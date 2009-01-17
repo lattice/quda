@@ -42,10 +42,10 @@ gamma1 = complexify([
 ])
 
 gamma2 = complexify([
-    0, 0, 0, -1,
-    0, 0, 1,  0,
-    0, 1, 0,  0,
-    -1, 0, 0,  0
+    0, 0, 0, 1,
+    0, 0, -1,  0,
+    0, -1, 0,  0,
+    1, 0, 0,  0
 ])
 
 gamma3 = complexify([
@@ -56,11 +56,17 @@ gamma3 = complexify([
 ])
 
 gamma4 = complexify([
-    0, 0, 1, 0,
-    0, 0, 0, 1,
     1, 0, 0, 0,
-    0, 1, 0, 0
+    0, 1, 0, 0,
+    0, 0, -1, 0,
+    0, 0, 0, -1
 ])
+#gamma4 = complexify([
+#    0, 0, 1, 0,
+#    0, 0, 0, 1,
+#    1, 0, 0, 0,
+#    0, 1, 0, 0
+#])
 
 
 def gplus(g1, g2):
@@ -98,6 +104,8 @@ def block(code):
 def sign(x):
     if x==1: return "+"
     elif x==-1: return "-"
+    elif x==+2: return "+2*"
+    elif x==-2: return "-2*"
 
 def nthFloat4(n):
     return `(n/4)` + "." + ["x", "y", "z", "w"][n%4]
@@ -139,7 +147,12 @@ def prolog():
             str.append("#define "+g_re(1,m,n)+" (+"+g_re(0,n,m)+")\n")
             str.append("#define "+g_im(1,m,n)+" (-"+g_im(0,n,m)+")\n")
     str.append("\n")
-    
+
+    # last two components of the 5th float4 used for temp storage
+    str.append("#define A_re G"+nthFloat4(18)+"\n")
+    str.append("#define A_im G"+nthFloat4(19)+"\n")    
+
+    str.append("\n")
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -155,33 +168,9 @@ def prolog():
     
     str.append(
 """
-// Performs the complex conjugated accumulation: a += b* c*
-#define ACC_CONJ_PROD(a, b, c) \\
-    a##_re += b##_re * c##_re - b##_im * c##_im, \\
-    a##_im -= b##_re * c##_im + b##_im * c##_re
 
-#define READ_GAUGE_MATRIX(gauge, dir) \\
-    float4 G0 = tex1Dfetch((gauge), ga_idx + ((dir/2)*3+0)*Nh); \\
-    float4 G1 = tex1Dfetch((gauge), ga_idx + ((dir/2)*3+1)*Nh); \\
-    float4 G2 = tex1Dfetch((gauge), ga_idx + ((dir/2)*3+2)*Nh); \\
-    float4 G3 = make_float4(0,0,0,0); \\
-    float4 G4 = make_float4(0,0,0,0); \\
-    ACC_CONJ_PROD(g20, +g01, +g12); \\
-    ACC_CONJ_PROD(g20, -g02, +g11); \\
-    ACC_CONJ_PROD(g21, +g02, +g10); \\
-    ACC_CONJ_PROD(g21, -g00, +g12); \\
-    ACC_CONJ_PROD(g22, +g00, +g11); \\
-    ACC_CONJ_PROD(g22, -g01, +g10); \\
-    float u0 = (dir < 6 ? SPATIAL_SCALING : (ga_idx >= (L4-1)*L1h*L2*L3 ? TIME_SYMMETRY : 1)); \\
-    G3.x*=u0; G3.y*=u0; G3.z*=u0; G3.w*=u0; G4.x*=u0; G4.y*=u0;
-
-#define READ_SPINOR(spinor) \\
-    float4 I0 = tex1Dfetch((spinor), sp_idx + 0*Nh); \\
-    float4 I1 = tex1Dfetch((spinor), sp_idx + 1*Nh); \\
-    float4 I2 = tex1Dfetch((spinor), sp_idx + 2*Nh); \\
-    float4 I3 = tex1Dfetch((spinor), sp_idx + 3*Nh); \\
-    float4 I4 = tex1Dfetch((spinor), sp_idx + 4*Nh); \\
-    float4 I5 = tex1Dfetch((spinor), sp_idx + 5*Nh);
+#include "read_gauge.h"
+#include "io_spinor.h"
 
 int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
 int boundaryCrossings = sid/L1h + sid/(L2*L1h) + sid/(L3*L2*L1h);
@@ -228,51 +217,8 @@ def epilog():
     
     str.append(
 """
-#ifdef WRITE_FLOAT4
-// this code exhibits a hardware bug in our C870 card
-g_out[0*Nh+sid] = make_float4(o00_re, o00_im, o01_re, o01_im);
-g_out[1*Nh+sid] = make_float4(o02_re, o02_im, o10_re, o10_im);
-g_out[2*Nh+sid] = make_float4(o11_re, o11_im, o12_re, o12_im);
-g_out[3*Nh+sid] = make_float4(o20_re, o20_im, o21_re, o21_im);
-g_out[4*Nh+sid] = make_float4(o22_re, o22_im, o30_re, o30_im);
-g_out[5*Nh+sid] = make_float4(o31_re, o31_im, o32_re, o32_im);
-#endif
-
-#ifdef WRITE_FLOAT1_SMEM
-int t = threadIdx.x;
-int B = BLOCK_DIM;
-int b = blockIdx.x;
-int f = SHARED_FLOATS_PER_THREAD;
-__syncthreads();
-for (int i = 0; i < 6; i++) // spinor indices
-    for (int c = 0; c < 4; c++) // components of float4
-        ((float*)g_out)[i*(Nh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
-#endif
-
-#ifdef WRITE_FLOAT1_STAGGERED
-// the alternative to writing float4's directly: almost as fast, a lot more confusing
-int t = threadIdx.x;
-int B = BLOCK_DIM;
-int b = blockIdx.x;
-int f = SHARED_FLOATS_PER_THREAD;
-__syncthreads();
-for (int i = 0; i < 4; i++) // spinor indices
-    for (int c = 0; c < 4; c++) // components of float4
-        ((float*)g_out)[i*(Nh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
-__syncthreads();
-s[0] = o22_re;
-s[1] = o22_im;
-s[2] = o30_re;
-s[3] = o30_im;
-s[4] = o31_re;
-s[5] = o31_im;
-s[6] = o32_re;
-s[7] = o32_im;
-__syncthreads();
-for (int i = 0; i < 2; i++)
-    for (int c = 0; c < 4; c++)
-        ((float*)g_out)[(i+4)*(Nh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
-#endif
+    // write spinor field back to device memory
+    WRITE_SPINOR();
 
 """)
     return ''.join(str)
@@ -315,9 +261,31 @@ def gen(dir):
     ga_idx = "sid" if dir % 2 == 0 else "sp_idx"
     str.append("int ga_idx = "+ga_idx+";\n\n")
     
+    # scan the projector to determine which loads are required
+    row_cnt = ([0,0,0,0])
+    for h in range(0,4):
+        for s in range(0,4):
+            re = proj(h,s).real
+            im = proj(h,s).imag
+            if re != 0 or im != 0:
+                row_cnt[h] += 1
+    row_cnt[0] += row_cnt[1]
+    row_cnt[2] += row_cnt[3]
+
+    load_spinor = []
+    load_spinor.append("// read spinor from device memory\n")
+    if row_cnt[0] == 0:
+        load_spinor.append("READ_SPINOR_DOWN(spinorTex);\n\n")
+    elif row_cnt[2] == 0:
+        load_spinor.append("READ_SPINOR_UP(spinorTex);\n\n")
+    else:
+        load_spinor.append("READ_SPINOR(spinorTex);\n\n")
+
+    load_gauge = []
+    load_gauge.append("// read gauge matrix from device memory\n")
+    load_gauge.append("READ_GAUGE_MATRIX(GAUGE"+`dir%2`+"TEX, "+`dir`+");\n\n")
+
     project = []
-    project.append("// read spinor from device memory\n")
-    project.append("READ_SPINOR(spinorTex);\n\n")
     project.append("// project spinor into half spinors\n")
     for h in range(0, 2):
         for c in range(0, 3):
@@ -333,6 +301,18 @@ def gen(dir):
                 elif re==0:
                     strRe.append(sign(-im)+in_im(s,c))
                     strIm.append(sign(im)+in_re(s,c))
+            if row_cnt[0] == 0: #projector defined on lower half only
+                for s in range(0, 4):
+                    re = proj(h+2,s).real
+                    im = proj(h+2,s).imag
+                    if re==0 and im==0: ()
+                    elif im==0:
+                        strRe.append(sign(re)+in_re(s,c))
+                        strIm.append(sign(re)+in_im(s,c))
+                    elif re==0:
+                        strRe.append(sign(-im)+in_im(s,c))
+                        strIm.append(sign(im)+in_re(s,c))
+                
             project.append("float "+h1_re(h,c)+ " = "+''.join(strRe)+";\n")
             project.append("float "+h1_im(h,c)+ " = "+''.join(strIm)+";\n")
         project.append("\n")
@@ -346,8 +326,6 @@ def gen(dir):
     ident.append("\n")
     
     mult = []
-    mult.append("// read gauge matrix from device memory\n")
-    mult.append("READ_GAUGE_MATRIX(gauge"+`dir%2`+"Tex, "+`dir`+");\n\n")
     for m in range(0,3):
         mult.append("// multiply row "+`m`+"\n")
         for h in range(0,2):
@@ -362,16 +340,21 @@ def gen(dir):
     
     reconstruct = []
     for m in range(0,3):
-        reconstruct.append(out_re(0, m) + " += " + h2_re(0,m) + ";\n")
-        reconstruct.append(out_im(0, m) + " += " + h2_im(0,m) + ";\n")
-        reconstruct.append(out_re(1, m) + " += " + h2_re(1,m) + ";\n")
-        reconstruct.append(out_im(1, m) + " += " + h2_im(1,m) + ";\n")
+
+        for h in range(0,2):
+            h_out = h
+            if row_cnt[0] == 0: # projector defined on lower half only
+                h_out = h+2
+            reconstruct.append(out_re(h_out, m) + " += " + h2_re(h,m) + ";\n")
+            reconstruct.append(out_im(h_out, m) + " += " + h2_im(h,m) + ";\n")
     
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
             im = c.imag
-            if im == 0:
+            if im == 0 and re == 0:
+                ()
+            elif im == 0:
                 reconstruct.append(out_re(s, m) + " " + sign(re) + "= " + h2_re(h,m) + ";\n")
                 reconstruct.append(out_im(s, m) + " " + sign(re) + "= " + h2_im(h,m) + ";\n")
             elif re == 0:
@@ -381,12 +364,12 @@ def gen(dir):
         reconstruct.append("\n")
         
     if dir >= 6:
-        str.append("if (GAUGE_FIXED && ga_idx >= L1h*L2*L3) ")
-        str.append(block(''.join(project) + ''.join(ident) + ''.join(reconstruct)))
+        str.append("if (gauge_fixed && ga_idx < (L4-1)*L1h*L2*L3) ")
+        str.append(block(''.join(load_spinor) + ''.join(project) + ''.join(ident) + ''.join(reconstruct)))
         str.append("else ")
-        str.append(block(''.join(project) + ''.join(mult) + ''.join(reconstruct)))
+        str.append(block(''.join(load_gauge) + ''.join(load_spinor) + ''.join(project) + ''.join(mult) + ''.join(reconstruct)))
     else:
-        str.append(''.join(project) + ''.join(mult) + ''.join(reconstruct))
+        str.append(''.join(load_gauge) + ''.join(load_spinor) + ''.join(project) + ''.join(mult) + ''.join(reconstruct))
     
     return block(''.join(str))+"\n"
 # end def gen
@@ -396,6 +379,7 @@ def gen(dir):
 def generate():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + epilog()
 
-# dagger = False
-dagger = True
+dagger = False
+#dagger = True
+
 print generate()
