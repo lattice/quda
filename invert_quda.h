@@ -16,15 +16,15 @@ extern "C" {
 
     float anisotropy;
 
-    GaugeFieldOrder gauge_order;
+    QudaGaugeFieldOrder gauge_order;
 
-    Precision cpu_prec;
-    Precision cuda_prec;
+    QudaPrecision cpu_prec;
+    QudaPrecision cuda_prec;
 
-    ReconstructType reconstruct;
-    GaugeFixed gauge_fix;
+    QudaReconstructType reconstruct;
+    QudaGaugeFixed gauge_fix;
 
-    Tboundary t_boundary;
+    QudaTboundary t_boundary;
 
     int packed_size;
     float gaugeGiB;
@@ -34,21 +34,21 @@ extern "C" {
   typedef struct QudaInvertParam_s {
     
     float kappa;  
-    MassNormalization mass_normalization;
+    QudaMassNormalization mass_normalization;
 
-    InverterType inv_type;
+    QudaInverterType inv_type;
     float tol;
     int iter;
     int maxiter;
 
-    MatPCType matpc_type;
-    SolutionType solution_type;
+    QudaMatPCType matpc_type;
+    QudaSolutionType solution_type;
 
-    PreserveSource preserve_source;
+    QudaPreserveSource preserve_source;
 
-    Precision cpu_prec;
-    Precision cuda_prec;
-    DiracFieldOrder dirac_order;
+    QudaPrecision cpu_prec;
+    QudaPrecision cuda_prec;
+    QudaDiracFieldOrder dirac_order;
 
     float spinorGiB;
     float gflops;

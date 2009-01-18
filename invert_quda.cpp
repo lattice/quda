@@ -3,8 +3,8 @@
 #include <math.h>
 #include <cuda_runtime.h>
 
-#include <quda.h>
 #include <invert_quda.h>
+#include <quda.h>
 #include <util_quda.h>
 #include <field_quda.h>
 
