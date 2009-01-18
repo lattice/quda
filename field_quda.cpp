@@ -41,6 +41,7 @@ void freeSpinorField(FullSpinor spinor) {
 
 void freeSpinorBuffer() {
   cudaFreeHost(packedSpinor);
+  packedSpinor = 0;
 }
 
 // Packing method taken from Bunk and Sommer
