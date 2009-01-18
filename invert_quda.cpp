@@ -162,7 +162,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
 
     if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) freeSpinorField(b);
 
-  } else if (perf->solution_type == QUDA_MATPC_SOLUTION) {
+  } else {
     retrieveParitySpinor(h_x, out, perf->cpu_prec, perf->cuda_prec, perf->dirac_order);
   }
 
