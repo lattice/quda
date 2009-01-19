@@ -56,11 +56,12 @@ extern "C" {
 
   } QudaInvertParam;
 
+  // Interface functions
   void initQuda(int dev);
-  void loadQuda(void *h_gauge, QudaGaugeParam *param);
+  void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+  void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
   void endQuda(void);
 
-  void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
 #ifdef __cplusplus
 }

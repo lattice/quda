@@ -8,15 +8,16 @@
 extern "C" {
 #endif
 
+  void allocateGaugeField();
   ParitySpinor allocateParitySpinor();
   FullSpinor allocateSpinorField();
   
-  void freeGaugeField(FullGauge gauge);
+  void freeGaugeField();
   void freeParitySpinor(ParitySpinor spinor);
   void freeSpinorField(FullSpinor spinor);
   void freeSpinorBuffer();
 
-  FullGauge loadGaugeField(void *gauge);
+  void loadGaugeField(void *gauge);
   
   void loadParitySpinor(ParitySpinor, void *spinor, Precision cpu_prec, Precision cuda_prec, 
 			DiracFieldOrder dirac_order);

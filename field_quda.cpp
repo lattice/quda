@@ -4,8 +4,27 @@
 #include <quda.h>
 #include <field_quda.h>
 
+// GPU gauge field
+FullGauge cudaGauge;
+
 // Pinned memory for cpu-gpu memory copying
 float4 *packedSpinor = 0;
+
+void allocateGaugeField(int packed_gauge_bytes) {
+  if (!cudaGauge.even) {
+    if (cudaMalloc((void **)&cudaGauge.even, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
+      printf("Error allocating even gauge field\n");
+      exit(0);
+    }
+  }
+   
+  if (!cudaGauge.odd) {
+    if (cudaMalloc((void **)&cudaGauge.odd, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
+      printf("Error allocating even odd gauge field\n");
+      exit(0);
+    }
+  }
+}
 
 ParitySpinor allocateParitySpinor() {
   ParitySpinor ret;
@@ -29,9 +48,11 @@ void freeParitySpinor(ParitySpinor spinor) {
   cudaFree(spinor);
 }
 
-void freeGaugeField(FullGauge gauge) {
-  cudaFree(gauge.even);
-  cudaFree(gauge.odd);
+void freeGaugeField() {
+  if (cudaGauge.even) cudaFree(cudaGauge.even);
+  if (cudaGauge.odd) cudaFree(cudaGauge.odd);
+  cudaGauge.even = 0;
+  cudaGauge.odd = 0;
 }
 
 void freeSpinorField(FullSpinor spinor) {
@@ -350,7 +371,7 @@ void packHalfCPSSingleGaugeField(short4 *res, float *gauge, int oddBit, Reconstr
 
 }
 
-FullGauge loadGaugeField(void *gauge) {
+void loadGaugeField(void *gauge) {
 
   setCudaGaugeParam();
 
@@ -380,31 +401,16 @@ FullGauge loadGaugeField(void *gauge) {
 
   gauge_param->packed_size = packed_gauge_bytes;
   packed_gauge_bytes *= 4*Nh*sizeof(float);
+  allocateGaugeField(packed_gauge_bytes);
 
   // 2 since even-odd
   gauge_param->gaugeGiB = (float)2*packed_gauge_bytes/ (1 << 30);
-
-  FullGauge ret;
-
-  if (cudaMalloc((void **)&ret.even, packed_gauge_bytes) == 
-      cudaErrorMemoryAllocation) {
-    printf("Error allocating even gauge field\n");
-    exit(0);
-  }   
-        
-  if (cudaMalloc((void **)&ret.odd, packed_gauge_bytes) ==
-      cudaErrorMemoryAllocation) {
-    printf("Error allocating even odd field\n");
-    exit(0);
-  }   
 
   if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
     // Use pinned memory
     float4 *packedEven, *packedOdd;
     cudaMallocHost((void**)&packedEven, packed_gauge_bytes);
     cudaMallocHost((void**)&packedOdd, packed_gauge_bytes);
-    //float4 *packedEven = (float4*) malloc(packed_gauge_bytes);
-    //float4 *packedOdd  = (float4*) malloc(packed_gauge_bytes);
     if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
       if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
 	packQDPDoubleGaugeField(packedEven, (double**)gauge, 0, gauge_param->reconstruct);
@@ -427,21 +433,17 @@ FullGauge loadGaugeField(void *gauge) {
       exit(-1);
     }
 
-    cudaMemcpy(ret.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(ret.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
+    cudaMemcpy(cudaGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(cudaGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
 
     cudaFreeHost(packedEven);
     cudaFreeHost(packedOdd);
-    //free(packedEven);
-    //free(packedOdd);
 
   } else {
     // Use pinned memory
     short4 *packedEven, *packedOdd;
     cudaMallocHost((void**)&packedEven, packed_gauge_bytes);
     cudaMallocHost((void**)&packedOdd, packed_gauge_bytes);
-    //short4 *packedEven = (short4*) malloc(packed_gauge_bytes);
-    //short4 *packedOdd  = (short4*) malloc(packed_gauge_bytes);
     if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
       if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
 	packHalfQDPDoubleGaugeField(packedEven, (double**)gauge, 0, gauge_param->reconstruct);
@@ -463,16 +465,13 @@ FullGauge loadGaugeField(void *gauge) {
       exit(-1);
     }
 
-    cudaMemcpy(ret.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(ret.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
+    cudaMemcpy(cudaGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(cudaGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
 
     cudaFreeHost(packedEven);
     cudaFreeHost(packedOdd);
-    //free(packedEven);
-    //free(packedOdd);
   }
 
-  return ret;
 }
 
 

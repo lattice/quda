@@ -8,8 +8,6 @@
 #include <util_quda.h>
 #include <field_quda.h>
 
-FullGauge gauge;
-
 void initQuda(int dev)
 {
   int deviceCount;
@@ -39,18 +37,21 @@ void initQuda(int dev)
 
   fprintf(stderr, "Using device %d: %s\n", dev, deviceProp.name);
   cudaSetDevice(dev);
+
+  cudaGauge.even = 0;
+  cudaGauge.odd = 0;
 }
 
-void loadQuda(void *h_gauge, QudaGaugeParam *param)
+void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   gauge_param = param;
-  gauge = loadGaugeField(h_gauge);
+  loadGaugeField(h_gauge);
 }
 
 void endQuda()
 {
   freeSpinorBuffer();
-  freeGaugeField(gauge);
+  freeGaugeField();
 }
 
 void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
@@ -107,9 +108,9 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
     }
 
     if (perf->matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashXpayCuda(in, gauge, b.odd, 0, 0, b.even, kappa);
+      dslashXpayCuda(in, cudaGauge, b.odd, 0, 0, b.even, kappa);
     } else {
-      dslashXpayCuda(in, gauge, b.even, 1, 0, b.odd, kappa);
+      dslashXpayCuda(in, cudaGauge, b.even, 1, 0, b.odd, kappa);
     }
 
   } else if (perf->solution_type == QUDA_MATPC_SOLUTION || 
@@ -128,16 +129,16 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
   case QUDA_CG_INVERTER:
     if (perf->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda((float *)out, (float *)in, slenh);
-      MatPCDagCuda(in, gauge, out, kappa, tmp, perf->matpc_type);
+      MatPCDagCuda(in, cudaGauge, out, kappa, tmp, perf->matpc_type);
     }
-    invertCgCuda(out, in, gauge, tmp, perf);
+    invertCgCuda(out, in, cudaGauge, tmp, perf);
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (perf->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(out, in, gauge, tmp, perf, QUDA_DAG_YES);
+      invertBiCGstabCuda(out, in, cudaGauge, tmp, perf, QUDA_DAG_YES);
       copyCuda((float *)in, (float *)out, slenh);
     }
-    invertBiCGstabCuda(out, in, gauge, tmp, perf, QUDA_DAG_NO);
+    invertBiCGstabCuda(out, in, cudaGauge, tmp, perf, QUDA_DAG_NO);
     break;
   default:
     printf("Inverter type %d not implemented\n", perf->inv_type);
@@ -153,9 +154,9 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
     }
 
     if (perf->matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashXpayCuda(x.odd, gauge, out, 1, 0, b.odd, kappa);
+      dslashXpayCuda(x.odd, cudaGauge, out, 1, 0, b.odd, kappa);
     } else {
-      dslashXpayCuda(x.even, gauge, out, 0, 0, b.even, kappa);
+      dslashXpayCuda(x.even, cudaGauge, out, 0, 0, b.even, kappa);
     }
 
     retrieveSpinorField(h_x, x, perf->cpu_prec, perf->cuda_prec, perf->dirac_order);

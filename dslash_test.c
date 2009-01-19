@@ -8,7 +8,6 @@
 #define FULL_WILSON 1
 
 QudaGaugeParam param;
-FullGauge cudaGauge;
 FullSpinor cudaSpinor;
 ParitySpinor tmp;
 
@@ -29,14 +28,17 @@ void printSpinorHalfField(float *spinor) {
 
 void init() {
 
+  cudaGauge.even = 0;
+  cudaGauge.odd = 0;
+
   param.cpu_prec = QUDA_SINGLE_PRECISION;
-  param.cuda_prec = QUDA_HALF_PRECISION;
+  param.cuda_prec = QUDA_SINGLE_PRECISION;
   param.X = L1;
   param.Y = L2;
   param.Z = L3;
   param.T = L4;
   param.anisotropy = 2.3;
-  param.reconstruct = QUDA_RECONSTRUCT_8;
+  param.reconstruct = QUDA_RECONSTRUCT_12;
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
@@ -61,7 +63,7 @@ void init() {
   cudaSetDevice(dev);
 
   printf("Sending fields to GPU..."); fflush(stdout);
-  cudaGauge = loadGaugeField(hostGauge);
+  loadGaugeField(hostGauge);
   cudaSpinor = allocateSpinorField();
   tmp = allocateParitySpinor();
 
@@ -143,7 +145,7 @@ void dslashTest() {
     printf("GFLOPS = %f\n", 1.0e-9*flops*Nh/secs);
     printf("GiB/s = %f\n\n", Nh*floats*sizeof(float)/(secs*(1<<30)));
     
-    int res = compareFloats(spinorOdd, spinorRef, Nh*4*3*2, 1e-1);
+    int res = compareFloats(spinorOdd, spinorRef, Nh*4*3*2, 1e-4);
     printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
   }  
 

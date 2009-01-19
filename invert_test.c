@@ -5,8 +5,10 @@
 #include <quda.h>
 #include <util_quda.h>
 
-int main()
+int main(int argc, char **argv)
 {
+  int device = 1;
+
   float *gauge[4];
 
   QudaGaugeParam Gauge_param;
@@ -14,6 +16,7 @@ int main()
 
   Gauge_param.cpu_prec = QUDA_SINGLE_PRECISION;
   Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   Gauge_param.X = L1;
   Gauge_param.Y = L2;
   Gauge_param.Z = L3;
@@ -27,16 +30,16 @@ int main()
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param = &Gauge_param;
   
-  float mass = -0.95;
+  float mass = -0.4;
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 1e-7;
-  inv_param.maxiter = 500;
+  inv_param.maxiter = 5000;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   for (int dir = 0; dir < 4; dir++) {
@@ -60,8 +63,8 @@ int main()
 
   double time0 = -((double)clock()); // Start the timer
 
-  initQuda(1);
-  loadQuda((void*)gauge, &Gauge_param);
+  initQuda(device);
+  loadGaugeQuda((void*)gauge, &Gauge_param);
 
   invertQuda(spinorOut, spinorIn, &inv_param);
 

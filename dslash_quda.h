@@ -23,7 +23,8 @@
 extern "C" {
 #endif
 
-extern QudaGaugeParam *gauge_param;
+  extern FullGauge cudaGauge;
+  extern QudaGaugeParam *gauge_param;
 
 // ---------- dslash_quda.cu ----------
 
