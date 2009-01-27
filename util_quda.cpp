@@ -319,8 +319,6 @@ void applyGaugeFieldScaling(float **gauge) {
     }
   }
     
-  printf("%d Boundary %d\n", gaugeSiteSize, gauge_param->t_boundary);
-
   // Apply boundary conditions to temporal links
   if (gauge_param->t_boundary == QUDA_ANTI_PERIODIC_T) {
     for (int j = L1h*L2*L3*(L4-1); j < Nh; j++) {
