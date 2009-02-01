@@ -62,6 +62,8 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
   void endQuda(void);
 
+  void printGaugeParam(QudaGaugeParam *);
+  void printInvertParam(QudaInvertParam *);
 
 #ifdef __cplusplus
 }

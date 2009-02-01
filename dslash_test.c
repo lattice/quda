@@ -5,7 +5,7 @@
 #include <util_quda.h>
 #include <field_quda.h>
 
-#define FULL_WILSON 1
+#define FULL_WILSON 0
 
 QudaGaugeParam param;
 FullSpinor cudaSpinor;

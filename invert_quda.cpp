@@ -8,6 +8,42 @@
 #include <util_quda.h>
 #include <field_quda.h>
 
+void printGaugeParam(QudaGaugeParam *param) {
+
+  printf("Gauge Params:\n");
+  printf("X = %d\n", param->X);
+  printf("Y = %d\n", param->Y);
+  printf("Z = %d\n", param->Z);
+  printf("T = %d\n", param->T);
+  printf("anisotropy = %e\n", param->anisotropy);
+  printf("gauge_order = %d\n", param->gauge_order);
+  printf("cpu_prec = %d\n", param->cpu_prec);
+  printf("cuda_prec = %d\n", param->cuda_prec);
+  printf("reconstruct = %d\n", param->reconstruct);
+  printf("gauge_fix = %d\n", param->gauge_fix);
+  printf("t_boundary = %d\n", param->t_boundary);
+  printf("packed_size = %d\n", param->packed_size);
+  printf("gaugeGiB = %e\n", param->gaugeGiB);
+}
+
+void printInvertParam(QudaInvertParam *param) {
+  printf("kappa = %e\n", param->kappa);
+  printf("mass_normalization = %d\n", param->mass_normalization);
+  printf("inv_type = %d\n", param->inv_type);
+  printf("tol = %e\n", param->tol);
+  printf("iter = %d\n", param->iter);
+  printf("maxiter = %d\n", param->maxiter);
+  printf("matpc_type = %d\n", param->matpc_type);
+  printf("solution_type = %d\n", param->solution_type);
+  printf("preserve_source = %d\n", param->preserve_source);
+  printf("cpu_prec = %d\n", param->cpu_prec);
+  printf("cuda_prec = %d\n", param->cuda_prec);
+  printf("dirac_order = %d\n", param->dirac_order);
+  printf("spinorGiB = %e\n", param->spinorGiB);
+  printf("gflops = %e\n", param->gflops);
+  printf("secs = %f\n", param->secs);
+}
+
 void initQuda(int dev)
 {
   int deviceCount;

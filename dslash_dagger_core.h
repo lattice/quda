@@ -851,4 +851,22 @@ o32_re = o32_im = 0;
     // write spinor field back to device memory
     WRITE_SPINOR();
 
-
+#undef o00_re
+#undef o00_im
+#undef o01_re
+#undef o01_im
+#undef o02_re
+#undef o02_im
+#undef o10_re
+#undef o10_im
+#undef o11_re
+#undef o11_im
+#undef o12_re
+#undef o12_im
+#undef o20_re
+#undef o20_im
+#undef o21_re
+#undef o21_im
+#undef o22_re
+#undef o22_im
+#undef o30_re

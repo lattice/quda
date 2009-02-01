@@ -69,7 +69,7 @@
 #define A_re G4.z
 #define A_im G4.w
 
-#define o00_re s[0]
+/*#define o00_re s[0]
 #define o00_im s[1]
 #define o01_re s[2]
 #define o01_im s[3]
@@ -87,13 +87,31 @@
 #define o21_im s[15]
 #define o22_re s[16]
 #define o22_im s[17]
-#define o30_re s[18]
+#define o30_re s[18]*/
+volatile float o00_re;
+volatile float o00_im;
+volatile float o01_re;
+volatile float o01_im;
+volatile float o02_re;
+volatile float o02_im;
+volatile float o10_re;
+volatile float o10_im;
+volatile float o11_re;
+volatile float o11_im;
+volatile float o12_re;
+volatile float o12_im;
+volatile float o20_re;
+volatile float o20_im;
+volatile float o21_re;
+volatile float o21_im;
+volatile float o22_re;
+volatile float o22_im;
+volatile float o30_re;
 volatile float o30_im;
 volatile float o31_re;
 volatile float o31_im;
 volatile float o32_re;
 volatile float o32_im;
-
 
 
 #include "read_gauge.h"
@@ -107,8 +125,8 @@ int x3 = (X/(L2*L1)) % L3;
 int x2 = (X/L1) % L2;
 int x1 = X % L1;
 
-extern __shared__ float s_data[];
-volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;
+//extern __shared__ float s_data[];
+//volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;
 
 o00_re = o00_im = 0;
 o01_re = o01_im = 0;
