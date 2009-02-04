@@ -7,7 +7,7 @@
 
 int main(int argc, char **argv)
 {
-  int device = 1;
+  int device = 0;
 
   float *gauge[4];
 
@@ -15,7 +15,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param;
 
   Gauge_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  Gauge_param.cuda_prec = QUDA_HALF_PRECISION;
   Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   Gauge_param.X = L1;
   Gauge_param.Y = L2;
@@ -24,19 +24,19 @@ int main(int argc, char **argv)
   Gauge_param.anisotropy = 1.0;
 
   Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  inv_param.inv_type = QUDA_CG_INVERTER;
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
   Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param = &Gauge_param;
   
-  float mass = -0.4;
+  float mass = -0.9;
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 1e-7;
   inv_param.maxiter = 5000;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_HALF_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;

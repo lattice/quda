@@ -90,15 +90,16 @@ void endQuda()
   freeGaugeField();
 }
 
-void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
+void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 {
+  invert_param = param;
 
-  if (perf->cuda_prec != QUDA_SINGLE_PRECISION) {
-    printf("Sorry, only single precision supported\n");
+  if (param->cuda_prec == QUDA_DOUBLE_PRECISION) {
+    printf("Sorry, only double precision not yet supported\n");
     exit(-1);
   }
 
-  if (perf->cpu_prec == QUDA_HALF_PRECISION) {
+  if (param->cpu_prec == QUDA_HALF_PRECISION) {
     printf("Half precision not supported on cpu\n");
     exit(-1);
   }
@@ -106,25 +107,25 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
   int slenh = Nh*spinorSiteSize;
 
   float spinorGiB = (float)slenh*sizeof(float) / (1 << 30);
-  if (perf->preserve_source == QUDA_PRESERVE_SOURCE_NO)
-    spinorGiB *= (perf->inv_type == QUDA_CG_INVERTER ? 5 : 7);
+  if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO)
+    spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 5 : 7);
   else
-    spinorGiB *= (perf->inv_type == QUDA_CG_INVERTER ? 8 : 9);
-  perf->spinorGiB = spinorGiB;
+    spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 8 : 9);
+  param->spinorGiB = spinorGiB;
 
-  perf->secs = 0;
-  perf->gflops = 0;
-  perf->iter = 0;
+  param->secs = 0;
+  param->gflops = 0;
+  param->iter = 0;
 
-  float kappa = perf->kappa;
+  float kappa = param->kappa;
 
   FullSpinor b, x;
   ParitySpinor in = allocateParitySpinor(); // source vector
   ParitySpinor out = allocateParitySpinor(); // solution vector
   ParitySpinor tmp = allocateParitySpinor(); // temporary used when applying operator
 
-  if (perf->solution_type == QUDA_MAT_SOLUTION) {
-    if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
+  if (param->solution_type == QUDA_MAT_SOLUTION) {
+    if (param->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
       b.even = allocateParitySpinor();
       b.odd = allocateParitySpinor();
     } else {
@@ -132,75 +133,75 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *perf)
       b.odd = tmp;
     }
 
-    if (perf->matpc_type == QUDA_MATPC_EVEN_EVEN) { x.odd = tmp; x.even = out; }
+    if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) { x.odd = tmp; x.even = out; }
     else { x.even = tmp; x.odd = out; }
 
-    loadSpinorField(b, h_b, perf->cpu_prec, perf->cuda_prec, perf->dirac_order);
+    loadSpinorField(b, h_b, param->cpu_prec, param->cuda_prec, param->dirac_order);
 
     // multiply the source to get the mass normalization
-    if (perf->mass_normalization == QUDA_MASS_NORMALIZATION) {
+    if (param->mass_normalization == QUDA_MASS_NORMALIZATION) {
       axCuda(2*kappa, (float *)b.even, slenh);
       axCuda(2*kappa, (float *)b.odd, slenh);
     }
 
-    if (perf->matpc_type == QUDA_MATPC_EVEN_EVEN) {
+    if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashXpayCuda(in, cudaGauge, b.odd, 0, 0, b.even, kappa);
     } else {
       dslashXpayCuda(in, cudaGauge, b.even, 1, 0, b.odd, kappa);
     }
 
-  } else if (perf->solution_type == QUDA_MATPC_SOLUTION || 
-	     perf->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION){
-    loadParitySpinor(in, h_b, perf->cpu_prec, perf->cuda_prec, perf->dirac_order);
+  } else if (param->solution_type == QUDA_MATPC_SOLUTION || 
+	     param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION){
+    loadParitySpinor(in, h_b, param->cpu_prec, param->cuda_prec, param->dirac_order);
 
     // multiply the source to get the mass normalization
-    if (perf->mass_normalization == QUDA_MASS_NORMALIZATION)
-      if (perf->solution_type == QUDA_MATPC_SOLUTION) 
+    if (param->mass_normalization == QUDA_MASS_NORMALIZATION)
+      if (param->solution_type == QUDA_MATPC_SOLUTION) 
 	axCuda(4*kappa*kappa, (float *)in, slenh);
       else
 	axCuda(16*pow(kappa,4), (float *)in, slenh);
   }
 
-  switch (perf->inv_type) {
+  switch (param->inv_type) {
   case QUDA_CG_INVERTER:
-    if (perf->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
+    if (param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda((float *)out, (float *)in, slenh);
-      MatPCDagCuda(in, cudaGauge, out, kappa, tmp, perf->matpc_type);
+      MatPCDagCuda(in, cudaGauge, out, kappa, tmp, param->matpc_type);
     }
-    invertCgCuda(out, in, cudaGauge, tmp, perf);
+    invertCgCuda(out, in, cudaGauge, tmp, param);
     break;
   case QUDA_BICGSTAB_INVERTER:
-    if (perf->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(out, in, cudaGauge, tmp, perf, QUDA_DAG_YES);
+    if (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      invertBiCGstabCuda(out, in, cudaGauge, tmp, param, QUDA_DAG_YES);
       copyCuda((float *)in, (float *)out, slenh);
     }
-    invertBiCGstabCuda(out, in, cudaGauge, tmp, perf, QUDA_DAG_NO);
+    invertBiCGstabCuda(out, in, cudaGauge, tmp, param, QUDA_DAG_NO);
     break;
   default:
-    printf("Inverter type %d not implemented\n", perf->inv_type);
+    printf("Inverter type %d not implemented\n", param->inv_type);
     exit(-1);
   }
 
-  if (perf->solution_type == QUDA_MAT_SOLUTION) {
+  if (param->solution_type == QUDA_MAT_SOLUTION) {
 
-    if (perf->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+    if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
       // qdp dirac fields are even-odd ordered
       b.even = in;
-      loadSpinorField(b, h_b, perf->cpu_prec, perf->cuda_prec, perf->dirac_order);
+      loadSpinorField(b, h_b, param->cpu_prec, param->cuda_prec, param->dirac_order);
     }
 
-    if (perf->matpc_type == QUDA_MATPC_EVEN_EVEN) {
+    if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashXpayCuda(x.odd, cudaGauge, out, 1, 0, b.odd, kappa);
     } else {
       dslashXpayCuda(x.even, cudaGauge, out, 0, 0, b.even, kappa);
     }
 
-    retrieveSpinorField(h_x, x, perf->cpu_prec, perf->cuda_prec, perf->dirac_order);
+    retrieveSpinorField(h_x, x, param->cpu_prec, param->cuda_prec, param->dirac_order);
 
-    if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) freeSpinorField(b);
+    if (param->preserve_source == QUDA_PRESERVE_SOURCE_YES) freeSpinorField(b);
 
   } else {
-    retrieveParitySpinor(h_x, out, perf->cpu_prec, perf->cuda_prec, perf->dirac_order);
+    retrieveParitySpinor(h_x, out, param->cpu_prec, param->cuda_prec, param->dirac_order);
   }
 
   freeParitySpinor(tmp);

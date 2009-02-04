@@ -137,7 +137,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE0TEX, 0);
     
     // read spinor from device memory
-    READ_SPINOR(spinorTex);
+    READ_SPINOR(SPINORTEX);
     
     // project spinor into half spinors
     float a0_re = +i00_re-i30_im;
@@ -215,7 +215,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE1TEX, 1);
     
     // read spinor from device memory
-    READ_SPINOR(spinorTex);
+    READ_SPINOR(SPINORTEX);
     
     // project spinor into half spinors
     float a0_re = +i00_re+i30_im;
@@ -293,7 +293,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE0TEX, 2);
     
     // read spinor from device memory
-    READ_SPINOR(spinorTex);
+    READ_SPINOR(SPINORTEX);
     
     // project spinor into half spinors
     float a0_re = +i00_re+i30_re;
@@ -371,7 +371,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE1TEX, 3);
     
     // read spinor from device memory
-    READ_SPINOR(spinorTex);
+    READ_SPINOR(SPINORTEX);
     
     // project spinor into half spinors
     float a0_re = +i00_re-i30_re;
@@ -449,7 +449,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE0TEX, 4);
     
     // read spinor from device memory
-    READ_SPINOR(spinorTex);
+    READ_SPINOR(SPINORTEX);
     
     // project spinor into half spinors
     float a0_re = +i00_re-i20_im;
@@ -527,7 +527,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE1TEX, 5);
     
     // read spinor from device memory
-    READ_SPINOR(spinorTex);
+    READ_SPINOR(SPINORTEX);
     
     // project spinor into half spinors
     float a0_re = +i00_re+i20_im;
@@ -603,7 +603,7 @@ o32_re = o32_im = 0;
     
     if (gauge_fixed && ga_idx < (L4-1)*L1h*L2*L3) {
         // read spinor from device memory
-        READ_SPINOR_UP(spinorTex);
+        READ_SPINOR_UP(SPINORTEX);
         
         // project spinor into half spinors
         float a0_re = +2*i00_re;
@@ -649,7 +649,7 @@ o32_re = o32_im = 0;
         READ_GAUGE_MATRIX(GAUGE0TEX, 6);
         
         // read spinor from device memory
-        READ_SPINOR_UP(spinorTex);
+        READ_SPINOR_UP(SPINORTEX);
         
         // project spinor into half spinors
         float a0_re = +2*i00_re;
@@ -714,7 +714,7 @@ o32_re = o32_im = 0;
     
     if (gauge_fixed && ga_idx < (L4-1)*L1h*L2*L3) {
         // read spinor from device memory
-        READ_SPINOR_DOWN(spinorTex);
+        READ_SPINOR_DOWN(SPINORTEX);
         
         // project spinor into half spinors
         float a0_re = +2*i20_re;
@@ -760,7 +760,7 @@ o32_re = o32_im = 0;
         READ_GAUGE_MATRIX(GAUGE1TEX, 7);
         
         // read spinor from device memory
-        READ_SPINOR_DOWN(spinorTex);
+        READ_SPINOR_DOWN(SPINORTEX);
         
         // project spinor into half spinors
         float a0_re = +2*i20_re;

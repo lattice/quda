@@ -3,14 +3,16 @@
 
 #include <cuda_runtime.h>
 
-#define L1 4 // "x" dimension
-#define L2 4 // "y" dimension
-#define L3 4 // "z" dimension
-#define L4 4 // "time" dimension
+#define L1 24 // "x" dimension
+#define L2 24 // "y" dimension
+#define L3 24 // "z" dimension
+#define L4 32 // "time" dimension
 #define L1h (L1/2) // half of the full "x" dimension, useful for even/odd lattice indexing
 
 #define N (L1*L2*L3*L4) // total number of lattice points
 #define Nh (N/2) // total number of even/odd lattice points
+
+#define MAX_SHORT 32767
 
 // The Quda is added to avoid collisions with other libs
 #define GaugeFieldOrder QudaGaugeFieldOrder

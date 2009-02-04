@@ -5,9 +5,10 @@
 #include <util_quda.h>
 #include <field_quda.h>
 
-#define FULL_WILSON 0
+#define FULL_WILSON 1
 
 QudaGaugeParam param;
+QudaInvertParam inv_param;
 FullSpinor cudaSpinor;
 ParitySpinor tmp;
 
@@ -44,6 +45,11 @@ void init() {
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param = &param;
 
+  inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  invert_param = &inv_param;
+
   // construct input fields
   for (int dir = 0; dir < 4; dir++) {
     hostGauge[dir] = (float*)malloc(N*gaugeSiteSize*sizeof(float));
@@ -57,6 +63,23 @@ void init() {
   printf("Randomizing fields...");
   constructGaugeField(hostGauge);
   constructSpinorField(spinor);
+
+  /*{
+    float *spinor2 = (float*)malloc(N*spinorSiteSize*sizeof(float));
+    short *spinorHalf = (short*)malloc(Nh*spinorSiteSize*sizeof(short));
+    float *spinorNorm = (float*)malloc(Nh*sizeof(float));
+    spinorHalfPack(spinorNorm, spinorHalf, spinor);
+    spinorHalfUnpack(spinor2, spinorNorm, spinorHalf);
+    free(spinor2);
+    free(spinorNorm);
+    free(spinorHalf);
+
+    for (int i=0; i<24*Nh; i++) {
+      printf("%e %e %e\n", spinor[i], spinor2[i], fabs(spinor[i]-spinor2[i]));
+    }
+    //exit(0);
+    }*/
+
   printf("done.\n"); fflush(stdout);
   
   int dev = 0;
@@ -67,8 +90,8 @@ void init() {
   cudaSpinor = allocateSpinorField();
   tmp = allocateParitySpinor();
 
-  loadSpinorField(cudaSpinor, (void*)spinor, QUDA_SINGLE_PRECISION, 
-		  QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+  loadSpinorField(cudaSpinor, (void*)spinor, inv_param.cpu_prec, 
+		  inv_param.cuda_prec, inv_param.dirac_order);
 }
 
 void end() {
@@ -120,45 +143,7 @@ double dslashCUDA() {
   return secs;
 }
 
-void dslashTest() {
-
-  init();
-
-  float spinorGiB = (float)Nh*spinorSiteSize*sizeof(float) / (1 << 30);
-  float sharedKB = (float)dslashCudaSharedBytes() / (1 << 10);
-  printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
-  printf("Gauge mem: %.3f GiB\n", param.gaugeGiB);
-  printf("Shared mem: %.3f KB\n", sharedKB);
-
-  int attempts = 100;
-  dslashRef();
-  for (int i=0; i<attempts; i++) {
-    
-    double secs = dslashCUDA();
-    retrieveParitySpinor(spinorOdd, cudaSpinor.odd, QUDA_SINGLE_PRECISION, 
-			 QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
-    
-    // print timing information
-    printf("%fms per loop\n", 1000*secs);
-    int flops = FULL_WILSON ? 1320*2 + 48 : 1320;
-    int floats = FULL_WILSON ? 2*(7*24+8*param.packed_size+24)+24 : 7*24+8*param.packed_size+24;
-    printf("GFLOPS = %f\n", 1.0e-9*flops*Nh/secs);
-    printf("GiB/s = %f\n\n", Nh*floats*sizeof(float)/(secs*(1<<30)));
-    
-    int res = compareFloats(spinorOdd, spinorRef, Nh*4*3*2, 1e-4);
-    printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
-  }  
-
-  end();
-
-}
-
-int main(int argc, char **argv) {
-  dslashTest();
-}
-
-
-  /*
+void strongCheck() {
   printf("Reference:\n");
   printSpinorHalfField(spinorRef);
     
@@ -189,6 +174,48 @@ int main(int argc, char **argv) {
     printf("%e Failures: %d / %d  = %e\n", pow(10,-(f+1)), fail[f], Nh*24, fail[f] / (float)(Nh*24));
   }
 
-  if (stat != cudaSuccess)
-    printf("Cuda failed with ERROR: %s\n", cudaGetErrorString(stat));
-  */ 
+}
+
+
+void dslashTest() {
+
+  init();
+
+  float spinorGiB = (float)Nh*spinorSiteSize*sizeof(float) / (1 << 30);
+  float sharedKB = (float)dslashCudaSharedBytes() / (1 << 10);
+  printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
+  printf("Gauge mem: %.3f GiB\n", param.gaugeGiB);
+  printf("Shared mem: %.3f KB\n", sharedKB);
+
+  int attempts = 10000;
+  dslashRef();
+  for (int i=0; i<attempts; i++) {
+    
+    double secs = dslashCUDA();
+    retrieveParitySpinor(spinorOdd, cudaSpinor.odd, QUDA_SINGLE_PRECISION, 
+			 QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+    
+    // print timing information
+    printf("%fms per loop\n", 1000*secs);
+    int flops = FULL_WILSON ? 1320*2 + 48 : 1320;
+    int floats = FULL_WILSON ? 2*(7*24+8*param.packed_size+24)+24 : 7*24+8*param.packed_size+24;
+    printf("GFLOPS = %f\n", 1.0e-9*flops*Nh/secs);
+    printf("GiB/s = %f\n\n", Nh*floats*sizeof(float)/(secs*(1<<30)));
+    
+    int res = compareFloats(spinorOdd, spinorRef, Nh*4*3*2, 1e-4);
+    printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
+
+    strongCheck();
+
+    exit(0);
+  }  
+
+  end();
+
+}
+
+int main(int argc, char **argv) {
+  dslashTest();
+}
+
+

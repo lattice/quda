@@ -1,4 +1,4 @@
-#define READ_SPINOR(spinor)			     \
+#define READ_SPINOR_SINGLE(spinor)		     \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*Nh);   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*Nh);   \
   float4 I2 = tex1Dfetch((spinor), sp_idx + 2*Nh);   \
@@ -6,15 +6,48 @@
   float4 I4 = tex1Dfetch((spinor), sp_idx + 4*Nh);   \
   float4 I5 = tex1Dfetch((spinor), sp_idx + 5*Nh);
 
-#define READ_SPINOR_UP(spinor)			     \
+#define READ_SPINOR_SINGLE_UP(spinor)		     \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*Nh);   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*Nh);   \
   float4 I2 = tex1Dfetch((spinor), sp_idx + 2*Nh);   \
 
-#define READ_SPINOR_DOWN(spinor)		     \
+#define READ_SPINOR_SINGLE_DOWN(spinor)		     \
   float4 I3 = tex1Dfetch((spinor), sp_idx + 3*Nh);   \
   float4 I4 = tex1Dfetch((spinor), sp_idx + 4*Nh);   \
   float4 I5 = tex1Dfetch((spinor), sp_idx + 5*Nh);
+
+#define READ_SPINOR_HALF(spinor)		     \
+  float4 I0 = tex1Dfetch((spinor), sp_idx + 0*Nh);   \
+  float4 I1 = tex1Dfetch((spinor), sp_idx + 1*Nh);   \
+  float4 I2 = tex1Dfetch((spinor), sp_idx + 2*Nh);   \
+  float4 I3 = tex1Dfetch((spinor), sp_idx + 3*Nh);   \
+  float4 I4 = tex1Dfetch((spinor), sp_idx + 4*Nh);   \
+  float4 I5 = tex1Dfetch((spinor), sp_idx + 5*Nh);   \
+  float C = tex1Dfetch((spinorTexNorm), sp_idx);     \
+  I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;	     \
+  I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;	     \
+  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;        \
+  I3.x *= C; I3.y *= C;	I3.z *= C; I3.w *= C;	     \
+  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	     \
+  I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
+
+#define READ_SPINOR_HALF_UP(spinor)		     \
+  float4 I0 = tex1Dfetch((spinor), sp_idx + 0*Nh);   \
+  float4 I1 = tex1Dfetch((spinor), sp_idx + 1*Nh);   \
+  float4 I2 = tex1Dfetch((spinor), sp_idx + 2*Nh);   \
+  float C = tex1Dfetch((spinorTexNorm), sp_idx);     \
+  I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;	     \
+  I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;	     \
+  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;        \
+
+#define READ_SPINOR_HALF_DOWN(spinor)		     \
+  float4 I3 = tex1Dfetch((spinor), sp_idx + 3*Nh);   \
+  float4 I4 = tex1Dfetch((spinor), sp_idx + 4*Nh);   \
+  float4 I5 = tex1Dfetch((spinor), sp_idx + 5*Nh);   \
+  float C = tex1Dfetch((spinorTexNorm), sp_idx);     \
+  I3.x *= C; I3.y *= C;	I3.z *= C; I3.w *= C;	     \
+  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	     \
+  I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
 
 #define WRITE_SPINOR_FLOAT4()					 \
   g_out[0*Nh+sid] = make_float4(o00_re, o00_im, o01_re, o01_im); \
@@ -54,3 +87,5 @@
   __syncthreads(); \
   for (int i = 0; i < 2; i++) for (int c = 0; c < 4; c++) \
     ((float*)g_out)[(i+4)*(Nh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
+
+

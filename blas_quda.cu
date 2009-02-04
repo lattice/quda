@@ -19,6 +19,7 @@ void copyCuda(float* dst, float *src, int len) {
     cudaMemcpy(dst, src, len*sizeof(float), cudaMemcpyDeviceToDevice);
 }
 
+
 __global__ void axpbyKernel(float a, float *x, float b, float *y, int len) {
     unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
     unsigned int gridSize = gridDim.x*blockDim.x;

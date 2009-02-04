@@ -25,6 +25,10 @@ extern "C" {
 
   extern FullGauge cudaGauge;
   extern QudaGaugeParam *gauge_param;
+  extern QudaInvertParam *invert_param;
+
+  extern short4 *spinorHalf;
+  extern float *spinorNorm;
 
 // ---------- dslash_quda.cu ----------
 

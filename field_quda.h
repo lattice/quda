@@ -29,6 +29,10 @@ extern "C" {
   void retrieveSpinorField(void *res, FullSpinor spinor, Precision cpu_prec,  Precision cuda_prec, 
 			   DiracFieldOrder dirac_order);
   
+  void spinorHalfPack(float *c, short *s0, float *f0);
+  void spinorHalfUnpack(float *f0, float *c, short *s0);
+
+
 #ifdef __cplusplus
 }
 #endif
