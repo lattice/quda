@@ -6,16 +6,16 @@ INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include
 LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcublas
 
 CC = gcc
-CFLAGS = -Wall -O3 -std=c99 $(INCLUDES)
+CFLAGS = -Wall -O3 -std=c99 $(INCLUDES) #-D__DEVICE_EMULATION__
 CXX = g++
-CXXFLAGS = -Wall $(INCLUDES) -DUNIX -O3 
+CXXFLAGS = -Wall -O3 $(INCLUDES) -DUNIX #-D__DEVICE_EMULATION__
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = $(INCLUDES) -DUNIX -O3
+NVCCFLAGS = -O3 $(INCLUDES) -DUNIX #-arch=sm_13
 LDFLAGS = -fPIC $(LIB)
 CCOBJECTS = $(CCFILES:.cpp=.o)
 CUOBJECTS = $(CUFILES:.cu=.o)
 
-all: dslash_test invert_test su3_test
+all: dslash_test invert_test su3_test pack_test
 
 ILIB = libquda.a
 ILIB_OBJS = inv_bicgstab_quda.o inv_cg_quda.o dslash_quda.o blas_quda.o util_quda.o \
@@ -34,8 +34,11 @@ dslash_test: dslash_test.o $(ILIB)
 su3_test: su3_test.o $(ILIB)
 	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
 
+pack_test: pack_test.o $(ILIB)
+	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
+
 clean:
-	-rm -f *.o dslash_test invert_test su3_test $(ILIB)
+	-rm -f *.o dslash_test invert_test su3_test pack_test $(ILIB)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $< -c -o $@

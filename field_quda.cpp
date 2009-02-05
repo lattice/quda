@@ -419,23 +419,23 @@ void loadGaugeField(void *gauge) {
   setCudaGaugeParam();
 
   if (gauge_param->X != L1 || gauge_param->Y != L2 || gauge_param->Z != L3 || gauge_param->T != L4) {
-    printf("Spatial dimensions do not match: %d=%d, %d=%d, %d=%d, %d=%d\n", 
+    printf("QUDA error: dimensions do not match: %d=%d, %d=%d, %d=%d, %d=%d\n", 
 	   gauge_param->X, L1, gauge_param->Y, L2, gauge_param->Z, L3, gauge_param->T, L4);
     exit(-1);
   }
 
   if (gauge_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
-    printf("Sorry, double precision not supported\n");
+    printf("QUDA error: sorry, double precision not supported\n");
     exit(-1);
   }
 
   if (gauge_param->cpu_prec == QUDA_HALF_PRECISION) {
-    printf("Half precision not supported on cpu\n");
+    printf("QUDA error: half precision not supported on cpu\n");
     exit(-1);
   }
 
   if (gauge_param->reconstruct == QUDA_RECONSTRUCT_NO) {
-    printf("ReconstructType not yet supported\n");
+    printf("QUDA error: ReconstructType not yet supported\n");
     exit(-1);
   }
 

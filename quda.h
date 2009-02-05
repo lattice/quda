@@ -6,7 +6,7 @@
 #define L1 24 // "x" dimension
 #define L2 24 // "y" dimension
 #define L3 24 // "z" dimension
-#define L4 32 // "time" dimension
+#define L4 64 // "time" dimension
 #define L1h (L1/2) // half of the full "x" dimension, useful for even/odd lattice indexing
 
 #define N (L1*L2*L3*L4) // total number of lattice points
