@@ -175,21 +175,21 @@ inline void pack12Double(float4 *res, double *g) {
   }
 }
 
+// sse packing routine
 inline void pack12Single(float4 *res, float *g) {
-  /*__m128 a, b, c;
+  __m128 a, b, c;
   a = _mm_loadu_ps((const float*)g);
   b = _mm_loadu_ps((const float*)(g+4));
   c = _mm_loadu_ps((const float*)(g+8));
   _mm_store_ps((float*)(res), a);
   _mm_store_ps((float*)(res+Nh), b);
   _mm_store_ps((float*)(res+2*Nh), c);
-  */
-  for (int j=0; j<3; j++) {
+  /* for (int j=0; j<3; j++) {
     res[j*Nh].x = g[j*4+0]; 
     res[j*Nh].y = g[j*4+1]; 
     res[j*Nh].z = g[j*4+2]; 
     res[j*Nh].w = g[j*4+3];
-  }
+    }*/
 }
 
 inline void packHalf12Double(short4 *res, double *g) {
@@ -297,10 +297,10 @@ void packHalfQDPSingleGaugeField(short4 *res, float **gauge, int oddBit, Reconst
 // Assume the gauge field is "Wilson" ordered directions inside of
 // space-time column-row ordering even-odd space-time
 void packCPSDoubleGaugeField(float4 *res, double *gauge, int oddBit, ReconstructType reconstruct) {
+  float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[12];
       float4 *r = res + dir*3*Nh;
       for (int i = 0; i < Nh; i++) {
 	// Must reorder rows-columns
@@ -312,7 +312,6 @@ void packCPSDoubleGaugeField(float4 *res, double *gauge, int oddBit, Reconstruct
   } else {
     for (int dir = 0; dir < 4; dir++) {
       double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[18];
       float4 *r = res + dir*2*Nh;
       for (int i = 0; i < Nh; i++) {
 	// Must reorder rows-columns
@@ -326,10 +325,10 @@ void packCPSDoubleGaugeField(float4 *res, double *gauge, int oddBit, Reconstruct
 }
 
 void packHalfCPSDoubleGaugeField(short4 *res, double *gauge, int oddBit, ReconstructType reconstruct) {
+  float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[12];
       short4 *r = res + dir*3*Nh;
       for (int i = 0; i < Nh; i++) {
 	// Must reorder rows-columns
@@ -341,7 +340,6 @@ void packHalfCPSDoubleGaugeField(short4 *res, double *gauge, int oddBit, Reconst
   } else {
     for (int dir = 0; dir < 4; dir++) {
       double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[12];
       short4 *r = res + dir*2*Nh;
       for (int i = 0; i < Nh; i++) {
 	// Must reorder rows-columns
@@ -356,10 +354,10 @@ void packHalfCPSDoubleGaugeField(short4 *res, double *gauge, int oddBit, Reconst
 
 // Single precision version of the above
 void packCPSSingleGaugeField(float4 *res, float *gauge, int oddBit, ReconstructType reconstruct) {
+  float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       float *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[12];
       float4 *r = res + dir*3*Nh;
       for (int i = 0; i < Nh; i++) {
 	// Must reorder rows-columns
@@ -371,7 +369,6 @@ void packCPSSingleGaugeField(float4 *res, float *gauge, int oddBit, ReconstructT
   } else {
     for (int dir = 0; dir < 4; dir++) {
       float *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[18];
       float4 *r = res + dir*2*Nh;      
       for (int i = 0; i < Nh; i++) {
 	// Must reorder rows-columns

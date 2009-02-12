@@ -1,16 +1,16 @@
 
-#ifdef REDUCE_DOUBLE_PRECISION
+#ifdef REDUCE_KNUTH_SUMMATION
 
 
 #define DSACC(c0, c1, a0, a1) dsadd((c0), (c1), (c0), (c1), (a0), (a1))
 
-__global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, float *g_odata, unsigned int n) {
+__global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, unsigned int n) {
     unsigned int tid = threadIdx.x;
     unsigned int i = blockIdx.x*(REDUCE_THREADS) + threadIdx.x;
     unsigned int gridSize = REDUCE_THREADS*gridDim.x;
     
-    float acc0 = 0;
-    float acc1 = 0;
+    QudaSumFloat acc0 = 0;
+    QudaSumFloat acc1 = 0;
 
     while (i < n) {
         REDUCE_AUXILIARY(i);
@@ -18,8 +18,8 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, float *g_odata, unsigned
         i += gridSize;
     }
 
-    extern __shared__ float sdata[];
-    float *s = sdata + 2*tid;
+    extern __shared__ QudaSumFloat sdata[];
+    QudaSumFloat *s = sdata + 2*tid;
     s[0] = acc0;
     s[1] = acc1;
     
@@ -41,7 +41,7 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, float *g_odata, unsigned
 }
 
 
-float REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
+QudaSumFloat REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     if (n % (REDUCE_THREADS) != 0) {
         printf("ERROR reduceCuda(): length must be a multiple of %d\n", (REDUCE_THREADS));
         return 0.;
@@ -49,10 +49,10 @@ float REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     
     // allocate arrays on device and host to store one float for each block
     int blocks = min(REDUCE_MAX_BLOCKS, n / (REDUCE_THREADS));
-    float h_odata[REDUCE_MAX_BLOCKS];
-    float *d_odata;
+    QudaSumFloat h_odata[REDUCE_MAX_BLOCKS];
+    QudaSumFloat *d_odata;
     
-    if (cudaMalloc((void**) &d_odata, blocks*sizeof(float))) {
+    if (cudaMalloc((void**) &d_odata, blocks*sizeof(QudaSumFloat))) {
       printf("Error allocating reduction matrix\n");
       exit(0);
     }   
@@ -60,12 +60,12 @@ float REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     // partial reduction; each block generates one number
     dim3 dimBlock(REDUCE_THREADS, 1, 1);
     dim3 dimGrid(blocks, 1, 1);
-    int smemSize = 2 * REDUCE_THREADS * sizeof(float);
+    int smemSize = 2 * REDUCE_THREADS * sizeof(QudaSumFloat);
     REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_odata, n);
     
     // copy result from device to host, and perform final reduction on CPU
-    cudaMemcpy(h_odata, d_odata, blocks*sizeof(float), cudaMemcpyDeviceToHost);
-    float gpu_result = 0;
+    cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
+    QudaSumFloat gpu_result = 0;
     for (int i = 0; i < blocks; i++) 
         gpu_result += h_odata[i];
     
@@ -77,13 +77,13 @@ float REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
 #else
 
 
-__global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, float *g_odata, unsigned int n) {
+__global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, unsigned int n) {
     unsigned int tid = threadIdx.x;
     unsigned int i = blockIdx.x*REDUCE_THREADS + threadIdx.x;
     unsigned int gridSize = REDUCE_THREADS*gridDim.x;
 
-    extern __shared__ float sdata[];
-    float *s = sdata + tid;
+    extern __shared__ QudaSumFloat sdata[];
+    QudaSumFloat *s = sdata + tid;
     s[0] = 0;
 
     while (i < n) {
@@ -111,17 +111,17 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, float *g_odata, unsigned
 }
 
 
-float REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
+QudaSumFloat REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     if (n % REDUCE_THREADS != 0) {
         printf("ERROR reduceCuda(): length must be a multiple of %d\n", REDUCE_THREADS);
         return 0.;
     }
     
-    // allocate arrays on device and host to store one float for each block
+    // allocate arrays on device and host to store one QudaSumFloat for each block
     int blocks = min(REDUCE_MAX_BLOCKS, n / REDUCE_THREADS);
-    float h_odata[REDUCE_MAX_BLOCKS];
-    float *d_odata;
-    if (cudaMalloc((void**) &d_odata, blocks*sizeof(float))) {
+    QudaSumFloat h_odata[REDUCE_MAX_BLOCKS];
+    QudaSumFloat *d_odata;
+    if (cudaMalloc((void**) &d_odata, blocks*sizeof(QudaSumFloat))) {
       printf("Error allocating reduction matrix\n");
       exit(0);
     }   
@@ -129,12 +129,12 @@ float REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     // partial reduction; each block generates one number
     dim3 dimBlock(REDUCE_THREADS, 1, 1);
     dim3 dimGrid(blocks, 1, 1);
-    int smemSize = REDUCE_THREADS * sizeof(float);
+    int smemSize = REDUCE_THREADS * sizeof(QudaSumFloat);
     REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_odata, n);
     
     // copy result from device to host, and perform final reduction on CPU
-    cudaMemcpy(h_odata, d_odata, blocks*sizeof(float), cudaMemcpyDeviceToHost);
-    float gpu_result = 0;
+    cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
+    QudaSumFloat gpu_result = 0;
     for (int i = 0; i < blocks; i++) 
         gpu_result += h_odata[i];
     

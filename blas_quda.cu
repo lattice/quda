@@ -4,8 +4,6 @@
 #include <quda.h>
 #include <util_quda.h>
 
-#define REDUCE_DOUBLE_PRECISION
-
 #define REDUCE_THREADS 128
 #define REDUCE_MAX_BLOCKS 64
 
@@ -199,22 +197,24 @@ void caxpbypzYmbwCuda(float2 a, float2 *x, float2 b, float2 *y,
 
 
 // Computes c = a + b in "double single" precision.
-__device__ void dsadd(float &c0, float &c1, const float a0, const float a1, const float b0, const float b1) {
-    // Compute dsa + dsb using Knuth's trick.
-    float t1 = a0 + b0;
-    float e = t1 - a0;
-    float t2 = ((b0 - e) + (a0 - (t1 - e))) + a1 + b1;
-    // The result is t1 + t2, after normalization.
-    c0 = e = t1 + t2;
-    c1 = t2 - (e - t1);
+__device__ void dsadd(QudaSumFloat &c0, QudaSumFloat &c1, const QudaSumFloat a0, 
+		      const QudaSumFloat a1, const float b0, const float b1) {
+  // Compute dsa + dsb using Knuth's trick.
+  QudaSumFloat t1 = a0 + b0;
+  QudaSumFloat e = t1 - a0;
+  QudaSumFloat t2 = ((b0 - e) + (a0 - (t1 - e))) + a1 + b1;
+  // The result is t1 + t2, after normalization.
+  c0 = e = t1 + t2;
+  c1 = t2 - (e - t1);
 }
 
 // Computes c = a + b in "double single" precision (complex version)
-__device__ void zcadd(float2 &c0, float2 &c1, const float2 a0, const float2 a1, const float2 b0, const float2 b1) {
+__device__ void zcadd(QudaSumComplex &c0, QudaSumComplex &c1, const QudaSumComplex a0, 
+		      const QudaSumComplex a1, const QudaSumComplex b0, const QudaSumComplex b1) {
     // Compute dsa + dsb using Knuth's trick.
-    float t1 = a0.x + b0.x;
-    float e = t1 - a0.x;
-    float t2 = ((b0.x - e) + (a0.x - (t1 - e))) + a1.x + b1.x;
+    QudaSumFloat t1 = a0.x + b0.x;
+    QudaSumFloat e = t1 - a0.x;
+    QudaSumFloat t2 = ((b0.x - e) + (a0.x - (t1 - e))) + a1.x + b1.x;
     // The result is t1 + t2, after normalization.
     c0.x = e = t1 + t2;
     c1.x = t2 - (e - t1);
@@ -229,11 +229,12 @@ __device__ void zcadd(float2 &c0, float2 &c1, const float2 a0, const float2 a1, 
 }
 
 // Computes c = a + b in "double single" precision (float3 version)
-__device__ void dsadd3(float3 &c0, float3 &c1, const float3 a0, const float3 a1, const float3 b0, const float3 b1) {
+__device__ void dsadd3(QudaSumFloat3 &c0, QudaSumFloat3 &c1, const QudaSumFloat3 a0, 
+		       const QudaSumFloat3 a1, const QudaSumFloat3 b0, const QudaSumFloat3 b1) {
     // Compute dsa + dsb using Knuth's trick.
-    float t1 = a0.x + b0.x;
-    float e = t1 - a0.x;
-    float t2 = ((b0.x - e) + (a0.x - (t1 - e))) + a1.x + b1.x;
+    QudaSumFloat t1 = a0.x + b0.x;
+    QudaSumFloat e = t1 - a0.x;
+    QudaSumFloat t2 = ((b0.x - e) + (a0.x - (t1 - e))) + a1.x + b1.x;
     // The result is t1 + t2, after normalization.
     c0.x = e = t1 + t2;
     c1.x = t2 - (e - t1);

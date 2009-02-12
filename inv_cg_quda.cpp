@@ -20,7 +20,8 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
   float r2_old;
   float stop = r2*perf->tol*perf->tol; // stopping condition of solver
 
-  float alpha, beta, pAp;
+  float alpha, beta;
+  QudaSumFloat pAp;
 
   if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
     r = allocateParitySpinor();
@@ -39,7 +40,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
 
     pAp = reDotProductCuda((float *)p, (float *)Ap, len);
 
-    alpha = r2 / pAp;        
+    alpha = r2 / (float)pAp;        
     r2_old = r2;
     r2 = axpyNormCuda(-alpha, (float *)Ap, (float *)r, len);
 

@@ -3,14 +3,15 @@ CCFILES		:= inv_bicgstab_cuda.cpp inv_cg.cpp util_cuda.cpp field_cuda.cpp
 
 CUDA_INSTALL_PATH = /usr/local/cuda
 INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include
-LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcublas
+LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
 
+DFLAGS = -DQudaSumFloat=double -DQudaSumComplex=cuDoubleComplex -DUNIX #-D__DEVICE_EMULATION__
 CC = gcc
-CFLAGS = -Wall -O3 -std=c99 $(INCLUDES) #-D__DEVICE_EMULATION__
+CFLAGS = -Wall -O3 -std=c99 $(INCLUDES) ${DFLAGS}
 CXX = g++
-CXXFLAGS = -Wall -O3 $(INCLUDES) -DUNIX #-D__DEVICE_EMULATION__
+CXXFLAGS = -Wall -O3 $(INCLUDES) ${DFLAGS} 
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(INCLUDES) -DUNIX #-arch=sm_13
+NVCCFLAGS = -O3 $(INCLUDES) ${DFLAGS} -arch=sm_13
 LDFLAGS = -fPIC $(LIB)
 CCOBJECTS = $(CCFILES:.cpp=.o)
 CUOBJECTS = $(CUFILES:.cu=.o)

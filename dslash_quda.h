@@ -47,10 +47,10 @@ extern "C" {
   void MatPCDagMatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven,
 			 float kappa, ParitySpinor tmp, MatPCType matpc_type);
   
-  cuComplex MatPCcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-			    float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
-  cuComplex MatPCDagcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-			       float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
+  QudaSumComplex MatPCcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
+				 float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
+  QudaSumComplex MatPCDagcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
+				    float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
   
   // ---------- dslash_reference.cpp ----------
   

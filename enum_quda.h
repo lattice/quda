@@ -72,6 +72,12 @@ extern "C" {
     QUDA_PERIODIC_T = 1
   } QudaTboundary;
 
+  typedef struct double3_s {
+    double x;
+    double y;
+    double z;
+  } double3;
+
 #ifdef __cplusplus
 }
 #endif

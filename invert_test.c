@@ -7,7 +7,7 @@
 
 int main(int argc, char **argv)
 {
-  int device = 0;
+  int device = 1;
 
   float *gauge[4];
 
@@ -15,7 +15,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param;
 
   Gauge_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  Gauge_param.cuda_prec = QUDA_HALF_PRECISION;
+  Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   Gauge_param.X = L1;
   Gauge_param.Y = L2;
@@ -30,13 +30,13 @@ int main(int argc, char **argv)
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param = &Gauge_param;
   
-  float mass = -0.9;
+  float mass = -0.95;
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 1e-7;
   inv_param.maxiter = 5000;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
@@ -79,10 +79,11 @@ int main(int argc, char **argv)
   Mat(spinorCheck, gauge, spinorOut, inv_param.kappa);
   if  (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
     ax(0.5/inv_param.kappa, spinorCheck, N*spinorSiteSize);
+
   mxpy(spinorIn, spinorCheck, N*spinorSiteSize);
-  float nrm2;
-  nrm2 = norm(spinorCheck, N*spinorSiteSize);
-  printf("r2 = %g\n", nrm2);
+  float nrm2 = norm(spinorCheck, N*spinorSiteSize);
+  float src2 = norm(spinorIn, N*spinorSiteSize);
+  printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
   endQuda();
 

@@ -5,7 +5,7 @@
 #include <util_quda.h>
 #include <field_quda.h>
 
-#define FULL_WILSON 1
+#define FULL_WILSON 0
 
 QudaGaugeParam param;
 QudaInvertParam inv_param;
@@ -39,14 +39,14 @@ void init() {
   param.Z = L3;
   param.T = L4;
   param.anisotropy = 2.3;
-  param.reconstruct = QUDA_RECONSTRUCT_12;
+  param.reconstruct = QUDA_RECONSTRUCT_8;
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param = &param;
 
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_HALF_PRECISION;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   invert_param = &inv_param;
 
@@ -82,7 +82,7 @@ void init() {
 
   printf("done.\n"); fflush(stdout);
   
-  int dev = 0;
+  int dev = 1;
   cudaSetDevice(dev);
 
   printf("Sending fields to GPU..."); fflush(stdout);

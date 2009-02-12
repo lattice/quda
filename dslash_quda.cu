@@ -54,18 +54,18 @@ __global__ void spinorHalfPack(float *c, short4* half) {
   float4 F4 = tex1Dfetch(spinorTexSingle, sid + 4*Nh);
   float4 F5 = tex1Dfetch(spinorTexSingle, sid + 5*Nh);
   
-  float c0 = cuCabsf(make_cuFloatComplex(F0.x, F0.y));
-  float c1 = cuCabsf(make_cuFloatComplex(F0.z, F0.w));
-  float c2 = cuCabsf(make_cuFloatComplex(F1.x, F1.y));
-  float c3 = cuCabsf(make_cuFloatComplex(F1.z, F1.w));
-  float c4 = cuCabsf(make_cuFloatComplex(F2.x, F2.y));    
-  float c5 = cuCabsf(make_cuFloatComplex(F2.z, F2.w));
-  float c6 = cuCabsf(make_cuFloatComplex(F3.x, F3.y));
-  float c7 = cuCabsf(make_cuFloatComplex(F3.z, F3.w));
-  float c8 = cuCabsf(make_cuFloatComplex(F4.x, F4.y));
-  float c9 = cuCabsf(make_cuFloatComplex(F4.z, F4.w));
-  float c10 = cuCabsf(make_cuFloatComplex(F5.x, F5.y));
-  float c11 = cuCabsf(make_cuFloatComplex(F5.z, F5.w));
+  float c0 = fmaxf(fabsf(F0.x), fabsf(F0.y));
+  float c1 = fmaxf(fabsf(F0.z), fabsf(F0.w));
+  float c2 = fmaxf(fabsf(F1.x), fabsf(F1.y));
+  float c3 = fmaxf(fabsf(F1.z), fabsf(F1.w));
+  float c4 = fmaxf(fabsf(F2.x), fabsf(F2.y));    
+  float c5 = fmaxf(fabsf(F2.z), fabsf(F2.w));
+  float c6 = fmaxf(fabsf(F3.x), fabsf(F3.y));
+  float c7 = fmaxf(fabsf(F3.z), fabsf(F3.w));
+  float c8 = fmaxf(fabsf(F4.x), fabsf(F4.y));
+  float c9 = fmaxf(fabsf(F4.z), fabsf(F4.w));
+  float c10 = fmaxf(fabsf(F5.x), fabsf(F5.y));
+  float c11 = fmaxf(fabsf(F5.z), fabsf(F5.w));
   
   c0 = fmaxf(c0, c1);
   c1 = fmaxf(c2, c3);
@@ -73,11 +73,9 @@ __global__ void spinorHalfPack(float *c, short4* half) {
   c3 = fmaxf(c6, c7);
   c4 = fmaxf(c8, c9);
   c5 = fmaxf(c10, c11);
-  
   c0 = fmaxf(c0, c1);
   c1 = fmaxf(c2, c3);
   c2 = fmaxf(c4, c5);
-  
   c0 = fmaxf(c0, c1);
   c0 = fmaxf(c0, c2); // c0 is now the maximum element
   
@@ -336,8 +334,8 @@ void MatPCDagCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, float kapp
 }
 
 // Apply the even-odd preconditioned Dirac operator
-cuComplex MatPCcDotWXCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, float kappa, 
-		     ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type) {
+QudaSumComplex MatPCcDotWXCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, float kappa, 
+				ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type) {
   float kappa2 = -kappa*kappa;
 
   if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
@@ -353,8 +351,8 @@ cuComplex MatPCcDotWXCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, fl
 }
 
 // Apply the even-odd preconditioned Dirac operator
-cuComplex MatPCDagcDotWXCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, float kappa, 
-			ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type) {
+QudaSumComplex MatPCDagcDotWXCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, float kappa, 
+				  ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type) {
   float kappa2 = -kappa*kappa;
 
   if (matpc_type == QUDA_MATPC_EVEN_EVEN) {

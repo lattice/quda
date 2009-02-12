@@ -57,6 +57,45 @@
   g_out[4*Nh+sid] = make_float4(o22_re, o22_im, o30_re, o30_im); \
   g_out[5*Nh+sid] = make_float4(o31_re, o31_im, o32_re, o32_im);
 
+#define WRITE_SPINOR_SHORT4()						\
+  float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));			\
+  float c1 = fmaxf(fabsf(o01_re), fabsf(o02_im));			\
+  float c2 = fmaxf(fabsf(o02_re), fabsf(o01_im));			\
+  float c3 = fmaxf(fabsf(o10_re), fabsf(o10_im));			\
+  float c4 = fmaxf(fabsf(o11_re), fabsf(o11_im));			\
+  float c5 = fmaxf(fabsf(o12_re), fabsf(o12_im));			\
+  float c6 = fmaxf(fabsf(o20_re), fabsf(o20_im));			\
+  float c7 = fmaxf(fabsf(o21_re), fabsf(o21_im));			\
+  float c8 = fmaxf(fabsf(o22_re), fabsf(o22_im));			\
+  float c9 = fmaxf(fabsf(o30_re), fabsf(o30_im));			\
+  float c10 = fmaxf(fabsf(o31_re), fabsf(o31_im));			\
+  float c11 = fmaxf(fabsf(o32_re), fabsf(o32_im));			\
+  c0 = fmaxf(c0, c1);							\
+  c1 = fmaxf(c2, c3);							\
+  c2 = fmaxf(c4, c5);							\
+  c3 = fmaxf(c6, c7);							\
+  c4 = fmaxf(c8, c9);							\
+  c5 = fmaxf(c10, c11);							\
+  c0 = fmaxf(c0, c1);							\
+  c1 = fmaxf(c2, c3);							\
+  c2 = fmaxf(c4, c5);							\
+  c0 = fmaxf(c0, c1);							\
+  c0 = fmaxf(c0, c2);							\
+  c[sid] = c0;								\
+  float scale = __fdividef(MAX_SHORT, c0);				\
+  o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
+  o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale;	\
+  o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale;	\
+  o20_re *= scale; o20_im *= scale; o21_re *= scale; o21_im *= scale;	\
+  o22_re *= scale; o22_im *= scale; o30_re *= scale; o30_im *= scale;	\
+  o31_re *= scale; o31_im *= scale; o32_re *= scale; o32_im *= scale;	\
+  g_out[sid+0*Nh] = make_short4((short)o00_re, (short)o00_im, (short)o01_re, (short)o01_im); \
+  g_out[sid+1*Nh] = make_short4((short)o02_re, (short)o02_im, (short)o10_re, (short)o10_im); \
+  g_out[sid+2*Nh] = make_short4((short)o11_re, (short)o11_im, (short)o12_re, (short)o12_im); \
+  g_out[sid+3*Nh] = make_short4((short)o20_re, (short)o20_im, (short)o21_re, (short)o21_im); \
+  g_out[sid+4*Nh] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
+  g_out[sid+5*Nh] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
+
 #define WRITE_SPINOR_FLOAT1_SMEM() \
   int t = threadIdx.x; \
   int B = BLOCK_DIM; \
