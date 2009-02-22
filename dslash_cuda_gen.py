@@ -94,7 +94,7 @@ projectors = [
 ### code generation  ########################################################################
 
 ### parameters
-sharedFloats = 19
+sharedFloats = 0
 dagger = False
 
 def block(code):
@@ -182,8 +182,9 @@ int x1 = X % L1;
 
 """)
     
-    str.append("extern __shared__ float s_data[];\n")
-    str.append("volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n\n")
+    if sharedFloats > 0:
+        str.append("extern __shared__ float s_data[];\n")
+        str.append("volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n\n")
     
     for s in range(0,4):
         for c in range(0,3):
@@ -200,12 +201,7 @@ def epilog():
     str.append(
 """
 #ifdef DSLASH_XPAY
-    float4 accum0 = tex1Dfetch(accumTex, sid + 0*Nh);
-    float4 accum1 = tex1Dfetch(accumTex, sid + 1*Nh);
-    float4 accum2 = tex1Dfetch(accumTex, sid + 2*Nh);
-    float4 accum3 = tex1Dfetch(accumTex, sid + 3*Nh);
-    float4 accum4 = tex1Dfetch(accumTex, sid + 4*Nh);
-    float4 accum5 = tex1Dfetch(accumTex, sid + 5*Nh);
+    READ_ACCUM(ACCUMTEX)
 """)
     
     for s in range(0,4):
@@ -275,15 +271,19 @@ def gen(dir):
     load_spinor = []
     load_spinor.append("// read spinor from device memory\n")
     if row_cnt[0] == 0:
-        load_spinor.append("READ_SPINOR_DOWN(spinorTex);\n\n")
+        load_spinor.append("READ_SPINOR_DOWN(SPINORTEX);\n\n")
     elif row_cnt[2] == 0:
-        load_spinor.append("READ_SPINOR_UP(spinorTex);\n\n")
+        load_spinor.append("READ_SPINOR_UP(SPINORTEX);\n\n")
     else:
-        load_spinor.append("READ_SPINOR(spinorTex);\n\n")
+        load_spinor.append("READ_SPINOR(SPINORTEX);\n\n")
 
     load_gauge = []
     load_gauge.append("// read gauge matrix from device memory\n")
     load_gauge.append("READ_GAUGE_MATRIX(GAUGE"+`dir%2`+"TEX, "+`dir`+");\n\n")
+
+    reconstruct_gauge = []
+    reconstruct_gauge.append("// reconstruct gauge matrix\n")
+    reconstruct_gauge.append("RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n")
 
     project = []
     project.append("// project spinor into half spinors\n")
@@ -367,9 +367,11 @@ def gen(dir):
         str.append("if (gauge_fixed && ga_idx < (L4-1)*L1h*L2*L3) ")
         str.append(block(''.join(load_spinor) + ''.join(project) + ''.join(ident) + ''.join(reconstruct)))
         str.append("else ")
-        str.append(block(''.join(load_gauge) + ''.join(load_spinor) + ''.join(project) + ''.join(mult) + ''.join(reconstruct)))
+        str.append(block(''.join(load_gauge) + ''.join(load_spinor) + ''.join(reconstruct_gauge) + 
+                         ''.join(project) + ''.join(mult) + ''.join(reconstruct)))
     else:
-        str.append(''.join(load_gauge) + ''.join(load_spinor) + ''.join(project) + ''.join(mult) + ''.join(reconstruct))
+        str.append(''.join(load_gauge) + ''.join(load_spinor) + ''.join(reconstruct_gauge) + 
+                   ''.join(project) + ''.join(mult) + ''.join(reconstruct))
     
     return block(''.join(str))+"\n"
 # end def gen
@@ -380,6 +382,7 @@ def generate():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + epilog()
 
 dagger = False
-#dagger = True
+sharedFloats = 0
+dagger = True
 
 print generate()

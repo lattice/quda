@@ -34,6 +34,8 @@ extern "C" {
   void su3_reconstruct_12(float *mat, int dir, int ga_idx);
   void su3_construct_8(float *mat);
   void su3_reconstruct_8(float *mat, int dir, int ga_idx);
+  void su3_construct_8_half(float *mat, short *mat_half);
+  void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx);
 
   void su3_construct_8_bunk(float *mat, int dir);
   void su3_reconstruct_8_bunk(float *mat, int dir, int ga_idx);

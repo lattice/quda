@@ -81,7 +81,7 @@ QudaSumFloat3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     
     // copy result from device to host, and perform final reduction on CPU
     cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
-    QudaSumFloat3 gpu_result;
+    double3 gpu_result;
     gpu_result.x = 0;
     gpu_result.y = 0;
     gpu_result.z = 0;
@@ -92,7 +92,12 @@ QudaSumFloat3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     }
     
     cudaFree(d_odata);    
-    return gpu_result;
+
+    QudaSumFloat3 res;
+    res.x = (QudaSumFloat)gpu_result.x;
+    res.y = (QudaSumFloat)gpu_result.y;
+    res.z = (QudaSumFloat)gpu_result.z;
+    return res;
 }
 
 
@@ -168,7 +173,8 @@ QudaSumFloat3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     
     // copy result from device to host, and perform final reduction on CPU
     cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
-    QudaSumFloat3 gpu_result;
+
+    double3 gpu_result;
     gpu_result.x = 0;
     gpu_result.y = 0;
     gpu_result.z = 0;
@@ -179,7 +185,12 @@ QudaSumFloat3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     }
     
     cudaFree(d_odata);    
-    return gpu_result;
+
+    QudaSumFloat3 res;
+    res.x = (QudaSumFloat)gpu_result.x;
+    res.y = (QudaSumFloat)gpu_result.y;
+    res.z = (QudaSumFloat)gpu_result.z;
+    return res;
 }
 
 #endif // REDUCE_DOUBLE_PRECISION

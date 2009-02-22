@@ -24,22 +24,35 @@ extern "C" {
 #endif
 
   extern FullGauge cudaGauge;
+  extern FullGauge cudaHGauge;
   extern QudaGaugeParam *gauge_param;
   extern QudaInvertParam *invert_param;
 
-  extern short4 *spinorHalf;
-  extern float *spinorNorm;
+  extern ParityHSpinor hSpinor1;
+  extern ParityHSpinor hSpinor2;
 
 // ---------- dslash_quda.cu ----------
 
+  int dslashCudaSharedBytes();
+  
   void setCudaGaugeParam();
 
-  void dslashCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		  int oddBit, int daggerBit);
-  void dslashXpayCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		      int oddBit, int daggerBit, ParitySpinor x, float a);
-  int  dslashCudaSharedBytes();
-  
+  // Single precision routines
+  void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
+		   int oddBit, int daggerBit);
+  void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
+		       int oddBit, int daggerBit, ParitySpinor x, float a);
+
+  // Half precision dslash routines
+  void dslashHCuda(ParityHSpinor res, FullGauge gauge, ParityHSpinor spinor,
+		   int oddBit, int daggerBit);
+  void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParityHSpinor spinor, 
+		       int oddBit, int daggerBit, ParityHSpinor x, float a);
+
+  // wrapper to above
+  void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger);
+
+  // Full Wilson matrix
   void MatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
 		 float kappa, ParitySpinor tmp, MatPCType matpc_type);
   void MatPCDagCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
@@ -70,8 +83,9 @@ extern "C" {
 		    ParitySpinor tmp, QudaInvertParam *param);
   
 // -- inv_bicgstab_cuda.cpp
-void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 
-			ParitySpinor tmp, QudaInvertParam *param, DagType dag_type);
+  void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, FullGauge gaugeSloppy, 
+			  FullGauge gaugePrecise, ParitySpinor tmp, 
+			  QudaInvertParam *param, DagType dag_type);
   
 // ---------- cg_reference.cpp ----------  
 void cgReference(float *out, float **gauge, float *in, float kappa, float tol);

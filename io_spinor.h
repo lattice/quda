@@ -49,6 +49,30 @@
   I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	     \
   I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
 
+#define READ_ACCUM_SINGLE(spinor)			\
+  float4 accum0 = tex1Dfetch((spinor), sid + 0*Nh);	\
+  float4 accum1 = tex1Dfetch((spinor), sid + 1*Nh);	\
+  float4 accum2 = tex1Dfetch((spinor), sid + 2*Nh);	\
+  float4 accum3 = tex1Dfetch((spinor), sid + 3*Nh);	\
+  float4 accum4 = tex1Dfetch((spinor), sid + 4*Nh);	\
+  float4 accum5 = tex1Dfetch((spinor), sid + 5*Nh); 
+
+#define READ_ACCUM_HALF(spinor)					     \
+  float4 accum0 = tex1Dfetch((spinor), sid + 0*Nh);		     \
+  float4 accum1 = tex1Dfetch((spinor), sid + 1*Nh);		     \
+  float4 accum2 = tex1Dfetch((spinor), sid + 2*Nh);		     \
+  float4 accum3 = tex1Dfetch((spinor), sid + 3*Nh);		     \
+  float4 accum4 = tex1Dfetch((spinor), sid + 4*Nh);		     \
+  float4 accum5 = tex1Dfetch((spinor), sid + 5*Nh);		     \
+  float C = tex1Dfetch((accumTexNorm), sid);			     \
+  accum0.x *= C; accum0.y *= C;	accum0.z *= C; accum0.w *= C;	     \
+  accum1.x *= C; accum1.y *= C;	accum1.z *= C; accum1.w *= C;	     \
+  accum2.x *= C; accum2.y *= C;	accum2.z *= C; accum2.w *= C;        \
+  accum3.x *= C; accum3.y *= C;	accum3.z *= C; accum3.w *= C;	     \
+  accum4.x *= C; accum4.y *= C; accum4.z *= C; accum4.w *= C;	     \
+  accum5.x *= C; accum5.y *= C;	accum5.z *= C; accum5.w *= C;					     
+
+
 #define WRITE_SPINOR_FLOAT4()					 \
   g_out[0*Nh+sid] = make_float4(o00_re, o00_im, o01_re, o01_im); \
   g_out[1*Nh+sid] = make_float4(o02_re, o02_im, o10_re, o10_im); \

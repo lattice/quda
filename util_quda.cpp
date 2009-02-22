@@ -235,6 +235,46 @@ void su3_construct_8(float *mat) {
   for (int i=8; i<18; i++) mat[i] = 0.0;
 }
 
+#define SHORT_LENGTH 65536
+#define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
+#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
+
+inline short floatToShort(float a) {
+  //return (short)(a*MAX_SHORT);
+  short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
+  return rtn;
+}
+
+inline float shortToFloat(short a) {
+  float rtn = (float)a/SCALE_FLOAT - SHIFT_FLOAT;
+  return rtn;
+}
+
+void su3_construct_8_half(float *mat, short *mat_half) {
+  su3_construct_8(mat);
+
+  mat_half[0] = floatToShort(mat[0] / M_PI);
+  mat_half[1] = floatToShort(mat[1] / M_PI);
+  for (int i=2; i<18; i++) {
+    mat_half[i] = floatToShort(mat[i]);
+  }
+
+  //for (int i=0; i<18; i++) printf("%d %e\n", mat_half[i], mat[i]);
+}
+
+void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx) {
+
+  for (int i=0; i<18; i++) {
+    mat[i] = shortToFloat(mat_half[i]);
+  }
+  mat[0] *= M_PI;
+  mat[1] *= M_PI;
+
+  su3_reconstruct_8(mat, dir, ga_idx);
+  //  printf("\n");for (int i=0; i<18; i++) printf("%d %e\n", mat_half[i], mat[i]);
+  //exit(0);
+}
+
 void su3_reconstruct_8(float *mat, int dir, int ga_idx) {
   // First reconstruct first row
   float row_sum = 0.0;

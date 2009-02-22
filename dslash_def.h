@@ -3,38 +3,46 @@
 __global__ void
 dslashSS12Kernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashSS12DaggerKernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -44,38 +52,54 @@ dslashSS12DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashSS12XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashSS12DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -84,38 +108,46 @@ dslashSS12DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 __global__ void
 dslashSS8Kernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashSS8DaggerKernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -125,38 +157,54 @@ dslashSS8DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashSS8XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashSS8DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -167,38 +215,46 @@ dslashSS8DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 __global__ void
 dslashHS12Kernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashHS12DaggerKernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -208,38 +264,54 @@ dslashHS12DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashHS12XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashHS12DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -248,38 +320,46 @@ dslashHS12DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 __global__ void
 dslashHS8Kernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashHS8DaggerKernel(float4* g_out, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -289,38 +369,54 @@ dslashHS8DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashHS8XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashHS8DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexSingle
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexSingle
+#define READ_ACCUM READ_ACCUM_SINGLE
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -329,40 +425,48 @@ dslashHS8DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 // All dslash definitions 
 
 __global__ void
-dslashSH12Kernel(float4* g_out, int oddBit) {
+dslashSH12Kernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
-dslashSH12DaggerKernel(float4* g_out, int oddBit) {
+dslashSH12DaggerKernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -372,78 +476,102 @@ dslashSH12DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashSH12XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashSH12DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 #undef DSLASH_XPAY
 
 __global__ void
-dslashSH8Kernel(float4* g_out, int oddBit) {
+dslashSH8Kernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
-dslashSH8DaggerKernel(float4* g_out, int oddBit) {
+dslashSH8DaggerKernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -453,38 +581,54 @@ dslashSH8DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashSH8XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashSH8DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -493,40 +637,48 @@ dslashSH8DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 //////////////////////////
 
 __global__ void
-dslashHH12Kernel(float4* g_out, int oddBit) {
+dslashHH12Kernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
-dslashHH12DaggerKernel(float4* g_out, int oddBit) {
+dslashHH12DaggerKernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -536,78 +688,102 @@ dslashHH12DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashHH12XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashHH12DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 #undef DSLASH_XPAY
 
 __global__ void
-dslashHH8Kernel(float4* g_out, int oddBit) {
+dslashHH8Kernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
-dslashHH8DaggerKernel(float4* g_out, int oddBit) {
+dslashHH8DaggerKernel(short4* g_out, float *c, int oddBit) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #include "dslash_dagger_core.h"
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
@@ -617,38 +793,54 @@ dslashHH8DaggerKernel(float4* g_out, int oddBit) {
 __global__ void
 dslashHH8XpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 
 __global__ void
 dslashHH8DaggerXpayKernel(float4* g_out, int oddBit, float a) {
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
 #define SPINORTEX spinorTexHalf
+#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#define ACCUMTEX accumTexHalf
+#define READ_ACCUM READ_ACCUM_HALF
 #include "dslash_dagger_core.h"
+#undef ACCUMTEX
+#undef READ_ACCUM
+#undef WRITE_SPINOR
 #undef SPINORTEX
 #undef GAUGE1TEX
 #undef GAUGE0TEX
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
+#undef RECONSTRUCT_GAUGE_MATRIX
 #undef READ_GAUGE_MATRIX
 }
 

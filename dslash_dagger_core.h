@@ -1,6 +1,6 @@
 // *** CUDA DSLASH DAGGER ***
 
-#define SHARED_FLOATS_PER_THREAD 19
+#define SHARED_FLOATS_PER_THREAD 0
 #define SHARED_BYTES (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))
 
 #define i00_re I0.x
@@ -69,25 +69,25 @@
 #define A_re G4.z
 #define A_im G4.w
 
-#define o00_re s[0]
-#define o00_im s[1]
-#define o01_re s[2]
-#define o01_im s[3]
-#define o02_re s[4]
-#define o02_im s[5]
-#define o10_re s[6]
-#define o10_im s[7]
-#define o11_re s[8]
-#define o11_im s[9]
-#define o12_re s[10]
-#define o12_im s[11]
-#define o20_re s[12]
-#define o20_im s[13]
-#define o21_re s[14]
-#define o21_im s[15]
-#define o22_re s[16]
-#define o22_im s[17]
-#define o30_re s[18]
+volatile float o00_re;
+volatile float o00_im;
+volatile float o01_re;
+volatile float o01_im;
+volatile float o02_re;
+volatile float o02_im;
+volatile float o10_re;
+volatile float o10_im;
+volatile float o11_re;
+volatile float o11_im;
+volatile float o12_re;
+volatile float o12_im;
+volatile float o20_re;
+volatile float o20_im;
+volatile float o21_re;
+volatile float o21_im;
+volatile float o22_re;
+volatile float o22_im;
+volatile float o30_re;
 volatile float o30_im;
 volatile float o31_re;
 volatile float o31_im;
@@ -106,9 +106,6 @@ int x4 = X/(L3*L2*L1);
 int x3 = (X/(L2*L1)) % L3;
 int x2 = (X/L1) % L2;
 int x1 = X % L1;
-
-extern __shared__ float s_data[];
-volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;
 
 o00_re = o00_im = 0;
 o01_re = o01_im = 0;
@@ -138,6 +135,9 @@ o32_re = o32_im = 0;
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX);
+    
+    // reconstruct gauge matrix
+    RECONSTRUCT_GAUGE_MATRIX(0);
     
     // project spinor into half spinors
     float a0_re = +i00_re-i30_im;
@@ -217,6 +217,9 @@ o32_re = o32_im = 0;
     // read spinor from device memory
     READ_SPINOR(SPINORTEX);
     
+    // reconstruct gauge matrix
+    RECONSTRUCT_GAUGE_MATRIX(1);
+    
     // project spinor into half spinors
     float a0_re = +i00_re+i30_im;
     float a0_im = +i00_im-i30_re;
@@ -294,6 +297,9 @@ o32_re = o32_im = 0;
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX);
+    
+    // reconstruct gauge matrix
+    RECONSTRUCT_GAUGE_MATRIX(2);
     
     // project spinor into half spinors
     float a0_re = +i00_re+i30_re;
@@ -373,6 +379,9 @@ o32_re = o32_im = 0;
     // read spinor from device memory
     READ_SPINOR(SPINORTEX);
     
+    // reconstruct gauge matrix
+    RECONSTRUCT_GAUGE_MATRIX(3);
+    
     // project spinor into half spinors
     float a0_re = +i00_re-i30_re;
     float a0_im = +i00_im-i30_im;
@@ -451,6 +460,9 @@ o32_re = o32_im = 0;
     // read spinor from device memory
     READ_SPINOR(SPINORTEX);
     
+    // reconstruct gauge matrix
+    RECONSTRUCT_GAUGE_MATRIX(4);
+    
     // project spinor into half spinors
     float a0_re = +i00_re-i20_im;
     float a0_im = +i00_im+i20_re;
@@ -528,6 +540,9 @@ o32_re = o32_im = 0;
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX);
+    
+    // reconstruct gauge matrix
+    RECONSTRUCT_GAUGE_MATRIX(5);
     
     // project spinor into half spinors
     float a0_re = +i00_re+i20_im;
@@ -651,6 +666,9 @@ o32_re = o32_im = 0;
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX);
         
+        // reconstruct gauge matrix
+        RECONSTRUCT_GAUGE_MATRIX(6);
+        
         // project spinor into half spinors
         float a0_re = +2*i00_re;
         float a0_im = +2*i00_im;
@@ -762,6 +780,9 @@ o32_re = o32_im = 0;
         // read spinor from device memory
         READ_SPINOR_DOWN(SPINORTEX);
         
+        // reconstruct gauge matrix
+        RECONSTRUCT_GAUGE_MATRIX(7);
+        
         // project spinor into half spinors
         float a0_re = +2*i20_re;
         float a0_im = +2*i20_im;
@@ -815,12 +836,7 @@ o32_re = o32_im = 0;
 
 
 #ifdef DSLASH_XPAY
-    float4 accum0 = tex1Dfetch(accumTex, sid + 0*Nh);
-    float4 accum1 = tex1Dfetch(accumTex, sid + 1*Nh);
-    float4 accum2 = tex1Dfetch(accumTex, sid + 2*Nh);
-    float4 accum3 = tex1Dfetch(accumTex, sid + 3*Nh);
-    float4 accum4 = tex1Dfetch(accumTex, sid + 4*Nh);
-    float4 accum5 = tex1Dfetch(accumTex, sid + 5*Nh);
+    READ_ACCUM(ACCUMTEX)
     o00_re = a*o00_re + accum0.x;
     o00_im = a*o00_im + accum0.y;
     o01_re = a*o01_re + accum0.z;
@@ -851,22 +867,4 @@ o32_re = o32_im = 0;
     // write spinor field back to device memory
     WRITE_SPINOR();
 
-#undef o00_re
-#undef o00_im
-#undef o01_re
-#undef o01_im
-#undef o02_re
-#undef o02_im
-#undef o10_re
-#undef o10_im
-#undef o11_re
-#undef o11_im
-#undef o12_re
-#undef o12_im
-#undef o20_re
-#undef o20_im
-#undef o21_re
-#undef o21_im
-#undef o22_re
-#undef o22_im
-#undef o30_re
+

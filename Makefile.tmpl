@@ -5,7 +5,9 @@ CUDA_INSTALL_PATH = /usr/local/cuda
 INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include
 LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
 
-DFLAGS = -DQudaSumFloat=double -DQudaSumComplex=cuDoubleComplex -DUNIX #-D__DEVICE_EMULATION__
+DFLAGS = -DQudaSumFloat=double #-DREDUCE_KNUTH_SUMMATION 
+	#-D__DEVICE_EMULATION__
+
 CC = gcc
 CFLAGS = -Wall -O3 -std=c99 $(INCLUDES) ${DFLAGS}
 CXX = g++

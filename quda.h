@@ -28,6 +28,8 @@
 #define DagType QudaDagType
 #define Tboundary QudaTboundary
 
+#include <enum_quda.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,10 +43,17 @@ extern "C" {
   } FullSpinor;
   
   typedef struct {
+    Precision precision;
+    ReconstructType reconstruct;
     ParityGauge odd;
     ParityGauge even;
   } FullGauge;
   
+  typedef struct ParityHSpinor_S {
+    short4 *spinorHalf;
+    float *spinorNorm;
+  } ParityHSpinor;
+
 #ifdef __cplusplus
 }
 #endif

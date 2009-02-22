@@ -4,6 +4,14 @@
 #ifndef _QUDA_BLAS_H
 #define _QUDA_BLAS_H
 
+#if QudaSumFloat==double
+#define QudaSumComplex cuDoubleComplex
+#define QudaSumFloat3 double3
+#else
+#define QudaSumComplex cuComplex
+#define QudaSumFloat3 float3
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

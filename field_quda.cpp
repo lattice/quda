@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -5,33 +6,33 @@
 #include <field_quda.h>
 
 #include <xmmintrin.h>
-#define is_aligned(p,a) ((((size_t)(p))&((size_t)(a-1)))==0)
 
 // GPU gauge field
 FullGauge cudaGauge;
+FullGauge cudaHGauge;
 
 // Pinned memory for cpu-gpu memory copying
 float4 *packedSpinor = 0;
 
-// Half precision spinor field
-short4 *spinorHalf = 0;
-float *spinorNorm = 0;
+// Half precision spinor field temporaries
+ParityHSpinor hSpinor1, hSpinor2;
 
-void allocateGaugeField(int packed_gauge_bytes) {
-  if (!cudaGauge.even) {
-    if (cudaMalloc((void **)&cudaGauge.even, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
+void allocateGaugeField(FullGauge *gauge, int packed_gauge_bytes) {
+  if (!gauge->even) {
+    if (cudaMalloc((void **)&gauge->even, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
       printf("Error allocating even gauge field\n");
       exit(0);
     }
   }
    
-  if (!cudaGauge.odd) {
-    if (cudaMalloc((void **)&cudaGauge.odd, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
+  if (!gauge->odd) {
+    if (cudaMalloc((void **)&gauge->odd, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
       printf("Error allocating even odd gauge field\n");
       exit(0);
     }
   }
 }
+
 
 ParitySpinor allocateParitySpinor() {
   ParitySpinor ret;
@@ -60,6 +61,11 @@ void freeGaugeField() {
   if (cudaGauge.odd) cudaFree(cudaGauge.odd);
   cudaGauge.even = 0;
   cudaGauge.odd = 0;
+
+  if (cudaHGauge.even) cudaFree(cudaHGauge.even);
+  if (cudaHGauge.odd) cudaFree(cudaHGauge.odd);
+  cudaHGauge.even = 0;
+  cudaHGauge.odd = 0;
 }
 
 void freeSpinorField(FullSpinor spinor) {
@@ -77,15 +83,21 @@ void freeSpinorBuffer() {
 }
 
 void allocateSpinorHalf() {
-  cudaMalloc((void**)&spinorHalf, SPINOR_BYTES/2);
-  cudaMalloc((void**)&spinorNorm, SPINOR_BYTES/24);
+  cudaMalloc((void**)&hSpinor1.spinorHalf, SPINOR_BYTES/2);
+  cudaMalloc((void**)&hSpinor1.spinorNorm, SPINOR_BYTES/24);
+  cudaMalloc((void**)&hSpinor2.spinorHalf, SPINOR_BYTES/2);
+  cudaMalloc((void**)&hSpinor2.spinorNorm, SPINOR_BYTES/24);
 }
 
 void freeSpinorHalf() {
-  cudaFree(spinorHalf);
-  cudaFree(spinorNorm);
-  spinorHalf = 0;
-  spinorNorm = 0;
+  cudaFree(hSpinor1.spinorHalf);
+  cudaFree(hSpinor1.spinorNorm);
+  cudaFree(hSpinor2.spinorHalf);
+  cudaFree(hSpinor2.spinorNorm);
+  hSpinor1.spinorHalf = 0;
+  hSpinor1.spinorNorm = 0;
+  hSpinor2.spinorHalf = 0;
+  hSpinor2.spinorNorm = 0;
 }
 
 
@@ -158,6 +170,11 @@ inline void packHalf8Double(short4 *res, double *g) {
 inline void packHalf8Single(short4 *res, float *g) {
   res[0].x = floatToShort(atan2(g[1], g[0])/ M_PI);
   res[0].y = floatToShort(atan2(g[13], g[12])/ M_PI);
+  
+  /*float t1 = atan2(g[1], g[0])/ M_PI;
+  float t2 = atan2(g[13], g[12])/ M_PI;
+  if (fabs(t1)>0.99999) printf("%e %d\n", t1, res[0].x);
+  if (fabs(t2)>0.99999) printf("%e %d\n", t2, res[0].y);*/
   res[0].z = floatToShort(g[2]);
   res[0].w = floatToShort(g[3]);
   res[Nh].x = floatToShort(g[4]);
@@ -437,61 +454,69 @@ void loadGaugeField(void *gauge) {
   }
 
   int packed_gauge_bytes = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
-  if (gauge_param->cuda_prec == QUDA_HALF_PRECISION) packed_gauge_bytes /= 2;
 
   gauge_param->packed_size = packed_gauge_bytes;
   packed_gauge_bytes *= 4*Nh*sizeof(float);
-  allocateGaugeField(packed_gauge_bytes);
+  allocateGaugeField(&cudaGauge, packed_gauge_bytes);
+  cudaGauge.reconstruct = gauge_param->reconstruct;
+  cudaGauge.precision = QUDA_SINGLE_PRECISION;
 
   // 2 since even-odd
   gauge_param->gaugeGiB = (float)2*packed_gauge_bytes/ (1 << 30);
 
-  if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
-    // Use pinned memory
-    float4 *packedEven, *packedOdd;
-
+  // Use pinned memory
+  float4 *packedEven, *packedOdd;
+  
 #ifndef __DEVICE_EMULATION__
-    cudaMallocHost((void**)&packedEven, packed_gauge_bytes);
-    cudaMallocHost((void**)&packedOdd, packed_gauge_bytes);
+  cudaMallocHost((void**)&packedEven, packed_gauge_bytes);
+  cudaMallocHost((void**)&packedOdd, packed_gauge_bytes);
 #else
-    packedEven = (float4*)malloc(packed_gauge_bytes);
-    packedOdd = (float4*)malloc(packed_gauge_bytes);
+  packedEven = (float4*)malloc(packed_gauge_bytes);
+  packedOdd = (float4*)malloc(packed_gauge_bytes);
 #endif
-
-    if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
-      if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
-	packQDPDoubleGaugeField(packedEven, (double**)gauge, 0, gauge_param->reconstruct);
-	packQDPDoubleGaugeField(packedOdd,  (double**)gauge, 1, gauge_param->reconstruct);
-      } else {
-	packQDPSingleGaugeField(packedEven, (float**)gauge, 0, gauge_param->reconstruct);
-	packQDPSingleGaugeField(packedOdd,  (float**)gauge, 1, gauge_param->reconstruct);
-      }
-    } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
-
-      if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
-	packCPSDoubleGaugeField(packedEven, (double*)gauge, 0, gauge_param->reconstruct);
-	packCPSDoubleGaugeField(packedOdd,  (double*)gauge, 1, gauge_param->reconstruct);
-      } else {
-	packCPSSingleGaugeField(packedEven, (float*)gauge, 0, gauge_param->reconstruct);
-	packCPSSingleGaugeField(packedOdd,  (float*)gauge, 1, gauge_param->reconstruct);
-      }
+  
+  if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
+      packQDPDoubleGaugeField(packedEven, (double**)gauge, 0, gauge_param->reconstruct);
+      packQDPDoubleGaugeField(packedOdd,  (double**)gauge, 1, gauge_param->reconstruct);
     } else {
-      printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
-      exit(-1);
+      packQDPSingleGaugeField(packedEven, (float**)gauge, 0, gauge_param->reconstruct);
+      packQDPSingleGaugeField(packedOdd,  (float**)gauge, 1, gauge_param->reconstruct);
     }
-
-    cudaMemcpy(cudaGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(cudaGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
-
+  } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
+    
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
+      packCPSDoubleGaugeField(packedEven, (double*)gauge, 0, gauge_param->reconstruct);
+      packCPSDoubleGaugeField(packedOdd,  (double*)gauge, 1, gauge_param->reconstruct);
+    } else {
+      packCPSSingleGaugeField(packedEven, (float*)gauge, 0, gauge_param->reconstruct);
+      packCPSSingleGaugeField(packedOdd,  (float*)gauge, 1, gauge_param->reconstruct);
+    }
+  } else {
+    printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
+    exit(-1);
+  }
+  
+  cudaMemcpy(cudaGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(cudaGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
+  
 #ifndef __DEVICE_EMULATION__
-    cudaFreeHost(packedEven);
-    cudaFreeHost(packedOdd);
+  cudaFreeHost(packedEven);
+  cudaFreeHost(packedOdd);
 #else
-    free(packedEven);
-    free(packedOdd);
+  free(packedEven);
+  free(packedOdd);
 #endif
 
-  } else {
+  if (gauge_param->cuda_prec == QUDA_HALF_PRECISION) {
+    packed_gauge_bytes /= 2;
+    gauge_param->packed_size += packed_gauge_bytes/(4*Nh*sizeof(float));
+    allocateGaugeField(&cudaHGauge, packed_gauge_bytes);
+    cudaHGauge.reconstruct = gauge_param->reconstruct;
+    cudaHGauge.precision = QUDA_HALF_PRECISION;
+  }
+
+  if (gauge_param->cuda_prec == QUDA_HALF_PRECISION) {
     // Use pinned memory
     short4 *packedEven, *packedOdd;
 #ifndef __DEVICE_EMULATION__
@@ -501,7 +526,7 @@ void loadGaugeField(void *gauge) {
     packedEven = (short4*)malloc(packed_gauge_bytes);
     packedOdd = (short4*)malloc(packed_gauge_bytes);
 #endif
-
+    
     if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
       if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
 	packHalfQDPDoubleGaugeField(packedEven, (double**)gauge, 0, gauge_param->reconstruct);
@@ -523,8 +548,8 @@ void loadGaugeField(void *gauge) {
       exit(-1);
     }
 
-    cudaMemcpy(cudaGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(cudaGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
+    cudaMemcpy(cudaHGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(cudaHGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
 
 #ifndef __DEVICE_EMULATION__
     cudaFreeHost(packedEven);
@@ -744,10 +769,14 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
   }
 
   if (cuda_prec == QUDA_HALF_PRECISION) {
-    if (!spinorHalf && !spinorNorm) {
+    if (!hSpinor1.spinorHalf && !hSpinor1.spinorNorm &&
+	!hSpinor2.spinorHalf && !hSpinor2.spinorNorm ) {
       allocateSpinorHalf();
-    } else if (!spinorHalf || !spinorNorm) {
-      printf("allocateSpinorHalf error %u %u\n", spinorHalf, spinorNorm);
+    } else if (!hSpinor1.spinorHalf || !hSpinor1.spinorNorm ||
+	       !hSpinor2.spinorHalf || !hSpinor2.spinorNorm) {
+      printf("allocateSpinorHalf error %u %u %u %u\n", 
+	     hSpinor1.spinorHalf, hSpinor1.spinorNorm,
+	     hSpinor2.spinorHalf, hSpinor2.spinorNorm);
       exit(-1);
     }
   }
