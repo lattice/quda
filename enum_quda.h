@@ -14,6 +14,7 @@ extern "C" {
     QUDA_DIRAC_ORDER, // even-odd, colour inside spin
     QUDA_QDP_DIRAC_ORDER, // even-odd, spin inside colour
     QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, colour inside spin
+    QUDA_LEX_DIRAC_ORDER // lexicographical order, colour inside spin
   } QudaDiracFieldOrder;  
 
   typedef enum QudaInverterType_s {

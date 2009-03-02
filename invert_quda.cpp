@@ -195,6 +195,64 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   freeParitySpinor(in);
 }
 
+void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param) {
+  FullSpinor in, out;
+  in.even = allocateParitySpinor();
+  in.odd = allocateParitySpinor();
+  out.even = allocateParitySpinor();
+  out.odd = allocateParitySpinor();
+
+  loadSpinorField(in, h_in, inv_param->cpu_prec, 
+		  inv_param->cuda_prec, inv_param->dirac_order);
+
+  if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+    dslashCuda(out.odd, cudaGauge, in.even, 1, 0);
+    dslashCuda(out.even, cudaGauge, in.odd, 0, 0);
+  } else if (inv_param->cuda_prec == QUDA_HALF_PRECISION) {
+    dslashCuda(out.odd, cudaHGauge, in.even, 1, 0);
+    dslashCuda(out.even, cudaHGauge, in.odd, 0, 0);
+  }
+  xpayCuda((float*)in.even, -inv_param->kappa, (float*)out.even, Nh*spinorSiteSize);
+  xpayCuda((float*)in.odd, -inv_param->kappa, (float*)out.odd, Nh*spinorSiteSize);
+
+  retrieveSpinorField(h_out, out, inv_param->cpu_prec, 
+		      inv_param->cuda_prec, inv_param->dirac_order);
+
+  freeParitySpinor(in.even);
+  freeParitySpinor(in.odd);
+  freeParitySpinor(out.even);
+  freeParitySpinor(out.odd);
+}
+
+void MatDagQuda(void *h_out, void *h_in, QudaInvertParam *inv_param) {
+  FullSpinor in, out;
+  in.even = allocateParitySpinor();
+  in.odd = allocateParitySpinor();
+  out.even = allocateParitySpinor();
+  out.odd = allocateParitySpinor();
+
+  loadSpinorField(in, h_in, inv_param->cpu_prec, 
+		  inv_param->cuda_prec, inv_param->dirac_order);
+
+  if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+    dslashCuda(out.odd, cudaGauge, in.even, 1, 1);
+    dslashCuda(out.even, cudaGauge, in.odd, 0, 1);
+  } else if (inv_param->cuda_prec == QUDA_HALF_PRECISION) {
+    dslashCuda(out.odd, cudaHGauge, in.even, 1, 1);
+    dslashCuda(out.even, cudaHGauge, in.odd, 0, 1);
+  }
+  xpayCuda((float*)in.even, -inv_param->kappa, (float*)out.even, Nh*spinorSiteSize);
+  xpayCuda((float*)in.odd, -inv_param->kappa, (float*)out.odd, Nh*spinorSiteSize);
+
+  retrieveSpinorField(h_out, out, inv_param->cpu_prec, 
+		      inv_param->cuda_prec, inv_param->dirac_order);
+
+  freeParitySpinor(in.even);
+  freeParitySpinor(in.odd);
+  freeParitySpinor(out.even);
+  freeParitySpinor(out.odd);
+}
+
 void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 {
   invert_param = param;

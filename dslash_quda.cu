@@ -514,3 +514,33 @@ void MatPCDagMatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
   MatPCCuda(out, gauge, in, kappa, tmp, matpc_type);
   MatPCDagCuda(out, gauge, out, kappa, tmp, matpc_type);
 }
+
+// Apply the full operator
+void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, float kappa) {
+
+  if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+    dslashCuda(out.odd, gauge, in.even, 1, 0);
+    dslashCuda(out.even, gauge, in.odd, 0, 0);
+    xpayCuda((float*)in.even, -kappa, (float*)out.even, Nh*spinorSiteSize);
+    xpayCuda((float*)in.odd, -kappa, (float*)out.odd, Nh*spinorSiteSize);
+  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+    printf("Half precision not supported in MatCuda\n");
+    exit(-1);
+  }
+
+}
+
+// Apply the full operator dagger
+void MatDaggerCuda(FullSpinor out, FullGauge gauge, FullSpinor in, float kappa) {
+
+  if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+    dslashCuda(out.odd, gauge, in.even, 1, 1);
+    dslashCuda(out.even, gauge, in.odd, 0, 1);
+    xpayCuda((float*)in.even, -kappa, (float*)out.even, Nh*spinorSiteSize);
+    xpayCuda((float*)in.odd, -kappa, (float*)out.odd, Nh*spinorSiteSize);
+  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+    printf("Half precision not supported in MatDaggerCuda\n");
+    exit(-1);
+  }
+
+}

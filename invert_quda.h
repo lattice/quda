@@ -66,6 +66,9 @@ extern "C" {
   void MatPCDagQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
   void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
+  void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
+  void MatDagQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
+
   void endQuda(void);
 
   void printGaugeParam(QudaGaugeParam *);
