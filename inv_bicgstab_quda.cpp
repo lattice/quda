@@ -49,7 +49,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
   QudaSumFloat r0Norm = rNorm;
   QudaSumFloat maxrx = rNorm;
   QudaSumFloat maxrr = rNorm;
-  QudaSumFloat delta = 5e-1;
+  QudaSumFloat delta = 1e-5;
 
   int k=0;
   int xUpdate = 0, rUpdate = 0;
@@ -100,7 +100,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
     rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, (float2*)p, omega, (float2*)r, 
 						(float2*)x, (float2*)t, (float2*)b, len/2);
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
-
+    
     // reliable updates (ideally should be double precision)
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;

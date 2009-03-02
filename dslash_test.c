@@ -33,20 +33,20 @@ void printSpinorHalfField(float *spinor) {
 void init() {
 
   gaugeParam.cpu_prec = QUDA_SINGLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_HALF_PRECISION;
+  gaugeParam.cuda_prec = QUDA_SINGLE_PRECISION;
   gaugeParam.X = L1;
   gaugeParam.Y = L2;
   gaugeParam.Z = L3;
   gaugeParam.T = L4;
   gaugeParam.anisotropy = 2.3;
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_8;
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param = &gaugeParam;
 
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.kappa = kappa;
   invert_param = &inv_param;
@@ -113,7 +113,7 @@ void dslashRef() {
 double dslashCUDA() {
 
   // execute kernel
-  const int LOOPS = 200;
+  const int LOOPS = 20;
   printf("Executing %d kernel loops...", LOOPS);
   fflush(stdout);
   stopwatchStart();

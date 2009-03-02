@@ -1,5 +1,5 @@
 
-#ifdef REDUCE_KNUTH_SUMMATION
+#ifdef REDUCE_KAHAN_SUMMATION
 
 
 #define DSACC(c0, c1, a0, a1) dsadd((c0), (c1), (c0), (c1), (a0), (a1))
@@ -65,12 +65,12 @@ QudaSumFloat REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     
     // copy result from device to host, and perform final reduction on CPU
     cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
-    double gpu_result = 0;
+    double cpu_sum = 0;
     for (int i = 0; i < blocks; i++) 
-        gpu_result += h_odata[i];
+      cpu_sum += h_odata[i];
     
     cudaFree(d_odata);    
-    return (QudaSumFloat)gpu_result;
+    return (QudaSumFloat)cpu_sum;
 }
 
 
@@ -134,12 +134,12 @@ QudaSumFloat REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     
     // copy result from device to host, and perform final reduction on CPU
     cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
-    double gpu_result = 0;
+    double cpu_sum = 0;
     for (int i = 0; i < blocks; i++) 
-        gpu_result += h_odata[i];
+      cpu_sum += h_odata[i];
     
     cudaFree(d_odata);    
-    return (QudaSumFloat)gpu_result;
+    return (QudaSumFloat)cpu_sum;
 }
 
 #endif // REDUCE_DOUBLE_PRECISION

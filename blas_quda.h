@@ -4,10 +4,12 @@
 #ifndef _QUDA_BLAS_H
 #define _QUDA_BLAS_H
 
-#if QudaSumFloat==double
+#ifdef REDUCE_DOUBLE 
+#define QudaSumFloat double
 #define QudaSumComplex cuDoubleComplex
 #define QudaSumFloat3 double3
 #else
+#define QudaSumFloat float
 #define QudaSumComplex cuComplex
 #define QudaSumFloat3 float3
 #endif

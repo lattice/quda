@@ -1,5 +1,5 @@
 
-#ifdef REDUCE_KNUTH_SUMMATION
+#ifdef REDUCE_KAHAN_SUMMATION
 
 
 #define DSACC(c0, c1, a0, a1) dsadd((c0), (c1), (c0), (c1), (a0), (a1))

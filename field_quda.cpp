@@ -566,14 +566,14 @@ void loadGaugeField(void *gauge) {
 
 inline void packFloat4(float4* a, float *b) {
   __m128 SSEtmp;
-  SSEtmp = _mm_load_ps((const float*)b);
+  SSEtmp = _mm_loadu_ps((const float*)b);
   _mm_store_ps((float*)a, SSEtmp);
   //a->x = b[0]; a->y = b[1]; a->z = b[2]; a->w = b[3];
 }
 
 inline void unpackFloat4(float *a, float4 *b) {
   __m128 SSEtmp;
-  SSEtmp = _mm_load_ps((const float*)b);
+  SSEtmp = _mm_loadu_ps((const float*)b);
   _mm_store_ps((float*)a, SSEtmp);
   //a[0] = b->x; a[1] = b->y; a[2] = b->z; a[3] = b->w;
 }
@@ -775,8 +775,8 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
     } else if (!hSpinor1.spinorHalf || !hSpinor1.spinorNorm ||
 	       !hSpinor2.spinorHalf || !hSpinor2.spinorNorm) {
       printf("allocateSpinorHalf error %u %u %u %u\n", 
-	     hSpinor1.spinorHalf, hSpinor1.spinorNorm,
-	     hSpinor2.spinorHalf, hSpinor2.spinorNorm);
+	     (unsigned long)hSpinor1.spinorHalf, (unsigned long)hSpinor1.spinorNorm,
+	     (unsigned long)hSpinor2.spinorHalf, (unsigned long)hSpinor2.spinorNorm);
       exit(-1);
     }
   }
