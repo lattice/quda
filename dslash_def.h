@@ -1,26 +1,27 @@
 // dslash_def.h - Dslash kernel definitions
 
-// There are currently 32 different variants of the Dslash kernel,
-// each one characterized by a set of 5 options, where each option can
-// take one of two values (2^5 = 32).  This file is structured so that
-// the C preprocessor loops through all 32 variants (in a manner
+// There are currently 64 different variants of the Dslash kernel,
+// each one characterized by a set of 6 options, where each option can
+// take one of two values (2^6 = 64).  This file is structured so that
+// the C preprocessor loops through all 64 variants (in a manner
 // resembling a binary counter), sets the appropriate macros, and
 // defines the corresponding functions.
 //
-// For an example of the function naming conventions, consider
+// As an example of the function naming conventions, consider
 //
-// dslashSH12DaggerXpayKernel(float4* g_out, int oddBit, float a).
+// dslashSHS12DaggerXpayKernel(float4* g_out, int oddBit, float a).
 //
 // This is a Dslash^dagger kernel where the gauge field is read in single
-// precision (S), the spinor field is read in half precision (H), each
-// gauge matrix is reconstructed from 12 real numbers, and the result is
-// multiplied by "a" and accumulated into an input vector (Xpay).
-// In other words, a general function name is given by the concatenation
-// of the following 5 fields, with "dslash" at the beginning and "Kernel"
-// at the end:
+// precision (S), the spinor field is read in half precision (H), the clover
+// term is read in single precision (S), each gauge matrix is reconstructed
+// from 12 real numbers, and the result is multiplied by "a" and summed
+// with an input vector (Xpay).  More generally, each function name is given
+// by the concatenation of the following 6 fields, with "dslash" at the
+// beginning and "Kernel" at the end:
 //
 // DD_GPREC_F = S, H
 // DD_SPREC_F = S, H
+// DD_CPREC_F = S, [blank]; the latter corresponds to plain Wilson
 // DD_RECON_F = 12, 8
 // DD_DAG_F = Dagger, [blank]
 // DD_XPAY_F = Xpay, [blank]
@@ -35,6 +36,7 @@
 #define DD_RECON 0
 #define DD_GPREC 0
 #define DD_SPREC 0
+#define DD_CPREC 0
 #endif
 
 // set options for current iteration
@@ -107,13 +109,22 @@
 #endif
 #endif
 
-#define DD_CONCAT(g,s,r,d,x) dslash ## g ## s ## r ## d ## x ## Kernel
-#define DD_FUNC(g,s,r,d,x) DD_CONCAT(g,s,r,d,x)
+#if (DD_CPREC==0) // single-precision clover term
+#define DD_CPREC_F S
+#define CLOVERTEX cloverTexSingle
+#define READ_CLOVER READ_CLOVER_SINGLE
+#define DSLASH_CLOVER
+#else             // no clover term
+#define DD_CPREC_F
+#endif
+
+#define DD_CONCAT(g,s,c,r,d,x) dslash ## g ## s ## c ## r ## d ## x ## Kernel
+#define DD_FUNC(g,s,c,r,d,x) DD_CONCAT(g,s,c,r,d,x)
 
 // define the kernel
 
 __global__ void
-DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_PARAM1, DD_PARAM2) {
+DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_PARAM1, DD_PARAM2) {
 #if DD_DAG
 #include "dslash_dagger_core.h"
 #else
@@ -125,6 +136,7 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_PARAM1, DD_P
 
 #undef DD_GPREC_F
 #undef DD_SPREC_F
+#undef DD_CPREC_F
 #undef DD_RECON_F
 #undef DD_DAG_F
 #undef DD_XPAY_F
@@ -145,6 +157,9 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_PARAM1, DD_P
 #undef WRITE_SPINOR
 #undef ACCUMTEX
 #undef READ_ACCUM
+#undef CLOVERTEX
+#undef READ_CLOVER
+#undef DSLASH_CLOVER
 
 // prepare next set of options, or clean up after final iteration
 
@@ -180,6 +195,13 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_PARAM1, DD_P
 #undef DD_SPREC
 #define DD_SPREC 1
 #else
+#undef DD_SPREC
+#define DD_SPREC 0
+
+#if (DD_CPREC==0)
+#undef DD_CPREC
+#define DD_CPREC 1
+#else
 
 #undef DD_LOOP
 #undef DD_DAG
@@ -187,7 +209,9 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_PARAM1, DD_P
 #undef DD_RECON
 #undef DD_GPREC
 #undef DD_SPREC
+#undef DD_CPREC
 
+#endif // DD_CPREC
 #endif // DD_SPREC
 #endif // DD_GPREC
 #endif // DD_RECON

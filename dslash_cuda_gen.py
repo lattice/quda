@@ -120,7 +120,10 @@ def h1_re(h, c): return ["a","b"][h]+`c`+"_re"
 def h1_im(h, c): return ["a","b"][h]+`c`+"_im"
 def h2_re(h, c): return ["A","B"][h]+`c`+"_re"
 def h2_im(h, c): return ["A","B"][h]+`c`+"_im"
-
+def c_re(b, sm, cm, sn, cn): return "c"+`(sm+2*b)`+`cm`+"_"+`(sn+2*b)`+`cn`+"_re"
+def c_im(b, sm, cm, sn, cn): return "c"+`(sm+2*b)`+`cm`+"_"+`(sn+2*b)`+`cn`+"_im"
+def a_re(b, s, c): return "a"+`(s+2*b)`+`c`+"_re"
+def a_im(b, s, c): return "a"+`(s+2*b)`+`c`+"_im"
 
 
 def prolog():
@@ -129,18 +132,23 @@ def prolog():
     str.append("#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n")
     str.append("#define SHARED_BYTES (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))\n\n")
     
+    str.append("// input spinor\n")
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             str.append("#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n")
             str.append("#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n")
     str.append("\n")
+
+    str.append("// gauge link\n")
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
             str.append("#define "+g_re(0,m,n)+" G"+nthFloat4(2*i+0)+"\n")
             str.append("#define "+g_im(0,m,n)+" G"+nthFloat4(2*i+1)+"\n")
     str.append("\n")
+
+    str.append("// conjugated gauge link\n")
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
@@ -148,11 +156,49 @@ def prolog():
             str.append("#define "+g_im(1,m,n)+" (-"+g_im(0,n,m)+")\n")
     str.append("\n")
 
-    # last two components of the 5th float4 used for temp storage
+    str.append("// temporaries\n")
     str.append("#define A_re G"+nthFloat4(18)+"\n")
     str.append("#define A_im G"+nthFloat4(19)+"\n")    
-
     str.append("\n")
+
+    str.append("// first chiral block of inverted clover term\n")
+    i = 0
+    for m in range(0,6):
+        s = m/3
+        c = m%3
+        str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat4(i)+"\n")
+        i += 1
+    for n in range(0,6):
+        sn = n/3
+        cn = n%3
+        for m in range(n+1,6):
+            sm = m/3
+            cm = m%3
+            str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat4(i)+"\n")
+            str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat4(i+1)+"\n")
+            i += 2
+    for n in range(0,6):
+        sn = n/3
+        cn = n%3
+        for m in range(0,n):
+            sm = m/3
+            cm = m%3
+            str.append("#define "+c_re(0,sm,cm,sn,cn)+" (+"+c_re(0,sn,cn,sm,cm)+")\n")
+            str.append("#define "+c_im(0,sm,cm,sn,cn)+" (-"+c_im(0,sn,cn,sm,cm)+")\n")
+    str.append("\n")
+
+    str.append("// second chiral block of inverted clover term (reuses C0,...,C9)\n")
+    for n in range(0,6):
+        sn = n/3
+        cn = n%3
+        for m in range(0,6):
+            sm = m/3
+            cm = m%3
+            str.append("#define "+c_re(1,sm,cm,sn,cn)+" "+c_re(0,sm,cm,sn,cn)+"\n")
+            if m != n: str.append("#define "+c_im(1,sm,cm,sn,cn)+" "+c_im(0,sm,cm,sn,cn)+"\n")
+    str.append("\n")
+
+    str.append("// output spinor\n")
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -170,6 +216,7 @@ def prolog():
 """
 
 #include "read_gauge.h"
+#include "read_clover.h"
 #include "io_spinor.h"
 
 int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
@@ -191,32 +238,6 @@ int x1 = X % L1;
             str.append(out_re(s,c) + " = " + out_im(s,c)+" = 0;\n")
     str.append("\n")
     
-    return ''.join(str)
-# end def prolog
-
-
-
-def epilog():
-    str = []
-    str.append(
-"""
-#ifdef DSLASH_XPAY
-    READ_ACCUM(ACCUMTEX)
-""")
-    
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
-            str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
-    str.append("#endif\n\n")
-    
-    str.append(
-"""
-    // write spinor field back to device memory
-    WRITE_SPINOR();
-
-""")
     return ''.join(str)
 # end def prolog
 
@@ -377,12 +398,122 @@ def gen(dir):
 # end def gen
 
 
+def to_chiral_basis(c):
+    str = []
+    str.append("float "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n")
+    str.append("float "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n")
+    str.append("\n")
+
+    for s in range (0,4):
+        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";\n")
+
+    return block(''.join(str))
+# end def to_chiral_basis
+
+
+def from_chiral_basis(c): # note: factor of 1/2 is included in clover term normalization
+    str = []
+    str.append("float "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n")
+    str.append("float "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n")
+    str.append("\n")
+
+    for s in range (0,4):
+        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";\n")
+
+    return block(''.join(str))
+# end def from_chiral_basis
+
+
+def clover_mult(chi):
+    str = []
+    str.append("READ_CLOVER(CLOVERTEX, "+`chi`+")\n")
+    str.append("\n")
+
+    for s in range (0,2):
+        for c in range (0,3):
+            str.append("float "+a_re(chi,s,c)+" = 0; float "+a_im(chi,s,c)+" = 0;\n")
+    str.append("\n")
+
+    for sm in range (0,2):
+        for cm in range (0,3):
+            for sn in range (0,2):
+                for cn in range (0,3):
+                    str.append(a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn))
+                    if (sn != sm) or (cn != cm): str.append(" - "+c_im(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n")
+                    else: str.append(";\n")
+                    str.append(a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn))
+                    if (sn != sm) or (cn != cm): str.append(" + "+c_im(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n")
+                    else: str.append(";\n")
+            str.append("\n")
+
+    for s in range (0,2):
+        for c in range (0,3):
+            str.append(out_re(2*chi+s,c)+" = "+a_re(chi,s,c)+"; "+out_im(2*chi+s,c)+" = "+a_im(chi,s,c)+";\n")
+    str.append("\n")
+
+    return block(''.join(str))+"\n"
+# end def clover_mult
+
+
+def clover():
+    str = []
+    str.append("#ifdef DSLASH_CLOVER\n\n")
+    str.append("// change to chiral basis\n")
+    str.append(to_chiral_basis(0) + to_chiral_basis(1) + to_chiral_basis(2) + "\n")
+    str.append("// apply first chiral block\n")
+    str.append(clover_mult(0))
+    str.append("// apply second chiral block\n")
+    str.append(clover_mult(1))
+    str.append("// change back from chiral basis\n")
+    str.append("// (note: required factor of 1/2 is included in clover term normalization)\n")
+    str.append(from_chiral_basis(0) + from_chiral_basis(1) + from_chiral_basis(2))
+    str.append("#endif // DSLASH_CLOVER\n")
+
+    return ''.join(str)+"\n"
+# end def clover
+
+
+def epilog():
+    str = []
+    str.append(
+"""
+#ifdef DSLASH_XPAY
+    READ_ACCUM(ACCUMTEX)
+""")
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
+            str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
+    str.append("#endif // DSLASH_XPAY\n\n")
+    
+    str.append(
+"""
+    // write spinor field back to device memory
+    WRITE_SPINOR();
+
+""")
+    return ''.join(str)
+# end def epilog
+
 
 def generate():
-    return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + epilog()
+    return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + clover() + epilog()
 
 dagger = False
-sharedFloats = 0
+sharedFloats = 19
 dagger = True
 
 print generate()

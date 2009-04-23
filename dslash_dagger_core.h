@@ -1,8 +1,9 @@
 // *** CUDA DSLASH DAGGER ***
 
-#define SHARED_FLOATS_PER_THREAD 0
+#define SHARED_FLOATS_PER_THREAD 19
 #define SHARED_BYTES (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))
 
+// input spinor
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -28,6 +29,7 @@
 #define i32_re I5.z
 #define i32_im I5.w
 
+// gauge link
 #define g00_re G0.x
 #define g00_im G0.y
 #define g01_re G0.z
@@ -47,6 +49,7 @@
 #define g22_re G4.x
 #define g22_im G4.y
 
+// conjugated gauge link
 #define gT00_re (+g00_re)
 #define gT00_im (-g00_im)
 #define gT01_re (+g10_re)
@@ -66,28 +69,166 @@
 #define gT22_re (+g22_re)
 #define gT22_im (-g22_im)
 
+// temporaries
 #define A_re G4.z
 #define A_im G4.w
 
-volatile float o00_re;
-volatile float o00_im;
-volatile float o01_re;
-volatile float o01_im;
-volatile float o02_re;
-volatile float o02_im;
-volatile float o10_re;
-volatile float o10_im;
-volatile float o11_re;
-volatile float o11_im;
-volatile float o12_re;
-volatile float o12_im;
-volatile float o20_re;
-volatile float o20_im;
-volatile float o21_re;
-volatile float o21_im;
-volatile float o22_re;
-volatile float o22_im;
-volatile float o30_re;
+// first chiral block of inverted clover term
+#define c00_00_re C0.x
+#define c01_01_re C0.y
+#define c02_02_re C0.z
+#define c10_10_re C0.w
+#define c11_11_re C1.x
+#define c12_12_re C1.y
+#define c01_00_re C1.z
+#define c01_00_im C1.w
+#define c02_00_re C2.x
+#define c02_00_im C2.y
+#define c10_00_re C2.z
+#define c10_00_im C2.w
+#define c11_00_re C3.x
+#define c11_00_im C3.y
+#define c12_00_re C3.z
+#define c12_00_im C3.w
+#define c02_01_re C4.x
+#define c02_01_im C4.y
+#define c10_01_re C4.z
+#define c10_01_im C4.w
+#define c11_01_re C5.x
+#define c11_01_im C5.y
+#define c12_01_re C5.z
+#define c12_01_im C5.w
+#define c10_02_re C6.x
+#define c10_02_im C6.y
+#define c11_02_re C6.z
+#define c11_02_im C6.w
+#define c12_02_re C7.x
+#define c12_02_im C7.y
+#define c11_10_re C7.z
+#define c11_10_im C7.w
+#define c12_10_re C8.x
+#define c12_10_im C8.y
+#define c12_11_re C8.z
+#define c12_11_im C8.w
+#define c00_01_re (+c01_00_re)
+#define c00_01_im (-c01_00_im)
+#define c00_02_re (+c02_00_re)
+#define c00_02_im (-c02_00_im)
+#define c01_02_re (+c02_01_re)
+#define c01_02_im (-c02_01_im)
+#define c00_10_re (+c10_00_re)
+#define c00_10_im (-c10_00_im)
+#define c01_10_re (+c10_01_re)
+#define c01_10_im (-c10_01_im)
+#define c02_10_re (+c10_02_re)
+#define c02_10_im (-c10_02_im)
+#define c00_11_re (+c11_00_re)
+#define c00_11_im (-c11_00_im)
+#define c01_11_re (+c11_01_re)
+#define c01_11_im (-c11_01_im)
+#define c02_11_re (+c11_02_re)
+#define c02_11_im (-c11_02_im)
+#define c10_11_re (+c11_10_re)
+#define c10_11_im (-c11_10_im)
+#define c00_12_re (+c12_00_re)
+#define c00_12_im (-c12_00_im)
+#define c01_12_re (+c12_01_re)
+#define c01_12_im (-c12_01_im)
+#define c02_12_re (+c12_02_re)
+#define c02_12_im (-c12_02_im)
+#define c10_12_re (+c12_10_re)
+#define c10_12_im (-c12_10_im)
+#define c11_12_re (+c12_11_re)
+#define c11_12_im (-c12_11_im)
+
+// second chiral block of inverted clover term (reuses C0,...,C9)
+#define c20_20_re c00_00_re
+#define c21_20_re c01_00_re
+#define c21_20_im c01_00_im
+#define c22_20_re c02_00_re
+#define c22_20_im c02_00_im
+#define c30_20_re c10_00_re
+#define c30_20_im c10_00_im
+#define c31_20_re c11_00_re
+#define c31_20_im c11_00_im
+#define c32_20_re c12_00_re
+#define c32_20_im c12_00_im
+#define c20_21_re c00_01_re
+#define c20_21_im c00_01_im
+#define c21_21_re c01_01_re
+#define c22_21_re c02_01_re
+#define c22_21_im c02_01_im
+#define c30_21_re c10_01_re
+#define c30_21_im c10_01_im
+#define c31_21_re c11_01_re
+#define c31_21_im c11_01_im
+#define c32_21_re c12_01_re
+#define c32_21_im c12_01_im
+#define c20_22_re c00_02_re
+#define c20_22_im c00_02_im
+#define c21_22_re c01_02_re
+#define c21_22_im c01_02_im
+#define c22_22_re c02_02_re
+#define c30_22_re c10_02_re
+#define c30_22_im c10_02_im
+#define c31_22_re c11_02_re
+#define c31_22_im c11_02_im
+#define c32_22_re c12_02_re
+#define c32_22_im c12_02_im
+#define c20_30_re c00_10_re
+#define c20_30_im c00_10_im
+#define c21_30_re c01_10_re
+#define c21_30_im c01_10_im
+#define c22_30_re c02_10_re
+#define c22_30_im c02_10_im
+#define c30_30_re c10_10_re
+#define c31_30_re c11_10_re
+#define c31_30_im c11_10_im
+#define c32_30_re c12_10_re
+#define c32_30_im c12_10_im
+#define c20_31_re c00_11_re
+#define c20_31_im c00_11_im
+#define c21_31_re c01_11_re
+#define c21_31_im c01_11_im
+#define c22_31_re c02_11_re
+#define c22_31_im c02_11_im
+#define c30_31_re c10_11_re
+#define c30_31_im c10_11_im
+#define c31_31_re c11_11_re
+#define c32_31_re c12_11_re
+#define c32_31_im c12_11_im
+#define c20_32_re c00_12_re
+#define c20_32_im c00_12_im
+#define c21_32_re c01_12_re
+#define c21_32_im c01_12_im
+#define c22_32_re c02_12_re
+#define c22_32_im c02_12_im
+#define c30_32_re c10_12_re
+#define c30_32_im c10_12_im
+#define c31_32_re c11_12_re
+#define c31_32_im c11_12_im
+#define c32_32_re c12_12_re
+
+// output spinor
+#define o00_re s[0]
+#define o00_im s[1]
+#define o01_re s[2]
+#define o01_im s[3]
+#define o02_re s[4]
+#define o02_im s[5]
+#define o10_re s[6]
+#define o10_im s[7]
+#define o11_re s[8]
+#define o11_im s[9]
+#define o12_re s[10]
+#define o12_im s[11]
+#define o20_re s[12]
+#define o20_im s[13]
+#define o21_re s[14]
+#define o21_im s[15]
+#define o22_re s[16]
+#define o22_im s[17]
+#define o30_re s[18]
 volatile float o30_im;
 volatile float o31_re;
 volatile float o31_im;
@@ -97,6 +238,7 @@ volatile float o32_im;
 
 
 #include "read_gauge.h"
+#include "read_clover.h"
 #include "io_spinor.h"
 
 int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
@@ -106,6 +248,9 @@ int x4 = X/(L3*L2*L1);
 int x3 = (X/(L2*L1)) % L3;
 int x2 = (X/L1) % L2;
 int x1 = X % L1;
+
+extern __shared__ float s_data[];
+volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;
 
 o00_re = o00_im = 0;
 o01_re = o01_im = 0;
@@ -834,6 +979,300 @@ o32_re = o32_im = 0;
     }
 }
 
+#ifdef DSLASH_CLOVER
+
+// change to chiral basis
+{
+    float a00_re =  o10_re + o30_re;
+    float a00_im =  o10_im + o30_im;
+    float a10_re = -o00_re - o20_re;
+    float a10_im = -o00_im - o20_im;
+    float a20_re =  o10_re - o30_re;
+    float a20_im =  o10_im - o30_im;
+    float a30_re = -o00_re + o20_re;
+    float a30_im = -o00_im + o20_im;
+    
+    o00_re = a00_re;
+    o10_re = a10_re;
+    o20_re = a20_re;
+    o30_re = a30_re;
+}
+{
+    float a01_re =  o11_re + o31_re;
+    float a01_im =  o11_im + o31_im;
+    float a11_re = -o01_re - o21_re;
+    float a11_im = -o01_im - o21_im;
+    float a21_re =  o11_re - o31_re;
+    float a21_im =  o11_im - o31_im;
+    float a31_re = -o01_re + o21_re;
+    float a31_im = -o01_im + o21_im;
+    
+    o01_re = a01_re;
+    o11_re = a11_re;
+    o21_re = a21_re;
+    o31_re = a31_re;
+}
+{
+    float a02_re =  o12_re + o32_re;
+    float a02_im =  o12_im + o32_im;
+    float a12_re = -o02_re - o22_re;
+    float a12_im = -o02_im - o22_im;
+    float a22_re =  o12_re - o32_re;
+    float a22_im =  o12_im - o32_im;
+    float a32_re = -o02_re + o22_re;
+    float a32_im = -o02_im + o22_im;
+    
+    o02_re = a02_re;
+    o12_re = a12_re;
+    o22_re = a22_re;
+    o32_re = a32_re;
+}
+
+// apply first chiral block
+{
+    READ_CLOVER(CLOVERTEX, 0)
+    
+    float a00_re = 0; float a00_im = 0;
+    float a01_re = 0; float a01_im = 0;
+    float a02_re = 0; float a02_im = 0;
+    float a10_re = 0; float a10_im = 0;
+    float a11_re = 0; float a11_im = 0;
+    float a12_re = 0; float a12_im = 0;
+    
+    a00_re += c00_00_re * o00_re;
+    a00_im += c00_00_re * o00_im;
+    a00_re += c00_01_re * o01_re - c00_01_im * o01_im;
+    a00_im += c00_01_re * o01_im + c00_01_im * o01_re;
+    a00_re += c00_02_re * o02_re - c00_02_im * o02_im;
+    a00_im += c00_02_re * o02_im + c00_02_im * o02_re;
+    a00_re += c00_10_re * o10_re - c00_10_im * o10_im;
+    a00_im += c00_10_re * o10_im + c00_10_im * o10_re;
+    a00_re += c00_11_re * o11_re - c00_11_im * o11_im;
+    a00_im += c00_11_re * o11_im + c00_11_im * o11_re;
+    a00_re += c00_12_re * o12_re - c00_12_im * o12_im;
+    a00_im += c00_12_re * o12_im + c00_12_im * o12_re;
+    
+    a01_re += c01_00_re * o00_re - c01_00_im * o00_im;
+    a01_im += c01_00_re * o00_im + c01_00_im * o00_re;
+    a01_re += c01_01_re * o01_re;
+    a01_im += c01_01_re * o01_im;
+    a01_re += c01_02_re * o02_re - c01_02_im * o02_im;
+    a01_im += c01_02_re * o02_im + c01_02_im * o02_re;
+    a01_re += c01_10_re * o10_re - c01_10_im * o10_im;
+    a01_im += c01_10_re * o10_im + c01_10_im * o10_re;
+    a01_re += c01_11_re * o11_re - c01_11_im * o11_im;
+    a01_im += c01_11_re * o11_im + c01_11_im * o11_re;
+    a01_re += c01_12_re * o12_re - c01_12_im * o12_im;
+    a01_im += c01_12_re * o12_im + c01_12_im * o12_re;
+    
+    a02_re += c02_00_re * o00_re - c02_00_im * o00_im;
+    a02_im += c02_00_re * o00_im + c02_00_im * o00_re;
+    a02_re += c02_01_re * o01_re - c02_01_im * o01_im;
+    a02_im += c02_01_re * o01_im + c02_01_im * o01_re;
+    a02_re += c02_02_re * o02_re;
+    a02_im += c02_02_re * o02_im;
+    a02_re += c02_10_re * o10_re - c02_10_im * o10_im;
+    a02_im += c02_10_re * o10_im + c02_10_im * o10_re;
+    a02_re += c02_11_re * o11_re - c02_11_im * o11_im;
+    a02_im += c02_11_re * o11_im + c02_11_im * o11_re;
+    a02_re += c02_12_re * o12_re - c02_12_im * o12_im;
+    a02_im += c02_12_re * o12_im + c02_12_im * o12_re;
+    
+    a10_re += c10_00_re * o00_re - c10_00_im * o00_im;
+    a10_im += c10_00_re * o00_im + c10_00_im * o00_re;
+    a10_re += c10_01_re * o01_re - c10_01_im * o01_im;
+    a10_im += c10_01_re * o01_im + c10_01_im * o01_re;
+    a10_re += c10_02_re * o02_re - c10_02_im * o02_im;
+    a10_im += c10_02_re * o02_im + c10_02_im * o02_re;
+    a10_re += c10_10_re * o10_re;
+    a10_im += c10_10_re * o10_im;
+    a10_re += c10_11_re * o11_re - c10_11_im * o11_im;
+    a10_im += c10_11_re * o11_im + c10_11_im * o11_re;
+    a10_re += c10_12_re * o12_re - c10_12_im * o12_im;
+    a10_im += c10_12_re * o12_im + c10_12_im * o12_re;
+    
+    a11_re += c11_00_re * o00_re - c11_00_im * o00_im;
+    a11_im += c11_00_re * o00_im + c11_00_im * o00_re;
+    a11_re += c11_01_re * o01_re - c11_01_im * o01_im;
+    a11_im += c11_01_re * o01_im + c11_01_im * o01_re;
+    a11_re += c11_02_re * o02_re - c11_02_im * o02_im;
+    a11_im += c11_02_re * o02_im + c11_02_im * o02_re;
+    a11_re += c11_10_re * o10_re - c11_10_im * o10_im;
+    a11_im += c11_10_re * o10_im + c11_10_im * o10_re;
+    a11_re += c11_11_re * o11_re;
+    a11_im += c11_11_re * o11_im;
+    a11_re += c11_12_re * o12_re - c11_12_im * o12_im;
+    a11_im += c11_12_re * o12_im + c11_12_im * o12_re;
+    
+    a12_re += c12_00_re * o00_re - c12_00_im * o00_im;
+    a12_im += c12_00_re * o00_im + c12_00_im * o00_re;
+    a12_re += c12_01_re * o01_re - c12_01_im * o01_im;
+    a12_im += c12_01_re * o01_im + c12_01_im * o01_re;
+    a12_re += c12_02_re * o02_re - c12_02_im * o02_im;
+    a12_im += c12_02_re * o02_im + c12_02_im * o02_re;
+    a12_re += c12_10_re * o10_re - c12_10_im * o10_im;
+    a12_im += c12_10_re * o10_im + c12_10_im * o10_re;
+    a12_re += c12_11_re * o11_re - c12_11_im * o11_im;
+    a12_im += c12_11_re * o11_im + c12_11_im * o11_re;
+    a12_re += c12_12_re * o12_re;
+    a12_im += c12_12_re * o12_im;
+    
+    o00_re = a00_re; o00_im = a00_im;
+    o01_re = a01_re; o01_im = a01_im;
+    o02_re = a02_re; o02_im = a02_im;
+    o10_re = a10_re; o10_im = a10_im;
+    o11_re = a11_re; o11_im = a11_im;
+    o12_re = a12_re; o12_im = a12_im;
+    
+}
+
+// apply second chiral block
+{
+    READ_CLOVER(CLOVERTEX, 1)
+    
+    float a20_re = 0; float a20_im = 0;
+    float a21_re = 0; float a21_im = 0;
+    float a22_re = 0; float a22_im = 0;
+    float a30_re = 0; float a30_im = 0;
+    float a31_re = 0; float a31_im = 0;
+    float a32_re = 0; float a32_im = 0;
+    
+    a20_re += c20_20_re * o20_re;
+    a20_im += c20_20_re * o20_im;
+    a20_re += c20_21_re * o21_re - c20_21_im * o21_im;
+    a20_im += c20_21_re * o21_im + c20_21_im * o21_re;
+    a20_re += c20_22_re * o22_re - c20_22_im * o22_im;
+    a20_im += c20_22_re * o22_im + c20_22_im * o22_re;
+    a20_re += c20_30_re * o30_re - c20_30_im * o30_im;
+    a20_im += c20_30_re * o30_im + c20_30_im * o30_re;
+    a20_re += c20_31_re * o31_re - c20_31_im * o31_im;
+    a20_im += c20_31_re * o31_im + c20_31_im * o31_re;
+    a20_re += c20_32_re * o32_re - c20_32_im * o32_im;
+    a20_im += c20_32_re * o32_im + c20_32_im * o32_re;
+    
+    a21_re += c21_20_re * o20_re - c21_20_im * o20_im;
+    a21_im += c21_20_re * o20_im + c21_20_im * o20_re;
+    a21_re += c21_21_re * o21_re;
+    a21_im += c21_21_re * o21_im;
+    a21_re += c21_22_re * o22_re - c21_22_im * o22_im;
+    a21_im += c21_22_re * o22_im + c21_22_im * o22_re;
+    a21_re += c21_30_re * o30_re - c21_30_im * o30_im;
+    a21_im += c21_30_re * o30_im + c21_30_im * o30_re;
+    a21_re += c21_31_re * o31_re - c21_31_im * o31_im;
+    a21_im += c21_31_re * o31_im + c21_31_im * o31_re;
+    a21_re += c21_32_re * o32_re - c21_32_im * o32_im;
+    a21_im += c21_32_re * o32_im + c21_32_im * o32_re;
+    
+    a22_re += c22_20_re * o20_re - c22_20_im * o20_im;
+    a22_im += c22_20_re * o20_im + c22_20_im * o20_re;
+    a22_re += c22_21_re * o21_re - c22_21_im * o21_im;
+    a22_im += c22_21_re * o21_im + c22_21_im * o21_re;
+    a22_re += c22_22_re * o22_re;
+    a22_im += c22_22_re * o22_im;
+    a22_re += c22_30_re * o30_re - c22_30_im * o30_im;
+    a22_im += c22_30_re * o30_im + c22_30_im * o30_re;
+    a22_re += c22_31_re * o31_re - c22_31_im * o31_im;
+    a22_im += c22_31_re * o31_im + c22_31_im * o31_re;
+    a22_re += c22_32_re * o32_re - c22_32_im * o32_im;
+    a22_im += c22_32_re * o32_im + c22_32_im * o32_re;
+    
+    a30_re += c30_20_re * o20_re - c30_20_im * o20_im;
+    a30_im += c30_20_re * o20_im + c30_20_im * o20_re;
+    a30_re += c30_21_re * o21_re - c30_21_im * o21_im;
+    a30_im += c30_21_re * o21_im + c30_21_im * o21_re;
+    a30_re += c30_22_re * o22_re - c30_22_im * o22_im;
+    a30_im += c30_22_re * o22_im + c30_22_im * o22_re;
+    a30_re += c30_30_re * o30_re;
+    a30_im += c30_30_re * o30_im;
+    a30_re += c30_31_re * o31_re - c30_31_im * o31_im;
+    a30_im += c30_31_re * o31_im + c30_31_im * o31_re;
+    a30_re += c30_32_re * o32_re - c30_32_im * o32_im;
+    a30_im += c30_32_re * o32_im + c30_32_im * o32_re;
+    
+    a31_re += c31_20_re * o20_re - c31_20_im * o20_im;
+    a31_im += c31_20_re * o20_im + c31_20_im * o20_re;
+    a31_re += c31_21_re * o21_re - c31_21_im * o21_im;
+    a31_im += c31_21_re * o21_im + c31_21_im * o21_re;
+    a31_re += c31_22_re * o22_re - c31_22_im * o22_im;
+    a31_im += c31_22_re * o22_im + c31_22_im * o22_re;
+    a31_re += c31_30_re * o30_re - c31_30_im * o30_im;
+    a31_im += c31_30_re * o30_im + c31_30_im * o30_re;
+    a31_re += c31_31_re * o31_re;
+    a31_im += c31_31_re * o31_im;
+    a31_re += c31_32_re * o32_re - c31_32_im * o32_im;
+    a31_im += c31_32_re * o32_im + c31_32_im * o32_re;
+    
+    a32_re += c32_20_re * o20_re - c32_20_im * o20_im;
+    a32_im += c32_20_re * o20_im + c32_20_im * o20_re;
+    a32_re += c32_21_re * o21_re - c32_21_im * o21_im;
+    a32_im += c32_21_re * o21_im + c32_21_im * o21_re;
+    a32_re += c32_22_re * o22_re - c32_22_im * o22_im;
+    a32_im += c32_22_re * o22_im + c32_22_im * o22_re;
+    a32_re += c32_30_re * o30_re - c32_30_im * o30_im;
+    a32_im += c32_30_re * o30_im + c32_30_im * o30_re;
+    a32_re += c32_31_re * o31_re - c32_31_im * o31_im;
+    a32_im += c32_31_re * o31_im + c32_31_im * o31_re;
+    a32_re += c32_32_re * o32_re;
+    a32_im += c32_32_re * o32_im;
+    
+    o20_re = a20_re; o20_im = a20_im;
+    o21_re = a21_re; o21_im = a21_im;
+    o22_re = a22_re; o22_im = a22_im;
+    o30_re = a30_re; o30_im = a30_im;
+    o31_re = a31_re; o31_im = a31_im;
+    o32_re = a32_re; o32_im = a32_im;
+    
+}
+
+// change back from chiral basis
+// (note: required factor of 1/2 is included in clover term normalization)
+{
+    float a00_re = -o10_re - o30_re;
+    float a00_im = -o10_im - o30_im;
+    float a10_re =  o00_re + o20_re;
+    float a10_im =  o00_im + o20_im;
+    float a20_re = -o10_re + o30_re;
+    float a20_im = -o10_im + o30_im;
+    float a30_re =  o00_re - o20_re;
+    float a30_im =  o00_im - o20_im;
+    
+    o00_re = a00_re;
+    o10_re = a10_re;
+    o20_re = a20_re;
+    o30_re = a30_re;
+}
+{
+    float a01_re = -o11_re - o31_re;
+    float a01_im = -o11_im - o31_im;
+    float a11_re =  o01_re + o21_re;
+    float a11_im =  o01_im + o21_im;
+    float a21_re = -o11_re + o31_re;
+    float a21_im = -o11_im + o31_im;
+    float a31_re =  o01_re - o21_re;
+    float a31_im =  o01_im - o21_im;
+    
+    o01_re = a01_re;
+    o11_re = a11_re;
+    o21_re = a21_re;
+    o31_re = a31_re;
+}
+{
+    float a02_re = -o12_re - o32_re;
+    float a02_im = -o12_im - o32_im;
+    float a12_re =  o02_re + o22_re;
+    float a12_im =  o02_im + o22_im;
+    float a22_re = -o12_re + o32_re;
+    float a22_im = -o12_im + o32_im;
+    float a32_re =  o02_re - o22_re;
+    float a32_im =  o02_im - o22_im;
+    
+    o02_re = a02_re;
+    o12_re = a12_re;
+    o22_re = a22_re;
+    o32_re = a32_re;
+}
+#endif // DSLASH_CLOVER
+
 
 #ifdef DSLASH_XPAY
     READ_ACCUM(ACCUMTEX)
@@ -861,7 +1300,7 @@ o32_re = o32_im = 0;
     o31_im = a*o31_im + accum5.y;
     o32_re = a*o32_re + accum5.z;
     o32_im = a*o32_im + accum5.w;
-#endif
+#endif // DSLASH_XPAY
 
 
     // write spinor field back to device memory

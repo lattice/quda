@@ -6,27 +6,30 @@
 // ----------------------------------------------------------------------
 // Cuda code
 
+// Single precision gauge field
+texture<float4, 1, cudaReadModeElementType> gauge0TexSingle;
+texture<float4, 1, cudaReadModeElementType> gauge1TexSingle;
+
 // Half precision gauge field
 texture<short4, 1, cudaReadModeNormalizedFloat> gauge0TexHalf;
 texture<short4, 1, cudaReadModeNormalizedFloat> gauge1TexHalf;
 
-// Single precision gauge field
-texture<float4, 1, cudaReadModeElementType> gauge0TexSingle;
-texture<float4, 1, cudaReadModeElementType> gauge1TexSingle;
+// Single precision input spinor field
+texture<float4, 1, cudaReadModeElementType> spinorTexSingle;
 
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> spinorTexHalf;
 texture<float, 1, cudaReadModeElementType> spinorTexNorm;
 
-// Single precision input spinor field
-texture<float4, 1, cudaReadModeElementType> spinorTexSingle;
-
 // Single precision accumulate spinor field
 texture<float4, 1, cudaReadModeElementType> accumTexSingle;
 
-// Single precision accumulate spinor field
+// Half precision accumulate spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> accumTexHalf;
 texture<float, 1, cudaReadModeElementType> accumTexNorm;
+
+// Single precision clover term
+texture<float4, 1, cudaReadModeElementType> cloverTexSingle;
 
 QudaGaugeParam *gauge_param;
 QudaInvertParam *invert_param;
