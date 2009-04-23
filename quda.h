@@ -36,12 +36,8 @@ extern "C" {
   
   typedef struct ParityGauge_s *ParityGauge;
   typedef struct ParitySpinor_s *ParitySpinor;
+  typedef struct ParityClover_s *ParityClover;
 
-  typedef struct {
-    ParitySpinor odd;
-    ParitySpinor even;
-  } FullSpinor;
-  
   typedef struct {
     Precision precision;
     ReconstructType reconstruct;
@@ -49,10 +45,21 @@ extern "C" {
     ParityGauge even;
   } FullGauge;
   
+  typedef struct {
+    ParitySpinor odd;
+    ParitySpinor even;
+  } FullSpinor;
+  
   typedef struct ParityHSpinor_S {
     short4 *spinorHalf;
     float *spinorNorm;
   } ParityHSpinor;
+
+  typedef struct {
+    Precision precision;
+    ParityClover odd;
+    ParityClover even;
+  } FullClover;
 
 #ifdef __cplusplus
 }

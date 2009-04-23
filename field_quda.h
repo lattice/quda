@@ -11,11 +11,15 @@ extern "C" {
   void allocateGaugeField();
   ParitySpinor allocateParitySpinor();
   FullSpinor allocateSpinorField();
+  ParityClover allocateParityClover();
+  FullClover allocateCloverField();
   
   void freeGaugeField();
   void freeParitySpinor(ParitySpinor spinor);
   void freeSpinorField(FullSpinor spinor);
   void freeSpinorBuffer();
+  void freeParityClover(ParityClover clover);
+  void freeCloverField(FullClover clover);
 
   void loadGaugeField(void *gauge);
   

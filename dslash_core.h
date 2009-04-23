@@ -983,14 +983,14 @@ o32_re = o32_im = 0;
 
 // change to chiral basis
 {
-    float a00_re =  o10_re + o30_re;
-    float a00_im =  o10_im + o30_im;
-    float a10_re = -o00_re - o20_re;
-    float a10_im = -o00_im - o20_im;
-    float a20_re =  o10_re - o30_re;
-    float a20_im =  o10_im - o30_im;
-    float a30_re = -o00_re + o20_re;
-    float a30_im = -o00_im + o20_im;
+    float a00_re = -o10_re - o30_re;
+    float a00_im = -o10_im - o30_im;
+    float a10_re =  o00_re + o20_re;
+    float a10_im =  o00_im + o20_im;
+    float a20_re = -o10_re + o30_re;
+    float a20_im = -o10_im + o30_im;
+    float a30_re =  o00_re - o20_re;
+    float a30_im =  o00_im - o20_im;
     
     o00_re = a00_re;
     o10_re = a10_re;
@@ -998,14 +998,14 @@ o32_re = o32_im = 0;
     o30_re = a30_re;
 }
 {
-    float a01_re =  o11_re + o31_re;
-    float a01_im =  o11_im + o31_im;
-    float a11_re = -o01_re - o21_re;
-    float a11_im = -o01_im - o21_im;
-    float a21_re =  o11_re - o31_re;
-    float a21_im =  o11_im - o31_im;
-    float a31_re = -o01_re + o21_re;
-    float a31_im = -o01_im + o21_im;
+    float a01_re = -o11_re - o31_re;
+    float a01_im = -o11_im - o31_im;
+    float a11_re =  o01_re + o21_re;
+    float a11_im =  o01_im + o21_im;
+    float a21_re = -o11_re + o31_re;
+    float a21_im = -o11_im + o31_im;
+    float a31_re =  o01_re - o21_re;
+    float a31_im =  o01_im - o21_im;
     
     o01_re = a01_re;
     o11_re = a11_re;
@@ -1013,14 +1013,14 @@ o32_re = o32_im = 0;
     o31_re = a31_re;
 }
 {
-    float a02_re =  o12_re + o32_re;
-    float a02_im =  o12_im + o32_im;
-    float a12_re = -o02_re - o22_re;
-    float a12_im = -o02_im - o22_im;
-    float a22_re =  o12_re - o32_re;
-    float a22_im =  o12_im - o32_im;
-    float a32_re = -o02_re + o22_re;
-    float a32_im = -o02_im + o22_im;
+    float a02_re = -o12_re - o32_re;
+    float a02_im = -o12_im - o32_im;
+    float a12_re =  o02_re + o22_re;
+    float a12_im =  o02_im + o22_im;
+    float a22_re = -o12_re + o32_re;
+    float a22_im = -o12_im + o32_im;
+    float a32_re =  o02_re - o22_re;
+    float a32_im =  o02_im - o22_im;
     
     o02_re = a02_re;
     o12_re = a12_re;
@@ -1227,14 +1227,14 @@ o32_re = o32_im = 0;
 // change back from chiral basis
 // (note: required factor of 1/2 is included in clover term normalization)
 {
-    float a00_re = -o10_re - o30_re;
-    float a00_im = -o10_im - o30_im;
-    float a10_re =  o00_re + o20_re;
-    float a10_im =  o00_im + o20_im;
-    float a20_re = -o10_re + o30_re;
-    float a20_im = -o10_im + o30_im;
-    float a30_re =  o00_re - o20_re;
-    float a30_im =  o00_im - o20_im;
+    float a00_re =  o10_re + o30_re;
+    float a00_im =  o10_im + o30_im;
+    float a10_re = -o00_re - o20_re;
+    float a10_im = -o00_im - o20_im;
+    float a20_re =  o10_re - o30_re;
+    float a20_im =  o10_im - o30_im;
+    float a30_re = -o00_re + o20_re;
+    float a30_im = -o00_im + o20_im;
     
     o00_re = a00_re;
     o10_re = a10_re;
@@ -1242,14 +1242,14 @@ o32_re = o32_im = 0;
     o30_re = a30_re;
 }
 {
-    float a01_re = -o11_re - o31_re;
-    float a01_im = -o11_im - o31_im;
-    float a11_re =  o01_re + o21_re;
-    float a11_im =  o01_im + o21_im;
-    float a21_re = -o11_re + o31_re;
-    float a21_im = -o11_im + o31_im;
-    float a31_re =  o01_re - o21_re;
-    float a31_im =  o01_im - o21_im;
+    float a01_re =  o11_re + o31_re;
+    float a01_im =  o11_im + o31_im;
+    float a11_re = -o01_re - o21_re;
+    float a11_im = -o01_im - o21_im;
+    float a21_re =  o11_re - o31_re;
+    float a21_im =  o11_im - o31_im;
+    float a31_re = -o01_re + o21_re;
+    float a31_im = -o01_im + o21_im;
     
     o01_re = a01_re;
     o11_re = a11_re;
@@ -1257,14 +1257,14 @@ o32_re = o32_im = 0;
     o31_re = a31_re;
 }
 {
-    float a02_re = -o12_re - o32_re;
-    float a02_im = -o12_im - o32_im;
-    float a12_re =  o02_re + o22_re;
-    float a12_im =  o02_im + o22_im;
-    float a22_re = -o12_re + o32_re;
-    float a22_im = -o12_im + o32_im;
-    float a32_re =  o02_re - o22_re;
-    float a32_im =  o02_im - o22_im;
+    float a02_re =  o12_re + o32_re;
+    float a02_im =  o12_im + o32_im;
+    float a12_re = -o02_re - o22_re;
+    float a12_im = -o02_im - o22_im;
+    float a22_re =  o12_re - o32_re;
+    float a22_im =  o12_im - o32_im;
+    float a32_re = -o02_re + o22_re;
+    float a32_im = -o02_im + o22_im;
     
     o02_re = a02_re;
     o12_re = a12_re;

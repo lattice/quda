@@ -400,14 +400,14 @@ def gen(dir):
 
 def to_chiral_basis(c):
     str = []
-    str.append("float "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n")
-    str.append("float "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n")
+    str.append("float "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n")
+    str.append("float "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n")
     str.append("\n")
 
     for s in range (0,4):
@@ -419,14 +419,14 @@ def to_chiral_basis(c):
 
 def from_chiral_basis(c): # note: factor of 1/2 is included in clover term normalization
     str = []
-    str.append("float "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n")
-    str.append("float "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n")
+    str.append("float "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n")
+    str.append("float "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n")
+    str.append("float "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n")
+    str.append("float "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n")
+    str.append("float "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n")
     str.append("\n")
 
     for s in range (0,4):
@@ -514,6 +514,6 @@ def generate():
 
 dagger = False
 sharedFloats = 19
-dagger = True
+#dagger = True
 
 print generate()

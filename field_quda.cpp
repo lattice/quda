@@ -11,6 +11,9 @@
 FullGauge cudaGauge;
 FullGauge cudaHGauge;
 
+// GPU clover matrix
+FullClover cudaClover;
+
 // Pinned memory for cpu-gpu memory copying
 float4 *packedSpinor1 = 0;
 float4 *packedSpinor2 = 0;
@@ -53,8 +56,30 @@ FullSpinor allocateSpinorField() {
   return ret;
 }
 
+ParityClover allocateParityClover() {
+  ParityClover ret;
+
+  if (cudaMalloc((void**)&ret, CLOVER_BYTES) == cudaErrorMemoryAllocation) {
+    printf("Error allocating clover term\n");
+    exit(0);
+  }   
+    
+  return ret;
+}
+
+FullClover allocateCloverField() {
+  FullClover ret;
+  ret.even = allocateParityClover();
+  ret.odd = allocateParityClover();
+  return ret;
+}
+
 void freeParitySpinor(ParitySpinor spinor) {
   cudaFree(spinor);
+}
+
+void freeParityClover(ParityClover clover) {
+  cudaFree(clover);
 }
 
 void freeGaugeField() {
@@ -72,6 +97,11 @@ void freeGaugeField() {
 void freeSpinorField(FullSpinor spinor) {
   cudaFree(spinor.even);
   cudaFree(spinor.odd);
+}
+
+void freeCloverField(FullClover clover) {
+  cudaFree(clover.even);
+  cudaFree(clover.odd);
 }
 
 void freeSpinorBuffer() {

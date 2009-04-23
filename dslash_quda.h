@@ -10,6 +10,7 @@
 
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
+#define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
 
 #define BLOCK_DIM (64) // threads per block
 #define GRID_DIM (Nh/BLOCK_DIM) // there are Nh threads in total
@@ -19,6 +20,8 @@
 #define PACKED12_GAUGE_BYTES (4*Nh*packed12GaugeSiteSize*sizeof(float))
 #define PACKED8_GAUGE_BYTES (4*Nh*packed8GaugeSiteSize*sizeof(float))
 
+#define CLOVER_BYTES (Nh*cloverSiteSize*sizeof(float))
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -27,6 +30,8 @@ extern "C" {
   extern FullGauge cudaHGauge;
   extern QudaGaugeParam *gauge_param;
   extern QudaInvertParam *invert_param;
+
+  extern FullClover cudaClover;
 
   extern ParityHSpinor hSpinor1;
   extern ParityHSpinor hSpinor2;
