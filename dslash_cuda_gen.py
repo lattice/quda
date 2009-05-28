@@ -398,7 +398,7 @@ def gen(dir):
 # end def gen
 
 
-def to_chiral_basis(c):
+def toChiralBasis(c):
     str = []
     str.append("float "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
     str.append("float "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
@@ -414,10 +414,10 @@ def to_chiral_basis(c):
         str.append(out_re(s,c)+" = "+a_re(0,s,c)+";\n")
 
     return block(''.join(str))
-# end def to_chiral_basis
+# end def toChiralBasis
 
 
-def from_chiral_basis(c): # note: factor of 1/2 is included in clover term normalization
+def fromChiralBasis(c): # note: factor of 1/2 is included in clover term normalization
     str = []
     str.append("float "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n")
     str.append("float "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n")
@@ -433,10 +433,10 @@ def from_chiral_basis(c): # note: factor of 1/2 is included in clover term norma
         str.append(out_re(s,c)+" = "+a_re(0,s,c)+";\n")
 
     return block(''.join(str))
-# end def from_chiral_basis
+# end def fromChiralBasis
 
 
-def clover_mult(chi):
+def cloverMult(chi):
     str = []
     str.append("READ_CLOVER(CLOVERTEX, "+`chi`+")\n")
     str.append("\n")
@@ -464,21 +464,21 @@ def clover_mult(chi):
     str.append("\n")
 
     return block(''.join(str))+"\n"
-# end def clover_mult
+# end def cloverMult
 
 
 def clover():
     str = []
     str.append("#ifdef DSLASH_CLOVER\n\n")
     str.append("// change to chiral basis\n")
-    str.append(to_chiral_basis(0) + to_chiral_basis(1) + to_chiral_basis(2) + "\n")
+    str.append(toChiralBasis(0) + toChiralBasis(1) + toChiralBasis(2) + "\n")
     str.append("// apply first chiral block\n")
-    str.append(clover_mult(0))
+    str.append(cloverMult(0))
     str.append("// apply second chiral block\n")
-    str.append(clover_mult(1))
+    str.append(cloverMult(1))
     str.append("// change back from chiral basis\n")
     str.append("// (note: required factor of 1/2 is included in clover term normalization)\n")
-    str.append(from_chiral_basis(0) + from_chiral_basis(1) + from_chiral_basis(2))
+    str.append(fromChiralBasis(0) + fromChiralBasis(1) + fromChiralBasis(2))
     str.append("#endif // DSLASH_CLOVER\n")
 
     return ''.join(str)+"\n"
