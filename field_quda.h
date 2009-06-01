@@ -9,8 +9,8 @@ extern "C" {
 #endif
 
   void allocateGaugeField();
-  ParitySpinor allocateParitySpinor();
-  FullSpinor allocateSpinorField();
+  ParitySpinor allocateParitySpinor(Precision precision);
+  FullSpinor allocateSpinorField(Precision precision);
   ParityClover allocateParityClover();
   FullClover allocateCloverField();
   

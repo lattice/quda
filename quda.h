@@ -34,9 +34,8 @@
 extern "C" {
 #endif
   
-  typedef struct ParityGauge_s *ParityGauge;
-  typedef struct ParitySpinor_s *ParitySpinor;
-  typedef struct ParityClover_s *ParityClover;
+  typedef void *ParityGauge;
+  typedef void *ParityClover;
 
   typedef struct {
     Precision precision;
@@ -46,21 +45,22 @@ extern "C" {
   } FullGauge;
   
   typedef struct {
-    ParitySpinor odd;
-    ParitySpinor even;
-  } FullSpinor;
-  
-  typedef struct ParityHSpinor_S {
-    short4 *spinorHalf;
-    float *spinorNorm;
-  } ParityHSpinor;
-
-  typedef struct {
     Precision precision;
     ParityClover odd;
     ParityClover even;
   } FullClover;
 
+  typedef struct {
+    Precision precision;
+    void *spinor; // either (float4 *) or (short4 *), depending on precision
+    float *spinorNorm; // used only when precision is QUDA_HALF_PRECISION
+  } ParitySpinor;
+
+  typedef struct {
+    ParitySpinor odd;
+    ParitySpinor even;
+  } FullSpinor;
+  
 #ifdef __cplusplus
 }
 #endif
@@ -70,4 +70,3 @@ extern "C" {
 #include <dslash_quda.h>
 
 #endif // _QUDA_H
-

@@ -89,9 +89,10 @@ void init() {
   printf("Sending fields to GPU..."); fflush(stdout);
 
   if (!TRANSFER) {
-    cudaSpinor = allocateSpinorField();
-    cudaSpinorOut = allocateSpinorField();
-    tmp = allocateParitySpinor();
+    Precision prec = QUDA_SINGLE_PRECISION;
+    cudaSpinor = allocateSpinorField(prec);
+    cudaSpinorOut = allocateSpinorField(prec);
+    tmp = allocateParitySpinor(prec);
     
     loadSpinorField(cudaSpinor, (void*)spinor, inv_param.cpu_prec, 
 		    inv_param.cuda_prec, inv_param.dirac_order);

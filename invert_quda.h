@@ -36,6 +36,7 @@ extern "C" {
     float kappa;  
     QudaMassNormalization mass_normalization;
 
+    QudaDslashType dslash_type;
     QudaInverterType inv_type;
     float tol;
     int iter;

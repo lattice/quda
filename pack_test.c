@@ -42,8 +42,10 @@ void printSpinorHalfField(float *spinor) {
 
 void init() {
 
-  cudaGauge.even = 0;
-  cudaGauge.odd = 0;
+  Precision single = QUDA_SINGLE_PRECISION;
+
+  cudaGauge.even = NULL;
+  cudaGauge.odd = NULL;
 
   param.cpu_prec = QUDA_SINGLE_PRECISION;
   param.cuda_prec = QUDA_SINGLE_PRECISION;
@@ -68,8 +70,8 @@ void init() {
   int dev = 0;
   cudaSetDevice(dev);
 
-  cudaFullSpinor = allocateSpinorField();
-  cudaParitySpinor = allocateParitySpinor();
+  cudaFullSpinor = allocateSpinorField(single);
+  cudaParitySpinor = allocateParitySpinor(single);
 
 }
 

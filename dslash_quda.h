@@ -1,3 +1,4 @@
+
 #ifndef _QUDA_DSLASH_H
 #define _QUDA_DSLASH_H
 
@@ -33,8 +34,8 @@ extern "C" {
 
   extern FullClover cudaClover;
 
-  extern ParityHSpinor hSpinor1;
-  extern ParityHSpinor hSpinor2;
+  extern ParitySpinor hSpinor1;
+  extern ParitySpinor hSpinor2;
 
 // ---------- dslash_quda.cu ----------
 
@@ -49,10 +50,10 @@ extern "C" {
 		       int oddBit, int daggerBit, ParitySpinor x, float a);
 
   // Half precision dslash routines
-  void dslashHCuda(ParityHSpinor res, FullGauge gauge, ParityHSpinor spinor,
+  void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 		   int oddBit, int daggerBit);
-  void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParityHSpinor spinor, 
-		       int oddBit, int daggerBit, ParityHSpinor x, float a);
+  void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
+		       int oddBit, int daggerBit, ParitySpinor x, float a);
 
   // wrapper to above
   void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger);

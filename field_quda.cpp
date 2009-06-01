@@ -19,7 +19,8 @@ float4 *packedSpinor1 = 0;
 float4 *packedSpinor2 = 0;
 
 // Half precision spinor field temporaries
-ParityHSpinor hSpinor1, hSpinor2;
+ParitySpinor hSpinor1, hSpinor2;
+
 
 void allocateGaugeField(FullGauge *gauge, int packed_gauge_bytes) {
   if (!gauge->even) {
@@ -38,23 +39,41 @@ void allocateGaugeField(FullGauge *gauge, int packed_gauge_bytes) {
 }
 
 
-ParitySpinor allocateParitySpinor() {
+ParitySpinor allocateParitySpinor(Precision precision) {
   ParitySpinor ret;
 
-  if (cudaMalloc((void**)&ret, SPINOR_BYTES) == cudaErrorMemoryAllocation) {
-    printf("Error allocating spinor\n");
+  ret.precision = precision;
+
+  if (precision == QUDA_SINGLE_PRECISION) {
+    if (cudaMalloc((void**)&ret.spinor, SPINOR_BYTES) == cudaErrorMemoryAllocation) {
+      printf("Error allocating spinor\n");
+      exit(0);
+    }
+  } else if (precision == QUDA_HALF_PRECISION) {
+    if (cudaMalloc((void**)&ret.spinor, SPINOR_BYTES/2) == cudaErrorMemoryAllocation) {
+      printf("Error allocating spinor\n");
+      exit(0);
+    }
+    if (cudaMalloc((void**)&ret.spinorNorm, SPINOR_BYTES/24) == cudaErrorMemoryAllocation) {
+      printf("Error allocating spinorNorm\n");
+      exit(0);
+    }
+  } else {
+    printf("Error allocating spinor: double precision not supported\n");
     exit(0);
-  }   
-    
+  }
+ 
   return ret;
 }
 
-FullSpinor allocateSpinorField() {
+
+FullSpinor allocateSpinorField(Precision precision) {
   FullSpinor ret;
-  ret.even = allocateParitySpinor();
-  ret.odd = allocateParitySpinor();
+  ret.even = allocateParitySpinor(precision);
+  ret.odd = allocateParitySpinor(precision);
   return ret;
 }
+
 
 ParityClover allocateParityClover() {
   ParityClover ret;
@@ -63,9 +82,9 @@ ParityClover allocateParityClover() {
     printf("Error allocating clover term\n");
     exit(0);
   }   
-    
   return ret;
 }
+
 
 FullClover allocateCloverField() {
   FullClover ret;
@@ -75,7 +94,13 @@ FullClover allocateCloverField() {
 }
 
 void freeParitySpinor(ParitySpinor spinor) {
-  cudaFree(spinor);
+
+  cudaFree(spinor.spinor);
+  if (spinor.precision == QUDA_HALF_PRECISION)
+    cudaFree(spinor.spinorNorm);
+
+  spinor.spinor = NULL;
+  spinor.spinorNorm = NULL;
 }
 
 void freeParityClover(ParityClover clover) {
@@ -85,18 +110,18 @@ void freeParityClover(ParityClover clover) {
 void freeGaugeField() {
   if (cudaGauge.even) cudaFree(cudaGauge.even);
   if (cudaGauge.odd) cudaFree(cudaGauge.odd);
-  cudaGauge.even = 0;
-  cudaGauge.odd = 0;
+  cudaGauge.even = NULL;
+  cudaGauge.odd = NULL;
 
   if (cudaHGauge.even) cudaFree(cudaHGauge.even);
   if (cudaHGauge.odd) cudaFree(cudaHGauge.odd);
-  cudaHGauge.even = 0;
-  cudaHGauge.odd = 0;
+  cudaHGauge.even = NULL;
+  cudaHGauge.odd = NULL;
 }
 
 void freeSpinorField(FullSpinor spinor) {
-  cudaFree(spinor.even);
-  cudaFree(spinor.odd);
+  freeParitySpinor(spinor.even);
+  freeParitySpinor(spinor.odd);
 }
 
 void freeCloverField(FullClover clover) {
@@ -110,25 +135,18 @@ void freeSpinorBuffer() {
 #else
   free(packedSpinor1);
 #endif
-  packedSpinor1 = 0;
+  packedSpinor1 = NULL;
 }
 
 void allocateSpinorHalf() {
-  cudaMalloc((void**)&hSpinor1.spinorHalf, SPINOR_BYTES/2);
-  cudaMalloc((void**)&hSpinor1.spinorNorm, SPINOR_BYTES/24);
-  cudaMalloc((void**)&hSpinor2.spinorHalf, SPINOR_BYTES/2);
-  cudaMalloc((void**)&hSpinor2.spinorNorm, SPINOR_BYTES/24);
+  Precision precision = QUDA_HALF_PRECISION;
+  hSpinor1 = allocateParitySpinor(precision);
+  hSpinor2 = allocateParitySpinor(precision);
 }
 
 void freeSpinorHalf() {
-  cudaFree(hSpinor1.spinorHalf);
-  cudaFree(hSpinor1.spinorNorm);
-  cudaFree(hSpinor2.spinorHalf);
-  cudaFree(hSpinor2.spinorNorm);
-  hSpinor1.spinorHalf = 0;
-  hSpinor1.spinorNorm = 0;
-  hSpinor2.spinorHalf = 0;
-  hSpinor2.spinorNorm = 0;
+  freeParitySpinor(hSpinor1);
+  freeParitySpinor(hSpinor2);
 }
 
 
@@ -979,19 +997,19 @@ void unpackQDPSingleParitySpinor(float *res, float4 *spinorPacked) {
 void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec, 
 		      Precision cuda_prec, DiracFieldOrder dirac_order) {
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
-    printf("Sorry, only double precision not supported\n");
+    printf("Sorry, double precision not supported\n");
     exit(-1);
   }
 
   if (cuda_prec == QUDA_HALF_PRECISION) {
-    if (!hSpinor1.spinorHalf && !hSpinor1.spinorNorm &&
-	!hSpinor2.spinorHalf && !hSpinor2.spinorNorm ) {
+    if (!hSpinor1.spinor && !hSpinor1.spinorNorm &&
+	!hSpinor2.spinor && !hSpinor2.spinorNorm ) {
       allocateSpinorHalf();
-    } else if (!hSpinor1.spinorHalf || !hSpinor1.spinorNorm ||
-	       !hSpinor2.spinorHalf || !hSpinor2.spinorNorm) {
+    } else if (!hSpinor1.spinor || !hSpinor1.spinorNorm ||
+	       !hSpinor2.spinor || !hSpinor2.spinorNorm) {
       printf("allocateSpinorHalf error %lu %lu %lu %lu\n", 
-	     (unsigned long)hSpinor1.spinorHalf, (unsigned long)hSpinor1.spinorNorm,
-	     (unsigned long)hSpinor2.spinorHalf, (unsigned long)hSpinor2.spinorNorm);
+	     (unsigned long)hSpinor1.spinor, (unsigned long)hSpinor1.spinorNorm,
+	     (unsigned long)hSpinor2.spinor, (unsigned long)hSpinor2.spinorNorm);
       exit(-1);
     }
   }
@@ -1008,13 +1026,13 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
     if (cpu_prec == QUDA_DOUBLE_PRECISION) packQDPDoubleParitySpinor(packedSpinor1, (double*)spinor);
     else packQDPSingleParitySpinor(packedSpinor1, (float*)spinor);
   }
-  cudaMemcpy(ret, packedSpinor1, SPINOR_BYTES, cudaMemcpyHostToDevice);
+  cudaMemcpy(ret.spinor, packedSpinor1, SPINOR_BYTES, cudaMemcpyHostToDevice);
 }
 
 void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec, Precision cuda_prec) {
 
   if (cuda_prec == QUDA_DOUBLE_PRECISION || cuda_prec == QUDA_HALF_PRECISION) {
-    printf("Sorry, only single precision not supported\n");
+    printf("Sorry, only single precision is supported\n");
     exit(-1);
   }
 
@@ -1029,8 +1047,8 @@ void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec, Precision 
   if (cpu_prec == QUDA_DOUBLE_PRECISION) packDoubleFullSpinor(packedSpinor1, packedSpinor2, (double*)spinor);
   else packSingleFullSpinor(packedSpinor1, packedSpinor2, (float*)spinor);
 
-  cudaMemcpy(ret.even, packedSpinor1, SPINOR_BYTES, cudaMemcpyHostToDevice);
-  cudaMemcpy(ret.odd, packedSpinor2, SPINOR_BYTES, cudaMemcpyHostToDevice);
+  cudaMemcpy(ret.even.spinor, packedSpinor1, SPINOR_BYTES, cudaMemcpyHostToDevice);
+  cudaMemcpy(ret.odd.spinor, packedSpinor2, SPINOR_BYTES, cudaMemcpyHostToDevice);
 
 #ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedSpinor2);
@@ -1069,7 +1087,7 @@ void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, Pr
     }*/
 
   if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, SPINOR_BYTES);
-  cudaMemcpy(packedSpinor1, spinor, SPINOR_BYTES, cudaMemcpyDeviceToHost);
+  cudaMemcpy(packedSpinor1, spinor.spinor, SPINOR_BYTES, cudaMemcpyDeviceToHost);
   if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackDoubleParitySpinor((double*)res, packedSpinor1);
     else unpackSingleParitySpinor((float*)res, packedSpinor1);
@@ -1083,8 +1101,8 @@ void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec, Precis
   if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, SPINOR_BYTES);
   if (!packedSpinor2) cudaMallocHost((void**)&packedSpinor2, SPINOR_BYTES);
 
-  cudaMemcpy(packedSpinor1, spinor.even, SPINOR_BYTES, cudaMemcpyDeviceToHost);
-  cudaMemcpy(packedSpinor2, spinor.odd, SPINOR_BYTES, cudaMemcpyDeviceToHost);
+  cudaMemcpy(packedSpinor1, spinor.even.spinor, SPINOR_BYTES, cudaMemcpyDeviceToHost);
+  cudaMemcpy(packedSpinor2, spinor.odd.spinor, SPINOR_BYTES, cudaMemcpyDeviceToHost);
   if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackDoubleFullSpinor((double*)res, packedSpinor1, packedSpinor2);
   else unpackSingleFullSpinor((float*)res, packedSpinor1, packedSpinor2);
 

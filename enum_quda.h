@@ -17,6 +17,11 @@ extern "C" {
     QUDA_LEX_DIRAC_ORDER // lexicographical order, colour inside spin
   } QudaDiracFieldOrder;  
 
+  typedef enum QudaDslashType_s {
+    QUDA_WILSON_DSLASH,
+    QUDA_CLOVER_WILSON_DSLASH
+  } QudaDslashType;
+
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
     QUDA_BICGSTAB_INVERTER

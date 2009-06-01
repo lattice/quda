@@ -12,21 +12,22 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
 			QudaInvertParam *invert_param, DagType dag_type)
 {
   int len = Nh*spinorSiteSize;
+  Precision prec = QUDA_SINGLE_PRECISION;
 
-  ParitySpinor r = allocateParitySpinor();
-  ParitySpinor p = allocateParitySpinor();
-  ParitySpinor v = allocateParitySpinor();
-  ParitySpinor t = allocateParitySpinor();
+  ParitySpinor r = allocateParitySpinor(prec);
+  ParitySpinor p = allocateParitySpinor(prec);
+  ParitySpinor v = allocateParitySpinor(prec);
+  ParitySpinor t = allocateParitySpinor(prec);
 
-  ParitySpinor y = allocateParitySpinor();
-  ParitySpinor b = allocateParitySpinor();
+  ParitySpinor y = allocateParitySpinor(prec);
+  ParitySpinor b = allocateParitySpinor(prec);
 
-  copyCuda((float *)b, (float *)source, len);
-  copyCuda((float *)r, (float *)b, len);
-  zeroCuda((float *)y, len);
-  zeroCuda((float *)x, len);
+  copyCuda((float *)b.spinor, (float *)source.spinor, len);
+  copyCuda((float *)r.spinor, (float *)b.spinor, len);
+  zeroCuda((float *)y.spinor, len);
+  zeroCuda((float *)x.spinor, len);
 
-  QudaSumFloat b2 = normCuda((float *)b, len);
+  QudaSumFloat b2 = normCuda((float *)b.spinor, len);
   QudaSumFloat r2 = b2;
   QudaSumFloat stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
 
@@ -60,7 +61,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
 
     if (k==0) {
       rho = make_cuFloatComplex(r2, 0.0);
-      copyCuda((float *)p, (float *)r, len);
+      copyCuda((float *)p.spinor, (float *)r.spinor, len);
     } else {
       alpha_omega = cuCdivf(alpha, omega);
       rho_rho0 = cuCdivf(rho, rho0);
@@ -68,7 +69,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
 
       // p = r - beta*omega*v + beta*(p)
       beta_omega = cuCmulf(beta, omega); beta_omega.x *= -1.0f; beta_omega.y *= -1.0f;
-      cxpaypbzCuda((float2*)r, beta_omega, (float2*)v, beta, (float2*)p, len/2); // 8
+      cxpaypbzCuda((float2*)r.spinor, beta_omega, (float2*)v.spinor, beta, (float2*)p.spinor, len/2); // 8
     }
 
     if (dag_type == QUDA_DAG_NO) 
@@ -78,13 +79,13 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
       //rv = MatPCDagcDotWXCuda(v, gauge, p, invert_param->kappa, tmp, b, invert_param->matpc_type);
       MatPCDagCuda(v, gaugeSloppy, p, invert_param->kappa, tmp, invert_param->matpc_type);
 
-    rv = cDotProductCuda((float2*)source, (float2*)v, len/2);
+    rv = cDotProductCuda((float2*)source.spinor, (float2*)v.spinor, len/2);
     cuComplex rv32 = make_cuFloatComplex((float)rv.x, (float)rv.y);
     alpha = cuCdivf(rho, rv32);
 
     // r -= alpha*v
     alpha.x *= -1.0f; alpha.y *= -1.0f;
-    caxpyCuda(alpha, (float2*)v, (float2*)r, len/2); // 4
+    caxpyCuda(alpha, (float2*)v.spinor, (float2*)r.spinor, len/2); // 4
     alpha.x *= -1.0f; alpha.y *= -1.0f;
 
     if (dag_type == QUDA_DAG_NO) 
@@ -93,12 +94,12 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
       MatPCDagCuda(t, gaugeSloppy, r, invert_param->kappa, tmp, invert_param->matpc_type);
 
     // omega = (t, r) / (t, t)
-    omega_t2 = cDotProductNormACuda((float2*)t, (float2*)r, len/2); // 6
+    omega_t2 = cDotProductNormACuda((float2*)t.spinor, (float2*)r.spinor, len/2); // 6
     omega.x = omega_t2.x / omega_t2.z; omega.y = omega_t2.y/omega_t2.z;
 
     //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-    rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, (float2*)p, omega, (float2*)r, 
-						(float2*)x, (float2*)t, (float2*)source, len/2);
+    rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, (float2*)p.spinor, omega, (float2*)r.spinor, 
+						(float2*)x.spinor, (float2*)t.spinor, (float2*)source.spinor, len/2);
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
     
     // reliable updates (ideally should be double precision)
@@ -109,7 +110,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
     int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
 
     if (updateR) {
-      QudaPrecision spinorPrec = invert_param ->cuda_prec;
+      QudaPrecision spinorPrec = invert_param->cuda_prec;
       invert_param -> cuda_prec = QUDA_SINGLE_PRECISION;
 
       if (dag_type == QUDA_DAG_NO) 
@@ -119,18 +120,18 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
 
       invert_param -> cuda_prec = spinorPrec;
 
-      copyCuda((float*)r, (float*)b, len);
-      mxpyCuda((float*)t, (float*)r, len);
-      r2 = normCuda((float*)r, len);
+      copyCuda((float*)r.spinor, (float*)b.spinor, len);
+      mxpyCuda((float*)t.spinor, (float*)r.spinor, len);
+      r2 = normCuda((float*)r.spinor, len);
       rNorm = sqrt(r2);
 
       maxrr = rNorm;
       rUpdate++;
 
       if (updateX) {
-	axpyCuda(1.0f, (float*)x, (float*)y, len);
-	zeroCuda((float*)x, len);
-	copyCuda((float*)b, (float*)r, len);
+	axpyCuda(1.0f, (float*)x.spinor, (float*)y.spinor, len);
+	zeroCuda((float*)x.spinor, len);
+	copyCuda((float*)b.spinor, (float*)r.spinor, len);
 	r0Norm = rNorm;
 
 	maxrx = rNorm;
@@ -141,9 +142,9 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
       
 
     k++;
-    printf("%d iterations, r2 = %e, x2 = %e\n", k, r2, normCuda((float*)x, len));
+    printf("%d iterations, r2 = %e, x2 = %e\n", k, r2, normCuda((float*)x.spinor, len));
   }
-  axpyCuda(1.0f, (float*)y, (float*)x, len);
+  axpyCuda(1.0f, (float*)y.spinor, (float*)x.spinor, len);
 
   invert_param->secs += stopwatchReadSeconds();
 
@@ -161,12 +162,12 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
 #if 0
   // Calculate the true residual
   if (dag_type == QUDA_DAG_NO) 
-    MatPCCuda(t, gauge, x, invert_param->kappa, tmp, invert_param->matpc_type);
+    MatPCCuda(t.spinor, gauge, x.spinor, invert_param->kappa, tmp.spinor, invert_param->matpc_type);
   else 
-    MatPCDagCuda(t, gauge, x, invert_param->kappa, tmp, invert_param->matpc_type);
-  copyCuda((float *)r, (float *)b, len);
-  mxpyCuda((float *)t, (float *)r, len);
-  double true_res = normCuda((float *)r, len);
+    MatPCDagCuda(t.spinor, gauge, x.spinor, invert_param->kappa, tmp.spinor, invert_param->matpc_type);
+  copyCuda((float *)r.spinor, (float *)b.spinor, len);
+  mxpyCuda((float *)t.spinor, (float *)r.spinor, len);
+  double true_res = normCuda((float *)r.spinor, len);
   
   printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
 	 k, r2, true_res / b2);
