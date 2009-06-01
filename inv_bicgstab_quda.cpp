@@ -78,7 +78,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
       //rv = MatPCDagcDotWXCuda(v, gauge, p, invert_param->kappa, tmp, b, invert_param->matpc_type);
       MatPCDagCuda(v, gaugeSloppy, p, invert_param->kappa, tmp, invert_param->matpc_type);
 
-    rv = cDotProductCuda((float2*)b, (float2*)v, len/2);
+    rv = cDotProductCuda((float2*)source, (float2*)v, len/2);
     cuComplex rv32 = make_cuFloatComplex((float)rv.x, (float)rv.y);
     alpha = cuCdivf(rho, rv32);
 
@@ -98,7 +98,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
 
     //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
     rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, (float2*)p, omega, (float2*)r, 
-						(float2*)x, (float2*)t, (float2*)b, len/2);
+						(float2*)x, (float2*)t, (float2*)source, len/2);
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
     
     // reliable updates (ideally should be double precision)

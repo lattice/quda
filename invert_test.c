@@ -15,7 +15,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param;
 
   Gauge_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  Gauge_param.cuda_prec = QUDA_HALF_PRECISION;
   Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   Gauge_param.X = L1;
   Gauge_param.Y = L2;
