@@ -49,7 +49,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
   QudaSumFloat r0Norm = rNorm;
   QudaSumFloat maxrx = rNorm;
   QudaSumFloat maxrr = rNorm;
-  QudaSumFloat delta = 1e-5;
+  QudaSumFloat delta = invert_param->reliable_delta;
 
   int k=0;
   int xUpdate = 0, rUpdate = 0;

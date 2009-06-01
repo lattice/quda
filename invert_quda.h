@@ -40,6 +40,7 @@ extern "C" {
     float tol;
     int iter;
     int maxiter;
+    float reliable_delta; // reliable update tolerance
 
     QudaMatPCType matpc_type;
     QudaSolutionType solution_type;

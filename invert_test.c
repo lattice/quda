@@ -34,6 +34,7 @@ int main(int argc, char **argv)
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 5e-7;
   inv_param.maxiter = 5000;
+  inv_param.reliable_delta = 1e-3;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
   inv_param.cuda_prec = QUDA_HALF_PRECISION;
