@@ -1,4 +1,3 @@
-
 #ifndef _QUDA_DSLASH_H
 #define _QUDA_DSLASH_H
 
@@ -40,8 +39,8 @@ extern "C" {
 // ---------- dslash_quda.cu ----------
 
   int dslashCudaSharedBytes();
-  
   void setCudaGaugeParam();
+  void bindGaugeTex(FullGauge gauge, int oddBit);
 
   // Single precision routines
   void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
@@ -74,7 +73,7 @@ extern "C" {
   QudaSumComplex MatPCDagcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
 				    float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
   
-  // ---------- dslash_reference.cpp ----------
+  // -- dslash_reference.cpp
   
   void dslashReference(float *res, float **gauge, float *spinorField, 
 		       int oddBit, int daggerBit);
@@ -91,13 +90,13 @@ extern "C" {
   void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 
 		    ParitySpinor tmp, QudaInvertParam *param);
   
-// -- inv_bicgstab_cuda.cpp
+  // -- inv_bicgstab_cuda.cpp
   void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, FullGauge gaugeSloppy, 
 			  FullGauge gaugePrecise, ParitySpinor tmp, 
 			  QudaInvertParam *param, DagType dag_type);
   
-// ---------- cg_reference.cpp ----------  
-void cgReference(float *out, float **gauge, float *in, float kappa, float tol);
+  // -- cg_reference.cpp
+  void cgReference(float *out, float **gauge, float *in, float kappa, float tol);
 
 #ifdef __cplusplus
 }
