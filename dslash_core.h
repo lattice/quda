@@ -1,9 +1,40 @@
 // *** CUDA DSLASH ***
 
-#define SHARED_FLOATS_PER_THREAD 19
-#define SHARED_BYTES (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))
+#define SHARED_FLOATS_PER_THREAD 0
+#define SHARED_BYTES_DOUBLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(double))
+
+#define SHARED_BYTES_SINGLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))
 
 // input spinor
+#if (DD_SPREC==0)
+#define spinorFloat double
+#define i00_re I0.x
+#define i00_im I0.y
+#define i01_re I1.x
+#define i01_im I1.y
+#define i02_re I2.x
+#define i02_im I2.y
+#define i10_re I3.x
+#define i10_im I3.y
+#define i11_re I4.x
+#define i11_im I4.y
+#define i12_re I5.x
+#define i12_im I5.y
+#define i20_re I6.x
+#define i20_im I6.y
+#define i21_re I7.x
+#define i21_im I7.y
+#define i22_re I8.x
+#define i22_im I8.y
+#define i30_re I9.x
+#define i30_im I9.y
+#define i31_re I10.x
+#define i31_im I10.y
+#define i32_re I11.x
+#define i32_im I11.y
+
+#else
+#define spinorFloat float
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -28,8 +59,33 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
+#endif
 
 // gauge link
+#if (DD_GPREC==0)
+#define g00_re G0.x
+#define g00_im G0.y
+#define g01_re G1.x
+#define g01_im G1.y
+#define g02_re G2.x
+#define g02_im G2.y
+#define g10_re G3.x
+#define g10_im G3.y
+#define g11_re G4.x
+#define g11_im G4.y
+#define g12_re G5.x
+#define g12_im G5.y
+#define g20_re G6.x
+#define g20_im G6.y
+#define g21_re G7.x
+#define g21_im G7.y
+#define g22_re G8.x
+#define g22_im G8.y
+// temporaries
+#define A_re G9.x
+#define A_im G9.y
+
+#else
 #define g00_re G0.x
 #define g00_im G0.y
 #define g01_re G0.z
@@ -48,6 +104,11 @@
 #define g21_im G3.w
 #define g22_re G4.x
 #define g22_im G4.y
+// temporaries
+#define A_re G4.z
+#define A_im G4.w
+
+#endif
 
 // conjugated gauge link
 #define gT00_re (+g00_re)
@@ -68,10 +129,6 @@
 #define gT21_im (-g12_im)
 #define gT22_re (+g22_re)
 #define gT22_im (-g22_im)
-
-// temporaries
-#define A_re G4.z
-#define A_im G4.w
 
 // first chiral block of inverted clover term
 #define c00_00_re C0.x
@@ -210,30 +267,30 @@
 #define c32_32_re c12_12_re
 
 // output spinor
-#define o00_re s[0]
-#define o00_im s[1]
-#define o01_re s[2]
-#define o01_im s[3]
-#define o02_re s[4]
-#define o02_im s[5]
-#define o10_re s[6]
-#define o10_im s[7]
-#define o11_re s[8]
-#define o11_im s[9]
-#define o12_re s[10]
-#define o12_im s[11]
-#define o20_re s[12]
-#define o20_im s[13]
-#define o21_re s[14]
-#define o21_im s[15]
-#define o22_re s[16]
-#define o22_im s[17]
-#define o30_re s[18]
-volatile float o30_im;
-volatile float o31_re;
-volatile float o31_im;
-volatile float o32_re;
-volatile float o32_im;
+volatile spinorFloat o00_re;
+volatile spinorFloat o00_im;
+volatile spinorFloat o01_re;
+volatile spinorFloat o01_im;
+volatile spinorFloat o02_re;
+volatile spinorFloat o02_im;
+volatile spinorFloat o10_re;
+volatile spinorFloat o10_im;
+volatile spinorFloat o11_re;
+volatile spinorFloat o11_im;
+volatile spinorFloat o12_re;
+volatile spinorFloat o12_im;
+volatile spinorFloat o20_re;
+volatile spinorFloat o20_im;
+volatile spinorFloat o21_re;
+volatile spinorFloat o21_im;
+volatile spinorFloat o22_re;
+volatile spinorFloat o22_im;
+volatile spinorFloat o30_re;
+volatile spinorFloat o30_im;
+volatile spinorFloat o31_re;
+volatile spinorFloat o31_im;
+volatile spinorFloat o32_re;
+volatile spinorFloat o32_im;
 
 
 
@@ -248,9 +305,6 @@ int x4 = X/(L3*L2*L1);
 int x3 = (X/(L2*L1)) % L3;
 int x2 = (X/L1) % L2;
 int x1 = X % L1;
-
-extern __shared__ float s_data[];
-volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;
 
 o00_re = o00_im = 0;
 o01_re = o01_im = 0;
@@ -285,37 +339,37 @@ o32_re = o32_im = 0;
     RECONSTRUCT_GAUGE_MATRIX(0);
     
     // project spinor into half spinors
-    float a0_re = +i00_re+i30_im;
-    float a0_im = +i00_im-i30_re;
-    float a1_re = +i01_re+i31_im;
-    float a1_im = +i01_im-i31_re;
-    float a2_re = +i02_re+i32_im;
-    float a2_im = +i02_im-i32_re;
+    spinorFloat a0_re = +i00_re+i30_im;
+    spinorFloat a0_im = +i00_im-i30_re;
+    spinorFloat a1_re = +i01_re+i31_im;
+    spinorFloat a1_im = +i01_im-i31_re;
+    spinorFloat a2_re = +i02_re+i32_im;
+    spinorFloat a2_im = +i02_im-i32_re;
     
-    float b0_re = +i10_re+i20_im;
-    float b0_im = +i10_im-i20_re;
-    float b1_re = +i11_re+i21_im;
-    float b1_im = +i11_im-i21_re;
-    float b2_re = +i12_re+i22_im;
-    float b2_im = +i12_im-i22_re;
+    spinorFloat b0_re = +i10_re+i20_im;
+    spinorFloat b0_im = +i10_im-i20_re;
+    spinorFloat b1_re = +i11_re+i21_im;
+    spinorFloat b1_im = +i11_im-i21_re;
+    spinorFloat b2_re = +i12_re+i22_im;
+    spinorFloat b2_im = +i12_im-i22_re;
     
     // multiply row 0
-    float A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
-    float A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
-    float B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
-    float B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
+    spinorFloat A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
+    spinorFloat A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
+    spinorFloat B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
+    spinorFloat B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
     
     // multiply row 1
-    float A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
-    float A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
-    float B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
-    float B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
+    spinorFloat A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
+    spinorFloat A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
+    spinorFloat B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
+    spinorFloat B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
     
     // multiply row 2
-    float A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
-    float A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
-    float B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
-    float B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
+    spinorFloat A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
+    spinorFloat A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
+    spinorFloat B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
+    spinorFloat B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
     
     o00_re += A0_re;
     o00_im += A0_im;
@@ -366,37 +420,37 @@ o32_re = o32_im = 0;
     RECONSTRUCT_GAUGE_MATRIX(1);
     
     // project spinor into half spinors
-    float a0_re = +i00_re-i30_im;
-    float a0_im = +i00_im+i30_re;
-    float a1_re = +i01_re-i31_im;
-    float a1_im = +i01_im+i31_re;
-    float a2_re = +i02_re-i32_im;
-    float a2_im = +i02_im+i32_re;
+    spinorFloat a0_re = +i00_re-i30_im;
+    spinorFloat a0_im = +i00_im+i30_re;
+    spinorFloat a1_re = +i01_re-i31_im;
+    spinorFloat a1_im = +i01_im+i31_re;
+    spinorFloat a2_re = +i02_re-i32_im;
+    spinorFloat a2_im = +i02_im+i32_re;
     
-    float b0_re = +i10_re-i20_im;
-    float b0_im = +i10_im+i20_re;
-    float b1_re = +i11_re-i21_im;
-    float b1_im = +i11_im+i21_re;
-    float b2_re = +i12_re-i22_im;
-    float b2_im = +i12_im+i22_re;
+    spinorFloat b0_re = +i10_re-i20_im;
+    spinorFloat b0_im = +i10_im+i20_re;
+    spinorFloat b1_re = +i11_re-i21_im;
+    spinorFloat b1_im = +i11_im+i21_re;
+    spinorFloat b2_re = +i12_re-i22_im;
+    spinorFloat b2_im = +i12_im+i22_re;
     
     // multiply row 0
-    float A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
-    float A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
-    float B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
-    float B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
+    spinorFloat A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
+    spinorFloat A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
+    spinorFloat B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
+    spinorFloat B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
     
     // multiply row 1
-    float A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
-    float A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
-    float B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
-    float B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
+    spinorFloat A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
+    spinorFloat A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
+    spinorFloat B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
+    spinorFloat B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
     
     // multiply row 2
-    float A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
-    float A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
-    float B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
-    float B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
+    spinorFloat A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
+    spinorFloat A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
+    spinorFloat B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
+    spinorFloat B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
     
     o00_re += A0_re;
     o00_im += A0_im;
@@ -447,37 +501,37 @@ o32_re = o32_im = 0;
     RECONSTRUCT_GAUGE_MATRIX(2);
     
     // project spinor into half spinors
-    float a0_re = +i00_re-i30_re;
-    float a0_im = +i00_im-i30_im;
-    float a1_re = +i01_re-i31_re;
-    float a1_im = +i01_im-i31_im;
-    float a2_re = +i02_re-i32_re;
-    float a2_im = +i02_im-i32_im;
+    spinorFloat a0_re = +i00_re-i30_re;
+    spinorFloat a0_im = +i00_im-i30_im;
+    spinorFloat a1_re = +i01_re-i31_re;
+    spinorFloat a1_im = +i01_im-i31_im;
+    spinorFloat a2_re = +i02_re-i32_re;
+    spinorFloat a2_im = +i02_im-i32_im;
     
-    float b0_re = +i10_re+i20_re;
-    float b0_im = +i10_im+i20_im;
-    float b1_re = +i11_re+i21_re;
-    float b1_im = +i11_im+i21_im;
-    float b2_re = +i12_re+i22_re;
-    float b2_im = +i12_im+i22_im;
+    spinorFloat b0_re = +i10_re+i20_re;
+    spinorFloat b0_im = +i10_im+i20_im;
+    spinorFloat b1_re = +i11_re+i21_re;
+    spinorFloat b1_im = +i11_im+i21_im;
+    spinorFloat b2_re = +i12_re+i22_re;
+    spinorFloat b2_im = +i12_im+i22_im;
     
     // multiply row 0
-    float A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
-    float A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
-    float B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
-    float B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
+    spinorFloat A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
+    spinorFloat A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
+    spinorFloat B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
+    spinorFloat B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
     
     // multiply row 1
-    float A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
-    float A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
-    float B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
-    float B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
+    spinorFloat A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
+    spinorFloat A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
+    spinorFloat B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
+    spinorFloat B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
     
     // multiply row 2
-    float A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
-    float A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
-    float B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
-    float B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
+    spinorFloat A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
+    spinorFloat A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
+    spinorFloat B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
+    spinorFloat B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
     
     o00_re += A0_re;
     o00_im += A0_im;
@@ -528,37 +582,37 @@ o32_re = o32_im = 0;
     RECONSTRUCT_GAUGE_MATRIX(3);
     
     // project spinor into half spinors
-    float a0_re = +i00_re+i30_re;
-    float a0_im = +i00_im+i30_im;
-    float a1_re = +i01_re+i31_re;
-    float a1_im = +i01_im+i31_im;
-    float a2_re = +i02_re+i32_re;
-    float a2_im = +i02_im+i32_im;
+    spinorFloat a0_re = +i00_re+i30_re;
+    spinorFloat a0_im = +i00_im+i30_im;
+    spinorFloat a1_re = +i01_re+i31_re;
+    spinorFloat a1_im = +i01_im+i31_im;
+    spinorFloat a2_re = +i02_re+i32_re;
+    spinorFloat a2_im = +i02_im+i32_im;
     
-    float b0_re = +i10_re-i20_re;
-    float b0_im = +i10_im-i20_im;
-    float b1_re = +i11_re-i21_re;
-    float b1_im = +i11_im-i21_im;
-    float b2_re = +i12_re-i22_re;
-    float b2_im = +i12_im-i22_im;
+    spinorFloat b0_re = +i10_re-i20_re;
+    spinorFloat b0_im = +i10_im-i20_im;
+    spinorFloat b1_re = +i11_re-i21_re;
+    spinorFloat b1_im = +i11_im-i21_im;
+    spinorFloat b2_re = +i12_re-i22_re;
+    spinorFloat b2_im = +i12_im-i22_im;
     
     // multiply row 0
-    float A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
-    float A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
-    float B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
-    float B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
+    spinorFloat A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
+    spinorFloat A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
+    spinorFloat B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
+    spinorFloat B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
     
     // multiply row 1
-    float A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
-    float A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
-    float B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
-    float B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
+    spinorFloat A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
+    spinorFloat A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
+    spinorFloat B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
+    spinorFloat B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
     
     // multiply row 2
-    float A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
-    float A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
-    float B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
-    float B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
+    spinorFloat A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
+    spinorFloat A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
+    spinorFloat B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
+    spinorFloat B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
     
     o00_re += A0_re;
     o00_im += A0_im;
@@ -609,37 +663,37 @@ o32_re = o32_im = 0;
     RECONSTRUCT_GAUGE_MATRIX(4);
     
     // project spinor into half spinors
-    float a0_re = +i00_re+i20_im;
-    float a0_im = +i00_im-i20_re;
-    float a1_re = +i01_re+i21_im;
-    float a1_im = +i01_im-i21_re;
-    float a2_re = +i02_re+i22_im;
-    float a2_im = +i02_im-i22_re;
+    spinorFloat a0_re = +i00_re+i20_im;
+    spinorFloat a0_im = +i00_im-i20_re;
+    spinorFloat a1_re = +i01_re+i21_im;
+    spinorFloat a1_im = +i01_im-i21_re;
+    spinorFloat a2_re = +i02_re+i22_im;
+    spinorFloat a2_im = +i02_im-i22_re;
     
-    float b0_re = +i10_re-i30_im;
-    float b0_im = +i10_im+i30_re;
-    float b1_re = +i11_re-i31_im;
-    float b1_im = +i11_im+i31_re;
-    float b2_re = +i12_re-i32_im;
-    float b2_im = +i12_im+i32_re;
+    spinorFloat b0_re = +i10_re-i30_im;
+    spinorFloat b0_im = +i10_im+i30_re;
+    spinorFloat b1_re = +i11_re-i31_im;
+    spinorFloat b1_im = +i11_im+i31_re;
+    spinorFloat b2_re = +i12_re-i32_im;
+    spinorFloat b2_im = +i12_im+i32_re;
     
     // multiply row 0
-    float A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
-    float A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
-    float B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
-    float B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
+    spinorFloat A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
+    spinorFloat A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
+    spinorFloat B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
+    spinorFloat B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
     
     // multiply row 1
-    float A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
-    float A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
-    float B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
-    float B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
+    spinorFloat A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
+    spinorFloat A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
+    spinorFloat B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
+    spinorFloat B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
     
     // multiply row 2
-    float A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
-    float A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
-    float B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
-    float B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
+    spinorFloat A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
+    spinorFloat A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
+    spinorFloat B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
+    spinorFloat B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
     
     o00_re += A0_re;
     o00_im += A0_im;
@@ -690,37 +744,37 @@ o32_re = o32_im = 0;
     RECONSTRUCT_GAUGE_MATRIX(5);
     
     // project spinor into half spinors
-    float a0_re = +i00_re-i20_im;
-    float a0_im = +i00_im+i20_re;
-    float a1_re = +i01_re-i21_im;
-    float a1_im = +i01_im+i21_re;
-    float a2_re = +i02_re-i22_im;
-    float a2_im = +i02_im+i22_re;
+    spinorFloat a0_re = +i00_re-i20_im;
+    spinorFloat a0_im = +i00_im+i20_re;
+    spinorFloat a1_re = +i01_re-i21_im;
+    spinorFloat a1_im = +i01_im+i21_re;
+    spinorFloat a2_re = +i02_re-i22_im;
+    spinorFloat a2_im = +i02_im+i22_re;
     
-    float b0_re = +i10_re+i30_im;
-    float b0_im = +i10_im-i30_re;
-    float b1_re = +i11_re+i31_im;
-    float b1_im = +i11_im-i31_re;
-    float b2_re = +i12_re+i32_im;
-    float b2_im = +i12_im-i32_re;
+    spinorFloat b0_re = +i10_re+i30_im;
+    spinorFloat b0_im = +i10_im-i30_re;
+    spinorFloat b1_re = +i11_re+i31_im;
+    spinorFloat b1_im = +i11_im-i31_re;
+    spinorFloat b2_re = +i12_re+i32_im;
+    spinorFloat b2_im = +i12_im-i32_re;
     
     // multiply row 0
-    float A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
-    float A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
-    float B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
-    float B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
+    spinorFloat A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
+    spinorFloat A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
+    spinorFloat B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
+    spinorFloat B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
     
     // multiply row 1
-    float A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
-    float A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
-    float B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
-    float B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
+    spinorFloat A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
+    spinorFloat A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
+    spinorFloat B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
+    spinorFloat B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
     
     // multiply row 2
-    float A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
-    float A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
-    float B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
-    float B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
+    spinorFloat A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
+    spinorFloat A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
+    spinorFloat B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
+    spinorFloat B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
     
     o00_re += A0_re;
     o00_im += A0_im;
@@ -766,27 +820,27 @@ o32_re = o32_im = 0;
         READ_SPINOR_DOWN(SPINORTEX);
         
         // project spinor into half spinors
-        float a0_re = +2*i20_re;
-        float a0_im = +2*i20_im;
-        float a1_re = +2*i21_re;
-        float a1_im = +2*i21_im;
-        float a2_re = +2*i22_re;
-        float a2_im = +2*i22_im;
+        spinorFloat a0_re = +2*i20_re;
+        spinorFloat a0_im = +2*i20_im;
+        spinorFloat a1_re = +2*i21_re;
+        spinorFloat a1_im = +2*i21_im;
+        spinorFloat a2_re = +2*i22_re;
+        spinorFloat a2_im = +2*i22_im;
         
-        float b0_re = +2*i30_re;
-        float b0_im = +2*i30_im;
-        float b1_re = +2*i31_re;
-        float b1_im = +2*i31_im;
-        float b2_re = +2*i32_re;
-        float b2_im = +2*i32_im;
+        spinorFloat b0_re = +2*i30_re;
+        spinorFloat b0_im = +2*i30_im;
+        spinorFloat b1_re = +2*i31_re;
+        spinorFloat b1_im = +2*i31_im;
+        spinorFloat b2_re = +2*i32_re;
+        spinorFloat b2_im = +2*i32_im;
         
         // identity gauge matrix
-        float A0_re = a0_re; float A0_im = a0_im;
-        float B0_re = b0_re; float B0_im = b0_im;
-        float A1_re = a1_re; float A1_im = a1_im;
-        float B1_re = b1_re; float B1_im = b1_im;
-        float A2_re = a2_re; float A2_im = a2_im;
-        float B2_re = b2_re; float B2_im = b2_im;
+        spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
+        spinorFloat B0_re = b0_re; spinorFloat B0_im = b0_im;
+        spinorFloat A1_re = a1_re; spinorFloat A1_im = a1_im;
+        spinorFloat B1_re = b1_re; spinorFloat B1_im = b1_im;
+        spinorFloat A2_re = a2_re; spinorFloat A2_im = a2_im;
+        spinorFloat B2_re = b2_re; spinorFloat B2_im = b2_im;
         
         o20_re += A0_re;
         o20_im += A0_im;
@@ -815,37 +869,37 @@ o32_re = o32_im = 0;
         RECONSTRUCT_GAUGE_MATRIX(6);
         
         // project spinor into half spinors
-        float a0_re = +2*i20_re;
-        float a0_im = +2*i20_im;
-        float a1_re = +2*i21_re;
-        float a1_im = +2*i21_im;
-        float a2_re = +2*i22_re;
-        float a2_im = +2*i22_im;
+        spinorFloat a0_re = +2*i20_re;
+        spinorFloat a0_im = +2*i20_im;
+        spinorFloat a1_re = +2*i21_re;
+        spinorFloat a1_im = +2*i21_im;
+        spinorFloat a2_re = +2*i22_re;
+        spinorFloat a2_im = +2*i22_im;
         
-        float b0_re = +2*i30_re;
-        float b0_im = +2*i30_im;
-        float b1_re = +2*i31_re;
-        float b1_im = +2*i31_im;
-        float b2_re = +2*i32_re;
-        float b2_im = +2*i32_im;
+        spinorFloat b0_re = +2*i30_re;
+        spinorFloat b0_im = +2*i30_im;
+        spinorFloat b1_re = +2*i31_re;
+        spinorFloat b1_im = +2*i31_im;
+        spinorFloat b2_re = +2*i32_re;
+        spinorFloat b2_im = +2*i32_im;
         
         // multiply row 0
-        float A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
-        float A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
-        float B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
-        float B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
+        spinorFloat A0_re = + (g00_re * a0_re - g00_im * a0_im) + (g01_re * a1_re - g01_im * a1_im) + (g02_re * a2_re - g02_im * a2_im);
+        spinorFloat A0_im = + (g00_re * a0_im + g00_im * a0_re) + (g01_re * a1_im + g01_im * a1_re) + (g02_re * a2_im + g02_im * a2_re);
+        spinorFloat B0_re = + (g00_re * b0_re - g00_im * b0_im) + (g01_re * b1_re - g01_im * b1_im) + (g02_re * b2_re - g02_im * b2_im);
+        spinorFloat B0_im = + (g00_re * b0_im + g00_im * b0_re) + (g01_re * b1_im + g01_im * b1_re) + (g02_re * b2_im + g02_im * b2_re);
         
         // multiply row 1
-        float A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
-        float A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
-        float B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
-        float B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
+        spinorFloat A1_re = + (g10_re * a0_re - g10_im * a0_im) + (g11_re * a1_re - g11_im * a1_im) + (g12_re * a2_re - g12_im * a2_im);
+        spinorFloat A1_im = + (g10_re * a0_im + g10_im * a0_re) + (g11_re * a1_im + g11_im * a1_re) + (g12_re * a2_im + g12_im * a2_re);
+        spinorFloat B1_re = + (g10_re * b0_re - g10_im * b0_im) + (g11_re * b1_re - g11_im * b1_im) + (g12_re * b2_re - g12_im * b2_im);
+        spinorFloat B1_im = + (g10_re * b0_im + g10_im * b0_re) + (g11_re * b1_im + g11_im * b1_re) + (g12_re * b2_im + g12_im * b2_re);
         
         // multiply row 2
-        float A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
-        float A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
-        float B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
-        float B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
+        spinorFloat A2_re = + (g20_re * a0_re - g20_im * a0_im) + (g21_re * a1_re - g21_im * a1_im) + (g22_re * a2_re - g22_im * a2_im);
+        spinorFloat A2_im = + (g20_re * a0_im + g20_im * a0_re) + (g21_re * a1_im + g21_im * a1_re) + (g22_re * a2_im + g22_im * a2_re);
+        spinorFloat B2_re = + (g20_re * b0_re - g20_im * b0_im) + (g21_re * b1_re - g21_im * b1_im) + (g22_re * b2_re - g22_im * b2_im);
+        spinorFloat B2_im = + (g20_re * b0_im + g20_im * b0_re) + (g21_re * b1_im + g21_im * b1_re) + (g22_re * b2_im + g22_im * b2_re);
         
         o20_re += A0_re;
         o20_im += A0_im;
@@ -880,27 +934,27 @@ o32_re = o32_im = 0;
         READ_SPINOR_UP(SPINORTEX);
         
         // project spinor into half spinors
-        float a0_re = +2*i00_re;
-        float a0_im = +2*i00_im;
-        float a1_re = +2*i01_re;
-        float a1_im = +2*i01_im;
-        float a2_re = +2*i02_re;
-        float a2_im = +2*i02_im;
+        spinorFloat a0_re = +2*i00_re;
+        spinorFloat a0_im = +2*i00_im;
+        spinorFloat a1_re = +2*i01_re;
+        spinorFloat a1_im = +2*i01_im;
+        spinorFloat a2_re = +2*i02_re;
+        spinorFloat a2_im = +2*i02_im;
         
-        float b0_re = +2*i10_re;
-        float b0_im = +2*i10_im;
-        float b1_re = +2*i11_re;
-        float b1_im = +2*i11_im;
-        float b2_re = +2*i12_re;
-        float b2_im = +2*i12_im;
+        spinorFloat b0_re = +2*i10_re;
+        spinorFloat b0_im = +2*i10_im;
+        spinorFloat b1_re = +2*i11_re;
+        spinorFloat b1_im = +2*i11_im;
+        spinorFloat b2_re = +2*i12_re;
+        spinorFloat b2_im = +2*i12_im;
         
         // identity gauge matrix
-        float A0_re = a0_re; float A0_im = a0_im;
-        float B0_re = b0_re; float B0_im = b0_im;
-        float A1_re = a1_re; float A1_im = a1_im;
-        float B1_re = b1_re; float B1_im = b1_im;
-        float A2_re = a2_re; float A2_im = a2_im;
-        float B2_re = b2_re; float B2_im = b2_im;
+        spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
+        spinorFloat B0_re = b0_re; spinorFloat B0_im = b0_im;
+        spinorFloat A1_re = a1_re; spinorFloat A1_im = a1_im;
+        spinorFloat B1_re = b1_re; spinorFloat B1_im = b1_im;
+        spinorFloat A2_re = a2_re; spinorFloat A2_im = a2_im;
+        spinorFloat B2_re = b2_re; spinorFloat B2_im = b2_im;
         
         o00_re += A0_re;
         o00_im += A0_im;
@@ -929,37 +983,37 @@ o32_re = o32_im = 0;
         RECONSTRUCT_GAUGE_MATRIX(7);
         
         // project spinor into half spinors
-        float a0_re = +2*i00_re;
-        float a0_im = +2*i00_im;
-        float a1_re = +2*i01_re;
-        float a1_im = +2*i01_im;
-        float a2_re = +2*i02_re;
-        float a2_im = +2*i02_im;
+        spinorFloat a0_re = +2*i00_re;
+        spinorFloat a0_im = +2*i00_im;
+        spinorFloat a1_re = +2*i01_re;
+        spinorFloat a1_im = +2*i01_im;
+        spinorFloat a2_re = +2*i02_re;
+        spinorFloat a2_im = +2*i02_im;
         
-        float b0_re = +2*i10_re;
-        float b0_im = +2*i10_im;
-        float b1_re = +2*i11_re;
-        float b1_im = +2*i11_im;
-        float b2_re = +2*i12_re;
-        float b2_im = +2*i12_im;
+        spinorFloat b0_re = +2*i10_re;
+        spinorFloat b0_im = +2*i10_im;
+        spinorFloat b1_re = +2*i11_re;
+        spinorFloat b1_im = +2*i11_im;
+        spinorFloat b2_re = +2*i12_re;
+        spinorFloat b2_im = +2*i12_im;
         
         // multiply row 0
-        float A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
-        float A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
-        float B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
-        float B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
+        spinorFloat A0_re = + (gT00_re * a0_re - gT00_im * a0_im) + (gT01_re * a1_re - gT01_im * a1_im) + (gT02_re * a2_re - gT02_im * a2_im);
+        spinorFloat A0_im = + (gT00_re * a0_im + gT00_im * a0_re) + (gT01_re * a1_im + gT01_im * a1_re) + (gT02_re * a2_im + gT02_im * a2_re);
+        spinorFloat B0_re = + (gT00_re * b0_re - gT00_im * b0_im) + (gT01_re * b1_re - gT01_im * b1_im) + (gT02_re * b2_re - gT02_im * b2_im);
+        spinorFloat B0_im = + (gT00_re * b0_im + gT00_im * b0_re) + (gT01_re * b1_im + gT01_im * b1_re) + (gT02_re * b2_im + gT02_im * b2_re);
         
         // multiply row 1
-        float A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
-        float A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
-        float B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
-        float B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
+        spinorFloat A1_re = + (gT10_re * a0_re - gT10_im * a0_im) + (gT11_re * a1_re - gT11_im * a1_im) + (gT12_re * a2_re - gT12_im * a2_im);
+        spinorFloat A1_im = + (gT10_re * a0_im + gT10_im * a0_re) + (gT11_re * a1_im + gT11_im * a1_re) + (gT12_re * a2_im + gT12_im * a2_re);
+        spinorFloat B1_re = + (gT10_re * b0_re - gT10_im * b0_im) + (gT11_re * b1_re - gT11_im * b1_im) + (gT12_re * b2_re - gT12_im * b2_im);
+        spinorFloat B1_im = + (gT10_re * b0_im + gT10_im * b0_re) + (gT11_re * b1_im + gT11_im * b1_re) + (gT12_re * b2_im + gT12_im * b2_re);
         
         // multiply row 2
-        float A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
-        float A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
-        float B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
-        float B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
+        spinorFloat A2_re = + (gT20_re * a0_re - gT20_im * a0_im) + (gT21_re * a1_re - gT21_im * a1_im) + (gT22_re * a2_re - gT22_im * a2_im);
+        spinorFloat A2_im = + (gT20_re * a0_im + gT20_im * a0_re) + (gT21_re * a1_im + gT21_im * a1_re) + (gT22_re * a2_im + gT22_im * a2_re);
+        spinorFloat B2_re = + (gT20_re * b0_re - gT20_im * b0_im) + (gT21_re * b1_re - gT21_im * b1_im) + (gT22_re * b2_re - gT22_im * b2_im);
+        spinorFloat B2_im = + (gT20_re * b0_im + gT20_im * b0_re) + (gT21_re * b1_im + gT21_im * b1_re) + (gT22_re * b2_im + gT22_im * b2_re);
         
         o00_re += A0_re;
         o00_im += A0_im;
@@ -983,14 +1037,14 @@ o32_re = o32_im = 0;
 
 // change to chiral basis
 {
-    float a00_re = -o10_re - o30_re;
-    float a00_im = -o10_im - o30_im;
-    float a10_re =  o00_re + o20_re;
-    float a10_im =  o00_im + o20_im;
-    float a20_re = -o10_re + o30_re;
-    float a20_im = -o10_im + o30_im;
-    float a30_re =  o00_re - o20_re;
-    float a30_im =  o00_im - o20_im;
+    spinorFloat a00_re = -o10_re - o30_re;
+    spinorFloat a00_im = -o10_im - o30_im;
+    spinorFloat a10_re =  o00_re + o20_re;
+    spinorFloat a10_im =  o00_im + o20_im;
+    spinorFloat a20_re = -o10_re + o30_re;
+    spinorFloat a20_im = -o10_im + o30_im;
+    spinorFloat a30_re =  o00_re - o20_re;
+    spinorFloat a30_im =  o00_im - o20_im;
     
     o00_re = a00_re;
     o10_re = a10_re;
@@ -998,14 +1052,14 @@ o32_re = o32_im = 0;
     o30_re = a30_re;
 }
 {
-    float a01_re = -o11_re - o31_re;
-    float a01_im = -o11_im - o31_im;
-    float a11_re =  o01_re + o21_re;
-    float a11_im =  o01_im + o21_im;
-    float a21_re = -o11_re + o31_re;
-    float a21_im = -o11_im + o31_im;
-    float a31_re =  o01_re - o21_re;
-    float a31_im =  o01_im - o21_im;
+    spinorFloat a01_re = -o11_re - o31_re;
+    spinorFloat a01_im = -o11_im - o31_im;
+    spinorFloat a11_re =  o01_re + o21_re;
+    spinorFloat a11_im =  o01_im + o21_im;
+    spinorFloat a21_re = -o11_re + o31_re;
+    spinorFloat a21_im = -o11_im + o31_im;
+    spinorFloat a31_re =  o01_re - o21_re;
+    spinorFloat a31_im =  o01_im - o21_im;
     
     o01_re = a01_re;
     o11_re = a11_re;
@@ -1013,14 +1067,14 @@ o32_re = o32_im = 0;
     o31_re = a31_re;
 }
 {
-    float a02_re = -o12_re - o32_re;
-    float a02_im = -o12_im - o32_im;
-    float a12_re =  o02_re + o22_re;
-    float a12_im =  o02_im + o22_im;
-    float a22_re = -o12_re + o32_re;
-    float a22_im = -o12_im + o32_im;
-    float a32_re =  o02_re - o22_re;
-    float a32_im =  o02_im - o22_im;
+    spinorFloat a02_re = -o12_re - o32_re;
+    spinorFloat a02_im = -o12_im - o32_im;
+    spinorFloat a12_re =  o02_re + o22_re;
+    spinorFloat a12_im =  o02_im + o22_im;
+    spinorFloat a22_re = -o12_re + o32_re;
+    spinorFloat a22_im = -o12_im + o32_im;
+    spinorFloat a32_re =  o02_re - o22_re;
+    spinorFloat a32_im =  o02_im - o22_im;
     
     o02_re = a02_re;
     o12_re = a12_re;
@@ -1032,12 +1086,12 @@ o32_re = o32_im = 0;
 {
     READ_CLOVER(CLOVERTEX, 0)
     
-    float a00_re = 0; float a00_im = 0;
-    float a01_re = 0; float a01_im = 0;
-    float a02_re = 0; float a02_im = 0;
-    float a10_re = 0; float a10_im = 0;
-    float a11_re = 0; float a11_im = 0;
-    float a12_re = 0; float a12_im = 0;
+    spinorFloat a00_re = 0; spinorFloat a00_im = 0;
+    spinorFloat a01_re = 0; spinorFloat a01_im = 0;
+    spinorFloat a02_re = 0; spinorFloat a02_im = 0;
+    spinorFloat a10_re = 0; spinorFloat a10_im = 0;
+    spinorFloat a11_re = 0; spinorFloat a11_im = 0;
+    spinorFloat a12_re = 0; spinorFloat a12_im = 0;
     
     a00_re += c00_00_re * o00_re;
     a00_im += c00_00_re * o00_im;
@@ -1130,12 +1184,12 @@ o32_re = o32_im = 0;
 {
     READ_CLOVER(CLOVERTEX, 1)
     
-    float a20_re = 0; float a20_im = 0;
-    float a21_re = 0; float a21_im = 0;
-    float a22_re = 0; float a22_im = 0;
-    float a30_re = 0; float a30_im = 0;
-    float a31_re = 0; float a31_im = 0;
-    float a32_re = 0; float a32_im = 0;
+    spinorFloat a20_re = 0; spinorFloat a20_im = 0;
+    spinorFloat a21_re = 0; spinorFloat a21_im = 0;
+    spinorFloat a22_re = 0; spinorFloat a22_im = 0;
+    spinorFloat a30_re = 0; spinorFloat a30_im = 0;
+    spinorFloat a31_re = 0; spinorFloat a31_im = 0;
+    spinorFloat a32_re = 0; spinorFloat a32_im = 0;
     
     a20_re += c20_20_re * o20_re;
     a20_im += c20_20_re * o20_im;
@@ -1227,14 +1281,14 @@ o32_re = o32_im = 0;
 // change back from chiral basis
 // (note: required factor of 1/2 is included in clover term normalization)
 {
-    float a00_re =  o10_re + o30_re;
-    float a00_im =  o10_im + o30_im;
-    float a10_re = -o00_re - o20_re;
-    float a10_im = -o00_im - o20_im;
-    float a20_re =  o10_re - o30_re;
-    float a20_im =  o10_im - o30_im;
-    float a30_re = -o00_re + o20_re;
-    float a30_im = -o00_im + o20_im;
+    spinorFloat a00_re =  o10_re + o30_re;
+    spinorFloat a00_im =  o10_im + o30_im;
+    spinorFloat a10_re = -o00_re - o20_re;
+    spinorFloat a10_im = -o00_im - o20_im;
+    spinorFloat a20_re =  o10_re - o30_re;
+    spinorFloat a20_im =  o10_im - o30_im;
+    spinorFloat a30_re = -o00_re + o20_re;
+    spinorFloat a30_im = -o00_im + o20_im;
     
     o00_re = a00_re;
     o10_re = a10_re;
@@ -1242,14 +1296,14 @@ o32_re = o32_im = 0;
     o30_re = a30_re;
 }
 {
-    float a01_re =  o11_re + o31_re;
-    float a01_im =  o11_im + o31_im;
-    float a11_re = -o01_re - o21_re;
-    float a11_im = -o01_im - o21_im;
-    float a21_re =  o11_re - o31_re;
-    float a21_im =  o11_im - o31_im;
-    float a31_re = -o01_re + o21_re;
-    float a31_im = -o01_im + o21_im;
+    spinorFloat a01_re =  o11_re + o31_re;
+    spinorFloat a01_im =  o11_im + o31_im;
+    spinorFloat a11_re = -o01_re - o21_re;
+    spinorFloat a11_im = -o01_im - o21_im;
+    spinorFloat a21_re =  o11_re - o31_re;
+    spinorFloat a21_im =  o11_im - o31_im;
+    spinorFloat a31_re = -o01_re + o21_re;
+    spinorFloat a31_im = -o01_im + o21_im;
     
     o01_re = a01_re;
     o11_re = a11_re;
@@ -1257,14 +1311,14 @@ o32_re = o32_im = 0;
     o31_re = a31_re;
 }
 {
-    float a02_re =  o12_re + o32_re;
-    float a02_im =  o12_im + o32_im;
-    float a12_re = -o02_re - o22_re;
-    float a12_im = -o02_im - o22_im;
-    float a22_re =  o12_re - o32_re;
-    float a22_im =  o12_im - o32_im;
-    float a32_re = -o02_re + o22_re;
-    float a32_im = -o02_im + o22_im;
+    spinorFloat a02_re =  o12_re + o32_re;
+    spinorFloat a02_im =  o12_im + o32_im;
+    spinorFloat a12_re = -o02_re - o22_re;
+    spinorFloat a12_im = -o02_im - o22_im;
+    spinorFloat a22_re =  o12_re - o32_re;
+    spinorFloat a22_im =  o12_im - o32_im;
+    spinorFloat a32_re = -o02_re + o22_re;
+    spinorFloat a32_im = -o02_im + o22_im;
     
     o02_re = a02_re;
     o12_re = a12_re;
@@ -1276,6 +1330,32 @@ o32_re = o32_im = 0;
 
 #ifdef DSLASH_XPAY
     READ_ACCUM(ACCUMTEX)
+#if (DD_SPREC==0)
+    o00_re = a*o00_re + accum0.x;
+    o00_im = a*o00_im + accum0.y;
+    o01_re = a*o01_re + accum1.x;
+    o01_im = a*o01_im + accum1.y;
+    o02_re = a*o02_re + accum2.x;
+    o02_im = a*o02_im + accum2.y;
+    o10_re = a*o10_re + accum3.x;
+    o10_im = a*o10_im + accum3.y;
+    o11_re = a*o11_re + accum4.x;
+    o11_im = a*o11_im + accum4.y;
+    o12_re = a*o12_re + accum5.x;
+    o12_im = a*o12_im + accum5.y;
+    o20_re = a*o20_re + accum6.x;
+    o20_im = a*o20_im + accum6.y;
+    o21_re = a*o21_re + accum7.x;
+    o21_im = a*o21_im + accum7.y;
+    o22_re = a*o22_re + accum8.x;
+    o22_im = a*o22_im + accum8.y;
+    o30_re = a*o30_re + accum9.x;
+    o30_im = a*o30_im + accum9.y;
+    o31_re = a*o31_re + accum10.x;
+    o31_im = a*o31_im + accum10.y;
+    o32_re = a*o32_re + accum11.x;
+    o32_im = a*o32_im + accum11.y;
+#else
     o00_re = a*o00_re + accum0.x;
     o00_im = a*o00_im + accum0.y;
     o01_re = a*o01_re + accum0.z;
@@ -1300,10 +1380,59 @@ o32_re = o32_im = 0;
     o31_im = a*o31_im + accum5.y;
     o32_re = a*o32_re + accum5.z;
     o32_im = a*o32_im + accum5.w;
+#endif // DD_SPREC
 #endif // DSLASH_XPAY
 
 
     // write spinor field back to device memory
     WRITE_SPINOR();
 
+// undefine to prevent warning when precision is changed
+#undef spinorFloat
+#undef A_re
+#undef A_im
+
+#undef g00_re
+#undef g00_im
+#undef g01_re
+#undef g01_im
+#undef g02_re
+#undef g02_im
+#undef g10_re
+#undef g10_im
+#undef g11_re
+#undef g11_im
+#undef g12_re
+#undef g12_im
+#undef g20_re
+#undef g20_im
+#undef g21_re
+#undef g21_im
+#undef g22_re
+#undef g22_im
+
+#undef i00_re
+#undef i00_im
+#undef i01_re
+#undef i01_im
+#undef i02_re
+#undef i02_im
+#undef i10_re
+#undef i10_im
+#undef i11_re
+#undef i11_im
+#undef i12_re
+#undef i12_im
+#undef i20_re
+#undef i20_im
+#undef i21_re
+#undef i21_im
+#undef i22_re
+#undef i22_im
+#undef i30_re
+#undef i30_im
+#undef i31_re
+#undef i31_im
+#undef i32_re
+#undef i32_im
 

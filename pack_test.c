@@ -3,7 +3,9 @@
 
 #include <quda.h>
 #include <util_quda.h>
-#include <field_quda.h>
+
+#include <gauge_quda.h>
+#include <spinor_quda.h>
 
 #define FULL_WILSON 1
 
@@ -44,8 +46,8 @@ void init() {
 
   Precision single = QUDA_SINGLE_PRECISION;
 
-  cudaGauge.even = NULL;
-  cudaGauge.odd = NULL;
+  cudaSGauge.even = NULL;
+  cudaSGauge.odd = NULL;
 
   param.cpu_prec = QUDA_SINGLE_PRECISION;
   param.cuda_prec = QUDA_SINGLE_PRECISION;
@@ -98,13 +100,13 @@ void packTest() {
   
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-  loadGaugeField(cpsGauge);
+  createGaugeField(cpsGauge);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
   stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  loadGaugeField(qdpGauge);
+  createGaugeField(qdpGauge);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 

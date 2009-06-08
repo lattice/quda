@@ -1,3 +1,33 @@
+#define READ_SPINOR_DOUBLE(spinor)		     \
+  double2 I0 = fetch_double2((spinor), sp_idx + 0*Nh);   \
+  double2 I1 = fetch_double2((spinor), sp_idx + 1*Nh);   \
+  double2 I2 = fetch_double2((spinor), sp_idx + 2*Nh);   \
+  double2 I3 = fetch_double2((spinor), sp_idx + 3*Nh);   \
+  double2 I4 = fetch_double2((spinor), sp_idx + 4*Nh);   \
+  double2 I5 = fetch_double2((spinor), sp_idx + 5*Nh);   \
+  double2 I6 = fetch_double2((spinor), sp_idx + 6*Nh);   \
+  double2 I7 = fetch_double2((spinor), sp_idx + 7*Nh);   \
+  double2 I8 = fetch_double2((spinor), sp_idx + 8*Nh);   \
+  double2 I9 = fetch_double2((spinor), sp_idx + 9*Nh);   \
+  double2 I10 = fetch_double2((spinor), sp_idx + 10*Nh);   \
+  double2 I11 = fetch_double2((spinor), sp_idx + 11*Nh);
+
+#define READ_SPINOR_DOUBLE_UP(spinor)		     \
+  double2 I0 = fetch_double2((spinor), sp_idx + 0*Nh);   \
+  double2 I1 = fetch_double2((spinor), sp_idx + 1*Nh);   \
+  double2 I2 = fetch_double2((spinor), sp_idx + 2*Nh);   \
+  double2 I3 = fetch_double2((spinor), sp_idx + 3*Nh);   \
+  double2 I4 = fetch_double2((spinor), sp_idx + 4*Nh);   \
+  double2 I5 = fetch_double2((spinor), sp_idx + 5*Nh);
+
+#define READ_SPINOR_DOUBLE_DOWN(spinor)		     \
+  double2 I6 = fetch_double2((spinor), sp_idx + 6*Nh);   \
+  double2 I7 = fetch_double2((spinor), sp_idx + 7*Nh);   \
+  double2 I8 = fetch_double2((spinor), sp_idx + 8*Nh);   \
+  double2 I9 = fetch_double2((spinor), sp_idx + 9*Nh);   \
+  double2 I10 = fetch_double2((spinor), sp_idx + 10*Nh);   \
+  double2 I11 = fetch_double2((spinor), sp_idx + 11*Nh);
+
 #define READ_SPINOR_SINGLE(spinor)		     \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*Nh);   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*Nh);   \
@@ -49,6 +79,20 @@
   I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	     \
   I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
 
+#define READ_ACCUM_DOUBLE(spinor)				\
+  double2 accum0 = fetch_double2((spinor), sid + 0*Nh);		\
+  double2 accum1 = fetch_double2((spinor), sid + 1*Nh);		\
+  double2 accum2 = fetch_double2((spinor), sid + 2*Nh);		\
+  double2 accum3 = fetch_double2((spinor), sid + 3*Nh);		\
+  double2 accum4 = fetch_double2((spinor), sid + 4*Nh);		\
+  double2 accum5 = fetch_double2((spinor), sid + 5*Nh);		\
+  double2 accum6 = fetch_double2((spinor), sid + 6*Nh);		\
+  double2 accum7 = fetch_double2((spinor), sid + 7*Nh);		\
+  double2 accum8 = fetch_double2((spinor), sid + 8*Nh);		\
+  double2 accum9 = fetch_double2((spinor), sid + 9*Nh);		\
+  double2 accum10 = fetch_double2((spinor), sid + 10*Nh);	\
+  double2 accum11 = fetch_double2((spinor), sid + 11*Nh);	
+
 #define READ_ACCUM_SINGLE(spinor)			\
   float4 accum0 = tex1Dfetch((spinor), sid + 0*Nh);	\
   float4 accum1 = tex1Dfetch((spinor), sid + 1*Nh);	\
@@ -72,6 +116,20 @@
   accum4.x *= C; accum4.y *= C; accum4.z *= C; accum4.w *= C;	     \
   accum5.x *= C; accum5.y *= C;	accum5.z *= C; accum5.w *= C;					     
 
+
+#define WRITE_SPINOR_DOUBLE2()					 \
+  g_out[0*Nh+sid] = make_double2(o00_re, o00_im);		 \
+  g_out[1*Nh+sid] = make_double2(o01_re, o01_im);		 \
+  g_out[2*Nh+sid] = make_double2(o02_re, o02_im);		 \
+  g_out[3*Nh+sid] = make_double2(o10_re, o10_im);		 \
+  g_out[4*Nh+sid] = make_double2(o11_re, o11_im);		 \
+  g_out[5*Nh+sid] = make_double2(o12_re, o12_im);		 \
+  g_out[6*Nh+sid] = make_double2(o20_re, o20_im);		 \
+  g_out[7*Nh+sid] = make_double2(o21_re, o21_im);		 \
+  g_out[8*Nh+sid] = make_double2(o22_re, o22_im);		 \
+  g_out[9*Nh+sid] = make_double2(o30_re, o30_im);		 \
+  g_out[10*Nh+sid] = make_double2(o31_re, o31_im);		 \
+  g_out[11*Nh+sid] = make_double2(o32_re, o32_im);		 
 
 #define WRITE_SPINOR_FLOAT4()					 \
   g_out[0*Nh+sid] = make_float4(o00_re, o00_im, o01_re, o01_im); \
@@ -120,6 +178,7 @@
   g_out[sid+4*Nh] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
   g_out[sid+5*Nh] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
 
+/*
 #define WRITE_SPINOR_FLOAT1_SMEM() \
   int t = threadIdx.x; \
   int B = BLOCK_DIM; \
@@ -150,5 +209,5 @@
   __syncthreads(); \
   for (int i = 0; i < 2; i++) for (int c = 0; c < 4; c++) \
     ((float*)g_out)[(i+4)*(Nh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
-
+*/
 

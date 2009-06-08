@@ -1,6 +1,5 @@
 
-#ifdef REDUCE_KAHAN_SUMMATION
-
+#if (REDUCE_TYPE == REDUCE_KAHAN)
 
 #define DSACC(c0, c1, a0, a1) dsadd((c0), (c1), (c0), (c1), (a0), (a1))
 
@@ -40,42 +39,7 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
     if (tid == 0) g_odata[blockIdx.x] = sdata[0]+sdata[1];
 }
 
-
-QudaSumFloat REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
-    if (n % (REDUCE_THREADS) != 0) {
-        printf("ERROR reduceCuda(): length must be a multiple of %d\n", (REDUCE_THREADS));
-        return 0.;
-    }
-    
-    // allocate arrays on device and host to store one float for each block
-    int blocks = min(REDUCE_MAX_BLOCKS, n / (REDUCE_THREADS));
-    QudaSumFloat h_odata[REDUCE_MAX_BLOCKS];
-    QudaSumFloat *d_odata;
-    
-    if (cudaMalloc((void**) &d_odata, blocks*sizeof(QudaSumFloat))) {
-      printf("Error allocating reduction matrix\n");
-      exit(0);
-    }   
-    
-    // partial reduction; each block generates one number
-    dim3 dimBlock(REDUCE_THREADS, 1, 1);
-    dim3 dimGrid(blocks, 1, 1);
-    int smemSize = 2 * REDUCE_THREADS * sizeof(QudaSumFloat);
-    REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_odata, n);
-    
-    // copy result from device to host, and perform final reduction on CPU
-    cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
-    double cpu_sum = 0;
-    for (int i = 0; i < blocks; i++) 
-      cpu_sum += h_odata[i];
-    
-    cudaFree(d_odata);    
-    return (QudaSumFloat)cpu_sum;
-}
-
-
-#else
-
+#else // true double precision kernel
 
 __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, unsigned int n) {
     unsigned int tid = threadIdx.x;
@@ -110,8 +74,9 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
     if (tid == 0) g_odata[blockIdx.x] = s[0];
 }
 
+#endif
 
-QudaSumFloat REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
+double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     if (n % REDUCE_THREADS != 0) {
         printf("ERROR reduceCuda(): length must be a multiple of %d\n", REDUCE_THREADS);
         return 0.;
@@ -139,7 +104,7 @@ QudaSumFloat REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
       cpu_sum += h_odata[i];
     
     cudaFree(d_odata);    
-    return (QudaSumFloat)cpu_sum;
+    return cpu_sum;
 }
 
-#endif // REDUCE_DOUBLE_PRECISION
+

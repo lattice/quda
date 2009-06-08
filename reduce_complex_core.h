@@ -1,5 +1,5 @@
 
-#ifdef REDUCE_KAHAN_SUMMATION
+#if (REDUCE_TYPE == REDUCE_KAHAN)
 
 
 #define DSACC(c0, c1, a0, a1) dsadd((c0), (c1), (c0), (c1), (a0), (a1))
@@ -50,49 +50,7 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
     }
 }
 
-
-QudaSumComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
-    if (n % (REDUCE_THREADS) != 0) {
-        printf("ERROR reduceCuda(): length must be a multiple of %d\n", (REDUCE_THREADS));
-	exit(-1);
-    }
-    
-    // allocate arrays on device and host to store one QudaSumComplex for each block
-    int blocks = min(REDUCE_MAX_BLOCKS, n / (REDUCE_THREADS));
-    QudaSumComplex h_odata[REDUCE_MAX_BLOCKS];
-    QudaSumComplex *d_odata;
-    if (cudaMalloc((void**) &d_odata, blocks*sizeof(QudaSumComplex))) {
-      printf("Error allocating reduction matrix\n");
-      exit(0);
-    }   
-    
-    // partial reduction; each block generates one number
-    dim3 dimBlock(REDUCE_THREADS, 1, 1);
-    dim3 dimGrid(blocks, 1, 1);
-    int smemSize = 2 * REDUCE_THREADS * sizeof(QudaSumComplex);
-    REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_odata, n);
-    
-    // copy result from device to host, and perform final reduction on CPU
-    cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumComplex), cudaMemcpyDeviceToHost);
-    cuDoubleComplex gpu_result;
-    gpu_result.x = 0;
-    gpu_result.y = 0;
-    for (int i = 0; i < blocks; i++) {
-        gpu_result.x += h_odata[i].x;
-        gpu_result.y += h_odata[i].y;
-    }
-    
-    cudaFree(d_odata);    
-
-    QudaSumComplex res;
-    res.x = (QudaSumFloat)gpu_result.x;
-    res.y = (QudaSumFloat)gpu_result.y;
-    return res;
-}
-
-
 #else
-
 
 __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata, unsigned int n) {
     unsigned int tid = threadIdx.x;
@@ -133,8 +91,9 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
     }
 }
 
+#endif
 
-QudaSumComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
+cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     if (n % REDUCE_THREADS != 0) {
         printf("ERROR reduceCuda(): length must be a multiple of %d\n", REDUCE_THREADS);
 	exit(-1);
@@ -168,11 +127,7 @@ QudaSumComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
     
     cudaFree(d_odata);    
 
-    QudaSumComplex res;
-    res.x = (QudaSumFloat)gpu_result.x;
-    res.y = (QudaSumFloat)gpu_result.y;
-    return res;
+    return gpu_result;
 }
 
-#endif // REDUCE_DOUBLE_PRECISION
 

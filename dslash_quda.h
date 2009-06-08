@@ -17,8 +17,8 @@
 
 #define SPINOR_BYTES (Nh*spinorSiteSize*sizeof(float))
 
-#define PACKED12_GAUGE_BYTES (4*Nh*packed12GaugeSiteSize*sizeof(float))
-#define PACKED8_GAUGE_BYTES (4*Nh*packed8GaugeSiteSize*sizeof(float))
+#define PACKED12_GAUGE_BYTES (4*Nh*12*sizeof(float))
+#define PACKED8_GAUGE_BYTES (4*Nh*8*sizeof(float))
 
 #define CLOVER_BYTES (Nh*cloverSiteSize*sizeof(float))
 
@@ -26,7 +26,8 @@
 extern "C" {
 #endif
 
-  extern FullGauge cudaGauge;
+  extern FullGauge cudaDGauge;
+  extern FullGauge cudaSGauge;
   extern FullGauge cudaHGauge;
   extern QudaGaugeParam *gauge_param;
   extern QudaInvertParam *invert_param;
@@ -41,6 +42,12 @@ extern "C" {
   int dslashCudaSharedBytes();
   void setCudaGaugeParam();
   void bindGaugeTex(FullGauge gauge, int oddBit);
+
+  // Double precision routines
+  void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
+		   int oddBit, int daggerBit);
+  void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
+		       int oddBit, int daggerBit, ParitySpinor x, float a);
 
   // Single precision routines
   void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
@@ -68,10 +75,10 @@ extern "C" {
   void MatPCDagMatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven,
 			 float kappa, ParitySpinor tmp, MatPCType matpc_type);
   
-  QudaSumComplex MatPCcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
+  /*QudaSumComplex MatPCcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
 				 float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
   QudaSumComplex MatPCDagcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-				    float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
+  float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);*/
   
   // -- dslash_reference.cpp
   
@@ -95,9 +102,6 @@ extern "C" {
 			  FullGauge gaugePrecise, ParitySpinor tmp, 
 			  QudaInvertParam *param, DagType dag_type);
   
-  // -- cg_reference.cpp
-  void cgReference(float *out, float **gauge, float *in, float kappa, float tol);
-
 #ifdef __cplusplus
 }
 #endif

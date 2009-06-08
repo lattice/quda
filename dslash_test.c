@@ -3,11 +3,12 @@
 
 #include <quda.h>
 #include <util_quda.h>
-#include <field_quda.h>
+#include <spinor_quda.h>
+#include <gauge_quda.h>
 
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 2;
+int test_type = 1;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -43,20 +44,20 @@ void printSpinorFullField(float *spinor) {
 void init() {
 
   gaugeParam.cpu_prec = QUDA_SINGLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_SINGLE_PRECISION;
+  gaugeParam.cuda_prec = QUDA_HALF_PRECISION;
   gaugeParam.X = L1;
   gaugeParam.Y = L2;
   gaugeParam.Z = L3;
   gaugeParam.T = L4;
   gaugeParam.anisotropy = 2.3;
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_8;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param = &gaugeParam;
 
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_HALF_PRECISION;
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.kappa = kappa;
@@ -83,7 +84,7 @@ void init() {
   initQuda(dev);
   loadGaugeQuda((void*)hostGauge, &gaugeParam);
 
-  if (gaugeParam.cuda_prec == QUDA_SINGLE_PRECISION) gauge = cudaGauge;
+  if (gaugeParam.cuda_prec == QUDA_SINGLE_PRECISION) gauge = cudaSGauge;
   else gauge = cudaHGauge;
 
   printf("Sending fields to GPU..."); fflush(stdout);

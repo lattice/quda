@@ -3,7 +3,9 @@
 
 #include <quda.h>
 #include <util_quda.h>
-#include <field_quda.h>
+
+#include <gauge_quda.h>
+#include <spinor_quda.h>
 
 #define MAX_SHORT 32767
 #define SHORT_LENGTH 65536

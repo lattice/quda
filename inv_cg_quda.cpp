@@ -4,7 +4,8 @@
 
 #include <quda.h>
 #include <util_quda.h>
-#include <field_quda.h>
+#include <spinor_quda.h>
+#include <gauge_quda.h>
 
 void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 
 		  ParitySpinor tmp, QudaInvertParam *perf)
@@ -16,13 +17,15 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
   ParitySpinor p = allocateParitySpinor(prec);
   ParitySpinor Ap = allocateParitySpinor(prec);
 
-  float b2 = normCuda((float *)b.spinor, len);
+  double b2 = 0.0;
+  b2 = normCuda((float *)b.spinor, len);
+
   float r2 = b2;
   float r2_old;
   float stop = r2*perf->tol*perf->tol; // stopping condition of solver
 
   float alpha, beta;
-  QudaSumFloat pAp;
+  double pAp;
 
   if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
     r = allocateParitySpinor(prec);
@@ -50,7 +53,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
     axpyZpbxCuda(alpha, (float *)p.spinor, (float *)x.spinor, (float *)r.spinor, beta, len);
 
     k++;
-    //printf("%d iterations, r2 = %e\n", k, r2);
+    printf("%d iterations, r2 = %e\n", k, r2);
   }
   perf->secs = stopwatchReadSeconds();
 

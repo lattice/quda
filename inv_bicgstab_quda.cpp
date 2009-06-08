@@ -5,7 +5,8 @@
 
 #include <quda.h>
 #include <util_quda.h>
-#include <field_quda.h>
+#include <spinor_quda.h>
+#include <gauge_quda.h>
 
 void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSloppy, 
 			FullGauge gaugePrecise, ParitySpinor tmp, 
@@ -27,9 +28,9 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
   zeroCuda((float *)y.spinor, len);
   zeroCuda((float *)x.spinor, len);
 
-  QudaSumFloat b2 = normCuda((float *)b.spinor, len);
-  QudaSumFloat r2 = b2;
-  QudaSumFloat stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
+  double b2 = normCuda((float *)b.spinor, len);
+  double r2 = b2;
+  double stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
 
   cuComplex rho = make_cuFloatComplex(1.0f, 0.0f);
   cuComplex rho0 = rho;
@@ -37,20 +38,21 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
   cuComplex omega = make_cuFloatComplex(1.0f, 0.0f);
   cuComplex beta;
 
-  QudaSumComplex rv;
+  cuDoubleComplex rv;
+
   cuComplex rho_rho0;
   cuComplex alpha_omega;
   cuComplex beta_omega;
   cuComplex one = make_cuFloatComplex(1.0f, 0.0f);
 
-  QudaSumFloat3 rho_r2;
-  QudaSumFloat3 omega_t2;
+  double3 rho_r2;
+  double3 omega_t2;
 
-  QudaSumFloat rNorm = sqrt(r2);
-  QudaSumFloat r0Norm = rNorm;
-  QudaSumFloat maxrx = rNorm;
-  QudaSumFloat maxrr = rNorm;
-  QudaSumFloat delta = invert_param->reliable_delta;
+  double rNorm = sqrt(r2);
+  double r0Norm = rNorm;
+  double maxrx = rNorm;
+  double maxrr = rNorm;
+  double delta = invert_param->reliable_delta;
 
   int k=0;
   int xUpdate = 0, rUpdate = 0;
@@ -78,6 +80,8 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
     else 
       //rv = MatPCDagcDotWXCuda(v, gauge, p, invert_param->kappa, tmp, b, invert_param->matpc_type);
       MatPCDagCuda(v, gaugeSloppy, p, invert_param->kappa, tmp, invert_param->matpc_type);
+
+    printf("%e %e\n", normCuda((float*) v.spinor, len), normCuda((float*) p.spinor, len));
 
     rv = cDotProductCuda((float2*)source.spinor, (float2*)v.spinor, len/2);
     cuComplex rv32 = make_cuFloatComplex((float)rv.x, (float)rv.y);

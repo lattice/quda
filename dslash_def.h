@@ -19,8 +19,8 @@
 // by the concatenation of the following 6 fields, with "dslash" at the
 // beginning and "Kernel" at the end:
 //
-// DD_GPREC_F = S, H
-// DD_SPREC_F = S, H
+// DD_GPREC_F = D, S, H
+// DD_SPREC_F = D, S, H
 // DD_CPREC_F = S, [blank]; the latter corresponds to plain Wilson
 // DD_RECON_F = 12, 8
 // DD_DAG_F = Dagger, [blank]
@@ -58,19 +58,35 @@
 
 #if (DD_RECON==0) // reconstruct from 12 reals
 #define DD_RECON_F 12
-#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12
+#if (DD_GPREC==0)
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_DOUBLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_DOUBLE
+#elif (DD_GPREC==1)
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SINGLE
+#else
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SINGLE
+#endif
 #else             // reconstruct from 8 reals
 #define DD_RECON_F 8
-#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8
 #if (DD_GPREC==0)
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_DOUBLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_DOUBLE
+#elif (DD_GPREC==1)
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_SINGLE
 #else
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
 #endif
 #endif
 
-#if (DD_GPREC==0) // single-precision gauge field
+#if (DD_GPREC==0) // double-precision gauge field
+#define DD_GPREC_F D
+#define GAUGE0TEX gauge0TexDouble
+#define GAUGE1TEX gauge1TexDouble
+#elif (DD_GPREC==1) // single-precision gauge field
 #define DD_GPREC_F S
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
@@ -80,7 +96,19 @@
 #define GAUGE1TEX gauge1TexHalf
 #endif
 
-#if (DD_SPREC==0) // single-precision spinor field
+#if (DD_SPREC==0) // double-precision spinor field
+#define DD_SPREC_F D
+#define DD_PARAM1 double2* g_out
+#define READ_SPINOR READ_SPINOR_DOUBLE
+#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
+#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
+#define SPINORTEX spinorTexDouble
+#define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
+#if (DD_XPAY==1)
+#define ACCUMTEX accumTexDouble
+#define READ_ACCUM READ_ACCUM_DOUBLE
+#endif
+#elif (DD_SPREC==1) // single-precision spinor field
 #define DD_SPREC_F S
 #define DD_PARAM1 float4* g_out
 #define READ_SPINOR READ_SPINOR_SINGLE
@@ -118,6 +146,8 @@
 #define DD_CPREC_F
 #endif
 
+#if !(__CUDA_ARCH__ != 130 && (DD_SPREC == 0 || DD_GPREC == 0))
+
 #define DD_CONCAT(g,s,c,r,d,x) dslash ## g ## s ## c ## r ## d ## x ## Kernel
 #define DD_FUNC(g,s,c,r,d,x) DD_CONCAT(g,s,c,r,d,x)
 
@@ -131,6 +161,8 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #include "dslash_core.h"
 #endif
 }
+
+#endif
 
 // clean up
 
@@ -187,6 +219,9 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #if (DD_GPREC==0)
 #undef DD_GPREC
 #define DD_GPREC 1
+#elif (DD_GPREC==1)
+#undef DD_GPREC
+#define DD_GPREC 2
 #else
 #undef DD_GPREC
 #define DD_GPREC 0
@@ -194,6 +229,9 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #if (DD_SPREC==0)
 #undef DD_SPREC
 #define DD_SPREC 1
+#elif (DD_SPREC==1)
+#undef DD_SPREC
+#define DD_SPREC 2
 #else
 #undef DD_SPREC
 #define DD_SPREC 0

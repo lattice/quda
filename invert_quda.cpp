@@ -6,7 +6,8 @@
 #include <invert_quda.h>
 #include <quda.h>
 #include <util_quda.h>
-#include <field_quda.h>
+#include <spinor_quda.h>
+#include <gauge_quda.h>
 
 FullGauge gaugeSloppy; // sloppy gauge field
 FullGauge gaugePrecise; // precise gauge field
@@ -77,8 +78,8 @@ void initQuda(int dev)
   fprintf(stderr, "Using device %d: %s\n", dev, deviceProp.name);
   cudaSetDevice(dev);
 
-  cudaGauge.even = NULL;
-  cudaGauge.odd = NULL;
+  cudaSGauge.even = NULL;
+  cudaSGauge.odd = NULL;
 
   cudaHGauge.even = NULL;
   cudaHGauge.odd = NULL;
@@ -93,10 +94,10 @@ void initQuda(int dev)
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   gauge_param = param;
-  loadGaugeField(h_gauge);
+  createGaugeField(h_gauge);
 
-  gaugePrecise = cudaGauge;
-  gaugeSloppy = (param->cuda_prec == QUDA_HALF_PRECISION) ? cudaHGauge : cudaGauge;
+  gaugePrecise = cudaSGauge;
+  gaugeSloppy = (param->cuda_prec == QUDA_HALF_PRECISION) ? cudaHGauge : cudaSGauge;
 }
 
 void endQuda()
@@ -116,7 +117,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
 		   inv_param->cuda_prec, inv_param->dirac_order);
   
   if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
-    dslashCuda(out, cudaGauge, in, parity, dagger);
+    dslashCuda(out, cudaSGauge, in, parity, dagger);
   } else if (inv_param->cuda_prec == QUDA_HALF_PRECISION) {
     dslashCuda(out, cudaHGauge, in, parity, dagger);
   }
@@ -140,7 +141,7 @@ void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 		   inv_param->cuda_prec, inv_param->dirac_order);
   
   if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
-    MatPCCuda(out, cudaGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
+    MatPCCuda(out, cudaSGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
   } else {
     MatPCCuda(out, cudaHGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
   }
@@ -165,7 +166,7 @@ void MatPCDagQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 		   inv_param->cuda_prec, inv_param->dirac_order);
   
   if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
-    MatPCDagCuda(out, cudaGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
+    MatPCDagCuda(out, cudaSGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
   } else {
     MatPCDagCuda(out, cudaHGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
   }
@@ -190,7 +191,7 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 		   inv_param->cuda_prec, inv_param->dirac_order);
   
   if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
-    MatPCDagMatPCCuda(out, cudaGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
+    MatPCDagMatPCCuda(out, cudaSGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
   } else {
     MatPCDagMatPCCuda(out, cudaHGauge, in, inv_param->kappa, tmp, inv_param->matpc_type);
   }
@@ -216,8 +217,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param) {
 		  inv_param->cuda_prec, inv_param->dirac_order);
 
   if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
-    dslashCuda(out.odd, cudaGauge, in.even, 1, 0);
-    dslashCuda(out.even, cudaGauge, in.odd, 0, 0);
+    dslashCuda(out.odd, cudaSGauge, in.even, 1, 0);
+    dslashCuda(out.even, cudaSGauge, in.odd, 0, 0);
   } else if (inv_param->cuda_prec == QUDA_HALF_PRECISION) {
     dslashCuda(out.odd, cudaHGauge, in.even, 1, 0);
     dslashCuda(out.even, cudaHGauge, in.odd, 0, 0);
@@ -247,8 +248,8 @@ void MatDagQuda(void *h_out, void *h_in, QudaInvertParam *inv_param) {
 		  inv_param->cuda_prec, inv_param->dirac_order);
 
   if (gauge_param->cuda_prec == QUDA_SINGLE_PRECISION) {
-    dslashCuda(out.odd, cudaGauge, in.even, 1, 1);
-    dslashCuda(out.even, cudaGauge, in.odd, 0, 1);
+    dslashCuda(out.odd, cudaSGauge, in.even, 1, 1);
+    dslashCuda(out.even, cudaSGauge, in.odd, 0, 1);
   } else if (inv_param->cuda_prec == QUDA_HALF_PRECISION) {
     dslashCuda(out.odd, cudaHGauge, in.even, 1, 1);
     dslashCuda(out.even, cudaHGauge, in.odd, 0, 1);
@@ -345,7 +346,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
       copyCuda((float *)out.spinor, (float *)in.spinor, slenh);
       MatPCDagCuda(in, gaugePrecise, out, kappa, tmp, param->matpc_type);
     }
-    invertCgCuda(out, in, gaugePrecise, tmp, param);
+    invertCgCuda(out, in, gaugeSloppy, tmp, param);
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {

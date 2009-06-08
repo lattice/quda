@@ -192,10 +192,6 @@ void caxpbypzYmbwCuda(float2 a, float2 *x, float2 b, float2 *y,
 }
 
 
-// performs the operation y[i] = a*x[i] + y[i], and returns norm(y)
-// float axpyNormCuda(float a, float *x, float *y, int len);
-
-
 // Computes c = a + b in "double single" precision.
 __device__ void dsadd(QudaSumFloat &c0, QudaSumFloat &c1, const QudaSumFloat a0, 
 		      const QudaSumFloat a1, const float b0, const float b1) {

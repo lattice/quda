@@ -38,6 +38,7 @@ extern "C" {
   typedef void *ParityClover;
 
   typedef struct {
+    size_t packedGaugeBytes;
     Precision precision;
     ReconstructType reconstruct;
     ParityGauge odd;

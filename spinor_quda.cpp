@@ -1,15 +1,10 @@
-
 #include <stdlib.h>
 #include <stdio.h>
 
 #include <quda.h>
-#include <field_quda.h>
+#include <spinor_quda.h>
 
 #include <xmmintrin.h>
-
-// GPU gauge field
-FullGauge cudaGauge;
-FullGauge cudaHGauge;
 
 // GPU clover matrix
 FullClover cudaClover;
@@ -21,40 +16,30 @@ float4 *packedSpinor2 = 0;
 // Half precision spinor field temporaries
 ParitySpinor hSpinor1, hSpinor2;
 
-
-void allocateGaugeField(FullGauge *gauge, int packed_gauge_bytes) {
-  if (!gauge->even) {
-    if (cudaMalloc((void **)&gauge->even, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
-      printf("Error allocating even gauge field\n");
-      exit(0);
-    }
-  }
-   
-  if (!gauge->odd) {
-    if (cudaMalloc((void **)&gauge->odd, packed_gauge_bytes) == cudaErrorMemoryAllocation) {
-      printf("Error allocating even odd gauge field\n");
-      exit(0);
-    }
-  }
-}
-
-
 ParitySpinor allocateParitySpinor(Precision precision) {
   ParitySpinor ret;
 
   ret.precision = precision;
 
-  if (precision == QUDA_SINGLE_PRECISION) {
-    if (cudaMalloc((void**)&ret.spinor, SPINOR_BYTES) == cudaErrorMemoryAllocation) {
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    int spinor_bytes = Nh*spinorSiteSize*sizeof(double);
+    if (cudaMalloc((void**)&ret.spinor, spinor_bytes) == cudaErrorMemoryAllocation) {
+      printf("Error allocating spinor\n");
+      exit(0);
+    }
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    int spinor_bytes = Nh*spinorSiteSize*sizeof(float);
+    if (cudaMalloc((void**)&ret.spinor, spinor_bytes) == cudaErrorMemoryAllocation) {
       printf("Error allocating spinor\n");
       exit(0);
     }
   } else if (precision == QUDA_HALF_PRECISION) {
-    if (cudaMalloc((void**)&ret.spinor, SPINOR_BYTES/2) == cudaErrorMemoryAllocation) {
+    int spinor_bytes = Nh*spinorSiteSize*sizeof(float)/2;
+    if (cudaMalloc((void**)&ret.spinor, spinor_bytes) == cudaErrorMemoryAllocation) {
       printf("Error allocating spinor\n");
       exit(0);
     }
-    if (cudaMalloc((void**)&ret.spinorNorm, SPINOR_BYTES/24) == cudaErrorMemoryAllocation) {
+    if (cudaMalloc((void**)&ret.spinorNorm, spinor_bytes/12) == cudaErrorMemoryAllocation) {
       printf("Error allocating spinorNorm\n");
       exit(0);
     }
@@ -74,6 +59,11 @@ FullSpinor allocateSpinorField(Precision precision) {
   return ret;
 }
 
+void allocateSpinorHalf() {
+  Precision precision = QUDA_HALF_PRECISION;
+  hSpinor1 = allocateParitySpinor(precision);
+  hSpinor2 = allocateParitySpinor(precision);
+}
 
 ParityClover allocateParityClover() {
   ParityClover ret;
@@ -96,8 +86,7 @@ FullClover allocateCloverField() {
 void freeParitySpinor(ParitySpinor spinor) {
 
   cudaFree(spinor.spinor);
-  if (spinor.precision == QUDA_HALF_PRECISION)
-    cudaFree(spinor.spinorNorm);
+  if (spinor.precision == QUDA_HALF_PRECISION) cudaFree(spinor.spinorNorm);
 
   spinor.spinor = NULL;
   spinor.spinorNorm = NULL;
@@ -105,18 +94,6 @@ void freeParitySpinor(ParitySpinor spinor) {
 
 void freeParityClover(ParityClover clover) {
   cudaFree(clover);
-}
-
-void freeGaugeField() {
-  if (cudaGauge.even) cudaFree(cudaGauge.even);
-  if (cudaGauge.odd) cudaFree(cudaGauge.odd);
-  cudaGauge.even = NULL;
-  cudaGauge.odd = NULL;
-
-  if (cudaHGauge.even) cudaFree(cudaHGauge.even);
-  if (cudaHGauge.odd) cudaFree(cudaHGauge.odd);
-  cudaHGauge.even = NULL;
-  cudaHGauge.odd = NULL;
 }
 
 void freeSpinorField(FullSpinor spinor) {
@@ -138,480 +115,10 @@ void freeSpinorBuffer() {
   packedSpinor1 = NULL;
 }
 
-void allocateSpinorHalf() {
-  Precision precision = QUDA_HALF_PRECISION;
-  hSpinor1 = allocateParitySpinor(precision);
-  hSpinor2 = allocateParitySpinor(precision);
-}
-
 void freeSpinorHalf() {
   freeParitySpinor(hSpinor1);
   freeParitySpinor(hSpinor2);
 }
-
-
-// Packing method taken from Bunk and Sommer
-/*inline void pack8Double(float4 *res, double *g, double r0) {
-  double f0 = 1.0 / sqrt(2.0*r0*(r0+g[0]));
-  double r1_2 = 0.0;
-  for (int i=2; i<6; i++) r1_2 += g[i]*g[i];
-  double r1 = sqrt(r1_2);
-  double f1 = 1.0 / sqrt(2*r1*(r1+g[13]));
-  res[0].x = g[12]*f1;
-  res[0].y = g[1]*f0;
-  res[0].z = g[2]*f0;
-  res[0].w = g[3]*f0;
-  res[Nh].x = g[4]*f0;
-  res[Nh].y = g[5]*f0;
-  res[Nh].z = g[6]*f1;
-  res[Nh].w = g[7]*f1;
-  }*/
-
-inline void pack8Double(float4 *res, double *g) {
-  res[0].x = atan2(g[1], g[0]);
-  res[0].y = atan2(g[13], g[12]);
-  res[0].z = g[2];
-  res[0].w = g[3];
-  res[Nh].x = g[4];
-  res[Nh].y = g[5];
-  res[Nh].z = g[6];
-  res[Nh].w = g[7];
-}
-
-inline void pack8Single(float4 *res, float *g) {
-  res[0].x = atan2(g[1], g[0]);
-  res[0].y = atan2(g[13], g[12]);
-  res[0].z = g[2];
-  res[0].w = g[3];
-  res[Nh].x = g[4];
-  res[Nh].y = g[5];
-  res[Nh].z = g[6];
-  res[Nh].w = g[7];
-}
-
-
-#define SHORT_LENGTH 65536
-#define SCALE_FLOAT (SHORT_LENGTH-1) / 2.f
-#define SHIFT_FLOAT -1.f / (SHORT_LENGTH-1)
-
-inline short floatToShort(float a) {
-  //return (short)(a*MAX_SHORT);
-  short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
-  return rtn;
-}
-
-inline short doubleToShort(double a) {
-  //return (short)(a*MAX_SHORT);
-  return (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
-}
-
-inline void packHalf8Double(short4 *res, double *g) {
-  res[0].x = doubleToShort(atan2(g[1], g[0])/ M_PI);
-  res[0].y = doubleToShort(atan2(g[13], g[12])/ M_PI);
-  res[0].z = doubleToShort(g[2]);
-  res[0].w = doubleToShort(g[3]);
-  res[Nh].x = doubleToShort(g[4]);
-  res[Nh].y = doubleToShort(g[5]);
-  res[Nh].z = doubleToShort(g[6]);
-  res[Nh].w = doubleToShort(g[7]);
-}
-
-inline void packHalf8Single(short4 *res, float *g) {
-  res[0].x = floatToShort(atan2(g[1], g[0])/ M_PI);
-  res[0].y = floatToShort(atan2(g[13], g[12])/ M_PI);
-  
-  /*float t1 = atan2(g[1], g[0])/ M_PI;
-  float t2 = atan2(g[13], g[12])/ M_PI;
-  if (fabs(t1)>0.99999) printf("%e %d\n", t1, res[0].x);
-  if (fabs(t2)>0.99999) printf("%e %d\n", t2, res[0].y);*/
-  res[0].z = floatToShort(g[2]);
-  res[0].w = floatToShort(g[3]);
-  res[Nh].x = floatToShort(g[4]);
-  res[Nh].y = floatToShort(g[5]);
-  res[Nh].z = floatToShort(g[6]);
-  res[Nh].w = floatToShort(g[7]);
-}
-
-inline void pack12Double(float4 *res, double *g) {
-  for (int j=0; j<3; j++) {
-    res[j*Nh].x = (float)g[j*4+0]; 
-    res[j*Nh].y = (float)g[j*4+1]; 
-    res[j*Nh].z = (float)g[j*4+2]; 
-    res[j*Nh].w = (float)g[j*4+3];
-  }
-}
-
-// sse packing routine
-inline void pack12Single(float4 *res, float *g) {
-  __m128 a, b, c;
-  a = _mm_loadu_ps((const float*)g);
-  b = _mm_loadu_ps((const float*)(g+4));
-  c = _mm_loadu_ps((const float*)(g+8));
-  _mm_store_ps((float*)(res), a);
-  _mm_store_ps((float*)(res+Nh), b);
-  _mm_store_ps((float*)(res+2*Nh), c);
-  /* for (int j=0; j<3; j++) {
-    res[j*Nh].x = g[j*4+0]; 
-    res[j*Nh].y = g[j*4+1]; 
-    res[j*Nh].z = g[j*4+2]; 
-    res[j*Nh].w = g[j*4+3];
-    }*/
-}
-
-inline void packHalf12Double(short4 *res, double *g) {
-  for (int j=0; j<3; j++) {
-    res[j*Nh].x = doubleToShort(g[j*4+0]);
-    res[j*Nh].y = doubleToShort(g[j*4+1]);
-    res[j*Nh].z = doubleToShort(g[j*4+2]);
-    res[j*Nh].w = doubleToShort(g[j*4+3]);
-  }
-}
-
-inline void packHalf12Single(short4 *res, float *g) {
-  for (int j=0; j<3; j++) {
-    res[j*Nh].x = floatToShort(g[j*4+0]);
-    res[j*Nh].y = floatToShort(g[j*4+1]);
-    res[j*Nh].z = floatToShort(g[j*4+2]);
-    res[j*Nh].w = floatToShort(g[j*4+3]);
-  }
-}
-
-// Assume the gauge field is "Wilson" ordered directions inside of
-// space-time column-row ordering even-odd space-time
-void packQDPDoubleGaugeField(float4 *res, double **gauge, int oddBit, ReconstructType reconstruct) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      float4 *r = res + dir*3*Nh;
-      for (int i = 0; i < Nh; i++) {
-	pack12Double(r+i, g+i*18);
-      }
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      float4 *r = res + dir*2*Nh;
-      for (int i = 0; i < Nh; i++) {
-	pack8Double(r+i, g+i*18);
-      }
-    }
-  }
-}
-
-void packHalfQDPDoubleGaugeField(short4 *res, double **gauge, int oddBit, ReconstructType reconstruct) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      short4 *r = res + dir*3*Nh;
-      for (int i = 0; i < Nh; i++) {
-	packHalf12Double(r+i, g+i*18);
-      }
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      short4 *r = res + dir*2*Nh;
-      for (int i = 0; i < Nh; i++) {
-	packHalf8Double(r+i, g+i*18);
-      }
-    }
-  }
-}
-
-// Single precision version of the above
-void packQDPSingleGaugeField(float4 *res, float **gauge, int oddBit, ReconstructType reconstruct) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {      
-      float *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      float4 *r = res + dir*3*Nh;
-      for (int i = 0; i < Nh; i++) {
-	pack12Single(r+i, g+i*18);
-      }
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      float *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      float4 *r = res + dir*2*Nh;
-      for (int i = 0; i < Nh; i++) {
-	pack8Single(r+i, g+i*18);
-      }
-    }
-  }
-}
-
-// Cuda half precision version of the above
-void packHalfQDPSingleGaugeField(short4 *res, float **gauge, int oddBit, ReconstructType reconstruct) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      float *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      short4 *r = res + dir*3*Nh;
-      for (int i = 0; i < Nh; i++) {
-	packHalf12Single(r+i, g+i*18);
-      }
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      float *g = gauge[dir] + oddBit*Nh*gaugeSiteSize;
-      short4 *r = res + dir*2*Nh;
-      for (int i = 0; i < Nh; i++) {
-	packHalf8Single(r+i, g+i*18);
-      }
-    }
-  }
-}
-
-// Assume the gauge field is "Wilson" ordered directions inside of
-// space-time column-row ordering even-odd space-time
-void packCPSDoubleGaugeField(float4 *res, double *gauge, int oddBit, ReconstructType reconstruct) {
-  float gT[18];
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float4 *r = res + dir*3*Nh;
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<2; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	      gT[(ic*3+jc)*2+r] = (float)g[4*i*18 + (jc*3+ic)*2+r];      
-	pack12Single(r+i, gT);
-      }
-    } 
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float4 *r = res + dir*2*Nh;
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<3; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	      gT[(ic*3+jc)*2+r] = (float)g[4*i*18 + (jc*3+ic)*2+r];      
-	pack8Single(r+i, gT);
-      }
-    }
-  }
-
-}
-
-void packHalfCPSDoubleGaugeField(short4 *res, double *gauge, int oddBit, ReconstructType reconstruct) {
-  float gT[18];
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      short4 *r = res + dir*3*Nh;
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<2; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	  gT[(ic*3+jc)*2+r] = (float)g[4*i*18 + (jc*3+ic)*2+r];      
-	packHalf12Single(r+i, gT);
-      }
-    } 
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      double *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      short4 *r = res + dir*2*Nh;
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<3; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	  gT[(ic*3+jc)*2+r] = (float)g[4*i*18 + (jc*3+ic)*2+r];      
-	packHalf8Single(r+i, gT);
-      }
-    }
-  }
-
-}
-
-// Single precision version of the above
-void packCPSSingleGaugeField(float4 *res, float *gauge, int oddBit, ReconstructType reconstruct) {
-  float gT[18];
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      float *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float4 *r = res + dir*3*Nh;
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<2; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];
-	pack12Single(r+i, gT);
-      }
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      float *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float4 *r = res + dir*2*Nh;      
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<3; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];
-	pack8Single(r+i, gT);
-      }
-    }
-  }
-
-}
-
-// Cuda half precision, single precision CPS field
-void packHalfCPSSingleGaugeField(short4 *res, float *gauge, int oddBit, ReconstructType reconstruct) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      float *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[12];
-      short4 *r = res + dir*3*Nh;      
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<2; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	      gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];
-	packHalf12Single(r+i, gT);
-      }
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      float *g = gauge + (oddBit*Nh*4+dir)*gaugeSiteSize;
-      float gT[18];
-      short4 *r = res + dir*2*Nh;      
-      for (int i = 0; i < Nh; i++) {
-	// Must reorder rows-columns
-	for (int ic=0; ic<3; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	      gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];
-	packHalf8Single(r+i, gT);
-      }
-    }
-  }
-
-}
-
-void loadGaugeField(void *gauge) {
-
-  setCudaGaugeParam();
-
-  if (gauge_param->X != L1 || gauge_param->Y != L2 || gauge_param->Z != L3 || gauge_param->T != L4) {
-    printf("QUDA error: dimensions do not match: %d=%d, %d=%d, %d=%d, %d=%d\n", 
-	   gauge_param->X, L1, gauge_param->Y, L2, gauge_param->Z, L3, gauge_param->T, L4);
-    exit(-1);
-  }
-
-  if (gauge_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
-    printf("QUDA error: sorry, double precision not supported\n");
-    exit(-1);
-  }
-
-  if (gauge_param->cpu_prec == QUDA_HALF_PRECISION) {
-    printf("QUDA error: half precision not supported on cpu\n");
-    exit(-1);
-  }
-
-  if (gauge_param->reconstruct == QUDA_RECONSTRUCT_NO) {
-    printf("QUDA error: ReconstructType not yet supported\n");
-    exit(-1);
-  }
-
-  int packed_gauge_bytes = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
-
-  gauge_param->packed_size = packed_gauge_bytes;
-  packed_gauge_bytes *= 4*Nh*sizeof(float);
-  allocateGaugeField(&cudaGauge, packed_gauge_bytes);
-  cudaGauge.reconstruct = gauge_param->reconstruct;
-  cudaGauge.precision = QUDA_SINGLE_PRECISION;
-
-  // 2 since even-odd
-  gauge_param->gaugeGiB = (float)2*packed_gauge_bytes/ (1 << 30);
-
-  // Use pinned memory
-  float4 *packedEven, *packedOdd;
-  
-#ifndef __DEVICE_EMULATION__
-  cudaMallocHost((void**)&packedEven, packed_gauge_bytes);
-  cudaMallocHost((void**)&packedOdd, packed_gauge_bytes);
-#else
-  packedEven = (float4*)malloc(packed_gauge_bytes);
-  packedOdd = (float4*)malloc(packed_gauge_bytes);
-#endif
-  
-  if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
-      packQDPDoubleGaugeField(packedEven, (double**)gauge, 0, gauge_param->reconstruct);
-      packQDPDoubleGaugeField(packedOdd,  (double**)gauge, 1, gauge_param->reconstruct);
-    } else {
-      packQDPSingleGaugeField(packedEven, (float**)gauge, 0, gauge_param->reconstruct);
-      packQDPSingleGaugeField(packedOdd,  (float**)gauge, 1, gauge_param->reconstruct);
-    }
-  } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
-    
-    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
-      packCPSDoubleGaugeField(packedEven, (double*)gauge, 0, gauge_param->reconstruct);
-      packCPSDoubleGaugeField(packedOdd,  (double*)gauge, 1, gauge_param->reconstruct);
-    } else {
-      packCPSSingleGaugeField(packedEven, (float*)gauge, 0, gauge_param->reconstruct);
-      packCPSSingleGaugeField(packedOdd,  (float*)gauge, 1, gauge_param->reconstruct);
-    }
-  } else {
-    printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
-    exit(-1);
-  }
-  
-  cudaMemcpy(cudaGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
-  cudaMemcpy(cudaGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
-  
-#ifndef __DEVICE_EMULATION__
-  cudaFreeHost(packedEven);
-  cudaFreeHost(packedOdd);
-#else
-  free(packedEven);
-  free(packedOdd);
-#endif
-
-  if (gauge_param->cuda_prec == QUDA_HALF_PRECISION) {
-    packed_gauge_bytes /= 2;
-    gauge_param->packed_size += packed_gauge_bytes/(4*Nh*sizeof(float));
-    allocateGaugeField(&cudaHGauge, packed_gauge_bytes);
-    cudaHGauge.reconstruct = gauge_param->reconstruct;
-    cudaHGauge.precision = QUDA_HALF_PRECISION;
-  }
-
-  if (gauge_param->cuda_prec == QUDA_HALF_PRECISION) {
-    // Use pinned memory
-    short4 *packedEven, *packedOdd;
-#ifndef __DEVICE_EMULATION__
-    cudaMallocHost((void**)&packedEven, packed_gauge_bytes);
-    cudaMallocHost((void**)&packedOdd, packed_gauge_bytes);
-#else
-    packedEven = (short4*)malloc(packed_gauge_bytes);
-    packedOdd = (short4*)malloc(packed_gauge_bytes);
-#endif
-    
-    if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
-      if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
-	packHalfQDPDoubleGaugeField(packedEven, (double**)gauge, 0, gauge_param->reconstruct);
-	packHalfQDPDoubleGaugeField(packedOdd,  (double**)gauge, 1, gauge_param->reconstruct);
-      } else {
-	packHalfQDPSingleGaugeField(packedEven, (float**)gauge, 0, gauge_param->reconstruct);
-	packHalfQDPSingleGaugeField(packedOdd,  (float**)gauge, 1, gauge_param->reconstruct);
-      }
-    } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
-      if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
-	packHalfCPSDoubleGaugeField(packedEven, (double*)gauge, 0, gauge_param->reconstruct);
-	packHalfCPSDoubleGaugeField(packedOdd,  (double*)gauge, 1, gauge_param->reconstruct);
-      } else {
-	packHalfCPSSingleGaugeField(packedEven, (float*)gauge, 0, gauge_param->reconstruct);
-	packHalfCPSSingleGaugeField(packedOdd,  (float*)gauge, 1, gauge_param->reconstruct);
-      }
-    } else {
-      printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
-      exit(-1);
-    }
-
-    cudaMemcpy(cudaHGauge.even, packedEven, packed_gauge_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(cudaHGauge.odd,  packedOdd,  packed_gauge_bytes, cudaMemcpyHostToDevice);    
-
-#ifndef __DEVICE_EMULATION__
-    cudaFreeHost(packedEven);
-    cudaFreeHost(packedOdd);
-#else
-    free(packedEven);
-    free(packedOdd);
-#endif
-
-  }
-
-}
-
 
 inline void packFloat4(float4* a, float *b) {
   __m128 SSEtmp;

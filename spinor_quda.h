@@ -1,5 +1,5 @@
-#ifndef _QUDA_FIELD_H
-#define _QUDA_FIELD_H
+#ifndef _QUDA_SPINOR_H
+#define _QUDA_SPINOR_H
 
 #include <enum_quda.h>
 #include <dslash_quda.h>
@@ -8,21 +8,17 @@
 extern "C" {
 #endif
 
-  void allocateGaugeField();
   ParitySpinor allocateParitySpinor(Precision precision);
   FullSpinor allocateSpinorField(Precision precision);
   ParityClover allocateParityClover();
   FullClover allocateCloverField();
   
-  void freeGaugeField();
   void freeParitySpinor(ParitySpinor spinor);
   void freeSpinorField(FullSpinor spinor);
   void freeSpinorBuffer();
   void freeParityClover(ParityClover clover);
   void freeCloverField(FullClover clover);
 
-  void loadGaugeField(void *gauge);
-  
   void loadParitySpinor(ParitySpinor, void *spinor, Precision cpu_prec, Precision cuda_prec, 
 			DiracFieldOrder dirac_order);
   void loadSpinorField(FullSpinor, void *spinor, Precision cpu_prec,  Precision cuda_prec, 
@@ -41,4 +37,4 @@ extern "C" {
 }
 #endif
 
-#endif // _QUDA_FIELD_H
+#endif // _QUDA_SPINOR_H

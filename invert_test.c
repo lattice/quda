@@ -23,8 +23,8 @@ int main(int argc, char **argv)
   Gauge_param.T = L4;
   Gauge_param.anisotropy = 1.0;
 
-  Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  Gauge_param.reconstruct = QUDA_RECONSTRUCT_8;
+  inv_param.inv_type = QUDA_CG_INVERTER;
 
   Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 5e-7;
   inv_param.maxiter = 5000;
-  inv_param.reliable_delta = 1e-3;
+  inv_param.reliable_delta = 1e-8;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
   inv_param.cuda_prec = QUDA_HALF_PRECISION;
@@ -60,6 +60,7 @@ int main(int argc, char **argv)
   int i0 = 0;
   int s0 = 0;
   int c0 = 0;
+  //  constructPointSpinorField(spinorIn, i0, s0, c0);
   constructPointSpinorField(spinorIn, i0, s0, c0);
 
   double time0 = -((double)clock()); // Start the timer

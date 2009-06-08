@@ -4,11 +4,16 @@
 #ifndef _QUDA_BLAS_H
 #define _QUDA_BLAS_H
 
-#ifdef REDUCE_DOUBLE 
+#define REDUCE_DOUBLE 64
+#define REDUCE_KAHAN 32
+
+#if (__CUDA_ARCH__ == 130)
+#define REDUCE_TYPE REDUCE_DOUBLE
 #define QudaSumFloat double
 #define QudaSumComplex cuDoubleComplex
 #define QudaSumFloat3 double3
 #else
+#define REDUCE_TYPE REDUCE_KAHAN
 #define QudaSumFloat float
 #define QudaSumComplex cuComplex
 #define QudaSumFloat3 float3
@@ -30,11 +35,11 @@ void xpayCuda(float *x, float a, float *y, int len);
 void mxpyCuda(float *x, float *y, int len);
 
 void axpyZpbxCuda(float a, float *x, float *y, float *z, float b, int len);
-QudaSumFloat axpyNormCuda(float a, float *x, float *y, int len);
+double axpyNormCuda(float a, float *x, float *y, int len);
 
-QudaSumFloat sumCuda(float *a, int n);
-QudaSumFloat normCuda(float *a, int n);
-QudaSumFloat reDotProductCuda(float *a, float *b, int n);
+double sumCuda(float *a, int n);
+double normCuda(float *a, int n);
+double reDotProductCuda(float *a, float *b, int n);
 
 void blasTest();
 void axpbyTest();
@@ -42,14 +47,14 @@ void axpbyTest();
 void caxpbyCuda(float2 a, float2 *x, float2 b, float2 *y, int len);
 void caxpyCuda(float2 a, float2 *x, float2 *y, int len);
 void cxpaypbzCuda(float2 *x, float2 b, float2 *y, float2 c, float2 *z, int len);
-QudaSumComplex cDotProductCuda(float2*, float2*, int len);
+cuDoubleComplex cDotProductCuda(float2*, float2*, int len);
 void caxpbypzYmbwCuda(float2, float2*, float2, float2*, float2*, float2*, int len);
-QudaSumFloat3 cDotProductNormACuda(float2 *a, float2 *b, int n);
-QudaSumFloat3 cDotProductNormBCuda(float2 *a, float2 *b, int n);
-QudaSumFloat3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
+double3 cDotProductNormACuda(float2 *a, float2 *b, int n);
+double3 cDotProductNormBCuda(float2 *a, float2 *b, int n);
+double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
 						 float2 *z, float2 *w, float2 *u, int len);
 
-QudaSumComplex xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int len);
+cuDoubleComplex xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int len);
 
 // ---------- blas_reference.cpp ----------
 
