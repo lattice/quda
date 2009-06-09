@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-// ---------- blas_cuda.cu ----------
+// ---------- blas_quda.cu ----------
 
 void zeroCuda(float* dst, int cnt);
 void copyCuda(float* dst, float *src, int len);
@@ -55,26 +55,6 @@ double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2
 						 float2 *z, float2 *w, float2 *u, int len);
 
 cuDoubleComplex xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int len);
-
-// ---------- blas_reference.cpp ----------
-
-void zero(float* a, int cnt);
-void copy(float* a, float *b, int len);
-
-void ax(float a, float *x, int len);
-
-void axpbyCuda(float a, float *x, float b, float *y, int len);
-void axpy(float a, float *x, float *y, int len);
-void xpay(float *x, float a, float *y, int len);
-void mxpy(float *x, float *y, int len);
-
-float norm(float *vector, int len);
-float reDotProduct(float *v1, float *v2, int len);
-float imDotProduct(float *v1, float *v2, int len);
-double normD(float *vector, int len);
-double reDotProductD(float *v1, float *v2, int len);
-double imDotProductD(float *v1, float *v2, int len);
-
 
 #ifdef __cplusplus
 }

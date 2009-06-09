@@ -10,8 +10,8 @@
 FullClover cudaClover;
 
 // Pinned memory for cpu-gpu memory copying
-float4 *packedSpinor1 = 0;
-float4 *packedSpinor2 = 0;
+void *packedSpinor1 = 0;
+void *packedSpinor2 = 0;
 
 // Half precision spinor field temporaries
 ParitySpinor hSpinor1, hSpinor2;
@@ -120,6 +120,14 @@ void freeSpinorHalf() {
   freeParitySpinor(hSpinor2);
 }
 
+inline void packDouble2(double2* a, double *b) {
+  a->x = b[0]; a->y = b[1];
+}
+
+inline void unpackDouble2(double *a, double2 *b) {
+  a[0] = b->x; a[1] = b->y;
+}
+
 inline void packFloat4(float4* a, float *b) {
   __m128 SSEtmp;
   SSEtmp = _mm_loadu_ps((const float*)b);
@@ -134,7 +142,50 @@ inline void unpackFloat4(float *a, float4 *b) {
   //a[0] = b->x; a[1] = b->y; a[2] = b->z; a[3] = b->w;
 }
 
-void packDoubleFullSpinor(float4 *even, float4 *odd, double *spinor) {
+void packFullSpinorDD(double2 *even, double2 *odd, double *spinor) {
+  double K = 1.0 / 2.0;
+  double b[24];
+
+  for (int i=0; i<Nh; i++) {
+
+    int boundaryCrossings = i/L1h + i/(L2*L1h) + i/(L3*L2*L1h);
+
+    { // even sites
+      int k = 2*i + boundaryCrossings%2; 
+      double *a = spinor + k*24;
+      for (int c=0; c<3; c++) {
+	for (int r=0; r<2; r++) {
+	  int cr = c*2+r;
+	  b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
+	  b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
+	  b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
+	  b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
+	}
+      }
+      
+      for (int j = 0; j < 12; j++) packDouble2(even+j*Nh+i, b+j*4);
+    }
+    
+    { // odd sites
+      int k = 2*i + (boundaryCrossings+1)%2;
+      double *a = spinor + k*24;
+      for (int c=0; c<3; c++) {
+	for (int r=0; r<2; r++) {
+	  int cr = c*2+r;
+	  b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
+	  b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
+	  b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
+	  b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
+	}
+      }
+      
+      for (int j = 0; j < 12; j++) packDouble2(odd+j*Nh+i, b+j*4);
+    }
+  }
+
+}
+
+void packFullSpinorSD(float4 *even, float4 *odd, double *spinor) {
   double K = 1.0 / 2.0;
   float b[24];
 
@@ -177,11 +228,9 @@ void packDoubleFullSpinor(float4 *even, float4 *odd, double *spinor) {
 
 }
 
-void packSingleFullSpinor(float4 *even, float4 *odd, float *spinor) {
+void packFullSpinorSS(float4 *even, float4 *odd, float *spinor) {
   float K = 1.0 / 2.0;
   float b[24];
-
-  //printf("\n");
 
   for (int i=0; i<Nh; i++) {
 
@@ -221,11 +270,32 @@ void packSingleFullSpinor(float4 *even, float4 *odd, float *spinor) {
       for (int j = 0; j < 6; j++) packFloat4(odd+j*Nh+i, b+j*4);
     }
   }
-  //exit(0);
+
 }
 
 // Standard spinor packing, colour inside spin
-void packDoubleParitySpinor(float4 *res, double *spinor) {
+void packParitySpinorDD(double2 *res, double *spinor) {
+  double K = 1.0 / (2.0);
+  double b[24];
+
+  for (int i = 0; i < Nh; i++) {
+    double *a = spinor+i*24;
+
+    for (int c=0; c<3; c++) {
+      for (int r=0; r<2; r++) {
+	int cr = c*2+r;
+	b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
+	b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
+	b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
+	b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
+      }
+    }
+
+    for (int j = 0; j < 12; j++) packDouble2(res+j*Nh+i, b+j*4);
+  }
+}
+
+void packParitySpinorSD(float4 *res, double *spinor) {
   double K = 1.0 / (2.0);
   float b[24];
 
@@ -247,7 +317,7 @@ void packDoubleParitySpinor(float4 *res, double *spinor) {
 }
 
 // single precision version of the above
-void packSingleParitySpinor(float4 *res, float *spinor) {
+void packParitySpinorSS(float4 *res, float *spinor) {
   float K = 1.0 / (2.0);
   float b[24];
 
@@ -269,7 +339,30 @@ void packSingleParitySpinor(float4 *res, float *spinor) {
 }
 
 // QDP spinor packing, spin inside colour
-void packQDPDoubleParitySpinor(float4 *res, double *spinor) {
+void packQDPParitySpinorDD(double2 *res, double *spinor) {
+  double K = 1.0 / 2.0;
+  
+  double b[24];
+  for (int i = 0; i < Nh; i++) {
+    double *a = spinor+i*24;
+
+    // reorder and change basis
+    for (int c=0; c<3; c++) {
+      for (int r=0; r<2; r++) {
+	int cr = c*2+r;
+	b[0*6+cr] = K*(a[(c*4+1)*2+r]+a[(c*4+3)*2+r]);
+	b[1*6+cr] = -K*(a[(c*4+0)*2+r]+a[(c*4+2)*2+r]);
+	b[2*6+cr] = K*(a[(c*4+1)*2+r]-a[(c*4+3)*2+r]);
+	b[3*6+cr] = K*(a[(c*4+2)*2+r]-a[(c*4+0)*2+r]);
+      }
+    }
+
+    for (int j = 0; j < 6; j++) packDouble2(res+j*Nh+i, b+j*4);
+  }
+}
+
+// QDP spinor packing, spin inside colour
+void packQDPParitySpinorSD(float4 *res, double *spinor) {
   double K = 1.0 / 2.0;
   
   float b[24];
@@ -291,10 +384,8 @@ void packQDPDoubleParitySpinor(float4 *res, double *spinor) {
   }
 }
 
-
-
 // Single precision version of the above
-void packQDPSingleParitySpinor(float4 *res, float *spinor) {
+void packQDPParitySpinorSS(float4 *res, float *spinor) {
   float K = 1.0 / 2.0;
   
   float b[24];
@@ -316,7 +407,54 @@ void packQDPSingleParitySpinor(float4 *res, float *spinor) {
   }
 }
 
-void unpackDoubleFullSpinor(double *res, float4 *even, float4 *odd) {
+void unpackFullSpinorDD(double *res, double2 *even, double2 *odd) {
+  double K = 1.0;
+  double b[24];
+
+  for (int i=0; i<Nh; i++) {
+
+    int boundaryCrossings = i/L1h + i/(L2*L1h) + i/(L3*L2*L1h);
+
+    { // even sites
+      int k = 2*i + boundaryCrossings%2; 
+      double *a = res + k*24;
+
+      for (int j = 0; j < 12; j++) unpackDouble2(b+j*4, even+j*Nh+i);
+
+      for (int c=0; c<3; c++) {
+	for (int r=0; r<2; r++) {
+	  int cr = c*2+r;
+	  a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
+	  a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
+	  a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
+	  a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
+	}
+      }
+      
+    }
+    
+    { // odd sites
+      int k = 2*i + (boundaryCrossings+1)%2;
+      double *a = res + k*24;
+
+      for (int j = 0; j < 12; j++) unpackDouble2(b+j*4, odd+j*Nh+i);
+
+      for (int c=0; c<3; c++) {
+	for (int r=0; r<2; r++) {
+	  int cr = c*2+r;
+	  a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
+	  a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
+	  a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
+	  a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
+	}
+      }
+      
+    }
+  }
+
+}
+
+void unpackFullSpinorDS(double *res, float4 *even, float4 *odd) {
   double K = 1.0;
   float b[24];
 
@@ -363,7 +501,7 @@ void unpackDoubleFullSpinor(double *res, float4 *even, float4 *odd) {
 
 }
 
-void unpackSingleFullSpinor(float *res, float4 *even, float4 *odd) {
+void unpackFullSpinorSS(float *res, float4 *even, float4 *odd) {
   float K = 1.0;
   float b[24];
 
@@ -410,7 +548,30 @@ void unpackSingleFullSpinor(float *res, float4 *even, float4 *odd) {
 
 }
 
-void unpackDoubleParitySpinor(double *res, float4 *spinorPacked) {
+void unpackParitySpinorDD(double *res, double2 *spinorPacked) {
+  double K = 1.0;///sqrt(2.0);
+  double b[24];
+
+  for (int i = 0; i < Nh; i++) {
+    double *a = res+i*24;
+
+    for (int j = 0; j < 12; j++) unpackDouble2(b+j*4, spinorPacked+j*Nh+i);
+
+    for (int c=0; c<3; c++) {
+      for (int r=0; r<2; r++) {
+	int cr = c*2+r;
+	a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
+	a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
+	a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
+	a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
+      }
+    }
+
+  }
+
+}
+
+void unpackParitySpinorDS(double *res, float4 *spinorPacked) {
   float K = 1.0;///sqrt(2.0);
   float b[24];
 
@@ -433,7 +594,7 @@ void unpackDoubleParitySpinor(double *res, float4 *spinorPacked) {
 
 }
 
-void unpackSingleParitySpinor(float *res, float4 *spinorPacked) {
+void unpackParitySpinorSS(float *res, float4 *spinorPacked) {
   float K = 1.0;///sqrt(2.0);
   float b[24];
 
@@ -456,7 +617,29 @@ void unpackSingleParitySpinor(float *res, float4 *spinorPacked) {
 
 }
 
-void unpackQDPDoubleParitySpinor(double *res, float4 *spinorPacked) {
+void unpackQDPParitySpinorDD(double *res, double2 *spinorPacked) {
+  double K = 1.0;///sqrt(2.0);
+  double b[24];
+
+  for (int i = 0; i < Nh; i++) {
+    double *a = res+i*24;
+
+    for (int j = 0; j < 12; j++) unpackDouble2(b+j*4, spinorPacked+j*Nh+i);
+
+    for (int c=0; c<3; c++) {
+      for (int r=0; r<2; r++) {
+	int cr = c*2+r;
+	a[(c*4+0)*2+r] = -K*(b[1*6+cr]+b[3*6+cr]);
+	a[(c*4+1)*2+r] = K*(b[0*6+cr]+b[2*6+cr]);
+	a[(c*4+2)*2+r] = -K*(b[1*6+cr]-b[3*6+cr]);
+	a[(c*4+3)*2+r] = -K*(b[2*6+cr]-b[0*6+cr]);
+      }
+    }
+  }
+
+}
+
+void unpackQDPParitySpinorDS(double *res, float4 *spinorPacked) {
   float K = 1.0;///sqrt(2.0);
   float b[24];
 
@@ -478,7 +661,7 @@ void unpackQDPDoubleParitySpinor(double *res, float4 *spinorPacked) {
 
 }
 
-void unpackQDPSingleParitySpinor(float *res, float4 *spinorPacked) {
+void unpackQDPParitySpinorSS(float *res, float4 *spinorPacked) {
   float K = 1.0;///sqrt(2.0);
   float b[24];
 
@@ -503,10 +686,6 @@ void unpackQDPSingleParitySpinor(float *res, float4 *spinorPacked) {
 
 void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec, 
 		      Precision cuda_prec, DiracFieldOrder dirac_order) {
-  if (cuda_prec == QUDA_DOUBLE_PRECISION) {
-    printf("Sorry, double precision not supported\n");
-    exit(-1);
-  }
 
   if (cuda_prec == QUDA_HALF_PRECISION) {
     if (!hSpinor1.spinor && !hSpinor1.spinorNorm &&
@@ -521,41 +700,61 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
     }
   }
 
+  size_t spinor_bytes;
+  if (cuda_prec == QUDA_DOUBLE_PRECISION) spinor_bytes = Nh*spinorSiteSize*sizeof(double);
+  else spinor_bytes = Nh*spinorSiteSize*sizeof(float);
+
 #ifndef __DEVICE_EMULATION__
-  if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, SPINOR_BYTES);
+  if (!packedSpinor1) cudaMallocHost(&packedSpinor1, spinor_bytes);
 #else
-  if (!packedSpinor1) packedSpinor1 = (float4*)malloc(SPINOR_BYTES);
+  if (!packedSpinor1) packedSpinor1 = malloc(spinor_bytes);
 #endif
   if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
-    if (cpu_prec == QUDA_DOUBLE_PRECISION) packDoubleParitySpinor(packedSpinor1, (double*)spinor);
-    else packSingleParitySpinor(packedSpinor1, (float*)spinor);
+    if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+      packParitySpinorDD((double2*)packedSpinor1, (double*)spinor);
+    } else {
+      if (cpu_prec == QUDA_DOUBLE_PRECISION) packParitySpinorSD((float4*)packedSpinor1, (double*)spinor);
+      else packParitySpinorSS((float4*)packedSpinor1, (float*)spinor);
+    }
   } else if (dirac_order == QUDA_QDP_DIRAC_ORDER) {
-    if (cpu_prec == QUDA_DOUBLE_PRECISION) packQDPDoubleParitySpinor(packedSpinor1, (double*)spinor);
-    else packQDPSingleParitySpinor(packedSpinor1, (float*)spinor);
+    if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+      packQDPParitySpinorDD((double2*)packedSpinor1, (double*)spinor);
+    } else {
+      if (cpu_prec == QUDA_DOUBLE_PRECISION) packQDPParitySpinorSD((float4*)packedSpinor1, (double*)spinor);
+      else packQDPParitySpinorSS((float4*)packedSpinor1, (float*)spinor);
+    }
   }
-  cudaMemcpy(ret.spinor, packedSpinor1, SPINOR_BYTES, cudaMemcpyHostToDevice);
+  cudaMemcpy(ret.spinor, packedSpinor1, spinor_bytes, cudaMemcpyHostToDevice);
 }
 
 void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec, Precision cuda_prec) {
 
-  if (cuda_prec == QUDA_DOUBLE_PRECISION || cuda_prec == QUDA_HALF_PRECISION) {
-    printf("Sorry, only single precision is supported\n");
+  if (cuda_prec == QUDA_HALF_PRECISION) {
+    printf("Sorry, half precision isn't supported\n");
     exit(-1);
   }
 
+  size_t spinor_bytes;
+  if (cuda_prec == QUDA_DOUBLE_PRECISION) spinor_bytes = Nh*spinorSiteSize*sizeof(double);
+  else spinor_bytes = Nh*spinorSiteSize*sizeof(float);
+
 #ifndef __DEVICE_EMULATION__
-  if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, SPINOR_BYTES);
-  if (!packedSpinor2) cudaMallocHost((void**)&packedSpinor2, SPINOR_BYTES);
+  if (!packedSpinor1) cudaMallocHost(&packedSpinor1, spinor_bytes);
+  if (!packedSpinor2) cudaMallocHost(&packedSpinor2, spinor_bytes);
 #else
-  if (!packedSpinor1) packedSpinor1 = (float4*)malloc(SPINOR_BYTES);
-  if (!packedSpinor2) packedSpinor2 = (float4*)malloc(SPINOR_BYTES);
+  if (!packedSpinor1) packedSpinor1 = malloc(spinor_bytes);
+  if (!packedSpinor2) packedSpinor2 = malloc(spinor_bytes);
 #endif
 
-  if (cpu_prec == QUDA_DOUBLE_PRECISION) packDoubleFullSpinor(packedSpinor1, packedSpinor2, (double*)spinor);
-  else packSingleFullSpinor(packedSpinor1, packedSpinor2, (float*)spinor);
+  if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+    packFullSpinorDD((double2*)packedSpinor1, (double2*)packedSpinor2, (double*)spinor);
+  } else {
+    if (cpu_prec == QUDA_DOUBLE_PRECISION) packFullSpinorSD((float4*)packedSpinor1, (float4*)packedSpinor2, (double*)spinor);
+    else packFullSpinorSS((float4*)packedSpinor1, (float4*)packedSpinor2, (float*)spinor);
+  }
 
-  cudaMemcpy(ret.even.spinor, packedSpinor1, SPINOR_BYTES, cudaMemcpyHostToDevice);
-  cudaMemcpy(ret.odd.spinor, packedSpinor2, SPINOR_BYTES, cudaMemcpyHostToDevice);
+  cudaMemcpy(ret.even.spinor, packedSpinor1, spinor_bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(ret.odd.spinor, packedSpinor2, spinor_bytes, cudaMemcpyHostToDevice);
 
 #ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedSpinor2);
@@ -588,30 +787,47 @@ void loadSpinorField(FullSpinor ret, void *spinor, Precision cpu_prec,
 
 void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, Precision cuda_prec,
 			  DiracFieldOrder dirac_order) {
-  /*if (cuda_prec != QUDA_SINGLE_PRECISION) {
-    printf("Sorry, only single precision supported\n");
-    exit(-1);
-    }*/
 
-  if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, SPINOR_BYTES);
-  cudaMemcpy(packedSpinor1, spinor.spinor, SPINOR_BYTES, cudaMemcpyDeviceToHost);
+  size_t spinor_bytes;
+  if (cuda_prec == QUDA_DOUBLE_PRECISION) spinor_bytes = Nh*spinorSiteSize*sizeof(double);
+  else spinor_bytes = Nh*spinorSiteSize*sizeof(float);
+
+  if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, spinor_bytes);
+  cudaMemcpy(packedSpinor1, spinor.spinor, spinor_bytes, cudaMemcpyDeviceToHost);
   if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
-    if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackDoubleParitySpinor((double*)res, packedSpinor1);
-    else unpackSingleParitySpinor((float*)res, packedSpinor1);
+    if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+      unpackParitySpinorDD((double*)res, (double2*)packedSpinor1);
+    } else {
+      if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackParitySpinorDS((double*)res, (float4*)packedSpinor1);
+      else unpackParitySpinorSS((float*)res, (float4*)packedSpinor1);
+    }
   } else if (dirac_order == QUDA_QDP_DIRAC_ORDER) {
-    if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackQDPDoubleParitySpinor((double*)res, packedSpinor1);
-    else unpackQDPSingleParitySpinor((float*)res, packedSpinor1);
+    if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+      unpackQDPParitySpinorDD((double*)res, (double2*)packedSpinor1);
+    } else {
+      if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackQDPParitySpinorDS((double*)res, (float4*)packedSpinor1);
+      else unpackQDPParitySpinorSS((float*)res, (float4*)packedSpinor1);
+    }
   }
 }
 
 void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec, Precision cuda_prec) {
-  if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, SPINOR_BYTES);
-  if (!packedSpinor2) cudaMallocHost((void**)&packedSpinor2, SPINOR_BYTES);
 
-  cudaMemcpy(packedSpinor1, spinor.even.spinor, SPINOR_BYTES, cudaMemcpyDeviceToHost);
-  cudaMemcpy(packedSpinor2, spinor.odd.spinor, SPINOR_BYTES, cudaMemcpyDeviceToHost);
-  if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackDoubleFullSpinor((double*)res, packedSpinor1, packedSpinor2);
-  else unpackSingleFullSpinor((float*)res, packedSpinor1, packedSpinor2);
+  size_t spinor_bytes;
+  if (cuda_prec == QUDA_DOUBLE_PRECISION) spinor_bytes = Nh*spinorSiteSize*sizeof(double);
+  else spinor_bytes = Nh*spinorSiteSize*sizeof(float);
+
+  if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, spinor_bytes);
+  if (!packedSpinor2) cudaMallocHost((void**)&packedSpinor2, spinor_bytes);
+
+  cudaMemcpy(packedSpinor1, spinor.even.spinor, spinor_bytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(packedSpinor2, spinor.odd.spinor, spinor_bytes, cudaMemcpyDeviceToHost);
+  if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+    unpackFullSpinorDD((double*)res, (double2*)packedSpinor1, (double2*)packedSpinor2);
+  } else {
+    if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackFullSpinorDS((double*)res, (float4*)packedSpinor1, (float4*)packedSpinor2);
+    else unpackFullSpinorSS((float*)res, (float4*)packedSpinor1, (float4*)packedSpinor2);
+  }
 
 #ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedSpinor2);
@@ -642,6 +858,7 @@ void retrieveSpinorField(void *res, FullSpinor spinor, Precision cpu_prec,
   
 }
 
+/*
 void spinorHalfPack(float *c, short *s0, float *f0) {
 
   float *f = f0;
@@ -670,3 +887,4 @@ void spinorHalfUnpack(float *f0, float *c, short *s0) {
   }
 
 }
+*/

@@ -19,9 +19,13 @@ extern "C" {
     QudaGaugeFieldOrder gauge_order;
 
     QudaPrecision cpu_prec;
-    QudaPrecision cuda_prec;
 
-    QudaReconstructType reconstruct;
+    QudaPrecision cuda_prec_precise;
+    QudaReconstructType reconstruct_precise;
+
+    QudaPrecision cuda_prec_sloppy;
+    QudaReconstructType reconstruct_sloppy;
+
     QudaGaugeFixed gauge_fix;
 
     QudaTboundary t_boundary;

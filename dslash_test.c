@@ -2,13 +2,13 @@
 #include <stdlib.h>
 
 #include <quda.h>
+#include <dslash_reference.h>
 #include <util_quda.h>
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 
-
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 1;
+int test_type = 0;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -18,85 +18,75 @@ FullSpinor cudaSpinor;
 FullSpinor cudaSpinorOut;
 ParitySpinor tmp;
 
-float *hostGauge[4];
-float *spinor, *spinorRef, *spinorGPU;
-float *spinorEven, *spinorOdd;
+void *hostGauge[4];
+void *spinor, *spinorRef, *spinorGPU;
+void *spinorEven, *spinorOdd;
     
-float kappa = 1.0;
+double kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
 int TRANSFER = 0; // include transfer time in the benchmark?
-    
-void printSpinorHalfField(float *spinor) {
-  printSpinor(&spinor[0*spinorSiteSize]);
-  printf("...\n");
-  printSpinor(&spinor[(Nh-1)*spinorSiteSize]);
-  printf("\n");    
-}
-
-void printSpinorFullField(float *spinor) {
-  printSpinor(&spinor[0*spinorSiteSize]);
-  printf("...\n");
-  printSpinor(&spinor[(N-1)*spinorSiteSize]);
-  printf("\n");    
-}
 
 void init() {
 
   gaugeParam.cpu_prec = QUDA_SINGLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_HALF_PRECISION;
+  gaugeParam.reconstruct_precise = QUDA_RECONSTRUCT_8;
+  gaugeParam.cuda_prec_precise = QUDA_SINGLE_PRECISION;
+  gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_8;
+  gaugeParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   gaugeParam.X = L1;
   gaugeParam.Y = L2;
   gaugeParam.Z = L3;
   gaugeParam.T = L4;
   gaugeParam.anisotropy = 2.3;
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_8;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param = &gaugeParam;
 
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.kappa = kappa;
   invert_param = &inv_param;
 
-  // construct input fields
-  for (int dir = 0; dir < 4; dir++) {
-    hostGauge[dir] = (float*)malloc(N*gaugeSiteSize*sizeof(float));
-  }
+  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-  spinor = (float*)malloc(N*spinorSiteSize*sizeof(float));
-  spinorRef = (float*)malloc(N*spinorSiteSize*sizeof(float));
-  spinorGPU = (float*)malloc(N*spinorSiteSize*sizeof(float));
+  // construct input fields
+  for (int dir = 0; dir < 4; dir++)
+    hostGauge[dir] = malloc(N*gaugeSiteSize*gSize);
+
+  spinor = malloc(N*spinorSiteSize*sSize);
+  spinorRef = malloc(N*spinorSiteSize*sSize);
+  spinorGPU = malloc(N*spinorSiteSize*sSize);
   spinorEven = spinor;
   spinorOdd = spinor + Nh*spinorSiteSize;
     
   printf("Randomizing fields...");
-  constructGaugeField(hostGauge);
-  constructSpinorField(spinor);
+  construct_gauge_field(hostGauge, 1, gaugeParam.cpu_prec);
+  construct_spinor_field(spinor, 1, 0, 0, 0, inv_param.cpu_prec);
 
   printf("done.\n"); fflush(stdout);
   
   int dev = 0;
   initQuda(dev);
-  loadGaugeQuda((void*)hostGauge, &gaugeParam);
+  loadGaugeQuda(hostGauge, &gaugeParam);
 
-  if (gaugeParam.cuda_prec == QUDA_SINGLE_PRECISION) gauge = cudaSGauge;
-  else gauge = cudaHGauge;
+  gauge = cudaGaugePrecise;
 
   printf("Sending fields to GPU..."); fflush(stdout);
 
   if (!TRANSFER) {
-    Precision prec = QUDA_SINGLE_PRECISION;
-    cudaSpinor = allocateSpinorField(prec);
-    cudaSpinorOut = allocateSpinorField(prec);
-    tmp = allocateParitySpinor(prec);
+    cudaSpinor = allocateSpinorField(inv_param.cuda_prec);
+    cudaSpinorOut = allocateSpinorField(inv_param.cuda_prec);
+    tmp = allocateParitySpinor(inv_param.cuda_prec);
     
-    loadSpinorField(cudaSpinor, (void*)spinor, inv_param.cpu_prec, 
+    loadSpinorField(cudaSpinor, spinor, inv_param.cpu_prec, 
 		    inv_param.cuda_prec, inv_param.dirac_order);
+    
+    printf("\nnorm = %e\n", normCuda(cudaSpinor.even.spinor, Nh*24));
   }
 }
 
@@ -121,13 +111,16 @@ void dslashRef() {
   fflush(stdout);
   switch (test_type) {
   case 0:
-    dslashReference(spinorRef, hostGauge, spinorEven, ODD_BIT, DAGGER_BIT);
+    dslash_reference(spinorRef, hostGauge, spinorEven, ODD_BIT, DAGGER_BIT, 
+		     inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   case 1:    
-    MatPC(spinorRef, hostGauge, spinorEven, kappa, QUDA_MATPC_EVEN_EVEN);
+    matpc(spinorRef, hostGauge, spinorEven, kappa, QUDA_MATPC_EVEN_EVEN, DAGGER_BIT, 
+	  inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   case 2:
-    Mat(spinorRef, hostGauge, spinor, kappa);
+    mat(spinorRef, hostGauge, spinor, kappa, DAGGER_BIT, 
+	inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   default:
     printf("Test type not defined\n");
@@ -174,63 +167,25 @@ double dslashCUDA() {
   }
 
 void strongCheck() {
+  int len;
+  void *spinorRes;
   if (test_type < 2) {
-    printf("Reference:\n");
-    printSpinorHalfField(spinorRef);
-    
-    printf("\nCUDA:\n");
-    printSpinorHalfField(spinorOdd);
+    len = Nh;
+    spinorRes = spinorOdd;
   } else {
-    printf("Reference:\n");
-    printSpinorHalfField(spinorRef);
-    
-    printf("\nCUDA:\n");
-    printSpinorHalfField(spinorGPU);
+    len = N;
+    spinorRes = spinorGPU;
   }
 
-  int fail_check = 12;
-  int fail[fail_check];
-  for (int f=0; f<fail_check; f++) fail[f] = 0;
+  printf("Reference:\n");
+  printSpinorElement(spinorRef, 0, inv_param.cpu_prec); printf("...\n");
+  printSpinorElement(spinorRef, len-1, inv_param.cpu_prec); printf("\n");    
+    
+  printf("\nCUDA:\n");
+  printSpinorElement(spinorRes, 0, inv_param.cpu_prec); printf("...\n");
+  printSpinorElement(spinorRes, len-1, inv_param.cpu_prec); printf("\n");
 
-  int iter[24];
-  for (int i=0; i<24; i++) iter[i] = 0;
-
-  if (test_type < 2) {
-    for (int i=0; i<Nh; i++) {
-      for (int j=0; j<24; j++) {
-	int is = i*24+j;
-	float diff = fabs(spinorRef[is]-spinorOdd[is]);
-	for (int f=0; f<fail_check; f++)
-	  if (diff > pow(10,-(f+1))) fail[f]++;
-	//if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-	if (diff > 1e-3) iter[j]++;
-      }
-    }
-    
-    for (int i=0; i<24; i++) printf("%d fails = %d\n", i, iter[i]);
-    
-    for (int f=0; f<fail_check; f++) {
-      printf("%e Failures: %d / %d  = %e\n", pow(10,-(f+1)), fail[f], Nh*24, fail[f] / (float)(Nh*24));
-    }
-  } else {
-    for (int i=0; i<N; i++) {
-      for (int j=0; j<24; j++) {
-	int is = i*24+j;
-	float diff = fabs(spinorRef[is]-spinorGPU[is]);
-	for (int f=0; f<fail_check; f++)
-	  if (diff > pow(10,-(f+1))) fail[f]++;
-	//if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-	if (diff > 1e-3) iter[j]++;
-      }
-    }
-    
-    for (int i=0; i<24; i++) printf("%d fails = %d\n", i, iter[i]);
-    
-    for (int f=0; f<fail_check; f++) {
-      printf("%e Failures: %d / %d  = %e\n", pow(10,-(f+1)), fail[f], N*24, fail[f] / (float)(N*24));
-    }
-  }
-
+  //compare_spinor(spinorRef, spinorRes, len, inv_param.cpu_prec);
 }
 
 
@@ -238,7 +193,7 @@ void dslashTest() {
 
   init();
 
-  float spinorGiB = (float)Nh*spinorSiteSize*sizeof(float) / (1 << 30);
+  float spinorGiB = (float)Nh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
   float sharedKB = (float)dslashCudaSharedBytes() / (1 << 10);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", gaugeParam.gaugeGiB);
@@ -251,10 +206,10 @@ void dslashTest() {
     double secs = dslashCUDA();
   
     if (!TRANSFER) {
-      if (test_type < 2) retrieveParitySpinor(spinorOdd, cudaSpinor.odd, QUDA_SINGLE_PRECISION, 
-					      QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
-      else retrieveSpinorField(spinorGPU, cudaSpinorOut, QUDA_SINGLE_PRECISION, 
-			       QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+      if (test_type < 2) retrieveParitySpinor(spinorOdd, cudaSpinor.odd, inv_param.cpu_prec, 
+					      inv_param.cuda_prec, QUDA_DIRAC_ORDER);
+      else retrieveSpinorField(spinorGPU, cudaSpinorOut, inv_param.cpu_prec, 
+			       inv_param.cuda_prec, QUDA_DIRAC_ORDER);
     }
     // print timing information
     printf("%fms per loop\n", 1000*secs);
@@ -264,8 +219,8 @@ void dslashTest() {
     printf("GiB/s = %f\n\n", Nh*floats*sizeof(float)/(secs*(1<<30)));
     
     int res;
-    if (test_type < 2) res = compareFloats(spinorOdd, spinorRef, Nh*4*3*2, 1e-4);
-    else res = compareFloats(spinorGPU, spinorRef, N*4*3*2, 1e-4);
+    if (test_type < 2) res = compare_floats(spinorOdd, spinorRef, Nh*4*3*2, 1e-4, inv_param.cpu_prec);
+    else res = compare_floats(spinorGPU, spinorRef, N*4*3*2, 1e-4, inv_param.cpu_prec);
     printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
 
     strongCheck();
@@ -280,5 +235,3 @@ void dslashTest() {
 int main(int argc, char **argv) {
   dslashTest();
 }
-
-

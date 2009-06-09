@@ -15,8 +15,6 @@
 #define BLOCK_DIM (64) // threads per block
 #define GRID_DIM (Nh/BLOCK_DIM) // there are Nh threads in total
 
-#define SPINOR_BYTES (Nh*spinorSiteSize*sizeof(float))
-
 #define PACKED12_GAUGE_BYTES (4*Nh*12*sizeof(float))
 #define PACKED8_GAUGE_BYTES (4*Nh*8*sizeof(float))
 
@@ -26,9 +24,9 @@
 extern "C" {
 #endif
 
-  extern FullGauge cudaDGauge;
-  extern FullGauge cudaSGauge;
-  extern FullGauge cudaHGauge;
+  extern FullGauge cudaGaugePrecise;
+  extern FullGauge cudaGaugeSloppy;
+
   extern QudaGaugeParam *gauge_param;
   extern QudaInvertParam *invert_param;
 
@@ -79,19 +77,6 @@ extern "C" {
 				 float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
   QudaSumComplex MatPCDagcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
   float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);*/
-  
-  // -- dslash_reference.cpp
-  
-  void dslashReference(float *res, float **gauge, float *spinorField, 
-		       int oddBit, int daggerBit);
-  
-  void Mat(float *out, float **gauge, float *in, float kappa);
-  void MatDag(float *out, float **gauge, float *in, float kappa);
-  void MatDagMat(float *out, float **gauge, float *in, float kappa);
-  
-  void MatPC(float *out, float **gauge, float *in, float kappa, MatPCType matpc_type);
-  void MatPCDag(float *out, float **gauge, float *in, float kappa, MatPCType matpc_type);
-  void MatPCDagMatPC(float *out, float **gauge, float *in, float kappa, MatPCType matpc_type);
   
   // -- inv_cg_cuda.cpp
   void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 

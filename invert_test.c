@@ -4,18 +4,25 @@
 
 #include <quda.h>
 #include <util_quda.h>
+#include <dslash_reference.h>
 
 int main(int argc, char **argv)
 {
   int device = 0;
 
-  float *gauge[4];
+  void *gauge[4];
 
   QudaGaugeParam Gauge_param;
   QudaInvertParam inv_param;
 
   Gauge_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  Gauge_param.cuda_prec = QUDA_HALF_PRECISION;
+
+  Gauge_param.cuda_prec_precise = QUDA_SINGLE_PRECISION;
+  Gauge_param.reconstruct_precise = QUDA_RECONSTRUCT_12;
+
+  Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
+
   Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   Gauge_param.X = L1;
   Gauge_param.Y = L2;
@@ -23,18 +30,17 @@ int main(int argc, char **argv)
   Gauge_param.T = L4;
   Gauge_param.anisotropy = 1.0;
 
-  Gauge_param.reconstruct = QUDA_RECONSTRUCT_8;
-  inv_param.inv_type = QUDA_CG_INVERTER;
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
   Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param = &Gauge_param;
   
-  float mass = -0.95;
+  float mass = -0.958;
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 5e-7;
   inv_param.maxiter = 5000;
-  inv_param.reliable_delta = 1e-8;
+  inv_param.reliable_delta = 1e-6;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
   inv_param.cuda_prec = QUDA_HALF_PRECISION;
@@ -44,10 +50,9 @@ int main(int argc, char **argv)
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = (float*)malloc(N*gaugeSiteSize*sizeof(float));
+    gauge[dir] = malloc(N*gaugeSiteSize*sizeof(float));
   }
-  constructGaugeField(gauge);
-  //constructUnitGaugeField(gauge);
+  construct_gauge_field(gauge, 1, QUDA_SINGLE_PRECISION);
 
   float *spinorIn = (float*)malloc(N*spinorSiteSize*sizeof(float));
   float *spinorOut = (float*)malloc(N*spinorSiteSize*sizeof(float));
@@ -60,8 +65,7 @@ int main(int argc, char **argv)
   int i0 = 0;
   int s0 = 0;
   int c0 = 0;
-  //  constructPointSpinorField(spinorIn, i0, s0, c0);
-  constructPointSpinorField(spinorIn, i0, s0, c0);
+  construct_spinor_field(spinorIn, 0, i0, s0, c0, QUDA_SINGLE_PRECISION);
 
   double time0 = -((double)clock()); // Start the timer
 
@@ -78,13 +82,13 @@ int main(int argc, char **argv)
   printf("done: %i iter / %g secs = %g gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
-  Mat(spinorCheck, gauge, spinorOut, inv_param.kappa);
+  mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, Gauge_param.cpu_prec);
   if  (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-    ax(0.5/inv_param.kappa, spinorCheck, N*spinorSiteSize);
+    ax(0.5/inv_param.kappa, spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
 
-  mxpy(spinorIn, spinorCheck, N*spinorSiteSize);
-  float nrm2 = norm(spinorCheck, N*spinorSiteSize);
-  float src2 = norm(spinorIn, N*spinorSiteSize);
+  mxpy(spinorIn, spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
+  float nrm2 = norm_2(spinorCheck, N*spinorSiteSize, QUDA_SINGLE_PRECISION);
+  float src2 = norm_2(spinorIn, N*spinorSiteSize, QUDA_SINGLE_PRECISION);
   printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
   endQuda();

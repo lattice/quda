@@ -35,10 +35,10 @@ aligned_malloc(size_t n, void **m0)
 }
 
 
-void printSpinorHalfField(float *spinor) {
-  printSpinor(&spinor[0*spinorSiteSize]);
+void printSpinorHalfField(void *spinor, Precision precision) {
+  printSpinorElement(spinor, 0, precision);
   printf("...\n");
-  printSpinor(&spinor[(Nh-1)*spinorSiteSize]);
+  printSpinorElement(spinor, Nh-1, precision);
   printf("\n");    
 }
 
@@ -46,17 +46,16 @@ void init() {
 
   Precision single = QUDA_SINGLE_PRECISION;
 
-  cudaSGauge.even = NULL;
-  cudaSGauge.odd = NULL;
-
   param.cpu_prec = QUDA_SINGLE_PRECISION;
-  param.cuda_prec = QUDA_SINGLE_PRECISION;
+  param.cuda_prec_precise = QUDA_SINGLE_PRECISION;
+  param.reconstruct_precise = QUDA_RECONSTRUCT_12;
+  param.cuda_prec_sloppy = param.cuda_prec_precise;
+  param.reconstruct_sloppy = param.reconstruct_precise;
   param.X = L1;
   param.Y = L2;
   param.Z = L3;
   param.T = L4;
   param.anisotropy = 2.3;
-  param.reconstruct = QUDA_RECONSTRUCT_12;
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param = &param;
@@ -100,13 +99,13 @@ void packTest() {
   
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-  createGaugeField(cpsGauge);
+  createGaugeField(&cudaGaugePrecise, cpsGauge, param.reconstruct_precise, param.cuda_prec_precise);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
   stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  createGaugeField(qdpGauge);
+  createGaugeField(&cudaGaugePrecise, qdpGauge, param.reconstruct_precise, param.cuda_prec_precise);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 

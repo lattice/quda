@@ -81,8 +81,6 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
       //rv = MatPCDagcDotWXCuda(v, gauge, p, invert_param->kappa, tmp, b, invert_param->matpc_type);
       MatPCDagCuda(v, gaugeSloppy, p, invert_param->kappa, tmp, invert_param->matpc_type);
 
-    printf("%e %e\n", normCuda((float*) v.spinor, len), normCuda((float*) p.spinor, len));
-
     rv = cDotProductCuda((float2*)source.spinor, (float2*)v.spinor, len/2);
     cuComplex rv32 = make_cuFloatComplex((float)rv.x, (float)rv.y);
     alpha = cuCdivf(rho, rv32);

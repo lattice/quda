@@ -3,10 +3,10 @@
 
 #include <cuda_runtime.h>
 
-#define L1 24 // "x" dimension
-#define L2 24 // "y" dimension
-#define L3 24 // "z" dimension
-#define L4 32 // "time" dimension
+#define L1 8 // "x" dimension
+#define L2 8 // "y" dimension
+#define L3 8 // "z" dimension
+#define L4 8 // "time" dimension
 #define L1h (L1/2) // half of the full "x" dimension, useful for even/odd lattice indexing
 
 #define N (L1*L2*L3*L4) // total number of lattice points
@@ -53,7 +53,7 @@ extern "C" {
 
   typedef struct {
     Precision precision;
-    void *spinor; // either (float4 *) or (short4 *), depending on precision
+    void *spinor; // either (double2*), (float4 *) or (short4 *), depending on precision
     float *spinorNorm; // used only when precision is QUDA_HALF_PRECISION
   } ParitySpinor;
 
