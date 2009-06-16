@@ -1,7 +1,6 @@
 
 #if (REDUCE_TYPE == REDUCE_KAHAN)
 
-
 #define DSACC(c0, c1, a0, a1) dsadd((c0), (c1), (c0), (c1), (a0), (a1))
 #define DSACC3(c0, c1, a0, a1) dsadd3((c0), (c1), (c0), (c1), (a0), (a1))
 
@@ -106,6 +105,7 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
 
 #endif
 
+template <typename Float2>
 double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
   if (n % REDUCE_THREADS != 0) {
     printf("ERROR reduceCuda(): length must be a multiple of %d\n", REDUCE_THREADS);

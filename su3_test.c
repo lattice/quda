@@ -24,9 +24,12 @@ inline short doubleToShort(double a) {
 
 // CPU only test of SU(3) accuracy, tests 8 and 12 component reconstruction
 void SU3Test() {
+
+  Precision gauge_precision = QUDA_DOUBLE_PRECISION;
+
   // construct input fields
-  float *gauge[4];
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = (float*)malloc(N*gaugeSiteSize*sizeof(float));
+  double *gauge[4];
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = (double*)malloc(N*gaugeSiteSize*sizeof(double));
 
   QudaGaugeParam param;
   gauge_param = &param;
@@ -34,10 +37,10 @@ void SU3Test() {
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
     
   printf("Randomizing fields...");
-  construct_gauge_field(gauge, 1, QUDA_SINGLE_PRECISION);
+  construct_gauge_field((void**)gauge, 1, gauge_precision);
   printf("done.\n");
 
-  int fail_check = 12;
+  int fail_check = 17;
   int fail8[fail_check], fail12[fail_check];
   for (int f=0; f<fail_check; f++) {
     fail8[f] = 0;
@@ -54,36 +57,34 @@ void SU3Test() {
     for (int i=0; i<Nh; i++) {
       int ga_idx = (eo*Nh+i);
       for (int d=0; d<4; d++) {
-	float gauge8[18], gauge12[18];
+	double gauge8[18], gauge12[18];
 	for (int j=0; j<18; j++) {
 	  gauge8[j] = gauge[d][ga_idx*18+j];
 	  gauge12[j] = gauge[d][ga_idx*18+j];
 	}
 	
-	su3_construct(gauge8, QUDA_RECONSTRUCT_8, QUDA_SINGLE_PRECISION);
-	su3_reconstruct(gauge8, d, i, QUDA_RECONSTRUCT_8, QUDA_SINGLE_PRECISION);
+	su3_construct(gauge8, QUDA_RECONSTRUCT_8, gauge_precision);
+	su3_reconstruct(gauge8, d, i, QUDA_RECONSTRUCT_8, gauge_precision);
 	
-	su3_construct(gauge12, QUDA_RECONSTRUCT_12, QUDA_SINGLE_PRECISION);
-	su3_reconstruct(gauge12, d, i, QUDA_RECONSTRUCT_12, QUDA_SINGLE_PRECISION);
+	su3_construct(gauge12, QUDA_RECONSTRUCT_12, gauge_precision);
+	su3_reconstruct(gauge12, d, i, QUDA_RECONSTRUCT_12, gauge_precision);
 	
 	if (fabs(gauge8[8] - gauge[d][ga_idx*18+8]) > 1e-1) {
-	  printGaugeElement(gauge[d]+ga_idx*18, 0, QUDA_SINGLE_PRECISION);printf("\n");
-	  printGaugeElement(gauge8, 0, QUDA_SINGLE_PRECISION);printf("\n");
-	  printGaugeElement(gauge12, 0, QUDA_SINGLE_PRECISION);
+	  printGaugeElement(gauge[d]+ga_idx*18, 0, gauge_precision);printf("\n");
+	  printGaugeElement(gauge8, 0, gauge_precision);printf("\n");
+	  printGaugeElement(gauge12, 0, gauge_precision);
 	  exit(0);
 	}
 	
 	for (int j=0; j<18; j++) {
-	  float diff8 = fabs(gauge8[j] - gauge[d][ga_idx*18+j]);
-	  float diff12 = fabs(gauge12[j] - gauge[d][ga_idx*18+j]);
+	  double diff8 = fabs(gauge8[j] - gauge[d][ga_idx*18+j]);
+	  double diff12 = fabs(gauge12[j] - gauge[d][ga_idx*18+j]);
 	  for (int f=0; f<fail_check; f++) {
 	    if (diff8 > pow(10,-(f+1))) fail8[f]++;
 	    if (diff12 > pow(10,-(f+1))) fail12[f]++;
 	  }
 	  if (diff8 > 1e-3) {
 	    iter8[j]++;
-	    //printf("%d %e %e\n", j, gauge[d][ga_idx*18+j], gauge8[j]);
-	    //exit(0);
 	  }
 	  if (diff12 > 1e-3) {
 	    iter12[j]++;
@@ -98,8 +99,8 @@ void SU3Test() {
 
   for (int f=0; f<fail_check; f++) {
     printf("%e Failures: 12 component = %d / %d  = %e, 8 component = %d / %d = %e\n", 
-	   pow(10,-(f+1)), fail12[f], N*4*18, fail12[f] / (float)(4*N*18),
-	   fail8[f], N*4*18, fail8[f] / (float)(4*N*18));
+	   pow(10,-(f+1)), fail12[f], N*4*18, fail12[f] / (double)(4*N*18),
+	   fail8[f], N*4*18, fail8[f] / (double)(4*N*18));
   }
 
   // release memory

@@ -6,6 +6,8 @@
 
 #include <xmmintrin.h>
 
+#define __DEVICE_EMULATION__
+
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT (SHORT_LENGTH-1) / 2.f
 #define SHIFT_FLOAT -1.f / (SHORT_LENGTH-1)
@@ -75,8 +77,8 @@ inline void packH8S(short4 *res, float *g) {
 
 inline void packD12D(double2 *res, double *g) {
   for (int j=0; j<6; j++) {
-    res[j*Nh].x = g[j*4+0]; 
-    res[j*Nh].y = g[j*4+1]; 
+    res[j*Nh].x = g[j*2+0]; 
+    res[j*Nh].y = g[j*2+1]; 
   }
 }
 

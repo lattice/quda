@@ -36,36 +36,35 @@ int main(int argc, char **argv)
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param = &Gauge_param;
   
-  float mass = -0.958;
+  double mass = -0.958;
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 5e-7;
   inv_param.maxiter = 5000;
   inv_param.reliable_delta = 1e-6;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(N*gaugeSiteSize*sizeof(float));
-  }
-  construct_gauge_field(gauge, 1, QUDA_SINGLE_PRECISION);
+  size_t gSize = (Gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-  float *spinorIn = (float*)malloc(N*spinorSiteSize*sizeof(float));
-  float *spinorOut = (float*)malloc(N*spinorSiteSize*sizeof(float));
-  float *spinorCheck = (float*)malloc(N*spinorSiteSize*sizeof(float));
-  if(!spinorCheck) {
-    printf("malloc failed in %s\n", __func__);
-    exit(1);
+  for (int dir = 0; dir < 4; dir++) {
+    gauge[dir] = malloc(N*gaugeSiteSize*gSize);
   }
+  construct_gauge_field(gauge, 1, Gauge_param.cpu_prec);
+
+  void *spinorIn = malloc(N*spinorSiteSize*sSize);
+  void *spinorOut = malloc(N*spinorSiteSize*sSize);
+  void *spinorCheck = malloc(N*spinorSiteSize*sSize);
 
   int i0 = 0;
   int s0 = 0;
   int c0 = 0;
-  construct_spinor_field(spinorIn, 0, i0, s0, c0, QUDA_SINGLE_PRECISION);
+  construct_spinor_field(spinorIn, 0, i0, s0, c0, inv_param.cpu_prec);
 
   double time0 = -((double)clock()); // Start the timer
 
@@ -87,8 +86,8 @@ int main(int argc, char **argv)
     ax(0.5/inv_param.kappa, spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
 
   mxpy(spinorIn, spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
-  float nrm2 = norm_2(spinorCheck, N*spinorSiteSize, QUDA_SINGLE_PRECISION);
-  float src2 = norm_2(spinorIn, N*spinorSiteSize, QUDA_SINGLE_PRECISION);
+  double nrm2 = norm_2(spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
+  double src2 = norm_2(spinorIn, N*spinorSiteSize, inv_param.cpu_prec);
   printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
   endQuda();

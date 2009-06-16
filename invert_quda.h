@@ -14,7 +14,7 @@ extern "C" {
     int Z;
     int T;
 
-    float anisotropy;
+    double anisotropy;
 
     QudaGaugeFieldOrder gauge_order;
 
@@ -31,21 +31,21 @@ extern "C" {
     QudaTboundary t_boundary;
 
     int packed_size;
-    float gaugeGiB;
+    double gaugeGiB;
 
   } QudaGaugeParam;
 
   typedef struct QudaInvertParam_s {
     
-    float kappa;  
+    double kappa;  
     QudaMassNormalization mass_normalization;
 
     QudaDslashType dslash_type;
     QudaInverterType inv_type;
-    float tol;
+    double tol;
     int iter;
     int maxiter;
-    float reliable_delta; // reliable update tolerance
+    double reliable_delta; // reliable update tolerance
 
     QudaMatPCType matpc_type;
     QudaSolutionType solution_type;
@@ -56,9 +56,9 @@ extern "C" {
     QudaPrecision cuda_prec;
     QudaDiracFieldOrder dirac_order;
 
-    float spinorGiB;
-    float gflops;
-    float secs;
+    double spinorGiB;
+    double gflops;
+    double secs;
 
   } QudaInvertParam;
 

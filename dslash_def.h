@@ -52,7 +52,11 @@
 #define DD_PARAM2 int oddBit
 #else            // xpay
 #define DD_XPAY_F Xpay
+#if (DD_SPREC == 0)
+#define DD_PARAM2 int oddBit, double a
+#else
 #define DD_PARAM2 int oddBit, float a
+#endif
 #define DSLASH_XPAY
 #endif
 

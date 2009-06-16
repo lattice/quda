@@ -23,39 +23,40 @@
 extern "C" {
 #endif
 
-// ---------- blas_quda.cu ----------
+  // ---------- blas_quda.cu ----------
+  
+  void zeroQuda(ParitySpinor a);
+  void copyQuda(ParitySpinor dst, ParitySpinor src);
+  
+  double axpyNormQuda(double a, ParitySpinor x, ParitySpinor y);
+  double sumQuda(ParitySpinor b);
+  double normQuda(ParitySpinor b);
+  double reDotProductQuda(ParitySpinor a, ParitySpinor b);
+  
+  void axpbyQuda(double a, ParitySpinor x, double b, ParitySpinor y);
+  void axpyQuda(double a, ParitySpinor x, ParitySpinor y);
+  void axQuda(double a, ParitySpinor x);
+  void xpayQuda(ParitySpinor x, double a, ParitySpinor y);
+  void mxpyQuda(ParitySpinor x, ParitySpinor y);
+  
+  void axpyZpbxQuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, double b);
 
-void zeroCuda(float* dst, int cnt);
-void copyCuda(float* dst, float *src, int len);
+  void caxpbyQuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y);
+  void caxpyQuda(double2 a, ParitySpinor x, ParitySpinor y);
+  void cxpaypbzQuda(ParitySpinor, double2 b, ParitySpinor y, double2 c, ParitySpinor z);
+  void caxpbypzYmbwQuda(double2, ParitySpinor, double2, ParitySpinor, ParitySpinor, ParitySpinor);
 
-void axpbyCuda(float a, float *x, float b, float *y, int len);
-void axpyCuda(float a, float *x, float *y, int len);
-void axCuda(float a, float *x, int len);
-void xpayCuda(float *x, float a, float *y, int len);
-void mxpyCuda(float *x, float *y, int len);
+  cuDoubleComplex cDotProductQuda(ParitySpinor, ParitySpinor);
+  cuDoubleComplex xpaycDotzyQuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z);
 
-void axpyZpbxCuda(float a, float *x, float *y, float *z, float b, int len);
-double axpyNormCuda(float a, float *x, float *y, int len);
-
-double sumCuda(float *a, int n);
-double normCuda(float *a, int n);
-double reDotProductCuda(float *a, float *b, int n);
-
-void blasTest();
-void axpbyTest();
-
-void caxpbyCuda(float2 a, float2 *x, float2 b, float2 *y, int len);
-void caxpyCuda(float2 a, float2 *x, float2 *y, int len);
-void cxpaypbzCuda(float2 *x, float2 b, float2 *y, float2 c, float2 *z, int len);
-cuDoubleComplex cDotProductCuda(float2*, float2*, int len);
-void caxpbypzYmbwCuda(float2, float2*, float2, float2*, float2*, float2*, int len);
-double3 cDotProductNormACuda(float2 *a, float2 *b, int n);
-double3 cDotProductNormBCuda(float2 *a, float2 *b, int n);
-double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
-						 float2 *z, float2 *w, float2 *u, int len);
-
-cuDoubleComplex xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int len);
-
+  void blasTest();
+  void axpbyTest();
+  
+  double3 cDotProductNormAQuda(ParitySpinor a, ParitySpinor b);
+  double3 cDotProductNormBQuda(ParitySpinor a, ParitySpinor b);
+  double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y, 
+					     ParitySpinor z, ParitySpinor w, ParitySpinor u);
+  
 #ifdef __cplusplus
 }
 #endif

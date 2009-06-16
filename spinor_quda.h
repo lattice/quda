@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-  ParitySpinor allocateParitySpinor(Precision precision);
-  FullSpinor allocateSpinorField(Precision precision);
+  ParitySpinor allocateParitySpinor(int length, Precision precision);
+  FullSpinor allocateSpinorField(int length, Precision precision);
   ParityClover allocateParityClover();
   FullClover allocateCloverField();
   

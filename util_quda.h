@@ -31,6 +31,7 @@ extern "C" {
   void apply_gamma5(void *out, void *in, int len, Precision precision);
   
   void compare_spinor(void *spinor_cpu, void *spinor_gpu, int len, Precision precision);
+  void strong_check(void *spinor, void *spinorGPU, int len, Precision precision);
 
   // ---------- gauge_read.cpp ----------
   

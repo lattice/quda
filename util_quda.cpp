@@ -511,7 +511,7 @@ void apply_gamma5(void *out, void *in, int sites, Precision precision) {
 
 template <typename Float>
 void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
-  int fail_check = 12;
+  int fail_check = 16;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
@@ -541,3 +541,17 @@ void compare_spinor(void *spinor_ref, void *spinor_gpu, int len, Precision preci
   if (precision == QUDA_DOUBLE_PRECISION) compareSpinor((double*)spinor_ref, (double*)spinor_gpu, len);
   else compareSpinor((float*)spinor_ref, (float*)spinor_gpu, len);
 }
+
+void strong_check(void *spinorRef, void *spinorGPU, int len, Precision prec) {
+  printf("Reference:\n");
+  printSpinorElement(spinorRef, 0, prec); printf("...\n");
+  printSpinorElement(spinorRef, len-1, prec); printf("\n");    
+    
+  printf("\nCUDA:\n");
+  printSpinorElement(spinorGPU, 0, prec); printf("...\n");
+  printSpinorElement(spinorGPU, len-1, prec); printf("\n");
+
+  compare_spinor(spinorRef, spinorGPU, len, prec);
+}
+
+

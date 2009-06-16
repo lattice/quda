@@ -71,8 +71,8 @@ void init() {
   int dev = 0;
   cudaSetDevice(dev);
 
-  cudaFullSpinor = allocateSpinorField(single);
-  cudaParitySpinor = allocateParitySpinor(single);
+  cudaFullSpinor = allocateSpinorField(N, single);
+  cudaParitySpinor = allocateParitySpinor(Nh, single);
 
 }
 

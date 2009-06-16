@@ -45,33 +45,33 @@ extern "C" {
   void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 		   int oddBit, int daggerBit);
   void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, float a);
+		       int oddBit, int daggerBit, ParitySpinor x, double a);
 
   // Single precision routines
   void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 		   int oddBit, int daggerBit);
   void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, float a);
+		       int oddBit, int daggerBit, ParitySpinor x, double a);
 
   // Half precision dslash routines
   void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 		   int oddBit, int daggerBit);
   void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, float a);
+		       int oddBit, int daggerBit, ParitySpinor x, double a);
 
   // wrapper to above
   void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger);
 
   // Full Wilson matrix
-  void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, float kappa);
-  void MatDagCuda(FullSpinor out, FullGauge gauge, FullSpinor in, float kappa);
+  void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa);
+  void MatDagCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa);
 
   void MatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-		 float kappa, ParitySpinor tmp, MatPCType matpc_type);
+		 double kappa, ParitySpinor tmp, MatPCType matpc_type);
   void MatPCDagCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-		    float kappa, ParitySpinor tmp, MatPCType matpc_type);
+		    double kappa, ParitySpinor tmp, MatPCType matpc_type);
   void MatPCDagMatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven,
-			 float kappa, ParitySpinor tmp, MatPCType matpc_type);
+			 double kappa, ParitySpinor tmp, MatPCType matpc_type);
   
   /*QudaSumComplex MatPCcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
 				 float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);

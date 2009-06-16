@@ -30,12 +30,12 @@
     a##_im -= b##_re * c##_im + b##_im * c##_re
 
 #define READ_GAUGE_MATRIX_12_DOUBLE(gauge, dir) \
-  double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*3+0)*Nh);	\
-  double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*3+1)*Nh);	\
-  double2 G2 = fetch_double2((gauge), ga_idx + ((dir/2)*3+2)*Nh);	\
-  double2 G3 = fetch_double2((gauge), ga_idx + ((dir/2)*3+3)*Nh);	\
-  double2 G4 = fetch_double2((gauge), ga_idx + ((dir/2)*3+4)*Nh);	\
-  double2 G5 = fetch_double2((gauge), ga_idx + ((dir/2)*3+5)*Nh);	\
+  double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*6+0)*Nh);	\
+  double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*6+1)*Nh);	\
+  double2 G2 = fetch_double2((gauge), ga_idx + ((dir/2)*6+2)*Nh);	\
+  double2 G3 = fetch_double2((gauge), ga_idx + ((dir/2)*6+3)*Nh);	\
+  double2 G4 = fetch_double2((gauge), ga_idx + ((dir/2)*6+4)*Nh);	\
+  double2 G5 = fetch_double2((gauge), ga_idx + ((dir/2)*6+5)*Nh);	\
   double2 G6 = make_double2(0,0);					\
   double2 G7 = make_double2(0,0);					\
   double2 G8 = make_double2(0,0);					\
@@ -65,15 +65,15 @@
   ACC_CONJ_PROD(g21, -g00, +g12);				\
   ACC_CONJ_PROD(g22, +g00, +g11);				\
   ACC_CONJ_PROD(g22, -g01, +g10);				\
-  float u0 = (dir < 6 ? anisotropy : (ga_idx >= (L4-1)*L1h*L2*L3 ? t_boundary : 1)); \
+  float u0 = (dir < 6 ? anisotropy_f : (ga_idx >= (L4-1)*L1h*L2*L3 ? t_boundary_f : 1)); \
   G3.x*=u0; G3.y*=u0; G3.z*=u0; G3.w*=u0; G4.x*=u0; G4.y*=u0;
 
 // set A to be last components of G4 (otherwise unused)
 #define READ_GAUGE_MATRIX_8_DOUBLE(gauge, dir)				\
-  double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*2+0)*Nh);	\
-  double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*2+1)*Nh);	\
-  double2 G2 = fetch_double2((gauge), ga_idx + ((dir/2)*2+2)*Nh);	\
-  double2 G3 = fetch_double2((gauge), ga_idx + ((dir/2)*2+3)*Nh);	\
+  double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*4+0)*Nh);	\
+  double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*4+1)*Nh);	\
+  double2 G2 = fetch_double2((gauge), ga_idx + ((dir/2)*4+2)*Nh);	\
+  double2 G3 = fetch_double2((gauge), ga_idx + ((dir/2)*4+3)*Nh);	\
   double2 G4 = make_double2(0,0);					\
   double2 G5 = make_double2(0,0);					\
   double2 G6 = make_double2(0,0);					\
@@ -99,8 +99,8 @@
   float4 G2 = make_float4(0,0,0,0);				\
   float4 G3 = make_float4(0,0,0,0);				\
   float4 G4 = make_float4(0,0,0,0);				\
-  g21_re = pi*g00_re;						\
-  g21_im = pi*g00_im;
+  g21_re = pi_f*g00_re;						\
+  g21_im = pi_f*g00_im;
 
 #define RECONSTRUCT_MATRIX_8_DOUBLE(dir)				\
   double row_sum = g01_re*g01_re + g01_im*g01_im;			\
@@ -143,7 +143,7 @@
 #define RECONSTRUCT_MATRIX_8_SINGLE(dir)				\
   float row_sum = g01_re*g01_re + g01_im*g01_im;			\
   row_sum += g02_re*g02_re + g02_im*g02_im;				\
-  float u0 = (dir < 6 ? anisotropy : (ga_idx >= (L4-1)*L1h*L2*L3 ? t_boundary : 1)); \
+  float u0 = (dir < 6 ? anisotropy_f : (ga_idx >= (L4-1)*L1h*L2*L3 ? t_boundary_f : 1)); \
   float u02_inv = __fdividef(1.f, u0*u0);				\
   float column_sum = u02_inv - row_sum;					\
   float U00_mag = sqrtf(column_sum);					\
