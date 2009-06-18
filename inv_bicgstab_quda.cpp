@@ -54,7 +54,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
   int k=0;
   int xUpdate = 0, rUpdate = 0;
 
-  //printf("%d iterations, r2 = %e\n", k, r2);
+  printf("%d iterations, r2 = %e, x2 = %e\n", k, r2, normQuda(x));
   stopwatchStart();
   while (r2 > stop && k<invert_param->maxiter) {
 
@@ -106,16 +106,16 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
     int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
     int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
 
-    if (updateR) {
-      QudaPrecision spinorPrec = invert_param->cuda_prec;
-      invert_param -> cuda_prec = QUDA_SINGLE_PRECISION;
+    if (updateR) {      
+      //QudaPrecision spinorPrec = invert_param->cuda_prec;
+      //invert_param -> cuda_prec = QUDA_SINGLE_PRECISION;
 
       if (dag_type == QUDA_DAG_NO) 
 	MatPCCuda(t, gaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
       else 
 	MatPCDagCuda(t, gaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
 
-      invert_param -> cuda_prec = spinorPrec;
+      //invert_param -> cuda_prec = spinorPrec;
 
       copyQuda(r, b);
       mxpyQuda(t, r);
@@ -134,14 +134,14 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
 	maxrx = rNorm;
 	xUpdate++;
       }
-      
+
     }
       
 
     k++;
     printf("%d iterations, r2 = %e, x2 = %e\n", k, r2, normQuda(x));
   }
-  axpyQuda(1.0f, y, x);
+  axpyQuda(1.0, y, x);
 
   invert_param->secs += stopwatchReadSeconds();
 
@@ -156,19 +156,19 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugeSlop
   invert_param->gflops += gflops;
   invert_param->iter += k;
 
-#if 0
+  //#if 0
   // Calculate the true residual
   if (dag_type == QUDA_DAG_NO) 
-    MatPCCuda(t.spinor, gauge, x.spinor, invert_param->kappa, tmp.spinor, invert_param->matpc_type);
+    MatPCCuda(t, gaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
   else 
-    MatPCDagCuda(t.spinor, gauge, x.spinor, invert_param->kappa, tmp.spinor, invert_param->matpc_type);
-  copyQuda(r, b);
+    MatPCDagCuda(t, gaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
+  copyQuda(r, source);
   mxpyQuda(t, r);
   double true_res = normQuda(r);
   
   printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
 	 k, r2, true_res / b2);
-#endif
+  //#endif
 
   freeParitySpinor(b);
   freeParitySpinor(y);

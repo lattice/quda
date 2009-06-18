@@ -483,7 +483,7 @@ void loadGaugeField(FullGauge *cudaGauge, void *cpuGauge) {
       printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
       exit(-1);
     }
-    
+
     cudaMemcpy(cudaGauge->even, packedEven, cudaGauge->packedGaugeBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaGauge->odd,  packedOdd,  cudaGauge->packedGaugeBytes, cudaMemcpyHostToDevice);    
     

@@ -4,21 +4,6 @@
 #ifndef _QUDA_BLAS_H
 #define _QUDA_BLAS_H
 
-#define REDUCE_DOUBLE 64
-#define REDUCE_KAHAN 32
-
-#if (__CUDA_ARCH__ == 130)
-#define REDUCE_TYPE REDUCE_DOUBLE
-#define QudaSumFloat double
-#define QudaSumComplex cuDoubleComplex
-#define QudaSumFloat3 double3
-#else
-#define REDUCE_TYPE REDUCE_KAHAN
-#define QudaSumFloat float
-#define QudaSumComplex cuComplex
-#define QudaSumFloat3 float3
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -7,6 +7,21 @@
 #define REDUCE_THREADS 128
 #define REDUCE_MAX_BLOCKS 64
 
+#define REDUCE_DOUBLE 64
+#define REDUCE_KAHAN 32
+
+#if (__CUDA_ARCH__ == 130)
+#define REDUCE_TYPE REDUCE_DOUBLE
+#define QudaSumFloat double
+#define QudaSumComplex cuDoubleComplex
+#define QudaSumFloat3 double3
+#else
+#define REDUCE_TYPE REDUCE_KAHAN
+#define QudaSumFloat float
+#define QudaSumComplex cuComplex
+#define QudaSumFloat3 float3
+#endif
+
 inline void checkSpinor(ParitySpinor &a, ParitySpinor &b) {
   if (a.precision == QUDA_HALF_PRECISION || b.precision == QUDA_HALF_PRECISION) {
     printf("checkSpinor error, this kernel does not support QUDA_HALF_PRECISION\n");
@@ -34,7 +49,7 @@ void zeroCuda(Float* dst, int len) {
 void zeroQuda(ParitySpinor a) {
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     zeroCuda((double*)a.spinor, a.length);
-  } else if (a.precision == QUDA_HALF_PRECISION) {
+  } else if (a.precision == QUDA_SINGLE_PRECISION) {
     zeroCuda((float*)a.spinor, a.length);
   } else {
     zeroCuda((short*)a.spinor, a.length);
@@ -65,7 +80,6 @@ __global__ void axpbyKernel(Float a, Float *x, Float b, Float *y, int len) {
 }
 
 // performs the operation y[i] = a*x[i] + b*y[i]
-template <typename Float>
 void axpbyQuda(double a, ParitySpinor x, double b, ParitySpinor y) {
   checkSpinor(x, y);
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));

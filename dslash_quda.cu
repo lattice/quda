@@ -408,8 +408,35 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   
 }
 
+void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger,
+		    ParitySpinor x, double a) {
+  if (invert_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
+    dslashXpayDCuda(out, gauge, in, parity, dagger, x, a);
+  } else if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+    dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
+  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+    printf("Not yet implemented\n");
+    exit(-1);
+
+    dim3 gridDim(GRID_DIM, 1, 1);
+    dim3 blockDim(BLOCK_DIM, 1, 1);
+
+    int spinor_float_bytes = Nh*spinorSiteSize*sizeof(float);
+    cudaBindTexture(0, spinorTexSingle, in.spinor, spinor_float_bytes); 
+    spinorHalfPack <<<gridDim, blockDim, SHARED_BYTES_SINGLE>>>(hSpinor1.spinorNorm, hSpinor1.spinor);
+    
+    dslashXpayHCuda(hSpinor2, gauge, hSpinor1, parity, dagger, x, a);
+
+    int spinor_half_bytes = Nh*spinorSiteSize*sizeof(float)/2;
+    cudaBindTexture(0, spinorTexHalf, hSpinor2.spinor, spinor_half_bytes); 
+    cudaBindTexture(0, spinorTexNorm, hSpinor2.spinorNorm, spinor_half_bytes/12); 
+    spinorHalfUnpack <<<gridDim, blockDim, SHARED_BYTES_SINGLE>>>(out);
+  }
+}
+
+
 void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		    int oddBit, int daggerBit, ParitySpinor x, double a) {
+		     int oddBit, int daggerBit, ParitySpinor x, double a) {
 
   dim3 gridDim(GRID_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);

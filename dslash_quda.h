@@ -5,9 +5,6 @@
 
 #include <quda.h>
 
-#define packed12GaugeSiteSize 12 // real numbers per link, using SU(3) reconstruction
-#define packed8GaugeSiteSize 8 // real numbers per link, using SU(3) reconstruction
-
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
 #define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
@@ -61,6 +58,8 @@ extern "C" {
 
   // wrapper to above
   void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger);
+  void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger,
+		      ParitySpinor x, double a);
 
   // Full Wilson matrix
   void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa);

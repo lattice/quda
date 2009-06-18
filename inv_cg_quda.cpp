@@ -34,7 +34,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
   zeroQuda(x);
 
   int k=0;
-  //printf("%d iterations, r2 = %e\n", k, r2);
+  printf("%d iterations, r2 = %e\n", k, r2);
   stopwatchStart();
   while (r2 > stop && k<perf->maxiter) {
     MatPCDagMatPCCuda(Ap, gauge, p, perf->kappa, tmp, perf->matpc_type);

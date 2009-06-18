@@ -109,9 +109,10 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->reconstruct_precise, gauge_param->cuda_prec_precise);
   gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.packedGaugeBytes/ (1 << 30);
-  if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec_precise) {
+  if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec_precise ||
+      gauge_param->reconstruct_sloppy != gauge_param->reconstruct_precise) {
     createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->reconstruct_sloppy, gauge_param->cuda_prec_sloppy);
-    gauge_param->gaugeGiB = 2.0*cudaGaugeSloppy.packedGaugeBytes/ (1 << 30);
+    gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.packedGaugeBytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
   }
@@ -269,9 +270,9 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     }
 
     if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashXpaySCuda(in, cudaGaugePrecise, b.odd, 0, 0, b.even, kappa);
+      dslashXpayCuda(in, cudaGaugePrecise, b.odd, 0, 0, b.even, kappa);
     } else {
-      dslashXpaySCuda(in, cudaGaugePrecise, b.even, 1, 0, b.odd, kappa);
+      dslashXpayCuda(in, cudaGaugePrecise, b.even, 1, 0, b.odd, kappa);
     }
 
   } else if (param->solution_type == QUDA_MATPC_SOLUTION || 
@@ -315,9 +316,9 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     }
 
     if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashXpaySCuda(x.odd, cudaGaugePrecise, out, 1, 0, b.odd, kappa);
+      dslashXpayCuda(x.odd, cudaGaugePrecise, out, 1, 0, b.odd, kappa);
     } else {
-      dslashXpaySCuda(x.even, cudaGaugePrecise, out, 0, 0, b.even, kappa);
+      dslashXpayCuda(x.even, cudaGaugePrecise, out, 0, 0, b.even, kappa);
     }
 
     retrieveSpinorField(h_x, x, param->cpu_prec, param->cuda_prec, param->dirac_order);
