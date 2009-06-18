@@ -1,19 +1,18 @@
 CUFILES		:= dslash_cuda.cu blas_cuda.cu
-CCFILES		:= inv_bicgstab_cuda.cpp inv_cg.cpp util_cuda.cpp field_cuda.cpp
+CCFILES		:= inv_bicgstab_cuda.cpp inv_cg.cpp util_cuda.cpp gauge_cuda.cpp spinor_quda.cpp
 
 CUDA_INSTALL_PATH = /usr/local/cuda
-INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include
+INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I$(CUDA_INSTALL_PATH)/../cuda_sdk/common/inc
 LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
 
-DFLAGS = -DREDUCE_DOUBLE #-DREDUCE_KAHAN_SUMMATION 
-	#-D__DEVICE_EMULATION__
+DFLAGS = #-D__DEVICE_EMULATION__
 
 CC = gcc
-CFLAGS = -Wall -O3 -std=c99 $(INCLUDES) ${DFLAGS}
+CFLAGS = -Wall -g -std=c99 $(INCLUDES) ${DFLAGS}
 CXX = g++
-CXXFLAGS = -Wall -O3 $(INCLUDES) ${DFLAGS} 
+CXXFLAGS = -Wall -g $(INCLUDES) ${DFLAGS} 
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(INCLUDES) ${DFLAGS} -arch=sm_13
+NVCCFLAGS = -g $(INCLUDES) ${DFLAGS} -arch=sm_13 #-deviceemu
 LDFLAGS = -fPIC $(LIB)
 CCOBJECTS = $(CCFILES:.cpp=.o)
 CUOBJECTS = $(CUFILES:.cu=.o)
@@ -22,8 +21,8 @@ all: dslash_test invert_test su3_test pack_test
 
 ILIB = libquda.a
 ILIB_OBJS = inv_bicgstab_quda.o inv_cg_quda.o dslash_quda.o blas_quda.o util_quda.o \
-	dslash_reference.o blas_reference.o invert_quda.o field_quda.o
-ILIB_DEPS = $(ILIB_OBJS) blas_quda.h quda.h util_quda.h invert_quda.h field_quda.h enum_quda.h
+	dslash_reference.o blas_reference.o invert_quda.o gauge_quda.o spinor_quda.o
+ILIB_DEPS = $(ILIB_OBJS) blas_quda.h quda.h util_quda.h invert_quda.h gauge_quda.h spinor_quda.h enum_quda.h dslash_reference.h
 
 $(ILIB): $(ILIB_DEPS)
 	ar cru $@ $(ILIB_OBJS)
