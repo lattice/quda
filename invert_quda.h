@@ -20,8 +20,8 @@ extern "C" {
 
     QudaPrecision cpu_prec;
 
-    QudaPrecision cuda_prec_precise;
-    QudaReconstructType reconstruct_precise;
+    QudaPrecision cuda_prec;
+    QudaReconstructType reconstruct;
 
     QudaPrecision cuda_prec_sloppy;
     QudaReconstructType reconstruct_sloppy;
@@ -54,6 +54,8 @@ extern "C" {
 
     QudaPrecision cpu_prec;
     QudaPrecision cuda_prec;
+    QudaPrecision cuda_prec_sloppy;
+
     QudaDiracFieldOrder dirac_order;
 
     double spinorGiB;

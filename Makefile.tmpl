@@ -1,18 +1,18 @@
 CUFILES		:= dslash_cuda.cu blas_cuda.cu
 CCFILES		:= inv_bicgstab_cuda.cpp inv_cg.cpp util_cuda.cpp gauge_cuda.cpp spinor_quda.cpp
 
-CUDA_INSTALL_PATH = /usr/local/cuda
+CUDA_INSTALL_PATH = /usr/local/cuda-2.0.0.2.1221
 INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I$(CUDA_INSTALL_PATH)/../cuda_sdk/common/inc
 LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
 
 DFLAGS = #-D__DEVICE_EMULATION__
 
 CC = gcc
-CFLAGS = -Wall -g -std=c99 $(INCLUDES) ${DFLAGS}
+CFLAGS = -Wall -O3 -std=c99 $(INCLUDES) ${DFLAGS}
 CXX = g++
-CXXFLAGS = -Wall -g $(INCLUDES) ${DFLAGS} 
+CXXFLAGS = -Wall -O3 $(INCLUDES) ${DFLAGS} 
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -g $(INCLUDES) ${DFLAGS} -arch=sm_13 #-deviceemu
+NVCCFLAGS = -O3 $(INCLUDES) ${DFLAGS} -arch=sm_13 #-deviceemu
 LDFLAGS = -fPIC $(LIB)
 CCOBJECTS = $(CCFILES:.cpp=.o)
 CUOBJECTS = $(CUFILES:.cu=.o)

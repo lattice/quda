@@ -6,8 +6,6 @@
 
 #include <xmmintrin.h>
 
-#define __DEVICE_EMULATION__
-
 // GPU clover matrix
 FullClover cudaClover;
 
@@ -46,9 +44,6 @@ ParitySpinor allocateParitySpinor(int geometric_length, Precision precision) {
       printf("Error allocating spinorNorm\n");
       exit(0);
     }
-  } else {
-    printf("Error allocating spinor: double precision not supported\n");
-    exit(0);
   }
 
   return ret;

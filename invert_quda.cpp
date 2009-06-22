@@ -24,8 +24,8 @@ void printGaugeParam(QudaGaugeParam *param) {
   printf("anisotropy = %e\n", param->anisotropy);
   printf("gauge_order = %d\n", param->gauge_order);
   printf("cpu_prec = %d\n", param->cpu_prec);
-  printf("cuda_prec_precise = %d\n", param->cuda_prec_precise);
-  printf("reconstruct_precise = %d\n", param->reconstruct_precise);
+  printf("cuda_prec = %d\n", param->cuda_prec);
+  printf("reconstruct = %d\n", param->reconstruct);
   printf("cuda_prec_sloppy = %d\n", param->cuda_prec_sloppy);
   printf("reconstruct_sloppy = %d\n", param->reconstruct_sloppy);
   printf("gauge_fix = %d\n", param->gauge_fix);
@@ -105,12 +105,12 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 	   gauge_param->X, L1, gauge_param->Y, L2, gauge_param->Z, L3, gauge_param->T, L4);
     exit(-1);
   }
-  gauge_param->packed_size = (gauge_param->reconstruct_precise == QUDA_RECONSTRUCT_8) ? 8 : 12;
+  gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
-  createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->reconstruct_precise, gauge_param->cuda_prec_precise);
+  createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->reconstruct, gauge_param->cuda_prec);
   gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.packedGaugeBytes/ (1 << 30);
-  if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec_precise ||
-      gauge_param->reconstruct_sloppy != gauge_param->reconstruct_precise) {
+  if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec ||
+      gauge_param->reconstruct_sloppy != gauge_param->reconstruct) {
     createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->reconstruct_sloppy, gauge_param->cuda_prec_sloppy);
     gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.packedGaugeBytes/ (1 << 30);
   } else {
@@ -262,6 +262,20 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     else { x.even = tmp; x.odd = out; }
 
     loadSpinorField(b, h_b, param->cpu_prec, param->cuda_prec, param->dirac_order);
+
+    /*ParitySpinor t = allocateParitySpinor(Nh, invert_param->cuda_prec_sloppy);
+    ParitySpinor s = allocateParitySpinor(Nh, invert_param->cuda_prec_sloppy);
+
+    dslashCuda(in, cudaGaugeSloppy, b.odd, 0, 0);
+    copyQuda(s, b.odd);
+    dslashCuda(t, cudaGaugeSloppy, s, 0, 0);
+    copyQuda(b.even, t);
+    printf("%e %e %e\n", normQuda(in), normQuda(t), normQuda(b.even));
+    FILE *file = fopen("test.dat","w");
+    for (int i=0; i<in.length; i++) {
+      fprintf(file, "%d %e %e %e\n", i, ((double*)in.spinor)[i], ((float*)t.spinor)[i], ((double*)b.even.spinor)[i]);
+    }
+    exit(0);*/
 
     // multiply the source to get the mass normalization
     if (param->mass_normalization == QUDA_MASS_NORMALIZATION) {

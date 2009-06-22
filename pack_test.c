@@ -47,10 +47,10 @@ void init() {
   Precision single = QUDA_SINGLE_PRECISION;
 
   param.cpu_prec = QUDA_SINGLE_PRECISION;
-  param.cuda_prec_precise = QUDA_SINGLE_PRECISION;
-  param.reconstruct_precise = QUDA_RECONSTRUCT_12;
-  param.cuda_prec_sloppy = param.cuda_prec_precise;
-  param.reconstruct_sloppy = param.reconstruct_precise;
+  param.cuda_prec = QUDA_SINGLE_PRECISION;
+  param.reconstruct = QUDA_RECONSTRUCT_12;
+  param.cuda_prec_sloppy = param.cuda_prec;
+  param.reconstruct_sloppy = param.reconstruct;
   param.X = L1;
   param.Y = L2;
   param.Z = L3;
@@ -99,13 +99,13 @@ void packTest() {
   
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, cpsGauge, param.reconstruct_precise, param.cuda_prec_precise);
+  createGaugeField(&cudaGaugePrecise, cpsGauge, param.reconstruct, param.cuda_prec);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
   stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, qdpGauge, param.reconstruct_precise, param.cuda_prec_precise);
+  createGaugeField(&cudaGaugePrecise, qdpGauge, param.reconstruct, param.cuda_prec);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 

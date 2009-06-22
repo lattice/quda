@@ -26,7 +26,7 @@ texture<float4, 1, cudaReadModeElementType> gauge1TexSingle;
 texture<short4, 1, cudaReadModeNormalizedFloat> gauge0TexHalf;
 texture<short4, 1, cudaReadModeNormalizedFloat> gauge1TexHalf;
 
-// Single precision input spinor field
+// Double precision input spinor field
 texture<int4, 1> spinorTexDouble;
 
 // Single precision input spinor field
@@ -211,12 +211,23 @@ void bindGaugeTex(FullGauge gauge, int oddBit) {
 
 // ----------------------------------------------------------------------
 
+void checkSpinor(ParitySpinor out, ParitySpinor in) {
+  if (in.precision != out.precision) {
+    printf("Error in dslash quda: input and out spinor precision's don't match\n");
+    exit(-1);
+  }
+}
+
+
+
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
-  if (invert_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
+  checkSpinor(in, out);
+
+  if (in.precision == QUDA_DOUBLE_PRECISION) {
     dslashDCuda(out, gauge, in, parity, dagger);
-  } else if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+  } else if (in.precision == QUDA_SINGLE_PRECISION) {
     dslashSCuda(out, gauge, in, parity, dagger);
-  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+  } else if (in.precision == QUDA_HALF_PRECISION) {
     dim3 gridDim(GRID_DIM, 1, 1);
     dim3 blockDim(BLOCK_DIM, 1, 1);
 
@@ -410,11 +421,13 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
 void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger,
 		    ParitySpinor x, double a) {
-  if (invert_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
+  checkSpinor(in, out);
+
+  if (in.precision == QUDA_DOUBLE_PRECISION) {
     dslashXpayDCuda(out, gauge, in, parity, dagger, x, a);
-  } else if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+  } else if (in.precision == QUDA_SINGLE_PRECISION) {
     dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
-  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+  } else if (in.precision == QUDA_HALF_PRECISION) {
     printf("Not yet implemented\n");
     exit(-1);
 
@@ -624,9 +637,13 @@ int dslashCudaSharedBytes() {
 // Apply the even-odd preconditioned Dirac operator
 void MatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa, 
 	       ParitySpinor tmp, MatPCType matpc_type) {
+
+  checkSpinor(in, out);
+  checkSpinor(in, tmp);
+
   double kappa2 = -kappa*kappa;
 
-  if (invert_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
+  if (in.precision == QUDA_DOUBLE_PRECISION) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashDCuda(tmp, gauge, in, 1, 0);
       dslashXpayDCuda(out, gauge, tmp, 0, 0, in, kappa2); 
@@ -634,7 +651,7 @@ void MatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa,
       dslashDCuda(tmp, gauge, in, 0, 0);
       dslashXpayDCuda(out, gauge, tmp, 1, 0, in, kappa2); 
     }
-  } else if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+  } else if (in.precision == QUDA_SINGLE_PRECISION) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashSCuda(tmp, gauge, in, 1, 0);
       dslashXpaySCuda(out, gauge, tmp, 0, 0, in, kappa2); 
@@ -642,7 +659,7 @@ void MatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa,
       dslashSCuda(tmp, gauge, in, 0, 0);
       dslashXpaySCuda(out, gauge, tmp, 1, 0, in, kappa2); 
     }
-  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+  } else if (in.precision == QUDA_HALF_PRECISION) {
     dim3 gridDim(GRID_DIM, 1, 1);
     dim3 blockDim(BLOCK_DIM, 1, 1);
 
@@ -662,9 +679,13 @@ void MatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa,
 // Apply the even-odd preconditioned Dirac operator
 void MatPCDagCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa, 
 		  ParitySpinor tmp, MatPCType matpc_type) {
+
+  checkSpinor(in, out);
+  checkSpinor(in, tmp);
+
   double kappa2 = -kappa*kappa;
 
-  if (invert_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
+  if (in.precision == QUDA_DOUBLE_PRECISION) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashDCuda(tmp, gauge, in, 1, 1);
       dslashXpayDCuda(out, gauge, tmp, 0, 1, in, kappa2);
@@ -672,7 +693,7 @@ void MatPCDagCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kap
       dslashDCuda(tmp, gauge, in, 0, 1);
       dslashXpayDCuda(out, gauge, tmp, 1, 1, in, kappa2);
     }
-  } else if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+  } else if (in.precision == QUDA_SINGLE_PRECISION) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashSCuda(tmp, gauge, in, 1, 1);
       dslashXpaySCuda(out, gauge, tmp, 0, 1, in, kappa2);
@@ -705,14 +726,15 @@ void MatPCDagMatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
 
 // Apply the full operator
 void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa) {
+  checkSpinor(in.even, out.even);
 
-  if (invert_param->cuda_prec == QUDA_DOUBLE_PRECISION) {
+  if (in.even.precision == QUDA_DOUBLE_PRECISION) {
     dslashXpayDCuda(out.odd, gauge, in.even, 1, 0, in.odd, -kappa);
     dslashXpayDCuda(out.even, gauge, in.odd, 0, 0, in.even, -kappa);
-  } else if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+  } else if (in.even.precision == QUDA_SINGLE_PRECISION) {
     dslashXpaySCuda(out.odd, gauge, in.even, 1, 0, in.odd, -kappa);
     dslashXpaySCuda(out.even, gauge, in.odd, 0, 0, in.even, -kappa);
-  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+  } else if (in.even.precision == QUDA_HALF_PRECISION) {
     printf("Half precision not supported in MatCuda\n");
     exit(-1);
   }
@@ -721,14 +743,15 @@ void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa) {
 
 // Apply the full operator dagger
 void MatDaggerCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa) {
+  checkSpinor(in.even, out.even);
 
-  if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+  if (in.even.precision == QUDA_SINGLE_PRECISION) {
     dslashXpayDCuda(out.odd, gauge, in.even, 1, 1, in.odd, -kappa);
     dslashXpayDCuda(out.even, gauge, in.odd, 0, 1, in.even, -kappa);
-  } else if (invert_param->cuda_prec == QUDA_SINGLE_PRECISION) {
+  } else if (in.even.precision == QUDA_SINGLE_PRECISION) {
     dslashXpaySCuda(out.odd, gauge, in.even, 1, 1, in.odd, -kappa);
     dslashXpaySCuda(out.even, gauge, in.odd, 0, 1, in.even, -kappa);
-  } else if (invert_param->cuda_prec == QUDA_HALF_PRECISION) {
+  } else if (in.even.precision == QUDA_HALF_PRECISION) {
     printf("Half precision not supported in MatDaggerCuda\n");
     exit(-1);
   }

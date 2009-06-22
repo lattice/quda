@@ -39,6 +39,19 @@ inline void checkSpinor(ParitySpinor &a, ParitySpinor &b) {
   }
 }
 
+// For kernels with precision conversion built in
+inline void checkHalfSpinor(ParitySpinor &a, ParitySpinor &b) {
+  if (a.precision == QUDA_HALF_PRECISION || b.precision == QUDA_HALF_PRECISION) {
+    printf("checkSpinor error, this kernel does not support QUDA_HALF_PRECISION\n");
+    exit(-1);
+  }
+
+  if (a.length != b.length) {
+    printf("checkSpinor error, lengths do not match: %d %d\n", a.length, b.length);
+    exit(-1);
+  }
+}
+
 template <typename Float>
 void zeroCuda(Float* dst, int len) {
   // cuda's floating point format, IEEE-754, represents the floating point
@@ -57,23 +70,58 @@ void zeroQuda(ParitySpinor a) {
   }
 }
 
-template <typename Float>
-void copyCuda(Float* dst, Float *src, int len) {
-  cudaMemcpy(dst, src, len*sizeof(Float), cudaMemcpyDeviceToDevice);
+__global__ void convertDSKernel(double2 *dst, float4 *src, int length) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    for (int k=0; k<6; k++) {
+      dst[2*k*length+i].x = src[k*length+i].x;
+      dst[2*k*length+i].y = src[k*length+i].y;
+      dst[(2*k+1)*length+i].x = src[k*length+i].z;
+      dst[(2*k+1)*length+i].y = src[k*length+i].w;
+    }
+    i += gridSize;
+  }   
+}
+
+__global__ void convertSDKernel(float4 *dst, double2 *src, int length) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    for (int k=0; k<6; k++) {
+      dst[k*length+i].x = src[2*k*length+i].x;
+      dst[k*length+i].y = src[2*k*length+i].y;
+      dst[k*length+i].z = src[(2*k+1)*length+i].x;
+      dst[k*length+i].w = src[(2*k+1)*length+i].y;
+    }
+    i += gridSize;
+  }   
 }
 
 void copyQuda(ParitySpinor dst, ParitySpinor src) {
-  checkSpinor(dst, src);
-  if (dst.precision == QUDA_DOUBLE_PRECISION) copyCuda((double*)dst.spinor, (double*)src.spinor, dst.length);
-  else copyCuda((float*)dst.spinor, (float*)src.spinor, src.length);
+  checkHalfSpinor(dst, src);
+
+  int convertLength = dst.length / 24;
+  int blocks = min(REDUCE_MAX_BLOCKS, max(convertLength/REDUCE_THREADS, 1));
+  dim3 dimBlock(REDUCE_THREADS, 1, 1);
+  dim3 dimGrid(blocks, 1, 1);
+
+  if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_SINGLE_PRECISION) 
+    convertDSKernel<<<dimGrid, dimBlock>>>((double2*)dst.spinor, (float4*)src.spinor, convertLength);
+  else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) 
+    convertSDKernel<<<dimGrid, dimBlock>>>((float4*)dst.spinor, (double2*)src.spinor, convertLength);
+  else if (dst.precision == QUDA_DOUBLE_PRECISION) 
+    cudaMemcpy(dst.spinor, src.spinor, dst.length*sizeof(double), cudaMemcpyDeviceToDevice);
+  else 
+    cudaMemcpy(dst.spinor, src.spinor, dst.length*sizeof(float), cudaMemcpyDeviceToDevice);
 }
 
 
 template <typename Float>
-__global__ void axpbyKernel(Float a, Float *x, Float b, Float *y, int len) {
+__global__ void axpbyKernel(Float a, Float *x, Float b, Float *y, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
+  while (i < length) {
     y[i] = a*x[i] + b*y[i];
     i += gridSize;
   } 
@@ -89,6 +137,28 @@ void axpbyQuda(double a, ParitySpinor x, double b, ParitySpinor y) {
     axpbyKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, b, (double*)y.spinor, x.length);
   else
     axpbyKernel<<<dimGrid, dimBlock>>>((float)a, (float*)x.spinor, (float)b, (float*)y.spinor, x.length);
+}
+
+template <typename xFloat, typename yFloat>
+__global__ void xpyKernel(xFloat *x, yFloat *y, int len) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    y[i] += x[i];
+    i += gridSize;
+  } 
+}
+
+// performs the operation y[i] = x[i] + y[i]
+void xpyQuda(ParitySpinor x, ParitySpinor y) {
+  checkSpinor(x,y);
+  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
+  dim3 dimBlock(REDUCE_THREADS, 1, 1);
+  dim3 dimGrid(blocks, 1, 1);
+  if (x.precision == QUDA_DOUBLE_PRECISION) 
+    xpyKernel<<<dimGrid, dimBlock>>>((double*)x.spinor, (double*)y.spinor, x.length);
+  else
+    xpyKernel<<<dimGrid, dimBlock>>>((float*)x.spinor, (float*)y.spinor, x.length);
 }
 
 template <typename Float>
@@ -529,6 +599,36 @@ double axpyNormQuda(double a, ParitySpinor x, ParitySpinor y) {
     return axpyNormCuda(a, (double*)x.spinor, (double*)y.spinor, x.length);
   } else {
     return axpyNormCuda((float)a, (float*)x.spinor, (float*)y.spinor, x.length);
+  }
+}
+
+
+//
+// double axpyNormCuda(float a, float *x, float *y, n){}
+//
+// First performs the operation y[i] = a*x[i] + y[i]
+// Second returns the norm of y
+//
+
+template <typename Float>
+#define REDUCE_FUNC_NAME(suffix) xmyNorm##suffix
+#define REDUCE_TYPES Float *x, Float *y
+#define REDUCE_PARAMS x, y
+#define REDUCE_AUXILIARY(i) y[i] = x[i] - y[i]
+#define REDUCE_OPERATION(i) (y[i]*y[i])
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+double xmyNormQuda(ParitySpinor x, ParitySpinor y) {
+  checkSpinor(x,y);
+  if (x.precision == QUDA_DOUBLE_PRECISION) {
+    return xmyNormCuda((double*)x.spinor, (double*)y.spinor, x.length);
+  } else {
+    return xmyNormCuda((float*)x.spinor, (float*)y.spinor, x.length);
   }
 }
 

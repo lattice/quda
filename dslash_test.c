@@ -30,10 +30,10 @@ int TRANSFER = 1; // include transfer time in the benchmark?
 void init() {
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.reconstruct_precise = QUDA_RECONSTRUCT_12;
-  gaugeParam.cuda_prec_precise = QUDA_DOUBLE_PRECISION;
-  gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
-  gaugeParam.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+  gaugeParam.cuda_prec = QUDA_DOUBLE_PRECISION;
+  gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
+  gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
   gaugeParam.X = L1;
   gaugeParam.Y = L2;
   gaugeParam.Z = L3;

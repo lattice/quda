@@ -58,7 +58,7 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaReconstructType_s {
-    QUDA_RECONSTRUCT_NO, // store all 18 real numbers epxlicitly
+    QUDA_RECONSTRUCT_NO, // store all 18 real numbers explicitly
     QUDA_RECONSTRUCT_8, // reconstruct from 8 real numbers
     QUDA_RECONSTRUCT_12 // reconstruct from 12 real numbers
   } QudaReconstructType;

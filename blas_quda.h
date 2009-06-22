@@ -17,10 +17,12 @@ extern "C" {
   double sumQuda(ParitySpinor b);
   double normQuda(ParitySpinor b);
   double reDotProductQuda(ParitySpinor a, ParitySpinor b);
+  double xmyNormQuda(ParitySpinor a, ParitySpinor b);
   
   void axpbyQuda(double a, ParitySpinor x, double b, ParitySpinor y);
   void axpyQuda(double a, ParitySpinor x, ParitySpinor y);
   void axQuda(double a, ParitySpinor x);
+  void xpyQuda(ParitySpinor x, ParitySpinor y);
   void xpayQuda(ParitySpinor x, double a, ParitySpinor y);
   void mxpyQuda(ParitySpinor x, ParitySpinor y);
   
