@@ -22,6 +22,24 @@
 #define QudaSumFloat3 float3
 #endif
 
+// Double precision input spinor field
+texture<int4, 1> spinorTexDouble;
+
+// Single precision input spinor field
+texture<float4, 1, cudaReadModeElementType> spinorTexSingle;
+
+// Half precision input spinor field
+texture<short4, 1, cudaReadModeNormalizedFloat> spinorTexHalf;
+texture<float, 1, cudaReadModeElementType> spinorTexNorm;
+
+#if (__CUDA_ARCH__ == 130)
+static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
+{
+    int4 v = tex1Dfetch(t,i);
+    return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
+}
+#endif
+
 inline void checkSpinor(ParitySpinor &a, ParitySpinor &b) {
   if (a.precision == QUDA_HALF_PRECISION || b.precision == QUDA_HALF_PRECISION) {
     printf("checkSpinor error, this kernel does not support QUDA_HALF_PRECISION\n");
@@ -40,12 +58,7 @@ inline void checkSpinor(ParitySpinor &a, ParitySpinor &b) {
 }
 
 // For kernels with precision conversion built in
-inline void checkHalfSpinor(ParitySpinor &a, ParitySpinor &b) {
-  if (a.precision == QUDA_HALF_PRECISION || b.precision == QUDA_HALF_PRECISION) {
-    printf("checkSpinor error, this kernel does not support QUDA_HALF_PRECISION\n");
-    exit(-1);
-  }
-
+inline void checkSpinorLength(ParitySpinor &a, ParitySpinor &b) {
   if (a.length != b.length) {
     printf("checkSpinor error, lengths do not match: %d %d\n", a.length, b.length);
     exit(-1);
@@ -98,22 +111,217 @@ __global__ void convertSDKernel(float4 *dst, double2 *src, int length) {
   }   
 }
 
-void copyQuda(ParitySpinor dst, ParitySpinor src) {
-  checkHalfSpinor(dst, src);
+__global__ void convertHSKernel(short4 *h, float *norm, int length) {
 
-  int convertLength = dst.length / 24;
+  int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+
+  while(i < length) {
+    float4 F0 = tex1Dfetch(spinorTexSingle, i + 0*length);
+    float4 F1 = tex1Dfetch(spinorTexSingle, i + 1*length);
+    float4 F2 = tex1Dfetch(spinorTexSingle, i + 2*length);
+    float4 F3 = tex1Dfetch(spinorTexSingle, i + 3*length);
+    float4 F4 = tex1Dfetch(spinorTexSingle, i + 4*length);
+    float4 F5 = tex1Dfetch(spinorTexSingle, i + 5*length);
+    
+    float c0 = fmaxf(fabsf(F0.x), fabsf(F0.y));
+    float c1 = fmaxf(fabsf(F0.z), fabsf(F0.w));
+    float c2 = fmaxf(fabsf(F1.x), fabsf(F1.y));
+    float c3 = fmaxf(fabsf(F1.z), fabsf(F1.w));
+    float c4 = fmaxf(fabsf(F2.x), fabsf(F2.y));    
+    float c5 = fmaxf(fabsf(F2.z), fabsf(F2.w));
+    float c6 = fmaxf(fabsf(F3.x), fabsf(F3.y));
+    float c7 = fmaxf(fabsf(F3.z), fabsf(F3.w));
+    float c8 = fmaxf(fabsf(F4.x), fabsf(F4.y));
+    float c9 = fmaxf(fabsf(F4.z), fabsf(F4.w));
+    float c10 = fmaxf(fabsf(F5.x), fabsf(F5.y));
+    float c11 = fmaxf(fabsf(F5.z), fabsf(F5.w));
+    
+    c0 = fmaxf(c0, c1);
+    c1 = fmaxf(c2, c3);
+    c2 = fmaxf(c4, c5);
+    c3 = fmaxf(c6, c7);
+    c4 = fmaxf(c8, c9);
+    c5 = fmaxf(c10, c11);
+    c0 = fmaxf(c0, c1);
+    c1 = fmaxf(c2, c3);
+    c2 = fmaxf(c4, c5);
+    c0 = fmaxf(c0, c1);
+    c0 = fmaxf(c0, c2); // c0 is now the maximum element
+    
+    norm[i] = c0;
+    
+    float C = __fdividef(MAX_SHORT, c0);
+    F0.x *= C; F0.y *= C; F0.z *= C; F0.w *= C; F1.x *= C; F1.y *= C; F1.z *= C; F1.w *= C;
+    F2.x *= C; F2.y *= C; F2.z *= C; F2.w *= C; F3.x *= C; F3.y *= C; F3.z *= C; F3.w *= C;
+    F4.x *= C; F4.y *= C; F4.z *= C; F4.w *= C; F5.x *= C; F5.y *= C; F5.z *= C; F5.w *= C;
+    
+    h[i+0*length] = make_short4((short)F0.x, (short)F0.y, (short)F0.z, (short)F0.w);
+    h[i+1*length] = make_short4((short)F1.x, (short)F1.y, (short)F1.z, (short)F1.w);
+    h[i+2*length] = make_short4((short)F2.x, (short)F2.y, (short)F2.z, (short)F2.w);
+    h[i+3*length] = make_short4((short)F3.x, (short)F3.y, (short)F3.z, (short)F3.w);
+    h[i+4*length] = make_short4((short)F4.x, (short)F4.y, (short)F4.z, (short)F4.w);
+    h[i+5*length] = make_short4((short)F5.x, (short)F5.y, (short)F5.z, (short)F5.w);
+    
+    i += gridSize;
+  }
+
+}
+
+__global__ void convertSHKernel(float4 *res, int length) {
+
+  int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+
+  while (i<length) {
+    float4 I0 = tex1Dfetch(spinorTexHalf, i + 0*length);
+    float4 I1 = tex1Dfetch(spinorTexHalf, i + 1*length);
+    float4 I2 = tex1Dfetch(spinorTexHalf, i + 2*length);
+    float4 I3 = tex1Dfetch(spinorTexHalf, i + 3*length);
+    float4 I4 = tex1Dfetch(spinorTexHalf, i + 4*length);
+    float4 I5 = tex1Dfetch(spinorTexHalf, i + 5*length);
+    float C = tex1Dfetch(spinorTexNorm, i);
+    I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C; I1.x *= C; I1.y *= C; I1.z *= C; I1.w *= C;
+    I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C; I3.x *= C; I3.y *= C; I3.z *= C; I3.w *= C;
+    I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C; I5.x *= C; I5.y *= C; I5.z *= C; I5.w *= C;
+    
+    res[0*length+i] = I0;
+    res[1*length+i] = I1;
+    res[2*length+i] = I2;
+    res[3*length+i] = I3;
+    res[4*length+i] = I4;
+    res[5*length+i] = I5;
+    i += gridSize;
+  }
+}
+
+__global__ void convertHDKernel(short4 *h, float *norm, int length) {
+
+  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
+  unsigned int gridSize = gridDim.x*blockDim.x;
+
+  while(i < length) {
+    double2 F0 = fetch_double2(spinorTexDouble, i + 0*length);
+    double2 F1 = fetch_double2(spinorTexDouble, i + 1*length);
+    double2 F2 = fetch_double2(spinorTexDouble, i + 2*length);
+    double2 F3 = fetch_double2(spinorTexDouble, i + 3*length);
+    double2 F4 = fetch_double2(spinorTexDouble, i + 4*length);
+    double2 F5 = fetch_double2(spinorTexDouble, i + 5*length);
+    double2 F6 = fetch_double2(spinorTexDouble, i + 6*length);
+    double2 F7 = fetch_double2(spinorTexDouble, i + 7*length);
+    double2 F8 = fetch_double2(spinorTexDouble, i + 8*length);
+    double2 F9 = fetch_double2(spinorTexDouble, i + 9*length);
+    double2 F10 = fetch_double2(spinorTexDouble, i + 10*length);
+    double2 F11 = fetch_double2(spinorTexDouble, i + 11*length);
+    
+    float c0 = fmaxf(fabsf(F0.x), fabsf(F0.y));
+    float c1 = fmaxf(fabsf(F1.x), fabsf(F1.y));
+    float c2 = fmaxf(fabsf(F2.x), fabsf(F2.y));    
+    float c3 = fmaxf(fabsf(F3.x), fabsf(F3.y));
+    float c4 = fmaxf(fabsf(F4.x), fabsf(F4.y));
+    float c5 = fmaxf(fabsf(F5.x), fabsf(F5.y));
+    float c6 = fmaxf(fabsf(F6.x), fabsf(F6.y));
+    float c7 = fmaxf(fabsf(F7.x), fabsf(F7.y));
+    float c8 = fmaxf(fabsf(F8.x), fabsf(F8.y));    
+    float c9 = fmaxf(fabsf(F9.x), fabsf(F9.y));
+    float c10 = fmaxf(fabsf(F10.x), fabsf(F10.y));
+    float c11 = fmaxf(fabsf(F11.x), fabsf(F11.y));
+    
+    c0 = fmaxf(c0, c1); c1 = fmaxf(c2, c3);  c2 = fmaxf(c4, c5); c3 = fmaxf(c6, c7);
+    c4 = fmaxf(c8, c9); c5 = fmaxf(c10, c11); c0 = fmaxf(c0, c1); c1 = fmaxf(c2, c3);
+    c2 = fmaxf(c4, c5); c0 = fmaxf(c0, c1); c0 = fmaxf(c0, c2); // c0 is now the maximum element
+    
+    norm[i] = c0;
+    
+    float C = __fdividef(MAX_SHORT, c0);
+    h[i+0*length] = make_short4((short)(C*(float)F0.x), (short)(C*(float)F0.y), 
+				(short)(C*(float)F1.x), (short)(C*(float)F1.y));
+    h[i+1*length] = make_short4((short)(C*(float)F2.x), (short)(C*(float)F2.y),
+				(short)(C*(float)F3.x), (short)(C*(float)F3.y));
+    h[i+2*length] = make_short4((short)(C*(float)F4.x), (short)(C*(float)F4.y), 
+				(short)(C*(float)F5.x), (short)(C*(float)F5.y));
+    h[i+3*length] = make_short4((short)(C*(float)F6.x), (short)(C*(float)F6.y), 
+				(short)(C*(float)F7.x), (short)(C*(float)F7.y));
+    h[i+4*length] = make_short4((short)(C*(float)F8.x), (short)(C*(float)F8.y),
+				(short)(C*(float)F9.x), (short)(C*(float)F9.y));
+    h[i+5*length] = make_short4((short)(C*(float)F10.x), (short)(C*(float)F10.y),
+				(short)(C*(float)F11.x), (short)(C*(float)F11.y));
+    i += gridSize;
+  }
+}
+
+__global__ void convertDHKernel(double2 *res, int length) {
+
+  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
+  unsigned int gridSize = gridDim.x*blockDim.x;
+
+  while(i < length) {
+    float4 I0 = tex1Dfetch(spinorTexHalf, i + 0*length);
+    float4 I1 = tex1Dfetch(spinorTexHalf, i + 1*length);
+    float4 I2 = tex1Dfetch(spinorTexHalf, i + 2*length);
+    float4 I3 = tex1Dfetch(spinorTexHalf, i + 3*length);
+    float4 I4 = tex1Dfetch(spinorTexHalf, i + 4*length);
+    float4 I5 = tex1Dfetch(spinorTexHalf, i + 5*length);
+    float C = tex1Dfetch(spinorTexNorm, i);
+    I0.x *= C; I0.y *= C; I0.z *= C; I0.w *= C;
+    I1.x *= C; I1.y *= C; I1.z *= C; I1.w *= C;
+    I2.x *= C; I2.y *= C; I2.z *= C; I2.w *= C;
+    I3.x *= C; I3.y *= C; I3.z *= C; I3.w *= C;
+    I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;
+    I5.x *= C; I5.y *= C; I5.z *= C; I5.w *= C;
+    
+    res[0*length+i] = make_double2(I0.x, I0.y);
+    res[1*length+i] = make_double2(I0.z, I0.w);
+    res[2*length+i] = make_double2(I1.x, I1.y);
+    res[3*length+i] = make_double2(I1.z, I1.w);
+    res[4*length+i] = make_double2(I2.x, I2.y);
+    res[5*length+i] = make_double2(I2.z, I2.w);
+    res[6*length+i] = make_double2(I3.x, I3.y);
+    res[7*length+i] = make_double2(I3.z, I3.w);
+    res[8*length+i] = make_double2(I4.x, I4.y);
+    res[9*length+i] = make_double2(I4.z, I4.w);
+    res[10*length+i] = make_double2(I0.x, I5.y);
+    res[11*length+i] = make_double2(I0.z, I5.w);
+    i += gridSize;
+  }
+
+}
+
+void copyQuda(ParitySpinor dst, ParitySpinor src) {
+  checkSpinorLength(dst, src);
+
+  int convertLength = dst.length / spinorSiteSize;
   int blocks = min(REDUCE_MAX_BLOCKS, max(convertLength/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
 
-  if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_SINGLE_PRECISION) 
+  if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
     convertDSKernel<<<dimGrid, dimBlock>>>((double2*)dst.spinor, (float4*)src.spinor, convertLength);
-  else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) 
+  } else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
     convertSDKernel<<<dimGrid, dimBlock>>>((float4*)dst.spinor, (double2*)src.spinor, convertLength);
-  else if (dst.precision == QUDA_DOUBLE_PRECISION) 
+  } else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
+    int spinor_bytes = dst.length*sizeof(short);
+    cudaBindTexture(0, spinorTexHalf, src.spinor, spinor_bytes); 
+    cudaBindTexture(0, spinorTexNorm, src.spinorNorm, spinor_bytes/12);
+    convertSHKernel<<<dimGrid, dimBlock>>>((float4*)dst.spinor, convertLength);
+  } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
+    int spinor_bytes = dst.length*sizeof(float);
+    cudaBindTexture(0, spinorTexSingle, src.spinor, spinor_bytes); 
+    convertHSKernel<<<dimGrid, dimBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, convertLength);
+  } else if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
+    int spinor_bytes = dst.length*sizeof(short);
+    cudaBindTexture(0, spinorTexHalf, src.spinor, spinor_bytes); 
+    cudaBindTexture(0, spinorTexNorm, src.spinorNorm, spinor_bytes/12);
+    convertDHKernel<<<dimGrid, dimBlock>>>((double2*)dst.spinor, convertLength);
+  } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
+    int spinor_bytes = dst.length*sizeof(double);
+    cudaBindTexture(0, spinorTexDouble, src.spinor, spinor_bytes); 
+    convertHDKernel<<<dimGrid, dimBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, convertLength);
+  } else if (dst.precision == QUDA_DOUBLE_PRECISION) {
     cudaMemcpy(dst.spinor, src.spinor, dst.length*sizeof(double), cudaMemcpyDeviceToDevice);
-  else 
+  } else {
     cudaMemcpy(dst.spinor, src.spinor, dst.length*sizeof(float), cudaMemcpyDeviceToDevice);
+  }
 }
 
 

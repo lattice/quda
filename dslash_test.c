@@ -30,8 +30,8 @@ int TRANSFER = 1; // include transfer time in the benchmark?
 void init() {
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
+  gaugeParam.cuda_prec = QUDA_SINGLE_PRECISION;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
-  gaugeParam.cuda_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
   gaugeParam.X = L1;
@@ -45,7 +45,7 @@ void init() {
   gauge_param = &gaugeParam;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.kappa = kappa;
@@ -88,12 +88,14 @@ void init() {
 
     if (test_type < 2) {
       loadParitySpinor(cudaSpinor.even, spinorEven, inv_param.cpu_prec, 
-		       inv_param.cuda_prec, inv_param.dirac_order);
+		       inv_param.dirac_order);
     } else {
       loadSpinorField(cudaSpinor, spinor, inv_param.cpu_prec, 
-		      inv_param.cuda_prec, inv_param.dirac_order);
+		      inv_param.dirac_order);
     }
   }
+
+
 }
 
 void end() {
@@ -189,10 +191,8 @@ void dslashTest() {
     double secs = dslashCUDA();
   
     if (!TRANSFER) {
-      if (test_type < 2) retrieveParitySpinor(spinorOdd, cudaSpinor.odd, inv_param.cpu_prec, 
-					      inv_param.cuda_prec, inv_param.dirac_order);
-      else retrieveSpinorField(spinorGPU, cudaSpinorOut, inv_param.cpu_prec, 
-			       inv_param.cuda_prec, inv_param.dirac_order);
+      if (test_type < 2) retrieveParitySpinor(spinorOdd, cudaSpinor.odd, inv_param.cpu_prec, inv_param.dirac_order);
+      else retrieveSpinorField(spinorGPU, cudaSpinorOut, inv_param.cpu_prec, inv_param.dirac_order);
     }
     // print timing information
     printf("%fms per loop\n", 1000*secs);

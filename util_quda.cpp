@@ -9,8 +9,6 @@
 #include <complex>
 
 using namespace std;
-typedef complex<float> Complex;
-typedef complex<double> Complex16;
 
 struct timeval startTime;
 

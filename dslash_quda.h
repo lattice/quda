@@ -29,9 +29,6 @@ extern "C" {
 
   extern FullClover cudaClover;
 
-  extern ParitySpinor hSpinor1;
-  extern ParitySpinor hSpinor2;
-
 // ---------- dslash_quda.cu ----------
 
   int dslashCudaSharedBytes();

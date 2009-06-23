@@ -19,15 +19,11 @@ extern "C" {
   void freeParityClover(ParityClover clover);
   void freeCloverField(FullClover clover);
 
-  void loadParitySpinor(ParitySpinor, void *spinor, Precision cpu_prec, Precision cuda_prec, 
-			DiracFieldOrder dirac_order);
-  void loadSpinorField(FullSpinor, void *spinor, Precision cpu_prec,  Precision cuda_prec, 
-		       DiracFieldOrder dirac_order);
+  void loadParitySpinor(ParitySpinor, void *spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
+  void loadSpinorField(FullSpinor, void *spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
   
-  void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec,  Precision cuda_prec, 
-			    DiracFieldOrder dirac_order);
-  void retrieveSpinorField(void *res, FullSpinor spinor, Precision cpu_prec,  Precision cuda_prec, 
-			   DiracFieldOrder dirac_order);
+  void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
+  void retrieveSpinorField(void *res, FullSpinor spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
   
   void spinorHalfPack(float *c, short *s0, float *f0);
   void spinorHalfUnpack(float *f0, float *c, short *s0);

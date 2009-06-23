@@ -130,12 +130,9 @@
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define SPINORTEX spinorTexHalf
-#if (DD_XPAY==0)
 #define DD_PARAM1 short4* g_out, float *c
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
-#else
-#define DD_PARAM1 float4* g_out
-#define WRITE_SPINOR WRITE_SPINOR_FLOAT4
+#if (DD_XPAY==1)
 #define ACCUMTEX accumTexHalf
 #define READ_ACCUM READ_ACCUM_HALF
 #endif

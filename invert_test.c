@@ -44,7 +44,7 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
