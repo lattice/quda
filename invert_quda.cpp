@@ -251,8 +251,8 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 
     // multiply the source to get the mass normalization
     if (param->mass_normalization == QUDA_MASS_NORMALIZATION) {
-      axQuda(2.0*kappa, b.even);
-      axQuda(2.0*kappa, b.odd);
+      axCuda(2.0*kappa, b.even);
+      axCuda(2.0*kappa, b.odd);
     }
 
     if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
@@ -268,15 +268,15 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     // multiply the source to get the mass normalization
     if (param->mass_normalization == QUDA_MASS_NORMALIZATION)
       if (param->solution_type == QUDA_MATPC_SOLUTION) 
-	axQuda(4.0*kappa*kappa, in);
+	axCuda(4.0*kappa*kappa, in);
       else
-	axQuda(16.0*pow(kappa,4), in);
+	axCuda(16.0*pow(kappa,4), in);
   }
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
-      copyQuda(out, in);
+      copyCuda(out, in);
       MatPCDagCuda(in, cudaGaugePrecise, out, kappa, tmp, param->matpc_type);
     }
     invertCgCuda(out, in, cudaGaugeSloppy, tmp, param);
@@ -284,7 +284,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
       invertBiCGstabCuda(out, in, cudaGaugeSloppy, cudaGaugePrecise, tmp, param, QUDA_DAG_YES);
-      copyQuda(in, out);
+      copyCuda(in, out);
     }
     invertBiCGstabCuda(out, in, cudaGaugeSloppy, cudaGaugePrecise, tmp, param, QUDA_DAG_NO);
     break;

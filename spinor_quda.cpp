@@ -704,7 +704,7 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
   } else {
     ParitySpinor tmp = allocateParitySpinor(ret.length/spinorSiteSize, QUDA_SINGLE_PRECISION);
     loadParitySpinor(tmp, spinor, cpu_prec, dirac_order);
-    copyQuda(ret, tmp);
+    copyCuda(ret, tmp);
     freeParitySpinor(tmp);
   }
 
@@ -745,8 +745,8 @@ void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec) {
   } else {
     FullSpinor tmp = allocateSpinorField(2*ret.even.length/spinorSiteSize, QUDA_SINGLE_PRECISION);
     loadFullSpinor(tmp, spinor, cpu_prec);
-    copyQuda(ret.even, tmp.even);
-    copyQuda(ret.odd, tmp.odd);
+    copyCuda(ret.even, tmp.even);
+    copyCuda(ret.odd, tmp.odd);
     freeSpinorField(tmp);
   }
 
@@ -799,7 +799,7 @@ void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, Di
     }
   } else {
     ParitySpinor tmp = allocateParitySpinor(spinor.length/spinorSiteSize, QUDA_SINGLE_PRECISION);
-    copyQuda(tmp, spinor);
+    copyCuda(tmp, spinor);
     retrieveParitySpinor(res, tmp, cpu_prec, dirac_order);
     freeParitySpinor(tmp);
   }
@@ -832,8 +832,8 @@ void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec) {
     packedSpinor2 = 0;
   } else {
     FullSpinor tmp = allocateSpinorField(2*spinor.even.length/spinorSiteSize, QUDA_SINGLE_PRECISION);
-    copyQuda(tmp.even, spinor.even);
-    copyQuda(tmp.odd, spinor.odd);
+    copyCuda(tmp.even, spinor.even);
+    copyCuda(tmp.odd, spinor.odd);
     retrieveFullSpinor(res, tmp, cpu_prec);
     freeSpinorField(tmp);
   }

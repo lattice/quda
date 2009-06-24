@@ -21,7 +21,7 @@ int main(int argc, char **argv)
   Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
 
   Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_8;
+  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
 
   Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   Gauge_param.X = L1;
@@ -36,15 +36,15 @@ int main(int argc, char **argv)
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param = &Gauge_param;
   
-  double mass = -0.97;
+  double mass = -0.96;
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
-  inv_param.tol = 1e-12;
+  inv_param.tol = 1e-7;
   inv_param.maxiter = 5000;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = 1e-2;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;

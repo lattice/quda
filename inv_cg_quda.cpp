@@ -15,7 +15,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
   ParitySpinor Ap = allocateParitySpinor(x.length/spinorSiteSize, x.precision);
 
   double b2 = 0.0;
-  b2 = normQuda(b);
+  b2 = normCuda(b);
 
   double r2 = b2;
   double r2_old;
@@ -26,12 +26,12 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
 
   if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
     r = allocateParitySpinor(x.length/spinorSiteSize, x.precision);
-    copyQuda(r, b);
+    copyCuda(r, b);
   } else {
     r = b;
   }
-  copyQuda(p, r);
-  zeroQuda(x);
+  copyCuda(p, r);
+  zeroCuda(x);
 
   int k=0;
   printf("%d iterations, r2 = %e\n", k, r2);
@@ -39,15 +39,15 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
   while (r2 > stop && k<perf->maxiter) {
     MatPCDagMatPCCuda(Ap, gauge, p, perf->kappa, tmp, perf->matpc_type);
 
-    pAp = reDotProductQuda(p, Ap);
+    pAp = reDotProductCuda(p, Ap);
 
     alpha = r2 / pAp;        
     r2_old = r2;
-    r2 = axpyNormQuda(-alpha, Ap, r);
+    r2 = axpyNormCuda(-alpha, Ap, r);
 
     beta = r2 / r2_old;
 
-    axpyZpbxQuda(alpha, p, x, r, beta);
+    axpyZpbxCuda(alpha, p, x, r, beta);
 
     k++;
     printf("%d iterations, r2 = %e\n", k, r2);
@@ -65,9 +65,9 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge,
 #if 0
   // Calculate the true residual
   MatPCDagMatPCCuda(Ap, gauge, x, perf->kappa, tmp, perf->matpc_type);
-  copyQuda(r, b);
-  mxpyQuda(Ap, r);
-  double true_res = normQuda(r);
+  copyCuda(r, b);
+  mxpyCuda(Ap, r);
+  double true_res = normCuda(r);
   
   printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
 	 k, r2, true_res / b2);

@@ -10,37 +10,37 @@ extern "C" {
 
   // ---------- blas_quda.cu ----------
   
-  void zeroQuda(ParitySpinor a);
-  void copyQuda(ParitySpinor dst, ParitySpinor src);
+  void zeroCuda(ParitySpinor a);
+  void copyCuda(ParitySpinor dst, ParitySpinor src);
   
-  double axpyNormQuda(double a, ParitySpinor x, ParitySpinor y);
-  double sumQuda(ParitySpinor b);
-  double normQuda(ParitySpinor b);
-  double reDotProductQuda(ParitySpinor a, ParitySpinor b);
-  double xmyNormQuda(ParitySpinor a, ParitySpinor b);
+  double axpyNormCuda(double a, ParitySpinor x, ParitySpinor y);
+  double sumCuda(ParitySpinor b);
+  double normCuda(ParitySpinor b);
+  double reDotProductCuda(ParitySpinor a, ParitySpinor b);
+  double xmyNormCuda(ParitySpinor a, ParitySpinor b);
   
-  void axpbyQuda(double a, ParitySpinor x, double b, ParitySpinor y);
-  void axpyQuda(double a, ParitySpinor x, ParitySpinor y);
-  void axQuda(double a, ParitySpinor x);
-  void xpyQuda(ParitySpinor x, ParitySpinor y);
-  void xpayQuda(ParitySpinor x, double a, ParitySpinor y);
-  void mxpyQuda(ParitySpinor x, ParitySpinor y);
+  void axpbyCuda(double a, ParitySpinor x, double b, ParitySpinor y);
+  void axpyCuda(double a, ParitySpinor x, ParitySpinor y);
+  void axCuda(double a, ParitySpinor x);
+  void xpyCuda(ParitySpinor x, ParitySpinor y);
+  void xpayCuda(ParitySpinor x, double a, ParitySpinor y);
+  void mxpyCuda(ParitySpinor x, ParitySpinor y);
   
-  void axpyZpbxQuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, double b);
+  void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, double b);
 
-  void caxpbyQuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y);
-  void caxpyQuda(double2 a, ParitySpinor x, ParitySpinor y);
-  void cxpaypbzQuda(ParitySpinor, double2 b, ParitySpinor y, double2 c, ParitySpinor z);
-  void caxpbypzYmbwQuda(double2, ParitySpinor, double2, ParitySpinor, ParitySpinor, ParitySpinor);
+  void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y);
+  void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y);
+  void cxpaypbzCuda(ParitySpinor, double2 b, ParitySpinor y, double2 c, ParitySpinor z);
+  void caxpbypzYmbwCuda(double2, ParitySpinor, double2, ParitySpinor, ParitySpinor, ParitySpinor);
 
-  cuDoubleComplex cDotProductQuda(ParitySpinor, ParitySpinor);
-  cuDoubleComplex xpaycDotzyQuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z);
+  cuDoubleComplex cDotProductCuda(ParitySpinor, ParitySpinor);
+  cuDoubleComplex xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z);
 
   void blasTest();
   void axpbyTest();
   
-  double3 cDotProductNormAQuda(ParitySpinor a, ParitySpinor b);
-  double3 cDotProductNormBQuda(ParitySpinor a, ParitySpinor b);
+  double3 cDotProductNormACuda(ParitySpinor a, ParitySpinor b);
+  double3 cDotProductNormBCuda(ParitySpinor a, ParitySpinor b);
   double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y, 
 					     ParitySpinor z, ParitySpinor w, ParitySpinor u);
   
