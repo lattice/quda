@@ -110,28 +110,24 @@ void packTest() {
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 
   stopwatchStart();
-  loadSpinorField(cudaFullSpinor, (void*)spinor, QUDA_SINGLE_PRECISION, 
-		  QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+  loadSpinorField(cudaFullSpinor, (void*)spinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
   double sSendTime = stopwatchReadSeconds();
   printf("Spinor send time = %e seconds\n", sSendTime);
 
   stopwatchStart();
 
   stopwatchStart();
-  loadParitySpinor(cudaFullSpinor.even, (void*)spinor, QUDA_SINGLE_PRECISION, 
-		   QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+  loadParitySpinor(cudaFullSpinor.even, (void*)spinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
   double pSendTime = stopwatchReadSeconds();
   printf("Parity spinor send time = %e seconds\n", pSendTime);
 
   stopwatchStart();
-  retrieveSpinorField(spinor, cudaFullSpinor, QUDA_SINGLE_PRECISION, 
-		      QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+  retrieveSpinorField(spinor, cudaFullSpinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime);
   
   stopwatchStart();
-  retrieveParitySpinor(spinor, cudaParitySpinor, QUDA_SINGLE_PRECISION, 
-		       QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+  retrieveParitySpinor(spinor, cudaParitySpinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
   double pRecTime = stopwatchReadSeconds();
   printf("Parity receive time = %e seconds\n", pRecTime);
 

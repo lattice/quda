@@ -8,7 +8,7 @@
 #include <gauge_quda.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 0;
+int test_type = 1;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -30,7 +30,7 @@ int TRANSFER = 0; // include transfer time in the benchmark?
 void init() {
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_HALF_PRECISION;
+  gaugeParam.cuda_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
@@ -45,7 +45,7 @@ void init() {
   gauge_param = &gaugeParam;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.kappa = kappa;
