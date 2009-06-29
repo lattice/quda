@@ -8,7 +8,7 @@
 #include <gauge_quda.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 2;
+int test_type = 1;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;

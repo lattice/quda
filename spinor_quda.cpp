@@ -104,28 +104,6 @@ void freeSpinorBuffer() {
   packedSpinor1 = NULL;
 }
 
-inline void packDouble2(double2* a, double *b) {
-  a->x = b[0]; a->y = b[1];
-}
-
-inline void unpackDouble2(double *a, double2 *b) {
-  a[0] = b->x; a[1] = b->y;
-}
-
-inline void packFloat4(float4* a, float *b) {
-  __m128 SSEtmp;
-  SSEtmp = _mm_loadu_ps((const float*)b);
-  _mm_storeu_ps((float*)a, SSEtmp);
-  //a->x = b[0]; a->y = b[1]; a->z = b[2]; a->w = b[3];
-}
-
-inline void unpackFloat4(float *a, float4 *b) {
-  __m128 SSEtmp;
-  SSEtmp = _mm_load_ps((const float*)b);
-  _mm_storeu_ps((float*)a, SSEtmp);
-  //a[0] = b->x; a[1] = b->y; a[2] = b->z; a[3] = b->w;
-}
-
 template <typename Float>
 inline void packSpinorVector(float4* a, Float *b) {
   Float K = 1.0 / 2.0;
@@ -134,11 +112,11 @@ inline void packSpinorVector(float4* a, Float *b) {
   a[0*Nh].y = K*(b[1*6+0*2+1]+b[3*6+0*2+1]);
   a[0*Nh].z = K*(b[1*6+1*2+0]+b[3*6+1*2+0]);
   a[0*Nh].w = K*(b[1*6+1*2+1]+b[3*6+1*2+1]);
-
+  
   a[1*Nh].x = K*(b[1*6+2*2+0]+b[3*6+2*2+0]);
   a[1*Nh].y = K*(b[1*6+2*2+1]+b[3*6+2*2+1]);
-  a[1*Nh].z = -K*(b[0*6+0*2+0]+b[2*6+0*2+0]);
-  a[1*Nh].w = -K*(b[0*6+0*2+1]+b[2*6+0*2+1]);
+  a[1*Nh].z = -K*(b[2*6+0*2+0]+b[0*6+0*2+0]);
+  a[1*Nh].w = -K*(b[2*6+0*2+1]+b[0*6+0*2+1]);
   
   a[2*Nh].x = -K*(b[0*6+1*2+0]+b[2*6+1*2+0]);
   a[2*Nh].y = -K*(b[0*6+1*2+1]+b[2*6+1*2+1]);
@@ -159,7 +137,6 @@ inline void packSpinorVector(float4* a, Float *b) {
   a[5*Nh].y = K*(b[2*6+1*2+1]-b[0*6+1*2+1]);
   a[5*Nh].z = K*(b[2*6+2*2+0]-b[0*6+2*2+0]);
   a[5*Nh].w = K*(b[2*6+2*2+1]-b[0*6+2*2+1]);
-    
 }
 
 template <typename Float>
