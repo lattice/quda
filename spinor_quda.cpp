@@ -126,226 +126,233 @@ inline void unpackFloat4(float *a, float4 *b) {
   //a[0] = b->x; a[1] = b->y; a[2] = b->z; a[3] = b->w;
 }
 
-void packFullSpinorDD(double2 *even, double2 *odd, double *spinor) {
-  double K = 1.0 / 2.0;
-  double b[24];
+template <typename Float>
+inline void packSpinorVector(float4* a, Float *b) {
+  Float K = 1.0 / 2.0;
 
-  for (int i=0; i<Nh; i++) {
+  a[0*Nh].x = K*(b[1*6+0*2+0]+b[3*6+0*2+0]);
+  a[0*Nh].y = K*(b[1*6+0*2+1]+b[3*6+0*2+1]);
+  a[0*Nh].z = K*(b[1*6+1*2+0]+b[3*6+1*2+0]);
+  a[0*Nh].w = K*(b[1*6+1*2+1]+b[3*6+1*2+1]);
 
-    int boundaryCrossings = i/L1h + i/(L2*L1h) + i/(L3*L2*L1h);
+  a[1*Nh].x = K*(b[1*6+2*2+0]+b[3*6+2*2+0]);
+  a[1*Nh].y = K*(b[1*6+2*2+1]+b[3*6+2*2+1]);
+  a[1*Nh].z = -K*(b[0*6+0*2+0]+b[2*6+0*2+0]);
+  a[1*Nh].w = -K*(b[0*6+0*2+1]+b[2*6+0*2+1]);
+  
+  a[2*Nh].x = -K*(b[0*6+1*2+0]+b[2*6+1*2+0]);
+  a[2*Nh].y = -K*(b[0*6+1*2+1]+b[2*6+1*2+1]);
+  a[2*Nh].z = -K*(b[0*6+2*2+0]+b[2*6+2*2+0]);
+  a[2*Nh].w = -K*(b[0*6+2*2+1]+b[2*6+2*2+1]);
 
-    { // even sites
-      int k = 2*i + boundaryCrossings%2; 
-      double *a = spinor + k*24;
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
-	  b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
-	  b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
-	  b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
-	}
-      }
-      for (int j = 0; j < 12; j++) packDouble2(even+j*Nh+i, b+j*2);
-    }
+  a[3*Nh].x = K*(b[1*6+0*2+0]-b[3*6+0*2+0]);
+  a[3*Nh].y = K*(b[1*6+0*2+1]-b[3*6+0*2+1]);
+  a[3*Nh].z = K*(b[1*6+1*2+0]-b[3*6+1*2+0]);
+  a[3*Nh].w = K*(b[1*6+1*2+1]-b[3*6+1*2+1]);
+
+  a[4*Nh].x = K*(b[1*6+2*2+0]-b[3*6+2*2+0]);
+  a[4*Nh].y = K*(b[1*6+2*2+1]-b[3*6+2*2+1]);
+  a[4*Nh].z = K*(b[2*6+0*2+0]-b[0*6+0*2+0]);
+  a[4*Nh].w = K*(b[2*6+0*2+1]-b[0*6+0*2+1]);
+
+  a[5*Nh].x = K*(b[2*6+1*2+0]-b[0*6+1*2+0]);
+  a[5*Nh].y = K*(b[2*6+1*2+1]-b[0*6+1*2+1]);
+  a[5*Nh].z = K*(b[2*6+2*2+0]-b[0*6+2*2+0]);
+  a[5*Nh].w = K*(b[2*6+2*2+1]-b[0*6+2*2+1]);
     
-    { // odd sites
-      int k = 2*i + (boundaryCrossings+1)%2;
-      double *a = spinor + k*24;
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
-	  b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
-	  b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
-	  b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
-	}
-      }
-      for (int j=0; j<12; j++) packDouble2(odd+j*Nh+i, b+j*2);
-    }
+}
+
+template <typename Float>
+inline void packQDPSpinorVector(float4* a, Float *b) {
+  Float K = 1.0 / 2.0;
+
+  a[0*Nh].x = K*(b[(0*4+1)*2+0]+b[(0*4+3)*2+0]);
+  a[0*Nh].y = K*(b[(0*4+1)*2+1]+b[(0*4+3)*2+1]);
+  a[0*Nh].z = K*(b[(1*4+1)*2+0]+b[(1*4+3)*2+0]);
+  a[0*Nh].w = K*(b[(1*4+1)*2+1]+b[(1*4+3)*2+1]);
+
+  a[1*Nh].x = K*(b[(2*4+1)*2+0]+b[(2*4+3)*2+0]);
+  a[1*Nh].y = K*(b[(2*4+1)*2+1]+b[(2*4+3)*2+1]);
+  a[1*Nh].z = -K*(b[(0*4+0)*2+0]+b[(0*4+2)*2+0]);
+  a[1*Nh].w = -K*(b[(0*4+0)*2+1]+b[(0*4+2)*2+1]);
+
+  a[2*Nh].x = -K*(b[(1*4+0)*2+0]+b[(1*4+2)*2+0]);
+  a[2*Nh].y = -K*(b[(1*4+0)*2+1]+b[(1*4+2)*2+1]);
+  a[2*Nh].z = -K*(b[(2*4+0)*2+0]+b[(2*4+2)*2+0]);
+  a[2*Nh].w = -K*(b[(2*4+0)*2+1]+b[(2*4+2)*2+1]);
+
+  a[3*Nh].x = K*(b[(0*4+1)*2+0]+b[(0*4+3)*2+0]);
+  a[3*Nh].y = K*(b[(0*4+1)*2+1]+b[(0*4+3)*2+1]);
+  a[3*Nh].z = K*(b[(1*4+1)*2+0]+b[(1*4+3)*2+0]);
+  a[3*Nh].w = K*(b[(1*4+1)*2+1]+b[(1*4+3)*2+1]);
+
+  a[4*Nh].x = K*(b[(2*4+1)*2+0]+b[(2*4+3)*2+0]);
+  a[4*Nh].y = K*(b[(2*4+1)*2+1]+b[(2*4+3)*2+1]);
+  a[4*Nh].z = K*(b[(0*4+2)*2+0]+b[(0*4+0)*2+0]);
+  a[4*Nh].w = K*(b[(0*4+2)*2+1]+b[(0*4+0)*2+1]);
+
+  a[5*Nh].x = K*(b[(1*4+2)*2+0]+b[(1*4+0)*2+0]);
+  a[5*Nh].y = K*(b[(1*4+2)*2+1]+b[(1*4+0)*2+1]);
+  a[5*Nh].z = K*(b[(2*4+2)*2+0]+b[(2*4+0)*2+0]);
+  a[5*Nh].w = K*(b[(2*4+2)*2+1]+b[(2*4+0)*2+1]);
+}
+
+template <typename Float>
+inline void packSpinorVector(double2* a, Float *b) {
+  Float K = 1.0 / 2.0;
+
+  for (int c=0; c<3; c++) {
+    a[c*Nh].x = K*(b[1*6+c*2+0]+b[3*6+c*2+0]);
+    a[c*Nh].y = K*(b[1*6+c*2+1]+b[3*6+c*2+1]);
+
+    a[(3+c)*Nh].x = -K*(b[0*6+c*2+0]+b[2*6+c*2+0]);
+    a[(3+c)*Nh].y = -K*(b[0*6+c*2+1]+b[2*6+c*2+1]);
+
+    a[(6+c)*Nh].x = K*(b[1*6+c*2+0]-b[3*6+c*2+0]);
+    a[(6+c)*Nh].y = K*(b[1*6+c*2+1]-b[3*6+c*2+1]);
+
+    a[(9+c)*Nh].x = K*(b[2*6+c*2+0]-b[0*6+c*2+0]);
+    a[(9+c)*Nh].y = K*(b[2*6+c*2+1]-b[0*6+c*2+1]);
   }
 
 }
 
 template <typename Float>
-void packFullSpinorSF(float4 *even, float4 *odd, Float *spinor) {
+inline void packQDPSpinorVector(double2* a, Float *b) {
   Float K = 1.0 / 2.0;
-  float b[24];
 
-  for (int i=0; i<Nh; i++) {
+  for (int c=0; c<3; c++) {
+    a[c*Nh].x = K*(b[(c*4+1)*2+0]+b[(c*4+3)*2+0]);
+    a[c*Nh].y = K*(b[(c*4+1)*2+1]+b[(c*4+3)*2+1]);
 
-    int boundaryCrossings = i/L1h + i/(L2*L1h) + i/(L3*L2*L1h);
+    a[(3+c)*Nh].x = -K*(b[(c*4+0)*2+0]+b[(c*4+2)*2+0]);
+    a[(3+c)*Nh].y = -K*(b[(c*4+0)*2+1]+b[(c*4+2)*2+1]);
 
-    { // even sites
-      int k = 2*i + boundaryCrossings%2; 
-      Float *a = spinor + k*24;
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
-	  b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
-	  b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
-	  b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
-	}
-      }
-      for (int j=0; j<6; j++) packFloat4(even+j*Nh+i, b+j*4);
-    }
+    a[(6+c)*Nh].x = K*(b[(c*4+1)*2+0]-b[(c*4+3)*2+0]);
+    a[(6+c)*Nh].y = K*(b[(c*4+1)*2+1]-b[(c*4+3)*2+1]);
+
+    a[(9+c)*Nh].x = K*(b[(c*4+2)*2+0]-b[(c*4+0)*2+0]);
+    a[(9+c)*Nh].y = K*(b[(c*4+2)*2+1]-b[(c*4+0)*2+1]);
+  }
+
+}
+
+template <typename Float>
+inline void unpackSpinorVector(Float *a, float4 *b) {
+  Float K = 1.0;
+
+  a[0*6+0*2+0] = -K*(b[Nh].z+b[4*Nh].z);
+  a[0*6+0*2+1] = -K*(b[Nh].w+b[4*Nh].w);
+  a[0*6+1*2+0] = -K*(b[2*Nh].x+b[5*Nh].x);
+  a[0*6+1*2+1] = -K*(b[2*Nh].y+b[5*Nh].y);
+  a[0*6+2*2+0] = -K*(b[2*Nh].z+b[5*Nh].z);
+  a[0*6+2*2+1] = -K*(b[2*Nh].w+b[5*Nh].w);
+  
+  a[1*6+0*2+0] = K*(b[0].x+b[3*Nh].x);
+  a[1*6+0*2+1] = K*(b[0].y+b[3*Nh].y);
+  a[1*6+1*2+0] = K*(b[0].z+b[3*Nh].z);
+  a[1*6+1*2+1] = K*(b[0].w+b[3*Nh].w);  
+  a[1*6+2*2+0] = K*(b[Nh].x+b[4*Nh].x);
+  a[1*6+2*2+1] = K*(b[Nh].y+b[4*Nh].y);
+  
+  a[2*6+0*2+0] = -K*(b[Nh].z-b[4*Nh].z);
+  a[2*6+0*2+1] = -K*(b[Nh].w-b[4*Nh].w);
+  a[2*6+1*2+0] = -K*(b[2*Nh].x-b[5*Nh].x);
+  a[2*6+1*2+1] = -K*(b[2*Nh].y-b[5*Nh].y);
+  a[2*6+2*2+0] = -K*(b[2*Nh].z-b[5*Nh].z);
+  a[2*6+2*2+1] = -K*(b[2*Nh].w-b[5*Nh].w);
+  
+  a[3*6+0*2+0] = -K*(b[3*Nh].x-b[0].x);
+  a[3*6+0*2+1] = -K*(b[3*Nh].y-b[0].y);
+  a[3*6+1*2+0] = -K*(b[3*Nh].z-b[0].z);
+  a[3*6+1*2+1] = -K*(b[3*Nh].w-b[0].w);
+  a[3*6+2*2+0] = -K*(b[4*Nh].x-b[Nh].x);
+  a[3*6+2*2+1] = -K*(b[4*Nh].y-b[Nh].y);
+}
+
+template <typename Float>
+inline void unpackQDPSpinorVector(Float *a, float4 *b) {
+  Float K = 1.0;
+
+  a[(0*4+0)*2+0] = -K*(b[Nh].z+b[4*Nh].z);
+  a[(0*4+0)*2+1] = -K*(b[Nh].w+b[4*Nh].w);
+  a[(1*4+0)*2+0] = -K*(b[2*Nh].x+b[5*Nh].x);
+  a[(1*4+0)*2+1] = -K*(b[2*Nh].y+b[5*Nh].y);
+  a[(2*4+0)*2+0] = -K*(b[2*Nh].z+b[5*Nh].z);
+  a[(2*4+0)*2+1] = -K*(b[2*Nh].w+b[5*Nh].w);
+  
+  a[(0*4+1)*2+0] = K*(b[0].x+b[3*Nh].x);
+  a[(0*4+1)*2+1] = K*(b[0].y+b[3*Nh].y);
+  a[(1*4+1)*2+0] = K*(b[0].z+b[3*Nh].z);
+  a[(1*4+1)*2+1] = K*(b[0].w+b[3*Nh].w);  
+  a[(2*4+1)*2+0] = K*(b[Nh].x+b[4*Nh].x);
+  a[(2*4+1)*2+1] = K*(b[Nh].y+b[4*Nh].y);
+  
+  a[(0*4+2)*2+0] = -K*(b[Nh].z-b[4*Nh].z);
+  a[(0*4+2)*2+1] = -K*(b[Nh].w-b[4*Nh].w);
+  a[(1*4+2)*2+0] = -K*(b[2*Nh].x-b[5*Nh].x);
+  a[(1*4+2)*2+1] = -K*(b[2*Nh].y-b[5*Nh].y);
+  a[(2*4+2)*2+0] = -K*(b[2*Nh].z-b[5*Nh].z);
+  a[(2*4+2)*2+1] = -K*(b[2*Nh].w-b[5*Nh].w);
+  
+  a[(0*4+3)*2+0] = -K*(b[3*Nh].x-b[0].x);
+  a[(0*4+3)*2+1] = -K*(b[3*Nh].y-b[0].y);
+  a[(1*4+3)*2+0] = -K*(b[3*Nh].z-b[0].z);
+  a[(1*4+3)*2+1] = -K*(b[3*Nh].w-b[0].w);
+  a[(2*4+3)*2+0] = -K*(b[4*Nh].x-b[Nh].x);
+  a[(2*4+3)*2+1] = -K*(b[4*Nh].y-b[Nh].y);
+}
+
+template <typename Float>
+inline void unpackSpinorVector(Float *a, double2 *b) {
+  Float K = 1.0;
+
+  for (int c=0; c<3; c++) {
+    a[0*6+c*2+0] = -K*(b[(3+c)*Nh].x+b[(9+c)*Nh].x);
+    a[0*6+c*2+1] = -K*(b[(3+c)*Nh].y+b[(9+c)*Nh].y);
+
+    a[1*6+c*2+0] = K*(b[c*Nh].x+b[(6+c)*Nh].x);
+    a[1*6+c*2+1] = K*(b[c*Nh].y+b[(6+c)*Nh].y);
+
+    a[2*6+c*2+0] = -K*(b[(3+c)*Nh].x-b[(9+c)*Nh].x);
+    a[2*6+c*2+1] = -K*(b[(3+c)*Nh].y-b[(9+c)*Nh].y);
     
-    { // odd sites
-      int k = 2*i + (boundaryCrossings+1)%2;
-      Float *a = spinor + k*24;
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
-	  b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
-	  b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
-	  b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
-	}
-      } 
-      for (int j=0; j<6; j++) packFloat4(odd+j*Nh+i, b+j*4);
-    }
+    a[3*6+c*2+0] = -K*(b[(6+c)*Nh].x-b[c*Nh].x);
+    a[3*6+c*2+1] = -K*(b[(6+c)*Nh].y-b[c*Nh].y);
+  }
+
+}
+
+template <typename Float>
+inline void unpackQDPSpinorVector(Float *a, double2 *b) {
+  Float K = 1.0;
+
+  for (int c=0; c<3; c++) {
+    a[(c*4+0)*2+0] = -K*(b[(3+c)*Nh].x+b[(9+c)*Nh].x);
+    a[(c*4+0)*2+1] = -K*(b[(3+c)*Nh].y+b[(9+c)*Nh].y);
+
+    a[(c*4+1)*2+0] = K*(b[c*Nh].x+b[(6+c)*Nh].x);
+    a[(c*4+1)*2+1] = K*(b[c*Nh].y+b[(6+c)*Nh].y);
+
+    a[(c*4+2)*2+0] = -K*(b[(3+c)*Nh].x-b[(9+c)*Nh].x);
+    a[(c*4+2)*2+1] = -K*(b[(3+c)*Nh].y-b[(9+c)*Nh].y);
+    
+    a[(c*4+3)*2+0] = -K*(b[(6+c)*Nh].x-b[c*Nh].x);
+    a[(c*4+3)*2+1] = -K*(b[(6+c)*Nh].y-b[c*Nh].y);
   }
 
 }
 
 // Standard spinor packing, colour inside spin
-void packParitySpinorDD(double2 *res, double *spinor) {
-  double K = 1.0 / (2.0);
-  double b[24];
-
+template <typename Float, typename FloatN>
+void packParitySpinor(FloatN *res, Float *spinor) {
   for (int i = 0; i < Nh; i++) {
-    double *a = spinor+i*24;
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
-	b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
-	b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
-	b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
-      }
-    }
-
-    for (int j=0; j<12; j++) packDouble2(res+j*Nh+i, b+j*2);
+    packSpinorVector(res+i, spinor+24*i);
   }
 }
 
-void packParitySpinorSD(float4 *res, double *spinor) {
-  double K = 1.0 / (2.0);
-  float b[24];
-
-  for (int i = 0; i < Nh; i++) {
-    double *a = spinor+i*24;
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	b[0*6+cr] = K*(a[1*6+cr]+a[3*6+cr]);
-	b[1*6+cr] = -K*(a[0*6+cr]+a[2*6+cr]);
-	b[2*6+cr] = K*(a[1*6+cr]-a[3*6+cr]);
-	b[3*6+cr] = K*(a[2*6+cr]-a[0*6+cr]);
-      }
-    }
-
-    for (int j=0; j<6; j++) packFloat4(res+j*Nh+i, b+j*4);
-  }
-}
-
-// single precision version of the above
-void packParitySpinorSS(float4 *res, float *spinor) {
-  float K = 1.0 / (2.0);
-  float b[24];
-
-  for (int i = 0; i < Nh; i++) {
-    float *a = spinor+i*24;
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	b[cr] = K*(a[6+cr]+a[18+cr]);
-	b[6+cr] = -K*(a[cr]+a[12+cr]);
-	b[12+cr] = K*(a[6+cr]-a[18+cr]);
-	b[18+cr] = K*(a[12+cr]-a[cr]);
-      }
-    }
-
-    for (int j = 0; j < 6; j++) packFloat4(res+j*Nh+i, b+j*4);
-  }
-}
-
-// QDP spinor packing, spin inside colour
-void packQDPParitySpinorDD(double2 *res, double *spinor) {
-  double K = 1.0 / 2.0;
-  
-  double b[24];
-  for (int i = 0; i < Nh; i++) {
-    double *a = spinor+i*24;
-
-    // reorder and change basis
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	b[0*6+cr] = K*(a[(c*4+1)*2+r]+a[(c*4+3)*2+r]);
-	b[1*6+cr] = -K*(a[(c*4+0)*2+r]+a[(c*4+2)*2+r]);
-	b[2*6+cr] = K*(a[(c*4+1)*2+r]-a[(c*4+3)*2+r]);
-	b[3*6+cr] = K*(a[(c*4+2)*2+r]-a[(c*4+0)*2+r]);
-      }
-    }
-
-    for (int j = 0; j < 6; j++) packDouble2(res+j*Nh+i, b+j*2);
-  }
-}
-
-// QDP spinor packing, spin inside colour
-void packQDPParitySpinorSD(float4 *res, double *spinor) {
-  double K = 1.0 / 2.0;
-  
-  float b[24];
-  for (int i = 0; i < Nh; i++) {
-    double *a = spinor+i*24;
-
-    // reorder and change basis
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	b[0*6+cr] = K*(a[(c*4+1)*2+r]+a[(c*4+3)*2+r]);
-	b[1*6+cr] = -K*(a[(c*4+0)*2+r]+a[(c*4+2)*2+r]);
-	b[2*6+cr] = K*(a[(c*4+1)*2+r]-a[(c*4+3)*2+r]);
-	b[3*6+cr] = K*(a[(c*4+2)*2+r]-a[(c*4+0)*2+r]);
-      }
-    }
-
-    for (int j = 0; j < 6; j++) packFloat4(res+j*Nh+i, b+j*4);
-  }
-}
-
-// Single precision version of the above
-void packQDPParitySpinorSS(float4 *res, float *spinor) {
-  float K = 1.0 / 2.0;
-  
-  float b[24];
-  for (int i = 0; i < Nh; i++) {
-    float *a = spinor+i*24;
-
-    // reorder and change basis
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	b[0*6+cr] = K*(a[(c*4+1)*2+r]+a[(c*4+3)*2+r]);
-	b[1*6+cr] = -K*(a[(c*4+0)*2+r]+a[(c*4+2)*2+r]);
-	b[2*6+cr] = K*(a[(c*4+1)*2+r]-a[(c*4+3)*2+r]);
-	b[3*6+cr] = K*(a[(c*4+2)*2+r]-a[(c*4+0)*2+r]);
-      }
-    }
-
-    for (int j = 0; j < 6; j++) packFloat4(res+j*Nh+i, b+j*4);
-  }
-}
-
-void unpackFullSpinorDD(double *res, double2 *even, double2 *odd) {
-  double K = 1.0;
-  double b[24];
+template <typename Float, typename FloatN>
+void packFullSpinor(FloatN *even, FloatN *odd, Float *spinor) {
 
   for (int i=0; i<Nh; i++) {
 
@@ -353,47 +360,19 @@ void unpackFullSpinorDD(double *res, double2 *even, double2 *odd) {
 
     { // even sites
       int k = 2*i + boundaryCrossings%2; 
-      double *a = res + k*24;
-
-      for (int j = 0; j < 12; j++) unpackDouble2(b+j*2, even+j*Nh+i);
-
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
-	  a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
-	  a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
-	  a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
-	}
-      }
-      
+      packSpinorVector(even+i, spinor+24*k);
     }
     
     { // odd sites
       int k = 2*i + (boundaryCrossings+1)%2;
-      double *a = res + k*24;
-
-      for (int j = 0; j < 12; j++) unpackDouble2(b+j*2, odd+j*Nh+i);
-
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
-	  a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
-	  a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
-	  a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
-	}
-      }
-      
+      packSpinorVector(odd+i, spinor+24*k);
     }
   }
 
 }
 
-template <typename Float>
-void unpackFullSpinorFS(Float *res, float4 *even, float4 *odd) {
-  Float K = 1.0;
-  float b[24];
+template <typename Float, typename FloatN>
+void unpackFullSpinor(Float *res, FloatN *even, FloatN *odd) {
 
   for (int i=0; i<Nh; i++) {
 
@@ -401,178 +380,42 @@ void unpackFullSpinorFS(Float *res, float4 *even, float4 *odd) {
 
     { // even sites
       int k = 2*i + boundaryCrossings%2; 
-      Float *a = res + k*24;
-
-      for (int j = 0; j < 6; j++) unpackFloat4(b+j*4, even+j*Nh+i);
-
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
-	  a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
-	  a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
-	  a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
-	}
-      }
-      
+      unpackSpinorVector(res+24*k, even+i);
     }
     
     { // odd sites
       int k = 2*i + (boundaryCrossings+1)%2;
-      Float *a = res + k*24;
-
-      for (int j = 0; j < 6; j++) unpackFloat4(b+j*4, odd+j*Nh+i);
-
-      for (int c=0; c<3; c++) {
-	for (int r=0; r<2; r++) {
-	  int cr = c*2+r;
-	  a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
-	  a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
-	  a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
-	  a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
-	}
-      }
-      
+      unpackSpinorVector(res+24*k, odd+i);
     }
   }
 
 }
 
-void unpackParitySpinorDD(double *res, double2 *spinorPacked) {
-  double K = 1.0;///sqrt(2.0);
-  double b[24];
+
+template <typename Float, typename FloatN>
+void unpackParitySpinor(Float *res, FloatN *spinorPacked) {
 
   for (int i = 0; i < Nh; i++) {
-    double *a = res+i*24;
-
-    for (int j = 0; j < 12; j++) unpackDouble2(b+j*2, spinorPacked+j*Nh+i);
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
-	a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
-	a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
-	a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
-      }
-    }
-
+    unpackSpinorVector(res+i*24, spinorPacked+i);
   }
 
 }
 
-void unpackParitySpinorDS(double *res, float4 *spinorPacked) {
-  float K = 1.0;///sqrt(2.0);
-  float b[24];
-
+// QDP spinor packing, spin inside colour
+template <typename Float, typename FloatN>
+void packQDPParitySpinor(FloatN *res, Float *spinor) {
   for (int i = 0; i < Nh; i++) {
-    double *a = res+i*24;
-
-    for (int j = 0; j < 6; j++) unpackFloat4(b+j*4, spinorPacked+j*Nh+i);
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
-	a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
-	a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
-	a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
-      }
-    }
-
+    packQDPSpinorVector(res+i, spinor+i*24);
   }
-
 }
 
-void unpackParitySpinorSS(float *res, float4 *spinorPacked) {
-  float K = 1.0;///sqrt(2.0);
-  float b[24];
-
+// QDP spinor packing, spin inside colour
+template <typename Float, typename FloatN>
+void unpackQDPParitySpinor(Float *res, FloatN *spinor) {
   for (int i = 0; i < Nh; i++) {
-    float *a = res+i*24;
-
-    for (int j = 0; j < 6; j++) unpackFloat4(b+j*4, spinorPacked+j*Nh+i);
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	a[0*6+cr] = -K*(b[1*6+cr]+b[3*6+cr]);
-	a[1*6+cr] = K*(b[0*6+cr]+b[2*6+cr]);
-	a[2*6+cr] = -K*(b[1*6+cr]-b[3*6+cr]);
-	a[3*6+cr] = -K*(b[2*6+cr]-b[0*6+cr]);
-      }
-    }
-
-  }
-
-}
-
-void unpackQDPParitySpinorDD(double *res, double2 *spinorPacked) {
-  double K = 1.0;///sqrt(2.0);
-  double b[24];
-
-  for (int i = 0; i < Nh; i++) {
-    double *a = res+i*24;
-
-    for (int j = 0; j < 12; j++) unpackDouble2(b+j*2, spinorPacked+j*Nh+i);
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	a[(c*4+0)*2+r] = -K*(b[1*6+cr]+b[3*6+cr]);
-	a[(c*4+1)*2+r] = K*(b[0*6+cr]+b[2*6+cr]);
-	a[(c*4+2)*2+r] = -K*(b[1*6+cr]-b[3*6+cr]);
-	a[(c*4+3)*2+r] = -K*(b[2*6+cr]-b[0*6+cr]);
-      }
-    }
-  }
-
-}
-
-void unpackQDPParitySpinorDS(double *res, float4 *spinorPacked) {
-  float K = 1.0;///sqrt(2.0);
-  float b[24];
-
-  for (int i = 0; i < Nh; i++) {
-    double *a = res+i*24;
-
-    for (int j = 0; j < 6; j++) unpackFloat4(b+j*4, spinorPacked+j*Nh+i);
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	a[(c*4+0)*2+r] = -K*(b[1*6+cr]+b[3*6+cr]);
-	a[(c*4+1)*2+r] = K*(b[0*6+cr]+b[2*6+cr]);
-	a[(c*4+2)*2+r] = -K*(b[1*6+cr]-b[3*6+cr]);
-	a[(c*4+3)*2+r] = -K*(b[2*6+cr]-b[0*6+cr]);
-      }
-    }
-  }
-
-}
-
-void unpackQDPParitySpinorSS(float *res, float4 *spinorPacked) {
-  float K = 1.0;///sqrt(2.0);
-  float b[24];
-
-  for (int i = 0; i < Nh; i++) {
-    float *a = res+i*24;
-
-    for (int j = 0; j < 6; j++) unpackFloat4(b+j*4, spinorPacked+j*Nh+i);
-
-    for (int c=0; c<3; c++) {
-      for (int r=0; r<2; r++) {
-	int cr = c*2+r;
-	a[(c*4+0)*2+r] = -K*(b[1*6+cr]+b[3*6+cr]);
-	a[(c*4+1)*2+r] = K*(b[0*6+cr]+b[2*6+cr]);
-	a[(c*4+2)*2+r] = -K*(b[1*6+cr]-b[3*6+cr]);
-	a[(c*4+3)*2+r] = -K*(b[2*6+cr]-b[0*6+cr]);
-      }
-    }
-
+    unpackQDPSpinorVector(res+i*24, spinor+i);
   }
 }
-
 
 void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec, 
 		      DiracFieldOrder dirac_order) {
@@ -595,17 +438,17 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
     
     if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (ret.precision == QUDA_DOUBLE_PRECISION) {
-	packParitySpinorDD((double2*)packedSpinor1, (double*)spinor);
+	packParitySpinor((double2*)packedSpinor1, (double*)spinor);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) packParitySpinorSD((float4*)packedSpinor1, (double*)spinor);
-	else packParitySpinorSS((float4*)packedSpinor1, (float*)spinor);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) packParitySpinor((float4*)packedSpinor1, (double*)spinor);
+	else packParitySpinor((float4*)packedSpinor1, (float*)spinor);
       }
     } else if (dirac_order == QUDA_QDP_DIRAC_ORDER) {
       if (ret.precision == QUDA_DOUBLE_PRECISION) {
-	packQDPParitySpinorDD((double2*)packedSpinor1, (double*)spinor);
+	packQDPParitySpinor((double2*)packedSpinor1, (double*)spinor);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) packQDPParitySpinorSD((float4*)packedSpinor1, (double*)spinor);
-	else packQDPParitySpinorSS((float4*)packedSpinor1, (float*)spinor);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) packQDPParitySpinor((float4*)packedSpinor1, (double*)spinor);
+	else packQDPParitySpinor((float4*)packedSpinor1, (float*)spinor);
       }
     }
     cudaMemcpy(ret.spinor, packedSpinor1, spinor_bytes, cudaMemcpyHostToDevice);
@@ -634,11 +477,12 @@ void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec) {
 #endif
     
     if (ret.even.precision == QUDA_DOUBLE_PRECISION) {
-      packFullSpinorDD((double2*)packedSpinor1, (double2*)packedSpinor2, (double*)spinor);
+      packFullSpinor((double2*)packedSpinor1, (double2*)packedSpinor2, (double*)spinor);
     } else {
       if (cpu_prec == QUDA_DOUBLE_PRECISION) 
-	packFullSpinorSF((float4*)packedSpinor1, (float4*)packedSpinor2, (double*)spinor);
-      else packFullSpinorSF((float4*)packedSpinor1, (float4*)packedSpinor2, (float*)spinor);
+	packFullSpinor((float4*)packedSpinor1, (float4*)packedSpinor2, (double*)spinor);
+      else 
+	packFullSpinor((float4*)packedSpinor1, (float4*)packedSpinor2, (float*)spinor);
     }
     
     cudaMemcpy(ret.even.spinor, packedSpinor1, spinor_bytes, cudaMemcpyHostToDevice);
@@ -692,17 +536,17 @@ void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, Di
     cudaMemcpy(packedSpinor1, spinor.spinor, spinor_bytes, cudaMemcpyDeviceToHost);
     if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (spinor.precision == QUDA_DOUBLE_PRECISION) {
-	unpackParitySpinorDD((double*)res, (double2*)packedSpinor1);
+	unpackParitySpinor((double*)res, (double2*)packedSpinor1);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackParitySpinorDS((double*)res, (float4*)packedSpinor1);
-	else unpackParitySpinorSS((float*)res, (float4*)packedSpinor1);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackParitySpinor((double*)res, (float4*)packedSpinor1);
+	else unpackParitySpinor((float*)res, (float4*)packedSpinor1);
       }
     } else if (dirac_order == QUDA_QDP_DIRAC_ORDER) {
       if (spinor.precision == QUDA_DOUBLE_PRECISION) {
-	unpackQDPParitySpinorDD((double*)res, (double2*)packedSpinor1);
+	unpackQDPParitySpinor((double*)res, (double2*)packedSpinor1);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackQDPParitySpinorDS((double*)res, (float4*)packedSpinor1);
-	else unpackQDPParitySpinorSS((float*)res, (float4*)packedSpinor1);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackQDPParitySpinor((double*)res, (float4*)packedSpinor1);
+	else unpackQDPParitySpinor((float*)res, (float4*)packedSpinor1);
       }
     }
   } else {
@@ -726,11 +570,11 @@ void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec) {
     cudaMemcpy(packedSpinor1, spinor.even.spinor, spinor_bytes, cudaMemcpyDeviceToHost);
     cudaMemcpy(packedSpinor2, spinor.odd.spinor, spinor_bytes, cudaMemcpyDeviceToHost);
     if (spinor.even.precision == QUDA_DOUBLE_PRECISION) {
-      unpackFullSpinorDD((double*)res, (double2*)packedSpinor1, (double2*)packedSpinor2);
+      unpackFullSpinor((double*)res, (double2*)packedSpinor1, (double2*)packedSpinor2);
     } else {
       if (cpu_prec == QUDA_DOUBLE_PRECISION) 
-	unpackFullSpinorFS((double*)res, (float4*)packedSpinor1, (float4*)packedSpinor2);
-      else unpackFullSpinorFS((float*)res, (float4*)packedSpinor1, (float4*)packedSpinor2);
+	unpackFullSpinor((double*)res, (float4*)packedSpinor1, (float4*)packedSpinor2);
+      else unpackFullSpinor((float*)res, (float4*)packedSpinor1, (float4*)packedSpinor2);
     }
     
 #ifndef __DEVICE_EMULATION__

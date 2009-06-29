@@ -8,7 +8,7 @@
 #include <gauge_quda.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 1;
+int test_type = 2;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -25,7 +25,7 @@ void *spinorEven, *spinorOdd;
 double kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
-int TRANSFER = 0; // include transfer time in the benchmark?
+int TRANSFER = 1; // include transfer time in the benchmark?
 
 void init() {
 
@@ -126,12 +126,12 @@ double dslashCUDA() {
       else dslashCuda(cudaSpinor.odd, gauge, cudaSpinor.even, ODD_BIT, DAGGER_BIT);
       break;
     case 1:
-      if (TRANSFER) MatPCQuda(spinorOdd, spinorEven, &inv_param);
-      else MatPCCuda(cudaSpinor.odd, gauge, cudaSpinor.even, kappa, tmp, QUDA_MATPC_EVEN_EVEN);
+      if (TRANSFER) MatPCQuda(spinorOdd, spinorEven, &inv_param, DAGGER_BIT);
+      else MatPCCuda(cudaSpinor.odd, gauge, cudaSpinor.even, kappa, tmp, QUDA_MATPC_EVEN_EVEN, DAGGER_BIT);
       break;
     case 2:
-      if (TRANSFER) MatQuda(spinorGPU, spinor, &inv_param);
-      else MatCuda(cudaSpinorOut, gauge, cudaSpinor, kappa);
+      if (TRANSFER) MatQuda(spinorGPU, spinor, &inv_param, DAGGER_BIT);
+      else MatCuda(cudaSpinorOut, gauge, cudaSpinor, kappa, DAGGER_BIT);
     }
   }
     

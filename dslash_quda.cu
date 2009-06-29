@@ -537,7 +537,7 @@ int dslashCudaSharedBytes() {
 
 // Apply the even-odd preconditioned Dirac operator
 void MatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa, 
-	       ParitySpinor tmp, MatPCType matpc_type) {
+	       ParitySpinor tmp, MatPCType matpc_type, int dagger) {
 
   checkSpinor(in, out);
   checkSpinor(in, tmp);
@@ -546,64 +546,27 @@ void MatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa,
 
   if (in.precision == QUDA_DOUBLE_PRECISION) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashDCuda(tmp, gauge, in, 1, 0);
-      dslashXpayDCuda(out, gauge, tmp, 0, 0, in, kappa2); 
+      dslashDCuda(tmp, gauge, in, 1, dagger);
+      dslashXpayDCuda(out, gauge, tmp, 0, dagger, in, kappa2); 
     } else {
-      dslashDCuda(tmp, gauge, in, 0, 0);
-      dslashXpayDCuda(out, gauge, tmp, 1, 0, in, kappa2); 
+      dslashDCuda(tmp, gauge, in, 0, dagger);
+      dslashXpayDCuda(out, gauge, tmp, 1, dagger, in, kappa2); 
     }
   } else if (in.precision == QUDA_SINGLE_PRECISION) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashSCuda(tmp, gauge, in, 1, 0);
-      dslashXpaySCuda(out, gauge, tmp, 0, 0, in, kappa2); 
+      dslashSCuda(tmp, gauge, in, 1, dagger);
+      dslashXpaySCuda(out, gauge, tmp, 0, dagger, in, kappa2); 
     } else {
-      dslashSCuda(tmp, gauge, in, 0, 0);
-      dslashXpaySCuda(out, gauge, tmp, 1, 0, in, kappa2); 
+      dslashSCuda(tmp, gauge, in, 0, dagger);
+      dslashXpaySCuda(out, gauge, tmp, 1, dagger, in, kappa2); 
     }
   } else if (in.precision == QUDA_HALF_PRECISION) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashHCuda(tmp, gauge, in, 1, 0);
-      dslashXpayHCuda(out, gauge, tmp, 0, 0, in, kappa2); 
+      dslashHCuda(tmp, gauge, in, 1, dagger);
+      dslashXpayHCuda(out, gauge, tmp, 0, dagger, in, kappa2); 
     } else {
-      dslashHCuda(tmp, gauge, in, 0, 0);
-      dslashXpayHCuda(out, gauge, tmp, 1, 0, in, kappa2); 
-    }
-  }
-
-}
-
-// Apply the even-odd preconditioned Dirac operator
-void MatPCDagCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa, 
-		  ParitySpinor tmp, MatPCType matpc_type) {
-
-  checkSpinor(in, out);
-  checkSpinor(in, tmp);
-
-  double kappa2 = -kappa*kappa;
-
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashDCuda(tmp, gauge, in, 1, 1);
-      dslashXpayDCuda(out, gauge, tmp, 0, 1, in, kappa2);
-    } else {
-      dslashDCuda(tmp, gauge, in, 0, 1);
-      dslashXpayDCuda(out, gauge, tmp, 1, 1, in, kappa2);
-    }
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashSCuda(tmp, gauge, in, 1, 1);
-      dslashXpaySCuda(out, gauge, tmp, 0, 1, in, kappa2);
-    } else {
-      dslashSCuda(tmp, gauge, in, 0, 1);
-      dslashXpaySCuda(out, gauge, tmp, 1, 1, in, kappa2);
-    }
-  } else {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      dslashHCuda(tmp, gauge, in, 1, 1);
-      dslashXpayHCuda(out, gauge, tmp, 0, 1, in, kappa2);
-    } else {
-      dslashHCuda(tmp, gauge, in, 0, 1);
-      dslashXpayHCuda(out, gauge, tmp, 1, 1, in, kappa2);
+      dslashHCuda(tmp, gauge, in, 0, dagger);
+      dslashXpayHCuda(out, gauge, tmp, 1, dagger, in, kappa2); 
     }
   }
 
@@ -611,43 +574,27 @@ void MatPCDagCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kap
 
 void MatPCDagMatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, 
 		       double kappa, ParitySpinor tmp, MatPCType matpc_type) {
-  MatPCCuda(out, gauge, in, kappa, tmp, matpc_type);
-  MatPCDagCuda(out, gauge, out, kappa, tmp, matpc_type);
+  MatPCCuda(out, gauge, in, kappa, tmp, matpc_type, 0);
+  MatPCCuda(out, gauge, out, kappa, tmp, matpc_type, 1);
 }
 
 // Apply the full operator
-void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa) {
+void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa, int dagger) {
   checkSpinor(in.even, out.even);
 
   if (in.even.precision == QUDA_DOUBLE_PRECISION) {
-    dslashXpayDCuda(out.odd, gauge, in.even, 1, 0, in.odd, -kappa);
-    dslashXpayDCuda(out.even, gauge, in.odd, 0, 0, in.even, -kappa);
+    dslashXpayDCuda(out.odd, gauge, in.even, 1, dagger, in.odd, -kappa);
+    dslashXpayDCuda(out.even, gauge, in.odd, 0, dagger, in.even, -kappa);
   } else if (in.even.precision == QUDA_SINGLE_PRECISION) {
-    dslashXpaySCuda(out.odd, gauge, in.even, 1, 0, in.odd, -kappa);
-    dslashXpaySCuda(out.even, gauge, in.odd, 0, 0, in.even, -kappa);
+    dslashXpaySCuda(out.odd, gauge, in.even, 1, dagger, in.odd, -kappa);
+    dslashXpaySCuda(out.even, gauge, in.odd, 0, dagger, in.even, -kappa);
   } else if (in.even.precision == QUDA_HALF_PRECISION) {
-    dslashXpayHCuda(out.odd, gauge, in.even, 1, 0, in.odd, -kappa);
-    dslashXpayHCuda(out.even, gauge, in.odd, 0, 0, in.even, -kappa);
+    dslashXpayHCuda(out.odd, gauge, in.even, 1, dagger, in.odd, -kappa);
+    dslashXpayHCuda(out.even, gauge, in.odd, 0, dagger, in.even, -kappa);
   }
 
 }
 
-// Apply the full operator dagger
-void MatDaggerCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa) {
-  checkSpinor(in.even, out.even);
-
-  if (in.even.precision == QUDA_SINGLE_PRECISION) {
-    dslashXpayDCuda(out.odd, gauge, in.even, 1, 1, in.odd, -kappa);
-    dslashXpayDCuda(out.even, gauge, in.odd, 0, 1, in.even, -kappa);
-  } else if (in.even.precision == QUDA_SINGLE_PRECISION) {
-    dslashXpaySCuda(out.odd, gauge, in.even, 1, 1, in.odd, -kappa);
-    dslashXpaySCuda(out.even, gauge, in.odd, 0, 1, in.even, -kappa);
-  } else if (in.even.precision == QUDA_HALF_PRECISION) {
-    dslashXpayHCuda(out.odd, gauge, in.even, 1, 1, in.odd, -kappa);
-    dslashXpayHCuda(out.even, gauge, in.odd, 0, 1, in.even, -kappa);
-  }
-
-}
 
 /*
 // Apply the even-odd preconditioned Dirac operator

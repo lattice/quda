@@ -134,29 +134,14 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   freeParitySpinor(in);
 }
 
-void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
+void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
 {
   ParitySpinor in = allocateParitySpinor(Nh, inv_param->cuda_prec);
   ParitySpinor out = allocateParitySpinor(Nh, inv_param->cuda_prec);
   ParitySpinor tmp = allocateParitySpinor(Nh, inv_param->cuda_prec);
   
   loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
-  MatPCCuda(out, cudaGaugePrecise, in, inv_param->kappa, tmp, inv_param->matpc_type);
-  retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
-
-  freeParitySpinor(tmp);
-  freeParitySpinor(out);
-  freeParitySpinor(in);
-}
-
-void MatPCDagQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
-{
-  ParitySpinor in = allocateParitySpinor(Nh, inv_param->cuda_prec);
-  ParitySpinor out = allocateParitySpinor(Nh, inv_param->cuda_prec);
-  ParitySpinor tmp = allocateParitySpinor(Nh, inv_param->cuda_prec);
-  
-  loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
-  MatPCDagCuda(out, cudaGaugePrecise, in, inv_param->kappa, tmp, inv_param->matpc_type);
+  MatPCCuda(out, cudaGaugePrecise, in, inv_param->kappa, tmp, inv_param->matpc_type, dagger);
   retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
   freeParitySpinor(tmp);
@@ -179,29 +164,14 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   freeParitySpinor(in);
 }
 
-void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param) {
+void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger) {
   FullSpinor in = allocateSpinorField(N, inv_param->cuda_prec);
   FullSpinor out = allocateSpinorField(N, inv_param->cuda_prec);
 
   loadSpinorField(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
 
-  dslashXpayCuda(out.odd, cudaGaugePrecise, in.even, 1, 0, in.odd, -inv_param->kappa);
-  dslashXpayCuda(out.even, cudaGaugePrecise, in.odd, 0, 0, in.even, -inv_param->kappa);
-
-  retrieveSpinorField(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
-
-  freeSpinorField(out);
-  freeSpinorField(in);
-}
-
-void MatDagQuda(void *h_out, void *h_in, QudaInvertParam *inv_param) {
-  FullSpinor in = allocateSpinorField(N, inv_param->cuda_prec);
-  FullSpinor out = allocateSpinorField(N, inv_param->cuda_prec);
-
-  loadSpinorField(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
-
-  dslashXpayCuda(out.odd, cudaGaugePrecise, in.even, 1, 1, in.odd, -inv_param->kappa);
-  dslashXpayCuda(out.even, cudaGaugePrecise, in.odd, 0, 1, in.even, -inv_param->kappa);
+  dslashXpayCuda(out.odd, cudaGaugePrecise, in.even, 1, dagger, in.odd, -inv_param->kappa);
+  dslashXpayCuda(out.even, cudaGaugePrecise, in.odd, 0, dagger, in.even, -inv_param->kappa);
 
   retrieveSpinorField(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -277,7 +247,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(out, in);
-      MatPCDagCuda(in, cudaGaugePrecise, out, kappa, tmp, param->matpc_type);
+      MatPCCuda(in, cudaGaugePrecise, out, kappa, tmp, param->matpc_type, QUDA_DAG_YES);
     }
     invertCgCuda(out, in, cudaGaugeSloppy, tmp, param);
     break;

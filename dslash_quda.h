@@ -59,13 +59,11 @@ extern "C" {
 		      ParitySpinor x, double a);
 
   // Full Wilson matrix
-  void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa);
-  void MatDagCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa);
+  void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa, int daggerBit);
 
   void MatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-		 double kappa, ParitySpinor tmp, MatPCType matpc_type);
-  void MatPCDagCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-		    double kappa, ParitySpinor tmp, MatPCType matpc_type);
+		 double kappa, ParitySpinor tmp, MatPCType matpc_type, int daggerBit);
+
   void MatPCDagMatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven,
 			 double kappa, ParitySpinor tmp, MatPCType matpc_type);
   
