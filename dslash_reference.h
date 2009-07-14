@@ -7,12 +7,17 @@
 extern "C" {
 #endif
 
-  // -- dslash_reference.cpp
+  extern int Z[4];
+  extern int Vh;
+  extern int V;
+
+  void setDims(int *);
+
+  void dslash(void *res, void **gauge, void *spinorField, 
+	      int oddBit, int daggerBit, Precision sPrecision, Precision gPrecision);
   
-  void dslash_reference(void *res, void **gauge, void *spinorField, 
-			int oddBit, int daggerBit, Precision sPrecision, Precision gPrecision);
-  
-  void mat(void *out, void **gauge, void *in, double kappa, int daggerBit, Precision sPrecision, Precision gPrecision);
+  void mat(void *out, void **gauge, void *in, double kappa, int daggerBit,
+	   Precision sPrecision, Precision gPrecision);
 
   void matpc(void *out, void **gauge, void *in, double kappa, MatPCType matpc_type, 
 	     int daggerBit, Precision sPrecision, Precision gPrecision);

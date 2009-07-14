@@ -15,22 +15,25 @@ int main(int argc, char **argv)
   QudaGaugeParam Gauge_param;
   QudaInvertParam inv_param;
 
+  Gauge_param.X[0] = 24;
+  Gauge_param.X[1] = 24;
+  Gauge_param.X[2] = 24;
+  Gauge_param.X[3] = 32;
+  setDims(Gauge_param.X);
+
   Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
 
   Gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
 
-  Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  Gauge_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
   Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
 
   Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  Gauge_param.X = L1;
-  Gauge_param.Y = L2;
-  Gauge_param.Z = L3;
-  Gauge_param.T = L4;
+
   Gauge_param.anisotropy = 1.0;
 
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  inv_param.inv_type = QUDA_CG_INVERTER;
 
   Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -44,23 +47,23 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;  // preservation doesn't work with reliable?
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   size_t gSize = (Gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(N*gaugeSiteSize*gSize);
+    gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
   construct_gauge_field(gauge, 1, Gauge_param.cpu_prec);
 
-  void *spinorIn = malloc(N*spinorSiteSize*sSize);
-  void *spinorOut = malloc(N*spinorSiteSize*sSize);
-  void *spinorCheck = malloc(N*spinorSiteSize*sSize);
+  void *spinorIn = malloc(V*spinorSiteSize*sSize);
+  void *spinorOut = malloc(V*spinorSiteSize*sSize);
+  void *spinorCheck = malloc(V*spinorSiteSize*sSize);
 
   int i0 = 0;
   int s0 = 0;
@@ -84,11 +87,11 @@ int main(int argc, char **argv)
 
   mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, Gauge_param.cpu_prec);
   if  (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-    ax(0.5/inv_param.kappa, spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
+    ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
 
-  mxpy(spinorIn, spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
-  double nrm2 = norm_2(spinorCheck, N*spinorSiteSize, inv_param.cpu_prec);
-  double src2 = norm_2(spinorIn, N*spinorSiteSize, inv_param.cpu_prec);
+  mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+  double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+  double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
   printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
   endQuda();

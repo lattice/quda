@@ -21,11 +21,10 @@
 //
 // DD_GPREC_F = D, S, H
 // DD_SPREC_F = D, S, H
-// DD_CPREC_F = S, [blank]; the latter corresponds to plain Wilson
+// DD_CPREC_F = D, S, H, [blank]; the latter corresponds to plain Wilson
 // DD_RECON_F = 12, 8
 // DD_DAG_F = Dagger, [blank]
 // DD_XPAY_F = Xpay, [blank]
-
 
 // initialize on first iteration
 
@@ -36,7 +35,7 @@
 #define DD_RECON 0
 #define DD_GPREC 0
 #define DD_SPREC 0
-#define DD_CPREC 0
+#define DD_CPREC 1
 #endif
 
 // set options for current iteration
@@ -138,16 +137,26 @@
 #endif
 #endif
 
-#if (DD_CPREC==0) // single-precision clover term
+#if (DD_CPREC==0) // double-precision clover term
+#define DD_CPREC_F D
+#define CLOVERTEX cloverTexDouble
+#define READ_CLOVER READ_CLOVER_DOUBLE
+#define DSLASH_CLOVER
+#elif (DD_CPREC==1) // single-precision clover term
 #define DD_CPREC_F S
 #define CLOVERTEX cloverTexSingle
 #define READ_CLOVER READ_CLOVER_SINGLE
+#define DSLASH_CLOVER
+#elif (DD_CPREC==2) // single-precision clover term
+#define DD_CPREC_F H
+#define CLOVERTEX cloverTexHalf
+#define READ_CLOVER READ_CLOVER_HALF
 #define DSLASH_CLOVER
 #else             // no clover term
 #define DD_CPREC_F
 #endif
 
-#if !(__CUDA_ARCH__ != 130 && (DD_SPREC == 0 || DD_GPREC == 0))
+#if !(__CUDA_ARCH__ != 130 && (DD_SPREC == 0 || DD_GPREC == 0 || DD_CPREC == 0))
 
 #define DD_CONCAT(g,s,c,r,d,x) dslash ## g ## s ## c ## r ## d ## x ## Kernel
 #define DD_FUNC(g,s,c,r,d,x) DD_CONCAT(g,s,c,r,d,x)
@@ -237,9 +246,15 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #undef DD_SPREC
 #define DD_SPREC 0
 
-#if (DD_CPREC==0)
+//#if (DD_CPREC==0)
+//#undef DD_CPREC
+//#define DD_CPREC 1
+#if (DD_CPREC==1)
 #undef DD_CPREC
-#define DD_CPREC 1
+//#define DD_CPREC 2
+//#elif (DD_CPREC==2)
+//#undef DD_CPREC
+#define DD_CPREC 3
 #else
 
 #undef DD_LOOP

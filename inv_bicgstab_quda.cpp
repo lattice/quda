@@ -8,17 +8,17 @@
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 
-void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugeSloppy, 
-			FullGauge gaugePrecise, ParitySpinor tmp, 
+void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise, 
+			FullGauge gaugeSloppy, ParitySpinor tmp, 
 			QudaInvertParam *invert_param, DagType dag_type)
 {
-  ParitySpinor r = allocateParitySpinor(x.length/spinorSiteSize, x.precision);
-  ParitySpinor p = allocateParitySpinor(x.length/spinorSiteSize, invert_param->cuda_prec_sloppy);
-  ParitySpinor v = allocateParitySpinor(x.length/spinorSiteSize, invert_param->cuda_prec_sloppy);
-  ParitySpinor t = allocateParitySpinor(x.length/spinorSiteSize, invert_param->cuda_prec_sloppy);
+  ParitySpinor r = allocateParitySpinor(x.X, x.precision);
+  ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+  ParitySpinor v = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+  ParitySpinor t = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
 
-  ParitySpinor y = allocateParitySpinor(x.length/spinorSiteSize, x.precision);
-  ParitySpinor b = allocateParitySpinor(x.length/spinorSiteSize, x.precision);
+  ParitySpinor y = allocateParitySpinor(x.X, x.precision);
+  ParitySpinor b = allocateParitySpinor(x.X, x.precision);
 
   ParitySpinor x_sloppy, r_sloppy, tmp_sloppy, src_sloppy;
   if (invert_param->cuda_prec_sloppy == x.precision) {
@@ -27,10 +27,10 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugeSloppy,
     tmp_sloppy = tmp;
     src_sloppy = src;
   } else {
-    x_sloppy = allocateParitySpinor(x.length/spinorSiteSize, invert_param->cuda_prec_sloppy);
-    r_sloppy = allocateParitySpinor(x.length/spinorSiteSize, invert_param->cuda_prec_sloppy);
-    src_sloppy = allocateParitySpinor(x.length/spinorSiteSize, invert_param->cuda_prec_sloppy);
-    tmp_sloppy = allocateParitySpinor(x.length/spinorSiteSize, invert_param->cuda_prec_sloppy);
+    x_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+    r_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+    src_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+    tmp_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
     copyCuda(src_sloppy, src);
   }
 
@@ -151,13 +151,14 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugeSloppy,
 
   invert_param->secs += stopwatchReadSeconds();
 
-  if (k==invert_param->maxiter) printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
+  if (k==invert_param->maxiter) 
+    printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
 
   printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
 
-  float gflops = (1.0e-9*Nh)*(2*(2*1320+48)*k + (32*k + 8*(k-1))*spinorSiteSize);
-  gflops += 1.0e-9*Nh*rUpdate*((2*1320+48) + 3*spinorSiteSize);
-  gflops += 1.0e-9*Nh*xUpdate*spinorSiteSize;
+  float gflops = (1.0e-9*x.volume)*(2*(2*1320+48)*k + (32*k + 8*(k-1))*spinorSiteSize);
+  gflops += 1.0e-9*x.volume*rUpdate*((2*1320+48) + 3*spinorSiteSize);
+  gflops += 1.0e-9*x.volume*xUpdate*spinorSiteSize;
   //printf("%f gflops\n", k*gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;
   invert_param->iter += k;

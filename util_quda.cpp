@@ -51,14 +51,14 @@ void printVector(Float *v) {
 void printSpinorElement(void *spinor, int X, Precision precision) {
   if (getOddBit(X) == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int s=0; s<4; s++) printVector((double*)spinor+(X/2)*4*3*2+s*(3*2));
+      for (int s=0; s<4; s++) printVector((double*)spinor+(X/2)*(4*3*2)+s*(3*2));
     else
-      for (int s=0; s<4; s++) printVector((float*)spinor+(X/2)*4*3*2+s*(3*2));
+      for (int s=0; s<4; s++) printVector((float*)spinor+(X/2)*(4*3*2)+s*(3*2));
   } else {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int s=0; s<4; s++) printVector((double*)spinor+(X/2)*(4*3*2)+Nh*spinorSiteSize+s*(3*2));
+      for (int s=0; s<4; s++) printVector((double*)spinor+(X/2)*(4*3*2)+Vh*24+s*(3*2));
     else
-      for (int s=0; s<4; s++) printVector((float*)spinor+(X/2)*(4*3*2)+Nh*spinorSiteSize+s*(3*2));
+      for (int s=0; s<4; s++) printVector((float*)spinor+(X/2)*(4*3*2)+Vh*24+s*(3*2));
   }
 }
 
@@ -72,18 +72,18 @@ void printGaugeElement(void *gauge, int X, Precision precision) {
       
   } else {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m = 0; m < 3; m++) printVector((double*)gauge + (X/2+Nh)*gaugeSiteSize + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((double*)gauge + (X/2+Vh)*gaugeSiteSize + m*3*2);
     else
-      for (int m = 0; m < 3; m++) printVector((float*)gauge + (X/2+Nh)*gaugeSiteSize + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((float*)gauge + (X/2+Vh)*gaugeSiteSize + m*3*2);
   }
 }
 
 // returns 0 or 1 if the full lattice index X is even or odd
-int getOddBit(int X) {
-  int x4 = X/(L3*L2*L1);
-  int x3 = (X/(L2*L1)) % L3;
-  int x2 = (X/L1) % L2;
-  int x1 = X % L1;
+int getOddBit(int Y) {
+  int x4 = Y/(Z[2]*Z[1]*Z[0]);
+  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
+  int x2 = (Y/Z[0]) % Z[1];
+  int x1 = Y % Z[0];
   return (x4+x3+x2+x1) % 2;
 }
 
@@ -181,7 +181,7 @@ void su3Reconstruct12(Float *mat, int dir, int ga_idx) {
   accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
   accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
   Float u0 = (dir < 3 ? gauge_param->anisotropy :
-	      (ga_idx >= (L4-1)*L1h*L2*L3 ? gauge_param->t_boundary : 1));
+	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? gauge_param->t_boundary : 1));
   w[0]*=u0; w[1]*=u0; w[2]*=u0; w[3]*=u0; w[4]*=u0; w[5]*=u0;
 }
 
@@ -194,7 +194,7 @@ void su3Reconstruct8(Float *mat, int dir, int ga_idx) {
   row_sum += mat[4]*mat[4];
   row_sum += mat[5]*mat[5];
   Float u0 = (dir < 3 ? gauge_param->anisotropy :
-	      (ga_idx >= (L4-1)*L1h*L2*L3 ? gauge_param->t_boundary : 1));
+	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? gauge_param->t_boundary : 1));
   Float U00_mag = sqrt(1.f/(u0*u0) - row_sum);
 
   mat[14] = mat[0];
@@ -295,36 +295,36 @@ int compare_floats(void *a, void *b, int len, double epsilon, Precision precisio
 // given a "half index" i into either an even or odd half lattice (corresponding
 // to oddBit = {0, 1}), returns the corresponding full lattice index.
 int fullLatticeIndex(int i, int oddBit) {
-  int boundaryCrossings = i/L1h + i/(L2*L1h) + i/(L3*L2*L1h);
+  int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2);
   return 2*i + (boundaryCrossings + oddBit) % 2;
 }
 
 template <typename Float>
-void applyGaugeFieldScaling(Float **gauge) {
+void applyGaugeFieldScaling(Float **gauge, int Vh) {
   // Apply spatial scaling factor (u0) to spatial links
   for (int d = 0; d < 3; d++) {
-    for (int i = 0; i < gaugeSiteSize*N; i++) {
+    for (int i = 0; i < gaugeSiteSize*Vh*2; i++) {
       gauge[d][i] /= gauge_param->anisotropy;
     }
   }
     
   // Apply boundary conditions to temporal links
   if (gauge_param->t_boundary == QUDA_ANTI_PERIODIC_T) {
-    for (int j = L1h*L2*L3*(L4-1); j < Nh; j++) {
+    for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
       for (int i = 0; i < gaugeSiteSize; i++) {
 	gauge[3][j*gaugeSiteSize+i] *= -1.0;
-	gauge[3][(Nh+j)*gaugeSiteSize+i] *= -1.0;
+	gauge[3][(Vh+j)*gaugeSiteSize+i] *= -1.0;
       }
     }
   }
     
   if (gauge_param->gauge_fix) {
-    // set all gauge links (except for the first L1h*L2*L3) to the identity,
+    // set all gauge links (except for the first Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
     int dir = 3; // time direction only
     Float *even = gauge[dir];
-    Float *odd  = gauge[dir]+Nh*gaugeSiteSize;
-    for (int i = L1h*L2*L3; i < Nh; i++) {
+    Float *odd  = gauge[dir]+Vh*gaugeSiteSize;
+    for (int i = Z[0]*Z[1]*Z[2]/2; i < Vh; i++) {
       for (int m = 0; m < 3; m++) {
 	for (int n = 0; n < 3; n++) {
 	  even[i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
@@ -342,11 +342,11 @@ void constructUnitGaugeField(Float **res) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {  
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Nh*gaugeSiteSize;
+    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
   }
     
   for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < Nh; i++) {
+    for (int i = 0; i < Vh; i++) {
       for (int m = 0; m < 3; m++) {
 	for (int n = 0; n < 3; n++) {
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
@@ -358,7 +358,7 @@ void constructUnitGaugeField(Float **res) {
     }
   }
     
-  applyGaugeFieldScaling(res);
+  applyGaugeFieldScaling(res, Vh);
 }
 
 // normalize the vector a
@@ -382,11 +382,11 @@ void constructGaugeField(Float **res) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {  
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Nh*gaugeSiteSize;
+    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
   }
     
   for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < Nh; i++) {
+    for (int i = 0; i < Vh; i++) {
       for (int m = 1; m < 3; m++) { // last 2 rows
 	for (int n = 0; n < 3; n++) { // 3 columns
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
@@ -434,7 +434,7 @@ void constructGaugeField(Float **res) {
     }
   }
     
-  applyGaugeFieldScaling(res);
+  applyGaugeFieldScaling(res, Vh);
 }
 
 void construct_gauge_field(void **gauge, int type, Precision precision) {
@@ -450,9 +450,9 @@ void construct_gauge_field(void **gauge, int type, Precision precision) {
 template <typename Float>
 void constructPointSpinorField(Float *res, int i0, int s0, int c0) {
   Float *resEven = res;
-  Float *resOdd = res + Nh*spinorSiteSize;
+  Float *resOdd = res + Vh*spinorSiteSize;
     
-  for(int i = 0; i < Nh; i++) {
+  for(int i = 0; i < Vh; i++) {
     for (int s = 0; s < 4; s++) {
       for (int m = 0; m < 3; m++) {
 	resEven[i*(4*3*2) + s*(3*2) + m*(2) + 0] = 0;
@@ -472,7 +472,7 @@ void constructPointSpinorField(Float *res, int i0, int s0, int c0) {
 
 template <typename Float>
 void constructSpinorField(Float *res) {
-  for(int i = 0; i < N; i++) {
+  for(int i = 0; i < V; i++) {
     for (int s = 0; s < 4; s++) {
       for (int m = 0; m < 3; m++) {
 	res[i*(4*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
@@ -490,21 +490,6 @@ void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, Prec
     if (precision == QUDA_DOUBLE_PRECISION) constructSpinorField((double*)spinor);
     else constructSpinorField((float*)spinor);
   }
-}
-
-template <typename Float>
-void applyGamma5(Float *out, Float *in, int sites) {
-  for (int i=0; i<sites*spinorSiteSize; i+=spinorSiteSize) {
-    for (int j=0; j<spinorSiteSize/2; j++) 
-      out[i+j] = in[i+j];
-    for (int j=0; j<spinorSiteSize/2; j++) 
-      out[i+j+spinorSiteSize/2] = -in[i+j+spinorSiteSize/2];
-  }
-}
-
-void apply_gamma5(void *out, void *in, int sites, Precision precision) {
-  if (precision == QUDA_DOUBLE_PRECISION) applyGamma5((double*)out, (double*)in, sites);
-  else applyGamma5((float*)out, (float*)in, sites);
 }
 
 template <typename Float>

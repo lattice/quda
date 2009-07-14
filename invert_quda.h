@@ -9,10 +9,7 @@ extern "C" {
 
   typedef struct QudaGaugeParam_s {
 
-    int X;
-    int Y;
-    int Z;
-    int T;
+    int X[4];
 
     double anisotropy;
 

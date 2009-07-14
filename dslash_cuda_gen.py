@@ -94,7 +94,6 @@ projectors = [
 ### code generation  ########################################################################
 
 ### parameters
-sharedFloats = 0
 dagger = False
 
 def block(code):
@@ -109,6 +108,10 @@ def sign(x):
 
 def nthFloat4(n):
     return `(n/4)` + "." + ["x", "y", "z", "w"][n%4]
+
+def nthFloat2(n):
+    return `(n/2)` + "." + ["x", "y"][n%2]
+
 
 def in_re(s, c): return "i"+`s`+`c`+"_re"
 def in_im(s, c): return "i"+`s`+`c`+"_im"
@@ -130,35 +133,60 @@ def prolog():
     str = []
     str.append("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
     str.append("#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n")
-    str.append("#define SHARED_BYTES (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))\n\n")
+    str.append("#define SHARED_BYTES_DOUBLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(double))\n\n")
+    str.append("#define SHARED_BYTES_SINGLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))\n\n")
     
     str.append("// input spinor\n")
+
+    str.append("#if (DD_SPREC==0)\n")
+    str.append("#define spinorFloat double\n")
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str.append("#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n")
+            str.append("#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n")
+    str.append("\n")
+    str.append("#else\n")
+    str.append("#define spinorFloat float\n")
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             str.append("#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n")
             str.append("#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n")
-    str.append("\n")
+    str.append("#endif\n\n")
 
     str.append("// gauge link\n")
+
+    str.append("#if (DD_GPREC==0)\n")
+    for m in range(0,3):
+        for n in range(0,3):
+            i = 3*m+n
+            str.append("#define "+g_re(0,m,n)+" G"+nthFloat2(2*i+0)+"\n")
+            str.append("#define "+g_im(0,m,n)+" G"+nthFloat2(2*i+1)+"\n")
+
+    str.append("// temporaries\n")
+    str.append("#define A_re G"+nthFloat2(18)+"\n")
+    str.append("#define A_im G"+nthFloat2(19)+"\n")    
+    str.append("\n")
+    str.append("#else\n")
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
             str.append("#define "+g_re(0,m,n)+" G"+nthFloat4(2*i+0)+"\n")
             str.append("#define "+g_im(0,m,n)+" G"+nthFloat4(2*i+1)+"\n")
-    str.append("\n")
 
+    str.append("// temporaries\n")
+    str.append("#define A_re G"+nthFloat4(18)+"\n")
+    str.append("#define A_im G"+nthFloat4(19)+"\n")    
+    str.append("\n")
+    str.append("#endif\n\n")    
+            
     str.append("// conjugated gauge link\n")
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
             str.append("#define "+g_re(1,m,n)+" (+"+g_re(0,n,m)+")\n")
             str.append("#define "+g_im(1,m,n)+" (-"+g_im(0,n,m)+")\n")
-    str.append("\n")
-
-    str.append("// temporaries\n")
-    str.append("#define A_re G"+nthFloat4(18)+"\n")
-    str.append("#define A_im G"+nthFloat4(19)+"\n")    
     str.append("\n")
 
     str.append("// first chiral block of inverted clover term\n")
@@ -205,11 +233,11 @@ def prolog():
             if 2*i < sharedFloats:
                 str.append("#define "+out_re(s,c)+" s["+`(2*i+0)`+"]\n")
             else:
-                str.append("volatile float "+out_re(s,c)+";\n")
+                str.append("volatile spinorFloat "+out_re(s,c)+";\n")
             if 2*i+1 < sharedFloats:
                 str.append("#define "+out_im(s,c)+" s["+`(2*i+1)`+"]\n")
             else:
-                str.append("volatile float "+out_im(s,c)+";\n")
+                str.append("volatile spinorFloat "+out_im(s,c)+";\n")
     str.append("\n")
     
     str.append(
@@ -220,18 +248,26 @@ def prolog():
 #include "io_spinor.h"
 
 int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
-int boundaryCrossings = sid/L1h + sid/(L2*L1h) + sid/(L3*L2*L1h);
-int X = 2*sid + (boundaryCrossings + oddBit) % 2;
-int x4 = X/(L3*L2*L1);
-int x3 = (X/(L2*L1)) % L3;
-int x2 = (X/L1) % L2;
-int x1 = X % L1;
+int boundaryCrossings = FAST_INT_DIVIDE(sid,X1h) + 
+  FAST_INT_DIVIDE(sid,X2X1h) + FAST_INT_DIVIDE(sid,X3X2X1h);
+int X = 2*sid + ((boundaryCrossings + oddBit)&1);
+
+int x4 = FAST_INT_DIVIDE(X, X3X2X1);
+int x3 = FAST_INT_MOD(FAST_INT_DIVIDE(X, X2X1), X3);
+int x2 = FAST_INT_DIVIDE(X, X1);
+int x1 = X - x2*X1;
+x2 = FAST_INT_MOD(x2, X2);
 
 """)
     
     if sharedFloats > 0:
-        str.append("extern __shared__ float s_data[];\n")
-        str.append("volatile float *s = s_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n\n")
+        str.append("#if (DD_SPREC==0)\n")
+        str.append("extern __shared__ spinorFloat sd_data[];\n")
+        str.append("volatile spinorFloat *s = sd_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n")
+        str.append("#else\n")
+        str.append("extern __shared__ spinorFloat ss_data[];\n")
+        str.append("volatile spinorFloat *s = ss_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n")
+        str.append("#endif\n\n")
     
     for s in range(0,4):
         for c in range(0,3):
@@ -266,14 +302,14 @@ def gen(dir):
         str.append("// "+l+"\n")
     str.append("\n")
     
-    if dir == 0: str.append("int sp_idx = ((x1==L1-1) ? X-(L1-1) : X+1) / 2;\n")
-    if dir == 1: str.append("int sp_idx = ((x1==0)    ? X+(L1-1) : X-1) / 2;\n")
-    if dir == 2: str.append("int sp_idx = ((x2==L2-1) ? X-(L2-1)*L1 : X+L1) / 2;\n")
-    if dir == 3: str.append("int sp_idx = ((x2==0)    ? X+(L2-1)*L1 : X-L1) / 2;\n")
-    if dir == 4: str.append("int sp_idx = ((x3==L3-1) ? X-(L3-1)*L2*L1 : X+L2*L1) / 2;\n")
-    if dir == 5: str.append("int sp_idx = ((x3==0)    ? X+(L3-1)*L2*L1 : X-L2*L1) / 2;\n")
-    if dir == 6: str.append("int sp_idx = ((x4==L4-1) ? X-(L4-1)*L3*L2*L1 : X+L3*L2*L1) / 2;\n")
-    if dir == 7: str.append("int sp_idx = ((x4==0)    ? X+(L4-1)*L3*L2*L1 : X-L3*L2*L1) / 2;\n")
+    if dir == 0: str.append("int sp_idx = ((x1==X1-1) ? X-X1+1 : X+1) >> 1;\n")
+    if dir == 1: str.append("int sp_idx = ((x1==0)    ? X+X1-1 : X-1) >> 1;\n")
+    if dir == 2: str.append("int sp_idx = ((x2==X2-1) ? X-X2X1+X1 : X+X1) >> 1;\n")
+    if dir == 3: str.append("int sp_idx = ((x2==0)    ? X+X2X1-X1 : X-X1) >> 1;\n")
+    if dir == 4: str.append("int sp_idx = ((x3==X3-1) ? X-X3X2X1+X2X1 : X+X2X1) >> 1;\n")
+    if dir == 5: str.append("int sp_idx = ((x3==0)    ? X+X3X2X1-X2X1 : X-X2X1) >> 1;\n")
+    if dir == 6: str.append("int sp_idx = ((x4==X4-1) ? X-X4X3X2X1+X3X2X1 : X+X3X2X1) >> 1;\n")
+    if dir == 7: str.append("int sp_idx = ((x4==0)    ? X+X4X3X2X1-X3X2X1 : X-X3X2X1) >> 1;\n")
     
     ga_idx = "sid" if dir % 2 == 0 else "sp_idx"
     str.append("int ga_idx = "+ga_idx+";\n\n")
@@ -334,24 +370,24 @@ def gen(dir):
                         strRe.append(sign(-im)+in_im(s,c))
                         strIm.append(sign(im)+in_re(s,c))
                 
-            project.append("float "+h1_re(h,c)+ " = "+''.join(strRe)+";\n")
-            project.append("float "+h1_im(h,c)+ " = "+''.join(strIm)+";\n")
+            project.append("spinorFloat "+h1_re(h,c)+ " = "+''.join(strRe)+";\n")
+            project.append("spinorFloat "+h1_im(h,c)+ " = "+''.join(strIm)+";\n")
         project.append("\n")
     
     ident = []
     ident.append("// identity gauge matrix\n")
     for m in range(0,3):
         for h in range(0,2):
-            ident.append("float "+h2_re(h,m)+" = " + h1_re(h,m) + "; ")
-            ident.append("float "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n")
+            ident.append("spinorFloat "+h2_re(h,m)+" = " + h1_re(h,m) + "; ")
+            ident.append("spinorFloat "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n")
     ident.append("\n")
     
     mult = []
     for m in range(0,3):
         mult.append("// multiply row "+`m`+"\n")
         for h in range(0,2):
-            re = ["float "+h2_re(h,m)+" ="]
-            im = ["float "+h2_im(h,m)+" ="]
+            re = ["spinorFloat "+h2_re(h,m)+" ="]
+            im = ["spinorFloat "+h2_im(h,m)+" ="]
             for c in range(0,3):
                 re.append(" + ("+g_re(dir,m,c)+" * "+h1_re(h,c)+" - "+g_im(dir,m,c)+" * "+h1_im(h,c)+")")
                 im.append(" + ("+g_re(dir,m,c)+" * "+h1_im(h,c)+" + "+g_im(dir,m,c)+" * "+h1_re(h,c)+")")
@@ -385,7 +421,7 @@ def gen(dir):
         reconstruct.append("\n")
         
     if dir >= 6:
-        str.append("if (gauge_fixed && ga_idx < (L4-1)*L1h*L2*L3) ")
+        str.append("if (gauge_fixed && ga_idx < X4X3X2X1h-X3X2X1h) ")
         str.append(block(''.join(load_spinor) + ''.join(project) + ''.join(ident) + ''.join(reconstruct)))
         str.append("else ")
         str.append(block(''.join(load_gauge) + ''.join(load_spinor) + ''.join(reconstruct_gauge) + 
@@ -400,14 +436,14 @@ def gen(dir):
 
 def toChiralBasis(c):
     str = []
-    str.append("float "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n")
-    str.append("float "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n")
+    str.append("spinorFloat "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
+    str.append("spinorFloat "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
+    str.append("spinorFloat "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n")
+    str.append("spinorFloat "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n")
+    str.append("spinorFloat "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n")
+    str.append("spinorFloat "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n")
+    str.append("spinorFloat "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n")
+    str.append("spinorFloat "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n")
     str.append("\n")
 
     for s in range (0,4):
@@ -419,14 +455,14 @@ def toChiralBasis(c):
 
 def fromChiralBasis(c): # note: factor of 1/2 is included in clover term normalization
     str = []
-    str.append("float "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n")
-    str.append("float "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n")
-    str.append("float "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n")
-    str.append("float "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n")
-    str.append("float "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n")
+    str.append("spinorFloat "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n")
+    str.append("spinorFloat "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n")
+    str.append("spinorFloat "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n")
+    str.append("spinorFloat "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n")
+    str.append("spinorFloat "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n")
+    str.append("spinorFloat "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n")
+    str.append("spinorFloat "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n")
+    str.append("spinorFloat "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n")
     str.append("\n")
 
     for s in range (0,4):
@@ -443,7 +479,7 @@ def cloverMult(chi):
 
     for s in range (0,2):
         for c in range (0,3):
-            str.append("float "+a_re(chi,s,c)+" = 0; float "+a_im(chi,s,c)+" = 0;\n")
+            str.append("spinorFloat "+a_re(chi,s,c)+" = 0; spinorFloat "+a_im(chi,s,c)+" = 0;\n")
     str.append("\n")
 
     for sm in range (0,2):
@@ -492,11 +528,25 @@ def epilog():
 #ifdef DSLASH_XPAY
     READ_ACCUM(ACCUMTEX)
 """)
+
+    str.append("#if (DD_SPREC==0)\n")
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n")
+            str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n")
+
+    str.append("#else\n")
+
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
             str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
+
+    str.append("#endif // DD_SPREC\n")
+
     str.append("#endif // DSLASH_XPAY\n\n")
     
     str.append(
@@ -505,6 +555,27 @@ def epilog():
     WRITE_SPINOR();
 
 """)
+
+    str.append("// undefine to prevent warning when precision is changed\n")
+
+    str.append("#undef spinorFloat\n")
+
+    str.append("#undef A_re\n")
+    str.append("#undef A_im\n\n")
+
+    for m in range(0,3):
+        for n in range(0,3):
+            i = 3*m+n
+            str.append("#undef "+g_re(0,m,n)+"\n")
+            str.append("#undef "+g_im(0,m,n)+"\n")
+    str.append("\n")
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str.append("#undef "+in_re(s,c)+"\n")
+            str.append("#undef "+in_im(s,c)+"\n")
+
     return ''.join(str)
 # end def epilog
 
@@ -513,7 +584,7 @@ def generate():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + clover() + epilog()
 
 dagger = False
-sharedFloats = 19
-#dagger = True
+dagger = True
+sharedFloats = 0
 
 print generate()

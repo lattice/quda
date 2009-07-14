@@ -6,6 +6,7 @@
 
 #include <gauge_quda.h>
 #include <spinor_quda.h>
+#include <dslash_reference.h>
 
 #define MAX_SHORT 32767
 #define SHORT_LENGTH 65536
@@ -20,8 +21,6 @@ inline short doubleToShort(double a) {
   return (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
 }
 
-
-
 // CPU only test of SU(3) accuracy, tests 8 and 12 component reconstruction
 void SU3Test() {
 
@@ -29,10 +28,17 @@ void SU3Test() {
 
   // construct input fields
   double *gauge[4];
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = (double*)malloc(N*gaugeSiteSize*sizeof(double));
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = (double*)malloc(V*gaugeSiteSize*sizeof(double));
 
   QudaGaugeParam param;
   gauge_param = &param;
+
+  param.X[0] = 4;
+  param.X[1] = 4;
+  param.X[2] = 4;
+  param.X[3] = 4;
+  setDims(param.X);
+
   param.anisotropy = 2.0;
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
     
@@ -54,8 +60,8 @@ void SU3Test() {
   }
 
   for (int eo=0; eo<2; eo++) {
-    for (int i=0; i<Nh; i++) {
-      int ga_idx = (eo*Nh+i);
+    for (int i=0; i<Vh; i++) {
+      int ga_idx = (eo*Vh+i);
       for (int d=0; d<4; d++) {
 	double gauge8[18], gauge12[18];
 	for (int j=0; j<18; j++) {
@@ -99,8 +105,8 @@ void SU3Test() {
 
   for (int f=0; f<fail_check; f++) {
     printf("%e Failures: 12 component = %d / %d  = %e, 8 component = %d / %d = %e\n", 
-	   pow(10,-(f+1)), fail12[f], N*4*18, fail12[f] / (double)(4*N*18),
-	   fail8[f], N*4*18, fail8[f] / (double)(4*N*18));
+	   pow(10,-(f+1)), fail12[f], V*4*18, fail12[f] / (double)(4*V*18),
+	   fail8[f], V*4*18, fail8[f] / (double)(4*V*18));
   }
 
   // release memory

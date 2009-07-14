@@ -3,14 +3,14 @@
 
 #include <cuda_runtime.h>
 
-#define L1 24 // "x" dimension
-#define L2 24 // "y" dimension
-#define L3 24 // "z" dimension
-#define L4 32 // "time" dimension
-#define L1h (L1/2) // half of the full "x" dimension, useful for even/odd lattice indexing
+//#define L1 4 // "x" dimension
+//#define L2 4 // "y" dimension
+//#define L3 4 // "z" dimension
+//#define L4 4 // "time" dimension
+//#define L1h (L1/2) // half of the full "x" dimension, useful for even/odd lattice indexing
 
-#define N (L1*L2*L3*L4) // total number of lattice points
-#define Nh (N/2) // total number of even/odd lattice points
+//#define N (L1*L2*L3*L4) // total number of lattice points
+//#define Nh (N/2) // total number of even/odd lattice points
 
 #define MAX_SHORT 32767
 
@@ -35,16 +35,30 @@ extern "C" {
 #endif
   
   typedef void *ParityGauge;
-  typedef void *ParityClover;
 
   typedef struct {
-    size_t packedGaugeBytes;
+    size_t bytes;
     Precision precision;
+    int length; // total length
+    int volume; // geometric volume (single parity)
+    int X[4]; // the geometric lengths (single parity)
+    int Nc; // number of colors
     ReconstructType reconstruct;
     ParityGauge odd;
     ParityGauge even;
   } FullGauge;
   
+  typedef struct {
+    size_t bytes;
+    Precision precision;
+    int length;
+    int volume;
+    int Nc;
+    int Ns;
+    void *clover; // pointer to clover matrix
+    void *cloverInverse; // pointer to inverse of clover matrix
+  } ParityClover;
+
   typedef struct {
     Precision precision;
     ParityClover odd;
@@ -52,8 +66,13 @@ extern "C" {
   } FullClover;
 
   typedef struct {
+    size_t bytes;
     Precision precision;
-    int length; // geometric length of spinor
+    int length; // total length
+    int volume; // geometric volume (single parity)
+    int X[4]; // the geometric lengths (single parity)
+    int Nc; // length of color dimension
+    int Ns; // length of spin dimension
     void *spinor; // either (double2*), (float4 *) or (short4 *), depending on precision
     float *spinorNorm; // used only when precision is QUDA_HALF_PRECISION
   } ParitySpinor;

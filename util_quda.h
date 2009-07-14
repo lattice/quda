@@ -7,10 +7,6 @@
 extern "C" {
 #endif
   
-  // ---------- qcd.cpp ----------
-  
-  int compare_floats(void *a, void *b, int len, double tol, Precision precision);
-  
   void stopwatchStart();
   double stopwatchReadSeconds();
 
@@ -28,11 +24,9 @@ extern "C" {
   //void su3_construct_8_half(float *mat, short *mat_half);
   //void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx);
 
-  void apply_gamma5(void *out, void *in, int len, Precision precision);
-  
   void compare_spinor(void *spinor_cpu, void *spinor_gpu, int len, Precision precision);
   void strong_check(void *spinor, void *spinorGPU, int len, Precision precision);
-
+  int compare_floats(void *a, void *b, int len, double epsilon, Precision precision);
   // ---------- gauge_read.cpp ----------
   
   void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]);

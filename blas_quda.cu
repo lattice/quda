@@ -22,6 +22,20 @@
 #define QudaSumFloat3 float3
 #endif
 
+#if (__CUDA_ARCH__ == 130)
+static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
+{
+  int4 v = tex1Dfetch(t,i);
+  return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
+}
+#else
+static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
+{
+  // do nothing
+  return make_double2(0.0, 0.0);
+}
+#endif
+
 #define RECONSTRUCT_HALF_SPINOR(a, texHalf, texNorm, length)		\
   float4 a##0 = tex1Dfetch(texHalf, i + 0*length);			\
   float4 a##1 = tex1Dfetch(texHalf, i + 1*length);			\
@@ -158,7 +172,7 @@
   Z.x = z.x; Z.y = z.y;				       \
   z.x = X.z + a.x*Y.z - a.y*Y.w + b.x*Z.z - b.y*Z.w;   \
   z.y = X.w + a.y*Y.z + a.x*Y.w + b.y*Z.z + b.x*Z.w;   \
-  Z.z = z.x; Z.w = z.y;}			       \  
+  Z.z = z.x; Z.w = z.y;}
 
 #define CAXPBYPZ_FLOAT4(a, X, b, Y, Z)		  \
   Z.x += a.x*X.x - a.y*X.y + b.x*Y.x - b.y*Y.y;   \
@@ -191,14 +205,6 @@ texture<float, 1, cudaReadModeElementType> texNorm4;
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf5;
 texture<float, 1, cudaReadModeElementType> texNorm5;
-
-#if (__CUDA_ARCH__ == 130)
-static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
-{
-    int4 v = tex1Dfetch(t,i);
-    return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
-}
-#endif
 
 inline void checkSpinor(ParitySpinor &a, ParitySpinor &b) {
   if (a.precision != b.precision) {

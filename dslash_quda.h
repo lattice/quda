@@ -10,12 +10,6 @@
 #define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
 
 #define BLOCK_DIM (64) // threads per block
-#define GRID_DIM (Nh/BLOCK_DIM) // there are Nh threads in total
-
-#define PACKED12_GAUGE_BYTES (4*Nh*12*sizeof(float))
-#define PACKED8_GAUGE_BYTES (4*Nh*8*sizeof(float))
-
-#define CLOVER_BYTES (Nh*cloverSiteSize*sizeof(float))
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +26,7 @@ extern "C" {
 // ---------- dslash_quda.cu ----------
 
   int dslashCudaSharedBytes();
-  void setCudaGaugeParam();
+  void initDslashCuda();
   void bindGaugeTex(FullGauge gauge, int oddBit);
 
   // Double precision routines
@@ -67,18 +61,13 @@ extern "C" {
   void MatPCDagMatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven,
 			 double kappa, ParitySpinor tmp, MatPCType matpc_type);
   
-  /*QudaSumComplex MatPCcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-				 float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);
-  QudaSumComplex MatPCDagcDotWXCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-  float kappa, ParitySpinor tmp, ParitySpinor d, MatPCType matpc_type);*/
-  
   // -- inv_cg_cuda.cpp
   void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 
-		    ParitySpinor tmp, QudaInvertParam *param);
+		    FullGauge gaugeSloppy, ParitySpinor tmp, QudaInvertParam *param);
   
   // -- inv_bicgstab_cuda.cpp
-  void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, FullGauge gaugeSloppy, 
-			  FullGauge gaugePrecise, ParitySpinor tmp, 
+  void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 
+			  FullGauge gaugeSloppy, ParitySpinor tmp, 
 			  QudaInvertParam *param, DagType dag_type);
   
 #ifdef __cplusplus
