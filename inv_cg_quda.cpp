@@ -59,7 +59,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugePrecise,
   int k=0;
   int xUpdate = 0, rUpdate = 0;
 
-  //printf("%d iterations, r2 = %e\n", k, r2);
+  printf("%d iterations, r2 = %e\n", k, r2);
   stopwatchStart();
   while (r2 > stop && k<perf->maxiter) {
     MatPCDagMatPCCuda(Ap, gaugeSloppy, p, perf->kappa, tmp_sloppy, perf->matpc_type);
@@ -110,7 +110,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugePrecise,
     }
 
     k++;
-    //printf("%d iterations, r2 = %e\n", k, r2);
+    printf("%d iterations, r2 = %e\n", k, r2);
   }
 
   if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
@@ -121,7 +121,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugePrecise,
   if (k==invert_param->maxiter) 
     printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
 
-  //printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
+  printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
 
   float gflops = k*(1.0e-9*x.volume)*(2*(2*1320+48) + 10*spinorSiteSize);
   //printf("%f gflops\n", k*gflops / stopwatchReadSeconds());

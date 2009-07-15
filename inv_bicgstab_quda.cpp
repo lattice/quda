@@ -111,7 +111,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
     rho_r2 = caxpbypzYmbwcDotProductWYNormYQuda(alpha, p, omega, r_sloppy, x_sloppy, t, src_sloppy);
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
 
-    // reliable updates (ideally should be double precision)
+    // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
     if (rNorm > maxrr) maxrr = rNorm;

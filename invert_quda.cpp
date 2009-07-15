@@ -93,20 +93,15 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   gauge_param = param;
 
-  /*  if (gauge_param->X != L1 || gauge_param->Y != L2 || gauge_param->Z != L3 || gauge_param->T != L4) {
-    printf("QUDA error: dimensions do not match: %d=%d, %d=%d, %d=%d, %d=%d\n", 
-	   gauge_param->X, L1, gauge_param->Y, L2, gauge_param->Z, L3, gauge_param->T, L4);
-    exit(-1);
-    }*/
   gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
   createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->reconstruct, 
-		   gauge_param->cuda_prec, gauge_param->X);
+		   gauge_param->cuda_prec, gauge_param->X, gauge_param->anisotropy);
   gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec ||
       gauge_param->reconstruct_sloppy != gauge_param->reconstruct) {
     createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->reconstruct_sloppy, 
-		     gauge_param->cuda_prec_sloppy, gauge_param->X);
+		     gauge_param->cuda_prec_sloppy, gauge_param->X, gauge_param->anisotropy);
     gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
@@ -212,6 +207,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   param->iter = 0;
 
   double kappa = param->kappa;
+  if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa /= cudaGaugePrecise.anisotropy;
 
   FullSpinor b, x;
   ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec); // source vector
@@ -237,6 +233,12 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
       axCuda(2.0*kappa, b.odd);
     }
 
+    // cps uses a different anisotropy normalization
+    if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+      axCuda(1.0/gauge_param->anisotropy, b.even);
+      axCuda(1.0/gauge_param->anisotropy, b.even);
+    }
+
     if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashXpayCuda(in, cudaGaugePrecise, b.odd, 0, 0, b.even, kappa);
     } else {
@@ -253,6 +255,14 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 	axCuda(4.0*kappa*kappa, in);
       else
 	axCuda(16.0*pow(kappa,4), in);
+
+    // cps uses a different anisotropy normalization
+    if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
+      if (param->solution_type == QUDA_MATPC_SOLUTION) 
+	axCuda(pow(1.0/gauge_param->anisotropy, 2), in);
+      else 
+	axCuda(pow(1.0/gauge_param->anisotropy, 4), in);
+
   }
 
   switch (param->inv_type) {

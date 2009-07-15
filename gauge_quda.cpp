@@ -10,6 +10,8 @@
 #define SCALE_FLOAT (SHORT_LENGTH-1) / 2.f
 #define SHIFT_FLOAT -1.f / (SHORT_LENGTH-1)
 
+double Anisotropy;
+
 template <typename Float>
 inline short FloatToShort(Float a) {
   return (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
@@ -111,9 +113,9 @@ void packCPSGaugeField(FloatN *res, Float *gauge, int oddBit, ReconstructType re
     for (int dir = 0; dir < 4; dir++) {
       Float *g = gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	// Must reorder rows-columns
+	// Must reorder rows-columns and divide by anisotropy
 	for (int ic=0; ic<2; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];      
+	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r] / Anisotropy;
 	pack12(res+i, gT, dir, V);
       }
     } 
@@ -121,9 +123,9 @@ void packCPSGaugeField(FloatN *res, Float *gauge, int oddBit, ReconstructType re
     for (int dir = 0; dir < 4; dir++) {
       Float *g = gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	// Must reorder rows-columns
+	// Must reorder rows-columns and divide by anisotropy
 	for (int ic=0; ic<3; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];      
+	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r] / Anisotropy;
 	pack8(res+i, gT, dir, V);
       }
     }
@@ -191,6 +193,7 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
   } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
     packCPSGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, Vh);
     packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh);
+    
   } else {
     printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
     exit(-1);
@@ -210,7 +213,7 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
 }
 
 void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, ReconstructType reconstruct, 
-		      Precision precision, int *X) {
+		      Precision precision, int *X, double anisotropy) {
 
   if (gauge_param->cpu_prec == QUDA_HALF_PRECISION) {
     printf("QUDA error: half precision not supported on cpu\n");
@@ -227,6 +230,9 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, ReconstructType reco
     exit(-1);
   }
 
+  Anisotropy = anisotropy;
+
+  cudaGauge->anisotropy = anisotropy;
   cudaGauge->volume = 1;
   for (int d=0; d<4; d++) {
     cudaGauge->X[d] = X[d];

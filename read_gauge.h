@@ -1,3 +1,10 @@
+// this will evaluate wrong for (1/L^3) < 5e-7, i.e., L=100
+
+#define FAST_INT_DIVIDE(a, b)			\
+  ((int)(__fdividef((float)a, (float)b)+0.0000005f))
+
+#define FAST_INT_MOD(a, b) (a - FAST_INT_DIVIDE(a,b)*b)
+
 // Performs complex addition
 #define COMPLEX_ADD_TO(a, b)			\
   a##_re += b##_re,				\

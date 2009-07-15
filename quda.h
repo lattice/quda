@@ -46,6 +46,7 @@ extern "C" {
     ReconstructType reconstruct;
     ParityGauge odd;
     ParityGauge even;
+    double anisotropy;
   } FullGauge;
   
   typedef struct {
