@@ -1,7 +1,7 @@
-// this will evaluate wrong for (1/L^3) < 5e-7, i.e., L=100
+// this will evaluate wrong for (1/L^3) < 3e-7
 
 #define FAST_INT_DIVIDE(a, b)			\
-  ((int)(__fdividef((float)a, (float)b)+0.0000005f))
+  ((int)(__fdividef((float)a, (float)b)+0.0000003f))
 
 #define FAST_INT_MOD(a, b) (a - FAST_INT_DIVIDE(a,b)*b)
 
