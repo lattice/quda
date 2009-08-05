@@ -69,6 +69,16 @@ __constant__ int X2X1;
 __constant__ int X3X2X1;
 __constant__ int X4X3X2X1;
 
+__constant__ float X1h_inv;
+__constant__ float X2X1h_inv;
+__constant__ float X3X2X1h_inv;
+
+__constant__ float X1_inv;
+__constant__ float X2_inv;
+__constant__ float X3_inv;
+__constant__ float X2X1_inv;
+__constant__ float X3X2X1_inv;
+
 __constant__ int Vh;
 
 __constant__ int gauge_fixed;
@@ -87,6 +97,11 @@ __constant__ double t_boundary;
 void initDslashCuda(FullGauge gauge) {
   int Vh = gauge.volume;
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
+
+  if (Vh%BLOCK_DIM !=0) {
+    printf("Sorry, volume is not a multiple of number of threads %d\n", BLOCK_DIM);
+    exit(-1);
+  }
 
   int X1 = 2*gauge.X[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
@@ -120,6 +135,30 @@ void initDslashCuda(FullGauge gauge) {
 
   int X4X3X2X1h = X4*X3*X2*X1h;
   cudaMemcpyToSymbol("X4X3X2X1h", &X4X3X2X1h, sizeof(int));  
+
+  float X1h_inv = 1.0 / X1h;
+  cudaMemcpyToSymbol("X1h_inv", &X1h_inv, sizeof(float));  
+
+  float X2X1h_inv = 1.0 / X2X1h;
+  cudaMemcpyToSymbol("X2X1h_inv", &X2X1h_inv, sizeof(float));  
+
+  float X3X2X1h_inv = 1.0 / X3X2X1h;
+  cudaMemcpyToSymbol("X3X2X1h_inv", &X3X2X1h_inv, sizeof(float));  
+
+  float X1_inv = 1.0 / X1;
+  cudaMemcpyToSymbol("X1_inv", &X1_inv, sizeof(float));  
+
+  float X2_inv = 1.0 / X2;
+  cudaMemcpyToSymbol("X2_inv", &X2_inv, sizeof(float));  
+
+  float X3_inv = 1.0 / X3;
+  cudaMemcpyToSymbol("X3_inv", &X3_inv, sizeof(float));  
+
+  float X2X1_inv = 1.0 / X2X1;
+  cudaMemcpyToSymbol("X2X1_inv", &X2X1_inv, sizeof(float));  
+
+  float X3X2X1_inv = 1.0 / X3X2X1;
+  cudaMemcpyToSymbol("X3X2X1_inv", &X3X2X1_inv, sizeof(float));  
 
   int gf = (gauge_param->gauge_fix == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
   cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));

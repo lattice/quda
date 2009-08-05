@@ -252,11 +252,12 @@ int boundaryCrossings = FAST_INT_DIVIDE(sid,X1h) +
   FAST_INT_DIVIDE(sid,X2X1h) + FAST_INT_DIVIDE(sid,X3X2X1h);
 int X = 2*sid + ((boundaryCrossings + oddBit)&1);
 
-int x4 = FAST_INT_DIVIDE(X, X3X2X1);
-int x3 = FAST_INT_MOD(FAST_INT_DIVIDE(X, X2X1), X3);
-int x2 = FAST_INT_DIVIDE(X, X1);
-int x1 = X - x2*X1;
-x2 = FAST_INT_MOD(x2, X2);
+int z1 = FAST_INT_DIVIDE(X, X1);
+int x1 = X - z1*X1;
+int z2 = FAST_INT_DIVIDE(z1, X2);
+int x2 = z1 - z2*X2;
+int x4 = FAST_INT_DIVIDE(z2, X3);
+int x3 = z2 - x4*X3;
 
 """)
     

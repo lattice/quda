@@ -47,19 +47,12 @@ void printVector(Float *v) {
   printf("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
 }
 
-// X indexes the full lattice
+// X indexes the lattice site
 void printSpinorElement(void *spinor, int X, Precision precision) {
-  if (getOddBit(X) == 0) {
-    if (precision == QUDA_DOUBLE_PRECISION)
-      for (int s=0; s<4; s++) printVector((double*)spinor+(X/2)*(4*3*2)+s*(3*2));
-    else
-      for (int s=0; s<4; s++) printVector((float*)spinor+(X/2)*(4*3*2)+s*(3*2));
-  } else {
-    if (precision == QUDA_DOUBLE_PRECISION)
-      for (int s=0; s<4; s++) printVector((double*)spinor+(X/2)*(4*3*2)+Vh*24+s*(3*2));
-    else
-      for (int s=0; s<4; s++) printVector((float*)spinor+(X/2)*(4*3*2)+Vh*24+s*(3*2));
-  }
+  if (precision == QUDA_DOUBLE_PRECISION)
+    for (int s=0; s<4; s++) printVector((double*)spinor+X*24+s*6);
+  else
+    for (int s=0; s<4; s++) printVector((float*)spinor+X*24+s*6);
 }
 
 // X indexes the full lattice
@@ -536,5 +529,3 @@ void strong_check(void *spinorRef, void *spinorGPU, int len, Precision prec) {
 
   compare_spinor(spinorRef, spinorGPU, len, prec);
 }
-
-

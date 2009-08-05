@@ -25,19 +25,19 @@ void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
     
 double kappa = 1.0;
 int ODD_BIT = 1;
-int DAGGER_BIT = 0;
-int TRANSFER = 1; // include transfer time in the benchmark?
+int DAGGER_BIT = 1;
+int TRANSFER = 0; // include transfer time in the benchmark?
 
 void init() {
 
-  gaugeParam.X[0] = 8;
-  gaugeParam.X[1] = 8;
-  gaugeParam.X[2] = 8;
-  gaugeParam.X[3] = 8;
+  gaugeParam.X[0] = 24;
+  gaugeParam.X[1] = 24;
+  gaugeParam.X[2] = 24;
+  gaugeParam.X[3] = 32;
   setDims(gaugeParam.X);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_DOUBLE_PRECISION;
+  gaugeParam.cuda_prec = QUDA_SINGLE_PRECISION;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
@@ -49,7 +49,7 @@ void init() {
   gauge_param = &gaugeParam;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.kappa = kappa;
@@ -219,7 +219,7 @@ void dslashTest() {
     printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
 
-    /*    for (int is=0; is<Vh; is++) {
+    /*for (int is=0; is<Vh; is++) {
       printf("%e %e\n", ((double*)spinorRef)[is*24], ((double*)spinorOdd)[is*24]);
     }
     exit(0);*/

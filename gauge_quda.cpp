@@ -19,7 +19,7 @@ inline short FloatToShort(Float a) {
 
 template <typename Float>
 inline void pack8(double2 *res, Float *g, int dir, int V) {
-  double2 *r = res + dir*2*V;
+  double2 *r = res + dir*4*V;
   r[0].x = atan2(g[1], g[0]);
   r[0].y = atan2(g[13], g[12]);
   r[V].x = g[2];
@@ -32,7 +32,7 @@ inline void pack8(double2 *res, Float *g, int dir, int V) {
 
 template <typename Float>
 inline void pack8(float4 *res, Float *g, int dir, int V) {
-  float4 *r = res + dir*4*V;
+  float4 *r = res + dir*2*V;
   r[0].x = atan2(g[1], g[0]);
   r[0].y = atan2(g[13], g[12]);
   r[0].z = g[2];
@@ -45,7 +45,7 @@ inline void pack8(float4 *res, Float *g, int dir, int V) {
 
 template <typename Float>
 inline void pack8(short4 *res, Float *g, int dir, int V) {
-  short4 *r = res + dir*4*V;
+  short4 *r = res + dir*2*V;
   r[0].x = FloatToShort(atan2(g[1], g[0])/ M_PI);
   r[0].y = FloatToShort(atan2(g[13], g[12])/ M_PI);
   r[0].z = FloatToShort(g[2]);
@@ -179,6 +179,7 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
   
   FloatN *packedEven, *packedOdd;
     
+
 #ifndef __DEVICE_EMULATION__
   cudaMallocHost((void**)&packedEven, bytes);
   cudaMallocHost((void**)&packedOdd, bytes);
