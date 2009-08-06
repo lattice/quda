@@ -248,16 +248,15 @@ def prolog():
 #include "io_spinor.h"
 
 int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
-int boundaryCrossings = FAST_INT_DIVIDE(sid,X1h) + 
-  FAST_INT_DIVIDE(sid,X2X1h) + FAST_INT_DIVIDE(sid,X3X2X1h);
-int X = 2*sid + ((boundaryCrossings + oddBit)&1);
-
-int z1 = FAST_INT_DIVIDE(X, X1);
-int x1 = X - z1*X1;
+int z1 = FAST_INT_DIVIDE(sid, X1h);
+int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);
 int x2 = z1 - z2*X2;
 int x4 = FAST_INT_DIVIDE(z2, X3);
 int x3 = z2 - x4*X3;
+int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+int x1 = 2*x1h + x1odd;
+int X = 2*sid + x1odd;
 
 """)
     
@@ -585,7 +584,7 @@ def generate():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + clover() + epilog()
 
 dagger = False
-dagger = True
+#dagger = True
 sharedFloats = 0
 
 print generate()
