@@ -87,6 +87,15 @@ inline void pack12(short4 *res, Float *g, int dir, int V) {
   }
 }
 
+template <typename Float>
+inline void pack18(double2 *res, Float *g, int dir, int V) {
+  double2 *r = res + dir*9*V;
+  for (int j=0; j<9; j++) {
+    r[j*V].x = g[j*2+0]; 
+    r[j*V].y = g[j*2+1]; 
+  }
+}
+
 // Assume the gauge field is "QDP" ordered directions inside of
 // space-time column-row ordering even-odd space-time
 template <typename Float, typename FloatN>
