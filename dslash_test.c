@@ -25,15 +25,15 @@ void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
     
 double kappa = 1.0;
 int ODD_BIT = 1;
-int DAGGER_BIT = 1;
+int DAGGER_BIT = 0;
 int TRANSFER = 0; // include transfer time in the benchmark?
 
 void init() {
 
-  gaugeParam.X[0] = 24;
-  gaugeParam.X[1] = 24;
-  gaugeParam.X[2] = 24;
-  gaugeParam.X[3] = 32;
+  gaugeParam.X[0] = 36;
+  gaugeParam.X[1] = 36;
+  gaugeParam.X[2] = 36;
+  gaugeParam.X[3] = 24;
   setDims(gaugeParam.X);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;

@@ -302,14 +302,14 @@ def gen(dir):
         str.append("// "+l+"\n")
     str.append("\n")
     
-    if dir == 0: str.append("int sp_idx = ((x1==X1-1) ? X-X1+1 : X+1) >> 1;\n")
-    if dir == 1: str.append("int sp_idx = ((x1==0)    ? X+X1-1 : X-1) >> 1;\n")
-    if dir == 2: str.append("int sp_idx = ((x2==X2-1) ? X-X2X1+X1 : X+X1) >> 1;\n")
-    if dir == 3: str.append("int sp_idx = ((x2==0)    ? X+X2X1-X1 : X-X1) >> 1;\n")
-    if dir == 4: str.append("int sp_idx = ((x3==X3-1) ? X-X3X2X1+X2X1 : X+X2X1) >> 1;\n")
-    if dir == 5: str.append("int sp_idx = ((x3==0)    ? X+X3X2X1-X2X1 : X-X2X1) >> 1;\n")
-    if dir == 6: str.append("int sp_idx = ((x4==X4-1) ? X-X4X3X2X1+X3X2X1 : X+X3X2X1) >> 1;\n")
-    if dir == 7: str.append("int sp_idx = ((x4==0)    ? X+X4X3X2X1-X3X2X1 : X-X3X2X1) >> 1;\n")
+    if dir == 0: str.append("int sp_idx = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;\n")
+    if dir == 1: str.append("int sp_idx = ((x1==0)    ? X+X1m1 : X-1) >> 1;\n")
+    if dir == 2: str.append("int sp_idx = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;\n")
+    if dir == 3: str.append("int sp_idx = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;\n")
+    if dir == 4: str.append("int sp_idx = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;\n")
+    if dir == 5: str.append("int sp_idx = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;\n")
+    if dir == 6: str.append("int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;\n")
+    if dir == 7: str.append("int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;\n")
     
     ga_idx = "sid" if dir % 2 == 0 else "sp_idx"
     str.append("int ga_idx = "+ga_idx+";\n\n")
@@ -421,7 +421,7 @@ def gen(dir):
         reconstruct.append("\n")
         
     if dir >= 6:
-        str.append("if (gauge_fixed && ga_idx < X4X3X2X1h-X3X2X1h) ")
+        str.append("if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) ")
         str.append(block(''.join(load_spinor) + ''.join(project) + ''.join(ident) + ''.join(reconstruct)))
         str.append("else ")
         str.append(block(''.join(load_gauge) + ''.join(load_spinor) + ''.join(reconstruct_gauge) + 

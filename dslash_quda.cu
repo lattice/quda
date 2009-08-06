@@ -56,28 +56,28 @@ texture<float, 1, cudaReadModeElementType> cloverTexNorm;
 QudaGaugeParam *gauge_param;
 QudaInvertParam *invert_param;
 
+__constant__ int X1h;
 __constant__ int X1;
 __constant__ int X2;
 __constant__ int X3;
 __constant__ int X4;
 
-__constant__ int X1h;
-__constant__ int X2X1h;
-__constant__ int X3X2X1h;
-__constant__ int X4X3X2X1h;
-__constant__ int X2X1;
-__constant__ int X3X2X1;
-__constant__ int X4X3X2X1;
+__constant__ int X1m1;
+__constant__ int X2m1;
+__constant__ int X3m1;
+__constant__ int X4m1;
+
+__constant__ int X2X1mX1;
+__constant__ int X3X2X1mX2X1;
+__constant__ int X4X3X2X1mX3X2X1;
+__constant__ int X4X3X2X1hmX3X2X1h;
 
 __constant__ float X1h_inv;
-__constant__ float X2X1h_inv;
-__constant__ float X3X2X1h_inv;
-
-__constant__ float X1_inv;
 __constant__ float X2_inv;
 __constant__ float X3_inv;
-__constant__ float X2X1_inv;
-__constant__ float X3X2X1_inv;
+
+__constant__ int X2X1;
+__constant__ int X3X2X1;
 
 __constant__ int Vh;
 
@@ -91,6 +91,8 @@ __constant__ float pi_f;
 // double precision constants
 __constant__ double anisotropy;
 __constant__ double t_boundary;
+
+int initDslash = 0;
 
 #include <dslash_def.h>
 
@@ -121,32 +123,11 @@ void initDslashCuda(FullGauge gauge) {
   int X3X2X1 = X3*X2*X1;
   cudaMemcpyToSymbol("X3X2X1", &X3X2X1, sizeof(int));  
 
-  int X4X3X2X1 = X4*X3*X2*X1;
-  cudaMemcpyToSymbol("X4X3X2X1", &X4X3X2X1, sizeof(int));  
-
   int X1h = X1/2;
   cudaMemcpyToSymbol("X1h", &X1h, sizeof(int));  
 
-  int X2X1h = X2*X1h;
-  cudaMemcpyToSymbol("X2X1h", &X2X1h, sizeof(int));  
-
-  int X3X2X1h = X3*X2*X1h;
-  cudaMemcpyToSymbol("X3X2X1h", &X3X2X1h, sizeof(int));  
-
-  int X4X3X2X1h = X4*X3*X2*X1h;
-  cudaMemcpyToSymbol("X4X3X2X1h", &X4X3X2X1h, sizeof(int));  
-
   float X1h_inv = 1.0 / X1h;
   cudaMemcpyToSymbol("X1h_inv", &X1h_inv, sizeof(float));  
-
-  float X2X1h_inv = 1.0 / X2X1h;
-  cudaMemcpyToSymbol("X2X1h_inv", &X2X1h_inv, sizeof(float));  
-
-  float X3X2X1h_inv = 1.0 / X3X2X1h;
-  cudaMemcpyToSymbol("X3X2X1h_inv", &X3X2X1h_inv, sizeof(float));  
-
-  float X1_inv = 1.0 / X1;
-  cudaMemcpyToSymbol("X1_inv", &X1_inv, sizeof(float));  
 
   float X2_inv = 1.0 / X2;
   cudaMemcpyToSymbol("X2_inv", &X2_inv, sizeof(float));  
@@ -154,11 +135,29 @@ void initDslashCuda(FullGauge gauge) {
   float X3_inv = 1.0 / X3;
   cudaMemcpyToSymbol("X3_inv", &X3_inv, sizeof(float));  
 
-  float X2X1_inv = 1.0 / X2X1;
-  cudaMemcpyToSymbol("X2X1_inv", &X2X1_inv, sizeof(float));  
+  int X1m1 = X1 - 1;
+  cudaMemcpyToSymbol("X1m1", &X1m1, sizeof(int));  
 
-  float X3X2X1_inv = 1.0 / X3X2X1;
-  cudaMemcpyToSymbol("X3X2X1_inv", &X3X2X1_inv, sizeof(float));  
+  int X2m1 = X2 - 1;
+  cudaMemcpyToSymbol("X2m1", &X2m1, sizeof(int));  
+
+  int X3m1 = X3 - 1;
+  cudaMemcpyToSymbol("X3m1", &X3m1, sizeof(int));  
+
+  int X4m1 = X4 - 1;
+  cudaMemcpyToSymbol("X4m1", &X4m1, sizeof(int));  
+  
+  int X2X1mX1 = X2X1 - X1;
+  cudaMemcpyToSymbol("X2X1mX1", &X2X1mX1, sizeof(int));  
+
+  int X3X2X1mX2X1 = X3X2X1 - X2X1;
+  cudaMemcpyToSymbol("X3X2X1mX2X1", &X3X2X1mX2X1, sizeof(int));  
+
+  int X4X3X2X1mX3X2X1 = (X4-1)*X3X2X1;
+  cudaMemcpyToSymbol("X4X3X2X1mX3X2X1", &X4X3X2X1mX3X2X1, sizeof(int));  
+
+  int X4X3X2X1hmX3X2X1h = (X4-1)*X3*X2*X1h;
+  cudaMemcpyToSymbol("X4X3X2X1hmX3X2X1h", &X4X3X2X1hmX3X2X1h, sizeof(int));  
 
   int gf = (gauge_param->gauge_fix == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
   cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
@@ -176,6 +175,8 @@ void initDslashCuda(FullGauge gauge) {
 
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
+
+  initDslash = 1;
 }
 
 void bindGaugeTex(FullGauge gauge, int oddBit) {
@@ -238,7 +239,7 @@ void checkGaugeSpinor(ParitySpinor spinor, FullGauge gauge) {
 }
 
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
-  initDslashCuda(gauge);
+  if (!initDslash) initDslashCuda(gauge);
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
@@ -434,7 +435,7 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
 void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger,
 		    ParitySpinor x, double a) {
-  initDslashCuda(gauge);
+  if (!initDslash) initDslashCuda(gauge);
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 

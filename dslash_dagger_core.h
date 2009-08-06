@@ -329,7 +329,7 @@ o32_re = o32_im = 0;
     // 0 -i 1 0 
     // -i 0 0 1 
     
-    int sp_idx = ((x1==X1-1) ? X-X1+1 : X+1) >> 1;
+    int sp_idx = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;
     int ga_idx = sid;
     
     // read gauge matrix from device memory
@@ -410,7 +410,7 @@ o32_re = o32_im = 0;
     // 0 i 1 0 
     // i 0 0 1 
     
-    int sp_idx = ((x1==0)    ? X+X1-1 : X-1) >> 1;
+    int sp_idx = ((x1==0)    ? X+X1m1 : X-1) >> 1;
     int ga_idx = sp_idx;
     
     // read gauge matrix from device memory
@@ -491,7 +491,7 @@ o32_re = o32_im = 0;
     // 0 -1 1 0 
     // 1 0 0 1 
     
-    int sp_idx = ((x2==X2-1) ? X-X2X1+X1 : X+X1) >> 1;
+    int sp_idx = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;
     int ga_idx = sid;
     
     // read gauge matrix from device memory
@@ -572,7 +572,7 @@ o32_re = o32_im = 0;
     // 0 1 1 0 
     // -1 0 0 1 
     
-    int sp_idx = ((x2==0)    ? X+X2X1-X1 : X-X1) >> 1;
+    int sp_idx = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;
     int ga_idx = sp_idx;
     
     // read gauge matrix from device memory
@@ -653,7 +653,7 @@ o32_re = o32_im = 0;
     // -i 0 1 0 
     // 0 i 0 1 
     
-    int sp_idx = ((x3==X3-1) ? X-X3X2X1+X2X1 : X+X2X1) >> 1;
+    int sp_idx = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
     int ga_idx = sid;
     
     // read gauge matrix from device memory
@@ -734,7 +734,7 @@ o32_re = o32_im = 0;
     // i 0 1 0 
     // 0 -i 0 1 
     
-    int sp_idx = ((x3==0)    ? X+X3X2X1-X2X1 : X-X2X1) >> 1;
+    int sp_idx = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
     int ga_idx = sp_idx;
     
     // read gauge matrix from device memory
@@ -815,10 +815,10 @@ o32_re = o32_im = 0;
     // 0 0 0 0 
     // 0 0 0 0 
     
-    int sp_idx = ((x4==X4-1) ? X-X4X3X2X1+X3X2X1 : X+X3X2X1) >> 1;
+    int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
     int ga_idx = sid;
     
-    if (gauge_fixed && ga_idx < X4X3X2X1h-X3X2X1h) {
+    if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX);
         
@@ -929,10 +929,10 @@ o32_re = o32_im = 0;
     // 0 0 2 0 
     // 0 0 0 2 
     
-    int sp_idx = ((x4==0)    ? X+X4X3X2X1-X3X2X1 : X-X3X2X1) >> 1;
+    int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
     int ga_idx = sp_idx;
     
-    if (gauge_fixed && ga_idx < X4X3X2X1h-X3X2X1h) {
+    if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
         READ_SPINOR_DOWN(SPINORTEX);
         
