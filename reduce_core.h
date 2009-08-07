@@ -85,26 +85,20 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
   
   // allocate arrays on device and host to store one QudaSumFloat for each block
   int blocks = min(REDUCE_MAX_BLOCKS, n / REDUCE_THREADS);
-  QudaSumFloat h_odata[REDUCE_MAX_BLOCKS];
-  QudaSumFloat *d_odata;
-  if (cudaMalloc((void**) &d_odata, blocks*sizeof(QudaSumFloat))) {
-    printf("Error allocating reduction matrix of size %d\n", blocks*sizeof(QudaSumFloat));
-    exit(0);
-  }   
+  initReduceFloat(blocks);
   
   // partial reduction; each block generates one number
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
   int smemSize = REDUCE_THREADS * sizeof(QudaSumFloat);
-  REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_odata, n);
+  REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat, n);
   
   // copy result from device to host, and perform final reduction on CPU
-  cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_reduceFloat, d_reduceFloat, blocks*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
   double cpu_sum = 0;
   for (int i = 0; i < blocks; i++) 
-    cpu_sum += h_odata[i];
+    cpu_sum += h_reduceFloat[i];
   
-  cudaFree(d_odata);    
   return cpu_sum;
 }
 

@@ -114,33 +114,26 @@ double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
   
   // allocate arrays on device and host to store one QudaSumFloat3 for each block
   int blocks = min(REDUCE_MAX_BLOCKS, n / REDUCE_THREADS);
-  QudaSumFloat3 h_odata[REDUCE_MAX_BLOCKS];
-  QudaSumFloat3 *d_odata;
-  if (cudaMalloc((void**) &d_odata, blocks*sizeof(QudaSumFloat3))) {
-    printf("Error allocating reduction matrix\n");
-    exit(0);
-  }
+  initReduceFloat3(blocks);
   
   // partial reduction; each block generates one number
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
   int smemSize = REDUCE_THREADS * sizeof(QudaSumFloat3);
-  REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_odata, n);
+  REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
   
   // copy result from device to host, and perform final reduction on CPU
-  cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_reduceFloat3, d_reduceFloat3, blocks*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
   
   double3 gpu_result;
   gpu_result.x = 0;
   gpu_result.y = 0;
   gpu_result.z = 0;
   for (int i = 0; i < blocks; i++) {
-    gpu_result.x += h_odata[i].x;
-    gpu_result.y += h_odata[i].y;
-    gpu_result.z += h_odata[i].z;
+    gpu_result.x += h_reduceFloat3[i].x;
+    gpu_result.y += h_reduceFloat3[i].y;
+    gpu_result.z += h_reduceFloat3[i].z;
   }
-  
-  cudaFree(d_odata);    
   
   return gpu_result;
 }

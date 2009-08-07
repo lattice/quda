@@ -22,6 +22,62 @@
 #define QudaSumFloat3 float3
 #endif
 
+// These are used for reduction kernels
+QudaSumFloat *d_reduceFloat;
+QudaSumComplex *d_reduceComplex;
+QudaSumFloat3 *d_reduceFloat3;
+
+QudaSumFloat h_reduceFloat[REDUCE_MAX_BLOCKS];
+QudaSumComplex h_reduceComplex[REDUCE_MAX_BLOCKS];
+QudaSumFloat3 h_reduceFloat3[REDUCE_MAX_BLOCKS];
+
+int blocksFloat = 0;
+int blocksComplex = 0;
+int blocksFloat3 = 0;
+
+void initReduceFloat(int blocks) {
+  if (blocks != blocksFloat) {
+    if (blocksFloat > 0) cudaFree(h_reduceFloat);
+
+    if (cudaMalloc((void**) &d_reduceFloat, blocks*sizeof(QudaSumFloat))) {
+      printf("Error allocating reduction matrix\n");
+      exit(0);
+    }
+
+    blocksFloat = blocks;
+
+    printf("Initialized reduce floats %d\n", blocksFloat);
+  }
+}
+
+void initReduceComplex(int blocks) {
+  if (blocks != blocksComplex) {
+    if (blocksComplex > 0) cudaFree(h_reduceComplex);
+
+    if (cudaMalloc((void**) &d_reduceComplex, blocks*sizeof(QudaSumComplex))) {
+      printf("Error allocating reduction matrix\n");
+      exit(0);
+    }
+
+    blocksComplex = blocks;
+    printf("Initialized reduce complex %d\n", blocksComplex);
+  }
+}
+
+void initReduceFloat3(int blocks) {
+  if (blocks != blocksFloat3) {
+    if (blocksFloat3 > 0) cudaFree(h_reduceFloat3);
+
+    if (cudaMalloc((void**) &d_reduceFloat3, blocks*sizeof(QudaSumFloat3))) {
+      printf("Error allocating reduction matrix\n");
+      exit(0);
+    }
+
+    blocksFloat3 = blocks;
+    printf("Initialized reduce float3 %d\n", blocksFloat3);
+  }
+}
+
 #if (__CUDA_ARCH__ == 130)
 static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 {

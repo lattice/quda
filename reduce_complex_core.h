@@ -102,31 +102,24 @@ cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
   
   // allocate arrays on device and host to store one QudaSumComplex for each block
   int blocks = min(REDUCE_MAX_BLOCKS, n / REDUCE_THREADS);
-  QudaSumComplex h_odata[REDUCE_MAX_BLOCKS];
-  QudaSumComplex *d_odata;
-  if (cudaMalloc((void**) &d_odata, blocks*sizeof(QudaSumComplex))) {
-    printf("Error allocating reduction matrix\n");
-    exit(0);
-  }
+  initReduceComplex(blocks);
   
   // partial reduction; each block generates one number
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
   int smemSize = REDUCE_THREADS * sizeof(QudaSumComplex);
-  REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_odata, n);
+  REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_reduceComplex, n);
   
   // copy result from device to host, and perform final reduction on CPU
-  cudaMemcpy(h_odata, d_odata, blocks*sizeof(QudaSumComplex), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_reduceComplex, d_reduceComplex, blocks*sizeof(QudaSumComplex), cudaMemcpyDeviceToHost);
   
   cuDoubleComplex gpu_result;
   gpu_result.x = 0;
   gpu_result.y = 0;
   for (int i = 0; i < blocks; i++) {
-    gpu_result.x += h_odata[i].x;
-    gpu_result.y += h_odata[i].y;
+    gpu_result.x += h_reduceComplex[i].x;
+    gpu_result.y += h_reduceComplex[i].y;
   }
-  
-  cudaFree(d_odata);    
   
   return gpu_result;
 }
