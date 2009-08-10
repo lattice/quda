@@ -1,10 +1,6 @@
 // *** CUDA DSLASH ***
 
 #define SHARED_FLOATS_PER_THREAD 0
-#define SHARED_BYTES_DOUBLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(double))
-
-#define SHARED_BYTES_SINGLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))
-
 // input spinor
 #if (DD_SPREC==0)
 #define spinorFloat double
@@ -298,7 +294,7 @@ volatile spinorFloat o32_im;
 #include "read_clover.h"
 #include "io_spinor.h"
 
-int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
+int sid = blockIdx.x*blockDim.x + threadIdx.x;
 int z1 = FAST_INT_DIVIDE(sid, X1h);
 int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);

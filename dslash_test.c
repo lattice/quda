@@ -30,11 +30,14 @@ int TRANSFER = 0; // include transfer time in the benchmark?
 
 void init() {
 
-  gaugeParam.X[0] = 36;
-  gaugeParam.X[1] = 36;
-  gaugeParam.X[2] = 36;
-  gaugeParam.X[3] = 24;
+  gaugeParam.X[0] = 64;
+  gaugeParam.X[1] = 24;
+  gaugeParam.X[2] = 26;
+  gaugeParam.X[3] = 26;
+
   setDims(gaugeParam.X);
+
+  gaugeParam.blockDim = 64;
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.cuda_prec = QUDA_SINGLE_PRECISION;
@@ -129,7 +132,7 @@ void end() {
 double dslashCUDA() {
 
   // execute kernel
-  const int LOOPS = 10;
+  const int LOOPS = 100;
   printf("Executing %d kernel loops...", LOOPS);
   fflush(stdout);
   stopwatchStart();
@@ -191,53 +194,47 @@ void dslashRef() {
 void dslashTest() {
 
   init();
-
+  
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
-  float sharedKB = (float)dslashCudaSharedBytes() / (1 << 10);
+  float sharedKB = (float)dslashCudaSharedBytes(inv_param.cuda_prec, gaugeParam.blockDim) / (1 << 10);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", gaugeParam.gaugeGiB);
   printf("Shared mem: %.3f KB\n", sharedKB);
-
-  int attempts = 10000;
+  
+  int attempts = 1;
   dslashRef();
   for (int i=0; i<attempts; i++) {
     
     double secs = dslashCUDA();
-  
+    
     if (!TRANSFER) {
       if (test_type < 2) 
 	retrieveParitySpinor(spinorOdd, cudaSpinor.odd, inv_param.cpu_prec, inv_param.dirac_order);
       else 
 	retrieveSpinorField(spinorGPU, cudaSpinorOut, inv_param.cpu_prec, inv_param.dirac_order);
     }
-
+    
     // print timing information
     printf("%fms per loop\n", 1000*secs);
-
+    
     int flops = test_type ? 1320*2 + 48 : 1320;
     int floats = test_type ? 2*(7*24+8*gaugeParam.packed_size+24)+24 : 7*24+8*gaugeParam.packed_size+24;
     printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
-
-    /*for (int is=0; is<Vh; is++) {
-      printf("%e %e\n", ((double*)spinorRef)[is*24], ((double*)spinorOdd)[is*24]);
-    }
-    exit(0);*/
     
     int res;
     if (test_type < 2) res = compare_floats(spinorOdd, spinorRef, Vh*4*3*2, 1e-4, inv_param.cpu_prec);
     else res = compare_floats(spinorGPU, spinorRef, V*4*3*2, 1e-4, inv_param.cpu_prec);
-
-    printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
-
-    if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-    else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);
-
-    exit(0);
+      
+      printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
+      
+      if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
+      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);
+    
   }  
-
+  
   end();
-
+  
 }
 
 int main(int argc, char **argv) {

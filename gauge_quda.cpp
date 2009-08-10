@@ -223,7 +223,7 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
 }
 
 void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, ReconstructType reconstruct, 
-		      Precision precision, int *X, double anisotropy) {
+		      Precision precision, int *X, double anisotropy, int blockDim) {
 
   if (gauge_param->cpu_prec == QUDA_HALF_PRECISION) {
     printf("QUDA error: half precision not supported on cpu\n");
@@ -250,6 +250,8 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, ReconstructType reco
   }
   cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
   cudaGauge->volume /= 2;
+
+  cudaGauge->blockDim = blockDim;
 
   allocateGaugeField(cudaGauge, reconstruct, precision);
 

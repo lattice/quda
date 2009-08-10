@@ -96,12 +96,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
   createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->reconstruct, 
-		   gauge_param->cuda_prec, gauge_param->X, gauge_param->anisotropy);
+		   gauge_param->cuda_prec, gauge_param->X, gauge_param->anisotropy, gauge_param->blockDim);
   gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec ||
       gauge_param->reconstruct_sloppy != gauge_param->reconstruct) {
     createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->reconstruct_sloppy, 
-		     gauge_param->cuda_prec_sloppy, gauge_param->X, gauge_param->anisotropy);
+		     gauge_param->cuda_prec_sloppy, gauge_param->X, gauge_param->anisotropy,
+		     gauge_param->blockDim_sloppy);
     gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;

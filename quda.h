@@ -37,6 +37,7 @@ extern "C" {
   typedef void *ParityGauge;
 
   typedef struct {
+    int blockDim; // The size of the thread block to use
     size_t bytes;
     Precision precision;
     int length; // total length

@@ -30,6 +30,8 @@ extern "C" {
     int packed_size;
     double gaugeGiB;
 
+    int blockDim; // number of threads in a block
+    int blockDim_sloppy;
   } QudaGaugeParam;
 
   typedef struct QudaInvertParam_s {

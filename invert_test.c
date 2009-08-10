@@ -21,6 +21,8 @@ int main(int argc, char **argv)
   Gauge_param.X[3] = 32;
   setDims(Gauge_param.X);
 
+  Gauge_param.blockDim = 64;
+
   Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
 
   Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;

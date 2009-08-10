@@ -133,8 +133,8 @@ def prolog():
     str = []
     str.append("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
     str.append("#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n")
-    str.append("#define SHARED_BYTES_DOUBLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(double))\n\n")
-    str.append("#define SHARED_BYTES_SINGLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))\n\n")
+#    str.append("#define SHARED_BYTES_DOUBLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(double))\n\n")
+#    str.append("#define SHARED_BYTES_SINGLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))\n\n")
     
     str.append("// input spinor\n")
 
@@ -247,7 +247,7 @@ def prolog():
 #include "read_clover.h"
 #include "io_spinor.h"
 
-int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
+int sid = blockIdx.x*blockDim.x + threadIdx.x;
 int z1 = FAST_INT_DIVIDE(sid, X1h);
 int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);

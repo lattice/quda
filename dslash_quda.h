@@ -9,8 +9,6 @@
 #define spinorSiteSize 24 // real numbers per spinor
 #define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
 
-#define BLOCK_DIM (64) // threads per block
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,7 +23,7 @@ extern "C" {
 
 // ---------- dslash_quda.cu ----------
 
-  int dslashCudaSharedBytes();
+  int dslashCudaSharedBytes(Precision spinor_prec, int blockDim);
   void initDslashCuda();
   void bindGaugeTex(FullGauge gauge, int oddBit);
 
