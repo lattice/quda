@@ -1,8 +1,4 @@
-// this will evaluate wrong for (1/L^3) < 3e-7
-
-#define FAST_INT_DIVIDE(a, b) ( (int)(((float)a * b##_inv)+0.0000003f) )
-
-//#define FAST_INT_DIVIDE(a, b) ( a/b )
+#define FAST_INT_DIVIDE(a, b) ( a/b )
 
 // Performs complex addition
 #define COMPLEX_ADD_TO(a, b)			\
