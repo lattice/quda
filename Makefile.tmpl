@@ -1,7 +1,7 @@
 CUFILES		:= dslash_cuda.cu blas_cuda.cu
 CCFILES		:= inv_bicgstab_cuda.cpp inv_cg.cpp util_cuda.cpp gauge_cuda.cpp spinor_quda.cpp
 
-CUDA_INSTALL_PATH = /usr/local/cuda-2.0.0.2.1221
+CUDA_INSTALL_PATH = /usr/local/cuda
 INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I$(CUDA_INSTALL_PATH)/../cuda_sdk/common/inc
 LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
 
