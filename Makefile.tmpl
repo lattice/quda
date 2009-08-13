@@ -3,7 +3,7 @@ CCFILES		:= inv_bicgstab_cuda.cpp inv_cg.cpp util_cuda.cpp gauge_cuda.cpp spinor
 
 CUDA_INSTALL_PATH = /usr/local/cuda
 INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I$(CUDA_INSTALL_PATH)/../cuda_sdk/common/inc
-LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
+LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
 
 DFLAGS = #-D__DEVICE_EMULATION__
 

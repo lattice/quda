@@ -22,34 +22,35 @@ int main(int argc, char **argv)
   setDims(Gauge_param.X);
 
   Gauge_param.blockDim = 64;
+  Gauge_param.blockDim_sloppy = 64;
 
   Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
 
-  Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  Gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
 
-  Gauge_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
-  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_8;
+  Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
 
-  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_YES;
+  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   Gauge_param.anisotropy = 1.0;
 
-  inv_param.inv_type = QUDA_CG_INVERTER;
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
   Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param = &Gauge_param;
   
-  double mass = -0.97;
+  double mass = -0.95;
   inv_param.kappa = 1.0 / (2.0*(4 + mass));
   inv_param.tol = 1e-12;
-  inv_param.maxiter = 100;
-  inv_param.reliable_delta = 1e-8;
+  inv_param.maxiter = 10000;
+  inv_param.reliable_delta = 1e-3;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;  // preservation doesn't work with reliable?

@@ -30,10 +30,10 @@ int TRANSFER = 0; // include transfer time in the benchmark?
 
 void init() {
 
-  gaugeParam.X[0] = 64;
+  gaugeParam.X[0] = 24;
   gaugeParam.X[1] = 24;
-  gaugeParam.X[2] = 26;
-  gaugeParam.X[3] = 26;
+  gaugeParam.X[2] = 24;
+  gaugeParam.X[3] = 32;
 
   setDims(gaugeParam.X);
 
