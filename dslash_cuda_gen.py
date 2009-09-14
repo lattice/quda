@@ -138,7 +138,7 @@ def prolog():
     
     str.append("// input spinor\n")
 
-    str.append("#if (DD_SPREC==0)\n")
+    str.append("#ifdef SPINOR_DOUBLE\n")
     str.append("#define spinorFloat double\n")
     for s in range(0,4):
         for c in range(0,3):
@@ -153,11 +153,11 @@ def prolog():
             i = 3*s+c
             str.append("#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n")
             str.append("#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n")
-    str.append("#endif\n\n")
+    str.append("#endif // SPINOR_DOUBLE\n\n")
 
     str.append("// gauge link\n")
 
-    str.append("#if (DD_GPREC==0)\n")
+    str.append("#ifdef GAUGE_DOUBLE\n")
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
@@ -179,7 +179,7 @@ def prolog():
     str.append("#define A_re G"+nthFloat4(18)+"\n")
     str.append("#define A_im G"+nthFloat4(19)+"\n")    
     str.append("\n")
-    str.append("#endif\n\n")    
+    str.append("#endif // GAUGE_DOUBLE\n\n")    
             
     str.append("// conjugated gauge link\n")
     for m in range(0,3):
@@ -190,6 +190,23 @@ def prolog():
     str.append("\n")
 
     str.append("// first chiral block of inverted clover term\n")
+    str.append("#ifdef CLOVER_DOUBLE\n")
+    i = 0
+    for m in range(0,6):
+        s = m/3
+        c = m%3
+        str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat2(i)+"\n")
+        i += 1
+    for n in range(0,6):
+        sn = n/3
+        cn = n%3
+        for m in range(n+1,6):
+            sm = m/3
+            cm = m%3
+            str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat2(i)+"\n")
+            str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat2(i+1)+"\n")
+            i += 2
+    str.append("#else\n")
     i = 0
     for m in range(0,6):
         s = m/3
@@ -205,6 +222,8 @@ def prolog():
             str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat4(i)+"\n")
             str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat4(i+1)+"\n")
             i += 2
+    str.append("#endif // CLOVER_DOUBLE\n\n")    
+
     for n in range(0,6):
         sn = n/3
         cn = n%3
@@ -261,7 +280,7 @@ int X = 2*sid + x1odd;
 """)
     
     if sharedFloats > 0:
-        str.append("#if (DD_SPREC==0)\n")
+        str.append("#ifdef SPINOR_DOUBLE\n")
         str.append("extern __shared__ spinorFloat sd_data[];\n")
         str.append("volatile spinorFloat *s = sd_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n")
         str.append("#else\n")
@@ -529,7 +548,7 @@ def epilog():
     READ_ACCUM(ACCUMTEX)
 """)
 
-    str.append("#if (DD_SPREC==0)\n")
+    str.append("#ifdef SPINOR_DOUBLE\n")
 
     for s in range(0,4):
         for c in range(0,3):
@@ -545,7 +564,7 @@ def epilog():
             str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
             str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
 
-    str.append("#endif // DD_SPREC\n")
+    str.append("#endif // SPINOR_DOUBLE\n")
 
     str.append("#endif // DSLASH_XPAY\n\n")
     
@@ -579,12 +598,22 @@ def epilog():
     return ''.join(str)
 # end def epilog
 
-
 def generate():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + clover() + epilog()
 
-dagger = False
-#dagger = True
+# To fit 192 threads/SM with 16K shared memory, set sharedFloats to 19 or smaller
 sharedFloats = 0
 
-print generate()
+dagger = False
+f = open('dslash_core.h', 'w')
+f.write(generate())
+f.close()
+
+dagger = True
+f = open('dslash_dagger_core.h', 'w')
+f.write(generate())
+f.close()
+
+#f = open('clover_core.h', 'w')
+#f.write(prolog() + clover() + epilog())
+#f.close()

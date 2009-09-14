@@ -89,6 +89,7 @@
 #define DD_GPREC_F D
 #define GAUGE0TEX gauge0TexDouble
 #define GAUGE1TEX gauge1TexDouble
+#define GAUGE_DOUBLE
 #elif (DD_GPREC==1) // single-precision gauge field
 #define DD_GPREC_F S
 #define GAUGE0TEX gauge0TexSingle
@@ -107,6 +108,7 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
 #define SPINORTEX spinorTexDouble
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
+#define SPINOR_DOUBLE
 #if (DD_XPAY==1)
 #define ACCUMTEX accumTexDouble
 #define READ_ACCUM READ_ACCUM_DOUBLE
@@ -142,12 +144,13 @@
 #define CLOVERTEX cloverTexDouble
 #define READ_CLOVER READ_CLOVER_DOUBLE
 #define DSLASH_CLOVER
+#define CLOVER_DOUBLE
 #elif (DD_CPREC==1) // single-precision clover term
 #define DD_CPREC_F S
 #define CLOVERTEX cloverTexSingle
 #define READ_CLOVER READ_CLOVER_SINGLE
 #define DSLASH_CLOVER
-#elif (DD_CPREC==2) // single-precision clover term
+#elif (DD_CPREC==2) // half-precision clover term
 #define DD_CPREC_F H
 #define CLOVERTEX cloverTexHalf
 #define READ_CLOVER READ_CLOVER_HALF
@@ -202,6 +205,9 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #undef CLOVERTEX
 #undef READ_CLOVER
 #undef DSLASH_CLOVER
+#undef GAUGE_DOUBLE
+#undef SPINOR_DOUBLE
+#undef CLOVER_DOUBLE
 
 // prepare next set of options, or clean up after final iteration
 

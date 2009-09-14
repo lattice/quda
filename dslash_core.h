@@ -2,7 +2,7 @@
 
 #define SHARED_FLOATS_PER_THREAD 0
 // input spinor
-#if (DD_SPREC==0)
+#ifdef SPINOR_DOUBLE
 #define spinorFloat double
 #define i00_re I0.x
 #define i00_im I0.y
@@ -55,10 +55,10 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
-#endif
+#endif // SPINOR_DOUBLE
 
 // gauge link
-#if (DD_GPREC==0)
+#ifdef GAUGE_DOUBLE
 #define g00_re G0.x
 #define g00_im G0.y
 #define g01_re G1.x
@@ -104,7 +104,7 @@
 #define A_re G4.z
 #define A_im G4.w
 
-#endif
+#endif // GAUGE_DOUBLE
 
 // conjugated gauge link
 #define gT00_re (+g00_re)
@@ -127,6 +127,44 @@
 #define gT22_im (-g22_im)
 
 // first chiral block of inverted clover term
+#ifdef CLOVER_DOUBLE
+#define c00_00_re C0.x
+#define c01_01_re C0.y
+#define c02_02_re C1.x
+#define c10_10_re C1.y
+#define c11_11_re C2.x
+#define c12_12_re C2.y
+#define c01_00_re C3.x
+#define c01_00_im C3.y
+#define c02_00_re C4.x
+#define c02_00_im C4.y
+#define c10_00_re C5.x
+#define c10_00_im C5.y
+#define c11_00_re C6.x
+#define c11_00_im C6.y
+#define c12_00_re C7.x
+#define c12_00_im C7.y
+#define c02_01_re C8.x
+#define c02_01_im C8.y
+#define c10_01_re C9.x
+#define c10_01_im C9.y
+#define c11_01_re C10.x
+#define c11_01_im C10.y
+#define c12_01_re C11.x
+#define c12_01_im C11.y
+#define c10_02_re C12.x
+#define c10_02_im C12.y
+#define c11_02_re C13.x
+#define c11_02_im C13.y
+#define c12_02_re C14.x
+#define c12_02_im C14.y
+#define c11_10_re C15.x
+#define c11_10_im C15.y
+#define c12_10_re C16.x
+#define c12_10_im C16.y
+#define c12_11_re C17.x
+#define c12_11_im C17.y
+#else
 #define c00_00_re C0.x
 #define c01_01_re C0.y
 #define c02_02_re C0.z
@@ -163,6 +201,8 @@
 #define c12_10_im C8.y
 #define c12_11_re C8.z
 #define c12_11_im C8.w
+#endif // CLOVER_DOUBLE
+
 #define c00_01_re (+c01_00_re)
 #define c00_01_im (-c01_00_im)
 #define c00_02_re (+c02_00_re)
@@ -1329,7 +1369,7 @@ o32_re = o32_im = 0;
 
 #ifdef DSLASH_XPAY
     READ_ACCUM(ACCUMTEX)
-#if (DD_SPREC==0)
+#ifdef SPINOR_DOUBLE
     o00_re = a*o00_re + accum0.x;
     o00_im = a*o00_im + accum0.y;
     o01_re = a*o01_re + accum1.x;
@@ -1379,7 +1419,7 @@ o32_re = o32_im = 0;
     o31_im = a*o31_im + accum5.y;
     o32_re = a*o32_re + accum5.z;
     o32_im = a*o32_im + accum5.w;
-#endif // DD_SPREC
+#endif // SPINOR_DOUBLE
 #endif // DSLASH_XPAY
 
 
@@ -1434,4 +1474,3 @@ o32_re = o32_im = 0;
 #undef i31_im
 #undef i32_re
 #undef i32_im
-

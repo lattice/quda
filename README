@@ -1,0 +1,12 @@
+QUDA v0.x Release Notes
+-----------------------
+
+
+Known issues:
+
+* For compatibility with CUDA, the library is compiled with the GCC option
+  -malign-double.  On 32-bit machines, this differs from the GCC default
+  and may affect the alignment of various structures, notably those of type
+  QudaGaugeParam and QudaInvertParam, defined in invert_quda.h.  As a result,
+  it may be necessary to use this switch when compiling code that is to be
+  linked against the QUDA library.

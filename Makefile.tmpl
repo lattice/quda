@@ -1,36 +1,41 @@
-CUFILES		:= dslash_cuda.cu blas_cuda.cu
-CCFILES		:= inv_bicgstab_cuda.cpp inv_cg.cpp util_cuda.cpp gauge_cuda.cpp spinor_quda.cpp
-
 CUDA_INSTALL_PATH = /usr/local/cuda
-INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I$(CUDA_INSTALL_PATH)/../cuda_sdk/common/inc
-LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
+INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include
+
+# On 64-bit platforms:
+LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart # for release 2.3 and newer
+# LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart # for release 2.2 and older
+COPT =
+
+# On 32-bit platforms:
+# LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
+# COPT = -malign-double
 
 DFLAGS = #-D__DEVICE_EMULATION__
 
 CC = gcc
-CFLAGS = -Wall -O3 -std=c99 $(INCLUDES) ${DFLAGS}
+CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INCLUDES) ${DFLAGS}
 CXX = g++
-CXXFLAGS = -Wall -O3 $(INCLUDES) ${DFLAGS} 
+CXXFLAGS = -Wall -O3 $(COPT) $(INCLUDES) ${DFLAGS} 
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
 NVCCFLAGS = -O3 $(INCLUDES) ${DFLAGS} -arch=sm_13 #-deviceemu
 LDFLAGS = -fPIC $(LIB)
-CCOBJECTS = $(CCFILES:.cpp=.o)
-CUOBJECTS = $(CUFILES:.cu=.o)
 
 all: dslash_test invert_test su3_test pack_test
 
 ILIB = libquda.a
-ILIB_OBJS = inv_bicgstab_quda.o inv_cg_quda.o dslash_quda.o blas_quda.o util_quda.o \
-	dslash_reference.o blas_reference.o invert_quda.o gauge_quda.o spinor_quda.o
-ILIB_DEPS = $(ILIB_OBJS) blas_quda.h quda.h util_quda.h invert_quda.h gauge_quda.h spinor_quda.h enum_quda.h dslash_reference.h
+ILIB_OBJS = inv_bicgstab_quda.o inv_cg_quda.o dslash_quda.o blas_quda.o \
+	util_quda.o dslash_reference.o blas_reference.o invert_quda.o   \
+	gauge_quda.o spinor_quda.o
+ILIB_DEPS = $(ILIB_OBJS) blas_quda.h quda.h util_quda.h invert_quda.h \
+	gauge_quda.h spinor_quda.h enum_quda.h dslash_reference.h
 
 $(ILIB): $(ILIB_DEPS)
 	ar cru $@ $(ILIB_OBJS)
 
-invert_test: invert_test.o $(ILIB)
+dslash_test: dslash_test.o $(ILIB)
 	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
 
-dslash_test: dslash_test.o $(ILIB)
+invert_test: invert_test.o $(ILIB)
 	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
 
 su3_test: su3_test.o $(ILIB)
