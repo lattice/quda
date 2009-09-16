@@ -1,3 +1,4 @@
+import sys
 
 ### complex numbers ########################################################################
 
@@ -605,11 +606,13 @@ def generate():
 sharedFloats = 0
 
 dagger = False
+print sys.argv[0] + ": generating dslash_core.h";
 f = open('dslash_core.h', 'w')
 f.write(generate())
 f.close()
 
 dagger = True
+print sys.argv[0] + ": generating dslash_dagger_core.h";
 f = open('dslash_dagger_core.h', 'w')
 f.write(generate())
 f.close()

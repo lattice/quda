@@ -1,12 +1,82 @@
 QUDA v0.x Release Notes
 -----------------------
 
+Overview:
+
+QUDA is a library for performing calculations in lattice QCD on
+graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
+This release includes optimized kernels for applying the Wilson Dirac
+operator and clover-improved Wilson Dirac operator, kernels for
+performing various BLAS-like operations, and full inverters built on
+these kernels.  Mixed-precision implementations of both CG and
+BiCGstab are provided, with support for double, single, and half
+(16-bit fixed-point) precision.
+
+NOTE: In this pre-release, only the BiCGstab inverter supports clover.
+
+
+Software compatibility:
+
+The library has been tested under linux (CentOS 5.3 and Ubuntu 8.04)
+using release 2.3 of the CUDA toolkit.  There are known issues with
+releases 2.1 and 2.2, but 2.0 should work if one is forced to use an
+older version (for compatibility with an old driver, for example).
+
+Under Mac OS X, the library fails to compile due to bugs in CUDA 2.3.
+It might work with CUDA 2.2 or 2.0, but this hasn't been tested.
+
+
+Hardware compatibility:
+
+For a list of supported devices, see
+
+http://www.nvidia.com/object/cuda_learn_products.html
+
+Before building the library, you should determine the "compute
+capability" of your card, either from NVIDIA's documentation or by
+running the deviceQuery example in the CUDA SDK, and set GPU_ARCH in
+the Makefile appropriately.  Setting 'GPU_ARCH = sm_13' will enable
+double precision support.
+
+
+Installation:
+
+In the source directory, copy the template 'Makefile.tmpl' to
+'Makefile', and edit the first few lines to specify the CUDA install
+path, the platform (x86 or x86_64), and the GPU architecture (see
+"Compatibility" above).  Then type 'make' to build the library.
+
+
+Using the library:
+
+Include the header file "invert_quda.h" in your application, link
+against libquda.a, and study invert_test.c for an example of the
+interface.
+
 
 Known issues:
 
-* For compatibility with CUDA, the library is compiled with the GCC option
-  -malign-double.  On 32-bit machines, this differs from the GCC default
-  and may affect the alignment of various structures, notably those of type
-  QudaGaugeParam and QudaInvertParam, defined in invert_quda.h.  As a result,
-  it may be necessary to use this switch when compiling code that is to be
-  linked against the QUDA library.
+* One of the stages of the build process requires over 5 GB of memory.
+  If too little memory is available, the compilation will either take
+  a very long time (given enough swap space) or fail completely.
+
+* For compatibility with CUDA, on 32-bit platforms the library is compiled
+  with the GCC option -malign-double.  This differs from the GCC default
+  and may affect the alignment of various structures, notably those of
+  type QudaGaugeParam and QudaInvertParam, defined in invert_quda.h.
+  Therefore, any code to be linked against QUDA should also be compiled
+  with this option.
+
+
+Contact information:
+
+For help or to report a bug, please contact Mike Clark
+(mikec@seas.harvard.edu) or Ron Babich (rbabich@bu.edu).
+
+If you find this code useful in your work, a citation to the following
+write-up would be appreciated:
+
+K. Barros et al., "Blasting through lattice calculations using CUDA,"
+PoS LATTICE2008, 045 (2008) [arXiv:0810.5365 [hep-lat]].
+
+Please also let us know so that we can send you updates and bug-fixes.
