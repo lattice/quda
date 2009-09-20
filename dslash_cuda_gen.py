@@ -467,7 +467,8 @@ def toChiralBasis(c):
     str.append("\n")
 
     for s in range (0,4):
-        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";\n")
+        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";  ")
+        str.append(out_im(s,c)+" = "+a_im(0,s,c)+";\n")
 
     return block(''.join(str))
 # end def toChiralBasis
@@ -486,7 +487,8 @@ def fromChiralBasis(c): # note: factor of 1/2 is included in clover term normali
     str.append("\n")
 
     for s in range (0,4):
-        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";\n")
+        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";  ")
+        str.append(out_im(s,c)+" = "+a_im(0,s,c)+";\n")
 
     return block(''.join(str))
 # end def fromChiralBasis
@@ -516,7 +518,8 @@ def cloverMult(chi):
 
     for s in range (0,2):
         for c in range (0,3):
-            str.append(out_re(2*chi+s,c)+" = "+a_re(chi,s,c)+"; "+out_im(2*chi+s,c)+" = "+a_im(chi,s,c)+";\n")
+            str.append(out_re(2*chi+s,c)+" = "+a_re(chi,s,c)+";  ")
+            str.append(out_im(2*chi+s,c)+" = "+a_im(chi,s,c)+";\n")
     str.append("\n")
 
     return block(''.join(str))+"\n"
@@ -595,6 +598,20 @@ def epilog():
             i = 3*s+c
             str.append("#undef "+in_re(s,c)+"\n")
             str.append("#undef "+in_im(s,c)+"\n")
+    str.append("\n")
+
+    for m in range(0,6):
+        s = m/3
+        c = m%3
+        str.append("#undef "+c_re(0,s,c,s,c)+"\n")
+    for n in range(0,6):
+        sn = n/3
+        cn = n%3
+        for m in range(n+1,6):
+            sm = m/3
+            cm = m%3
+            str.append("#undef "+c_re(0,sm,cm,sn,cn)+"\n")
+            str.append("#undef "+c_im(0,sm,cm,sn,cn)+"\n")
 
     return ''.join(str)
 # end def epilog

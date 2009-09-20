@@ -17,6 +17,11 @@ extern "C" {
     QUDA_LEX_DIRAC_ORDER // lexicographical order, colour inside spin
   } QudaDiracFieldOrder;  
 
+  typedef enum QudaCloverFieldOrder_s {
+    QUDA_PACKED_CLOVER_ORDER, // even-odd, packed
+    QUDA_LEX_PACKED_CLOVER_ORDER // lexicographical order, packed
+  } QudaCloverFieldOrder;
+
   typedef enum QudaDslashType_s {
     QUDA_WILSON_DSLASH,
     QUDA_CLOVER_WILSON_DSLASH
@@ -77,6 +82,12 @@ extern "C" {
     QUDA_ANTI_PERIODIC_T = -1,
     QUDA_PERIODIC_T = 1
   } QudaTboundary;
+
+  typedef enum QudaVerbosity_s {
+    QUDA_SILENT = 0,
+    QUDA_SUMMARIZE = 1,
+    QUDA_VERBOSE = 2
+  } QudaVerbosity;
 
   typedef struct double3_s {
     double x;

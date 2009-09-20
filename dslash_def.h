@@ -30,12 +30,12 @@
 
 #ifndef DD_LOOP
 #define DD_LOOP
-#define DD_DAG 0
+//#define DD_DAG 0
 #define DD_XPAY 0
 #define DD_RECON 0
 #define DD_GPREC 0
 #define DD_SPREC 0
-#define DD_CPREC 1
+#define DD_CPREC 0
 #endif
 
 // set options for current iteration
@@ -211,12 +211,12 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 
 // prepare next set of options, or clean up after final iteration
 
-#if (DD_DAG==0)
-#undef DD_DAG
-#define DD_DAG 1
-#else
-#undef DD_DAG
-#define DD_DAG 0
+//#if (DD_DAG==0)
+//#undef DD_DAG
+//#define DD_DAG 1
+//#else
+//#undef DD_DAG
+//#define DD_DAG 0
 
 #if (DD_XPAY==0)
 #undef DD_XPAY
@@ -252,14 +252,14 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #undef DD_SPREC
 #define DD_SPREC 0
 
-//#if (DD_CPREC==0)
-//#undef DD_CPREC
-//#define DD_CPREC 1
-#if (DD_CPREC==1)
+#if (DD_CPREC==0)
 #undef DD_CPREC
-//#define DD_CPREC 2
-//#elif (DD_CPREC==2)
-//#undef DD_CPREC
+#define DD_CPREC 1
+#elif (DD_CPREC==1)
+#undef DD_CPREC
+#define DD_CPREC 2
+#elif (DD_CPREC==2)
+#undef DD_CPREC
 #define DD_CPREC 3
 #else
 
@@ -276,7 +276,7 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #endif // DD_GPREC
 #endif // DD_RECON
 #endif // DD_XPAY
-#endif // DD_DAG
+//#endif // DD_DAG
 
 #ifdef DD_LOOP
 #include "dslash_def.h"

@@ -17,6 +17,7 @@
 // The Quda is added to avoid collisions with other libs
 #define GaugeFieldOrder QudaGaugeFieldOrder
 #define DiracFieldOrder QudaDiracFieldOrder
+#define CloverFieldOrder QudaCloverFieldOrder
 #define InverterType QudaInverterType  
 #define Precision QudaPrecision
 #define MatPCType QudaMatPCType
@@ -55,14 +56,14 @@ extern "C" {
     Precision precision;
     int length;
     int volume;
+    int X[4];
     int Nc;
     int Ns;
-    void *clover; // pointer to clover matrix
-    void *cloverInverse; // pointer to inverse of clover matrix
+    void *clover;
+    float *cloverNorm;
   } ParityClover;
 
   typedef struct {
-    Precision precision;
     ParityClover odd;
     ParityClover even;
   } FullClover;

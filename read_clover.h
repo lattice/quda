@@ -8,7 +8,7 @@
   double2 C6 = fetch_double2((clover), sid + (18*chi+6)*Vh);	\
   double2 C7 = fetch_double2((clover), sid + (18*chi+7)*Vh);	\
   double2 C8 = fetch_double2((clover), sid + (18*chi+8)*Vh);	\
-  double2 c9 = fetch_double2((clover), sid + (18*chi+9)*Vh);	\
+  double2 C9 = fetch_double2((clover), sid + (18*chi+9)*Vh);	\
   double2 C10 = fetch_double2((clover), sid + (18*chi+10)*Vh);  \
   double2 C11 = fetch_double2((clover), sid + (18*chi+11)*Vh);  \
   double2 C12 = fetch_double2((clover), sid + (18*chi+12)*Vh);  \
@@ -39,7 +39,7 @@
   float4 C6 = tex1Dfetch((clover), sid + (9*chi+6)*Vh);  \
   float4 C7 = tex1Dfetch((clover), sid + (9*chi+7)*Vh);  \
   float4 C8 = tex1Dfetch((clover), sid + (9*chi+8)*Vh);	 \
-  float K = tex1Dfetch((cloverTexNorm), sid+chi*Vh);	 \
+  float K = tex1Dfetch((cloverTexNorm), sid + chi*Vh);	 \
   C0.x *= K; C0.y *= K;	C0.z *= K; C0.w *= K;		 \
   C1.x *= K; C1.y *= K;	C1.z *= K; C1.w *= K;		 \
   C2.x *= K; C2.y *= K;	C2.z *= K; C2.w *= K;		 \

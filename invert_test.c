@@ -53,8 +53,9 @@ int main(int argc, char **argv)
   inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;  // preservation doesn't work with reliable?
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  inv_param.verbosity = QUDA_VERBOSE;
 
   size_t gSize = (Gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

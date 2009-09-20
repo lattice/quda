@@ -8,26 +8,42 @@
 extern "C" {
 #endif
 
+  // -- spinor_quda.cpp
+
   ParitySpinor allocateParitySpinor(int *X, Precision precision);
   FullSpinor allocateSpinorField(int *X, Precision precision);
-  ParityClover allocateParityClover(int length, Precision precision);
-  FullClover allocateCloverField(int length, Precision precision);
   
   void freeParitySpinor(ParitySpinor spinor);
   void freeSpinorField(FullSpinor spinor);
   void freeSpinorBuffer();
-  void freeParityClover(ParityClover clover);
-  void freeCloverField(FullClover clover);
 
-  void loadParitySpinor(ParitySpinor, void *spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
-  void loadSpinorField(FullSpinor, void *spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
+  void loadParitySpinor(ParitySpinor, void *spinor, Precision cpu_prec,
+			DiracFieldOrder dirac_order);
+  void loadSpinorField(FullSpinor, void *spinor, Precision cpu_prec,
+		       DiracFieldOrder dirac_order);
   
-  void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
-  void retrieveSpinorField(void *res, FullSpinor spinor, Precision cpu_prec, DiracFieldOrder dirac_order);
+  void retrieveParitySpinor(void *res, ParitySpinor spinor,
+			    Precision cpu_prec, DiracFieldOrder dirac_order);
+  void retrieveSpinorField(void *res, FullSpinor spinor,
+			   Precision cpu_prec, DiracFieldOrder dirac_order);
   
   void spinorHalfPack(float *c, short *s0, float *f0);
   void spinorHalfUnpack(float *f0, float *c, short *s0);
 
+  // -- clover_quda.cpp
+
+  ParityClover allocateParityClover(int *X, Precision precision);
+  FullClover allocateCloverField(int *X, Precision precision);
+
+  void freeParityClover(ParityClover *clover);
+  void freeCloverField(FullClover *clover);
+
+  void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec,
+			CloverFieldOrder clover_order);
+  void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
+		      CloverFieldOrder clover_order);
+  void loadCloverField(FullSpinor ret, void *clover, Precision cpu_prec,
+		       CloverFieldOrder clover_order);
 
 #ifdef __cplusplus
 }

@@ -9,6 +9,8 @@
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 1;
+// clover-improved? (0 = plain Wilson, 1 = clover)
+int dslash_type = 0;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -22,7 +24,7 @@ void *hostGauge[4];
 void *spinor, *spinorEven, *spinorOdd;
 void *spinorRef, *spinorRefEven, *spinorRefOdd;
 void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
-    
+
 double kappa = 1.0;
 int ODD_BIT = 1;
 int DAGGER_BIT = 0;
@@ -49,13 +51,22 @@ void init() {
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param = &gaugeParam;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.kappa = kappa;
+
+  if (dslash_type) {
+    inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+    inv_param.clover_cpu_prec = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
+  } else {
+    inv_param.dslash_type = QUDA_WILSON_DSLASH;
+  }
+
+  gauge_param = &gaugeParam;
   invert_param = &inv_param;
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -219,6 +230,10 @@ void dslashTest() {
     
     int flops = test_type ? 1320*2 + 48 : 1320;
     int floats = test_type ? 2*(7*24+8*gaugeParam.packed_size+24)+24 : 7*24+8*gaugeParam.packed_size+24;
+    if (dslash_type) {
+      flops += test_type ? 504*2 : 504;
+      floats += test_type ? 72*2 : 72;
+    }
     printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
     
@@ -229,12 +244,9 @@ void dslashTest() {
       printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
       
       if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);
-    
-  }  
-  
+      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
+  }    
   end();
-  
 }
 
 int main(int argc, char **argv) {

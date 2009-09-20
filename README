@@ -1,5 +1,6 @@
-QUDA v0.x Release Notes
------------------------
+
+Release Notes for QUDA v0.x
+---------------------------
 
 Overview:
 
@@ -44,7 +45,8 @@ Installation:
 In the source directory, copy the template 'Makefile.tmpl' to
 'Makefile', and edit the first few lines to specify the CUDA install
 path, the platform (x86 or x86_64), and the GPU architecture (see
-"Compatibility" above).  Then type 'make' to build the library.
+"Hardware compatibility" above).  Then type 'make' to build the
+library.
 
 
 Using the library:
@@ -74,9 +76,11 @@ For help or to report a bug, please contact Mike Clark
 (mikec@seas.harvard.edu) or Ron Babich (rbabich@bu.edu).
 
 If you find this code useful in your work, a citation to the following
-write-up would be appreciated:
+would be appreciated:
 
 K. Barros et al., "Blasting through lattice calculations using CUDA,"
 PoS LATTICE2008, 045 (2008) [arXiv:0810.5365 [hep-lat]].
 
-Please also let us know so that we can send you updates and bug-fixes.
+Please also drop us a note so that we can send you updates and
+bug-fixes.
+

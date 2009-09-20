@@ -7,9 +7,6 @@
 
 #include <xmmintrin.h>
 
-// GPU clover matrix
-FullClover cudaClover;
-
 // Pinned memory for cpu-gpu memory copying
 void *packedSpinor1 = 0;
 void *packedSpinor2 = 0;
@@ -50,45 +47,10 @@ ParitySpinor allocateParitySpinor(int *X, Precision precision) {
   return ret;
 }
 
-
 FullSpinor allocateSpinorField(int *X, Precision precision) {
   FullSpinor ret;
   ret.even = allocateParitySpinor(X, precision);
   ret.odd = allocateParitySpinor(X, precision);
-  return ret;
-}
-
-ParityClover allocateParityClover(int volume, Precision precision) {
-  ParityClover ret;
-
-  ret.precision = precision;
-  ret.volume = volume;
-  ret.Nc = 3;
-  ret.Ns = 4;
-  ret.length = ret.volume*ret.Nc*ret.Nc*ret.Ns*ret.Ns*2;
-
-  if (precision == QUDA_DOUBLE_PRECISION) ret.bytes = ret.length*sizeof(double);
-  else if (precision == QUDA_SINGLE_PRECISION) ret.bytes = ret.length*sizeof(float);
-  else ret.bytes = ret.length*sizeof(short);
-
-  if (cudaMalloc((void**)&(ret.clover), ret.bytes) == cudaErrorMemoryAllocation) {
-    printf("Error allocating clover term\n");
-    exit(0);
-  }   
-
-  if (cudaMalloc((void**)&(ret.cloverInverse), ret.bytes) == cudaErrorMemoryAllocation) {
-    printf("Error allocating clover term\n");
-    exit(0);
-  }   
-
-  return ret;
-}
-
-
-FullClover allocateCloverField(int V, Precision precision) {
-  FullClover ret;
-  ret.even = allocateParityClover(V/2, precision);
-  ret.odd = allocateParityClover(V/2, precision);
   return ret;
 }
 
@@ -101,19 +63,9 @@ void freeParitySpinor(ParitySpinor spinor) {
   spinor.spinorNorm = NULL;
 }
 
-void freeParityClover(ParityClover clover) {
-  cudaFree(clover.clover);
-  cudaFree(clover.cloverInverse);
-}
-
 void freeSpinorField(FullSpinor spinor) {
   freeParitySpinor(spinor.even);
   freeParitySpinor(spinor.odd);
-}
-
-void freeCloverField(FullClover clover) {
-  freeParityClover(clover.even);
-  freeParityClover(clover.odd);
 }
 
 void freeSpinorBuffer() {

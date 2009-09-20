@@ -57,9 +57,18 @@ extern "C" {
 
     QudaDiracFieldOrder dirac_order;
 
+    QudaPrecision clover_cpu_prec;
+    QudaPrecision clover_cuda_prec;
+    QudaPrecision clover_cuda_prec_sloppy;
+
+    QudaCloverFieldOrder clover_order;
+
     double spinorGiB;
+    double cloverGiB;
     double gflops;
     double secs;
+
+    QudaVerbosity verbosity;
 
   } QudaInvertParam;
 

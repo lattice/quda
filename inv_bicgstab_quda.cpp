@@ -72,7 +72,8 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
   int k=0;
   int xUpdate = 0, rUpdate = 0;
 
-  printf("%d iterations, r2 = %e\n", k, r2);
+  if (invert_param->verbosity >= QUDA_VERBOSE)
+    printf("%d iterations, r2 = %e\n", k, r2);
   stopwatchStart();
   while (r2 > stop && k<invert_param->maxiter) {
 
@@ -143,7 +144,9 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
     }
 
     k++;
-    printf("%d iterations, r2 = %e\n", k, r2);
+
+    if (invert_param->verbosity >= QUDA_VERBOSE)
+      printf("%d iterations, r2 = %e\n", k, r2);
   }
 
   if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
@@ -154,7 +157,8 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
   if (k==invert_param->maxiter) 
     printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
 
-  printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
+  if (invert_param->verbosity >= QUDA_SUMMARIZE)
+    printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
 
   float gflops = (1.0e-9*x.volume)*(2*(2*1320+48)*k + (32*k + 8*(k-1))*spinorSiteSize);
   gflops += 1.0e-9*x.volume*rUpdate*((2*1320+48) + 3*spinorSiteSize);

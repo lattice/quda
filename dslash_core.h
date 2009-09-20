@@ -1085,10 +1085,10 @@ o32_re = o32_im = 0;
     spinorFloat a30_re =  o00_re - o20_re;
     spinorFloat a30_im =  o00_im - o20_im;
     
-    o00_re = a00_re;
-    o10_re = a10_re;
-    o20_re = a20_re;
-    o30_re = a30_re;
+    o00_re = a00_re;  o00_im = a00_im;
+    o10_re = a10_re;  o10_im = a10_im;
+    o20_re = a20_re;  o20_im = a20_im;
+    o30_re = a30_re;  o30_im = a30_im;
 }
 {
     spinorFloat a01_re = -o11_re - o31_re;
@@ -1100,10 +1100,10 @@ o32_re = o32_im = 0;
     spinorFloat a31_re =  o01_re - o21_re;
     spinorFloat a31_im =  o01_im - o21_im;
     
-    o01_re = a01_re;
-    o11_re = a11_re;
-    o21_re = a21_re;
-    o31_re = a31_re;
+    o01_re = a01_re;  o01_im = a01_im;
+    o11_re = a11_re;  o11_im = a11_im;
+    o21_re = a21_re;  o21_im = a21_im;
+    o31_re = a31_re;  o31_im = a31_im;
 }
 {
     spinorFloat a02_re = -o12_re - o32_re;
@@ -1115,10 +1115,10 @@ o32_re = o32_im = 0;
     spinorFloat a32_re =  o02_re - o22_re;
     spinorFloat a32_im =  o02_im - o22_im;
     
-    o02_re = a02_re;
-    o12_re = a12_re;
-    o22_re = a22_re;
-    o32_re = a32_re;
+    o02_re = a02_re;  o02_im = a02_im;
+    o12_re = a12_re;  o12_im = a12_im;
+    o22_re = a22_re;  o22_im = a22_im;
+    o32_re = a32_re;  o32_im = a32_im;
 }
 
 // apply first chiral block
@@ -1210,12 +1210,12 @@ o32_re = o32_im = 0;
     a12_re += c12_12_re * o12_re;
     a12_im += c12_12_re * o12_im;
     
-    o00_re = a00_re; o00_im = a00_im;
-    o01_re = a01_re; o01_im = a01_im;
-    o02_re = a02_re; o02_im = a02_im;
-    o10_re = a10_re; o10_im = a10_im;
-    o11_re = a11_re; o11_im = a11_im;
-    o12_re = a12_re; o12_im = a12_im;
+    o00_re = a00_re;  o00_im = a00_im;
+    o01_re = a01_re;  o01_im = a01_im;
+    o02_re = a02_re;  o02_im = a02_im;
+    o10_re = a10_re;  o10_im = a10_im;
+    o11_re = a11_re;  o11_im = a11_im;
+    o12_re = a12_re;  o12_im = a12_im;
     
 }
 
@@ -1308,12 +1308,12 @@ o32_re = o32_im = 0;
     a32_re += c32_32_re * o32_re;
     a32_im += c32_32_re * o32_im;
     
-    o20_re = a20_re; o20_im = a20_im;
-    o21_re = a21_re; o21_im = a21_im;
-    o22_re = a22_re; o22_im = a22_im;
-    o30_re = a30_re; o30_im = a30_im;
-    o31_re = a31_re; o31_im = a31_im;
-    o32_re = a32_re; o32_im = a32_im;
+    o20_re = a20_re;  o20_im = a20_im;
+    o21_re = a21_re;  o21_im = a21_im;
+    o22_re = a22_re;  o22_im = a22_im;
+    o30_re = a30_re;  o30_im = a30_im;
+    o31_re = a31_re;  o31_im = a31_im;
+    o32_re = a32_re;  o32_im = a32_im;
     
 }
 
@@ -1329,10 +1329,10 @@ o32_re = o32_im = 0;
     spinorFloat a30_re = -o00_re + o20_re;
     spinorFloat a30_im = -o00_im + o20_im;
     
-    o00_re = a00_re;
-    o10_re = a10_re;
-    o20_re = a20_re;
-    o30_re = a30_re;
+    o00_re = a00_re;  o00_im = a00_im;
+    o10_re = a10_re;  o10_im = a10_im;
+    o20_re = a20_re;  o20_im = a20_im;
+    o30_re = a30_re;  o30_im = a30_im;
 }
 {
     spinorFloat a01_re =  o11_re + o31_re;
@@ -1344,10 +1344,10 @@ o32_re = o32_im = 0;
     spinorFloat a31_re = -o01_re + o21_re;
     spinorFloat a31_im = -o01_im + o21_im;
     
-    o01_re = a01_re;
-    o11_re = a11_re;
-    o21_re = a21_re;
-    o31_re = a31_re;
+    o01_re = a01_re;  o01_im = a01_im;
+    o11_re = a11_re;  o11_im = a11_im;
+    o21_re = a21_re;  o21_im = a21_im;
+    o31_re = a31_re;  o31_im = a31_im;
 }
 {
     spinorFloat a02_re =  o12_re + o32_re;
@@ -1359,10 +1359,10 @@ o32_re = o32_im = 0;
     spinorFloat a32_re = -o02_re + o22_re;
     spinorFloat a32_im = -o02_im + o22_im;
     
-    o02_re = a02_re;
-    o12_re = a12_re;
-    o22_re = a22_re;
-    o32_re = a32_re;
+    o02_re = a02_re;  o02_im = a02_im;
+    o12_re = a12_re;  o12_im = a12_im;
+    o22_re = a22_re;  o22_im = a22_im;
+    o32_re = a32_re;  o32_im = a32_im;
 }
 #endif // DSLASH_CLOVER
 
@@ -1474,3 +1474,40 @@ o32_re = o32_im = 0;
 #undef i31_im
 #undef i32_re
 #undef i32_im
+
+#undef c00_00_re
+#undef c01_01_re
+#undef c02_02_re
+#undef c10_10_re
+#undef c11_11_re
+#undef c12_12_re
+#undef c01_00_re
+#undef c01_00_im
+#undef c02_00_re
+#undef c02_00_im
+#undef c10_00_re
+#undef c10_00_im
+#undef c11_00_re
+#undef c11_00_im
+#undef c12_00_re
+#undef c12_00_im
+#undef c02_01_re
+#undef c02_01_im
+#undef c10_01_re
+#undef c10_01_im
+#undef c11_01_re
+#undef c11_01_im
+#undef c12_01_re
+#undef c12_01_im
+#undef c10_02_re
+#undef c10_02_im
+#undef c11_02_re
+#undef c11_02_im
+#undef c12_02_re
+#undef c12_02_im
+#undef c11_10_re
+#undef c11_10_im
+#undef c12_10_re
+#undef c12_10_im
+#undef c12_11_re
+#undef c12_11_im

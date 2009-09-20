@@ -6,7 +6,7 @@ CPU_ARCH = x86_64   # x86 or x86_64
 GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
 GPU_EMU  = false    # set to 'true' for device emulation
 
-PYTHON = python2.6  # python 2.5 or later required for 'make generated'
+PYTHON = python2.6  # python 2.5 or later required for 'make gen'
 
 ######
 
@@ -36,44 +36,45 @@ LDFLAGS = -fPIC $(LIB)
 
 all: dslash_test invert_test su3_test pack_test
 
-ILIB = libquda.a
-ILIB_OBJS = blas_quda.o blas_reference.o dslash_quda.o dslash_reference.o   \
-	gauge_quda.o inv_bicgstab_quda.o inv_cg_quda.o invert_quda.o        \
-	spinor_quda.o util_quda.o
-ILIB_HDRS = blas_quda.h blas_reference.h dslash_def.h dslash_quda.h         \
-	dslash_reference.h enum_quda.h gauge_quda.h invert_quda.h           \
-	io_spinor.h quda.h read_clover.h read_gauge.h reduce_complex_core.h \
-	reduce_core.h reduce_triple_core.h spinor_quda.h util_quda.h
-ILIB_CORE = dslash_core.h dslash_dagger_core.h
+QUDA = libquda.a
+QUDA_OBJS = blas_quda.o blas_reference.o clover_quda.o dslash_quda.o      \
+	dslash_reference.o gauge_quda.o inv_bicgstab_quda.o inv_cg_quda.o \
+	invert_quda.o spinor_quda.o util_quda.o
+QUDA_HDRS = blas_quda.h blas_reference.h clover_def.h dslash_def.h        \
+	dslash_quda.h dslash_reference.h enum_quda.h gauge_quda.h         \
+	invert_quda.h io_spinor.h quda.h read_clover.h read_gauge.h       \
+	reduce_complex_core.h reduce_core.h reduce_triple_core.h          \
+	spinor_quda.h util_quda.h
+QUDA_CORE = clover_core.h dslash_core.h dslash_dagger_core.h
 
-$(ILIB): $(ILIB_OBJS)
-	ar cru $@ $(ILIB_OBJS)
+$(QUDA): $(QUDA_OBJS)
+	ar cru $@ $(QUDA_OBJS)
 
-dslash_test: dslash_test.o $(ILIB)
-	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
+dslash_test: dslash_test.o $(QUDA)
+	$(CXX) $(LDFLAGS) $< $(QUDA) -o $@
 
-invert_test: invert_test.o $(ILIB)
-	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
+invert_test: invert_test.o $(QUDA)
+	$(CXX) $(LDFLAGS) $< $(QUDA) -o $@
 
-su3_test: su3_test.o $(ILIB)
-	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
+su3_test: su3_test.o $(QUDA)
+	$(CXX) $(LDFLAGS) $< $(QUDA) -o $@
 
-pack_test: pack_test.o $(ILIB)
-	$(CXX) $(LDFLAGS) $< $(ILIB) -o $@
+pack_test: pack_test.o $(QUDA)
+	$(CXX) $(LDFLAGS) $< $(QUDA) -o $@
 
-generated:
+gen:
 	$(PYTHON) dslash_cuda_gen.py
 
 clean:
-	-rm -f *.o dslash_test invert_test su3_test pack_test $(ILIB)
+	-rm -f *.o dslash_test invert_test su3_test pack_test $(QUDA)
 
-%.o: %.c $(ILIB_HDRS)
+%.o: %.c $(QUDA_HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@
 
-%.o: %.cpp $(ILIB_HDRS)
+%.o: %.cpp $(QUDA_HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 
-%.o: %.cu $(ILIB_HDRS) $(ILIB_CORE)
+%.o: %.cu $(QUDA_HDRS) $(QUDA_CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-.PHONY: all generated clean
+.PHONY: all gen clean

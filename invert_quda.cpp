@@ -14,6 +14,9 @@
 FullGauge cudaGaugePrecise; // precise gauge field
 FullGauge cudaGaugeSloppy; // sloppy gauge field
 
+FullClover cudaCloverPrecise;
+FullClover cudaCloverSloppy;
+
 void printGaugeParam(QudaGaugeParam *param) {
 
   printf("Gauge Params:\n");
@@ -36,6 +39,7 @@ void printGaugeParam(QudaGaugeParam *param) {
 void printInvertParam(QudaInvertParam *param) {
   printf("kappa = %e\n", param->kappa);
   printf("mass_normalization = %d\n", param->mass_normalization);
+  printf("dslash_type = %d\n", param->dslash_type);
   printf("inv_type = %d\n", param->inv_type);
   printf("tol = %e\n", param->tol);
   printf("iter = %d\n", param->iter);
@@ -45,10 +49,19 @@ void printInvertParam(QudaInvertParam *param) {
   printf("preserve_source = %d\n", param->preserve_source);
   printf("cpu_prec = %d\n", param->cpu_prec);
   printf("cuda_prec = %d\n", param->cuda_prec);
+  printf("cuda_prec_sloppy = %d\n", param->cuda_prec_sloppy);
   printf("dirac_order = %d\n", param->dirac_order);
   printf("spinorGiB = %e\n", param->spinorGiB);
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    printf("clover_cpu_prec = %d\n", param->clover_cpu_prec);
+    printf("clover_cuda_prec = %d\n", param->clover_cuda_prec);
+    printf("clover_cuda_prec_sloppy = %d\n", param->clover_cuda_prec_sloppy);
+    printf("clover_order = %d\n", param->clover_order);
+    printf("cloverGiB = %e\n", param->cloverGiB);
+  }
   printf("gflops = %e\n", param->gflops);
   printf("secs = %f\n", param->secs);
+  printf("verbosity = %d\n", param->verbosity);
 }
 
 void initQuda(int dev)
@@ -108,6 +121,14 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     cudaGaugeSloppy = cudaGaugePrecise;
   }
 
+}
+
+// for now, only single-precision clover is supported
+void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *param)
+{
+
+
+  cudaCloverSloppy = cudaCloverPrecise;
 }
 
 void endQuda()
