@@ -16,8 +16,11 @@ extern "C" {
   extern FullGauge cudaGaugePrecise;
   extern FullGauge cudaGaugeSloppy;
 
-  extern FullClover cudaClover;
+  extern FullClover cudaCloverPrecise;
   extern FullClover cudaCloverSloppy;
+
+  extern FullClover cudaCloverInvPrecise;
+  extern FullClover cudaCloverInvSloppy;
 
   extern QudaGaugeParam *gauge_param;
   extern QudaInvertParam *invert_param;
@@ -90,12 +93,12 @@ extern "C" {
 			     int oddBit, int daggerBit, ParitySpinor x,
 			     double a);
 
-  void cloverMatPCCuda(ParitySpinor out, FullGauge gauge,
+  void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
 		       FullClover cloverInv, ParitySpinor in, double kappa,
 		       ParitySpinor tmp, MatPCType matpc_type, int dagger);
   void cloverMatPCDagMatPCCuda(ParitySpinor out, FullGauge gauge,
-			       FullClover cloverInv, ParitySpinor in,
-			       double kappa, ParitySpinor tmp,
+			       FullClover clover, FullClover cloverInv,
+			       ParitySpinor in, double kappa, ParitySpinor tmp,
 			       MatPCType matpc_type);
   void cloverMatCuda(FullSpinor out, FullGauge gauge, FullClover clover,
 		     FullSpinor in, double kappa, ParitySpinor tmp,
@@ -112,13 +115,11 @@ extern "C" {
 		   ParitySpinor spinor, int oddBit);
   
   // -- inv_cg_cuda.cpp
-  void invertCgCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 
-		    FullGauge gaugeSloppy, ParitySpinor tmp,
+  void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp,
 		    QudaInvertParam *param);
   
   // -- inv_bicgstab_cuda.cpp
-  void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, FullGauge gauge, 
-			  FullGauge gaugeSloppy, ParitySpinor tmp, 
+  void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp, 
 			  QudaInvertParam *param, DagType dag_type);
   
 #ifdef __cplusplus

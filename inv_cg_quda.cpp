@@ -7,8 +7,7 @@
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 
-void invertCgCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugePrecise, 
-		  FullGauge gaugeSloppy, ParitySpinor tmp, QudaInvertParam *perf)
+void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInvertParam *perf)
 {
   ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
   ParitySpinor Ap = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
@@ -63,7 +62,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugePrecise,
     printf("%d iterations, r2 = %e\n", k, r2);
   stopwatchStart();
   while (r2 > stop && k<perf->maxiter) {
-    MatPCDagMatPCCuda(Ap, gaugeSloppy, p, perf->kappa, tmp_sloppy, perf->matpc_type);
+    MatPCDagMatPCCuda(Ap, cudaGaugeSloppy, p, perf->kappa, tmp_sloppy, perf->matpc_type);
 
     pAp = reDotProductCuda(p, Ap);
 
@@ -86,7 +85,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugePrecise,
       
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
 
-      MatPCDagMatPCCuda(r, gaugePrecise, x, invert_param->kappa, 
+      MatPCDagMatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, 
 			tmp, invert_param->matpc_type);
 
       r2 = xmyNormCuda(b, r);
@@ -133,7 +132,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, FullGauge gaugePrecise,
 
 #if 0
   // Calculate the true residual
-  MatPCDagMatPCCuda(Ap, gauge, x, perf->kappa, tmp, perf->matpc_type);
+  MatPCDagMatPCCuda(Ap, cudaGaugePrecise, x, perf->kappa, tmp, perf->matpc_type);
   copyCuda(r, b);
   mxpyCuda(Ap, r);
   double true_res = normCuda(r);

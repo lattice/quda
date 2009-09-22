@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 {
   int device = 0;
 
-  void *gauge[4];
+  void *gauge[4], *clover_inv;
 
   QudaGaugeParam Gauge_param;
   QudaInvertParam inv_param;
@@ -21,40 +21,53 @@ int main(int argc, char **argv)
   Gauge_param.X[3] = 32;
   setDims(Gauge_param.X);
 
+  Gauge_param.anisotropy = 1.0;
+  Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+
+  Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  Gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
+  Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
+  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
   Gauge_param.blockDim = 64;
   Gauge_param.blockDim_sloppy = 64;
 
-  Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  gauge_param = &Gauge_param;
 
-  Gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-
-  Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
-
-  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  Gauge_param.anisotropy = 1.0;
-
+  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
+  
+  if (clover_yes) {
+    inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+  } else {
+    inv_param.dslash_type = QUDA_WILSON_DSLASH;
+  }
   inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
-  Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param = &Gauge_param;
-  
   double mass = -0.95;
-  inv_param.kappa = 1.0 / (2.0*(4 + mass));
+  inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param->anisotropy + mass));
   inv_param.tol = 1e-12;
   inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-3;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
-  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+
+  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (clover_yes) {
+    inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+  }
   inv_param.verbosity = QUDA_VERBOSE;
 
   size_t gSize = (Gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -64,6 +77,15 @@ int main(int argc, char **argv)
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
   construct_gauge_field(gauge, 1, Gauge_param.cpu_prec);
+
+  if (clover_yes) {
+    double norm = 1.0; // random components range between -norm and norm
+    double diag = 1.0; // constant added to the diagonal
+
+    size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+    clover_inv = malloc(V*cloverSiteSize*cSize);
+    construct_clover_field(clover_inv, norm, diag, inv_param.clover_cpu_prec);
+  }
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize);
   void *spinorOut = malloc(V*spinorSiteSize*sSize);
@@ -78,6 +100,7 @@ int main(int argc, char **argv)
 
   initQuda(device);
   loadGaugeQuda((void*)gauge, &Gauge_param);
+  if (clover_yes) loadCloverQuda(NULL, clover_inv, &inv_param);
 
   invertQuda(spinorOut, spinorIn, &inv_param);
 

@@ -63,20 +63,24 @@ void freeCloverField(FullClover *clover)
 template <typename Float>
 static inline void packCloverMatrix(float4* a, Float *b, int Vh)
 {
+  const Float half = 0.5; // pre-include factor of 1/2 introduced by basis change
+
   for (int i=0; i<18; i++) {
-    a[i*Vh].x = b[4*i+0];
-    a[i*Vh].y = b[4*i+1];
-    a[i*Vh].z = b[4*i+2];
-    a[i*Vh].w = b[4*i+3];
+    a[i*Vh].x = half * b[4*i+0];
+    a[i*Vh].y = half * b[4*i+1];
+    a[i*Vh].z = half * b[4*i+2];
+    a[i*Vh].w = half * b[4*i+3];
   }
 }
 
 template <typename Float>
 static inline void packCloverMatrix(double2* a, Float *b, int Vh)
 {
+  const Float half = 0.5; // pre-include factor of 1/2 introduced by basis change
+
   for (int i=0; i<36; i++) {
-    a[i*Vh].x = b[2*i+0];
-    a[i*Vh].y = b[2*i+1];
+    a[i*Vh].x = half * b[2*i+0];
+    a[i*Vh].y = half * b[2*i+1];
   }
 }
 
@@ -113,6 +117,7 @@ static void packFullClover(FloatN *even, FloatN *odd, Float *clover, int *X)
 template<typename Float>
 static inline void packCloverMatrixHalf(short4 *res, float *norm, Float *clover, int Vh)
 {
+  const Float half = 0.5; // pre-include factor of 1/2 introduced by basis change
   Float max, a, c;
 
   // treat the two chiral blocks separately
@@ -128,7 +133,7 @@ static inline void packCloverMatrixHalf(short4 *res, float *norm, Float *clover,
       res[i*Vh].z = (short) (c * clover[4*i+2]);
       res[i*Vh].w = (short) (c * clover[4*i+3]);
     }
-    norm[chi*Vh] = 1/c;
+    norm[chi*Vh] = half/c;
     res += 9;
     clover += 36;
   }
@@ -310,3 +315,17 @@ void loadCloverField(FullClover ret, void *clover, Precision cpu_prec, CloverFie
     exit(-1);
   }
 }
+
+/*
+void createCloverField(FullClover *cudaClover, void *cpuClover, int *X, Precision precision)
+{
+  if (invert_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
+    printf("QUDA error: half precision not supported on cpu\n");
+    exit(-1);
+  }
+
+  // X should contain the dimensions of the even/odd sublattice
+  *cudaClover = allocateCloverField(X, precision);
+  loadCloverField(*cudaClover, cpuClover, precision, invert_param->clover_order);
+}
+*/

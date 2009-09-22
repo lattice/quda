@@ -441,6 +441,28 @@ void construct_gauge_field(void **gauge, int type, Precision precision) {
 }
 
 template <typename Float>
+void constructCloverField(Float *res, double norm, double diag) {
+
+  Float c = 2.0 * norm / RAND_MAX;
+
+  for(int i = 0; i < V; i++) {
+    for (int j = 0; j < 72; j++) {
+      res[i*72 + j] = c * rand() - 1.0;
+    }
+    for (int j = 0; j< 6; j++) {
+      res[i*72 + j] += diag;
+      res[i*72 + j+36] += diag;
+    }
+  }
+}
+
+void construct_clover_field(void *clover, double norm, double diag, Precision precision) {
+
+  if (precision == QUDA_DOUBLE_PRECISION) constructCloverField((double *)clover, norm, diag);
+  else constructCloverField((float *)clover, norm, diag);
+}
+
+template <typename Float>
 void constructPointSpinorField(Float *res, int i0, int s0, int c0) {
   Float *resEven = res;
   Float *resOdd = res + Vh*spinorSiteSize;

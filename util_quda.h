@@ -17,6 +17,7 @@ extern "C" {
   int getOddBit(int X);
   
   void construct_gauge_field(void **gauge, int type, Precision precision);
+  void construct_clover_field(void *clover, double norm, double diag, Precision precision);
   void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, Precision precision);
   
   void su3_construct(void *mat, ReconstructType reconstruct, Precision precision);

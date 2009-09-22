@@ -15,6 +15,8 @@ extern "C" {
 
     QudaGaugeFieldOrder gauge_order;
 
+    QudaTboundary t_boundary;
+
     QudaPrecision cpu_prec;
 
     QudaPrecision cuda_prec;
@@ -25,29 +27,27 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix;
 
-    QudaTboundary t_boundary;
+    int blockDim; // number of threads in a block
+    int blockDim_sloppy;
 
     int packed_size;
     double gaugeGiB;
 
-    int blockDim; // number of threads in a block
-    int blockDim_sloppy;
   } QudaGaugeParam;
 
   typedef struct QudaInvertParam_s {
     
-    double kappa;  
-    QudaMassNormalization mass_normalization;
-
     QudaDslashType dslash_type;
     QudaInverterType inv_type;
+
+    double kappa;  
     double tol;
-    int iter;
     int maxiter;
     double reliable_delta; // reliable update tolerance
 
     QudaMatPCType matpc_type;
     QudaSolutionType solution_type;
+    QudaMassNormalization mass_normalization;
 
     QudaPreserveSource preserve_source;
 
@@ -63,24 +63,26 @@ extern "C" {
 
     QudaCloverFieldOrder clover_order;
 
+    QudaVerbosity verbosity;
+
+    int iter;
     double spinorGiB;
     double cloverGiB;
     double gflops;
     double secs;
-
-    QudaVerbosity verbosity;
 
   } QudaInvertParam;
 
   // Interface functions
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+  void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param);
+  void discardCloverQuda(QudaInvertParam *inv_param);
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger);
   void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger);
   void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
-
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger);
 
   void endQuda(void);

@@ -42,8 +42,11 @@ extern "C" {
 			CloverFieldOrder clover_order);
   void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
 		      CloverFieldOrder clover_order);
-  void loadCloverField(FullSpinor ret, void *clover, Precision cpu_prec,
+  void loadCloverField(FullClover ret, void *clover, Precision cpu_prec,
 		       CloverFieldOrder clover_order);
+
+  /* void createCloverField(FullClover *cudaClover, void *cpuClover, int *X,
+                         Precision precision); */
 
 #ifdef __cplusplus
 }

@@ -39,16 +39,26 @@ extern "C" {
   } QudaPrecision;
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
+  //
+  // For the clover-improved Wilson Dirac operator, QUDA_MATPC_EVEN_EVEN
+  // defaults to the "symmetric" form, (1 - k^2 A_ee^-1 D_eo A_oo^-1 D_oe),
+  // and likewise for QUDA_MATPC_ODD_ODD.
+  //
+  // For the "asymmetric" form, (A_ee - k^2 D_eo A_oo^-1 D_oe), select
+  // QUDA_MATPC_EVEN_EVEN_ASYMMETRIC.
+  //
   typedef enum QudaMatPCType_s {
     QUDA_MATPC_EVEN_EVEN,
-    QUDA_MATPC_ODD_ODD
+    QUDA_MATPC_ODD_ODD,
+    QUDA_MATPC_EVEN_EVEN_ASYMMETRIC,
+    QUDA_MATPC_ODD_ODD_ASYMMETRIC
   } QudaMatPCType;
 
   // The different solutions supported
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
     QUDA_MATPC_SOLUTION,
-    QUDA_MATPCDAG_SOLUTION,
+    QUDA_MATPCDAG_SOLUTION, // not implemented
     QUDA_MATPCDAG_MATPC_SOLUTION,
   } QudaSolutionType;
 

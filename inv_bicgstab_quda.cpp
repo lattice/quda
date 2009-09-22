@@ -8,8 +8,7 @@
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 
-void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise, 
-			FullGauge gaugeSloppy, ParitySpinor tmp, 
+void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, ParitySpinor tmp, 
 			QudaInvertParam *invert_param, DagType dag_type)
 {
   ParitySpinor r = allocateParitySpinor(x.X, x.precision);
@@ -38,7 +37,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
   copyCuda(b, src);
   copyCuda(r_sloppy, src);
 
-  /*MatPCDagCuda(y, gaugePrecise, src, invert_param->kappa, tmp, invert_param->matpc_type);
+  /*MatPCDagCuda(y, cudaGaugePrecise, src, invert_param->kappa, tmp, invert_param->matpc_type);
     copyCuda(src_sloppy, y);*/ // uncomment for BiCRstab
 
   zeroCuda(y);
@@ -90,7 +89,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
       cxpaypbzCuda(r_sloppy, beta_omega, v, beta, p); // 8
     }
 
-    MatPCCuda(v, gaugeSloppy, p, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
+    MatPCCuda(v, cudaGaugeSloppy, p, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
     
     // rv = (r0,v)
     rv = cDotProductCuda(src_sloppy, v);
@@ -102,7 +101,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
     caxpyCuda(alpha, v, r_sloppy); // 4
     alpha.x *= -1.0; alpha.y *= -1.0;
 
-    MatPCCuda(t, gaugeSloppy, r_sloppy, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
+    MatPCCuda(t, cudaGaugeSloppy, r_sloppy, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
 
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, r_sloppy); // 6
@@ -122,7 +121,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
     if (updateR) {
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
 
-      MatPCCuda(r, gaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type, dag_type);
+      MatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type, dag_type);
 
       r2 = xmyNormCuda(b, r);
       if (x.precision != r_sloppy.precision) copyCuda(r_sloppy, r);
@@ -169,7 +168,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, FullGauge gaugePrecise
 
 #if 0
   // Calculate the true residual
-  MatPCCuda(r, gaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type, dag_type);
+  MatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type, dag_type);
   double true_res = xmyNormCuda(src, r);
   
   printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", k, sqrt(r2/b2), sqrt(true_res / b2));

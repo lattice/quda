@@ -13,8 +13,6 @@ these kernels.  Mixed-precision implementations of both CG and
 BiCGstab are provided, with support for double, single, and half
 (16-bit fixed-point) precision.
 
-NOTE: In this pre-release, only the BiCGstab inverter supports clover.
-
 
 Software compatibility:
 
@@ -53,7 +51,8 @@ Using the library:
 
 Include the header file "invert_quda.h" in your application, link
 against libquda.a, and study invert_test.c for an example of the
-interface.
+interface.  The various inverter options are enumerated in
+enum_quda.h.
 
 
 Known issues:
