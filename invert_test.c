@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
     inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
   construct_gauge_field(gauge, 1, Gauge_param.cpu_prec);
 
   if (clover_yes) {
-    double norm = 1.0; // random components range between -norm and norm
+    double norm = 0.1; // random components range between -norm and norm
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -107,9 +107,10 @@ int main(int argc, char **argv)
   time0 += clock(); // stop the timer
   time0 /= CLOCKS_PER_SEC;
 
-  printf("Cuda Space Required. Spinor:%f + Gauge:%f GiB\n", 
+  printf("Cuda Space Required:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, Gauge_param.gaugeGiB);
-  printf("done: %i iter / %g secs = %g gflops, total time = %g secs\n", 
+  if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
+  printf("\nDone: %i iter / %g secs = %g gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, Gauge_param.cpu_prec);

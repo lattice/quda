@@ -89,8 +89,13 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, ParitySpinor tmp,
       cxpaypbzCuda(r_sloppy, beta_omega, v, beta, p); // 8
     }
 
-    MatPCCuda(v, cudaGaugeSloppy, p, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
-    
+    if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
+      MatPCCuda(v, cudaGaugeSloppy, p, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
+    } else {
+      cloverMatPCCuda(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param->kappa, tmp_sloppy,
+		      invert_param->matpc_type, dag_type);
+    }
+
     // rv = (r0,v)
     rv = cDotProductCuda(src_sloppy, v);
 
@@ -101,7 +106,12 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, ParitySpinor tmp,
     caxpyCuda(alpha, v, r_sloppy); // 4
     alpha.x *= -1.0; alpha.y *= -1.0;
 
-    MatPCCuda(t, cudaGaugeSloppy, r_sloppy, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
+    if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
+      MatPCCuda(t, cudaGaugeSloppy, r_sloppy, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
+    } else {
+      cloverMatPCCuda(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, r_sloppy, invert_param->kappa, tmp_sloppy,
+		      invert_param->matpc_type,dag_type);
+    }
 
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, r_sloppy); // 6
@@ -121,7 +131,12 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, ParitySpinor tmp,
     if (updateR) {
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
 
+    if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
       MatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type, dag_type);
+    } else {
+      cloverMatPCCuda(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, invert_param->kappa, tmp,
+		      invert_param->matpc_type, dag_type);
+    }
 
       r2 = xmyNormCuda(b, r);
       if (x.precision != r_sloppy.precision) copyCuda(r_sloppy, r);
@@ -162,13 +177,22 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, ParitySpinor tmp,
   float gflops = (1.0e-9*x.volume)*(2*(2*1320+48)*k + (32*k + 8*(k-1))*spinorSiteSize);
   gflops += 1.0e-9*x.volume*rUpdate*((2*1320+48) + 3*spinorSiteSize);
   gflops += 1.0e-9*x.volume*xUpdate*spinorSiteSize;
+  if (invert_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    gflops += (1.0e-9*x.volume)*4*504*k;
+    gflops += (1.0e-9*x.volume)*rUpdate*2*504;
+  }
   //printf("%f gflops\n", k*gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;
   invert_param->iter += k;
 
 #if 0
   // Calculate the true residual
-  MatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type, dag_type);
+  if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
+    MatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type, dag_type);
+  } else {
+    cloverMatPCCuda(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, invert_param->kappa, tmp,
+		    invert_param->matpc_type, dag_type);
+  }
   double true_res = xmyNormCuda(src, r);
   
   printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", k, sqrt(r2/b2), sqrt(true_res / b2));

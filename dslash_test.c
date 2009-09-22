@@ -116,7 +116,7 @@ void init() {
   construct_spinor_field(spinor, 1, 0, 0, 0, inv_param.cpu_prec);
 
   if (clover_yes) {
-    double norm = 1.0; // random components range between -norm and norm
+    double norm = 0; // random components range between -norm and norm
     double diag = 1.0; // constant added to the diagonal
 
     if (test_type == 2) {

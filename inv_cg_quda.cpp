@@ -62,7 +62,13 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
     printf("%d iterations, r2 = %e\n", k, r2);
   stopwatchStart();
   while (r2 > stop && k<perf->maxiter) {
-    MatPCDagMatPCCuda(Ap, cudaGaugeSloppy, p, perf->kappa, tmp_sloppy, perf->matpc_type);
+
+    if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
+      MatPCDagMatPCCuda(Ap, cudaGaugeSloppy, p, perf->kappa, tmp_sloppy, perf->matpc_type);
+    } else {
+      cloverMatPCDagMatPCCuda(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, perf->kappa,
+			      tmp_sloppy, perf->matpc_type);
+    }
 
     pAp = reDotProductCuda(p, Ap);
 
@@ -85,8 +91,12 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
       
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
 
-      MatPCDagMatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, 
-			tmp, invert_param->matpc_type);
+      if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
+	MatPCDagMatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
+      } else {
+	cloverMatPCDagMatPCCuda(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, invert_param->kappa,
+				tmp, invert_param->matpc_type);
+      }
 
       r2 = xmyNormCuda(b, r);
       if (x.precision != r_sloppy.precision) copyCuda(r_sloppy, r);
@@ -126,13 +136,19 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
     printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
 
   float gflops = k*(1.0e-9*x.volume)*(2*(2*1320+48) + 10*spinorSiteSize);
+  if (invert_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) gflops += k*(1.0e-9*x.volume)*4*504;
   //printf("%f gflops\n", k*gflops / stopwatchReadSeconds());
   perf->gflops = gflops;
   perf->iter = k;
 
 #if 0
   // Calculate the true residual
-  MatPCDagMatPCCuda(Ap, cudaGaugePrecise, x, perf->kappa, tmp, perf->matpc_type);
+  if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
+    MatPCDagMatPCCuda(Ap, cudaGaugePrecise, x, perf->kappa, tmp, perf->matpc_type);
+  } else {
+    cloverMatPCDagMatPCCuda(Ap, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, perf->kappa,
+			    tmp, perf->matpc_type);
+  }
   copyCuda(r, b);
   mxpyCuda(Ap, r);
   double true_res = normCuda(r);
