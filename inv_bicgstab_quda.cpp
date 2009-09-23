@@ -109,7 +109,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor src, ParitySpinor tmp,
     if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
       MatPCCuda(t, cudaGaugeSloppy, r_sloppy, invert_param->kappa, tmp_sloppy, invert_param->matpc_type, dag_type);
     } else {
-      cloverMatPCCuda(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, r_sloppy, invert_param->kappa, tmp_sloppy,
+      cloverMatPCCuda(t, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, r_sloppy, invert_param->kappa, tmp_sloppy,
 		      invert_param->matpc_type,dag_type);
     }
 

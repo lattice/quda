@@ -26,7 +26,7 @@ int main(int argc, char **argv)
   Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  Gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
@@ -37,14 +37,14 @@ int main(int argc, char **argv)
 
   gauge_param = &Gauge_param;
 
-  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
+  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
   } else {
     inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  inv_param.inv_type = QUDA_CG_INVERTER;
 
   double mass = -0.95;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param->anisotropy + mass));
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
   construct_gauge_field(gauge, 1, Gauge_param.cpu_prec);
 
   if (clover_yes) {
-    double norm = 0.1; // random components range between -norm and norm
+    double norm = 0.2; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include <dslash_quda.h>
+#include <spinor_quda.h> // not needed once call to allocateParitySpinor() is removed
 
 #if (__CUDA_ARCH__ == 130)
 static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
@@ -1855,8 +1856,10 @@ void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover, FullC
 void cloverMatPCDagMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover, FullClover cloverInv, ParitySpinor in,
 			     double kappa, ParitySpinor tmp, MatPCType matpc_type)
 {
-  cloverMatPCCuda(out, gauge, clover, cloverInv, in, kappa, tmp, matpc_type, 0);
-  cloverMatPCCuda(out, gauge, clover, cloverInv, out, kappa, tmp, matpc_type, 1);
+  ParitySpinor aux = allocateParitySpinor(out.X, out.precision); // FIXME: eliminate aux
+  cloverMatPCCuda(aux, gauge, clover, cloverInv, in, kappa, tmp, matpc_type, 0);
+  cloverMatPCCuda(out, gauge, clover, cloverInv, aux, kappa, tmp, matpc_type, 1);
+  freeParitySpinor(aux);
 }
 
 // Apply the full operator (FIXME: create kernel to eliminate tmp)

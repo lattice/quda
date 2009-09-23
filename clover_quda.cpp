@@ -134,7 +134,7 @@ static inline void packCloverMatrixHalf(short4 *res, float *norm, Float *clover,
       res[i*Vh].w = (short) (c * clover[4*i+3]);
     }
     norm[chi*Vh] = half/c;
-    res += 9;
+    res += 9*Vh;
     clover += 36;
   }
 }
@@ -265,10 +265,10 @@ void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
     }
   } else {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-      packFullCloverHalf((short4 *)packedEven, (float *) packedEvenNorm, (short4 *)packedOdd,
+      packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
 			 (float *) packedOddNorm, (double *)clover, ret.even.X);
     } else {
-      packFullCloverHalf((short4 *)packedEven, (float *) packedEvenNorm, (short4 *)packedOdd,
+      packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
 			 (float * )packedOddNorm, (float *)clover, ret.even.X);    
     }
   }

@@ -92,7 +92,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
 
       if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
-	MatPCDagMatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
+      	MatPCDagMatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
       } else {
 	cloverMatPCDagMatPCCuda(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, invert_param->kappa,
 				tmp, invert_param->matpc_type);

@@ -10,7 +10,7 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 1;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 0;
+int clover_yes = 1;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -116,7 +116,7 @@ void init() {
   construct_spinor_field(spinor, 1, 0, 0, 0, inv_param.cpu_prec);
 
   if (clover_yes) {
-    double norm = 0; // random components range between -norm and norm
+    double norm = 0; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     if (test_type == 2) {

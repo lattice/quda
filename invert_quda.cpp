@@ -138,10 +138,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
-  if (!cudaGaugePrecise.even) {
-    printf("QUDA error: loadGaugeQuda() must precede call to loadCloverQuda()\n");
-    exit(-1);
-  }
   if (!h_clover && !h_clovinv) {
     printf("QUDA error: loadCloverQuda() called with neither clover term nor inverse\n");
     exit(-1);
@@ -161,14 +157,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if (h_clover) {
     cudaCloverPrecise = allocateCloverField(X, inv_param->clover_cuda_prec);
-    loadCloverField(cudaCloverPrecise, h_clover, inv_param->clover_cuda_prec, inv_param->clover_order);
+    loadCloverField(cudaCloverPrecise, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
     inv_param->cloverGiB += 2.0*cudaCloverPrecise.even.bytes / (1<<30);
 
     if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
 	inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
 	cudaCloverSloppy = allocateCloverField(X, inv_param->clover_cuda_prec_sloppy);
-	loadCloverField(cudaCloverSloppy, h_clover, inv_param->clover_cuda_prec_sloppy, inv_param->clover_order);
+	loadCloverField(cudaCloverSloppy, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
 	inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
       } else {
 	cudaCloverSloppy = cudaCloverPrecise;
@@ -181,13 +177,13 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     printf("QUDA error: clover term inverse not implemented yet\n");
     exit(-1);
   } else {
-    loadCloverField(cudaCloverInvPrecise, h_clovinv, inv_param->clover_cuda_prec, inv_param->clover_order);
+    loadCloverField(cudaCloverInvPrecise, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
   }
   inv_param->cloverGiB += 2.0*cudaCloverInvPrecise.even.bytes / (1<<30);
 
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
     cudaCloverInvSloppy = allocateCloverField(X, inv_param->clover_cuda_prec_sloppy);
-    loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cuda_prec_sloppy, inv_param->clover_order);
+    loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
     inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
   } else {
     cudaCloverInvSloppy = cudaCloverInvPrecise;
@@ -444,7 +440,12 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(out, in);
-      MatPCCuda(in, cudaGaugePrecise, out, kappa, tmp, param->matpc_type, QUDA_DAG_YES);
+      if (param->dslash_type == QUDA_WILSON_DSLASH) {
+	MatPCCuda(in, cudaGaugePrecise, out, kappa, tmp, param->matpc_type, QUDA_DAG_YES);
+      } else {
+	cloverMatPCCuda(in, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, out, kappa, tmp,
+			param->matpc_type, QUDA_DAG_YES);
+      }
     }
     invertCgCuda(out, in, tmp, param);
     break;
@@ -477,22 +478,17 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 	dslashXpayCuda(x.even, cudaGaugePrecise, out, 0, 0, b.even, kappa);
       }
     } else {
-      if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
+      if (param->matpc_type == QUDA_MATPC_EVEN_EVEN ||
+	  param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 	// x_o = A_oo^-1 (b_o + k D_oe x_e)
 	ParitySpinor aux = b.even;
 	dslashXpayCuda(aux, cudaGaugePrecise, out, 1, 0, b.odd, kappa);
 	cloverCuda(x.odd, cudaGaugePrecise, cudaCloverInvPrecise, aux, 1);
-      } else if (param->matpc_type == QUDA_MATPC_ODD_ODD) {
+      } else {
 	// x_e = A_ee^-1 (b_e + k D_eo x_o)
 	ParitySpinor aux = b.odd;
 	dslashXpayCuda(aux, cudaGaugePrecise, out, 0, 0, b.even, kappa);
 	cloverCuda(x.even, cudaGaugePrecise, cudaCloverInvPrecise, aux, 0);
-      } else if (param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-	// x_o = b_o + k D_oe x_e
-	dslashXpayCuda(x.odd, cudaGaugePrecise, out, 1, 0, b.odd, kappa);
-      } else {
-	// x_e = b_e + k D_eo x_o
-	dslashXpayCuda(x.even, cudaGaugePrecise, out, 0, 0, b.even, kappa);
       }
     }
 

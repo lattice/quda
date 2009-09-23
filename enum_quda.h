@@ -94,9 +94,9 @@ extern "C" {
   } QudaTboundary;
 
   typedef enum QudaVerbosity_s {
-    QUDA_SILENT = 0,
-    QUDA_SUMMARIZE = 1,
-    QUDA_VERBOSE = 2
+    QUDA_SILENT,
+    QUDA_SUMMARIZE,
+    QUDA_VERBOSE
   } QudaVerbosity;
 
   typedef struct double3_s {
