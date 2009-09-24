@@ -36,7 +36,7 @@ void init() {
   gaugeParam.X[0] = 24;
   gaugeParam.X[1] = 24;
   gaugeParam.X[2] = 24;
-  gaugeParam.X[3] = 32;
+  gaugeParam.X[3] = 48;
   setDims(gaugeParam.X);
 
   gaugeParam.anisotropy = 2.3;
@@ -60,6 +60,8 @@ void init() {
   }
 
   inv_param.kappa = kappa;
+
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
@@ -85,7 +87,7 @@ void init() {
 
   if (clover_yes) {
     size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-    if (test_type == 2) {
+    if (test_type > 0) {
       hostClover = malloc(V*cloverSiteSize*cSize);
       hostCloverInv = hostClover; // fake it
     } else {
@@ -201,10 +203,10 @@ double dslashCUDA() {
       if (TRANSFER) {
 	MatPCQuda(spinorOdd, spinorEven, &inv_param, DAGGER_BIT);
       } else if (!clover_yes) {
-	MatPCCuda(cudaSpinor.odd, gauge, cudaSpinor.even, kappa, tmp, QUDA_MATPC_EVEN_EVEN, DAGGER_BIT);
+	MatPCCuda(cudaSpinor.odd, gauge, cudaSpinor.even, kappa, tmp, inv_param.matpc_type, DAGGER_BIT);
       } else {
 	cloverMatPCCuda(cudaSpinor.odd, gauge, clover, cloverInv, cudaSpinor.even, kappa, tmp,
-			QUDA_MATPC_EVEN_EVEN, DAGGER_BIT);
+			inv_param.matpc_type, DAGGER_BIT);
       }
       break;
     case 2:

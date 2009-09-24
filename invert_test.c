@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
   gauge_param = &Gauge_param;
 
-  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
+  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;

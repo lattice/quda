@@ -1812,40 +1812,36 @@ void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover, FullC
     printf("QUDA error: For asymmetric matpc_type, the uninverted clover term must be loaded\n");
   }
 
-  if (!dagger) {
+  // FIXME: For asymmetric, a "dslashCxpay" kernel would improve performance.
+
+  if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      cloverDslashCuda(tmp, gauge, cloverInv, in, 1, dagger);
+      cloverCuda(out, gauge, clover, in, 0);
+      dslashXpayCuda(out, gauge, tmp, 0, dagger, out, kappa2);
+  } else if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      cloverDslashCuda(tmp, gauge, cloverInv, in, 0, dagger);
+      cloverCuda(out, gauge, clover, in, 1);
+      dslashXpayCuda(out, gauge, tmp, 1, dagger, out, kappa2);
+  } else if (!dagger) { // symmetric preconditioning
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
       cloverDslashCuda(tmp, gauge, cloverInv, in, 1, dagger);
       cloverDslashXpayCuda(out, gauge, cloverInv, tmp, 0, dagger, in, kappa2); 
     } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
       cloverDslashCuda(tmp, gauge, cloverInv, in, 0, dagger);
       cloverDslashXpayCuda(out, gauge, cloverInv, tmp, 1, dagger, in, kappa2); 
-    } else if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      printf("QUDA error: matpc_type QUDA_MATPC_EVEN_EVEN_ASYMMETRIC not implemented yet\n");
-      exit(1);
-    } else if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      printf("QUDA error: matpc_type QUDA_MATPC_ODD_ODD_ASYMMETRIC not implemented yet\n");
-      exit(-1);
     } else {
       printf("QUDA error: invalid matpc_type\n");
       exit(-1);
     }
-  } else { // very inefficient (FIXME)
+  } else { // symmetric preconditioning, dagger
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      cloverCuda(tmp, gauge, cloverInv, in, 0); 
-      cloverDslashCuda(out, gauge, cloverInv, tmp, 1, dagger);
-      copyCuda(tmp, out);
+      cloverCuda(out, gauge, cloverInv, in, 0); 
+      cloverDslashCuda(tmp, gauge, cloverInv, out, 1, dagger);
       dslashXpayCuda(out, gauge, tmp, 0, dagger, in, kappa2); 
     } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
-      cloverCuda(tmp, gauge, cloverInv, in, 1); 
-      cloverDslashCuda(out, gauge, cloverInv, tmp, 0, dagger);
-      copyCuda(tmp, out);
+      cloverCuda(out, gauge, cloverInv, in, 1); 
+      cloverDslashCuda(tmp, gauge, cloverInv, out, 0, dagger);
       dslashXpayCuda(out, gauge, tmp, 1, dagger, in, kappa2); 
-    } else if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      printf("QUDA error: matpc_type QUDA_MATPC_EVEN_EVEN_ASYMMETRIC not implemented yet\n");
-      exit(1);
-    } else if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      printf("QUDA error: matpc_type QUDA_MATPC_ODD_ODD_ASYMMETRIC not implemented yet\n");
-      exit(-1);
     } else {
       printf("QUDA error: invalid matpc_type\n");
       exit(-1);

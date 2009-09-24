@@ -219,7 +219,7 @@ void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec,
   if (ret.precision == QUDA_HALF_PRECISION) cudaFreeHost(packedCloverNorm);
 #else
   free(packedClover);
-  if (ret.precision == CUDA_HALF_PRECISION) free(packedCloverNorm);
+  if (ret.precision == QUDA_HALF_PRECISION) free(packedCloverNorm);
 #endif
 
 }
