@@ -96,8 +96,8 @@ inline void pack18(double2 *res, Float *g, int dir, int V) {
   }
 }
 
-// Assume the gauge field is "QDP" ordered directions inside of
-// space-time column-row ordering even-odd space-time
+// Assume the gauge field is "QDP" ordered (takes an array of pointers
+// to the four directions): even-odd space-time with row-column ordering
 template <typename Float, typename FloatN>
 void packQDPGaugeField(FloatN *res, Float **gauge, int oddBit, ReconstructType reconstruct, int V) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
@@ -113,8 +113,36 @@ void packQDPGaugeField(FloatN *res, Float **gauge, int oddBit, ReconstructType r
   }
 }
 
-// Assume the gauge field is "Wilson" ordered directions inside of
-// space-time column-row ordering even-odd space-time
+// Assume the gauge field is "chroma" ordered (takes an array of pointers
+// to the four directions): even-odd space-time with column-row ordering
+template <typename Float, typename FloatN>
+void packChromaGaugeField(FloatN *res, Float **gauge, int oddBit, ReconstructType reconstruct, int V) {
+  Float gT[18];
+  if (reconstruct == QUDA_RECONSTRUCT_12) {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *g = gauge[dir] + oddBit*V*18;
+      for (int i = 0; i < V; i++) {
+	// reorder rows and columns
+	for (int ic=0; ic<2; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
+	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];
+	pack12(res+i, gT, dir, V);
+      }
+    }
+  } else {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *g = gauge[dir] + oddBit*V*18;
+      for (int i = 0; i < V; i++) {
+	// reorder and columns
+	for (int ic=0; ic<3; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
+	  gT[(ic*3+jc)*2+r] = g[4*i*18 + (jc*3+ic)*2+r];
+	pack8(res+i, gT, dir, V);
+      }
+    }
+  }
+}
+
+// Assume the gauge field is "Wilson" ordered: directions inside of
+// space-time, column-row ordering, even-odd space-time
 template <typename Float, typename FloatN>
 void packCPSGaugeField(FloatN *res, Float *gauge, int oddBit, ReconstructType reconstruct, int V) {
   Float gT[18];
@@ -200,6 +228,9 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
   if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
     packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, Vh);
     packQDPGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, Vh);
+  } else if (gauge_param->gauge_order == QUDA_CHROMA_GAUGE_ORDER) {
+    packChromaGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, Vh);
+    packChromaGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, Vh);
   } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
     packCPSGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, Vh);
     packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh);
