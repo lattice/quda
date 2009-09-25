@@ -61,7 +61,7 @@ void init() {
 
   inv_param.kappa = kappa;
 
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  inv_param.matpc_type = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
@@ -233,7 +233,14 @@ double dslashCUDA() {
 }
 
 void dslashRef() {
-  
+
+  // to be removed once reference clover is finished
+  if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  } else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+    inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
+  }
+
   // compare to dslash reference implementation
   printf("Calculating reference implementation...");
   fflush(stdout);
@@ -243,7 +250,7 @@ void dslashRef() {
 	   inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   case 1:    
-    matpc(spinorRef, hostGauge, spinorEven, kappa, QUDA_MATPC_EVEN_EVEN, DAGGER_BIT, 
+    matpc(spinorRef, hostGauge, spinorEven, kappa, inv_param.matpc_type, DAGGER_BIT, 
 	  inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   case 2:
