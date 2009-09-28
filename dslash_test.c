@@ -71,7 +71,7 @@ void init() {
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_HALF_PRECISION;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;
@@ -234,7 +234,7 @@ double dslashCUDA() {
 
 void dslashRef() {
 
-  // to be removed once reference clover is finished
+  // FIXME: remove once reference clover is finished
   if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   } else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {

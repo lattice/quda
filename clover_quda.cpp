@@ -133,7 +133,7 @@ static inline void packCloverMatrixHalf(short4 *res, float *norm, Float *clover,
       res[i*Vh].z = (short) (c * clover[4*i+2]);
       res[i*Vh].w = (short) (c * clover[4*i+3]);
     }
-    norm[chi*Vh] = half/c;
+    norm[chi*Vh] = half*max;
     res += 9*Vh;
     clover += 36;
   }

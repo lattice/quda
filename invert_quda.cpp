@@ -391,22 +391,20 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 	cloverCuda(in, cudaGaugePrecise, cudaCloverInvPrecise, aux, 0);
       } else if (param->matpc_type == QUDA_MATPC_ODD_ODD) {
 	// in = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
-	ParitySpinor aux = tmp; // aliases b.odd when PRESERVE_SOURCE_NO is set
+	ParitySpinor aux = out; // aliases b.even when PRESERVE_SOURCE_NO is set
 	cloverCuda(in, cudaGaugePrecise, cudaCloverInvPrecise, b.even, 0);
 	dslashXpayCuda(aux, cudaGaugePrecise, in, 1, 0, b.odd, kappa);
 	cloverCuda(in, cudaGaugePrecise, cudaCloverInvPrecise, aux, 1);
       } else if (param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 	// in = b_e + k D_eo A_oo^-1 b_o
-	ParitySpinor aux = out; // aliases b.even when PRESERVE_SOURCE_NO is set
-	cloverCuda(in, cudaGaugePrecise, cudaCloverInvPrecise, b.odd, 1);
-	dslashXpayCuda(aux, cudaGaugePrecise, in, 0, 0, b.even, kappa);
-	copyCuda(in, aux);
+	ParitySpinor aux = tmp; // aliases b.odd when PRESERVE_SOURCE_NO is set
+	cloverCuda(aux, cudaGaugePrecise, cudaCloverInvPrecise, b.odd, 1); // safe even when aux = b.odd
+	dslashXpayCuda(in, cudaGaugePrecise, aux, 0, 0, b.even, kappa);
       } else if (param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 	// in = b_o + k D_oe A_ee^-1 b_e
 	ParitySpinor aux = out; // aliases b.even when PRESERVE_SOURCE_NO is set
-	cloverCuda(in, cudaGaugePrecise, cudaCloverInvPrecise, b.even, 0);
-	dslashXpayCuda(aux, cudaGaugePrecise, in, 1, 0, b.odd, kappa);
-	copyCuda(in, aux);
+	cloverCuda(aux, cudaGaugePrecise, cudaCloverInvPrecise, b.even, 0); // safe even when aux = b.even
+	dslashXpayCuda(in, cudaGaugePrecise, aux, 1, 0, b.odd, kappa);
       } else {
 	printf("QUDA error: invalid matpc_type\n");
 	exit(-1);
@@ -422,10 +420,11 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 
     // multiply the source to get the mass normalization
     if (param->mass_normalization == QUDA_MASS_NORMALIZATION)
-      if (param->solution_type == QUDA_MATPC_SOLUTION) 
+      if (param->solution_type == QUDA_MATPC_SOLUTION)  {
+	axCuda(2.0*kappa, in);
+      } else {
 	axCuda(4.0*kappa*kappa, in);
-      else
-	axCuda(16.0*pow(kappa,4), in);
+      }
 
     // cps uses a different anisotropy normalization
     if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)

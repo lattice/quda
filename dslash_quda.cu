@@ -1817,7 +1817,7 @@ void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover, FullC
   if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       cloverDslashCuda(tmp, gauge, cloverInv, in, 1, dagger);
       cloverCuda(out, gauge, clover, in, 0);
-      dslashXpayCuda(out, gauge, tmp, 0, dagger, out, kappa2);
+      dslashXpayCuda(out, gauge, tmp, 0, dagger, out, kappa2); // safe since out is not read after writing
   } else if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       cloverDslashCuda(tmp, gauge, cloverInv, in, 0, dagger);
       cloverCuda(out, gauge, clover, in, 1);

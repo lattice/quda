@@ -113,10 +113,11 @@ void packQDPGaugeField(FloatN *res, Float **gauge, int oddBit, ReconstructType r
   }
 }
 
-// Assume the gauge field is "chroma" ordered (takes an array of pointers
+#if 0 // unused ordering
+// Assume the gauge field is "QDP transposed" ordered (takes an array of pointers
 // to the four directions): even-odd space-time with column-row ordering
 template <typename Float, typename FloatN>
-void packChromaGaugeField(FloatN *res, Float **gauge, int oddBit, ReconstructType reconstruct, int V) {
+void packTransposedGaugeField(FloatN *res, Float **gauge, int oddBit, ReconstructType reconstruct, int V) {
   Float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
@@ -140,6 +141,7 @@ void packChromaGaugeField(FloatN *res, Float **gauge, int oddBit, ReconstructTyp
     }
   }
 }
+#endif
 
 // Assume the gauge field is "Wilson" ordered: directions inside of
 // space-time, column-row ordering, even-odd space-time
@@ -228,13 +230,9 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
   if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
     packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, Vh);
     packQDPGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, Vh);
-  } else if (gauge_param->gauge_order == QUDA_CHROMA_GAUGE_ORDER) {
-    packChromaGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, Vh);
-    packChromaGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, Vh);
   } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
     packCPSGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, Vh);
-    packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh);
-    
+    packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh);    
   } else {
     printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
     exit(-1);

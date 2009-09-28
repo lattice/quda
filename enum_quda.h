@@ -6,8 +6,7 @@ extern "C" {
 #endif
 
   typedef enum QudaGaugeFieldOrder_s {
-    QUDA_QDP_GAUGE_ORDER, // expect *gauge[mu], even-odd, row-column colour
-    QUDA_CHROMA_GAUGE_ORDER, // expect *gauge[mu], even-odd, column-row colour
+    QUDA_QDP_GAUGE_ORDER, // expect *gauge[4], even-odd, row-column colour
     QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu inside, column-row colour
   } QudaGaugeFieldOrder;
 
