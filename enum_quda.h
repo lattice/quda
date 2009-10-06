@@ -64,7 +64,8 @@ extern "C" {
 
   typedef enum QudaMassNormalization_s {
     QUDA_KAPPA_NORMALIZATION,
-    QUDA_MASS_NORMALIZATION
+    QUDA_MASS_NORMALIZATION,
+    QUDA_ASYMMETRIC_MASS_NORMALIZATION
   } QudaMassNormalization;
 
   typedef enum QudaPreserveSource_s {

@@ -360,7 +360,8 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     loadSpinorField(b, h_b, param->cpu_prec, param->dirac_order);
 
     // multiply the source to get the mass normalization
-    if (param->mass_normalization == QUDA_MASS_NORMALIZATION) {
+    if (param->mass_normalization == QUDA_MASS_NORMALIZATION ||
+	param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
       axCuda(2.0*kappa, b.even);
       axCuda(2.0*kappa, b.odd);
     }
@@ -419,20 +420,27 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     loadParitySpinor(in, h_b, param->cpu_prec, param->dirac_order);
 
     // multiply the source to get the mass normalization
-    if (param->mass_normalization == QUDA_MASS_NORMALIZATION)
+    if (param->mass_normalization == QUDA_MASS_NORMALIZATION) {
+      if (param->solution_type == QUDA_MATPC_SOLUTION)  {
+	axCuda(4.0*kappa*kappa, in);
+      } else {
+	axCuda(16.0*pow(kappa,4), in);
+      }
+    } else if (param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
       if (param->solution_type == QUDA_MATPC_SOLUTION)  {
 	axCuda(2.0*kappa, in);
       } else {
 	axCuda(4.0*kappa*kappa, in);
       }
+    }
 
     // cps uses a different anisotropy normalization
-    if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
+    if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (param->solution_type == QUDA_MATPC_SOLUTION) 
 	axCuda(pow(1.0/gauge_param->anisotropy, 2), in);
       else 
 	axCuda(pow(1.0/gauge_param->anisotropy, 4), in);
-
+    }
   }
 
   switch (param->inv_type) {
