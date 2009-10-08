@@ -186,8 +186,15 @@ void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec,
   }
 
 #ifndef __DEVICE_EMULATION__
-  cudaMallocHost(&packedClover, ret.bytes);
-  if (ret.precision == QUDA_HALF_PRECISION) cudaMallocHost(&packedCloverNorm, ret.bytes/18);
+  if (cudaMallocHost(&packedClover, ret.bytes) == cudaErrorMemoryAllocation) {
+    printf("Error allocating clover pinned memory\n");
+    exit(0);
+  }  
+  if (ret.precision == QUDA_HALF_PRECISION) 
+    if (cudaMallocHost(&packedCloverNorm, ret.bytes/18) == cudaErrorMemoryAllocation) {
+      printf("Error allocating clover pinned memory\n");
+      exit(0);
+    } 
 #else
   packedClover = malloc(ret.bytes);
   if (ret.precision == QUDA_HALF_PRECISION) packedCloverNorm = malloc(ret.bytes/18);

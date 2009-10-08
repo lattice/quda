@@ -29,14 +29,14 @@ void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
 double kappa = 1.0;
 int ODD_BIT = 1;
 int DAGGER_BIT = 0;
-int TRANSFER = 0; // include transfer time in the benchmark?
+int TRANSFER = 1; // include transfer time in the benchmark?
 
 void init() {
 
   gaugeParam.X[0] = 24;
   gaugeParam.X[1] = 24;
   gaugeParam.X[2] = 24;
-  gaugeParam.X[3] = 48;
+  gaugeParam.X[3] = 24;
   setDims(gaugeParam.X);
 
   gaugeParam.anisotropy = 2.3;
@@ -49,7 +49,7 @@ void init() {
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
-  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_YES;
+  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   gaugeParam.blockDim = 64;
 
@@ -61,7 +61,7 @@ void init() {
 
   inv_param.kappa = kappa;
 
-  inv_param.matpc_type = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
+  inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
@@ -71,7 +71,8 @@ void init() {
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_HALF_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;
