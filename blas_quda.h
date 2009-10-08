@@ -45,6 +45,7 @@ extern "C" {
 					     ParitySpinor z, ParitySpinor w, ParitySpinor u);
 
   extern unsigned long long blas_quda_flops;
+  extern unsigned long long blas_quda_bytes;
 
 #ifdef __cplusplus
 }

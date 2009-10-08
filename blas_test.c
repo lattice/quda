@@ -25,7 +25,7 @@ void init() {
   X[3] = 32;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
   inv_param.verbosity = QUDA_VERBOSE;
 
   invert_param = &inv_param;
@@ -136,7 +136,7 @@ double benchmark(int kernel) {
       break;
 
     case 17:
-      xpayDotzyCuda(x, a, y, z);
+      xpaycDotzyCuda(x, a, y, z);
       break;
       
       // double3
@@ -167,19 +167,45 @@ int main(int argc, char** argv) {
   init();
 
   int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+  char names[][100] = {
+      "axpbyCuda(a, x, b, y):                                     ",
+      "xpyCuda(x, y):                                             ",
+      "axpyCuda(a, x, y):                                         ",
+      "xpayCuda(x, a, y):                                         ",
+      "mxpyCuda(x, y):                                            ",
+      "axCuda(a, x):                                              ",
+      "caxpyCuda(a2, x, y):                                       ",
+      "caxpbyCuda(a2, x, b2, y):                                  ",
+      "cxpaypbzCuda(x, a2, y, b2, z):                             ",
+      "axpyZpbxCuda(a, x, y, z, b):                               ",
+      "caxpbypzYmbwCuda(a2, x, b2, y, z, w):                      ",
+      "sumCuda(x):                                                ",
+      "normCuda(x):                                               ",
+      "reDotProductCuda(x, y):                                    ",
+      "axpyNormCuda(a, x, y):                                     ",
+      "xmyNormCuda(x, y):                                         ",
+      "cDotProductCuda(x, y):                                     ",
+      "xpaycDotzyCuda(x, a, y, z):                                ",
+      "cDotProductNormACuda(x, y):                                ",
+      "cDotProductNormBCuda(x, y):                                ",
+      "caxpbypzYmbwcDotProductWYNormYQuda(a2, x, b2, y, z, w, v): "
+  };
 
   nIters = 1;
   // first do warmup run
-  for (int i = 0; i < 19; i++) {
+  for (int i = 0; i <= 20; i++) {
     benchmark(kernels[i]);
   }
 
   nIters = 1000;
-  for (int i = 0; i < 19; i++) {
-    blas_quda_flops = 0;  
+  for (int i = 0; i <= 20; i++) {
+    blas_quda_flops = 0;
+    blas_quda_bytes = 0;
     double secs = benchmark(kernels[i]);
     double flops = blas_quda_flops / (double)nIters;
-    printf("Average time: %f s, flops = %e, Gflops/s = %f\n", secs, flops, flops/secs*1e-9);
+    double bytes = blas_quda_bytes / (double)nIters;
+    printf("%s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
+	   names[i], secs, flops, flops/secs*1e-9, bytes/(secs*(1<<30)));
     //printf("Bandwidth:    %f GiB/s\n\n", GiB / secs);
   }
 }

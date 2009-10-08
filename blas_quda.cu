@@ -36,6 +36,7 @@ int blocksComplex = 0;
 int blocksFloat3 = 0;
 
 unsigned long long blas_quda_flops;
+unsigned long long blas_quda_bytes;
 
 void initReduceFloat(int blocks) {
   if (blocks != blocksFloat) {
@@ -482,6 +483,7 @@ void axpbyCuda(double a, ParitySpinor x, double b, ParitySpinor y) {
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     axpbyKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, b, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -532,6 +534,7 @@ void xpyCuda(ParitySpinor x, ParitySpinor y) {
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     xpyKernel<<<dimGrid, dimBlock>>>((double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -581,6 +584,7 @@ void axpyCuda(double a, ParitySpinor x, ParitySpinor y) {
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     axpyKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -630,6 +634,7 @@ void xpayCuda(ParitySpinor x, double a, ParitySpinor y) {
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     xpayKernel<<<dimGrid, dimBlock>>>((double*)x.spinor, a, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -675,11 +680,12 @@ __global__ void mxpyHKernel(short4 *yH, float *yN, int length) {
 
 
 // performs the operation y[i] -= x[i] (minus x plus y)
-void mxpyQuda(ParitySpinor x, ParitySpinor y) {
+void mxpyCuda(ParitySpinor x, ParitySpinor y) {
   checkSpinor(x,y);
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     mxpyKernel<<<dimGrid, dimBlock>>>((double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -723,6 +729,7 @@ void axCuda(double a, ParitySpinor x) {
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 2*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     axKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -778,6 +785,7 @@ void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y) {
   int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     caxpyKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -838,6 +846,7 @@ void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
   int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     caxpbyKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -911,6 +920,7 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
   int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 4*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     cxpaypbzKernel<<<dimGrid, dimBlock>>>((double2*)x.spinor, a, (double2*)y.spinor, b, (double2*)z.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -978,6 +988,7 @@ void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, doub
   int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 5*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     axpyZpbxKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, (double*)y.spinor, (double*)z.spinor, b, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -1062,6 +1073,7 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
   int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+  blas_quda_bytes += 6*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     caxpbypzYmbwKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, 
 					  (double2*)z.spinor, (double2*)w.spinor, length); 
@@ -1188,6 +1200,7 @@ template <typename Float>
 
 double sumCuda(ParitySpinor a) {
   blas_quda_flops += a.length;
+  blas_quda_bytes += a.length*sizeof(a.precision);
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return sumFCuda((double*)a.spinor, a.length);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
@@ -1242,6 +1255,7 @@ template <typename Float>
 
 double normCuda(ParitySpinor a) {
   blas_quda_flops += 2*a.length;
+  blas_quda_bytes += a.length*sizeof(a.precision);
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return normFCuda((double*)a.spinor, a.length);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
@@ -1300,6 +1314,7 @@ template <typename Float>
 double reDotProductCuda(ParitySpinor a, ParitySpinor b) {
   blas_quda_flops += 2*a.length;
   checkSpinor(a, b);
+  blas_quda_bytes += 2*a.length*sizeof(a.precision);
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return reDotProductFCuda((double*)a.spinor, (double*)b.spinor, a.length);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
@@ -1366,6 +1381,7 @@ template <typename Float>
 double axpyNormCuda(double a, ParitySpinor x, ParitySpinor y) {
   blas_quda_flops += 4*x.length;
   checkSpinor(x,y);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return axpyNormFCuda(a, (double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -1433,6 +1449,7 @@ template <typename Float>
 double xmyNormCuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_flops +=3*x.length;
   checkSpinor(x,y);
+  blas_quda_bytes += 3*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return xmyNormFCuda((double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -1505,6 +1522,7 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_flops += 4*x.length;
   checkSpinor(x,y);
   int length = x.length/2;
+  blas_quda_bytes += 2*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     char c = NULL;
     return cDotProductFCuda((double2*)x.spinor, (double2*)y.spinor, c, length);
@@ -1591,6 +1609,7 @@ double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z)
   checkSpinor(x,y);
   checkSpinor(x,z);
   int length = x.length/2;
+  blas_quda_bytes += 4*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return xpaycDotzyFCuda((double2*)x.spinor, a, (double2*)y.spinor, (double2*)z.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -1680,6 +1699,7 @@ double3 cDotProductNormACuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_flops += 6*x.length;
   checkSpinor(x,y);
   int length = x.length/2;
+  blas_quda_bytes += 2*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return cDotProductNormAFCuda((double2*)x.spinor, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -1766,6 +1786,7 @@ double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_flops += 6*x.length;
   checkSpinor(x,y);
   int length = x.length/2;
+  blas_quda_bytes += 2*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return cDotProductNormBFCuda((double2*)x.spinor, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -1898,6 +1919,7 @@ double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b,
   checkSpinor(x,w);
   checkSpinor(x,u);
   int length = x.length/2;
+  blas_quda_bytes += 7*x.length*sizeof(x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return caxpbypzYmbwcDotProductWYNormYFCuda(a, (double2*)x.spinor, b, (double2*)y.spinor, (double2*)z.spinor, 
 					       (double2*)w.spinor, (double2*)u.spinor, length);

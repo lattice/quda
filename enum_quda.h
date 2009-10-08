@@ -33,9 +33,9 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaPrecision_s {
-    QUDA_HALF_PRECISION,
-    QUDA_SINGLE_PRECISION,
-    QUDA_DOUBLE_PRECISION
+    QUDA_HALF_PRECISION = 2,
+    QUDA_SINGLE_PRECISION = 4,
+    QUDA_DOUBLE_PRECISION = 8
   } QudaPrecision;
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
