@@ -29,7 +29,7 @@ void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
 double kappa = 1.0;
 int ODD_BIT = 1;
 int DAGGER_BIT = 0;
-int TRANSFER = 1; // include transfer time in the benchmark?
+int TRANSFER = 0; // include transfer time in the benchmark?
 
 void init() {
 
@@ -45,7 +45,7 @@ void init() {
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_DOUBLE_PRECISION;
+  gaugeParam.cuda_prec = QUDA_HALF_PRECISION;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
@@ -64,14 +64,14 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_HALF_PRECISION;
 
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_HALF_PRECISION;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
@@ -308,8 +308,8 @@ void dslashTest() {
       
       printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
       
-      //if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-      //else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
+      if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
+      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
   }    
   end();
 }

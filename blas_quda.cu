@@ -847,6 +847,7 @@ void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
   blas_quda_bytes += 3*x.length*sizeof(x.precision);
+  blas_quda_flops += 7*x.length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     caxpbyKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -863,7 +864,6 @@ void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     caxpbyHKernel<<<dimGrid, dimBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, y.length/spinorSiteSize);
   }
-  blas_quda_flops += 7*x.length;
 }
 
 template <typename Float2>

@@ -13,7 +13,7 @@ QudaInvertParam inv_param;
 
 ParitySpinor x, y, z, w, v;
 
-int nIters = 1000;
+int nIters;
 
 void init() {
 
@@ -58,9 +58,10 @@ double benchmark(int kernel) {
   double a, b;
   double2 a2, b2;
 
-  //printf("Executing %d kernel loops...", nIters);
-  //fflush(stdout);
-  stopwatchStart();
+  cudaEvent_t start, end;
+  cudaEventCreate(&start);
+  cudaEventCreate(&end);
+  cudaEventRecord(start, 0);
 
   for (int i=0; i < nIters; ++i) {
     switch (kernel) {
@@ -158,7 +159,11 @@ double benchmark(int kernel) {
     }
   }
   
-  double secs = stopwatchReadSeconds() / nIters;
+  cudaEventRecord(end, 0);
+  cudaEventSynchronize(end);
+  float runTime;
+  cudaEventElapsedTime(&runTime, start, end);
+  double secs = runTime / 1000;
   return secs;
 }
 
@@ -202,10 +207,10 @@ int main(int argc, char** argv) {
     blas_quda_flops = 0;
     blas_quda_bytes = 0;
     double secs = benchmark(kernels[i]);
-    double flops = blas_quda_flops / (double)nIters;
-    double bytes = blas_quda_bytes / (double)nIters;
+    double flops = blas_quda_flops;
+    double bytes = blas_quda_bytes;
     printf("%s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
-	   names[i], secs, flops, flops/secs*1e-9, bytes/(secs*(1<<30)));
+	   names[i], secs, flops, (flops*1e-9)/(secs), bytes/(secs*(1<<30)));
     //printf("Bandwidth:    %f GiB/s\n\n", GiB / secs);
   }
 }
