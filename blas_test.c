@@ -82,7 +82,7 @@ double benchmark(int kernel) {
       break;
 
     case 4:
-      //mxpyQuda(x, y);
+      mxpyCuda(x, y);
       break;
 
     case 5:
@@ -136,7 +136,7 @@ double benchmark(int kernel) {
       break;
 
     case 17:
-      //xpayDotzyCuda(x, a, y, z);
+      xpayDotzyCuda(x, a, y, z);
       break;
       
       // double3
@@ -166,7 +166,7 @@ double benchmark(int kernel) {
 int main(int argc, char** argv) {
   init();
 
-  int kernels[] = {0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20};
+  int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
 
   nIters = 1;
   // first do warmup run

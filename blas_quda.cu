@@ -1586,7 +1586,7 @@ template <typename Float, typename Float2>
 #undef REDUCE_REAL_OPERATION
 #undef REDUCE_IMAG_OPERATION
 
-double2 xpayDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z) {
+double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z) {
   blas_quda_flops += 6*x.length;
   checkSpinor(x,y);
   checkSpinor(x,z);
