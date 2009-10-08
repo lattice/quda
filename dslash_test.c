@@ -10,7 +10,7 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 1;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 1;
+int clover_yes = 0;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -45,11 +45,11 @@ void init() {
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_SINGLE_PRECISION;
+  gaugeParam.cuda_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
-  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_YES;
 
   gaugeParam.blockDim = 64;
 
@@ -64,7 +64,7 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
 
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -307,8 +307,8 @@ void dslashTest() {
       
       printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
       
-      if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
+      //if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
+      //else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
   }    
   end();
 }

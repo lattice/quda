@@ -43,7 +43,9 @@ extern "C" {
   double3 cDotProductNormBCuda(ParitySpinor a, ParitySpinor b);
   double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y, 
 					     ParitySpinor z, ParitySpinor w, ParitySpinor u);
-  
+
+  extern unsigned long long blas_quda_flops;
+
 #ifdef __cplusplus
 }
 #endif

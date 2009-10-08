@@ -35,6 +35,8 @@ int blocksFloat = 0;
 int blocksComplex = 0;
 int blocksFloat3 = 0;
 
+unsigned long long blas_quda_flops;
+
 void initReduceFloat(int blocks) {
   if (blocks != blocksFloat) {
     if (blocksFloat > 0) cudaFree(h_reduceFloat);
@@ -46,7 +48,7 @@ void initReduceFloat(int blocks) {
 
     blocksFloat = blocks;
 
-    printf("Initialized reduce floats %d\n", blocksFloat);
+    //printf("Initialized reduce floats %d\n", blocksFloat);
   }
 }
 
@@ -60,7 +62,7 @@ void initReduceComplex(int blocks) {
     }
 
     blocksComplex = blocks;
-    printf("Initialized reduce complex %d\n", blocksComplex);
+    //printf("Initialized reduce complex %d\n", blocksComplex);
   }
 }
 
@@ -74,7 +76,7 @@ void initReduceFloat3(int blocks) {
     }
 
     blocksFloat3 = blocks;
-    printf("Initialized reduce float3 %d\n", blocksFloat3);
+    //printf("Initialized reduce float3 %d\n", blocksFloat3);
   }
 }
 
@@ -493,6 +495,7 @@ void axpbyCuda(double a, ParitySpinor x, double b, ParitySpinor y) {
     axpbyHKernel<<<dimGrid, dimBlock>>>((float)a, (float)b, (short4*)y.spinor, 
 					(float*)y.spinorNorm, y.length/spinorSiteSize);
   }
+  blas_quda_flops += 3*x.length;
 }
 
 template <typename Float>
@@ -541,6 +544,7 @@ void xpyCuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     xpyHKernel<<<dimGrid, dimBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.length/spinorSiteSize);
   }
+  blas_quda_flops += x.length;
 }
 
 template <typename Float>
@@ -589,6 +593,7 @@ void axpyCuda(double a, ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     axpyHKernel<<<dimGrid, dimBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.length/spinorSiteSize);
   }
+  blas_quda_flops += 2*x.length;
 }
 
 template <typename Float>
@@ -637,6 +642,7 @@ void xpayCuda(ParitySpinor x, double a, ParitySpinor y) {
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     xpayHKernel<<<dimGrid, dimBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.length/spinorSiteSize);
   }
+  blas_quda_flops += 2*x.length;
 }
 
 template <typename Float>
@@ -686,6 +692,7 @@ void mxpyQuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     mxpyHKernel<<<dimGrid, dimBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.length/spinorSiteSize);
   }
+  blas_quda_flops += x.length;
 }
 
 template <typename Float>
@@ -726,6 +733,7 @@ void axCuda(double a, ParitySpinor x) {
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     axHKernel<<<dimGrid, dimBlock>>>((float)a, (short4*)x.spinor, (float*)x.spinorNorm, x.length/spinorSiteSize);
   }
+  blas_quda_flops += x.length;
 }
 
 template <typename Float2>
@@ -784,6 +792,7 @@ void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     caxpyHKernel<<<dimGrid, dimBlock>>>(af2, (short4*)y.spinor, (float*)y.spinorNorm, y.length/spinorSiteSize);
   }
+  blas_quda_flops += 4*x.length;
 }
 
 template <typename Float2>
@@ -823,7 +832,7 @@ __global__ void caxpbyHKernel(float2 a, float2 b, short4 *yH, float *yN, int len
 
 
 // performs the operation y[i] = c*x[i] + b*y[i]
-void caxbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
+void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
   checkSpinor(x,y);
   int length = x.length/2;
   int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
@@ -845,6 +854,7 @@ void caxbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     caxpbyHKernel<<<dimGrid, dimBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, y.length/spinorSiteSize);
   }
+  blas_quda_flops += 7*x.length;
 }
 
 template <typename Float2>
@@ -919,6 +929,7 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     cxpaypbzHKernel<<<dimGrid, dimBlock>>>(af2, bf2, (short4*)z.spinor, (float*)z.spinorNorm, z.length/spinorSiteSize);
   }
+  blas_quda_flops += 8*x.length;
 }
 
 template <typename Float>
@@ -960,7 +971,7 @@ __global__ void axpyZpbxHKernel(float a, float b, short4 *xH, float *xN, short4 
 }
 
 
-// performs the operations: {y[i] = a x[i] + y[i]; x[i] = z[i] + b x[i]}
+// performs the operations: {y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]}
 void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, double b) {
   checkSpinor(x,y);
   checkSpinor(x,z);
@@ -982,6 +993,7 @@ void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, doub
     axpyZpbxHKernel<<<dimGrid, dimBlock>>>((float)a, (float)b, (short4*)x.spinor, (float*)x.spinorNorm,
 					   (short4*)y.spinor, (float*)y.spinorNorm, z.length/spinorSiteSize);
   }
+  blas_quda_flops += 8*x.length;
 }
 
 template <typename Float2>
@@ -1073,6 +1085,7 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
     caxpbypzYmbwHKernel<<<dimGrid, dimBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm,
 					       (short4*)z.spinor, (float*)z.spinorNorm, z.length/spinorSiteSize);
   }
+  blas_quda_flops += 12*x.length;  
 }
 
 
@@ -1174,6 +1187,7 @@ template <typename Float>
 #undef REDUCE_OPERATION
 
 double sumCuda(ParitySpinor a) {
+  blas_quda_flops += a.length;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return sumFCuda((double*)a.spinor, a.length);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
@@ -1227,6 +1241,7 @@ template <typename Float>
 #undef REDUCE_OPERATION
 
 double normCuda(ParitySpinor a) {
+  blas_quda_flops += 2*a.length;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return normFCuda((double*)a.spinor, a.length);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
@@ -1283,6 +1298,7 @@ template <typename Float>
 #undef REDUCE_OPERATION
 
 double reDotProductCuda(ParitySpinor a, ParitySpinor b) {
+  blas_quda_flops += 2*a.length;
   checkSpinor(a, b);
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return reDotProductFCuda((double*)a.spinor, (double*)b.spinor, a.length);
@@ -1348,6 +1364,7 @@ template <typename Float>
 #undef REDUCE_OPERATION
 
 double axpyNormCuda(double a, ParitySpinor x, ParitySpinor y) {
+  blas_quda_flops += 4*x.length;
   checkSpinor(x,y);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return axpyNormFCuda(a, (double*)x.spinor, (double*)y.spinor, x.length);
@@ -1414,6 +1431,7 @@ template <typename Float>
 #undef REDUCE_OPERATION
 
 double xmyNormCuda(ParitySpinor x, ParitySpinor y) {
+  blas_quda_flops +=3*x.length;
   checkSpinor(x,y);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return xmyNormFCuda((double*)x.spinor, (double*)y.spinor, x.length);
@@ -1484,6 +1502,7 @@ template <typename Float, typename Float2>
 #undef REDUCE_IMAG_OPERATION
 
 double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
+  blas_quda_flops += 4*x.length;
   checkSpinor(x,y);
   int length = x.length/2;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
@@ -1568,6 +1587,7 @@ template <typename Float, typename Float2>
 #undef REDUCE_IMAG_OPERATION
 
 double2 xpayDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z) {
+  blas_quda_flops += 6*x.length;
   checkSpinor(x,y);
   checkSpinor(x,z);
   int length = x.length/2;
@@ -1657,6 +1677,7 @@ template <typename Float2>
 #undef REDUCE_Z_OPERATION
 
 double3 cDotProductNormACuda(ParitySpinor x, ParitySpinor y) {
+  blas_quda_flops += 6*x.length;
   checkSpinor(x,y);
   int length = x.length/2;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
@@ -1742,6 +1763,7 @@ template <typename Float2>
 #undef REDUCE_Z_OPERATION
 
 double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
+  blas_quda_flops += 6*x.length;
   checkSpinor(x,y);
   int length = x.length/2;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
@@ -1870,6 +1892,7 @@ template <typename Float2>
 // This convoluted kernel does the following: z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
 double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
 					   ParitySpinor z, ParitySpinor w, ParitySpinor u) {
+  blas_quda_flops += 18*x.length;
   checkSpinor(x,y);
   checkSpinor(x,z);
   checkSpinor(x,w);

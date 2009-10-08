@@ -34,7 +34,7 @@ NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
 NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
 LDFLAGS = -fPIC $(LIB)
 
-all: dslash_test invert_test su3_test pack_test
+all: dslash_test invert_test su3_test pack_test blas_test
 
 QUDA = libquda.a
 QUDA_OBJS = blas_quda.o blas_reference.o clover_quda.o dslash_quda.o      \
@@ -60,6 +60,9 @@ su3_test: su3_test.o $(QUDA)
 	$(CXX) $(LDFLAGS) $< $(QUDA) -o $@
 
 pack_test: pack_test.o $(QUDA)
+	$(CXX) $(LDFLAGS) $< $(QUDA) -o $@
+
+blas_test: blas_test.o $(QUDA)
 	$(CXX) $(LDFLAGS) $< $(QUDA) -o $@
 
 gen:

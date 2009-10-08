@@ -509,7 +509,8 @@ void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, Prec
 
 template <typename Float>
 void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
-  int fail_check = 16;
+  int res = 1;
+  int fail_check = 16*res;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
@@ -521,7 +522,7 @@ void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
       int is = i*24+j;
       double diff = fabs(spinorRef[is]-spinorGPU[is]);
       for (int f=0; f<fail_check; f++)
-	if (diff > pow(10.0,-(f+1))) fail[f]++;
+	if (diff > pow(10.0,-(f+1)/(double)res)) fail[f]++;
       //if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
       if (diff > 1e-3) iter[j]++;
     }
@@ -530,7 +531,7 @@ void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
   for (int i=0; i<24; i++) printf("%d fails = %d\n", i, iter[i]);
     
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*24, fail[f] / (double)(len*24));
+    printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)res), fail[f], len*24, fail[f] / (double)(len*24));
   }
 
 }
