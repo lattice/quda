@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
     benchmark(kernels[i]);
   }
 
-  nIters = 1000;
+  nIters = 300;
   for (int i = 0; i <= 20; i++) {
     blas_quda_flops = 0;
     blas_quda_bytes = 0;
