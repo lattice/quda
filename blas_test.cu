@@ -173,27 +173,27 @@ int main(int argc, char** argv) {
 
   int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
   char names[][100] = {
-      "axpbyCuda(a, x, b, y):                                     ",
-      "xpyCuda(x, y):                                             ",
-      "axpyCuda(a, x, y):                                         ",
-      "xpayCuda(x, a, y):                                         ",
-      "mxpyCuda(x, y):                                            ",
-      "axCuda(a, x):                                              ",
-      "caxpyCuda(a2, x, y):                                       ",
-      "caxpbyCuda(a2, x, b2, y):                                  ",
-      "cxpaypbzCuda(x, a2, y, b2, z):                             ",
-      "axpyZpbxCuda(a, x, y, z, b):                               ",
-      "caxpbypzYmbwCuda(a2, x, b2, y, z, w):                      ",
-      "sumCuda(x):                                                ",
-      "normCuda(x):                                               ",
-      "reDotProductCuda(x, y):                                    ",
-      "axpyNormCuda(a, x, y):                                     ",
-      "xmyNormCuda(x, y):                                         ",
-      "cDotProductCuda(x, y):                                     ",
-      "xpaycDotzyCuda(x, a, y, z):                                ",
-      "cDotProductNormACuda(x, y):                                ",
-      "cDotProductNormBCuda(x, y):                                ",
-      "caxpbypzYmbwcDotProductWYNormYQuda(a2, x, b2, y, z, w, v): "
+      "axpbyCuda:                          ",
+      "xpyCuda:                            ",
+      "axpyCuda:                           ",
+      "xpayCuda:                           ",
+      "mxpyCuda:                           ",
+      "axCuda:                             ",
+      "caxpyCuda:                          ",
+      "caxpbyCuda:                         ",
+      "cxpaypbzCuda:                       ",
+      "axpyZpbxCuda:                       ",
+      "caxpbypzYmbwCuda:                   ",
+      "sumCuda:                            ",
+      "normCuda:                           ",
+      "reDotProductCuda:                   ",
+      "axpyNormCuda:                       ",
+      "xmyNormCuda:                        ",
+      "cDotProductCuda:                    ",
+      "xpaycDotzyCuda:                     ",
+      "cDotProductNormACuda:               ",
+      "cDotProductNormBCuda:               ",
+      "caxpbypzYmbwcDotProductWYNormYQuda: "
   };
 
   nIters = 1;
@@ -202,6 +202,10 @@ int main(int argc, char** argv) {
     benchmark(kernels[i]);
   }
 
+  char filename[100];
+  sprintf(filename, "%d_%d_blas.dat", inv_param.cuda_prec, 256);
+  FILE *blas_out = fopen(filename, "w");
+
   nIters = 300;
   for (int i = 0; i <= 20; i++) {
     blas_quda_flops = 0;
@@ -209,10 +213,14 @@ int main(int argc, char** argv) {
     double secs = benchmark(kernels[i]);
     double flops = blas_quda_flops;
     double bytes = blas_quda_bytes;
-    printf("%s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
+    printf("%s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
+	   names[i], secs, flops, (flops*1e-9)/(secs), bytes/(secs*(1<<30)));
+    fprintf(blas_out, "%s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
 	   names[i], secs, flops, (flops*1e-9)/(secs), bytes/(secs*(1<<30)));
     //printf("Bandwidth:    %f GiB/s\n\n", GiB / secs);
   }
+
+  fclose(blas_out);
 }
 
 

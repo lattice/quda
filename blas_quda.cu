@@ -40,7 +40,7 @@ unsigned long long blas_quda_bytes;
 
 void initReduceFloat(int blocks) {
   if (blocks != blocksFloat) {
-    if (blocksFloat > 0) cudaFree(h_reduceFloat);
+    if (blocksFloat > 0) cudaFree(d_reduceFloat);
 
     if (cudaMalloc((void**) &d_reduceFloat, blocks*sizeof(QudaSumFloat))) {
       printf("Error allocating reduction matrix\n");
@@ -55,7 +55,7 @@ void initReduceFloat(int blocks) {
 
 void initReduceComplex(int blocks) {
   if (blocks != blocksComplex) {
-    if (blocksComplex > 0) cudaFree(h_reduceComplex);
+    if (blocksComplex > 0) cudaFree(d_reduceComplex);
 
     if (cudaMalloc((void**) &d_reduceComplex, blocks*sizeof(QudaSumComplex))) {
       printf("Error allocating reduction matrix\n");
@@ -69,7 +69,7 @@ void initReduceComplex(int blocks) {
 
 void initReduceFloat3(int blocks) {
   if (blocks != blocksFloat3) {
-    if (blocksFloat3 > 0) cudaFree(h_reduceFloat3);
+    if (blocksFloat3 > 0) cudaFree(d_reduceFloat3);
 
     if (cudaMalloc((void**) &d_reduceFloat3, blocks*sizeof(QudaSumFloat3))) {
       printf("Error allocating reduction matrix\n");
@@ -701,12 +701,21 @@ void mxpyCuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_flops += x.length;
 }
 
-template <typename Float>
-__global__ void axKernel(Float a, Float *x, int len) {
+float2 __device__ make_Float2(float x, float y) {
+  return make_float2(x, y);
+}
+
+double2 __device__ make_Float2(double x, double y) {
+  return make_double2(x, y);
+}
+
+template <typename Float, typename Float2>
+__global__ void axKernel(Float a, Float2 *x, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
-    x[i] *= a;
+    x[i].x *= a;
+    x[i].y *= a;
     i += gridSize;
   } 
 }
@@ -731,9 +740,9 @@ void axCuda(double a, ParitySpinor x) {
   dim3 dimGrid(blocks, 1, 1);
   blas_quda_bytes += 2*x.length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, x.length);
+    axKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, x.length/2);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axKernel<<<dimGrid, dimBlock>>>((float)a, (float*)x.spinor, x.length);
+    axKernel<<<dimGrid, dimBlock>>>((float)a, (float2*)x.spinor, x.length/2);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -741,14 +750,6 @@ void axCuda(double a, ParitySpinor x) {
     axHKernel<<<dimGrid, dimBlock>>>((float)a, (short4*)x.spinor, (float*)x.spinorNorm, x.length/spinorSiteSize);
   }
   blas_quda_flops += x.length;
-}
-
-float2 __device__ make_Float2(float x, float y) {
-  return make_float2(x, y);
-}
-
-double2 __device__ make_Float2(double x, double y) {
-  return make_double2(x, y);
 }
 
 template <typename Float2>
@@ -940,14 +941,16 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
   }
 }
 
-template <typename Float>
-__global__ void axpyZpbxKernel(Float a, Float *x, Float *y, Float *z, Float b, int len) {
+template <typename Float, typename Float2>
+__global__ void axpyZpbxKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float b, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
-    Float x_i = x[i];
-    y[i] += a*x_i;
-    x[i] = z[i] + b*x_i;
+    Float2 x_i = make_Float2(x[i].x, x[i].y);
+    y[i].x += a*x_i.x;
+    y[i].y += a*x_i.y;
+    x[i].x = z[i].x + b*x_i.x;
+    x[i].y = z[i].y + b*x_i.y;
     i += gridSize;
   }
 }
@@ -988,9 +991,9 @@ void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, doub
   dim3 dimGrid(blocks, 1, 1);
   blas_quda_bytes += 5*x.length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axpyZpbxKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, (double*)y.spinor, (double*)z.spinor, b, x.length);
+    axpyZpbxKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, (double2*)z.spinor, b, x.length/2);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpyZpbxKernel<<<dimGrid, dimBlock>>>((float)a, (float*)x.spinor, (float*)y.spinor, (float*)z.spinor, (float)b, x.length);
+    axpyZpbxKernel<<<dimGrid, dimBlock>>>((float)a, (float2*)x.spinor, (float2*)y.spinor, (float2*)z.spinor, (float)b, x.length/2);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -1945,81 +1948,3 @@ double cpuDouble(float *data, int size) {
   return sum;
 }
 
-/*
-void blasTest() {
-  int n = 3*1<<24;
-  float *h_data = (float *)malloc(n*sizeof(float));
-  float *d_data;
-  if (cudaMalloc((void **)&d_data,  n*sizeof(float))) {
-    printf("Error allocating d_data\n");
-    exit(0);
-  }
-  
-  for (int i = 0; i < n; i++) {
-    h_data[i] = rand()/(float)RAND_MAX - 0.5; // n-1.0-i;
-  }
-  
-  cudaMemcpy(d_data, h_data, n*sizeof(float), cudaMemcpyHostToDevice);
-  
-  cudaThreadSynchronize();
-  stopwatchStart();
-  int LOOPS = 20;
-  for (int i = 0; i < LOOPS; i++) {
-    sumCuda(d_data, n);
-  }
-  cudaThreadSynchronize();
-  float secs = stopwatchReadSeconds();
-  
-  printf("%f GiB/s\n", 1.e-9*n*sizeof(float)*LOOPS / secs);
-  printf("Device: %f MiB\n", (float)n*sizeof(float) / (1 << 20));
-  printf("Shared: %f KiB\n", (float)REDUCE_THREADS*sizeof(float) / (1 << 10));
-  
-  float correctDouble = cpuDouble(h_data, n);
-  printf("Total: %f\n", correctDouble);
-  printf("CUDA db: %f\n", fabs(correctDouble-sumCuda(d_data, n)));
-  
-  cudaFree(d_data) ;
-  free(h_data);
-}
-*/
-/*
-void axpbyTest() {
-    int n = 3 * 1 << 20;
-    float *h_x = (float *)malloc(n*sizeof(float));
-    float *h_y = (float *)malloc(n*sizeof(float));
-    float *h_res = (float *)malloc(n*sizeof(float));
-    
-    float *d_x, *d_y;
-    if (cudaMalloc((void **)&d_x,  n*sizeof(float))) {
-      printf("Error allocating d_x\n");
-      exit(0);
-    }
-    if (cudaMalloc((void **)&d_y,  n*sizeof(float))) {
-      printf("Error allocating d_y\n");
-      exit(0);
-    }
-    
-    for (int i = 0; i < n; i++) {
-        h_x[i] = 1;
-        h_y[i] = 2;
-    }
-    
-    cudaMemcpy(d_x, h_x, n*sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_y, h_y, n*sizeof(float), cudaMemcpyHostToDevice);
-    
-    axpbyCuda(4, d_x, 3, d_y, n/2);
-    
-    cudaMemcpy( h_res, d_y, n*sizeof(float), cudaMemcpyDeviceToHost);
-
-    for (int i = 0; i < n; i++) {
-        float expect = (i < n/2) ? 4*h_x[i] + 3*h_y[i] : h_y[i];
-        if (h_res[i] != expect)
-            printf("FAILED %d : %f != %f\n", i, h_res[i], h_y[i]);
-    }
-    
-    cudaFree(d_y);
-    cudaFree(d_x);
-    free(h_x);
-    free(h_y);
-}
-*/

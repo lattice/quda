@@ -156,14 +156,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   inv_param->cloverGiB = 0;
 
   if (h_clover) {
-    cudaCloverPrecise = allocateCloverField(X, inv_param->clover_cuda_prec);
+    allocateCloverField(&cudaCloverPrecise, X, inv_param->clover_cuda_prec);
     loadCloverField(cudaCloverPrecise, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
     inv_param->cloverGiB += 2.0*cudaCloverPrecise.even.bytes / (1<<30);
 
     if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
 	inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-	cudaCloverSloppy = allocateCloverField(X, inv_param->clover_cuda_prec_sloppy);
+	allocateCloverField(&cudaCloverSloppy, X, inv_param->clover_cuda_prec_sloppy);
 	loadCloverField(cudaCloverSloppy, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
 	inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
       } else {
@@ -172,7 +172,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     } // sloppy precision clover term not needed otherwise
   }
 
-  cudaCloverInvPrecise = allocateCloverField(X, inv_param->clover_cuda_prec);
+  allocateCloverField(&cudaCloverInvPrecise, X, inv_param->clover_cuda_prec);
   if (!h_clovinv) {
     printf("QUDA error: clover term inverse not implemented yet\n");
     exit(-1);
@@ -182,7 +182,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   inv_param->cloverGiB += 2.0*cudaCloverInvPrecise.even.bytes / (1<<30);
 
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-    cudaCloverInvSloppy = allocateCloverField(X, inv_param->clover_cuda_prec_sloppy);
+    allocateCloverField(&cudaCloverInvSloppy, X, inv_param->clover_cuda_prec_sloppy);
     loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
     inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
   } else {

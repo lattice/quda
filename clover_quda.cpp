@@ -7,45 +7,44 @@
 #include <util_quda.h>
 
 
-ParityClover allocateParityClover(int *X, Precision precision)
+void allocateParityClover(ParityClover *ret, int *X, Precision precision)
 {
-  ParityClover ret;
-
-  ret.precision = precision;
-  ret.volume = 1;
+  ret->precision = precision;
+  ret->volume = 1;
   for (int d=0; d<4; d++) {
-    ret.X[d] = X[d];
-    ret.volume *= X[d];
+    ret->X[d] = X[d];
+    ret->volume *= X[d];
   }
-  ret.Nc = 3;
-  ret.Ns = 4;
-  ret.length = ret.volume*ret.Nc*ret.Nc*ret.Ns*ret.Ns/2; // block-diagonal Hermitian (72 reals)
+  ret->Nc = 3;
+  ret->Ns = 4;
+  ret->length = ret->volume*ret->Nc*ret->Nc*ret->Ns*ret->Ns/2; // block-diagonal Hermitian (72 reals)
 
-  if (precision == QUDA_DOUBLE_PRECISION) ret.bytes = ret.length*sizeof(double);
-  else if (precision == QUDA_SINGLE_PRECISION) ret.bytes = ret.length*sizeof(float);
-  else ret.bytes = ret.length*sizeof(short);
+  if (precision == QUDA_DOUBLE_PRECISION) ret->bytes = ret->length*sizeof(double);
+  else if (precision == QUDA_SINGLE_PRECISION) ret->bytes = ret->length*sizeof(float);
+  else ret->bytes = ret->length*sizeof(short);
 
-  if (cudaMalloc((void**)&(ret.clover), ret.bytes) == cudaErrorMemoryAllocation) {
-    printf("Error allocating clover term\n");
-    exit(0);
-  }   
-
-  if (precision == QUDA_HALF_PRECISION) {
-    if (cudaMalloc((void**)&ret.cloverNorm, ret.bytes/18) == cudaErrorMemoryAllocation) {
-      printf("Error allocating cloverNorm\n");
+  if (!ret->clover) {
+    if (cudaMalloc((void**)&(ret->clover), ret->bytes) == cudaErrorMemoryAllocation) {
+      printf("Error allocating clover term\n");
       exit(0);
+    }   
+  }
+
+  if (!ret->cloverNorm) {
+    if (precision == QUDA_HALF_PRECISION) {
+      if (cudaMalloc((void**)&ret->cloverNorm, ret->bytes/18) == cudaErrorMemoryAllocation) {
+	printf("Error allocating cloverNorm\n");
+	exit(0);
+      }
     }
   }
 
-  return ret;
 }
 
-FullClover allocateCloverField(int *X, Precision precision)
+void allocateCloverField(FullClover *ret, int *X, Precision precision)
 {
-  FullClover ret;
-  ret.even = allocateParityClover(X, precision);
-  ret.odd = allocateParityClover(X, precision);
-  return ret;
+  allocateParityClover(&(ret->even), X, precision);
+  allocateParityClover(&(ret->odd), X, precision);
 }
 
 void freeParityClover(ParityClover *clover)
