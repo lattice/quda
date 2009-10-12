@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
   }
 
   char filename[100];
-  sprintf(filename, "%d_%d_blas.dat", inv_param.cuda_prec, 256);
+  sprintf(filename, "%d_blas.dat", inv_param.cuda_prec);
   FILE *blas_out = fopen(filename, "w");
 
   nIters = 300;

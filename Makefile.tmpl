@@ -69,7 +69,7 @@ gen:
 	$(PYTHON) dslash_cuda_gen.py
 
 clean:
-	-rm -f *.o dslash_test invert_test su3_test pack_test $(QUDA)
+	-rm -f *.o dslash_test invert_test su3_test pack_test blas_test $(QUDA)
 
 %.o: %.c $(QUDA_HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@
