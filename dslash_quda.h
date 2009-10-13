@@ -122,6 +122,9 @@ extern "C" {
   void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp, 
 			  QudaInvertParam *param, DagType dag_type);
   
+  extern unsigned long long dslash_quda_flops;
+  extern unsigned long long dslash_quda_bytes;
+
 #ifdef __cplusplus
 }
 #endif

@@ -39,6 +39,9 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
   zeroCuda(x_sloppy);
   zeroCuda(y);
 
+  double kappa = invert_param->kappa;
+  if (invert_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= cudaGaugePrecise.anisotropy;
+
   double b2 = 0.0;
   b2 = normCuda(b);
 
@@ -60,13 +63,16 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
 
   if (invert_param->verbosity >= QUDA_VERBOSE)
     printf("%d iterations, r2 = %e\n", k, r2);
+
+  blas_quda_flops = 0;
+
   stopwatchStart();
   while (r2 > stop && k<perf->maxiter) {
 
     if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
-      MatPCDagMatPCCuda(Ap, cudaGaugeSloppy, p, perf->kappa, tmp_sloppy, perf->matpc_type);
+      MatPCDagMatPCCuda(Ap, cudaGaugeSloppy, p, kappa, tmp_sloppy, perf->matpc_type);
     } else {
-      cloverMatPCDagMatPCCuda(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, perf->kappa,
+      cloverMatPCDagMatPCCuda(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, kappa,
 			      tmp_sloppy, perf->matpc_type);
     }
 
@@ -92,9 +98,9 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
 
       if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
-      	MatPCDagMatPCCuda(r, cudaGaugePrecise, x, invert_param->kappa, tmp, invert_param->matpc_type);
+      	MatPCDagMatPCCuda(r, cudaGaugePrecise, x, kappa, tmp, invert_param->matpc_type);
       } else {
-	cloverMatPCDagMatPCCuda(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, invert_param->kappa,
+	cloverMatPCDagMatPCCuda(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, kappa,
 				tmp, invert_param->matpc_type);
       }
 
@@ -128,6 +134,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
   xpyCuda(y, x);
 
   perf->secs = stopwatchReadSeconds();
+  
 
   if (k==invert_param->maxiter) 
     printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
@@ -135,18 +142,20 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
     printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
 
-  float gflops = k*(1.0e-9*x.volume)*(2*(2*1320+48) + 10*spinorSiteSize);
-  if (invert_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) gflops += k*(1.0e-9*x.volume)*4*504;
-  //printf("%f gflops\n", k*gflops / stopwatchReadSeconds());
+  float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
+  //  printf("%f gflops\n", gflops / stopwatchReadSeconds());
   perf->gflops = gflops;
   perf->iter = k;
+
+  blas_quda_flops = 0;
+  dslash_quda_flops = 0;
 
 #if 0
   // Calculate the true residual
   if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
-    MatPCDagMatPCCuda(Ap, cudaGaugePrecise, x, perf->kappa, tmp, perf->matpc_type);
+    MatPCDagMatPCCuda(Ap, cudaGaugePrecise, x, kappa, tmp, perf->matpc_type);
   } else {
-    cloverMatPCDagMatPCCuda(Ap, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, perf->kappa,
+    cloverMatPCDagMatPCCuda(Ap, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, kappa,
 			    tmp, perf->matpc_type);
   }
   copyCuda(r, b);

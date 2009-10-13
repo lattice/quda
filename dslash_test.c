@@ -36,7 +36,7 @@ void init() {
   gaugeParam.X[0] = 24;
   gaugeParam.X[1] = 24;
   gaugeParam.X[2] = 24;
-  gaugeParam.X[3] = 24;
+  gaugeParam.X[3] = 48;
   setDims(gaugeParam.X);
 
   gaugeParam.anisotropy = 2.3;
@@ -45,7 +45,7 @@ void init() {
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.cuda_prec = QUDA_HALF_PRECISION;
+  gaugeParam.cuda_prec = QUDA_SINGLE_PRECISION;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
@@ -64,7 +64,7 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
 
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -308,8 +308,8 @@ void dslashTest() {
       
       printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
       
-      if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
+      //if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
+      //else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
   }    
   end();
 }

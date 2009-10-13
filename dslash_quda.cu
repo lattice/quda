@@ -95,6 +95,9 @@ __constant__ double t_boundary;
 
 static int initDslash = 0;
 
+unsigned long long dslash_quda_flops;
+unsigned long long dslash_quda_bytes;
+
 //#include <dslash_def.h> // Dslash kernel definitions
 
 // kludge to avoid '#include nested too deeply' error
@@ -306,6 +309,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   } else if (in.precision == QUDA_HALF_PRECISION) {
     dslashHCuda(out, gauge, in, parity, dagger);
   }
+  dslash_quda_flops += 1320*in.volume;
 }
 
 
@@ -508,6 +512,8 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   } else if (in.precision == QUDA_HALF_PRECISION) {
     dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
   }
+
+  dslash_quda_flops += (1320+48)*in.volume;
 }
 
 
@@ -768,6 +774,8 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
   }
+
+  dslash_quda_flops += (1320+504)*in.volume;
 }
 
 void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
@@ -1272,6 +1280,8 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
   }
+
+  dslash_quda_flops += (1320+504+48)*in.volume;
 }
 
 
@@ -1887,6 +1897,8 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverHCuda(out, gauge, clover, in, parity);
   }
+
+  dslash_quda_flops += 504*in.volume;
 }
 
 void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,

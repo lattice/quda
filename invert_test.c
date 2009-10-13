@@ -18,7 +18,7 @@ int main(int argc, char **argv)
   Gauge_param.X[0] = 24;
   Gauge_param.X[1] = 24;
   Gauge_param.X[2] = 24;
-  Gauge_param.X[3] = 48;
+  Gauge_param.X[3] = 24;
   setDims(Gauge_param.X);
 
   Gauge_param.anisotropy = 1.0;
@@ -28,29 +28,29 @@ int main(int argc, char **argv)
   Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   Gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  Gauge_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
+  Gauge_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
   Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
-  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_YES;
+  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   Gauge_param.blockDim = 64;
   Gauge_param.blockDim_sloppy = 64;
 
   gauge_param = &Gauge_param;
 
-  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
+  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
   } else {
     inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
-  inv_param.inv_type = QUDA_CG_INVERTER;
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
   double mass = -0.95;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param->anisotropy + mass));
   inv_param.tol = 1e-12;
-  inv_param.maxiter = 200;
-  inv_param.reliable_delta = 1e-13;
+  inv_param.maxiter = 1000;
+  inv_param.reliable_delta = 1e-1;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 

@@ -227,6 +227,12 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
 
   loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    parity = (parity+1)%2;
+    axCuda(gauge_param->anisotropy, in);
+  }
+
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
     dslashCuda(out, cudaGaugePrecise, in, parity, dagger);
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -248,12 +254,17 @@ void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
   ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
   ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
   ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
-  
+
   loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
+
+  double kappa = inv_param->kappa;
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
+    kappa *= cudaGaugePrecise.anisotropy;
+
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
-    MatPCCuda(out, cudaGaugePrecise, in, inv_param->kappa, tmp, inv_param->matpc_type, dagger);
+    MatPCCuda(out, cudaGaugePrecise, in, kappa, tmp, inv_param->matpc_type, dagger);
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    cloverMatPCCuda(out, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, in, inv_param->kappa,
+    cloverMatPCCuda(out, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, in, kappa,
 		    tmp, inv_param->matpc_type, dagger);
   } else {
     printf("QUDA error: unsupported dslash_type\n");
@@ -275,10 +286,15 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
   
   loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);  
+
+  double kappa = inv_param->kappa;
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
+    kappa *= cudaGaugePrecise.anisotropy;
+
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
-    MatPCDagMatPCCuda(out, cudaGaugePrecise, in, inv_param->kappa, tmp, inv_param->matpc_type);
+    MatPCDagMatPCCuda(out, cudaGaugePrecise, in, kappa, tmp, inv_param->matpc_type);
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    cloverMatPCDagMatPCCuda(out, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, in, inv_param->kappa,
+    cloverMatPCDagMatPCCuda(out, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, in, kappa,
 			    tmp, inv_param->matpc_type);
   } else {
     printf("QUDA error: unsupported dslash_type\n");
@@ -299,11 +315,15 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger) {
 
   loadSpinorField(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
 
+  double kappa = inv_param->kappa;
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
+    kappa *= cudaGaugePrecise.anisotropy;
+
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
-    MatCuda(out, cudaGaugePrecise, in, -inv_param->kappa, dagger);
+    MatCuda(out, cudaGaugePrecise, in, -kappa, dagger);
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
-    cloverMatCuda(out, cudaGaugePrecise, cudaCloverPrecise, in, inv_param->kappa, tmp, dagger);
+    cloverMatCuda(out, cudaGaugePrecise, cudaCloverPrecise, in, kappa, tmp, dagger);
     freeParitySpinor(tmp);
   } else {
     printf("QUDA error: unsupported dslash_type\n");
@@ -333,7 +353,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   param->iter = 0;
 
   double kappa = param->kappa;
-  if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa /= cudaGaugePrecise.anisotropy;
+  if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= cudaGaugePrecise.anisotropy;
 
   FullSpinor b, x;
   ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec); // source vector
@@ -364,12 +384,6 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 	param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
       axCuda(2.0*kappa, b.even);
       axCuda(2.0*kappa, b.odd);
-    }
-
-    // cps uses a different anisotropy normalization
-    if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-      axCuda(1.0/gauge_param->anisotropy, b.even);
-      axCuda(1.0/gauge_param->anisotropy, b.odd);
     }
 
     if (param->dslash_type == QUDA_WILSON_DSLASH) {
@@ -433,16 +447,9 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 	axCuda(4.0*kappa*kappa, in);
       }
     }
-
-    // cps uses a different anisotropy normalization
-    if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-      if (param->solution_type == QUDA_MATPC_SOLUTION) 
-	axCuda(pow(1.0/gauge_param->anisotropy, 2), in);
-      else 
-	axCuda(pow(1.0/gauge_param->anisotropy, 4), in);
-    }
   }
 
+  
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -467,7 +474,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     printf("Inverter type %d not implemented\n", param->inv_type);
     exit(-1);
   }
-
+  
   if (param->solution_type == QUDA_MAT_SOLUTION) {
 
     if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
