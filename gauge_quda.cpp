@@ -233,7 +233,7 @@ inline void unpack8(Float *h_gauge, double2 *d_gauge, int dir, int V, int idx) {
 
 template <typename Float>
 inline void unpack8(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
-  float4 *dg = d_gauge + dir*4*V;
+  float4 *dg = d_gauge + dir*2*V;
   h_gauge[0] = dg[0].x;
   h_gauge[1] = dg[0].y;
   h_gauge[2] = dg[0].z;
@@ -247,7 +247,7 @@ inline void unpack8(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
 
 template <typename Float>
 inline void unpack8(Float *h_gauge, short4 *d_gauge, int dir, int V, int idx) {
-  short4 *dg = d_gauge + dir*4*V;
+  short4 *dg = d_gauge + dir*2*V;
   ShortToFloat(h_gauge[0], dg[0].x);
   ShortToFloat(h_gauge[1], dg[0].y);
   ShortToFloat(h_gauge[2], dg[0].z);
@@ -583,16 +583,11 @@ void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, ReconstructT
 
 }
 
-void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, ReconstructType reconstruct, 
-		      Tboundary t_boundary, Precision precision, int *XX, double anisotropy, int blockDim) {
+void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision precision, ReconstructType reconstruct, 
+		      Tboundary t_boundary, int *XX, double anisotropy, int blockDim) {
 
-  if (precision == QUDA_HALF_PRECISION) {
+  if (gauge_param->cpu_prec == QUDA_HALF_PRECISION) {
     printf("QUDA error: half precision not supported on cpu\n");
-    exit(-1);
-  }
-
-  if (cudaGauge->precision == QUDA_DOUBLE_PRECISION && precision != QUDA_DOUBLE_PRECISION) {
-    printf("Error: can only create a double GPU gauge field from a double CPU gauge field\n");
     exit(-1);
   }
 
@@ -614,53 +609,68 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, ReconstructType reco
   allocateGaugeField(cudaGauge, reconstruct, precision);
 
   if (precision == QUDA_DOUBLE_PRECISION) {
-    loadGaugeField((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (double*)cpuGauge, 
-		   cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
+      loadGaugeField((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (double*)cpuGauge, 
+		     cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+    else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
+      loadGaugeField((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (float*)cpuGauge, 
+		     cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+
   } else if (precision == QUDA_SINGLE_PRECISION) {
-    if (precision == QUDA_DOUBLE_PRECISION)
+
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
       loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (double*)cpuGauge, 
 		     cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
-    else if (precision == QUDA_SINGLE_PRECISION)
+    else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
       loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (float*)cpuGauge, 
 		     cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+ 
   } else if (precision == QUDA_HALF_PRECISION) {
-    if (precision == QUDA_DOUBLE_PRECISION)
+
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
       loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (double*)cpuGauge, 
 		     cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
-    else if (precision == QUDA_SINGLE_PRECISION)
+    else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
       loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (float*)cpuGauge,
 		     cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+
   }
 }
 
-void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, Precision precision) {
+void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge) {
 
-  if (precision == QUDA_HALF_PRECISION) {
+  if (gauge_param->cpu_prec == QUDA_HALF_PRECISION) {
     printf("QUDA error: half precision not supported on cpu\n");
     exit(-1);
   }
 
-  if (cudaGauge->precision == QUDA_DOUBLE_PRECISION && precision != QUDA_DOUBLE_PRECISION) {
-    printf("Error: can only create a double GPU gauge field from a double CPU gauge field\n");
-    exit(-1);
-  }
+  if (cudaGauge->precision == QUDA_DOUBLE_PRECISION) {
 
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    retrieveGaugeField((double*)cpuGauge, (double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), 
-		       cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
-  } else if (precision == QUDA_SINGLE_PRECISION) {
-    if (precision == QUDA_DOUBLE_PRECISION)
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
+      retrieveGaugeField((double*)cpuGauge, (double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), 
+			 cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+    else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
+      retrieveGaugeField((float*)cpuGauge, (double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), 
+			 cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+
+  } else if (cudaGauge->precision == QUDA_SINGLE_PRECISION) {
+
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
       retrieveGaugeField((double*)cpuGauge, (float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), 
 			 cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
-    else if (precision == QUDA_SINGLE_PRECISION)
+    else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
       retrieveGaugeField((float*)cpuGauge, (float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), 
 			 cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
-  } else if (precision == QUDA_HALF_PRECISION) {
-    if (precision == QUDA_DOUBLE_PRECISION)
+
+  } else if (cudaGauge->precision == QUDA_HALF_PRECISION) {
+
+    if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
       retrieveGaugeField((double*)cpuGauge, (short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), 
 			cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
-    else if (precision == QUDA_SINGLE_PRECISION)
+    else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
       retrieveGaugeField((float*)cpuGauge, (short4*)(cudaGauge->even), (short4*)(cudaGauge->odd),
 			 cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+
   }
 }

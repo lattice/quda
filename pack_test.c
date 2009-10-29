@@ -44,14 +44,14 @@ void init() {
 
   param.cpu_prec = QUDA_SINGLE_PRECISION;
   param.cuda_prec = QUDA_SINGLE_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_12;
+  param.reconstruct = QUDA_RECONSTRUCT_8;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] = 4;
-  param.X[1] = 4;
-  param.X[2] = 4;
-  param.X[3] = 4;
+  param.X[0] = 24;
+  param.X[1] = 24;
+  param.X[2] = 24;
+  param.X[3] = 24;
   setDims(param.X);
 
   param.anisotropy = 2.3;
@@ -99,15 +99,27 @@ void packTest() {
   
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, cpsGauge, param.reconstruct, param.t_boundary, param.cuda_prec, param.X, 1.0, param.blockDim);
+  createGaugeField(&cudaGaugePrecise, cpsGauge, param.cuda_prec, param.reconstruct, 
+		   param.t_boundary, param.X, 1.0, param.blockDim);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
   stopwatchStart();
+  restoreGaugeField(cpsGauge, &cudaGaugePrecise);
+  double cpsGRtime = stopwatchReadSeconds();
+  printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
+
+  stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, qdpGauge, param.reconstruct, param.t_boundary, param.cuda_prec, param.X, 1.0, param.blockDim);
+  createGaugeField(&cudaGaugePrecise, qdpGauge, param.cpu_prec, param.reconstruct, 
+		   param.t_boundary, param.X, 1.0, param.blockDim);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
+
+  stopwatchStart();
+  restoreGaugeField(qdpGauge, &cudaGaugePrecise);
+  double qdpGRtime = stopwatchReadSeconds();
+  printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
 
   stopwatchStart();
   loadSpinorField(cudaFullSpinor, (void*)spinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);

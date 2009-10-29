@@ -8,8 +8,12 @@
 extern "C" {
 #endif
 
-  void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, ReconstructType reconstruct, Tboundary t_boundary,
-			Precision precision, int *X, double anisotropy, int blockDim);
+  void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision precision, 
+			ReconstructType reconstruct, Tboundary t_boundary,
+			int *X, double anisotropy, int blockDim);
+
+  void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge);
+
   void freeGaugeField(FullGauge *cudaCauge);
   
 #ifdef __cplusplus

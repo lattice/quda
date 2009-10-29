@@ -67,6 +67,13 @@ void printInvertParam(QudaInvertParam *param) {
   printf("verbosity = %d\n", param->verbosity);
 }
 
+void checkPrecision(QudaPrecision precision) {
+  if (precision == QUDA_HALF_PRECISION) {
+    printf("Half precision not supported on cpu\n");
+    exit(-1);
+  }
+}
+
 void initQuda(int dev)
 {
   int deviceCount;
@@ -122,13 +129,14 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
-  createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->reconstruct, gauge_param->t_boundary,
-		   gauge_param->cuda_prec, gauge_param->X, gauge_param->anisotropy, gauge_param->blockDim);
+  createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->cuda_prec, gauge_param->reconstruct, 
+		   gauge_param->t_boundary, gauge_param->X, gauge_param->anisotropy, gauge_param->blockDim);
   gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec ||
       gauge_param->reconstruct_sloppy != gauge_param->reconstruct) {
-    createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->reconstruct_sloppy, gauge_param->t_boundary,
-		     gauge_param->cuda_prec_sloppy, gauge_param->X, gauge_param->anisotropy,
+    createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->cuda_prec_sloppy, 
+		     gauge_param->reconstruct_sloppy, gauge_param->t_boundary,
+		     gauge_param->X, gauge_param->anisotropy,
 		     gauge_param->blockDim_sloppy);
     gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
@@ -212,16 +220,9 @@ void endQuda(void)
   if (cudaCloverInvSloppy.even.clover) freeCloverField(&cudaCloverInvSloppy);
 }
 
-void checkPrecision(QudaInvertParam *param) {
-  if (param->cpu_prec == QUDA_HALF_PRECISION) {
-    printf("Half precision not supported on cpu\n");
-    exit(-1);
-  }
-}
-
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger)
 {
-  checkPrecision(inv_param);
+  checkPrecision(inv_param->cpu_prec);
 
   ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
   ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
@@ -249,7 +250,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
 
 void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
 {
-  checkPrecision(inv_param);
+  checkPrecision(inv_param->cpu_prec);
 
   ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
   ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
@@ -279,7 +280,7 @@ void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
 
 void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
-  checkPrecision(inv_param);
+  checkPrecision(inv_param->cpu_prec);
 
   ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
   ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
@@ -308,7 +309,7 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 }
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger) {
-  checkPrecision(inv_param);
+  checkPrecision(inv_param->cpu_prec);
 
   FullSpinor in = allocateSpinorField(cudaGaugePrecise.X, inv_param->cuda_prec);
   FullSpinor out = allocateSpinorField(cudaGaugePrecise.X, inv_param->cuda_prec);
@@ -339,7 +340,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 {
   invert_param = param;
 
-  checkPrecision(param);
+  checkPrecision(param->cpu_prec);
 
   int slenh = cudaGaugePrecise.volume*spinorSiteSize;
   param->spinorGiB = (double)slenh*(param->cuda_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double): sizeof(float);
