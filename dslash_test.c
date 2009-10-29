@@ -80,26 +80,22 @@ void init() {
   gauge_param = &gaugeParam;
   invert_param = &inv_param;
 
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gSize);
+  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gaugeParam.cpu_prec);
 
   if (clover_yes) {
-    size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     if (test_type > 0) {
-      hostClover = malloc(V*cloverSiteSize*cSize);
+      hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
       hostCloverInv = hostClover; // fake it
     } else {
       hostClover = NULL;
-      hostCloverInv = malloc(V*cloverSiteSize*cSize);
+      hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
     }
   }
 
-  spinor = malloc(V*spinorSiteSize*sSize);
-  spinorRef = malloc(V*spinorSiteSize*sSize);
-  spinorGPU = malloc(V*spinorSiteSize*sSize);
+  spinor = malloc(V*spinorSiteSize*inv_param.cpu_prec);
+  spinorRef = malloc(V*spinorSiteSize*inv_param.cpu_prec);
+  spinorGPU = malloc(V*spinorSiteSize*inv_param.cpu_prec);
   spinorEven = spinor;
   spinorRefEven = spinorRef;
   spinorGPUEven = spinorGPU;

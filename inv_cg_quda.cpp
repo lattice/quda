@@ -177,7 +177,6 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
   freeParitySpinor(p);
   freeParitySpinor(Ap);
 
-  freeParitySpinor(b);
   freeParitySpinor(y);
 
   return;

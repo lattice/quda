@@ -144,6 +144,17 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 }
 
+/*
+  Very limited functionailty here
+  - currently assumes that the precision of the cpu field is the same as before
+  - no ability to dump the sloppy gauge field
+  - really exposes how crap the current api is
+*/
+void saveGaugeQuda(void *h_gauge)
+{
+  restoreGaugeField(h_gauge, &cudaGaugePrecise);
+}
+
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
   if (!h_clover && !h_clovinv) {

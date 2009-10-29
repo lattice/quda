@@ -76,6 +76,7 @@ extern "C" {
   // Interface functions
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+  void saveGaugeQuda(void *h_gauge);
   void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param);
   void discardCloverQuda(QudaInvertParam *inv_param);
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);

@@ -28,6 +28,9 @@ extern "C" {
   void compare_spinor(void *spinor_cpu, void *spinor_gpu, int len, Precision precision);
   void strong_check(void *spinor, void *spinorGPU, int len, Precision precision);
   int compare_floats(void *a, void *b, int len, double epsilon, Precision precision);
+
+  void check_gauge(void *, void *, Precision precision);
+
   // ---------- gauge_read.cpp ----------
   
   void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]);
