@@ -7,30 +7,34 @@
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 
-void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInvertParam *perf)
+void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cloverInv, ParitySpinor in, 
+	    QudaInvertParam *invert_param, ParitySpinor tmp) {
+  double kappa = invert_param->kappa;
+  if (invert_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
+    kappa *= cudaGaugePrecise.anisotropy;
+  
+  if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
+    MatPCDagMatPCCuda(out, gauge, in, kappa, tmp, invert_param->matpc_type);
+  } else {
+    cloverMatPCDagMatPCCuda(out, gauge, clover, cloverInv, in, kappa, tmp, invert_param->matpc_type);
+  }
+}
+
+void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r, QudaInvertParam *invert_param)
 {
+  ParitySpinor y = allocateParitySpinor(x.X, x.precision);
+
   ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
   ParitySpinor Ap = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-  ParitySpinor y = allocateParitySpinor(x.X, x.precision);
-  ParitySpinor r = allocateParitySpinor(x.X, x.precision);
+  ParitySpinor tmp = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
 
-  ParitySpinor b;
-  if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
-    b = allocateParitySpinor(x.X, x.precision);
-    copyCuda(b, source);
-  } else {
-    b = source;
-  }
-
-  ParitySpinor x_sloppy, r_sloppy, tmp_sloppy;
+  ParitySpinor x_sloppy, r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.precision) {
     x_sloppy = x;
     r_sloppy = r;
-    tmp_sloppy = tmp;
   } else {
     x_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
     r_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-    tmp_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
   }
 
   copyCuda(r, b);
@@ -39,15 +43,12 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
   zeroCuda(x_sloppy);
   zeroCuda(y);
 
-  double kappa = invert_param->kappa;
-  if (invert_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= cudaGaugePrecise.anisotropy;
-
   double b2 = 0.0;
   b2 = normCuda(b);
 
   double r2 = b2;
   double r2_old;
-  double stop = r2*perf->tol*perf->tol; // stopping condition of solver
+  double stop = r2*invert_param->tol*invert_param->tol; // stopping condition of solver
 
   double alpha, beta;
   double pAp;
@@ -59,22 +60,16 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
   double delta = invert_param->reliable_delta;
 
   int k=0;
-  int xUpdate = 0, rUpdate = 0;
+  int rUpdate = 0;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE)
-    printf("%d iterations, r2 = %e\n", k, r2);
+  if (invert_param->verbosity >= QUDA_VERBOSE) printf("%d iterations, r2 = %e\n", k, r2);
 
   blas_quda_flops = 0;
 
   stopwatchStart();
-  while (r2 > stop && k<perf->maxiter) {
+  while (r2 > stop && k<invert_param->maxiter) {
 
-    if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
-      MatPCDagMatPCCuda(Ap, cudaGaugeSloppy, p, kappa, tmp_sloppy, perf->matpc_type);
-    } else {
-      cloverMatPCDagMatPCCuda(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, kappa,
-			      tmp_sloppy, perf->matpc_type);
-    }
+    MatVec(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param, tmp);
 
     pAp = reDotProductCuda(p, Ap);
 
@@ -89,37 +84,25 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
     int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
     int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
 
-    if (!updateR) {
+    if (!(updateR || updateX)) {
       beta = r2 / r2_old;
       axpyZpbxCuda(alpha, p, x_sloppy, r_sloppy, beta);
     } else {
       axpyCuda(alpha, p, x_sloppy);
       
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
-
-      if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
-      	MatPCDagMatPCCuda(r, cudaGaugePrecise, x, kappa, tmp, invert_param->matpc_type);
-      } else {
-	cloverMatPCDagMatPCCuda(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, kappa,
-				tmp, invert_param->matpc_type);
-      }
-
-      r2 = xmyNormCuda(b, r);
-      if (x.precision != r_sloppy.precision) copyCuda(r_sloppy, r);
-      rNorm = sqrt(r2);
-
-      maxrr = rNorm;
-      rUpdate++;
       
-      if (updateX) {
-	xpyCuda(x, y);
-	zeroCuda(x_sloppy);
-	copyCuda(b, r);
-	r0Norm = rNorm;
+      xpyCuda(x, y);
+      MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, y, invert_param, x);
+      r2 = xmyNormCuda(b, r);
+      if (x.precision != r_sloppy.precision) copyCuda(r_sloppy, r);            
+      zeroCuda(x_sloppy);
 
-	maxrx = rNorm;
-	xUpdate++;
-      }
+      rNorm = sqrt(r2);
+      maxrr = rNorm;
+      maxrx = rNorm;
+      r0Norm = rNorm;      
+      rUpdate++;
 
       beta = r2 / r2_old;
       xpayCuda(r_sloppy, beta, p);
@@ -133,49 +116,40 @@ void invertCgCuda(ParitySpinor x, ParitySpinor source, ParitySpinor tmp, QudaInv
   if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
   xpyCuda(y, x);
 
-  perf->secs = stopwatchReadSeconds();
+  invert_param->secs = stopwatchReadSeconds();
   
 
   if (k==invert_param->maxiter) 
     printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
 
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
-    printf("Residual updates = %d, Solution updates = %d\n", rUpdate, xUpdate);
+    printf("Reliable updates = %d\n", rUpdate);
 
   float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
   //  printf("%f gflops\n", gflops / stopwatchReadSeconds());
-  perf->gflops = gflops;
-  perf->iter = k;
+  invert_param->gflops = gflops;
+  invert_param->iter = k;
 
   blas_quda_flops = 0;
   dslash_quda_flops = 0;
 
 #if 0
   // Calculate the true residual
-  if (invert_param->dslash_type == QUDA_WILSON_DSLASH) {
-    MatPCDagMatPCCuda(Ap, cudaGaugePrecise, x, kappa, tmp, perf->matpc_type);
-  } else {
-    cloverMatPCDagMatPCCuda(Ap, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, kappa,
-			    tmp, perf->matpc_type);
-  }
-  copyCuda(r, b);
-  mxpyCuda(Ap, r);
-  double true_res = normCuda(r);
+  MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, y);
+  double true_res = xmyNormCuda(b, r);
   
   printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
 	 k, r2, true_res / b2);
 #endif
 
   if (invert_param->cuda_prec_sloppy != x.precision) {
-    freeParitySpinor(tmp_sloppy);
     freeParitySpinor(r_sloppy);
     freeParitySpinor(x_sloppy);
   }
 
-  if (perf->preserve_source == QUDA_PRESERVE_SOURCE_YES) freeParitySpinor(b);
-  freeParitySpinor(r);
   freeParitySpinor(p);
   freeParitySpinor(Ap);
+  freeParitySpinor(tmp);
 
   freeParitySpinor(y);
 
