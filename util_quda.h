@@ -29,7 +29,7 @@ extern "C" {
   void strong_check(void *spinor, void *spinorGPU, int len, Precision precision);
   int compare_floats(void *a, void *b, int len, double epsilon, Precision precision);
 
-  void check_gauge(void *, void *, Precision precision);
+  void check_gauge(void **, void **, double epsilon, Precision precision);
 
   // ---------- gauge_read.cpp ----------
   

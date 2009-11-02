@@ -28,16 +28,16 @@ void init() {
 
   param.blockDim = 64;
 
-  param.cpu_prec = QUDA_SINGLE_PRECISION;
-  param.cuda_prec = QUDA_SINGLE_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_8;
+  param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  param.reconstruct = QUDA_RECONSTRUCT_12;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] = 24;
-  param.X[1] = 24;
-  param.X[2] = 24;
-  param.X[3] = 24;
+  param.X[0] = 8;
+  param.X[1] = 8;
+  param.X[2] = 8;
+  param.X[3] = 4;
   setDims(param.X);
 
   param.anisotropy = 2.3;
@@ -74,7 +74,7 @@ void SU3Test() {
   loadGaugeQuda(gauge, &param);
   saveGaugeQuda(new_gauge);
 
-  check_gauge(gauge, new_gauge, param.cpu_prec);
+  check_gauge(gauge, new_gauge, 1e-3, param.cpu_prec);
 
   end();
 }

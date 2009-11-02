@@ -554,7 +554,7 @@ void strong_check(void *spinorRef, void *spinorGPU, int len, Precision prec) {
 }
 
 template <typename Float>
-void checkGauge(Float **oldG, Float **newG) {
+void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   int fail_check = 17;
   int fail[fail_check];
@@ -562,15 +562,15 @@ void checkGauge(Float **oldG, Float **newG) {
   for (int i=0; i<fail_check; i++) fail[i] = 0;
   for (int i=0; i<18; i++) iter[i] = 0;
 
-  for (int eo=0; eo<2; eo++) {
-    for (int i=0; i<Vh; i++) {
-      int ga_idx = (eo*Vh+i);
-      for (int d=0; d<4; d++) {
+  for (int d=0; d<4; d++) {
+    for (int eo=0; eo<2; eo++) {
+      for (int i=0; i<Vh; i++) {
+	int ga_idx = (eo*Vh+i);
 	for (int j=0; j<18; j++) {
 	  double diff = fabs(newG[d][ga_idx*18+j] - oldG[d][ga_idx*18+j]);
 
 	  for (int f=0; f<fail_check; f++) if (diff > pow(10.0,-(f+1))) fail[f]++;
-	  if (diff > 1e-3) iter[j]++;
+	  if (diff > epsilon) iter[j]++;
 	}
       }
     }
@@ -584,9 +584,9 @@ void checkGauge(Float **oldG, Float **newG) {
 
 }
 
-void check_gauge(void *oldG, void *newG, QudaPrecision precision) {
-  if (precision == QUDA_SINGLE_PRECISION) 
-    checkGauge((double**)oldG, (double**)newG);
+void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precision) {
+  if (precision == QUDA_DOUBLE_PRECISION) 
+    checkGauge((double**)oldG, (double**)newG, epsilon);
   else 
-    checkGauge((float**)oldG, (float**)newG);
+    checkGauge((float**)oldG, (float**)newG, epsilon);
 }
