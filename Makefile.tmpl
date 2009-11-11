@@ -37,7 +37,7 @@ LDFLAGS = -fPIC $(LIB)
 all: dslash_test invert_test su3_test pack_test blas_test
 
 QUDA = libquda.a
-QUDA_OBJS = blas_quda.o blas_reference.o clover_field.o clover_quda.o dslash_quda.o      \
+QUDA_OBJS = blas_quda.o blas_reference.o clover_quda.o dslash_quda.o      \
 	dslash_reference.o gauge_quda.o inv_bicgstab_quda.o inv_cg_quda.o \
 	invert_quda.o spinor_quda.o util_quda.o
 QUDA_HDRS = blas_quda.h blas_reference.h clover_def.h dslash_def.h        \
