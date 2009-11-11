@@ -531,8 +531,18 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
     exit(-1);
   }
     
-  cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
-  cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);    
+  cudaError_t error = cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
+  if (error != cudaSuccess) {
+    printf("Error: %s\n", cudaGetErrorString(error));
+    exit(-1);
+  }
+
+  error = cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);
+  if (error != cudaSuccess) {
+    printf("Error: %s\n", cudaGetErrorString(error));
+    exit(-1);
+  }
+  
     
 #ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedEven);
@@ -584,7 +594,7 @@ void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, ReconstructT
 }
 
 void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision precision, ReconstructType reconstruct, 
-		      Tboundary t_boundary, int *XX, double anisotropy, int blockDim) {
+		      Tboundary t_boundary, int *XX, double anisotropy) {
 
   if (gauge_param->cpu_prec == QUDA_HALF_PRECISION) {
     printf("QUDA error: half precision not supported on cpu\n");
@@ -603,8 +613,6 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision precision,
   }
   cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
   cudaGauge->volume /= 2;
-
-  cudaGauge->blockDim = blockDim;
 
   allocateGaugeField(cudaGauge, reconstruct, precision);
 

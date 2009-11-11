@@ -13,7 +13,7 @@ void *packedSpinor2 = 0;
 
 int L[4];
 
-ParitySpinor allocateParitySpinor(int *X, Precision precision) {
+ParitySpinor allocateParitySpinor(int *X, Precision precision, int pad) {
   ParitySpinor ret;
 
   ret.precision = precision;
@@ -23,10 +23,14 @@ ParitySpinor allocateParitySpinor(int *X, Precision precision) {
     ret.volume *= X[d];
     L[d] = X[d];
   }
+  ret.pad = pad;
+  ret.stride = ret.volume + ret.pad;
+
   //ret.volume = volume/2;
   ret.Nc = 3;
   ret.Ns = 4;
-  ret.length = ret.volume*ret.Nc*ret.Ns*2;
+  ret.length = ret.stride*ret.Nc*ret.Ns*2;
+  ret.real_length = ret.volume*ret.Nc*ret.Ns*2;
 
   if (precision == QUDA_DOUBLE_PRECISION) ret.bytes = ret.length*sizeof(double);
   else if (precision == QUDA_SINGLE_PRECISION) ret.bytes = ret.length*sizeof(float);
@@ -44,13 +48,15 @@ ParitySpinor allocateParitySpinor(int *X, Precision precision) {
     }
   }
 
+  zeroCuda(ret); // Need this make sure padded elements don't screw things up
+
   return ret;
 }
 
-FullSpinor allocateSpinorField(int *X, Precision precision) {
+FullSpinor allocateSpinorField(int *X, Precision precision, int pad) {
   FullSpinor ret;
-  ret.even = allocateParitySpinor(X, precision);
-  ret.odd = allocateParitySpinor(X, precision);
+  ret.even = allocateParitySpinor(X, precision, pad);
+  ret.odd = allocateParitySpinor(X, precision, pad);
   return ret;
 }
 
@@ -294,38 +300,38 @@ inline void unpackQDPSpinorVector(Float *a, double2 *b, int V) {
 
 // Standard spinor packing, colour inside spin
 template <typename Float, typename FloatN>
-void packParitySpinor(FloatN *res, Float *spinor, int Vh) {
+void packParitySpinor(FloatN *res, Float *spinor, int Vh, int pad) {
   for (int i = 0; i < Vh; i++) {
-    packSpinorVector(res+i, spinor+24*i, Vh);
+    packSpinorVector(res+i, spinor+24*i, Vh+pad);
   }
 }
 
 template <typename Float, typename FloatN>
-void unpackParitySpinor(Float *res, FloatN *spinorPacked, int Vh) {
+void unpackParitySpinor(Float *res, FloatN *spinorPacked, int Vh, int pad) {
 
   for (int i = 0; i < Vh; i++) {
-    unpackSpinorVector(res+i*24, spinorPacked+i, Vh);
-  }
-}
-
-// QDP spinor packing, spin inside colour
-template <typename Float, typename FloatN>
-void packQDPParitySpinor(FloatN *res, Float *spinor, int Vh) {
-  for (int i = 0; i < Vh; i++) {
-    packQDPSpinorVector(res+i, spinor+i*24, Vh);
+    unpackSpinorVector(res+i*24, spinorPacked+i, Vh+pad);
   }
 }
 
 // QDP spinor packing, spin inside colour
 template <typename Float, typename FloatN>
-void unpackQDPParitySpinor(Float *res, FloatN *spinor, int Vh) {
+void packQDPParitySpinor(FloatN *res, Float *spinor, int Vh, int pad) {
   for (int i = 0; i < Vh; i++) {
-    unpackQDPSpinorVector(res+i*24, spinor+i, Vh);
+    packQDPSpinorVector(res+i, spinor+i*24, Vh+pad);
+  }
+}
+
+// QDP spinor packing, spin inside colour
+template <typename Float, typename FloatN>
+void unpackQDPParitySpinor(Float *res, FloatN *spinor, int Vh, int pad) {
+  for (int i = 0; i < Vh; i++) {
+    unpackQDPSpinorVector(res+i*24, spinor+i, Vh+pad);
   }
 }
 
 template <typename Float, typename FloatN>
-void packFullSpinor(FloatN *even, FloatN *odd, Float *spinor, int Vh) {
+void packFullSpinor(FloatN *even, FloatN *odd, Float *spinor, int Vh, int pad) {
 
   for (int i=0; i<Vh; i++) {
 
@@ -333,18 +339,18 @@ void packFullSpinor(FloatN *even, FloatN *odd, Float *spinor, int Vh) {
 
     { // even sites
       int k = 2*i + boundaryCrossings%2; 
-      packSpinorVector(even+i, spinor+24*k, Vh);
+      packSpinorVector(even+i, spinor+24*k, Vh+pad);
     }
     
     { // odd sites
       int k = 2*i + (boundaryCrossings+1)%2;
-      packSpinorVector(odd+i, spinor+24*k, Vh);
+      packSpinorVector(odd+i, spinor+24*k, Vh+pad);
     }
   }
 }
 
 template <typename Float, typename FloatN>
-void unpackFullSpinor(Float *res, FloatN *even, FloatN *odd, int Vh) {
+void unpackFullSpinor(Float *res, FloatN *even, FloatN *odd, int Vh, int pad) {
 
   for (int i=0; i<Vh; i++) {
 
@@ -352,12 +358,12 @@ void unpackFullSpinor(Float *res, FloatN *even, FloatN *odd, int Vh) {
 
     { // even sites
       int k = 2*i + boundaryCrossings%2; 
-      unpackSpinorVector(res+24*k, even+i, Vh);
+      unpackSpinorVector(res+24*k, even+i, Vh+pad);
     }
     
     { // odd sites
       int k = 2*i + (boundaryCrossings+1)%2;
-      unpackSpinorVector(res+24*k, odd+i, Vh);
+      unpackSpinorVector(res+24*k, odd+i, Vh+pad);
     }
   }
 }
@@ -380,22 +386,22 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
     
     if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (ret.precision == QUDA_DOUBLE_PRECISION) {
-	packParitySpinor((double2*)packedSpinor1, (double*)spinor, ret.volume);
+	packParitySpinor((double2*)packedSpinor1, (double*)spinor, ret.volume, ret.pad);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) packParitySpinor((float4*)packedSpinor1, (double*)spinor, ret.volume);
-	else packParitySpinor((float4*)packedSpinor1, (float*)spinor, ret.volume);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) packParitySpinor((float4*)packedSpinor1, (double*)spinor, ret.volume, ret.pad);
+	else packParitySpinor((float4*)packedSpinor1, (float*)spinor, ret.volume, ret.pad);
       }
     } else if (dirac_order == QUDA_QDP_DIRAC_ORDER) {
       if (ret.precision == QUDA_DOUBLE_PRECISION) {
-	packQDPParitySpinor((double2*)packedSpinor1, (double*)spinor, ret.volume);
+	packQDPParitySpinor((double2*)packedSpinor1, (double*)spinor, ret.volume, ret.pad);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) packQDPParitySpinor((float4*)packedSpinor1, (double*)spinor, ret.volume);
-	else packQDPParitySpinor((float4*)packedSpinor1, (float*)spinor, ret.volume);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) packQDPParitySpinor((float4*)packedSpinor1, (double*)spinor, ret.volume, ret.pad);
+	else packQDPParitySpinor((float4*)packedSpinor1, (float*)spinor, ret.volume, ret.pad);
       }
     }
     cudaMemcpy(ret.spinor, packedSpinor1, ret.bytes, cudaMemcpyHostToDevice);
   } else {
-    ParitySpinor tmp = allocateParitySpinor(ret.X, QUDA_SINGLE_PRECISION);
+    ParitySpinor tmp = allocateParitySpinor(ret.X, QUDA_SINGLE_PRECISION, ret.pad);
     loadParitySpinor(tmp, spinor, cpu_prec, dirac_order);
     copyCuda(ret, tmp);
     freeParitySpinor(tmp);
@@ -416,12 +422,12 @@ void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec) {
 #endif
     
     if (ret.even.precision == QUDA_DOUBLE_PRECISION) {
-      packFullSpinor((double2*)packedSpinor1, (double2*)packedSpinor2, (double*)spinor, ret.even.volume);
+      packFullSpinor((double2*)packedSpinor1, (double2*)packedSpinor2, (double*)spinor, ret.even.volume, ret.even.pad);
     } else {
       if (cpu_prec == QUDA_DOUBLE_PRECISION) 
-	packFullSpinor((float4*)packedSpinor1, (float4*)packedSpinor2, (double*)spinor, ret.even.volume);
+	packFullSpinor((float4*)packedSpinor1, (float4*)packedSpinor2, (double*)spinor, ret.even.volume, ret.even.pad);
       else 
-	packFullSpinor((float4*)packedSpinor1, (float4*)packedSpinor2, (float*)spinor, ret.even.volume);
+	packFullSpinor((float4*)packedSpinor1, (float4*)packedSpinor2, (float*)spinor, ret.even.volume, ret.even.pad);
     }
     
     cudaMemcpy(ret.even.spinor, packedSpinor1, ret.even.bytes, cudaMemcpyHostToDevice);
@@ -434,7 +440,7 @@ void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec) {
 #endif
     packedSpinor2 = 0;
   } else {
-    FullSpinor tmp = allocateSpinorField(ret.even.X, QUDA_SINGLE_PRECISION);
+    FullSpinor tmp = allocateSpinorField(ret.even.X, QUDA_SINGLE_PRECISION, ret.even.pad);
     loadFullSpinor(tmp, spinor, cpu_prec);
     copyCuda(ret.even, tmp.even);
     copyCuda(ret.odd, tmp.odd);
@@ -445,8 +451,8 @@ void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec) {
 
 void loadSpinorField(FullSpinor ret, void *spinor, Precision cpu_prec, DiracFieldOrder dirac_order) {
   void *spinor_odd;
-  if (cpu_prec == QUDA_SINGLE_PRECISION) spinor_odd = (float*)spinor + ret.even.length;
-  else spinor_odd = (double*)spinor + ret.even.length;
+  if (cpu_prec == QUDA_SINGLE_PRECISION) spinor_odd = (float*)spinor + ret.even.real_length;
+  else spinor_odd = (double*)spinor + ret.even.real_length;
 
   if (dirac_order == QUDA_LEX_DIRAC_ORDER) {
     loadFullSpinor(ret, spinor, cpu_prec);
@@ -471,22 +477,22 @@ void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, Di
 
     if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (spinor.precision == QUDA_DOUBLE_PRECISION) {
-	unpackParitySpinor((double*)res, (double2*)packedSpinor1, spinor.volume);
+	unpackParitySpinor((double*)res, (double2*)packedSpinor1, spinor.volume, spinor.pad);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackParitySpinor((double*)res, (float4*)packedSpinor1, spinor.volume);
-	else unpackParitySpinor((float*)res, (float4*)packedSpinor1, spinor.volume);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackParitySpinor((double*)res, (float4*)packedSpinor1, spinor.volume, spinor.pad);
+	else unpackParitySpinor((float*)res, (float4*)packedSpinor1, spinor.volume, spinor.pad);
       }
     } else if (dirac_order == QUDA_QDP_DIRAC_ORDER) {
       if (spinor.precision == QUDA_DOUBLE_PRECISION) {
-	unpackQDPParitySpinor((double*)res, (double2*)packedSpinor1, spinor.volume);
+	unpackQDPParitySpinor((double*)res, (double2*)packedSpinor1, spinor.volume, spinor.pad);
       } else {
-	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackQDPParitySpinor((double*)res, (float4*)packedSpinor1, spinor.volume);
-	else unpackQDPParitySpinor((float*)res, (float4*)packedSpinor1, spinor.volume);
+	if (cpu_prec == QUDA_DOUBLE_PRECISION) unpackQDPParitySpinor((double*)res, (float4*)packedSpinor1, spinor.volume, spinor.pad);
+	else unpackQDPParitySpinor((float*)res, (float4*)packedSpinor1, spinor.volume, spinor.pad);
       }
     }
 
   } else {
-    ParitySpinor tmp = allocateParitySpinor(spinor.X, QUDA_SINGLE_PRECISION);
+    ParitySpinor tmp = allocateParitySpinor(spinor.X, QUDA_SINGLE_PRECISION, spinor.pad);
     copyCuda(tmp, spinor);
     retrieveParitySpinor(res, tmp, cpu_prec, dirac_order);
     freeParitySpinor(tmp);
@@ -503,11 +509,11 @@ void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec) {
     cudaMemcpy(packedSpinor2, spinor.odd.spinor, spinor.odd.bytes, cudaMemcpyDeviceToHost);
 
     if (spinor.even.precision == QUDA_DOUBLE_PRECISION) {
-      unpackFullSpinor((double*)res, (double2*)packedSpinor1, (double2*)packedSpinor2, spinor.even.volume);
+      unpackFullSpinor((double*)res, (double2*)packedSpinor1, (double2*)packedSpinor2, spinor.even.volume, spinor.even.pad);
     } else {
       if (cpu_prec == QUDA_DOUBLE_PRECISION) 
-	unpackFullSpinor((double*)res, (float4*)packedSpinor1, (float4*)packedSpinor2, spinor.even.volume);
-      else unpackFullSpinor((float*)res, (float4*)packedSpinor1, (float4*)packedSpinor2, spinor.even.volume);
+	unpackFullSpinor((double*)res, (float4*)packedSpinor1, (float4*)packedSpinor2, spinor.even.volume, spinor.even.pad);
+      else unpackFullSpinor((float*)res, (float4*)packedSpinor1, (float4*)packedSpinor2, spinor.even.volume, spinor.even.pad);
     }
     
 #ifndef __DEVICE_EMULATION__
@@ -517,7 +523,7 @@ void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec) {
 #endif
     packedSpinor2 = 0;
   } else {
-    FullSpinor tmp = allocateSpinorField(spinor.even.X, QUDA_SINGLE_PRECISION);
+    FullSpinor tmp = allocateSpinorField(spinor.even.X, QUDA_SINGLE_PRECISION, spinor.even.pad);
     copyCuda(tmp.even, spinor.even);
     copyCuda(tmp.odd, spinor.odd);
     retrieveFullSpinor(res, tmp, cpu_prec);
@@ -527,8 +533,8 @@ void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec) {
 
 void retrieveSpinorField(void *res, FullSpinor spinor, Precision cpu_prec, DiracFieldOrder dirac_order) {
   void *res_odd;
-  if (cpu_prec == QUDA_SINGLE_PRECISION) res_odd = (float*)res + spinor.even.length;
-  else res_odd = (double*)res + spinor.even.length;
+  if (cpu_prec == QUDA_SINGLE_PRECISION) res_odd = (float*)res + spinor.even.real_length;
+  else res_odd = (double*)res + spinor.even.real_length;
 
   if (dirac_order == QUDA_LEX_DIRAC_ORDER) {
     retrieveFullSpinor(res, spinor, cpu_prec);

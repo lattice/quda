@@ -30,6 +30,8 @@ extern "C" {
     int blockDim; // number of threads in a block
     int blockDim_sloppy;
 
+    int ga_pad;
+
     int packed_size;
     double gaugeGiB;
 
@@ -64,6 +66,9 @@ extern "C" {
     QudaCloverFieldOrder clover_order;
 
     QudaVerbosity verbosity;
+
+    int sp_pad;
+    int cl_pad;
 
     int iter;
     double spinorGiB;

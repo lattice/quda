@@ -36,7 +36,7 @@ void init() {
   gaugeParam.X[0] = 24;
   gaugeParam.X[1] = 24;
   gaugeParam.X[2] = 24;
-  gaugeParam.X[3] = 48;
+  gaugeParam.X[3] = 64;
   setDims(gaugeParam.X);
 
   gaugeParam.anisotropy = 2.3;
@@ -51,8 +51,6 @@ void init() {
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  gaugeParam.blockDim = 64;
-
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
   } else {
@@ -66,12 +64,14 @@ void init() {
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
 
+  inv_param.sp_pad = 24*24*24;
+
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_HALF_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
@@ -143,9 +143,9 @@ void init() {
   if (!TRANSFER) {
 
     gaugeParam.X[0] /= 2;
-    tmp = allocateParitySpinor(gaugeParam.X, inv_param.cuda_prec);
-    cudaSpinor = allocateSpinorField(gaugeParam.X, inv_param.cuda_prec);
-    cudaSpinorOut = allocateSpinorField(gaugeParam.X, inv_param.cuda_prec);
+    tmp = allocateParitySpinor(gaugeParam.X, inv_param.cuda_prec, inv_param.sp_pad);
+    cudaSpinor = allocateSpinorField(gaugeParam.X, inv_param.cuda_prec, inv_param.sp_pad);
+    cudaSpinorOut = allocateSpinorField(gaugeParam.X, inv_param.cuda_prec, inv_param.sp_pad);
     gaugeParam.X[0] *= 2;
 
     if (test_type < 2) {
@@ -268,7 +268,7 @@ void dslashTest() {
   init();
   
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
-  float sharedKB = (float)dslashCudaSharedBytes(inv_param.cuda_prec, gaugeParam.blockDim) / (1 << 10);
+  float sharedKB = 0;//(float)dslashCudaSharedBytes(inv_param.cuda_prec) / (1 << 10);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", gaugeParam.gaugeGiB);
   printf("Shared mem: %.3f KB\n", sharedKB);

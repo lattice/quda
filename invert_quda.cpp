@@ -130,14 +130,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
   createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->cuda_prec, gauge_param->reconstruct, 
-		   gauge_param->t_boundary, gauge_param->X, gauge_param->anisotropy, gauge_param->blockDim);
+		   gauge_param->t_boundary, gauge_param->X, gauge_param->anisotropy);
   gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec ||
       gauge_param->reconstruct_sloppy != gauge_param->reconstruct) {
     createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->cuda_prec_sloppy, 
 		     gauge_param->reconstruct_sloppy, gauge_param->t_boundary,
-		     gauge_param->X, gauge_param->anisotropy,
-		     gauge_param->blockDim_sloppy);
+		     gauge_param->X, gauge_param->anisotropy);
     gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
@@ -235,8 +234,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
 {
   checkPrecision(inv_param->cpu_prec);
 
-  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
-  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
+  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
 
   loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -263,9 +262,9 @@ void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
 {
   checkPrecision(inv_param->cpu_prec);
 
-  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
-  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
-  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
+  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
 
   loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -293,9 +292,9 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   checkPrecision(inv_param->cpu_prec);
 
-  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
-  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
-  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
+  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
   
   loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);  
 
@@ -322,8 +321,8 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger) {
   checkPrecision(inv_param->cpu_prec);
 
-  FullSpinor in = allocateSpinorField(cudaGaugePrecise.X, inv_param->cuda_prec);
-  FullSpinor out = allocateSpinorField(cudaGaugePrecise.X, inv_param->cuda_prec);
+  FullSpinor in = allocateSpinorField(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+  FullSpinor out = allocateSpinorField(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
 
   loadSpinorField(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -334,7 +333,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger) {
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
     MatCuda(out, cudaGaugePrecise, in, -kappa, dagger);
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec);
+    ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
     cloverMatCuda(out, cudaGaugePrecise, cudaCloverPrecise, in, kappa, tmp, dagger);
     freeParitySpinor(tmp);
   } else {
@@ -368,18 +367,18 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= cudaGaugePrecise.anisotropy;
 
   FullSpinor b, x;
-  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec); // source vector
-  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec); // solution vector
-  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec); // temporary used when applying operator
+  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);// source
+  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);// solution
+  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);// temporary
 
   if (param->solution_type == QUDA_MAT_SOLUTION) {
     if (param->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
-      b = allocateSpinorField(cudaGaugePrecise.X, invert_param->cuda_prec);
+      b = allocateSpinorField(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);
     } else {
       b.even = out;
       b.odd = tmp;
     }
-
+    
     if (param->matpc_type == QUDA_MATPC_EVEN_EVEN ||
 	param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       x.odd = tmp;

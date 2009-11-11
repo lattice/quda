@@ -10,8 +10,8 @@ extern "C" {
 
   // -- spinor_quda.cpp
 
-  ParitySpinor allocateParitySpinor(int *X, Precision precision);
-  FullSpinor allocateSpinorField(int *X, Precision precision);
+  ParitySpinor allocateParitySpinor(int *X, Precision precision, int stride);
+  FullSpinor allocateSpinorField(int *X, Precision precision, int stride);
   
   void freeParitySpinor(ParitySpinor spinor);
   void freeSpinorField(FullSpinor spinor);

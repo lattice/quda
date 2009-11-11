@@ -20,21 +20,21 @@ void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cl
   }
 }
 
-void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r, QudaInvertParam *invert_param)
+void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertParam *invert_param)
 {
-  ParitySpinor y = allocateParitySpinor(x.X, x.precision);
+  ParitySpinor r = allocateParitySpinor(x.X, x.precision, x.pad);
 
-  ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-  ParitySpinor Ap = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-  ParitySpinor tmp = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+  ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+  ParitySpinor Ap = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+  ParitySpinor tmp = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
 
   ParitySpinor x_sloppy, r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.precision) {
     x_sloppy = x;
     r_sloppy = r;
   } else {
-    x_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-    r_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+    x_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+    r_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
   }
 
   copyCuda(r, b);
@@ -151,7 +151,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r, QudaInvertPara
   freeParitySpinor(Ap);
   freeParitySpinor(tmp);
 
-  freeParitySpinor(y);
+  freeParitySpinor(r);
 
   return;
 }

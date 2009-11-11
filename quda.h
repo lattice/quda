@@ -38,11 +38,13 @@ extern "C" {
   typedef void *ParityGauge;
 
   typedef struct {
-    int blockDim; // The size of the thread block to use
     size_t bytes;
     Precision precision;
     int length; // total length
+    int real_length; // physical length (excluding padding)
     int volume; // geometric volume (single parity)
+    int pad; // padding from end of array to start of next
+    int stride; // geometric stride between volume lengthed arrays
     int X[4]; // the geometric lengths (single parity)
     int Nc; // number of colors
     ReconstructType reconstruct;
@@ -55,7 +57,10 @@ extern "C" {
     size_t bytes;
     Precision precision;
     int length;
+    int real_length; // physical length (excluding padding)
     int volume;
+    int pad; // padding from end of array to start of next
+    int stride; // geometric stride between volume lengthed arrays
     int X[4];
     int Nc;
     int Ns;
@@ -72,7 +77,10 @@ extern "C" {
     size_t bytes;
     Precision precision;
     int length; // total length
+    int real_length; // physical length (excluding padding)
     int volume; // geometric volume (single parity)
+    int pad; // padding from end of array to start of next
+    int stride; // geometric stride between volume lengthed arrays
     int X[4]; // the geometric lengths (single parity)
     int Nc; // length of color dimension
     int Ns; // length of spin dimension

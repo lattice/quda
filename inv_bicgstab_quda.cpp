@@ -25,12 +25,12 @@ void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cl
 void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r, 
 			QudaInvertParam *invert_param, DagType dag_type)
 {
-  ParitySpinor y = allocateParitySpinor(x.X, x.precision);
+  ParitySpinor y = allocateParitySpinor(x.X, x.precision, x.pad);
 
-  ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-  ParitySpinor v = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-  ParitySpinor t = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-  ParitySpinor tmp = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+  ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+  ParitySpinor v = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+  ParitySpinor t = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+  ParitySpinor tmp = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
 
   ParitySpinor x_sloppy, r_sloppy, r0;
   if (invert_param->cuda_prec_sloppy == x.precision) {
@@ -38,9 +38,9 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     r_sloppy = r;
     r0 = b;
   } else {
-    x_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-    r_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
-    r0 = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy);
+    x_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+    r_sloppy = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+    r0 = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
     copyCuda(r0, b);
   }
 
@@ -50,6 +50,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
   zeroCuda(y);
 
   double b2 = normCuda(b);
+
   double r2 = b2;
   double stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
   double delta = invert_param->reliable_delta;
@@ -108,7 +109,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     alpha.x *= -1.0; alpha.y *= -1.0;
     caxpyCuda(alpha, v, r_sloppy); // 4
     alpha.x *= -1.0; alpha.y *= -1.0;
-    
+
     MatVec(t, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, r_sloppy, invert_param, tmp, dag_type);
     
     // omega = (t, r) / (t, t)

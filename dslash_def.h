@@ -35,7 +35,7 @@
 #define DD_RECON 0
 #define DD_GPREC 0
 #define DD_SPREC 0
-#define DD_CPREC 0
+#define DD_CPREC 0 //
 #endif
 
 // set options for current iteration
@@ -249,7 +249,8 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #undef DD_SPREC
 #define DD_SPREC 2
 #else
-#undef DD_SPREC
+
+#undef DD_SPREC // from here
 #define DD_SPREC 0
 
 #if (DD_CPREC==0)
@@ -261,7 +262,8 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #elif (DD_CPREC==2)
 #undef DD_CPREC
 #define DD_CPREC 3
-#else
+
+#else // to here
 
 #undef DD_LOOP
 #undef DD_DAG
@@ -269,9 +271,9 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #undef DD_RECON
 #undef DD_GPREC
 #undef DD_SPREC
-#undef DD_CPREC
+#undef DD_CPREC //
 
-#endif // DD_CPREC
+#endif // DD_CPREC //
 #endif // DD_SPREC
 #endif // DD_GPREC
 #endif // DD_RECON

@@ -113,7 +113,7 @@ extern "C" {
 		   ParitySpinor spinor, int oddBit);
   void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 		   ParitySpinor spinor, int oddBit);
-  
+
   // -- inv_cg_cuda.cpp
   void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp,
 		    QudaInvertParam *param);

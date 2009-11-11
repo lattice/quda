@@ -108,7 +108,7 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
 template <typename Float2>
 double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
   if (n % REDUCE_THREADS != 0) {
-    printf("ERROR reduceCuda(): length must be a multiple of %d\n", REDUCE_THREADS);
+    printf("ERROR reduceCuda(): length %d must be a multiple of %d\n", n, REDUCE_THREADS);
     exit(-1);
   }
   
@@ -119,11 +119,19 @@ double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
   // partial reduction; each block generates one number
   dim3 dimBlock(REDUCE_THREADS, 1, 1);
   dim3 dimGrid(blocks, 1, 1);
+#if (REDUCE_TYPE == REDUCE_KAHAN)
+  int smemSize = REDUCE_THREADS * 2 * sizeof(QudaSumFloat3);
+#else
   int smemSize = REDUCE_THREADS * sizeof(QudaSumFloat3);
+#endif
   REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
   
   // copy result from device to host, and perform final reduction on CPU
-  cudaMemcpy(h_reduceFloat3, d_reduceFloat3, blocks*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
+  cudaError_t error =   cudaMemcpy(h_reduceFloat3, d_reduceFloat3, blocks*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
+  if (error != cudaSuccess) {
+    printf("Error: %s\n", cudaGetErrorString(error));
+    exit(-1);
+  }
   
   double3 gpu_result;
   gpu_result.x = 0;

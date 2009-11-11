@@ -328,13 +328,12 @@ volatile spinorFloat o31_im;
 volatile spinorFloat o32_re;
 volatile spinorFloat o32_im;
 
-
-
 #include "read_gauge.h"
 #include "read_clover.h"
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
+
 int z1 = FAST_INT_DIVIDE(sid, X1h);
 int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);

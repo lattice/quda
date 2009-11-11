@@ -15,9 +15,10 @@ QudaGaugeParam param;
 FullSpinor cudaFullSpinor;
 ParitySpinor cudaParitySpinor;
 
-float *qdpGauge[4];
-float *cpsGauge;
-float *spinor;
+void *qdpGauge[4];
+void *cpsGauge;
+void *spinor;
+void *spinor2;
     
 float kappa = 1.0;
 int ODD_BIT = 0;
@@ -38,20 +39,17 @@ aligned_malloc(size_t n, void **m0)
 
 void init() {
 
-  Precision single = QUDA_SINGLE_PRECISION;
-
-  param.blockDim = 64;
-
   param.cpu_prec = QUDA_SINGLE_PRECISION;
-  param.cuda_prec = QUDA_SINGLE_PRECISION;
+  param.cuda_prec = QUDA_HALF_PRECISION;
   param.reconstruct = QUDA_RECONSTRUCT_8;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] = 24;
-  param.X[1] = 24;
-  param.X[2] = 24;
-  param.X[3] = 24;
+  param.X[0] = 4;
+  param.X[1] = 4;
+  param.X[2] = 4;
+  param.X[3] = 4;
+  param.ga_pad = 0;
   setDims(param.X);
 
   param.anisotropy = 2.3;
@@ -59,20 +57,25 @@ void init() {
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param = &param;
 
+  int sp_pad = 256;
+
   // construct input fields
   for (int dir = 0; dir < 4; dir++) {
-    qdpGauge[dir] = (float*)malloc(V*gaugeSiteSize*sizeof(float));
+    qdpGauge[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
   }
-  cpsGauge = (float*)malloc(4*V*gaugeSiteSize*sizeof(float));
+  cpsGauge = malloc(4*V*gaugeSiteSize*param.cpu_prec);
 
-  spinor = (float*)malloc(V*spinorSiteSize*sizeof(float));
+  spinor = malloc(V*spinorSiteSize*param.cpu_prec);
+  spinor2 = malloc(V*spinorSiteSize*param.cpu_prec);
+
+  construct_spinor_field(spinor, 1, 0, 0, 0, param.cpu_prec);
   
   int dev = 0;
   cudaSetDevice(dev);
 
   param.X[0] /= 2;
-  cudaFullSpinor = allocateSpinorField(param.X, single);
-  cudaParitySpinor = allocateParitySpinor(param.X, single);
+  cudaFullSpinor = allocateSpinorField(param.X, param.cuda_prec, sp_pad);
+  cudaParitySpinor = allocateParitySpinor(param.X, param.cuda_prec, sp_pad);
   param.X[0] *= 2;
 
 }
@@ -82,6 +85,7 @@ void end() {
   for (int dir = 0; dir < 4; dir++) free(qdpGauge[dir]);
   free(cpsGauge);
   free(spinor);
+  free(spinor2);
   freeSpinorField(cudaFullSpinor);
   freeParitySpinor(cudaParitySpinor);
   freeSpinorBuffer();
@@ -91,7 +95,7 @@ void packTest() {
 
   init();
 
-  float spinorGiB = (float)Vh*spinorSiteSize*sizeof(float) / (1 << 30);
+  float spinorGiB = (float)Vh*spinorSiteSize*param.cuda_prec / (1 << 30);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", param.gaugeGiB);
 
@@ -100,7 +104,7 @@ void packTest() {
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
   createGaugeField(&cudaGaugePrecise, cpsGauge, param.cuda_prec, param.reconstruct, 
-		   param.t_boundary, param.X, 1.0, param.blockDim);
+		   param.t_boundary, param.X, 1.0);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
@@ -111,8 +115,8 @@ void packTest() {
 
   stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, qdpGauge, param.cpu_prec, param.reconstruct, 
-		   param.t_boundary, param.X, 1.0, param.blockDim);
+  createGaugeField(&cudaGaugePrecise, qdpGauge, param.cuda_prec, param.reconstruct, 
+		   param.t_boundary, param.X, 1.0);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 
@@ -122,26 +126,26 @@ void packTest() {
   printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
 
   stopwatchStart();
-  loadSpinorField(cudaFullSpinor, (void*)spinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
-  double sSendTime = stopwatchReadSeconds();
-  printf("Spinor send time = %e seconds\n", sSendTime);
-
-  stopwatchStart();
-
-  stopwatchStart();
-  loadParitySpinor(cudaFullSpinor.even, (void*)spinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+  loadParitySpinor(cudaFullSpinor.even, (void*)spinor, param.cpu_prec, QUDA_DIRAC_ORDER);
   double pSendTime = stopwatchReadSeconds();
   printf("Parity spinor send time = %e seconds\n", pSendTime);
 
   stopwatchStart();
-  retrieveSpinorField(spinor, cudaFullSpinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
+  retrieveParitySpinor(spinor2, cudaFullSpinor.even, param.cpu_prec, QUDA_DIRAC_ORDER);
+  double pRecTime = stopwatchReadSeconds();
+  printf("Parity receive time = %e seconds\n", pRecTime);
+
+  stopwatchStart();
+  loadSpinorField(cudaFullSpinor, (void*)spinor, param.cpu_prec, QUDA_DIRAC_ORDER);
+  double sSendTime = stopwatchReadSeconds();
+  printf("Spinor send time = %e seconds\n", sSendTime);
+
+  stopwatchStart();
+  retrieveSpinorField(spinor2, cudaFullSpinor, param.cpu_prec, QUDA_DIRAC_ORDER);
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime);
   
-  stopwatchStart();
-  retrieveParitySpinor(spinor, cudaParitySpinor, QUDA_SINGLE_PRECISION, QUDA_DIRAC_ORDER);
-  double pRecTime = stopwatchReadSeconds();
-  printf("Parity receive time = %e seconds\n", pRecTime);
+  compare_spinor(spinor, spinor2, V, param.cpu_prec);
 
   end();
 

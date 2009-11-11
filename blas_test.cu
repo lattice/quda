@@ -19,14 +19,15 @@ void init() {
 
   int X[4];
 
-  X[0] = 32;
-  X[1] = 32;
-  X[2] = 32;
-  X[3] = 32;
+  X[0] = 24;
+  X[1] = 24;
+  X[2] = 24;
+  X[3] = 64;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_HALF_PRECISION;
   inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.sp_pad = 0;
 
   invert_param = &inv_param;
 
@@ -35,11 +36,11 @@ void init() {
 
   // need single parity dimensions
   X[0] /= 2;
-  v = allocateParitySpinor(X, inv_param.cuda_prec);
-  w = allocateParitySpinor(X, inv_param.cuda_prec);
-  x = allocateParitySpinor(X, inv_param.cuda_prec);
-  y = allocateParitySpinor(X, inv_param.cuda_prec);
-  z = allocateParitySpinor(X, inv_param.cuda_prec);
+  v = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
+  w = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
+  x = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
+  y = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
+  z = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
 
 }
 
