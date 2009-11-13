@@ -3,7 +3,7 @@
 #include <math.h>
 #include <cuda_runtime.h>
 
-#include <invert_quda.h>
+#include <quda.h>
 #include <quda_internal.h>
 #include <util_quda.h>
 #include <spinor_quda.h>

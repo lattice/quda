@@ -97,7 +97,7 @@ extern "C" {
 }
 #endif
 
-#include <invert_quda.h>
+#include <quda.h>
 #include <blas_quda.h>
 #include <dslash_quda.h>
 
