@@ -104,7 +104,7 @@ void packTest() {
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
   createGaugeField(&cudaGaugePrecise, cpsGauge, param.cuda_prec, param.reconstruct, 
-		   param.t_boundary, param.X, 1.0);
+		   param.t_boundary, param.X, param.ga_pad, 1.0);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
@@ -116,7 +116,7 @@ void packTest() {
   stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   createGaugeField(&cudaGaugePrecise, qdpGauge, param.cuda_prec, param.reconstruct, 
-		   param.t_boundary, param.X, 1.0);
+		   param.t_boundary, param.X, param.ga_pad, 1.0);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 

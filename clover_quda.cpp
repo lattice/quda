@@ -6,7 +6,7 @@
 #include <spinor_quda.h>
 #include <util_quda.h>
 
-void allocateParityClover(ParityClover *ret, int *X, Precision precision)
+void allocateParityClover(ParityClover *ret, int *X, int pad, Precision precision)
 {
   ret->precision = precision;
   ret->volume = 1;
@@ -14,9 +14,13 @@ void allocateParityClover(ParityClover *ret, int *X, Precision precision)
     ret->X[d] = X[d];
     ret->volume *= X[d];
   }
+  ret->pad = pad;
+  ret->stride = ret->volume + ret->pad;
+
   ret->Nc = 3;
   ret->Ns = 4;
-  ret->length = ret->volume*ret->Nc*ret->Nc*ret->Ns*ret->Ns/2; // block-diagonal Hermitian (72 reals)
+  ret->real_length = ret->volume*ret->Nc*ret->Nc*ret->Ns*ret->Ns/2; // block-diagonal Hermitian (72 reals)
+  ret->length = ret->stride*ret->Nc*ret->Nc*ret->Ns*ret->Ns/2; // block-diagonal Hermitian (72 reals)
 
   if (precision == QUDA_DOUBLE_PRECISION) ret->bytes = ret->length*sizeof(double);
   else if (precision == QUDA_SINGLE_PRECISION) ret->bytes = ret->length*sizeof(float);
@@ -40,10 +44,10 @@ void allocateParityClover(ParityClover *ret, int *X, Precision precision)
 
 }
 
-void allocateCloverField(FullClover *ret, int *X, Precision precision)
+void allocateCloverField(FullClover *ret, int *X, int pad, Precision precision)
 {
-  allocateParityClover(&(ret->even), X, precision);
-  allocateParityClover(&(ret->odd), X, precision);
+  allocateParityClover(&(ret->even), X, pad, precision);
+  allocateParityClover(&(ret->odd), X, pad, precision);
 }
 
 void freeParityClover(ParityClover *clover)
@@ -83,15 +87,15 @@ static inline void packCloverMatrix(double2* a, Float *b, int Vh)
 }
 
 template <typename Float, typename FloatN>
-static void packParityClover(FloatN *res, Float *clover, int Vh)
+static void packParityClover(FloatN *res, Float *clover, int Vh, int pad)
 {
   for (int i = 0; i < Vh; i++) {
-    packCloverMatrix(res+i, clover+72*i, Vh);
+    packCloverMatrix(res+i, clover+72*i, Vh+pad);
   }
 }
 
 template <typename Float, typename FloatN>
-static void packFullClover(FloatN *even, FloatN *odd, Float *clover, int *X)
+static void packFullClover(FloatN *even, FloatN *odd, Float *clover, int *X, int pad)
 {
   int Vh = X[0]*X[1]*X[2]*X[3];
   X[0] *= 2; // X now contains dimensions of the full lattice
@@ -102,12 +106,12 @@ static void packFullClover(FloatN *even, FloatN *odd, Float *clover, int *X)
 
     { // even sites
       int k = 2*i + boundaryCrossings%2; 
-      packCloverMatrix(even+i, clover+72*k, Vh);
+      packCloverMatrix(even+i, clover+72*k, Vh+pad);
     }
     
     { // odd sites
       int k = 2*i + (boundaryCrossings+1)%2;
-      packCloverMatrix(odd+i, clover+72*k, Vh);
+      packCloverMatrix(odd+i, clover+72*k, Vh+pad);
     }
   }
 }
@@ -138,16 +142,16 @@ static inline void packCloverMatrixHalf(short4 *res, float *norm, Float *clover,
 }
 
 template <typename Float>
-static void packParityCloverHalf(short4 *res, float *norm, Float *clover, int Vh)
+static void packParityCloverHalf(short4 *res, float *norm, Float *clover, int Vh, int pad)
 {
   for (int i = 0; i < Vh; i++) {
-    packCloverMatrixHalf(res+i, norm+i, clover+72*i, Vh);
+    packCloverMatrixHalf(res+i, norm+i, clover+72*i, Vh+pad);
   }
 }
 
 template <typename Float>
 static void packFullCloverHalf(short4 *even, float *evenNorm, short4 *odd, float *oddNorm,
-			       Float *clover, int *X)
+			       Float *clover, int *X, int pad)
 {
   int Vh = X[0]*X[1]*X[2]*X[3];
   X[0] *= 2; // X now contains dimensions of the full lattice
@@ -158,12 +162,12 @@ static void packFullCloverHalf(short4 *even, float *evenNorm, short4 *odd, float
 
     { // even sites
       int k = 2*i + boundaryCrossings%2; 
-      packCloverMatrixHalf(even+i, evenNorm+i, clover+72*k, Vh);
+      packCloverMatrixHalf(even+i, evenNorm+i, clover+72*k, Vh+pad);
     }
     
     { // odd sites
       int k = 2*i + (boundaryCrossings+1)%2;
-      packCloverMatrixHalf(odd+i, oddNorm+i, clover+72*k, Vh);
+      packCloverMatrixHalf(odd+i, oddNorm+i, clover+72*k, Vh+pad);
     }
   }
 }
@@ -199,18 +203,20 @@ void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec,
 #endif
     
   if (ret.precision == QUDA_DOUBLE_PRECISION) {
-    packParityClover((double2 *)packedClover, (double *)clover, ret.volume);
+    packParityClover((double2 *)packedClover, (double *)clover, ret.volume, ret.pad);
   } else if (ret.precision == QUDA_SINGLE_PRECISION) {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-      packParityClover((float4 *)packedClover, (double *)clover, ret.volume);
+      packParityClover((float4 *)packedClover, (double *)clover, ret.volume, ret.pad);
     } else {
-      packParityClover((float4 *)packedClover, (float *)clover, ret.volume);
+      packParityClover((float4 *)packedClover, (float *)clover, ret.volume, ret.pad);
     }
   } else {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-      packParityCloverHalf((short4 *)packedClover, (float *)packedCloverNorm, (double *)clover, ret.volume);
+      packParityCloverHalf((short4 *)packedClover, (float *)packedCloverNorm, 
+			   (double *)clover, ret.volume, ret.pad);
     } else {
-      packParityCloverHalf((short4 *)packedClover, (float *)packedCloverNorm, (float *)clover, ret.volume);
+      packParityCloverHalf((short4 *)packedClover, (float *)packedCloverNorm, 
+			   (float *)clover, ret.volume, ret.pad);
     }
   }
   
@@ -261,20 +267,20 @@ void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
 #endif
     
   if (ret.even.precision == QUDA_DOUBLE_PRECISION) {
-    packFullClover((double2 *)packedEven, (double2 *)packedOdd, (double *)clover, ret.even.X);
+    packFullClover((double2 *)packedEven, (double2 *)packedOdd, (double *)clover, ret.even.X, ret.even.pad);
   } else if (ret.even.precision == QUDA_SINGLE_PRECISION) {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (double *)clover, ret.even.X);
+      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (double *)clover, ret.even.X, ret.even.pad);
     } else {
-      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (float *)clover, ret.even.X);    
+      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (float *)clover, ret.even.X, ret.even.pad);    
     }
   } else {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
       packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
-			 (float *) packedOddNorm, (double *)clover, ret.even.X);
+			 (float *) packedOddNorm, (double *)clover, ret.even.X, ret.even.pad);
     } else {
       packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
-			 (float * )packedOddNorm, (float *)clover, ret.even.X);    
+			 (float * )packedOddNorm, (float *)clover, ret.even.X, ret.even.pad);    
     }
   }
 
@@ -307,8 +313,8 @@ void loadCloverField(FullClover ret, void *clover, Precision cpu_prec, CloverFie
 {
   void *clover_odd;
 
-  if (cpu_prec == QUDA_SINGLE_PRECISION) clover_odd = (float *)clover + ret.even.length;
-  else clover_odd = (double *)clover + ret.even.length;
+  if (cpu_prec == QUDA_SINGLE_PRECISION) clover_odd = (float *)clover + ret.even.real_length;
+  else clover_odd = (double *)clover + ret.even.real_length;
 
   if (clover_order == QUDA_LEX_PACKED_CLOVER_ORDER) {
     loadFullClover(ret, clover, cpu_prec, clover_order);

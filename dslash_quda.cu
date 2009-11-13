@@ -37,11 +37,16 @@ int dslashCudaSharedBytes(Precision precision) {
 
 int initDslash = 0;
 
-void initDslashConstants(FullGauge gauge, int sp_stride) {
+void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   int Vh = gauge.volume;
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
 
   cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));  
+
+  int ga_stride = gauge.stride;
+  cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
+
+  cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 
   if (Vh%BLOCK_DIM != 0) {
     printf("Error, volume not a multiple of the thread block size\n");
@@ -156,7 +161,7 @@ void bindGaugeTex(FullGauge gauge, int oddBit) {
 // plain Wilson Dslash:
 
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
@@ -359,7 +364,7 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
 void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger,
 		    ParitySpinor x, double a) {
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
@@ -632,7 +637,7 @@ void bindCloverTex(ParityClover clover) {
 void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
 		      ParitySpinor in, int parity, int dagger)
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
@@ -1138,7 +1143,7 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv, ParitySpinor in,
 			  int parity, int dagger, ParitySpinor x, double a)
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
@@ -1755,7 +1760,7 @@ void cloverMatCuda(FullSpinor out, FullGauge gauge, FullClover clover,
 void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
 		ParitySpinor in, int parity)
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.stride, clover.even.stride);
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, clover);

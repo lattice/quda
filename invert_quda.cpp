@@ -130,13 +130,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
   createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->cuda_prec, gauge_param->reconstruct, 
-		   gauge_param->t_boundary, gauge_param->X, gauge_param->anisotropy);
+		   gauge_param->t_boundary, gauge_param->X, gauge_param->anisotropy, gauge_param->ga_pad);
   gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec ||
       gauge_param->reconstruct_sloppy != gauge_param->reconstruct) {
     createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->cuda_prec_sloppy, 
 		     gauge_param->reconstruct_sloppy, gauge_param->t_boundary,
-		     gauge_param->X, gauge_param->anisotropy);
+		     gauge_param->X, gauge_param->anisotropy, gauge_param->ga_pad);
     gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
@@ -174,14 +174,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   inv_param->cloverGiB = 0;
 
   if (h_clover) {
-    allocateCloverField(&cudaCloverPrecise, X, inv_param->clover_cuda_prec);
+    allocateCloverField(&cudaCloverPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
     loadCloverField(cudaCloverPrecise, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
     inv_param->cloverGiB += 2.0*cudaCloverPrecise.even.bytes / (1<<30);
 
     if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
 	inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-	allocateCloverField(&cudaCloverSloppy, X, inv_param->clover_cuda_prec_sloppy);
+	allocateCloverField(&cudaCloverSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
 	loadCloverField(cudaCloverSloppy, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
 	inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
       } else {
@@ -190,7 +190,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     } // sloppy precision clover term not needed otherwise
   }
 
-  allocateCloverField(&cudaCloverInvPrecise, X, inv_param->clover_cuda_prec);
+  allocateCloverField(&cudaCloverInvPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
   if (!h_clovinv) {
     printf("QUDA error: clover term inverse not implemented yet\n");
     exit(-1);
@@ -200,7 +200,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   inv_param->cloverGiB += 2.0*cudaCloverInvPrecise.even.bytes / (1<<30);
 
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-    allocateCloverField(&cudaCloverInvSloppy, X, inv_param->clover_cuda_prec_sloppy);
+    allocateCloverField(&cudaCloverInvSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
     loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
     inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
   } else {

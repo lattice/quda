@@ -32,8 +32,8 @@ extern "C" {
 
   // -- clover_quda.cpp
 
-  void allocateParityClover(ParityClover *, int *X, Precision precision);
-  void allocateCloverField(FullClover *, int *X, Precision precision);
+  void allocateParityClover(ParityClover *, int *X, int pad, Precision precision);
+  void allocateCloverField(FullClover *, int *X, int pad, Precision precision);
 
   void freeParityClover(ParityClover *clover);
   void freeCloverField(FullClover *clover);

@@ -59,7 +59,9 @@ int main(int argc, char **argv)
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
+  Gauge_param.ga_pad = 24*24*24;
   inv_param.sp_pad = 24*24*24;
+  inv_param.cl_pad = 24*24*24;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;

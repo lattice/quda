@@ -10,7 +10,7 @@ extern "C" {
 
   void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision precision, 
 			ReconstructType reconstruct, Tboundary t_boundary,
-			int *X, double anisotropy);
+			int *X, double anisotropy, int pad);
 
   void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge);
 

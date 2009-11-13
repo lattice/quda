@@ -10,7 +10,7 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 1;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 0;
+int clover_yes = 1;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -64,7 +64,13 @@ void init() {
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
 
+  gaugeParam.ga_pad = 0;
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  /*gaugeParam.ga_pad = 24*24*12;
   inv_param.sp_pad = 24*24*12;
+  inv_param.cl_pad = 24*24*12;*/
 
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
