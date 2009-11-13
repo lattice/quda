@@ -1,5 +1,5 @@
-#ifndef _QUDA_H
-#define _QUDA_H
+#ifndef _QUDA_INTERNAL_H
+#define _QUDA_INTERNAL_H
 
 #include <cuda_runtime.h>
 
@@ -101,4 +101,4 @@ extern "C" {
 #include <blas_quda.h>
 #include <dslash_quda.h>
 
-#endif // _QUDA_H
+#endif // _QUDA_INTERNAL_H

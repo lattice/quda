@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <gauge_quda.h>
 
-#include <xmmintrin.h>
+//#include <xmmintrin.h>
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT (SHORT_LENGTH-1) / 2.f

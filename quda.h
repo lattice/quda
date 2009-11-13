@@ -1,5 +1,5 @@
-#ifndef _INVERT_QUDA_H
-#define _INVERT_QUDA_H
+#ifndef _QUDA_H
+#define _QUDA_H
 
 #include <enum_quda.h>
 
@@ -100,4 +100,4 @@ extern "C" {
 }
 #endif
 
-#endif // _INVERT_CUDA_H
+#endif // _QUDA_H

@@ -49,10 +49,9 @@ library.
 
 Using the library:
 
-Include the header file "invert_quda.h" in your application, link
-against libquda.a, and study invert_test.c for an example of the
-interface.  The various inverter options are enumerated in
-enum_quda.h.
+Include the header file "quda.h" in your application, link against
+libquda.a, and study invert_test.c for an example of the interface.
+The various inverter options are enumerated in enum_quda.h.
 
 
 Known issues:
