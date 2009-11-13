@@ -1,7 +1,7 @@
 #ifndef _QUDA_BLAS_REF_H
 #define _QUDA_BLAS_REF_H
 
-#include <quda.h>
+#include <quda_internal.h>
 
 #ifdef __cplusplus
 extern "C" {

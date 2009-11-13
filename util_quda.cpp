@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 
-#include <quda.h>
+#include <quda_internal.h>
 #include <util_quda.h>
 #include <dslash_reference.h>
 

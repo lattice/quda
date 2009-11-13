@@ -3,7 +3,7 @@
 
 #include <cuComplex.h>
 
-#include <quda.h>
+#include <quda_internal.h>
 
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor

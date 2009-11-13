@@ -1,7 +1,7 @@
 #ifndef _QUDA_UTIL_H
 #define _QUDA_UTIL_H
 
-#include <quda.h>
+#include <quda_internal.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -3,7 +3,7 @@
 #include <math.h>
 #include <cuComplex.h>
 
-#include <quda.h>
+#include <quda_internal.h>
 #include <util_quda.h>
 #include <spinor_quda.h>
 #include <gauge_quda.h>
@@ -124,10 +124,12 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
     if (rNorm > maxrr) maxrr = rNorm;
-    int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
-    int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+    //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
+    //int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
     
-    if (updateR || updateX) {
+    int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+
+    if (updateR) {
       if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
       
       xpyCuda(x, y);

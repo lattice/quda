@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include <quda.h>
+#include <quda_internal.h>
 #include <util_quda.h>
 #include <dslash_reference.h>
 
@@ -41,13 +41,13 @@ int main(int argc, char **argv)
   } else {
     inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  inv_param.inv_type = QUDA_CG_INVERTER;
 
   double mass = -0.94;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param->anisotropy + mass));
   inv_param.tol = 5e-7;
   inv_param.maxiter = 10000;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = 1e-3;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  inv_param.sp_pad = 0;
+  inv_param.sp_pad = 24*24*24;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;

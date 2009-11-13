@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <quda.h>
+#include <quda_internal.h>
 #include <util_quda.h>
 #include <spinor_quda.h>
 #include <gauge_quda.h>

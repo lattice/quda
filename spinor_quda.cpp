@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <quda.h>
+#include <quda_internal.h>
 #include <spinor_quda.h>
 #include <util_quda.h>
 

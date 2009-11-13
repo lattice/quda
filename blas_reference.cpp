@@ -1,4 +1,4 @@
-#include <quda.h>
+#include <quda_internal.h>
 #include <blas_reference.h>
 
 // performs the operation x[i] *= a

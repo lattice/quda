@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <quda.h>
+#include <quda_internal.h>
 #include <dslash_reference.h>
 #include <util_quda.h>
 #include <spinor_quda.h>
@@ -64,7 +64,7 @@ void init() {
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
 
-  inv_param.sp_pad = 24*24*24;
+  inv_param.sp_pad = 24*24*12;
 
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -133,7 +133,7 @@ void init() {
   gauge = cudaGaugePrecise;
 
   if (clover_yes) {
-    loadCloverQuda(hostClover, hostCloverInv, &inv_param);
+    loadCloverQuda(NULL, hostCloverInv, &inv_param);
     clover = cudaCloverPrecise;
     cloverInv = cudaCloverInvPrecise;
   }
