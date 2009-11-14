@@ -3,11 +3,10 @@
 
 #include <quda_internal.h>
 #include <util_quda.h>
-#include <test_util.h>
-
 #include <gauge_quda.h>
 #include <spinor_quda.h>
 
+#include <test_util.h>
 #include <dslash_reference.h>
 
 #define FULL_WILSON 1

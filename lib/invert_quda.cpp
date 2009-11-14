@@ -7,8 +7,6 @@
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 
-#include <blas_reference.h>
-
 FullGauge cudaGaugePrecise; // precise gauge field
 FullGauge cudaGaugeSloppy; // sloppy gauge field
 

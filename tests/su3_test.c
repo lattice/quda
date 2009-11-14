@@ -1,11 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <quda_internal.h>
 #include <test_util.h>
-
-#include <gauge_quda.h>
-#include <spinor_quda.h>
 #include <dslash_reference.h>
 
 #define MAX_SHORT 32767

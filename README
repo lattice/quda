@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.x
+Release Notes for QUDA v0.1
 ---------------------------
 
 Overview:
@@ -34,24 +34,24 @@ http://www.nvidia.com/object/cuda_learn_products.html
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and set GPU_ARCH in
-the Makefile appropriately.  Setting 'GPU_ARCH = sm_13' will enable
-double precision support.
+make.inc appropriately.  Setting 'GPU_ARCH = sm_13' will enable double
+precision support.
 
 
 Installation:
 
-In the source directory, copy the template 'Makefile.tmpl' to
-'Makefile', and edit the first few lines to specify the CUDA install
-path, the platform (x86 or x86_64), and the GPU architecture (see
-"Hardware compatibility" above).  Then type 'make' to build the
-library.
+In the source directory, copy 'make.inc.example' to 'make.inc', and
+edit the first few lines to specify the CUDA install path, the
+platform (x86 or x86_64), and the GPU architecture (see "Hardware
+compatibility" above).  Then type 'make' to build the library.
 
 
 Using the library:
 
-Include the header file "quda.h" in your application, link against
-libquda.a, and study invert_test.c for an example of the interface.
-The various inverter options are enumerated in enum_quda.h.
+Include the header file include/quda.h in your application, link
+against lib/libquda.a, and study tests/invert_test.c for an example of
+the interface.  The various inverter options are enumerated in
+include/enum_quda.h.
 
 
 Known issues:

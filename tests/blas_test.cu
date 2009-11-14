@@ -2,9 +2,10 @@
 #include <stdlib.h>
 
 #include <quda_internal.h>
-#include <test_util.h>
 #include <spinor_quda.h>
 #include <blas_quda.h>
+
+#include <test_util.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 1;

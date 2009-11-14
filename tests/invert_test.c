@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include <quda_internal.h>
+
 #include <test_util.h>
 #include <dslash_reference.h>
 
