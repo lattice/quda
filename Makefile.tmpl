@@ -3,7 +3,7 @@
 CUDA_INSTALL_PATH = /usr/local/cuda
 
 CPU_ARCH = x86_64   # x86 or x86_64
-GPU_ARCH = sm_12    # sm_10, sm_11, sm_12, or sm_13
+GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
 GPU_EMU  = false    # set to 'true' for device emulation
 
 PYTHON = python2.6  # python 2.5 or later required for 'make gen'
@@ -39,12 +39,12 @@ all: dslash_test invert_test su3_test pack_test blas_test
 QUDA = libquda.a
 QUDA_OBJS = blas_quda.o blas_reference.o clover_quda.o dslash_quda.o \
 	dslash_reference.o gauge_quda.o inv_bicgstab_quda.o inv_cg_quda.o \
-	invert_quda.o spinor_quda.o util_quda.o
+	invert_quda.o spinor_quda.o test_util.o util_quda.o
 QUDA_HDRS = blas_quda.h blas_reference.h clover_def.h dslash_common.h dslash_def.h        \
 	dslash_quda.h dslash_reference.h dslash_textures.h enum_quda.h gauge_quda.h         \
 	io_spinor.h quda.h quda_internal.h read_clover.h read_gauge.h       \
 	reduce_complex_core.h reduce_core.h reduce_triple_core.h          \
-	spinor_quda.h util_quda.h
+	spinor_quda.h test_util.h util_quda.h
 QUDA_CORE = clover_core.h dslash_core.h dslash_dagger_core.h
 
 $(QUDA): $(QUDA_OBJS)

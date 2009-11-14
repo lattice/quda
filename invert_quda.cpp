@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <cuda_runtime.h>
 
 #include <quda.h>
 #include <quda_internal.h>
-#include <util_quda.h>
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 
@@ -67,7 +65,7 @@ void printInvertParam(QudaInvertParam *param) {
   printf("verbosity = %d\n", param->verbosity);
 }
 
-void checkPrecision(QudaPrecision precision) {
+static void checkPrecision(QudaPrecision precision) {
   if (precision == QUDA_HALF_PRECISION) {
     printf("Half precision not supported on cpu\n");
     exit(-1);

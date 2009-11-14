@@ -3,9 +3,8 @@
 
 #include <quda_internal.h>
 #include <spinor_quda.h>
-#include <util_quda.h>
 
-#include <xmmintrin.h>
+//#include <xmmintrin.h>
 
 // Pinned memory for cpu-gpu memory copying
 void *packedSpinor1 = 0;

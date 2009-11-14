@@ -2,7 +2,6 @@
 #include <stdio.h>
 
 #include <quda_internal.h>
-#include <util_quda.h>
 
 #define REDUCE_THREADS 128
 #define REDUCE_MAX_BLOCKS 64

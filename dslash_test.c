@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <dslash_reference.h>
 #include <util_quda.h>
+#include <test_util.h>
 #include <spinor_quda.h>
 #include <gauge_quda.h>
 

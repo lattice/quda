@@ -3,7 +3,7 @@
 #include <time.h>
 
 #include <quda_internal.h>
-#include <util_quda.h>
+#include <test_util.h>
 #include <dslash_reference.h>
 
 int main(int argc, char **argv)

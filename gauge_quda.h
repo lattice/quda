@@ -1,5 +1,5 @@
-#ifndef _QUDA_GAUGE_H
-#define _QUDA_GAUGE_H
+#ifndef _GAUGE_QUDA_H
+#define _GAUGE_QUDA_H
 
 #include <enum_quda.h>
 #include <dslash_quda.h>
@@ -20,4 +20,4 @@ extern "C" {
 }
 #endif
 
-#endif // _QUDA_GAUGE_H
+#endif // _GAUGE_QUDA_H

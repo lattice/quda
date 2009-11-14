@@ -4,9 +4,10 @@
 #include <cuComplex.h>
 
 #include <quda_internal.h>
-#include <util_quda.h>
 #include <spinor_quda.h>
 #include <gauge_quda.h>
+
+#include <util_quda.h>
 
 void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cloverInv, ParitySpinor in, 
 	    QudaInvertParam *invert_param, ParitySpinor tmp, DagType dag_type) {
