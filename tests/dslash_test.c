@@ -12,7 +12,7 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 1;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 1;
+int clover_yes = 0;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -38,7 +38,7 @@ void init() {
   gaugeParam.X[0] = 24;
   gaugeParam.X[1] = 24;
   gaugeParam.X[2] = 24;
-  gaugeParam.X[3] = 64;
+  gaugeParam.X[3] = 48;
   setDims(gaugeParam.X);
 
   gaugeParam.anisotropy = 2.3;
