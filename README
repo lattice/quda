@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.1
+Release Notes for QUDA v0.1                          17 November 2009
 ---------------------------
 
 Overview:
@@ -73,12 +73,12 @@ Contact information:
 For help or to report a bug, please contact Mike Clark
 (mikec@seas.harvard.edu) or Ron Babich (rbabich@bu.edu).
 
-If you find this code useful in your work, a citation to the following
-would be appreciated:
+If you find this code useful in your work, please cite:
 
-K. Barros et al., "Blasting through lattice calculations using CUDA,"
-PoS LATTICE2008, 045 (2008) [arXiv:0810.5365 [hep-lat]].
+M. A. Clark et al., "Solving Lattice QCD systems of equations using mixed
+precision solvers on GPUs" (2009), arXiv:0911.3191 [hep-lat].
 
-Please also drop us a note so that we can send you updates and
-bug-fixes.
+Please also drop us a note so that we can inform you of updates and
+bug-fixes.  The most recent public release will always be available
+online at http://lattice.bu.edu/quda/
 
