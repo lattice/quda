@@ -7,9 +7,6 @@
 
 #include <test_util.h>
 
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 1;
-
 QudaInvertParam inv_param;
 
 ParitySpinor x, y, z, w, v;

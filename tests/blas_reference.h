@@ -1,7 +1,7 @@
-#ifndef _QUDA_BLAS_REF_H
-#define _QUDA_BLAS_REF_H
+#ifndef _BLAS_REFERENCE_H
+#define _BLAS_REFERENCE_H
 
-#include <quda_internal.h>
+#include <enum_quda.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -9,9 +9,9 @@ extern "C" {
   
   // ---------- blas_reference.cpp ----------
   
-  double norm_2(void *vector, int len, Precision precision);
-  void mxpy(void *x, void *y, int len, Precision precision);
-  void ax(double a, void *x, int len, Precision precision);
+  double norm_2(void *vector, int len, QudaPrecision precision);
+  void mxpy(void *x, void *y, int len, QudaPrecision precision);
+  void ax(double a, void *x, int len, QudaPrecision precision);
    
   /*  void zero(float* a, int cnt);
       void copy(float* a, float *b, int len);*/
@@ -30,4 +30,4 @@ extern "C" {
 }
 #endif
 
-#endif // _QUDA_BLAS_REF_H
+#endif // _BLAS_REFERENCE_H

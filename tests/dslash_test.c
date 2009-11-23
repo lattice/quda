@@ -119,7 +119,7 @@ void init() {
 
   printf("Randomizing fields... ");
 
-  construct_gauge_field(hostGauge, 1, gaugeParam.cpu_prec);
+  construct_gauge_field(hostGauge, 1, gaugeParam.cpu_prec, &gaugeParam);
   construct_spinor_field(spinor, 1, 0, 0, 0, inv_param.cpu_prec);
 
   if (clover_yes) {

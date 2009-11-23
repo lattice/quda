@@ -1,13 +1,9 @@
-#ifndef _QUDA_DSLASH_H
-#define _QUDA_DSLASH_H
+#ifndef _DSLASH_QUDA_H
+#define _DSLASH_QUDA_H
 
 #include <cuComplex.h>
 
 #include <quda_internal.h>
-
-#define gaugeSiteSize 18 // real numbers per link
-#define spinorSiteSize 24 // real numbers per spinor
-#define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
 
 #ifdef __cplusplus
 extern "C" {
@@ -129,4 +125,4 @@ extern "C" {
 }
 #endif
 
-#endif // _QUDA_DLASH_H
+#endif // _DLASH_QUDA_H

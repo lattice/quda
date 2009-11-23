@@ -1,24 +1,23 @@
-#include <quda_internal.h>
 #include <blas_reference.h>
 
 // performs the operation x[i] *= a
 template <typename Float>
-void aX(Float a, Float *x, int len) {
+inline void aX(Float a, Float *x, int len) {
   for (int i=0; i<len; i++) x[i] *= a;
 }
 
-void ax(double a, void *x, int len, Precision precision) {
+void ax(double a, void *x, int len, QudaPrecision precision) {
   if (precision == QUDA_DOUBLE_PRECISION) aX(a, (double*)x, len);
   else aX((float)a, (float*)x, len);
 }
 
 // performs the operation y[i] -= x[i] (minus x plus y)
 template <typename Float>
-void mXpY(Float *x, Float *y, int len) {
+inline void mXpY(Float *x, Float *y, int len) {
   for (int i=0; i<len; i++) y[i] -= x[i];
 }
 
-void mxpy(void* x, void* y, int len, Precision precision) {
+void mxpy(void* x, void* y, int len, QudaPrecision precision) {
   if (precision == QUDA_DOUBLE_PRECISION) mXpY((double*)x, (double*)y, len);
   else mXpY((float*)x, (float*)y, len);
 }
@@ -26,13 +25,13 @@ void mxpy(void* x, void* y, int len, Precision precision) {
 
 // returns the square of the L2 norm of the vector
 template <typename Float>
-double norm2(Float *v, int len) {
+inline double norm2(Float *v, int len) {
   double sum=0.0;
   for (int i=0; i<len; i++) sum += v[i]*v[i];
   return sum;
 }
 
-double norm_2(void *v, int len, Precision precision) {
+double norm_2(void *v, int len, QudaPrecision precision) {
   if (precision == QUDA_DOUBLE_PRECISION) return norm2((double*)v, len);
   else return norm2((float*)v, len);
 }

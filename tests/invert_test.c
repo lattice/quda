@@ -1,10 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
-#include <quda_internal.h>
+#include <quda.h>
 
 #include <test_util.h>
+#include <blas_reference.h>
 #include <dslash_reference.h>
 
 int main(int argc, char **argv)
@@ -33,8 +35,6 @@ int main(int argc, char **argv)
   Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  gauge_param = &Gauge_param;
-
   int clover_yes = 0; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
@@ -45,7 +45,7 @@ int main(int argc, char **argv)
   inv_param.inv_type = QUDA_CG_INVERTER;
 
   double mass = -0.94;
-  inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param->anisotropy + mass));
+  inv_param.kappa = 1.0 / (2.0*(1 + 3/Gauge_param.anisotropy + mass));
   inv_param.tol = 5e-7;
   inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-3;
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
-  construct_gauge_field(gauge, 1, Gauge_param.cpu_prec);
+  construct_gauge_field(gauge, 1, Gauge_param.cpu_prec, &Gauge_param);
 
   if (clover_yes) {
     double norm = 0.2; // clover components are random numbers in the range (-norm, norm)

@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <quda_internal.h>
 #include <util_quda.h>
+
 #include <test_util.h>
+#include <blas_reference.h>
 #include <dslash_reference.h>
 
 int Z[4];
@@ -250,7 +251,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 }
 
 void dslash(void *res, void **gaugeFull, void *spinorField, int oddBit, int daggerBit,
-	    Precision sPrecision, Precision gPrecision) {
+	    QudaPrecision sPrecision, QudaPrecision gPrecision) {
   
   if (sPrecision == QUDA_DOUBLE_PRECISION) 
     if (gPrecision == QUDA_DOUBLE_PRECISION)
@@ -281,7 +282,7 @@ void Mat(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa, int daggerBit) {
 }
 
 void mat(void *out, void **gauge, void *in, double kappa, int dagger_bit,
-	 Precision sPrecision, Precision gPrecision) {
+	 QudaPrecision sPrecision, QudaPrecision gPrecision) {
 
   if (sPrecision == QUDA_DOUBLE_PRECISION)
     if (gPrecision == QUDA_DOUBLE_PRECISION) 
@@ -298,7 +299,7 @@ void mat(void *out, void **gauge, void *in, double kappa, int dagger_bit,
 // Apply the even-odd preconditioned Dirac operator
 template <typename sFloat, typename gFloat>
 void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, 
-	   int daggerBit, MatPCType matpc_type) {
+	   int daggerBit, QudaMatPCType matpc_type) {
   
   sFloat *tmp = (sFloat*)malloc(Vh*spinorSiteSize*sizeof(sFloat));
     
@@ -318,7 +319,7 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa,
 }
 
 void matpc(void *outEven, void **gauge, void *inEven, double kappa, 
-	   MatPCType matpc_type, int dagger_bit, Precision sPrecision, Precision gPrecision) {
+	   QudaMatPCType matpc_type, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision) {
 
   if (sPrecision == QUDA_DOUBLE_PRECISION)
     if (gPrecision == QUDA_DOUBLE_PRECISION) 

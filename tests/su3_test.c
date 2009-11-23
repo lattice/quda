@@ -39,7 +39,6 @@ void init() {
   param.anisotropy = 2.3;
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param = &param;
 
   // construct gauge fields
   for (int dir = 0; dir < 4; dir++) {
@@ -48,7 +47,7 @@ void init() {
   }
 
   int dev = 0;
-  cudaSetDevice(dev);
+  initQuda(dev);
 }
 
 void end() {
@@ -64,7 +63,7 @@ void SU3Test() {
   init();
     
   printf("Randomizing fields...");
-  construct_gauge_field((void**)gauge, 1, param.cpu_prec);
+  construct_gauge_field((void**)gauge, 1, param.cpu_prec, &param);
   printf("done.\n");
 
   loadGaugeQuda(gauge, &param);

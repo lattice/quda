@@ -1,7 +1,7 @@
-#include <blas_reference.h>
+#ifndef _DSLASH_REFERENCE_H
+#define _DSLASH_REFERENCE_H
 
-#ifndef _QUDA_DSLASH_REF_H
-#define _QUDA_DSLASH_REF_H
+#include <enum_quda.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,18 +13,19 @@ extern "C" {
 
   void setDims(int *);
 
-  void dslash(void *res, void **gauge, void *spinorField, 
-	      int oddBit, int daggerBit, Precision sPrecision, Precision gPrecision);
+  void dslash(void *res, void **gauge, void *spinorField, int oddBit,
+	      int daggerBit, QudaPrecision sPrecision,
+	      QudaPrecision gPrecision);
   
   void mat(void *out, void **gauge, void *in, double kappa, int daggerBit,
-	   Precision sPrecision, Precision gPrecision);
+	   QudaPrecision sPrecision, QudaPrecision gPrecision);
 
-  void matpc(void *out, void **gauge, void *in, double kappa, MatPCType matpc_type, 
-	     int daggerBit, Precision sPrecision, Precision gPrecision);
+  void matpc(void *out, void **gauge, void *in, double kappa,
+	     QudaMatPCType matpc_type,  int daggerBit,
+	     QudaPrecision sPrecision, QudaPrecision gPrecision);
 
-  
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _QUDA_DLASH_REF_H
+#endif // _DSLASH_REFERENCE_H

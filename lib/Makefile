@@ -37,6 +37,9 @@ gen:
 clean:
 	-rm -f *.o $(QUDA)
 
+dslash_quda.o: dslash_quda.cu $(HDRS) $(CORE)
+	$(NVCC) $(NVCCFLAGS) -maxrregcount=80 $< -c -o $@
+
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 

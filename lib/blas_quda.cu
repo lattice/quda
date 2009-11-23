@@ -1521,10 +1521,10 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
   int length = x.length/2;
   blas_quda_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    char c = NULL;
+    char c = 0;
     return cDotProductFCuda((double2*)x.spinor, (double2*)y.spinor, c, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    char c = NULL;
+    char c = 0;
     return cDotProductFCuda((float2*)x.spinor, (float2*)y.spinor, c, length);
   } else {
     int spinor_bytes = x.length*sizeof(short);

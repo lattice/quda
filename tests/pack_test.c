@@ -9,8 +9,6 @@
 #include <test_util.h>
 #include <dslash_reference.h>
 
-#define FULL_WILSON 1
-
 QudaGaugeParam param;
 FullSpinor cudaFullSpinor;
 ParitySpinor cudaParitySpinor;

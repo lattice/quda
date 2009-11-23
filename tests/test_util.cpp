@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <quda_internal.h>
 #include <dslash_reference.h>
 #include <test_util.h>
 
@@ -27,12 +26,12 @@ inline Float shortToFloat(short a) {
 }
 
 template <typename Float>
-void printVector(Float *v) {
+static void printVector(Float *v) {
   printf("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
 }
 
 // X indexes the lattice site
-void printSpinorElement(void *spinor, int X, Precision precision) {
+void printSpinorElement(void *spinor, int X, QudaPrecision precision) {
   if (precision == QUDA_DOUBLE_PRECISION)
     for (int s=0; s<4; s++) printVector((double*)spinor+X*24+s*6);
   else
@@ -40,7 +39,7 @@ void printSpinorElement(void *spinor, int X, Precision precision) {
 }
 
 // X indexes the full lattice
-void printGaugeElement(void *gauge, int X, Precision precision) {
+void printGaugeElement(void *gauge, int X, QudaPrecision precision) {
   if (getOddBit(X) == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
       for (int m=0; m<3; m++) printVector((double*)gauge +(X/2)*gaugeSiteSize + m*3*2);
@@ -66,54 +65,54 @@ int getOddBit(int Y) {
 
 // a+=b
 template <typename Float>
-void complexAddTo(Float *a, Float *b) {
+inline void complexAddTo(Float *a, Float *b) {
   a[0] += b[0];
   a[1] += b[1];
 }
 
 // a = b*c
 template <typename Float>
-void complexProduct(Float *a, Float *b, Float *c) {
+inline void complexProduct(Float *a, Float *b, Float *c) {
     a[0] = b[0]*c[0] - b[1]*c[1];
     a[1] = b[0]*c[1] + b[1]*c[0];
 }
 
 // a = conj(b)*conj(c)
 template <typename Float>
-void complexConjugateProduct(Float *a, Float *b, Float *c) {
+inline void complexConjugateProduct(Float *a, Float *b, Float *c) {
     a[0] = b[0]*c[0] - b[1]*c[1];
     a[1] = -b[0]*c[1] - b[1]*c[0];
 }
 
 // a = conj(b)*c
 template <typename Float>
-void complexDotProduct(Float *a, Float *b, Float *c) {
+inline void complexDotProduct(Float *a, Float *b, Float *c) {
     a[0] = b[0]*c[0] + b[1]*c[1];
     a[1] = b[0]*c[1] - b[1]*c[0];
 }
 
 // a += b*c
 template <typename Float>
-void accumulateComplexProduct(Float *a, Float *b, Float *c, Float sign) {
+inline void accumulateComplexProduct(Float *a, Float *b, Float *c, Float sign) {
   a[0] += sign*(b[0]*c[0] - b[1]*c[1]);
   a[1] += sign*(b[0]*c[1] + b[1]*c[0]);
 }
 
 // a += conj(b)*c)
 template <typename Float>
-void accumulateComplexDotProduct(Float *a, Float *b, Float *c) {
+inline void accumulateComplexDotProduct(Float *a, Float *b, Float *c) {
     a[0] += b[0]*c[0] + b[1]*c[1];
     a[1] += b[0]*c[1] - b[1]*c[0];
 }
 
 template <typename Float>
-void accumulateConjugateProduct(Float *a, Float *b, Float *c, int sign) {
+inline void accumulateConjugateProduct(Float *a, Float *b, Float *c, int sign) {
   a[0] += sign * (b[0]*c[0] - b[1]*c[1]);
   a[1] -= sign * (b[0]*c[1] + b[1]*c[0]);
 }
 
 template <typename Float>
-void su3Construct12(Float *mat) {
+inline void su3Construct12(Float *mat) {
   Float *w = mat+12;
   w[0] = 0.0;
   w[1] = 0.0;
@@ -125,13 +124,13 @@ void su3Construct12(Float *mat) {
 
 // Stabilized Bunk and Sommer
 template <typename Float>
-void su3Construct8(Float *mat) {
+inline void su3Construct8(Float *mat) {
   mat[0] = atan2(mat[1], mat[0]);
   mat[1] = atan2(mat[13], mat[12]);
   for (int i=8; i<18; i++) mat[i] = 0.0;
 }
 
-void su3_construct(void *mat, ReconstructType reconstruct, Precision precision) {
+void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     if (precision == QUDA_DOUBLE_PRECISION) su3Construct12((double*)mat);
     else su3Construct12((float*)mat);
@@ -146,7 +145,7 @@ void su3_construct(void *mat, ReconstructType reconstruct, Precision precision) 
 // 
 // 48 flops
 template <typename Float>
-void su3Reconstruct12(Float *mat, int dir, int ga_idx) {
+static void su3Reconstruct12(Float *mat, int dir, int ga_idx, QudaGaugeParam *param) {
   Float *u = &mat[0*(3*2)];
   Float *v = &mat[1*(3*2)];
   Float *w = &mat[2*(3*2)];
@@ -157,21 +156,21 @@ void su3Reconstruct12(Float *mat, int dir, int ga_idx) {
   accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
   accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
   accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-  Float u0 = (dir < 3 ? gauge_param->anisotropy :
-	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? gauge_param->t_boundary : 1));
+  Float u0 = (dir < 3 ? param->anisotropy :
+	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
   w[0]*=u0; w[1]*=u0; w[2]*=u0; w[3]*=u0; w[4]*=u0; w[5]*=u0;
 }
 
 template <typename Float>
-void su3Reconstruct8(Float *mat, int dir, int ga_idx) {
+static void su3Reconstruct8(Float *mat, int dir, int ga_idx, QudaGaugeParam *param) {
   // First reconstruct first row
   Float row_sum = 0.0;
   row_sum += mat[2]*mat[2];
   row_sum += mat[3]*mat[3];
   row_sum += mat[4]*mat[4];
   row_sum += mat[5]*mat[5];
-  Float u0 = (dir < 3 ? gauge_param->anisotropy :
-	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? gauge_param->t_boundary : 1));
+  Float u0 = (dir < 3 ? param->anisotropy :
+	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
   Float U00_mag = sqrt(1.f/(u0*u0) - row_sum);
 
   mat[14] = mat[0];
@@ -221,13 +220,13 @@ void su3Reconstruct8(Float *mat, int dir, int ga_idx) {
   mat[17] *= -r_inv2;
 }
 
-void su3_reconstruct(void *mat, int dir, int ga_idx, ReconstructType reconstruct, Precision precision) {
+void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision, QudaGaugeParam *param) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
-    if (precision == QUDA_DOUBLE_PRECISION) su3Reconstruct12((double*)mat, dir, ga_idx);
-    else su3Reconstruct12((float*)mat, dir, ga_idx);
+    if (precision == QUDA_DOUBLE_PRECISION) su3Reconstruct12((double*)mat, dir, ga_idx, param);
+    else su3Reconstruct12((float*)mat, dir, ga_idx, param);
   } else {
-    if (precision == QUDA_DOUBLE_PRECISION) su3Reconstruct8((double*)mat, dir, ga_idx);
-    else su3Reconstruct8((float*)mat, dir, ga_idx);
+    if (precision == QUDA_DOUBLE_PRECISION) su3Reconstruct8((double*)mat, dir, ga_idx, param);
+    else su3Reconstruct8((float*)mat, dir, ga_idx, param);
   }
 }
 
@@ -242,7 +241,7 @@ void su3_construct_8_half(float *mat, short *mat_half) {
   }
 }
 
-void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx) {
+void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx, QudaGaugeParam *param) {
 
   for (int i=0; i<18; i++) {
     mat[i] = shortToFloat(mat_half[i]);
@@ -250,11 +249,11 @@ void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx) {
   mat[0] *= M_PI;
   mat[1] *= M_PI;
 
-  su3Reconstruct8(mat, dir, ga_idx);
+  su3Reconstruct8(mat, dir, ga_idx, param);
   }*/
 
 template <typename Float>
-int compareFloats(Float *a, Float *b, int len, double epsilon) {
+static int compareFloats(Float *a, Float *b, int len, double epsilon) {
   for (int i = 0; i < len; i++) {
     double diff = fabs(a[i] - b[i]);
     if (diff > epsilon) return 0;
@@ -262,7 +261,7 @@ int compareFloats(Float *a, Float *b, int len, double epsilon) {
   return 1;
 }
 
-int compare_floats(void *a, void *b, int len, double epsilon, Precision precision) {
+int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision precision) {
   if  (precision == QUDA_DOUBLE_PRECISION) return compareFloats((double*)a, (double*)b, len, epsilon);
   else return compareFloats((float*)a, (float*)b, len, epsilon);
 }
@@ -277,16 +276,16 @@ int fullLatticeIndex(int i, int oddBit) {
 }
 
 template <typename Float>
-void applyGaugeFieldScaling(Float **gauge, int Vh) {
+static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param) {
   // Apply spatial scaling factor (u0) to spatial links
   for (int d = 0; d < 3; d++) {
     for (int i = 0; i < gaugeSiteSize*Vh*2; i++) {
-      gauge[d][i] /= gauge_param->anisotropy;
+      gauge[d][i] /= param->anisotropy;
     }
   }
     
   // Apply boundary conditions to temporal links
-  if (gauge_param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
     for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
       for (int i = 0; i < gaugeSiteSize; i++) {
 	gauge[3][j*gaugeSiteSize+i] *= -1.0;
@@ -295,7 +294,7 @@ void applyGaugeFieldScaling(Float **gauge, int Vh) {
     }
   }
     
-  if (gauge_param->gauge_fix) {
+  if (param->gauge_fix) {
     // set all gauge links (except for the first Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
     int dir = 3; // time direction only
@@ -315,7 +314,7 @@ void applyGaugeFieldScaling(Float **gauge, int Vh) {
 }
 
 template <typename Float>
-void constructUnitGaugeField(Float **res) {
+static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {  
     resEven[dir] = res[dir];
@@ -335,12 +334,12 @@ void constructUnitGaugeField(Float **res) {
     }
   }
     
-  applyGaugeFieldScaling(res, Vh);
+  applyGaugeFieldScaling(res, Vh, param);
 }
 
 // normalize the vector a
 template <typename Float>
-void normalize(complex<Float> *a, int len) {
+static void normalize(complex<Float> *a, int len) {
   double sum = 0.0;
   for (int i=0; i<len; i++) sum += norm(a[i]);
   for (int i=0; i<len; i++) a[i] /= sqrt(sum);
@@ -348,14 +347,14 @@ void normalize(complex<Float> *a, int len) {
 
 // orthogonalize vector b to vector a
 template <typename Float>
-void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
+static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
   complex<double> dot = 0.0;
   for (int i=0; i<len; i++) dot += conj(a[i])*b[i];
   for (int i=0; i<len; i++) b[i] -= (complex<Float>)dot*a[i];
 }
 
 template <typename Float> 
-void constructGaugeField(Float **res) {
+static void constructGaugeField(Float **res, QudaGaugeParam *param) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {  
     resEven[dir] = res[dir];
@@ -411,21 +410,21 @@ void constructGaugeField(Float **res) {
     }
   }
     
-  applyGaugeFieldScaling(res, Vh);
+  applyGaugeFieldScaling(res, Vh, param);
 }
 
-void construct_gauge_field(void **gauge, int type, Precision precision) {
+void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
   if (type == 0) {
-    if (precision == QUDA_DOUBLE_PRECISION) constructUnitGaugeField((double**)gauge);
-    else constructUnitGaugeField((float**)gauge);
+    if (precision == QUDA_DOUBLE_PRECISION) constructUnitGaugeField((double**)gauge, param);
+    else constructUnitGaugeField((float**)gauge, param);
    } else {
-    if (precision == QUDA_DOUBLE_PRECISION) constructGaugeField((double**)gauge);
-    else constructGaugeField((float**)gauge);
+    if (precision == QUDA_DOUBLE_PRECISION) constructGaugeField((double**)gauge, param);
+    else constructGaugeField((float**)gauge, param);
   }
 }
 
 template <typename Float>
-void constructCloverField(Float *res, double norm, double diag) {
+static void constructCloverField(Float *res, double norm, double diag) {
 
   Float c = 2.0 * norm / RAND_MAX;
 
@@ -440,14 +439,14 @@ void constructCloverField(Float *res, double norm, double diag) {
   }
 }
 
-void construct_clover_field(void *clover, double norm, double diag, Precision precision) {
+void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision) {
 
   if (precision == QUDA_DOUBLE_PRECISION) constructCloverField((double *)clover, norm, diag);
   else constructCloverField((float *)clover, norm, diag);
 }
 
 template <typename Float>
-void constructPointSpinorField(Float *res, int i0, int s0, int c0) {
+static void constructPointSpinorField(Float *res, int i0, int s0, int c0) {
   Float *resEven = res;
   Float *resOdd = res + Vh*spinorSiteSize;
     
@@ -470,7 +469,7 @@ void constructPointSpinorField(Float *res, int i0, int s0, int c0) {
 }
 
 template <typename Float>
-void constructSpinorField(Float *res) {
+static void constructSpinorField(Float *res) {
   for(int i = 0; i < V; i++) {
     for (int s = 0; s < 4; s++) {
       for (int m = 0; m < 3; m++) {
@@ -481,7 +480,7 @@ void constructSpinorField(Float *res) {
   }
 }
 
-void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, Precision precision) {
+void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision) {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) constructPointSpinorField((double*)spinor, i0, s0, c0);
     else constructPointSpinorField((float*)spinor, i0, s0, c0);
@@ -492,7 +491,7 @@ void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, Prec
 }
 
 template <typename Float>
-void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
+static void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
   int res = 1;
   int fail_check = 16*res;
   int fail[fail_check];
@@ -520,12 +519,12 @@ void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
 
 }
 
-void compare_spinor(void *spinor_ref, void *spinor_gpu, int len, Precision precision) {
+void compare_spinor(void *spinor_ref, void *spinor_gpu, int len, QudaPrecision precision) {
   if (precision == QUDA_DOUBLE_PRECISION) compareSpinor((double*)spinor_ref, (double*)spinor_gpu, len);
   else compareSpinor((float*)spinor_ref, (float*)spinor_gpu, len);
 }
 
-void strong_check(void *spinorRef, void *spinorGPU, int len, Precision prec) {
+void strong_check(void *spinorRef, void *spinorGPU, int len, QudaPrecision prec) {
   printf("Reference:\n");
   printSpinorElement(spinorRef, 0, prec); printf("...\n");
   printSpinorElement(spinorRef, len-1, prec); printf("\n");    
@@ -538,7 +537,7 @@ void strong_check(void *spinorRef, void *spinorGPU, int len, Precision prec) {
 }
 
 template <typename Float>
-void checkGauge(Float **oldG, Float **newG, double epsilon) {
+static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   int fail_check = 17;
   int fail[fail_check];
