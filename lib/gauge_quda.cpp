@@ -7,8 +7,8 @@
 //#include <xmmintrin.h>
 
 #define SHORT_LENGTH 65536
-#define SCALE_FLOAT (SHORT_LENGTH-1) / 2.f
-#define SHIFT_FLOAT -1.f / (SHORT_LENGTH-1)
+#define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
+#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
 
 double Anisotropy;
 QudaTboundary tBoundary;
@@ -21,7 +21,7 @@ inline short FloatToShort(const Float &a) {
 
 template <typename Float>
 inline void ShortToFloat(Float &a, const short &b) {
-  a = (((Float)b/SCALE_FLOAT-SHIFT_FLOAT)*SCALE_FLOAT);
+  a = ((Float)b/SCALE_FLOAT-SHIFT_FLOAT);
 }
 
 // Routines used to pack the gauge field matrices
@@ -172,7 +172,8 @@ inline void reconstruct8(Float *mat, int dir, int idx) {
   row_sum += mat[4]*mat[4];
   row_sum += mat[5]*mat[5];
   Float u0 = (dir < 3 ? Anisotropy : (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
-  Float U00_mag = sqrt(1.f/(u0*u0) - row_sum);
+  Float diff = 1.f/(u0*u0) - row_sum;
+  Float U00_mag = sqrt(diff >= 0 ? diff : 0.0);
 
   mat[14] = mat[0];
   mat[15] = mat[1];
@@ -183,7 +184,8 @@ inline void reconstruct8(Float *mat, int dir, int idx) {
   Float column_sum = 0.0;
   for (int i=0; i<2; i++) column_sum += mat[i]*mat[i];
   for (int i=6; i<8; i++) column_sum += mat[i]*mat[i];
-  Float U20_mag = sqrt(1.f/(u0*u0) - column_sum);
+  diff = 1.f/(u0*u0) - column_sum;
+  Float U20_mag = sqrt(diff >= 0 ? diff : 0.0);
 
   mat[12] = U20_mag * cos(mat[15]);
   mat[13] = U20_mag * sin(mat[15]);
@@ -293,10 +295,10 @@ template <typename Float>
 inline void unpack12(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
   float4 *dg = d_gauge + dir*3*V;
   for (int j=0; j<3; j++) {
-    h_gauge[j*2+0] = dg[j*V].x;
-    h_gauge[j*2+1] = dg[j*V].y; 
-    h_gauge[j*2+2] = dg[j*V].z;
-    h_gauge[j*2+3] = dg[j*V].w; 
+    h_gauge[j*4+0] = dg[j*V].x;
+    h_gauge[j*4+1] = dg[j*V].y; 
+    h_gauge[j*4+2] = dg[j*V].z;
+    h_gauge[j*4+3] = dg[j*V].w; 
   }
   reconstruct12(h_gauge, dir, idx);
 }
@@ -305,10 +307,10 @@ template <typename Float>
 inline void unpack12(Float *h_gauge, short4 *d_gauge, int dir, int V, int idx) {
   short4 *dg = d_gauge + dir*3*V;
   for (int j=0; j<3; j++) {
-    ShortToFloat(h_gauge[j*2+0], dg[j*V].x);
-    ShortToFloat(h_gauge[j*2+1], dg[j*V].y);
-    ShortToFloat(h_gauge[j*2+2], dg[j*V].z);
-    ShortToFloat(h_gauge[j*2+3], dg[j*V].w);
+    ShortToFloat(h_gauge[j*4+0], dg[j*V].x);
+    ShortToFloat(h_gauge[j*4+1], dg[j*V].y);
+    ShortToFloat(h_gauge[j*4+2], dg[j*V].z);
+    ShortToFloat(h_gauge[j*4+3], dg[j*V].w);
   }
   reconstruct12(h_gauge, dir, idx);
 }
