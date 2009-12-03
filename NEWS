@@ -1,6 +1,8 @@
 
 Version 0.x
 
+- Added Guochun's patch to improve half precision 8 SU(3) 
+  reconstruction: 8 half precision now actually works
 - Cleaned up the invert_test example to remove unnecessary dependencies.
 - Fixed bug affecting saveGaugeQuda() that caused su3_test to fail.
 - Added compiler directive to Makefile to improve performance of the
