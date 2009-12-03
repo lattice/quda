@@ -1,3 +1,13 @@
-Release 0.1 - 17 November 2009
+
+Version 0.x
+
+- Cleaned up the invert_test example to remove unnecessary dependencies.
+- Fixed bug affecting saveGaugeQuda() that caused su3_test to fail.
+- Added compiler directive to Makefile to improve performance of the
+  half-precision clover Dslash on sm_13 hardware.
+- Formally adopted the MIT/X11 license.
+
+Version 0.1 - 17 November 2009
 
 - Initial public release.
+

@@ -528,8 +528,7 @@ void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, ReconstructType 
     packQDPGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, Vh, pad);
   } else if (gauge_param->gauge_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
     packCPSGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, Vh, pad);
-    packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh, pad);
-    
+    packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh, pad);    
   } else {
     printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_param->gauge_order);
     exit(-1);
@@ -573,8 +572,8 @@ void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, ReconstructT
   packedOdd = (FloatN*)malloc(bytes);
 #endif
     
-  cudaMemcpy(packedEven, even, bytes, cudaMemcpyHostToDevice);
-  cudaMemcpy(packedOdd, odd, bytes, cudaMemcpyHostToDevice);    
+  cudaMemcpy(packedEven, even, bytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(packedOdd, odd, bytes, cudaMemcpyDeviceToHost);    
     
   if (gauge_param->gauge_order == QUDA_QDP_GAUGE_ORDER) {
     unpackQDPGaugeField((Float**)cpuGauge, packedEven, 0, reconstruct, Vh, pad);

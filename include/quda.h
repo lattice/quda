@@ -78,7 +78,8 @@ extern "C" {
 
   } QudaInvertParam;
 
-  // Interface functions
+  // Interface functions, found in invert_quda.cpp
+
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void saveGaugeQuda(void *h_gauge);
