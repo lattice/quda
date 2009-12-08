@@ -327,7 +327,7 @@ void loadCloverField(FullClover ret, void *clover, Precision cpu_prec, CloverFie
 }
 
 /*
-void createCloverField(FullClover *cudaClover, void *cpuClover, int *X, Precision precision)
+void createCloverField(FullClover *cudaClover, void *cpuClover, int *X, Precision precision, QudaInvertParam invert_param)
 {
   if (invert_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
     printf("QUDA error: half precision not supported on cpu\n");

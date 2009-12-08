@@ -8,7 +8,6 @@
 #include<dslash_constants.h>
 
 QudaGaugeParam *gauge_param;
-QudaInvertParam *invert_param;
 
 unsigned long long dslash_quda_flops;
 unsigned long long dslash_quda_bytes;

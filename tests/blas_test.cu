@@ -7,8 +7,7 @@
 
 #include <test_util.h>
 
-QudaInvertParam inv_param;
-
+QudaPrecision cuda_prec;
 ParitySpinor x, y, z, w, v;
 
 int nIters;
@@ -22,23 +21,19 @@ void init() {
   X[2] = 24;
   X[3] = 64;
 
-  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
-  inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.sp_pad = 0;
-
-  invert_param = &inv_param;
+  cuda_prec = QUDA_HALF_PRECISION;
+  int sp_pad = 0;
 
   int dev = 0;
   initQuda(dev);
 
   // need single parity dimensions
   X[0] /= 2;
-  v = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
-  w = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
-  x = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
-  y = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
-  z = allocateParitySpinor(X, inv_param.cuda_prec, inv_param.sp_pad);
+  v = allocateParitySpinor(X, cuda_prec, sp_pad);
+  w = allocateParitySpinor(X, cuda_prec, sp_pad);
+  x = allocateParitySpinor(X, cuda_prec, sp_pad);
+  y = allocateParitySpinor(X, cuda_prec, sp_pad);
+  z = allocateParitySpinor(X, cuda_prec, sp_pad);
 
 }
 
@@ -202,7 +197,7 @@ int main(int argc, char** argv) {
   }
 
   char filename[100];
-  sprintf(filename, "%d_blas.dat", inv_param.cuda_prec);
+  sprintf(filename, "%d_blas.dat", cuda_prec);
   FILE *blas_out = fopen(filename, "w");
 
   nIters = 300;

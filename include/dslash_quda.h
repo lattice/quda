@@ -19,7 +19,6 @@ extern "C" {
   extern FullClover cudaCloverInvSloppy;
 
   extern QudaGaugeParam *gauge_param;
-  extern QudaInvertParam *invert_param;
 
 // ---------- dslash_quda.cu ----------
 

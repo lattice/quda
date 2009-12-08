@@ -328,8 +328,6 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
 
 void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 {
-  invert_param = param;
-
   checkInvertParam(param);
   checkPrecision(param->cpu_prec);
 
@@ -348,13 +346,13 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   if (param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= cudaGaugePrecise.anisotropy;
 
   FullSpinor b, x;
-  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);// source
-  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);// solution
-  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);// temporary
+  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, param->cuda_prec, param->sp_pad); // source
+  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, param->cuda_prec, param->sp_pad); // solution
+  ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, param->cuda_prec, param->sp_pad); // temporary
 
   if (param->solution_type == QUDA_MAT_SOLUTION) {
     if (param->preserve_source == QUDA_PRESERVE_SOURCE_YES) {
-      b = allocateSpinorField(cudaGaugePrecise.X, invert_param->cuda_prec, invert_param->sp_pad);
+      b = allocateSpinorField(cudaGaugePrecise.X, param->cuda_prec, param->sp_pad);
     } else {
       b.even = out;
       b.odd = tmp;

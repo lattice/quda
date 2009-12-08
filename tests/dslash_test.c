@@ -89,7 +89,6 @@ void init() {
   inv_param.verbosity = QUDA_VERBOSE;
 
   gauge_param = &gaugeParam;
-  invert_param = &inv_param;
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gaugeParam.cpu_prec);
