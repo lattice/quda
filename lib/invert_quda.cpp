@@ -24,7 +24,6 @@ void initBlas();
 #define INIT_PARAM
 #include "check_params.h"
 #undef INIT_PARAM
->>>>>>> .r585
 
 // define (static) checkGaugeParam() and checkInvertParam()
 #define CHECK_PARAM
