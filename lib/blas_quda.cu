@@ -3,8 +3,7 @@
 
 #include <quda_internal.h>
 
-#define REDUCE_THREADS 128
-#define REDUCE_MAX_BLOCKS 64
+#define REDUCE_MAX_BLOCKS 2048
 
 #define REDUCE_DOUBLE 64
 #define REDUCE_KAHAN 32
@@ -22,62 +21,105 @@
 #endif
 
 // These are used for reduction kernels
-QudaSumFloat *d_reduceFloat;
-QudaSumComplex *d_reduceComplex;
-QudaSumFloat3 *d_reduceFloat3;
+QudaSumFloat *d_reduceFloat=0;
+QudaSumComplex *d_reduceComplex=0;
+QudaSumFloat3 *d_reduceFloat3=0;
 
-QudaSumFloat h_reduceFloat[REDUCE_MAX_BLOCKS];
-QudaSumComplex h_reduceComplex[REDUCE_MAX_BLOCKS];
-QudaSumFloat3 h_reduceFloat3[REDUCE_MAX_BLOCKS];
-
-int blocksFloat = 0;
-int blocksComplex = 0;
-int blocksFloat3 = 0;
+QudaSumFloat *h_reduceFloat=0;
+QudaSumComplex *h_reduceComplex=0;
+QudaSumFloat3 *h_reduceFloat3=0;
 
 unsigned long long blas_quda_flops;
 unsigned long long blas_quda_bytes;
 
-void initReduceFloat(int blocks) {
-  if (blocks != blocksFloat) {
+// Number of threads used for each blas kernel
+int blas_threads[3][22];
+// Number of thread blocks for each blas kernel
+int blas_blocks[3][22];
 
-    if (blocksFloat > 0) cudaFree(d_reduceFloat);
-    if (cudaMalloc((void**) &d_reduceFloat, blocks*sizeof(QudaSumFloat))) {
-      printf("Error allocating reduction matrix\n");
+dim3 blasBlock;
+dim3 blasGrid;
+
+void initBlas() {
+  
+  if (!d_reduceFloat) {
+    if (cudaMalloc((void**) &d_reduceFloat, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
+      printf("Error allocating device reduction array\n");
       exit(0);
     }
-
-    blocksFloat = blocks;
-
-    //printf("Initialized reduce floats %d\n", blocksFloat);
   }
+
+  if (!d_reduceComplex) {
+    if (cudaMalloc((void**) &d_reduceComplex, REDUCE_MAX_BLOCKS*sizeof(QudaSumComplex)) == cudaErrorMemoryAllocation) {
+      printf("Error allocating device reduction array\n");
+      exit(0);
+    }
+  }
+  
+  if (!d_reduceFloat3) {
+    if (cudaMalloc((void**) &d_reduceFloat3, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat3)) == cudaErrorMemoryAllocation) {
+      printf("Error allocating device reduction array\n");
+      exit(0);
+    }
+  }
+
+  if (!h_reduceFloat) {
+    if (cudaMallocHost((void**) &h_reduceFloat, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
+      printf("Error allocating host reduction array\n");
+      exit(0);
+    }
+  }
+
+  if (!h_reduceComplex) {
+    if (cudaMallocHost((void**) &h_reduceComplex, REDUCE_MAX_BLOCKS*sizeof(QudaSumComplex)) == cudaErrorMemoryAllocation) {
+      printf("Error allocating host reduction array\n");
+      exit(0);
+    }
+  }
+  
+  if (!h_reduceFloat3) {
+    if (cudaMallocHost((void**) &h_reduceFloat3, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat3)) == cudaErrorMemoryAllocation) {
+      printf("Error allocating host reduction array\n");
+      exit(0);
+    }
+  }
+
+  // Output from blas_test
+#include<blas_param.h>
+
 }
 
-void initReduceComplex(int blocks) {
-  if (blocks != blocksComplex) {
-
-    if (blocksComplex > 0) cudaFree(d_reduceComplex);
-    if (cudaMalloc((void**) &d_reduceComplex, blocks*sizeof(QudaSumComplex))) {
-      printf("Error allocating reduction matrix\n");
-      exit(0);
-    }
-
-    blocksComplex = blocks;
-    //printf("Initialized reduce complex %d\n", blocksComplex);
-  }
+void endBlas() {
+  if (d_reduceFloat) cudaFree(d_reduceFloat);
+  if (d_reduceComplex) cudaFree(d_reduceComplex);
+  if (d_reduceFloat3) cudaFree(d_reduceFloat3);
+  if (h_reduceFloat) cudaFreeHost(h_reduceFloat);
+  if (h_reduceComplex) cudaFreeHost(h_reduceComplex);
+  if (h_reduceFloat3) cudaFreeHost(h_reduceFloat3);
 }
 
-void initReduceFloat3(int blocks) {
-  if (blocks != blocksFloat3) {
-
-    if (blocksFloat3 > 0) cudaFree(d_reduceFloat3);
-    if (cudaMalloc((void**) &d_reduceFloat3, blocks*sizeof(QudaSumFloat3))) {
-      printf("Error allocating reduction matrix\n");
-      exit(0);
-    }
-
-    blocksFloat3 = blocks;
-    //printf("Initialized reduce float3 %d\n", blocksFloat3);
+void setBlock(int kernel, int length, QudaPrecision precision) {
+  int prec;
+  switch(precision) {
+  case QUDA_HALF_PRECISION:
+    prec = 0;
+    break;
+  case QUDA_SINGLE_PRECISION:
+    prec = 1;
+    break;
+  case QUDA_DOUBLE_PRECISION:
+    prec = 2;
+    break;
   }
+
+  int blocks = min(blas_blocks[prec][kernel], max(length/blas_threads[prec][kernel], 1));
+  blasBlock.x = blas_threads[prec][kernel];
+  blasBlock.y = 1;
+  blasBlock.z = 1;
+
+  blasGrid.x = blocks;
+  blasGrid.y = 1;
+  blasGrid.z = 1;
 }
 
 #if (__CUDA_ARCH__ == 130)
@@ -410,32 +452,32 @@ __global__ void convertDHKernel(double2 *res, int length, int real_length) {
 void copyCuda(ParitySpinor dst, ParitySpinor src) {
   checkSpinorLength(dst, src);
 
-  int blocks = min(REDUCE_MAX_BLOCKS, max(dst.stride/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(0, dst.stride, dst.precision);
+
+  blas_quda_bytes += src.real_length*(src.precision + dst.precision);
 
   if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
-    convertDSKernel<<<dimGrid, dimBlock>>>((double2*)dst.spinor, (float4*)src.spinor, src.stride);
+    convertDSKernel<<<blasGrid, blasBlock>>>((double2*)dst.spinor, (float4*)src.spinor, src.stride);
   } else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
-    convertSDKernel<<<dimGrid, dimBlock>>>((float4*)dst.spinor, (double2*)src.spinor, src.stride);
+    convertSDKernel<<<blasGrid, blasBlock>>>((float4*)dst.spinor, (double2*)src.spinor, src.stride);
   } else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
     int spinor_bytes = dst.length*sizeof(short);
     cudaBindTexture(0, texHalf1, src.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, src.spinorNorm, spinor_bytes/12);
-    convertSHKernel<<<dimGrid, dimBlock>>>((float4*)dst.spinor, src.stride, src.volume);
+    convertSHKernel<<<blasGrid, blasBlock>>>((float4*)dst.spinor, src.stride, src.volume);
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
     int spinor_bytes = dst.length*sizeof(float);
     cudaBindTexture(0, spinorTexSingle, src.spinor, spinor_bytes); 
-    convertHSKernel<<<dimGrid, dimBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, src.stride, src.volume);
+    convertHSKernel<<<blasGrid, blasBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, src.stride, src.volume);
   } else if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
     int spinor_bytes = dst.length*sizeof(short);
     cudaBindTexture(0, texHalf1, src.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, src.spinorNorm, spinor_bytes/12);
-    convertDHKernel<<<dimGrid, dimBlock>>>((double2*)dst.spinor, src.stride, src.volume);
+    convertDHKernel<<<blasGrid, blasBlock>>>((double2*)dst.spinor, src.stride, src.volume);
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = dst.length*sizeof(double);
     cudaBindTexture(0, spinorTexDouble, src.spinor, spinor_bytes); 
-    convertHDKernel<<<dimGrid, dimBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, src.stride, src.volume);
+    convertHDKernel<<<blasGrid, blasBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, src.stride, src.volume);
   } else if (dst.precision == QUDA_DOUBLE_PRECISION) {
     cudaMemcpy(dst.spinor, src.spinor, dst.length*sizeof(double), cudaMemcpyDeviceToDevice);
   } else if (dst.precision == QUDA_SINGLE_PRECISION) {
@@ -477,21 +519,19 @@ __global__ void axpbyHKernel(float a, float b, short4 *yH, float *yN, int stride
 
 // performs the operation y[i] = a*x[i] + b*y[i]
 void axpbyCuda(double a, ParitySpinor x, double b, ParitySpinor y) {
-  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(1, x.length, x.precision);
   checkSpinor(x, y);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axpbyKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, b, (double*)y.spinor, x.length);
+    axpbyKernel<<<blasGrid, blasBlock>>>(a, (double*)x.spinor, b, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpbyKernel<<<dimGrid, dimBlock>>>((float)a, (float*)x.spinor, (float)b, (float*)y.spinor, x.length);
+    axpbyKernel<<<blasGrid, blasBlock>>>((float)a, (float*)x.spinor, (float)b, (float*)y.spinor, x.length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    axpbyHKernel<<<dimGrid, dimBlock>>>((float)a, (float)b, (short4*)y.spinor, 
+    axpbyHKernel<<<blasGrid, blasBlock>>>((float)a, (float)b, (short4*)y.spinor, 
 					(float*)y.spinorNorm, y.stride, y.volume);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
@@ -529,20 +569,18 @@ __global__ void xpyHKernel(short4 *yH, float *yN, int stride, int length) {
 // performs the operation y[i] = x[i] + y[i]
 void xpyCuda(ParitySpinor x, ParitySpinor y) {
   checkSpinor(x,y);
-  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(2, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    xpyKernel<<<dimGrid, dimBlock>>>((double*)x.spinor, (double*)y.spinor, x.length);
+    xpyKernel<<<blasGrid, blasBlock>>>((double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    xpyKernel<<<dimGrid, dimBlock>>>((float*)x.spinor, (float*)y.spinor, x.length);
+    xpyKernel<<<blasGrid, blasBlock>>>((float*)x.spinor, (float*)y.spinor, x.length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    xpyHKernel<<<dimGrid, dimBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    xpyHKernel<<<blasGrid, blasBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += x.real_length;
@@ -579,20 +617,18 @@ __global__ void axpyHKernel(float a, short4 *yH, float *yN, int stride, int leng
 // performs the operation y[i] = a*x[i] + y[i]
 void axpyCuda(double a, ParitySpinor x, ParitySpinor y) {
   checkSpinor(x,y);
-  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(3, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axpyKernel<<<dimGrid, dimBlock>>>(a, (double*)x.spinor, (double*)y.spinor, x.length);
+    axpyKernel<<<blasGrid, blasBlock>>>(a, (double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpyKernel<<<dimGrid, dimBlock>>>((float)a, (float*)x.spinor, (float*)y.spinor, x.length);
+    axpyKernel<<<blasGrid, blasBlock>>>((float)a, (float*)x.spinor, (float*)y.spinor, x.length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    axpyHKernel<<<dimGrid, dimBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    axpyHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 2*x.real_length;
@@ -629,20 +665,18 @@ __global__ void xpayHKernel(float a, short4 *yH, float *yN, int stride, int leng
 // performs the operation y[i] = x[i] + a*y[i]
 void xpayCuda(ParitySpinor x, double a, ParitySpinor y) {
   checkSpinor(x,y);
-  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(4, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    xpayKernel<<<dimGrid, dimBlock>>>((double*)x.spinor, a, (double*)y.spinor, x.length);
+    xpayKernel<<<blasGrid, blasBlock>>>((double*)x.spinor, a, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    xpayKernel<<<dimGrid, dimBlock>>>((float*)x.spinor, (float)a, (float*)y.spinor, x.length);
+    xpayKernel<<<blasGrid, blasBlock>>>((float*)x.spinor, (float)a, (float*)y.spinor, x.length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    xpayHKernel<<<dimGrid, dimBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    xpayHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 2*x.real_length;
@@ -680,20 +714,18 @@ __global__ void mxpyHKernel(short4 *yH, float *yN, int stride, int length) {
 // performs the operation y[i] -= x[i] (minus x plus y)
 void mxpyCuda(ParitySpinor x, ParitySpinor y) {
   checkSpinor(x,y);
-  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(5, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    mxpyKernel<<<dimGrid, dimBlock>>>((double*)x.spinor, (double*)y.spinor, x.length);
+    mxpyKernel<<<blasGrid, blasBlock>>>((double*)x.spinor, (double*)y.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    mxpyKernel<<<dimGrid, dimBlock>>>((float*)x.spinor, (float*)y.spinor, x.length);
+    mxpyKernel<<<blasGrid, blasBlock>>>((float*)x.spinor, (float*)y.spinor, x.length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    mxpyHKernel<<<dimGrid, dimBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    mxpyHKernel<<<blasGrid, blasBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += x.real_length;
@@ -733,18 +765,16 @@ __global__ void axHKernel(float a, short4 *xH, float *xN, int stride, int length
 
 // performs the operation x[i] = a*x[i]
 void axCuda(double a, ParitySpinor x) {
-  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(6, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, x.length/2);
+    axKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, x.length/2);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axKernel<<<dimGrid, dimBlock>>>((float)a, (float2*)x.spinor, x.length/2);
+    axKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.spinor, x.length/2);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
-    axHKernel<<<dimGrid, dimBlock>>>((float)a, (short4*)x.spinor, (float*)x.spinorNorm, x.stride, x.volume);
+    axHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)x.spinor, (float*)x.spinorNorm, x.stride, x.volume);
   }
   blas_quda_bytes += 2*x.real_length*x.precision;
   blas_quda_flops += x.real_length;
@@ -787,16 +817,14 @@ __global__ void caxpyHKernel(float2 a, short4 *yH, float *yN, int stride, int le
 void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y) {
   checkSpinor(x,y);
   int length = x.length/2;
-  int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(7, length, x.precision);
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 4*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    caxpyKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, length);
+    caxpyKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
-    caxpyKernel<<<dimGrid, dimBlock>>>(af2, (float2*)x.spinor, (float2*)y.spinor, length);
+    caxpyKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, (float2*)y.spinor, length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -804,7 +832,7 @@ void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     float2 af2 = make_float2((float)a.x, (float)a.y);
-    caxpyHKernel<<<dimGrid, dimBlock>>>(af2, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    caxpyHKernel<<<blasGrid, blasBlock>>>(af2, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
   }
 }
 
@@ -845,17 +873,15 @@ __global__ void caxpbyHKernel(float2 a, float2 b, short4 *yH, float *yN, int str
 void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
   checkSpinor(x,y);
   int length = x.length/2;
-  int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(8, length, x.precision);
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 7*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    caxpbyKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, length);
+    caxpbyKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    caxpbyKernel<<<dimGrid, dimBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, length);
+    caxpbyKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -864,7 +890,7 @@ void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    caxpbyHKernel<<<dimGrid, dimBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    caxpbyHKernel<<<blasGrid, blasBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
   }
 }
 
@@ -914,17 +940,15 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
   checkSpinor(x,y);
   checkSpinor(x,z);
   int length = x.length/2;
-  int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(9, length, x.precision);
   blas_quda_bytes += 4*x.real_length*x.precision;
   blas_quda_flops += 8*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    cxpaypbzKernel<<<dimGrid, dimBlock>>>((double2*)x.spinor, a, (double2*)y.spinor, b, (double2*)z.spinor, length);
+    cxpaypbzKernel<<<blasGrid, blasBlock>>>((double2*)x.spinor, a, (double2*)y.spinor, b, (double2*)z.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    cxpaypbzKernel<<<dimGrid, dimBlock>>>((float2*)x.spinor, af2, (float2*)y.spinor, bf2, (float2*)z.spinor, length);
+    cxpaypbzKernel<<<blasGrid, blasBlock>>>((float2*)x.spinor, af2, (float2*)y.spinor, bf2, (float2*)z.spinor, length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -935,7 +959,7 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
     cudaBindTexture(0, texNorm3, z.spinorNorm, spinor_bytes/12);    
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    cxpaypbzHKernel<<<dimGrid, dimBlock>>>(af2, bf2, (short4*)z.spinor, (float*)z.spinorNorm, z.stride, z.volume);
+    cxpaypbzHKernel<<<blasGrid, blasBlock>>>(af2, bf2, (short4*)z.spinor, (float*)z.spinorNorm, z.stride, z.volume);
   }
 }
 
@@ -984,13 +1008,11 @@ __global__ void axpyZpbxHKernel(float a, float b, short4 *xH, float *xN, short4 
 void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, double b) {
   checkSpinor(x,y);
   checkSpinor(x,z);
-  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(10, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axpyZpbxKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, (double2*)z.spinor, b, x.length/2);
+    axpyZpbxKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, (double2*)z.spinor, b, x.length/2);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpyZpbxKernel<<<dimGrid, dimBlock>>>((float)a, (float2*)x.spinor, (float2*)y.spinor, (float2*)z.spinor, (float)b, x.length/2);
+    axpyZpbxKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.spinor, (float2*)y.spinor, (float2*)z.spinor, (float)b, x.length/2);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -999,7 +1021,7 @@ void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, doub
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf3, z.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm3, z.spinorNorm, spinor_bytes/12);    
-    axpyZpbxHKernel<<<dimGrid, dimBlock>>>((float)a, (float)b, (short4*)x.spinor, (float*)x.spinorNorm,
+    axpyZpbxHKernel<<<blasGrid, blasBlock>>>((float)a, (float)b, (short4*)x.spinor, (float*)x.spinorNorm,
 					   (short4*)y.spinor, (float*)y.spinorNorm, z.stride, z.volume);
   }
   blas_quda_bytes += 5*x.real_length*x.precision;
@@ -1067,16 +1089,14 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
   checkSpinor(x,z);
   checkSpinor(x,w);
   int length = x.length/2;
-  int blocks = min(REDUCE_MAX_BLOCKS, max(length/REDUCE_THREADS, 1));
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
+  setBlock(11, length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    caxpbypzYmbwKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, 
+    caxpbypzYmbwKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, 
 					  (double2*)z.spinor, (double2*)w.spinor, length); 
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    caxpbypzYmbwKernel<<<dimGrid, dimBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, 
+    caxpbypzYmbwKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, 
 					  (float2*)z.spinor, (float2*)w.spinor, length); 
   } else {
     int spinor_bytes = x.length*sizeof(short);
@@ -1090,7 +1110,7 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
     cudaBindTexture(0, texNorm4, w.spinorNorm, spinor_bytes/12); 
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    caxpbypzYmbwHKernel<<<dimGrid, dimBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm,
+    caxpbypzYmbwHKernel<<<blasGrid, blasBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm,
 					       (short4*)z.spinor, (float*)z.spinorNorm, z.stride, z.volume);
   }
   blas_quda_bytes += 6*x.real_length*x.precision;
@@ -1161,7 +1181,7 @@ __device__ void dsadd3(QudaSumFloat3 &c0, QudaSumFloat3 &c1, const QudaSumFloat3
 //
 // double sumCuda(float *a, int n) {}
 //
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) sumF##suffix
 #define REDUCE_TYPES Float *a
 #define REDUCE_PARAMS a
@@ -1174,7 +1194,7 @@ template <typename Float>
 #undef REDUCE_AUXILIARY
 #undef REDUCE_OPERATION
 
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) sumH##suffix
 #define REDUCE_TYPES Float *a, int stride
 #define REDUCE_PARAMS a, stride
@@ -1199,21 +1219,21 @@ double sumCuda(ParitySpinor a) {
   blas_quda_flops += a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
-    return sumFCuda((double*)a.spinor, a.length);
+    return sumFCuda((double*)a.spinor, a.length, 12, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    return sumFCuda((float*)a.spinor, a.length);
+    return sumFCuda((float*)a.spinor, a.length, 12, a.precision);
   } else {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
-    return sumHCuda((char*)0, a.stride, a.volume);
+    return sumHCuda((char*)0, a.stride, a.volume, 12, a.precision);
   }
 }
 
 //
 // double normCuda(float *a, int n) {}
 //
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) normF##suffix
 #define REDUCE_TYPES Float *a
 #define REDUCE_PARAMS a
@@ -1229,7 +1249,7 @@ template <typename Float>
 //
 // double normHCuda(char *, int n) {}
 //
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) normH##suffix
 #define REDUCE_TYPES Float *a, int stride // dummy type
 #define REDUCE_PARAMS a, stride
@@ -1254,14 +1274,14 @@ double normCuda(ParitySpinor a) {
   blas_quda_flops += 2*a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
-    return normFCuda((double*)a.spinor, a.length);
+    return normFCuda((double*)a.spinor, a.length, 13, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    return normFCuda((float*)a.spinor, a.length);
+    return normFCuda((float*)a.spinor, a.length, 13, a.precision);
   } else {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
-    return normHCuda((char*)0, a.stride, a.volume);
+    return normHCuda((char*)0, a.stride, a.volume, 13, a.precision);
   }
 }
 
@@ -1270,7 +1290,7 @@ double normCuda(ParitySpinor a) {
 //
 // double reDotProductFCuda(float *a, float *b, int n) {}
 //
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) reDotProductF##suffix
 #define REDUCE_TYPES Float *a, Float *b
 #define REDUCE_PARAMS a, b
@@ -1286,7 +1306,7 @@ template <typename Float>
 //
 // double reDotProductHCuda(float *a, float *b, int n) {}
 //
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) reDotProductH##suffix
 #define REDUCE_TYPES Float *a, Float *b, int stride
 #define REDUCE_PARAMS a, b, stride
@@ -1313,16 +1333,16 @@ double reDotProductCuda(ParitySpinor a, ParitySpinor b) {
   checkSpinor(a, b);
   blas_quda_bytes += 2*a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
-    return reDotProductFCuda((double*)a.spinor, (double*)b.spinor, a.length);
+    return reDotProductFCuda((double*)a.spinor, (double*)b.spinor, a.length, 14, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    return reDotProductFCuda((float*)a.spinor, (float*)b.spinor, a.length);
+    return reDotProductFCuda((float*)a.spinor, (float*)b.spinor, a.length, 14, a.precision);
   } else {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, b.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, b.spinorNorm, spinor_bytes/12);    
-    return reDotProductHCuda((char*)0, (char*)0, a.stride, a.volume);
+    return reDotProductHCuda((char*)0, (char*)0, a.stride, a.volume, 14, a.precision);
   }
 }
 
@@ -1333,7 +1353,7 @@ double reDotProductCuda(ParitySpinor a, ParitySpinor b) {
 // Second returns the norm of y
 //
 
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) axpyNormF##suffix
 #define REDUCE_TYPES Float a, Float *x, Float *y
 #define REDUCE_PARAMS a, x, y
@@ -1346,7 +1366,7 @@ template <typename Float>
 #undef REDUCE_AUXILIARY
 #undef REDUCE_OPERATION
 
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) axpyNormH##suffix
 #define REDUCE_TYPES Float a, short4 *yH, float *yN, int stride
 #define REDUCE_PARAMS a, yH, yN, stride
@@ -1380,16 +1400,16 @@ double axpyNormCuda(double a, ParitySpinor x, ParitySpinor y) {
   checkSpinor(x,y);
   blas_quda_bytes += 3*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return axpyNormFCuda(a, (double*)x.spinor, (double*)y.spinor, x.length);
+    return axpyNormFCuda(a, (double*)x.spinor, (double*)y.spinor, x.length, 15, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return axpyNormFCuda((float)a, (float*)x.spinor, (float*)y.spinor, x.length);
+    return axpyNormFCuda((float)a, (float*)x.spinor, (float*)y.spinor, x.length, 15, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return axpyNormHCuda((float)a, (short4*)y.spinor, (float*)y.spinorNorm, x.stride, x.volume);
+    return axpyNormHCuda((float)a, (short4*)y.spinor, (float*)y.spinorNorm, x.stride, x.volume, 15, x.precision);
   }
 }
 
@@ -1401,7 +1421,7 @@ double axpyNormCuda(double a, ParitySpinor x, ParitySpinor y) {
 // Second returns the norm of y
 //
 
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) xmyNormF##suffix
 #define REDUCE_TYPES Float *x, Float *y
 #define REDUCE_PARAMS x, y
@@ -1414,7 +1434,7 @@ template <typename Float>
 #undef REDUCE_AUXILIARY
 #undef REDUCE_OPERATION
 
-template <typename Float>
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) xmyNormH##suffix
 #define REDUCE_TYPES Float *d1, Float *d2, short4 *yH, float *yN, int stride
 #define REDUCE_PARAMS d1, d2, yH, yN, stride
@@ -1448,16 +1468,16 @@ double xmyNormCuda(ParitySpinor x, ParitySpinor y) {
   checkSpinor(x,y);
   blas_quda_bytes += 3*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return xmyNormFCuda((double*)x.spinor, (double*)y.spinor, x.length);
+    return xmyNormFCuda((double*)x.spinor, (double*)y.spinor, x.length, 16, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return xmyNormFCuda((float*)x.spinor, (float*)y.spinor, x.length);
+    return xmyNormFCuda((float*)x.spinor, (float*)y.spinor, x.length, 16, x.precision);
   } else { 
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return xmyNormHCuda((char*)0, (char*)0, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    return xmyNormHCuda((char*)0, (char*)0, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume, 16, x.precision);
   }
 }
 
@@ -1465,7 +1485,7 @@ double xmyNormCuda(ParitySpinor x, ParitySpinor y) {
 //
 // double2 cDotProductCuda(float2 *a, float2 *b, int n) {}
 //
-template <typename Float, typename Float2>
+template <int reduce_threads, typename Float, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductF##suffix
 #define REDUCE_TYPES Float2 *a, Float2 *b, Float c
 #define REDUCE_PARAMS a, b, c
@@ -1482,7 +1502,7 @@ template <typename Float, typename Float2>
 #undef REDUCE_REAL_OPERATION
 #undef REDUCE_IMAG_OPERATION
 
-template <typename Float, typename Float2>
+template <int reduce_threads, typename Float, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductH##suffix
 #define REDUCE_TYPES Float2 *a, Float b, int stride
 #define REDUCE_PARAMS a, b, stride
@@ -1522,17 +1542,17 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     char c = 0;
-    return cDotProductFCuda((double2*)x.spinor, (double2*)y.spinor, c, length);
+    return cDotProductFCuda((double2*)x.spinor, (double2*)y.spinor, c, length, 17, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     char c = 0;
-    return cDotProductFCuda((float2*)x.spinor, (float2*)y.spinor, c, length);
+    return cDotProductFCuda((float2*)x.spinor, (float2*)y.spinor, c, length, 17, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductHCuda((char*)0, (char*)0, x.stride, x.volume);
+    return cDotProductHCuda((char*)0, (char*)0, x.stride, x.volume, 17, x.precision);
   }
 }
 
@@ -1543,7 +1563,7 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
 // Second returns complex dot product (z,y)
 //
 
-template <typename Float, typename Float2>
+template <int reduce_threads, typename Float, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) xpaycDotzyF##suffix
 #define REDUCE_TYPES Float2 *x, Float a, Float2 *y, Float2 *z
 #define REDUCE_PARAMS x, a, y, z
@@ -1560,7 +1580,7 @@ template <typename Float, typename Float2>
 #undef REDUCE_REAL_OPERATION
 #undef REDUCE_IMAG_OPERATION
 
-template <typename Float, typename Float2>
+template <int reduce_threads, typename Float, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) xpaycDotzyH##suffix
 #define REDUCE_TYPES Float a, short4 *yH, Float2 *yN, int stride
 #define REDUCE_PARAMS a, yH, yN, stride
@@ -1608,9 +1628,9 @@ double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z)
   int length = x.length/2;
   blas_quda_bytes += 4*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return xpaycDotzyFCuda((double2*)x.spinor, a, (double2*)y.spinor, (double2*)z.spinor, length);
+    return xpaycDotzyFCuda((double2*)x.spinor, a, (double2*)y.spinor, (double2*)z.spinor, length, 18, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return xpaycDotzyFCuda((float2*)x.spinor, (float)a, (float2*)y.spinor, (float2*)z.spinor, length);
+    return xpaycDotzyFCuda((float2*)x.spinor, (float)a, (float2*)y.spinor, (float2*)z.spinor, length, 18, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -1619,7 +1639,7 @@ double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z)
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf3, z.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm3, z.spinorNorm, spinor_bytes/12);    
-    return xpaycDotzyHCuda((float)a, (short4*)y.spinor, (float*)y.spinorNorm, x.stride, x.volume);
+    return xpaycDotzyHCuda((float)a, (short4*)y.spinor, (float*)y.spinorNorm, x.stride, x.volume, 18, x.precision);
   }
 }
 
@@ -1627,7 +1647,7 @@ double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z)
 //
 // double3 cDotProductNormACuda(float2 *a, float2 *b, int n) {}
 //
-template <typename Float2>
+template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormAF##suffix
 #define REDUCE_TYPES Float2 *a, Float2 *b
 #define REDUCE_PARAMS a, b
@@ -1648,7 +1668,7 @@ template <typename Float2>
 #undef REDUCE_Y_OPERATION
 #undef REDUCE_Z_OPERATION
 
-template <typename Float2>
+template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormAH##suffix
 #define REDUCE_TYPES Float2 *a, int stride
 #define REDUCE_PARAMS a, stride
@@ -1698,23 +1718,23 @@ double3 cDotProductNormACuda(ParitySpinor x, ParitySpinor y) {
   int length = x.length/2;
   blas_quda_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return cDotProductNormAFCuda((double2*)x.spinor, (double2*)y.spinor, length);
+    return cDotProductNormAFCuda((double2*)x.spinor, (double2*)y.spinor, length, 19, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return cDotProductNormAFCuda((float2*)x.spinor, (float2*)y.spinor, length);
+    return cDotProductNormAFCuda((float2*)x.spinor, (float2*)y.spinor, length, 19, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductNormAHCuda((char*)0,  x.stride, x.volume);
+    return cDotProductNormAHCuda((char*)0,  x.stride, x.volume, 19, x.precision);
   }
 }
 
 //
 // double3 cDotProductNormBCuda(float2 *a, float2 *b, int n) {}
 //
-template <typename Float2>
+template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormBF##suffix
 #define REDUCE_TYPES Float2 *a, Float2 *b
 #define REDUCE_PARAMS a, b
@@ -1735,7 +1755,7 @@ template <typename Float2>
 #undef REDUCE_Y_OPERATION
 #undef REDUCE_Z_OPERATION
 
-template <typename Float2>
+template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormBH##suffix
 #define REDUCE_TYPES Float2 *a, int stride
 #define REDUCE_PARAMS a, stride
@@ -1785,16 +1805,16 @@ double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
   int length = x.length/2;
   blas_quda_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return cDotProductNormBFCuda((double2*)x.spinor, (double2*)y.spinor, length);
+    return cDotProductNormBFCuda((double2*)x.spinor, (double2*)y.spinor, length, 20, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return cDotProductNormBFCuda((float2*)x.spinor, (float2*)y.spinor, length);
+    return cDotProductNormBFCuda((float2*)x.spinor, (float2*)y.spinor, length, 20, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductNormBHCuda((char*)0, x.stride, x.volume);
+    return cDotProductNormBHCuda((char*)0, x.stride, x.volume, 20, x.precision);
   }
 }
 
@@ -1803,7 +1823,7 @@ double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
 // double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
 // float2 *z, float2 *w, float2 *u, int len)
 //
-template <typename Float2>
+template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYF##suffix
 #define REDUCE_TYPES Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, Float2 *u
 #define REDUCE_PARAMS a, x, b, y, z, w, u
@@ -1840,7 +1860,7 @@ template <typename Float2>
 // double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
 // float2 *z, float2 *w, float2 *u, int len)
 //
-template <typename Float2>
+template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYH##suffix
 #define REDUCE_TYPES Float2 a, Float2 b, short4 *yH, float *yN, short4 *zH, float *zN, int stride
 #define REDUCE_PARAMS a, b, yH, yN, zH, zN, stride
@@ -1913,12 +1933,12 @@ double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b,
   blas_quda_bytes += 7*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return caxpbypzYmbwcDotProductWYNormYFCuda(a, (double2*)x.spinor, b, (double2*)y.spinor, (double2*)z.spinor, 
-					       (double2*)w.spinor, (double2*)u.spinor, length);
+					       (double2*)w.spinor, (double2*)u.spinor, length, 21, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     return caxpbypzYmbwcDotProductWYNormYFCuda(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, (float2*)z.spinor,
-					       (float2*)w.spinor, (float2*)u.spinor, length);
+					       (float2*)w.spinor, (float2*)u.spinor, length, 21, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -1934,7 +1954,7 @@ double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b,
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     return caxpbypzYmbwcDotProductWYNormYHCuda(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, 
-					       (short4*)z.spinor, (float*)z.spinorNorm, y.stride, y.volume);
+					       (short4*)z.spinor, (float*)z.spinorNorm, y.stride, y.volume, 21, x.precision);
   }
 }
 

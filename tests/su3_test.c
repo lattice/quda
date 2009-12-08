@@ -25,7 +25,7 @@ void init() {
   param.blockDim = 64;
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  param.cuda_prec = QUDA_HALF_PRECISION;
   param.reconstruct = QUDA_RECONSTRUCT_12;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;

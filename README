@@ -53,6 +53,15 @@ against lib/libquda.a, and study tests/invert_test.c for an example of
 the interface.  The various inverter options are enumerated in
 include/enum_quda.h.
 
+The lib/blas_quda.cu file contains all of the BLAS like functions
+required for the inverters.  The threads per block and blocks per grid
+parameters are auto-tuned using the blas_test function in quda/tests,
+and the output stored in blas_param.h which is included here.  These
+optimal values may change a function of the CUDA device and the host
+hardware, so re-running blas_test and copying over the output
+blas_param.h and recompiling the blas library may provide extra
+performance.
+
 
 Known issues:
 

@@ -67,7 +67,7 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
 
   gauge_param.ga_pad = 0;
   inv_param.sp_pad = 0;
@@ -123,7 +123,7 @@ void init() {
   construct_spinor_field(spinor, 1, 0, 0, 0, inv_param.cpu_prec);
 
   if (clover_yes) {
-    double norm = 0; // clover components are random numbers in the range (-norm, norm)
+    double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     if (test_type == 2) {

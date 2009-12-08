@@ -29,8 +29,8 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
 
   ParitySpinor p = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
   ParitySpinor v = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
-  ParitySpinor t = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
   ParitySpinor tmp = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
+  ParitySpinor t = allocateParitySpinor(x.X, invert_param->cuda_prec_sloppy, x.pad);
 
   ParitySpinor x_sloppy, r_sloppy, r0;
   if (invert_param->cuda_prec_sloppy == x.precision) {
@@ -46,6 +46,14 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
 
   zeroCuda(x_sloppy);
   copyCuda(r_sloppy, b);
+
+  /*{
+  cuDoubleComplex rv;
+  MatVec(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, r_sloppy, invert_param, tmp, dag_type);
+  // rv = (r0,v)
+  rv = cDotProductCuda(r0, v);    
+  printf("%e %e %e %e %e\n", rv.x, rv.y, normCuda(r_sloppy), normCuda(v), normCuda(tmp)); exit(0);
+  } */
 
   zeroCuda(y);
 
@@ -101,8 +109,8 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     
     MatVec(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param, tmp, dag_type);
     // rv = (r0,v)
-    rv = cDotProductCuda(r0, v);
-    
+    rv = cDotProductCuda(r0, v);    
+
     alpha = cuCdiv(rho, rv);
     
     // r -= alpha*v
@@ -119,7 +127,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
     rho_r2 = caxpbypzYmbwcDotProductWYNormYQuda(alpha, p, omega, r_sloppy, x_sloppy, t, r0);
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
-    
+
     // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;

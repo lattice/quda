@@ -8,9 +8,17 @@
 #include <test_util.h>
 
 QudaPrecision cuda_prec;
-ParitySpinor x, y, z, w, v;
+QudaPrecision other_precision;   // Used for copy benchmark
+ParitySpinor x, y, z, w, v, p;
 
 int nIters;
+
+int Nthreads = 3;
+int Ngrids = 5;
+int blockSizes[] = {64, 128, 256};
+int gridSizes[] = {64, 128, 256, 512, 1024, 2048};
+
+int prec;
 
 void init() {
 
@@ -19,13 +27,24 @@ void init() {
   X[0] = 24;
   X[1] = 24;
   X[2] = 24;
-  X[3] = 64;
+  X[3] = 24;
 
-  cuda_prec = QUDA_HALF_PRECISION;
   int sp_pad = 0;
 
-  int dev = 0;
-  initQuda(dev);
+  switch(prec) {
+  case 0:
+    cuda_prec = QUDA_HALF_PRECISION;
+    other_prec = QUDA_SINGLE_PRECISION;
+    break;
+  case 1:
+    cuda_prec = QUDA_SINGLE_PRECISION;
+    other_prec = QUDA_HALF_PRECISION;
+    break;
+  case 2:
+    cuda_prec = QUDA_DOUBLE_PRECISION;
+    other_prec = QUDA_HALF_PRECISION;
+    break;
+  }
 
   // need single parity dimensions
   X[0] /= 2;
@@ -34,17 +53,17 @@ void init() {
   x = allocateParitySpinor(X, cuda_prec, sp_pad);
   y = allocateParitySpinor(X, cuda_prec, sp_pad);
   z = allocateParitySpinor(X, cuda_prec, sp_pad);
-
+  p = allocateParitySpinor(X, other_precision, sp_pad);
 }
 
 void end() {
   // release memory
+  freeParitySpinor(p);
   freeParitySpinor(v);
   freeParitySpinor(w);
   freeParitySpinor(x);
   freeParitySpinor(y);
   freeParitySpinor(z);
-  endQuda();
 }
 
 double benchmark(int kernel) {
@@ -61,89 +80,93 @@ double benchmark(int kernel) {
     switch (kernel) {
 
     case 0:
-      axpbyCuda(a, x, b, y);
+      copyCuda(y, p);
       break;
 
     case 1:
-      xpyCuda(x, y);
+      axpbyCuda(a, x, b, y);
       break;
 
     case 2:
-      axpyCuda(a, x, y);
+      xpyCuda(x, y);
       break;
 
     case 3:
-      xpayCuda(x, a, y);
+      axpyCuda(a, x, y);
       break;
 
     case 4:
-      mxpyCuda(x, y);
+      xpayCuda(x, a, y);
       break;
 
     case 5:
-      axCuda(a, x);
+      mxpyCuda(x, y);
       break;
 
     case 6:
-      caxpyCuda(a2, x, y);
+      axCuda(a, x);
       break;
 
     case 7:
-      caxpbyCuda(a2, x, b2, y);
+      caxpyCuda(a2, x, y);
       break;
 
     case 8:
-      cxpaypbzCuda(x, a2, y, b2, z);
+      caxpbyCuda(a2, x, b2, y);
       break;
 
     case 9:
-      axpyZpbxCuda(a, x, y, z, b);
+      cxpaypbzCuda(x, a2, y, b2, z);
       break;
 
     case 10:
+      axpyZpbxCuda(a, x, y, z, b);
+      break;
+
+    case 11:
       caxpbypzYmbwCuda(a2, x, b2, y, z, w);
       break;
       
       // double
-    case 11:
+    case 12:
       sumCuda(x);
       break;
 
-    case 12:
+    case 13:
       normCuda(x);
       break;
 
-    case 13:
+    case 14:
       reDotProductCuda(x, y);
       break;
 
-    case 14:
+    case 15:
       axpyNormCuda(a, x, y);
       break;
 
-    case 15:
+    case 16:
       xmyNormCuda(x, y);
       break;
       
       // double2
-    case 16:
+    case 17:
       cDotProductCuda(x, y);
       break;
 
-    case 17:
+    case 18:
       xpaycDotzyCuda(x, a, y, z);
       break;
       
       // double3
-    case 18:
+    case 19:
       cDotProductNormACuda(x, y);
       break;
 
-    case 19:
+    case 20:
       cDotProductNormBCuda(x, y);
       break;
 
-    case 20:
+    case 21:
       caxpbypzYmbwcDotProductWYNormYQuda(a2, x, b2, y, z, w, v);
       break;
       
@@ -163,58 +186,95 @@ double benchmark(int kernel) {
 
 
 int main(int argc, char** argv) {
-  init();
+  int dev = 0;
+  initQuda(dev);
 
-  int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+  int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21};
   char names[][100] = {
-      "axpbyCuda:                          ",
-      "xpyCuda:                            ",
-      "axpyCuda:                           ",
-      "xpayCuda:                           ",
-      "mxpyCuda:                           ",
-      "axCuda:                             ",
-      "caxpyCuda:                          ",
-      "caxpbyCuda:                         ",
-      "cxpaypbzCuda:                       ",
-      "axpyZpbxCuda:                       ",
-      "caxpbypzYmbwCuda:                   ",
-      "sumCuda:                            ",
-      "normCuda:                           ",
-      "reDotProductCuda:                   ",
-      "axpyNormCuda:                       ",
-      "xmyNormCuda:                        ",
-      "cDotProductCuda:                    ",
-      "xpaycDotzyCuda:                     ",
-      "cDotProductNormACuda:               ",
-      "cDotProductNormBCuda:               ",
-      "caxpbypzYmbwcDotProductWYNormYQuda: "
+    "copyCuda                           ",
+    "axpbyCuda                          ",
+    "xpyCuda                            ",
+    "axpyCuda                           ",
+    "xpayCuda                           ",
+    "mxpyCuda                           ",
+    "axCuda                             ",
+    "caxpyCuda                          ",
+    "caxpbyCuda                         ",
+    "cxpaypbzCuda                       ",
+    "axpyZpbxCuda                       ",
+    "caxpbypzYmbwCuda                   ",
+    "sumCuda                            ",
+    "normCuda                           ",
+    "reDotProductCuda                   ",
+    "axpyNormCuda                       ",
+    "xmyNormCuda                        ",
+    "cDotProductCuda                    ",
+    "xpaycDotzyCuda                     ",
+    "cDotProductNormACuda               ",
+    "cDotProductNormBCuda               ",
+    "caxpbypzYmbwcDotProductWYNormYQuda "
   };
 
-  nIters = 1;
-  // first do warmup run
-  for (int i = 0; i <= 20; i++) {
-    benchmark(kernels[i]);
-  }
+  FILE *blas_out = fopen("blas_param.h", "w");
+  fprintf(blas_out, "/*\n     Auto-tuned blas CUDA parameters, generated by blas_test\n*/\n");
+      
+  for (prec = 0; prec<3; prec++) {
 
-  char filename[100];
-  sprintf(filename, "%d_blas.dat", cuda_prec);
-  FILE *blas_out = fopen(filename, "w");
+    init();
 
-  nIters = 300;
-  for (int i = 0; i <= 20; i++) {
-    blas_quda_flops = 0;
-    blas_quda_bytes = 0;
-    double secs = benchmark(kernels[i]);
-    double flops = blas_quda_flops;
-    double bytes = blas_quda_bytes;
-    printf("%s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
-	   names[i], secs, flops, (flops*1e-9)/(secs), bytes/(secs*(1<<30)));
-    fprintf(blas_out, "%s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
-	   names[i], secs, flops, (flops*1e-9)/(secs), bytes/(secs*(1<<30)));
-    //printf("Bandwidth:    %f GiB/s\n\n", GiB / secs);
+    printf("\nBenchmarking %d bit precision\n", (int)(pow(2.0,prec)*16));
+
+    for (int i = 0; i <= 21; i++) {
+      double gflops_max = 0.0;
+      double gbytes_max = 0.0;
+      int threads_max = 0; 
+      int blocks_max = 0;
+      for (int thread=0; thread<Nthreads; thread++) {
+	blas_threads[prec][i] = blockSizes[thread];
+	for (int grid=0; grid<Ngrids; grid++) {
+	  blas_blocks[prec][i] = gridSizes[grid];
+
+	  // first do warmup run
+	  nIters = 1;
+	  benchmark(kernels[i]);
+	  
+	  nIters = 300;
+	  blas_quda_flops = 0;
+	  blas_quda_bytes = 0;
+	  
+	  double secs = benchmark(kernels[i]);
+	  double flops = blas_quda_flops;
+	  double bytes = blas_quda_bytes;
+	  
+	  double gflops = (flops*1e-9)/(secs);
+	  double gbytes = bytes/(secs*(1<<30));
+	  
+	  if (gbytes > gbytes_max && gbytes < 300) { // prevents selection of failed parameters
+	    gflops_max = gflops;
+	    gbytes_max = gbytes;
+	    threads_max = blockSizes[thread];
+	    blocks_max = gridSizes[grid];
+	  }
+	  
+	  //printf("%d %d %s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
+	  // blockSizes[thread], gridSizes[grid], names[i], secs, flops, gflops, gbytes);
+	}
+      }
+      
+      printf("%s Performance maximum at %d threads per block, %d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
+	     names[i], threads_max, blocks_max, gflops_max, gbytes_max);
+
+      fprintf(blas_out, "// Kernel: %s\n", names[i]);
+      fprintf(blas_out, "blas_threads[%d][%d] = %d;\n", prec, i, threads_max);
+      fprintf(blas_out, "blas_blocks[%d][%d] = %d;\n\n", prec, i, blocks_max);
+    }
+
+    end();
   }
 
   fclose(blas_out);
+
+  endQuda();
 }
 
 

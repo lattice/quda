@@ -1,6 +1,7 @@
 
 Version 0.x
 
+- Add auto-tuning blas to improve performance (see README for details)
 - Introduced new interface functions newQudaGaugeParam() and
   newQudaInvertParam() to allow for enhanced error checking.  See
   invert_test for an example of their use.

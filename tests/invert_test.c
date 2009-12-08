@@ -42,13 +42,13 @@ int main(int argc, char **argv)
   } else {
     inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
-  inv_param.inv_type = QUDA_CG_INVERTER;
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
   double mass = -0.94;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
-  inv_param.tol = 5e-7;
-  inv_param.maxiter = 10000;
-  inv_param.reliable_delta = 1e-3;
+  inv_param.tol = 5e-8;
+  inv_param.maxiter = 1000;
+  inv_param.reliable_delta = 1e-2;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -66,8 +66,8 @@ int main(int argc, char **argv)
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
-    inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
   construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
 
   if (clover_yes) {
-    double norm = 0.2; // clover components are random numbers in the range (-norm, norm)
+    double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

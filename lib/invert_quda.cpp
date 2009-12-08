@@ -18,10 +18,13 @@ FullClover cudaCloverSloppy;
 FullClover cudaCloverInvPrecise; // inverted clover term
 FullClover cudaCloverInvSloppy;
 
+void initBlas();
+
 // define newQudaGaugeParam() and newQudaInvertParam()
 #define INIT_PARAM
 #include "check_params.h"
 #undef INIT_PARAM
+>>>>>>> .r585
 
 // define (static) checkGaugeParam() and checkInvertParam()
 #define CHECK_PARAM
@@ -88,6 +91,8 @@ void initQuda(int dev)
 
   cudaCloverInvSloppy.even.clover = NULL;
   cudaCloverInvSloppy.odd.clover = NULL;
+
+  initBlas();
 }
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
@@ -204,6 +209,7 @@ void endQuda(void)
   if (cudaCloverSloppy.even.clover) freeCloverField(&cudaCloverSloppy);
   if (cudaCloverInvPrecise.even.clover) freeCloverField(&cudaCloverInvPrecise);
   if (cudaCloverInvSloppy.even.clover) freeCloverField(&cudaCloverInvSloppy);
+  endBlas();
 }
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger)

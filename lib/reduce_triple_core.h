@@ -6,8 +6,8 @@
 
 __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, unsigned int n) {
   unsigned int tid = threadIdx.x;
-  unsigned int i = blockIdx.x*(REDUCE_THREADS) + threadIdx.x;
-  unsigned int gridSize = REDUCE_THREADS*gridDim.x;
+  unsigned int i = blockIdx.x*(reduce_threads) + threadIdx.x;
+  unsigned int gridSize = reduce_threads*gridDim.x;
     
   QudaSumFloat acc0 = 0;
   QudaSumFloat acc1 = 0;
@@ -37,15 +37,17 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
     
   __syncthreads();
     
-  if (REDUCE_THREADS >= 256) { if (tid < 128) { DSACC3(s[0],s[1],s[256+0],s[256+1]); } __syncthreads(); }
-  if (REDUCE_THREADS >= 128) { if (tid <  64) { DSACC3(s[0],s[1],s[128+0],s[128+1]); } __syncthreads(); }    
+  if (reduce_threads >= 1024) { if (tid < 512) { DSACC3(s[0],s[1],s[1024+0],s[1024+1]); } __syncthreads(); }
+  if (reduce_threads >= 512) { if (tid < 256) { DSACC3(s[0],s[1],s[512+0],s[512+1]); } __syncthreads(); }    
+  if (reduce_threads >= 256) { if (tid < 128) { DSACC3(s[0],s[1],s[256+0],s[256+1]); } __syncthreads(); }
+  if (reduce_threads >= 128) { if (tid <  64) { DSACC3(s[0],s[1],s[128+0],s[128+1]); } __syncthreads(); }    
   if (tid < 32) {
-    if (REDUCE_THREADS >=  64) { DSACC3(s[0],s[1],s[64+0],s[64+1]); }
-    if (REDUCE_THREADS >=  32) { DSACC3(s[0],s[1],s[32+0],s[32+1]); }
-    if (REDUCE_THREADS >=  16) { DSACC3(s[0],s[1],s[16+0],s[16+1]); }
-    if (REDUCE_THREADS >=   8) { DSACC3(s[0],s[1], s[8+0], s[8+1]); }
-    if (REDUCE_THREADS >=   4) { DSACC3(s[0],s[1], s[4+0], s[4+1]); }
-    if (REDUCE_THREADS >=   2) { DSACC3(s[0],s[1], s[2+0], s[2+1]); }
+    if (reduce_threads >=  64) { DSACC3(s[0],s[1],s[64+0],s[64+1]); }
+    if (reduce_threads >=  32) { DSACC3(s[0],s[1],s[32+0],s[32+1]); }
+    if (reduce_threads >=  16) { DSACC3(s[0],s[1],s[16+0],s[16+1]); }
+    if (reduce_threads >=   8) { DSACC3(s[0],s[1], s[8+0], s[8+1]); }
+    if (reduce_threads >=   4) { DSACC3(s[0],s[1], s[4+0], s[4+1]); }
+    if (reduce_threads >=   2) { DSACC3(s[0],s[1], s[2+0], s[2+1]); }
   }
     
   // write result for this block to global mem as single QudaSumFloat3
@@ -60,8 +62,8 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
 
 __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, unsigned int n) {
   unsigned int tid = threadIdx.x;
-  unsigned int i = blockIdx.x*REDUCE_THREADS + threadIdx.x;
-  unsigned int gridSize = REDUCE_THREADS*gridDim.x;
+  unsigned int i = blockIdx.x*reduce_threads + threadIdx.x;
+  unsigned int gridSize = reduce_threads*gridDim.x;
 
   extern __shared__ QudaSumFloat3 tdata[];
   QudaSumFloat3 *s = tdata + tid;
@@ -81,18 +83,22 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
   __syncthreads();
 
   // do reduction in shared mem
-  if (REDUCE_THREADS >= 256) 
+  if (reduce_threads >= 1024) 
+    { if (tid < 512) { s[0].x += s[512].x; s[0].y += s[512].y; s[0].z += s[512].z; } __syncthreads(); }
+  if (reduce_threads >= 512) 
+    { if (tid < 256) { s[0].x += s[256].x; s[0].y += s[256].y; s[0].z += s[256].z; } __syncthreads(); }
+  if (reduce_threads >= 256) 
     { if (tid < 128) { s[0].x += s[128].x; s[0].y += s[128].y; s[0].z += s[128].z; } __syncthreads(); }
-  if (REDUCE_THREADS >= 128) 
+  if (reduce_threads >= 128) 
     { if (tid <  64) { s[0].x += s[ 64].x; s[0].y += s[ 64].y; s[0].z += s[ 64].z; } __syncthreads(); }
     
   if (tid < 32) {
-    if (REDUCE_THREADS >=  64) { s[0].x += s[32].x; s[0].y += s[32].y; s[0].z += s[32].z; }
-    if (REDUCE_THREADS >=  32) { s[0].x += s[16].x; s[0].y += s[16].y; s[0].z += s[16].z; }
-    if (REDUCE_THREADS >=  16) { s[0].x += s[ 8].x; s[0].y += s[ 8].y; s[0].z += s[ 8].z; }
-    if (REDUCE_THREADS >=   8) { s[0].x += s[ 4].x; s[0].y += s[ 4].y; s[0].z += s[ 4].z; }
-    if (REDUCE_THREADS >=   4) { s[0].x += s[ 2].x; s[0].y += s[ 2].y; s[0].z += s[ 2].z; }
-    if (REDUCE_THREADS >=   2) { s[0].x += s[ 1].x; s[0].y += s[ 1].y; s[0].z += s[ 1].z; }
+    if (reduce_threads >=  64) { s[0].x += s[32].x; s[0].y += s[32].y; s[0].z += s[32].z; }
+    if (reduce_threads >=  32) { s[0].x += s[16].x; s[0].y += s[16].y; s[0].z += s[16].z; }
+    if (reduce_threads >=  16) { s[0].x += s[ 8].x; s[0].y += s[ 8].y; s[0].z += s[ 8].z; }
+    if (reduce_threads >=   8) { s[0].x += s[ 4].x; s[0].y += s[ 4].y; s[0].z += s[ 4].z; }
+    if (reduce_threads >=   4) { s[0].x += s[ 2].x; s[0].y += s[ 2].y; s[0].z += s[ 2].z; }
+    if (reduce_threads >=   2) { s[0].x += s[ 1].x; s[0].y += s[ 1].y; s[0].z += s[ 1].z; }
   }
     
   // write result for this block to global mem 
@@ -106,28 +112,43 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
 #endif
 
 template <typename Float2>
-double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
-  if (n % REDUCE_THREADS != 0) {
-    printf("ERROR reduceCuda(): length %d must be a multiple of %d\n", n, REDUCE_THREADS);
+double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision precision) {
+
+  setBlock(kernel, n, precision);
+  
+  if (n % blasBlock.x != 0) {
+    printf("ERROR reduce_triple_core: length %d must be a multiple of %d\n", n, blasBlock.x);
     exit(-1);
   }
   
-  // allocate arrays on device and host to store one QudaSumFloat3 for each block
-  int blocks = min(REDUCE_MAX_BLOCKS, n / REDUCE_THREADS);
-  initReduceFloat3(blocks);
+  if (blasBlock.x > REDUCE_MAX_BLOCKS) {
+    printf("ERROR reduce_triple_core: block size greater then maximum permitted\n");
+    exit(-1);
+  }
   
-  // partial reduction; each block generates one number
-  dim3 dimBlock(REDUCE_THREADS, 1, 1);
-  dim3 dimGrid(blocks, 1, 1);
 #if (REDUCE_TYPE == REDUCE_KAHAN)
-  int smemSize = REDUCE_THREADS * 2 * sizeof(QudaSumFloat3);
+  int smemSize = blasBlock.x * 2 * sizeof(QudaSumFloat3);
 #else
-  int smemSize = REDUCE_THREADS * sizeof(QudaSumFloat3);
+  int smemSize = blasBlock.x * sizeof(QudaSumFloat3);
 #endif
-  REDUCE_FUNC_NAME(Kernel)<<< dimGrid, dimBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
-  
+
+  if (blasBlock.x == 64) {
+    REDUCE_FUNC_NAME(Kernel)<64><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
+  } else if (blasBlock.x == 128) {
+    REDUCE_FUNC_NAME(Kernel)<128><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
+  } else if (blasBlock.x == 256) {
+    REDUCE_FUNC_NAME(Kernel)<256><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
+  } else if (blasBlock.x == 512) {
+    REDUCE_FUNC_NAME(Kernel)<512><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
+  } else if (blasBlock.x == 1024) {
+    REDUCE_FUNC_NAME(Kernel)<1024><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
+  } else {
+    printf("Reduction not implemented for %d threads\n", blasBlock.x);
+    exit(-1);
+  }
+
   // copy result from device to host, and perform final reduction on CPU
-  cudaError_t error =   cudaMemcpy(h_reduceFloat3, d_reduceFloat3, blocks*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
+  cudaError_t error = cudaMemcpy(h_reduceFloat3, d_reduceFloat3, blasGrid.x*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
   if (error != cudaSuccess) {
     printf("Error: %s\n", cudaGetErrorString(error));
     exit(-1);
@@ -137,7 +158,7 @@ double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n) {
   gpu_result.x = 0;
   gpu_result.y = 0;
   gpu_result.z = 0;
-  for (int i = 0; i < blocks; i++) {
+  for (int i = 0; i < blasGrid.x; i++) {
     gpu_result.x += h_reduceFloat3[i].x;
     gpu_result.y += h_reduceFloat3[i].y;
     gpu_result.z += h_reduceFloat3[i].z;
