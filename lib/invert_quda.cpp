@@ -92,21 +92,19 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  gauge_param = param;
+  checkGaugeParam(param);
 
-  checkGaugeParam(gauge_param);
+  param->packed_size = (param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
-  gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
-
-  createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->cuda_prec, gauge_param->reconstruct, 
-		   gauge_param->t_boundary, gauge_param->X, gauge_param->anisotropy, gauge_param->ga_pad);
-  gauge_param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
-  if (gauge_param->cuda_prec_sloppy != gauge_param->cuda_prec ||
-      gauge_param->reconstruct_sloppy != gauge_param->reconstruct) {
-    createGaugeField(&cudaGaugeSloppy, h_gauge, gauge_param->cuda_prec_sloppy, 
-		     gauge_param->reconstruct_sloppy, gauge_param->t_boundary,
-		     gauge_param->X, gauge_param->anisotropy, gauge_param->ga_pad);
-    gauge_param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
+  createGaugeField(&cudaGaugePrecise, h_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
+		   param->t_boundary, param->X, param->anisotropy, param->ga_pad);
+  param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
+  if (param->cuda_prec_sloppy != param->cuda_prec ||
+      param->reconstruct_sloppy != param->reconstruct) {
+    createGaugeField(&cudaGaugeSloppy, h_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
+		     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
+		     param->X, param->anisotropy, param->ga_pad);
+    param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
   }
@@ -114,16 +112,15 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 /*
   Very limited functionailty here
-  - currently assumes that the precision of the cpu field is the same as before
   - no ability to dump the sloppy gauge field
   - really exposes how crap the current api is
 */
-void saveGaugeQuda(void *h_gauge)
+void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  restoreGaugeField(h_gauge, &cudaGaugePrecise);
+  restoreGaugeField(h_gauge, &cudaGaugePrecise, param->cpu_prec, param->gauge_order);
 }
 
-void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
+void loadCloverQuda(void *h_clover, void *h_clovinv, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
   if (!h_clover && !h_clovinv) {
     printf("QUDA error: loadCloverQuda() called with neither clover term nor inverse\n");
@@ -220,7 +217,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
 
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
     parity = (parity+1)%2;
-    axCuda(gauge_param->anisotropy, in);
+    axCuda(cudaGaugePrecise.anisotropy, in);
   }
 
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {

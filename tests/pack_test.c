@@ -53,7 +53,6 @@ void init() {
   param.anisotropy = 2.3;
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param = &param;
 
   int sp_pad = 256;
 
@@ -101,25 +100,25 @@ void packTest() {
   
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, cpsGauge, param.cuda_prec, param.reconstruct, 
-		   param.t_boundary, param.X, param.ga_pad, 1.0);
+  createGaugeField(&cudaGaugePrecise, cpsGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
+		   param.gauge_fix, param.t_boundary, param.X, param.ga_pad, 1.0);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
   stopwatchStart();
-  restoreGaugeField(cpsGauge, &cudaGaugePrecise);
+  restoreGaugeField(cpsGauge, &cudaGaugePrecise, param.cpu_prec, param.gauge_order);
   double cpsGRtime = stopwatchReadSeconds();
   printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
 
   stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, qdpGauge, param.cuda_prec, param.reconstruct, 
-		   param.t_boundary, param.X, param.ga_pad, 1.0);
+  createGaugeField(&cudaGaugePrecise, qdpGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
+		   param.gauge_fix, param.t_boundary, param.X, param.ga_pad, 1.0);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 
   stopwatchStart();
-  restoreGaugeField(qdpGauge, &cudaGaugePrecise);
+  restoreGaugeField(qdpGauge, &cudaGaugePrecise, param.cpu_prec, param.gauge_order);
   double qdpGRtime = stopwatchReadSeconds();
   printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
 

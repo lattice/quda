@@ -15,25 +15,25 @@ int main(int argc, char **argv)
 
   void *gauge[4], *clover_inv;
 
-  QudaGaugeParam Gauge_param = newQudaGaugeParam();
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  Gauge_param.X[0] = 24;
-  Gauge_param.X[1] = 24;
-  Gauge_param.X[2] = 24;
-  Gauge_param.X[3] = 64;
-  setDims(Gauge_param.X);
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 64;
+  setDims(gauge_param.X);
 
-  Gauge_param.anisotropy = 1.0;
-  Gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  Gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.anisotropy = 1.0;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
-  Gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  Gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  Gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  Gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  Gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
-  Gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
+  gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   int clover_yes = 0; // 0 for plain Wilson, 1 for clover
   
@@ -45,7 +45,7 @@ int main(int argc, char **argv)
   inv_param.inv_type = QUDA_CG_INVERTER;
 
   double mass = -0.94;
-  inv_param.kappa = 1.0 / (2.0*(1 + 3/Gauge_param.anisotropy + mass));
+  inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.tol = 5e-7;
   inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-3;
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  Gauge_param.ga_pad = 24*24*24;
+  gauge_param.ga_pad = 24*24*24;
   inv_param.sp_pad = 24*24*24;
   inv_param.cl_pad = 24*24*24;
 
@@ -72,13 +72,13 @@ int main(int argc, char **argv)
   }
   inv_param.verbosity = QUDA_VERBOSE;
 
-  size_t gSize = (Gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
-  construct_gauge_field(gauge, 1, Gauge_param.cpu_prec, &Gauge_param);
+  construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
 
   if (clover_yes) {
     double norm = 0.2; // clover components are random numbers in the range (-norm, norm)
@@ -101,8 +101,8 @@ int main(int argc, char **argv)
   double time0 = -((double)clock()); // Start the timer
 
   initQuda(device);
-  loadGaugeQuda((void*)gauge, &Gauge_param);
-  if (clover_yes) loadCloverQuda(NULL, clover_inv, &inv_param);
+  loadGaugeQuda((void*)gauge, &gauge_param);
+  if (clover_yes) loadCloverQuda(NULL, clover_inv, &gauge_param, &inv_param);
 
   invertQuda(spinorOut, spinorIn, &inv_param);
 
@@ -110,12 +110,12 @@ int main(int argc, char **argv)
   time0 /= CLOCKS_PER_SEC;
 
   printf("Cuda Space Required:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
-	 inv_param.spinorGiB, Gauge_param.gaugeGiB);
+	 inv_param.spinorGiB, gauge_param.gaugeGiB);
   if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
   printf("\nDone: %i iter / %g secs = %g gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
-  mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, Gauge_param.cpu_prec);
+  mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
   if  (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
     ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
 

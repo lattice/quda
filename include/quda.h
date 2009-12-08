@@ -82,9 +82,9 @@ extern "C" {
 
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
-  void saveGaugeQuda(void *h_gauge);
-  void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param);
-  // void discardCloverQuda(QudaInvertParam *inv_param);
+  void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+  void loadCloverQuda(void *h_clover, void *h_clovinv, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger);

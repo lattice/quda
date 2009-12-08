@@ -49,6 +49,8 @@ extern "C" {
     int X[4]; // the geometric lengths (single parity)
     int Nc; // number of colors
     ReconstructType reconstruct;
+    GaugeFixed gauge_fixed;
+    Tboundary t_boundary;
     ParityGauge odd;
     ParityGauge even;
     double anisotropy;

@@ -8,13 +8,13 @@
 extern "C" {
 #endif
 
-  void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision precision, 
-			ReconstructType reconstruct, Tboundary t_boundary,
-			int *X, double anisotropy, int pad);
+  void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision cuda_prec, Precision cpu_prec,
+			GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
+			Tboundary t_boundary, int *XX, double anisotropy, int pad);
 
-  void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge);
+  void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, Precision cpu_prec, GaugeFieldOrder gauge_order);
 
-  void freeGaugeField(FullGauge *cudaCauge);
+  void freeGaugeField(FullGauge *cudaGauge);
   
 #ifdef __cplusplus
 }

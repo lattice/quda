@@ -18,8 +18,6 @@ extern "C" {
   extern FullClover cudaCloverInvPrecise;
   extern FullClover cudaCloverInvSloppy;
 
-  extern QudaGaugeParam *gauge_param;
-
 // ---------- dslash_quda.cu ----------
 
   int dslashCudaSharedBytes(Precision spinor_prec, int blockDim);

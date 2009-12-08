@@ -7,8 +7,6 @@
 #include<dslash_textures.h>
 #include<dslash_constants.h>
 
-QudaGaugeParam *gauge_param;
-
 unsigned long long dslash_quda_flops;
 unsigned long long dslash_quda_bytes;
 
@@ -106,18 +104,18 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   int X4X3X2X1hmX3X2X1h = (X4-1)*X3*X2*X1h;
   cudaMemcpyToSymbol("X4X3X2X1hmX3X2X1h", &X4X3X2X1hmX3X2X1h, sizeof(int));  
 
-  int gf = (gauge_param->gauge_fix == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
+  int gf = (gauge.gauge_fixed == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
   cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
 
-  cudaMemcpyToSymbol("anisotropy", &(gauge_param->anisotropy), sizeof(double));
+  cudaMemcpyToSymbol("anisotropy", &(gauge.anisotropy), sizeof(double));
 
-  double t_bc = (gauge_param->t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+  double t_bc = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary", &(t_bc), sizeof(double));
 
-  float anisotropy_f = gauge_param->anisotropy;
+  float anisotropy_f = gauge.anisotropy;
   cudaMemcpyToSymbol("anisotropy_f", &(anisotropy_f), sizeof(float));
 
-  float t_bc_f = (gauge_param->t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+  float t_bc_f = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary_f", &(t_bc_f), sizeof(float));
 
   float h_pi_f = M_PI;
