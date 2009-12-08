@@ -75,8 +75,9 @@ For help or to report a bug, please contact Mike Clark
 
 If you find this code useful in your work, please cite:
 
-M. A. Clark et al., "Solving Lattice QCD systems of equations using mixed
-precision solvers on GPUs" (2009), arXiv:0911.3191 [hep-lat].
+M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
+Lattice QCD systems of equations using mixed precision solvers on
+GPUs" (2009), arXiv:0911.3191 [hep-lat].
 
 Please also drop us a note so that we can inform you of updates and
 bug-fixes.  The most recent public release will always be available

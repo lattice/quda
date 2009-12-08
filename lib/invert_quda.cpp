@@ -18,54 +18,23 @@ FullClover cudaCloverSloppy;
 FullClover cudaCloverInvPrecise; // inverted clover term
 FullClover cudaCloverInvSloppy;
 
-void printGaugeParam(QudaGaugeParam *param) {
+// define newQudaGaugeParam() and newQudaInvertParam()
+#define INIT_PARAM
+#include "check_params.h"
+#undef INIT_PARAM
 
-  printf("Gauge Params:\n");
-  for (int d=0; d<4; d++) {
-    printf("X[%d] = %d\n", d, param->X[d]);
-  }
-  printf("anisotropy = %e\n", param->anisotropy);
-  printf("gauge_order = %d\n", param->gauge_order);
-  printf("cpu_prec = %d\n", param->cpu_prec);
-  printf("cuda_prec = %d\n", param->cuda_prec);
-  printf("reconstruct = %d\n", param->reconstruct);
-  printf("cuda_prec_sloppy = %d\n", param->cuda_prec_sloppy);
-  printf("reconstruct_sloppy = %d\n", param->reconstruct_sloppy);
-  printf("gauge_fix = %d\n", param->gauge_fix);
-  printf("t_boundary = %d\n", param->t_boundary);
-  printf("packed_size = %d\n", param->packed_size);
-  printf("gaugeGiB = %e\n", param->gaugeGiB);
-}
+// define (static) checkGaugeParam() and checkInvertParam()
+#define CHECK_PARAM
+#include "check_params.h"
+#undef CHECK_PARAM
 
-void printInvertParam(QudaInvertParam *param) {
-  printf("kappa = %e\n", param->kappa);
-  printf("mass_normalization = %d\n", param->mass_normalization);
-  printf("dslash_type = %d\n", param->dslash_type);
-  printf("inv_type = %d\n", param->inv_type);
-  printf("tol = %e\n", param->tol);
-  printf("iter = %d\n", param->iter);
-  printf("maxiter = %d\n", param->maxiter);
-  printf("matpc_type = %d\n", param->matpc_type);
-  printf("solution_type = %d\n", param->solution_type);
-  printf("preserve_source = %d\n", param->preserve_source);
-  printf("cpu_prec = %d\n", param->cpu_prec);
-  printf("cuda_prec = %d\n", param->cuda_prec);
-  printf("cuda_prec_sloppy = %d\n", param->cuda_prec_sloppy);
-  printf("dirac_order = %d\n", param->dirac_order);
-  printf("spinorGiB = %e\n", param->spinorGiB);
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    printf("clover_cpu_prec = %d\n", param->clover_cpu_prec);
-    printf("clover_cuda_prec = %d\n", param->clover_cuda_prec);
-    printf("clover_cuda_prec_sloppy = %d\n", param->clover_cuda_prec_sloppy);
-    printf("clover_order = %d\n", param->clover_order);
-    printf("cloverGiB = %e\n", param->cloverGiB);
-  }
-  printf("gflops = %e\n", param->gflops);
-  printf("secs = %f\n", param->secs);
-  printf("verbosity = %d\n", param->verbosity);
-}
+// define printQudaGaugeParam() and printQudaInvertParam()
+#define PRINT_PARAM
+#include "check_params.h"
+#undef PRINT_PARAM
 
-static void checkPrecision(QudaPrecision precision) {
+static void checkPrecision(QudaPrecision precision)
+{
   if (precision == QUDA_HALF_PRECISION) {
     printf("Half precision not supported on cpu\n");
     exit(-1);
@@ -125,6 +94,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   gauge_param = param;
 
+  checkGaugeParam(gauge_param);
+
   gauge_param->packed_size = (gauge_param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
   createGaugeField(&cudaGaugePrecise, h_gauge, gauge_param->cuda_prec, gauge_param->reconstruct, 
@@ -160,6 +131,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
     printf("QUDA error: half precision not supported on CPU\n");
+    exit(-1);
+  }
+  if (cudaGaugePrecise.even == NULL) {
+    printf("QUDA error: gauge field must be loaded before clover\n");
+    exit(-1);
+  }
+  if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
+    printf("QUDA error: wrong dslash_type in loadCloverQuda()\n");
     exit(-1);
   }
 
@@ -206,6 +185,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 }
 
+#if 0
 // discard clover term but keep the inverse
 void discardCloverQuda(QudaInvertParam *inv_param)
 {
@@ -216,6 +196,7 @@ void discardCloverQuda(QudaInvertParam *inv_param)
     freeCloverField(&cudaCloverSloppy);
   }
 }
+#endif
 
 void endQuda(void)
 {
@@ -316,7 +297,8 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   freeParitySpinor(in);
 }
 
-void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger) {
+void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
+{
   checkPrecision(inv_param->cpu_prec);
 
   FullSpinor in = allocateSpinorField(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
@@ -348,6 +330,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 {
   invert_param = param;
 
+  checkInvertParam(param);
   checkPrecision(param->cpu_prec);
 
   int slenh = cudaGaugePrecise.volume*spinorSiteSize;

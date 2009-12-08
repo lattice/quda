@@ -35,6 +35,9 @@ int TRANSFER = 0; // include transfer time in the benchmark?
 
 void init() {
 
+  gaugeParam = newQudaGaugeParam();
+  inv_param = newQudaInvertParam();
+
   gaugeParam.X[0] = 24;
   gaugeParam.X[1] = 24;
   gaugeParam.X[2] = 24;

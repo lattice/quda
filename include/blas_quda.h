@@ -8,6 +8,12 @@
 extern "C" {
 #endif
 
+  typedef struct double3_s {
+    double x;
+    double y;
+    double z;
+  } double3;
+
   // ---------- blas_quda.cu ----------
   
   void zeroCuda(ParitySpinor a);
@@ -36,8 +42,8 @@ extern "C" {
   cuDoubleComplex cDotProductCuda(ParitySpinor, ParitySpinor);
   cuDoubleComplex xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z);
 
-  void blasTest();
-  void axpbyTest();
+  //  void blasTest();
+  //  void axpbyTest();
   
   double3 cDotProductNormACuda(ParitySpinor a, ParitySpinor b);
   double3 cDotProductNormBCuda(ParitySpinor a, ParitySpinor b);

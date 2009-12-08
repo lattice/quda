@@ -18,6 +18,7 @@
 #define GaugeFieldOrder QudaGaugeFieldOrder
 #define DiracFieldOrder QudaDiracFieldOrder
 #define CloverFieldOrder QudaCloverFieldOrder
+#define DslashType QudaDslashType  
 #define InverterType QudaInverterType  
 #define Precision QudaPrecision
 #define MatPCType QudaMatPCType

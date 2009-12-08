@@ -15,8 +15,8 @@ int main(int argc, char **argv)
 
   void *gauge[4], *clover_inv;
 
-  QudaGaugeParam Gauge_param;
-  QudaInvertParam inv_param;
+  QudaGaugeParam Gauge_param = newQudaGaugeParam();
+  QudaInvertParam inv_param = newQudaInvertParam();
 
   Gauge_param.X[0] = 24;
   Gauge_param.X[1] = 24;
