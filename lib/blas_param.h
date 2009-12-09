@@ -3,43 +3,43 @@
 */
 // Kernel: copyCuda                           
 blas_threads[0][0] = 64;
-blas_blocks[0][0] = 256;
+blas_blocks[0][0] = 2048;
 
 // Kernel: axpbyCuda                          
 blas_threads[0][1] = 64;
-blas_blocks[0][1] = 1024;
+blas_blocks[0][1] = 2048;
 
 // Kernel: xpyCuda                            
 blas_threads[0][2] = 64;
-blas_blocks[0][2] = 1024;
+blas_blocks[0][2] = 2048;
 
 // Kernel: axpyCuda                           
 blas_threads[0][3] = 64;
-blas_blocks[0][3] = 1024;
+blas_blocks[0][3] = 2048;
 
 // Kernel: xpayCuda                           
 blas_threads[0][4] = 64;
-blas_blocks[0][4] = 1024;
+blas_blocks[0][4] = 2048;
 
 // Kernel: mxpyCuda                           
 blas_threads[0][5] = 64;
-blas_blocks[0][5] = 1024;
+blas_blocks[0][5] = 2048;
 
 // Kernel: axCuda                             
 blas_threads[0][6] = 64;
-blas_blocks[0][6] = 1024;
+blas_blocks[0][6] = 2048;
 
 // Kernel: caxpyCuda                          
 blas_threads[0][7] = 64;
-blas_blocks[0][7] = 1024;
+blas_blocks[0][7] = 2048;
 
 // Kernel: caxpbyCuda                         
 blas_threads[0][8] = 64;
-blas_blocks[0][8] = 1024;
+blas_blocks[0][8] = 2048;
 
 // Kernel: cxpaypbzCuda                       
 blas_threads[0][9] = 64;
-blas_blocks[0][9] = 1024;
+blas_blocks[0][9] = 2048;
 
 // Kernel: axpyZpbxCuda                       
 blas_threads[0][10] = 64;
@@ -102,7 +102,7 @@ blas_threads[1][2] = 128;
 blas_blocks[1][2] = 128;
 
 // Kernel: axpyCuda                           
-blas_threads[1][3] = 128;
+blas_threads[1][3] = 64;
 blas_blocks[1][3] = 128;
 
 // Kernel: xpayCuda                           
@@ -203,11 +203,11 @@ blas_blocks[2][5] = 128;
 
 // Kernel: axCuda                             
 blas_threads[2][6] = 64;
-blas_blocks[2][6] = 1024;
+blas_blocks[2][6] = 2048;
 
 // Kernel: caxpyCuda                          
 blas_threads[2][7] = 64;
-blas_blocks[2][7] = 128;
+blas_blocks[2][7] = 2048;
 
 // Kernel: caxpbyCuda                         
 blas_threads[2][8] = 64;

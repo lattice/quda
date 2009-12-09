@@ -11,6 +11,14 @@
 
 void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cloverInv, ParitySpinor in, 
 	    QudaInvertParam *invert_param, ParitySpinor tmp, DagType dag_type) {
+
+  {cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("B4 MatVec: %s\n",  cudaGetErrorString(error));
+    exit(0);
+  }}
+
   double kappa = invert_param->kappa;
   if (invert_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
     kappa *= cudaGaugePrecise.anisotropy;
@@ -21,6 +29,14 @@ void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cl
     cloverMatPCCuda(out, gauge, clover, cloverInv, in, kappa, tmp,
 		    invert_param->matpc_type, dag_type);
   }
+
+  cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("MatVec: %s\n",  cudaGetErrorString(error));
+    exit(0);
+  }
+  
 }
 
 void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r, 
@@ -47,14 +63,6 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
 
   zeroCuda(x_sloppy);
   copyCuda(r_sloppy, b);
-
-  /*{
-  cuDoubleComplex rv;
-  MatVec(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, r_sloppy, invert_param, tmp, dag_type);
-  // rv = (r0,v)
-  rv = cDotProductCuda(r0, v);    
-  printf("%e %e %e %e %e\n", rv.x, rv.y, normCuda(r_sloppy), normCuda(v), normCuda(tmp)); exit(0);
-  } */
 
   zeroCuda(y);
 
@@ -109,6 +117,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     }
     
     MatVec(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param, tmp, dag_type);
+
     // rv = (r0,v)
     rv = cDotProductCuda(r0, v);    
 

@@ -21,7 +21,7 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 24;
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 64;
+  gauge_param.X[3] = 48;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 1.0;
@@ -29,9 +29,9 @@ int main(int argc, char **argv)
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 

@@ -122,6 +122,13 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
 
+  cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("initDslashConstants error: %s\n",  cudaGetErrorString(error));
+    exit(0);
+  }
+
   initDslash = 1;
 }
 
@@ -170,6 +177,14 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   } else if (in.precision == QUDA_HALF_PRECISION) {
     dslashHCuda(out, gauge, in, parity, dagger);
   }
+
+  cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("dslashCuda error: %s\n",  cudaGetErrorString(error));
+    exit(0);
+  }
+
   dslash_quda_flops += 1320*in.volume;
 }
 
@@ -372,6 +387,13 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
   } else if (in.precision == QUDA_HALF_PRECISION) {
     dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
+  }
+
+  cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("dslashXpayCuda error: %s\n",  cudaGetErrorString(error));
+    exit(0);
   }
 
   dslash_quda_flops += (1320+48)*in.volume;
@@ -645,6 +667,13 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger);
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
+  }
+
+  cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("cloverDslashCuda error: %s\n",  cudaGetErrorString(error));
+    exit(0);
   }
 
   dslash_quda_flops += (1320+504)*in.volume;
@@ -1151,6 +1180,13 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
+  }
+
+  cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("cloverDslashXpayCuda error: %s\n",  cudaGetErrorString(error));
+    exit(0);
   }
 
   dslash_quda_flops += (1320+504+48)*in.volume;
@@ -1768,6 +1804,13 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
     cloverSCuda(out, gauge, clover, in, parity);
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverHCuda(out, gauge, clover, in, parity);
+  }
+
+  cudaError_t error = cudaGetLastError();
+  cudaGetLastError();
+  if(error != cudaSuccess) {
+    printf("cloverCuda error: %s\n",  cudaGetErrorString(error));
+    exit(0);
   }
 
   dslash_quda_flops += 504*in.volume;
