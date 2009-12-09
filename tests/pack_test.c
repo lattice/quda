@@ -2,14 +2,15 @@
 #include <stdlib.h>
 
 #include <quda_internal.h>
-#include <util_quda.h>
 #include <gauge_quda.h>
 #include <spinor_quda.h>
+#include <util_quda.h>
 
 #include <test_util.h>
 #include <dslash_reference.h>
 
 QudaGaugeParam param;
+FullGauge cudaGauge;
 FullSpinor cudaFullSpinor;
 ParitySpinor cudaParitySpinor;
 
@@ -17,7 +18,7 @@ void *qdpGauge[4];
 void *cpsGauge;
 void *spinor;
 void *spinor2;
-    
+
 float kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
@@ -100,25 +101,25 @@ void packTest() {
   
   stopwatchStart();
   param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, cpsGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
+  createGaugeField(&cudaGauge, cpsGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
 		   param.gauge_fix, param.t_boundary, param.X, param.ga_pad, 1.0);
   double cpsGtime = stopwatchReadSeconds();
   printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
   stopwatchStart();
-  restoreGaugeField(cpsGauge, &cudaGaugePrecise, param.cpu_prec, param.gauge_order);
+  restoreGaugeField(cpsGauge, &cudaGauge, param.cpu_prec, param.gauge_order);
   double cpsGRtime = stopwatchReadSeconds();
   printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
 
   stopwatchStart();
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  createGaugeField(&cudaGaugePrecise, qdpGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
+  createGaugeField(&cudaGauge, qdpGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
 		   param.gauge_fix, param.t_boundary, param.X, param.ga_pad, 1.0);
   double qdpGtime = stopwatchReadSeconds();
   printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 
   stopwatchStart();
-  restoreGaugeField(qdpGauge, &cudaGaugePrecise, param.cpu_prec, param.gauge_order);
+  restoreGaugeField(qdpGauge, &cudaGauge, param.cpu_prec, param.gauge_order);
   double qdpGRtime = stopwatchReadSeconds();
   printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
 

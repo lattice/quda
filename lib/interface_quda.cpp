@@ -4,8 +4,12 @@
 
 #include <quda.h>
 #include <quda_internal.h>
-#include <spinor_quda.h>
 #include <gauge_quda.h>
+#include <spinor_quda.h>
+#include <clover_quda.h>
+#include <blas_quda.h>
+#include <dslash_quda.h>
+#include <invert_quda.h>
 
 #define spinorSiteSize 24 // real numbers per spinor
 

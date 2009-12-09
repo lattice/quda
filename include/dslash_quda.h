@@ -1,24 +1,14 @@
 #ifndef _DSLASH_QUDA_H
 #define _DSLASH_QUDA_H
 
-#include <cuComplex.h>
-#include <quda.h>
 #include <quda_internal.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-  extern FullGauge cudaGaugePrecise;
-  extern FullGauge cudaGaugeSloppy;
-
-  extern FullClover cudaCloverPrecise;
-  extern FullClover cudaCloverSloppy;
-
-  extern FullClover cudaCloverInvPrecise;
-  extern FullClover cudaCloverInvSloppy;
-
-// ---------- dslash_quda.cu ----------
+  extern unsigned long long dslash_quda_flops;
+  extern unsigned long long dslash_quda_bytes;
 
   int dslashCudaSharedBytes(Precision spinor_prec, int blockDim);
 
@@ -106,17 +96,6 @@ extern "C" {
 		   ParitySpinor spinor, int oddBit);
   void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 		   ParitySpinor spinor, int oddBit);
-
-  // -- inv_cg_cuda.cpp
-  void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp,
-		    QudaInvertParam *param);
-  
-  // -- inv_bicgstab_cuda.cpp
-  void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp, 
-			  QudaInvertParam *param, DagType dag_type);
-  
-  extern unsigned long long dslash_quda_flops;
-  extern unsigned long long dslash_quda_bytes;
 
 #ifdef __cplusplus
 }

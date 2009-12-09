@@ -1,8 +1,7 @@
 #ifndef _GAUGE_QUDA_H
 #define _GAUGE_QUDA_H
 
-#include <enum_quda.h>
-#include <dslash_quda.h>
+#include <quda_internal.h>
 
 #ifdef __cplusplus
 extern "C" {

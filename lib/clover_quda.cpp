@@ -3,7 +3,7 @@
 #include <math.h>
 
 #include <quda_internal.h>
-#include <spinor_quda.h>
+#include <clover_quda.h>
 
 void allocateParityClover(ParityClover *ret, int *X, int pad, Precision precision)
 {

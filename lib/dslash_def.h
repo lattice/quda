@@ -1,11 +1,11 @@
 // dslash_def.h - Dslash kernel definitions
 
-// There are currently 64 different variants of the Dslash kernel,
+// There are currently 288 different variants of the Dslash kernel,
 // each one characterized by a set of 6 options, where each option can
-// take one of two values (2^6 = 64).  This file is structured so that
-// the C preprocessor loops through all 64 variants (in a manner
-// resembling a binary counter), sets the appropriate macros, and
-// defines the corresponding functions.
+// take one of several values (3*3*4*2*2*2 = 288).  This file is
+// structured so that the C preprocessor loops through all 288
+// variants (in a manner resembling a counter), sets the appropriate
+// macros, and defines the corresponding functions.
 //
 // As an example of the function naming conventions, consider
 //
@@ -250,7 +250,7 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #define DD_SPREC 2
 #else
 
-#undef DD_SPREC // from here
+#undef DD_SPREC
 #define DD_SPREC 0
 
 #if (DD_CPREC==0)
@@ -263,7 +263,7 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #undef DD_CPREC
 #define DD_CPREC 3
 
-#else // to here
+#else
 
 #undef DD_LOOP
 #undef DD_DAG
@@ -271,9 +271,9 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_
 #undef DD_RECON
 #undef DD_GPREC
 #undef DD_SPREC
-#undef DD_CPREC //
+#undef DD_CPREC
 
-#endif // DD_CPREC //
+#endif // DD_CPREC
 #endif // DD_SPREC
 #endif // DD_GPREC
 #endif // DD_RECON

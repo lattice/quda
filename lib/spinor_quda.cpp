@@ -3,14 +3,13 @@
 
 #include <quda_internal.h>
 #include <spinor_quda.h>
-
-//#include <xmmintrin.h>
+#include <blas_quda.h>
 
 // Pinned memory for cpu-gpu memory copying
 void *packedSpinor1 = 0;
 void *packedSpinor2 = 0;
 
-int L[4];
+static int L[4];
 
 ParitySpinor allocateParitySpinor(int *X, Precision precision, int pad) {
   ParitySpinor ret;

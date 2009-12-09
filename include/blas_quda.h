@@ -1,8 +1,8 @@
-#include <cuComplex.h>
-#include <enum_quda.h>
-
 #ifndef _QUDA_BLAS_H
 #define _QUDA_BLAS_H
+
+#include <cuComplex.h>
+#include <quda_internal.h>
 
 #ifdef __cplusplus
 extern "C" {

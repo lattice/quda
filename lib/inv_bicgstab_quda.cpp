@@ -3,10 +3,11 @@
 #include <math.h>
 #include <cuComplex.h>
 
-#include <quda.h>
 #include <quda_internal.h>
 #include <spinor_quda.h>
-
+#include <blas_quda.h>
+#include <dslash_quda.h>
+#include <invert_quda.h>
 #include <util_quda.h>
 
 void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cloverInv, ParitySpinor in, 

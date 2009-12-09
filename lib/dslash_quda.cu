@@ -5,8 +5,8 @@
 #include <dslash_quda.h>
 #include <spinor_quda.h> // not needed once call to allocateParitySpinor() is removed
 
-#include<dslash_textures.h>
-#include<dslash_constants.h>
+#include <dslash_textures.h>
+#include <dslash_constants.h>
 
 unsigned long long dslash_quda_flops;
 unsigned long long dslash_quda_bytes;
@@ -33,7 +33,7 @@ int dslashCudaSharedBytes(Precision precision) {
 
 #include <dslash_common.h>
 
-int initDslash = 0;
+static int initDslash = 0;
 
 void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   int Vh = gauge.volume;
@@ -159,8 +159,6 @@ static void bindGaugeTex(FullGauge gauge, int oddBit) {
     }
   }
 }
-
-// ----------------------------------------------------------------------
 
 // ----------------------------------------------------------------------
 // plain Wilson Dslash:

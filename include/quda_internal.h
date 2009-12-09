@@ -100,7 +100,4 @@ extern "C" {
 }
 #endif
 
-#include <blas_quda.h>
-#include <dslash_quda.h>
-
 #endif // _QUDA_INTERNAL_H

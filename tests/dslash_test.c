@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <quda.h>
 #include <quda_internal.h>
-#include <util_quda.h>
 #include <spinor_quda.h>
-#include <gauge_quda.h>
+#include <dslash_quda.h>
+#include <invert_quda.h>
+#include <util_quda.h>
 
 #include <test_util.h>
 #include <dslash_reference.h>

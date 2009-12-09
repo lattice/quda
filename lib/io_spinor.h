@@ -1,4 +1,4 @@
-#define READ_SPINOR_DOUBLE(spinor)		     \
+#define READ_SPINOR_DOUBLE(spinor)	                          \
   double2 I0 = fetch_double2((spinor), sp_idx + 0*(sp_stride));   \
   double2 I1 = fetch_double2((spinor), sp_idx + 1*(sp_stride));   \
   double2 I2 = fetch_double2((spinor), sp_idx + 2*(sp_stride));   \
@@ -9,10 +9,10 @@
   double2 I7 = fetch_double2((spinor), sp_idx + 7*(sp_stride));   \
   double2 I8 = fetch_double2((spinor), sp_idx + 8*(sp_stride));   \
   double2 I9 = fetch_double2((spinor), sp_idx + 9*(sp_stride));   \
-  double2 I10 = fetch_double2((spinor), sp_idx + 10*(sp_stride));   \
+  double2 I10 = fetch_double2((spinor), sp_idx + 10*(sp_stride)); \
   double2 I11 = fetch_double2((spinor), sp_idx + 11*(sp_stride));
 
-#define READ_SPINOR_DOUBLE_UP(spinor)		     \
+#define READ_SPINOR_DOUBLE_UP(spinor)		                  \
   double2 I0 = fetch_double2((spinor), sp_idx + 0*(sp_stride));   \
   double2 I1 = fetch_double2((spinor), sp_idx + 1*(sp_stride));   \
   double2 I2 = fetch_double2((spinor), sp_idx + 2*(sp_stride));   \
@@ -20,15 +20,15 @@
   double2 I4 = fetch_double2((spinor), sp_idx + 4*(sp_stride));   \
   double2 I5 = fetch_double2((spinor), sp_idx + 5*(sp_stride));
 
-#define READ_SPINOR_DOUBLE_DOWN(spinor)		     \
+#define READ_SPINOR_DOUBLE_DOWN(spinor)		                  \
   double2 I6 = fetch_double2((spinor), sp_idx + 6*(sp_stride));   \
   double2 I7 = fetch_double2((spinor), sp_idx + 7*(sp_stride));   \
   double2 I8 = fetch_double2((spinor), sp_idx + 8*(sp_stride));   \
   double2 I9 = fetch_double2((spinor), sp_idx + 9*(sp_stride));   \
-  double2 I10 = fetch_double2((spinor), sp_idx + 10*(sp_stride));   \
+  double2 I10 = fetch_double2((spinor), sp_idx + 10*(sp_stride)); \
   double2 I11 = fetch_double2((spinor), sp_idx + 11*(sp_stride));
 
-#define READ_SPINOR_SINGLE(spinor)		     \
+#define READ_SPINOR_SINGLE(spinor)		              \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*(sp_stride));   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*(sp_stride));   \
   float4 I2 = tex1Dfetch((spinor), sp_idx + 2*(sp_stride));   \
@@ -36,102 +36,102 @@
   float4 I4 = tex1Dfetch((spinor), sp_idx + 4*(sp_stride));   \
   float4 I5 = tex1Dfetch((spinor), sp_idx + 5*(sp_stride));
 
-#define READ_SPINOR_SINGLE_UP(spinor)		     \
+#define READ_SPINOR_SINGLE_UP(spinor)		              \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*(sp_stride));   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*(sp_stride));   \
   float4 I2 = tex1Dfetch((spinor), sp_idx + 2*(sp_stride));   \
 
-#define READ_SPINOR_SINGLE_DOWN(spinor)		     \
+#define READ_SPINOR_SINGLE_DOWN(spinor)                       \
   float4 I3 = tex1Dfetch((spinor), sp_idx + 3*(sp_stride));   \
   float4 I4 = tex1Dfetch((spinor), sp_idx + 4*(sp_stride));   \
   float4 I5 = tex1Dfetch((spinor), sp_idx + 5*(sp_stride));
 
-#define READ_SPINOR_HALF(spinor)		     \
+#define READ_SPINOR_HALF(spinor)                              \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*(sp_stride));   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*(sp_stride));   \
   float4 I2 = tex1Dfetch((spinor), sp_idx + 2*(sp_stride));   \
   float4 I3 = tex1Dfetch((spinor), sp_idx + 3*(sp_stride));   \
   float4 I4 = tex1Dfetch((spinor), sp_idx + 4*(sp_stride));   \
   float4 I5 = tex1Dfetch((spinor), sp_idx + 5*(sp_stride));   \
-  float C = tex1Dfetch((spinorTexNorm), sp_idx);     \
-  I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;	     \
-  I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;	     \
-  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;        \
-  I3.x *= C; I3.y *= C;	I3.z *= C; I3.w *= C;	     \
-  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	     \
+  float C = tex1Dfetch((spinorTexNorm), sp_idx);              \
+  I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;	              \
+  I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;	              \
+  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;                 \
+  I3.x *= C; I3.y *= C;	I3.z *= C; I3.w *= C;	              \
+  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	              \
   I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
 
-#define READ_SPINOR_HALF_UP(spinor)		     \
+#define READ_SPINOR_HALF_UP(spinor)		              \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*(sp_stride));   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*(sp_stride));   \
   float4 I2 = tex1Dfetch((spinor), sp_idx + 2*(sp_stride));   \
-  float C = tex1Dfetch((spinorTexNorm), sp_idx);     \
-  I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;	     \
-  I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;	     \
-  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;        \
+  float C = tex1Dfetch((spinorTexNorm), sp_idx);              \
+  I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;	              \
+  I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;	              \
+  I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;                 \
 
-#define READ_SPINOR_HALF_DOWN(spinor)		     \
+#define READ_SPINOR_HALF_DOWN(spinor)		              \
   float4 I3 = tex1Dfetch((spinor), sp_idx + 3*(sp_stride));   \
   float4 I4 = tex1Dfetch((spinor), sp_idx + 4*(sp_stride));   \
   float4 I5 = tex1Dfetch((spinor), sp_idx + 5*(sp_stride));   \
-  float C = tex1Dfetch((spinorTexNorm), sp_idx);     \
-  I3.x *= C; I3.y *= C;	I3.z *= C; I3.w *= C;	     \
-  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	     \
+  float C = tex1Dfetch((spinorTexNorm), sp_idx);              \
+  I3.x *= C; I3.y *= C;	I3.z *= C; I3.w *= C;	              \
+  I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	              \
   I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
 
-#define READ_ACCUM_DOUBLE(spinor)				\
-  double2 accum0 = fetch_double2((spinor), sid + 0*(sp_stride));		\
-  double2 accum1 = fetch_double2((spinor), sid + 1*(sp_stride));		\
-  double2 accum2 = fetch_double2((spinor), sid + 2*(sp_stride));		\
-  double2 accum3 = fetch_double2((spinor), sid + 3*(sp_stride));		\
-  double2 accum4 = fetch_double2((spinor), sid + 4*(sp_stride));		\
-  double2 accum5 = fetch_double2((spinor), sid + 5*(sp_stride));		\
-  double2 accum6 = fetch_double2((spinor), sid + 6*(sp_stride));		\
-  double2 accum7 = fetch_double2((spinor), sid + 7*(sp_stride));		\
-  double2 accum8 = fetch_double2((spinor), sid + 8*(sp_stride));		\
-  double2 accum9 = fetch_double2((spinor), sid + 9*(sp_stride));		\
-  double2 accum10 = fetch_double2((spinor), sid + 10*(sp_stride));	\
+#define READ_ACCUM_DOUBLE(spinor)				   \
+  double2 accum0 = fetch_double2((spinor), sid + 0*(sp_stride));   \
+  double2 accum1 = fetch_double2((spinor), sid + 1*(sp_stride));   \
+  double2 accum2 = fetch_double2((spinor), sid + 2*(sp_stride));   \
+  double2 accum3 = fetch_double2((spinor), sid + 3*(sp_stride));   \
+  double2 accum4 = fetch_double2((spinor), sid + 4*(sp_stride));   \
+  double2 accum5 = fetch_double2((spinor), sid + 5*(sp_stride));   \
+  double2 accum6 = fetch_double2((spinor), sid + 6*(sp_stride));   \
+  double2 accum7 = fetch_double2((spinor), sid + 7*(sp_stride));   \
+  double2 accum8 = fetch_double2((spinor), sid + 8*(sp_stride));   \
+  double2 accum9 = fetch_double2((spinor), sid + 9*(sp_stride));   \
+  double2 accum10 = fetch_double2((spinor), sid + 10*(sp_stride)); \
   double2 accum11 = fetch_double2((spinor), sid + 11*(sp_stride));	
 
-#define READ_ACCUM_SINGLE(spinor)			\
-  float4 accum0 = tex1Dfetch((spinor), sid + 0*(sp_stride));	\
-  float4 accum1 = tex1Dfetch((spinor), sid + 1*(sp_stride));	\
-  float4 accum2 = tex1Dfetch((spinor), sid + 2*(sp_stride));	\
-  float4 accum3 = tex1Dfetch((spinor), sid + 3*(sp_stride));	\
-  float4 accum4 = tex1Dfetch((spinor), sid + 4*(sp_stride));	\
+#define READ_ACCUM_SINGLE(spinor)                                  \
+  float4 accum0 = tex1Dfetch((spinor), sid + 0*(sp_stride));       \
+  float4 accum1 = tex1Dfetch((spinor), sid + 1*(sp_stride));       \
+  float4 accum2 = tex1Dfetch((spinor), sid + 2*(sp_stride));       \
+  float4 accum3 = tex1Dfetch((spinor), sid + 3*(sp_stride));       \
+  float4 accum4 = tex1Dfetch((spinor), sid + 4*(sp_stride));       \
   float4 accum5 = tex1Dfetch((spinor), sid + 5*(sp_stride)); 
 
-#define READ_ACCUM_HALF(spinor)					     \
-  float4 accum0 = tex1Dfetch((spinor), sid + 0*(sp_stride));		     \
-  float4 accum1 = tex1Dfetch((spinor), sid + 1*(sp_stride));		     \
-  float4 accum2 = tex1Dfetch((spinor), sid + 2*(sp_stride));		     \
-  float4 accum3 = tex1Dfetch((spinor), sid + 3*(sp_stride));		     \
-  float4 accum4 = tex1Dfetch((spinor), sid + 4*(sp_stride));		     \
-  float4 accum5 = tex1Dfetch((spinor), sid + 5*(sp_stride));		     \
-  float C = tex1Dfetch((accumTexNorm), sid);			     \
-  accum0.x *= C; accum0.y *= C;	accum0.z *= C; accum0.w *= C;	     \
-  accum1.x *= C; accum1.y *= C;	accum1.z *= C; accum1.w *= C;	     \
-  accum2.x *= C; accum2.y *= C;	accum2.z *= C; accum2.w *= C;        \
-  accum3.x *= C; accum3.y *= C;	accum3.z *= C; accum3.w *= C;	     \
-  accum4.x *= C; accum4.y *= C; accum4.z *= C; accum4.w *= C;	     \
+#define READ_ACCUM_HALF(spinor)					   \
+  float4 accum0 = tex1Dfetch((spinor), sid + 0*(sp_stride));       \
+  float4 accum1 = tex1Dfetch((spinor), sid + 1*(sp_stride));       \
+  float4 accum2 = tex1Dfetch((spinor), sid + 2*(sp_stride));       \
+  float4 accum3 = tex1Dfetch((spinor), sid + 3*(sp_stride));       \
+  float4 accum4 = tex1Dfetch((spinor), sid + 4*(sp_stride));       \
+  float4 accum5 = tex1Dfetch((spinor), sid + 5*(sp_stride));       \
+  float C = tex1Dfetch((accumTexNorm), sid);		           \
+  accum0.x *= C; accum0.y *= C;	accum0.z *= C; accum0.w *= C;      \
+  accum1.x *= C; accum1.y *= C;	accum1.z *= C; accum1.w *= C;      \
+  accum2.x *= C; accum2.y *= C;	accum2.z *= C; accum2.w *= C;      \
+  accum3.x *= C; accum3.y *= C;	accum3.z *= C; accum3.w *= C;      \
+  accum4.x *= C; accum4.y *= C; accum4.z *= C; accum4.w *= C;      \
   accum5.x *= C; accum5.y *= C;	accum5.z *= C; accum5.w *= C;					     
 
 
-#define WRITE_SPINOR_DOUBLE2()					 \
-  g_out[0*(sp_stride)+sid] = make_double2(o00_re, o00_im);		 \
-  g_out[1*(sp_stride)+sid] = make_double2(o01_re, o01_im);		 \
-  g_out[2*(sp_stride)+sid] = make_double2(o02_re, o02_im);		 \
-  g_out[3*(sp_stride)+sid] = make_double2(o10_re, o10_im);		 \
-  g_out[4*(sp_stride)+sid] = make_double2(o11_re, o11_im);		 \
-  g_out[5*(sp_stride)+sid] = make_double2(o12_re, o12_im);		 \
-  g_out[6*(sp_stride)+sid] = make_double2(o20_re, o20_im);		 \
-  g_out[7*(sp_stride)+sid] = make_double2(o21_re, o21_im);		 \
-  g_out[8*(sp_stride)+sid] = make_double2(o22_re, o22_im);		 \
-  g_out[9*(sp_stride)+sid] = make_double2(o30_re, o30_im);		 \
-  g_out[10*(sp_stride)+sid] = make_double2(o31_re, o31_im);		 \
+#define WRITE_SPINOR_DOUBLE2()					   \
+  g_out[0*(sp_stride)+sid] = make_double2(o00_re, o00_im);	   \
+  g_out[1*(sp_stride)+sid] = make_double2(o01_re, o01_im);	   \
+  g_out[2*(sp_stride)+sid] = make_double2(o02_re, o02_im);	   \
+  g_out[3*(sp_stride)+sid] = make_double2(o10_re, o10_im);	   \
+  g_out[4*(sp_stride)+sid] = make_double2(o11_re, o11_im);	   \
+  g_out[5*(sp_stride)+sid] = make_double2(o12_re, o12_im);	   \
+  g_out[6*(sp_stride)+sid] = make_double2(o20_re, o20_im);	   \
+  g_out[7*(sp_stride)+sid] = make_double2(o21_re, o21_im);	   \
+  g_out[8*(sp_stride)+sid] = make_double2(o22_re, o22_im);	   \
+  g_out[9*(sp_stride)+sid] = make_double2(o30_re, o30_im);	   \
+  g_out[10*(sp_stride)+sid] = make_double2(o31_re, o31_im);	   \
   g_out[11*(sp_stride)+sid] = make_double2(o32_re, o32_im);		 
 
-#define WRITE_SPINOR_FLOAT4()					 \
+#define WRITE_SPINOR_FLOAT4()					          \
   g_out[0*(sp_stride)+sid] = make_float4(o00_re, o00_im, o01_re, o01_im); \
   g_out[1*(sp_stride)+sid] = make_float4(o02_re, o02_im, o10_re, o10_im); \
   g_out[2*(sp_stride)+sid] = make_float4(o11_re, o11_im, o12_re, o12_im); \

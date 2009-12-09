@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include <quda_internal.h>
+#include <blas_quda.h>
 
 #define REDUCE_MAX_BLOCKS 2048
 

@@ -1,14 +1,11 @@
-#ifndef _QUDA_SPINOR_H
-#define _QUDA_SPINOR_H
+#ifndef _SPINOR_QUDA_H
+#define _SPINOR_QUDA_H
 
-#include <enum_quda.h>
-#include <dslash_quda.h>
+#include <quda_internal.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-  // -- spinor_quda.cpp
 
   ParitySpinor allocateParitySpinor(int *X, Precision precision, int stride);
   FullSpinor allocateSpinorField(int *X, Precision precision, int stride);
@@ -30,26 +27,8 @@ extern "C" {
   void spinorHalfPack(float *c, short *s0, float *f0);
   void spinorHalfUnpack(float *f0, float *c, short *s0);
 
-  // -- clover_quda.cpp
-
-  void allocateParityClover(ParityClover *, int *X, int pad, Precision precision);
-  void allocateCloverField(FullClover *, int *X, int pad, Precision precision);
-
-  void freeParityClover(ParityClover *clover);
-  void freeCloverField(FullClover *clover);
-
-  void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec,
-			CloverFieldOrder clover_order);
-  void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
-		      CloverFieldOrder clover_order);
-  void loadCloverField(FullClover ret, void *clover, Precision cpu_prec,
-		       CloverFieldOrder clover_order);
-
-  /* void createCloverField(FullClover *cudaClover, void *cpuClover, int *X,
-                         Precision precision); */
-
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _QUDA_SPINOR_H
+#endif // _SPINOR_QUDA_H
