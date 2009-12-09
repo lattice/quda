@@ -40,7 +40,7 @@ int blas_blocks[3][22];
 dim3 blasBlock;
 dim3 blasGrid;
 
-void initBlas() {
+void initBlas(void) {
   
   if (!d_reduceFloat) {
     if (cudaMalloc((void**) &d_reduceFloat, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {

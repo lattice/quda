@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <quda_internal.h>
 #include <dslash_quda.h>
 #include <spinor_quda.h> // not needed once call to allocateParitySpinor() is removed
 
@@ -124,7 +125,7 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   initDslash = 1;
 }
 
-void bindGaugeTex(FullGauge gauge, int oddBit) {
+static void bindGaugeTex(FullGauge gauge, int oddBit) {
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (oddBit) {
       cudaBindTexture(0, gauge0TexDouble, gauge.odd, gauge.bytes); 
@@ -613,8 +614,7 @@ void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa, int d
 }
 
 
-
-void bindCloverTex(ParityClover clover) {
+static void bindCloverTex(ParityClover clover) {
   if (clover.precision == QUDA_DOUBLE_PRECISION) {
     cudaBindTexture(0, cloverTexDouble, clover.clover, clover.bytes); 
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {

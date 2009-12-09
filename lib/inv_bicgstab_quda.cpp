@@ -3,6 +3,7 @@
 #include <math.h>
 #include <cuComplex.h>
 
+#include <quda.h>
 #include <quda_internal.h>
 #include <spinor_quda.h>
 

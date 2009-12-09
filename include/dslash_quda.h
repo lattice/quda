@@ -2,7 +2,7 @@
 #define _DSLASH_QUDA_H
 
 #include <cuComplex.h>
-
+#include <quda.h>
 #include <quda_internal.h>
 
 #ifdef __cplusplus

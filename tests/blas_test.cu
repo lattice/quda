@@ -8,7 +8,7 @@
 #include <test_util.h>
 
 QudaPrecision cuda_prec;
-QudaPrecision other_precision;   // Used for copy benchmark
+QudaPrecision other_prec; // Used for copy benchmark
 ParitySpinor x, y, z, w, v, p;
 
 int nIters;
@@ -53,7 +53,7 @@ void init() {
   x = allocateParitySpinor(X, cuda_prec, sp_pad);
   y = allocateParitySpinor(X, cuda_prec, sp_pad);
   z = allocateParitySpinor(X, cuda_prec, sp_pad);
-  p = allocateParitySpinor(X, other_precision, sp_pad);
+  p = allocateParitySpinor(X, other_prec, sp_pad);
 }
 
 void end() {
