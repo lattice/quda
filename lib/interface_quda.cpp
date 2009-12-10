@@ -22,8 +22,6 @@ FullClover cudaCloverSloppy;
 FullClover cudaCloverInvPrecise; // inverted clover term
 FullClover cudaCloverInvSloppy;
 
-void initBlas(void);
-
 // define newQudaGaugeParam() and newQudaInvertParam()
 #define INIT_PARAM
 #include "check_params.h"

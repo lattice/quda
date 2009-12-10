@@ -22,13 +22,13 @@
 #endif
 
 // These are used for reduction kernels
-QudaSumFloat *d_reduceFloat=0;
-QudaSumComplex *d_reduceComplex=0;
-QudaSumFloat3 *d_reduceFloat3=0;
+static QudaSumFloat *d_reduceFloat=0;
+static QudaSumComplex *d_reduceComplex=0;
+static QudaSumFloat3 *d_reduceFloat3=0;
 
-QudaSumFloat *h_reduceFloat=0;
-QudaSumComplex *h_reduceComplex=0;
-QudaSumFloat3 *h_reduceFloat3=0;
+static QudaSumFloat *h_reduceFloat=0;
+static QudaSumComplex *h_reduceComplex=0;
+static QudaSumFloat3 *h_reduceFloat3=0;
 
 unsigned long long blas_quda_flops;
 unsigned long long blas_quda_bytes;
@@ -38,8 +38,8 @@ int blas_threads[3][22];
 // Number of thread blocks for each blas kernel
 int blas_blocks[3][22];
 
-dim3 blasBlock;
-dim3 blasGrid;
+static dim3 blasBlock;
+static dim3 blasGrid;
 
 void initBlas(void) {
   
@@ -85,12 +85,12 @@ void initBlas(void) {
     }
   }
 
-  // Output from blas_test
-#include<blas_param.h>
+// Output from blas_test
+#include <blas_param.h>
 
 }
 
-void endBlas() {
+void endBlas(void) {
   if (d_reduceFloat) cudaFree(d_reduceFloat);
   if (d_reduceComplex) cudaFree(d_reduceComplex);
   if (d_reduceFloat3) cudaFree(d_reduceFloat3);

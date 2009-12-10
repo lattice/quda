@@ -17,8 +17,8 @@ extern "C" {
   // ---------- blas_quda.cu ----------
   
   // creates and destroys reduction buffers  
-  void initBlas(); 
-  void endBlas();
+  void initBlas(void); 
+  void endBlas(void);
 
   void zeroCuda(ParitySpinor a);
   void copyCuda(ParitySpinor dst, ParitySpinor src);
