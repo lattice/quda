@@ -45,43 +45,37 @@ void initBlas(void) {
   
   if (!d_reduceFloat) {
     if (cudaMalloc((void**) &d_reduceFloat, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
-      printf("Error allocating device reduction array\n");
-      exit(0);
+      errorQuda("Error allocating device reduction array");
     }
   }
 
   if (!d_reduceComplex) {
     if (cudaMalloc((void**) &d_reduceComplex, REDUCE_MAX_BLOCKS*sizeof(QudaSumComplex)) == cudaErrorMemoryAllocation) {
-      printf("Error allocating device reduction array\n");
-      exit(0);
+      errorQuda("Error allocating device reduction array");
     }
   }
   
   if (!d_reduceFloat3) {
     if (cudaMalloc((void**) &d_reduceFloat3, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat3)) == cudaErrorMemoryAllocation) {
-      printf("Error allocating device reduction array\n");
-      exit(0);
+      errorQuda("Error allocating device reduction array");
     }
   }
 
   if (!h_reduceFloat) {
     if (cudaMallocHost((void**) &h_reduceFloat, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
-      printf("Error allocating host reduction array\n");
-      exit(0);
+      errorQuda("Error allocating host reduction array");
     }
   }
 
   if (!h_reduceComplex) {
     if (cudaMallocHost((void**) &h_reduceComplex, REDUCE_MAX_BLOCKS*sizeof(QudaSumComplex)) == cudaErrorMemoryAllocation) {
-      printf("Error allocating host reduction array\n");
-      exit(0);
+      errorQuda("Error allocating host reduction array");
     }
   }
   
   if (!h_reduceFloat3) {
     if (cudaMallocHost((void**) &h_reduceFloat3, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat3)) == cudaErrorMemoryAllocation) {
-      printf("Error allocating host reduction array\n");
-      exit(0);
+      errorQuda("Error allocating host reduction array");
     }
   }
 
@@ -309,21 +303,18 @@ texture<float, 1, cudaReadModeElementType> texNorm5;
 
 inline void checkSpinor(ParitySpinor &a, ParitySpinor &b) {
   if (a.precision != b.precision) {
-    printf("checkSpinor error, precisions do not match: %d %d\n", a.precision, b.precision);
-    exit(-1);
+    errorQuda("checkSpinor: precisions do not match: %d %d", a.precision, b.precision);
   }
 
   if (a.length != b.length) {
-    printf("checkSpinor error, lengths do not match: %d %d\n", a.length, b.length);
-    exit(-1);
+    errorQuda("checkSpinor: lengths do not match: %d %d", a.length, b.length);
   }
 }
 
 // For kernels with precision conversion built in
 inline void checkSpinorLength(ParitySpinor &a, ParitySpinor &b) {
   if (a.length != b.length) {
-    printf("checkSpinor error, lengths do not match: %d %d\n", a.length, b.length);
-    exit(-1);
+    errorQuda("checkSpinor: lengths do not match: %d %d", a.length, b.length);
   }
 }
 

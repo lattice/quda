@@ -29,9 +29,9 @@ int main(int argc, char **argv)
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  gauge_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
+  gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -66,8 +66,8 @@ int main(int argc, char **argv)
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
 
   initQuda(device);
   loadGaugeQuda((void*)gauge, &gauge_param);
-  if (clover_yes) loadCloverQuda(NULL, clover_inv, &gauge_param, &inv_param);
+  if (clover_yes) loadCloverQuda(NULL, clover_inv, &inv_param);
 
   invertQuda(spinorOut, spinorIn, &inv_param);
 

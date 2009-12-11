@@ -35,14 +35,12 @@ ParitySpinor allocateParitySpinor(int *X, Precision precision, int pad) {
   else ret.bytes = ret.length*sizeof(short);
 
   if (cudaMalloc((void**)&ret.spinor, ret.bytes) == cudaErrorMemoryAllocation) {
-    printf("Error allocating spinor\n");
-    exit(0);
+    errorQuda("Error allocating spinor");
   }
   
   if (precision == QUDA_HALF_PRECISION) {
     if (cudaMalloc((void**)&ret.spinorNorm, ret.bytes/12) == cudaErrorMemoryAllocation) {
-      printf("Error allocating spinorNorm\n");
-      exit(0);
+      errorQuda("Error allocating spinorNorm");
     }
   }
 
@@ -370,8 +368,7 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
 		      DiracFieldOrder dirac_order) {
 
   if (ret.precision == QUDA_DOUBLE_PRECISION && cpu_prec != QUDA_DOUBLE_PRECISION) {
-    printf("Error, cannot have CUDA double precision without double CPU precision\n");
-    exit(-1);
+    errorQuda("Cannot have CUDA double precision without CPU double precision");
   }
 
   if (ret.precision != QUDA_HALF_PRECISION) {
@@ -462,8 +459,7 @@ void loadSpinorField(FullSpinor ret, void *spinor, Precision cpu_prec, DiracFiel
     loadParitySpinor(ret.even, spinor_odd, cpu_prec, dirac_order);
     loadParitySpinor(ret.odd, spinor, cpu_prec, dirac_order);
   } else {
-    printf("DiracFieldOrder %d not supported\n", dirac_order);
-    exit(-1);
+    errorQuda("Invalid dirac_order");
   }
 }
 
@@ -543,8 +539,7 @@ void retrieveSpinorField(void *res, FullSpinor spinor, Precision cpu_prec, Dirac
     retrieveParitySpinor(res, spinor.odd, cpu_prec, dirac_order);
     retrieveParitySpinor(res_odd, spinor.even, cpu_prec, dirac_order);
   } else {
-    printf("DiracFieldOrder %d not supported\n", dirac_order);
-    exit(-1);
+    errorQuda("Invalid dirac_order");
   }
   
 }

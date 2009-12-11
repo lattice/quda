@@ -85,13 +85,11 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision pr
   setBlock(kernel, n, precision);
   
   if (n % blasBlock.x != 0) {
-    printf("ERROR reduce_core: length %d must be a multiple of %d\n", n, blasBlock.x);
-    exit(-1);
+    errorQuda("reduce_core: length %d must be a multiple of %d", n, blasBlock.x);
   }
 
   if (blasBlock.x > REDUCE_MAX_BLOCKS) {
-    printf("ERROR reduce_core: block size greater then maximum permitted\n");
-    exit(-1);
+    errorQuda("reduce_core: block size greater then maximum permitted");
   }
   
 #if (REDUCE_TYPE == REDUCE_KAHAN)
@@ -111,16 +109,12 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision pr
   } else if (blasBlock.x == 1024) {
     REDUCE_FUNC_NAME(Kernel)<1024><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat, n);
   } else {
-    printf("Reduction not implemented for %d threads\n", blasBlock.x);
-    exit(-1);
+    errorQuda("Reduction not implemented for %d threads", blasBlock.x);
   }
 
   // copy result from device to host, and perform final reduction on CPU
-  cudaError_t error = cudaMemcpy(h_reduceFloat, d_reduceFloat, blasGrid.x*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
-  if (error != cudaSuccess) {
-    printf("Error: %s\n", cudaGetErrorString(error));
-    exit(-1);
-  }
+  cudaMemcpy(h_reduceFloat, d_reduceFloat, blasGrid.x*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
+  checkCudaError();
 
   double cpu_sum = 0;
   for (int i = 0; i < blasGrid.x; i++) cpu_sum += h_reduceFloat[i];

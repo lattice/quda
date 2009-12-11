@@ -27,16 +27,14 @@ void allocateParityClover(ParityClover *ret, int *X, int pad, Precision precisio
 
   if (!ret->clover) {
     if (cudaMalloc((void**)&(ret->clover), ret->bytes) == cudaErrorMemoryAllocation) {
-      printf("Error allocating clover term\n");
-      exit(0);
+      errorQuda("Error allocating clover term");
     }   
   }
 
   if (!ret->cloverNorm) {
     if (precision == QUDA_HALF_PRECISION) {
       if (cudaMalloc((void**)&ret->cloverNorm, ret->bytes/18) == cudaErrorMemoryAllocation) {
-	printf("Error allocating cloverNorm\n");
-	exit(0);
+	errorQuda("Error allocating cloverNorm");
       }
     }
   }
@@ -178,23 +176,19 @@ void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec,
   void *packedClover, *packedCloverNorm;
 
   if (ret.precision == QUDA_DOUBLE_PRECISION && cpu_prec != QUDA_DOUBLE_PRECISION) {
-    printf("QUDA error: cannot have CUDA double precision without double CPU precision\n");
-    exit(-1);
+    errorQuda("Cannot have CUDA double precision without CPU double precision");
   }
   if (clover_order != QUDA_PACKED_CLOVER_ORDER) {
-    printf("QUDA error: invalid clover order\n");
-    exit(-1);
+    errorQuda("Invalid clover_order");
   }
 
 #ifndef __DEVICE_EMULATION__
   if (cudaMallocHost(&packedClover, ret.bytes) == cudaErrorMemoryAllocation) {
-    printf("Error allocating clover pinned memory\n");
-    exit(0);
+    errorQuda("Error allocating clover pinned memory");
   }  
   if (ret.precision == QUDA_HALF_PRECISION) 
     if (cudaMallocHost(&packedCloverNorm, ret.bytes/18) == cudaErrorMemoryAllocation) {
-      printf("Error allocating clover pinned memory\n");
-      exit(0);
+      errorQuda("Error allocating clover pinned memory");
     } 
 #else
   packedClover = malloc(ret.bytes);
@@ -241,12 +235,10 @@ void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
   void *packedEven, *packedEvenNorm, *packedOdd, *packedOddNorm;
 
   if (ret.even.precision == QUDA_DOUBLE_PRECISION && cpu_prec != QUDA_DOUBLE_PRECISION) {
-    printf("QUDA error: cannot have CUDA double precision without double CPU precision\n");
-    exit(-1);
+    errorQuda("Cannot have CUDA double precision without CPU double precision");
   }
   if (clover_order != QUDA_LEX_PACKED_CLOVER_ORDER) {
-    printf("QUDA error: invalid clover order\n");
-    exit(-1);
+    errorQuda("Invalid clover order");
   }
 
 #ifndef __DEVICE_EMULATION__
@@ -321,8 +313,7 @@ void loadCloverField(FullClover ret, void *clover, Precision cpu_prec, CloverFie
     loadParityClover(ret.even, clover, cpu_prec, clover_order);
     loadParityClover(ret.odd, clover_odd, cpu_prec, clover_order);
   } else {
-    printf("QUDA error: CloverFieldOrder %d not supported\n", clover_order);
-    exit(-1);
+    errorQuda("Invalid clover_order");
   }
 }
 
@@ -330,8 +321,7 @@ void loadCloverField(FullClover ret, void *clover, Precision cpu_prec, CloverFie
 void createCloverField(FullClover *cudaClover, void *cpuClover, int *X, Precision precision, QudaInvertParam invert_param)
 {
   if (invert_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
-    printf("QUDA error: half precision not supported on cpu\n");
-    exit(-1);
+    errorQuda("Half precision not supported on CPU");
   }
 
   // X should contain the dimensions of the even/odd sublattice

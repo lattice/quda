@@ -4,8 +4,6 @@ Version 0.x
 - Introduced new interface functions newQudaGaugeParam() and
   newQudaInvertParam() to allow for enhanced error checking.  See
   invert_test for an example of their use.
-- Modified loadCloverQuda() to take gauge_param as an additional
-  parameter.
 - Added auto-tuning blas to improve performance (see README for details).
 - Improved stability of the half precision 8-parameter SU(3)
   reconstruction (with thanks to Guochun Shi).

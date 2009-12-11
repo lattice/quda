@@ -2,8 +2,13 @@
 
 // This file defines functions to either initialize, check, or print
 // the QUDA gauge and inverter parameters.  It gets included in
-// invert_quda.cpp, after either INIT_PARAM, CHECK_PARAM, or
+// interface_quda.cpp, after either INIT_PARAM, CHECK_PARAM, or
 // PRINT_PARAM is defined.
+//
+// If you're reading this file because it was mentioned in a "QUDA
+// error" message, it probably means that you forgot to set one of the
+// gauge or inverter parameters in your application before calling
+// loadGaugeQuda() or invertQuda().
 
 #include <float.h>
 #define INVALID_INT QUDA_INVALID_ENUM
@@ -12,18 +17,12 @@
 // define macro to carry out the appropriate action for a given parameter
 
 #if defined INIT_PARAM
-#define P(x, val) do { ret.x = val; } while (0)
+#define P(x, val) ret.x = val
 #elif defined CHECK_PARAM
-#define P(x, val) do {                           \
-    if (param->x == val) {                       \
-      printf("QUDA error: " #x " undefined.\n"); \
-      exit(1);                                   \
-    }                                            \
-} while (0)
+#define P(x, val) if (param->x == val) errorQuda("Parameter " #x " undefined")
 #elif defined PRINT_PARAM
-#define P(x, val) do {                                                       \
-    printf((val == INVALID_DOUBLE) ? #x " = %g\n" : #x " = %d\n", param->x); \
-} while (0)
+#define P(x, val) \
+  printfQuda((val == INVALID_DOUBLE) ? #x " = %g\n" : #x " = %d\n", param->x)
 #else
 #error INIT_PARAM, CHECK_PARAM, and PRINT_PARAM all undefined in check_params.h
 #endif
@@ -38,7 +37,7 @@ QudaGaugeParam newQudaGaugeParam(void) {
 static void checkGaugeParam(QudaGaugeParam *param) {
 #else
 void printQudaGaugeParam(QudaGaugeParam *param) {
-  printf("QUDA Gauge Parameters:\n");
+  printfQuda("QUDA Gauge Parameters:\n");
 #endif
 
   P(X[0], INVALID_INT);
@@ -76,7 +75,7 @@ QudaInvertParam newQudaInvertParam(void) {
 static void checkInvertParam(QudaInvertParam *param) {
 #else
 void printQudaInvertParam(QudaInvertParam *param) {
-  printf("QUDA Inverter Parameters:\n");
+  printfQuda("QUDA Inverter Parameters:\n");
 #endif
 
   P(dslash_type, QUDA_INVALID_DSLASH);

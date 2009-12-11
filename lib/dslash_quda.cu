@@ -47,8 +47,7 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 
   if (Vh%BLOCK_DIM != 0) {
-    printf("Error, volume not a multiple of the thread block size\n");
-    exit(-1);
+    errorQuda("Error, Volume not a multiple of the thread block size");
   }
 
   int X1 = 2*gauge.X[0];
@@ -122,12 +121,7 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
 
-  cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("initDslashConstants error: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }
+  checkCudaError();
 
   initDslash = 1;
 }
@@ -175,13 +169,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   } else if (in.precision == QUDA_HALF_PRECISION) {
     dslashHCuda(out, gauge, in, parity, dagger);
   }
-
-  cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("dslashCuda error: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }
+  checkCudaError();
 
   dslash_quda_flops += 1320*in.volume;
 }
@@ -386,13 +374,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   } else if (in.precision == QUDA_HALF_PRECISION) {
     dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
   }
-
-  cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("dslashXpayCuda error: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }
+  checkCudaError();
 
   dslash_quda_flops += (1320+48)*in.volume;
 }
@@ -616,8 +598,7 @@ void MatPCCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, double kappa,
     dslashCuda(tmp, gauge, in, 0, dagger);
     dslashXpayCuda(out, gauge, tmp, 1, dagger, in, kappa2); 
   } else {
-    printf("QUDA error: matpc_type not valid for plain Wilson\n");
-    exit(-1);
+    errorQuda("matpc_type not valid for plain Wilson");
   }
 }
 
@@ -666,13 +647,7 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
   }
-
-  cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("cloverDslashCuda error: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }
+  checkCudaError();
 
   dslash_quda_flops += (1320+504)*in.volume;
 }
@@ -1179,13 +1154,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
   }
-
-  cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("cloverDslashXpayCuda error: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }
+  checkCudaError();
 
   dslash_quda_flops += (1320+504+48)*in.volume;
 }
@@ -1725,7 +1694,7 @@ void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover, FullC
 
   if (((matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) || (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC))
       && (clover.even.clover == NULL)) {
-    printf("QUDA error: For asymmetric matpc_type, the uninverted clover term must be loaded\n");
+    errorQuda("For asymmetric matpc_type, the uninverted clover term must be loaded");
   }
 
   // FIXME: For asymmetric, a "dslashCxpay" kernel would improve performance.
@@ -1746,8 +1715,7 @@ void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover, FullC
       cloverDslashCuda(tmp, gauge, cloverInv, in, 0, dagger);
       cloverDslashXpayCuda(out, gauge, cloverInv, tmp, 1, dagger, in, kappa2); 
     } else {
-      printf("QUDA error: invalid matpc_type\n");
-      exit(-1);
+      errorQuda("Invalid matpc_type");
     }
   } else { // symmetric preconditioning, dagger
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
@@ -1759,8 +1727,7 @@ void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover, FullC
       cloverDslashCuda(tmp, gauge, cloverInv, out, 0, dagger);
       dslashXpayCuda(out, gauge, tmp, 1, dagger, in, kappa2); 
     } else {
-      printf("QUDA error: invalid matpc_type\n");
-      exit(-1);
+      errorQuda("Invalid matpc_type");
     }
   }
 }
@@ -1803,13 +1770,7 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverHCuda(out, gauge, clover, in, parity);
   }
-
-  cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("cloverCuda error: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }
+  checkCudaError();
 
   dslash_quda_flops += 504*in.volume;
 }

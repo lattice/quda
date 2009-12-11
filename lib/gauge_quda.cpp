@@ -488,15 +488,13 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
 
   if (!cudaGauge->even) {
     if (cudaMalloc((void **)&cudaGauge->even, cudaGauge->bytes) == cudaErrorMemoryAllocation) {
-      printf("Error allocating even gauge field\n");
-      exit(0);
+      errorQuda("Error allocating even gauge field");
     }
   }
    
   if (!cudaGauge->odd) {
     if (cudaMalloc((void **)&cudaGauge->odd, cudaGauge->bytes) == cudaErrorMemoryAllocation) {
-      printf("Error allocating even odd gauge field\n");
-      exit(0);
+      errorQuda("Error allocating even odd gauge field");
     }
   }
 
@@ -531,22 +529,14 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
     packCPSGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, Vh, pad);
     packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh, pad);    
   } else {
-    printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_order);
-    exit(-1);
-  }
-    
-  cudaError_t error = cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
-  if (error != cudaSuccess) {
-    printf("Error: %s\n", cudaGetErrorString(error));
-    exit(-1);
+    errorQuda("Invalid gauge_order");
   }
 
-  error = cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);
-  if (error != cudaSuccess) {
-    printf("Error: %s\n", cudaGetErrorString(error));
-    exit(-1);
-  }
-  
+  cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
+  checkCudaError();
+    
+  cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);
+  checkCudaError();
     
 #ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedEven);
@@ -583,8 +573,7 @@ static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, Gauge
     unpackCPSGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, Vh, pad);
     unpackCPSGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, Vh, pad);
   } else {
-    printf("Sorry, %d GaugeFieldOrder not supported\n", gauge_order);
-    exit(-1);
+    errorQuda("Invalid gauge_order");
   }
     
 #ifndef __DEVICE_EMULATION__
@@ -602,8 +591,7 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision cuda_prec,
 		      Tboundary t_boundary, int *XX, double anisotropy, int pad)
 {
   if (cpu_prec == QUDA_HALF_PRECISION) {
-    printf("QUDA error: half precision not supported on cpu\n");
-    exit(-1);
+    errorQuda("Half precision not supported on CPU");
   }
 
   Anisotropy = anisotropy;
@@ -658,8 +646,7 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision cuda_prec,
 void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, Precision cpu_prec, GaugeFieldOrder gauge_order)
 {
   if (cpu_prec == QUDA_HALF_PRECISION) {
-    printf("QUDA error: half precision not supported on cpu\n");
-    exit(-1);
+    errorQuda("Half precision not supported on CPU");
   }
 
   if (cudaGauge->precision == QUDA_DOUBLE_PRECISION) {

@@ -64,7 +64,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
   int k=0;
   int rUpdate = 0;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printf("%d iterations, r2 = %e\n", k, r2);
+  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
 
   blas_quda_flops = 0;
 
@@ -112,7 +112,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
 
     k++;
     if (invert_param->verbosity >= QUDA_VERBOSE)
-      printf("%d iterations, r2 = %e\n", k, r2);
+      printfQuda("%d iterations, r2 = %e\n", k, r2);
   }
 
   if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
@@ -122,13 +122,13 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
   
 
   if (k==invert_param->maxiter) 
-    printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
+    warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
 
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
-    printf("Reliable updates = %d\n", rUpdate);
+    printfQuda("Reliable updates = %d\n", rUpdate);
 
   float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
-  //  printf("%f gflops\n", gflops / stopwatchReadSeconds());
+  //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops = gflops;
   invert_param->iter = k;
 
@@ -140,7 +140,7 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
   MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, y);
   double true_res = xmyNormCuda(b, r);
   
-  printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
+  printfQuda("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
 	 k, r2, true_res / b2);
 #endif
 

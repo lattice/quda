@@ -40,8 +40,7 @@ FullClover cudaCloverInvSloppy;
 static void checkPrecision(QudaPrecision precision)
 {
   if (precision == QUDA_HALF_PRECISION) {
-    printf("Half precision not supported on cpu\n");
-    exit(-1);
+    errorQuda("Half precision not supported on CPU");
   }
 }
 
@@ -50,29 +49,26 @@ void initQuda(int dev)
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
-    fprintf(stderr, "No devices supporting CUDA.\n");
-    exit(EXIT_FAILURE);
+    errorQuda("No devices supporting CUDA");
   }
 
   for(int i=0; i<deviceCount; i++) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
-    fprintf(stderr, "found device %d: %s\n", i, deviceProp.name);
+    fprintf(stderr, "QUDA: Found device %d: %s\n", i, deviceProp.name);
   }
 
-  if(dev<0) {
+  if (dev < 0) {
     dev = deviceCount - 1;
-    //dev = 0;
   }
 
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
   if (deviceProp.major < 1) {
-    fprintf(stderr, "Device %d does not support CUDA.\n", dev);
-    exit(EXIT_FAILURE);
+    errorQuda("Device %d does not support CUDA", dev);
   }
 
-  fprintf(stderr, "Using device %d: %s\n", dev, deviceProp.name);
+  fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
   cudaSetDevice(dev);
 
   cudaGaugePrecise.even = NULL;
@@ -126,30 +122,25 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   restoreGaugeField(h_gauge, &cudaGaugePrecise, param->cpu_prec, param->gauge_order);
 }
 
-void loadCloverQuda(void *h_clover, void *h_clovinv, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
   if (!h_clover && !h_clovinv) {
-    printf("QUDA error: loadCloverQuda() called with neither clover term nor inverse\n");
-    exit(-1);
+    errorQuda("loadCloverQuda() called with neither clover term nor inverse");
   }
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
-    printf("QUDA error: half precision not supported on CPU\n");
-    exit(-1);
+    errorQuda("Half precision not supported on CPU");
   }
   if (cudaGaugePrecise.even == NULL) {
-    printf("QUDA error: gauge field must be loaded before clover\n");
-    exit(-1);
+    errorQuda("Gauge field must be loaded before clover");
   }
   if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
-    printf("QUDA error: wrong dslash_type in loadCloverQuda()\n");
-    exit(-1);
+    errorQuda("Wrong dslash_type in loadCloverQuda()");
   }
 
   int X[4];
   for (int i=0; i<4; i++) {
-    X[i] = gauge_param->X[i];
+    X[i] = cudaGaugePrecise.X[i];
   }
-  X[0] /= 2; // dimensions of the even-odd sublattice
 
   inv_param->cloverGiB = 0;
 
@@ -172,8 +163,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaGaugeParam *gauge_param
 
   allocateCloverField(&cudaCloverInvPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
   if (!h_clovinv) {
-    printf("QUDA error: clover term inverse not implemented yet\n");
-    exit(-1);
+    errorQuda("Clover term inverse not implemented yet");
   } else {
     loadCloverField(cudaCloverInvPrecise, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
   }
@@ -232,8 +222,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     cloverDslashCuda(out, cudaGaugePrecise, cudaCloverInvPrecise, in, parity, dagger);
   } else {
-    printf("QUDA error: unsupported dslash_type\n");
-    exit(-1);
+    errorQuda("Unsupported dslash_type");
   }
   retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -261,8 +250,7 @@ void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
     cloverMatPCCuda(out, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, in, kappa,
 		    tmp, inv_param->matpc_type, dagger);
   } else {
-    printf("QUDA error: unsupported dslash_type\n");
-    exit(-1);
+    errorQuda("Unsupported dslash_type");
   }
   retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -291,8 +279,7 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
     cloverMatPCDagMatPCCuda(out, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, in, kappa,
 			    tmp, inv_param->matpc_type);
   } else {
-    printf("QUDA error: unsupported dslash_type\n");
-    exit(-1);
+    errorQuda("Unsupported dslash_type");
   }
   retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -321,8 +308,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
     cloverMatCuda(out, cudaGaugePrecise, cudaCloverPrecise, in, kappa, tmp, dagger);
     freeParitySpinor(tmp);
   } else {
-    printf("QUDA error: unsupported dslash_type\n");
-    exit(-1);
+    errorQuda("Unsupported dslash_type");
   }
   retrieveSpinorField(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -388,8 +374,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 	// in = b_o + k D_oe b_e
 	dslashXpayCuda(in, cudaGaugePrecise, b.even, 1, 0, b.odd, kappa);
       } else {
-	printf("QUDA error: matpc_type not valid for plain Wilson\n");
-	exit(-1);
+	errorQuda("matpc_type not valid for plain Wilson");
       }
     } else if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       if (param->matpc_type == QUDA_MATPC_EVEN_EVEN) {
@@ -415,12 +400,10 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
 	cloverCuda(aux, cudaGaugePrecise, cudaCloverInvPrecise, b.even, 0); // safe even when aux = b.even
 	dslashXpayCuda(in, cudaGaugePrecise, aux, 1, 0, b.odd, kappa);
       } else {
-	printf("QUDA error: invalid matpc_type\n");
-	exit(-1);
+	errorQuda("Invalid matpc_type");
       }
     } else {
-      printf("QUDA error: unsupported dslash_type\n");
-      exit(-1);
+      errorQuda("Unsupported dslash_type");
     }
 
   } else if (param->solution_type == QUDA_MATPC_SOLUTION || 
@@ -465,8 +448,7 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
     invertBiCGstabCuda(out, in, tmp, param, QUDA_DAG_NO);
     break;
   default:
-    printf("Inverter type %d not implemented\n", param->inv_type);
-    exit(-1);
+    errorQuda("Inverter type %d not implemented", param->inv_type);
   }
   
   if (param->solution_type == QUDA_MAT_SOLUTION) {

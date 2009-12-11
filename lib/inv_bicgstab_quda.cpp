@@ -13,12 +13,7 @@
 void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cloverInv, ParitySpinor in, 
 	    QudaInvertParam *invert_param, ParitySpinor tmp, DagType dag_type) {
 
-  {cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("B4 MatVec: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }}
+  checkCudaError();
 
   double kappa = invert_param->kappa;
   if (invert_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
@@ -30,14 +25,7 @@ void MatVec(ParitySpinor out, FullGauge gauge,  FullClover clover, FullClover cl
     cloverMatPCCuda(out, gauge, clover, cloverInv, in, kappa, tmp,
 		    invert_param->matpc_type, dag_type);
   }
-
-  cudaError_t error = cudaGetLastError();
-  cudaGetLastError();
-  if(error != cudaSuccess) {
-    printf("MatVec: %s\n",  cudaGetErrorString(error));
-    exit(0);
-  }
-  
+  checkCudaError();
 }
 
 void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r, 
@@ -95,7 +83,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
   double maxrr = rNorm;
   double maxrx = rNorm;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printf("%d iterations, r2 = %e\n", k, r2);
+  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
 
   blas_quda_flops = 0;
   dslash_quda_flops = 0;
@@ -166,20 +154,20 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     }
     
     k++;
-    if (invert_param->verbosity >= QUDA_VERBOSE) printf("%d iterations, r2 = %e\n", k, r2);
+    if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
   }
   
   if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
   xpyCuda(y, x);
     
-  if (k==invert_param->maxiter) printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
+  if (k==invert_param->maxiter) warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printf("Reliable updates = %d\n", rUpdate);
+  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("Reliable updates = %d\n", rUpdate);
   
   invert_param->secs += stopwatchReadSeconds();
   
   float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
-  //  printf("%f gflops\n", gflops / stopwatchReadSeconds());
+  //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;
   invert_param->iter += k;
   
@@ -190,7 +178,7 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
   copyCuda(b, src);
     
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
-    printf("Converged after %d iterations, r2 = %e, true_r2 = %e\n", k, sqrt(r2/b2), sqrt(true_res / b2));    
+    printfQuda("Converged after %d iterations, r2 = %e, true_r2 = %e\n", k, sqrt(r2/b2), sqrt(true_res / b2));    
 #endif
 
   if (invert_param->cuda_prec_sloppy != x.precision) {

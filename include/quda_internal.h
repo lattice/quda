@@ -3,6 +3,10 @@
 
 #include <cuda_runtime.h>
 
+#ifdef USE_QMP
+#include <qmp.h>
+#endif
+
 //#define L1 4 // "x" dimension
 //#define L2 4 // "y" dimension
 //#define L3 4 // "z" dimension
@@ -31,6 +35,7 @@
 #define Tboundary QudaTboundary
 
 #include <enum_quda.h>
+#include <util_quda.h>
 
 #ifdef __cplusplus
 extern "C" {

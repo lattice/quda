@@ -52,7 +52,7 @@ void init() {
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
@@ -69,7 +69,7 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
 
   gauge_param.ga_pad = 0;
   inv_param.sp_pad = 0;
@@ -143,7 +143,7 @@ void init() {
   gauge = cudaGaugePrecise;
 
   if (clover_yes) {
-    loadCloverQuda(NULL, hostCloverInv, &gauge_param, &inv_param);
+    loadCloverQuda(NULL, hostCloverInv, &inv_param);
     clover = cudaCloverPrecise;
     cloverInv = cudaCloverInvPrecise;
   }
