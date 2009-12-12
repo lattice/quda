@@ -1,6 +1,7 @@
 // *** CUDA DSLASH DAGGER ***
 
-#define SHARED_FLOATS_PER_THREAD 0
+#define SHARED_FLOATS_PER_THREAD 8
+
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
@@ -303,14 +304,14 @@
 #define c32_32_re c12_12_re
 
 // output spinor
-volatile spinorFloat o00_re;
-volatile spinorFloat o00_im;
-volatile spinorFloat o01_re;
-volatile spinorFloat o01_im;
-volatile spinorFloat o02_re;
-volatile spinorFloat o02_im;
-volatile spinorFloat o10_re;
-volatile spinorFloat o10_im;
+#define o00_re s[0*SHARED_STRIDE]
+#define o00_im s[1*SHARED_STRIDE]
+#define o01_re s[2*SHARED_STRIDE]
+#define o01_im s[3*SHARED_STRIDE]
+#define o02_re s[4*SHARED_STRIDE]
+#define o02_im s[5*SHARED_STRIDE]
+#define o10_re s[6*SHARED_STRIDE]
+#define o10_im s[7*SHARED_STRIDE]
 volatile spinorFloat o11_re;
 volatile spinorFloat o11_im;
 volatile spinorFloat o12_re;
@@ -344,6 +345,18 @@ int x3 = z2 - x4*X3;
 int x1odd = (x2 + x3 + x4 + oddBit) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
+
+#ifdef SPINOR_DOUBLE
+#define SHARED_STRIDE 8  // to avoid bank conflicts
+extern __shared__ spinorFloat sd_data[];
+volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
+#else
+#define SHARED_STRIDE 16 // to avoid bank conflicts
+extern __shared__ spinorFloat ss_data[];
+volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
+#endif
 
 o00_re = o00_im = 0;
 o01_re = o01_im = 0;
@@ -1428,6 +1441,8 @@ o32_re = o32_im = 0;
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
+#undef SHARED_STRIDE
+
 #undef A_re
 #undef A_im
 

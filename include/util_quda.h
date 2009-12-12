@@ -39,7 +39,7 @@
 #define checkCudaError() do {                          \
   cudaError_t error = cudaGetLastError();              \
   if (error != cudaSuccess)                            \
-    errorQuda("CUDA: %s", cudaGetErrorString(error));  \
+    errorQuda("(CUDA) %s", cudaGetErrorString(error));  \
 } while (0)
 
 #ifdef __cplusplus

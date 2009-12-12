@@ -133,7 +133,7 @@ def a_im(b, s, c): return "a"+`(s+2*b)`+`c`+"_im"
 def prolog():
     str = []
     str.append("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
-    str.append("#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n")
+    str.append("#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n\n")
 #    str.append("#define SHARED_BYTES_DOUBLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(double))\n\n")
 #    str.append("#define SHARED_BYTES_SINGLE (BLOCK_DIM*SHARED_FLOATS_PER_THREAD*sizeof(float))\n\n")
     
@@ -251,11 +251,11 @@ def prolog():
         for c in range(0,3):
             i = 3*s+c
             if 2*i < sharedFloats:
-                str.append("#define "+out_re(s,c)+" s["+`(2*i+0)`+"]\n")
+                str.append("#define "+out_re(s,c)+" s["+`(2*i+0)`+"*SHARED_STRIDE]\n")
             else:
                 str.append("volatile spinorFloat "+out_re(s,c)+";\n")
             if 2*i+1 < sharedFloats:
-                str.append("#define "+out_im(s,c)+" s["+`(2*i+1)`+"]\n")
+                str.append("#define "+out_im(s,c)+" s["+`(2*i+1)`+"*SHARED_STRIDE]\n")
             else:
                 str.append("volatile spinorFloat "+out_im(s,c)+";\n")
     str.append("\n")
@@ -282,11 +282,15 @@ int X = 2*sid + x1odd;
     
     if sharedFloats > 0:
         str.append("#ifdef SPINOR_DOUBLE\n")
+        str.append("#define SHARED_STRIDE 8  // to avoid bank conflicts\n")
         str.append("extern __shared__ spinorFloat sd_data[];\n")
-        str.append("volatile spinorFloat *s = sd_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n")
+        str.append("volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)\n")
+        str.append("                                  + (threadIdx.x % SHARED_STRIDE);\n")
         str.append("#else\n")
+        str.append("#define SHARED_STRIDE 16 // to avoid bank conflicts\n")
         str.append("extern __shared__ spinorFloat ss_data[];\n")
-        str.append("volatile spinorFloat *s = ss_data+SHARED_FLOATS_PER_THREAD*threadIdx.x;\n")
+        str.append("volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)\n")
+        str.append("                                  + (threadIdx.x % SHARED_STRIDE);\n")
         str.append("#endif\n\n")
     
     for s in range(0,4):
@@ -580,8 +584,8 @@ def epilog():
 """)
 
     str.append("// undefine to prevent warning when precision is changed\n")
-
     str.append("#undef spinorFloat\n")
+    str.append("#undef SHARED_STRIDE\n\n")
 
     str.append("#undef A_re\n")
     str.append("#undef A_im\n\n")
@@ -619,8 +623,8 @@ def epilog():
 def generate():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + clover() + epilog()
 
-# To fit 192 threads/SM with 16K shared memory, set sharedFloats to 19 or smaller
-sharedFloats = 0
+# To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
+sharedFloats = 8
 
 dagger = False
 print sys.argv[0] + ": generating dslash_core.h";

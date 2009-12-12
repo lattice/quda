@@ -143,7 +143,7 @@ void init() {
   gauge = cudaGaugePrecise;
 
   if (clover_yes) {
-    loadCloverQuda(NULL, hostCloverInv, &inv_param);
+    loadCloverQuda(hostClover, hostCloverInv, &inv_param);
     clover = cudaCloverPrecise;
     cloverInv = cudaCloverInvPrecise;
   }
