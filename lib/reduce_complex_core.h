@@ -132,7 +132,9 @@ cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPre
 
   // copy result from device to host, and perform final reduction on CPU
   cudaMemcpy(h_reduceComplex, d_reduceComplex, blasGrid.x*sizeof(QudaSumComplex), cudaMemcpyDeviceToHost);
-  checkCudaError();
+
+  // for a tuning run, let blas_test check the error condition
+  if (!blasTuning) checkCudaError();
   
   cuDoubleComplex gpu_result;
   gpu_result.x = 0;

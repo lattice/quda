@@ -20,6 +20,9 @@ extern "C" {
   void initBlas(void); 
   void endBlas(void);
 
+  void setBlasTuning(int tuning);
+  void setBlasParam(int kernel, int prec, int threads, int blocks);
+
   void zeroCuda(ParitySpinor a);
   void copyCuda(ParitySpinor dst, ParitySpinor src);
   

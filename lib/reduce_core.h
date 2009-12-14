@@ -114,12 +114,12 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision pr
 
   // copy result from device to host, and perform final reduction on CPU
   cudaMemcpy(h_reduceFloat, d_reduceFloat, blasGrid.x*sizeof(QudaSumFloat), cudaMemcpyDeviceToHost);
-  checkCudaError();
+
+  // for a tuning run, let blas_test check the error condition
+  if (!blasTuning) checkCudaError();
 
   double cpu_sum = 0;
   for (int i = 0; i < blasGrid.x; i++) cpu_sum += h_reduceFloat[i];
   
   return cpu_sum;
 }
-
-

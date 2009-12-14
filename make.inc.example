@@ -6,7 +6,8 @@ CPU_ARCH = x86_64   # x86 or x86_64
 GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
 GPU_EMU  = false    # set to 'true' for device emulation
 
-PYTHON = python2.6  # python 2.5 or later required for 'make gen'
+PYTHON = python     # python 2.5 or later required for 'make gen'
+DEVICE = 0          # CUDA device to use for 'make tune'
 
 ######
 

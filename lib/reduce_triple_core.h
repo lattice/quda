@@ -146,7 +146,9 @@ double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision p
 
   // copy result from device to host, and perform final reduction on CPU
   cudaMemcpy(h_reduceFloat3, d_reduceFloat3, blasGrid.x*sizeof(QudaSumFloat3), cudaMemcpyDeviceToHost);
-  checkCudaError();
+
+  // for a tuning run, let blas_test check the error condition
+  if (!blasTuning) checkCudaError();
   
   double3 gpu_result;
   gpu_result.x = 0;

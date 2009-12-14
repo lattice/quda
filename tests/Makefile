@@ -25,6 +25,9 @@ pack_test: pack_test.o test_util.o dslash_reference.o $(QUDA)
 blas_test: blas_test.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
+tune: blas_test
+	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
+
 clean:
 	-rm -f *.o $(TESTS)
 
@@ -37,4 +40,4 @@ clean:
 %.o: %.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-.PHONY: all clean
+.PHONY: all tune clean

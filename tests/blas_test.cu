@@ -48,12 +48,19 @@ void init() {
 
   // need single parity dimensions
   X[0] /= 2;
+
   v = allocateParitySpinor(X, cuda_prec, sp_pad);
   w = allocateParitySpinor(X, cuda_prec, sp_pad);
   x = allocateParitySpinor(X, cuda_prec, sp_pad);
   y = allocateParitySpinor(X, cuda_prec, sp_pad);
   z = allocateParitySpinor(X, cuda_prec, sp_pad);
   p = allocateParitySpinor(X, other_prec, sp_pad);
+
+  // check for successful allocation
+  checkCudaError();
+
+  // turn off error checking in blas kernels
+  setBlasTuning(1);
 }
 
 void end() {
@@ -186,33 +193,35 @@ double benchmark(int kernel) {
 
 
 int main(int argc, char** argv) {
+
   int dev = 0;
+  if (argc == 2) dev = atoi(argv[1]);
   initQuda(dev);
 
   int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21};
   char names[][100] = {
-    "copyCuda                           ",
-    "axpbyCuda                          ",
-    "xpyCuda                            ",
-    "axpyCuda                           ",
-    "xpayCuda                           ",
-    "mxpyCuda                           ",
-    "axCuda                             ",
-    "caxpyCuda                          ",
-    "caxpbyCuda                         ",
-    "cxpaypbzCuda                       ",
-    "axpyZpbxCuda                       ",
-    "caxpbypzYmbwCuda                   ",
-    "sumCuda                            ",
-    "normCuda                           ",
-    "reDotProductCuda                   ",
-    "axpyNormCuda                       ",
-    "xmyNormCuda                        ",
-    "cDotProductCuda                    ",
-    "xpaycDotzyCuda                     ",
-    "cDotProductNormACuda               ",
-    "cDotProductNormBCuda               ",
-    "caxpbypzYmbwcDotProductWYNormYQuda "
+    "copyCuda",
+    "axpbyCuda",
+    "xpyCuda",
+    "axpyCuda",
+    "xpayCuda",
+    "mxpyCuda",
+    "axCuda",
+    "caxpyCuda",
+    "caxpbyCuda",
+    "cxpaypbzCuda",
+    "axpyZpbxCuda",
+    "caxpbypzYmbwCuda",
+    "sumCuda",
+    "normCuda",
+    "reDotProductCuda",
+    "axpyNormCuda",
+    "xmyNormCuda",
+    "cDotProductCuda",
+    "xpaycDotzyCuda",
+    "cDotProductNormACuda",
+    "cDotProductNormBCuda",
+    "caxpbypzYmbwcDotProductWYNormYQuda"
   };
 
   FILE *blas_out = fopen("blas_param.h", "w");
@@ -230,9 +239,10 @@ int main(int argc, char** argv) {
       int threads_max = 0; 
       int blocks_max = 0;
       for (int thread=0; thread<Nthreads; thread++) {
-	blas_threads[prec][i] = blockSizes[thread];
 	for (int grid=0; grid<Ngrids; grid++) {
-	  blas_blocks[prec][i] = gridSizes[grid];
+	  setBlasParam(i, prec, blockSizes[thread], gridSizes[grid]);
+
+	  if (i==12) printfQuda("warmup    %d   %d\n", blockSizes[thread], gridSizes[grid]); // DEBUG
 
 	  // first do warmup run
 	  nIters = 1;
@@ -241,27 +251,42 @@ int main(int argc, char** argv) {
 	  nIters = 300;
 	  blas_quda_flops = 0;
 	  blas_quda_bytes = 0;
-	  
+
+	  // DEBUG	  
+	  {
+	    cudaError_t error = cudaGetLastError();
+	    if (error != cudaSuccess) warningQuda("%s", cudaGetErrorString(error));
+	  }
+	  if (i==12) printfQuda("running   %d   %d\n", blockSizes[thread], gridSizes[grid]);
+	  // END DEBUG
+
 	  double secs = benchmark(kernels[i]);
 	  double flops = blas_quda_flops;
 	  double bytes = blas_quda_bytes;
 	  
 	  double gflops = (flops*1e-9)/(secs);
 	  double gbytes = bytes/(secs*(1<<30));
+
+	  cudaError_t error = cudaGetLastError();
+
+	  if (error != cudaSuccess) warningQuda("%s", cudaGetErrorString(error)); // DEBUG
 	  
-	  if (gbytes > gbytes_max && gbytes < 300) { // prevents selection of failed parameters
+	  if (gbytes > gbytes_max && error == cudaSuccess) { // prevents selection of failed parameters
 	    gflops_max = gflops;
 	    gbytes_max = gbytes;
 	    threads_max = blockSizes[thread];
 	    blocks_max = gridSizes[grid];
 	  }
 	  
-	  //printf("%d %d %s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
+	  //printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
 	  // blockSizes[thread], gridSizes[grid], names[i], secs, flops, gflops, gbytes);
 	}
       }
+
+      if (threads_max == 0 || blocks_max == 0)
+	errorQuda("Autotuning failed for %s kernel", names[i]);
       
-      printf("%s Performance maximum at %d threads per block, %d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
+      printf("%-36s Performance maximum at %d threads per block, %d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
 	     names[i], threads_max, blocks_max, gflops_max, gbytes_max);
 
       fprintf(blas_out, "// Kernel: %s\n", names[i]);

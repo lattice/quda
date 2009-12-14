@@ -41,8 +41,8 @@ int blas_blocks[3][22];
 static dim3 blasBlock;
 static dim3 blasGrid;
 
-void initBlas(void) {
-  
+void initBlas(void)
+{  
   if (!d_reduceFloat) {
     if (cudaMalloc((void**) &d_reduceFloat, REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating device reduction array");
@@ -84,13 +84,28 @@ void initBlas(void) {
 
 }
 
-void endBlas(void) {
+void endBlas(void)
+{
   if (d_reduceFloat) cudaFree(d_reduceFloat);
   if (d_reduceComplex) cudaFree(d_reduceComplex);
   if (d_reduceFloat3) cudaFree(d_reduceFloat3);
   if (h_reduceFloat) cudaFreeHost(h_reduceFloat);
   if (h_reduceComplex) cudaFreeHost(h_reduceComplex);
   if (h_reduceFloat3) cudaFreeHost(h_reduceFloat3);
+}
+
+// blasTuning = 1 turns off error checking
+static int blasTuning = 0;
+
+void setBlasTuning(int tuning)
+{
+  blasTuning = tuning;
+}
+
+void setBlasParam(int kernel, int prec, int threads, int blocks)
+{
+  blas_threads[prec][kernel] = threads;
+  blas_blocks[prec][kernel] = blocks;
 }
 
 void setBlock(int kernel, int length, QudaPrecision precision) {
