@@ -322,11 +322,11 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
   checkPrecision(param->cpu_prec);
 
   int slenh = cudaGaugePrecise.volume*spinorSiteSize;
-  param->spinorGiB = (double)slenh*(param->cuda_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double): sizeof(float);
+  param->spinorGiB = (double)slenh * (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
   if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO)
-    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 5 : 7)/(1<<30);
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 5 : 7)/(double)(1<<30);
   else
-    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 8 : 9)/(1<<30);
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 8 : 9)/(double)(1<<30);
 
   param->secs = 0;
   param->gflops = 0;
