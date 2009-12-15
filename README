@@ -16,7 +16,7 @@ BiCGstab are provided, with support for double, single, and half
 
 Software compatibility:
 
-The library has been tested under linux (CentOS 5.3 and Ubuntu 8.04)
+The library has been tested under Linux (CentOS 5.3 and Ubuntu 8.04)
 using release 2.3 of the CUDA toolkit.  There are known issues with
 releases 2.1 and 2.2, but 2.0 should work if one is forced to use an
 older version (for compatibility with an old driver, for example).
@@ -45,6 +45,24 @@ edit the first few lines to specify the CUDA install path, the
 platform (x86 or x86_64), and the GPU architecture (see "Hardware
 compatibility" above).  Then type 'make' to build the library.
 
+As an optional step, 'make tune' will invoke tests/blas_test to
+perform autotuning of the various BLAS-like functions needed by the
+inverters.  This involves testing many combinations of parameters
+(corresponding to different numbers of CUDA threads per block and
+blocks per grid for each kernel) and writing the optimal values to
+lib/blas_param.h.  The new values will take effect the next time the
+library is built.  Ideally, the autotuning should be performed on the
+machine where the library is to be used, since the optimal parameters
+will depend on the CUDA device and host hardware.
+
+In summary, for an optimized install, run
+
+    make && make tune && make
+
+By default, the autotuning is performed using CUDA device 0.  To
+select a different device number, set DEVICE in make.inc
+appropriately.
+
 
 Using the library:
 
@@ -53,21 +71,16 @@ against lib/libquda.a, and study tests/invert_test.c for an example of
 the interface.  The various inverter options are enumerated in
 include/enum_quda.h.
 
-The lib/blas_quda.cu file contains all of the BLAS-like functions
-required for the inverters.  The threads per block and blocks per grid
-parameters are auto-tuned using the blas_test function in tests/, and
-the output stored in blas_param.h which is included here.  These
-optimal values may change as a function of the CUDA device and the
-host hardware, so re-running blas_test and copying over the output
-blas_param.h into lib/ and recompiling the blas library may provide
-extra performance.
-
 
 Known issues:
 
-* One of the stages of the build process requires over 5 GB of memory.
-  If too little memory is available, the compilation will either take
-  a very long time (given enough swap space) or fail completely.
+* When building for the 'sm_13' GPU architecture (which enables double
+  precision support), one of the stages in the build process requires
+  over 5 GB of memory.  If too little memory is available, the
+  compilation will either take a very long time (given enough swap
+  space) or fail completely.  In addition, the CUDA C compiler
+  requires over 1 GB of disk space in /tmp for the creation of
+  temporary files.
 
 * For compatibility with CUDA, on 32-bit platforms the library is compiled
   with the GCC option -malign-double.  This differs from the GCC default
@@ -88,7 +101,7 @@ M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
 Lattice QCD systems of equations using mixed precision solvers on
 GPUs" (2009), arXiv:0911.3191 [hep-lat].
 
-Please also drop us a note so that we can inform you of updates and
+Please also drop us a note so that we may inform you of updates and
 bug-fixes.  The most recent public release will always be available
 online at http://lattice.bu.edu/quda/
 

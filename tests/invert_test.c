@@ -3,17 +3,18 @@
 #include <time.h>
 #include <math.h>
 
-#include <quda.h>
-
 #include <test_util.h>
 #include <blas_reference.h>
 #include <dslash_reference.h>
 
+// in a typical application, quda.h is the only QUDA header required
+#include <quda.h>
+
 int main(int argc, char **argv)
 {
-  int device = 0;
+  // set QUDA parameters
 
-  void *gauge[4], *clover_inv;
+  int device = 0; // CUDA device number
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -22,7 +23,6 @@ int main(int argc, char **argv)
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
   gauge_param.X[3] = 48;
-  setDims(gauge_param.X);
 
   gauge_param.anisotropy = 1.0;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -72,8 +72,15 @@ int main(int argc, char **argv)
   }
   inv_param.verbosity = QUDA_VERBOSE;
 
+  // Everything between here and the call to initQuda() is application-specific.
+
+  // set parameters for the reference Dslash, and prepare fields to be loaded
+  setDims(gauge_param.X);
+
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+
+  void *gauge[4], *clover_inv;
 
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
@@ -98,12 +105,18 @@ int main(int argc, char **argv)
   int c0 = 0;
   construct_spinor_field(spinorIn, 1, i0, s0, c0, inv_param.cpu_prec);
 
-  double time0 = -((double)clock()); // Start the timer
+  double time0 = -((double)clock()); // start the timer
 
+  // initialize the QUDA library
   initQuda(device);
+
+  // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
+
+  // load the clover term, if desired
   if (clover_yes) loadCloverQuda(NULL, clover_inv, &inv_param);
 
+  // perform the inversion
   invertQuda(spinorOut, spinorIn, &inv_param);
 
   time0 += clock(); // stop the timer
@@ -124,6 +137,7 @@ int main(int argc, char **argv)
   double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
   printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
+  // finalize the QUDA library
   endQuda();
 
   return 0;

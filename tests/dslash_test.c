@@ -31,9 +31,9 @@ void *spinorRef, *spinorRefEven, *spinorRefOdd;
 void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
 
 double kappa = 1.0;
-int ODD_BIT = 1;
-int DAGGER_BIT = 0;
-int TRANSFER = 0; // include transfer time in the benchmark?
+int parity = 1;   // even or odd? (0 = even, 1 = odd)
+int dagger = 0;   // apply Dslash or Dslash dagger?
+int transfer = 0; // include transfer time in the benchmark?
 
 void init() {
 
@@ -75,9 +75,9 @@ void init() {
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
-  /*gauge_param.ga_pad = 24*24*12;
-  inv_param.sp_pad = 24*24*12;
-  inv_param.cl_pad = 24*24*12;*/
+  // gauge_param.ga_pad = 24*24*12;
+  // inv_param.sp_pad = 24*24*12;
+  // inv_param.cl_pad = 24*24*12;
 
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -150,7 +150,7 @@ void init() {
 
   printf("Sending fields to GPU... "); fflush(stdout);
 
-  if (!TRANSFER) {
+  if (!transfer) {
 
     gauge_param.X[0] /= 2;
     tmp = allocateParitySpinor(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
@@ -180,7 +180,7 @@ void end() {
   free(spinorGPU);
   free(spinor);
   free(spinorRef);
-  if (!TRANSFER) {
+  if (!transfer) {
     freeSpinorField(cudaSpinorOut);
     freeSpinorField(cudaSpinor);
     freeParitySpinor(tmp);
@@ -198,31 +198,31 @@ double dslashCUDA() {
   for (int i = 0; i < LOOPS; i++) {
     switch (test_type) {
     case 0:
-      if (TRANSFER) {
-	dslashQuda(spinorOdd, spinorEven, &inv_param, ODD_BIT, DAGGER_BIT);
+      if (transfer) {
+	dslashQuda(spinorOdd, spinorEven, &inv_param, parity, dagger);
       } else if (!clover_yes) {
-	dslashCuda(cudaSpinor.odd, gauge, cudaSpinor.even, ODD_BIT, DAGGER_BIT);
+	dslashCuda(cudaSpinor.odd, gauge, cudaSpinor.even, parity, dagger);
       } else {
-	cloverDslashCuda(cudaSpinor.odd, gauge, cloverInv, cudaSpinor.even, ODD_BIT, DAGGER_BIT);    
+	cloverDslashCuda(cudaSpinor.odd, gauge, cloverInv, cudaSpinor.even, parity, dagger);    
       }
       break;
     case 1:
-      if (TRANSFER) {
-	MatPCQuda(spinorOdd, spinorEven, &inv_param, DAGGER_BIT);
+      if (transfer) {
+	MatPCQuda(spinorOdd, spinorEven, &inv_param, dagger);
       } else if (!clover_yes) {
-	MatPCCuda(cudaSpinor.odd, gauge, cudaSpinor.even, kappa, tmp, inv_param.matpc_type, DAGGER_BIT);
+	MatPCCuda(cudaSpinor.odd, gauge, cudaSpinor.even, kappa, tmp, inv_param.matpc_type, dagger);
       } else {
 	cloverMatPCCuda(cudaSpinor.odd, gauge, clover, cloverInv, cudaSpinor.even, kappa, tmp,
-			inv_param.matpc_type, DAGGER_BIT);
+			inv_param.matpc_type, dagger);
       }
       break;
     case 2:
-      if (TRANSFER) {
-	MatQuda(spinorGPU, spinor, &inv_param, DAGGER_BIT);
+      if (transfer) {
+	MatQuda(spinorGPU, spinor, &inv_param, dagger);
       } else if (!clover_yes) {
-	MatCuda(cudaSpinorOut, gauge, cudaSpinor, kappa, DAGGER_BIT);
+	MatCuda(cudaSpinorOut, gauge, cudaSpinor, kappa, dagger);
       } else {
-	cloverMatCuda(cudaSpinorOut, gauge, clover, cudaSpinor, kappa, tmp, DAGGER_BIT);
+	cloverMatCuda(cudaSpinorOut, gauge, clover, cudaSpinor, kappa, tmp, dagger);
       }
     }
   }
@@ -253,15 +253,15 @@ void dslashRef() {
   fflush(stdout);
   switch (test_type) {
   case 0:
-    dslash(spinorRef, hostGauge, spinorEven, ODD_BIT, DAGGER_BIT, 
+    dslash(spinorRef, hostGauge, spinorEven, parity, dagger, 
 	   inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   case 1:    
-    matpc(spinorRef, hostGauge, spinorEven, kappa, inv_param.matpc_type, DAGGER_BIT, 
+    matpc(spinorRef, hostGauge, spinorEven, kappa, inv_param.matpc_type, dagger, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   case 2:
-    mat(spinorRef, hostGauge, spinor, kappa, DAGGER_BIT, 
+    mat(spinorRef, hostGauge, spinor, kappa, dagger, 
 	inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   default:
@@ -273,8 +273,8 @@ void dslashRef() {
     
 }
 
-void dslashTest() {
-
+int main(int argc, char **argv)
+{
   init();
   
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
@@ -289,7 +289,7 @@ void dslashTest() {
     
     double secs = dslashCUDA();
     
-    if (!TRANSFER) {
+    if (!transfer) {
       if (test_type < 2) 
 	retrieveParitySpinor(spinorOdd, cudaSpinor.odd, inv_param.cpu_prec, inv_param.dirac_order);
       else 
@@ -318,8 +318,4 @@ void dslashTest() {
       //else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
   }    
   end();
-}
-
-int main(int argc, char **argv) {
-  dslashTest();
 }

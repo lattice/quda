@@ -4,7 +4,6 @@
 #include <quda_internal.h>
 #include <gauge_quda.h>
 #include <spinor_quda.h>
-#include <blas_quda.h>
 #include <util_quda.h>
 
 #include <test_util.h>
@@ -71,7 +70,6 @@ void init() {
   
   int dev = 0;
   cudaSetDevice(dev);
-  initBlas();
 
   param.X[0] /= 2;
   cudaFullSpinor = allocateSpinorField(param.X, param.cuda_prec, sp_pad);
