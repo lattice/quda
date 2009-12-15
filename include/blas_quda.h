@@ -60,9 +60,6 @@ extern "C" {
   extern unsigned long long blas_quda_flops;
   extern unsigned long long blas_quda_bytes;
 
-  extern int blas_threads[3][22];
-  extern int blas_blocks[3][22];
-
 #ifdef __cplusplus
 }
 #endif

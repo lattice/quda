@@ -34,9 +34,9 @@ unsigned long long blas_quda_flops;
 unsigned long long blas_quda_bytes;
 
 // Number of threads used for each blas kernel
-int blas_threads[3][22];
+static int blas_threads[3][22];
 // Number of thread blocks for each blas kernel
-int blas_blocks[3][22];
+static int blas_blocks[3][22];
 
 static dim3 blasBlock;
 static dim3 blasGrid;

@@ -187,6 +187,9 @@ double benchmark(int kernel) {
   cudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);
+  cudaEventDestroy(start);
+  cudaEventDestroy(end);
+
   double secs = runTime / 1000;
   return secs;
 }
@@ -242,8 +245,6 @@ int main(int argc, char** argv) {
 	for (int grid=0; grid<Ngrids; grid++) {
 	  setBlasParam(i, prec, blockSizes[thread], gridSizes[grid]);
 
-	  if (i==12) printfQuda("warmup    %d   %d\n", blockSizes[thread], gridSizes[grid]); // DEBUG
-
 	  // first do warmup run
 	  nIters = 1;
 	  benchmark(kernels[i]);
@@ -251,14 +252,6 @@ int main(int argc, char** argv) {
 	  nIters = 300;
 	  blas_quda_flops = 0;
 	  blas_quda_bytes = 0;
-
-	  // DEBUG	  
-	  {
-	    cudaError_t error = cudaGetLastError();
-	    if (error != cudaSuccess) warningQuda("%s", cudaGetErrorString(error));
-	  }
-	  if (i==12) printfQuda("running   %d   %d\n", blockSizes[thread], gridSizes[grid]);
-	  // END DEBUG
 
 	  double secs = benchmark(kernels[i]);
 	  double flops = blas_quda_flops;
@@ -269,8 +262,6 @@ int main(int argc, char** argv) {
 
 	  cudaError_t error = cudaGetLastError();
 
-	  if (error != cudaSuccess) warningQuda("%s", cudaGetErrorString(error)); // DEBUG
-	  
 	  if (gbytes > gbytes_max && error == cudaSuccess) { // prevents selection of failed parameters
 	    gflops_max = gflops;
 	    gbytes_max = gbytes;
