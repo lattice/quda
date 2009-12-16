@@ -6,9 +6,9 @@ static int blas_threads[22][3] = {
   {  64,   64,   64},  // Kernel  0: copyCuda
   {  64,  128,   64},  // Kernel  1: axpbyCuda
   {  64,  128,   64},  // Kernel  2: xpyCuda
-  {  64,  128,   64},  // Kernel  3: axpyCuda
+  {  64,  128,  256},  // Kernel  3: axpyCuda
   {  64,  128,   64},  // Kernel  4: xpayCuda
-  {  64,  128,   64},  // Kernel  5: mxpyCuda
+  {  64,  128,  256},  // Kernel  5: mxpyCuda
   {  64,   64,   64},  // Kernel  6: axCuda
   {  64,   64,   64},  // Kernel  7: caxpyCuda
   {  64,   64,   64},  // Kernel  8: caxpbyCuda
@@ -28,16 +28,16 @@ static int blas_threads[22][3] = {
 };
 
 static int blas_blocks[22][3] = {
-  {2048, 1024,  128},  // Kernel  0: copyCuda
+  {4096, 1024, 4096},  // Kernel  0: copyCuda
   {2048,  128,  128},  // Kernel  1: axpbyCuda
   {2048,  128,  128},  // Kernel  2: xpyCuda
-  {2048,  128,  128},  // Kernel  3: axpyCuda
+  {2048,  128, 4096},  // Kernel  3: axpyCuda
   {2048,  128,  128},  // Kernel  4: xpayCuda
-  {2048,  128,  128},  // Kernel  5: mxpyCuda
+  {2048,  128, 4096},  // Kernel  5: mxpyCuda
   {2048,  128, 2048},  // Kernel  6: axCuda
   {2048,  128, 2048},  // Kernel  7: caxpyCuda
   {2048,  128, 2048},  // Kernel  8: caxpbyCuda
-  {2048,  128, 2048},  // Kernel  9: cxpaypbzCuda
+  {1024,  128, 4096},  // Kernel  9: cxpaypbzCuda
   { 512,  128,  128},  // Kernel 10: axpyZpbxCuda
   {1024,  128,  128},  // Kernel 11: caxpbypzYmbwCuda
   { 128, 1024,  128},  // Kernel 12: sumCuda
