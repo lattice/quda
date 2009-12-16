@@ -1,5 +1,5 @@
 
-Version 0.x
+Version 0.2 - 16 December 2009
 
 - Introduced new interface functions newQudaGaugeParam() and
   newQudaInvertParam() to allow for enhanced error checking.  See
