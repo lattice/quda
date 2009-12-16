@@ -14,10 +14,6 @@ __constant__ int X3X2X1mX2X1;
 __constant__ int X4X3X2X1mX3X2X1;
 __constant__ int X4X3X2X1hmX3X2X1h;
 
-__constant__ float X1h_inv;
-__constant__ float X2_inv;
-__constant__ float X3_inv;
-
 __constant__ int X2X1;
 __constant__ int X3X2X1;
 

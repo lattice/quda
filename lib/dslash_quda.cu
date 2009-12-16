@@ -71,15 +71,6 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   int X1h = X1/2;
   cudaMemcpyToSymbol("X1h", &X1h, sizeof(int));  
 
-  float X1h_inv = 1.0 / X1h;
-  cudaMemcpyToSymbol("X1h_inv", &X1h_inv, sizeof(float));  
-
-  float X2_inv = 1.0 / X2;
-  cudaMemcpyToSymbol("X2_inv", &X2_inv, sizeof(float));  
-
-  float X3_inv = 1.0 / X3;
-  cudaMemcpyToSymbol("X3_inv", &X3_inv, sizeof(float));  
-
   int X1m1 = X1 - 1;
   cudaMemcpyToSymbol("X1m1", &X1m1, sizeof(int));  
 
