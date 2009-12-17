@@ -14,17 +14,17 @@ static int blas_threads[22][3] = {
   {  64,   64,   64},  // Kernel  8: caxpbyCuda
   {  64,   64,   64},  // Kernel  9: cxpaypbzCuda
   {  64,  128,   64},  // Kernel 10: axpyZpbxCuda
-  {  64,   64,   64},  // Kernel 11: caxpbypzYmbwCuda
-  {  64,  128,  128},  // Kernel 12: sumCuda
+  {  64,  128,   64},  // Kernel 11: caxpbypzYmbwCuda
+  { 128,  128,  128},  // Kernel 12: sumCuda
   {  64,  128,  128},  // Kernel 13: normCuda
-  {  64,  128,  128},  // Kernel 14: reDotProductCuda
+  {  64,  128,   64},  // Kernel 14: reDotProductCuda
   {  64,  128,   64},  // Kernel 15: axpyNormCuda
-  {  64,  128,   64},  // Kernel 16: xmyNormCuda
+  {  64,  256,   64},  // Kernel 16: xmyNormCuda
   {  64,  128,   64},  // Kernel 17: cDotProductCuda
   {  64,   64,   64},  // Kernel 18: xpaycDotzyCuda
   {  64,   64,   64},  // Kernel 19: cDotProductNormACuda
   {  64,   64,   64},  // Kernel 20: cDotProductNormBCuda
-  {  64,   64,   64}   // Kernel 21: caxpbypzYmbwcDotProductWYNormYQuda
+  { 128,   64,   64}   // Kernel 21: caxpbypzYmbwcDotProductWYNormYQuda
 };
 
 static int blas_blocks[22][3] = {
@@ -34,20 +34,20 @@ static int blas_blocks[22][3] = {
   {2048,  128, 4096},  // Kernel  3: axpyCuda
   {2048,  128,  128},  // Kernel  4: xpayCuda
   {2048,  128, 4096},  // Kernel  5: mxpyCuda
-  {2048,  128, 2048},  // Kernel  6: axCuda
-  {2048,  128, 2048},  // Kernel  7: caxpyCuda
-  {2048,  128, 2048},  // Kernel  8: caxpbyCuda
+  {1024,  128, 2048},  // Kernel  6: axCuda
+  {2048,  128, 1024},  // Kernel  7: caxpyCuda
+  {1024,  128,  128},  // Kernel  8: caxpbyCuda
   {1024,  128, 4096},  // Kernel  9: cxpaypbzCuda
-  { 512,  128,  128},  // Kernel 10: axpyZpbxCuda
+  {2048, 2048,  128},  // Kernel 10: axpyZpbxCuda
   {1024,  128,  128},  // Kernel 11: caxpbypzYmbwCuda
-  { 128, 1024,  128},  // Kernel 12: sumCuda
-  { 128, 1024,  128},  // Kernel 13: normCuda
-  {  64, 1024,  128},  // Kernel 14: reDotProductCuda
-  { 256, 1024,  128},  // Kernel 15: axpyNormCuda
+  { 128,  512, 1024},  // Kernel 12: sumCuda
+  { 128, 1024, 1024},  // Kernel 13: normCuda
+  { 512, 1024,  128},  // Kernel 14: reDotProductCuda
+  {2048, 2048,  128},  // Kernel 15: axpyNormCuda
   { 512, 1024,  128},  // Kernel 16: xmyNormCuda
-  {  64,  512,  128},  // Kernel 17: cDotProductCuda
+  { 256,  512,  128},  // Kernel 17: cDotProductCuda
   { 256,  128,  128},  // Kernel 18: xpaycDotzyCuda
-  {  64, 1024,  128},  // Kernel 19: cDotProductNormACuda
+  { 256, 1024,  128},  // Kernel 19: cDotProductNormACuda
   {  64, 1024,  128},  // Kernel 20: cDotProductNormBCuda
-  { 512,  128,  256}   // Kernel 21: caxpbypzYmbwcDotProductWYNormYQuda
+  { 256,  128,  256}   // Kernel 21: caxpbypzYmbwcDotProductWYNormYQuda
 };
