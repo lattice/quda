@@ -178,6 +178,15 @@ double2 __device__ make_Float2(double2 x) {
   (a##4).x *= b; (a##4).y *= b; (a##4).z *= b; (a##4).w *= b;		\
   (a##5).x *= b; (a##5).y *= b; (a##5).z *= b; (a##5).w *= b;}
 
+#define READ_HALF_SPINOR(a, tex, length)				\
+  float4 a##0 = tex1Dfetch(tex, i + 0*length);				\
+  float4 a##1 = tex1Dfetch(tex, i + 1*length);				\
+  float4 a##2 = tex1Dfetch(tex, i + 2*length);				\
+  float4 a##3 = tex1Dfetch(tex, i + 3*length);				\
+  float4 a##4 = tex1Dfetch(tex, i + 4*length);				\
+  float4 a##5 = tex1Dfetch(tex, i + 5*length);				\
+  float a##c = a[i];
+
 #define CONSTRUCT_HALF_SPINOR_FROM_SINGLE(h, n, a, length)		\
   {float c0 = fmaxf(fabsf((a##0).x), fabsf((a##0).y));			\
   float c1 = fmaxf(fabsf((a##0).z), fabsf((a##0).w));			\
@@ -1352,15 +1361,15 @@ template <int reduce_threads, typename Float>
 #define REDUCE_TYPES Float *a, int stride
 #define REDUCE_PARAMS a, stride
 #define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(I, texHalf1, texNorm1, stride);		\
-  SUM_FLOAT4(s0, I0);							\
-  SUM_FLOAT4(s1, I1);							\
-  SUM_FLOAT4(s2, I2);							\
-  SUM_FLOAT4(s3, I3);							\
-  SUM_FLOAT4(s4, I4);							\
-  SUM_FLOAT4(s5, I5);							\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  SUM_FLOAT4(s0, a0);							\
+  SUM_FLOAT4(s1, a1);							\
+  SUM_FLOAT4(s2, a2);							\
+  SUM_FLOAT4(s3, a3);							\
+  SUM_FLOAT4(s4, a4);							\
+  SUM_FLOAT4(s5, a5);							\
   s0 += s1; s2 += s3; s4 += s5; s0 += s2; s0 += s4;
-#define REDUCE_OPERATION(i) (I0.x)
+#define REDUCE_OPERATION(i) (ac*s0)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1379,7 +1388,7 @@ double sumCuda(ParitySpinor a) {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
-    return sumHCuda((char*)0, a.stride, a.volume, 12, a.precision);
+    return sumHCuda((float*)a.spinorNorm, a.stride, a.volume, 12, a.precision);
   }
 }
 
@@ -1420,15 +1429,15 @@ template <int reduce_threads, typename Float>
 #define REDUCE_TYPES Float *a, int stride // dummy type
 #define REDUCE_PARAMS a, stride
 #define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(I, texHalf1, texNorm1, stride);			\
-  REAL_DOT_FLOAT4(norm0, I0, I0);					\
-  REAL_DOT_FLOAT4(norm1, I1, I1);					\
-  REAL_DOT_FLOAT4(norm2, I2, I2);					\
-  REAL_DOT_FLOAT4(norm3, I3, I3);					\
-  REAL_DOT_FLOAT4(norm4, I4, I4);					\
-  REAL_DOT_FLOAT4(norm5, I5, I5);					\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  REAL_DOT_FLOAT4(norm0, a0, a0);					\
+  REAL_DOT_FLOAT4(norm1, a1, a1);					\
+  REAL_DOT_FLOAT4(norm2, a2, a2);					\
+  REAL_DOT_FLOAT4(norm3, a3, a3);					\
+  REAL_DOT_FLOAT4(norm4, a4, a4);					\
+  REAL_DOT_FLOAT4(norm5, a5, a5);					\
   norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2, norm0 += norm4;
-#define REDUCE_OPERATION(i) (norm0)
+#define REDUCE_OPERATION(i) (ac*ac*norm0)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1447,7 +1456,7 @@ double normCuda(ParitySpinor a) {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
-    return normHCuda((char*)0, a.stride, a.volume, 13, a.precision);
+    return normHCuda(a.spinorNorm, a.stride, a.volume, 13, a.precision);
   }
 }
 
@@ -1490,16 +1499,16 @@ template <int reduce_threads, typename Float>
 #define REDUCE_TYPES Float *a, Float *b, int stride
 #define REDUCE_PARAMS a, b, stride
 #define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(aH, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(bH, texHalf2, texNorm2, stride);		\
-  REAL_DOT_FLOAT4(rdot0, aH0, bH0);					\
-  REAL_DOT_FLOAT4(rdot1, aH1, bH1);					\
-  REAL_DOT_FLOAT4(rdot2, aH2, bH2);					\
-  REAL_DOT_FLOAT4(rdot3, aH3, bH3);					\
-  REAL_DOT_FLOAT4(rdot4, aH4, bH4);					\
-  REAL_DOT_FLOAT4(rdot5, aH5, bH5);					\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  READ_HALF_SPINOR(b, texHalf2, stride);				\
+  REAL_DOT_FLOAT4(rdot0, a0, b0);					\
+  REAL_DOT_FLOAT4(rdot1, a1, b1);					\
+  REAL_DOT_FLOAT4(rdot2, a2, b2);					\
+  REAL_DOT_FLOAT4(rdot3, a3, b3);					\
+  REAL_DOT_FLOAT4(rdot4, a4, b4);					\
+  REAL_DOT_FLOAT4(rdot5, a5, b5);					\
   rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4;
-#define REDUCE_OPERATION(i) (rdot0)
+#define REDUCE_OPERATION(i) (ac*bc*rdot0)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1521,7 +1530,7 @@ double reDotProductCuda(ParitySpinor a, ParitySpinor b) {
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, b.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, b.spinorNorm, spinor_bytes/12);    
-    return reDotProductHCuda((char*)0, (char*)0, a.stride, a.volume, 14, a.precision);
+    return reDotProductHCuda(a.spinorNorm, b.spinorNorm, a.stride, a.volume, 14, a.precision);
   }
 }
 
@@ -1700,28 +1709,28 @@ template <int reduce_threads, typename Float, typename Float2>
 
 template <int reduce_threads, typename Float, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductH##suffix
-#define REDUCE_TYPES Float2 *a, Float b, int stride
+#define REDUCE_TYPES Float *a, Float2 *b, int stride
 #define REDUCE_PARAMS a, b, stride
 #define REDUCE_REAL_AUXILIARY(i)					\
-  RECONSTRUCT_HALF_SPINOR(aH, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(bH, texHalf2, texNorm2, stride);		\
-  REAL_DOT_FLOAT4(rdot0, aH0, bH0);					\
-  REAL_DOT_FLOAT4(rdot1, aH1, bH1);					\
-  REAL_DOT_FLOAT4(rdot2, aH2, bH2);					\
-  REAL_DOT_FLOAT4(rdot3, aH3, bH3);					\
-  REAL_DOT_FLOAT4(rdot4, aH4, bH4);					\
-  REAL_DOT_FLOAT4(rdot5, aH5, bH5);					\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  READ_HALF_SPINOR(b, texHalf2, stride);				\
+  REAL_DOT_FLOAT4(rdot0, a0, b0);					\
+  REAL_DOT_FLOAT4(rdot1, a1, b1);					\
+  REAL_DOT_FLOAT4(rdot2, a2, b2);					\
+  REAL_DOT_FLOAT4(rdot3, a3, b3);					\
+  REAL_DOT_FLOAT4(rdot4, a4, b4);					\
+  REAL_DOT_FLOAT4(rdot5, a5, b5);					\
   rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4;
 #define REDUCE_IMAG_AUXILIARY(i)					\
-  IMAG_DOT_FLOAT4(idot0, aH0, bH0);					\
-  IMAG_DOT_FLOAT4(idot1, aH1, bH1);					\
-  IMAG_DOT_FLOAT4(idot2, aH2, bH2);					\
-  IMAG_DOT_FLOAT4(idot3, aH3, bH3);					\
-  IMAG_DOT_FLOAT4(idot4, aH4, bH4);					\
-  IMAG_DOT_FLOAT4(idot5, aH5, bH5);					\
+  IMAG_DOT_FLOAT4(idot0, a0, b0);					\
+  IMAG_DOT_FLOAT4(idot1, a1, b1);					\
+  IMAG_DOT_FLOAT4(idot2, a2, b2);					\
+  IMAG_DOT_FLOAT4(idot3, a3, b3);					\
+  IMAG_DOT_FLOAT4(idot4, a4, b4);					\
+  IMAG_DOT_FLOAT4(idot5, a5, b5);					\
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;
-#define REDUCE_REAL_OPERATION(i) (rdot0)
-#define REDUCE_IMAG_OPERATION(i) (idot0)
+#define REDUCE_REAL_OPERATION(i) (ac*bc*rdot0)
+#define REDUCE_IMAG_OPERATION(i) (ac*bc*idot0)
 #include "reduce_complex_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1754,7 +1763,7 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductHCuda((char*)0, (char*)0, x.stride, x.volume, 17, x.precision);
+    return cDotProductHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 17, x.precision);
   }
 }
 
@@ -1917,11 +1926,11 @@ template <int reduce_threads, typename Float2>
 
 template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormAH##suffix
-#define REDUCE_TYPES Float2 *a, int stride
-#define REDUCE_PARAMS a, stride
+#define REDUCE_TYPES Float2 *x, Float2 *y, int stride
+#define REDUCE_PARAMS x, y, stride
 #define REDUCE_X_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  READ_HALF_SPINOR(x, texHalf1, stride);				\
+  READ_HALF_SPINOR(y, texHalf2, stride);				\
   REAL_DOT_FLOAT4(norm0, x0, x0);					\
   REAL_DOT_FLOAT4(norm1, x1, x1);					\
   REAL_DOT_FLOAT4(norm2, x2, x2);					\
@@ -1945,9 +1954,9 @@ template <int reduce_threads, typename Float2>
   IMAG_DOT_FLOAT4(idot4, x4, y4);					\
   IMAG_DOT_FLOAT4(idot5, x5, y5);					\
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;  
-#define REDUCE_X_OPERATION(i) (rdot0)
-#define REDUCE_Y_OPERATION(i) (idot0)
-#define REDUCE_Z_OPERATION(i) (norm0)
+#define REDUCE_X_OPERATION(i) (xc*yc*rdot0)
+#define REDUCE_Y_OPERATION(i) (xc*yc*idot0)
+#define REDUCE_Z_OPERATION(i) (xc*xc*norm0)
 #include "reduce_triple_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1977,7 +1986,7 @@ double3 cDotProductNormACuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductNormAHCuda((char*)0,  x.stride, x.volume, 19, x.precision);
+    return cDotProductNormAHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 19, x.precision);
   }
 }
 
@@ -2028,11 +2037,11 @@ template <int reduce_threads, typename Float2>
 
 template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormBH##suffix
-#define REDUCE_TYPES Float2 *a, int stride
-#define REDUCE_PARAMS a, stride
+#define REDUCE_TYPES Float2 *x, Float2 *y, int stride
+#define REDUCE_PARAMS x, y, stride
 #define REDUCE_X_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  READ_HALF_SPINOR(x, texHalf1, stride);				\
+  READ_HALF_SPINOR(y, texHalf2, stride);				\
   REAL_DOT_FLOAT4(norm0, y0, y0);					\
   REAL_DOT_FLOAT4(norm1, y1, y1);					\
   REAL_DOT_FLOAT4(norm2, y2, y2);					\
@@ -2056,9 +2065,9 @@ template <int reduce_threads, typename Float2>
   IMAG_DOT_FLOAT4(idot4, x4, y4);					\
   IMAG_DOT_FLOAT4(idot5, x5, y5);					\
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;  
-#define REDUCE_X_OPERATION(i) (rdot0)
-#define REDUCE_Y_OPERATION(i) (idot0)
-#define REDUCE_Z_OPERATION(i) (norm0)
+#define REDUCE_X_OPERATION(i) (xc*yc*rdot0)
+#define REDUCE_Y_OPERATION(i) (xc*yc*idot0)
+#define REDUCE_Z_OPERATION(i) (yc*yc*norm0)
 #include "reduce_triple_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -2088,7 +2097,7 @@ double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductNormBHCuda((char*)0, x.stride, x.volume, 20, x.precision);
+    return cDotProductNormBHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 20, x.precision);
   }
 }
 
@@ -2169,8 +2178,8 @@ template <int reduce_threads, typename Float2>
 //
 template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYH##suffix
-#define REDUCE_TYPES Float2 a, Float2 b, short4 *yH, float *yN, short4 *zH, float *zN, int stride
-#define REDUCE_PARAMS a, b, yH, yN, zH, zN, stride
+#define REDUCE_TYPES Float2 a, Float2 b, short4 *yH, float *yN, short4 *zH, float *zN, float *u, int stride
+#define REDUCE_PARAMS a, b, yH, yN, zH, zN, u, stride
 #define REDUCE_X_AUXILIARY(i)						\
   RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
   RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
@@ -2197,7 +2206,7 @@ template <int reduce_threads, typename Float2>
   REAL_DOT_FLOAT4(norm5, y5, y5);					\
   CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);			
 #define REDUCE_Y_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(u, texHalf5, texNorm5, stride);		\
+  READ_HALF_SPINOR(u, texHalf5, stride);				\
   REAL_DOT_FLOAT4(rdot0, u0, y0);					\
   REAL_DOT_FLOAT4(rdot1, u1, y1);					\
   REAL_DOT_FLOAT4(rdot2, u2, y2);					\
@@ -2214,8 +2223,8 @@ template <int reduce_threads, typename Float2>
   norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2, norm0 += norm4; \
   rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4; \
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4; 
-#define REDUCE_X_OPERATION(i) (rdot0)
-#define REDUCE_Y_OPERATION(i) (idot0)
+#define REDUCE_X_OPERATION(i) (uc*rdot0)
+#define REDUCE_Y_OPERATION(i) (uc*idot0)
 #define REDUCE_Z_OPERATION(i) (norm0)
 #include "reduce_triple_core.h"
 #undef REDUCE_FUNC_NAME
@@ -2267,7 +2276,8 @@ double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b,
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     return caxpbypzYmbwcDotProductWYNormYHCuda(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, 
-					       (short4*)z.spinor, (float*)z.spinorNorm, y.stride, y.volume, 21, x.precision);
+					       (short4*)z.spinor, (float*)z.spinorNorm, (float*)u.spinorNorm, 
+					       y.stride, y.volume, 21, x.precision);
   }
 }
 
