@@ -82,12 +82,12 @@ Known issues:
   requires over 1 GB of disk space in /tmp for the creation of
   temporary files.
 
-* For compatibility with CUDA, on 32-bit platforms the library is compiled
-  with the GCC option -malign-double.  This differs from the GCC default
-  and may affect the alignment of various structures, notably those of
-  type QudaGaugeParam and QudaInvertParam, defined in invert_quda.h.
-  Therefore, any code to be linked against QUDA should also be compiled
-  with this option.
+* For compatibility with CUDA, on 32-bit platforms the library is
+  compiled with the GCC option -malign-double.  This differs from the
+  GCC default and may affect the alignment of various structures,
+  notably those of type QudaGaugeParam and QudaInvertParam, defined in
+  quda.h.  Therefore, any code to be linked against QUDA should also
+  be compiled with this option.
 
 
 Contact information:
