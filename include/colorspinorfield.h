@@ -9,13 +9,20 @@ typedef enum FieldType_s {
   ODD_FIELD
 } FieldType;
 
+// Unless otherwise stated, color runs faster than spin
 typedef enum FieldOrder_s {
   FLOAT_ORDER,
   FLOAT2_ORDER,
   FLOAT4_ORDER,
-  COLOR_SPIN_ORDER, // 
-  SPIN_COLOR_ORDER  //
+  FLOATN_ORDER, // One array of Nc * Ns complex elements
+  FLOATN_QLA_ORDER // As above but spin runs faster than color
 } FieldOrder;
+
+typedef enum FieldCreate_s {
+  CREATE_ZERO, // create new field
+  CREATE_COPY, // create copy to field
+  CREATE_REFERENCE // create reference to field
+} FieldCreate;
 
 typedef struct ColorSpinorParam_s {
   Precision prec; // Precision of the field
@@ -27,6 +34,9 @@ typedef struct ColorSpinorParam_s {
   FieldLocation fieldLocation; // cpu, cuda etc. 
   FieldType fieldType; // Full, even or odd
   FieldOrder fieldOrder; // Float, Float2, Float4 etc.
+
+  FieldCreate create; // 
+  void *v; // Pointer from which to copy data or to reference
 } ColorSpinorParam;
 
 class ColorSpinorField {
@@ -65,8 +75,11 @@ class ColorSpinorField {
   Precision precision() const { return prec; }
   int Ncolor() const { return nColor; } 
   int Nspin() const { return nSpin; } 
+
+  virtual ColorSpinorField& operator+=(const ColorSpinorField&) = 0;
 };
 
+// CUDA implementation
 class cudaColorSpinorField : public ColorSpinorField {
 
  private:
@@ -78,8 +91,11 @@ class cudaColorSpinorField : public ColorSpinorField {
   cudaColorSpinorField(const ColorSpinorParam&);
   virtual ~cudaColorSpinorField();
 
+  ColorSpinorField& operator+=(const ColorSpinorField&);
 };
 
+
+// CPU implementation
 class cpuColorSpinorField : public ColorSpinorField {
 
  private:
@@ -91,4 +107,5 @@ class cpuColorSpinorField : public ColorSpinorField {
   cpuColorSpinorField(const ColorSpinorParam&);
   virtual ~cpuColorSpinorField();
 
+  ColorSpinorField& operator+=(const ColorSpinorField&);
 };
