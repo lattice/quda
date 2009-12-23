@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <colorspinorfield.h>
+#include <color_spinor_field.h>
 #include <blas_quda.h>
 
 void zeroField(cudaColorSpinorField &a);

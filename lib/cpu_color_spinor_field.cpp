@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <colorspinorfield.h>
+#include <color_spinor_field.h>
 
 cpuColorSpinorField::cpuColorSpinorField() : 
   ColorSpinorField(), init(false) {

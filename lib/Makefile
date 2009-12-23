@@ -1,7 +1,7 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = blas_quda.o clover_quda.o dslash_quda.o gauge_quda.o         \
+QUDA_OBJS = color_spinor_field.o cpu_color_spinor_field.o cuda_color_spinor_field.o blas_quda.o clover_quda.o dslash_quda.o gauge_quda.o         \
 	inv_bicgstab_quda.o inv_cg_quda.o interface_quda.o spinor_quda.o \
 	util_quda.o
 

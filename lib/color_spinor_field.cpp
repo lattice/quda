@@ -1,4 +1,4 @@
-#include <colorspinorfield.h>
+#include <color_spinor_field.h>
 
 ColorSpinorField::ColorSpinorField() : init(false) {
 
