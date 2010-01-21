@@ -1,3 +1,16 @@
+Version 0.3 - alpha
+
+- Replaced all field with new ColorSpinorField object.  This will
+  eventually evolve into a heterogeneous environment through the cpu
+  and cuda implementations (and perhaps ocl?).
+
+- Promoted the Dirac operators to classes.
+
+- Introduced lots of bugs
+
+- Blas performance improvements and slightly faster 8 reconstruction
+  (single and half)
+
 
 Version 0.2 - 16 December 2009
 
