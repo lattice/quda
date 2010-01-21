@@ -471,7 +471,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
 
 }
 
-static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct, Precision precision) {
+static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct, QudaPrecision precision) {
 
   cudaGauge->reconstruct = reconstruct;
   cudaGauge->precision = precision;
@@ -586,7 +586,7 @@ static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, Gauge
 
 }
 
-void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision cuda_prec, Precision cpu_prec,
+void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
 		      GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
 		      Tboundary t_boundary, int *XX, double anisotropy, int pad)
 {
@@ -643,7 +643,7 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision cuda_prec,
   }
 }
 
-void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, Precision cpu_prec, GaugeFieldOrder gauge_order)
+void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, QudaPrecision cpu_prec, GaugeFieldOrder gauge_order)
 {
   if (cpu_prec == QUDA_HALF_PRECISION) {
     errorQuda("Half precision not supported on CPU");

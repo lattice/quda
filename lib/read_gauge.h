@@ -148,14 +148,15 @@
   float u0 = (dir < 6 ? anisotropy_f : (ga_idx >= (X4-1)*X1h*X2*X3 ? t_boundary_f : 1)); \
   float u02_inv = __fdividef(1.f, u0*u0);				\
   float column_sum = u02_inv - row_sum;					\
-  float U00_mag = sqrtf((column_sum > 0?column_sum:0));			\
+  float U00_mag = column_sum * rsqrtf((column_sum > 0 ? column_sum : 1e14)); \
   __sincosf(g21_re, &g00_im, &g00_re);					\
   g00_re *= U00_mag;							\
   g00_im *= U00_mag;							\
   column_sum += g10_re*g10_re;						\
   column_sum += g10_im*g10_im;						\
   __sincosf(g21_im, &g20_im, &g20_re);					\
-  float U20_mag = sqrtf(((u02_inv - column_sum)>0 ? (u02_inv - column_sum) :  0)); \
+  column_sum = u02_inv - column_sum;					\
+  float U20_mag = column_sum * rsqrtf((column_sum > 0 ? column_sum : 1e14)); \
   g20_re *= U20_mag;							\
   g20_im *= U20_mag;							\
   float r_inv2 = __fdividef(1.0f, u0*row_sum);				\

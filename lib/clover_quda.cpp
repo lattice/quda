@@ -5,7 +5,7 @@
 #include <quda_internal.h>
 #include <clover_quda.h>
 
-void allocateParityClover(ParityClover *ret, int *X, int pad, Precision precision)
+void allocateParityClover(ParityClover *ret, int *X, int pad, QudaPrecision precision)
 {
   ret->precision = precision;
   ret->volume = 1;
@@ -41,7 +41,7 @@ void allocateParityClover(ParityClover *ret, int *X, int pad, Precision precisio
 
 }
 
-void allocateCloverField(FullClover *ret, int *X, int pad, Precision precision)
+void allocateCloverField(FullClover *ret, int *X, int pad, QudaPrecision precision)
 {
   allocateParityClover(&(ret->even), X, pad, precision);
   allocateParityClover(&(ret->odd), X, pad, precision);
@@ -169,7 +169,7 @@ static void packFullCloverHalf(short4 *even, float *evenNorm, short4 *odd, float
   }
 }
 
-void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec, 
+void loadParityClover(ParityClover ret, void *clover, QudaPrecision cpu_prec, 
 		      CloverFieldOrder clover_order)
 {
   // use pinned memory                                                                                           
@@ -228,7 +228,7 @@ void loadParityClover(ParityClover ret, void *clover, Precision cpu_prec,
 
 }
 
-void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
+void loadFullClover(FullClover ret, void *clover, QudaPrecision cpu_prec,
 		    CloverFieldOrder clover_order)
 {
   // use pinned memory                                                                                           
@@ -300,7 +300,7 @@ void loadFullClover(FullClover ret, void *clover, Precision cpu_prec,
 
 }
 
-void loadCloverField(FullClover ret, void *clover, Precision cpu_prec, CloverFieldOrder clover_order)
+void loadCloverField(FullClover ret, void *clover, QudaPrecision cpu_prec, CloverFieldOrder clover_order)
 {
   void *clover_odd;
 

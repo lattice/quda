@@ -1,17 +1,19 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = color_spinor_field.o cpu_color_spinor_field.o cuda_color_spinor_field.o blas_quda.o clover_quda.o dslash_quda.o gauge_quda.o         \
-	inv_bicgstab_quda.o inv_cg_quda.o interface_quda.o spinor_quda.o \
-	util_quda.o
+QUDA_OBJS = color_spinor_field.o cpu_color_spinor_field.o cuda_color_spinor_field.o \
+	dirac.o dirac_wilson.o dirac_clover.o \
+	clover_quda.o gauge_quda.o inv_bicgstab_quda.o inv_cg_quda.o interface_quda.o \
+	util_quda.o dslash_quda.o blas_quda.o 
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_quda.h dslash_quda.h enum_quda.h gauge_quda.h \
-	invert_quda.h quda.h quda_internal.h spinor_quda.h util_quda.h
+	invert_quda.h quda.h quda_internal.h spinor_quda.h util_quda.h \
+	dirac.h color_spinor_field.h
 
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/
-QUDA_INLN = check_params.h clover_def.h dslash_common.h dslash_def.h	\
+QUDA_INLN = check_params.h clover_def.h dslash_def.h	\
 	dslash_textures.h io_spinor.h read_clover.h read_gauge.h	\
 	reduce_complex_core.h reduce_core.h reduce_triple_core.h
 
