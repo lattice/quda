@@ -24,7 +24,7 @@
 #define CloverFieldOrder QudaCloverFieldOrder
 #define DslashType QudaDslashType  
 #define InverterType QudaInverterType  
-#define Precision QudaPrecision
+//#define Precision QudaPrecision
 #define MatPCType QudaMatPCType
 #define SolutionType QudaSolutionType
 #define MassNormalization QudaMassNormalization
@@ -45,7 +45,7 @@ extern "C" {
 
   typedef struct {
     size_t bytes;
-    Precision precision;
+    QudaPrecision precision;
     int length; // total length
     int real_length; // physical length (excluding padding)
     int volume; // geometric volume (single parity)
@@ -63,7 +63,7 @@ extern "C" {
   
   typedef struct {
     size_t bytes;
-    Precision precision;
+    QudaPrecision precision;
     int length;
     int real_length; // physical length (excluding padding)
     int volume;
@@ -81,9 +81,9 @@ extern "C" {
     ParityClover even;
   } FullClover;
 
-  typedef struct {
+  /* typedef struct {
     size_t bytes;
-    Precision precision;
+    QudaPrecision precision;
     int length; // total length
     int real_length; // physical length (excluding padding)
     int volume; // geometric volume (single parity)
@@ -99,8 +99,14 @@ extern "C" {
   typedef struct {
     ParitySpinor odd;
     ParitySpinor even;
-  } FullSpinor;
+    } FullSpinor;*/
   
+  typedef struct double3_s {
+    double x;
+    double y;
+    double z;
+  } double3;
+
 #ifdef __cplusplus
 }
 #endif

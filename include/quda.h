@@ -48,6 +48,7 @@ extern "C" {
     double reliable_delta; // reliable update tolerance
 
     QudaMatPCType matpc_type;
+    FieldSubset field_subset;
     QudaSolutionType solution_type;
     QudaMassNormalization mass_normalization;
 

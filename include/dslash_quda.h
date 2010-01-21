@@ -7,95 +7,60 @@
 extern "C" {
 #endif
 
+  extern int initDslash;
   extern unsigned long long dslash_quda_flops;
   extern unsigned long long dslash_quda_bytes;
 
-  int dslashCudaSharedBytes(Precision spinor_prec, int blockDim);
+  int dslashCudaSharedBytes(QudaPrecision spinor_prec, int blockDim);
 
-  // Double precision routines
-  void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
-  void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, double a);
+  void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride);
 
-  // Single precision routines
-  void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
-  void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, double a);
+  // plain wilson
+  
+  void dslashDCuda(double2 *out, FullGauge gauge, double2 *in, int oddBit, int daggerBit,
+		   int volume, int length);
+  void dslashSCuda(float4 *out, FullGauge gauge, float4 *in, int oddBit, int daggerBit,
+		   int volume, int length);
+  void dslashHCuda(short4 *out, float* outNorm, FullGauge gauge, short4* in, float* inNorm,
+		   int oddBit, int daggerBit, int volume, int length);
+  
+  void dslashXpayDCuda(double2 *out, FullGauge gauge, double2 *in, int oddBit,
+		       int daggerBit, double2 *x, double a,int volume, int length);
+  void dslashXpaySCuda(float4 *out, FullGauge gauge, float4 *in, int oddBit,
+		       int daggerBit, float4 *x, double a, int volume, int length);
+  void dslashXpayHCuda(short4 *out, float *outNorm, FullGauge gauge, short4* in, float *inNorm, 
+		       int oddBit, int daggerBit, short4 *x, float *xNorm, double a,
+		       int volume, int length);
+  
+  // clover dslash
 
-  // Half precision dslash routines
-  void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
-  void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, double a);
+  void cloverDslashDCuda(double2 *out, FullGauge gauge, FullClover cloverInv, double2 *in,
+			 int oddBit, int daggerBit, int volume, int length);
 
-  // wrapper to above
-  void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
-		  int parity, int dagger);
-  void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
-		      int parity, int dagger, ParitySpinor x, double a);
+  void cloverDslashSCuda(float4 *out, FullGauge gauge, FullClover cloverInv, float4 *in,
+			 int oddBit, int daggerBit, int volume, int length);
 
-  // Full Wilson matrix
-  void MatCuda(FullSpinor out, FullGauge gauge, FullSpinor in, double kappa,
-	       int daggerBit);
-  void MatPCCuda(ParitySpinor outEven, FullGauge gauge, ParitySpinor inEven, 
-		 double kappa, ParitySpinor tmp, MatPCType matpc_type,
-		 int daggerBit);
-  void MatPCDagMatPCCuda(ParitySpinor outEven, FullGauge gauge,
-			 ParitySpinor inEven, double kappa, ParitySpinor tmp,
-			 MatPCType matpc_type);
+  void cloverDslashHCuda(short4 *out, float *outNorm, FullGauge gauge, FullClover cloverInv, 
+			 short4 *in, float *inNorm, int oddBit, int daggerBit,
+			 int volume, int length);
+  
+  void cloverDslashXpayDCuda(double2 *out, FullGauge gauge, FullClover cloverInv, double2 *in,
+			     int oddBit, int daggerBit, double2 *x, double a, int volume, int length);
+  
+  void cloverDslashXpaySCuda(float4 *out, FullGauge gauge, FullClover cloverInv, float4 *in,
+			     int oddBit, int daggerBit, float4 *x, double a, int volume, int length);
 
-  // clover Dslash routines
-  void cloverDslashCuda(ParitySpinor out, FullGauge gauge,
-			FullClover cloverInv, ParitySpinor in, int parity,
-			int dagger);
-  void cloverDslashDCuda(ParitySpinor res, FullGauge gauge,
-			 FullClover cloverInv, ParitySpinor spinor,
-			 int oddBit, int daggerBit);
-  void cloverDslashSCuda(ParitySpinor res, FullGauge gauge,
-			 FullClover cloverInv, ParitySpinor spinor,
-			 int oddBit, int daggerBit);
-  void cloverDslashHCuda(ParitySpinor res, FullGauge gauge,
-			 FullClover cloverInv, ParitySpinor spinor,
-			 int oddBit, int daggerBit);
+  void cloverDslashXpayHCuda(short4 *out, float *outNorm, FullGauge gauge, FullClover cloverInv, 
+			     short4 *in, float *inNorm, int oddBit, int daggerBit, 
+			     short4 *x, float*xNorm, double a, int volume, int length);
 
-  void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge,
-			    FullClover cloverInv, ParitySpinor in, int parity,
-			    int dagger, ParitySpinor x, double a);
-  void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge,
-			     FullClover cloverInv, ParitySpinor spinor,
-			     int oddBit, int daggerBit, ParitySpinor x,
-			     double a);
-  void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge,
-			     FullClover cloverInv, ParitySpinor spinor,
-			     int oddBit, int daggerBit, ParitySpinor x,
-			     double a);
-  void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge,
-			     FullClover cloverInv, ParitySpinor spinor,
-			     int oddBit, int daggerBit, ParitySpinor x,
-			     double a);
-
-  void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
-		       FullClover cloverInv, ParitySpinor in, double kappa,
-		       ParitySpinor tmp, MatPCType matpc_type, int dagger);
-  void cloverMatPCDagMatPCCuda(ParitySpinor out, FullGauge gauge,
-			       FullClover clover, FullClover cloverInv,
-			       ParitySpinor in, double kappa, ParitySpinor tmp,
-			       MatPCType matpc_type);
-  void cloverMatCuda(FullSpinor out, FullGauge gauge, FullClover clover,
-		     FullSpinor in, double kappa, ParitySpinor tmp,
-		     int dagger);
-
-  // routines for applying the clover term alone
-  void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
-		  ParitySpinor in, int parity);
-  void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
-		   ParitySpinor spinor, int oddBit);
-  void cloverSCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
-		   ParitySpinor spinor, int oddBit);
-  void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
-		   ParitySpinor spinor, int oddBit);
+  // solo clover term
+  void cloverDCuda(double2 *out, FullGauge gauge, FullClover clover,
+		   double2 *in, int oddBit, int volume, int length);
+  void cloverSCuda(float4 *out, FullGauge gauge, FullClover clover,
+		   float4 *in, int oddBit, int volume, int length);
+  void cloverHCuda(short4 *out, float *outNorm, FullGauge gauge, FullClover clover,
+		   short4 *in, float *inNorm, int oddBit, int volume, int length);
 
 #ifdef __cplusplus
 }

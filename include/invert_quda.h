@@ -3,6 +3,8 @@
 
 #include <quda_internal.h>
 #include <quda.h>
+#include <color_spinor_field.h>
+#include <dirac.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,11 +20,11 @@ extern "C" {
   extern FullClover cudaCloverInvSloppy;
 
   // -- inv_cg_cuda.cpp
-  void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp,
+  void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField &tmp,
 		    QudaInvertParam *param);
   
   // -- inv_bicgstab_cuda.cpp
-  void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor tmp, 
+  void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField &tmp, 
 			  QudaInvertParam *param, DagType dag_type);
 
 #ifdef __cplusplus

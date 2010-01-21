@@ -1,6 +1,9 @@
 #ifndef _UTIL_QUDA_H
 #define _UTIL_QUDA_H
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #ifdef USE_QMP
 
 #include <qmp.h>
