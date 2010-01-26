@@ -270,7 +270,7 @@ int main(int argc, char** argv)
     "caxpbypzYmbwcDotProductWYNormYQuda"
   };
   
-  for (prec = 0; prec < 2; prec++) {
+  for (prec = 0; prec < 3; prec++) {
 
     init();
 
