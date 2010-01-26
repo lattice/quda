@@ -24,21 +24,17 @@ int prec;
 
 void init()
 {
-  int X[4];
-
-  X[0] = 24;
-  X[1] = 24;
-  X[2] = 24;
-  X[3] = 24;
-
   ColorSpinorParam param;
   param.fieldType = QUDA_CUDA_FIELD;
   param.nColor = 3;
   param.nSpin = 4; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   param.nDim = 4; // number of spacetime dimensions
-  param.x = X;
+  param.x[0] = 24;
+  param.x[1] = 24;
+  param.x[2] = 24;
+  param.x[3] = 24;
   param.pad = 0;
-  param.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+  param.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
   param.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
   
   param.basis = QUDA_UKQCD_BASIS;
@@ -63,20 +59,19 @@ void init()
   }
 
   v = cudaColorSpinorField(param);
+  checkCudaError();
+
   w = cudaColorSpinorField(param);
   x = cudaColorSpinorField(param);
   y = cudaColorSpinorField(param);
   z = cudaColorSpinorField(param);
 
-  // always true since this is never double
-  param.precision = other_prec;
-  param.fieldOrder = QUDA_FLOAT4_ORDER; 
+  param.precision = QUDA_SINGLE_PRECISION;
+  param.fieldOrder = QUDA_FLOAT4_ORDER; // always true since this is never double
   p = cudaColorSpinorField(param);
 
   // check for successful allocation
   checkCudaError();
-
-  exit(0);
 
   // turn off error checking in blas kernels
   setBlasTuning(1);
@@ -273,7 +268,7 @@ int main(int argc, char** argv)
     "cDotProductNormBCuda",
     "caxpbypzYmbwcDotProductWYNormYQuda"
   };
-
+  
   for (prec = 0; prec < 3; prec++) {
 
     init();

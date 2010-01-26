@@ -5,13 +5,16 @@
 #ifndef __COLORSPINORFIELD_QUDA_H
 #define __COLORSPINORFIELD_QUDA_H
 
+// Probably want some checking for this limit
+#define QUDA_MAX_DIM 6
+
 class ColorSpinorParam {
  public:
   FieldType fieldType; // cpu, cuda etc. 
   int nColor; // Number of colors of the field
   int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   int nDim; // number of spacetime dimensions
-  int *x; // size of each dimension
+  int x[QUDA_MAX_DIM]; // size of each dimension
   QudaPrecision precision; // Precision of the field
   int pad; // volumetric padding
 
@@ -26,18 +29,19 @@ class ColorSpinorParam {
   void *norm;
 
  ColorSpinorParam()
-   : fieldType(QUDA_INVALID_FIELD), nColor(0), nSpin(0), nDim(0), x(0), precision(QUDA_INVALID_PRECISION), 
+   : fieldType(QUDA_INVALID_FIELD), nColor(0), nSpin(0), nDim(0), precision(QUDA_INVALID_PRECISION), 
     pad(0), fieldSubset(QUDA_INVALID_SUBSET), subsetOrder(QUDA_INVALID_SUBSET_ORDER), 
     fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_INVALID_BASIS), create(QUDA_INVALID_CREATE)
   {;}
 
   // used to create cpu params
  ColorSpinorParam(void *V, QudaInvertParam &inv_param, int *X)
-   : fieldType(QUDA_CPU_FIELD), nColor(3), nSpin(4), nDim(4), x(0), precision(inv_param.cpu_prec), 
+   : fieldType(QUDA_CPU_FIELD), nColor(3), nSpin(4), nDim(4), precision(inv_param.cpu_prec), 
     pad(0), fieldSubset(QUDA_INVALID_SUBSET), subsetOrder(QUDA_INVALID_SUBSET_ORDER), 
     fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_DEGRAND_ROSSI_BASIS), create(QUDA_REFERENCE_CREATE), v(V)
   { 
-    x = new int[nDim];
+
+    if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
 
     if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
@@ -52,11 +56,11 @@ class ColorSpinorParam {
   // used to create cuda param from a cpu param
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
     : fieldType(QUDA_CUDA_FIELD), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nDim(cpuParam.nDim), 
-    x(0), precision(inv_param.cuda_prec), pad(inv_param.sp_pad), fieldSubset(cpuParam.fieldSubset), 
+    precision(inv_param.cuda_prec), pad(inv_param.sp_pad), fieldSubset(cpuParam.fieldSubset), 
     subsetOrder(QUDA_EVEN_ODD_SUBSET_ORDER), fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_UKQCD_BASIS),
     create(QUDA_NULL_CREATE), v(0)
   {
-    x = new int[nDim];
+    if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
 
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -68,7 +72,6 @@ class ColorSpinorParam {
   }
 
   virtual ~ColorSpinorParam() {
-    if (x) delete[]x;
   }
 };
 
@@ -76,7 +79,7 @@ class ColorSpinorField {
 
  private:
   bool init;
-  void create(int nDim, int *x, int Nc, int Ns, QudaPrecision precision, 
+  void create(int nDim, const int *x, int Nc, int Ns, QudaPrecision precision, 
 	      int pad, FieldType type, FieldSubset subset, 
 	      SubsetOrder subsetOrder, FieldOrder order, GammaBasis basis);
   void destroy();  
@@ -88,7 +91,7 @@ class ColorSpinorField {
   int nSpin;
   
   int nDim;
-  int *x;
+  int x[QUDA_MAX_DIM];
 
   int volume;
   int pad;

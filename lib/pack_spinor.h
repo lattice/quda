@@ -134,7 +134,7 @@ void packQLAParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void packFullSpinor(FloatN *dest, Float *src, int V, int pad, int *x, int length,
+void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int length,
 		    GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
@@ -174,7 +174,7 @@ void packFullSpinor(FloatN *dest, Float *src, int V, int pad, int *x, int length
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, int *x, int length,
+void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int length,
 		    GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
@@ -318,7 +318,7 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, int *x, int length,
+void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int length,
 		      GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
@@ -358,7 +358,7 @@ void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, int *x, int leng
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, int *x, int length,
+void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int length,
 			 GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
@@ -398,7 +398,7 @@ void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, int *x, int l
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void packSpinor(FloatN *dest, Float *src, int V, int pad, int *x, int length,
+void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int length,
 		FieldSubset srcSubset, SubsetOrder subsetOrder, 
 		GammaBasis destBasis, GammaBasis srcBasis,
 		FieldOrder srcOrder) {
@@ -450,7 +450,7 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, int *x, int length,
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void unpackSpinor(Float *dest, FloatN *src, int V, int pad, int *x, int length,
+void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int length,
 		  FieldSubset destSubset, SubsetOrder subsetOrder, 
 		  GammaBasis destBasis, GammaBasis srcBasis,
 		  FieldOrder destOrder) {

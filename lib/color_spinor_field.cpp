@@ -18,17 +18,17 @@ ColorSpinorField::~ColorSpinorField() {
   destroy();
 }
 
-void ColorSpinorField::create(int Ndim, int *X, int Nc, int Ns, QudaPrecision Prec, 
+void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecision Prec, 
 			      int Pad, FieldType Type, FieldSubset Subset, 
 			      SubsetOrder Subset_order, FieldOrder Order,
 			      GammaBasis Basis) {
+  if (Ndim > QUDA_MAX_DIM) errorQuda("Number of dimensions nDim = %d too great", nDim);
   nDim = Ndim;
   nColor = Nc;
   nSpin = Ns;
 
   precision = Prec;
   volume = 1;
-  x = new int[nDim];
   for (int d=0; d<nDim; d++) {
     x[d] = X[d];
     volume *= x[d];
@@ -52,7 +52,6 @@ void ColorSpinorField::create(int Ndim, int *X, int Nc, int Ns, QudaPrecision Pr
 }
 
 void ColorSpinorField::destroy() {
-  if (init) delete []x;
 }
 
 ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
@@ -71,9 +70,7 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
 
   if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
   if (param.nDim != 0 && nDim != param.nDim) {
-    delete []x;
     nDim = param.nDim;
-    x = new int[nDim];
   }
 
   // only check the that the first dimension is non-zero

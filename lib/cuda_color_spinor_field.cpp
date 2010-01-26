@@ -3,6 +3,7 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
+#include <string.h>
 #include <iostream>
 
 void* cudaColorSpinorField::buffer = 0;
@@ -10,12 +11,12 @@ bool cudaColorSpinorField::bufferInit = false;
 size_t cudaColorSpinorField::bufferBytes = 0;
 
 cudaColorSpinorField::cudaColorSpinorField() : 
-  ColorSpinorField(), init(false) {
+  ColorSpinorField(), v(0), norm(0), init(false) {
 
 }
 
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-  ColorSpinorField(param), init(false) {
+  ColorSpinorField(param), v(0), norm(0), init(false) {
   create(param.create);
   if  (param.create == QUDA_NULL_CREATE) {
     // do nothing
@@ -30,14 +31,14 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
 }
 
 cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-  ColorSpinorField(src), init(false) {
+  ColorSpinorField(src), v(0), norm(0), init(false) {
   create(QUDA_COPY_CREATE);
   copy(src);
 }
 
 // creates a copy of src, any differences defined in param
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
-  ColorSpinorField(src), init(false) {
+  ColorSpinorField(src), v(0), norm(0), init(false) {
   reset(param);
   create(param.create);
 
@@ -117,7 +118,7 @@ void cudaColorSpinorField::create(const FieldCreate create) {
 
   // Check if buffer isn't big enough
   if (bytes > bufferBytes && bufferInit) {
-    cudaFree(buffer);
+    cudaFreeHost(buffer);
     bufferInit = false;
   }
 
@@ -132,7 +133,7 @@ void cudaColorSpinorField::create(const FieldCreate create) {
     ColorSpinorParam param;
     param.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
     param.nDim = nDim;
-    param.x = x;
+    memcpy(param.x, x, nDim*sizeof(int));
     param.x[0] /= 2; // set single parity dimensions
     param.create = QUDA_REFERENCE_CREATE;
     param.v = v;
@@ -141,8 +142,6 @@ void cudaColorSpinorField::create(const FieldCreate create) {
     param.v = (void*)((unsigned long)v + bytes/2);
     param.norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
     odd = new cudaColorSpinorField(*this, param);
-    param.x[0] *= 2; // restore full dimensions
-    param.x = 0;
   }
 
 }
