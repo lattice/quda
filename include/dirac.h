@@ -51,12 +51,12 @@ class Dirac {
 			  const cudaColorSpinorField &tmp, const double &k) = 0;
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		 const QudaDagType = QUDA_DAG_NO) = 0;
-  virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in);
+  virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) = 0;
 
   // required methods to use e-o preconditioning for solving full system
   virtual void Prepare(cudaColorSpinorField &src, cudaColorSpinorField &sol,
 		       const cudaColorSpinorField &x, const cudaColorSpinorField &b, 
-		       const QudaSolutionType, const QudaDagType dagger = QUDA_DAG_NO);
+		       const QudaSolutionType, const QudaDagType dagger = QUDA_DAG_NO) = 0;
   virtual void Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 			   const QudaSolutionType, const QudaDagType dagger = QUDA_DAG_NO) = 0;
 

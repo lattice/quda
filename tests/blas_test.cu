@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include <quda_internal.h>
-#include <spinor_quda.h>
+#include <color_spinor_field.h>
 #include <blas_quda.h>
 
 #include <test_util.h>
@@ -11,7 +11,7 @@
 
 QudaPrecision cuda_prec;
 QudaPrecision other_prec; // Used for copy benchmark
-ParitySpinor x, y, z, w, v, p;
+cudaColorSpinorField x, y, z, w, v, p;
 
 int nIters;
 
@@ -31,35 +31,52 @@ void init()
   X[2] = 24;
   X[3] = 24;
 
-  int sp_pad = 0;
+  ColorSpinorParam param;
+  param.fieldType = QUDA_CUDA_FIELD;
+  param.nColor = 3;
+  param.nSpin = 4; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+  param.nDim = 4; // number of spacetime dimensions
+  param.x = X;
+  param.pad = 0;
+  param.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+  param.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+  
+  param.basis = QUDA_UKQCD_BASIS;
+  param.create = QUDA_NULL_CREATE;
 
   switch(prec) {
   case 0:
-    cuda_prec = QUDA_HALF_PRECISION;
+    param.precision = QUDA_HALF_PRECISION;
     other_prec = QUDA_SINGLE_PRECISION;
+    param.fieldOrder = QUDA_FLOAT4_ORDER;
     break;
   case 1:
-    cuda_prec = QUDA_SINGLE_PRECISION;
+    param.precision = QUDA_SINGLE_PRECISION;
     other_prec = QUDA_HALF_PRECISION;
+    param.fieldOrder = QUDA_FLOAT4_ORDER;
     break;
   case 2:
-    cuda_prec = QUDA_DOUBLE_PRECISION;
+    param.precision = QUDA_DOUBLE_PRECISION;
     other_prec = QUDA_HALF_PRECISION;
+    param.fieldOrder = QUDA_FLOAT2_ORDER;
     break;
   }
 
-  // need single parity dimensions
-  X[0] /= 2;
+  v = cudaColorSpinorField(param);
+  w = cudaColorSpinorField(param);
+  x = cudaColorSpinorField(param);
+  y = cudaColorSpinorField(param);
+  z = cudaColorSpinorField(param);
 
-  v = allocateParitySpinor(X, cuda_prec, sp_pad);
-  w = allocateParitySpinor(X, cuda_prec, sp_pad);
-  x = allocateParitySpinor(X, cuda_prec, sp_pad);
-  y = allocateParitySpinor(X, cuda_prec, sp_pad);
-  z = allocateParitySpinor(X, cuda_prec, sp_pad);
-  p = allocateParitySpinor(X, other_prec, sp_pad);
+  // always true since this is never double
+  param.precision = other_prec;
+  param.fieldOrder = QUDA_FLOAT4_ORDER; 
+  p = cudaColorSpinorField(param);
 
   // check for successful allocation
   checkCudaError();
+
+  exit(0);
 
   // turn off error checking in blas kernels
   setBlasTuning(1);
@@ -69,12 +86,7 @@ void init()
 void end()
 {
   // release memory
-  freeParitySpinor(p);
-  freeParitySpinor(v);
-  freeParitySpinor(w);
-  freeParitySpinor(x);
-  freeParitySpinor(y);
-  freeParitySpinor(z);
+
 }
 
 
@@ -179,7 +191,7 @@ double benchmark(int kernel) {
       break;
 
     case 21:
-      caxpbypzYmbwcDotProductWYNormYQuda(a2, x, b2, y, z, w, v);
+      caxpbypzYmbwcDotProductWYNormYCuda(a2, x, b2, y, z, w, v);
       break;
       
     default:
@@ -283,7 +295,7 @@ int main(int argc, char** argv)
 	  nIters = 1;
 	  benchmark(kernels[i]);
 	  
-	  nIters = 300;
+	  nIters = 100;
 	  blas_quda_flops = 0;
 	  blas_quda_bytes = 0;
 

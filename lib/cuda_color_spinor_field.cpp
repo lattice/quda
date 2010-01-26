@@ -3,6 +3,8 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
+#include <iostream>
+
 void* cudaColorSpinorField::buffer = 0;
 bool cudaColorSpinorField::bufferInit = false;
 size_t cudaColorSpinorField::bufferBytes = 0;
@@ -25,7 +27,6 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
   } else if (param.create == QUDA_COPY_CREATE){
     errorQuda("not implemented");
   }
-
 }
 
 cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
@@ -92,6 +93,7 @@ cudaColorSpinorField::~cudaColorSpinorField() {
 }
 
 void cudaColorSpinorField::create(const FieldCreate create) {
+
   if (basis != QUDA_UKQCD_BASIS) {
     errorQuda("Basis not implemented");
   }
@@ -128,7 +130,10 @@ void cudaColorSpinorField::create(const FieldCreate create) {
   if (subset == QUDA_FULL_FIELD_SUBSET) {
     // create the associated even and odd subsets
     ColorSpinorParam param;
-    param.x[0] = x[0] / 2;
+    param.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    param.nDim = nDim;
+    param.x = x;
+    param.x[0] /= 2; // set single parity dimensions
     param.create = QUDA_REFERENCE_CREATE;
     param.v = v;
     param.norm = norm;
@@ -136,6 +141,8 @@ void cudaColorSpinorField::create(const FieldCreate create) {
     param.v = (void*)((unsigned long)v + bytes/2);
     param.norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
     odd = new cudaColorSpinorField(*this, param);
+    param.x[0] *= 2; // restore full dimensions
+    param.x = 0;
   }
 
 }
