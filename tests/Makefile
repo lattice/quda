@@ -6,7 +6,7 @@ INC += -I../include -I.
 
 HDRS = blas_reference.h dslash_reference.h test_util.h
 
-TESTS = dslash_test invert_test su3_test pack_test blas_test
+TESTS = su3_test blas_test #dslash_test invert_test su3_test pack_test colorspinor_test
 
 all: $(TESTS)
 
@@ -23,6 +23,9 @@ pack_test: pack_test.o test_util.o dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 blas_test: blas_test.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@
+
+colorspinor_test: colorspinor_test.o dslash_reference.o blas_reference.o test_util.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 tune: blas_test
