@@ -92,8 +92,8 @@ double benchmark(int kernel) {
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
-  cudaEventCreate(&end);
   cudaEventRecord(start, 0);
+  cudaEventSynchronize(start);
 
   for (int i=0; i < nIters; ++i) {
     switch (kernel) {
@@ -195,6 +195,7 @@ double benchmark(int kernel) {
     }
   }
   
+  cudaEventCreate(&end);
   cudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
@@ -269,7 +270,7 @@ int main(int argc, char** argv)
     "caxpbypzYmbwcDotProductWYNormYQuda"
   };
   
-  for (prec = 0; prec < 3; prec++) {
+  for (prec = 0; prec < 2; prec++) {
 
     init();
 
@@ -281,6 +282,8 @@ int main(int argc, char** argv)
       double gbytes_max = 0.0;
       int threads_max = 0; 
       int blocks_max = 0;
+
+      cudaError_t error;
 
       for (int thread = 0; thread < Nthreads; thread++) {
 	for (int grid = 0; grid < Ngrids; grid++) {
@@ -295,13 +298,12 @@ int main(int argc, char** argv)
 	  blas_quda_bytes = 0;
 
 	  double secs = benchmark(kernels[i]);
+	  error = cudaGetLastError();
 	  double flops = blas_quda_flops;
 	  double bytes = blas_quda_bytes;
 	  
 	  double gflops = (flops*1e-9)/(secs);
 	  double gbytes = bytes/(secs*(1<<30));
-
-	  cudaError_t error = cudaGetLastError();
 
 	  if (gbytes > gbytes_max && error == cudaSuccess) { // prevents selection of failed parameters
 	    gflops_max = gflops;
@@ -310,13 +312,17 @@ int main(int argc, char** argv)
 	    blocks_max = gridSizes[grid];
 	  }
 	  
-	  // printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
-	  //        blockSizes[thread], gridSizes[grid], names[i], secs, flops, gflops, gbytes);
+	  //printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
+	  //    blockSizes[thread], gridSizes[grid], names[i], secs, flops, gflops, gbytes);
 	}
       }
 
-      if (threads_max == 0) errorQuda("Autotuning failed for %s kernel", names[i]);
-      
+      if (threads_max == 0) {
+	errorQuda("Autotuning failed for %s kernel: %s", names[i], cudaGetErrorString(error));
+      } else {
+	
+      }
+
       printf("%-36s Performance maximum at %d threads per block, %d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
 	     names[i], threads_max, blocks_max, gflops_max, gbytes_max);
 

@@ -361,6 +361,10 @@ inline void checkSpinor(cudaColorSpinorField &a, cudaColorSpinorField &b) {
   if (a.Length() != b.Length()) {
     errorQuda("checkSpinor: lengths do not match: %d %d", a.Length(), b.Length());
   }
+
+  if (a.Stride() != b.Stride()) {
+    errorQuda("checkSpinor: strides do not match: %d %d", a.Stride(), b.Stride());
+  }
 }
 
 // For kernels with precision conversion built in
@@ -1578,15 +1582,13 @@ double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorFie
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     return axpyNormFCuda((float)a, (float*)x.v, (float*)y.v, x.length, 15, x.precision);
   } else {
-    int spinor_bytes = x.length*sizeof(short);
-    cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
-    cudaBindTexture(0, texHalf2, y.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm2, y.norm, spinor_bytes/12);    
+    cudaBindTexture(0, texHalf1, x.v, x.bytes); 
+    cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
+    cudaBindTexture(0, texHalf2, y.v, x.bytes); 
+    cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
     return axpyNormHCuda((float)a, (short4*)y.v, (float*)y.norm, x.stride, x.volume, 15, x.precision);
   }
 }
-
 
 //
 // double xmyNormCuda(float a, float *x, float *y, n){}
@@ -1638,7 +1640,7 @@ template <int reduce_threads, typename Float>
 #undef REDUCE_OPERATION
 
 double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  blas_quda_flops +=3*x.real_length;
+  blas_quda_flops += 3*x.real_length;
   checkSpinor(x,y);
   blas_quda_bytes += 3*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
@@ -1646,11 +1648,10 @@ double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     return xmyNormFCuda((float*)x.v, (float*)y.v, x.length, 16, x.precision);
   } else { 
-    int spinor_bytes = x.length*sizeof(short);
-    cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
-    cudaBindTexture(0, texHalf2, y.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm2, y.norm, spinor_bytes/12);    
+    cudaBindTexture(0, texHalf1, x.v, x.bytes); 
+    cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
+    cudaBindTexture(0, texHalf2, y.v, x.bytes); 
+    cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
     return xmyNormHCuda((char*)0, (char*)0, (short4*)y.v, (float*)y.norm, y.stride, y.volume, 16, x.precision);
   }
 }
