@@ -39,7 +39,8 @@ cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
 // creates a copy of src, any differences defined in param
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
   ColorSpinorField(src), v(0), norm(0), init(false) {
-  reset(param);
+  if (param.create != QUDA_REFERENCE_CREATE) reset(param); // can only overide if we are not using a reference
+  type = QUDA_CUDA_FIELD;
   create(param.create);
 
   if (param.create == QUDA_NULL_CREATE) {
