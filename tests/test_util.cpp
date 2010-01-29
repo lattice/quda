@@ -5,25 +5,9 @@
 #include <test_util.h>
 
 #include <complex>
+#include <short.h>
 
 using namespace std;
-
-#define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.0)
-#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
-
-template <typename Float>
-inline short FloatToShort(Float a) {
-  //return (short)(a*MAX_SHORT);
-  short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
-  return rtn;
-}
-
-template <typename Float>
-inline Float shortToFloat(short a) {
-  Float rtn = (float)a/SCALE_FLOAT - SHIFT_FLOAT;
-  return rtn;
-}
 
 template <typename Float>
 static void printVector(Float *v) {
@@ -445,86 +429,7 @@ void construct_clover_field(void *clover, double norm, double diag, QudaPrecisio
   else constructCloverField((float *)clover, norm, diag);
 }
 
-template <typename Float>
-static void constructPointSpinorField(Float *res, int i0, int s0, int c0) {
-  Float *resEven = res;
-  Float *resOdd = res + Vh*spinorSiteSize;
-    
-  for(int i = 0; i < Vh; i++) {
-    for (int s = 0; s < 4; s++) {
-      for (int m = 0; m < 3; m++) {
-	resEven[i*(4*3*2) + s*(3*2) + m*(2) + 0] = 0;
-	resEven[i*(4*3*2) + s*(3*2) + m*(2) + 1] = 0;
-	resOdd[i*(4*3*2) + s*(3*2) + m*(2) + 0] = 0;
-	resOdd[i*(4*3*2) + s*(3*2) + m*(2) + 1] = 0;
-	if (s == s0 && m == c0) {
-	  if (fullLatticeIndex(i, 0) == i0)
-	    resEven[i*(4*3*2) + s*(3*2) + m*(2) + 0] = 1;
-	  if (fullLatticeIndex(i, 1) == i0)
-	    resOdd[i*(4*3*2) + s*(3*2) + m*(2) + 0] = 1;
-	}
-      }
-    }
-  }
-}
-
-template <typename Float>
-static void constructSpinorField(Float *res) {
-  for(int i = 0; i < V; i++) {
-    for (int s = 0; s < 4; s++) {
-      for (int m = 0; m < 3; m++) {
-	res[i*(4*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-	res[i*(4*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
-      }
-    }
-  }
-}
-
-void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision) {
-  if (type == 0) {
-    if (precision == QUDA_DOUBLE_PRECISION) constructPointSpinorField((double*)spinor, i0, s0, c0);
-    else constructPointSpinorField((float*)spinor, i0, s0, c0);
-  } else {
-    if (precision == QUDA_DOUBLE_PRECISION) constructSpinorField((double*)spinor);
-    else constructSpinorField((float*)spinor);
-  }
-}
-
-template <typename Float>
-static void compareSpinor(Float *spinorRef, Float *spinorGPU, int len) {
-  int res = 1;
-  int fail_check = 16*res;
-  int fail[fail_check];
-  for (int f=0; f<fail_check; f++) fail[f] = 0;
-
-  int iter[24];
-  for (int i=0; i<24; i++) iter[i] = 0;
-
-  for (int i=0; i<len; i++) {
-    for (int j=0; j<24; j++) {
-      int is = i*24+j;
-      double diff = fabs(spinorRef[is]-spinorGPU[is]);
-      for (int f=0; f<fail_check; f++)
-	if (diff > pow(10.0,-(f+1)/(double)res)) fail[f]++;
-      //if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-      if (diff > 1e-3) iter[j]++;
-    }
-  }
-    
-  for (int i=0; i<24; i++) printf("%d fails = %d\n", i, iter[i]);
-    
-  for (int f=0; f<fail_check; f++) {
-    printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)res), fail[f], len*24, fail[f] / (double)(len*24));
-  }
-
-}
-
-void compare_spinor(void *spinor_ref, void *spinor_gpu, int len, QudaPrecision precision) {
-  if (precision == QUDA_DOUBLE_PRECISION) compareSpinor((double*)spinor_ref, (double*)spinor_gpu, len);
-  else compareSpinor((float*)spinor_ref, (float*)spinor_gpu, len);
-}
-
-void strong_check(void *spinorRef, void *spinorGPU, int len, QudaPrecision prec) {
+/*void strong_check(void *spinorRef, void *spinorGPU, int len, QudaPrecision prec) {
   printf("Reference:\n");
   printSpinorElement(spinorRef, 0, prec); printf("...\n");
   printSpinorElement(spinorRef, len-1, prec); printf("\n");    
@@ -534,7 +439,7 @@ void strong_check(void *spinorRef, void *spinorGPU, int len, QudaPrecision prec)
   printSpinorElement(spinorGPU, len-1, prec); printf("\n");
 
   compare_spinor(spinorRef, spinorGPU, len, prec);
-}
+  }*/
 
 template <typename Float>
 static void checkGauge(Float **oldG, Float **newG, double epsilon) {

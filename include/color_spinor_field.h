@@ -21,7 +21,7 @@ class ColorSpinorParam {
   FieldSubset fieldSubset; // Full, even or odd
   SubsetOrder subsetOrder; // defined for full fields
   
-  FieldOrder fieldOrder; // Float, Float2, Float4 etc.
+  QudaColorSpinorOrder fieldOrder; // Float, Float2, Float4 etc.
   GammaBasis basis;
   FieldCreate create; // 
 
@@ -32,7 +32,7 @@ class ColorSpinorParam {
    : fieldType(QUDA_INVALID_FIELD), nColor(0), nSpin(0), nDim(0), precision(QUDA_INVALID_PRECISION), 
     pad(0), fieldSubset(QUDA_INVALID_SUBSET), subsetOrder(QUDA_INVALID_SUBSET_ORDER), 
     fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_INVALID_BASIS), create(QUDA_INVALID_CREATE)
-  {;}
+  { for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0;}
 
   // used to create cpu params
  ColorSpinorParam(void *V, QudaInvertParam &inv_param, int *X)
@@ -78,13 +78,13 @@ class ColorSpinorParam {
 class ColorSpinorField {
 
  private:
-  bool init;
   void create(int nDim, const int *x, int Nc, int Ns, QudaPrecision precision, 
 	      int pad, FieldType type, FieldSubset subset, 
-	      SubsetOrder subsetOrder, FieldOrder order, GammaBasis basis);
+	      SubsetOrder subsetOrder, QudaColorSpinorOrder order, GammaBasis basis);
   void destroy();  
 
  protected:
+  bool init;
   QudaPrecision precision;
 
   int nColor;
@@ -104,7 +104,7 @@ class ColorSpinorField {
   FieldType type;
   FieldSubset subset;
   SubsetOrder subset_order;
-  FieldOrder order;
+  QudaColorSpinorOrder order;
   GammaBasis basis;
   
   // in the case of full fields, these are references to the even / odd sublattices
@@ -113,7 +113,7 @@ class ColorSpinorField {
 
   // resets the above attributes based on contents of param
   void reset(const ColorSpinorParam &);
-  void checkField(const ColorSpinorField &, const ColorSpinorField &);
+  static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
  public:
   ColorSpinorField();
@@ -134,7 +134,7 @@ class ColorSpinorField {
   FieldType fieldType() const { return type; }
   FieldSubset fieldSubset() const { return subset; }
   SubsetOrder subsetOrder() const { return subset_order; }
-  FieldOrder fieldOrder() const { return order; }
+  QudaColorSpinorOrder fieldOrder() const { return order; }
   GammaBasis gammaBasis() const { return basis; }
 };
 
@@ -219,6 +219,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   virtual ~cudaColorSpinorField();
 
   cudaColorSpinorField& operator=(const cudaColorSpinorField&);
+  cudaColorSpinorField& operator=(const cpuColorSpinorField&);
 
   void loadCPUSpinorField(const cpuColorSpinorField &src);
   void saveCPUSpinorField (cpuColorSpinorField &src) const;
@@ -258,7 +259,11 @@ class cpuColorSpinorField : public ColorSpinorField {
   virtual ~cpuColorSpinorField();
 
   cpuColorSpinorField& operator=(const cpuColorSpinorField&);
+  cpuColorSpinorField& operator=(const cudaColorSpinorField&);
 
+  void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
+  static void Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
+  void PrintVector(int vol);
 };
 
 #endif

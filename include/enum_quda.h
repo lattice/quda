@@ -130,45 +130,51 @@ extern "C" {
 typedef enum FieldType_s {
   QUDA_CPU_FIELD,
   QUDA_CUDA_FIELD,
-  QUDA_INVALID_FIELD
+  QUDA_INVALID_FIELD = QUDA_INVALID_ENUM
 } FieldType;
 
 typedef enum FieldSubset_s {
   QUDA_FULL_FIELD_SUBSET,
   QUDA_PARITY_FIELD_SUBSET,
-  QUDA_INVALID_SUBSET
+  QUDA_INVALID_SUBSET = QUDA_INVALID_ENUM
 } FieldSubset;
 
 typedef enum SubsetOrder_s {
   QUDA_LEXICOGRAPHIC_SUBSET_ORDER, // lexicographic ordering
   QUDA_EVEN_ODD_SUBSET_ORDER, // QUDA and qdp use this
   QUDA_ODD_EVEN_SUBSET_ORDER, // cps uses this
-  QUDA_INVALID_SUBSET_ORDER
+  QUDA_INVALID_SUBSET_ORDER = QUDA_INVALID_ENUM
 } SubsetOrder;
 
 // Unless otherwise stated, color runs faster than spin
-typedef enum FieldOrder_s {
+typedef enum QudaColorSpinorOrder_s {
   QUDA_FLOAT_ORDER, // spin-color-complex-space
   QUDA_FLOAT2_ORDER, // (spin-color-complex)/2-space-(spin-color-complex)%2
   QUDA_FLOAT4_ORDER, // (spin-color-complex)/4-space-(spin-color-complex)%4
   QUDA_SPACE_SPIN_COLOR_ORDER,
   QUDA_SPACE_COLOR_SPIN_ORDER, // QLA ordering (spin inside color)
-  QUDA_INVALID_ORDER
-} FieldOrder;
+  QUDA_INVALID_ORDER = QUDA_INVALID_ENUM
+} QudaColorSpinorOrder;
 
 typedef enum FieldCreate_s {
   QUDA_NULL_CREATE, // create new field
   QUDA_ZERO_CREATE, // create new field and zero it
   QUDA_COPY_CREATE, // create copy to field
   QUDA_REFERENCE_CREATE, // create reference to field
-  QUDA_INVALID_CREATE
+  QUDA_INVALID_CREATE = QUDA_INVALID_ENUM
 } FieldCreate;
 
 typedef enum GammaBasis_s {
   QUDA_DEGRAND_ROSSI_BASIS,
   QUDA_UKQCD_BASIS,
-  QUDA_INVALID_BASIS
+  QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
 } GammaBasis;
+
+typedef enum QudaSourceType_s {
+  QUDA_POINT_SOURCE,
+  QUDA_RANDOM_SOURCE,
+  QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
+} QudaSourceType;
 
 #ifdef __cplusplus
 }

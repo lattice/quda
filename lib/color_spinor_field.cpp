@@ -20,7 +20,7 @@ ColorSpinorField::~ColorSpinorField() {
 
 void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecision Prec, 
 			      int Pad, FieldType Type, FieldSubset Subset, 
-			      SubsetOrder Subset_order, FieldOrder Order,
+			      SubsetOrder Subset_order, QudaColorSpinorOrder Order,
 			      GammaBasis Basis) {
   if (Ndim > QUDA_MAX_DIM) errorQuda("Number of dimensions nDim = %d too great", nDim);
   nDim = Ndim;

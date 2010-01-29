@@ -296,7 +296,7 @@ void unpackParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
       unpackNonRelSpinorField<Nc, N>(dest+24*i, src+N*i, Vh+pad);
     }
   } else {
-    errorQuda("Basis change not supported");
+    errorQuda("Basis change from %d to %d not supported", srcBasis, destBasis);
   }
 }
 
@@ -313,7 +313,7 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
       unpackNonRelQLASpinorField<Nc, N>(dest+24*i, src+N*i, Vh+pad);
     }
   } else {
-    errorQuda("Basis change not supported");
+    errorQuda("Basis change from %d to %d not supported", srcBasis, destBasis);
   }
 }
 
@@ -401,7 +401,7 @@ template <int Nc, int Ns, int N, typename Float, typename FloatN>
 void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int length,
 		FieldSubset srcSubset, SubsetOrder subsetOrder, 
 		GammaBasis destBasis, GammaBasis srcBasis,
-		FieldOrder srcOrder) {
+		QudaColorSpinorOrder srcOrder) {
 
   if (srcSubset == QUDA_FULL_FIELD_SUBSET) {
     if (subsetOrder == QUDA_LEXICOGRAPHIC_SUBSET_ORDER) {
@@ -428,10 +428,10 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int len
 
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_ORDER) {
 	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, V/2, pad, destBasis, srcBasis);
-	packParitySpinor<Nc,Ns,N>(dest + length/(2*N), src+oddOff, V/2, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff, V/2, pad, destBasis, srcBasis);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_ORDER) {
 	packQLAParitySpinor<Nc,Ns,N>(dest, src+evenOff, V/2, pad, destBasis, srcBasis);
-	packQLAParitySpinor<Nc,Ns,N>(dest + length/(2*N), src+oddOff, V/2, pad, destBasis, srcBasis);
+	packQLAParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff, V/2, pad, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
       }
@@ -453,7 +453,7 @@ template <int Nc, int Ns, int N, typename Float, typename FloatN>
 void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int length,
 		  FieldSubset destSubset, SubsetOrder subsetOrder, 
 		  GammaBasis destBasis, GammaBasis srcBasis,
-		  FieldOrder destOrder) {
+		  QudaColorSpinorOrder destOrder) {
 
   if (destSubset == QUDA_FULL_FIELD_SUBSET) {
     if (subsetOrder == QUDA_LEXICOGRAPHIC_SUBSET_ORDER) {
@@ -479,11 +479,11 @@ void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int l
       }
 
       if (destOrder == QUDA_SPACE_SPIN_COLOR_ORDER) {
-	unpackParitySpinor<Nc,Ns,N>(dest, src+evenOff, V/2, pad, destBasis, srcBasis);
-	unpackParitySpinor<Nc,Ns,N>(dest + length/(2*N), src+oddOff, V/2, pad, destBasis, srcBasis);
+	unpackParitySpinor<Nc,Ns,N>(dest,            src+evenOff, V/2, pad, destBasis, srcBasis);
+	unpackParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff,  V/2, pad, destBasis, srcBasis);
       } else if (destOrder == QUDA_SPACE_COLOR_SPIN_ORDER) {
-	unpackQLAParitySpinor<Nc,Ns,N>(dest, src+evenOff, V/2, pad, destBasis, srcBasis);
-	unpackQLAParitySpinor<Nc,Ns,N>(dest + length/(2*N), src+oddOff, V/2, pad, destBasis, srcBasis);
+	unpackQLAParitySpinor<Nc,Ns,N>(dest,            src+evenOff, V/2, pad, destBasis, srcBasis);
+	unpackQLAParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff,  V/2, pad, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
       }

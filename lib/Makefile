@@ -8,7 +8,7 @@ QUDA_OBJS = color_spinor_field.o cpu_color_spinor_field.o cuda_color_spinor_fiel
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_quda.h dslash_quda.h enum_quda.h gauge_quda.h \
-	invert_quda.h quda.h quda_internal.h spinor_quda.h util_quda.h \
+	invert_quda.h quda.h quda_internal.h util_quda.h \
 	dirac.h color_spinor_field.h
 
 # files containing complex macros and other code fragments to be inlined,

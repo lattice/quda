@@ -29,6 +29,11 @@ Dirac& Dirac::operator=(const Dirac &dirac) {
 }
 
 void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
+  if (in.gammaBasis() != QUDA_UKQCD_BASIS || out.gammaBasis() != QUDA_UKQCD_BASIS) {
+    errorQuda("Cuda Dirac operator requires UKQCD basis, out = %d, in = %d", 
+	      out.gammaBasis(), in.gammaBasis());
+  }
+
   if (in.Precision() != out.Precision()) {
     errorQuda("Input and output spinor precisions don't match in dslash_quda");
   }
