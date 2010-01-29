@@ -113,6 +113,7 @@ class ColorSpinorField {
 
   // resets the above attributes based on contents of param
   void reset(const ColorSpinorParam &);
+  void fill(ColorSpinorParam &);
   static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
  public:
@@ -143,6 +144,8 @@ class cpuColorSpinorField;
 // CUDA implementation
 class cudaColorSpinorField : public ColorSpinorField {
 
+  friend class cpuColorSpinorField;
+
   friend class DiracWilson;
   friend class DiracClover;
   friend class DiracCloverPC;
@@ -150,7 +153,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend void copyCuda(cudaColorSpinorField &, const cudaColorSpinorField &);
   friend double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
   friend double sumCuda(cudaColorSpinorField &b);
-  friend double normCuda(cudaColorSpinorField &b);
+  friend double normCuda(const cudaColorSpinorField &b);
   friend double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   friend double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   friend void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y);
@@ -238,8 +241,9 @@ class cudaColorSpinorField : public ColorSpinorField {
 // CPU implementation
 class cpuColorSpinorField : public ColorSpinorField {
 
-  friend void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &);
-  friend void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &) const;
+  friend class cudaColorSpinorField;
+
+  friend double normCpu(const cpuColorSpinorField &);
 
  private:
   void *v; // the field elements

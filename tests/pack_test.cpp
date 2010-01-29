@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <gauge_quda.h>
@@ -9,6 +10,7 @@
 #include <dslash_reference.h>
 
 #include <color_spinor_field.h>
+#include <blas_quda.h>
 
 QudaGaugeParam param;
 FullGauge cudaGauge;
@@ -46,10 +48,10 @@ void init() {
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] = 2;
-  param.X[1] = 1;
-  param.X[2] = 1;
-  param.X[3] = 1;
+  param.X[0] = 4;
+  param.X[1] = 4;
+  param.X[2] = 4;
+  param.X[3] = 4;
   param.ga_pad = 0;
   setDims(param.X);
 
@@ -85,7 +87,7 @@ void init() {
 
   csParam.fieldType = QUDA_CUDA_FIELD;
   csParam.fieldOrder = QUDA_FLOAT4_ORDER;
-  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
+  csParam.basis = QUDA_UKQCD_BASIS;
   csParam.pad = 0;
   csParam.precision = QUDA_HALF_PRECISION;
 
@@ -155,6 +157,10 @@ void packTest() {
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime);
   
+  std::cout << "Norm check: CPU = " << norm2(spinor) << 
+    ", CUDA = " << norm2(cudaFullSpinor) << 
+    ", CPU =  " << norm2(spinor2) << std::endl;
+
   cpuColorSpinorField::Compare(spinor, spinor2, 1);
 
 }

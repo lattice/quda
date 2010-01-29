@@ -254,3 +254,16 @@ void cpuColorSpinorField::PrintVector(int vol) {
   }
 
 }
+
+double normCpu(const cpuColorSpinorField &a) {
+  
+  double norm2 = 0.0;
+  if (a.precision == QUDA_DOUBLE_PRECISION)
+    for (int i=0; i<a.length; i++) norm2 += ((double*)a.v)[i]*((double*)a.v)[i];
+  else if (a.precision == QUDA_SINGLE_PRECISION)
+    for (int i=0; i<a.length; i++) norm2 += ((float*)a.v)[i]*((float*)a.v)[i];
+  else
+    errorQuda("Precision type %d not implemented", a.precision);
+
+  return norm2;
+}

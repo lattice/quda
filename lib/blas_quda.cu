@@ -1447,7 +1447,7 @@ template <int reduce_threads, typename Float>
 #undef REDUCE_AUXILIARY
 #undef REDUCE_OPERATION
 
-double normCuda(cudaColorSpinorField &a) {
+double normCuda(const cudaColorSpinorField &a) {
   blas_quda_flops += 2*a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {

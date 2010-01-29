@@ -233,10 +233,16 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
   }
 
   if (precision == QUDA_HALF_PRECISION) {
-    cudaColorSpinorField tmp(src);
+    ColorSpinorParam param;
+    fill(param); // acquire all attributes of this
+    param.precision = QUDA_SINGLE_PRECISION; // change precision
+    param.create = QUDA_COPY_CREATE;
+    cudaColorSpinorField tmp(src, param);
     copy(tmp);
     return;
   }
+
+  std::cout << precision << " " << src.precision << " " << order << " " << src.order << std::endl;
 
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (src.precision == QUDA_DOUBLE_PRECISION) {

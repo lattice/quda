@@ -1,4 +1,5 @@
 #include <color_spinor_field.h>
+#include <string.h>
 
 ColorSpinorField::ColorSpinorField() : init(false) {
 
@@ -69,9 +70,7 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.nSpin != 0) nSpin = param.nSpin;
 
   if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
-  if (param.nDim != 0 && nDim != param.nDim) {
-    nDim = param.nDim;
-  }
+  if (param.nDim != 0 && nDim != param.nDim) nDim = param.nDim;
 
   // only check the that the first dimension is non-zero
   if (param.x[0] != 0) {
@@ -98,6 +97,22 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.basis != QUDA_INVALID_BASIS) basis = param.basis;
 }
 
+// Fills the param with the contents of this field
+void ColorSpinorField::fill(ColorSpinorParam &param) {
+  param.nColor = nColor;
+  param.nSpin = nSpin;
+  param.precision = precision;
+  param.nDim = nDim;
+  memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
+  param.pad = pad;
+  param.fieldType = type;
+  param.fieldSubset = subset;
+  param.subsetOrder = subset_order;
+  param.fieldOrder = order;
+  param.basis = basis;
+  param.create = QUDA_INVALID_CREATE;
+}
+
 // For kernels with precision conversion built in
 void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b) {
   if (a.Length() != b.Length()) {
@@ -113,3 +128,14 @@ void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorFi
   }
 }
 
+double norm2(const ColorSpinorField &a) {
+
+  if (a.fieldType() == QUDA_CUDA_FIELD) {
+    return normCuda(dynamic_cast<const cudaColorSpinorField&>(a));
+  } else if (a.fieldType() == QUDA_CPU_FIELD) {
+    return normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
+  } else {
+    errorQuda("Field type %d not supported", a.fieldType());
+  }
+
+}

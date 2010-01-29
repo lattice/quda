@@ -11,8 +11,7 @@
 extern "C" {
 #endif
 
-  // ---------- blas_quda.cu ----------
- 
+  // ---------- blas_quda.cu ---------- 
 
   // creates and destroys reduction buffers  
   void initBlas(void); 
@@ -30,12 +29,18 @@ extern "C" {
 
 // C++ linkage
 
+// Generic variants
+
+double norm2(const ColorSpinorField&);
+
+// CUDA variants
+
 void zeroCuda(cudaColorSpinorField &a);
 void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src);
 
 double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
 double sumCuda(cudaColorSpinorField &b);
-double normCuda(cudaColorSpinorField &b);
+double normCuda(const cudaColorSpinorField &b);
 double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 
@@ -60,5 +65,10 @@ double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 double3 caxpbypzYmbwcDotProductWYNormYCuda(const double2 &a, cudaColorSpinorField &x, const double2 &b, cudaColorSpinorField &y, 
 					   cudaColorSpinorField &z, cudaColorSpinorField &w, cudaColorSpinorField &u);
+
+// CPU variants
+
+double normCpu(const cpuColorSpinorField &b);
+
 
 #endif // _QUDA_BLAS_H
