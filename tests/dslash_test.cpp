@@ -42,10 +42,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 8;
-  gauge_param.X[1] = 8;
-  gauge_param.X[2] = 8;
-  gauge_param.X[3] = 8;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 32;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -86,7 +86,7 @@ void init() {
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_HALF_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     if (test_type > 0) {
@@ -178,8 +178,6 @@ void init() {
     tmp = cudaColorSpinorField(csParam);
 
     cudaSpinor = spinor;
-    std::cout << "Before anything " << norm2(cudaSpinor) << " " << norm2(spinor) << std::endl;
-
   }
 
   DiracParam diracParam;
@@ -205,7 +203,7 @@ void end() {
 double dslashCUDA() {
 
   // execute kernel
-  const int LOOPS = 1;
+  const int LOOPS = 100;
   printf("Executing %d kernel loops...", LOOPS);
   fflush(stdout);
   stopwatchStart();
@@ -215,9 +213,7 @@ double dslashCUDA() {
       if (transfer) {
 	dslashQuda((void*)((ulong)spinor.v+spinor.bytes/2), spinor.v, &inv_param, parity, dagger);
       } else {
-	std::cout << "\nBefore dslash " << norm2(cudaSpinor) << " " << norm2(cudaSpinor.Odd()) << " " << norm2(cudaSpinor.Even()) << std::endl;
 	dirac->Dslash(cudaSpinor.Odd(), cudaSpinor.Even(), parity, dagger);
-	std::cout << "\nAfter dslash " << norm2(cudaSpinor) << " " << norm2(cudaSpinor.Odd()) << " " << norm2(cudaSpinor.Even()) << std::endl;
       }
       break;
     case 1:
@@ -315,7 +311,6 @@ int main(int argc, char **argv)
     printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
     
-    std::cout << norm2(spinorRef) << " "<< norm2(spinorOut) << " " << norm2(cudaSpinor.Odd()) << " " << norm2(cudaSpinor.Even()) << std::endl;
     cpuColorSpinorField::Compare(spinorRef, spinorOut);
   }    
   end();

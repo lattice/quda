@@ -226,6 +226,10 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
     errorQuda("Ns != 4 not yet supported");
   }
 
+  if (subset != src.subset) {
+    errorQuda("Subset types do not match %d %d", subset, src.subset);
+  }
+
   if (precision == QUDA_HALF_PRECISION) {
     ColorSpinorParam param;
     fill(param); // acquire all attributes of this
@@ -311,6 +315,10 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
     errorQuda("Ns != 4 not yet supported");
   }
 
+  if (subset != dest.subset) {
+    errorQuda("Subset types do not match %d %d", subset, dest.subset);
+  }
+
   if (precision == QUDA_HALF_PRECISION) {
     ColorSpinorParam param;
     param.create = QUDA_COPY_CREATE;
@@ -321,12 +329,6 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   }
 
   cudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
-
-  double sum1 = 0.0, sum2 = 0.0;
-  for (int i=0; i<length; i++) {
-    sum2 += ((float*)buffer)[i] * ((float*)buffer)[i];
-  }
-  std::cout << norm2(*this) << " " << sum2 << std::endl;
 
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (dest.precision == QUDA_DOUBLE_PRECISION) {
@@ -341,10 +343,10 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
       }
     } else {
       if (order == QUDA_FLOAT_ORDER) {
-	unpackSpinor<3,4,1>((double*)dest.v, (float*)buffer, volume, pad, x, length,
+	unpackSpinor<3,4,1>((float*)dest.v, (double*)buffer, volume, pad, x, length,
 			  dest.fieldSubset(), dest.subsetOrder(), dest.gammaBasis(), basis, dest.fieldOrder());
       } else if (order == QUDA_FLOAT2_ORDER) {
-	unpackSpinor<3,4,2>((double*)dest.v, (float*)buffer, volume, pad, x, length,
+	unpackSpinor<3,4,2>((float*)dest.v, (double*)buffer, volume, pad, x, length,
 			  dest.fieldSubset(), dest.subsetOrder(), dest.gammaBasis(), basis, dest.fieldOrder());
       } else if (order == QUDA_FLOAT4_ORDER) {
 	errorQuda("double4 not supported");
@@ -353,13 +355,13 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   } else {
     if (dest.precision == QUDA_DOUBLE_PRECISION) {
       if (order == QUDA_FLOAT_ORDER) {
-	unpackSpinor<3,4,1>((float*)dest.v, (double*)buffer, volume, pad, x, length,
+	unpackSpinor<3,4,1>((double*)dest.v, (float*)buffer, volume, pad, x, length,
 			  dest.fieldSubset(), dest.subsetOrder(), dest.gammaBasis(), basis, dest.fieldOrder());
       } else if (order == QUDA_FLOAT2_ORDER) {
-	unpackSpinor<3,4,2>((float*)dest.v, (double*)buffer, volume, pad, x, length,
+	unpackSpinor<3,4,2>((double*)dest.v, (float*)buffer, volume, pad, x, length,
 			  dest.fieldSubset(), dest.subsetOrder(), dest.gammaBasis(), basis, dest.fieldOrder());
       } else if (order == QUDA_FLOAT4_ORDER) {
-	unpackSpinor<3,4,4>((float*)dest.v, (double*)buffer, volume, pad, x, length,
+	unpackSpinor<3,4,4>((double*)dest.v, (float*)buffer, volume, pad, x, length,
 			  dest.fieldSubset(), dest.subsetOrder(), dest.gammaBasis(), basis, dest.fieldOrder());
       }
     } else {
@@ -375,10 +377,6 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
       }
     }
   }
-
-  // bug somewhere here!
-
-  std::cout << norm2(*this) << " " << norm2(dest) << std::endl; exit(0);
 
   return;
 }
