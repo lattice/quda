@@ -16,10 +16,11 @@ class DiracParam {
   FullClover *clover;
   FullClover *cloverInv;
   cudaColorSpinorField *tmp;
+  QudaVerbosity verbose;
 
  DiracParam() 
    : type(QUDA_INVALID_DIRAC), kappa(0.0), matpcType(QUDA_MATPC_INVALID),
-    gauge(0), clover(0), cloverInv(0), tmp(0)
+    gauge(0), clover(0), cloverInv(0), tmp(0), verbose(QUDA_SILENT)
   {
 
   }
@@ -120,7 +121,8 @@ class DiracClover : public DiracWilson {
 
  protected:
   FullClover &clover;
-  void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &);
+  void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
+			 const FullClover &);
   void cloverApply(cudaColorSpinorField &out, const FullClover &clover, const cudaColorSpinorField &in, 
 		   const int parity);
 

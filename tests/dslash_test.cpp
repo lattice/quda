@@ -15,7 +15,7 @@
 #include<iostream>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 0;
+int test_type = 2;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 int clover_yes = 0;
 
@@ -33,7 +33,7 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 double kappa = 1.0;
 int parity = 1;   // even or odd? (0 = even, 1 = odd)
 QudaDagType dagger = QUDA_DAG_NO;   // apply Dslash or Dslash dagger?
-int transfer = 0; // include transfer time in the benchmark?
+int transfer = 1; // include transfer time in the benchmark?
 
 Dirac *dirac;
 
@@ -42,9 +42,9 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
+  gauge_param.X[0] = 16;
+  gauge_param.X[1] = 16;
+  gauge_param.X[2] = 16;
   gauge_param.X[3] = 32;
   setDims(gauge_param.X);
 
@@ -114,17 +114,18 @@ void init() {
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
-  csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+  if (test_type < 2) {
+    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    csParam.x[0] /= 2;
+  } else {
+    csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+  }    
   csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
   csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
   csParam.create = QUDA_NULL_CREATE;
   
   spinor = cpuColorSpinorField(csParam);
-  if (test_type < 2) {
-    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
-    csParam.x[0] /= 2;
-  }
   spinorOut = cpuColorSpinorField(csParam);
   spinorRef = cpuColorSpinorField(csParam);
 
@@ -151,16 +152,17 @@ void init() {
   int dev = 0;
   initQuda(dev);
 
+  std::cout << "Sending gauge field to GPU" << std::endl; fflush(stdout);
+
   loadGaugeQuda(hostGauge, &gauge_param);
   gauge = cudaGaugePrecise;
 
   if (clover_yes) {
+  std::cout << "Sending clover field to GPU" << std::endl; fflush(stdout);
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
     clover = cudaCloverPrecise;
     cloverInv = cudaCloverInvPrecise;
   }
-
-  printf("Sending fields to GPU... "); fflush(stdout);
 
   if (!transfer) {
     csParam.fieldType = QUDA_CUDA_FIELD;
@@ -169,17 +171,26 @@ void init() {
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
   
-    cudaSpinor = cudaColorSpinorField(csParam);
-    
+    if (test_type < 2) {
+      csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+      csParam.x[0] /= 2;
+    }
+
+    cudaSpinor = cudaColorSpinorField(csParam);    
     cudaSpinorOut = cudaColorSpinorField(csParam);
 
-    csParam.x[0] /= 2;
+    if (test_type == 2) csParam.x[0] /= 2;
+
     csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
     tmp = cudaColorSpinorField(csParam);
 
+    std::cout << "Sending spinor field to GPU" << std::endl; fflush(stdout);
     cudaSpinor = spinor;
+    std::cout << "Source: CPU = " << norm2(spinor) << ", CUDA = " << norm2(cudaSpinor) << std::endl;
+  } else {
+    std::cout << "Source: CPU = " << norm2(spinor) << std::endl;
   }
-
+    
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param);
   diracParam.tmp = &tmp;
@@ -203,7 +214,7 @@ void end() {
 double dslashCUDA() {
 
   // execute kernel
-  const int LOOPS = 100;
+  const int LOOPS = 1;
   printf("Executing %d kernel loops...", LOOPS);
   fflush(stdout);
   stopwatchStart();
@@ -211,22 +222,22 @@ double dslashCUDA() {
     switch (test_type) {
     case 0:
       if (transfer) {
-	dslashQuda((void*)((ulong)spinor.v+spinor.bytes/2), spinor.v, &inv_param, parity, dagger);
+	dslashQuda(spinorOut.v, spinor.v, &inv_param, parity, dagger);
       } else {
-	dirac->Dslash(cudaSpinor.Odd(), cudaSpinor.Even(), parity, dagger);
+	dirac->Dslash(cudaSpinorOut, cudaSpinor, parity, dagger);
       }
       break;
     case 1:
       if (transfer) {
-	MatQuda((void*)((ulong)spinor.v+spinor.bytes/2), spinor.v, &inv_param, dagger);
+	MatQuda(spinorOut.v, spinor.v, &inv_param, dagger);
       } else {
-	dirac->M(cudaSpinor.Odd(), cudaSpinor.Even(), dagger);
+	dirac->M(cudaSpinorOut, cudaSpinor, dagger);
       }
       break;
     case 2:
       if (transfer) {
 	MatQuda(spinorOut.v, spinor.v, &inv_param, dagger);
-      } else if (!clover_yes) {
+      } else {
 	dirac->M(cudaSpinorOut, cudaSpinor, dagger);
       }
     }
@@ -293,11 +304,8 @@ int main(int argc, char **argv)
   for (int i=0; i<attempts; i++) {
     
     double secs = dslashCUDA();
-    
-    if (!transfer) {
-      if (test_type < 2) spinorOut = cudaSpinor.Odd();
-      else spinorOut = cudaSpinor;
-    }
+
+    if (!transfer) spinorOut = cudaSpinorOut;
 
     // print timing information
     printf("%fms per loop\n", 1000*secs);
@@ -310,6 +318,13 @@ int main(int argc, char **argv)
     }
     printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
+    
+    if (!transfer) {
+      std::cout << "Results: CPU = " << norm2(spinorRef) << ", CUDA = " << norm2(cudaSpinorOut) << 
+	", CPU-CUDA = " << norm2(spinorOut) << std::endl;
+    } else {
+      std::cout << "Result: CPU = " << norm2(spinorRef) << ", CPU-CUDA = " << norm2(spinorOut) << std::endl;
+    }
     
     cpuColorSpinorField::Compare(spinorRef, spinorOut);
   }    

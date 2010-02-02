@@ -73,15 +73,18 @@ void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpin
 Dirac* Dirac::create(const DiracParam &param) {
 
   if (param.type == QUDA_WILSON_DIRAC) {
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator");
     return new DiracWilson(param);
   } else if (param.type == QUDA_WILSONPC_DIRAC) {
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracWilsonPC operator");
     return new DiracWilsonPC(param);
   } else if (param.type == QUDA_CLOVER_DIRAC) {
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracClover operator");
     return new DiracClover(param);
   } else if (param.type == QUDA_CLOVERPC_DIRAC) {
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator");
     return new DiracCloverPC(param);
   } else {
-    errorQuda("Dirac Operator not implemented");
     return 0;
   }
 

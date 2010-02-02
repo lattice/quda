@@ -50,6 +50,11 @@ class ColorSpinorParam {
     } else if (inv_param.dirac_order == QUDA_QDP_DIRAC_ORDER) {
       fieldOrder = QUDA_SPACE_COLOR_SPIN_ORDER;
       subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+    } else if (inv_param.dirac_order == QUDA_DIRAC_ORDER) {
+      fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
+      subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+    } else {
+      errorQuda("Dirac order %d not supported", inv_param.dirac_order);
     }
   }
 

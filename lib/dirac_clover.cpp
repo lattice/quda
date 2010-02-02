@@ -1,4 +1,5 @@
 #include <dirac.h>
+#include <iostream>
 
 DiracClover::DiracClover(const DiracParam &param)
   : DiracWilson(param), clover(*(param.clover)) {
@@ -24,7 +25,8 @@ DiracClover& DiracClover::operator=(const DiracClover &dirac) {
   return *this;
 }
 
-void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
+void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in,
+				    const FullClover &clover) {
   Dirac::checkParitySpinor(out, in);
 
   if (out.Volume() != clover.even.volume) {
@@ -50,7 +52,7 @@ void DiracClover::cloverApply(cudaColorSpinorField &out, const FullClover &clove
 			      const cudaColorSpinorField &in, const int parity) {
 
   if (!initDslash) initDslashConstants(gauge, in.stride, clover.even.stride);
-  checkParitySpinor(in, out);
+  checkParitySpinor(in, out, clover);
 
   if (in.precision == QUDA_DOUBLE_PRECISION) {
     cloverDCuda((double2*)out.v, gauge, clover, (double2*)in.v, parity, out.volume, out.length);
@@ -146,7 +148,7 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
 			   const int parity, const QudaDagType dagger) {
 
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
-  checkParitySpinor(in, out);
+  checkParitySpinor(in, out, cloverInv);
 
   if (in.precision == QUDA_DOUBLE_PRECISION) {
     cloverDslashDCuda((double2*)out.v, gauge, cloverInv, (double2*)in.v, parity, dagger,
@@ -169,7 +171,7 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
 			       const cudaColorSpinorField &x, const double &k) {
 
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
-  checkParitySpinor(in, out);
+  checkParitySpinor(in, out, cloverInv);
 
   if (in.precision == QUDA_DOUBLE_PRECISION) {
     cloverDslashXpayDCuda((double2*)out.v, gauge, cloverInv, (double2*)in.v, parity, 

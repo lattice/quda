@@ -13,6 +13,8 @@
 #include <color_spinor_field.h>
 #include <dirac.h>
 
+#include <iostream>
+
 #define spinorSiteSize 24 // real numbers per spinor
 
 FullGauge cudaGaugePrecise; // precise gauge field
@@ -222,6 +224,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   diracParam.matpcType = inv_param->matpc_type;
   diracParam.gauge = &cudaGaugePrecise;
   diracParam.clover = &cudaCloverPrecise;
+  diracParam.cloverInv = &cudaCloverInvPrecise;
   diracParam.kappa = kappa;
 }
 
@@ -249,6 +252,7 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   diracParam.matpcType = inv_param->matpc_type;
   diracParam.gauge = &cudaGaugeSloppy;
   diracParam.clover = &cudaCloverSloppy;
+  diracParam.cloverInv = &cudaCloverInvSloppy;
   diracParam.kappa = kappa;
 }
 
@@ -291,6 +295,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
+ 
   cudaColorSpinorField in(hIn, cudaParam);
   cudaParam.create = QUDA_NULL_CREATE;
   cudaColorSpinorField out(in, cudaParam);
@@ -314,14 +319,19 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
 
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
-  hOut = out;
+  out.saveCPUSpinorField(hOut);// since this is a reference this won't work: hOut = out;
 }
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger)
 {
-  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X); // wrong dimensions
-  cpuParam.fieldSubset = inv_param->solution_type == QUDA_MATPC_SOLUTION ? 
-    QUDA_PARITY_FIELD_SUBSET : QUDA_FULL_FIELD_SUBSET;
+  if (inv_param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
+  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
+  if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
+    cudaGaugePrecise.X[0] /= 2;
+    cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
+  } else {
+    cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+  }
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -329,6 +339,9 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
   cudaParam.create = QUDA_NULL_CREATE;
   cudaColorSpinorField out(in, cudaParam);
   cudaColorSpinorField tmp;
+
+  in = hIn;
+  std::cout << norm2(in) << " " << norm2(hIn) << std::endl;
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param);
@@ -343,14 +356,21 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
 
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
-  hOut = out;
+  out.saveCPUSpinorField(hOut);// since this is a reference this won't work: hOut = out;
+
+  std::cout << norm2(out) << " " << norm2(hOut) << std::endl;
 }
 
 void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  if (inv_param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
-  cpuParam.fieldSubset = inv_param->solution_type == QUDA_MATPC_SOLUTION ? 
-    QUDA_PARITY_FIELD_SUBSET : QUDA_FULL_FIELD_SUBSET;
+  if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
+    cudaGaugePrecise.X[0] /= 2;
+    cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
+  } else {
+    cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+  }
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -375,7 +395,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
-  hOut = out;
+  out.saveCPUSpinorField(hOut);// since this is a reference this won't work: hOut = out;
 }
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
@@ -446,7 +466,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   cpuParam.v = hp_x;
   cpuColorSpinorField h_x(cpuParam);
-  h_x = out;
+  out.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
 
   delete diracSloppy;
   delete dirac;
