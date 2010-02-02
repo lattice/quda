@@ -227,11 +227,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   void loadCPUSpinorField(const cpuColorSpinorField &src);
   void saveCPUSpinorField (cpuColorSpinorField &src) const;
 
-  cudaColorSpinorField& Even();
-  cudaColorSpinorField& Odd();
-
-  const cudaColorSpinorField& Even() const;
-  const cudaColorSpinorField& Odd() const;
+  cudaColorSpinorField& Even() const;
+  cudaColorSpinorField& Odd() const;
 
   static void freeBuffer();
 
@@ -244,6 +241,8 @@ class cpuColorSpinorField : public ColorSpinorField {
   friend class cudaColorSpinorField;
 
   friend double normCpu(const cpuColorSpinorField &);
+  friend double dslashCUDA();
+  friend void dslashRef();
 
  private:
   void *v; // the field elements
@@ -264,6 +263,9 @@ class cpuColorSpinorField : public ColorSpinorField {
 
   cpuColorSpinorField& operator=(const cpuColorSpinorField&);
   cpuColorSpinorField& operator=(const cudaColorSpinorField&);
+
+  //cpuColorSpinorField& Even() const;
+  //cpuColorSpinorField& Odd() const;
 
   void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
   static void Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);

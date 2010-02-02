@@ -38,8 +38,15 @@ cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
 
 // creates a copy of src, any differences defined in param
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
-  ColorSpinorField(src), v(0), norm(0), init(false) {
-  if (param.create != QUDA_REFERENCE_CREATE) reset(param); // can only overide if we are not using a reference
+  ColorSpinorField(src), v(0), norm(0), init(false) {  
+  if (param.create != QUDA_REFERENCE_CREATE || // can only overide if we are not using a reference or parity special case
+      (param.create == QUDA_REFERENCE_CREATE && src.fieldSubset() == QUDA_FULL_FIELD_SUBSET && 
+       param.fieldSubset == QUDA_PARITY_FIELD_SUBSET && src.fieldType() == QUDA_CUDA_FIELD) ) {
+    reset(param);
+  } else {
+    errorQuda("Undefined behaviour"); // else silent bug possible?
+  }
+
   type = QUDA_CUDA_FIELD;
   create(param.create);
 
@@ -147,9 +154,11 @@ void cudaColorSpinorField::create(const FieldCreate create) {
     param.v = v;
     param.norm = norm;
     even = new cudaColorSpinorField(*this, param);
-    param.v = (void*)((unsigned long)v + bytes/2);
-    param.norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
     odd = new cudaColorSpinorField(*this, param);
+    // need this hackery for the moment (need to locate the odd pointer half way into the full field)
+    (dynamic_cast<cudaColorSpinorField*>(odd))->v = param.v = (void*)((unsigned long)v + bytes/2);
+    if (precision == QUDA_HALF_PRECISION) 
+      (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
   }
 
 }
@@ -169,7 +178,7 @@ void cudaColorSpinorField::destroy() {
 }
 
 
-cudaColorSpinorField& cudaColorSpinorField::Even() { 
+cudaColorSpinorField& cudaColorSpinorField::Even() const { 
   if (subset == QUDA_FULL_FIELD_SUBSET) {
     return *(dynamic_cast<cudaColorSpinorField*>(even)); 
   } else {
@@ -177,23 +186,7 @@ cudaColorSpinorField& cudaColorSpinorField::Even() {
   }
 }
 
-cudaColorSpinorField& cudaColorSpinorField::Odd() {
-  if (subset == QUDA_FULL_FIELD_SUBSET) {
-    return *(dynamic_cast<cudaColorSpinorField*>(odd)); 
-  } else {
-    errorQuda("Cannot return odd subset of %d subset", subset);
-  }
-}
-
-const cudaColorSpinorField& cudaColorSpinorField::Even() const { 
-  if (subset == QUDA_FULL_FIELD_SUBSET) {
-    return *(dynamic_cast<cudaColorSpinorField*>(even)); 
-  } else {
-    errorQuda("Cannot return even subset of %d subset", subset);
-  }
-}
-
-const cudaColorSpinorField& cudaColorSpinorField::Odd() const {
+cudaColorSpinorField& cudaColorSpinorField::Odd() const {
   if (subset == QUDA_FULL_FIELD_SUBSET) {
     return *(dynamic_cast<cudaColorSpinorField*>(odd)); 
   } else {
@@ -218,7 +211,7 @@ void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
 void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
 
   if (volume != src.volume) {
-    errorQuda("Volumes don't match");
+    errorQuda("Volumes %d %d don't match", volume, src.volume);
   }
 
   if (subsetOrder() != src.subsetOrder()) {
@@ -242,8 +235,6 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
     copy(tmp);
     return;
   }
-
-  std::cout << precision << " " << src.precision << " " << order << " " << src.order << std::endl;
 
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (src.precision == QUDA_DOUBLE_PRECISION) {
@@ -305,7 +296,7 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
 void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
 
   if (volume != dest.volume) {
-    errorQuda("Volumes don't match");
+    errorQuda("Volumes %d %d don't match", volume, dest.volume);
   }
 
   if (subsetOrder() != dest.subsetOrder()) {
@@ -330,6 +321,12 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   }
 
   cudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
+
+  double sum1 = 0.0, sum2 = 0.0;
+  for (int i=0; i<length; i++) {
+    sum2 += ((float*)buffer)[i] * ((float*)buffer)[i];
+  }
+  std::cout << norm2(*this) << " " << sum2 << std::endl;
 
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (dest.precision == QUDA_DOUBLE_PRECISION) {
@@ -378,6 +375,10 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
       }
     }
   }
+
+  // bug somewhere here!
+
+  std::cout << norm2(*this) << " " << norm2(dest) << std::endl; exit(0);
 
   return;
 }

@@ -26,6 +26,9 @@ class DiracParam {
 
 };
 
+void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param);
+void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param);
+
 // Abstract base class
 class Dirac {
 

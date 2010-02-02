@@ -203,20 +203,20 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
     kappa *= cudaGaugePrecise.anisotropy;
 
-  if (inv_param->field_subset == QUDA_FULL_FIELD_SUBSET) {
+  if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
     else errorQuda("Unsupported dslash_type");
-  } else if (inv_param->field_subset == QUDA_PARITY_FIELD_SUBSET) {
+  } else if (inv_param->solution_type == QUDA_MATPC_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVERPC_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else {
-    errorQuda("Unsupported field subset");
+    errorQuda("Unsupported solution type %d", inv_param->solution_type);
   }
 
   diracParam.matpcType = inv_param->matpc_type;
@@ -230,20 +230,20 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
     kappa *= cudaGaugePrecise.anisotropy;
 
-  if (inv_param->field_subset == QUDA_FULL_FIELD_SUBSET) {
+  if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
     else errorQuda("Unsupported dslash_type");
-  } else if (inv_param->field_subset == QUDA_PARITY_FIELD_SUBSET) {
+  } else if (inv_param->solution_type == QUDA_MATPC_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVERPC_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else {
-    errorQuda("Unsupported field subset");
+    errorQuda("Unsupported solution type %d", inv_param->solution_type);
   }
 
   diracParam.matpcType = inv_param->matpc_type;
@@ -315,12 +315,13 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
   hOut = out;
- }
+}
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger)
 {
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X); // wrong dimensions
-  cpuParam.fieldSubset = inv_param->field_subset;
+  cpuParam.fieldSubset = inv_param->solution_type == QUDA_MATPC_SOLUTION ? 
+    QUDA_PARITY_FIELD_SUBSET : QUDA_FULL_FIELD_SUBSET;
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -348,7 +349,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
 void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
-  cpuParam.fieldSubset = inv_param->field_subset;
+  cpuParam.fieldSubset = inv_param->solution_type == QUDA_MATPC_SOLUTION ? 
+    QUDA_PARITY_FIELD_SUBSET : QUDA_FULL_FIELD_SUBSET;
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -392,7 +394,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   //FullSpinor b, x;
   ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X); // wrong dimensions
-  cpuParam.fieldSubset = param->field_subset;
+  cpuParam.fieldSubset = param->solution_type == QUDA_MATPC_SOLUTION ? 
+    QUDA_PARITY_FIELD_SUBSET : QUDA_FULL_FIELD_SUBSET;
   ColorSpinorParam cudaParam(cpuParam, *param);
 
   cpuColorSpinorField h_b(cpuParam);

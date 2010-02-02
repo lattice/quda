@@ -3,16 +3,19 @@
 
 #include <quda.h>
 #include <quda_internal.h>
-#include <spinor_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
+#include <blas_quda.h>
 
 #include <test_util.h>
 #include <dslash_reference.h>
+#include <dirac.h>
+
+#include<iostream>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 1;
+int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 int clover_yes = 0;
 
@@ -21,29 +24,28 @@ QudaInvertParam inv_param;
 
 FullGauge gauge;
 FullClover clover, cloverInv;
-FullSpinor cudaSpinor;
-FullSpinor cudaSpinorOut;
-ParitySpinor tmp;
+
+cpuColorSpinorField spinor, spinorOut, spinorRef;
+cudaColorSpinorField cudaSpinor, cudaSpinorOut, tmp;
 
 void *hostGauge[4], *hostClover, *hostCloverInv;
-void *spinor, *spinorEven, *spinorOdd;
-void *spinorRef, *spinorRefEven, *spinorRefOdd;
-void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
 
 double kappa = 1.0;
 int parity = 1;   // even or odd? (0 = even, 1 = odd)
-int dagger = 0;   // apply Dslash or Dslash dagger?
+QudaDagType dagger = QUDA_DAG_NO;   // apply Dslash or Dslash dagger?
 int transfer = 0; // include transfer time in the benchmark?
+
+Dirac *dirac;
 
 void init() {
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[0] = 8;
+  gauge_param.X[1] = 8;
+  gauge_param.X[2] = 8;
+  gauge_param.X[3] = 8;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -58,15 +60,9 @@ void init() {
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  if (clover_yes) {
-    inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-  } else {
-    inv_param.dslash_type = QUDA_WILSON_DSLASH;
-  }
-
   inv_param.kappa = kappa;
 
-  inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
@@ -79,21 +75,20 @@ void init() {
   // inv_param.sp_pad = 24*24*12;
   // inv_param.cl_pad = 24*24*12;
 
-  if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  else inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  if (test_type == 2) {
+    inv_param.dirac_order = QUDA_DIRAC_ORDER;
+    inv_param.solution_type = QUDA_MAT_SOLUTION;
+  } else {
+    inv_param.dirac_order = QUDA_DIRAC_ORDER;
+    inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  }
 
   if (clover_yes) {
+    inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec = QUDA_HALF_PRECISION;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-  }
-  inv_param.verbosity = QUDA_VERBOSE;
-
-  // construct input fields
-  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
-
-  if (clover_yes) {
     if (test_type > 0) {
       hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
       hostCloverInv = hostClover; // fake it
@@ -101,28 +96,45 @@ void init() {
       hostClover = NULL;
       hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
     }
-  }
-
-  spinor = malloc(V*spinorSiteSize*inv_param.cpu_prec);
-  spinorRef = malloc(V*spinorSiteSize*inv_param.cpu_prec);
-  spinorGPU = malloc(V*spinorSiteSize*inv_param.cpu_prec);
-  spinorEven = spinor;
-  spinorRefEven = spinorRef;
-  spinorGPUEven = spinorGPU;
-  if (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-    spinorOdd = (void*)((double*)spinor + Vh*spinorSiteSize);
-    spinorRefOdd = (void*)((double*)spinorRef + Vh*spinorSiteSize);
-    spinorGPUOdd = (void*)((double*)spinorGPU + Vh*spinorSiteSize);
   } else {
-    spinorOdd = (void*)((float*)spinor + Vh*spinorSiteSize);
-    spinorRefOdd = (void*)((float*)spinorRef + Vh*spinorSiteSize);
-    spinorGPUOdd = (void*)((float*)spinorGPU + Vh*spinorSiteSize);
+    inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
 
+  inv_param.verbosity = QUDA_VERBOSE;
+
+  // construct input fields
+  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
+
+  ColorSpinorParam csParam;
+  
+  csParam.fieldType = QUDA_CPU_FIELD;
+  csParam.nColor = 3;
+  csParam.nSpin = 4;
+  csParam.nDim = 4;
+  for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
+  csParam.precision = inv_param.cpu_prec;
+  csParam.pad = 0;
+  csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+  csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
+  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
+  csParam.create = QUDA_NULL_CREATE;
+  
+  spinor = cpuColorSpinorField(csParam);
+  if (test_type < 2) {
+    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    csParam.x[0] /= 2;
+  }
+  spinorOut = cpuColorSpinorField(csParam);
+  spinorRef = cpuColorSpinorField(csParam);
+
+  csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+  csParam.x[0] = gauge_param.X[0];
+  
   printf("Randomizing fields... ");
 
   construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
-  construct_spinor_field(spinor, 1, 0, 0, 0, inv_param.cpu_prec);
+  spinor.Source(QUDA_RANDOM_SOURCE);
 
   if (clover_yes) {
     double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
@@ -151,39 +163,41 @@ void init() {
   printf("Sending fields to GPU... "); fflush(stdout);
 
   if (!transfer) {
+    csParam.fieldType = QUDA_CUDA_FIELD;
+    csParam.fieldOrder = QUDA_FLOAT4_ORDER;
+    csParam.basis = QUDA_UKQCD_BASIS;
+    csParam.pad = inv_param.sp_pad;
+    csParam.precision = inv_param.cuda_prec;
+  
+    cudaSpinor = cudaColorSpinorField(csParam);
+    
+    cudaSpinorOut = cudaColorSpinorField(csParam);
 
-    gauge_param.X[0] /= 2;
-    tmp = allocateParitySpinor(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
-    cudaSpinor = allocateSpinorField(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
-    cudaSpinorOut = allocateSpinorField(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
-    gauge_param.X[0] *= 2;
+    csParam.x[0] /= 2;
+    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    tmp = cudaColorSpinorField(csParam);
 
-    if (test_type < 2) {
-      loadParitySpinor(cudaSpinor.even, spinorEven, inv_param.cpu_prec, 
-		       inv_param.dirac_order);
-    } else {
-      loadSpinorField(cudaSpinor, spinor, inv_param.cpu_prec, 
-		      inv_param.dirac_order);
-    }
+    cudaSpinor = spinor;
+    std::cout << "Before anything " << norm2(cudaSpinor) << " " << norm2(spinor) << std::endl;
 
   }
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, &inv_param);
+  diracParam.tmp = &tmp;
+
+  dirac = Dirac::create(diracParam);
 
 }
 
 void end() {
+  delete dirac;
+
   // release memory
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
   if (clover_yes) {
     if (test_type == 2) free(hostClover);
     else free(hostCloverInv);
-  }
-  free(spinorGPU);
-  free(spinor);
-  free(spinorRef);
-  if (!transfer) {
-    freeSpinorField(cudaSpinorOut);
-    freeSpinorField(cudaSpinor);
-    freeParitySpinor(tmp);
   }
   endQuda();
 }
@@ -191,7 +205,7 @@ void end() {
 double dslashCUDA() {
 
   // execute kernel
-  const int LOOPS = 100;
+  const int LOOPS = 1;
   printf("Executing %d kernel loops...", LOOPS);
   fflush(stdout);
   stopwatchStart();
@@ -199,30 +213,25 @@ double dslashCUDA() {
     switch (test_type) {
     case 0:
       if (transfer) {
-	dslashQuda(spinorOdd, spinorEven, &inv_param, parity, dagger);
-      } else if (!clover_yes) {
-	dslashCuda(cudaSpinor.odd, gauge, cudaSpinor.even, parity, dagger);
+	dslashQuda((void*)((ulong)spinor.v+spinor.bytes/2), spinor.v, &inv_param, parity, dagger);
       } else {
-	cloverDslashCuda(cudaSpinor.odd, gauge, cloverInv, cudaSpinor.even, parity, dagger);    
+	std::cout << "\nBefore dslash " << norm2(cudaSpinor) << " " << norm2(cudaSpinor.Odd()) << " " << norm2(cudaSpinor.Even()) << std::endl;
+	dirac->Dslash(cudaSpinor.Odd(), cudaSpinor.Even(), parity, dagger);
+	std::cout << "\nAfter dslash " << norm2(cudaSpinor) << " " << norm2(cudaSpinor.Odd()) << " " << norm2(cudaSpinor.Even()) << std::endl;
       }
       break;
     case 1:
       if (transfer) {
-	MatPCQuda(spinorOdd, spinorEven, &inv_param, dagger);
-      } else if (!clover_yes) {
-	MatPCCuda(cudaSpinor.odd, gauge, cudaSpinor.even, kappa, tmp, inv_param.matpc_type, dagger);
+	MatQuda((void*)((ulong)spinor.v+spinor.bytes/2), spinor.v, &inv_param, dagger);
       } else {
-	cloverMatPCCuda(cudaSpinor.odd, gauge, clover, cloverInv, cudaSpinor.even, kappa, tmp,
-			inv_param.matpc_type, dagger);
+	dirac->M(cudaSpinor.Odd(), cudaSpinor.Even(), dagger);
       }
       break;
     case 2:
       if (transfer) {
-	MatQuda(spinorGPU, spinor, &inv_param, dagger);
+	MatQuda(spinorOut.v, spinor.v, &inv_param, dagger);
       } else if (!clover_yes) {
-	MatCuda(cudaSpinorOut, gauge, cudaSpinor, kappa, dagger);
-      } else {
-	cloverMatCuda(cudaSpinorOut, gauge, clover, cudaSpinor, kappa, tmp, dagger);
+	dirac->M(cudaSpinorOut, cudaSpinor, dagger);
       }
     }
   }
@@ -253,15 +262,15 @@ void dslashRef() {
   fflush(stdout);
   switch (test_type) {
   case 0:
-    dslash(spinorRef, hostGauge, spinorEven, parity, dagger, 
+    dslash(spinorRef.v, hostGauge, spinor.v, parity, dagger, 
 	   inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   case 1:    
-    matpc(spinorRef, hostGauge, spinorEven, kappa, inv_param.matpc_type, dagger, 
+    matpc(spinorRef.v, hostGauge, spinor.v, kappa, inv_param.matpc_type, dagger, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   case 2:
-    mat(spinorRef, hostGauge, spinor, kappa, dagger, 
+    mat(spinorRef.v, hostGauge, spinor.v, kappa, dagger, 
 	inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   default:
@@ -290,12 +299,10 @@ int main(int argc, char **argv)
     double secs = dslashCUDA();
     
     if (!transfer) {
-      if (test_type < 2) 
-	retrieveParitySpinor(spinorOdd, cudaSpinor.odd, inv_param.cpu_prec, inv_param.dirac_order);
-      else 
-	retrieveSpinorField(spinorGPU, cudaSpinorOut, inv_param.cpu_prec, inv_param.dirac_order);
+      if (test_type < 2) spinorOut = cudaSpinor.Odd();
+      else spinorOut = cudaSpinor;
     }
-    
+
     // print timing information
     printf("%fms per loop\n", 1000*secs);
     
@@ -308,14 +315,8 @@ int main(int argc, char **argv)
     printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
     
-    int res;
-    if (test_type < 2) res = compare_floats(spinorOdd, spinorRef, Vh*4*3*2, 1e-4, inv_param.cpu_prec);
-    else res = compare_floats(spinorGPU, spinorRef, V*4*3*2, 1e-4, inv_param.cpu_prec);
-      
-      printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
-      
-      //if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-      //else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
+    std::cout << norm2(spinorRef) << " "<< norm2(spinorOut) << " " << norm2(cudaSpinor.Odd()) << " " << norm2(cudaSpinor.Even()) << std::endl;
+    cpuColorSpinorField::Compare(spinorRef, spinorOut);
   }    
   end();
 }

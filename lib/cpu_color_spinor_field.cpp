@@ -4,6 +4,23 @@
 #include <iostream>
 #include <color_spinor_field.h>
 
+/*
+Maybe this will be useful at some point
+
+#define myalloc(type, n, m0) (type *) aligned_malloc(n*sizeof(type), m0)
+
+#define ALIGN 16
+void *
+aligned_malloc(size_t n, void **m0)
+{
+  size_t m = (size_t) malloc(n+ALIGN);
+  *m0 = (void*)m;
+  size_t r = m % ALIGN;
+  if(r) m += (ALIGN - r);
+  return (void *)m;
+}
+*/
+
 cpuColorSpinorField::cpuColorSpinorField() : 
   ColorSpinorField(), init(false) {
 
@@ -106,7 +123,23 @@ void cpuColorSpinorField::zero() {
   memset(v, '0', bytes);
 }
 
+/*
+cpuColorSpinorField& cpuColorSpinorField::Even() const { 
+  if (subset == QUDA_FULL_FIELD_SUBSET) {
+    return *(dynamic_cast<cpuColorSpinorField*>(even)); 
+  } else {
+    errorQuda("Cannot return even subset of %d subset", subset);
+  }
+}
 
+cpuColorSpinorField& cpuColorSpinorField::Odd() const {
+  if (subset == QUDA_FULL_FIELD_SUBSET) {
+    return *(dynamic_cast<cpuColorSpinorField*>(odd)); 
+  } else {
+    errorQuda("Cannot return odd subset of %d subset", subset);
+  }
+}
+*/
 
 //sets the elements of the field to random [0, 1]
 template <typename Float>

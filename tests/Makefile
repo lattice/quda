@@ -6,7 +6,7 @@ INC += -I../include -I.
 
 HDRS = blas_reference.h dslash_reference.h test_util.h
 
-TESTS = su3_test blas_test #dslash_test invert_test su3_test pack_test colorspinor_test
+TESTS = su3_test blas_test pack_test dslash_test invert_test
 
 all: $(TESTS)
 

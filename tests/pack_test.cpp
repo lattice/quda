@@ -14,8 +14,7 @@
 
 QudaGaugeParam param;
 FullGauge cudaGauge;
-cudaColorSpinorField cudaFullSpinor;
-cudaColorSpinorField cudaParitySpinor;
+cudaColorSpinorField cudaSpinor;
 
 void *qdpGauge[4];
 void *cpsGauge;
@@ -27,19 +26,6 @@ float kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
     
-#define myalloc(type, n, m0) (type *) aligned_malloc(n*sizeof(type), m0)
-
-#define ALIGN 16
-void *
-aligned_malloc(size_t n, void **m0)
-{
-  size_t m = (size_t) malloc(n+ALIGN);
-  *m0 = (void*)m;
-  size_t r = m % ALIGN;
-  if(r) m += (ALIGN - r);
-  return (void *)m;
-}
-
 void init() {
 
   param.cpu_prec = QUDA_SINGLE_PRECISION;
@@ -72,7 +58,7 @@ void init() {
   for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
   csParam.precision = QUDA_SINGLE_PRECISION;
   csParam.pad = 0;
-  csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+  csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
   csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
   csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
@@ -91,11 +77,7 @@ void init() {
   csParam.pad = 0;
   csParam.precision = QUDA_HALF_PRECISION;
 
-  cudaFullSpinor = cudaColorSpinorField(csParam);
-
-  csParam.x[0] /= 2;
-  csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
-  cudaParitySpinor = cudaColorSpinorField(csParam);
+  cudaSpinor = cudaColorSpinorField(csParam);
 }
 
 void end() {
@@ -137,28 +119,18 @@ void packTest() {
   double qdpGRtime = stopwatchReadSeconds();
   printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
 
-  /*  stopwatchStart();
-  cudaFullSpinor.Even() = spinor.Even();
-  double pSendTime = stopwatchReadSeconds();
-  printf("Parity spinor send time = %e seconds\n", pSendTime);
-
   stopwatchStart();
-  spinor2.Even() = cudaFullSpinor.Even();
-  double pRecTime = stopwatchReadSeconds();
-  printf("Parity receive time = %e seconds\n", pRecTime);
-  */
-  stopwatchStart();
-  cudaFullSpinor = spinor;
+  cudaSpinor = spinor;
   double sSendTime = stopwatchReadSeconds();
   printf("Spinor send time = %e seconds\n", sSendTime);
 
   stopwatchStart();
-  spinor2 = cudaFullSpinor;
+  spinor2 = cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime);
   
   std::cout << "Norm check: CPU = " << norm2(spinor) << 
-    ", CUDA = " << norm2(cudaFullSpinor) << 
+    ", CUDA = " << norm2(cudaSpinor) << 
     ", CPU =  " << norm2(spinor2) << std::endl;
 
   cpuColorSpinorField::Compare(spinor, spinor2, 1);

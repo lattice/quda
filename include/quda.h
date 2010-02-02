@@ -48,7 +48,6 @@ extern "C" {
     double reliable_delta; // reliable update tolerance
 
     QudaMatPCType matpc_type;
-    FieldSubset field_subset;
     QudaSolutionType solution_type;
     QudaMassNormalization mass_normalization;
 
@@ -88,10 +87,10 @@ extern "C" {
 
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
-  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger);
-  void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger);
+  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, QudaDagType dagger);
+  void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger);
   void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
-  void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger);
+  void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger);
 
   void endQuda(void);
 

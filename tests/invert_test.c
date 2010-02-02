@@ -27,15 +27,15 @@ int main(int argc, char **argv)
   gauge_param.anisotropy = 1.0;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-
+  
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
+  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-2;
+  inv_param.reliable_delta = 1e-1;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -56,18 +56,18 @@ int main(int argc, char **argv)
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  gauge_param.ga_pad = 24*24*24;
-  inv_param.sp_pad = 24*24*24;
-  inv_param.cl_pad = 24*24*24;
+  gauge_param.ga_pad = 0;//24*24*24;
+  inv_param.sp_pad = 0;//24*24*24;
+  inv_param.cl_pad = 0;//24*24*24;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
-    inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec_sloppy = QUDA_HALF_PRECISION;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;
@@ -100,10 +100,9 @@ int main(int argc, char **argv)
   void *spinorOut = malloc(V*spinorSiteSize*sSize);
   void *spinorCheck = malloc(V*spinorSiteSize*sSize);
 
-  int i0 = 0;
-  int s0 = 0;
-  int c0 = 0;
-  construct_spinor_field(spinorIn, 1, i0, s0, c0, inv_param.cpu_prec);
+  // create a point source at 0
+  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = 1.0;
+  else *((double*)spinorIn) = 1.0;
 
   double time0 = -((double)clock()); // start the timer
 

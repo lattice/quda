@@ -4,19 +4,6 @@
 #include <test_util.h>
 #include <dslash_reference.h>
 
-#define MAX_SHORT 32767
-#define SHORT_LENGTH 65536
-#define SCALE_FLOAT (SHORT_LENGTH-1) / 2.f
-#define SHIFT_FLOAT -1.f / (SHORT_LENGTH-1)
-
-inline short floatToShort(float a) {
-  return (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
-}
-
-inline short doubleToShort(double a) {
-  return (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
-}
-
 QudaGaugeParam param;
 void *gauge[4], *new_gauge[4];
 
@@ -26,7 +13,7 @@ void init() {
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;
   param.cuda_prec = QUDA_HALF_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_12;
+  param.reconstruct = QUDA_RECONSTRUCT_8;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   

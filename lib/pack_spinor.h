@@ -38,6 +38,16 @@
 
 */
 
+#define PRESERVE_SPINOR_NORM 1
+
+#ifdef PRESERVE_SPINOR_NORM // Preserve the norm regardless of basis
+double kP = (1.0/sqrt(2.0));
+double kU = (1.0/sqrt(2.0));
+#else // More numerically accurate not to preserve the norm between basis
+double kP = 0.5;
+double kU = 1.0;
+#endif
+
 // SPACE_SPIN_COLOR -> FLOAT1, FLOAT2 or FLOAT4 (no "internal re-ordering")
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
 inline void packSpinorField(FloatN* a, Float *b, int V) {
@@ -66,8 +76,8 @@ template <int Nc, int N, typename Float, typename FloatN>
 inline void packNonRelSpinorField(FloatN* a, Float *b, int V) {
   int s1[4] = {1, 2, 3, 0};
   int s2[4] = {3, 0, 1, 2};
-  Float K1[4] = {0.5, -0.5, -0.5, -0.5};
-  Float K2[4] = {0.5, -0.5, 0.5, 0.5};
+  Float K1[4] = {kP, -kP, -kP, -kP};
+  Float K2[4] = {kP, -kP, kP, kP};
 
   for (int s=0; s<4; s++) {
     for (int c=0; c<Nc; c++) {
@@ -85,8 +95,8 @@ template <int Nc, int N, typename Float, typename FloatN>
 inline void packNonRelQLASpinorField(FloatN* a, Float *b, int V) {
   int s1[4] = {1, 2, 3, 0};
   int s2[4] = {3, 0, 1, 2};
-  Float K1[4] = {0.5, -0.5, -0.5, -0.5};
-  Float K2[4] = {0.5, -0.5, 0.5, 0.5};
+  Float K1[4] = {kP, -kP, -kP, -kP};
+  Float K2[4] = {kP, -kP, kP, kP};
 
   for (int s=0; s<4; s++) {
     for (int c=0; c<Nc; c++) {
@@ -248,8 +258,8 @@ template <int Nc, int N, typename Float, typename FloatN>
 inline void unpackNonRelSpinorField(Float* a, FloatN *b, int V) {
   int s1[4] = {1, 2, 3, 0};
   int s2[4] = {3, 0, 1, 2};
-  Float K1[4] = {-1, 1,  1,  1};
-  Float K2[4] = {-1, 1, -1, -1};
+  Float K1[4] = {-kU, kU,  kU,  kU};
+  Float K2[4] = {-kU, kU, -kU, -kU};
 
   for (int s=0; s<4; s++) {
     for (int c=0; c<Nc; c++) {
@@ -268,8 +278,8 @@ template <int Nc, int N, typename Float, typename FloatN>
 inline void unpackNonRelQLASpinorField(Float* a, FloatN *b, int V) {
   int s1[4] = {1, 2, 3, 0};
   int s2[4] = {3, 0, 1, 2};
-  Float K1[4] = {-1, 1,  1,  1};
-  Float K2[4] = {-1, 1, -1, -1};
+  Float K1[4] = {-kU, kU,  kU,  kU};
+  Float K2[4] = {-kU, kU, -kU, -kU};
 
   for (int s=0; s<4; s++) {
     for (int c=0; c<Nc; c++) {
