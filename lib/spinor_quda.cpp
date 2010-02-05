@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 
 #include <quda_internal.h>
@@ -6,8 +7,43 @@
 #include <blas_quda.h>
 
 // Pinned memory for cpu-gpu memory copying
-void *packedSpinor1 = 0;
-void *packedSpinor2 = 0;
+void *packedSpinor1 = NULL;
+void *packedSpinor2 = NULL;
+
+static void allocateBuffer(void **packedSpinor, size_t bytes)
+{
+  static size_t last_bytes = 0;
+
+  if (!*packedSpinor) {
+#ifndef __DEVICE_EMULATION__
+    cudaMallocHost(packedSpinor, bytes);
+#else
+    *packedSpinor = malloc(bytes);
+#endif
+    memset(*packedSpinor, 0, bytes);
+    last_bytes = bytes;
+  } else if (bytes != last_bytes) {
+    errorQuda("unexpected change in lattice volume or cpu_prec");
+  }
+}
+
+static void freeBuffer(void **packedSpinor)
+{
+  if (*packedSpinor) {
+#ifndef __DEVICE_EMULATION__
+    cudaFreeHost(*packedSpinor);
+#else
+    free(*packedSpinor);
+#endif
+    *packedSpinor = NULL;
+  }
+}
+
+void freeSpinorBuffer(void)
+{
+  freeBuffer(&packedSpinor1);
+  freeBuffer(&packedSpinor2);
+}
 
 static int L[4];
 
@@ -68,15 +104,6 @@ void freeParitySpinor(ParitySpinor spinor) {
 void freeSpinorField(FullSpinor spinor) {
   freeParitySpinor(spinor.even);
   freeParitySpinor(spinor.odd);
-}
-
-void freeSpinorBuffer() {
-#ifndef __DEVICE_EMULATION__
-  cudaFreeHost(packedSpinor1);
-#else
-  free(packedSpinor1);
-#endif
-  packedSpinor1 = NULL;
 }
 
 template <typename Float>
@@ -373,11 +400,7 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
 
   if (ret.precision != QUDA_HALF_PRECISION) {
 
-#ifndef __DEVICE_EMULATION__
-    if (!packedSpinor1) cudaMallocHost(&packedSpinor1, ret.bytes);
-#else
-    if (!packedSpinor1) packedSpinor1 = malloc(ret.bytes);
-#endif
+    allocateBuffer(&packedSpinor1, ret.bytes);
     
     if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (ret.precision == QUDA_DOUBLE_PRECISION) {
@@ -407,14 +430,9 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
 void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec) {
 
   if (ret.even.precision != QUDA_HALF_PRECISION) {
-    
-#ifndef __DEVICE_EMULATION__
-    if (!packedSpinor1) cudaMallocHost(&packedSpinor1, ret.even.bytes);
-    if (!packedSpinor2) cudaMallocHost(&packedSpinor2, ret.even.bytes);
-#else
-    if (!packedSpinor1) packedSpinor1 = malloc(ret.even.bytes);
-    if (!packedSpinor2) packedSpinor2 = malloc(ret.even.bytes);
-#endif
+
+    allocateBuffer(&packedSpinor1, ret.even.bytes);
+    allocateBuffer(&packedSpinor2, ret.even.bytes);
     
     if (ret.even.precision == QUDA_DOUBLE_PRECISION) {
       packFullSpinor((double2*)packedSpinor1, (double2*)packedSpinor2, (double*)spinor, ret.even.volume, ret.even.pad);
@@ -428,12 +446,8 @@ void loadFullSpinor(FullSpinor ret, void *spinor, Precision cpu_prec) {
     cudaMemcpy(ret.even.spinor, packedSpinor1, ret.even.bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(ret.odd.spinor, packedSpinor2, ret.even.bytes, cudaMemcpyHostToDevice);
 
-#ifndef __DEVICE_EMULATION__
-    cudaFreeHost(packedSpinor2);
-#else
-    free(packedSpinor2);
-#endif
-    packedSpinor2 = 0;
+    freeBuffer(&packedSpinor2);
+
   } else {
     FullSpinor tmp = allocateSpinorField(ret.even.X, QUDA_SINGLE_PRECISION, ret.even.pad);
     loadFullSpinor(tmp, spinor, cpu_prec);
@@ -466,7 +480,8 @@ void loadSpinorField(FullSpinor ret, void *spinor, Precision cpu_prec, DiracFiel
 void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, DiracFieldOrder dirac_order) {
 
   if (spinor.precision != QUDA_HALF_PRECISION) {
-    if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, spinor.bytes);
+
+    allocateBuffer(&packedSpinor1, spinor.bytes);
     cudaMemcpy(packedSpinor1, spinor.spinor, spinor.bytes, cudaMemcpyDeviceToHost);
 
     if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
@@ -496,9 +511,10 @@ void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, Di
 void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec) {
 
   if (spinor.even.precision != QUDA_HALF_PRECISION) {
-    if (!packedSpinor1) cudaMallocHost((void**)&packedSpinor1, spinor.even.bytes);
-    if (!packedSpinor2) cudaMallocHost((void**)&packedSpinor2, spinor.even.bytes);
-    
+
+    allocateBuffer(&packedSpinor1, spinor.even.bytes);
+    allocateBuffer(&packedSpinor2, spinor.even.bytes);
+
     cudaMemcpy(packedSpinor1, spinor.even.spinor, spinor.even.bytes, cudaMemcpyDeviceToHost);
     cudaMemcpy(packedSpinor2, spinor.odd.spinor, spinor.odd.bytes, cudaMemcpyDeviceToHost);
 
@@ -509,13 +525,8 @@ void retrieveFullSpinor(void *res, FullSpinor spinor, Precision cpu_prec) {
 	unpackFullSpinor((double*)res, (float4*)packedSpinor1, (float4*)packedSpinor2, spinor.even.volume, spinor.even.pad);
       else unpackFullSpinor((float*)res, (float4*)packedSpinor1, (float4*)packedSpinor2, spinor.even.volume, spinor.even.pad);
     }
-    
-#ifndef __DEVICE_EMULATION__
-    cudaFreeHost(packedSpinor2);
-#else
-    free(packedSpinor2);
-#endif
-    packedSpinor2 = 0;
+    freeBuffer(&packedSpinor2);
+
   } else {
     FullSpinor tmp = allocateSpinorField(spinor.even.X, QUDA_SINGLE_PRECISION, spinor.even.pad);
     copyCuda(tmp.even, spinor.even);

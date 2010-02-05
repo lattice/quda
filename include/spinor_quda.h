@@ -12,7 +12,7 @@ extern "C" {
   
   void freeParitySpinor(ParitySpinor spinor);
   void freeSpinorField(FullSpinor spinor);
-  void freeSpinorBuffer();
+  void freeSpinorBuffer(void);
 
   void loadParitySpinor(ParitySpinor, void *spinor, Precision cpu_prec,
 			DiracFieldOrder dirac_order);
