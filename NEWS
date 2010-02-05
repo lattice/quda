@@ -1,8 +1,7 @@
 Version 0.2.1
 
-- Fixed bug that would sometimes cause the inverter to fail when
-  padding, mixed precision, and the "PRESERVE_SOURCE_NO" option were
-  all used at the same time.
+- Fixed bug that would sometimes cause the inverter to fail when spinor
+  padding is enabled.
 
 - Improved performance of the half and double precision blas routines.
 
