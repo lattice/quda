@@ -41,7 +41,7 @@ clean:
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 
 blas_quda.o: blas_quda.cu blas_param.h $(HDRS)
-	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) --maxrregcount=80 $< -c -o $@
 
 %.o: %.cu $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@

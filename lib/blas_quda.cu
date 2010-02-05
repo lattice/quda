@@ -141,6 +141,28 @@ static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 }
 #endif
 
+float2 __device__ read_Float2(float2 *x, int i) {
+  return make_float2(x[i].x, x[i].y);
+}
+
+double2 __device__ read_Float2(double2 *x, int i) {
+  return make_double2(x[i].x, x[i].y);
+}
+
+#define READ_DOUBLE2_TEXTURE(x, i) \
+  fetch_double2(x##TexDouble2, i)
+
+#define READ_FLOAT2_TEXTURE(x, i) \
+  tex1Dfetch(x##TexSingle2, i)
+
+float2 __device__ make_Float2(float2 x) {
+  return make_float2(x.x, x.y);
+}
+
+double2 __device__ make_Float2(double2 x) {
+  return make_double2(x.x, x.y);
+}
+
 #define RECONSTRUCT_HALF_SPINOR(a, texHalf, texNorm, length)		\
   float4 a##0 = tex1Dfetch(texHalf, i + 0*length);			\
   float4 a##1 = tex1Dfetch(texHalf, i + 1*length);			\
@@ -155,6 +177,15 @@ static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   (a##3).x *= b; (a##3).y *= b; (a##3).z *= b; (a##3).w *= b;		\
   (a##4).x *= b; (a##4).y *= b; (a##4).z *= b; (a##4).w *= b;		\
   (a##5).x *= b; (a##5).y *= b; (a##5).z *= b; (a##5).w *= b;}
+
+#define READ_HALF_SPINOR(a, tex, length)				\
+  float4 a##0 = tex1Dfetch(tex, i + 0*length);				\
+  float4 a##1 = tex1Dfetch(tex, i + 1*length);				\
+  float4 a##2 = tex1Dfetch(tex, i + 2*length);				\
+  float4 a##3 = tex1Dfetch(tex, i + 3*length);				\
+  float4 a##4 = tex1Dfetch(tex, i + 4*length);				\
+  float4 a##5 = tex1Dfetch(tex, i + 5*length);				\
+  float a##c = a[i];
 
 #define CONSTRUCT_HALF_SPINOR_FROM_SINGLE(h, n, a, length)		\
   {float c0 = fmaxf(fabsf((a##0).x), fabsf((a##0).y));			\
@@ -286,10 +317,17 @@ static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   Z.w += a.y*X.z + a.x*X.w + b.y*Y.z + b.x*Y.w;
 
 // Double precision input spinor field
-texture<int4, 1> spinorTexDouble;
+texture<int4, 1> xTexDouble2;
+texture<int4, 1> yTexDouble2;
+texture<int4, 1> zTexDouble2;
+texture<int4, 1> wTexDouble2;
+texture<int4, 1> uTexDouble2;
 
 // Single precision input spinor field
-texture<float4, 1, cudaReadModeElementType> spinorTexSingle;
+texture<float2, 1> xTexSingle2;
+texture<float2, 1> yTexSingle2;
+
+texture<float4, 1> xTexSingle4;
 
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf1;
@@ -375,12 +413,12 @@ __global__ void convertHSKernel(short4 *h, float *norm, int length, int real_len
   unsigned int gridSize = gridDim.x*blockDim.x;
 
   while(i < real_length) {
-    float4 F0 = tex1Dfetch(spinorTexSingle, i + 0*length);
-    float4 F1 = tex1Dfetch(spinorTexSingle, i + 1*length);
-    float4 F2 = tex1Dfetch(spinorTexSingle, i + 2*length);
-    float4 F3 = tex1Dfetch(spinorTexSingle, i + 3*length);
-    float4 F4 = tex1Dfetch(spinorTexSingle, i + 4*length);
-    float4 F5 = tex1Dfetch(spinorTexSingle, i + 5*length);
+    float4 F0 = tex1Dfetch(xTexSingle4, i + 0*length);
+    float4 F1 = tex1Dfetch(xTexSingle4, i + 1*length);
+    float4 F2 = tex1Dfetch(xTexSingle4, i + 2*length);
+    float4 F3 = tex1Dfetch(xTexSingle4, i + 3*length);
+    float4 F4 = tex1Dfetch(xTexSingle4, i + 4*length);
+    float4 F5 = tex1Dfetch(xTexSingle4, i + 5*length);
     CONSTRUCT_HALF_SPINOR_FROM_SINGLE(h, norm, F, length);
     i += gridSize;
   }
@@ -410,18 +448,18 @@ __global__ void convertHDKernel(short4 *h, float *norm, int length, int real_len
   unsigned int gridSize = gridDim.x*blockDim.x;
 
   while(i < real_length) {
-    double2 F0 = fetch_double2(spinorTexDouble, i+0*length);
-    double2 F1 = fetch_double2(spinorTexDouble, i+1*length);
-    double2 F2 = fetch_double2(spinorTexDouble, i+2*length);
-    double2 F3 = fetch_double2(spinorTexDouble, i+3*length);
-    double2 F4 = fetch_double2(spinorTexDouble, i+4*length);
-    double2 F5 = fetch_double2(spinorTexDouble, i+5*length);
-    double2 F6 = fetch_double2(spinorTexDouble, i+6*length);
-    double2 F7 = fetch_double2(spinorTexDouble, i+7*length);
-    double2 F8 = fetch_double2(spinorTexDouble, i+8*length);
-    double2 F9 = fetch_double2(spinorTexDouble, i+9*length);
-    double2 F10 = fetch_double2(spinorTexDouble, i+10*length);
-    double2 F11 = fetch_double2(spinorTexDouble, i+11*length);
+    double2 F0 = fetch_double2(xTexDouble2, i+0*length);
+    double2 F1 = fetch_double2(xTexDouble2, i+1*length);
+    double2 F2 = fetch_double2(xTexDouble2, i+2*length);
+    double2 F3 = fetch_double2(xTexDouble2, i+3*length);
+    double2 F4 = fetch_double2(xTexDouble2, i+4*length);
+    double2 F5 = fetch_double2(xTexDouble2, i+5*length);
+    double2 F6 = fetch_double2(xTexDouble2, i+6*length);
+    double2 F7 = fetch_double2(xTexDouble2, i+7*length);
+    double2 F8 = fetch_double2(xTexDouble2, i+8*length);
+    double2 F9 = fetch_double2(xTexDouble2, i+9*length);
+    double2 F10 = fetch_double2(xTexDouble2, i+10*length);
+    double2 F11 = fetch_double2(xTexDouble2, i+11*length);
     CONSTRUCT_HALF_SPINOR_FROM_DOUBLE(h, norm, F, length);
     i += gridSize;
   }
@@ -469,7 +507,7 @@ void copyCuda(ParitySpinor dst, ParitySpinor src) {
     convertSHKernel<<<blasGrid, blasBlock>>>((float4*)dst.spinor, src.stride, src.volume);
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
     int spinor_bytes = dst.length*sizeof(float);
-    cudaBindTexture(0, spinorTexSingle, src.spinor, spinor_bytes); 
+    cudaBindTexture(0, xTexSingle4, src.spinor, spinor_bytes); 
     convertHSKernel<<<blasGrid, blasBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, src.stride, src.volume);
   } else if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
     int spinor_bytes = dst.length*sizeof(short);
@@ -478,7 +516,7 @@ void copyCuda(ParitySpinor dst, ParitySpinor src) {
     convertDHKernel<<<blasGrid, blasBlock>>>((double2*)dst.spinor, src.stride, src.volume);
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = dst.length*sizeof(double);
-    cudaBindTexture(0, spinorTexDouble, src.spinor, spinor_bytes); 
+    cudaBindTexture(0, xTexDouble2, src.spinor, spinor_bytes); 
     convertHDKernel<<<blasGrid, blasBlock>>>((short4*)dst.spinor, (float*)dst.spinorNorm, src.stride, src.volume);
   } else if (dst.precision == QUDA_DOUBLE_PRECISION) {
     cudaMemcpy(dst.spinor, src.spinor, dst.length*sizeof(double), cudaMemcpyDeviceToDevice);
@@ -733,16 +771,18 @@ void mxpyCuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_flops += x.real_length;
 }
 
-float2 __device__ make_Float2(float x, float y) {
-  return make_float2(x, y);
-}
-
-double2 __device__ make_Float2(double x, double y) {
-  return make_double2(x, y);
+template <typename Float>
+__global__ void axKernel(Float a, Float *x, int len) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    x[i] *= a;
+    i += gridSize;
+  } 
 }
 
 template <typename Float, typename Float2>
-__global__ void axKernel(Float a, Float2 *x, int len) {
+__global__ void ax2Kernel(Float a, Float2 *x, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
@@ -769,9 +809,9 @@ __global__ void axHKernel(float a, short4 *xH, float *xN, int stride, int length
 void axCuda(double a, ParitySpinor x) {
   setBlock(6, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, x.length/2);
+    axKernel<<<blasGrid, blasBlock>>>(a, (double*)x.spinor, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.spinor, x.length/2);
+    ax2Kernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.spinor, x.length/2);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -783,12 +823,26 @@ void axCuda(double a, ParitySpinor x) {
 }
 
 template <typename Float2>
-__global__ void caxpyKernel(Float2 a, Float2 *x, Float2 *y, int len) {
+__global__ void caxpyDKernel(Float2 a, Float2 *x, Float2 *y, int len) {
   
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
-    Float2 Z = make_Float2(x[i].x, x[i].y);
+    Float2 Z = READ_DOUBLE2_TEXTURE(x, i);
+    y[i].x += a.x*Z.x - a.y*Z.y;
+    y[i].y += a.y*Z.x + a.x*Z.y;
+    i += gridSize;
+  } 
+  
+}
+
+template <typename Float2>
+__global__ void caxpySKernel(Float2 a, Float2 *x, Float2 *y, int len) {
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 Z = read_Float2(x, i);
     y[i].x += a.x*Z.x - a.y*Z.y;
     y[i].y += a.y*Z.x + a.x*Z.y;
     i += gridSize;
@@ -823,10 +877,13 @@ void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y) {
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 4*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    caxpyKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, length);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    caxpyDKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
-    caxpyKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, (float2*)y.spinor, length);
+    caxpySKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, (float2*)y.spinor, length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -839,13 +896,27 @@ void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y) {
 }
 
 template <typename Float2>
-__global__ void caxpbyKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, int len) {
+__global__ void caxpbyDKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, int len) {
   
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
-    Float2 Z1 = make_Float2(x[i].x, x[i].y);
-    Float2 Z2 = make_Float2(y[i].x, y[i].y);
+    Float2 Z1 = READ_DOUBLE2_TEXTURE(x, i);
+    Float2 Z2 = READ_DOUBLE2_TEXTURE(y, i);
+    y[i].x = a.x*Z1.x + b.x*Z2.x - a.y*Z1.y - b.y*Z2.y;
+    y[i].y = a.y*Z1.x + b.y*Z2.x + a.x*Z1.y + b.x*Z2.y;
+    i += gridSize;
+  } 
+}
+
+template <typename Float2>
+__global__ void caxpbySKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, int len) {
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 Z1 = read_Float2(x, i);
+    Float2 Z2 = read_Float2(y, i);
     y[i].x = a.x*Z1.x + b.x*Z2.x - a.y*Z1.y - b.y*Z2.y;
     y[i].y = a.y*Z1.x + b.y*Z2.x + a.x*Z1.y + b.x*Z2.y;
     i += gridSize;
@@ -879,11 +950,14 @@ void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 7*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    caxpbyKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, length);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    caxpbyDKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    caxpbyKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, length);
+    caxpbySKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -897,21 +971,42 @@ void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
 }
 
 template <typename Float2>
-__global__ void cxpaypbzKernel(Float2 *x, Float2 a, Float2 *y, Float2 b, Float2 *z, int len) {
+__global__ void cxpaypbzDKernel(Float2 *x, Float2 a, Float2 *y, Float2 b, Float2 *z, int len) {
   
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
-    Float2 T1 = make_Float2(x[i].x, x[i].y);
-    Float2 T2 = make_Float2(y[i].x, y[i].y);
-    Float2 T3 = make_Float2(z[i].x, z[i].y);
+    Float2 T1 = READ_DOUBLE2_TEXTURE(x, i);
+    Float2 T2 = READ_DOUBLE2_TEXTURE(y, i);
+    Float2 T3 = read_Float2(z, i);
 
     T1.x += a.x*T2.x - a.y*T2.y;
     T1.y += a.y*T2.x + a.x*T2.y;
     T1.x += b.x*T3.x - b.y*T3.y;
     T1.y += b.y*T3.x + b.x*T3.y;
     
-    z[i] = make_Float2(T1.x, T1.y);
+    z[i] = make_Float2(T1);
+    i += gridSize;
+  } 
+  
+}
+
+template <typename Float2>
+__global__ void cxpaypbzSKernel(Float2 *x, Float2 a, Float2 *y, Float2 b, Float2 *z, int len) {
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 T1 = read_Float2(x, i);
+    Float2 T2 = read_Float2(y, i);
+    Float2 T3 = read_Float2(z, i);
+
+    T1.x += a.x*T2.x - a.y*T2.y;
+    T1.y += a.y*T2.x + a.x*T2.y;
+    T1.x += b.x*T3.x - b.y*T3.y;
+    T1.y += b.y*T3.x + b.x*T3.y;
+    
+    z[i] = make_Float2(T1);
     i += gridSize;
   } 
   
@@ -946,11 +1041,14 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
   blas_quda_bytes += 4*x.real_length*x.precision;
   blas_quda_flops += 8*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    cxpaypbzKernel<<<blasGrid, blasBlock>>>((double2*)x.spinor, a, (double2*)y.spinor, b, (double2*)z.spinor, length);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    cxpaypbzDKernel<<<blasGrid, blasBlock>>>((double2*)x.spinor, a, (double2*)y.spinor, b, (double2*)z.spinor, length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    cxpaypbzKernel<<<blasGrid, blasBlock>>>((float2*)x.spinor, af2, (float2*)y.spinor, bf2, (float2*)z.spinor, length);
+    cxpaypbzSKernel<<<blasGrid, blasBlock>>>((float2*)x.spinor, af2, (float2*)y.spinor, bf2, (float2*)z.spinor, length);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -966,11 +1064,26 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
 }
 
 template <typename Float, typename Float2>
-__global__ void axpyZpbxKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float b, int len) {
+__global__ void axpyZpbxDKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float b, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
-    Float2 x_i = make_Float2(x[i].x, x[i].y);
+    Float2 x_i = READ_DOUBLE2_TEXTURE(x, i);
+    Float2 z_i = READ_DOUBLE2_TEXTURE(z, i);
+    y[i].x += a*x_i.x;
+    y[i].y += a*x_i.y;
+    x[i].x = z_i.x + b*x_i.x;
+    x[i].y = z_i.y + b*x_i.y;
+    i += gridSize;
+  }
+}
+
+template <typename Float, typename Float2>
+__global__ void axpyZpbxSKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float b, int len) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 x_i = read_Float2(x, i);
     y[i].x += a*x_i.x;
     y[i].y += a*x_i.y;
     x[i].x = z[i].x + b*x_i.x;
@@ -1012,9 +1125,12 @@ void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, doub
   checkSpinor(x,z);
   setBlock(10, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    axpyZpbxKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, (double2*)z.spinor, b, x.length/2);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, zTexDouble2, z.spinor, spinor_bytes); 
+    axpyZpbxDKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, (double2*)y.spinor, (double2*)z.spinor, b, x.length/2);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpyZpbxKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.spinor, (float2*)y.spinor, (float2*)z.spinor, (float)b, x.length/2);
+    axpyZpbxSKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.spinor, (float2*)y.spinor, (float2*)z.spinor, (float)b, x.length/2);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -1031,28 +1147,55 @@ void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, doub
 }
 
 template <typename Float2>
-__global__ void caxpbypzYmbwKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, int len) {
+__global__ void caxpbypzYmbwDKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, int len) {
 
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
-    Float2 X = make_Float2(x[i].x, x[i].y);
-    Float2 Z = make_Float2(z[i].x, z[i].y);
+    Float2 X = READ_DOUBLE2_TEXTURE(x, i);
+    Float2 Z = read_Float2(z, i);
 
     Z.x += a.x*X.x - a.y*X.y;
     Z.y += a.y*X.x + a.x*X.y;
 
-    Float2 Y = make_Float2(y[i].x, y[i].y);
+    Float2 Y = READ_DOUBLE2_TEXTURE(y, i);
     Z.x += b.x*Y.x - b.y*Y.y;
     Z.y += b.y*Y.x + b.x*Y.y;
-    z[i] = make_Float2(Z.x, Z.y);
+    z[i] = make_Float2(Z);
 
-    Float2 W = make_Float2(w[i].x, w[i].y);
+    Float2 W = read_Float2(w, i);
 
     Y.x -= b.x*W.x - b.y*W.y;
     Y.y -= b.y*W.x + b.x*W.y;	
     
-    y[i] = make_Float2(Y.x, Y.y);
+    y[i] = make_Float2(Y);
+    i += gridSize;
+  } 
+}
+
+template <typename Float2>
+__global__ void caxpbypzYmbwSKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, int len) {
+
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 X = read_Float2(x, i);
+    Float2 Z = read_Float2(z, i);
+
+    Z.x += a.x*X.x - a.y*X.y;
+    Z.y += a.y*X.x + a.x*X.y;
+
+    Float2 Y = read_Float2(y, i);
+    Z.x += b.x*Y.x - b.y*Y.y;
+    Z.y += b.y*Y.x + b.x*Y.y;
+    z[i] = make_Float2(Z);
+
+    Float2 W = read_Float2(w, i);
+
+    Y.x -= b.x*W.x - b.y*W.y;
+    Y.y -= b.y*W.x + b.x*W.y;	
+    
+    y[i] = make_Float2(Y);
     i += gridSize;
   } 
 }
@@ -1093,12 +1236,16 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
   int length = x.length/2;
   setBlock(11, length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    caxpbypzYmbwKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, 
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    cudaBindTexture(0, zTexDouble2, z.spinor, spinor_bytes); 
+    caxpbypzYmbwDKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.spinor, b, (double2*)y.spinor, 
 					  (double2*)z.spinor, (double2*)w.spinor, length); 
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    caxpbypzYmbwKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, 
+    caxpbypzYmbwSKernel<<<blasGrid, blasBlock>>>(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, 
 					  (float2*)z.spinor, (float2*)w.spinor, length); 
   } else {
     int spinor_bytes = x.length*sizeof(short);
@@ -1116,7 +1263,7 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
 					       (short4*)z.spinor, (float*)z.spinorNorm, z.stride, z.volume);
   }
   blas_quda_bytes += 6*x.real_length*x.precision;
-  blas_quda_flops += 12*x.real_length;  
+  blas_quda_flops += 12*x.real_length;
 }
 
 
@@ -1184,7 +1331,7 @@ __device__ void dsadd3(QudaSumFloat3 &c0, QudaSumFloat3 &c1, const QudaSumFloat3
 // double sumCuda(float *a, int n) {}
 //
 template <int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) sumF##suffix
+#define REDUCE_FUNC_NAME(suffix) sumD##suffix
 #define REDUCE_TYPES Float *a
 #define REDUCE_PARAMS a
 #define REDUCE_AUXILIARY(i)
@@ -1197,19 +1344,32 @@ template <int reduce_threads, typename Float>
 #undef REDUCE_OPERATION
 
 template <int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) sumS##suffix
+#define REDUCE_TYPES Float *a
+#define REDUCE_PARAMS a
+#define REDUCE_AUXILIARY(i)
+#define REDUCE_OPERATION(i) a[i].x + a[i].y
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <int reduce_threads, typename Float>
 #define REDUCE_FUNC_NAME(suffix) sumH##suffix
 #define REDUCE_TYPES Float *a, int stride
 #define REDUCE_PARAMS a, stride
 #define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(I, texHalf1, texNorm1, stride);			\
-  SUM_FLOAT4(s0, I0);							\
-  SUM_FLOAT4(s1, I1);							\
-  SUM_FLOAT4(s2, I2);							\
-  SUM_FLOAT4(s3, I3);							\
-  SUM_FLOAT4(s4, I4);							\
-  SUM_FLOAT4(s5, I5);							\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  SUM_FLOAT4(s0, a0);							\
+  SUM_FLOAT4(s1, a1);							\
+  SUM_FLOAT4(s2, a2);							\
+  SUM_FLOAT4(s3, a3);							\
+  SUM_FLOAT4(s4, a4);							\
+  SUM_FLOAT4(s5, a5);							\
   s0 += s1; s2 += s3; s4 += s5; s0 += s2; s0 += s4;
-#define REDUCE_OPERATION(i) (I0.x)
+#define REDUCE_OPERATION(i) (ac*s0)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1221,14 +1381,14 @@ double sumCuda(ParitySpinor a) {
   blas_quda_flops += a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
-    return sumFCuda((double*)a.spinor, a.length, 12, a.precision);
+    return sumDCuda((double*)a.spinor, a.length, 12, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    return sumFCuda((float*)a.spinor, a.length, 12, a.precision);
+    return sumSCuda((float2*)a.spinor, a.length/2, 12, a.precision);
   } else {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
-    return sumHCuda((char*)0, a.stride, a.volume, 12, a.precision);
+    return sumHCuda((float*)a.spinorNorm, a.stride, a.volume, 12, a.precision);
   }
 }
 
@@ -1236,11 +1396,24 @@ double sumCuda(ParitySpinor a) {
 // double normCuda(float *a, int n) {}
 //
 template <int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) normF##suffix
+#define REDUCE_FUNC_NAME(suffix) normD##suffix
 #define REDUCE_TYPES Float *a
 #define REDUCE_PARAMS a
 #define REDUCE_AUXILIARY(i)
 #define REDUCE_OPERATION(i) (a[i]*a[i])
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) normS##suffix
+#define REDUCE_TYPES Float *a
+#define REDUCE_PARAMS a
+#define REDUCE_AUXILIARY(i)
+#define REDUCE_OPERATION(i) (a[i].x*a[i].x + a[i].y*a[i].y)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1256,15 +1429,15 @@ template <int reduce_threads, typename Float>
 #define REDUCE_TYPES Float *a, int stride // dummy type
 #define REDUCE_PARAMS a, stride
 #define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(I, texHalf1, texNorm1, stride);			\
-  REAL_DOT_FLOAT4(norm0, I0, I0);					\
-  REAL_DOT_FLOAT4(norm1, I1, I1);					\
-  REAL_DOT_FLOAT4(norm2, I2, I2);					\
-  REAL_DOT_FLOAT4(norm3, I3, I3);					\
-  REAL_DOT_FLOAT4(norm4, I4, I4);					\
-  REAL_DOT_FLOAT4(norm5, I5, I5);					\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  REAL_DOT_FLOAT4(norm0, a0, a0);					\
+  REAL_DOT_FLOAT4(norm1, a1, a1);					\
+  REAL_DOT_FLOAT4(norm2, a2, a2);					\
+  REAL_DOT_FLOAT4(norm3, a3, a3);					\
+  REAL_DOT_FLOAT4(norm4, a4, a4);					\
+  REAL_DOT_FLOAT4(norm5, a5, a5);					\
   norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2, norm0 += norm4;
-#define REDUCE_OPERATION(i) (norm0)
+#define REDUCE_OPERATION(i) (ac*ac*norm0)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1276,14 +1449,14 @@ double normCuda(ParitySpinor a) {
   blas_quda_flops += 2*a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
-    return normFCuda((double*)a.spinor, a.length, 13, a.precision);
+    return normDCuda((double*)a.spinor, a.length, 13, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    return normFCuda((float*)a.spinor, a.length, 13, a.precision);
+    return normSCuda((float2*)a.spinor, a.length/2, 13, a.precision);
   } else {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
-    return normHCuda((char*)0, a.stride, a.volume, 13, a.precision);
+    return normHCuda(a.spinorNorm, a.stride, a.volume, 13, a.precision);
   }
 }
 
@@ -1293,11 +1466,24 @@ double normCuda(ParitySpinor a) {
 // double reDotProductFCuda(float *a, float *b, int n) {}
 //
 template <int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) reDotProductF##suffix
+#define REDUCE_FUNC_NAME(suffix) reDotProductD##suffix
 #define REDUCE_TYPES Float *a, Float *b
 #define REDUCE_PARAMS a, b
 #define REDUCE_AUXILIARY(i)
 #define REDUCE_OPERATION(i) (a[i]*b[i])
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) reDotProductS##suffix
+#define REDUCE_TYPES Float *a, Float *b
+#define REDUCE_PARAMS a, b
+#define REDUCE_AUXILIARY(i)
+#define REDUCE_OPERATION(i) (a[i].x*b[i].x + a[i].y*b[i].y)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1313,16 +1499,16 @@ template <int reduce_threads, typename Float>
 #define REDUCE_TYPES Float *a, Float *b, int stride
 #define REDUCE_PARAMS a, b, stride
 #define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(aH, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(bH, texHalf2, texNorm2, stride);		\
-  REAL_DOT_FLOAT4(rdot0, aH0, bH0);					\
-  REAL_DOT_FLOAT4(rdot1, aH1, bH1);					\
-  REAL_DOT_FLOAT4(rdot2, aH2, bH2);					\
-  REAL_DOT_FLOAT4(rdot3, aH3, bH3);					\
-  REAL_DOT_FLOAT4(rdot4, aH4, bH4);					\
-  REAL_DOT_FLOAT4(rdot5, aH5, bH5);					\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  READ_HALF_SPINOR(b, texHalf2, stride);				\
+  REAL_DOT_FLOAT4(rdot0, a0, b0);					\
+  REAL_DOT_FLOAT4(rdot1, a1, b1);					\
+  REAL_DOT_FLOAT4(rdot2, a2, b2);					\
+  REAL_DOT_FLOAT4(rdot3, a3, b3);					\
+  REAL_DOT_FLOAT4(rdot4, a4, b4);					\
+  REAL_DOT_FLOAT4(rdot5, a5, b5);					\
   rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4;
-#define REDUCE_OPERATION(i) (rdot0)
+#define REDUCE_OPERATION(i) (ac*bc*rdot0)
 #include "reduce_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1335,16 +1521,16 @@ double reDotProductCuda(ParitySpinor a, ParitySpinor b) {
   checkSpinor(a, b);
   blas_quda_bytes += 2*a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
-    return reDotProductFCuda((double*)a.spinor, (double*)b.spinor, a.length, 14, a.precision);
+    return reDotProductDCuda((double*)a.spinor, (double*)b.spinor, a.length, 14, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    return reDotProductFCuda((float*)a.spinor, (float*)b.spinor, a.length, 14, a.precision);
+    return reDotProductSCuda((float2*)a.spinor, (float2*)b.spinor, a.length/2, 14, a.precision);
   } else {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, b.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, b.spinorNorm, spinor_bytes/12);    
-    return reDotProductHCuda((char*)0, (char*)0, a.stride, a.volume, 14, a.precision);
+    return reDotProductHCuda(a.spinorNorm, b.spinorNorm, a.stride, a.volume, 14, a.precision);
   }
 }
 
@@ -1485,16 +1671,33 @@ double xmyNormCuda(ParitySpinor x, ParitySpinor y) {
 
 
 //
-// double2 cDotProductCuda(float2 *a, float2 *b, int n) {}
+// double2 cDotProductCuda(float2 *x, float2 *y, int n) {}
 //
 template <int reduce_threads, typename Float, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) cDotProductF##suffix
-#define REDUCE_TYPES Float2 *a, Float2 *b, Float c
-#define REDUCE_PARAMS a, b, c
-#define REDUCE_REAL_AUXILIARY(i)
-#define REDUCE_IMAG_AUXILIARY(i)
-#define REDUCE_REAL_OPERATION(i) (a[i].x*b[i].x + a[i].y*b[i].y)
-#define REDUCE_IMAG_OPERATION(i) (a[i].x*b[i].y - a[i].y*b[i].x)
+#define REDUCE_FUNC_NAME(suffix) cDotProductD##suffix
+#define REDUCE_TYPES Float2 *x, Float2 *y, Float c
+#define REDUCE_PARAMS x, y, c
+#define REDUCE_REAL_AUXILIARY(i) Float2 a = READ_DOUBLE2_TEXTURE(x, i);
+#define REDUCE_IMAG_AUXILIARY(i) Float2 b = READ_DOUBLE2_TEXTURE(y, i);
+#define REDUCE_REAL_OPERATION(i) (a.x*b.x + a.y*b.y)
+#define REDUCE_IMAG_OPERATION(i) (a.x*b.y - a.y*b.x)
+#include "reduce_complex_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_REAL_AUXILIARY
+#undef REDUCE_IMAG_AUXILIARY
+#undef REDUCE_REAL_OPERATION
+#undef REDUCE_IMAG_OPERATION
+
+template <int reduce_threads, typename Float, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) cDotProductS##suffix
+#define REDUCE_TYPES Float2 *x, Float2 *y, Float c
+#define REDUCE_PARAMS x, y, c
+#define REDUCE_REAL_AUXILIARY(i) Float2 a = read_Float2(x, i);
+#define REDUCE_IMAG_AUXILIARY(i) Float2 b = read_Float2(y, i);
+#define REDUCE_REAL_OPERATION(i) (a.x*b.x + a.y*b.y)
+#define REDUCE_IMAG_OPERATION(i) (a.x*b.y - a.y*b.x)
 #include "reduce_complex_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1506,28 +1709,28 @@ template <int reduce_threads, typename Float, typename Float2>
 
 template <int reduce_threads, typename Float, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductH##suffix
-#define REDUCE_TYPES Float2 *a, Float b, int stride
+#define REDUCE_TYPES Float *a, Float2 *b, int stride
 #define REDUCE_PARAMS a, b, stride
 #define REDUCE_REAL_AUXILIARY(i)					\
-  RECONSTRUCT_HALF_SPINOR(aH, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(bH, texHalf2, texNorm2, stride);		\
-  REAL_DOT_FLOAT4(rdot0, aH0, bH0);					\
-  REAL_DOT_FLOAT4(rdot1, aH1, bH1);					\
-  REAL_DOT_FLOAT4(rdot2, aH2, bH2);					\
-  REAL_DOT_FLOAT4(rdot3, aH3, bH3);					\
-  REAL_DOT_FLOAT4(rdot4, aH4, bH4);					\
-  REAL_DOT_FLOAT4(rdot5, aH5, bH5);					\
+  READ_HALF_SPINOR(a, texHalf1, stride);				\
+  READ_HALF_SPINOR(b, texHalf2, stride);				\
+  REAL_DOT_FLOAT4(rdot0, a0, b0);					\
+  REAL_DOT_FLOAT4(rdot1, a1, b1);					\
+  REAL_DOT_FLOAT4(rdot2, a2, b2);					\
+  REAL_DOT_FLOAT4(rdot3, a3, b3);					\
+  REAL_DOT_FLOAT4(rdot4, a4, b4);					\
+  REAL_DOT_FLOAT4(rdot5, a5, b5);					\
   rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4;
 #define REDUCE_IMAG_AUXILIARY(i)					\
-  IMAG_DOT_FLOAT4(idot0, aH0, bH0);					\
-  IMAG_DOT_FLOAT4(idot1, aH1, bH1);					\
-  IMAG_DOT_FLOAT4(idot2, aH2, bH2);					\
-  IMAG_DOT_FLOAT4(idot3, aH3, bH3);					\
-  IMAG_DOT_FLOAT4(idot4, aH4, bH4);					\
-  IMAG_DOT_FLOAT4(idot5, aH5, bH5);					\
+  IMAG_DOT_FLOAT4(idot0, a0, b0);					\
+  IMAG_DOT_FLOAT4(idot1, a1, b1);					\
+  IMAG_DOT_FLOAT4(idot2, a2, b2);					\
+  IMAG_DOT_FLOAT4(idot3, a3, b3);					\
+  IMAG_DOT_FLOAT4(idot4, a4, b4);					\
+  IMAG_DOT_FLOAT4(idot5, a5, b5);					\
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;
-#define REDUCE_REAL_OPERATION(i) (rdot0)
-#define REDUCE_IMAG_OPERATION(i) (idot0)
+#define REDUCE_REAL_OPERATION(i) (ac*bc*rdot0)
+#define REDUCE_IMAG_OPERATION(i) (ac*bc*idot0)
 #include "reduce_complex_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1544,17 +1747,23 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
   blas_quda_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     char c = 0;
-    return cDotProductFCuda((double2*)x.spinor, (double2*)y.spinor, c, length, 17, x.precision);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    return cDotProductDCuda((double2*)x.spinor, (double2*)y.spinor, c, length, 17, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     char c = 0;
-    return cDotProductFCuda((float2*)x.spinor, (float2*)y.spinor, c, length, 17, x.precision);
+    int spinor_bytes = x.length*sizeof(float);
+    cudaBindTexture(0, xTexSingle2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexSingle2, y.spinor, spinor_bytes); 
+    return cDotProductSCuda((float2*)x.spinor, (float2*)y.spinor, c, length, 17, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductHCuda((char*)0, (char*)0, x.stride, x.volume, 17, x.precision);
+    return cDotProductHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 17, x.precision);
   }
 }
 
@@ -1566,7 +1775,27 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
 //
 
 template <int reduce_threads, typename Float, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) xpaycDotzyF##suffix
+#define REDUCE_FUNC_NAME(suffix) xpaycDotzyD##suffix
+#define REDUCE_TYPES Float2 *x, Float a, Float2 *y, Float2 *z
+#define REDUCE_PARAMS x, a, y, z
+#define REDUCE_REAL_AUXILIARY(i)		\
+  Float2 X = READ_DOUBLE2_TEXTURE(x, i);	\
+  Float2 Y = READ_DOUBLE2_TEXTURE(y, i);	\
+  Float2 Z = READ_DOUBLE2_TEXTURE(z, i);
+#define REDUCE_IMAG_AUXILIARY(i) y[i].x = X.x + a*Y.x; y[i].y = X.y + a*Y.y
+#define REDUCE_REAL_OPERATION(i) (Z.x*y[i].x + Z.y*y[i].y)
+#define REDUCE_IMAG_OPERATION(i) (Z.x*y[i].y - Z.y*y[i].x)
+#include "reduce_complex_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_REAL_AUXILIARY
+#undef REDUCE_IMAG_AUXILIARY
+#undef REDUCE_REAL_OPERATION
+#undef REDUCE_IMAG_OPERATION
+
+template <int reduce_threads, typename Float, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) xpaycDotzyS##suffix
 #define REDUCE_TYPES Float2 *x, Float a, Float2 *y, Float2 *z
 #define REDUCE_PARAMS x, a, y, z
 #define REDUCE_REAL_AUXILIARY(i) y[i].x = x[i].x + a*y[i].x
@@ -1630,9 +1859,13 @@ double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z)
   int length = x.length/2;
   blas_quda_bytes += 4*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return xpaycDotzyFCuda((double2*)x.spinor, a, (double2*)y.spinor, (double2*)z.spinor, length, 18, x.precision);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    cudaBindTexture(0, zTexDouble2, z.spinor, spinor_bytes); 
+    return xpaycDotzyDCuda((double2*)x.spinor, a, (double2*)y.spinor, (double2*)z.spinor, length, 18, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return xpaycDotzyFCuda((float2*)x.spinor, (float)a, (float2*)y.spinor, (float2*)z.spinor, length, 18, x.precision);
+    return xpaycDotzySCuda((float2*)x.spinor, (float)a, (float2*)y.spinor, (float2*)z.spinor, length, 18, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
@@ -1650,7 +1883,28 @@ double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z)
 // double3 cDotProductNormACuda(float2 *a, float2 *b, int n) {}
 //
 template <int reduce_threads, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) cDotProductNormAF##suffix
+#define REDUCE_FUNC_NAME(suffix) cDotProductNormAD##suffix
+#define REDUCE_TYPES Float2 *x, Float2 *y
+#define REDUCE_PARAMS x, y
+#define REDUCE_X_AUXILIARY(i) Float2 a = READ_DOUBLE2_TEXTURE(x, i);
+#define REDUCE_Y_AUXILIARY(i) Float2 b = READ_DOUBLE2_TEXTURE(y, i);
+#define REDUCE_Z_AUXILIARY(i)
+#define REDUCE_X_OPERATION(i) (a.x*b.x + a.y*b.y)
+#define REDUCE_Y_OPERATION(i) (a.x*b.y - a.y*b.x)
+#define REDUCE_Z_OPERATION(i) (a.x*a.x + a.y*a.y)
+#include "reduce_triple_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_X_AUXILIARY
+#undef REDUCE_Y_AUXILIARY
+#undef REDUCE_Z_AUXILIARY
+#undef REDUCE_X_OPERATION
+#undef REDUCE_Y_OPERATION
+#undef REDUCE_Z_OPERATION
+
+template <int reduce_threads, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) cDotProductNormAS##suffix
 #define REDUCE_TYPES Float2 *a, Float2 *b
 #define REDUCE_PARAMS a, b
 #define REDUCE_X_AUXILIARY(i)
@@ -1672,11 +1926,11 @@ template <int reduce_threads, typename Float2>
 
 template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormAH##suffix
-#define REDUCE_TYPES Float2 *a, int stride
-#define REDUCE_PARAMS a, stride
+#define REDUCE_TYPES Float2 *x, Float2 *y, int stride
+#define REDUCE_PARAMS x, y, stride
 #define REDUCE_X_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  READ_HALF_SPINOR(x, texHalf1, stride);				\
+  READ_HALF_SPINOR(y, texHalf2, stride);				\
   REAL_DOT_FLOAT4(norm0, x0, x0);					\
   REAL_DOT_FLOAT4(norm1, x1, x1);					\
   REAL_DOT_FLOAT4(norm2, x2, x2);					\
@@ -1700,9 +1954,9 @@ template <int reduce_threads, typename Float2>
   IMAG_DOT_FLOAT4(idot4, x4, y4);					\
   IMAG_DOT_FLOAT4(idot5, x5, y5);					\
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;  
-#define REDUCE_X_OPERATION(i) (rdot0)
-#define REDUCE_Y_OPERATION(i) (idot0)
-#define REDUCE_Z_OPERATION(i) (norm0)
+#define REDUCE_X_OPERATION(i) (xc*yc*rdot0)
+#define REDUCE_Y_OPERATION(i) (xc*yc*idot0)
+#define REDUCE_Z_OPERATION(i) (xc*xc*norm0)
 #include "reduce_triple_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1720,16 +1974,19 @@ double3 cDotProductNormACuda(ParitySpinor x, ParitySpinor y) {
   int length = x.length/2;
   blas_quda_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return cDotProductNormAFCuda((double2*)x.spinor, (double2*)y.spinor, length, 19, x.precision);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    return cDotProductNormADCuda((double2*)x.spinor, (double2*)y.spinor, length, 19, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return cDotProductNormAFCuda((float2*)x.spinor, (float2*)y.spinor, length, 19, x.precision);
+    return cDotProductNormASCuda((float2*)x.spinor, (float2*)y.spinor, length, 19, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductNormAHCuda((char*)0,  x.stride, x.volume, 19, x.precision);
+    return cDotProductNormAHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 19, x.precision);
   }
 }
 
@@ -1737,7 +1994,28 @@ double3 cDotProductNormACuda(ParitySpinor x, ParitySpinor y) {
 // double3 cDotProductNormBCuda(float2 *a, float2 *b, int n) {}
 //
 template <int reduce_threads, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) cDotProductNormBF##suffix
+#define REDUCE_FUNC_NAME(suffix) cDotProductNormBD##suffix
+#define REDUCE_TYPES Float2 *x, Float2 *y
+#define REDUCE_PARAMS x, y
+#define REDUCE_X_AUXILIARY(i) Float2 a = READ_DOUBLE2_TEXTURE(x, i);
+#define REDUCE_Y_AUXILIARY(i) Float2 b = READ_DOUBLE2_TEXTURE(y, i);
+#define REDUCE_Z_AUXILIARY(i)
+#define REDUCE_X_OPERATION(i) (a.x*b.x + a.y*b.y)
+#define REDUCE_Y_OPERATION(i) (a.x*b.y - a.y*b.x)
+#define REDUCE_Z_OPERATION(i) (b.x*b.x + b.y*b.y)
+#include "reduce_triple_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_X_AUXILIARY
+#undef REDUCE_Y_AUXILIARY
+#undef REDUCE_Z_AUXILIARY
+#undef REDUCE_X_OPERATION
+#undef REDUCE_Y_OPERATION
+#undef REDUCE_Z_OPERATION
+
+template <int reduce_threads, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) cDotProductNormBS##suffix
 #define REDUCE_TYPES Float2 *a, Float2 *b
 #define REDUCE_PARAMS a, b
 #define REDUCE_X_AUXILIARY(i)
@@ -1759,11 +2037,11 @@ template <int reduce_threads, typename Float2>
 
 template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) cDotProductNormBH##suffix
-#define REDUCE_TYPES Float2 *a, int stride
-#define REDUCE_PARAMS a, stride
+#define REDUCE_TYPES Float2 *x, Float2 *y, int stride
+#define REDUCE_PARAMS x, y, stride
 #define REDUCE_X_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  READ_HALF_SPINOR(x, texHalf1, stride);				\
+  READ_HALF_SPINOR(y, texHalf2, stride);				\
   REAL_DOT_FLOAT4(norm0, y0, y0);					\
   REAL_DOT_FLOAT4(norm1, y1, y1);					\
   REAL_DOT_FLOAT4(norm2, y2, y2);					\
@@ -1787,9 +2065,9 @@ template <int reduce_threads, typename Float2>
   IMAG_DOT_FLOAT4(idot4, x4, y4);					\
   IMAG_DOT_FLOAT4(idot5, x5, y5);					\
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;  
-#define REDUCE_X_OPERATION(i) (rdot0)
-#define REDUCE_Y_OPERATION(i) (idot0)
-#define REDUCE_Z_OPERATION(i) (norm0)
+#define REDUCE_X_OPERATION(i) (xc*yc*rdot0)
+#define REDUCE_Y_OPERATION(i) (xc*yc*idot0)
+#define REDUCE_Z_OPERATION(i) (yc*yc*norm0)
 #include "reduce_triple_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -1807,16 +2085,19 @@ double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
   int length = x.length/2;
   blas_quda_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return cDotProductNormBFCuda((double2*)x.spinor, (double2*)y.spinor, length, 20, x.precision);
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    return cDotProductNormBDCuda((double2*)x.spinor, (double2*)y.spinor, length, 20, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    return cDotProductNormBFCuda((float2*)x.spinor, (float2*)y.spinor, length, 20, x.precision);
+    return cDotProductNormBSCuda((float2*)x.spinor, (float2*)y.spinor, length, 20, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
-    return cDotProductNormBHCuda((char*)0, x.stride, x.volume, 20, x.precision);
+    return cDotProductNormBHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 20, x.precision);
   }
 }
 
@@ -1826,15 +2107,15 @@ double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
 // float2 *z, float2 *w, float2 *u, int len)
 //
 template <int reduce_threads, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYF##suffix
+#define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYD##suffix
 #define REDUCE_TYPES Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, Float2 *u
 #define REDUCE_PARAMS a, x, b, y, z, w, u
 #define REDUCE_X_AUXILIARY(i)				\
-  Float2 X = make_Float2(x[i].x, x[i].y);		\
-  Float2 Y = make_Float2(y[i].x, y[i].y);		\
-  Float2 W = make_Float2(w[i].x, w[i].y);		
+  Float2 X = READ_DOUBLE2_TEXTURE(x, i);		\
+  Float2 Y = READ_DOUBLE2_TEXTURE(y, i);		\
+  Float2 W = READ_DOUBLE2_TEXTURE(w, i);				
 #define REDUCE_Y_AUXILIARY(i)			\
-  Float2 Z = make_Float2(z[i].x, z[i].y);	\
+  Float2 Z = read_Float2(z, i);			\
   Z.x += a.x*X.x - a.y*X.y;			\
   Z.y += a.y*X.x + a.x*X.y;			\
   Z.x += b.x*Y.x - b.y*Y.y;			\
@@ -1842,8 +2123,41 @@ template <int reduce_threads, typename Float2>
   Y.x -= b.x*W.x - b.y*W.y;			\
   Y.y -= b.y*W.x + b.x*W.y;	
 #define REDUCE_Z_AUXILIARY(i)	      \
-  z[i] = make_Float2(Z.x, Z.y);	      \
-  y[i] = make_Float2(Y.x, Y.y);	      
+  z[i] = make_Float2(Z);	      \
+  y[i] = make_Float2(Y);	      
+#define REDUCE_X_OPERATION(i) (u[i].x*y[i].x + u[i].y*y[i].y)
+#define REDUCE_Y_OPERATION(i) (u[i].x*y[i].y - u[i].y*y[i].x)
+#define REDUCE_Z_OPERATION(i) (y[i].x*y[i].x + y[i].y*y[i].y)
+#include "reduce_triple_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_X_AUXILIARY
+#undef REDUCE_Y_AUXILIARY
+#undef REDUCE_Z_AUXILIARY
+#undef REDUCE_X_OPERATION
+#undef REDUCE_Y_OPERATION
+#undef REDUCE_Z_OPERATION
+
+template <int reduce_threads, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYS##suffix
+#define REDUCE_TYPES Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, Float2 *u
+#define REDUCE_PARAMS a, x, b, y, z, w, u
+#define REDUCE_X_AUXILIARY(i)				\
+  Float2 X = read_Float2(x, i);		\
+  Float2 Y = read_Float2(y, i);		\
+  Float2 W = read_Float2(w, i);		
+#define REDUCE_Y_AUXILIARY(i)			\
+  Float2 Z = read_Float2(z, i);	\
+  Z.x += a.x*X.x - a.y*X.y;			\
+  Z.y += a.y*X.x + a.x*X.y;			\
+  Z.x += b.x*Y.x - b.y*Y.y;			\
+  Z.y += b.y*Y.x + b.x*Y.y;			\
+  Y.x -= b.x*W.x - b.y*W.y;			\
+  Y.y -= b.y*W.x + b.x*W.y;	
+#define REDUCE_Z_AUXILIARY(i)	      \
+  z[i] = make_Float2(Z);	      \
+  y[i] = make_Float2(Y);	      
 #define REDUCE_X_OPERATION(i) (u[i].x*y[i].x + u[i].y*y[i].y)
 #define REDUCE_Y_OPERATION(i) (u[i].x*y[i].y - u[i].y*y[i].x)
 #define REDUCE_Z_OPERATION(i) (y[i].x*y[i].x + y[i].y*y[i].y)
@@ -1864,8 +2178,8 @@ template <int reduce_threads, typename Float2>
 //
 template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYH##suffix
-#define REDUCE_TYPES Float2 a, Float2 b, short4 *yH, float *yN, short4 *zH, float *zN, int stride
-#define REDUCE_PARAMS a, b, yH, yN, zH, zN, stride
+#define REDUCE_TYPES Float2 a, Float2 b, short4 *yH, float *yN, short4 *zH, float *zN, float *u, int stride
+#define REDUCE_PARAMS a, b, yH, yN, zH, zN, u, stride
 #define REDUCE_X_AUXILIARY(i)						\
   RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
   RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
@@ -1892,7 +2206,7 @@ template <int reduce_threads, typename Float2>
   REAL_DOT_FLOAT4(norm5, y5, y5);					\
   CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);			
 #define REDUCE_Y_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(u, texHalf5, texNorm5, stride);		\
+  READ_HALF_SPINOR(u, texHalf5, stride);				\
   REAL_DOT_FLOAT4(rdot0, u0, y0);					\
   REAL_DOT_FLOAT4(rdot1, u1, y1);					\
   REAL_DOT_FLOAT4(rdot2, u2, y2);					\
@@ -1909,8 +2223,8 @@ template <int reduce_threads, typename Float2>
   norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2, norm0 += norm4; \
   rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4; \
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4; 
-#define REDUCE_X_OPERATION(i) (rdot0)
-#define REDUCE_Y_OPERATION(i) (idot0)
+#define REDUCE_X_OPERATION(i) (uc*rdot0)
+#define REDUCE_Y_OPERATION(i) (uc*idot0)
 #define REDUCE_Z_OPERATION(i) (norm0)
 #include "reduce_triple_core.h"
 #undef REDUCE_FUNC_NAME
@@ -1934,12 +2248,18 @@ double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b,
   int length = x.length/2;
   blas_quda_bytes += 7*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
-    return caxpbypzYmbwcDotProductWYNormYFCuda(a, (double2*)x.spinor, b, (double2*)y.spinor, (double2*)z.spinor, 
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, yTexDouble2, y.spinor, spinor_bytes); 
+    cudaBindTexture(0, zTexDouble2, z.spinor, spinor_bytes); 
+    cudaBindTexture(0, wTexDouble2, w.spinor, spinor_bytes); 
+    cudaBindTexture(0, uTexDouble2, u.spinor, spinor_bytes); 
+    return caxpbypzYmbwcDotProductWYNormYDCuda(a, (double2*)x.spinor, b, (double2*)y.spinor, (double2*)z.spinor, 
 					       (double2*)w.spinor, (double2*)u.spinor, length, 21, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
-    return caxpbypzYmbwcDotProductWYNormYFCuda(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, (float2*)z.spinor,
+    return caxpbypzYmbwcDotProductWYNormYSCuda(af2, (float2*)x.spinor, bf2, (float2*)y.spinor, (float2*)z.spinor,
 					       (float2*)w.spinor, (float2*)u.spinor, length, 21, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
@@ -1956,7 +2276,8 @@ double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b,
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     return caxpbypzYmbwcDotProductWYNormYHCuda(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, 
-					       (short4*)z.spinor, (float*)z.spinorNorm, y.stride, y.volume, 21, x.precision);
+					       (short4*)z.spinor, (float*)z.spinorNorm, (float*)u.spinorNorm, 
+					       y.stride, y.volume, 21, x.precision);
   }
 }
 

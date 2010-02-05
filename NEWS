@@ -4,6 +4,8 @@ Version 0.2.1
   padding, mixed precision, and the "PRESERVE_SOURCE_NO" option were
   all used at the same time.
 
+- Improved performance of the half and double precision blas routines.
+
 
 Version 0.2 - 16 December 2009
 
