@@ -41,14 +41,18 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
   if (reduce_threads >= 512) { if (tid < 256) { DSACC3(s[0],s[1],s[512+0],s[512+1]); } __syncthreads(); }    
   if (reduce_threads >= 256) { if (tid < 128) { DSACC3(s[0],s[1],s[256+0],s[256+1]); } __syncthreads(); }
   if (reduce_threads >= 128) { if (tid <  64) { DSACC3(s[0],s[1],s[128+0],s[128+1]); } __syncthreads(); }    
-  if (tid < 32) {
-    if (reduce_threads >=  64) { DSACC3(s[0],s[1],s[64+0],s[64+1]); }
-    if (reduce_threads >=  32) { DSACC3(s[0],s[1],s[32+0],s[32+1]); }
-    if (reduce_threads >=  16) { DSACC3(s[0],s[1],s[16+0],s[16+1]); }
-    if (reduce_threads >=   8) { DSACC3(s[0],s[1], s[8+0], s[8+1]); }
-    if (reduce_threads >=   4) { DSACC3(s[0],s[1], s[4+0], s[4+1]); }
-    if (reduce_threads >=   2) { DSACC3(s[0],s[1], s[2+0], s[2+1]); }
-  }
+
+#ifndef __DEVICE_EMULATION__
+  if (tid < 32) 
+#endif
+    {
+      if (reduce_threads >=  64) { DSACC3(s[0],s[1],s[64+0],s[64+1]); EMUSYNC; }
+      if (reduce_threads >=  32) { DSACC3(s[0],s[1],s[32+0],s[32+1]); EMUSYNC; }
+      if (reduce_threads >=  16) { DSACC3(s[0],s[1],s[16+0],s[16+1]); EMUSYNC; }
+      if (reduce_threads >=   8) { DSACC3(s[0],s[1], s[8+0], s[8+1]); EMUSYNC; }
+      if (reduce_threads >=   4) { DSACC3(s[0],s[1], s[4+0], s[4+1]); EMUSYNC; } 
+      if (reduce_threads >=   2) { DSACC3(s[0],s[1], s[2+0], s[2+1]); EMUSYNC; }
+    }
     
   // write result for this block to global mem as single QudaSumFloat3
   if (tid == 0) {
@@ -92,14 +96,17 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
   if (reduce_threads >= 128) 
     { if (tid <  64) { s[0].x += s[ 64].x; s[0].y += s[ 64].y; s[0].z += s[ 64].z; } __syncthreads(); }
     
-  if (tid < 32) {
-    if (reduce_threads >=  64) { s[0].x += s[32].x; s[0].y += s[32].y; s[0].z += s[32].z; }
-    if (reduce_threads >=  32) { s[0].x += s[16].x; s[0].y += s[16].y; s[0].z += s[16].z; }
-    if (reduce_threads >=  16) { s[0].x += s[ 8].x; s[0].y += s[ 8].y; s[0].z += s[ 8].z; }
-    if (reduce_threads >=   8) { s[0].x += s[ 4].x; s[0].y += s[ 4].y; s[0].z += s[ 4].z; }
-    if (reduce_threads >=   4) { s[0].x += s[ 2].x; s[0].y += s[ 2].y; s[0].z += s[ 2].z; }
-    if (reduce_threads >=   2) { s[0].x += s[ 1].x; s[0].y += s[ 1].y; s[0].z += s[ 1].z; }
-  }
+#ifndef __DEVICE_EMULATION__
+  if (tid < 32) 
+#endif
+    {
+      if (reduce_threads >=  64) { s[0].x += s[32].x; s[0].y += s[32].y; s[0].z += s[32].z; EMUSYNC; }
+      if (reduce_threads >=  32) { s[0].x += s[16].x; s[0].y += s[16].y; s[0].z += s[16].z; EMUSYNC; }
+      if (reduce_threads >=  16) { s[0].x += s[ 8].x; s[0].y += s[ 8].y; s[0].z += s[ 8].z; EMUSYNC; }
+      if (reduce_threads >=   8) { s[0].x += s[ 4].x; s[0].y += s[ 4].y; s[0].z += s[ 4].z; EMUSYNC; }
+      if (reduce_threads >=   4) { s[0].x += s[ 2].x; s[0].y += s[ 2].y; s[0].z += s[ 2].z; EMUSYNC; }
+      if (reduce_threads >=   2) { s[0].x += s[ 1].x; s[0].y += s[ 1].y; s[0].z += s[ 1].z; EMUSYNC; }
+    }
     
   // write result for this block to global mem 
   if (tid == 0) {
