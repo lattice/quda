@@ -1,4 +1,4 @@
-Version 0.2.1
+Version 0.2.1 - 8 February 2010
 
 - Fixed bug that would sometimes cause the inverter to fail when spinor
   padding is enabled.
