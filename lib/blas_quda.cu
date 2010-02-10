@@ -21,6 +21,13 @@
 #define QudaSumFloat3 float3
 #endif
 
+// Required for the reduction kernels
+#ifdef __DEVICE_EMULATION__
+#define EMUSYNC __syncthreads()
+#else
+#define EMUSYNC
+#endif
+
 // These are used for reduction kernels
 static QudaSumFloat *d_reduceFloat=0;
 static QudaSumComplex *d_reduceComplex=0;
@@ -187,6 +194,24 @@ double2 __device__ make_Float2(double2 x) {
   float4 a##5 = tex1Dfetch(tex, i + 5*length);				\
   float a##c = a[i];
 
+#define SHORT_LENGTH 65536
+#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)
+#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
+
+__device__ short float2short(float c, float a) {
+  //return (short)(a*MAX_SHORT);
+  short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
+  return rtn;
+}
+
+__device__ float short2float(short a) {
+  return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
+}
+
+__device__ short4 float42short4(float c, float4 a) {
+  return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));
+}
+
 #define CONSTRUCT_HALF_SPINOR_FROM_SINGLE(h, n, a, length)		\
   {float c0 = fmaxf(fabsf((a##0).x), fabsf((a##0).y));			\
   float c1 = fmaxf(fabsf((a##0).z), fabsf((a##0).w));			\
@@ -217,7 +242,17 @@ double2 __device__ make_Float2(double2 x) {
   h[i+4*length] = make_short4((short)(C*(float)(a##4).x), (short)(C*(float)(a##4).y), \
 			      (short)(C*(float)(a##4).z), (short)(C*(float)(a##4).w)); \
   h[i+5*length] = make_short4((short)(C*(float)(a##5).x), (short)(C*(float)(a##5).y),	\
-			      (short)(C*(float)(a##5).z), (short)(C*(float)(a##5).w));}
+  (short)(C*(float)(a##5).z), (short)(C*(float)(a##5).w));}
+
+  /*
+  float C = 1.0f / c0;							\
+  h[i+0*length] = float42short4(C, a##0);				\
+  h[i+1*length] = float42short4(C, a##1);				\
+  h[i+2*length] = float42short4(C, a##2);				\
+  h[i+3*length] = float42short4(C, a##3);				\
+  h[i+4*length] = float42short4(C, a##4);				\
+  h[i+5*length] = float42short4(C, a##5);}
+*/
 
 #define CONSTRUCT_HALF_SPINOR_FROM_DOUBLE(h, n, a, length)		\
   {float c0 = fmaxf(fabsf((a##0).x), fabsf((a##0).y));			\
@@ -1460,6 +1495,24 @@ double normCuda(ParitySpinor a) {
   }
 }
 
+
+#if 0
+double normEven(const cudaColorSpinorField &a) {
+  blas_quda_flops += 2*a.real_length;
+  blas_quda_bytes += a.real_length*a.precision;
+  if (a.precision == QUDA_DOUBLE_PRECISION) {
+    return normDCuda((double*)a.v, a.length/2, 13, a.precision);
+  } else if (a.precision == QUDA_SINGLE_PRECISION) {
+    return normSCuda((float2*)a.v, a.length/4, 13, a.precision);
+  } else {
+    int spinor_bytes = a.length*sizeof(short);
+    cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 
+    cudaBindTexture(0, texNorm1, a.norm, spinor_bytes/12);    
+    blas_quda_bytes += (2*a.real_length*a.precision) / (a.nColor * a.nSpin);
+    return normHCuda((float*)a.norm, a.stride/2, a.volume/2, 13, a.precision);
+  }
+}
+#endif
 
 
 //

@@ -1,4 +1,3 @@
-
 #if (REDUCE_TYPE == REDUCE_KAHAN)
 
 #define DSACC(c0, c1, a0, a1) dsadd((c0), (c1), (c0), (c1), (a0), (a1))
@@ -28,14 +27,19 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
   if (reduce_threads >= 512) { if (tid < 256) { DSACC(s[0],s[1],s[512+0],s[512+1]); } __syncthreads(); }    
   if (reduce_threads >= 256) { if (tid < 128) { DSACC(s[0],s[1],s[256+0],s[256+1]); } __syncthreads(); }
   if (reduce_threads >= 128) { if (tid <  64) { DSACC(s[0],s[1],s[128+0],s[128+1]); } __syncthreads(); }    
-  if (tid < 32) {
-    if (reduce_threads >=  64) { DSACC(s[0],s[1],s[64+0],s[64+1]); }
-    if (reduce_threads >=  32) { DSACC(s[0],s[1],s[32+0],s[32+1]); }
-    if (reduce_threads >=  16) { DSACC(s[0],s[1],s[16+0],s[16+1]); }
-    if (reduce_threads >=   8) { DSACC(s[0],s[1], s[8+0], s[8+1]); }
-    if (reduce_threads >=   4) { DSACC(s[0],s[1], s[4+0], s[4+1]); }
-    if (reduce_threads >=   2) { DSACC(s[0],s[1], s[2+0], s[2+1]); }
-  }
+
+
+#ifndef __DEVICE_EMULATION__
+  if (tid < 32) 
+#endif
+    {
+      if (reduce_threads >=  64) { DSACC(s[0],s[1],s[64+0],s[64+1]); EMUSYNC; }
+      if (reduce_threads >=  32) { DSACC(s[0],s[1],s[32+0],s[32+1]); EMUSYNC; }
+      if (reduce_threads >=  16) { DSACC(s[0],s[1],s[16+0],s[16+1]); EMUSYNC; }
+      if (reduce_threads >=   8) { DSACC(s[0],s[1], s[8+0], s[8+1]); EMUSYNC; }
+      if (reduce_threads >=   4) { DSACC(s[0],s[1], s[4+0], s[4+1]); EMUSYNC; }
+      if (reduce_threads >=   2) { DSACC(s[0],s[1], s[2+0], s[2+1]); EMUSYNC; }
+    }
   
   // write result for this block to global mem as single float
   if (tid == 0) g_odata[blockIdx.x] = sdata[0]+sdata[1];
@@ -65,17 +69,23 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
   if (reduce_threads >= 256) { if (tid < 128) { s[0] += s[128]; } __syncthreads(); }
   if (reduce_threads >= 128) { if (tid <  64) { s[0] += s[ 64]; } __syncthreads(); }
   
-  if (tid < 32) {
-    if (reduce_threads >=  64) { s[0] += s[32]; }
-    if (reduce_threads >=  32) { s[0] += s[16]; }
-    if (reduce_threads >=  16) { s[0] += s[ 8]; }
-    if (reduce_threads >=   8) { s[0] += s[ 4]; }
-    if (reduce_threads >=   4) { s[0] += s[ 2]; }
-    if (reduce_threads >=   2) { s[0] += s[ 1]; }
-  }
+#ifndef __DEVICE_EMULATION__
+  if (tid < 32)
+#endif
+    {
+      if (reduce_threads >=  64) { s[0] += s[32]; EMUSYNC; }
+      if (reduce_threads >=  32) { s[0] += s[16]; EMUSYNC; }
+      if (reduce_threads >=  16) { s[0] += s[ 8]; EMUSYNC; }
+      if (reduce_threads >=   8) { s[0] += s[ 4]; EMUSYNC; }
+      if (reduce_threads >=   4) { s[0] += s[ 2]; EMUSYNC; }
+      if (reduce_threads >=   2) { s[0] += s[ 1]; EMUSYNC; }
+    }
   
   // write result for this block to global mem 
-  if (tid == 0) g_odata[blockIdx.x] = s[0];
+  if (tid == 0) {
+    g_odata[blockIdx.x] = s[0];
+  }
+
 }
 
 #endif
@@ -119,6 +129,7 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision pr
 
   double cpu_sum = 0;
   for (int i = 0; i < blasGrid.x; i++) cpu_sum += h_reduceFloat[i];
-  
+
   return cpu_sum;
 }
+
