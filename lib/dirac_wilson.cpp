@@ -66,12 +66,9 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
 }
 
 void DiracWilson::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) {
-  printfQuda("Source = %e\n", norm2(in));
   checkFullSpinor(out, in);
   DslashXpay(out.Odd(), in.Even(), 1, dagger, in.Odd(), -kappa);
-  printfQuda("Odd %e %e\n", norm2(out.Odd()), norm2(in.Odd()));
   DslashXpay(out.Even(), in.Odd(), 0, dagger, in.Even(), -kappa);
-  printfQuda("Even %e %e\n", norm2(out.Even()), norm2(in.Even()));
 }
 
 void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) {

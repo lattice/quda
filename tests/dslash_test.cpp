@@ -15,7 +15,7 @@
 #include<iostream>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 2;
+int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 int clover_yes = 0;
 
@@ -45,7 +45,7 @@ void init() {
   gauge_param.X[0] = 24;
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[3] = 64;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -71,8 +71,8 @@ void init() {
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
-  // gauge_param.ga_pad = 24*24*12;
-  // inv_param.sp_pad = 24*24*12;
+  gauge_param.ga_pad = 24*24*12;
+  //inv_param.sp_pad = 24*24*12;
   // inv_param.cl_pad = 24*24*12;
 
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -213,7 +213,7 @@ void end() {
 double dslashCUDA() {
 
   // execute kernel
-  const int LOOPS = 1;
+  const int LOOPS = 100;
   printfQuda("Executing %d kernel loops...\n", LOOPS);
   fflush(stdout);
   stopwatchStart();
