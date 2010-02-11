@@ -16,7 +16,7 @@ static int blas_threads[22][3] = {
   {  64,  128,  128},  // Kernel 10: axpyZpbxCuda
   {  64,  128,   64},  // Kernel 11: caxpbypzYmbwCuda
   { 128,  128,  128},  // Kernel 12: sumCuda
-  { 128,  128,  128},  // Kernel 13: normCuda
+  { 64,  64,  64},  // Kernel 13: normCuda
   {  64,  128,  128},  // Kernel 14: reDotProductCuda
   {  64,  128,   64},  // Kernel 15: axpyNormCuda
   {  64,  128,   64},  // Kernel 16: xmyNormCuda
@@ -41,7 +41,7 @@ static int blas_blocks[22][3] = {
   { 256,  128,  128},  // Kernel 10: axpyZpbxCuda
   { 256,  128,  128},  // Kernel 11: caxpbypzYmbwCuda
   { 128,  128,  128},  // Kernel 12: sumCuda
-  { 128,  128,  128},  // Kernel 13: normCuda
+  { 64 ,  64 ,  64 },  // Kernel 13: normCuda
   { 128,  128,  128},  // Kernel 14: reDotProductCuda
   { 256, 2048,  128},  // Kernel 15: axpyNormCuda
   {1024, 2048,  128},  // Kernel 16: xmyNormCuda

@@ -192,7 +192,7 @@ template <typename FloatA, typename FloatB>
 static void compareSpinor(const FloatA *u, const FloatB *v, const int volume, 
 			  const int N, const int resolution) {
   int fail_check = 16*resolution;
-  int fail[fail_check];
+  int *fail = new int[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
   int *iter = new int[N];
@@ -217,6 +217,7 @@ static void compareSpinor(const FloatA *u, const FloatB *v, const int volume,
   }
 
   delete []iter;
+  delete []fail;
 }
 
 void cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, 

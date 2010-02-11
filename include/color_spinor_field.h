@@ -63,7 +63,7 @@ class ColorSpinorParam {
     : fieldType(QUDA_CUDA_FIELD), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nDim(cpuParam.nDim), 
     precision(inv_param.cuda_prec), pad(inv_param.sp_pad), fieldSubset(cpuParam.fieldSubset), 
     subsetOrder(QUDA_EVEN_ODD_SUBSET_ORDER), fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_UKQCD_BASIS),
-    create(QUDA_NULL_CREATE), v(0)
+    create(QUDA_COPY_CREATE), v(0)
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
@@ -74,6 +74,23 @@ class ColorSpinorParam {
       fieldOrder = QUDA_FLOAT4_ORDER;
     }
 
+  }
+
+  void print() {
+    printfQuda("fieldType = %d\n", fieldType);
+    printfQuda("nColor = %d\n", nColor);
+    printfQuda("nSpin = %d\n", nSpin);
+    printfQuda("nDim = %d\n", nDim);
+    for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
+    printfQuda("precision = %d\n", precision);
+    printfQuda("pad = %d\n", pad);
+    printfQuda("fieldSubset = %d\n", fieldSubset);
+    printfQuda("subsetOrder = %d\n", subsetOrder);
+    printfQuda("fieldOrder = %d\n", fieldOrder);
+    printfQuda("basis = %d\n", basis);
+    printfQuda("create = %d\n", create);
+    printfQuda("v = %lx\n", (ulong)v);
+    printfQuda("norm = %lx\n", (ulong)norm);
   }
 
   virtual ~ColorSpinorParam() {
@@ -150,6 +167,8 @@ class cpuColorSpinorField;
 class cudaColorSpinorField : public ColorSpinorField {
 
   friend class cpuColorSpinorField;
+
+  friend double normEven(const cudaColorSpinorField &b);
 
   friend class DiracWilson;
   friend class DiracClover;

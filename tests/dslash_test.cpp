@@ -33,7 +33,7 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 double kappa = 1.0;
 int parity = 1;   // even or odd? (0 = even, 1 = odd)
 QudaDagType dagger = QUDA_DAG_NO;   // apply Dslash or Dslash dagger?
-int transfer = 1; // include transfer time in the benchmark?
+int transfer = 0; // include transfer time in the benchmark?
 
 Dirac *dirac;
 
@@ -42,10 +42,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 16;
-  gauge_param.X[1] = 16;
-  gauge_param.X[2] = 16;
-  gauge_param.X[3] = 32;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 48;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -64,7 +64,7 @@ void init() {
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
-  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
 
   gauge_param.ga_pad = 0;
@@ -75,13 +75,9 @@ void init() {
   // inv_param.sp_pad = 24*24*12;
   // inv_param.cl_pad = 24*24*12;
 
-  if (test_type == 2) {
-    inv_param.dirac_order = QUDA_DIRAC_ORDER;
-    inv_param.solution_type = QUDA_MAT_SOLUTION;
-  } else {
-    inv_param.dirac_order = QUDA_DIRAC_ORDER;
-    inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  }
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  if (test_type == 2) inv_param.solution_type = QUDA_MAT_SOLUTION;
+  else inv_param.solution_type = QUDA_MATPC_SOLUTION;
 
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
@@ -123,7 +119,7 @@ void init() {
   csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
   csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
-  csParam.create = QUDA_NULL_CREATE;
+  csParam.create = QUDA_ZERO_CREATE;
   
   spinor = cpuColorSpinorField(csParam);
   spinorOut = cpuColorSpinorField(csParam);
@@ -132,7 +128,7 @@ void init() {
   csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
   csParam.x[0] = gauge_param.X[0];
   
-  printf("Randomizing fields... ");
+  printfQuda("Randomizing fields...\n");
 
   construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
   spinor.Source(QUDA_RANDOM_SOURCE);
@@ -147,18 +143,18 @@ void init() {
       construct_clover_field(hostCloverInv, norm, diag, inv_param.clover_cpu_prec);
     }
   }
-  printf("done.\n"); fflush(stdout);
+  printfQuda("done.\n"); fflush(stdout);
   
   int dev = 0;
   initQuda(dev);
 
-  std::cout << "Sending gauge field to GPU" << std::endl; fflush(stdout);
+  printfQuda("Sending gauge field to GPU\n");
 
   loadGaugeQuda(hostGauge, &gauge_param);
   gauge = cudaGaugePrecise;
 
   if (clover_yes) {
-  std::cout << "Sending clover field to GPU" << std::endl; fflush(stdout);
+    printfQuda("Sending clover field to GPU\n");
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
     clover = cudaCloverPrecise;
     cloverInv = cudaCloverInvPrecise;
@@ -176,7 +172,9 @@ void init() {
       csParam.x[0] /= 2;
     }
 
-    cudaSpinor = cudaColorSpinorField(csParam);    
+    printfQuda("Creating cudaSpinor\n");
+    cudaSpinor = cudaColorSpinorField(csParam);
+    printfQuda("Creating cudaSpinorOut\n");
     cudaSpinorOut = cudaColorSpinorField(csParam);
 
     if (test_type == 2) csParam.x[0] /= 2;
@@ -184,8 +182,9 @@ void init() {
     csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
     tmp = cudaColorSpinorField(csParam);
 
-    std::cout << "Sending spinor field to GPU" << std::endl; fflush(stdout);
+    printfQuda("Sending spinor field to GPU\n");
     cudaSpinor = spinor;
+
     std::cout << "Source: CPU = " << norm2(spinor) << ", CUDA = " << norm2(cudaSpinor) << std::endl;
   } else {
     std::cout << "Source: CPU = " << norm2(spinor) << std::endl;
@@ -215,7 +214,7 @@ double dslashCUDA() {
 
   // execute kernel
   const int LOOPS = 1;
-  printf("Executing %d kernel loops...", LOOPS);
+  printfQuda("Executing %d kernel loops...\n", LOOPS);
   fflush(stdout);
   stopwatchStart();
   for (int i = 0; i < LOOPS; i++) {

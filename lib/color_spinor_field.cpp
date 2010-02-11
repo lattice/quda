@@ -5,12 +5,12 @@ ColorSpinorField::ColorSpinorField() : init(false) {
 
 }
 
-ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false) {
+ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0) {
   create(param.nDim, param.x, param.nColor, param.nSpin, param.precision, param.pad, 
 	 param.fieldType, param.fieldSubset, param.subsetOrder, param.fieldOrder, param.basis);
 }
 
-ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : init(false) {
+ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : init(false), even(0), odd(0) {
   create(field.nDim, field.x, field.nColor, field.nSpin, field.precision, field.pad,
 	 field.type, field.subset, field.subset_order, field.order, field.basis);
 }
@@ -35,7 +35,12 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
     volume *= x[d];
   }
   pad = Pad;
-  stride = volume + pad;
+  
+  if (subset == QUDA_FULL_FIELD_SUBSET) {
+    stride = volume + 2*pad; // padding is based on half volume
+  } else {
+    stride = volume + pad;
+  }
 
   length = stride*nColor*nSpin*2;
   real_length = volume*nColor*nSpin*2;
@@ -70,15 +75,12 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.nSpin != 0) nSpin = param.nSpin;
 
   if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
-  if (param.nDim != 0 && nDim != param.nDim) nDim = param.nDim;
+  if (param.nDim != 0) nDim = param.nDim;
 
-  // only check the that the first dimension is non-zero
-  if (param.x[0] != 0) {
-    volume = 1;
-    for (int d=0; d<nDim; d++) {
-      x[d] = param.x[d];
-      volume *= x[d];
-    }
+  volume = 1;
+  for (int d=0; d<nDim; d++) {
+    if (param.x[0] != 0) x[d] = param.x[d];
+    volume *= x[d];
   }
   
   if (param.pad != 0) pad = param.pad;
@@ -95,6 +97,8 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.fieldOrder != QUDA_INVALID_ORDER) order = param.fieldOrder;
 
   if (param.basis != QUDA_INVALID_BASIS) basis = param.basis;
+
+  if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 }
 
 // Fills the param with the contents of this field

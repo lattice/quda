@@ -2,7 +2,7 @@
 #define __SHORT_QUDA_H
 
 #define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.0)
+#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
 
 template <typename Float>

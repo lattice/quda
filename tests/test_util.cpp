@@ -445,7 +445,7 @@ template <typename Float>
 static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   int fail_check = 17;
-  int fail[fail_check];
+  int *fail = new int[fail_check];
   int iter[18];
   for (int i=0; i<fail_check; i++) fail[i] = 0;
   for (int i=0; i<18; i++) iter[i] = 0;
@@ -469,6 +469,8 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
   for (int f=0; f<fail_check; f++) {
     printf("%e Failures = %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], V*4*18, fail[f] / (double)(4*V*18));
   }
+
+  delete []fail;
 
 }
 

@@ -297,6 +297,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   cpuColorSpinorField hIn(cpuParam);
  
   cudaColorSpinorField in(hIn, cudaParam);
+
   cudaParam.create = QUDA_NULL_CREATE;
   cudaColorSpinorField out(in, cudaParam);
   cudaColorSpinorField tmp;
@@ -340,9 +341,6 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
   cudaColorSpinorField out(in, cudaParam);
   cudaColorSpinorField tmp;
 
-  in = hIn;
-  std::cout << norm2(in) << " " << norm2(hIn) << std::endl;
-
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param);
   if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
@@ -357,8 +355,6 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
   out.saveCPUSpinorField(hOut);// since this is a reference this won't work: hOut = out;
-
-  std::cout << norm2(out) << " " << norm2(hOut) << std::endl;
 }
 
 void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)

@@ -156,7 +156,7 @@ void cudaColorSpinorField::create(const FieldCreate create) {
     even = new cudaColorSpinorField(*this, param);
     odd = new cudaColorSpinorField(*this, param);
     // need this hackery for the moment (need to locate the odd pointer half way into the full field)
-    (dynamic_cast<cudaColorSpinorField*>(odd))->v = param.v = (void*)((unsigned long)v + bytes/2);
+    (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((unsigned long)v + bytes/2);
     if (precision == QUDA_HALF_PRECISION) 
       (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
   }
@@ -239,6 +239,9 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
     copy(tmp);
     return;
   }
+
+  // (temporary?) bug fix for padding
+  memset(buffer, 0, bufferBytes);
 
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (src.precision == QUDA_DOUBLE_PRECISION) {
@@ -327,6 +330,9 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
     tmp.saveCPUSpinorField(dest);
     return;
   }
+
+  // (temporary?) bug fix for padding
+  memset(buffer, 0, bufferBytes);
 
   cudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
 
