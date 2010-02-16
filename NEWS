@@ -1,9 +1,15 @@
+Version 0.2.2 - 16 February 2009
+
+- Fixed a bug that prevented reductions (and hence the inverter) from working
+  correctly in emulation mode.
+
+
 Version 0.2.1 - 8 February 2010
 
-- Fixed bug that would sometimes cause the inverter to fail when spinor
+- Fixed a bug that would sometimes cause the inverter to fail when spinor
   padding is enabled.
 
-- Improved performance of the half and double precision blas routines.
+- Significantly improved performance of the blas routines.
 
 
 Version 0.2 - 16 December 2009
