@@ -1,5 +1,6 @@
 #include <color_spinor_field.h>
 #include <string.h>
+#include <iostream>
 
 ColorSpinorField::ColorSpinorField() : init(false) {
 
@@ -36,7 +37,7 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
   }
   pad = Pad;
   
-  if (subset == QUDA_FULL_FIELD_SUBSET) {
+  if (Subset == QUDA_FULL_FIELD_SUBSET) {
     stride = volume + 2*pad; // padding is based on half volume
   } else {
     stride = volume + pad;
