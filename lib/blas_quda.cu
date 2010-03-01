@@ -1180,10 +1180,11 @@ __global__ void axpyZpbxSKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float 
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
     Float2 x_i = read_Float2(x, i);
+    Float2 z_i = read_Float2(z, i);
     y[i].x += a*x_i.x;
     y[i].y += a*x_i.y;
-    x[i].x = z[i].x + b*x_i.x;
-    x[i].y = z[i].y + b*x_i.y;
+    x[i].x = z_i.x + b*x_i.x;
+    x[i].y = z_i.y + b*x_i.y;
     i += gridSize;
   }
 }
@@ -1224,9 +1225,11 @@ void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField
     int spinor_bytes = x.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
     cudaBindTexture(0, zTexDouble2, z.v, spinor_bytes); 
-    axpyZpbxDKernel<<<blasGrid, blasBlock>>>(a, (double2*)x.v, (double2*)y.v, (double2*)z.v, b, x.length/2);
+    axpyZpbxDKernel<<<blasGrid, blasBlock>>>
+      (a, (double2*)x.v, (double2*)y.v, (double2*)z.v, b, x.length/2);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpyZpbxSKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.v, (float2*)y.v, (float2*)z.v, (float)b, x.length/2);
+    axpyZpbxSKernel<<<blasGrid, blasBlock>>>
+      ((float)a, (float2*)x.v, (float2*)y.v, (float2*)z.v, (float)b, x.length/2);
   } else {
     if (x.subset == QUDA_FULL_FIELD_SUBSET) {
       axpyZpbxCuda(a, x.Even(), y.Even(), z.Even(), b);

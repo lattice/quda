@@ -145,9 +145,8 @@
 #define RECONSTRUCT_MATRIX_8_SINGLE(dir)				\
   float row_sum = g01_re*g01_re + g01_im*g01_im;			\
   row_sum += g02_re*g02_re + g02_im*g02_im;				\
-  float u0 = (dir < 6 ? anisotropy_f : (ga_idx >= (X4-1)*X1h*X2*X3 ? t_boundary_f : 1)); \
-  float u02_inv = __fdividef(1.f, u0*u0);				\
-  float column_sum = u02_inv - row_sum;					\
+  float2 u0_2 = (dir < 6 ? An2 : (ga_idx >= (X4-1)*X1h*X2*X3 ? TB2 : No2)); \
+  float column_sum = u0_2.y - row_sum;					\
   float U00_mag = column_sum * rsqrtf((column_sum > 0 ? column_sum : 1e14)); \
   __sincosf(g21_re, &g00_im, &g00_re);					\
   g00_re *= U00_mag;							\
@@ -155,13 +154,13 @@
   column_sum += g10_re*g10_re;						\
   column_sum += g10_im*g10_im;						\
   __sincosf(g21_im, &g20_im, &g20_re);					\
-  column_sum = u02_inv - column_sum;					\
+  column_sum = u0_2.y - column_sum;					\
   float U20_mag = column_sum * rsqrtf((column_sum > 0 ? column_sum : 1e14)); \
   g20_re *= U20_mag;							\
   g20_im *= U20_mag;							\
-  float r_inv2 = __fdividef(1.0f, u0*row_sum);				\
+  float r_inv2 = __fdividef(1.0f, u0_2.x*row_sum);			\
   COMPLEX_DOT_PRODUCT(A, g00, g10);					\
-  A_re *= u0; A_im *= u0;						\
+  A_re *= u0_2.x; A_im *= u0_2.x;					\
   COMPLEX_CONJUGATE_PRODUCT(g11, g20, g02);				\
   ACC_COMPLEX_PROD(g11, A, g01);					\
   g11_re *= -r_inv2;							\
@@ -171,7 +170,7 @@
   g12_re *= r_inv2;							\
   g12_im *= r_inv2;							\
   COMPLEX_DOT_PRODUCT(A, g00, g20);					\
-  A_re *= u0; A_im *= u0;						\
+  A_re *= u0_2.x; A_im *= u0_2.x;					\
   COMPLEX_CONJUGATE_PRODUCT(g21, g10, g02);				\
   ACC_COMPLEX_PROD(g21, -A, g01);					\
   g21_re *= r_inv2;							\

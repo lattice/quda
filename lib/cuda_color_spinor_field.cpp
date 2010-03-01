@@ -174,6 +174,7 @@ void cudaColorSpinorField::destroy() {
       delete even;
       delete odd;
     }
+    init = false;
   }
 }
 

@@ -59,6 +59,7 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
 }
 
 void ColorSpinorField::destroy() {
+  init = false;
 }
 
 ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {

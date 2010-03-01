@@ -110,7 +110,10 @@ void cpuColorSpinorField::create(const FieldCreate create) {
 
 void cpuColorSpinorField::destroy() {
 
-  if (init) free(v);
+  if (init) {
+    free(v);
+    init = false;
+  }
 
 }
 

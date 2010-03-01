@@ -106,6 +106,13 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   float t_bc_f = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary_f", &(t_bc_f), sizeof(float));
 
+  float2 An2 = make_float2(gauge.anisotropy, 1.0 / (gauge.anisotropy*gauge.anisotropy));
+  cudaMemcpyToSymbol("An2", &(An2), sizeof(float2));
+  float2 TB2 = make_float2(t_bc_f, 1.0 / (t_bc_f * t_bc_f));
+  cudaMemcpyToSymbol("TB2", &(TB2), sizeof(float2));
+  float2 No2 = make_float2(1.0, 1.0);
+  cudaMemcpyToSymbol("No2", &(No2), sizeof(float2));
+
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
 

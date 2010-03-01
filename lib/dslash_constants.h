@@ -32,3 +32,7 @@ __constant__ float pi_f;
 // double precision constants
 __constant__ double anisotropy;
 __constant__ double t_boundary;
+
+__constant__ float2 An2;
+__constant__ float2 TB2;
+__constant__ float2 No2;
