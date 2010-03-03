@@ -1,0 +1,22 @@
+Features
+========
+
+
+
+
+Structure
+=========
+
+
+
+
+Optimizations
+=============
+
+Reductions are accelerated if registers are used while local (see
+reduce_core and reduce_complex_core).  However, this causes register
+spillage for half precision caxpbypzYmbwcDotProductWYNormY slowing it
+down, so this isn't implemented in the reduce_triple_core.  Perhaps
+use shared memory for this kernel to reduce registers?
+
+
