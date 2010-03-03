@@ -51,15 +51,6 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
     errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
   }
 
-#if (__CUDA_ARCH__ != 130)
-  if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    errorQuda("Double precision not supported on this GPU");
-  }
-
-  if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-    errorQuda("Double precision not supported on this GPU");
-  }
-#endif
 }
 
 void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {

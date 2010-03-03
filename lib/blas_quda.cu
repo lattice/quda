@@ -58,6 +58,44 @@ double3 operator+(const double3& x, const double3 &y) {
   return z;
 }
 
+__device__ float2 operator*(const float a, const float2 x) {
+  float2 y;
+  y.x = a*x.x;
+  y.y = a*x.y;
+  return y;
+}
+
+template <typename Float2>
+__device__ Float2 operator+(const Float2 x, const Float2 y) {
+  Float2 z;
+  z.x = x.x + y.x;
+  z.y = x.y + y.y;
+  return z;
+}
+
+template <typename Float2>
+__device__ Float2 operator+=(Float2 &x, const Float2 y) {
+  x.x += y.x;
+  x.y += y.y;
+  return x;
+}
+
+template <typename Float2>
+__device__ Float2 operator-=(Float2 &x, const Float2 y) {
+  x.x -= y.x;
+  x.y -= y.y;
+  return x;
+}
+
+template <typename Float, typename Float2>
+__device__ Float2 operator*=(Float2 &x, const Float a) {
+  x.x *= a;
+  x.y *= a;
+  return x;
+}
+
+
+
 void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 
 void initBlas(void)
@@ -539,7 +577,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 
   setBlock(0, dst.stride, dst.Precision());
 
-  blas_quda_bytes += src.real_length*(src.precision + dst.precision);
+  blas_quda_bytes += src.real_length*((int)src.precision + (int)dst.precision);
 
   if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
     convertDSKernel<<<blasGrid, blasBlock>>>((double2*)dst.v, (float4*)src.v, src.stride);
@@ -571,8 +609,8 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 }
 
 
-template <typename Float>
-__global__ void axpbyKernel(Float a, Float *x, Float b, Float *y, int length) {
+template <typename Float, typename Float2>
+__global__ void axpbyKernel(Float a, Float2 *x, Float b, Float2 *y, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < length) {
@@ -606,7 +644,7 @@ void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaCo
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     axpbyKernel<<<blasGrid, blasBlock>>>(a, (double*)x.v, b, (double*)y.v, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpbyKernel<<<blasGrid, blasBlock>>>((float)a, (float*)x.v, (float)b, (float*)y.v, x.length);
+    axpbyKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.v, (float)b, (float2*)y.v, x.length/2);
   } else {
     if (x.subset == QUDA_FULL_FIELD_SUBSET) {
       axpbyCuda(a, x.Even(), b, y.Even());
@@ -661,7 +699,7 @@ void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     xpyKernel<<<blasGrid, blasBlock>>>((double*)x.v, (double*)y.v, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    xpyKernel<<<blasGrid, blasBlock>>>((float*)x.v, (float*)y.v, x.length);
+    xpyKernel<<<blasGrid, blasBlock>>>((float2*)x.v, (float2*)y.v, x.length/2);
   } else {
     if (x.subset == QUDA_FULL_FIELD_SUBSET) {
       xpyCuda(x.Even(), y.Even());
@@ -680,8 +718,8 @@ void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   blas_quda_flops += x.real_length;
 }
 
-template <typename Float>
-__global__ void axpyKernel(Float a, Float *x, Float *y, int len) {
+template <typename Float, typename Float2>
+__global__ void axpyKernel(Float a, Float2 *x, Float2 *y, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
@@ -715,7 +753,7 @@ void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y)
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     axpyKernel<<<blasGrid, blasBlock>>>(a, (double*)x.v, (double*)y.v, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    axpyKernel<<<blasGrid, blasBlock>>>((float)a, (float*)x.v, (float*)y.v, x.length);
+    axpyKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.v, (float2*)y.v, x.length/2);
   } else {
     if (x.subset == QUDA_FULL_FIELD_SUBSET) {
       axpyCuda(a, x.Even(), y.Even());
@@ -734,8 +772,8 @@ void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y)
   blas_quda_flops += 2*x.real_length;
 }
 
-template <typename Float>
-__global__ void xpayKernel(Float *x, Float a, Float *y, int len) {
+template <typename Float, typename Float2>
+__global__ void xpayKernel(Float2 *x, Float a, Float2 *y, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
@@ -769,7 +807,7 @@ void xpayCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y)
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     xpayKernel<<<blasGrid, blasBlock>>>((double*)x.v, a, (double*)y.v, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    xpayKernel<<<blasGrid, blasBlock>>>((float*)x.v, (float)a, (float*)y.v, x.length);
+    xpayKernel<<<blasGrid, blasBlock>>>((float2*)x.v, (float)a, (float2*)y.v, x.length/2);
   } else {
     if (x.subset == QUDA_FULL_FIELD_SUBSET) {
       xpayCuda(x.Even(), a, y.Even());
@@ -824,7 +862,7 @@ void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     mxpyKernel<<<blasGrid, blasBlock>>>((double*)x.v, (double*)y.v, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    mxpyKernel<<<blasGrid, blasBlock>>>((float*)x.v, (float*)y.v, x.length);
+    mxpyKernel<<<blasGrid, blasBlock>>>((float2*)x.v, (float2*)y.v, x.length/2);
   } else {
     if (x.subset == QUDA_FULL_FIELD_SUBSET) {
       mxpyCuda(x.Even(), y.Even());
@@ -843,23 +881,12 @@ void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   blas_quda_flops += x.real_length;
 }
 
-template <typename Float>
-__global__ void axKernel(Float a, Float *x, int len) {
+template <typename Float, typename Float2>
+__global__ void axKernel(Float a, Float2 *x, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
     x[i] *= a;
-    i += gridSize;
-  } 
-}
-
-template <typename Float, typename Float2>
-__global__ void ax2Kernel(Float a, Float2 *x, int len) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    x[i].x *= a;
-    x[i].y *= a;
     i += gridSize;
   } 
 }
@@ -883,7 +910,7 @@ void axCuda(const double &a, cudaColorSpinorField &x) {
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     axKernel<<<blasGrid, blasBlock>>>(a, (double*)x.v, x.length);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
-    ax2Kernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.v, x.length/2);
+    axKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.v, x.length/2);
   } else {
     if (x.subset == QUDA_FULL_FIELD_SUBSET) {
       axCuda(a, x.Even());
