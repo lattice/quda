@@ -1,6 +1,6 @@
 ###### Local configuration:
 
-CUDA_INSTALL_PATH = /usr/local/cuda
+CUDA_INSTALL_PATH = /usr/local/cuda-3.0
 
 CPU_ARCH = x86_64   # x86 or x86_64
 GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
@@ -32,5 +32,5 @@ CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
 CXX = g++
 CXXFLAGS = -Wall -O3 $(COPT) $(INC)
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) --ptxas-options=-v -D__CUDA_ARCH__=130
 LDFLAGS = -fPIC $(LIB)
