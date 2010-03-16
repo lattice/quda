@@ -408,7 +408,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   param->gflops = 0;
   param->iter = 0;
 
-  //FullSpinor b, x;
   ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X); // wrong dimensions
   cpuParam.fieldSubset = param->solution_type == QUDA_MATPC_SOLUTION ? 
     QUDA_PARITY_FIELD_SUBSET : QUDA_FULL_FIELD_SUBSET;
@@ -416,6 +415,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   cpuColorSpinorField h_b(cpuParam);
   cudaColorSpinorField b(h_b, cudaParam); // download source
+
+  std::cout << "CPU source = " << norm2(h_b) << ", cuda copy = " << norm2(b) << std::endl;
+
   cudaParam.create = QUDA_NULL_CREATE;
   cudaColorSpinorField x(b, cudaParam); // solution
   cudaColorSpinorField tmp(b, cudaParam); // temporary
@@ -425,6 +427,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // set the Dirac operator parameters
   DiracParam diracParam;
   setDiracParam(diracParam, param);
+  diracParam.verbose = QUDA_VERBOSE;
   if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
     tmp = cudaColorSpinorField(in, cudaParam);
     diracParam.tmp = &tmp;
@@ -438,6 +441,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   massRescale(diracParam.kappa, param->solution_type, param->mass_normalization, out);
 
   dirac->Prepare(in, out, x, b, param->solution_type);
+  std::cout << "Source preparation complete " << norm2(in) << std::endl;
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:

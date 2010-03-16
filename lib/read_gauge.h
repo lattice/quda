@@ -143,19 +143,21 @@
   g22_im *= -r_inv2;	
 
 // use __saturate ?
+//  float U00_mag = sqrtf(__saturatef(column_sum));			\
+//  float U20_mag = sqrtf(__saturatef(column_sum));			\
 
 #define RECONSTRUCT_MATRIX_8_SINGLE(dir)				\
   float row_sum = g01_re*g01_re + g01_im*g01_im;			\
   row_sum += g02_re*g02_re + g02_im*g02_im;				\
+  __sincosf(g21_re, &g00_im, &g00_re);					\
+  __sincosf(g21_im, &g20_im, &g20_re);					\
   float2 u0_2 = (dir < 6 ? An2 : (ga_idx >= X4X3X2X1hmX3X2X1h ? TB2 : No2)); \
   float column_sum = u0_2.y - row_sum;					\
   float U00_mag = column_sum * rsqrtf((column_sum > 0 ? column_sum : 1e14)); \
-  __sincosf(g21_re, &g00_im, &g00_re);					\
   g00_re *= U00_mag;							\
   g00_im *= U00_mag;							\
   column_sum += g10_re*g10_re;						\
   column_sum += g10_im*g10_im;						\
-  __sincosf(g21_im, &g20_im, &g20_re);					\
   column_sum = u0_2.y - column_sum;					\
   float U20_mag = column_sum * rsqrtf((column_sum > 0 ? column_sum : 1e14)); \
   g20_re *= U20_mag;							\

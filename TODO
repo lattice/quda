@@ -1,14 +1,17 @@
 Features
 ========
 
-
+Staggered operator.
+Domain wall operator.
 
 
 Structure
 =========
 
-
-
+The use of QUDA_REFERENCE_CREATE to create ColorSpinorFields that
+refer to others is far from perfect.  In particular, a
+ColorSpinorField should know when it is a reference, and this should
+be a distinct case from when a ColorSpinorField is not initialized.
 
 Optimizations
 =============

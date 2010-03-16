@@ -118,26 +118,26 @@
 
 
 #define WRITE_SPINOR_DOUBLE2()					   \
-  g_out[0*(sp_stride)+sid] = make_double2(o00_re, o00_im);	   \
-  g_out[1*(sp_stride)+sid] = make_double2(o01_re, o01_im);	   \
-  g_out[2*(sp_stride)+sid] = make_double2(o02_re, o02_im);	   \
-  g_out[3*(sp_stride)+sid] = make_double2(o10_re, o10_im);	   \
-  g_out[4*(sp_stride)+sid] = make_double2(o11_re, o11_im);	   \
-  g_out[5*(sp_stride)+sid] = make_double2(o12_re, o12_im);	   \
-  g_out[6*(sp_stride)+sid] = make_double2(o20_re, o20_im);	   \
-  g_out[7*(sp_stride)+sid] = make_double2(o21_re, o21_im);	   \
-  g_out[8*(sp_stride)+sid] = make_double2(o22_re, o22_im);	   \
-  g_out[9*(sp_stride)+sid] = make_double2(o30_re, o30_im);	   \
-  g_out[10*(sp_stride)+sid] = make_double2(o31_re, o31_im);	   \
-  g_out[11*(sp_stride)+sid] = make_double2(o32_re, o32_im);		 
+  out[0*(sp_stride)+sid] = make_double2(o00_re, o00_im);	   \
+  out[1*(sp_stride)+sid] = make_double2(o01_re, o01_im);	   \
+  out[2*(sp_stride)+sid] = make_double2(o02_re, o02_im);	   \
+  out[3*(sp_stride)+sid] = make_double2(o10_re, o10_im);	   \
+  out[4*(sp_stride)+sid] = make_double2(o11_re, o11_im);	   \
+  out[5*(sp_stride)+sid] = make_double2(o12_re, o12_im);	   \
+  out[6*(sp_stride)+sid] = make_double2(o20_re, o20_im);	   \
+  out[7*(sp_stride)+sid] = make_double2(o21_re, o21_im);	   \
+  out[8*(sp_stride)+sid] = make_double2(o22_re, o22_im);	   \
+  out[9*(sp_stride)+sid] = make_double2(o30_re, o30_im);	   \
+  out[10*(sp_stride)+sid] = make_double2(o31_re, o31_im);	   \
+  out[11*(sp_stride)+sid] = make_double2(o32_re, o32_im);		 
 
-#define WRITE_SPINOR_FLOAT4()					          \
-  g_out[0*(sp_stride)+sid] = make_float4(o00_re, o00_im, o01_re, o01_im); \
-  g_out[1*(sp_stride)+sid] = make_float4(o02_re, o02_im, o10_re, o10_im); \
-  g_out[2*(sp_stride)+sid] = make_float4(o11_re, o11_im, o12_re, o12_im); \
-  g_out[3*(sp_stride)+sid] = make_float4(o20_re, o20_im, o21_re, o21_im); \
-  g_out[4*(sp_stride)+sid] = make_float4(o22_re, o22_im, o30_re, o30_im); \
-  g_out[5*(sp_stride)+sid] = make_float4(o31_re, o31_im, o32_re, o32_im);
+#define WRITE_SPINOR_FLOAT4()						\
+  out[0*(sp_stride)+sid] = make_float4(o00_re, o00_im, o01_re, o01_im); \
+  out[1*(sp_stride)+sid] = make_float4(o02_re, o02_im, o10_re, o10_im); \
+  out[2*(sp_stride)+sid] = make_float4(o11_re, o11_im, o12_re, o12_im); \
+  out[3*(sp_stride)+sid] = make_float4(o20_re, o20_im, o21_re, o21_im); \
+  out[4*(sp_stride)+sid] = make_float4(o22_re, o22_im, o30_re, o30_im); \
+  out[5*(sp_stride)+sid] = make_float4(o31_re, o31_im, o32_re, o32_im);
 
 #define WRITE_SPINOR_SHORT4()						\
   float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));			\
@@ -163,7 +163,7 @@
   c2 = fmaxf(c4, c5);							\
   c0 = fmaxf(c0, c1);							\
   c0 = fmaxf(c0, c2);							\
-  c[sid] = c0;								\
+  outNorm[sid] = c0;							\
   float scale = __fdividef(MAX_SHORT, c0);				\
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale;	\
@@ -171,12 +171,12 @@
   o20_re *= scale; o20_im *= scale; o21_re *= scale; o21_im *= scale;	\
   o22_re *= scale; o22_im *= scale; o30_re *= scale; o30_im *= scale;	\
   o31_re *= scale; o31_im *= scale; o32_re *= scale; o32_im *= scale;	\
-  g_out[sid+0*(sp_stride)] = make_short4((short)o00_re, (short)o00_im, (short)o01_re, (short)o01_im); \
-  g_out[sid+1*(sp_stride)] = make_short4((short)o02_re, (short)o02_im, (short)o10_re, (short)o10_im); \
-  g_out[sid+2*(sp_stride)] = make_short4((short)o11_re, (short)o11_im, (short)o12_re, (short)o12_im); \
-  g_out[sid+3*(sp_stride)] = make_short4((short)o20_re, (short)o20_im, (short)o21_re, (short)o21_im); \
-  g_out[sid+4*(sp_stride)] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
-  g_out[sid+5*(sp_stride)] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
+  out[sid+0*(sp_stride)] = make_short4((short)o00_re, (short)o00_im, (short)o01_re, (short)o01_im); \
+  out[sid+1*(sp_stride)] = make_short4((short)o02_re, (short)o02_im, (short)o10_re, (short)o10_im); \
+  out[sid+2*(sp_stride)] = make_short4((short)o11_re, (short)o11_im, (short)o12_re, (short)o12_im); \
+  out[sid+3*(sp_stride)] = make_short4((short)o20_re, (short)o20_im, (short)o21_re, (short)o21_im); \
+  out[sid+4*(sp_stride)] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
+  out[sid+5*(sp_stride)] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
 
 /*
 #define WRITE_SPINOR_FLOAT1_SMEM() \
@@ -186,7 +186,7 @@
   int f = SHARED_FLOATS_PER_THREAD; \
   __syncthreads(); \
   for (int i = 0; i < 6; i++) for (int c = 0; c < 4; c++) \
-      ((float*)g_out)[i*(Vh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
+      ((float*)out)[i*(Vh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
 
 // the alternative to writing float4's directly: almost as fast, a lot more confusing
 #define WRITE_SPINOR_FLOAT1_STAGGERED() \
@@ -196,7 +196,7 @@
   int f = SHARED_FLOATS_PER_THREAD; \
   __syncthreads(); \
   for (int i = 0; i < 4; i++) for (int c = 0; c < 4; c++) \
-      ((float*)g_out)[i*(Vh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4]; \
+      ((float*)out)[i*(Vh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4]; \
   __syncthreads(); \
   s[0] = o22_re; \
   s[1] = o22_im; \
@@ -208,6 +208,6 @@
   s[7] = o32_im; \
   __syncthreads(); \
   for (int i = 0; i < 2; i++) for (int c = 0; c < 4; c++) \
-    ((float*)g_out)[(i+4)*(Vh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
+    ((float*)out)[(i+4)*(Vh*4) + b*(B*4) + c*(B) + t] = s_data[(c*B/4 + t/4)*(f) + i*(4) + t%4];
 */
 

@@ -100,13 +100,14 @@ extern "C" {
     ParitySpinor odd;
     ParitySpinor even;
     } FullSpinor;*/
-  
+
+  /*  
   typedef struct double3_s {
     double x;
     double y;
     double z;
   } double3;
-
+  */
 #ifdef __cplusplus
 }
 #endif

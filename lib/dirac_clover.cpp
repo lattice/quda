@@ -54,15 +54,8 @@ void DiracClover::cloverApply(cudaColorSpinorField &out, const FullClover &clove
   if (!initDslash) initDslashConstants(gauge, in.stride, clover.even.stride);
   checkParitySpinor(in, out, clover);
 
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    cloverDCuda((double2*)out.v, gauge, clover, (double2*)in.v, parity, out.volume, out.length);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    cloverSCuda((float4*)out.v, gauge, clover, (float4*)in.v, parity, out.volume, out.length);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    cloverHCuda((short4*)out.v, (float*)out.norm, gauge, clover, (short4*)in.v, 
-		(float*)in.norm, parity, out.volume, out.length);
-  }
-  checkCudaError();
+  cloverCuda(out.v, gauge, clover, in.v, parity, in.volume, in.length,
+	      out.norm, in.norm, in.Precision());
 
   flops += 504*in.volume;
 }
@@ -150,17 +143,8 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkParitySpinor(in, out, cloverInv);
 
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    cloverDslashDCuda((double2*)out.v, gauge, cloverInv, (double2*)in.v, parity, dagger,
-		      out.volume, out.length);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashSCuda((float4*)out.v, gauge, cloverInv, (float4*)in.v, parity, dagger,
-		      out.volume, out.length);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    cloverDslashHCuda((short4*)out.v, (float*)out.norm, gauge, cloverInv, (short4*)in.v, 
-		      (float*)in.norm, parity, dagger, out.volume, out.length);
-  }
-  checkCudaError();
+  cloverDslashCuda(out.v, gauge, cloverInv, in.v, parity, dagger, out.volume, 
+		   out.length, out.norm, in.norm, in.Precision());
 
   flops += (1320+504)*in.volume;
 }
@@ -173,18 +157,8 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkParitySpinor(in, out, cloverInv);
 
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    cloverDslashXpayDCuda((double2*)out.v, gauge, cloverInv, (double2*)in.v, parity, 
-			  dagger, (double2*)x.v, k, out.volume, out.length);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashXpaySCuda((float4*)out.v, gauge, cloverInv, (float4*)in.v, parity, 
-			  dagger, (float4*)x.v, k, out.volume, out.length);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    cloverDslashXpayHCuda((short4*)out.v, (float*)out.norm, gauge, cloverInv, 
-			  (short4*)in.v, (float*)in.norm, parity, dagger, 
-			  (short4*)x.v, (float*)x.norm, k, out.volume, out.length);
-  }
-  checkCudaError();
+  cloverDslashXpayCuda(out.v, gauge, cloverInv, in.v, parity, dagger, x.v, k, 
+		       out.volume, out.length, out.norm, in.norm, x.norm, in.Precision());
 
   flops += (1320+504+48)*in.volume;
 }

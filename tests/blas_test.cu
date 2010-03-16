@@ -75,12 +75,18 @@ void init()
 
   // turn off error checking in blas kernels
   setBlasTuning(1);
+
 }
 
 
 void end()
 {
   // release memory
+  v.~cudaColorSpinorField();
+  w.~cudaColorSpinorField();
+  x.~cudaColorSpinorField();
+  y.~cudaColorSpinorField();
+  z.~cudaColorSpinorField();
 
 }
 
@@ -270,7 +276,14 @@ int main(int argc, char** argv)
     "caxpbypzYmbwcDotProductWYNormYQuda"
   };
   
-  for (prec = 0; prec < 3; prec++) {
+  // Only benchmark double precision if supported
+#if (__CUDA_ARCH__ >= 130)
+  int Nprec = 3;
+#else
+  int Nprec = 2;
+#endif
+
+  for (prec = 0; prec < Nprec; prec++) {
 
     init();
 

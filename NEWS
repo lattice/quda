@@ -6,8 +6,6 @@ Version 0.3 - alpha
 
 - Promoted the Dirac operators to classes.
 
-- Introduced lots of bugs
-
 - Blas performance improvements and slightly faster 8 reconstruction
   (single and half)
 

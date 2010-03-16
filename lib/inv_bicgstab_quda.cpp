@@ -70,7 +70,6 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
 
   blas_quda_flops = 0;
-  dslash_quda_flops = 0;
 
   stopwatchStart();
 
@@ -153,7 +152,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
   
   invert_param->secs += stopwatchReadSeconds();
   
-  float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
+  float gflops = (blas_quda_flops + dirac.Flops() + diracSloppy.Flops())*1e-9;
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;
   invert_param->iter += k;

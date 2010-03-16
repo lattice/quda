@@ -54,26 +54,26 @@ void init() {
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_YES;
 
   inv_param.kappa = kappa;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
-  inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
 
   gauge_param.ga_pad = 0;
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
   gauge_param.ga_pad = 24*24*12;
-  //inv_param.sp_pad = 24*24*12;
-  // inv_param.cl_pad = 24*24*12;
+  inv_param.sp_pad = 24*24*12;
+  inv_param.cl_pad = 24*24*12;
 
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   if (test_type == 2) inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -162,7 +162,7 @@ void init() {
 
   if (!transfer) {
     csParam.fieldType = QUDA_CUDA_FIELD;
-    csParam.fieldOrder = QUDA_FLOAT4_ORDER;
+    csParam.fieldOrder = QUDA_FLOAT2_ORDER;
     csParam.basis = QUDA_UKQCD_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;

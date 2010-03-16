@@ -39,9 +39,12 @@ cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
 // creates a copy of src, any differences defined in param
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
   ColorSpinorField(src), v(0), norm(0), init(false) {  
-  if (param.create != QUDA_REFERENCE_CREATE || // can only overide if we are not using a reference or parity special case
-      (param.create == QUDA_REFERENCE_CREATE && src.fieldSubset() == QUDA_FULL_FIELD_SUBSET && 
-       param.fieldSubset == QUDA_PARITY_FIELD_SUBSET && src.fieldType() == QUDA_CUDA_FIELD) ) {
+// can only overide if we are not using a reference or parity special case
+  if (param.create != QUDA_REFERENCE_CREATE || 
+      (param.create == QUDA_REFERENCE_CREATE && 
+       src.fieldSubset() == QUDA_FULL_FIELD_SUBSET && 
+       param.fieldSubset == QUDA_PARITY_FIELD_SUBSET && 
+       src.fieldType() == QUDA_CUDA_FIELD) ) {
     reset(param);
   } else {
     errorQuda("Undefined behaviour"); // else silent bug possible?

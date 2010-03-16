@@ -64,16 +64,16 @@ void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpin
 Dirac* Dirac::create(const DiracParam &param) {
 
   if (param.type == QUDA_WILSON_DIRAC) {
-    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator");
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator\n");
     return new DiracWilson(param);
   } else if (param.type == QUDA_WILSONPC_DIRAC) {
-    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracWilsonPC operator");
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracWilsonPC operator\n");
     return new DiracWilsonPC(param);
   } else if (param.type == QUDA_CLOVER_DIRAC) {
-    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracClover operator");
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracClover operator\n");
     return new DiracClover(param);
   } else if (param.type == QUDA_CLOVERPC_DIRAC) {
-    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator");
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
     return new DiracCloverPC(param);
   } else {
     return 0;

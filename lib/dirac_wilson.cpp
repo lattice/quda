@@ -30,15 +30,8 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
 
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    dslashDCuda((double2*)out.v, gauge, (double2*)in.v, parity, dagger, out.volume, out.length);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    dslashSCuda((float4*)out.v, gauge, (float4*)in.v, parity, dagger, out.volume, out.length);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    dslashHCuda((short4*)out.v, (float*)out.norm, gauge, (short4*)in.v, (float*)in.norm, 
-		parity, dagger, out.volume, out.length);
-  }
-  checkCudaError();
+  dslashCuda(out.v, gauge, in.v, parity, dagger, out.volume, 
+	     out.length, out.norm, in.norm, in.Precision());
 
   flops += 1320*in.volume;
 }
@@ -50,17 +43,8 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
 
-  if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    dslashXpayDCuda((double2*)out.v, gauge, (double2*)in.v, parity, dagger, (double2*)x.v, k,
-		    out.volume, out.length);
-  } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-    dslashXpaySCuda((float4*)out.v, gauge, (float4*)in.v, parity, dagger, (float4*)x.v, k,
-		    out.volume, out.length);
-  } else if (in.Precision() == QUDA_HALF_PRECISION) {
-    dslashXpayHCuda((short4*)out.v, (float*)out.norm, gauge, (short4*)in.v, (float*)in.norm, 
-		    parity, dagger, (short4*)x.v, (float*)x.norm, k, out.volume, out.length);
-  }
-  checkCudaError();
+  dslashXpayCuda(out.v, gauge, in.v, parity, dagger, x.v, k, out.volume, out.length, 
+		 out.norm, in.norm, x.norm, in.Precision());
 
   flops += (1320+48)*in.volume;
 }

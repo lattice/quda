@@ -66,6 +66,8 @@ class Dirac {
 
   // Dirac operator factory
   static Dirac* create(const DiracParam &param);
+
+  unsigned long long Flops() { unsigned long long rtn = flops; flops = 0; return rtn; }
 };
 
 // Full Wilson

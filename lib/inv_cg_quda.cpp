@@ -117,13 +117,12 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
     printfQuda("Reliable updates = %d\n", rUpdate);
 
-  float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
+  float gflops = (blas_quda_flops + dirac.Flops() + diracSloppy.Flops())*1e-9;
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops = gflops;
   invert_param->iter = k;
 
   blas_quda_flops = 0;
-  dslash_quda_flops = 0;
 
 #if 0
   // Calculate the true residual

@@ -36,3 +36,95 @@ __constant__ double t_boundary;
 __constant__ float2 An2;
 __constant__ float2 TB2;
 __constant__ float2 No2;
+
+int initDslash = 0;
+
+void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
+  int Vh = gauge.volume;
+  cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
+
+  cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));  
+
+  int ga_stride = gauge.stride;
+  cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
+
+  cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
+
+  if (Vh%BLOCK_DIM != 0) {
+    errorQuda("Error, Volume not a multiple of the thread block size");
+  }
+
+  int X1 = 2*gauge.X[0];
+  cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
+
+  int X2 = gauge.X[1];
+  cudaMemcpyToSymbol("X2", &X2, sizeof(int));  
+
+  int X3 = gauge.X[2];
+  cudaMemcpyToSymbol("X3", &X3, sizeof(int));  
+
+  int X4 = gauge.X[3];
+  cudaMemcpyToSymbol("X4", &X4, sizeof(int));  
+
+  int X2X1 = X2*X1;
+  cudaMemcpyToSymbol("X2X1", &X2X1, sizeof(int));  
+
+  int X3X2X1 = X3*X2*X1;
+  cudaMemcpyToSymbol("X3X2X1", &X3X2X1, sizeof(int));  
+
+  int X1h = X1/2;
+  cudaMemcpyToSymbol("X1h", &X1h, sizeof(int));  
+
+  int X1m1 = X1 - 1;
+  cudaMemcpyToSymbol("X1m1", &X1m1, sizeof(int));  
+
+  int X2m1 = X2 - 1;
+  cudaMemcpyToSymbol("X2m1", &X2m1, sizeof(int));  
+
+  int X3m1 = X3 - 1;
+  cudaMemcpyToSymbol("X3m1", &X3m1, sizeof(int));  
+
+  int X4m1 = X4 - 1;
+  cudaMemcpyToSymbol("X4m1", &X4m1, sizeof(int));  
+  
+  int X2X1mX1 = X2X1 - X1;
+  cudaMemcpyToSymbol("X2X1mX1", &X2X1mX1, sizeof(int));  
+
+  int X3X2X1mX2X1 = X3X2X1 - X2X1;
+  cudaMemcpyToSymbol("X3X2X1mX2X1", &X3X2X1mX2X1, sizeof(int));  
+
+  int X4X3X2X1mX3X2X1 = (X4-1)*X3X2X1;
+  cudaMemcpyToSymbol("X4X3X2X1mX3X2X1", &X4X3X2X1mX3X2X1, sizeof(int));  
+
+  int X4X3X2X1hmX3X2X1h = (X4-1)*X3*X2*X1h;
+  cudaMemcpyToSymbol("X4X3X2X1hmX3X2X1h", &X4X3X2X1hmX3X2X1h, sizeof(int));  
+
+  int gf = (gauge.gauge_fixed == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
+  cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
+
+  cudaMemcpyToSymbol("anisotropy", &(gauge.anisotropy), sizeof(double));
+
+  double t_bc = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+  cudaMemcpyToSymbol("t_boundary", &(t_bc), sizeof(double));
+
+  float anisotropy_f = gauge.anisotropy;
+  cudaMemcpyToSymbol("anisotropy_f", &(anisotropy_f), sizeof(float));
+
+  float t_bc_f = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+  cudaMemcpyToSymbol("t_boundary_f", &(t_bc_f), sizeof(float));
+
+  float2 An2 = make_float2(gauge.anisotropy, 1.0 / (gauge.anisotropy*gauge.anisotropy));
+  cudaMemcpyToSymbol("An2", &(An2), sizeof(float2));
+  float2 TB2 = make_float2(t_bc_f, 1.0 / (t_bc_f * t_bc_f));
+  cudaMemcpyToSymbol("TB2", &(TB2), sizeof(float2));
+  float2 No2 = make_float2(1.0, 1.0);
+  cudaMemcpyToSymbol("No2", &(No2), sizeof(float2));
+
+  float h_pi_f = M_PI;
+  cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
+
+  checkCudaError();
+
+  initDslash = 1;
+}
+

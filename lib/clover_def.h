@@ -13,20 +13,21 @@
 
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#define DD_PARAM2 int oddBit
+#define DD_PARAM4 int oddBit
 #else            // xpay
 #define DD_XPAY_F Xpay
 #if (DD_SPREC == 0)
-#define DD_PARAM2 int oddBit, double a
+#define DD_PARAM4 int oddBit, double a
 #else
-#define DD_PARAM2 int oddBit, float a
+#define DD_PARAM4 int oddBit, float a
 #endif
 #define DSLASH_XPAY
 #endif
 
 #if (DD_SPREC==0) // double-precision spinor field
 #define DD_SPREC_F D
-#define DD_PARAM1 double2* g_out
+#define DD_PARAM1 double2* out, float *null1
+#define DD_PARAM3 double2* in, float *null3
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define SPINORTEX spinorTexDouble
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
@@ -37,7 +38,8 @@
 #endif
 #elif (DD_SPREC==1) // single-precision spinor field
 #define DD_SPREC_F S
-#define DD_PARAM1 float4* g_out
+#define DD_PARAM1 float4* out, float *null1
+#define DD_PARAM3 float4* in, float *null3
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define SPINORTEX spinorTexSingle
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
@@ -49,7 +51,8 @@
 #define DD_SPREC_F H
 #define READ_SPINOR READ_SPINOR_HALF
 #define SPINORTEX spinorTexHalf
-#define DD_PARAM1 short4* g_out, float *c
+#define DD_PARAM1 short4* out, float *outNorm
+#define DD_PARAM3 short4* in, float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #if (DD_XPAY==1)
 #define ACCUMTEX accumTexHalf
@@ -59,29 +62,33 @@
 
 #if (DD_CPREC==0) // double-precision clover term
 #define DD_CPREC_F D
+#define DD_PARAM2 double2* clover, float *null
 #define CLOVERTEX cloverTexDouble
 #define READ_CLOVER READ_CLOVER_DOUBLE
 #define CLOVER_DOUBLE
 #elif (DD_CPREC==1) // single-precision clover term
 #define DD_CPREC_F S
+#define DD_PARAM2 float4* clover, float *null
 #define CLOVERTEX cloverTexSingle
 #define READ_CLOVER READ_CLOVER_SINGLE
 #else               // half-precision clover term
 #define DD_CPREC_F H
+#define DD_PARAM2 short4* clover, float *cloverNorm
 #define CLOVERTEX cloverTexHalf
 #define READ_CLOVER READ_CLOVER_HALF
 #endif
 
-#define DD_CONCAT(s,c,x) clover ## s ## c ## x ## Kernel
+//#define DD_CONCAT(s,c,x) clover ## s ## c ## x ## Kernel
+#define DD_CONCAT(s,c,x) clover ## x ## Kernel
 #define DD_FUNC(s,c,x) DD_CONCAT(s,c,x)
 
 // define the kernel
-
 #if !(__CUDA_ARCH__ != 130 && (DD_SPREC == 0 || DD_CPREC == 0))
 
-__global__ void
-DD_FUNC(DD_SPREC_F, DD_CPREC_F, DD_XPAY_F)(DD_PARAM1, DD_PARAM2) {
+__global__ void DD_FUNC(DD_SPREC_F, DD_CPREC_F, DD_XPAY_F)(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
 #include "clover_core.h"
+
 }
 
 #endif
@@ -93,6 +100,8 @@ DD_FUNC(DD_SPREC_F, DD_CPREC_F, DD_XPAY_F)(DD_PARAM1, DD_PARAM2) {
 #undef DD_XPAY_F
 #undef DD_PARAM1
 #undef DD_PARAM2
+#undef DD_PARAM3
+#undef DD_PARAM4
 #undef DD_CONCAT
 #undef DD_FUNC
 
