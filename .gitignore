@@ -1,0 +1,11 @@
+# We build in source so ignore .o files
+*.o
+
+#Ignore the built lib
+lib/libquda.a
+
+#Ignore the make.inc, just keep track of make.inc.example
+make.inc
+
+#ignore test executables
+tests/*_test
