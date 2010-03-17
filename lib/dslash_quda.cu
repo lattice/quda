@@ -29,368 +29,231 @@ __global__ dslashKernel(sFloat *out, gFloat *gauge, sFloat *in, int parity, floa
 template <QudaReconstructType reconType, typename sFloat, typename gFloat>
 __global__ dslashDaggerKernel(sFloat *out, gFloat *gauge, sFloat *in, int parity, float *outNorm, float *inNorm);*/
 
+// Wilson wrappers
 template <int spinorN, typename spinorFloat, typename gaugeFloat>
-void dslashCuda(spinorFloat *out, gaugeFloat *gauge0, gaugeFloat *gauge1, 
-		QudaReconstructType reconstruct, spinorFloat *in, 
-		int parity, int dagger, int volume, int length, 
-		float *outNorm, float *inNorm) {
+void dslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat *gauge0, const gaugeFloat *gauge1, 
+		const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
+		const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
+		const double &a, const int volume, const int length) {
 
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm);
+  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
 
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    if (!dagger) {
-      dslash12Kernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+  if (x==0) { // not doing xpay
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	dslash12Kernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+      } else {
+	dslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+      }
     } else {
-      dslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+      if (!dagger) {
+	dslash8Kernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+      } else {
+	dslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+      }
     }
-  } else {
-    if (!dagger) {
-      dslash8Kernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
-    } else {
-      dslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+  } else { // doing xpay
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	dslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
+      } else {
+	dslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+      if (!dagger) {
+	dslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
+      } else {
+	dslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
+      }
     }
   }
   
 }
 
 template <int spinorN, typename spinorFloat>
-void dslashCuda(spinorFloat *out, FullGauge gauge, spinorFloat *in, int parity, int dagger,
-		int volume, int length, float *outNorm, float *inNorm) {
+void dslashCuda(spinorFloat *out, float *outNorm, const FullGauge gauge, const spinorFloat *in, 
+		const float *inNorm, const int parity, const int dagger, const spinorFloat *x,
+		const float *xNorm, const double &a, const int volume, const int length) {
 
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
-    dslashCuda<spinorN>(out, (double2*)gauge0, (double2*)gauge1, gauge.reconstruct, in, parity, 
-			dagger, volume, length, outNorm, inNorm);
+    dslashCuda<spinorN>(out, outNorm, (double2*)gauge0, (double2*)gauge1, gauge.reconstruct,
+			in, inNorm, parity, dagger, x, xNorm, a, volume, length);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
-    dslashCuda<spinorN>(out, (float4*)gauge0, (float4*)gauge1, gauge.reconstruct, in, parity, 
-			dagger, volume, length, outNorm, inNorm);
+    dslashCuda<spinorN>(out, outNorm, (float4*)gauge0, (float4*)gauge1, gauge.reconstruct, 
+			in, inNorm, parity, dagger, x, xNorm, a, volume, length);
   } else {
-    dslashCuda<spinorN>(out, (short4*)gauge0, (short4*)gauge1, gauge.reconstruct, in, parity, 
-			dagger, volume, length, outNorm, inNorm);
+    dslashCuda<spinorN>(out, outNorm, (short4*)gauge0, (short4*)gauge1, gauge.reconstruct, 
+			in, inNorm, parity, dagger, x, xNorm, a, volume, length);
   }
 
 }
 
-void dslashCuda(void *out, FullGauge gauge, void *in, int parity, int dagger,
-		int volume, int length, void *outNorm, void *inNorm, const QudaPrecision precision) {
+void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, const void *inNorm, 
+		const int parity, const int dagger, const void *x, const void *xNorm, 
+		const double k, const int volume, const int length, const QudaPrecision precision) {
 
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
-    dslashCuda<2>((double2*)out, gauge, (double2*)in, parity, dagger, volume, length,
-		  (float*)0, (float*)0);
+    dslashCuda<2>((double2*)out, (float*)outNorm, gauge, (double2*)in, (float*)inNorm, 
+		  parity, dagger, (double2*)x, (float*)xNorm, k, volume, length);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
-    dslashCuda<4>((float4*)out, gauge, (float4*)in, parity, dagger, volume, length,
-		  (float*)0, (float*)0);
+    dslashCuda<4>((float4*)out, (float*)outNorm, gauge, (float4*)in, (float*)inNorm, 
+		  parity, dagger, (float4*)x, (float*)xNorm, k, volume, length);
   } else if (precision == QUDA_HALF_PRECISION) {
-    dslashCuda<4>((short4*)out, gauge, (short4*)in, parity, dagger, volume, length,
-		  (float*)outNorm, (float*)inNorm);
-  }
-
-}
-
-template <int spinorN, typename spinorFloat, typename gaugeFloat>
-void dslashXpayCuda(spinorFloat *out, gaugeFloat *gauge0, gaugeFloat *gauge1, 
-		QudaReconstructType reconstruct, spinorFloat *in, 
-		int parity, int dagger, spinorFloat *x, double a, 
-		int volume, int length,  float *outNorm, 
-		float *inNorm, float *xNorm) {
-
-  dim3 gridDim(volume/BLOCK_DIM, 1, 1);
-  dim3 blockDim(BLOCK_DIM, 1, 1);
-    
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
-
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    if (!dagger) {
-      dslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
-    } else {
-      dslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
-    }
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    if (!dagger) {
-      dslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
-    } else {
-      dslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	(out, outNorm, gauge0, gauge1, in, inNorm, parity, a);
-    }
-  }
-}
-
-
-template <int spinorN, typename spinorFloat>
-void dslashXpayCuda(spinorFloat *out, FullGauge gauge, spinorFloat *in, int parity, 
-		    int dagger, spinorFloat *x, double a, int volume, int length, 
-		    float *outNorm, float *inNorm, float *xNorm) {
-
-  void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-  if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
-    dslashXpayCuda<spinorN>(out, (double2*)gauge0, (double2*)gauge1, gauge.reconstruct, in, parity, 
-			    dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
-  } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
-    dslashXpayCuda<spinorN>(out, (float4*)gauge0, (float4*)gauge1, gauge.reconstruct, in, parity, 
-			    dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-  } else {
-    dslashXpayCuda<spinorN>(out, (short4*)gauge0, (short4*)gauge1, gauge.reconstruct, in, parity, 
-			    dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-  }
-
-}
-
-void dslashXpayCuda(void *out, FullGauge gauge, void *in, int parity, int dagger,
-		    void *x, double k, int volume, int length, void *outNorm, 
-		    void *inNorm, void *xNorm, QudaPrecision precision) {
-
-  if (precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
-    dslashXpayCuda<2>((double2*)out, gauge, (double2*)in, parity, dagger, (double2*)x, k,
-		      volume, length, (float*)0, (float*)0, (float*)0);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
-  } else if (precision == QUDA_SINGLE_PRECISION) {
-    dslashXpayCuda<4>((float4*)out, gauge, (float4*)in, parity, dagger, (float4*)x, k,
-		      volume, length, (float*)0, (float*)0, (float*)0);
-  } else if (precision == QUDA_HALF_PRECISION) {
-    dslashXpayCuda<4>((short4*)out, gauge, (short4*)in, parity, dagger, (short4*)x, k,
-		      volume, length, (float*)outNorm, (float*)inNorm, (float*)xNorm);
+    dslashCuda<4>((short4*)out, (float*)outNorm, gauge, (short4*)in, (float*)inNorm, 
+		  parity, dagger, (short4*)x, (float*)xNorm, k, volume, length);
   }
   checkCudaError();
 
 }
 
-
+// Clover wrappers
 template <int N, typename spinorFloat, typename cloverFloat, typename gaugeFloat>
-void cloverDslashCuda(spinorFloat *out, gaugeFloat gauge0, gaugeFloat gauge1, 
-		      QudaReconstructType reconstruct, cloverFloat *clover, float *cloverNorm, 
-		      spinorFloat *in, int parity, int dagger, int volume, int length, 
-		      float *outNorm, float *inNorm)
+void cloverDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0, 
+		      const gaugeFloat gauge1, const QudaReconstructType reconstruct, 
+		      const cloverFloat *clover, const float *cloverNorm, const spinorFloat *in, 
+		      const float* inNorm, const int parity, const int dagger, const spinorFloat *x, 
+		      const float* xNorm, const double &a, const int volume, const int length)
 {
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm);
+  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm, x, xNorm);
 
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    if (!dagger) {
-      dslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
-    } else {
-      dslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
- 	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+  if (x==0) { // not xpay
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	dslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+      } else {
+	dslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+      }
+      if (!dagger) {
+	dslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 	
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+      } else {
+	dslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+      }
     }
-    if (!dagger) {
-      dslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 	
-	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
-    } else {
-      dslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
-	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+  } else { // doing xpay
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	dslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
+      } else {
+	dslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
+      }
+      if (!dagger) {
+	dslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 	
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
+      } else {
+	dslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
+      }
     }
   }
 
 }
 
 template <int N, typename spinorFloat, typename cloverFloat>
-void cloverDslashCuda(spinorFloat *out, FullGauge gauge, cloverFloat *clover, float *cloverNorm, 
-		      spinorFloat *in, int parity, int dagger, int volume, int length, 
-		      float *outNorm, float *inNorm)
+void cloverDslashCuda(spinorFloat *out, float *outNorm, const FullGauge gauge, const cloverFloat *clover,
+		      const float *cloverNorm, const spinorFloat *in, const float *inNorm, const int parity, 
+		      const int dagger, const spinorFloat *x, const float *xNorm, const double &a, 
+		      const int volume, const int length)
 {
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
-    cloverDslashCuda<N>(out, (double2*)gauge0, (double2*)gauge1, gauge.reconstruct, 
-			clover, cloverNorm, in, parity, dagger, volume, length,
-			outNorm, inNorm);
+    cloverDslashCuda<N>(out, outNorm, (double2*)gauge0, (double2*)gauge1, gauge.reconstruct, 
+			clover, cloverNorm, in, inNorm, parity, dagger, x, xNorm, a, volume, length);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashCuda<N>(out, (float4*)gauge0, (float4*)gauge1, gauge.reconstruct, 
-			clover, cloverNorm, in, parity, dagger, volume, length,
-			outNorm, inNorm);
+    cloverDslashCuda<N>(out, outNorm, (float4*)gauge0, (float4*)gauge1, gauge.reconstruct, 
+			clover, cloverNorm, in, inNorm, parity, dagger, x, xNorm, a, volume, length);
   } else {
-    cloverDslashCuda<N>(out, (short4*)gauge0, (short4*)gauge1, gauge.reconstruct, 
-			clover, cloverNorm, in, parity, dagger, volume, length, 
-			outNorm, inNorm);
+    cloverDslashCuda<N>(out, outNorm, (short4*)gauge0, (short4*)gauge1, gauge.reconstruct, 
+			clover, cloverNorm, in, inNorm, parity, dagger, x, xNorm, a, volume, length);
   }
 }
 
 template <int N, typename spinorFloat>
-void cloverDslashCuda(spinorFloat *out, FullGauge gauge, FullClover cloverInv, 
-		      spinorFloat *in, int parity, int dagger, int volume, int length, 
-		      float *outNorm, float *inNorm) {
-
+void cloverDslashCuda(spinorFloat *out, float *outNorm, const FullGauge gauge, 
+		      const FullClover cloverInv, const spinorFloat *in, const float *inNorm,
+		      const int parity, const int dagger, const spinorFloat *x, const float *xNorm,
+		      const double &a, const int volume, const int length) {
+  
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
-    cloverDslashCuda<N>(out, gauge, (double2*)cloverP, (float*)cloverNormP, in, parity, 
-			dagger, volume, length, outNorm, inNorm);
+    cloverDslashCuda<N>(out, outNorm, gauge, (double2*)cloverP, (float*)cloverNormP, in, 
+			inNorm, parity, dagger, x, xNorm, a, volume, length);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
-    cloverDslashCuda<N>(out, gauge, (float4*)cloverP, (float*)cloverNormP, in, parity, 
-			dagger, volume, length, outNorm, inNorm);
+    cloverDslashCuda<N>(out, outNorm, gauge, (float4*)cloverP, (float*)cloverNormP, in,
+			inNorm, parity, dagger, x, xNorm, a, volume, length);
   } else {
-    cloverDslashCuda<N>(out, gauge, (short4*)cloverP, (float*)cloverNormP, in, parity, 
-			dagger, volume, length, outNorm, inNorm);
+    cloverDslashCuda<N>(out, outNorm, gauge, (short4*)cloverP, (float*)cloverNormP, in, 
+			inNorm, parity, dagger, x, xNorm, a, volume, length);
   }
 
 }
 
-void cloverDslashCuda(void *out, FullGauge gauge, FullClover cloverInv, void *in, 
-		      int parity, int dagger, int volume, int length, 
-		      void *outNorm, void *inNorm, const QudaPrecision precision) {
+void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover cloverInv,
+		      const void *in, const void *inNorm, const int parity, const int dagger, 
+		      const void *x, const void *xNorm, const double a, const int volume, 
+		      const int length, const QudaPrecision precision) {
 
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
-    cloverDslashCuda<2>((double2*)out, gauge, cloverInv, (double2*)in, parity, dagger,
-			volume, length, (float*)0, (float*)0);
+    cloverDslashCuda<2>((double2*)out, (float*)outNorm, gauge, cloverInv, (double2*)in, (float*)inNorm, 
+			parity, dagger, (double2*)x, (float*)xNorm, a, volume, length);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashCuda<4>((float4*)out, gauge, cloverInv, (float4*)in, parity, dagger,
-			volume, length, (float*)0, (float*)0);
+    cloverDslashCuda<4>((float4*)out, (float*)outNorm, gauge, cloverInv, (float4*)in, (float*)inNorm, 
+			parity, dagger, (float4*)x, (float*)xNorm, a, volume, length);
   } else if (precision == QUDA_HALF_PRECISION) {
-    cloverDslashCuda<4>((short4*)out, gauge, cloverInv, (short4*)in, parity, dagger,
-			volume, length, (float*)outNorm, (float*)inNorm);
-  }
-  checkCudaError();
-
-}
-
-template <int N, typename spinorFloat, typename cloverFloat, typename gaugeFloat>
-void cloverDslashXpayCuda(spinorFloat *out, gaugeFloat gauge0, gaugeFloat gauge1, 
-			  QudaReconstructType reconstruct, cloverFloat *clover, float *cloverNorm, 
-			  spinorFloat *in, int parity, int dagger, spinorFloat *x, double a, 
-			  int volume, int length, float *outNorm, float *inNorm, float *xNorm)
-{
-  dim3 gridDim(volume/BLOCK_DIM, 1, 1);
-  dim3 blockDim(BLOCK_DIM, 1, 1);
-
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm);
-
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    if (!dagger) {
-      dslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
-    } else {
-      dslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
- 	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
-    }
-    if (!dagger) {
-      dslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 	
-	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
-    } else {
-      dslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	(out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, a);
-    }
-  }
-
-}
-
-template <int N, typename spinorFloat, typename cloverFloat>
-void cloverDslashXpayCuda(spinorFloat *out, FullGauge gauge, cloverFloat *clover, float *cloverNorm, 
-			  spinorFloat *in, int parity, int dagger, spinorFloat *x, double a, 
-			  int volume, int length, float *outNorm, float *inNorm, float *xNorm)
-{
-  void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-  if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
-    cloverDslashXpayCuda<N>(out, (double2*)gauge0, (double2*)gauge1, gauge.reconstruct, clover, cloverNorm, in, 
-			    parity, dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
-  } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashXpayCuda<N>(out, (float4*)gauge0, (float4*)gauge1, gauge.reconstruct, clover, cloverNorm, in, 
-			    parity, dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-  } else {
-    cloverDslashXpayCuda<N>(out, (short4*)gauge0, (short4*)gauge1, gauge.reconstruct, clover, cloverNorm, in, 
-			    parity, dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-  }
-}
-
-template <int N, typename spinorFloat>
-void cloverDslashXpayCuda(spinorFloat *out, FullGauge gauge, FullClover cloverInv, spinorFloat *in, 
-			  int parity, int dagger, spinorFloat *x, double a, int volume, int length, 
-			  float *outNorm, float *inNorm, float *xNorm) {
-
-  void *cloverP, *cloverNormP;
-  QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
-
-  if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
-    cloverDslashXpayCuda<N>(out, gauge, (double2*)cloverP, (float*)cloverNormP, in, parity, 
-			    dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
-  } else if (clover_prec == QUDA_SINGLE_PRECISION) {
-    cloverDslashXpayCuda<N>(out, gauge, (float4*)cloverP, (float*)cloverNormP, in, parity, 
-			    dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-  } else {
-    cloverDslashXpayCuda<N>(out, gauge, (short4*)cloverP, (float*)cloverNormP, in, parity,
-			    dagger, x, a, volume, length, outNorm, inNorm, xNorm);
-  }
-
-}
-
-void cloverDslashXpayCuda(void *out, FullGauge gauge, FullClover cloverInv, void *in, 
-			  int parity, int dagger, void *x, double a, int volume, 
-			  int length, void *outNorm, void *inNorm, void *xNorm,
-			  const QudaPrecision precision) {
-
-  if (precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
-    cloverDslashXpayCuda<2>((double2*)out, gauge, cloverInv, (double2*)in, parity, 
-			    dagger, (double2*)x, a, volume, length, (float*)0, (float*)0, (float*)0);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
-  } else if (precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashXpayCuda<4>((float4*)out, gauge, cloverInv, (float4*)in, parity, 
-			    dagger, (float4*)x, a, volume, length, (float*)0, (float*)0, (float*)0);
-  } else if (precision == QUDA_HALF_PRECISION) {
-    cloverDslashXpayCuda<4>((short4*)out, gauge, cloverInv, (short4*)in, parity, dagger, 
-			    (short4*)x, a, volume, length, 
-			    (float*)outNorm, (float*)inNorm, (float*)xNorm);
+    cloverDslashCuda<4>((short4*)out, (float*)outNorm, gauge, cloverInv, (short4*)in, (float*)inNorm, 
+			parity, dagger, (short4*)x, (float*)xNorm, a, volume, length);
   }
   checkCudaError();
 
 }
 
 
-template <int N, typename FloatN>
-void cloverCuda(FloatN *out, float *outNorm, FullGauge gauge, FullClover clover, 
-		FloatN *in, float *inNorm, int parity, int volume, int length)
+template <int N, typename spinorFloat>
+void cloverCuda(spinorFloat *out, float *outNorm, const FullGauge gauge, const FullClover clover, 
+		const spinorFloat *in, const float *inNorm, const int parity, 
+		const int volume, const int length)
 {
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -415,9 +278,9 @@ void cloverCuda(FloatN *out, float *outNorm, FullGauge gauge, FullClover clover,
   }
 }
 
-void cloverCuda(void *out, FullGauge gauge, FullClover clover, 
-		void *in, int parity, int volume, int length, 
-		void *outNorm, void *inNorm, const QudaPrecision precision) {
+void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover clover, 
+		const void *in, const void *inNorm, const int parity, const int volume,
+		const int length, const QudaPrecision precision) {
 
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)

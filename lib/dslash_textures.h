@@ -38,7 +38,8 @@ texture<float4, 1, cudaReadModeElementType> accumTexSingle;
 texture<short4, 1, cudaReadModeNormalizedFloat> accumTexHalf;
 texture<float, 1, cudaReadModeElementType> accumTexNorm;
 
-static void bindGaugeTex(FullGauge gauge, int oddBit, void **gauge0, void **gauge1) {
+static void bindGaugeTex(const FullGauge gauge, const int oddBit, 
+			 void **gauge0, void **gauge1) {
   if(oddBit) {
     *gauge0 = gauge.odd;
     *gauge1 = gauge.even;
@@ -59,20 +60,21 @@ static void bindGaugeTex(FullGauge gauge, int oddBit, void **gauge0, void **gaug
   }
 }
 
-template <int N, typename FloatN>
-  int bindSpinorTex(int length, FloatN *in, float *inNorm, FloatN *x=0, float *xNorm=0) {
+template <int N, typename spinorFloat>
+  int bindSpinorTex(const int length, const spinorFloat *in, const float *inNorm,
+		    const spinorFloat *x=0, const float *xNorm=0) {
 
-  if (N==2 && sizeof(FloatN) == sizeof(double2)) {
+  if (N==2 && sizeof(spinorFloat) == sizeof(double2)) {
     int spinor_bytes = length*sizeof(double);
     cudaBindTexture(0, spinorTexDouble, in, spinor_bytes); 
     if (x) cudaBindTexture(0, accumTexDouble, x, spinor_bytes); 
     return sizeof(double);
-  } else if (N==4 && sizeof(FloatN) == sizeof(float4)) {
+  } else if (N==4 && sizeof(spinorFloat) == sizeof(float4)) {
     int spinor_bytes = length*sizeof(float);
     cudaBindTexture(0, spinorTexSingle, in, spinor_bytes); 
     if (x) cudaBindTexture(0, accumTexSingle, x, spinor_bytes); 
     return sizeof(float);
-  } else if (N==4 && sizeof(FloatN) == sizeof(short4)) {
+  } else if (N==4 && sizeof(spinorFloat) == sizeof(short4)) {
     int spinor_bytes = length*sizeof(short);
     cudaBindTexture(0, spinorTexHalf, in, spinor_bytes); 
     if (inNorm) cudaBindTexture(0, spinorTexNorm, inNorm, spinor_bytes/12); 
@@ -96,7 +98,7 @@ texture<float4, 1, cudaReadModeElementType> cloverTexSingle;
 texture<short4, 1, cudaReadModeNormalizedFloat> cloverTexHalf;
 texture<float, 1, cudaReadModeElementType> cloverTexNorm;
 
-static QudaPrecision bindCloverTex(FullClover clover, int oddBit, 
+static QudaPrecision bindCloverTex(const FullClover clover, const int oddBit, 
 				   void **cloverP, void **cloverNormP) {
 
   if (oddBit) {

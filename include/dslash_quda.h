@@ -15,27 +15,22 @@ extern "C" {
 
   // plain wilson
   
-  void dslashCuda(void *out, FullGauge gauge, void *in, int parity, int dagger,
-		  int volume, int length, void *outNorm, void *inNorm, const QudaPrecision precision);
-
-  void dslashXpayCuda(void *out, FullGauge gauge, void *in, int parity, int dagger,
-		      void *x, double k, int volume, int length, void *outNorm, 
-		      void *inNorm, void *xNorm, const QudaPrecision precision);
+  void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 
+		  const void *inNorm, const int parity, const int dagger, 
+		  const void *x, const void *xNorm, const double k,
+		  const int volume, const int length, const QudaPrecision precision);
 
   // clover dslash
 
-  void cloverDslashCuda(void *out, FullGauge gauge, FullClover cloverInv, void *in, 
-			int oddBit, int daggerBit, int volume, int length, 
-			void *outNorm, void *inNorm, const QudaPrecision precision);
-
-  void cloverDslashXpayCuda(void *out, FullGauge gauge, FullClover cloverInv, void *in, 
-			    int oddBit, int daggerBit, void *x, double a, int volume,
-			    int length, void *outNorm, void *inNorm, void *xNorm,
-			    const QudaPrecision);
+  void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, 
+			const FullClover cloverInv, const void *in, const void *inNorm,
+			const int oddBit, const int daggerBit, const void *x, const void *xNorm,
+			const double k, const int volume, const int length, const QudaPrecision precision);
 
   // solo clover term
-  void cloverCuda(void *out, FullGauge gauge, FullClover clover, void *in, int oddBit,
-		  int volume, int length, void *outNorm, void *inNorm, const QudaPrecision precision);
+  void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover clover, 
+		  const void *in, const void *inNorm, const int oddBit, const int volume, 
+		  const int length, const QudaPrecision precision);
 
 #ifdef __cplusplus
 }

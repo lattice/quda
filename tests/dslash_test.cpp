@@ -45,7 +45,7 @@ void init() {
   gauge_param.X[0] = 24;
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 64;
+  gauge_param.X[3] = 16;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -58,7 +58,7 @@ void init() {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_YES;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.kappa = kappa;
 

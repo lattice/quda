@@ -62,15 +62,15 @@
 #if (DD_RECON==0) // reconstruct from 8 reals
 #define DD_RECON_F 8
 #if (DD_GPREC==0)
-#define DD_PARAM2 double2 *gauge0, double2 *gauge1
+#define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_DOUBLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_DOUBLE
 #elif (DD_GPREC==1)
-#define DD_PARAM2 float4 *gauge0, float4 *gauge1
+#define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_SINGLE
 #else
-#define DD_PARAM2 short4 *gauge0, short4* gauge1
+#define DD_PARAM2 const short4 *gauge0, const short4* gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
 #endif
@@ -79,13 +79,13 @@
 #if (DD_GPREC==0)
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_DOUBLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_DOUBLE
-#define DD_PARAM2 double2 *gauge0, double2 *gauge1
+#define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 #elif (DD_GPREC==1)
-#define DD_PARAM2 float4 *gauge0, float4 *gauge1
+#define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SINGLE
 #else
-#define DD_PARAM2 short4 *gauge0, short4 *gauge1
+#define DD_PARAM2 const short4 *gauge0, const short4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SINGLE
 #endif
@@ -109,7 +109,7 @@
 #if (DD_SPREC==0) // double-precision spinor field
 #define DD_SPREC_F D
 #define DD_PARAM1 double2* out, float *null1
-#define DD_PARAM4 double2* in, float *null4
+#define DD_PARAM4 const double2* in, const float *null4
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
@@ -123,7 +123,7 @@
 #elif (DD_SPREC==1) // single-precision spinor field
 #define DD_SPREC_F S
 #define DD_PARAM1 float4* out, float *null1
-#define DD_PARAM4 float4* in, float *null4
+#define DD_PARAM4 const float4* in, const float *null4
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
@@ -140,7 +140,7 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
 #define SPINORTEX spinorTexHalf
 #define DD_PARAM1 short4* out, float *outNorm
-#define DD_PARAM4 short4* in, float *inNorm
+#define DD_PARAM4 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #if (DD_XPAY==1)
 #define ACCUMTEX accumTexHalf
@@ -150,20 +150,20 @@
 
 #if (DD_CPREC==0) // double-precision clover term
 #define DD_CPREC_F D
-#define DD_PARAM3 double2 *clover, float *null3,
+#define DD_PARAM3 const double2 *clover, const float *null3,
 #define CLOVERTEX cloverTexDouble
 #define READ_CLOVER READ_CLOVER_DOUBLE
 #define DSLASH_CLOVER
 #define CLOVER_DOUBLE
 #elif (DD_CPREC==1) // single-precision clover term
 #define DD_CPREC_F S
-#define DD_PARAM3 float4 *clover, float *null3,
+#define DD_PARAM3 const float4 *clover, const float *null3,
 #define CLOVERTEX cloverTexSingle
 #define READ_CLOVER READ_CLOVER_SINGLE
 #define DSLASH_CLOVER
 #elif (DD_CPREC==2) // half-precision clover term
 #define DD_CPREC_F H
-#define DD_PARAM3 short4 *clover, float *cloverNorm,
+#define DD_PARAM3 const short4 *clover, const float *cloverNorm,
 #define CLOVERTEX cloverTexHalf
 #define READ_CLOVER READ_CLOVER_HALF
 #define DSLASH_CLOVER

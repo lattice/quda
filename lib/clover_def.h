@@ -27,7 +27,7 @@
 #if (DD_SPREC==0) // double-precision spinor field
 #define DD_SPREC_F D
 #define DD_PARAM1 double2* out, float *null1
-#define DD_PARAM3 double2* in, float *null3
+#define DD_PARAM3 const double2* in, const float *null3
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define SPINORTEX spinorTexDouble
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
@@ -39,7 +39,7 @@
 #elif (DD_SPREC==1) // single-precision spinor field
 #define DD_SPREC_F S
 #define DD_PARAM1 float4* out, float *null1
-#define DD_PARAM3 float4* in, float *null3
+#define DD_PARAM3 const float4* in, const float *null3
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define SPINORTEX spinorTexSingle
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
@@ -52,7 +52,7 @@
 #define READ_SPINOR READ_SPINOR_HALF
 #define SPINORTEX spinorTexHalf
 #define DD_PARAM1 short4* out, float *outNorm
-#define DD_PARAM3 short4* in, float *inNorm
+#define DD_PARAM3 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #if (DD_XPAY==1)
 #define ACCUMTEX accumTexHalf
@@ -62,18 +62,18 @@
 
 #if (DD_CPREC==0) // double-precision clover term
 #define DD_CPREC_F D
-#define DD_PARAM2 double2* clover, float *null
+#define DD_PARAM2 const double2* clover, const float *null
 #define CLOVERTEX cloverTexDouble
 #define READ_CLOVER READ_CLOVER_DOUBLE
 #define CLOVER_DOUBLE
 #elif (DD_CPREC==1) // single-precision clover term
 #define DD_CPREC_F S
-#define DD_PARAM2 float4* clover, float *null
+#define DD_PARAM2 const float4* clover, const float *null
 #define CLOVERTEX cloverTexSingle
 #define READ_CLOVER READ_CLOVER_SINGLE
 #else               // half-precision clover term
 #define DD_CPREC_F H
-#define DD_PARAM2 short4* clover, float *cloverNorm
+#define DD_PARAM2 const short4* clover, const float *cloverNorm
 #define CLOVERTEX cloverTexHalf
 #define READ_CLOVER READ_CLOVER_HALF
 #endif

@@ -54,8 +54,8 @@ void DiracClover::cloverApply(cudaColorSpinorField &out, const FullClover &clove
   if (!initDslash) initDslashConstants(gauge, in.stride, clover.even.stride);
   checkParitySpinor(in, out, clover);
 
-  cloverCuda(out.v, gauge, clover, in.v, parity, in.volume, in.length,
-	      out.norm, in.norm, in.Precision());
+  cloverCuda(out.v, out.norm, gauge, clover, in.v, in.norm, parity, 
+	     in.volume, in.length, in.Precision());
 
   flops += 504*in.volume;
 }
@@ -143,8 +143,8 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkParitySpinor(in, out, cloverInv);
 
-  cloverDslashCuda(out.v, gauge, cloverInv, in.v, parity, dagger, out.volume, 
-		   out.length, out.norm, in.norm, in.Precision());
+  cloverDslashCuda(out.v, out.norm, gauge, cloverInv, in.v, in.norm, parity, dagger, 
+		   0, 0, 0.0, out.volume, out.length, in.Precision());
 
   flops += (1320+504)*in.volume;
 }
@@ -157,8 +157,8 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkParitySpinor(in, out, cloverInv);
 
-  cloverDslashXpayCuda(out.v, gauge, cloverInv, in.v, parity, dagger, x.v, k, 
-		       out.volume, out.length, out.norm, in.norm, x.norm, in.Precision());
+  cloverDslashCuda(out.v, out.norm, gauge, cloverInv, in.v, in.norm, parity, dagger, 
+		   x.v, x.norm, k, out.volume, out.length, in.Precision());
 
   flops += (1320+504+48)*in.volume;
 }
