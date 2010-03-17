@@ -88,6 +88,9 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger);
+
+  void dslash3DQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger);
+
   void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger);
   void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger);

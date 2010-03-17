@@ -230,6 +230,41 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   freeParitySpinor(in);
 }
 
+void dslash3DQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, int dagger)
+{
+  checkPrecision(inv_param->cpu_prec);
+
+  ParitySpinor in = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+  ParitySpinor out = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
+
+  loadParitySpinor(in, h_in, inv_param->cpu_prec, inv_param->dirac_order);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+#if 0
+    parity = (parity+1)%2;
+    axCuda(cudaGaugePrecise.anisotropy, in);
+#endif
+    errorQuda("unsupported Dirac Order");
+  }
+
+  
+  if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
+    dslash3DCuda(out, cudaGaugePrecise, in, parity, dagger);
+  } 
+#if 0
+else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    cloverDslashCuda(out, cudaGaugePrecise, cudaCloverInvPrecise, in, parity, dagger);
+  }
+#endif 
+  else {
+    errorQuda("Unsupported dslash_type");
+  }
+  retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
+
+  freeParitySpinor(out);
+  freeParitySpinor(in);
+}
+
 void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
 {
   checkPrecision(inv_param->cpu_prec);

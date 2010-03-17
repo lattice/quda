@@ -15,24 +15,40 @@ extern "C" {
   // Double precision routines
   void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 		   int oddBit, int daggerBit);
+
+  void dslash3DDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
+		   int oddBit, int daggerBit);
+
   void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		       int oddBit, int daggerBit, ParitySpinor x, double a);
 
   // Single precision routines
   void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 		   int oddBit, int daggerBit);
+
+  void dslash3DSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
+		   int oddBit, int daggerBit);
+
   void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		       int oddBit, int daggerBit, ParitySpinor x, double a);
 
   // Half precision dslash routines
   void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 		   int oddBit, int daggerBit);
+
+  void dslash3DHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
+		   int oddBit, int daggerBit);
+
   void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		       int oddBit, int daggerBit, ParitySpinor x, double a);
 
   // wrapper to above
   void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
 		  int parity, int dagger);
+
+  void dslash3DCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
+		  int parity, int dagger);
+
   void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
 		      int parity, int dagger, ParitySpinor x, double a);
 
