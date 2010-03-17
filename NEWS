@@ -1,4 +1,8 @@
-Version 0.2.2 - 16 February 2009
+Version 0.2.3 - 17 March 2010 (bjoo)
+ 
+- Added in 3D Dslash on the 0.2 branch
+
+Version 0.2.2 - 16 February 2010
 
 - Fixed a bug that prevented reductions (and hence the inverter) from working
   correctly in emulation mode.
