@@ -11,12 +11,12 @@ bool cudaColorSpinorField::bufferInit = false;
 size_t cudaColorSpinorField::bufferBytes = 0;
 
 cudaColorSpinorField::cudaColorSpinorField() : 
-  ColorSpinorField(), v(0), norm(0), init(false) {
+  ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
 
 }
 
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-  ColorSpinorField(param), v(0), norm(0), init(false) {
+  ColorSpinorField(param), v(0), norm(0), alloc(false), init(true) {
   create(param.create);
   if  (param.create == QUDA_NULL_CREATE) {
     // do nothing
@@ -31,14 +31,14 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
 }
 
 cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-  ColorSpinorField(src), v(0), norm(0), init(false) {
+  ColorSpinorField(src), v(0), norm(0), alloc(false), init(true) {
   create(QUDA_COPY_CREATE);
   copy(src);
 }
 
 // creates a copy of src, any differences defined in param
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
-  ColorSpinorField(src), v(0), norm(0), init(false) {  
+  ColorSpinorField(src), v(0), norm(0), alloc(false), init(true) {  
 // can only overide if we are not using a reference or parity special case
   if (param.create != QUDA_REFERENCE_CREATE || 
       (param.create == QUDA_REFERENCE_CREATE && 
@@ -55,6 +55,8 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
 
   if (param.create == QUDA_NULL_CREATE) {
     // do nothing
+  } else if (param.create == QUDA_ZERO_CREATE) {
+    zero();
   } else if (param.create == QUDA_COPY_CREATE) {
     if (src.fieldType() == QUDA_CUDA_FIELD) {
       copy(dynamic_cast<const cudaColorSpinorField&>(src));    
@@ -77,7 +79,7 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
 }
 
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
-  : ColorSpinorField(src), init(false) {
+  : ColorSpinorField(src), alloc(false), init(true) {
   type = QUDA_CUDA_FIELD;
   create(QUDA_COPY_CREATE);
   if (src.fieldType() == QUDA_CUDA_FIELD) {
@@ -131,7 +133,7 @@ void cudaColorSpinorField::create(const FieldCreate create) {
 	errorQuda("Error allocating norm");
       }
     }
-    init = true;
+    alloc = true;
   }
 
   // Check if buffer isn't big enough
@@ -170,14 +172,14 @@ void cudaColorSpinorField::freeBuffer() {
 }
 
 void cudaColorSpinorField::destroy() {
-  if (init) {
+  if (alloc) {
     cudaFree(v);
     if (precision == QUDA_HALF_PRECISION) cudaFree(norm);
     if (subset == QUDA_FULL_FIELD_SUBSET) {
       delete even;
       delete odd;
     }
-    init = false;
+    alloc = false;
   }
 }
 

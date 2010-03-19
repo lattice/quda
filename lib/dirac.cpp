@@ -47,7 +47,8 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
 	      in.fieldSubset(), out.fieldSubset());
   }
 
-  if (out.Volume() != gauge.volume) {
+  if ((out.Volume() != 2*gauge.volume && out.fieldSubset() == QUDA_FULL_FIELD_SUBSET) ||
+      (out.Volume() != gauge.volume && out.fieldSubset() == QUDA_PARITY_FIELD_SUBSET) ) {
     errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
   }
 

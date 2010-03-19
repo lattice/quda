@@ -19,8 +19,7 @@
 // by the concatenation of the following 6 fields, with "dslash" at the
 // beginning and "Kernel" at the end:
 //
-// DD_GPREC_F = D, S, H
-// DD_SPREC_F = D, S, H
+// DD_PREC_F = D, S, H
 // DD_CPREC_F = D, S, H, [blank]; the latter corresponds to plain Wilson
 // DD_RECON_F = 12, 8
 // DD_DAG_F = Dagger, [blank]
@@ -33,12 +32,18 @@
 //#define DD_DAG 0
 #define DD_XPAY 0
 #define DD_RECON 0
-#define DD_GPREC 0
-#define DD_SPREC 0
-#define DD_CPREC 0 //
+#define DD_PREC 0
+#define DD_CLOVER 0
 #endif
 
 // set options for current iteration
+
+#if (DD_CLOVER == 0) // no clover
+#define DD_FNAME dslash
+#else // we're doing clover
+#define DSLASH_CLOVER
+#define DD_FNAME cloverDslash
+#endif
 
 #if (DD_DAG==0) // no dagger
 #define DD_DAG_F
@@ -48,24 +53,26 @@
 
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#define DD_PARAM5 int oddBit
+#define DD_PARAM5 const int oddBit
 #else            // xpay
 #define DD_XPAY_F Xpay
-#if (DD_SPREC == 0)
-#define DD_PARAM5 int oddBit, double a
+#if (DD_PREC == 0)
+#define DD_PARAM5 const int oddBit, const double2 *x, const float *xNorm, const double a
+#elif (DD_PREC == 1) 
+#define DD_PARAM5 const int oddBit, const float4 *x, const float *xNorm, const float a
 #else
-#define DD_PARAM5 int oddBit, float a
+#define DD_PARAM5 const int oddBit, const short4 *x, const float *xNorm, const float a
 #endif
 #define DSLASH_XPAY
 #endif
 
 #if (DD_RECON==0) // reconstruct from 8 reals
 #define DD_RECON_F 8
-#if (DD_GPREC==0)
+#if (DD_PREC==0)
 #define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_DOUBLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_DOUBLE
-#elif (DD_GPREC==1)
+#elif (DD_PREC==1)
 #define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_SINGLE
@@ -76,11 +83,11 @@
 #endif
 #else // reconstruct from 12 reals
 #define DD_RECON_F 12
-#if (DD_GPREC==0)
+#if (DD_PREC==0)
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_DOUBLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_DOUBLE
 #define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
-#elif (DD_GPREC==1)
+#elif (DD_PREC==1)
 #define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SINGLE
@@ -91,23 +98,15 @@
 #endif
 #endif
 
-#if (DD_GPREC==0) // double-precision gauge field
-#define DD_GPREC_F D
+#if (DD_PREC==0) // double-precision fields
+
+// gauge field
+#define DD_PREC_F D
 #define GAUGE0TEX gauge0TexDouble
 #define GAUGE1TEX gauge1TexDouble
 #define GAUGE_DOUBLE
-#elif (DD_GPREC==1) // single-precision gauge field
-#define DD_GPREC_F S
-#define GAUGE0TEX gauge0TexSingle
-#define GAUGE1TEX gauge1TexSingle
-#else             // half-precision gauge field
-#define DD_GPREC_F H
-#define GAUGE0TEX gauge0TexHalf
-#define GAUGE1TEX gauge1TexHalf
-#endif
 
-#if (DD_SPREC==0) // double-precision spinor field
-#define DD_SPREC_F D
+// spinor fields
 #define DD_PARAM1 double2* out, float *null1
 #define DD_PARAM4 const double2* in, const float *null4
 #define READ_SPINOR READ_SPINOR_DOUBLE
@@ -120,8 +119,25 @@
 #define ACCUMTEX accumTexDouble
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #endif
-#elif (DD_SPREC==1) // single-precision spinor field
-#define DD_SPREC_F S
+
+// clover field
+#if (DD_CLOVER==0)
+#define DD_PARAM3
+#else
+#define DD_PARAM3 const double2 *clover, const float *null3,
+#endif
+#define CLOVERTEX cloverTexDouble
+#define READ_CLOVER READ_CLOVER_DOUBLE
+#define CLOVER_DOUBLE
+
+#elif (DD_PREC==1) // single-precision fields
+
+// gauge fields
+#define DD_PREC_F S
+#define GAUGE0TEX gauge0TexSingle
+#define GAUGE1TEX gauge1TexSingle
+
+// spinor fields
 #define DD_PARAM1 float4* out, float *null1
 #define DD_PARAM4 const float4* in, const float *null4
 #define READ_SPINOR READ_SPINOR_SINGLE
@@ -133,8 +149,22 @@
 #define ACCUMTEX accumTexSingle
 #define READ_ACCUM READ_ACCUM_SINGLE
 #endif
-#else            // half-precision spinor field
-#define DD_SPREC_F H
+
+// clover field
+#if (DD_CLOVER==0)
+#define DD_PARAM3
+#else
+#define DD_PARAM3 const float4 *clover, const float *null3,
+#endif
+#define CLOVERTEX cloverTexSingle
+#define READ_CLOVER READ_CLOVER_SINGLE
+
+#else             // half-precision fields
+
+// gauge fields
+#define DD_PREC_F H
+#define GAUGE0TEX gauge0TexHalf
+#define GAUGE1TEX gauge1TexHalf
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
@@ -146,42 +176,27 @@
 #define ACCUMTEX accumTexHalf
 #define READ_ACCUM READ_ACCUM_HALF
 #endif
-#endif
 
-#if (DD_CPREC==0) // double-precision clover term
-#define DD_CPREC_F D
-#define DD_PARAM3 const double2 *clover, const float *null3,
-#define CLOVERTEX cloverTexDouble
-#define READ_CLOVER READ_CLOVER_DOUBLE
-#define DSLASH_CLOVER
-#define CLOVER_DOUBLE
-#elif (DD_CPREC==1) // single-precision clover term
-#define DD_CPREC_F S
-#define DD_PARAM3 const float4 *clover, const float *null3,
-#define CLOVERTEX cloverTexSingle
-#define READ_CLOVER READ_CLOVER_SINGLE
-#define DSLASH_CLOVER
-#elif (DD_CPREC==2) // half-precision clover term
-#define DD_CPREC_F H
+// clover fields
+#if (DD_CLOVER==0)
+#define DD_PARAM3 
+#else
 #define DD_PARAM3 const short4 *clover, const float *cloverNorm,
+#endif
 #define CLOVERTEX cloverTexHalf
 #define READ_CLOVER READ_CLOVER_HALF
-#define DSLASH_CLOVER
-#else             // no clover term
-#define DD_CPREC_F
-#define DD_PARAM3 
+
 #endif
 
-#if !(__CUDA_ARCH__ != 130 && (DD_SPREC == 0 || DD_GPREC == 0 || DD_CPREC == 0))
+// only build double precision if supported
+#if !(__CUDA_ARCH__ != 130 && DD_PREC == 0) 
 
-//#define DD_CONCAT(g,s,c,r,d,x) dslash ## g ## s ## c ## r ## d ## x ## Kernel
-#define DD_CONCAT(g,s,c,r,d,x) dslash ## r ## d ## x ## Kernel
-#define DD_FUNC(g,s,c,r,d,x) DD_CONCAT(g,s,c,r,d,x)
+#define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
+#define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
 // define the kernel
 
-__global__ void	
-DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+__global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2, DD_PARAM3 DD_PARAM4, DD_PARAM5) {
 #if DD_DAG
 #include "dslash_dagger_core.h"
@@ -194,9 +209,7 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 // clean up
 
-#undef DD_GPREC_F
-#undef DD_SPREC_F
-#undef DD_CPREC_F
+#undef DD_PREC_F
 #undef DD_RECON_F
 #undef DD_DAG_F
 #undef DD_XPAY_F
@@ -205,6 +218,7 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_PARAM3
 #undef DD_PARAM4
 #undef DD_PARAM5
+#undef DD_FNAME
 #undef DD_CONCAT
 #undef DD_FUNC
 
@@ -250,36 +264,19 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_RECON
 #define DD_RECON 0
 
-#if (DD_GPREC==0)
-#undef DD_GPREC
-#define DD_GPREC 1
-#elif (DD_GPREC==1)
-#undef DD_GPREC
-#define DD_GPREC 2
+#if (DD_PREC==0)
+#undef DD_PREC
+#define DD_PREC 1
+#elif (DD_PREC==1)
+#undef DD_PREC
+#define DD_PREC 2
 #else
-#undef DD_GPREC
-#define DD_GPREC 0
+#undef DD_PREC
+#define DD_PREC 0
 
-#if (DD_SPREC==0)
-#undef DD_SPREC
-#define DD_SPREC 1
-#elif (DD_SPREC==1)
-#undef DD_SPREC
-#define DD_SPREC 2
-#else
-
-#undef DD_SPREC
-#define DD_SPREC 0
-
-#if (DD_CPREC==0)
-#undef DD_CPREC
-#define DD_CPREC 1
-#elif (DD_CPREC==1)
-#undef DD_CPREC
-#define DD_CPREC 2
-#elif (DD_CPREC==2)
-#undef DD_CPREC
-#define DD_CPREC 3
+#if (DD_CLOVER==0)
+#undef DD_CLOVER
+#define DD_CLOVER 1
 
 #else
 
@@ -287,13 +284,11 @@ DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_DAG
 #undef DD_XPAY
 #undef DD_RECON
-#undef DD_GPREC_
-#undef DD_SPREC
-#undef DD_CPREC
+#undef DD_PREC
+#undef DD_CLOVER
 
-#endif // DD_CPREC
-#endif // DD_SPREC
-#endif // DD_GPREC
+#endif // DD_CLOVER
+#endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_XPAY
 //#endif // DD_DAG

@@ -68,10 +68,9 @@ void DiracWilson::Prepare(cudaColorSpinorField &src, cudaColorSpinorField &sol,
 			  const cudaColorSpinorField &x, const cudaColorSpinorField &b, 
 			  const QudaSolutionType solutionType, const QudaDagType dagger) {
   ColorSpinorParam param;
-  param.create = QUDA_REFERENCE_CREATE;
 
-  src = cudaColorSpinorField(b, param);
-  sol = cudaColorSpinorField(x, param);
+  src = b;
+  sol = x;
 }
 
 void DiracWilson::Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
@@ -131,17 +130,14 @@ void DiracWilsonPC::Prepare(cudaColorSpinorField &src, cudaColorSpinorField &sol
     DiracWilson::Prepare(src, sol, x, b, solType, dagger);
   }
 
-  ColorSpinorParam param;
-  param.create = QUDA_REFERENCE_CREATE;
-
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
     // src = b_e + k D_eo b_o
     DslashXpay(src, b.Odd(), 0, dagger, b.Even(), kappa);
-    sol = cudaColorSpinorField(x.Even(), param);    
+    sol = x.Even();
   } else if (matpcType == QUDA_MATPC_ODD_ODD) {
     // src = b_o + k D_oe b_e
     DslashXpay(src, b.Even(), 1, dagger, b.Odd(), kappa);
-    sol = cudaColorSpinorField(x.Odd(), param);    
+    sol = x.Odd();
   } else {
     errorQuda("MatPCType %d not valid for DiracWilson", matpcType);
   }
