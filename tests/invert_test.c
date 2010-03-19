@@ -22,7 +22,7 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 24;
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[3] = 24;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
   inv_param.reliable_delta = 1e-1;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;

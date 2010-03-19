@@ -17,7 +17,7 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 0;
+int clover_yes = 1;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -35,6 +35,8 @@ int parity = 1;   // even or odd? (0 = even, 1 = odd)
 QudaDagType dagger = QUDA_DAG_NO;   // apply Dslash or Dslash dagger?
 int transfer = 0; // include transfer time in the benchmark?
 
+const int LOOPS = 10;
+
 Dirac *dirac;
 
 void init() {
@@ -42,10 +44,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 16;
+  gauge_param.X[0] = 4;
+  gauge_param.X[1] = 4;
+  gauge_param.X[2] = 4;
+  gauge_param.X[3] = 4;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -54,7 +56,7 @@ void init() {
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
@@ -65,15 +67,15 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
 
   gauge_param.ga_pad = 0;
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
-  gauge_param.ga_pad = 24*24*12;
-  inv_param.sp_pad = 24*24*12;
-  inv_param.cl_pad = 24*24*12;
+  //gauge_param.ga_pad = 24*24*12;
+  //inv_param.sp_pad = 24*24*12;
+  //inv_param.cl_pad = 24*24*12;
 
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   if (test_type == 2) inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -162,7 +164,7 @@ void init() {
 
   if (!transfer) {
     csParam.fieldType = QUDA_CUDA_FIELD;
-    csParam.fieldOrder = QUDA_FLOAT2_ORDER;
+    csParam.fieldOrder = QUDA_FLOAT4_ORDER;
     csParam.basis = QUDA_UKQCD_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
@@ -192,6 +194,7 @@ void init() {
     
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param);
+  diracParam.verbose = QUDA_VERBOSE;
   diracParam.tmp = &tmp;
 
   dirac = Dirac::create(diracParam);
@@ -210,10 +213,9 @@ void end() {
   endQuda();
 }
 
+// execute kernel
 double dslashCUDA() {
 
-  // execute kernel
-  const int LOOPS = 100;
   printfQuda("Executing %d kernel loops...\n", LOOPS);
   fflush(stdout);
   stopwatchStart();
@@ -248,7 +250,7 @@ double dslashCUDA() {
     printf("with ERROR: %s\n", cudaGetErrorString(stat));
 
   cudaThreadSynchronize();
-  double secs = stopwatchReadSeconds() / LOOPS;
+  double secs = stopwatchReadSeconds();
   printf("done.\n\n");
 
   return secs;
@@ -309,14 +311,13 @@ int main(int argc, char **argv)
     // print timing information
     printf("%fms per loop\n", 1000*secs);
     
-    int flops = test_type ? 1320*2 + 48 : 1320;
+    unsigned long long flops = dirac->Flops();
     int floats = test_type ? 2*(7*24+8*gauge_param.packed_size+24)+24 : 7*24+8*gauge_param.packed_size+24;
     if (clover_yes) {
-      flops += test_type ? 504*2 : 504;
       floats += test_type ? 72*2 : 72;
     }
-    printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
-    printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
+    printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/LOOPS)*(1<<30)));
     
     if (!transfer) {
       std::cout << "Results: CPU = " << norm2(spinorRef) << ", CUDA = " << norm2(cudaSpinorOut) << 
