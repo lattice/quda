@@ -101,13 +101,14 @@ extern "C" {
     ParitySpinor even;
     } FullSpinor;*/
 
-  /*  
+#if (CUDA_VERSION < 3000) 
   typedef struct double3_s {
     double x;
     double y;
     double z;
   } double3;
-  */
+#endif
+  
 #ifdef __cplusplus
 }
 #endif

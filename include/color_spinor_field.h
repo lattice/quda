@@ -226,6 +226,7 @@ class cudaColorSpinorField : public ColorSpinorField {
  private:
   void *v; // the field elements
   void *norm; // the normalization field
+  bool alloc; // whether we allocated memory
   bool init;
 
   static void *buffer;// pinned memory
