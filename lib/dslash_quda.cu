@@ -178,6 +178,7 @@ void cloverDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0,
 	cloverDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
 	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
       }
+    } else {
       if (!dagger) {
 	cloverDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 	
 	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
@@ -195,6 +196,7 @@ void cloverDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0,
 	cloverDslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
 	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
       }
+    } else {
       if (!dagger) {
 	cloverDslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 	
 	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
