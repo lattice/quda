@@ -11,6 +11,11 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 
+#define QMP_COMMS
+#ifdef QMP_COMMS
+#include <qmp.h>
+#endif
+
 #define spinorSiteSize 24 // real numbers per spinor
 
 FullGauge cudaGaugePrecise; // precise gauge field
@@ -21,6 +26,11 @@ FullClover cudaCloverSloppy;
 
 FullClover cudaCloverInvPrecise; // inverted clover term
 FullClover cudaCloverInvSloppy;
+
+#ifdef QMP_COMMS
+int rank_QMP;
+int num_QMP;
+#endif
 
 // define newQudaGaugeParam() and newQudaInvertParam()
 #define INIT_PARAM
@@ -46,6 +56,12 @@ static void checkPrecision(QudaPrecision precision)
 
 void initQuda(int dev)
 {
+
+#ifdef QMP_COMMS
+  int ndim;
+  const int *dim;
+#endif
+
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
@@ -58,9 +74,28 @@ void initQuda(int dev)
     fprintf(stderr, "QUDA: Found device %d: %s\n", i, deviceProp.name);
   }
 
+#ifdef QMP_COMMS
+  if ( QMP_is_initialized() != QMP_TRUE ) {
+    errorQuda("QMP is not initialized");
+  }
+  num_QMP=QMP_get_number_of_nodes();
+  rank_QMP=QMP_get_node_number();
+  
+  dev=rank_QMP % deviceCount;
+  ndim = QMP_get_logical_number_of_dimensions();
+  dim = QMP_get_logical_dimensions();
+  if (ndim != 4) { 
+    errorQuda("This code needs 4 logical dimensions");
+  }
+  if(  (dim[0] != 1) || (dim[1] != 1) || (dim[2] != 1) )  { 
+    errorQuda("This code needs all spatial dimensions local for now");
+  }
+
+#else 
   if (dev < 0) {
     dev = deviceCount - 1;
   }
+#endif
 
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
@@ -68,7 +103,12 @@ void initQuda(int dev)
     errorQuda("Device %d does not support CUDA", dev);
   }
 
+#ifdef QMP_COMMS
+  QMP_fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
+#else						
   fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
+#endif
+
   cudaSetDevice(dev);
 
   cudaGaugePrecise.even = NULL;
@@ -90,20 +130,39 @@ void initQuda(int dev)
   cudaCloverInvSloppy.odd.clover = NULL;
 
   initBlas();
+
+#ifdef QMP_COMMS
+  
+
+#endif
+
 }
 
-void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
+
+void loadGaugeQuda(void *h_gauge, void *h_gauge_minus, QudaGaugeParam *param)
 {
   checkGaugeParam(param);
-
+  
   param->packed_size = (param->reconstruct == QUDA_RECONSTRUCT_8) ? 8 : 12;
 
-  createGaugeField(&cudaGaugePrecise, h_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
-		   param->t_boundary, param->X, param->anisotropy, param->ga_pad);
+  // Allocates, and packs the field
+  createGaugeField(&cudaGaugePrecise, 
+		   h_gauge, 
+		   h_gauge_minus,
+		   param->cuda_prec, 
+		   param->cpu_prec, 
+		   param->gauge_order, 
+		   param->reconstruct, 
+		   param->gauge_fix,
+		   param->t_boundary, 
+		   param->X, 
+		   param->anisotropy, 
+		   param->ga_pad);
+
   param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (param->cuda_prec_sloppy != param->cuda_prec ||
       param->reconstruct_sloppy != param->reconstruct) {
-    createGaugeField(&cudaGaugeSloppy, h_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
+    createGaugeField(&cudaGaugeSloppy, h_gauge, h_gauge_minus,param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
 		     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
 		     param->X, param->anisotropy, param->ga_pad);
     param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);

@@ -345,6 +345,7 @@ int x3 = z2 - x4*X3;
 int x1odd = (x2 + x3 + x4 + oddBit) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
+int Pad = 2*(sid+Vh);
 
 #ifdef SPINOR_DOUBLE
 #define SHARED_STRIDE 8  // to avoid bank conflicts
@@ -863,8 +864,9 @@ o32_re = o32_im = 0;
     // 0 0 0 0 
     // 0 0 2 0 
     // 0 0 0 2 
-    
-    int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+    int sp_idx = ((x4==X4m1) ? Pad-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+
+    // int sp_idx = ((x4==X4m1) ? Pad : X+X3X2X1) >> 1;
     int ga_idx = sid;
     
     if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
@@ -978,8 +980,12 @@ o32_re = o32_im = 0;
     // 0 0 0 0 
     // 0 0 0 0 
     
-    int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
-    int ga_idx = sp_idx;
+    //int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
+    int sp_idx = ((x4==0) ? Pad : X-X3X2X1 ) >> 1;
+
+    // If t=0, read back links from pad, which is offset by Vh+sid from start of 
+    // buffer
+    int ga_idx = (x4==0) ? sid+Vh : sp_idx;
     
     if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
@@ -1025,9 +1031,8 @@ o32_re = o32_im = 0;
         
     }
     else {
-        // read gauge matrix from device memory
-        READ_GAUGE_MATRIX(GAUGE1TEX, 7);
-        
+  	READ_GAUGE_MATRIX(GAUGE1TEX, 7);
+	
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX);
         

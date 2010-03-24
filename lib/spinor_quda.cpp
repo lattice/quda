@@ -57,7 +57,7 @@ ParitySpinor allocateParitySpinor(int *X, Precision precision, int pad) {
     ret.volume *= X[d];
     L[d] = X[d];
   }
-  ret.pad = pad;
+  ret.pad = ret.X[0]*ret.X[1]*ret.X[2]; // CB spatial volume
   ret.stride = ret.volume + ret.pad;
 
   //ret.volume = volume/2;

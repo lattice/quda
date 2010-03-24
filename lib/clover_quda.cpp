@@ -13,7 +13,7 @@ void allocateParityClover(ParityClover *ret, int *X, int pad, Precision precisio
     ret->X[d] = X[d];
     ret->volume *= X[d];
   }
-  ret->pad = pad;
+  ret->pad = ret->X[0]*ret->X[1]*ret->X[2];
   ret->stride = ret->volume + ret->pad;
 
   ret->Nc = 3;

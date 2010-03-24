@@ -7,7 +7,8 @@
 extern "C" {
 #endif
 
-  void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, Precision cuda_prec, Precision cpu_prec,
+  void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, 
+			void *cpuGaugeMinus, Precision cuda_prec, Precision cpu_prec,
 			GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
 			Tboundary t_boundary, int *XX, double anisotropy, int pad);
 

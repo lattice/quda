@@ -32,3 +32,9 @@ __constant__ float pi_f;
 // double precision constants
 __constant__ double anisotropy;
 __constant__ double t_boundary;
+
+// an int to decide what we are doing
+// value = 0 -> first Vs sites (TFace 1)
+// value = 1..Nt-1 -> body
+// value = Nt-1 -> last Tface
+__constant__ int site_offset;

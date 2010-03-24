@@ -3,7 +3,8 @@
 
 #include <cuda_runtime.h>
 
-#ifdef USE_QMP
+#define QMP_COMMS
+#ifdef QMP_COMMS
 #include <qmp.h>
 #endif
 
@@ -100,7 +101,19 @@ extern "C" {
     ParitySpinor odd;
     ParitySpinor even;
   } FullSpinor;
-  
+
+  typedef struct {
+    void *my_fwd_face;
+    void *my_back_face;
+    void *from_back_face;
+    void *from_fwd_face;
+    int Vs; 
+    int V;
+    int stride; 
+    Precision precision;
+    int nbytes;
+  } FaceBuffer;
+
 #ifdef __cplusplus
 }
 #endif

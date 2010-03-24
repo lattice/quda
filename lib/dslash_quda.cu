@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <dslash_quda.h>
 #include <spinor_quda.h> // not needed once call to allocateParitySpinor() is removed
-
+#include <face_quda.h>
 #include <dslash_textures.h>
 #include <dslash_constants.h>
 
@@ -42,11 +42,16 @@ int dslashCudaSharedBytes(Precision precision) {
 #include <dslash_common.h>
 
 static int initDslash = 0;
+static FaceBuffer faceBufferPrecise;
+
+// For later
+static FaceBuffer faceBufferSloppy; 
 
 void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   int Vh = gauge.volume;
-  cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
 
+  cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
+  
   cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));  
 
   int ga_stride = gauge.stride;
@@ -123,6 +128,9 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   checkCudaError();
 
   initDslash = 1;
+
+
+
 }
 
 static void bindGaugeTex(FullGauge gauge, int oddBit) {
@@ -157,7 +165,19 @@ static void bindGaugeTex(FullGauge gauge, int oddBit) {
 // plain Wilson Dslash:
 
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
-  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
+  if (!initDslash) {
+    initDslashConstants(gauge, in.stride, 0);
+    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+  }    
+
+ 
+  gatherFromSpinor(faceBufferPrecise, in, dagger);
+  exchangeFaces(faceBufferPrecise);
+  scatterToPads(in, faceBufferPrecise, dagger);
+
+  // printf("Freeing Face Buffer");
+  //freeFaceBuffer(faceBufferPrecise);
+
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
@@ -258,6 +278,8 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   
   dim3 gridDim(res.volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
+  //
+  
 
   bindGaugeTex(gauge, oddBit);
 

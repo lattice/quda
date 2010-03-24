@@ -43,12 +43,14 @@
   double2 G8 = make_double2(0,0);					\
   double2 G9 = make_double2(0,0);				
 
+
 #define READ_GAUGE_MATRIX_12_SINGLE(gauge, dir) \
   float4 G0 = tex1Dfetch((gauge), ga_idx + ((dir/2)*3+0)*ga_stride);	\
   float4 G1 = tex1Dfetch((gauge), ga_idx + ((dir/2)*3+1)*ga_stride);	\
   float4 G2 = tex1Dfetch((gauge), ga_idx + ((dir/2)*3+2)*ga_stride);	\
   float4 G3 = make_float4(0,0,0,0);				\
   float4 G4 = make_float4(0,0,0,0);				
+
 
 #define RECONSTRUCT_MATRIX_12_DOUBLE(dir)				\
   ACC_CONJ_PROD(g20, +g01, +g12);					\
@@ -85,6 +87,7 @@
   g21_re = g00_re;							\
   g21_im = g00_im;
 
+
 // set A to be last components of G4 (otherwise unused)
 #define READ_GAUGE_MATRIX_8_SINGLE(gauge, dir)			\
   float4 G0 = tex1Dfetch((gauge), ga_idx + ((dir/2)*2+0)*ga_stride);	\
@@ -95,6 +98,7 @@
   g21_re = g00_re;						\
   g21_im = g00_im;
 
+
 #define READ_GAUGE_MATRIX_8_HALF(gauge, dir)			\
   float4 G0 = tex1Dfetch((gauge), ga_idx + ((dir/2)*2+0)*ga_stride);	\
   float4 G1 = tex1Dfetch((gauge), ga_idx + ((dir/2)*2+1)*ga_stride);	\
@@ -103,6 +107,7 @@
   float4 G4 = make_float4(0,0,0,0);				\
   g21_re = pi_f*g00_re;						\
   g21_im = pi_f*g00_im;
+
 
 #define RECONSTRUCT_MATRIX_8_DOUBLE(dir)				\
   double row_sum = g01_re*g01_re + g01_im*g01_im;			\

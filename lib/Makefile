@@ -3,11 +3,12 @@ include ../make.inc
 QUDA = libquda.a
 QUDA_OBJS = blas_quda.o clover_quda.o dslash_quda.o gauge_quda.o         \
 	inv_bicgstab_quda.o inv_cg_quda.o interface_quda.o spinor_quda.o \
-	util_quda.o
+	util_quda.o face_quda.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_quda.h dslash_quda.h enum_quda.h gauge_quda.h \
-	invert_quda.h quda.h quda_internal.h spinor_quda.h util_quda.h
+	invert_quda.h quda.h quda_internal.h spinor_quda.h util_quda.h \
+	face_quda.h
 
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/
