@@ -20,19 +20,22 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   cudaColorSpinorField Ap(x, param);
   cudaColorSpinorField tmp(x, param);
 
-  cudaColorSpinorField x_sloppy, r_sloppy;
+  cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
     param.create = QUDA_REFERENCE_CREATE;
-    x_sloppy = cudaColorSpinorField(x, param);
-    r_sloppy = cudaColorSpinorField(r, param);
-    zeroCuda(x_sloppy);
+    x_sloppy = &x;
+    r_sloppy = &r;
+    zeroCuda(*x_sloppy);
   } else {
-    x_sloppy = cudaColorSpinorField(x, param);
+    x_sloppy = new cudaColorSpinorField(x, param);
     param.create = QUDA_COPY_CREATE;
-    r_sloppy = cudaColorSpinorField(r, param);
+    r_sloppy = new cudaColorSpinorField(r, param);
   }
 
-  cudaColorSpinorField p(r_sloppy);
+  cudaColorSpinorField &xSloppy = *x_sloppy;
+  cudaColorSpinorField &rSloppy = *r_sloppy;
+  
+  cudaColorSpinorField p(rSloppy);
   zeroCuda(y);
 
   double b2 = normCuda(b);
@@ -52,7 +55,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   int k=0;
   int rUpdate = 0;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
+  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
 
   blas_quda_flops = 0;
 
@@ -66,7 +69,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
 
     alpha = r2 / pAp;        
     r2_old = r2;
-    r2 = axpyNormCuda(-alpha, Ap, r_sloppy);
+    r2 = axpyNormCuda(-alpha, Ap, rSloppy);
 
     // reliable update conditions
     rNorm = sqrt(r2);
@@ -77,18 +80,18 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
 
     if (!(updateR || updateX)) {
       beta = r2 / r2_old;
-      axpyZpbxCuda(alpha, p, x_sloppy, r_sloppy, beta);
+      axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
     } else {
-      axpyCuda(alpha, p, x_sloppy);
+      axpyCuda(alpha, p, xSloppy);
       
-      if (x.Precision() != x_sloppy.Precision()) copyCuda(x, x_sloppy);
+      if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
       xpyCuda(x, y); // swap these around?
       dirac.MdagM(r, y);
       //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, y, invert_param, x);
       r2 = xmyNormCuda(b, r);
-      if (x.Precision() != r_sloppy.Precision()) copyCuda(r_sloppy, r);            
-      zeroCuda(x_sloppy);
+      if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
+      zeroCuda(xSloppy);
 
       rNorm = sqrt(r2);
       maxrr = rNorm;
@@ -97,15 +100,15 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
       rUpdate++;
 
       beta = r2 / r2_old;
-      xpayCuda(r_sloppy, beta, p);
+      xpayCuda(rSloppy, beta, p);
     }
 
     k++;
     if (invert_param->verbosity >= QUDA_VERBOSE)
-      printfQuda("%d iterations, r2 = %e\n", k, r2);
+      printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
   }
 
-  if (x.Precision() != x_sloppy.Precision()) copyCuda(x, x_sloppy);
+  if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
   xpyCuda(y, x);
 
   invert_param->secs = stopwatchReadSeconds();
@@ -115,7 +118,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
     warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
 
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
-    printfQuda("Reliable updates = %d\n", rUpdate);
+    printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
   float gflops = (blas_quda_flops + dirac.Flops() + diracSloppy.Flops())*1e-9;
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
@@ -124,15 +127,20 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
 
   blas_quda_flops = 0;
 
-#if 0
+  //#if 0
   // Calculate the true residual
   dirac.MdagM(r, x);
   //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, y);
   double true_res = xmyNormCuda(b, r);
   
   printfQuda("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
-	 k, r2, true_res / b2);
-#endif
+	     k, r2, true_res / b2);
+  //#endif
+
+  if (invert_param->cuda_prec_sloppy != x.Precision()) {
+    delete r_sloppy;
+    delete x_sloppy;
+  }
 
   return;
 }

@@ -11,8 +11,9 @@
 
 #include <color_spinor_field.h>
 
-void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			cudaColorSpinorField &r, QudaInvertParam *invert_param, DagType dag_type)
+void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, 
+			cudaColorSpinorField &b, cudaColorSpinorField &r, 
+			QudaInvertParam *invert_param, DagType dag_type)
 {
   ColorSpinorParam param;
   param.create = QUDA_ZERO_CREATE;
@@ -24,20 +25,25 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
   cudaColorSpinorField tmp(x, param);
   cudaColorSpinorField t(x, param);
 
-  cudaColorSpinorField x_sloppy, r_sloppy, r0;
+  cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
     param.create = QUDA_REFERENCE_CREATE;
-    x_sloppy = cudaColorSpinorField(x, param);
-    r_sloppy = cudaColorSpinorField(r, param);
-    r0 = cudaColorSpinorField(b, param);
-    zeroCuda(x_sloppy);
-    copyCuda(r_sloppy, b);
+    x_sloppy = &x;
+    r_sloppy = &r;
+    r_0 = &b;
+    zeroCuda(*x_sloppy);
+    copyCuda(*r_sloppy, b);
   } else {
-    x_sloppy = cudaColorSpinorField(x, param);
+    x_sloppy = new cudaColorSpinorField(x, param);
     param.create = QUDA_COPY_CREATE;
-    r_sloppy = cudaColorSpinorField(b, param);
-    r0 = cudaColorSpinorField(b, param);
+    r_sloppy = new cudaColorSpinorField(b, param);
+    r_0 = new cudaColorSpinorField(b, param);
   }
+
+  // Syntatic sugar
+  cudaColorSpinorField &rSloppy = *r_sloppy;
+  cudaColorSpinorField &xSloppy = *x_sloppy;
+  cudaColorSpinorField &r0 = *r_0;
 
   double b2 = normCuda(b);
 
@@ -67,7 +73,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
   double maxrr = rNorm;
   double maxrx = rNorm;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
+  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: %d iterations, r2 = %e\n", k, r2);
 
   blas_quda_flops = 0;
 
@@ -77,7 +83,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
     
     if (k==0) {
       rho = make_cuDoubleComplex(r2, 0.0); // cDotProductCuda(r0, r_sloppy); // BiCRstab
-      copyCuda(p, r_sloppy);
+      copyCuda(p, rSloppy);
     } else {
       alpha_omega = cuCdiv(alpha, omega);
       rho_rho0 = cuCdiv(rho, rho0);
@@ -85,32 +91,35 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
       
       // p = r - beta*omega*v + beta*(p)
       beta_omega = cuCmul(beta, omega); beta_omega.x *= -1.0; beta_omega.y *= -1.0;
-      cxpaypbzCuda(r_sloppy, beta_omega, v, beta, p); // 8
+      cxpaypbzCuda(rSloppy, beta_omega, v, beta, p); // 8
     }
     
     diracSloppy.M(v, p, dag_type);
-    //MatVec(v, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param, tmp, dag_type);
 
     // rv = (r0,v)
     rv = cDotProductCuda(r0, v);    
 
     alpha = cuCdiv(rho, rv);
-    
+    printf("rho %e %e rv %e %e\n", rho.x, rho.y, rv.x, rv.y);
+
     // r -= alpha*v
     alpha.x *= -1.0; alpha.y *= -1.0;
-    caxpyCuda(alpha, v, r_sloppy); // 4
+    caxpyCuda(alpha, v, rSloppy); // 4
     alpha.x *= -1.0; alpha.y *= -1.0;
 
-    diracSloppy.M(t, r_sloppy, dag_type);
-    //MatVec(t, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, r_sloppy, invert_param, tmp, dag_type);
+    diracSloppy.M(t, rSloppy, dag_type);
     
     // omega = (t, r) / (t, t)
-    omega_t2 = cDotProductNormACuda(t, r_sloppy); // 6
+    omega_t2 = cDotProductNormACuda(t, rSloppy); // 6
     omega.x = omega_t2.x / omega_t2.z; omega.y = omega_t2.y/omega_t2.z;
     
     //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-    rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, p, omega, r_sloppy, x_sloppy, t, r0);
+    rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
+
+    double2 mup= cDotProductCuda(r0, rSloppy);
+    printf("test %e %e %e %e\n", mup.x, mup.y, norm2(r0), norm2(rSloppy));
+    printf("rho = %e %e %e %e %e\n", rho0.x, rho0.y, rho.x, rho.y, r2);
 
     // reliable updates
     rNorm = sqrt(r2);
@@ -122,15 +131,14 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
     int updateR = (rNorm < delta*maxrr) ? 1 : 0;
 
     if (updateR) {
-      if (x.Precision() != x_sloppy.Precision()) copyCuda(x, x_sloppy);
+      if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
       xpyCuda(x, y); // swap these around?
       dirac.M(r, y, dag_type);
-      //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, y, invert_param, x, dag_type);
       r2 = xmyNormCuda(b, r);
 
-      if (x.Precision() != r_sloppy.Precision()) copyCuda(r_sloppy, r);            
-      zeroCuda(x_sloppy);
+      if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
+      zeroCuda(xSloppy);
 
       rNorm = sqrt(r2);
       maxrr = rNorm;
@@ -140,15 +148,17 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
     }
     
     k++;
-    if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
+    if (invert_param->verbosity >= QUDA_VERBOSE) 
+      printfQuda("BiCGstab: %d iterations, r2 = %e %e %e %e %e %e %e %e %e \n\n", 
+		 k, r2, rho0.x, rho0.y, omega.x, omega.y, alpha.x, alpha.y, beta.x, beta.y);
   }
   
-  if (x.Precision() != x_sloppy.Precision()) copyCuda(x, x_sloppy);
+  if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
   xpyCuda(y, x);
     
   if (k==invert_param->maxiter) warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("Reliable updates = %d\n", rUpdate);
+  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
   invert_param->secs += stopwatchReadSeconds();
   
@@ -157,16 +167,20 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
   invert_param->gflops += gflops;
   invert_param->iter += k;
   
-#if 0
+  //#if 0
   // Calculate the true residual
   dirac.M(r, x, dag_type);
-  //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, invert_param, y, dag_type);
-  double true_res = xmyNormCuda(src, r);
-  copyCuda(b, src);
+  double true_res = xmyNormCuda(b, r);
     
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
-    printfQuda("Converged after %d iterations, r2 = %e, true_r2 = %e\n", k, sqrt(r2/b2), sqrt(true_res / b2));    
-#endif
+    printfQuda("BiCGstab: Converged after %d iterations, r2 = %e, true_r2 = %e\n", k, sqrt(r2/b2), sqrt(true_res / b2));    
+  //#endif
+
+  if (invert_param->cuda_prec_sloppy != x.Precision()) {
+    delete r_0;
+    delete r_sloppy;
+    delete x_sloppy;
+  }
 
   return;
 }

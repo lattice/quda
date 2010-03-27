@@ -28,9 +28,9 @@ ifeq ($(strip $(GPU_EMU)), true)
 endif
 
 CC = gcc
-CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
+CFLAGS = -g -Wall -O3 -std=c99 $(COPT) $(INC) -DCUDA_VERSION=3000
 CXX = g++
-CXXFLAGS = -Wall -O3 $(COPT) $(INC)
+CXXFLAGS = -g -Wall -O3 $(COPT) $(INC) -DCUDA_VERSION=3000
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) --ptxas-options=-v -D__CUDA_ARCH__=130
+NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) --ptxas-options=-v -DCUDA_VERSION=3000 -D__CUDA_ARCH__=130
 LDFLAGS = -fPIC $(LIB)

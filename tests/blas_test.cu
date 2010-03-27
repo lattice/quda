@@ -11,7 +11,7 @@
 
 QudaPrecision cuda_prec;
 QudaPrecision other_prec; // Used for copy benchmark
-cudaColorSpinorField x, y, z, w, v, p;
+cudaColorSpinorField *x, *y, *z, *w, *v, *p;
 
 int nIters;
 
@@ -58,17 +58,17 @@ void init()
     break;
   }
 
-  v = cudaColorSpinorField(param);
+  v = new cudaColorSpinorField(param);
   checkCudaError();
 
-  w = cudaColorSpinorField(param);
-  x = cudaColorSpinorField(param);
-  y = cudaColorSpinorField(param);
-  z = cudaColorSpinorField(param);
+  w = new cudaColorSpinorField(param);
+  x = new cudaColorSpinorField(param);
+  y = new cudaColorSpinorField(param);
+  z = new cudaColorSpinorField(param);
 
   param.precision = QUDA_SINGLE_PRECISION;
   param.fieldOrder = QUDA_FLOAT4_ORDER; // always true since this is never double
-  p = cudaColorSpinorField(param);
+  p = new cudaColorSpinorField(param);
 
   // check for successful allocation
   checkCudaError();
@@ -82,12 +82,12 @@ void init()
 void end()
 {
   // release memory
-  v.~cudaColorSpinorField();
-  w.~cudaColorSpinorField();
-  x.~cudaColorSpinorField();
-  y.~cudaColorSpinorField();
-  z.~cudaColorSpinorField();
-
+  delete p;
+  delete v;
+  delete w;
+  delete x;
+  delete y;
+  delete z;
 }
 
 
@@ -105,94 +105,94 @@ double benchmark(int kernel) {
     switch (kernel) {
 
     case 0:
-      copyCuda(y, p);
+      copyCuda(*y, *p);
       break;
 
     case 1:
-      axpbyCuda(a, x, b, y);
+      axpbyCuda(a, *x, b, *y);
       break;
 
     case 2:
-      xpyCuda(x, y);
+      xpyCuda(*x, *y);
       break;
 
     case 3:
-      axpyCuda(a, x, y);
+      axpyCuda(a, *x, *y);
       break;
 
     case 4:
-      xpayCuda(x, a, y);
+      xpayCuda(*x, a, *y);
       break;
 
     case 5:
-      mxpyCuda(x, y);
+      mxpyCuda(*x, *y);
       break;
 
     case 6:
-      axCuda(a, x);
+      axCuda(a, *x);
       break;
 
     case 7:
-      caxpyCuda(a2, x, y);
+      caxpyCuda(a2, *x, *y);
       break;
 
     case 8:
-      caxpbyCuda(a2, x, b2, y);
+      caxpbyCuda(a2, *x, b2, *y);
       break;
 
     case 9:
-      cxpaypbzCuda(x, a2, y, b2, z);
+      cxpaypbzCuda(*x, a2, *y, b2, *z);
       break;
 
     case 10:
-      axpyZpbxCuda(a, x, y, z, b);
+      axpyZpbxCuda(a, *x, *y, *z, b);
       break;
 
     case 11:
-      caxpbypzYmbwCuda(a2, x, b2, y, z, w);
+      caxpbypzYmbwCuda(a2, *x, b2, *y, *z, *w);
       break;
       
       // double
     case 12:
-      sumCuda(x);
+      sumCuda(*x);
       break;
 
     case 13:
-      normCuda(x);
+      normCuda(*x);
       break;
 
     case 14:
-      reDotProductCuda(x, y);
+      reDotProductCuda(*x, *y);
       break;
 
     case 15:
-      axpyNormCuda(a, x, y);
+      axpyNormCuda(a, *x, *y);
       break;
 
     case 16:
-      xmyNormCuda(x, y);
+      xmyNormCuda(*x, *y);
       break;
       
       // double2
     case 17:
-      cDotProductCuda(x, y);
+      cDotProductCuda(*x, *y);
       break;
 
     case 18:
-      xpaycDotzyCuda(x, a, y, z);
+      xpaycDotzyCuda(*x, a, *y, *z);
       break;
       
       // double3
     case 19:
-      cDotProductNormACuda(x, y);
+      cDotProductNormACuda(*x, *y);
       break;
 
     case 20:
-      cDotProductNormBCuda(x, y);
+      cDotProductNormBCuda(*x, *y);
       break;
 
     case 21:
-      caxpbypzYmbwcDotProductWYNormYCuda(a2, x, b2, y, z, w, v);
+      caxpbypzYmbwcDotProductWYNormYCuda(a2, *x, b2, *y, *z, *w, *v);
       break;
       
     default:

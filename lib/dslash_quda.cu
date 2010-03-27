@@ -84,6 +84,9 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
+  if (precision != gauge.precision)
+    errorQuda("Mixing gauge and spinor precision not supported");
+
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
     dslashCuda<2>((double2*)out, (float*)outNorm, (double2*)gauge0, (double2*)gauge1, 
@@ -106,50 +109,44 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 }
 
 
-template <int N, typename spinorFloat>
-void cloverCuda(spinorFloat *out, float *outNorm, const FullClover clover, 
-		const spinorFloat *in, const float *inNorm, const int parity, 
-		const int volume, const int length)
+template <int N, typename spinorFloat, typename cloverFloat>
+void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
+		const float *cloverNorm, const spinorFloat *in, const float *inNorm, 
+		const int parity, const int volume, const int length)
 {
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  void *cloverP, *cloverNormP;
-  QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm);
-
-  if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
-    cloverKernel <<<gridDim, blockDim, shared_bytes>>> 
-      (out, outNorm, (double2*)cloverP, (float*)cloverNormP, in, inNorm, parity);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
-  } else if (clover_prec == QUDA_SINGLE_PRECISION) {
-    cloverKernel <<<gridDim, blockDim, shared_bytes>>> 
-      (out, outNorm, (float4*)cloverP, (float*)cloverNormP, in, inNorm, parity);
-  } else {
-    cloverKernel <<<gridDim, blockDim, shared_bytes>>> 
-      (out, outNorm, (short4*)cloverP, (float*)cloverNormP, in, inNorm, parity);
-  }
+  cloverKernel<<<gridDim, blockDim, shared_bytes>>> 
+    (out, outNorm, clover, cloverNorm, in, inNorm, parity);
 }
 
 void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover clover, 
 		const void *in, const void *inNorm, const int parity, const int volume,
 		const int length, const QudaPrecision precision) {
 
+  void *cloverP, *cloverNormP;
+  QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
+
+  if (precision != clover_prec)
+    errorQuda("Mixing clover and spinor precision not supported");
+
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
-    cloverCuda<2>((double2*)out, (float*)outNorm, clover, (double2*)in, 
+    cloverCuda<2>((double2*)out, (float*)outNorm, (double2*)cloverP, 
+		  (float*)cloverNormP, (double2*)in, 
 		  (float*)inNorm, parity, volume, length);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
-    cloverCuda<4>((float4*)out, (float*)outNorm, clover, (float4*)in, 
+    cloverCuda<4>((float4*)out, (float*)outNorm, (float4*)cloverP, 
+		  (float*)cloverNormP, (float4*)in, 
 		  (float*)inNorm, parity, volume, length);
   } else if (precision == QUDA_HALF_PRECISION) {
-    cloverCuda<4>((short4*)out, (float*)outNorm, clover, (short4*)in,
+    cloverCuda<4>((short4*)out, (float*)outNorm, (short4*)cloverP, 
+		  (float*)cloverNormP, (short4*)in,
 		  (float*)inNorm, parity, volume, length);
   }
   checkCudaError();
@@ -219,6 +216,12 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
 
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
+
+  if (precision != gauge.precision)
+    errorQuda("Mixing gauge and spinor precision not supported");
+
+  if (precision != clover_prec)
+    errorQuda("Mixing clover and spinor precision not supported");
 
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)

@@ -19,10 +19,10 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 24;
+  gauge_param.X[0] = 4;
+  gauge_param.X[1] = 4;
+  gauge_param.X[2] = 4;
+  gauge_param.X[3] = 4;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -31,7 +31,7 @@ int main(int argc, char **argv)
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  gauge_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
@@ -44,19 +44,20 @@ int main(int argc, char **argv)
   }
   inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
-  double mass = -0.94;
+  double mass = -0.8;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = 1e-2;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solver_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
-    inv_param.clover_cuda_prec_sloppy = QUDA_HALF_PRECISION;
+    inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;

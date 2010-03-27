@@ -205,20 +205,20 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
     kappa *= cudaGaugePrecise.anisotropy;
 
-  if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
+  if (inv_param->solver_type == QUDA_MAT_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
     else errorQuda("Unsupported dslash_type");
-  } else if (inv_param->solution_type == QUDA_MATPC_SOLUTION) {
+  } else if (inv_param->solver_type == QUDA_MATPC_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVERPC_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else {
-    errorQuda("Unsupported solution type %d", inv_param->solution_type);
+    errorQuda("Unsupported solution type %d", inv_param->solver_type);
   }
 
   diracParam.matpcType = inv_param->matpc_type;
@@ -233,13 +233,13 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
     kappa *= cudaGaugePrecise.anisotropy;
 
-  if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
+  if (inv_param->solver_type == QUDA_MAT_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
     else errorQuda("Unsupported dslash_type");
-  } else if (inv_param->solution_type == QUDA_MATPC_SOLUTION) {
+  } else if (inv_param->solver_type == QUDA_MATPC_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
@@ -300,7 +300,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
 
   cudaParam.create = QUDA_NULL_CREATE;
   cudaColorSpinorField out(in, cudaParam);
-  cudaColorSpinorField tmp;
 
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
     parity = (parity+1)%2;
@@ -309,10 +308,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param);
-  if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
-    tmp = cudaColorSpinorField(in, cudaParam);
-    diracParam.tmp = &tmp;
-  }
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->Dslash(out, in, parity, dagger); // apply the operator
@@ -335,18 +330,16 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
   }
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
+  cpuParam.print(); std::cout << std::endl;
+  cudaParam.print(); std::cout << std::endl;
+
   cpuColorSpinorField hIn(cpuParam);
   cudaColorSpinorField in(hIn, cudaParam);
   cudaParam.create = QUDA_NULL_CREATE;
   cudaColorSpinorField out(in, cudaParam);
-  cudaColorSpinorField tmp;
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param);
-  if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
-    tmp = cudaColorSpinorField(in, cudaParam);
-    diracParam.tmp = &tmp;
-  }
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->M(out, in, dagger); // apply the operator
@@ -373,17 +366,12 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaColorSpinorField in(hIn, cudaParam);
   cudaParam.create = QUDA_NULL_CREATE;
   cudaColorSpinorField out(in, cudaParam);
-  cudaColorSpinorField tmp(in, cudaParam);
 
   double kappa = inv_param->kappa;
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= cudaGaugePrecise.anisotropy;
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param);
-  if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
-    tmp = cudaColorSpinorField(in, cudaParam);
-    diracParam.tmp = &tmp;
-  }
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   dirac->MdagM(out, in); // apply the operator
@@ -408,68 +396,92 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   param->gflops = 0;
   param->iter = 0;
 
-  ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X); // wrong dimensions
-  cpuParam.fieldSubset = param->solution_type == QUDA_MATPC_SOLUTION ? 
-    QUDA_PARITY_FIELD_SUBSET : QUDA_FULL_FIELD_SUBSET;
+  // temporary hack
+  if (param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
+  ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X);
+  if (param->solution_type == QUDA_MAT_SOLUTION) {
+    cudaGaugePrecise.X[0] /= 2;
+    cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
+  } else {
+    cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+  }
+
   ColorSpinorParam cudaParam(cpuParam, *param);
 
   cpuColorSpinorField h_b(cpuParam);
   cudaColorSpinorField b(h_b, cudaParam); // download source
 
+  std::cout << h_b.Volume() << " " << b.Volume() << std::endl;
+
   std::cout << "CPU source = " << norm2(h_b) << ", cuda copy = " << norm2(b) << std::endl;
 
   cudaParam.create = QUDA_NULL_CREATE;
-  cudaColorSpinorField x(b, cudaParam); // solution
-  cudaColorSpinorField tmp(b, cudaParam); // temporary
-  
-  cudaColorSpinorField in, out;
+  cudaColorSpinorField x(cudaParam); // solution
+
+  // if using preconditioning but solving the full system
+  if (param->solver_type == QUDA_MATPC_SOLUTION && 
+      param->solution_type == QUDA_MAT_SOLUTION) {
+    cudaParam.x[0] /= 2;
+    cudaParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+  }
+  cudaColorSpinorField tmp(cudaParam); // temporary
+
+  cudaColorSpinorField *in, *out;
 
   // set the Dirac operator parameters
   DiracParam diracParam;
   setDiracParam(diracParam, param);
   diracParam.verbose = QUDA_VERBOSE;
-  if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
-    tmp = cudaColorSpinorField(in, cudaParam);
-    diracParam.tmp = &tmp;
-  }
+  //if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
+  //tmp = cudaColorSpinorField(in, cudaParam);
+  //diracParam.tmp = &tmp;
+  //}
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
 
   setDiracSloppyParam(diracParam, param);
   Dirac *diracSloppy = Dirac::create(diracParam);
 
-  massRescale(diracParam.kappa, param->solution_type, param->mass_normalization, out);
+  massRescale(diracParam.kappa, param->solution_type, param->mass_normalization, *out);
+
+  std::cout << "Mass rescale done" << std::endl;
 
   dirac->Prepare(in, out, x, b, param->solution_type);
-  std::cout << "Source preparation complete " << norm2(in) << std::endl;
+
+  std::cout << "Source preparation complete " << norm2(*in) << " " << norm2(b) << std::endl;
+  std::cout << out->Volume() << " " << tmp.Volume() << " " << in->Volume() << " " << b.Volume() << std::endl;
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
-      copyCuda(out, in);
-      dirac->M(in, out); // tmp?
+      copyCuda(*out, *in);
+      dirac->M(*in, *out, QUDA_DAG_YES); // tmp?
     }
-    invertCgCuda(*dirac, *diracSloppy, out, in, tmp, param);
+    invertCgCuda(*dirac, *diracSloppy, *out, *in, tmp, param);
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(*dirac, *diracSloppy, out, in, tmp, param, QUDA_DAG_YES);
-      copyCuda(in, out);
+      invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, tmp, param, QUDA_DAG_YES);
+      copyCuda(*in, *out);
     }
-    invertBiCGstabCuda(*dirac, *diracSloppy, out, in, tmp, param, QUDA_DAG_NO);
+    invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, tmp, param, QUDA_DAG_NO);
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);
   }
-  
+
+  std::cout << "Solution = " << norm2(x) << std::endl;
   dirac->Reconstruct(x, b, param->solution_type);
+  std::cout << "Solution = " << norm2(x) << std::endl;
 
   cpuParam.v = hp_x;
   cpuColorSpinorField h_x(cpuParam);
-  out.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
+  x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
+
+  std::cout << "Solution = " << norm2(h_x) << std::endl;
 
   delete diracSloppy;
   delete dirac;
-
+  
   return;
 }

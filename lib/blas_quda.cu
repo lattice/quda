@@ -456,26 +456,22 @@ texture<float, 1, cudaReadModeElementType> texNorm4;
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf5;
 texture<float, 1, cudaReadModeElementType> texNorm5;
 
-inline void checkSpinor(cudaColorSpinorField &a, cudaColorSpinorField &b) {
-  if (a.Precision() != b.Precision()) {
-    errorQuda("checkSpinor: precisions do not match: %d %d", a.Precision(), b.Precision());
+#define checkSpinor(a, b)						\
+  {									\
+    if (a.Precision() != b.Precision())					\
+      errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision()); \
+    if (a.Length() != b.Length())					\
+      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+    if (a.Stride() != b.Stride())					\
+      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
   }
-
-  if (a.Length() != b.Length()) {
-    errorQuda("checkSpinor: lengths do not match: %d %d", a.Length(), b.Length());
-  }
-
-  if (a.Stride() != b.Stride()) {
-    errorQuda("checkSpinor: strides do not match: %d %d", a.Stride(), b.Stride());
-  }
-}
 
 // For kernels with precision conversion built in
-inline void checkSpinorLength(cudaColorSpinorField &a, cudaColorSpinorField &b) {
-  if (a.Length() != b.Length()) {
-    errorQuda("checkSpinor: lengths do not match: %d %d", a.Length(), b.Length());
-  }
-}
+#define checkSpinorLength(a, b)						\
+  {									\
+    if (a.Length() != b.Length()) {					\
+      errorQuda("engths do not match: %d %d", a.Length(), b.Length());	\
+    }									
 
 __global__ void convertDSKernel(double2 *dst, float4 *src, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;

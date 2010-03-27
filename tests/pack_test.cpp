@@ -14,11 +14,11 @@
 
 QudaGaugeParam param;
 FullGauge cudaGauge;
-cudaColorSpinorField cudaSpinor;
+cudaColorSpinorField *cudaSpinor;
 
 void *qdpGauge[4];
 void *cpsGauge;
-cpuColorSpinorField spinor, spinor2;
+cpuColorSpinorField *spinor, *spinor2;
 
 ColorSpinorParam csParam;
 
@@ -64,10 +64,10 @@ void init() {
   csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
   csParam.create = QUDA_NULL_CREATE;
 
-  spinor = cpuColorSpinorField(csParam);
-  spinor2 = cpuColorSpinorField(csParam);
+  spinor = new cpuColorSpinorField(csParam);
+  spinor2 = new cpuColorSpinorField(csParam);
 
-  spinor.Source(QUDA_RANDOM_SOURCE);
+  spinor->Source(QUDA_RANDOM_SOURCE);
 
   initQuda(0);
 
@@ -77,11 +77,15 @@ void init() {
   csParam.pad = 0;
   csParam.precision = QUDA_HALF_PRECISION;
 
-  cudaSpinor = cudaColorSpinorField(csParam);
+  cudaSpinor = new cudaColorSpinorField(csParam);
 }
 
 void end() {
   // release memory
+  delete cudaSpinor;
+  delete spinor2;
+  delete spinor;
+
   for (int dir = 0; dir < 4; dir++) free(qdpGauge[dir]);
   free(cpsGauge);
   endQuda();
@@ -120,20 +124,20 @@ void packTest() {
   printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
 
   stopwatchStart();
-  cudaSpinor = spinor;
+  *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
   printf("Spinor send time = %e seconds\n", sSendTime);
 
   stopwatchStart();
-  spinor2 = cudaSpinor;
+  *spinor2 = *cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime);
   
-  std::cout << "Norm check: CPU = " << norm2(spinor) << 
-    ", CUDA = " << norm2(cudaSpinor) << 
-    ", CPU =  " << norm2(spinor2) << std::endl;
+  std::cout << "Norm check: CPU = " << norm2(*spinor) << 
+    ", CUDA = " << norm2(*cudaSpinor) << 
+    ", CPU =  " << norm2(*spinor2) << std::endl;
 
-  cpuColorSpinorField::Compare(spinor, spinor2, 1);
+  cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
 
 }
 

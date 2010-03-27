@@ -21,10 +21,10 @@ aligned_malloc(size_t n, void **m0)
 }
 */
 
-cpuColorSpinorField::cpuColorSpinorField() : 
+ /*cpuColorSpinorField::cpuColorSpinorField() : 
   ColorSpinorField(), init(false) {
 
-}
+  }*/
 
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
   ColorSpinorField(param), init(false) {

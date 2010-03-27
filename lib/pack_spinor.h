@@ -144,7 +144,7 @@ void packQLAParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int length,
+void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int destLength,
 		    GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
@@ -160,7 +160,7 @@ void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packSpinorField<Nc,Ns,N>(dest+length/2+N*i, src+24*k, Vh+pad);
+	packSpinorField<Nc,Ns,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
       }
     }
   } else if (destBasis == QUDA_UKQCD_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -175,7 +175,7 @@ void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packNonRelSpinorField<Nc,N>(dest+length/2+N*i, src+24*k, Vh+pad);
+	packNonRelSpinorField<Nc,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
       }
     }
   } else {
@@ -184,8 +184,8 @@ void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int length,
-		    GammaBasis destBasis, GammaBasis srcBasis) {
+void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], 
+		       int destLength, GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
   if (destBasis==srcBasis) {
@@ -200,7 +200,7 @@ void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], 
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packQLASpinorField<Nc,Ns,N>(dest+length/2+N*i, src+24*k, Vh+pad);
+	packQLASpinorField<Nc,Ns,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
       }
     }
   } else if (destBasis == QUDA_UKQCD_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -215,7 +215,7 @@ void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], 
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packNonRelQLASpinorField<Nc,N>(dest+length/2+N*i, src+24*k, Vh+pad);
+	packNonRelQLASpinorField<Nc,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
       }
     }
   } else {
@@ -328,8 +328,8 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int length,
-		      GammaBasis destBasis, GammaBasis srcBasis) {
+void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], 
+		      int srcLength, GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
   if (destBasis==srcBasis) {
@@ -344,7 +344,7 @@ void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], i
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackSpinorField<Nc,Ns,N>(dest+24*k, src+length/2+N*i, Vh+pad);
+	unpackSpinorField<Nc,Ns,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else if (srcBasis == QUDA_UKQCD_BASIS && destBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -359,7 +359,7 @@ void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], i
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackNonRelSpinorField<Nc,N>(dest+24*k, src+length/2+N*i, Vh+pad);
+	unpackNonRelSpinorField<Nc,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else {
@@ -368,8 +368,8 @@ void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], i
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int length,
-			 GammaBasis destBasis, GammaBasis srcBasis) {
+void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], 
+			 int srcLength, GammaBasis destBasis, GammaBasis srcBasis) {
   
   int Vh = V/2;
   if (destBasis==srcBasis) {
@@ -384,7 +384,7 @@ void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[]
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackQLASpinorField<Nc,Ns,N>(dest+24*k, src+length/2+N*i, Vh+pad);
+	unpackQLASpinorField<Nc,Ns,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else if (srcBasis == QUDA_UKQCD_BASIS && destBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -399,7 +399,7 @@ void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[]
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackNonRelQLASpinorField<Nc,N>(dest+24*k, src+length/2+N*i, Vh+pad);
+	unpackNonRelQLASpinorField<Nc,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else {
@@ -408,18 +408,19 @@ void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[]
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int length,
-		FieldSubset srcSubset, SubsetOrder subsetOrder, 
-		GammaBasis destBasis, GammaBasis srcBasis,
-		QudaColorSpinorOrder srcOrder) {
+void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int destLength, 
+		int srcLength, FieldSubset srcSubset, SubsetOrder subsetOrder, 
+		GammaBasis destBasis, GammaBasis srcBasis, QudaColorSpinorOrder srcOrder) {
+
+  //  printf("%d %d %d %d %d %d %d %d %d %d %d\n", Nc, Ns, N, V, pad, length, srcSubset, subsetOrder, destBasis, srcBasis, srcOrder);
 
   if (srcSubset == QUDA_FULL_FIELD_SUBSET) {
     if (subsetOrder == QUDA_LEXICOGRAPHIC_SUBSET_ORDER) {
       // We are copying from a full spinor field that is not parity ordered
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_ORDER) {
-	packFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, length, destBasis, srcBasis);
+	packFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_ORDER) {
-	packQLAFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, length, destBasis, srcBasis);
+	packQLAFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
       }
@@ -430,18 +431,18 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int len
       uint evenOff, oddOff;
       if (subsetOrder == QUDA_EVEN_ODD_SUBSET_ORDER) {
 	evenOff = 0;
-	oddOff = length/2;
+	oddOff = srcLength/2;
       } else {
 	oddOff = 0;
-	evenOff = length/2;
+	evenOff = srcLength/2;
       }
 
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_ORDER) {
 	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, V/2, pad, destBasis, srcBasis);
-	packParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff, V/2, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, V/2, pad, destBasis, srcBasis);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_ORDER) {
 	packQLAParitySpinor<Nc,Ns,N>(dest, src+evenOff, V/2, pad, destBasis, srcBasis);
-	packQLAParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff, V/2, pad, destBasis, srcBasis);
+	packQLAParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, V/2, pad, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
       }
@@ -460,18 +461,17 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int len
 }
 
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int length,
-		  FieldSubset destSubset, SubsetOrder subsetOrder, 
-		  GammaBasis destBasis, GammaBasis srcBasis,
-		  QudaColorSpinorOrder destOrder) {
+void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int destLength, 
+		  int srcLength, FieldSubset destSubset, SubsetOrder subsetOrder,  
+		  GammaBasis destBasis, GammaBasis srcBasis, QudaColorSpinorOrder destOrder) {
 
   if (destSubset == QUDA_FULL_FIELD_SUBSET) {
     if (subsetOrder == QUDA_LEXICOGRAPHIC_SUBSET_ORDER) {
       // We are copying from a full spinor field that is not parity ordered
       if (destOrder == QUDA_SPACE_SPIN_COLOR_ORDER) {
-	unpackFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, length, destBasis, srcBasis);
+	unpackFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, srcLength, destBasis, srcBasis);
       } else if (destOrder == QUDA_SPACE_COLOR_SPIN_ORDER) {
-	unpackQLAFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, length, destBasis, srcBasis);
+	unpackQLAFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, srcLength, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
       }
@@ -482,18 +482,18 @@ void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int l
       uint evenOff, oddOff;
       if (subsetOrder == QUDA_EVEN_ODD_SUBSET_ORDER) {
 	evenOff = 0;
-	oddOff = length/2;
+	oddOff = srcLength/2;
       } else {
 	oddOff = 0;
-	evenOff = length/2;
+	evenOff = srcLength/2;
       }
 
       if (destOrder == QUDA_SPACE_SPIN_COLOR_ORDER) {
 	unpackParitySpinor<Nc,Ns,N>(dest,            src+evenOff, V/2, pad, destBasis, srcBasis);
-	unpackParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff,  V/2, pad, destBasis, srcBasis);
+	unpackParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff,  V/2, pad, destBasis, srcBasis);
       } else if (destOrder == QUDA_SPACE_COLOR_SPIN_ORDER) {
 	unpackQLAParitySpinor<Nc,Ns,N>(dest,            src+evenOff, V/2, pad, destBasis, srcBasis);
-	unpackQLAParitySpinor<Nc,Ns,N>(dest + length/2, src+oddOff,  V/2, pad, destBasis, srcBasis);
+	unpackQLAParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff,  V/2, pad, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
       }

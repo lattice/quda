@@ -47,8 +47,9 @@ extern "C" {
     int maxiter;
     double reliable_delta; // reliable update tolerance
 
+    QudaSolutionType solution_type; // type of system to solve
+    QudaSolutionType solver_type; // how to solve it
     QudaMatPCType matpc_type;
-    QudaSolutionType solution_type;
     QudaMassNormalization mass_normalization;
 
     QudaPreserveSource preserve_source;

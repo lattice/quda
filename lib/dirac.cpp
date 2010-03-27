@@ -2,12 +2,14 @@
 #include <dslash_quda.h>
 
 Dirac::Dirac(const DiracParam &param) 
-  : gauge(*(param.gauge)), kappa(param.kappa), matpcType(param.matpcType), flops(0) {
+  : gauge(*(param.gauge)), kappa(param.kappa), matpcType(param.matpcType), 
+    flops(0), tmp1(param.tmp1), tmp2(param.tmp2) {
 
 }
 
 Dirac::Dirac(const Dirac &dirac) 
-  : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), flops(0) {
+  : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
+    flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2) {
 
 }
 
@@ -22,6 +24,8 @@ Dirac& Dirac::operator=(const Dirac &dirac) {
     kappa = dirac.kappa;
     matpcType = dirac.matpcType;
     flops = 0;
+    tmp1 = dirac.tmp1;
+    tmp2 = dirac.tmp2;
   }
 
   return *this;
@@ -39,7 +43,7 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
   }
 
   if (in.Stride() != out.Stride()) {
-    errorQuda("Input and output spinor strides don't match in dslash_quda");
+    errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", in.Stride(), out.Stride());
   }
 
   if (in.fieldSubset() != QUDA_PARITY_FIELD_SUBSET || out.fieldSubset() != QUDA_PARITY_FIELD_SUBSET) {

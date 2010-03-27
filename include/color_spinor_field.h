@@ -139,7 +139,7 @@ class ColorSpinorField {
   static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
  public:
-  ColorSpinorField();
+  //ColorSpinorField();
   ColorSpinorField(const ColorSpinorField &);
   ColorSpinorField(const ColorSpinorParam &);
 
@@ -239,7 +239,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   void copy(const cudaColorSpinorField &);
 
  public:
-  cudaColorSpinorField();
+  //cudaColorSpinorField();
   cudaColorSpinorField(const cudaColorSpinorField&);
   cudaColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);
   cudaColorSpinorField(const ColorSpinorField&);
@@ -280,7 +280,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   void zero();
 
  public:
-  cpuColorSpinorField();
+  //cpuColorSpinorField();
   cpuColorSpinorField(const cpuColorSpinorField&);
   cpuColorSpinorField(const ColorSpinorField&);
   cpuColorSpinorField(const ColorSpinorParam&);

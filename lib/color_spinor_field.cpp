@@ -2,9 +2,9 @@
 #include <string.h>
 #include <iostream>
 
-ColorSpinorField::ColorSpinorField() : init(false) {
+/*ColorSpinorField::ColorSpinorField() : init(false) {
 
-}
+}*/
 
 ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0) {
   create(param.nDim, param.x, param.nColor, param.nSpin, param.precision, param.pad, 
