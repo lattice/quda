@@ -165,7 +165,9 @@ double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision p
     gpu_result.y += h_reduceFloat3[i].y;
     gpu_result.z += h_reduceFloat3[i].z;
   }
-  
+#ifdef QMP_COMMS
+  QMP_sum_double_array(&(gpu_result.x),3);  
+#endif
   return gpu_result;
 }
 

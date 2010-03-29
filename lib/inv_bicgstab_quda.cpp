@@ -167,8 +167,14 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
   invert_param->secs += stopwatchReadSeconds();
   
   float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
+#ifdef QMP_COMMS
+  QMP_sum_float(&gflops);
+#endif
+
+
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;
+
   invert_param->iter += k;
   
 #if 0
