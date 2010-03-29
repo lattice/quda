@@ -195,6 +195,9 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   }
   checkCudaError();
 
+  // HACK TO CHECK   
+  blankSpinorPads(in);
+
   dslash_quda_flops += 1320*in.volume;
 }
 
@@ -428,6 +431,8 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
   }
   checkCudaError();
+  // HACK TO CHECK   
+  blankSpinorPads(in);
 
   dslash_quda_flops += (1320+48)*in.volume;
 }
@@ -713,6 +718,8 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
   }
   checkCudaError();
+  // HACK TO CHECK   
+  blankSpinorPads(in);
 
   dslash_quda_flops += (1320+504)*in.volume;
 }
@@ -1231,6 +1238,8 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
   }
   checkCudaError();
+  // HACK TO CHECK   
+  blankSpinorPads(in);
 
   dslash_quda_flops += (1320+504+48)*in.volume;
 }

@@ -14,7 +14,7 @@ extern "C" {
   void gatherFromSpinor(FaceBuffer face, ParitySpinor in,  int dagger);
   void exchangeFaces(FaceBuffer bufs);
   void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger);
-
+  void blankSpinorPads(ParitySpinor out);
 #ifdef __cplusplus
 }
 #endif

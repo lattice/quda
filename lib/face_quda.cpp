@@ -365,5 +365,11 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
   }
 }
 
+void blankSpinorPads(ParitySpinor out)
+{
+   int i;
+   for(int i=0; i < 6; i++) { 
+	cudaMemset( (void *)( (float *)(out.spinor)+4*out.volume + 4*i*out.stride ),0x0,4*out.pad*sizeof(float));
+   }
+}
 
-  
