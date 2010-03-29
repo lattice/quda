@@ -47,6 +47,9 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
 
   double b2 = 0.0;
   b2 = normCuda(b);
+#ifdef QMP_COMMS
+  QMP_sum_double(&b2);
+#endif
 
   double r2 = b2;
   double r2_old;
@@ -74,11 +77,15 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
     MatVec(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param, tmp);
 
     pAp = reDotProductCuda(p, Ap);
-
+#ifdef QMP_COMMS
+    QMP_sum_double(&pAp);
+#endif
     alpha = r2 / pAp;        
     r2_old = r2;
     r2 = axpyNormCuda(-alpha, Ap, r_sloppy);
-
+#ifdef QMP_COMMS
+    QMP_sum_double(&r2);
+#endif
     // reliable update conditions
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
@@ -97,6 +104,9 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
       xpyCuda(x, y);
       MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, y, invert_param, x);
       r2 = xmyNormCuda(b, r);
+#ifdef QMP_COMMS
+      QMP_sum_double(&r2);
+#endif
       if (x.precision != r_sloppy.precision) copyCuda(r_sloppy, r);            
       zeroCuda(x_sloppy);
 
@@ -128,6 +138,9 @@ void invertCgCuda(ParitySpinor x, ParitySpinor b, ParitySpinor y, QudaInvertPara
     printfQuda("Reliable updates = %d\n", rUpdate);
 
   float gflops = (blas_quda_flops + dslash_quda_flops)*1e-9;
+#ifdef QMP_COMMS
+  QMP_sum_float(&gflops);
+#endif
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops = gflops;
   invert_param->iter = k;

@@ -30,6 +30,8 @@ FullClover cudaCloverInvSloppy;
 #ifdef QMP_COMMS
 int rank_QMP;
 int num_QMP;
+extern bool qudaPt0;
+extern bool qudaPtNm1;
 #endif
 
 // define newQudaGaugeParam() and newQudaInvertParam()
@@ -60,6 +62,7 @@ void initQuda(int dev)
 #ifdef QMP_COMMS
   int ndim;
   const int *dim;
+  const int *coords;
 #endif
 
   int deviceCount;
@@ -89,6 +92,20 @@ void initQuda(int dev)
   }
   if(  (dim[0] != 1) || (dim[1] != 1) || (dim[2] != 1) )  { 
     errorQuda("This code needs all spatial dimensions local for now");
+  }
+  coords = QMP_get_logical_coordinates();
+  if( coords[3] == 0 ) {
+ 	qudaPt0=true;
+  }
+  else { 
+        qudaPt0=false;
+  }
+
+  if( coords[3] == dim[3]-1 ) {
+ 	qudaPtNm1=true;
+  }
+  else { 
+        qudaPtNm1=false;
   }
 
 #else 

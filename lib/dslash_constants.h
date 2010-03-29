@@ -38,3 +38,11 @@ __constant__ double t_boundary;
 // value = 1..Nt-1 -> body
 // value = Nt-1 -> last Tface
 __constant__ int site_offset;
+
+// Are we processor 0 in time?
+__constant__ bool Pt0;
+
+// Are we processor Nt-1 in time?
+__constant__ bool PtNm1;
+
+

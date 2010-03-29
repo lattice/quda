@@ -32,6 +32,8 @@ unsigned long long dslash_quda_bytes;
 #undef DD3D_DAG
 
 
+bool qudaPt0=true;   // Single core versions always to Boundary
+bool qudaPtNm1=true;
 
 #include <clover_def.h> // kernels for applying the clover term alone
 
@@ -124,6 +126,9 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
 
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
+
+  cudaMemcpyToSymbol("Pt0", &(qudaPt0), sizeof(bool)); 
+  cudaMemcpyToSymbol("PtNm1", &(qudaPtNm1), sizeof(bool)); 
 
   checkCudaError();
 
@@ -401,7 +406,17 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
 void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger,
 		    ParitySpinor x, double a) {
-  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
+//  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
+  if (!initDslash) {
+    initDslashConstants(gauge, in.stride, 0);
+    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+  }    
+
+ 
+  gatherFromSpinor(faceBufferPrecise, in, dagger);
+  exchangeFaces(faceBufferPrecise);
+  scatterToPads(in, faceBufferPrecise, dagger);
+
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
@@ -673,7 +688,19 @@ static void bindCloverTex(ParityClover clover) {
 void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
 		      ParitySpinor in, int parity, int dagger)
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
+//  if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
+
+  if (!initDslash) {
+    initDslashConstants(gauge, in.stride, cloverInv.even.stride);
+    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+  }    
+
+ 
+  gatherFromSpinor(faceBufferPrecise, in, dagger);
+  exchangeFaces(faceBufferPrecise);
+  scatterToPads(in, faceBufferPrecise, dagger);
+
+
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
@@ -1180,8 +1207,19 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv, ParitySpinor in,
 			  int parity, int dagger, ParitySpinor x, double a)
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
-  checkSpinor(in, out);
+  //if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
+ 
+  if (!initDslash) {
+    initDslashConstants(gauge, in.stride, cloverInv.even.stride);
+    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+  }    
+
+ 
+  gatherFromSpinor(faceBufferPrecise, in, dagger);
+  exchangeFaces(faceBufferPrecise);
+  scatterToPads(in, faceBufferPrecise, dagger);
+
+ checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
 
@@ -1796,7 +1834,14 @@ void cloverMatCuda(FullSpinor out, FullGauge gauge, FullClover clover,
 void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
 		ParitySpinor in, int parity)
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride, clover.even.stride);
+ // if (!initDslash) initDslashConstants(gauge, in.stride, clover.even.stride);
+  if (!initDslash) {
+    initDslashConstants(gauge, in.stride, clover.even.stride);
+    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+  }    
+
+ 
+  
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, clover);

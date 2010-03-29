@@ -69,7 +69,8 @@
   ACC_CONJ_PROD(g21, -g00, +g12);				\
   ACC_CONJ_PROD(g22, +g00, +g11);				\
   ACC_CONJ_PROD(g22, -g01, +g10);				\
-  float u0 = (dir < 6 ? anisotropy_f : (ga_idx >= (X4-1)*X1h*X2*X3 ? t_boundary_f : 1)); \
+  bool do_boundary = (Pt0 && (ga_idx >= Vh)) || ( PtNm1 && (ga_idx >= (X4-1)*X1h*X2*X3) && (ga_idx < Vh) ) ; \
+  float u0 = (dir < 6 ? anisotropy_f : ( do_boundary ? t_boundary_f : 1)); \
   G3.x*=u0; G3.y*=u0; G3.z*=u0; G3.w*=u0; G4.x*=u0; G4.y*=u0;
 
 // set A to be last components of G4 (otherwise unused)
