@@ -190,7 +190,7 @@ void freeFaceBuffer(FaceBuffer f)
 void exchangeFaces(FaceBuffer bufs)
 {
 
-#if 1
+#ifdef QMP_COMMS
 
 
   QMP_start(mh_from_fwd);
@@ -223,19 +223,98 @@ void exchangeFaces(FaceBuffer bufs)
    
 }
 
-
-void gather12Float(float* dest, float* spinor, int Vs, int stride)
+void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger)
 {
+#ifdef QMP_COMMS
+  // Prepost all receives
+  QMP_start(mh_from_fwd);
+  QMP_start(mh_from_back);
+#endif
+  // Gather into face...
+  gatherFromSpinor(face, in, dagger);
 
-  // QUDA Memcpy 3 Pad's worth. 
+#ifdef QMP_COMMS
+  // Begin all sends 
+  QMP_start(mh_send_back);
+  QMP_start(mh_send_fwd);
+#endif
+}
+
+
+void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
+{
+#ifdef QMP_COMMS
+  // Make sure all outstanding sends are done
+  QMP_wait(mh_send_back);
+  QMP_wait(mh_send_fwd);
+
+  // Finish receives
+  QMP_wait(mh_from_back);
+  QMP_wait(mh_from_fwd);
+#else
+// NO QMP -- do copies
+#ifndef __DEVICE_EMULATION__
+  cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
+	     cudaMemcpyHostToHost);
+
+  cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
+	     cudaMemcpyHostToHost);
+
+#else
+  memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
+  memcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes);
+#endif
+#endif
+
+  // Scatter faces.
+  scatterToPads(out, face, dagger);
+}
+
+
+void gather12Float(float* dest, float* spinor, int Vs, int V, int stride, bool upper, bool tIsZero)
+{
+  int veclen=4;
+  int Npad = 12/veclen;  // Number of Pad's in one half spinor...
+  int upper_spin_offset=0;  // Uppers start at 0
+  int lower_spin_offset=veclen*Npad*stride;	
+  int t_zero_offset=0; // T=0 is the first VS block
+  int Nt_minus_one_offset=veclen*(V - Vs); // N_t -1 = V-Vs & 4 is from float4.
+
+ 
+  // QUDA Memcpy NPad's worth. 
   //  -- Dest will point to the right beginning PAD. 
-  //  -- Each Pad has size 4Vs floars. 
-  //  --  There is 4Stride floats from the
+  //  -- Each Pad has size veclen*Vs floats. 
+  //  --  There is veclen*Stride floats from the
   //           start of one PAD to the start of the next
-  for(int i=0; i < 3; i++) {
-    
-    cudaMemcpy((void *)(dest+4*i*Vs), (void *)(spinor + 4*i*stride), 4*Vs*sizeof(float), cudaMemcpyDeviceToHost );
-
+  for(int i=0; i < Npad; i++) {
+    if( upper ) { 
+      if( tIsZero ) { 
+        cudaMemcpy((void *)(dest + veclen*i*Vs), 
+                   (void *)(spinor + t_zero_offset + i*veclen*stride),
+	           veclen*Vs*sizeof(float),
+                   cudaMemcpyDeviceToHost );      
+      }
+      else {
+        cudaMemcpy((void *)(dest + veclen*i*Vs), 
+                   (void *)(spinor + Nt_minus_one_offset + i*veclen*stride),
+	           veclen*Vs*sizeof(float),
+                   cudaMemcpyDeviceToHost );      
+      }
+    }
+    else {
+      if( tIsZero ) { 
+        cudaMemcpy((void *)(dest + veclen*i*Vs), 
+                   (void *)(spinor + lower_spin_offset + t_zero_offset + i*veclen*stride),
+	           veclen*Vs*sizeof(float),
+                   cudaMemcpyDeviceToHost );      
+      }
+      else {
+        cudaMemcpy((void *)(dest + veclen*i*Vs), 
+                   (void *)(spinor + lower_spin_offset + Nt_minus_one_offset + i*veclen*stride),
+	           veclen*Vs*sizeof(float),
+                   cudaMemcpyDeviceToHost );      
+      }
+    }
   }
 }
 
@@ -278,16 +357,22 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
 
 
       gather12Float((float *)(face.my_back_face), 
-		    (float *)in.spinor + lower_spin_offset + t_zero_offset, // lower components
+		    (float *)in.spinor, // lower components
 		    face.Vs,
-		    face.stride);
+                    face.V,
+		    face.stride,
+                    false,         // lower_spins => upper = false
+                    true);        //  t=0, so tIsZero=true 
 
     // Not Hermitian conjugate: send upper spinors forward/recv from back
 
       gather12Float((float *)(face.my_fwd_face),
-		    (float *)in.spinor + upper_spin_offset + Nt_minus_one_offset,
-		    face.Vs,               // Size of face 
-		    face.stride);        // Stride
+		    (float *)in.spinor,
+		    face.Vs,               // Size of face
+                    face.V, 
+		    face.stride,
+                    true,          // upper spins => upper = true
+                    false);        // t=Nt-1 => tIsZero=false
 
  
 
@@ -297,15 +382,21 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
     // HC: send lower components fwd, receive them from back
       // lower components = buffers 4,5,6
       gather12Float((float *)face.my_fwd_face, 
-		    (float *)in.spinor + lower_spin_offset+Nt_minus_one_offset, // lower components, Nt-1
+		    (float *)in.spinor, // lower components, Nt-1
 		    face.Vs,
-		    face.stride);
+                    face.V,
+		    face.stride,
+                    false,     // Lower Spins => upper = false
+                    false);    // t=Nt-1      => tIsZero = true
 
       // HC: Send upper components back, receive them from front
       gather12Float((float *)face.my_back_face,
-		    (float *)in.spinor + upper_spin_offset+ t_zero_offset,  // upper 3 components,t = 0
+		    (float *)in.spinor,  // upper 3 components,t = 0
 		    face.Vs,               // Size of face 
-		    face.stride);        // Stride
+                    face.V,         
+		    face.stride, 
+                    true,         // UpperSpins => upper = true
+                    true);        //  t=0 => tIsZero = true
 
  
 

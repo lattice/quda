@@ -175,10 +175,12 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
- 
-  gatherFromSpinor(faceBufferPrecise, in, dagger);
-  exchangeFaces(faceBufferPrecise);
-  scatterToPads(in, faceBufferPrecise, dagger);
+  // This gathers from source spinors and starts comms
+  exchangeFacesStart(faceBufferPrecise, in, dagger);
+
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(faceBufferPrecise, in, dagger);
 
   // printf("Freeing Face Buffer");
   //freeFaceBuffer(faceBufferPrecise);
@@ -416,9 +418,12 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   }    
 
  
-  gatherFromSpinor(faceBufferPrecise, in, dagger);
-  exchangeFaces(faceBufferPrecise);
-  scatterToPads(in, faceBufferPrecise, dagger);
+  // This gathers from source spinors and starts comms
+  exchangeFacesStart(faceBufferPrecise, in, dagger);
+
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(faceBufferPrecise, in, dagger);
 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
@@ -701,10 +706,12 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
   }    
 
  
-  gatherFromSpinor(faceBufferPrecise, in, dagger);
-  exchangeFaces(faceBufferPrecise);
-  scatterToPads(in, faceBufferPrecise, dagger);
+ // This gathers from source spinors and starts comms
+  exchangeFacesStart(faceBufferPrecise, in, dagger);
 
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(faceBufferPrecise, in, dagger);
 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
@@ -1222,9 +1229,12 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   }    
 
  
-  gatherFromSpinor(faceBufferPrecise, in, dagger);
-  exchangeFaces(faceBufferPrecise);
-  scatterToPads(in, faceBufferPrecise, dagger);
+  // This gathers from source spinors and starts comms
+  exchangeFacesStart(faceBufferPrecise, in, dagger);
+
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(faceBufferPrecise, in, dagger);
 
  checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
