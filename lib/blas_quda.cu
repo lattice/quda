@@ -1119,10 +1119,11 @@ __global__ void axpyZpbxSKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float 
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
     Float2 x_i = read_Float2(x, i);
+    Float2 z_i = read_Float2(z, i);
     y[i].x += a*x_i.x;
     y[i].y += a*x_i.y;
-    x[i].x = z[i].x + b*x_i.x;
-    x[i].y = z[i].y + b*x_i.y;
+    x[i].x = z_i.x + b*x_i.x;
+    x[i].y = z_i.y + b*x_i.y;
     i += gridSize;
   }
 }
