@@ -323,9 +323,12 @@ void dslash3DQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parit
     errorQuda("unsupported Dirac Order");
   }
 
-  
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
+#ifdef BUILD_3D_DSLASH
     dslash3DCuda(out, cudaGaugePrecise, in, parity, dagger);
+#else
+    errorQuda("3D Dslash not enabled");
+#endif
   } 
 #if 0
 else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {

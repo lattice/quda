@@ -65,16 +65,19 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
   
   extern __shared__ QudaSumComplex cdata[];
   QudaSumComplex *s = cdata + tid;
-  s[0].x = 0;
-  s[0].y = 0;
+
+  QudaSumComplex sum;
+  sum.x = 0.0;
+  sum.y = 0.0;
   
   while (i < n) {
     REDUCE_REAL_AUXILIARY(i);
     REDUCE_IMAG_AUXILIARY(i);
-    s[0].x += REDUCE_REAL_OPERATION(i);
-    s[0].y += REDUCE_IMAG_OPERATION(i);
+    sum.x += REDUCE_REAL_OPERATION(i);
+    sum.y += REDUCE_IMAG_OPERATION(i);
     i += gridSize;
   }
+  s[0] = sum;
   __syncthreads();
   
   // do reduction in shared mem

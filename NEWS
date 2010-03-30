@@ -1,6 +1,9 @@
-Version 0.2.3 - 17 March 2010 (bjoo)
+Version 0.2.3
  
-- Added in 3D Dslash on the 0.2 branch
+- Further improved performance of the blas routines.
+
+- Added 3D Wilson Dslash in anticipation of temporal preconditioning.
+
 
 Version 0.2.2 - 16 February 2010
 

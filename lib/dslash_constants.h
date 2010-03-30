@@ -33,6 +33,10 @@ __constant__ float pi_f;
 __constant__ double anisotropy;
 __constant__ double t_boundary;
 
+__constant__ float2 An2;
+__constant__ float2 TB2;
+__constant__ float2 No2;
+
 // an int to decide what we are doing
 // value = 0 -> first Vs sites (TFace 1)
 // value = 1..Nt-1 -> body
@@ -44,5 +48,3 @@ __constant__ bool Pt0;
 
 // Are we processor Nt-1 in time?
 __constant__ bool PtNm1;
-
-
