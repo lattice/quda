@@ -258,23 +258,43 @@ __device__ short4 float42short4(float c, float4 a) {
   return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));
 }
 
-#define CONSTRUCT_HALF_SPINOR_FROM_SINGLE(h, n, a, length)		\
-  {float c0 = fmaxf(fabsf((a##0).x), fabsf((a##0).y));			\
-  float c1 = fmaxf(fabsf((a##0).z), fabsf((a##0).w));			\
-  float c2 = fmaxf(fabsf((a##1).x), fabsf((a##1).y));			\
-  float c3 = fmaxf(fabsf((a##1).z), fabsf((a##1).w));			\
-  float c4 = fmaxf(fabsf((a##2).x), fabsf((a##2).y));			\
-  float c5 = fmaxf(fabsf((a##2).z), fabsf((a##2).w));			\
-  float c6 = fmaxf(fabsf((a##3).x), fabsf((a##3).y));			\
-  float c7 = fmaxf(fabsf((a##3).z), fabsf((a##3).w));			\
-  float c8 = fmaxf(fabsf((a##4).x), fabsf((a##4).y));			\
-  float c9 = fmaxf(fabsf((a##4).z), fabsf((a##4).w));			\
-  float c10 = fmaxf(fabsf((a##5).x), fabsf((a##5).y));			\
-  float c11 = fmaxf(fabsf((a##5).z), fabsf((a##5).w));			\
-  c0 = fmaxf(c0, c1); c1 = fmaxf(c2, c3); c2 = fmaxf(c4, c5);		\
-  c3 = fmaxf(c6, c7); c4 = fmaxf(c8, c9); c5 = fmaxf(c10, c11);		\
-  c0 = fmaxf(c0, c1); c1 = fmaxf(c2, c3); c2 = fmaxf(c4, c5);		\
-  c0 = fmaxf(c0, c1); c0 = fmaxf(c0, c2);				\
+//#define FAST_ABS_MAX(a, b)						\
+// __int_as_float(max( __float_as_int(fabsf(a)) , __float_as_int(fabsf(b))));
+
+//#define FAST_ABS_MAX(a, b)					\
+//max( __float_as_int(fabsf(a)) , __float_as_int(fabsf(b)));
+
+//#define FAST_ABS_MAX(a, b)				\
+//max( abs(__float_as_int(a)) , abs(__float_as_int(b)) );
+
+#define FAST_ABS_MAX(a, b) fmaxf(fabsf(a), fabsf(b));
+
+//#define FAST_MAX(a, b)					\
+//__int_as_float(max(__float_as_int(a), __float_as_int(b)));
+
+#define FAST_MAX(a, b) fmaxf(a, b);
+
+//#define FAST_MAX(a, b)			\
+//  max(a, b);
+
+__device__ float fast_abs_max(float4 a) {
+  float c0 = FAST_ABS_MAX(a.x, a.y);
+  float c1 = FAST_ABS_MAX(a.z, a.w);
+  return FAST_MAX(c0, c1);
+}
+
+#define CONSTRUCT_HALF_SPINOR_FROM_SINGLE(h, n, a, length) {		\
+  float c0 = fast_abs_max(a##0);					        \
+  float c1 = fast_abs_max(a##1);						\
+  c0 = FAST_MAX(c0, c1);						\
+  float c2 = fast_abs_max(a##2);					        \
+  float c3 = fast_abs_max(a##3);						\
+  c1 = FAST_MAX(c2, c3);						\
+  c0 = FAST_MAX(c0, c1);						\
+  c2 = fast_abs_max(a##4);					        \
+  c3 = fast_abs_max(a##5);						\
+  c1 = FAST_MAX(c2, c3);						\
+  c0 = FAST_MAX(c0, c1);						\
   n[i] = c0;								\
   float C = __fdividef(MAX_SHORT, c0);					\
   h[i+0*length] = make_short4((short)(C*(float)(a##0).x), (short)(C*(float)(a##0).y), \
@@ -1279,20 +1299,20 @@ __global__ void caxpbypzYmbwHKernel(float2 a, float2 b, short4 *yH, float *yN, s
     RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);
     RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);
     RECONSTRUCT_HALF_SPINOR(z, texHalf3, texNorm3, stride);
-    RECONSTRUCT_HALF_SPINOR(w, texHalf4, texNorm4, stride);
     CAXPBYPZ_FLOAT4(a, x0, b, y0, z0);
     CAXPBYPZ_FLOAT4(a, x1, b, y1, z1);
     CAXPBYPZ_FLOAT4(a, x2, b, y2, z2);
     CAXPBYPZ_FLOAT4(a, x3, b, y3, z3);
     CAXPBYPZ_FLOAT4(a, x4, b, y4, z4);
     CAXPBYPZ_FLOAT4(a, x5, b, y5, z5);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE(zH, zN, z, stride);
+    RECONSTRUCT_HALF_SPINOR(w, texHalf4, texNorm4, stride);
     CMAXPY_FLOAT4(b, w0, y0);
     CMAXPY_FLOAT4(b, w1, y1);
     CMAXPY_FLOAT4(b, w2, y2);
     CMAXPY_FLOAT4(b, w3, y3);
     CMAXPY_FLOAT4(b, w4, y4);
     CMAXPY_FLOAT4(b, w5, y5);
-    CONSTRUCT_HALF_SPINOR_FROM_SINGLE(zH, zN, z, stride);
     CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
     i += gridSize;
   }   

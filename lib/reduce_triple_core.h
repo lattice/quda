@@ -89,6 +89,7 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
     s[0].z += REDUCE_Z_OPERATION(i);
     i += gridSize;
   }
+  
   __syncthreads();
 
   // do reduction in shared mem

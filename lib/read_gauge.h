@@ -142,6 +142,8 @@
   g22_re *= -r_inv2;							\
   g22_im *= -r_inv2;	
 
+// use __saturate ?
+
 #define RECONSTRUCT_MATRIX_8_SINGLE(dir)				\
   float row_sum = g01_re*g01_re + g01_im*g01_im;			\
   row_sum += g02_re*g02_re + g02_im*g02_im;				\
