@@ -674,6 +674,7 @@ void axpbyCuda(double a, ParitySpinor x, double b, ParitySpinor y) {
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     axpbyHKernel<<<blasGrid, blasBlock>>>((float)a, (float)b, (short4*)y.spinor, 
 					(float*)y.spinorNorm, y.stride, y.volume);
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 3*x.real_length;
@@ -722,6 +723,7 @@ void xpyCuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     xpyHKernel<<<blasGrid, blasBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += x.real_length;
@@ -770,6 +772,7 @@ void axpyCuda(double a, ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     axpyHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 2*x.real_length;
@@ -818,6 +821,7 @@ void xpayCuda(ParitySpinor x, double a, ParitySpinor y) {
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     xpayHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += 2*x.real_length;
@@ -867,6 +871,7 @@ void mxpyCuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     mxpyHKernel<<<blasGrid, blasBlock>>>((short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 3*x.real_length*x.precision;
   blas_quda_flops += x.real_length;
@@ -907,6 +912,7 @@ void axCuda(double a, ParitySpinor x) {
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     axHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)x.spinor, (float*)x.spinorNorm, x.stride, x.volume);
+    blas_quda_bytes += (2*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 2*x.real_length*x.precision;
   blas_quda_flops += x.real_length;
@@ -982,6 +988,7 @@ void caxpyCuda(double2 a, ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     float2 af2 = make_float2((float)a.x, (float)a.y);
     caxpyHKernel<<<blasGrid, blasBlock>>>(af2, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
 }
 
@@ -1057,6 +1064,7 @@ void caxpbyCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y) {
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     caxpbyHKernel<<<blasGrid, blasBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume);
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
 }
 
@@ -1150,6 +1158,7 @@ void cxpaypbzCuda(ParitySpinor x, double2 a, ParitySpinor y, double2 b, ParitySp
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     cxpaypbzHKernel<<<blasGrid, blasBlock>>>(af2, bf2, (short4*)z.spinor, (float*)z.spinorNorm, z.stride, z.volume);
+    blas_quda_bytes += (4*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
 }
 
@@ -1232,6 +1241,7 @@ void axpyZpbxCuda(double a, ParitySpinor x, ParitySpinor y, ParitySpinor z, doub
     cudaBindTexture(0, texNorm3, z.spinorNorm, spinor_bytes/12);    
     axpyZpbxHKernel<<<blasGrid, blasBlock>>>((float)a, (float)b, (short4*)x.spinor, (float*)x.spinorNorm,
 					   (short4*)y.spinor, (float*)y.spinorNorm, z.stride, z.volume);
+    blas_quda_bytes += (5*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 5*x.real_length*x.precision;
   blas_quda_flops += 8*x.real_length;
@@ -1352,6 +1362,7 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
     float2 bf2 = make_float2((float)b.x, (float)b.y);
     caxpbypzYmbwHKernel<<<blasGrid, blasBlock>>>(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm,
 					       (short4*)z.spinor, (float*)z.spinorNorm, z.stride, z.volume);
+    blas_quda_bytes += (6*x.real_length*x.precision) / (x.Nc * x.Ns);
   }
   blas_quda_bytes += 6*x.real_length*x.precision;
   blas_quda_flops += 12*x.real_length;
@@ -1479,6 +1490,7 @@ double sumCuda(ParitySpinor a) {
     int spinor_bytes = a.length*sizeof(short);
     cudaBindTexture(0, texHalf1, a.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
+    blas_quda_bytes += (a.real_length*a.precision) / (a.Nc * a.Ns);
     return sumHCuda((float*)a.spinorNorm, a.stride, a.volume, 12, a.precision);
   }
 }
@@ -1551,26 +1563,6 @@ double normCuda(ParitySpinor a) {
   }
 }
 
-
-#if 0
-double normEven(const cudaColorSpinorField &a) {
-  blas_quda_flops += 2*a.real_length;
-  blas_quda_bytes += a.real_length*a.precision;
-  if (a.precision == QUDA_DOUBLE_PRECISION) {
-    return normDCuda((double*)a.v, a.length/2, 13, a.precision);
-  } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    return normSCuda((float2*)a.v, a.length/4, 13, a.precision);
-  } else {
-    int spinor_bytes = a.length*sizeof(short);
-    cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm1, a.norm, spinor_bytes/12);    
-    blas_quda_bytes += (2*a.real_length*a.precision) / (a.nColor * a.nSpin);
-    return normHCuda((float*)a.norm, a.stride/2, a.volume/2, 13, a.precision);
-  }
-}
-#endif
-
-
 //
 // double reDotProductFCuda(float *a, float *b, int n) {}
 //
@@ -1639,7 +1631,8 @@ double reDotProductCuda(ParitySpinor a, ParitySpinor b) {
     cudaBindTexture(0, texNorm1, a.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, b.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, b.spinorNorm, spinor_bytes/12);    
-    return reDotProductHCuda(a.spinorNorm, b.spinorNorm, a.stride, a.volume, 14, a.precision);
+    blas_quda_bytes += (2*a.real_length*a.precision) / (a.Nc * a.Ns);
+    return reDotProductHCuda((float*)a.spinorNorm, (float*)b.spinorNorm, a.stride, a.volume, 14, a.precision);
   }
 }
 
@@ -1705,7 +1698,8 @@ double axpyNormCuda(double a, ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
-    cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
+    cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12); 
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
     return axpyNormHCuda((float)a, (short4*)y.spinor, (float*)y.spinorNorm, x.stride, x.volume, 15, x.precision);
   }
 }
@@ -1768,12 +1762,13 @@ double xmyNormCuda(ParitySpinor x, ParitySpinor y) {
     return xmyNormFCuda((double*)x.spinor, (double*)y.spinor, x.length, 16, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     return xmyNormFCuda((float*)x.spinor, (float*)y.spinor, x.length, 16, x.precision);
-  } else { 
+  } else {
     int spinor_bytes = x.length*sizeof(short);
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
+    blas_quda_bytes += (3*x.real_length*x.precision) / (x.Nc * x.Ns);
     return xmyNormHCuda((char*)0, (char*)0, (short4*)y.spinor, (float*)y.spinorNorm, y.stride, y.volume, 16, x.precision);
   }
 }
@@ -1871,7 +1866,8 @@ double2 cDotProductCuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texHalf1, x.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
-    cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
+    cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);
+    blas_quda_bytes += (2*x.real_length*x.precision) / (x.Nc * x.Ns);
     return cDotProductHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 17, x.precision);
   }
 }
@@ -1983,6 +1979,7 @@ double2 xpaycDotzyCuda(ParitySpinor x, double a, ParitySpinor y, ParitySpinor z)
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf3, z.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm3, z.spinorNorm, spinor_bytes/12);    
+    blas_quda_bytes += (4*x.real_length*x.precision) / (x.Nc * x.Ns);
     return xpaycDotzyHCuda((float)a, (short4*)y.spinor, (float*)y.spinorNorm, x.stride, x.volume, 18, x.precision);
   }
 }
@@ -2095,6 +2092,7 @@ double3 cDotProductNormACuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
+    blas_quda_bytes += (2*x.real_length*x.precision) / (x.Nc * x.Ns);
     return cDotProductNormAHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 19, x.precision);
   }
 }
@@ -2206,6 +2204,7 @@ double3 cDotProductNormBCuda(ParitySpinor x, ParitySpinor y) {
     cudaBindTexture(0, texNorm1, x.spinorNorm, spinor_bytes/12);    
     cudaBindTexture(0, texHalf2, y.spinor, spinor_bytes); 
     cudaBindTexture(0, texNorm2, y.spinorNorm, spinor_bytes/12);    
+    blas_quda_bytes += (2*x.real_length*x.precision) / (x.Nc * x.Ns);
     return cDotProductNormBHCuda((float*)x.spinorNorm, (float*)y.spinorNorm, x.stride, x.volume, 20, x.precision);
   }
 }
@@ -2384,12 +2383,12 @@ double3 caxpbypzYmbwcDotProductWYNormYQuda(double2 a, ParitySpinor x, double2 b,
     cudaBindTexture(0, texNorm5, u.spinorNorm, spinor_bytes/12);    
     float2 af2 = make_float2((float)a.x, (float)a.y);
     float2 bf2 = make_float2((float)b.x, (float)b.y);
+    blas_quda_bytes += (7*x.real_length*x.precision) / (x.Nc * x.Ns);
     return caxpbypzYmbwcDotProductWYNormYHCuda(af2, bf2, (short4*)y.spinor, (float*)y.spinorNorm, 
 					       (short4*)z.spinor, (float*)z.spinorNorm, (float*)u.spinorNorm, 
 					       y.stride, y.volume, 21, x.precision);
   }
 }
-
 
 
 double cpuDouble(float *data, int size) {
