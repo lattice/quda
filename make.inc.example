@@ -9,6 +9,8 @@ GPU_EMU  = false    # set to 'true' for device emulation
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
 
+BUILD_3D = false    # set to 'true' to build 3D Dslash
+
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include
@@ -25,6 +27,11 @@ endif
 ifeq ($(strip $(GPU_EMU)), true)
   COPT += -D__DEVICE_EMULATION__
   NVCCOPT = -deviceemu
+endif
+
+ifeq ($(strip $(BUILD_3D)), true)
+  COPT += -DBUILD_3D_DSLASH
+  NVCCOPT += -DBUILD_3D_DSLASH
 endif
 
 CC = gcc

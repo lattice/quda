@@ -24,13 +24,14 @@ unsigned long long dslash_quda_bytes;
 #include <dslash_def.h>
 #undef DD_DAG
 
+#ifdef BUILD_3D_DSLASH
 #define DD3D_DAG 0
 #include <dslash_3d_def.h>
 #undef DD3D_DAG
 #define DD3D_DAG 1
 #include <dslash_3d_def.h>
 #undef DD3D_DAG
-
+#endif
 
 
 #include <clover_def.h> // kernels for applying the clover term alone
@@ -180,6 +181,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   dslash_quda_flops += 1320*in.volume;
 }
 
+#ifdef BUILD_3D_DSLASH
 void dslash3DCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
   if (!initDslash) initDslashConstants(gauge, in.stride, 0);
   checkSpinor(in, out);
@@ -196,7 +198,7 @@ void dslash3DCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity
 
   dslash_quda_flops += 1320*in.volume;
 }
-
+#endif // BUILD_3D_DSLASH
 
 void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
@@ -1944,6 +1946,7 @@ void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   }
 }
 
+#ifdef BUILD_3D_DSLASH
 
 void dslash3DDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
@@ -2129,3 +2132,5 @@ void dslash3DHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   }
   
 }
+
+#endif // BUILD_3D_DSLASH
