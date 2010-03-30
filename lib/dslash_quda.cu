@@ -255,6 +255,8 @@ void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
       }
     }
   }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   
 }
@@ -288,6 +290,8 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 	dslashDS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -351,6 +355,8 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 	dslashDH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -464,6 +470,8 @@ void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
       }
     }
   }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
 
 }
@@ -498,6 +506,8 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 	dslashDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -568,6 +578,8 @@ void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -831,6 +843,8 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
       }
     }
   }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
 
 }
@@ -902,6 +916,8 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 	}
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -919,6 +935,8 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 	  dslashDSS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -965,6 +983,8 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 	  dslashDSH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1066,6 +1086,8 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 	}
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -1083,6 +1105,8 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 	  dslashDHS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1129,6 +1153,8 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 	  dslashDHH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1340,6 +1366,8 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
       }
     }
   }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
 }
 
@@ -1411,6 +1439,8 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 	}
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -1428,6 +1458,8 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 	  dslashDSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1474,6 +1506,8 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 	  dslashDSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1589,6 +1623,8 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 	}
       }
     }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -1610,6 +1646,8 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1668,6 +1706,8 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1828,6 +1868,8 @@ void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   } else {
     cloverDHKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
   }
+#else
+  errorQuda("Double precision not supported on this GPU");
 #endif
 }
 
@@ -1856,6 +1898,8 @@ void cloverSCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
     cloverSDKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+#else
+    errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     cloverSSKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
@@ -1890,6 +1934,8 @@ void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
     cloverHDKernel <<<gridDim, blockDim, shared_bytes>>> ((short4 *)res.spinor, (float *)res.spinorNorm, oddBit);
+#else
+    errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     cloverHSKernel <<<gridDim, blockDim, shared_bytes>>> ((short4 *)res.spinor, (float *)res.spinorNorm, oddBit);

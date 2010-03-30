@@ -54,13 +54,15 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
   
   extern __shared__ QudaSumFloat sdata[];
   QudaSumFloat *s = sdata + tid;
-  s[0] = 0;
   
+  QudaSumFloat sum = 0;
+
   while (i < n) {
     REDUCE_AUXILIARY(i);
-    s[0] += REDUCE_OPERATION(i);
+    sum += REDUCE_OPERATION(i);
     i += gridSize;
   }
+  s[0] = sum;
   __syncthreads();
   
   // do reduction in shared mem
