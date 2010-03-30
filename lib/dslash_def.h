@@ -169,11 +169,14 @@
 
 __global__ void
 DD_FUNC(DD_GPREC_F, DD_SPREC_F, DD_CPREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(DD_PARAM1, DD_PARAM2) {
+// hack to build only uniform precision kernels:
+#if ((DD_SPREC == DD_GPREC) && ((DD_CPREC == DD_GPREC) || (DD_CPREC == 3)))
 #if DD_DAG
 #include "dslash_dagger_core.h"
 #else
 #include "dslash_core.h"
 #endif
+#endif // hack
 }
 
 #endif
