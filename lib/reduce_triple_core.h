@@ -64,6 +64,11 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
 
 #else
 
+#define SUM_DOUBLE3(i, j)			\
+  s[i].x += s[j].x;				\
+  s[i].y += s[j].y;				\
+  s[i].z += s[j].z;
+
 __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, unsigned int n) {
   unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x*reduce_threads + threadIdx.x;
@@ -88,24 +93,24 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
 
   // do reduction in shared mem
   if (reduce_threads >= 1024) 
-    { if (tid < 512) { s[0].x += s[512].x; s[0].y += s[512].y; s[0].z += s[512].z; } __syncthreads(); }
+    { if (tid < 512) { SUM_DOUBLE3(0, 512); } __syncthreads(); }
   if (reduce_threads >= 512) 
-    { if (tid < 256) { s[0].x += s[256].x; s[0].y += s[256].y; s[0].z += s[256].z; } __syncthreads(); }
+    { if (tid < 256) { SUM_DOUBLE3(0, 256); } __syncthreads(); }
   if (reduce_threads >= 256) 
-    { if (tid < 128) { s[0].x += s[128].x; s[0].y += s[128].y; s[0].z += s[128].z; } __syncthreads(); }
+    { if (tid < 128) { SUM_DOUBLE3(0, 128); } __syncthreads(); }
   if (reduce_threads >= 128) 
-    { if (tid <  64) { s[0].x += s[ 64].x; s[0].y += s[ 64].y; s[0].z += s[ 64].z; } __syncthreads(); }
+    { if (tid <  64) { SUM_DOUBLE3(0, 64); } __syncthreads(); }
     
 #ifndef __DEVICE_EMULATION__
   if (tid < 32) 
 #endif
     {
-      if (reduce_threads >=  64) { s[0].x += s[32].x; s[0].y += s[32].y; s[0].z += s[32].z; EMUSYNC; }
-      if (reduce_threads >=  32) { s[0].x += s[16].x; s[0].y += s[16].y; s[0].z += s[16].z; EMUSYNC; }
-      if (reduce_threads >=  16) { s[0].x += s[ 8].x; s[0].y += s[ 8].y; s[0].z += s[ 8].z; EMUSYNC; }
-      if (reduce_threads >=   8) { s[0].x += s[ 4].x; s[0].y += s[ 4].y; s[0].z += s[ 4].z; EMUSYNC; }
-      if (reduce_threads >=   4) { s[0].x += s[ 2].x; s[0].y += s[ 2].y; s[0].z += s[ 2].z; EMUSYNC; }
-      if (reduce_threads >=   2) { s[0].x += s[ 1].x; s[0].y += s[ 1].y; s[0].z += s[ 1].z; EMUSYNC; }
+      if (reduce_threads >=  64) { SUM_DOUBLE3(0,32); EMUSYNC; }
+      if (reduce_threads >=  32) { SUM_DOUBLE3(0,16); EMUSYNC; }
+      if (reduce_threads >=  16) { SUM_DOUBLE3(0,8); EMUSYNC; }
+      if (reduce_threads >=   8) { SUM_DOUBLE3(0,4); EMUSYNC; }
+      if (reduce_threads >=   4) { SUM_DOUBLE3(0,2); EMUSYNC; }
+      if (reduce_threads >=   2) { SUM_DOUBLE3(0,1); EMUSYNC; }
     }
     
   // write result for this block to global mem 
@@ -115,6 +120,8 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
     g_odata[blockIdx.x].z = s[0].z;
   }
 }
+
+#undef SUM_DOUBLE3
 
 #endif
 
