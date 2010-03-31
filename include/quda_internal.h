@@ -93,6 +93,8 @@ extern "C" {
     int X[4]; // the geometric lengths (single parity)
     int Nc; // length of color dimension
     int Ns; // length of spin dimension
+    int tface_sites; // number of sites in a single tface buffer (either upper or lower) 
+    int tface_bytes; // total bytes in the tface buffers (both)
     void *spinor; // either (double2*), (float4 *) or (short4 *), depending on precision
     float *spinorNorm; // used only when precision is QUDA_HALF_PRECISION
   } ParitySpinor;

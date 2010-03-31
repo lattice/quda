@@ -66,14 +66,25 @@ ParitySpinor allocateParitySpinor(int *X, Precision precision, int pad) {
   ret.length = ret.stride*ret.Nc*ret.Ns*2;
   ret.real_length = ret.volume*ret.Nc*ret.Ns*2;
 
+  // Half Fermion = 2*12 numbers (12 spin up, 12 spin down)
+  //  Vs = X*Y*Z (one CB spatial volume)
+  ret.tface_sites = ret.X[0]*ret.X[1]*ret.X[2];
+  ret.tface_bytes = 24*ret.tface_sites;
+
+  if (precision == QUDA_DOUBLE_PRECISION) ret.tface_bytes *= sizeof(double);
+  else if (precision == QUDA_SINGLE_PRECISION) ret.tface_bytes *= sizeof(float);
+  else ret.tface_bytes *= sizeof(short);
+
   if (precision == QUDA_DOUBLE_PRECISION) ret.bytes = ret.length*sizeof(double);
   else if (precision == QUDA_SINGLE_PRECISION) ret.bytes = ret.length*sizeof(float);
   else ret.bytes = ret.length*sizeof(short);
 
-  if (cudaMalloc((void**)&ret.spinor, ret.bytes) == cudaErrorMemoryAllocation) {
+  // Overallocate to hold tface bytes extra
+  if (cudaMalloc((void**)&ret.spinor, ret.bytes+ret.tface_bytes) == cudaErrorMemoryAllocation) {
     errorQuda("Error allocating spinor");
   }
   
+  // HOW WILL WE DO THIS for tface norm buffer??
   if (precision == QUDA_HALF_PRECISION) {
     if (cudaMalloc((void**)&ret.spinorNorm, ret.bytes/12) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating spinorNorm");

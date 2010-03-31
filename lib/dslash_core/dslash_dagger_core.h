@@ -346,6 +346,7 @@ int x1odd = (x2 + x3 + x4 + oddBit) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
 int Pad = 2*(sid+Vh);
+int sp_stride = sp_body_stride;
 
 #ifdef SPINOR_DOUBLE
 #define SHARED_STRIDE 8  // to avoid bank conflicts
@@ -863,16 +864,32 @@ o32_re = o32_im = 0;
     // 2 0 0 0 
     // 0 2 0 0 
     // 0 0 0 0 
-    // 0 0 0 0 
-    int sp_idx = ((x4==X4m1) ? Pad-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+    // 0 0 0 0
 
-    //int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+    // Serial: int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+    // Parallel: in pads    int sp_idx = ((x4==X4m1) ? Pad-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+
+    int sp_idx;
+    if ( x4 == X4m1 ) {
+      sp_stride = sp_body_stride; 
+      sp_idx = sid + Vh - (X4X3X2X1mX3X2X1 >> 1);
+    }
+    else  {
+      sp_stride = sp_body_stride;
+      sp_idx = (X+X3X2X1) >> 1;
+    }
+
     int ga_idx = sid;
     
     if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX);
-        
+
+        // Immediately reset sp_stride to its correct version
+        // in case I changed it based on whether I am on a face or not
+        sp_stride = sp_body_stride;
+
+
         // project spinor into half spinors
         spinorFloat a0_re = +2*i00_re;
         spinorFloat a0_im = +2*i00_im;
@@ -918,7 +935,11 @@ o32_re = o32_im = 0;
         
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX);
-        
+
+        // Immediately reset sp_stride to its correct version
+        // in case I changed it based on whether I am on a face or not
+        sp_stride = sp_body_stride;
+   
         // reconstruct gauge matrix
         RECONSTRUCT_GAUGE_MATRIX(6);
         
@@ -979,9 +1000,19 @@ o32_re = o32_im = 0;
     // 0 0 0 0 
     // 0 0 2 0 
     // 0 0 0 2 
-    int sp_idx = ((x4==0) ? Pad : X-X3X2X1 ) >> 1;
-    // int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
     
+    // Serial Original: int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
+    // Parallel In Pads: int sp_idx = ((x4==0) ? Pad : X-X3X2X1 ) >> 1;
+
+   int sp_idx;
+    if ( x4 == 0 ) {
+      sp_stride = sp_body_stride; 
+      sp_idx = sid + Vh;
+    }
+    else  {
+      sp_stride = sp_body_stride;
+      sp_idx = (X-X3X2X1) >> 1;
+    }
 
     int ga_idx = (x4==0) ? sid+Vh : sp_idx;
     // int ga_idx = sp_idx;
@@ -989,7 +1020,11 @@ o32_re = o32_im = 0;
     if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
         READ_SPINOR_DOWN(SPINORTEX);
-        
+
+        // Immediately reset sp_stride to its correct version
+        // in case I changed it based on whether I am on a face or not
+        sp_stride = sp_body_stride;    
+   
         // project spinor into half spinors
         spinorFloat a0_re = +2*i20_re;
         spinorFloat a0_im = +2*i20_im;
@@ -1037,7 +1072,11 @@ o32_re = o32_im = 0;
         
         // read spinor from device memory
         READ_SPINOR_DOWN(SPINORTEX);
-        
+
+        // Immediately reset sp_stride to its correct version
+        // in case I changed it based on whether I am on a face or not
+        sp_stride = sp_body_stride;
+
         // reconstruct gauge matrix
         RECONSTRUCT_GAUGE_MATRIX(7);
         

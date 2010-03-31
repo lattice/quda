@@ -346,6 +346,7 @@ int x3 = z2 - x4*X3;
 int x1odd = (x2 + x3 + oddBit) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
+int sp_stride = sp_body_stride;
 
 #ifdef SPINOR_DOUBLE
 #define SHARED_STRIDE 8  // to avoid bank conflicts

@@ -50,12 +50,12 @@ static FaceBuffer faceBufferPrecise;
 // For later
 static FaceBuffer faceBufferSloppy; 
 
-void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
+void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   int Vh = gauge.volume;
 
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
   
-  cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));  
+  cudaMemcpyToSymbol("sp_body_stride", &sp_body_stride, sizeof(int));  
 
   int ga_stride = gauge.stride;
   cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
