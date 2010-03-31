@@ -238,7 +238,7 @@ void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
   bindGaugeTex(gauge, oddBit);
 
-  int spinor_bytes = spinor.bytes + +spinor.tface_bytes;
+  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
   cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
