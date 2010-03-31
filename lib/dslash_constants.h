@@ -18,6 +18,7 @@ __constant__ int X2X1;
 __constant__ int X3X2X1;
 
 __constant__ int Vh;
+__constant__ int Vs;
 __constant__ int sp_body_stride;
 __constant__ int ga_stride;
 __constant__ int cl_stride;

@@ -19,7 +19,7 @@ extern "C" {
   void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger);
 
   void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger);
-  void blankSpinorPads(ParitySpinor out);
+ 
 #ifdef __cplusplus
 }
 #endif

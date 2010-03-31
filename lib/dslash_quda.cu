@@ -54,7 +54,10 @@ void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   int Vh = gauge.volume;
 
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
-  
+
+  int Vs = gauge.X[0]*gauge.X[1]*gauge.X[2];
+  cudaMemcpyToSymbol("Vs", &Vs, sizeof(int));
+
   cudaMemcpyToSymbol("sp_body_stride", &sp_body_stride, sizeof(int));  
 
   int ga_stride = gauge.stride;
@@ -205,9 +208,6 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   }
   checkCudaError();
 
-  // HACK TO CHECK   
-  blankSpinorPads(in);
-
   dslash_quda_flops += 1320*in.volume;
 }
 
@@ -304,7 +304,7 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
   bindGaugeTex(gauge, oddBit);
 
-  int spinor_bytes = res.length*sizeof(float);
+  int spinor_bytes = spinor.bytes+spinor.tface_bytes;
   cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
@@ -451,9 +451,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
   }
   checkCudaError();
-  // HACK TO CHECK   
-  blankSpinorPads(in);
-
+ 
   dslash_quda_flops += (1320+48)*in.volume;
 }
 
@@ -746,8 +744,6 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
   }
   checkCudaError();
-  // HACK TO CHECK   
-  blankSpinorPads(in);
 
   dslash_quda_flops += (1320+504)*in.volume;
 }
@@ -1283,8 +1279,6 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
   }
   checkCudaError();
-  // HACK TO CHECK   
-  blankSpinorPads(in);
 
   dslash_quda_flops += (1320+504+48)*in.volume;
 }

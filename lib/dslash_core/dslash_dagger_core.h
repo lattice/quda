@@ -871,8 +871,11 @@ o32_re = o32_im = 0;
 
     int sp_idx;
     if ( x4 == X4m1 ) {
-      sp_stride = sp_body_stride; 
-      sp_idx = sid + Vh - (X4X3X2X1mX3X2X1 >> 1);
+
+    //  sp_stride = sp_body_stride; 
+    //  sp_idx = sid + Vh - (X4X3X2X1mX3X2X1 >> 1);
+      sp_stride = Vs;
+      sp_idx = sid - (Vh - Vs) + 6*sp_body_stride;
     }
     else  {
       sp_stride = sp_body_stride;
@@ -1006,8 +1009,10 @@ o32_re = o32_im = 0;
 
    int sp_idx;
     if ( x4 == 0 ) {
-      sp_stride = sp_body_stride; 
-      sp_idx = sid + Vh;
+      // sp_stride = sp_body_stride; 
+      // sp_idx = sid + Vh;
+      sp_stride = Vs;
+      sp_idx = sid + 6*sp_body_stride;
     }
     else  {
       sp_stride = sp_body_stride;

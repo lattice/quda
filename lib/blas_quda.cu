@@ -471,12 +471,11 @@ inline void checkSpinorLength(ParitySpinor &a, ParitySpinor &b) {
 // zero as 4 zero bytes
 void zeroCuda(ParitySpinor a) {
   if (a.precision == QUDA_DOUBLE_PRECISION) {
-    cudaMemset(a.spinor, 0, a.length*sizeof(double)+a.tface_bytes);
+    cudaMemset(a.spinor, 0, a.length*sizeof(double));
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
-    cudaMemset(a.spinor, 0, a.length*sizeof(float)+a.tface_bytes);
+    cudaMemset(a.spinor, 0, a.length*sizeof(float));
   } else {
-    cudaMemset(a.spinor, 0, a.length*sizeof(short)+a.tface_bytes);
-    // **FIXME** Deal with tfaces below.
+    cudaMemset(a.spinor, 0, a.length*sizeof(short));
     cudaMemset(a.spinorNorm, 0, a.length*sizeof(float)/(a.Nc*a.Ns*2));
   }
 }

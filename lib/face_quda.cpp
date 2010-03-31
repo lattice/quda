@@ -328,15 +328,22 @@ void scatter12Float(float* spinor, float* buf, int Vs, int V, int stride, bool u
 {
   int veclen=4;
   int Npad = 12/veclen;
-
-  for(int i=0; i < Npad; i++) {
-    if( upper ) { 
-      cudaMemcpy((void *)(spinor+veclen*(V+i*stride)),(void *)(buf+veclen*i*Vs), veclen*Vs*sizeof(float), cudaMemcpyHostToDevice );
-    }
-    else {
-      cudaMemcpy((void *)(spinor+veclen*(V+(i+Npad)*stride) ), (void *)(buf+veclen*i*Vs), veclen*Vs*sizeof(float), cudaMemcpyHostToDevice);  
-    }
+  int spinor_end = 2*Npad*veclen*stride;
+  int face_size = Npad*veclen*Vs;
+  
+  if( upper ) { 
+    cudaMemcpy((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(float), cudaMemcpyHostToDevice);
   }
+  else {
+#if 1
+    cudaMemcpy((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(float), cudaMemcpyHostToDevice);
+#else
+    for(int i=0; i < Npad; i++) {
+      cudaMemcpy((void *)(spinor+veclen*(V+(i+Npad)*stride) ), (void *)(buf+veclen*i*Vs), veclen*Vs*sizeof(float), cudaMemcpyHostToDevice); 
+    }
+#endif
+  }
+  
 }
 
 void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
@@ -456,11 +463,4 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
   }
 }
 
-void blankSpinorPads(ParitySpinor out)
-{
-   int i;
-   for(int i=0; i < 6; i++) { 
-	cudaMemset( (void *)( (float *)(out.spinor)+4*out.volume + 4*i*out.stride ),0x0,4*out.pad*sizeof(float));
-   }
-}
 
