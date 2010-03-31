@@ -605,7 +605,7 @@ void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   cudaBindTexture(0, spinorTexHalf, spinor.spinor, spinor_bytes); 
   cudaBindTexture(0, spinorTexNorm, spinor.spinorNorm, spinor_norm_bytes); 
   cudaBindTexture(0, accumTexHalf, x.spinor, spinor_bytes); 
-  cudaBindTexture(0, accumTexNorm, x.spinorNorm, spinor_norm_bytes; 
+  cudaBindTexture(0, accumTexNorm, x.spinorNorm, spinor_norm_bytes); 
   
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
