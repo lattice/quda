@@ -531,7 +531,8 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
   bindGaugeTex(gauge, oddBit);
 
-  int spinor_bytes = res.length*sizeof(float);
+
+  int spinor_bytes = spinor.bytes+spinor.tface_bytes;
   cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
   cudaBindTexture(0, accumTexSingle, x.spinor, spinor_bytes); 
   
@@ -927,7 +928,7 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     clover_prec = cloverInv.even.precision;
   }
 
-  int spinor_bytes = res.length*sizeof(float);
+  int spinor_bytes = spinor.length*sizeof(float)+spinor.tface_bytes;
   cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
@@ -1463,7 +1464,7 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     clover_prec = cloverInv.even.precision;
   }
 
-  int spinor_bytes = res.length*sizeof(float);
+  int spinor_bytes = spinor.length*sizeof(float)+spinor.tface_bytes;
   cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
   cudaBindTexture(0, accumTexSingle, x.spinor, spinor_bytes); 
   
@@ -1972,7 +1973,7 @@ void cloverSCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
     clover_prec = clover.even.precision;
   }
 
-  int spinor_bytes = res.length*sizeof(float);
+  int spinor_bytes = res.length*sizeof(float) + spinor.tface_bytes;
   cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
