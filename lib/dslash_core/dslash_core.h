@@ -867,8 +867,8 @@ o32_re = o32_im = 0;
     // 0 0 0 2 
     // Parallel version: int sp_idx = ((x4==X4m1) ? Pad-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
 
-
     int sp_idx;
+    int sp_norm_idx;
     if( x4 == X4m1 ) {
        // Front face (lower spin components) 
        // sp_stride = sp_body_stride; 
@@ -878,14 +878,14 @@ o32_re = o32_im = 0;
        // NB: The data only starts Npad*Vs later 
        // but the READ_SPINOR_DOWN takes care of that...
 
-       // NB: need to change from 6 to 12 for double
-       // and 6 is OK for half prec...
-       //
-       sp_idx = sid - (Vh - Vs) + 6*(sizeof(spinorFloat)/sizeof(float))*sp_body_stride;
+       sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_body_stride;
+       // need extra Vs addition since we require the lower norm buffer
+       sp_norm_idx = sid - (Vh - Vs) + sp_body_stride + Vs;
     }
     else { 
        sp_stride = sp_body_stride;
        sp_idx = (X+X3X2X1) >> 1;
+       sp_norm_idx = sp_idx;
     }
     // int sp_idx = ((x4==X4m1) ? Pad : X+X3X2X1) >> 1;
     int ga_idx = sid;
@@ -1014,18 +1014,18 @@ o32_re = o32_im = 0;
      
     // parallel data in tail pads v2:
     int sp_idx;
+    int sp_norm_idx;
     if ( x4 == 0 ) { 
         // Back Face (Upper spinors) 
         sp_stride = Vs;
 
-	// NB: need to change from 6 to 12 for double
-	// and 6 is OK for half prec...
-	//
-        sp_idx = sid + 6*(sizeof(spinorFloat)/sizeof(float))*sp_body_stride;
+        sp_idx = sid + SPINOR_HOP*sp_body_stride;
+	sp_norm_idx = sid + sp_body_stride;
     }
     else { 
         sp_stride = sp_body_stride;
         sp_idx = (X - X3X2X1) >> 1;
+	sp_norm_idx = sp_idx;
     }
     // If t=0, read back links from pad, which is offset by Vh+sid from start of 
     // buffer

@@ -65,7 +65,7 @@
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*(sp_stride));   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*(sp_stride));   \
   float4 I2 = tex1Dfetch((spinor), sp_idx + 2*(sp_stride));   \
-  float C = tex1Dfetch((spinorTexNorm), sp_idx);              \
+  float C = tex1Dfetch((spinorTexNorm), sp_norm_idx);	      \
   I0.x *= C; I0.y *= C;	I0.z *= C; I0.w *= C;	              \
   I1.x *= C; I1.y *= C;	I1.z *= C; I1.w *= C;	              \
   I2.x *= C; I2.y *= C;	I2.z *= C; I2.w *= C;                 \
@@ -74,7 +74,7 @@
   float4 I3 = tex1Dfetch((spinor), sp_idx + 3*(sp_stride));   \
   float4 I4 = tex1Dfetch((spinor), sp_idx + 4*(sp_stride));   \
   float4 I5 = tex1Dfetch((spinor), sp_idx + 5*(sp_stride));   \
-  float C = tex1Dfetch((spinorTexNorm), sp_idx);              \
+  float C = tex1Dfetch((spinorTexNorm), sp_norm_idx);	      \
   I3.x *= C; I3.y *= C;	I3.z *= C; I3.w *= C;	              \
   I4.x *= C; I4.y *= C; I4.z *= C; I4.w *= C;	              \
   I5.x *= C; I5.y *= C;	I5.z *= C; I5.w *= C;					     
