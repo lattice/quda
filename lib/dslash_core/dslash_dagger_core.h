@@ -345,7 +345,7 @@ int x3 = z2 - x4*X3;
 int x1odd = (x2 + x3 + x4 + oddBit) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
-int Pad = 2*(sid+Vh);
+//int Pad = 2*(sid+Vh);
 int sp_stride = sp_body_stride;
 
 #ifdef SPINOR_DOUBLE
@@ -872,10 +872,14 @@ o32_re = o32_im = 0;
     int sp_idx;
     if ( x4 == X4m1 ) {
 
-    //  sp_stride = sp_body_stride; 
-    //  sp_idx = sid + Vh - (X4X3X2X1mX3X2X1 >> 1);
+      //  sp_stride = sp_body_stride; 
+      //  sp_idx = sid + Vh - (X4X3X2X1mX3X2X1 >> 1);
       sp_stride = Vs;
-      sp_idx = sid - (Vh - Vs) + 6*sp_body_stride;
+
+      // NB: need to change from 6 to 12 for double
+      // and 6 is OK for half prec...
+      //
+      sp_idx = sid - (Vh - Vs) + 6*(sizeof(spinorFloat)/sizeof(float))*sp_body_stride;
     }
     else  {
       sp_stride = sp_body_stride;
@@ -1011,8 +1015,15 @@ o32_re = o32_im = 0;
     if ( x4 == 0 ) {
       // sp_stride = sp_body_stride; 
       // sp_idx = sid + Vh;
+
+      // NB: The data starts Npad*Vs later, but the READ_SPINOR_DOWN
+      // Macro takes care of that.
       sp_stride = Vs;
-      sp_idx = sid + 6*sp_body_stride;
+
+      // NB: need to change from 6 to 12 for double
+      // and 6 is OK for half prec...
+      //
+      sp_idx = sid + 6*(sizeof(spinorFloat)/sizeof(float))*sp_body_stride;
     }
     else  {
       sp_stride = sp_body_stride;

@@ -263,7 +263,6 @@ template <int vecLen, typename Float>
 void gather12Float(Float* dest, Float* spinor, int Vs, int V, int stride, bool upper, bool tIsZero)
 {
   int Npad = 12/vecLen;  // Number of Pad's in one half spinor...
-  int upper_spin_offset=0;  // Uppers start at 0
   int lower_spin_offset=vecLen*Npad*stride;	
   int t_zero_offset=0; // T=0 is the first VS block
   int Nt_minus_one_offset=vecLen*(V - Vs); // N_t -1 = V-Vs & vecLen is from FloatN.
@@ -372,12 +371,7 @@ void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper)
 
 void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
 {
-  int upper_spin_offset=0;  // Upper Spin is from 0 to 12stride
-  int lower_spin_offset=12*(face.stride); // Lower spin is from 12 stride to 24 stride
-
-  int t_zero_offset=0; // T=0 is the first VS block
-  int Nt_minus_one_offset=4*(face.V - face.Vs); // N_t -1 = V-Vs & 4 is from float4.
-
+  
   // I need to gather the faces with opposite Checkerboard
   // Depending on whether I do dagger or not I want top 2 components
   // from forward, and bottom 2 components from backward
@@ -412,7 +406,7 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
 		       face.Vs, face.V, face.stride, false, true);
     
       gatherNorm((float*)((short*)face.my_back_face+12*face.Vs), 
-		 (float*)in.norm, face.Vs, face.V, face.stride, true);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true);
 
       // Not Hermitian conjugate: send upper spinors forward/recv from back
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
@@ -420,7 +414,7 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
 		       face.Vs, face.V, face.stride, true, false);
 
       gatherNorm((float*)((short*)face.my_fwd_face+12*face.Vs), 
-		 (float*)in.norm, face.Vs, face.V, face.stride, false);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false);
     }
  
 
@@ -454,7 +448,7 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
 		       face.Vs, face.V, face.stride, false, false);
     
       gatherNorm((float*)((short*)face.my_fwd_face+12*face.Vs), 
-		 (float*)in.norm, face.Vs, face.V, face.stride, false);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false);
 
       // HC: Send upper components back, receive them from front
       //UpperSpins => upper = true, t=0 => tIsZero = true
@@ -462,7 +456,7 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
 		       face.Vs, face.V, face.stride, true, true);
 
       gatherNorm((float*)((short*)face.my_back_face+12*face.Vs), 
-		 (float*)in.norm, face.Vs, face.V, face.stride, true);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true);
     }
 
   }
@@ -477,7 +471,7 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
   // from forward, and bottom 2 components from backward
   if (!dagger) { 
 
-    if (precision == QUDA_DOUBLE_PRECISION) {
+    if (out.precision == QUDA_DOUBLE_PRECISION) {
       // Not HC: send lower components back, receive them from forward
       // lower components = buffers 4,5,6
       scatter12Float<2>((double *)out.spinor, (double *)face.from_fwd_face, 
@@ -486,7 +480,7 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
       // Not H: Send upper components forward, receive them from back
       scatter12Float<2>((double *)out.spinor, (double *)face.from_back_face,
 			face.Vs, face.V, face.stride, true);        // Upper
-    } else if (precision == QUDA_SINGLE_PRECISION) {
+    } else if (out.precision == QUDA_SINGLE_PRECISION) {
       // Not HC: send lower components back, receive them from forward
       // lower components = buffers 4,5,6
       scatter12Float<4>((float *)out.spinor, (float *)face.from_fwd_face, 
@@ -501,20 +495,20 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
       scatter12Float<4>((short *)out.spinor, (short *)face.from_fwd_face, 
 			face.Vs, face.V, face.stride, false); // LOWER
       
-      scatterNorm((float*)out.norm, (float*)((short*)face.from_fwd_face+12*Vs), 
-		  Vs, V, stride, false);
+      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_fwd_face+12*face.Vs), 
+		  face.Vs, face.V, face.stride, false);
 
       // Not H: Send upper components forward, receive them from back
       scatter12Float<4>((short *)out.spinor, (short *)face.from_back_face,
 			face.Vs, face.V, face.stride, true);        // Upper
 
-      scatterNorm((float*)out.norm, (float*)((short*)face.from_back_face+12*Vs), 
-		  Vs, V, stride, true);
+      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_back_face+12*face.Vs), 
+		  face.Vs, face.V, face.stride, true);
 
     }
     
   } else { 
-    if (precision == QUDA_DOUBLE_PRECISION) {
+    if (out.precision == QUDA_DOUBLE_PRECISION) {
       // HC: send lower components fwd, receive them from back
       // lower components = buffers 4,5,6
       scatter12Float<2>((double *)out.spinor, (double *)face.from_back_face,
@@ -523,7 +517,7 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
       // upper components = buffers 1, 2,3, go forward (into my_fwd face)
       scatter12Float<2>((double *)out.spinor, (double *)face.from_fwd_face,
 			face.Vs, face.V, face.stride, true );       
-    } else if (precision == QUDA_SINGLE_PRECISION) {
+    } else if (out.precision == QUDA_SINGLE_PRECISION) {
       // HC: send lower components fwd, receive them from back
       // lower components = buffers 4,5,6
       scatter12Float<4>((float *)out.spinor, (float *)face.from_back_face,
@@ -538,15 +532,15 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
       scatter12Float<4>((short *)out.spinor, (short *)face.from_back_face,
 			face.Vs, face.V, face.stride, false);       // Lower
       
-      scatterNorm((float*)out.norm, (float*)((short*)face.from_back_face+12*Vs), 
-		  Vs, V, stride, false);
+      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_back_face+12*face.Vs), 
+		  face.Vs, face.V, face.stride, false);
 
       // upper components = buffers 1, 2,3, go forward (into my_fwd face)
       scatter12Float<4>((short *)out.spinor, (short *)face.from_fwd_face,
 			face.Vs, face.V, face.stride, true );
  
-      scatterNorm((float*)out.norm, (float*)((short*)face.from_fwd_face+12*Vs), 
-		  Vs, V, stride, true);
+      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_fwd_face+12*face.Vs), 
+		  face.Vs, face.V, face.stride, true);
 
     }
 
