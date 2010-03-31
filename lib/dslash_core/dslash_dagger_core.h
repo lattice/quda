@@ -871,12 +871,17 @@ o32_re = o32_im = 0;
 
     int sp_idx;
     int sp_norm_idx;
-    if ( x4 == 0 ) { 
+    if ( x4 == X4m1 ) { 
         // Back Face (Upper spinors) 
         sp_stride = Vs;
 
-        sp_idx = sid + SPINOR_HOP*sp_body_stride;
-	sp_norm_idx = sid + sp_body_stride;
+	sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_body_stride;
+	
+	// need extra Vs addition since we require the lower norm buffer
+	sp_norm_idx = sid - (Vh - Vs) + sp_body_stride;
+
+	//        sp_idx = sid + SPINOR_HOP*sp_body_stride;
+	//  sp_norm_idx = sid + sp_body_stride;
     }
     else { 
         sp_stride = sp_body_stride;
@@ -1011,7 +1016,7 @@ o32_re = o32_im = 0;
 
     int sp_idx;
     int sp_norm_idx;
-    if( x4 == X4m1 ) {
+    if( x4 == 0) {
        // Front face (lower spin components) 
        // sp_stride = sp_body_stride; 
        // sp_idx = sid+Vh-(X4X3X2X1mX3X2X1 >> 1);
@@ -1020,9 +1025,9 @@ o32_re = o32_im = 0;
        // NB: The data only starts Npad*Vs later 
        // but the READ_SPINOR_DOWN takes care of that...
 
-       sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_body_stride;
+       sp_idx = sid + SPINOR_HOP*sp_body_stride;
        // need extra Vs addition since we require the lower norm buffer
-       sp_norm_idx = sid - (Vh - Vs) + sp_body_stride + Vs;
+       sp_norm_idx = sid + sp_body_stride + Vs;
     }
     else { 
        sp_stride = sp_body_stride;
