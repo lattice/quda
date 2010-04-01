@@ -11,8 +11,14 @@
 #include <test_util.h>
 #include <dslash_reference.h>
 
+#define QMP_COMMS
+
+#ifdef QMP_COMMS
+#include <qmp.h>
+#endif
+
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 1;
+int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 int clover_yes = 0;
 
@@ -40,10 +46,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[0] = 8;
+  gauge_param.X[1] = 8;
+  gauge_param.X[2] = 8;
+  gauge_param.X[3] = 24;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -69,11 +75,11 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = gauge_param.cuda_prec;
 
-  gauge_param.ga_pad = 0;
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
+  gauge_param.ga_pad = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  inv_param.sp_pad = gauge_param.ga_pad;
+  inv_param.cl_pad = gauge_param.ga_pad;
 
   // gauge_param.ga_pad = 24*24*12;
   // inv_param.sp_pad = 24*24*12;
@@ -84,7 +90,7 @@ void init() {
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec = gauge_param.cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
@@ -186,12 +192,16 @@ void end() {
     freeParitySpinor(tmp);
   }
   endQuda();
+
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
 }
 
 double dslashCUDA() {
 
   // execute kernel
-  const int LOOPS = 100;
+  const int LOOPS = 10;
   printf("Executing %d kernel loops...", LOOPS);
   fflush(stdout);
   stopwatchStart();
@@ -275,6 +285,15 @@ void dslashRef() {
 
 int main(int argc, char **argv)
 {
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif
+
   init();
   
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
@@ -314,8 +333,8 @@ int main(int argc, char **argv)
       
       printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
       
-      //if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-      //else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
+      if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
+      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
   }    
   end();
 }

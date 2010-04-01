@@ -6,12 +6,12 @@ INC += -I../include -I.
 
 HDRS = blas_reference.h dslash_reference.h test_util.h
 
-TESTS = dslash_test invert_test su3_test pack_test blas_test
+TESTS = dslash_test #invert_test su3_test pack_test blas_test
 
 all: $(TESTS)
 
 dslash_test: dslash_test.o test_util.o dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -lqmp -o $@
 
 invert_test: invert_test.o test_util.o dslash_reference.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@

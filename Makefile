@@ -1,6 +1,4 @@
-all: make.inc lib
-
-# tests
+all: make.inc lib tests
 
 make.inc:
 	@echo 'Before building, please create make.inc from make.inc.example'

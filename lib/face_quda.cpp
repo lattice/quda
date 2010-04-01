@@ -13,12 +13,18 @@ QMP_msgmem_t mm_from_fwd;
 QMP_msgmem_t mm_send_back;
 QMP_msgmem_t mm_from_back;
 QMP_msghandle_t mh_send_fwd;
-QMP_msghandle_t mh_send_back;
 QMP_msghandle_t mh_from_fwd;
+QMP_msghandle_t mh_send_back;
 QMP_msghandle_t mh_from_back;
+
+QMP_msgmem_t mm_gauge_send_fwd;
+QMP_msgmem_t mm_gauge_from_back;
+QMP_msghandle_t mh_gauge_send_fwd;
+QMP_msghandle_t mh_gauge_from_back;
 #endif
 
 using namespace std;
+
 
 FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision)
 {
@@ -150,7 +156,7 @@ void freeFaceBuffer(FaceBuffer f)
   QMP_free_msgmem(mm_send_fwd);
   QMP_free_msgmem(mm_send_back);
   QMP_free_msgmem(mm_from_fwd);
-  QMP_free_msgmem(mm_send_back);
+  QMP_free_msgmem(mm_from_back);
 #else
 
 #ifndef __DEVICE_EMULATION__
@@ -548,3 +554,79 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
 }
 
 
+void transferGaugeFaces(void *gauge, void *gauge_face, Precision precision,
+			int veclength, ReconstructType reconstruct, int V, int Vs)
+{
+  int nblocks, ndim=4;
+  size_t linksize, blocksize, nbytes;
+  ptrdiff_t offset, stride;
+  void *g, *gf;
+
+  switch (reconstruct) {
+  case QUDA_RECONSTRUCT_NO:
+    linksize = 18;
+    break;
+  case QUDA_RECONSTRUCT_12:
+    linksize = 12;
+    break;
+  case QUDA_RECONSTRUCT_8:
+    linksize = 8;
+    break;
+  default:
+    errorQuda("Invalid reconstruct type");
+  }
+  nblocks = ndim*linksize/veclength;
+  blocksize = Vs*veclength*precision;
+  offset = (V-Vs)*veclength*precision;
+  stride = (V+Vs)*veclength*precision; // assume that pad = Vs
+  // stride = V*veclength*precision;
+  // nbytes = Vs*ndim*linksize*precision; /* for contiguous face buffer */
+
+#ifdef QMP_COMMS
+
+  g = (void *) ((char *) gauge + offset);
+  mm_gauge_send_fwd = QMP_declare_strided_msgmem(g, blocksize, nblocks, stride);
+  if (!mm_gauge_send_fwd) {
+    errorQuda("Unable to allocate gauge message mem");
+  }
+  // mm_gauge_from_back = QMP_declare_msgmem(gauge_face, nbytes); /* for contiguous face buffer */
+  mm_gauge_from_back = QMP_declare_strided_msgmem(gauge_face, blocksize, nblocks, stride);
+  if (!mm_gauge_from_back) { 
+    errorQuda("Unable to allocate gauge face message mem");
+  }
+
+  mh_gauge_send_fwd = QMP_declare_send_relative(mm_gauge_send_fwd, 3, +1, 0);
+  if (!mh_gauge_send_fwd) {
+    errorQuda("Unable to allocate gauge message handle");
+  }
+  mh_gauge_from_back = QMP_declare_receive_relative(mm_gauge_from_back, 3, -1, 0);
+  if (!mh_gauge_from_back) {
+    errorQuda("Unable to allocate gauge face message handle");
+  }
+
+  QMP_start(mh_gauge_send_fwd);
+  QMP_start(mh_gauge_from_back);
+  
+  QMP_wait(mh_gauge_send_fwd);
+  QMP_wait(mh_gauge_from_back);
+
+  QMP_free_msghandle(mh_gauge_send_fwd);
+  QMP_free_msghandle(mh_gauge_from_back);
+  QMP_free_msgmem(mm_gauge_send_fwd);
+  QMP_free_msgmem(mm_gauge_from_back);
+
+#else 
+
+  for (int i=0; i<nblocks; i++) {
+    g = (void *) ((char *) gauge + offset + i*stride);
+    gf = (void *) ((char *) gauge_face + i*stride);
+    // gf = (void *) ((char *) gauge_face + i*blocksize); /* for contiguous face buffer */
+#ifndef __DEVICE_EMULATION__
+    cudaMemcpy(gf, g, blocksize, cudaMemcpyHostToHost);
+#else
+    memcpy(gf, g, blocksize);
+#endif
+  }
+
+#endif // QMP_COMMS
+}

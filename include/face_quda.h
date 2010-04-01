@@ -7,7 +7,6 @@
 extern "C" {
 #endif
 
-
   FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision);
   void freeFaceBuffer(FaceBuffer bufs);
 
@@ -19,6 +18,9 @@ extern "C" {
   void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger);
 
   void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger);
+
+  void transferGaugeFaces(void *gauge, void *gauge_face, Precision precision,
+			  int veclength, ReconstructType reconstruct, int V, int Vs);
  
 #ifdef __cplusplus
 }
