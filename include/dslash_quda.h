@@ -14,33 +14,33 @@ extern "C" {
 
   // Double precision routines
   void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
+		   int oddBit, int daggerBit, cudaStream_t *);
 
   void dslash3DDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
+		   int oddBit, int daggerBit, cudaStream_t *);
 
   void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, double a);
+		       int oddBit, int daggerBit, ParitySpinor x, double a, cudaStream_t *);
 
   // Single precision routines
   void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
+		   int oddBit, int daggerBit, cudaStream_t *);
 
   void dslash3DSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
+		   int oddBit, int daggerBit, cudaStream_t *);
 
   void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, double a);
+		       int oddBit, int daggerBit, ParitySpinor x, double a, cudaStream_t *);
 
   // Half precision dslash routines
   void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
+		   int oddBit, int daggerBit, cudaStream_t *);
 
   void dslash3DHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
-		   int oddBit, int daggerBit);
+		   int oddBit, int daggerBit, cudaStream_t *);
 
   void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		       int oddBit, int daggerBit, ParitySpinor x, double a);
+		       int oddBit, int daggerBit, ParitySpinor x, double a, cudaStream_t *);
 
   // wrapper to above
   void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in,
@@ -66,31 +66,33 @@ extern "C" {
   void cloverDslashCuda(ParitySpinor out, FullGauge gauge,
 			FullClover cloverInv, ParitySpinor in, int parity,
 			int dagger);
+
   void cloverDslashDCuda(ParitySpinor res, FullGauge gauge,
 			 FullClover cloverInv, ParitySpinor spinor,
-			 int oddBit, int daggerBit);
+			 int oddBit, int daggerBit, cudaStream_t *);
   void cloverDslashSCuda(ParitySpinor res, FullGauge gauge,
 			 FullClover cloverInv, ParitySpinor spinor,
-			 int oddBit, int daggerBit);
+			 int oddBit, int daggerBit, cudaStream_t *);
   void cloverDslashHCuda(ParitySpinor res, FullGauge gauge,
 			 FullClover cloverInv, ParitySpinor spinor,
-			 int oddBit, int daggerBit);
+			 int oddBit, int daggerBit, cudaStream_t *);
 
   void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge,
 			    FullClover cloverInv, ParitySpinor in, int parity,
 			    int dagger, ParitySpinor x, double a);
+
   void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge,
 			     FullClover cloverInv, ParitySpinor spinor,
 			     int oddBit, int daggerBit, ParitySpinor x,
-			     double a);
+			     double a, cudaStream_t *);
   void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge,
 			     FullClover cloverInv, ParitySpinor spinor,
 			     int oddBit, int daggerBit, ParitySpinor x,
-			     double a);
+			     double a, cudaStream_t *);
   void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge,
 			     FullClover cloverInv, ParitySpinor spinor,
 			     int oddBit, int daggerBit, ParitySpinor x,
-			     double a);
+			     double a, cudaStream_t *);
 
   void cloverMatPCCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
 		       FullClover cloverInv, ParitySpinor in, double kappa,

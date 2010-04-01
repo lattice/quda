@@ -18,6 +18,7 @@ QMP_msghandle_t mh_gauge_from_back;
 
 using namespace std;
 
+cudaStream_t *stream;
 
 FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision)
 {
@@ -38,88 +39,88 @@ FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision)
 #ifndef __DEVICE_EMULATION__
    cudaMallocHost(&(ret.my_fwd_face), ret.nbytes);
 #else
-    ret.my_fwd_face = malloc(ret.nbytes);
+   ret.my_fwd_face = malloc(ret.nbytes);
 #endif
 
-    if( !ret.my_fwd_face ) { 
-      errorQuda("Unable to allocate my_fwd_face");
-    }
-
+   if( !ret.my_fwd_face ) { 
+     errorQuda("Unable to allocate my_fwd_face");
+   }
+   
 #ifndef __DEVICE_EMULATION__
-    cudaMallocHost(&(ret.my_back_face), ret.nbytes);
+   cudaMallocHost(&(ret.my_back_face), ret.nbytes);
 #else
-    ret.my_back_face = malloc(ret.nbytes);
+   ret.my_back_face = malloc(ret.nbytes);
 #endif
 
-    if( !ret.my_back_face ) { 
-      errorQuda("Unable to allocate my_back_face");
-    }
-
+   if( !ret.my_back_face ) { 
+     errorQuda("Unable to allocate my_back_face");
+   }
+   
 #ifndef __DEVICE_EMULATION__
-    cudaMallocHost(&(ret.from_fwd_face), ret.nbytes);
+   cudaMallocHost(&(ret.from_fwd_face), ret.nbytes);
 #else
-    ret.from_fwd_face = malloc(ret.nbytes);
+   ret.from_fwd_face = malloc(ret.nbytes);
 #endif
-
-    if( !ret.from_fwd_face ) { 
-      errorQuda("Unable to allocate from_fwd_face");
-    }
-
-
+   
+   if( !ret.from_fwd_face ) { 
+     errorQuda("Unable to allocate from_fwd_face");
+   }
+   
+   
 #ifndef __DEVICE_EMULATION__
-    cudaMallocHost(&(ret.from_back_face), ret.nbytes);
+   cudaMallocHost(&(ret.from_back_face), ret.nbytes);
 #else
-    ret.from_back_face = malloc(ret.nbytes);
+   ret.from_back_face = malloc(ret.nbytes);
 #endif
+   
 
-
-    if( !ret.from_back_face ) { 
-      errorQuda("Unable to allocate from_back_face");
-    }
-
-
+   if( !ret.from_back_face ) { 
+     errorQuda("Unable to allocate from_back_face");
+   }
+   
+   
 #ifdef QMP_COMMS
-    ret.mm_send_fwd = QMP_declare_msgmem(ret.my_fwd_face, ret.nbytes);
-    if( ret.mm_send_fwd == NULL ) { 
-      errorQuda("Unable to allocate send fwd message mem");
-    }
-    ret.mm_send_back = QMP_declare_msgmem(ret.my_back_face, ret.nbytes);
-    if( ret.mm_send_back == NULL ) { 
-      errorQuda("Unable to allocate send back message mem");
-    }
+   ret.mm_send_fwd = QMP_declare_msgmem(ret.my_fwd_face, ret.nbytes);
+   if( ret.mm_send_fwd == NULL ) { 
+     errorQuda("Unable to allocate send fwd message mem");
+   }
+   ret.mm_send_back = QMP_declare_msgmem(ret.my_back_face, ret.nbytes);
+   if( ret.mm_send_back == NULL ) { 
+     errorQuda("Unable to allocate send back message mem");
+   }
+   
 
-
-    ret.mm_from_fwd = QMP_declare_msgmem(ret.from_fwd_face, ret.nbytes);
-    if( ret.mm_from_fwd == NULL ) { 
-      errorQuda("Unable to allocate recv from fwd message mem");
-    }
-
-    ret.mm_from_back = QMP_declare_msgmem(ret.from_back_face, ret.nbytes);
-    if( ret.mm_from_back == NULL ) { 
-      errorQuda("Unable to allocate recv from back message mem");
-    }
-
-    ret.mh_send_fwd = QMP_declare_send_relative(ret.mm_send_fwd,
-					    3,
-					    +1, 
-					    0);
-    if( ret.mh_send_fwd == NULL ) {
-      errorQuda("Unable to allocate forward send");
-    }
-
+   ret.mm_from_fwd = QMP_declare_msgmem(ret.from_fwd_face, ret.nbytes);
+   if( ret.mm_from_fwd == NULL ) { 
+     errorQuda("Unable to allocate recv from fwd message mem");
+   }
+   
+   ret.mm_from_back = QMP_declare_msgmem(ret.from_back_face, ret.nbytes);
+   if( ret.mm_from_back == NULL ) { 
+     errorQuda("Unable to allocate recv from back message mem");
+   }
+   
+   ret.mh_send_fwd = QMP_declare_send_relative(ret.mm_send_fwd,
+					       3,
+					       +1, 
+					       0);
+   if( ret.mh_send_fwd == NULL ) {
+     errorQuda("Unable to allocate forward send");
+   }
+   
     ret.mh_send_back = QMP_declare_send_relative(ret.mm_send_back, 
-					     3,
-					     -1,
-					     0);
+						 3,
+						 -1,
+						 0);
     if( ret.mh_send_back == NULL ) {
       errorQuda("Unable to allocate backward send");
     }
     
     
     ret.mh_from_fwd = QMP_declare_receive_relative(ret.mm_from_fwd,
-					    3,
-					    +1,
-					    0);
+						   3,
+						   +1,
+						   0);
     if( ret.mh_from_fwd == NULL ) {
       errorQuda("Unable to allocate forward recv");
     }
@@ -197,11 +198,11 @@ void exchangeFaces(FaceBuffer bufs)
 #else 
 
 #ifndef __DEVICE_EMULATION__
-  cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
-	     cudaMemcpyHostToHost);
+  cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
+		  cudaMemcpyHostToHost, *stream);
 
-  cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
-	     cudaMemcpyHostToHost);
+  cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
+		  cudaMemcpyHostToHost, *stream);
 
 #else
   memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
@@ -211,8 +212,11 @@ void exchangeFaces(FaceBuffer bufs)
    
 }
 
-void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger)
+void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger, 
+			cudaStream_t *stream_p)
 {
+  stream = stream_p;
+
 #ifdef QMP_COMMS
   // Prepost all receives
   QMP_start(face.mh_from_fwd);
@@ -229,8 +233,11 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger)
 }
 
 
-void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
+void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger,
+		       cudaStream_t *stream_p)
 {
+  stream = stream_p;
+
 #ifdef QMP_COMMS
   // Make sure all outstanding sends are done
   QMP_wait(face.mh_send_back);
@@ -242,11 +249,11 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
 #else
 // NO QMP -- do copies
 #ifndef __DEVICE_EMULATION__
-  cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
-	     cudaMemcpyHostToHost);
+  cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
+		  cudaMemcpyHostToHost, *stream);
 
-  cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
-	     cudaMemcpyHostToHost);
+  cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
+		  cudaMemcpyHostToHost, *stream);
 
 #else
   memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
@@ -275,30 +282,30 @@ void gather12Float(Float* dest, Float* spinor, int Vs, int V, int stride, bool u
   for(int i=0; i < Npad; i++) {
     if( upper ) { 
       if( tIsZero ) { 
-        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
+        cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
                    (void *)(spinor + t_zero_offset + i*vecLen*stride),
 	           vecLen*Vs*sizeof(Float),
-                   cudaMemcpyDeviceToHost );      
+			cudaMemcpyDeviceToHost, *stream );      
       }
       else {
-        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
+        cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
                    (void *)(spinor + Nt_minus_one_offset + i*vecLen*stride),
 	           vecLen*Vs*sizeof(Float),
-                   cudaMemcpyDeviceToHost );      
+			cudaMemcpyDeviceToHost, *stream );      
       }
     }
     else {
       if( tIsZero ) { 
-        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
-                   (void *)(spinor + lower_spin_offset + t_zero_offset + i*vecLen*stride),
-	           vecLen*Vs*sizeof(Float),
-                   cudaMemcpyDeviceToHost );      
+        cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
+			(void *)(spinor + lower_spin_offset + t_zero_offset + i*vecLen*stride),
+			vecLen*Vs*sizeof(Float),
+			cudaMemcpyDeviceToHost, *stream );      
       }
       else {
-        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
+        cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
                    (void *)(spinor + lower_spin_offset + Nt_minus_one_offset + i*vecLen*stride),
 	           vecLen*Vs*sizeof(Float),
-                   cudaMemcpyDeviceToHost );      
+			cudaMemcpyDeviceToHost, *stream );      
       }
     }
   }
@@ -312,15 +319,15 @@ void gatherNorm(Float* dest, Float* norm, int Vs, int V, int stride, bool tIsZer
   int Nt_minus_one_offset=V - Vs; // N_t -1 = V-Vs.
  
   if( tIsZero ) { 
-    cudaMemcpy((void *)dest, 
-	       (void *)(norm + t_zero_offset),
-	       Vs*sizeof(Float),
-	       cudaMemcpyDeviceToHost );      
+    cudaMemcpyAsync((void *)dest, 
+		    (void *)(norm + t_zero_offset),
+		    Vs*sizeof(Float),
+		    cudaMemcpyDeviceToHost, *stream );      
   } else {
-    cudaMemcpy((void *)dest, 
+    cudaMemcpyAsync((void *)dest, 
 	       (void *)(norm + Nt_minus_one_offset),
-	       Vs*sizeof(Float),
-	       cudaMemcpyDeviceToHost );      
+		    Vs*sizeof(Float),
+		    cudaMemcpyDeviceToHost, *stream );      
   }
 
 }
@@ -341,14 +348,14 @@ void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, bool u
   int face_size = Npad*vecLen*Vs;
   
   if( upper ) { 
-    cudaMemcpy((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
+    cudaMemcpyAsync((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice, *stream);
   }
   else {
 #if 1
-    cudaMemcpy((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
+    cudaMemcpyAsync((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice, *stream);
 #else
     for(int i=0; i < Npad; i++) {
-      cudaMemcpy((void *)(spinor+vecLen*(V+(i+Npad)*stride) ), (void *)(buf+vecLen*i*Vs), vecLen*Vs*sizeof(Float), cudaMemcpyHostToDevice); 
+      cudaMemcpyAsync((void *)(spinor+vecLen*(V+(i+Npad)*stride) ), (void *)(buf+vecLen*i*Vs), vecLen*Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream); 
     }
 #endif
   }
@@ -362,9 +369,9 @@ void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper)
   int norm_end = stride;
   int face_size = Vs;
   if (upper) { // upper goes in the first norm zone
-    cudaMemcpy((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);  
+    cudaMemcpyAsync((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream);  
   } else { // lower goes in the second norm zone
-    cudaMemcpy((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);  
+    cudaMemcpyAsync((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream);  
   }
 }
 
@@ -615,7 +622,7 @@ void transferGaugeFaces(void *gauge, void *gauge_face, Precision precision,
     gf = (void *) ((char *) gauge_face + i*stride);
     // gf = (void *) ((char *) gauge_face + i*blocksize); /* for contiguous face buffer */
 #ifndef __DEVICE_EMULATION__
-    cudaMemcpy(gf, g, blocksize, cudaMemcpyHostToHost);
+    cudaMemcpyAsync(gf, g, blocksize, cudaMemcpyHostToHost, *stream);
 #else
     memcpy(gf, g, blocksize);
 #endif

@@ -47,6 +47,9 @@ int dslashCudaSharedBytes(Precision precision) {
 static int initDslash = 0;
 static int gridVolume;
 
+const int Nstreams = 2;
+cudaStream_t streams[Nstreams];
+
 void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   int Vh = gauge.volume;
 
@@ -141,6 +144,12 @@ void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   checkCudaError();
 
   initDslash = 1;
+
+  // create the streams
+  for (int i=0; i<Nstreams; i++)
+    cudaStreamCreate(&streams[i]);
+
+  //  streams = (cudaStream_t*) malloc(Nstreams * sizeof(cudaStream_t));
 }
 
 void initTLocation(int toffset, int tmul, int threads) {
@@ -185,21 +194,14 @@ static void bindGaugeTex(FullGauge gauge, int oddBit) {
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
   if (!initDslash) {
     initDslashConstants(gauge, in.stride, 0);
-    //faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
-
-  // This gathers from source spinors and starts comms
-  exchangeFacesStart(gauge.faces, in, dagger);
-
-  // This waits for comms to finish, and sprays into the 
-  // pads of the SOURCE spinor
-  exchangeFacesWait(gauge.faces, in, dagger);
-
-  // printf("Freeing Face Buffer");
-  //freeFaceBuffer(faceBufferPrecise);
 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
+
+  // This gathers from source spinors and starts comms
+  exchangeFacesStart(gauge.faces, in, dagger, &(streams[0]));
+  checkCudaError();
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
   
@@ -212,15 +214,20 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     initTLocation(tOffset, tMul, threads);
         
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger);
+      dslashDCuda(out, gauge, in, parity, dagger, &streams[1]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger);
+      dslashSCuda(out, gauge, in, parity, dagger, &streams[1]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger);
+      dslashHCuda(out, gauge, in, parity, dagger, &streams[1]);
     }
     checkCudaError();
-    }
+  }
     
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(gauge.faces, in, dagger, &streams[0]);
+  checkCudaError();
+
   // do faces
   {
     int tOffset = 0;
@@ -230,14 +237,16 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger);
+      dslashDCuda(out, gauge, in, parity, dagger, &streams[0]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger);
+      dslashSCuda(out, gauge, in, parity, dagger, &streams[0]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger);
+      dslashHCuda(out, gauge, in, parity, dagger, &streams[0]);
     }
     checkCudaError();
   }
+
+  cudaThreadSynchronize();
 
   // do all
   /*{
@@ -280,7 +289,7 @@ void dslash3DCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity
 #endif // BUILD_3D_DSLASH
 
 void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		 int oddBit, int daggerBit) {
+		 int oddBit, int daggerBit, cudaStream_t *stream) {
   
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -296,43 +305,43 @@ void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashDD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashDD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslashDD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashDD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashDD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashDD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslashDD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashDD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     }
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashSD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashSD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslashSD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashSD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashSD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashSD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslashSD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashSD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashHD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashHD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslashHD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashHD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashHD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashHD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslashHD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslashHD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     }
   }
@@ -344,7 +353,7 @@ void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
 
 void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		 int oddBit, int daggerBit) {
+		 int oddBit, int daggerBit, cudaStream_t *stream) {
   
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -362,15 +371,15 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 #if (__CUDA_ARCH__ == 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashDS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashDS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslashDS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashDS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashDS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashDS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslashDS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashDS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     }
 #else
@@ -379,29 +388,29 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashSS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashSS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslashSS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashSS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashSS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashSS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslashSS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashSS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashHS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashHS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslashHS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashHS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashHS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashHS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslashHS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslashHS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     }
   }
@@ -410,7 +419,7 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
 
 void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		 int oddBit, int daggerBit) {
+		 int oddBit, int daggerBit, cudaStream_t *stream) {
 
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -428,15 +437,15 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 #if (__CUDA_ARCH__ == 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashDH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashDH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslashDH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashDH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashDH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashDH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslashDH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashDH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     }
 #else
@@ -445,29 +454,29 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashSH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashSH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslashSH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashSH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashSH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashSH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslashSH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashSH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashHH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashHH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslashHH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashHH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslashHH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashHH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslashHH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslashHH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     }
   }
@@ -482,16 +491,11 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
- 
-  // This gathers from source spinors and starts comms
-  exchangeFacesStart(gauge.faces, in, dagger);
-
-  // This waits for comms to finish, and sprays into the 
-  // pads of the SOURCE spinor
-  exchangeFacesWait(gauge.faces, in, dagger);
-
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
+ 
+  // This gathers from source spinors and starts comms
+  exchangeFacesStart(gauge.faces, in, dagger, &streams[0]);
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
@@ -504,14 +508,18 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a);
+      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a, &streams[1]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
+      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a, &streams[1]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
+      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a, &streams[1]);
     }
     checkCudaError();
   }
+
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(gauge.faces, in, dagger, &streams[0]);
 
   // do faces
   {
@@ -522,11 +530,11 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a);
+      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a, &streams[0]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
+      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a, &streams[0]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
+      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a, &streams[0]);
     }
     checkCudaError();
   }
@@ -536,7 +544,8 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
 
 
 void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		     int oddBit, int daggerBit, ParitySpinor x, double a) {
+		     int oddBit, int daggerBit, ParitySpinor x, double a, 
+		     cudaStream_t *stream) {
 
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -553,46 +562,46 @@ void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashDD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashDD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       } else {
-	dslashDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashDD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashDD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
       else {
-	dslashDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
     }
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashSD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashSD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       } else {
-	dslashSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashSD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashSD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
       else {
-	dslashSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashHD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashHD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
     } else {
-	dslashHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
     }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashHD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashHD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
       else {
-	dslashHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	dslashHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
       }
     }
   }
@@ -603,7 +612,8 @@ void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 }
 
 void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		     int oddBit, int daggerBit, ParitySpinor x, double a) {
+		     int oddBit, int daggerBit, ParitySpinor x, double a, 
+		     cudaStream_t *stream) {
 
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -621,16 +631,16 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 #if (__CUDA_ARCH__ == 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashDS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashDS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       } else {
-	dslashDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashDS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashDS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
       else {
-	dslashDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
     }
 #else
@@ -639,31 +649,31 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashSS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashSS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       } else {
-	dslashSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashSS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashSS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
       else {
-	dslashSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashHS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashHS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
     } else {
-	dslashHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
     }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashHS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashHS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
       else {
-	dslashHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	dslashHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
       }
     }
   }
@@ -671,7 +681,8 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 }
 
 void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
-		     int oddBit, int daggerBit, ParitySpinor x, double a) {
+		     int oddBit, int daggerBit, ParitySpinor x, double a,
+		     cudaStream_t *stream) {
 
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -691,18 +702,18 @@ void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 #if (__CUDA_ARCH__ == 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashDH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	dslashDH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       } else {
-	dslashDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	dslashDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashDH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	dslashDH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       } else {
-	dslashDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       }
     }
@@ -712,36 +723,36 @@ void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashSH12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashSH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       } else {
-	dslashSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashSH8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashSH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       } else {
-	dslashSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslashHH12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashHH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       } else {
-	dslashHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       }
     } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
       if (!daggerBit) {
-	dslashHH8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashHH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       } else {
-	dslashHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	dslashHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	  ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
       }
     }
@@ -805,17 +816,12 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
- 
- // This gathers from source spinors and starts comms
-  exchangeFacesStart(gauge.faces, in, dagger);
-
-  // This waits for comms to finish, and sprays into the 
-  // pads of the SOURCE spinor
-  exchangeFacesWait(gauge.faces, in, dagger);
-
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
+
+  // This gathers from source spinors and starts comms
+  exchangeFacesStart(gauge.faces, in, dagger, &streams[0]);
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
@@ -828,14 +834,18 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger);
+      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger, &streams[1]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger);
+      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger, &streams[1]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
+      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger, &streams[1]);
     }
     checkCudaError();
   }
+
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(gauge.faces, in, dagger, &streams[0]);
 
   // do faces
   {
@@ -846,11 +856,11 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger);
+      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger, &streams[0]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger);
+      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger, &streams[0]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
+      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger, &streams[0]);
     }
     checkCudaError();
   }
@@ -859,7 +869,8 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
 }
 
 void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
-		       ParitySpinor spinor, int oddBit, int daggerBit)
+		       ParitySpinor spinor, int oddBit, int daggerBit, 
+		       cudaStream_t *stream)
 {
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -885,43 +896,43 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDDD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashDDD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDDD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashDDD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSDD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashSDD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSDD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashSDD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHDD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashHDD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHDD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashHDD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     }
@@ -929,43 +940,43 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDDS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashDDS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDDS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashDDS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSDS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashSDS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSDS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashSDS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHDS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashHDS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHDS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashHDS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     }
@@ -973,43 +984,43 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDDH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashDDH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDDH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashDDH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashDDH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSDH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashSDH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSDH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashSDH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashSDH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHDH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashHDH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHDH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	} else {
-	  dslashHDH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	  dslashHDH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
 	}
       }
     }
@@ -1021,7 +1032,8 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 }
 
 void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
-		       ParitySpinor spinor, int oddBit, int daggerBit)
+		       ParitySpinor spinor, int oddBit, int daggerBit,
+		       cudaStream_t *stream)
 {  
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -1047,43 +1059,43 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDSD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashDSD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDSD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashDSD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSSD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashSSD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSSD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashSSD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHSD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashHSD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHSD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashHSD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
     }
@@ -1095,15 +1107,15 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDSS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashDSS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDSS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashDSS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
 #else
@@ -1112,29 +1124,29 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSSS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashSSS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSSS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashSSS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHSS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashHSS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHSS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashHSS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
     }
@@ -1143,15 +1155,15 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDSH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashDSH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDSH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashDSH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashDSH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
 #else
@@ -1160,29 +1172,29 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSSH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashSSH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSSH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashSSH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashSSH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHSH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashHSH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHSH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	} else {
-	  dslashHSH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	  dslashHSH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
 	}
       }
     }
@@ -1190,7 +1202,8 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 }
 
 void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
-		       ParitySpinor spinor, int oddBit, int daggerBit)
+		       ParitySpinor spinor, int oddBit, int daggerBit,
+		       cudaStream_t *stream)
 {
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -1218,43 +1231,43 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDHD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashDHD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDHD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashDHD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSHD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashSHD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSHD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashSHD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHHD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashHHD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHHD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashHHD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
     }
@@ -1266,15 +1279,15 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDHS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashDHS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDHS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashDHS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
 #else
@@ -1283,29 +1296,29 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSHS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashSHS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSHS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashSHS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHHS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashHHS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHHS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashHHS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
     }
@@ -1314,15 +1327,15 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDHH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashDHH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashDHH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashDHH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashDHH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
 #else
@@ -1331,29 +1344,29 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSHH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashSHH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashSHH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashSHH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashSHH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHHH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashHHH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       } else {
 	if (!daggerBit) {
-	  dslashHHH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	} else {
-	  dslashHHH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	  dslashHHH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
 	}
       }
     }
@@ -1370,18 +1383,12 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
- 
-  // This gathers from source spinors and starts comms
-  exchangeFacesStart(gauge.faces, in, dagger);
-
-  // This waits for comms to finish, and sprays into the 
-  // pads of the SOURCE spinor
-  exchangeFacesWait(gauge.faces, in, dagger);
-
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
-
+ 
+  // This gathers from source spinors and starts comms
+  exchangeFacesStart(gauge.faces, in, dagger, &streams[0]);
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
@@ -1394,14 +1401,18 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
+      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[1]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
+      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[1]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
+      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[1]);
     }
     checkCudaError();
   }
+
+  // This waits for comms to finish, and sprays into the 
+  // pads of the SOURCE spinor
+  exchangeFacesWait(gauge.faces, in, dagger, &streams[0]);
 
   // do faces
   {
@@ -1412,11 +1423,11 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
+      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[0]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
+      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[0]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
+      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[0]);
     }
     checkCudaError();
   }
@@ -1424,9 +1435,9 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   dslash_quda_flops += (1320+504+48)*in.volume;
 }
 
-
-void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, ParitySpinor spinor, 
-			   int oddBit, int daggerBit, ParitySpinor x, double a)
+void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, 
+			   ParitySpinor spinor, int oddBit, int daggerBit, ParitySpinor x,
+			   double a, cudaStream_t *stream)
 {
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -1453,43 +1464,43 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDDD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDDD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSDD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSDD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHDD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHDD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     }
@@ -1497,43 +1508,43 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDDS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDDS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSDS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSDS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHDS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHDS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     }
@@ -1541,43 +1552,43 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDDH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDDH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashDDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSDH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSDH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashSDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHDH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHDH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit, a);
+	  dslashHDH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit, a);
 	}
       }
     }
@@ -1588,7 +1599,8 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 }
 
 void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, ParitySpinor spinor, 
-			   int oddBit, int daggerBit, ParitySpinor x, double a)
+			   int oddBit, int daggerBit, ParitySpinor x, double a,
+			   cudaStream_t *stream)
 {
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -1615,43 +1627,43 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDSD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDSD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSSD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSSD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHSD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHSD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
     }
@@ -1663,15 +1675,15 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDSS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDSS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
 #else
@@ -1680,29 +1692,29 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSSS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSSS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHSS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHSS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
     }
@@ -1711,15 +1723,15 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDSH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDSH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashDSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashDSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
 #else
@@ -1728,37 +1740,38 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSSH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSSH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashSSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashSSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHSH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHSH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	} else {
-	  dslashHSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit, a);
+	  dslashHSH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit, a);
 	}
       }
     }
   }
 }
 
-void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, ParitySpinor spinor, 
-			   int oddBit, int daggerBit, ParitySpinor x, double a)
+void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, 
+			   ParitySpinor spinor, int oddBit, int daggerBit, ParitySpinor x,
+			   double a, cudaStream_t *stream)
 {
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -1788,54 +1801,54 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDHD12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashDHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDHD8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashDHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashDHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSHD12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashSHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSHD8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashSHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHHD12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHD12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashHHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHD12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHHD8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHD8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashHHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHD8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
@@ -1848,18 +1861,18 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDHS12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashDHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDHS8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashDHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashDHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
@@ -1869,36 +1882,36 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSHS12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashSHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSHS8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashSHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHHS12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashHHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHS12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHHS8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHS8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashHHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHS8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
@@ -1908,18 +1921,18 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 #if (__CUDA_ARCH__ == 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashDHH12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashDHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashDHH8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  dslashDHH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashDHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashDHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
@@ -1929,36 +1942,36 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashSHH12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashSHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashSHH8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashSHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashSHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
     } else {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
-	  dslashHHH12XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashHHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHH12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       } else if (gauge.reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!daggerBit) {
-	  dslashHHH8XpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHH8XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	} else {
-	  dslashHHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  dslashHHH8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>>
 	    ((short4*)res.spinor, (float*)res.spinorNorm, oddBit, a);
 	}
       }
@@ -2192,43 +2205,43 @@ void dslash3DDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DDD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DDD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslash3DDD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DDD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DDD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DDD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslash3DDD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DDD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     }
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DSD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DSD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslash3DSD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DSD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DSD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DSD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslash3DSD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DSD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DHD12Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DHD12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslash3DHD12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DHD12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DHD8Kernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DHD8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       } else {
-	dslash3DHD8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, oddBit);
+	dslash3DHD8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((double2 *)res.spinor, oddBit);
       }
     }
   }
@@ -2253,44 +2266,44 @@ void dslash3DSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 #if (__CUDA_ARCH__ == 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DDS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DDS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslash3DDS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DDS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DDS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DDS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslash3DDS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DDS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     }
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DSS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DSS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslash3DSS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DSS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DSS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DSS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslash3DSS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DSS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DHS12Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DHS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslash3DHS12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DHS12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DHS8Kernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DHS8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       } else {
-	dslash3DHS8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, oddBit);
+	dslash3DHS8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
       }
     }
   }
@@ -2316,44 +2329,44 @@ void dslash3DHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 #if (__CUDA_ARCH__ == 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DDH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DDH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslash3DDH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DDH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DDH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DDH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslash3DDH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DDH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     }
 #endif
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DSH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DSH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslash3DSH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DSH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DSH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DSH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslash3DSH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DSH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
-	dslash3DHH12Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DHH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslash3DHH12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DHH12DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     } else {
       if (!daggerBit) {
-	dslash3DHH8Kernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DHH8Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       } else {
-	dslash3DHH8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
+	dslash3DHH8DaggerKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
       }
     }
   }
