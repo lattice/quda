@@ -265,6 +265,7 @@ volatile spinorFloat o32_im;
 #define sp_idx sid // alias needed by READ_SPINOR()
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= threads) return;
 int sp_stride = sp_body_stride;
 
 #ifdef SPINOR_DOUBLE

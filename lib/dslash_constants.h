@@ -52,3 +52,4 @@ __constant__ bool PtNm1;
 
 // Constants required for doing bulk vs faces
 __constant__ short2 tLocate;
+__constant__ int threads;

@@ -45,7 +45,7 @@ int dslashCudaSharedBytes(Precision precision) {
 #include <dslash_common.h>
 
 static int initDslash = 0;
-static int threadVolume;
+static int gridVolume;
 
 void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   int Vh = gauge.volume;
@@ -62,9 +62,9 @@ void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
 
   cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 
-  if (Vh%BLOCK_DIM != 0) {
-    errorQuda("Error, Volume not a multiple of the thread block size");
-  }
+  /*  if (Vh%BLOCK_DIM != 0) {
+    errorQuda("Volume not a multiple of the thread block size");
+    }*/
 
   int X1 = 2*gauge.X[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
@@ -143,10 +143,11 @@ void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   initDslash = 1;
 }
 
-void initTLocation(int toffset, int tmul) {
+void initTLocation(int toffset, int tmul, int threads) {
 
-  short2 tLocate = make_short2(toffset, tmul);
+  short2 tLocate = make_short2((short)toffset, (short)tmul);
   cudaMemcpyToSymbol("tLocate", &(tLocate), sizeof(short2));
+  cudaMemcpyToSymbol("threads", &(threads), sizeof(threads));
 
 }
 
@@ -200,13 +201,33 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
+  int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+  
   // do body
   {
     int tOffset = 1;
     int tMul = 1;
-    initTLocation(tOffset, tMul);
-    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = (in.volume - 2*Vs) /BLOCK_DIM;
+    int threads = in.volume - 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
+        
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      dslashDCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      dslashSCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      dslashHCuda(out, gauge, in, parity, dagger);
+    }
+    checkCudaError();
+    }
+    
+  // do faces
+  {
+    int tOffset = 0;
+    int tMul = gauge.X[3] - 1;
+    int threads = 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
@@ -218,14 +239,14 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     checkCudaError();
   }
 
-  // do faces
-  {
+  // do all
+  /*{
     int tOffset = 0;
-    int tMul = gauge.X[3] - 1;
-    initTLocation(tOffset, tMul);
-    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = 2*Vs / BLOCK_DIM;
-    
+    int tMul = 1;
+    int threads = in.volume;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
+        
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
@@ -234,7 +255,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
       dslashHCuda(out, gauge, in, parity, dagger);
     }
     checkCudaError();
-  }
+    }*/
 
   dslash_quda_flops += 1320*in.volume;
 }
@@ -261,7 +282,7 @@ void dslash3DCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity
 void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
   
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   bindGaugeTex(gauge, oddBit);
@@ -325,7 +346,7 @@ void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
   
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   //
   
@@ -391,7 +412,7 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
 
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   bindGaugeTex(gauge, oddBit);
@@ -472,20 +493,22 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
+  int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+
   // do body
   {
     int tOffset = 1;
     int tMul = 1;
-    initTLocation(tOffset, tMul);
-    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = (in.volume - 2*Vs) /BLOCK_DIM;
+    int threads = in.volume - 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger);
+      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger);
+      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger);
+      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
     }
     checkCudaError();
   }
@@ -494,34 +517,20 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   {
     int tOffset = 0;
     int tMul = gauge.X[3] - 1;
-    initTLocation(tOffset, tMul);
-    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = 2*Vs / BLOCK_DIM;
+    int threads = 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger);
+      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger);
+      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger);
+      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
     }
     checkCudaError();
   }
 
-  /*  int tOffset = 0;
-  int tMul = 1;
-  initTLocation(tOffset, tMul);
-  threadVolume = in.volume/BLOCK_DIM;
-
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    dslashXpayDCuda(out, gauge, in, parity, dagger, x, a);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    dslashXpaySCuda(out, gauge, in, parity, dagger, x, a);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
-  }
-  checkCudaError();*/
- 
   dslash_quda_flops += (1320+48)*in.volume;
 }
 
@@ -529,7 +538,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
 void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		     int oddBit, int daggerBit, ParitySpinor x, double a) {
 
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   bindGaugeTex(gauge, oddBit);
@@ -596,7 +605,7 @@ void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		     int oddBit, int daggerBit, ParitySpinor x, double a) {
 
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   bindGaugeTex(gauge, oddBit);
@@ -664,7 +673,7 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		     int oddBit, int daggerBit, ParitySpinor x, double a) {
 
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
     
   bindGaugeTex(gauge, oddBit);
@@ -808,16 +817,43 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
 
-  threadVolume = in.volume/BLOCK_DIM;
+  int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
+  // do body
+  {
+    int tOffset = 1;
+    int tMul = 1;
+    int threads = in.volume - 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
+    }
+    checkCudaError();
   }
-  checkCudaError();
+
+  // do faces
+  {
+    int tOffset = 0;
+    int tMul = gauge.X[3] - 1;
+    int threads = 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger);
+    }
+    checkCudaError();
+  }
 
   dslash_quda_flops += (1320+504)*in.volume;
 }
@@ -825,7 +861,7 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
 void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 		       ParitySpinor spinor, int oddBit, int daggerBit)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -987,7 +1023,7 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 		       ParitySpinor spinor, int oddBit, int daggerBit)
 {  
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -1156,7 +1192,7 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 		       ParitySpinor spinor, int oddBit, int daggerBit)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -1342,24 +1378,27 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   // pads of the SOURCE spinor
   exchangeFacesWait(gauge.faces, in, dagger);
 
- checkSpinor(in, out);
+  checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
+
+
+  int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
   // do body
   {
     int tOffset = 1;
     int tMul = 1;
-    initTLocation(tOffset, tMul);
-    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = (in.volume - 2*Vs)/BLOCK_DIM;
+    int threads = in.volume - 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger);
+      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger);
+      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger);
+      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
     }
     checkCudaError();
   }
@@ -1368,33 +1407,19 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   {
     int tOffset = 0;
     int tMul = gauge.X[3] - 1;
-    initTLocation(tOffset, tMul);
-    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = 2*Vs / BLOCK_DIM;
+    int threads = 2*Vs;
+    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+    initTLocation(tOffset, tMul, threads);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger);
+      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger);
+      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger);
+      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
     }
     checkCudaError();
   }
-
-  /*  int tOffset = 0;
-  int tMul = 1;
-  initTLocation(tOffset, tMul);
-  threadVolume = in.volume/BLOCK_DIM;
-
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
-  }
-  checkCudaError();*/
 
   dslash_quda_flops += (1320+504+48)*in.volume;
 }
@@ -1403,7 +1428,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
 void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, ParitySpinor spinor, 
 			   int oddBit, int daggerBit, ParitySpinor x, double a)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -1565,7 +1590,7 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, ParitySpinor spinor, 
 			   int oddBit, int daggerBit, ParitySpinor x, double a)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -1735,7 +1760,7 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, ParitySpinor spinor, 
 			   int oddBit, int daggerBit, ParitySpinor x, double a)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -2019,16 +2044,15 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
     //faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
- 
-  
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, clover);
 
   int tOffset = 0;
   int tMul = 1;
-  initTLocation(tOffset, tMul);
-  threadVolume = in.volume/BLOCK_DIM;
+  int threads = in.volume;
+  gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
+  initTLocation(tOffset, tMul, threads);
 
   if (in.precision == QUDA_DOUBLE_PRECISION) {
     cloverDCuda(out, gauge, clover, in, parity);
@@ -2045,7 +2069,7 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
 void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 		 ParitySpinor spinor, int oddBit)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -2080,7 +2104,7 @@ void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 void cloverSCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 		 ParitySpinor spinor, int oddBit)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -2115,7 +2139,7 @@ void cloverSCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 		 ParitySpinor spinor, int oddBit)
 {
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
@@ -2154,7 +2178,7 @@ void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 void dslash3DDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
   
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   bindGaugeTex(gauge, oddBit);
@@ -2215,7 +2239,7 @@ void dslash3DDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 void dslash3DSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
   
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   bindGaugeTex(gauge, oddBit);
@@ -2277,7 +2301,7 @@ void dslash3DSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 void dslash3DHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor, 
 		 int oddBit, int daggerBit) {
 
-  dim3 gridDim(threadVolume, 1, 1);
+  dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   bindGaugeTex(gauge, oddBit);

@@ -20,7 +20,7 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 0;
+int clover_yes = 1;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -37,8 +37,8 @@ void *spinorRef, *spinorRefEven, *spinorRefOdd;
 void *spinorGPU, *spinorGPUEven, *spinorGPUOdd;
 
 double kappa = 1.0;
-int parity = 1;   // even or odd? (0 = even, 1 = odd)
-int dagger = 0;   // apply Dslash or Dslash dagger?
+int parity = 0;   // even or odd? (0 = even, 1 = odd)
+int dagger = 1;   // apply Dslash or Dslash dagger?
 int transfer = 0; // include transfer time in the benchmark?
 
 void init() {
@@ -46,9 +46,9 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 8;
-  gauge_param.X[1] = 8;
-  gauge_param.X[2] = 8;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
   gauge_param.X[3] = 24;
   setDims(gauge_param.X);
 
