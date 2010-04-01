@@ -879,14 +879,11 @@ o32_re = o32_im = 0;
 	
 	// need extra Vs addition since we require the lower norm buffer
 	sp_norm_idx = sid - (Vh - Vs) + sp_body_stride;
-
-	//        sp_idx = sid + SPINOR_HOP*sp_body_stride;
-	//  sp_norm_idx = sid + sp_body_stride;
     }
     else { 
-        sp_stride = sp_body_stride;
-        sp_idx = (X - X3X2X1) >> 1;
-	sp_norm_idx = sp_idx;
+      sp_stride = sp_body_stride;
+      sp_idx = (X+X3X2X1) >> 1;
+      sp_norm_idx = sp_idx;
     }
 
     int ga_idx = sid;
@@ -1030,9 +1027,9 @@ o32_re = o32_im = 0;
        sp_norm_idx = sid + sp_body_stride + Vs;
     }
     else { 
-       sp_stride = sp_body_stride;
-       sp_idx = (X+X3X2X1) >> 1;
-       sp_norm_idx = sp_idx;
+      sp_stride = sp_body_stride;
+      sp_idx = (X-X3X2X1) >> 1;
+      sp_norm_idx = sp_idx;
     }
 
     int ga_idx = (x4==0) ? sid+Vh : sp_idx;
