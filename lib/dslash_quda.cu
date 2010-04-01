@@ -45,10 +45,10 @@ int dslashCudaSharedBytes(Precision precision) {
 #include <dslash_common.h>
 
 static int initDslash = 0;
-static FaceBuffer faceBufferPrecise;
+extern FaceBuffer faceBufferPrecise;
 
 // For later
-static FaceBuffer faceBufferSloppy; 
+extern FaceBuffer faceBufferSloppy; 
 
 void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   int Vh = gauge.volume;
@@ -183,7 +183,7 @@ static void bindGaugeTex(FullGauge gauge, int oddBit) {
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
   if (!initDslash) {
     initDslashConstants(gauge, in.stride, 0);
-    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+    //faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
   // This gathers from source spinors and starts comms
@@ -430,7 +430,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
 //  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
   if (!initDslash) {
     initDslashConstants(gauge, in.stride, 0);
-    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+    // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
  
@@ -724,7 +724,7 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
 
   if (!initDslash) {
     initDslashConstants(gauge, in.stride, cloverInv.even.stride);
-    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+    // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
  
@@ -1260,7 +1260,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
  
   if (!initDslash) {
     initDslashConstants(gauge, in.stride, cloverInv.even.stride);
-    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+    // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
  
@@ -1904,7 +1904,7 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
  // if (!initDslash) initDslashConstants(gauge, in.stride, clover.even.stride);
   if (!initDslash) {
     initDslashConstants(gauge, in.stride, clover.even.stride);
-    faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
+    //faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
   }    
 
  

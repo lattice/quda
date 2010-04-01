@@ -34,6 +34,11 @@ extern bool qudaPt0;
 extern bool qudaPtNm1;
 #endif
 
+#include "face_quda.h"
+
+FaceBuffer faceBufferPrecise;
+FaceBuffer faceBufferSloppy;
+
 // define newQudaGaugeParam() and newQudaInvertParam()
 #define INIT_PARAM
 #include "check_params.h"
@@ -176,15 +181,20 @@ void loadGaugeQuda(void *h_gauge, void *h_gauge_minus, QudaGaugeParam *param)
 		   param->anisotropy, 
 		   param->ga_pad);
 
+  faceBufferPrecise=allocateFaceBuffer(cudaGaugePrecise.X[0]*cudaGaugePrecise.X[1]*cudaGaugePrecise.X[2], cudaGaugePrecise.volume, cudaGaugePrecise.stride, cudaGaugePrecise.precision);
+ 
   param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (param->cuda_prec_sloppy != param->cuda_prec ||
       param->reconstruct_sloppy != param->reconstruct) {
     createGaugeField(&cudaGaugeSloppy, h_gauge, h_gauge_minus,param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
 		     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
 		     param->X, param->anisotropy, param->ga_pad);
+
+    faceBufferSloppy=allocateFaceBuffer(cudaGaugeSloppy.X[0]*cudaGaugeSloppy.X[1]*cudaGaugeSloppy.X[2], cudaGaugeSloppy.volume, cudaGaugeSloppy.stride, cudaGaugeSloppy.precision);
     param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
+    faceBufferSloppy = faceBufferPrecise;
   }
 }
 
@@ -272,6 +282,10 @@ void endQuda(void)
   freeSpinorBuffer();
   freeGaugeField(&cudaGaugePrecise);
   freeGaugeField(&cudaGaugeSloppy);
+
+  freeFaceBuffer(faceBufferPrecise);
+  freeFaceBuffer(faceBufferSloppy);
+
   if (cudaCloverPrecise.even.clover) freeCloverField(&cudaCloverPrecise);
   if (cudaCloverSloppy.even.clover) freeCloverField(&cudaCloverSloppy);
   if (cudaCloverInvPrecise.even.clover) freeCloverField(&cudaCloverInvPrecise);
