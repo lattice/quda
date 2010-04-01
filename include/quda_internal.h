@@ -54,6 +54,18 @@ extern "C" {
     int stride; 
     Precision precision;
     int nbytes;
+#ifdef QMP_COMMS
+    QMP_msgmem_t mm_send_fwd;
+    QMP_msgmem_t mm_from_fwd;
+    QMP_msgmem_t mm_send_back;
+    QMP_msgmem_t mm_from_back;
+
+    QMP_msghandle_t mh_send_fwd;
+    QMP_msghandle_t mh_from_fwd;
+    QMP_msghandle_t mh_send_back;
+    QMP_msghandle_t mh_from_back;
+#endif
+
   } FaceBuffer;
  
 

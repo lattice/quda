@@ -8,15 +8,8 @@
 #define QMP_COMMS
 #ifdef QMP_COMMS
 #include <qmp.h>
-QMP_msgmem_t mm_send_fwd;
-QMP_msgmem_t mm_from_fwd;
-QMP_msgmem_t mm_send_back;
-QMP_msgmem_t mm_from_back;
-QMP_msghandle_t mh_send_fwd;
-QMP_msghandle_t mh_from_fwd;
-QMP_msghandle_t mh_send_back;
-QMP_msghandle_t mh_from_back;
 
+// This is now just for the gauge face.
 QMP_msgmem_t mm_gauge_send_fwd;
 QMP_msgmem_t mm_gauge_from_back;
 QMP_msghandle_t mh_gauge_send_fwd;
@@ -86,56 +79,56 @@ FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision)
 
 
 #ifdef QMP_COMMS
-    mm_send_fwd = QMP_declare_msgmem(ret.my_fwd_face, ret.nbytes);
-    if( mm_send_fwd == NULL ) { 
+    ret.mm_send_fwd = QMP_declare_msgmem(ret.my_fwd_face, ret.nbytes);
+    if( ret.mm_send_fwd == NULL ) { 
       errorQuda("Unable to allocate send fwd message mem");
     }
-    mm_send_back = QMP_declare_msgmem(ret.my_back_face, ret.nbytes);
-    if( mm_send_back == NULL ) { 
+    ret.mm_send_back = QMP_declare_msgmem(ret.my_back_face, ret.nbytes);
+    if( ret.mm_send_back == NULL ) { 
       errorQuda("Unable to allocate send back message mem");
     }
 
 
-    mm_from_fwd = QMP_declare_msgmem(ret.from_fwd_face, ret.nbytes);
-    if( mm_from_fwd == NULL ) { 
+    ret.mm_from_fwd = QMP_declare_msgmem(ret.from_fwd_face, ret.nbytes);
+    if( ret.mm_from_fwd == NULL ) { 
       errorQuda("Unable to allocate recv from fwd message mem");
     }
 
-    mm_from_back = QMP_declare_msgmem(ret.from_back_face, ret.nbytes);
-    if( mm_from_back == NULL ) { 
+    ret.mm_from_back = QMP_declare_msgmem(ret.from_back_face, ret.nbytes);
+    if( ret.mm_from_back == NULL ) { 
       errorQuda("Unable to allocate recv from back message mem");
     }
 
-    mh_send_fwd = QMP_declare_send_relative(mm_send_fwd,
+    ret.mh_send_fwd = QMP_declare_send_relative(ret.mm_send_fwd,
 					    3,
 					    +1, 
 					    0);
-    if( mh_send_fwd == NULL ) {
+    if( ret.mh_send_fwd == NULL ) {
       errorQuda("Unable to allocate forward send");
     }
 
-    mh_send_back = QMP_declare_send_relative(mm_send_back, 
+    ret.mh_send_back = QMP_declare_send_relative(ret.mm_send_back, 
 					     3,
 					     -1,
 					     0);
-    if( mh_send_back == NULL ) {
+    if( ret.mh_send_back == NULL ) {
       errorQuda("Unable to allocate backward send");
     }
     
     
-    mh_from_fwd = QMP_declare_receive_relative(mm_from_fwd,
+    ret.mh_from_fwd = QMP_declare_receive_relative(ret.mm_from_fwd,
 					    3,
 					    +1,
 					    0);
-    if( mh_from_fwd == NULL ) {
+    if( ret.mh_from_fwd == NULL ) {
       errorQuda("Unable to allocate forward recv");
     }
     
-    mh_from_back = QMP_declare_receive_relative(mm_from_back, 
+    ret.mh_from_back = QMP_declare_receive_relative(ret.mm_from_back, 
 					     3,
 					     -1,
 					     0);
-    if( mh_from_back == NULL ) {
+    if( ret.mh_from_back == NULL ) {
       errorQuda("Unable to allocate backward recv");
     }
 
@@ -149,14 +142,14 @@ void freeFaceBuffer(FaceBuffer f)
 {
 
 #ifdef QMP_COMMS
-  QMP_free_msghandle(mh_send_fwd);
-  QMP_free_msghandle(mh_send_back);
-  QMP_free_msghandle(mh_from_fwd);
-  QMP_free_msghandle(mh_from_back);
-  QMP_free_msgmem(mm_send_fwd);
-  QMP_free_msgmem(mm_send_back);
-  QMP_free_msgmem(mm_from_fwd);
-  QMP_free_msgmem(mm_from_back);
+  QMP_free_msghandle(f.mh_send_fwd);
+  QMP_free_msghandle(f.mh_send_back);
+  QMP_free_msghandle(f.mh_from_fwd);
+  QMP_free_msghandle(f.mh_from_back);
+  QMP_free_msgmem(f.mm_send_fwd);
+  QMP_free_msgmem(f.mm_send_back);
+  QMP_free_msgmem(f.mm_from_fwd);
+  QMP_free_msgmem(f.mm_from_back);
 #else
 
 #ifndef __DEVICE_EMULATION__
@@ -188,17 +181,17 @@ void exchangeFaces(FaceBuffer bufs)
 #ifdef QMP_COMMS
 
 
-  QMP_start(mh_from_fwd);
-  QMP_start(mh_from_back);
+  QMP_start(bufs.mh_from_fwd);
+  QMP_start(bufs.mh_from_back);
 
-  QMP_start(mh_send_back);
-  QMP_start(mh_send_fwd);
+  QMP_start(bufs.mh_send_back);
+  QMP_start(bufs.mh_send_fwd);
 
-  QMP_wait(mh_send_back);
-  QMP_wait(mh_send_fwd);
+  QMP_wait(bufs.mh_send_back);
+  QMP_wait(bufs.mh_send_fwd);
 
-  QMP_wait(mh_from_fwd);
-  QMP_wait(mh_from_back);
+  QMP_wait(bufs.mh_from_fwd);
+  QMP_wait(bufs.mh_from_back);
 
   
 #else 
@@ -222,16 +215,16 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger)
 {
 #ifdef QMP_COMMS
   // Prepost all receives
-  QMP_start(mh_from_fwd);
-  QMP_start(mh_from_back);
+  QMP_start(face.mh_from_fwd);
+  QMP_start(face.mh_from_back);
 #endif
   // Gather into face...
   gatherFromSpinor(face, in, dagger);
 
 #ifdef QMP_COMMS
   // Begin all sends 
-  QMP_start(mh_send_back);
-  QMP_start(mh_send_fwd);
+  QMP_start(face.mh_send_back);
+  QMP_start(face.mh_send_fwd);
 #endif
 }
 
@@ -240,12 +233,12 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
 {
 #ifdef QMP_COMMS
   // Make sure all outstanding sends are done
-  QMP_wait(mh_send_back);
-  QMP_wait(mh_send_fwd);
+  QMP_wait(face.mh_send_back);
+  QMP_wait(face.mh_send_fwd);
 
   // Finish receives
-  QMP_wait(mh_from_back);
-  QMP_wait(mh_from_fwd);
+  QMP_wait(face.mh_from_back);
+  QMP_wait(face.mh_from_fwd);
 #else
 // NO QMP -- do copies
 #ifndef __DEVICE_EMULATION__
