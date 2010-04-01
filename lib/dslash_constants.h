@@ -49,3 +49,6 @@ __constant__ bool Pt0;
 
 // Are we processor Nt-1 in time?
 __constant__ bool PtNm1;
+
+// Constants required for doing bulk vs faces
+__constant__ short2 tLocate;
