@@ -200,19 +200,41 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
-  int tOffset = 0;
-  int tMul = 1;
-  initTLocation(tOffset, tMul);
-  threadVolume = in.volume/BLOCK_DIM;
-
-  if (in.precision == QUDA_DOUBLE_PRECISION) {
-    dslashDCuda(out, gauge, in, parity, dagger);
-  } else if (in.precision == QUDA_SINGLE_PRECISION) {
-    dslashSCuda(out, gauge, in, parity, dagger);
-  } else if (in.precision == QUDA_HALF_PRECISION) {
-    dslashHCuda(out, gauge, in, parity, dagger);
+  // do body
+  {
+    int tOffset = 1;
+    int tMul = 1;
+    initTLocation(tOffset, tMul);
+    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+    threadVolume = in.volume/BLOCK_DIM - 2*Vs;
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      dslashDCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      dslashSCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      dslashHCuda(out, gauge, in, parity, dagger);
+    }
+    checkCudaError();
   }
-  checkCudaError();
+
+  // do faces
+  {
+    int tOffset = 0;
+    int tMul = gauge.X[3] - 1;
+    initTLocation(tOffset, tMul);
+    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+    threadVolume = 2*Vs;
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      dslashDCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      dslashSCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      dslashHCuda(out, gauge, in, parity, dagger);
+    }
+    checkCudaError();
+  }
 
   dslash_quda_flops += 1320*in.volume;
 }
@@ -450,7 +472,43 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
 
-  int tOffset = 0;
+  // do body
+  {
+    int tOffset = 1;
+    int tMul = 1;
+    initTLocation(tOffset, tMul);
+    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+    threadVolume = in.volume/BLOCK_DIM - 2*Vs;
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      dslashDCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      dslashSCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      dslashHCuda(out, gauge, in, parity, dagger);
+    }
+    checkCudaError();
+  }
+
+  // do faces
+  {
+    int tOffset = 0;
+    int tMul = gauge.X[3] - 1;
+    initTLocation(tOffset, tMul);
+    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+    threadVolume = 2*Vs;
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      dslashDCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      dslashSCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      dslashHCuda(out, gauge, in, parity, dagger);
+    }
+    checkCudaError();
+  }
+
+  /*  int tOffset = 0;
   int tMul = 1;
   initTLocation(tOffset, tMul);
   threadVolume = in.volume/BLOCK_DIM;
@@ -462,7 +520,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   } else if (in.precision == QUDA_HALF_PRECISION) {
     dslashXpayHCuda(out, gauge, in, parity, dagger, x, a);
   }
-  checkCudaError();
+  checkCudaError();*/
  
   dslash_quda_flops += (1320+48)*in.volume;
 }
@@ -1288,7 +1346,43 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
 
-  int tOffset = 0;
+  // do body
+  {
+    int tOffset = 1;
+    int tMul = 1;
+    initTLocation(tOffset, tMul);
+    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+    threadVolume = in.volume/BLOCK_DIM - 2*Vs;
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      dslashDCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      dslashSCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      dslashHCuda(out, gauge, in, parity, dagger);
+    }
+    checkCudaError();
+  }
+
+  // do faces
+  {
+    int tOffset = 0;
+    int tMul = gauge.X[3] - 1;
+    initTLocation(tOffset, tMul);
+    int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
+    threadVolume = 2*Vs;
+    
+    if (in.precision == QUDA_DOUBLE_PRECISION) {
+      dslashDCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      dslashSCuda(out, gauge, in, parity, dagger);
+    } else if (in.precision == QUDA_HALF_PRECISION) {
+      dslashHCuda(out, gauge, in, parity, dagger);
+    }
+    checkCudaError();
+  }
+
+  /*  int tOffset = 0;
   int tMul = 1;
   initTLocation(tOffset, tMul);
   threadVolume = in.volume/BLOCK_DIM;
@@ -1300,7 +1394,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a);
   }
-  checkCudaError();
+  checkCudaError();*/
 
   dslash_quda_flops += (1320+504+48)*in.volume;
 }
