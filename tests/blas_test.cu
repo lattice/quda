@@ -82,9 +82,6 @@ void end()
   freeParitySpinor(y);
   freeParitySpinor(z);
 
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#endif
 }
 
 
@@ -337,6 +334,10 @@ int main(int argc, char** argv)
     }
     end();
   }
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
+
   write(names, threads, blocks);
   endQuda();
 }
