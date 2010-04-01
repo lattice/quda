@@ -4,6 +4,7 @@
 
 #include <quda_internal.h>
 #include <gauge_quda.h>
+#include <face_quda.h>
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
@@ -654,6 +655,9 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, void *cpuGaugeMinus,
 
 
   allocateGaugeField(cudaGauge, reconstruct, cuda_prec);
+
+  cudaGauge->faces=allocateFaceBuffer(cudaGauge->X[0]*cudaGauge->X[1]*cudaGauge->X[2], cudaGauge->volume, 
+			  cudaGauge->stride, cudaGauge->precision);
 
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
 

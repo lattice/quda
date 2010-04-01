@@ -45,6 +45,19 @@ extern "C" {
   typedef void *ParityGauge;
 
   typedef struct {
+    void *my_fwd_face;
+    void *my_back_face;
+    void *from_back_face;
+    void *from_fwd_face;
+    int Vs; 
+    int V;
+    int stride; 
+    Precision precision;
+    int nbytes;
+  } FaceBuffer;
+ 
+
+ typedef struct {
     size_t bytes;
     Precision precision;
     int length; // total length
@@ -60,6 +73,7 @@ extern "C" {
     ParityGauge odd;
     ParityGauge even;
     double anisotropy;
+    FaceBuffer faces;
   } FullGauge;
   
   typedef struct {
@@ -104,17 +118,6 @@ extern "C" {
     ParitySpinor even;
   } FullSpinor;
 
-  typedef struct {
-    void *my_fwd_face;
-    void *my_back_face;
-    void *from_back_face;
-    void *from_fwd_face;
-    int Vs; 
-    int V;
-    int stride; 
-    Precision precision;
-    int nbytes;
-  } FaceBuffer;
 
 #ifdef __cplusplus
 }

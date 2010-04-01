@@ -36,8 +36,7 @@ extern bool qudaPtNm1;
 
 #include "face_quda.h"
 
-FaceBuffer faceBufferPrecise;
-FaceBuffer faceBufferSloppy;
+
 
 // define newQudaGaugeParam() and newQudaInvertParam()
 #define INIT_PARAM
@@ -136,9 +135,19 @@ void initQuda(int dev)
   cudaGaugePrecise.even = NULL;
   cudaGaugePrecise.odd = NULL;
 
+  // Pointers in the face array
+  cudaGaugePrecise.faces.my_fwd_face=NULL;
+  cudaGaugePrecise.faces.my_back_face=NULL;
+  cudaGaugePrecise.faces.from_fwd_face=NULL;
+  cudaGaugePrecise.faces.from_back_face=NULL;
+
   cudaGaugeSloppy.even = NULL;
   cudaGaugeSloppy.odd = NULL;
-
+  cudaGaugeSloppy.faces.my_fwd_face=NULL;
+  cudaGaugeSloppy.faces.my_back_face=NULL;
+  cudaGaugeSloppy.faces.from_fwd_face=NULL;
+  cudaGaugeSloppy.faces.from_back_face=NULL;
+  
   cudaCloverPrecise.even.clover = NULL;
   cudaCloverPrecise.odd.clover = NULL;
 
@@ -181,7 +190,6 @@ void loadGaugeQuda(void *h_gauge, void *h_gauge_minus, QudaGaugeParam *param)
 		   param->anisotropy, 
 		   param->ga_pad);
 
-  faceBufferPrecise=allocateFaceBuffer(cudaGaugePrecise.X[0]*cudaGaugePrecise.X[1]*cudaGaugePrecise.X[2], cudaGaugePrecise.volume, cudaGaugePrecise.stride, cudaGaugePrecise.precision);
  
   param->gaugeGiB = 2.0*cudaGaugePrecise.bytes/ (1 << 30);
   if (param->cuda_prec_sloppy != param->cuda_prec ||
@@ -190,11 +198,10 @@ void loadGaugeQuda(void *h_gauge, void *h_gauge_minus, QudaGaugeParam *param)
 		     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
 		     param->X, param->anisotropy, param->ga_pad);
 
-    faceBufferSloppy=allocateFaceBuffer(cudaGaugeSloppy.X[0]*cudaGaugeSloppy.X[1]*cudaGaugeSloppy.X[2], cudaGaugeSloppy.volume, cudaGaugeSloppy.stride, cudaGaugeSloppy.precision);
+ 
     param->gaugeGiB += 2.0*cudaGaugeSloppy.bytes/ (1 << 30);
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
-    faceBufferSloppy = faceBufferPrecise;
   }
 }
 
@@ -279,12 +286,13 @@ void discardCloverQuda(QudaInvertParam *inv_param)
 
 void endQuda(void)
 {
-  freeSpinorBuffer();
+  freeSpinorBuffer(); 
+  freeFaceBuffer(cudaGaugePrecise.faces);
+  freeFaceBuffer(cudaGaugeSloppy.faces);
   freeGaugeField(&cudaGaugePrecise);
   freeGaugeField(&cudaGaugeSloppy);
 
-  freeFaceBuffer(faceBufferPrecise);
-  freeFaceBuffer(faceBufferSloppy);
+ 
 
   if (cudaCloverPrecise.even.clover) freeCloverField(&cudaCloverPrecise);
   if (cudaCloverSloppy.even.clover) freeCloverField(&cudaCloverSloppy);
