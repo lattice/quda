@@ -6,24 +6,24 @@ INC += -I../include -I.
 
 HDRS = blas_reference.h dslash_reference.h test_util.h
 
-TESTS = dslash_test #invert_test su3_test pack_test blas_test
+TESTS = dslash_test invert_test blas_test #su3_test pack_test
 
 all: $(TESTS)
 
 dslash_test: dslash_test.o test_util.o dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -lqmp -o $@
+	$(CXX) $^ $(LDFLAGS) -o $@
 
 invert_test: invert_test.o test_util.o dslash_reference.o blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $^ $(LDFLAGS) -o $@
 
 su3_test: su3_test.o test_util.o dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $^ $(LDFLAGS) -o $@
 
 pack_test: pack_test.o test_util.o dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $^ $(LDFLAGS) -o $@
 
 blas_test: blas_test.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $^ $(LDFLAGS) -o $@
 
 tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/

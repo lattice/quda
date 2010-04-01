@@ -7,6 +7,12 @@
 
 #include <test_util.h>
 
+#define QMP_COMMS
+
+#ifdef QMP_COMMS
+#include <qmp.h>
+#endif
+
 #define Nkernels 22
 
 QudaPrecision cuda_prec;
@@ -31,7 +37,7 @@ void init()
   X[2] = 24;
   X[3] = 24;
 
-  int sp_pad = 0;
+  int sp_pad = X[0]*X[1]*X[2]/2;
 
   switch(prec) {
   case 0:
@@ -75,6 +81,10 @@ void end()
   freeParitySpinor(x);
   freeParitySpinor(y);
   freeParitySpinor(z);
+
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
 }
 
 
@@ -229,6 +239,15 @@ void write(char *names[], int threads[][3], int blocks[][3])
 
 int main(int argc, char** argv)
 {
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif
+
   int dev = 0;
   if (argc == 2) dev = atoi(argv[1]);
   initQuda(dev);

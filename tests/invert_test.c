@@ -7,11 +7,28 @@
 #include <blas_reference.h>
 #include <dslash_reference.h>
 
+#define QMP_COMMS
+
+#ifdef QMP_COMMS
+#include <qmp.h>
+#endif
+
 // in a typical application, quda.h is the only QUDA header required
 #include <quda.h>
 
 int main(int argc, char **argv)
 {
+  // initialize QMP
+
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif
+
   // set QUDA parameters
 
   int device = 0; // CUDA device number
@@ -19,10 +36,10 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[0] = 8;
+  gauge_param.X[1] = 8;
+  gauge_param.X[2] = 8;
+  gauge_param.X[3] = 12;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -60,9 +77,9 @@ int main(int argc, char **argv)
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  gauge_param.ga_pad = 24*24*24;
-  inv_param.sp_pad = 24*24*24;
-  inv_param.cl_pad = 24*24*24;
+  gauge_param.ga_pad = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  inv_param.sp_pad = gauge_param.ga_pad;
+  inv_param.cl_pad = gauge_param.ga_pad;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -139,6 +156,10 @@ int main(int argc, char **argv)
 
   // finalize the QUDA library
   endQuda();
+
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
 
   return 0;
 }
