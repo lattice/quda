@@ -206,7 +206,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     int tMul = 1;
     initTLocation(tOffset, tMul);
     int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = in.volume/BLOCK_DIM - 2*Vs;
+    threadVolume = (in.volume - 2*Vs) /BLOCK_DIM;
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
@@ -224,7 +224,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     int tMul = gauge.X[3] - 1;
     initTLocation(tOffset, tMul);
     int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = 2*Vs;
+    threadVolume = 2*Vs / BLOCK_DIM;
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
@@ -478,7 +478,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     int tMul = 1;
     initTLocation(tOffset, tMul);
     int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = in.volume/BLOCK_DIM - 2*Vs;
+    threadVolume = (in.volume - 2*Vs) /BLOCK_DIM;
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
@@ -496,7 +496,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     int tMul = gauge.X[3] - 1;
     initTLocation(tOffset, tMul);
     int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = 2*Vs;
+    threadVolume = 2*Vs / BLOCK_DIM;
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
@@ -1352,7 +1352,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     int tMul = 1;
     initTLocation(tOffset, tMul);
     int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = in.volume/BLOCK_DIM - 2*Vs;
+    threadVolume = (in.volume - 2*Vs)/BLOCK_DIM;
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
@@ -1370,7 +1370,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     int tMul = gauge.X[3] - 1;
     initTLocation(tOffset, tMul);
     int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
-    threadVolume = 2*Vs;
+    threadVolume = 2*Vs / BLOCK_DIM;
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       dslashDCuda(out, gauge, in, parity, dagger);
