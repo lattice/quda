@@ -1,28 +1,24 @@
 ###### Local configuration:
 
-CUDA_INSTALL_PATH = /usr/local/cuda
+CUDA_INSTALL_PATH = /usr/local/cuda-3.0
 
 CPU_ARCH = x86_64   # x86 or x86_64
-GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
+GPU_ARCH = sm_12    # sm_10, sm_11, sm_12, or sm_13
 GPU_EMU  = false    # set to 'true' for device emulation
 
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
 
+COMMS = overlap     # set to overlap for overalpping comms and computer
+
 BUILD_3D = false    # set to 'true' to build 3D Dslash
 
-BUILD_MPI = true  # set to 'true' to do MPI based build
-OMPI_HOME=/usr/mpi/gcc/openmpi-1.3.2
-QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
+OMPI_HOME=/usr/lib64/openmpi/1.3.2-gcc
+QMP_HOME=/home/rbabich/lqcd/install/qmp
 QMP_CFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --cflags)
 QMP_LDFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --ldflags)
 QMP_LIBS=$(shell $(QMP_HOME)/bin/qmp-config --libs)
 
-ifeq ($(strip $(BUILD_MPI)), true)
- RUN=$(OMPI_HOME)/bin/mpirun -n 1
-else
- RUN=""
-endif
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include
@@ -44,6 +40,11 @@ endif
 ifeq ($(strip $(BUILD_3D)), true)
   COPT += -DBUILD_3D_DSLASH
   NVCCOPT += -DBUILD_3D_DSLASH
+endif
+
+ifeq ($(strip $(COMMS)), overlap)
+  COPT += -DOVERLAP_COMMS
+  NVCCOPT += -DOVERLAP_COMMS
 endif
 
 CC = $(OMPI_HOME)/bin/mpicc

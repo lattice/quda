@@ -1020,16 +1020,16 @@ o32_re = o32_im = 0;
     int sp_idx;
     int sp_norm_idx;
     if ( x4 == 0 ) { 
-        // Back Face (Upper spinors) 
-        sp_stride = Vs;
-
-        sp_idx = sid + SPINOR_HOP*sp_body_stride;
-	sp_norm_idx = sid + sp_body_stride;
+      // Back Face (Upper spinors) 
+      sp_stride = Vs;
+      
+      sp_idx = sid + SPINOR_HOP*sp_body_stride;
+      sp_norm_idx = sid + sp_body_stride;
     }
     else { 
-        sp_stride = sp_body_stride;
-        sp_idx = (X - X3X2X1) >> 1;
-	sp_norm_idx = sp_idx;
+      sp_stride = sp_body_stride;
+      sp_idx = (X - X3X2X1) >> 1;
+      sp_norm_idx = sp_idx;
     }
     // If t=0, read back links from pad, which is offset by Vh+sid from start of 
     // buffer

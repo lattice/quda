@@ -198,11 +198,20 @@ void exchangeFaces(FaceBuffer bufs)
 #else 
 
 #ifndef __DEVICE_EMULATION__
+
+#ifdef OVERLAP_COMMS
   cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
 		  cudaMemcpyHostToHost, *stream);
 
   cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
 		  cudaMemcpyHostToHost, *stream);
+#else
+  cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
+	     cudaMemcpyHostToHost);
+
+  cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
+	     cudaMemcpyHostToHost);
+#endif
 
 #else
   memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
@@ -249,11 +258,20 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger,
 #else
 // NO QMP -- do copies
 #ifndef __DEVICE_EMULATION__
+
+#ifdef OVERLAP_COMMS
   cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
 		  cudaMemcpyHostToHost, *stream);
 
   cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
 		  cudaMemcpyHostToHost, *stream);
+#else
+  cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
+	     cudaMemcpyHostToHost);
+
+  cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
+	     cudaMemcpyHostToHost);
+#endif
 
 #else
   memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
@@ -279,36 +297,64 @@ void gather12Float(Float* dest, Float* spinor, int Vs, int V, int stride, bool u
   //  -- Each Pad has size vecLen*Vs Floats. 
   //  --  There is vecLen*Stride Floats from the
   //           start of one PAD to the start of the next
+#ifdef OVERLAP_COMMS
   for(int i=0; i < Npad; i++) {
     if( upper ) { 
       if( tIsZero ) { 
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
-                   (void *)(spinor + t_zero_offset + i*vecLen*stride),
-	           vecLen*Vs*sizeof(Float),
+			(void *)(spinor + t_zero_offset + i*vecLen*stride),
+			vecLen*Vs*sizeof(Float),
 			cudaMemcpyDeviceToHost, *stream );      
-      }
-      else {
+      } else {
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
-                   (void *)(spinor + Nt_minus_one_offset + i*vecLen*stride),
-	           vecLen*Vs*sizeof(Float),
+			(void *)(spinor + Nt_minus_one_offset + i*vecLen*stride),
+			vecLen*Vs*sizeof(Float),
 			cudaMemcpyDeviceToHost, *stream );      
       }
-    }
-    else {
+    } else {
       if( tIsZero ) { 
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
 			(void *)(spinor + lower_spin_offset + t_zero_offset + i*vecLen*stride),
 			vecLen*Vs*sizeof(Float),
 			cudaMemcpyDeviceToHost, *stream );      
-      }
-      else {
+      } else {
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
-                   (void *)(spinor + lower_spin_offset + Nt_minus_one_offset + i*vecLen*stride),
-	           vecLen*Vs*sizeof(Float),
+			(void *)(spinor + lower_spin_offset + Nt_minus_one_offset + i*vecLen*stride),
+			vecLen*Vs*sizeof(Float),
 			cudaMemcpyDeviceToHost, *stream );      
       }
     }
   }
+#else
+  for(int i=0; i < Npad; i++) {
+    if( upper ) { 
+      if( tIsZero ) { 
+        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
+                   (void *)(spinor + t_zero_offset + i*vecLen*stride),
+	           vecLen*Vs*sizeof(Float),
+		   cudaMemcpyDeviceToHost);
+      } else {
+        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
+                   (void *)(spinor + Nt_minus_one_offset + i*vecLen*stride),
+	           vecLen*Vs*sizeof(Float),
+		   cudaMemcpyDeviceToHost);
+      }
+    } else {
+      if( tIsZero ) { 
+        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
+		   (void *)(spinor + lower_spin_offset + t_zero_offset + i*vecLen*stride),
+		   vecLen*Vs*sizeof(Float),
+		   cudaMemcpyDeviceToHost);
+      } else {
+        cudaMemcpy((void *)(dest + vecLen*i*Vs), 
+                   (void *)(spinor + lower_spin_offset + Nt_minus_one_offset + i*vecLen*stride),
+	           vecLen*Vs*sizeof(Float),
+		   cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+#endif
+
 }
 
 // like the above but for the norms required for QUDA_HALF_PRECISION
@@ -318,17 +364,31 @@ void gatherNorm(Float* dest, Float* norm, int Vs, int V, int stride, bool tIsZer
   int t_zero_offset=0; // T=0 is the first VS block
   int Nt_minus_one_offset=V - Vs; // N_t -1 = V-Vs.
  
+#ifdef OVERLAP_COMMS
   if( tIsZero ) { 
     cudaMemcpyAsync((void *)dest, 
 		    (void *)(norm + t_zero_offset),
 		    Vs*sizeof(Float),
-		    cudaMemcpyDeviceToHost, *stream );      
+		    cudaMemcpyDeviceToHost, *stream); 
   } else {
     cudaMemcpyAsync((void *)dest, 
-	       (void *)(norm + Nt_minus_one_offset),
+		    (void *)(norm + Nt_minus_one_offset),
 		    Vs*sizeof(Float),
-		    cudaMemcpyDeviceToHost, *stream );      
+		    cudaMemcpyDeviceToHost, *stream);      
   }
+#else
+  if( tIsZero ) { 
+    cudaMemcpy((void *)dest, 
+	       (void *)(norm + t_zero_offset),
+	       Vs*sizeof(Float),
+	       cudaMemcpyDeviceToHost);      
+  } else {
+    cudaMemcpy((void *)dest, 
+	       (void *)(norm + Nt_minus_one_offset),
+	       Vs*sizeof(Float),
+	       cudaMemcpyDeviceToHost);      
+  }
+#endif
 
 }
 
@@ -347,16 +407,19 @@ void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, bool u
   int spinor_end = 2*Npad*vecLen*stride;
   int face_size = Npad*vecLen*Vs;
   
+#ifdef OVERLAP_COMMS
   if( upper ) { 
-    cudaMemcpyAsync((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice, *stream);
-  }
-  else {
-#if 1
-    cudaMemcpyAsync((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice, *stream);
+    cudaMemcpyAsync((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), 
+		    cudaMemcpyHostToDevice, *stream);
+  } else {
+    cudaMemcpyAsync((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), 
+		    cudaMemcpyHostToDevice, *stream);
 #else
-    for(int i=0; i < Npad; i++) {
-      cudaMemcpyAsync((void *)(spinor+vecLen*(V+(i+Npad)*stride) ), (void *)(buf+vecLen*i*Vs), vecLen*Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream); 
-    }
+  if( upper ) { 
+    cudaMemcpy((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
+  } else {
+    cudaMemcpy((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
+
 #endif
   }
   
@@ -368,11 +431,20 @@ void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper)
 {
   int norm_end = stride;
   int face_size = Vs;
+
+#ifdef OVERLAP_COMMS
   if (upper) { // upper goes in the first norm zone
     cudaMemcpyAsync((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream);  
   } else { // lower goes in the second norm zone
-    cudaMemcpyAsync((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream);  
+    cudaMemcpyAsync((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream);
   }
+#else
+  if (upper) { // upper goes in the first norm zone
+    cudaMemcpy((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);
+  } else { // lower goes in the second norm zone
+    cudaMemcpy((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);
+  }
+#endif
 }
 
 void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
@@ -621,8 +693,15 @@ void transferGaugeFaces(void *gauge, void *gauge_face, Precision precision,
     g = (void *) ((char *) gauge + offset + i*stride);
     gf = (void *) ((char *) gauge_face + i*stride);
     // gf = (void *) ((char *) gauge_face + i*blocksize); /* for contiguous face buffer */
+
 #ifndef __DEVICE_EMULATION__
+
+#ifdef OVERLAP_COMMS
     cudaMemcpyAsync(gf, g, blocksize, cudaMemcpyHostToHost, *stream);
+#else
+    cudaMemcpy(gf, g, blocksize, cudaMemcpyHostToHost);
+#endif
+
 #else
     memcpy(gf, g, blocksize);
 #endif

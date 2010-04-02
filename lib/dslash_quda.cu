@@ -65,10 +65,6 @@ void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
 
   cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 
-  /*  if (Vh%BLOCK_DIM != 0) {
-    errorQuda("Volume not a multiple of the thread block size");
-    }*/
-
   int X1 = 2*gauge.X[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
 
@@ -146,10 +142,8 @@ void initDslashConstants(FullGauge gauge, int sp_body_stride, int cl_stride) {
   initDslash = 1;
 
   // create the streams
-  for (int i=0; i<Nstreams; i++)
-    cudaStreamCreate(&streams[i]);
+  for (int i=0; i<Nstreams; i++) cudaStreamCreate(&streams[i]);
 
-  //  streams = (cudaStream_t*) malloc(Nstreams * sizeof(cudaStream_t));
 }
 
 void initTLocation(int toffset, int tmul, int threads) {
@@ -192,9 +186,9 @@ static void bindGaugeTex(FullGauge gauge, int oddBit) {
 // plain Wilson Dslash:
 
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
-  if (!initDslash) {
+
+  if (!initDslash)
     initDslashConstants(gauge, in.stride, 0);
-  }    
 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
@@ -205,6 +199,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
   
+#ifdef OVERLAP_COMMS
   // do body
   {
     int tOffset = 1;
@@ -222,17 +217,24 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     }
     checkCudaError();
   }
+#endif
     
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
   exchangeFacesWait(gauge.faces, in, dagger, &streams[0]);
   checkCudaError();
 
-  // do faces
   {
     int tOffset = 0;
+#ifdef OVERLAP_COMMS
+    // do faces
     int tMul = gauge.X[3] - 1;
     int threads = 2*Vs;
+#else
+    // do all
+    int tMul = 1;
+    int threads = in.volume;
+#endif
     gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
     initTLocation(tOffset, tMul, threads);
     
@@ -246,25 +248,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     checkCudaError();
   }
 
-  cudaThreadSynchronize();
-
-  // do all
-  /*{
-    int tOffset = 0;
-    int tMul = 1;
-    int threads = in.volume;
-    gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
-    initTLocation(tOffset, tMul, threads);
-        
-    if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger);
-    } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger);
-    } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger);
-    }
-    checkCudaError();
-    }*/
+  //cudaThreadSynchronize();
 
   dslash_quda_flops += 1320*in.volume;
 }
@@ -485,20 +469,19 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
 void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger,
 		    ParitySpinor x, double a) {
-//  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
-  if (!initDslash) {
-    initDslashConstants(gauge, in.stride, 0);
-    // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
-  }    
+
+  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
  
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, &streams[0]);
+  checkCudaError();
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
+#ifdef OVERLAP_COMMS
   // do body
   {
     int tOffset = 1;
@@ -516,16 +499,23 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     }
     checkCudaError();
   }
+#endif
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
   exchangeFacesWait(gauge.faces, in, dagger, &streams[0]);
+  checkCudaError();
 
   // do faces
   {
     int tOffset = 0;
+#ifdef OVERLAP_COMMS
     int tMul = gauge.X[3] - 1;
     int threads = 2*Vs;
+#else
+    int tMul = 1;
+    int threads = in.volume;
+#endif
     gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
     initTLocation(tOffset, tMul, threads);
     
@@ -538,6 +528,8 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     }
     checkCudaError();
   }
+
+  //cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+48)*in.volume;
 }
@@ -825,6 +817,7 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
+#ifdef OVERLAP_COMMS
   // do body
   {
     int tOffset = 1;
@@ -842,6 +835,7 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     }
     checkCudaError();
   }
+#endif
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
@@ -850,8 +844,13 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
   // do faces
   {
     int tOffset = 0;
+#ifdef OVERLAP_COMMS
     int tMul = gauge.X[3] - 1;
     int threads = 2*Vs;
+#else
+    int tMul = 1;
+    int threads = in.volume;
+#endif
     gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
     initTLocation(tOffset, tMul, threads);
     
@@ -1392,6 +1391,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
+#ifdef OVERLAP_COMMS
   // do body
   {
     int tOffset = 1;
@@ -1409,6 +1409,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     }
     checkCudaError();
   }
+#endif
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
@@ -1417,8 +1418,13 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
   // do faces
   {
     int tOffset = 0;
+#ifdef OVERLAP_COMMS
     int tMul = gauge.X[3] - 1;
     int threads = 2*Vs;
+#else
+    int tMul = 1;
+    int threads = in.volume;
+#endif
     gridVolume = (threads + BLOCK_DIM - 1) / BLOCK_DIM;
     initTLocation(tOffset, tMul, threads);
     
