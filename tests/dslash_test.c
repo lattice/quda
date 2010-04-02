@@ -12,9 +12,9 @@
 #include <dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 1;
+int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 0;
+int clover_yes = 1;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -43,7 +43,7 @@ void init() {
   gauge_param.X[0] = 24;
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[3] = 32;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -69,22 +69,22 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = gauge_param.cuda_prec;
 
-  gauge_param.ga_pad = 0;
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
+  //  gauge_param.ga_pad = 0;
+  //  inv_param.sp_pad = 0;
+  //  inv_param.cl_pad = 0;
 
-  // gauge_param.ga_pad = 24*24*12;
-  // inv_param.sp_pad = 24*24*12;
-  // inv_param.cl_pad = 24*24*12;
+  gauge_param.ga_pad = 24*24*12;
+  inv_param.sp_pad = 24*24*12;
+  inv_param.cl_pad = 24*24*12;
 
   if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
   else inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec = gauge_param.cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
@@ -314,8 +314,8 @@ int main(int argc, char **argv)
       
       printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
       
-      //if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
-      //else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
+      if (test_type < 2) strong_check(spinorRef, spinorOdd, Vh, inv_param.cpu_prec);
+      else strong_check(spinorRef, spinorGPU, V, inv_param.cpu_prec);    
   }    
   end();
 }

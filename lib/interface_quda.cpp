@@ -193,13 +193,23 @@ void discardCloverQuda(QudaInvertParam *inv_param)
 
 void endQuda(void)
 {
-  freeSpinorBuffer();
+  freeSpinorBuffer(); 
+
+  if (cudaGaugeSloppy.precision != cudaGaugePrecise.precision) {
+    freeGaugeField(&cudaGaugeSloppy);
+  }
   freeGaugeField(&cudaGaugePrecise);
-  freeGaugeField(&cudaGaugeSloppy);
+
+  if (cudaCloverSloppy.even.precision != cudaCloverPrecise.even.precision) {
+    if (cudaCloverSloppy.even.clover) freeCloverField(&cudaCloverSloppy);
+  }
   if (cudaCloverPrecise.even.clover) freeCloverField(&cudaCloverPrecise);
-  if (cudaCloverSloppy.even.clover) freeCloverField(&cudaCloverSloppy);
+
+  if (cudaCloverInvSloppy.even.precision != cudaCloverInvPrecise.even.precision) {
+    if (cudaCloverInvSloppy.even.clover) freeCloverField(&cudaCloverInvSloppy);
+  }
   if (cudaCloverInvPrecise.even.clover) freeCloverField(&cudaCloverInvPrecise);
-  if (cudaCloverInvSloppy.even.clover) freeCloverField(&cudaCloverInvSloppy);
+
   endBlas();
 }
 
