@@ -1,23 +1,22 @@
 ###### Local configuration:
 
-CUDA_INSTALL_PATH = /usr/local/cuda-3.0
+CUDA_INSTALL_PATH = /usr/local/cuda
 
 CPU_ARCH = x86_64   # x86 or x86_64
-GPU_ARCH = sm_12    # sm_10, sm_11, sm_12, or sm_13
+GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
 GPU_EMU  = false    # set to 'true' for device emulation
 
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
 
-COMMS = overlap     # set to overlap for overalpping comms and computer
+BUILD_3D = false      # set to 'true' to build 3D Dslash
+BUILD_MPI = true      # set to 'true' to do MPI based build
+OVERLAP_COMMS = true  # set to 'true' to overlap comms and compute
 
-BUILD_3D = false    # set to 'true' to build 3D Dslash
-
-OMPI_HOME=/usr/lib64/openmpi/1.3.2-gcc
-QMP_HOME=/home/rbabich/lqcd/install/qmp
-QMP_CFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --cflags)
-QMP_LDFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --ldflags)
-QMP_LIBS=$(shell $(QMP_HOME)/bin/qmp-config --libs)
+OMPI_HOME=/usr/mpi/gcc/openmpi-1.3.2
+QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
+#OMPI_HOME=/usr/lib64/openmpi/1.3.2-gcc
+#QMP_HOME=/home/rbabich/lqcd/install/qmp
 
 ######
 
@@ -42,10 +41,20 @@ ifeq ($(strip $(BUILD_3D)), true)
   NVCCOPT += -DBUILD_3D_DSLASH
 endif
 
-ifeq ($(strip $(COMMS)), overlap)
+ifeq ($(strip $(BUILD_MPI)), true)
+  RUN = $(OMPI_HOME)/bin/mpirun -np 1
+else
+  RUN =
+endif
+
+ifeq ($(strip $(OVERLAP_COMMS)), true)
   COPT += -DOVERLAP_COMMS
   NVCCOPT += -DOVERLAP_COMMS
 endif
+
+QMP_CFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --cflags)
+QMP_LDFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --ldflags)
+QMP_LIBS=$(shell $(QMP_HOME)/bin/qmp-config --libs)
 
 CC = $(OMPI_HOME)/bin/mpicc
 CFLAGS = -Wall -O3 -std=c99 $(QMP_CFLAGS) $(COPT) $(INC)
