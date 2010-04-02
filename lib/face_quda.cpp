@@ -18,6 +18,8 @@ QMP_msghandle_t mh_gauge_from_back;
 
 using namespace std;
 
+//#undef OVERLAP_COMMS
+
 cudaStream_t *stream;
 
 FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision)
@@ -231,14 +233,19 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
   QMP_start(face.mh_from_fwd);
   QMP_start(face.mh_from_back);
 #endif
+
   // Gather into face...
   gatherFromSpinor(face, in, dagger);
+
+  // Need to wait for copy to finish before sending to neighbour
+  cudaStreamSynchronize(*stream);
 
 #ifdef QMP_COMMS
   // Begin all sends 
   QMP_start(face.mh_send_back);
   QMP_start(face.mh_send_fwd);
 #endif
+
 }
 
 
@@ -260,22 +267,22 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger,
 #ifndef __DEVICE_EMULATION__
 
 #ifdef OVERLAP_COMMS
-  cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
+  cudaMemcpyAsync(face.from_fwd_face, face.my_back_face, face.nbytes, 
 		  cudaMemcpyHostToHost, *stream);
 
-  cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
+  cudaMemcpyAsync(face.from_back_face, face.my_fwd_face, face.nbytes, 
 		  cudaMemcpyHostToHost, *stream);
 #else
-  cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
+  cudaMemcpy(face.from_fwd_face, face.my_back_face, face.nbytes, 
 	     cudaMemcpyHostToHost);
 
-  cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
+  cudaMemcpy(face.from_back_face, face.my_fwd_face, face.nbytes, 
 	     cudaMemcpyHostToHost);
 #endif
 
 #else
-  memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
-  memcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes);
+  memcpy(face.from_fwd_face, face.my_back_face, face.nbytes);
+  memcpy(face.from_back_face, face.my_fwd_face, face.nbytes);
 #endif
 #endif
 

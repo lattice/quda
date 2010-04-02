@@ -182,6 +182,46 @@ static void bindGaugeTex(FullGauge gauge, int oddBit) {
   }
 }
 
+static void bindSpinorTex(ParitySpinor spinor) {
+  
+  if (spinor.precision == QUDA_DOUBLE_PRECISION) {
+    int spinor_bytes = spinor.bytes + spinor.tface_bytes;
+    cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
+  } else if (spinor.precision == QUDA_SINGLE_PRECISION) {
+    int spinor_bytes = spinor.bytes+spinor.tface_bytes;
+    cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes);
+  } else {
+    int spinor_bytes = spinor.bytes + spinor.tface_bytes;
+    int spinor_norm_bytes = spinor.bytes/12 + spinor.tface_bytes/6;
+    cudaBindTexture(0, spinorTexHalf, spinor.spinor, spinor_bytes); 
+    cudaBindTexture(0, spinorTexNorm, spinor.spinorNorm, spinor_norm_bytes); 
+  }
+
+}
+
+
+static void bindSpinorXTex(ParitySpinor spinor, ParitySpinor x) {
+  
+  if (spinor.precision == QUDA_DOUBLE_PRECISION) {
+    int spinor_bytes = spinor.bytes+spinor.tface_bytes;
+    cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
+    cudaBindTexture(0, accumTexDouble, x.spinor, spinor_bytes); 
+  } else if (spinor.precision == QUDA_SINGLE_PRECISION) {
+    int spinor_bytes = spinor.bytes+spinor.tface_bytes;
+    cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes);
+    cudaBindTexture(0, accumTexSingle, x.spinor, spinor_bytes); 
+  } else {
+    int spinor_bytes = spinor.bytes + spinor.tface_bytes;
+    int spinor_norm_bytes = spinor.bytes/12 + spinor.tface_bytes/6;
+    cudaBindTexture(0, spinorTexHalf, spinor.spinor, spinor_bytes); 
+    cudaBindTexture(0, spinorTexNorm, spinor.spinorNorm, spinor_norm_bytes); 
+    cudaBindTexture(0, accumTexHalf, x.spinor, spinor_bytes); 
+    cudaBindTexture(0, accumTexNorm, x.spinorNorm, spinor_norm_bytes); 
+  }
+
+}
+
+
 // ----------------------------------------------------------------------
 // plain Wilson Dslash:
 
@@ -192,6 +232,9 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
+
+  bindGaugeTex(gauge, parity);
+  bindSpinorTex(in);
 
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, &(streams[0]));
@@ -248,7 +291,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     checkCudaError();
   }
 
-  //cudaThreadSynchronize();
+  cudaThreadSynchronize();
 
   dslash_quda_flops += 1320*in.volume;
 }
@@ -278,14 +321,8 @@ void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  bindGaugeTex(gauge, oddBit);
-
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
-
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
-
 #if (__CUDA_ARCH__ == 130)
+  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
@@ -341,14 +378,7 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
-  //
   
-
-  bindGaugeTex(gauge, oddBit);
-
-  int spinor_bytes = spinor.bytes+spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
-
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -408,13 +438,6 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  bindGaugeTex(gauge, oddBit);
-
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  int spinor_norm_bytes = spinor.bytes/12 + spinor.tface_bytes/6;
-  cudaBindTexture(0, spinorTexHalf, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, spinorTexNorm, spinor.spinorNorm, spinor_norm_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -475,6 +498,9 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
  
+  bindGaugeTex(gauge, parity);
+  bindSpinorXTex(in, x);
+
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, &streams[0]);
   checkCudaError();
@@ -529,7 +555,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     checkCudaError();
   }
 
-  //cudaThreadSynchronize();
+  cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+48)*in.volume;
 }
@@ -542,12 +568,6 @@ void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  bindGaugeTex(gauge, oddBit);
-
-  int spinor_bytes = spinor.bytes+spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, accumTexDouble, x.spinor, spinor_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
 #if (__CUDA_ARCH__ == 130)
@@ -610,13 +630,6 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  bindGaugeTex(gauge, oddBit);
-
-
-  int spinor_bytes = spinor.bytes+spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, accumTexSingle, x.spinor, spinor_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -679,15 +692,6 @@ void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
     
-  bindGaugeTex(gauge, oddBit);
-
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  int spinor_norm_bytes = spinor.bytes/12 + spinor.tface_bytes/6;
-  cudaBindTexture(0, spinorTexHalf, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, spinorTexNorm, spinor.spinorNorm, spinor_norm_bytes); 
-  cudaBindTexture(0, accumTexHalf, x.spinor, spinor_bytes); 
-  cudaBindTexture(0, accumTexNorm, x.spinorNorm, spinor_norm_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
@@ -812,6 +816,9 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
 
+  bindGaugeTex(gauge, parity);
+  bindSpinorTex(in);
+
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, &streams[0]);
 
@@ -864,6 +871,8 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     checkCudaError();
   }
 
+  cudaThreadSynchronize();
+
   dslash_quda_flops += (1320+504)*in.volume;
 }
 
@@ -875,8 +884,6 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
-  bindGaugeTex(gauge, oddBit);
-
   if (oddBit) {
     bindCloverTex(cloverInv.odd);
     clover_prec = cloverInv.odd.precision;
@@ -884,9 +891,6 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     bindCloverTex(cloverInv.even);
     clover_prec = cloverInv.even.precision;
   }
-
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
@@ -1038,8 +1042,6 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
-  bindGaugeTex(gauge, oddBit);
-
   if (oddBit) {
     bindCloverTex(cloverInv.odd);
     clover_prec = cloverInv.odd.precision;
@@ -1047,9 +1049,6 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     bindCloverTex(cloverInv.even);
     clover_prec = cloverInv.even.precision;
   }
-
-  int spinor_bytes = spinor.bytes+spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
@@ -1208,8 +1207,6 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
-  bindGaugeTex(gauge, oddBit);
-
   if (oddBit) {
     bindCloverTex(cloverInv.odd);
     clover_prec = cloverInv.odd.precision;
@@ -1218,11 +1215,6 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     clover_prec = cloverInv.even.precision;
   }
 
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  int spinor_norm_bytes = spinor.bytes/12 + spinor.tface_bytes/6;
-  cudaBindTexture(0, spinorTexHalf, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, spinorTexNorm, spinor.spinorNorm, spinor_norm_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
@@ -1375,17 +1367,15 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv, ParitySpinor in,
 			  int parity, int dagger, ParitySpinor x, double a)
 {
-  //if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
+  if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
  
-  if (!initDslash) {
-    initDslashConstants(gauge, in.stride, cloverInv.even.stride);
-    // faceBufferPrecise=allocateFaceBuffer(gauge.X[0]*gauge.X[1]*gauge.X[2], gauge.volume, in.stride, in.precision); 
-  }    
-
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, cloverInv);
  
+  bindGaugeTex(gauge, parity);
+  bindSpinorXTex(in, x);
+
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, &streams[0]);
 
@@ -1438,6 +1428,8 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     checkCudaError();
   }
 
+  cudaThreadSynchronize();
+
   dslash_quda_flops += (1320+504+48)*in.volume;
 }
 
@@ -1449,8 +1441,6 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
-  bindGaugeTex(gauge, oddBit);
-
   if (oddBit) {
     bindCloverTex(cloverInv.odd);
     clover_prec = cloverInv.odd.precision;
@@ -1459,10 +1449,6 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     clover_prec = cloverInv.even.precision;
   }
 
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, accumTexDouble, x.spinor, spinor_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
 #if (__CUDA_ARCH__ == 130)
@@ -1612,8 +1598,6 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
-  bindGaugeTex(gauge, oddBit);
-
   if (oddBit) {
     bindCloverTex(cloverInv.odd);
     clover_prec = cloverInv.odd.precision;
@@ -1622,10 +1606,6 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     clover_prec = cloverInv.even.precision;
   }
 
-  int spinor_bytes = spinor.bytes+spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexSingle, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, accumTexSingle, x.spinor, spinor_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
@@ -1783,8 +1763,6 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
-  bindGaugeTex(gauge, oddBit);
-
   if (oddBit) {
     bindCloverTex(cloverInv.odd);
     clover_prec = cloverInv.odd.precision;
@@ -1793,13 +1771,6 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     clover_prec = cloverInv.even.precision;
   }
 
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  int spinor_norm_bytes = spinor.bytes/12 + spinor.tface_bytes/6;
-  cudaBindTexture(0, spinorTexHalf, spinor.spinor, spinor_bytes); 
-  cudaBindTexture(0, spinorTexNorm, spinor.spinorNorm, spinor_norm_bytes); 
-  cudaBindTexture(0, accumTexHalf, x.spinor, spinor_bytes); 
-  cudaBindTexture(0, accumTexNorm, x.spinorNorm, spinor_norm_bytes); 
-  
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
@@ -2067,6 +2038,9 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
   checkGaugeSpinor(in, gauge);
   checkCloverSpinor(in, clover);
 
+  bindGaugeTex(gauge, parity);
+  bindSpinorTex(in);
+
   int tOffset = 0;
   int tMul = 1;
   int threads = in.volume;
@@ -2092,8 +2066,6 @@ void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
 
-  bindGaugeTex(gauge, oddBit);
-
   if (oddBit) {
     bindCloverTex(clover.odd);
     clover_prec = clover.odd.precision;
@@ -2101,9 +2073,6 @@ void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
     bindCloverTex(clover.even);
     clover_prec = clover.even.precision;
   }
-
-  int spinor_bytes = spinor.bytes + spinor.tface_bytes;
-  cudaBindTexture(0, spinorTexDouble, spinor.spinor, spinor_bytes); 
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
@@ -2126,8 +2095,6 @@ void cloverSCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
-
-  bindGaugeTex(gauge, oddBit);
 
   if (oddBit) {
     bindCloverTex(clover.odd);
@@ -2161,8 +2128,6 @@ void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
   Precision clover_prec;
-
-  bindGaugeTex(gauge, oddBit);
 
   if (oddBit) {
     bindCloverTex(clover.odd);
