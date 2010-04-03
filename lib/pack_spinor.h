@@ -115,11 +115,11 @@ void packParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
 		      GammaBasis destBasis, GammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      packSpinorField<Nc, Ns, N>(dest+N*i, src+24*i, Vh+pad);
+      packSpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_BASIS) {
     for (int i = 0; i < Vh; i++) {
-      packNonRelSpinorField<Nc, N>(dest+N*i, src+24*i, Vh+pad);
+      packNonRelSpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change not supported");
@@ -132,11 +132,11 @@ void packQLAParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
 			 GammaBasis destBasis, GammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      packQLASpinorField<Nc, Ns, N>(dest+N*i, src+i*24, Vh+pad);
+      packQLASpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_BASIS) {
     for (int i = 0; i < Vh; i++) {
-      packNonRelQLASpinorField<Nc, N>(dest+N*i, src+i*24, Vh+pad);
+      packNonRelQLASpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change not supported");
@@ -155,12 +155,12 @@ void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	packSpinorField<Nc,Ns,N>(dest+N*i, src+24*k, Vh+pad);
+	packSpinorField<Nc,Ns,N>(dest+N*i, src+2*Nc*Ns*k, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packSpinorField<Nc,Ns,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
+	packSpinorField<Nc,Ns,N>(dest+destLength/2+N*i, src+ 2*Nc*Ns*k, Vh+pad);
       }
     }
   } else if (destBasis == QUDA_UKQCD_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -170,12 +170,12 @@ void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	packNonRelSpinorField<Nc,N>(dest+N*i, src+24*k, Vh+pad);
+	packNonRelSpinorField<Nc,N>(dest+N*i, src+2*Nc*Ns*k, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packNonRelSpinorField<Nc,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
+	packNonRelSpinorField<Nc,N>(dest+destLength/2+N*i, src+2*Nc*Ns*k, Vh+pad);
       }
     }
   } else {
@@ -195,12 +195,12 @@ void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[],
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	packQLASpinorField<Nc,Ns,N>(dest+N*i, src+24*k, Vh+pad);
+	packQLASpinorField<Nc,Ns,N>(dest+N*i, src+2*Nc*Ns*k, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packQLASpinorField<Nc,Ns,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
+	packQLASpinorField<Nc,Ns,N>(dest+destLength/2+N*i, src+2*Nc*Ns*k, Vh+pad);
       }
     }
   } else if (destBasis == QUDA_UKQCD_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -210,12 +210,12 @@ void packQLAFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[],
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	packNonRelQLASpinorField<Nc,N>(dest+N*i, src+24*k, Vh+pad);
+	packNonRelQLASpinorField<Nc,N>(dest+N*i, src+2*Nc*Ns*k, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packNonRelQLASpinorField<Nc,N>(dest+destLength/2+N*i, src+24*k, Vh+pad);
+	packNonRelQLASpinorField<Nc,N>(dest+destLength/2+N*i, src+2*Nc*Ns*k, Vh+pad);
       }
     }
   } else {
@@ -299,11 +299,11 @@ void unpackParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
 		      GammaBasis destBasis, GammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      unpackSpinorField<Nc, Ns, N>(dest+24*i, src+N*i, Vh+pad);
+      unpackSpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else if (srcBasis == QUDA_UKQCD_BASIS && destBasis == QUDA_DEGRAND_ROSSI_BASIS) {
     for (int i = 0; i < Vh; i++) {
-      unpackNonRelSpinorField<Nc, N>(dest+24*i, src+N*i, Vh+pad);
+      unpackNonRelSpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change from %d to %d not supported", srcBasis, destBasis);
@@ -316,11 +316,11 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
 			 GammaBasis destBasis, GammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      unpackQLASpinorField<Nc, Ns, N>(dest+24*i, src+N*i, Vh+pad);
+      unpackQLASpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else if (srcBasis == QUDA_UKQCD_BASIS && destBasis == QUDA_DEGRAND_ROSSI_BASIS) {
     for (int i = 0; i < Vh; i++) {
-      unpackNonRelQLASpinorField<Nc, N>(dest+24*i, src+N*i, Vh+pad);
+      unpackNonRelQLASpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change from %d to %d not supported", srcBasis, destBasis);
@@ -339,12 +339,12 @@ void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[],
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	unpackSpinorField<Nc,Ns,N>(dest+24*k, src+N*i, Vh+pad);
+	unpackSpinorField<Nc,Ns,N>(dest+2*Ns*Nc*k, src+N*i, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackSpinorField<Nc,Ns,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
+	unpackSpinorField<Nc,Ns,N>(dest+2*Ns*Nc*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else if (srcBasis == QUDA_UKQCD_BASIS && destBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -354,12 +354,12 @@ void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[],
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	unpackNonRelSpinorField<Nc,N>(dest+24*k, src+N*i, Vh+pad);
+	unpackNonRelSpinorField<Nc,N>(dest+2*Ns*Nc*k, src+N*i, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackNonRelSpinorField<Nc,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
+	unpackNonRelSpinorField<Nc,N>(dest+2*Ns*Nc*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else {
@@ -379,12 +379,12 @@ void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[]
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	unpackQLASpinorField<Nc,Ns,N>(dest+24*k, src+N*i, Vh+pad);
+	unpackQLASpinorField<Nc,Ns,N>(dest+2*Nc*Ns*k, src+N*i, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackQLASpinorField<Nc,Ns,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
+	unpackQLASpinorField<Nc,Ns,N>(dest+2*Nc*Ns*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else if (srcBasis == QUDA_UKQCD_BASIS && destBasis == QUDA_DEGRAND_ROSSI_BASIS) {
@@ -394,12 +394,12 @@ void unpackQLAFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[]
       
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	unpackNonRelQLASpinorField<Nc,N>(dest+24*k, src+N*i, Vh+pad);
+	unpackNonRelQLASpinorField<Nc,N>(dest+2*Ns*Nc*k, src+N*i, Vh+pad);
       }
       
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	unpackNonRelQLASpinorField<Nc,N>(dest+24*k, src+srcLength/2+N*i, Vh+pad);
+	unpackNonRelQLASpinorField<Nc,N>(dest+2*Ns*Nc*k, src+srcLength/2+N*i, Vh+pad);
       }
     }
   } else {
@@ -418,7 +418,7 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
     if (subsetOrder == QUDA_LEXICOGRAPHIC_SUBSET_ORDER) {
       // We are copying from a full spinor field that is not parity ordered
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_ORDER) {
-	packFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
+	  packFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_ORDER) {
 	packQLAFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
       } else {
