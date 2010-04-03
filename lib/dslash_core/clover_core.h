@@ -676,3 +676,13 @@ READ_SPINOR(SPINORTEX);
 #undef c12_10_im
 #undef c12_11_re
 #undef c12_11_im
+
+#undef o00_re
+#undef o00_im
+#undef o01_re
+#undef o01_im
+#undef o02_re
+#undef o02_im
+#undef o10_re
+#undef o10_im
+
