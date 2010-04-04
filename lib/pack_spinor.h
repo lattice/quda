@@ -235,7 +235,7 @@ template <int Nc, int Ns, int N, typename Float, typename FloatN>
 inline void unpackSpinorField(Float* a, FloatN *b, int V) {
   for (int sc=0; sc<(Ns*Nc*2)/N; sc++) {
     for (int zc=0; zc<N; zc++) {
-      a[sc*4+zc] = (b+N*V*sc)[zc];
+      a[sc*N+zc] = (b+N*V*sc)[zc];
     }
   }
 }
