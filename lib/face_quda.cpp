@@ -18,9 +18,9 @@ QMP_msghandle_t mh_gauge_from_back;
 
 using namespace std;
 
-//#undef OVERLAP_COMMS
-
 cudaStream_t *stream;
+int backIdx = 0;
+int fwdIdx = 1;
 
 FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision)
 {
@@ -203,10 +203,10 @@ void exchangeFaces(FaceBuffer bufs)
 
 #ifdef OVERLAP_COMMS
   cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
-		  cudaMemcpyHostToHost, *stream);
+		  cudaMemcpyHostToHost, stream[backIdx]);
 
   cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
-		  cudaMemcpyHostToHost, *stream);
+		  cudaMemcpyHostToHost, stream[fwdIdx);
 #else
   cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
 	     cudaMemcpyHostToHost);
@@ -223,6 +223,7 @@ void exchangeFaces(FaceBuffer bufs)
    
 }
 
+
 void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger, 
 			cudaStream_t *stream_p)
 {
@@ -237,22 +238,31 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
   // Gather into face...
   gatherFromSpinor(face, in, dagger);
 
+#ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
-  cudaStreamSynchronize(*stream);
+  cudaStreamSynchronize(stream[backIdx]);
+#endif
 
 #ifdef QMP_COMMS
-  // Begin all sends 
+  // Begin backward send
   QMP_start(face.mh_send_back);
+#endif
+
+#ifdef OVERLAP_COMMS
+  // Need to wait for copy to finish before sending to neighbour
+  cudaStreamSynchronize(stream[fwdIdx]);
+#endif
+
+#ifdef QMP_COMMS
+  // Begin forward send
   QMP_start(face.mh_send_fwd);
 #endif
 
 }
 
 
-void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger,
-		       cudaStream_t *stream_p)
+void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
 {
-  stream = stream_p;
 
 #ifdef QMP_COMMS
   // Make sure all outstanding sends are done
@@ -268,10 +278,10 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger,
 
 #ifdef OVERLAP_COMMS
   cudaMemcpyAsync(face.from_fwd_face, face.my_back_face, face.nbytes, 
-		  cudaMemcpyHostToHost, *stream);
+		  cudaMemcpyHostToHost, stream[backIdx]);
 
   cudaMemcpyAsync(face.from_back_face, face.my_fwd_face, face.nbytes, 
-		  cudaMemcpyHostToHost, *stream);
+		  cudaMemcpyHostToHost, stream[fwd[Idx]);
 #else
   cudaMemcpy(face.from_fwd_face, face.my_back_face, face.nbytes, 
 	     cudaMemcpyHostToHost);
@@ -291,7 +301,8 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger,
 }
 
 template <int vecLen, typename Float>
-void gather12Float(Float* dest, Float* spinor, int Vs, int V, int stride, bool upper, bool tIsZero)
+void gather12Float(Float* dest, Float* spinor, int Vs, int V, int stride, bool upper, bool tIsZero,
+		   int strmIdx)
 {
   int Npad = 12/vecLen;  // Number of Pad's in one half spinor...
   int lower_spin_offset=vecLen*Npad*stride;	
@@ -311,24 +322,24 @@ void gather12Float(Float* dest, Float* spinor, int Vs, int V, int stride, bool u
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
 			(void *)(spinor + t_zero_offset + i*vecLen*stride),
 			vecLen*Vs*sizeof(Float),
-			cudaMemcpyDeviceToHost, *stream );      
+			cudaMemcpyDeviceToHost, stream[strmIdx]);
       } else {
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
 			(void *)(spinor + Nt_minus_one_offset + i*vecLen*stride),
 			vecLen*Vs*sizeof(Float),
-			cudaMemcpyDeviceToHost, *stream );      
+			cudaMemcpyDeviceToHost, stream[strmIdx]);      
       }
     } else {
       if( tIsZero ) { 
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
 			(void *)(spinor + lower_spin_offset + t_zero_offset + i*vecLen*stride),
 			vecLen*Vs*sizeof(Float),
-			cudaMemcpyDeviceToHost, *stream );      
+			cudaMemcpyDeviceToHost, stream[strmIdx]);      
       } else {
         cudaMemcpyAsync((void *)(dest + vecLen*i*Vs), 
 			(void *)(spinor + lower_spin_offset + Nt_minus_one_offset + i*vecLen*stride),
 			vecLen*Vs*sizeof(Float),
-			cudaMemcpyDeviceToHost, *stream );      
+			cudaMemcpyDeviceToHost, stream[strmIdx]);      
       }
     }
   }
@@ -366,7 +377,7 @@ void gather12Float(Float* dest, Float* spinor, int Vs, int V, int stride, bool u
 
 // like the above but for the norms required for QUDA_HALF_PRECISION
 template <typename Float>
-void gatherNorm(Float* dest, Float* norm, int Vs, int V, int stride, bool tIsZero)
+  void gatherNorm(Float* dest, Float* norm, int Vs, int V, int stride, bool tIsZero, int strmIdx)
 {
   int t_zero_offset=0; // T=0 is the first VS block
   int Nt_minus_one_offset=V - Vs; // N_t -1 = V-Vs.
@@ -376,12 +387,12 @@ void gatherNorm(Float* dest, Float* norm, int Vs, int V, int stride, bool tIsZer
     cudaMemcpyAsync((void *)dest, 
 		    (void *)(norm + t_zero_offset),
 		    Vs*sizeof(Float),
-		    cudaMemcpyDeviceToHost, *stream); 
+		    cudaMemcpyDeviceToHost, stream[strmIdx]); 
   } else {
     cudaMemcpyAsync((void *)dest, 
 		    (void *)(norm + Nt_minus_one_offset),
 		    Vs*sizeof(Float),
-		    cudaMemcpyDeviceToHost, *stream);      
+		    cudaMemcpyDeviceToHost, stream[strmIdx]);      
   }
 #else
   if( tIsZero ) { 
@@ -408,7 +419,7 @@ void gatherNorm(Float* dest, Float* norm, int Vs, int V, int stride, bool tIsZer
   //           start of one PAD to the start of the next
 
 template <int vecLen, typename Float>
-void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, bool upper)
+  void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
 {
   int Npad = 12/vecLen;
   int spinor_end = 2*Npad*vecLen*stride;
@@ -417,10 +428,10 @@ void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, bool u
 #ifdef OVERLAP_COMMS
   if( upper ) { 
     cudaMemcpyAsync((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), 
-		    cudaMemcpyHostToDevice, *stream);
+		    cudaMemcpyHostToDevice, stream[strmIdx]);
   } else {
     cudaMemcpyAsync((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), 
-		    cudaMemcpyHostToDevice, *stream);
+		    cudaMemcpyHostToDevice, stream[strmIdx]);
 #else
   if( upper ) { 
     cudaMemcpy((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
@@ -434,16 +445,18 @@ void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, bool u
 
 // half precision norm version of the above
 template <typename Float>
-void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper)
+  void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
 {
   int norm_end = stride;
   int face_size = Vs;
 
 #ifdef OVERLAP_COMMS
   if (upper) { // upper goes in the first norm zone
-    cudaMemcpyAsync((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream);  
+    cudaMemcpyAsync((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), 
+		    cudaMemcpyHostToDevice, stream[strmIdx]);  
   } else { // lower goes in the second norm zone
-    cudaMemcpyAsync((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice, *stream);
+    cudaMemcpyAsync((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), 
+		    cudaMemcpyHostToDevice, stream[strmIdx]);
   }
 #else
   if (upper) { // upper goes in the first norm zone
@@ -468,80 +481,78 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       // lower_spins => upper = false, t=0, so tIsZero=true 
       gather12Float<2>((double *)(face.my_back_face), (double *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, true);
+		       face.Vs, face.V, face.stride, false, true, backIdx);
     
       // Not Hermitian conjugate: send upper spinors forward/recv from back
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<2>((double *)(face.my_fwd_face), (double *)in.spinor,
-		       face.Vs, face.V, face.stride, true, false);
+		       face.Vs, face.V, face.stride, true, false, fwdIdx);
     
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
       // lower_spins => upper = false, t=0, so tIsZero=true 
       gather12Float<4>((float *)(face.my_back_face), (float *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, true);
+		       face.Vs, face.V, face.stride, false, true, backIdx);
     
       // Not Hermitian conjugate: send upper spinors forward/recv from back
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<4>((float *)(face.my_fwd_face), (float *)in.spinor,
-		       face.Vs, face.V, face.stride, true, false);
+		       face.Vs, face.V, face.stride, true, false, fwdIdx);
     
     } else {       
       // lower_spins => upper = false, t=0, so tIsZero=true 
       gather12Float<4>((short *)(face.my_back_face), (short *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, true);
+		       face.Vs, face.V, face.stride, false, true, backIdx);
     
       gatherNorm((float*)((short*)face.my_back_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true, backIdx);
 
       // Not Hermitian conjugate: send upper spinors forward/recv from back
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<4>((short *)(face.my_fwd_face), (short *)in.spinor,
-		       face.Vs, face.V, face.stride, true, false);
+		       face.Vs, face.V, face.stride, true, false, fwdIdx);
 
       gatherNorm((float*)((short*)face.my_fwd_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false, fwdIdx);
     }
  
-
-  }
-  else { 
+  } else { 
 
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      // HC: send lower components fwd, receive them from back
-      // Lower Spins => upper = false, t=Nt-1      => tIsZero = true
-      gather12Float<2>((double *)(face.my_fwd_face), (double *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, false);
-    
       // HC: Send upper components back, receive them from front
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<2>((double *)(face.my_back_face), (double *)in.spinor,
-		       face.Vs, face.V, face.stride, true, true);
+		       face.Vs, face.V, face.stride, true, true, backIdx);
     
-    } else if (in.precision == QUDA_SINGLE_PRECISION) {
+      // HC: send lower components fwd, receive them from back
       // Lower Spins => upper = false, t=Nt-1      => tIsZero = true
-      gather12Float<4>((float *)(face.my_fwd_face), (float *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, false);
-    
+      gather12Float<2>((double *)(face.my_fwd_face), (double *)in.spinor, 
+		       face.Vs, face.V, face.stride, false, false, fwdIdx);    
+    } else if (in.precision == QUDA_SINGLE_PRECISION) {
       // HC: Send upper components back, receive them from front
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<4>((float *)(face.my_back_face), (float *)in.spinor,
-		       face.Vs, face.V, face.stride, true, true);
+		       face.Vs, face.V, face.stride, true, true, backIdx);
+    
+      // Lower Spins => upper = false, t=Nt-1      => tIsZero = true
+      gather12Float<4>((float *)(face.my_fwd_face), (float *)in.spinor, 
+		       face.Vs, face.V, face.stride, false, false, fwdIdx);
     
     } else {       
-      // lower_spins => upper = false, t=0, so tIsZero=true 
-      gather12Float<4>((short *)(face.my_fwd_face), (short *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, false);
-    
-      gatherNorm((float*)((short*)face.my_fwd_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false);
-
       // HC: Send upper components back, receive them from front
       //UpperSpins => upper = true, t=0 => tIsZero = true
       gather12Float<4>((short *)(face.my_back_face), (short *)in.spinor,
-		       face.Vs, face.V, face.stride, true, true);
+		       face.Vs, face.V, face.stride, true, true, backIdx);
 
       gatherNorm((float*)((short*)face.my_back_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true, backIdx);
+
+      // lower_spins => upper = false, t=0, so tIsZero=true 
+      gather12Float<4>((short *)(face.my_fwd_face), (short *)in.spinor, 
+		       face.Vs, face.V, face.stride, false, false, fwdIdx);
+    
+      gatherNorm((float*)((short*)face.my_fwd_face+12*face.Vs), 
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false, fwdIdx);
+
     }
 
   }
@@ -703,11 +714,12 @@ void transferGaugeFaces(void *gauge, void *gauge_face, Precision precision,
 
 #ifndef __DEVICE_EMULATION__
 
-#ifdef OVERLAP_COMMS
+    // I don't think stream has been set here so can't use async copy
+    /*#ifdef OVERLAP_COMMS
     cudaMemcpyAsync(gf, g, blocksize, cudaMemcpyHostToHost, *stream);
-#else
+    #else*/
     cudaMemcpy(gf, g, blocksize, cudaMemcpyHostToHost);
-#endif
+    //#endif
 
 #else
     memcpy(gf, g, blocksize);

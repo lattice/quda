@@ -15,7 +15,7 @@ extern "C" {
   void exchangeFaces(FaceBuffer bufs);
 
   void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger, cudaStream_t *stream);
-  void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger, cudaStream_t *stream);
+  void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger);
 
   void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger);
 
