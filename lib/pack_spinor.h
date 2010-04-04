@@ -53,7 +53,7 @@ template <int Nc, int Ns, int N, typename Float, typename FloatN>
 inline void packSpinorField(FloatN* a, Float *b, int V) {
   for (int sc=0; sc<(Ns*Nc*2)/N; sc++) {
     for (int zc=0; zc<N; zc++) {
-      (a+N*V*sc)[zc] = b[sc*4+zc];
+      (a+N*V*sc)[zc] = b[sc*N+zc];
     }
   }
 }
