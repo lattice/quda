@@ -18,9 +18,15 @@ QMP_msghandle_t mh_gauge_from_back;
 
 using namespace std;
 
+
 cudaStream_t *stream;
-int backIdx = 0;
-int fwdIdx = 1;
+
+// set these both = 0 for no overlap of qmp and cudamemcpyasync
+// sendBackIdx = 0, and sendFwdIdx = 1 for overlap
+int sendBackIdx = 0;
+int sendFwdIdx = 1;
+int recFwdIdx = sendBackIdx;
+int recBackIdx = sendFwdIdx;
 
 FaceBuffer allocateFaceBuffer(int Vs, int V, int stride, Precision precision)
 {
@@ -203,10 +209,10 @@ void exchangeFaces(FaceBuffer bufs)
 
 #ifdef OVERLAP_COMMS
   cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
-		  cudaMemcpyHostToHost, stream[backIdx]);
+		  cudaMemcpyHostToHost, stream[sendBackIdx]);
 
   cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
-		  cudaMemcpyHostToHost, stream[fwdIdx);
+		  cudaMemcpyHostToHost, stream[sendFwdIdx);
 #else
   cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
 	     cudaMemcpyHostToHost);
@@ -240,7 +246,7 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
 
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
-  cudaStreamSynchronize(stream[backIdx]);
+  cudaStreamSynchronize(stream[sendBackIdx]);
 #endif
 
 #ifdef QMP_COMMS
@@ -250,7 +256,7 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
 
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
-  cudaStreamSynchronize(stream[fwdIdx]);
+  cudaStreamSynchronize(stream[sendFwdIdx]);
 #endif
 
 #ifdef QMP_COMMS
@@ -264,24 +270,27 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
 void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
 {
 
+  /*
 #ifdef QMP_COMMS
   // Make sure all outstanding sends are done
   QMP_wait(face.mh_send_back);
   QMP_wait(face.mh_send_fwd);
 
   // Finish receives
-  QMP_wait(face.mh_from_back);
   QMP_wait(face.mh_from_fwd);
+  QMP_wait(face.mh_from_back);
 #else
+*/
+#ifndef QMP_COMMS
 // NO QMP -- do copies
 #ifndef __DEVICE_EMULATION__
 
 #ifdef OVERLAP_COMMS
   cudaMemcpyAsync(face.from_fwd_face, face.my_back_face, face.nbytes, 
-		  cudaMemcpyHostToHost, stream[backIdx]);
+		  cudaMemcpyHostToHost, stream[sendBackIdx]);
 
   cudaMemcpyAsync(face.from_back_face, face.my_fwd_face, face.nbytes, 
-		  cudaMemcpyHostToHost, stream[fwd[Idx]);
+		  cudaMemcpyHostToHost, stream[sendFwdIdx]);
 #else
   cudaMemcpy(face.from_fwd_face, face.my_back_face, face.nbytes, 
 	     cudaMemcpyHostToHost);
@@ -419,7 +428,8 @@ template <typename Float>
   //           start of one PAD to the start of the next
 
 template <int vecLen, typename Float>
-  void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
+  void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, 
+		      bool upper, int strmIdx=0)
 {
   int Npad = 12/vecLen;
   int spinor_end = 2*Npad*vecLen*stride;
@@ -481,38 +491,38 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
     if (in.precision == QUDA_DOUBLE_PRECISION) {
       // lower_spins => upper = false, t=0, so tIsZero=true 
       gather12Float<2>((double *)(face.my_back_face), (double *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, true, backIdx);
+		       face.Vs, face.V, face.stride, false, true, sendBackIdx);
     
       // Not Hermitian conjugate: send upper spinors forward/recv from back
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<2>((double *)(face.my_fwd_face), (double *)in.spinor,
-		       face.Vs, face.V, face.stride, true, false, fwdIdx);
+		       face.Vs, face.V, face.stride, true, false, sendFwdIdx);
     
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
       // lower_spins => upper = false, t=0, so tIsZero=true 
       gather12Float<4>((float *)(face.my_back_face), (float *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, true, backIdx);
+		       face.Vs, face.V, face.stride, false, true, sendBackIdx);
     
       // Not Hermitian conjugate: send upper spinors forward/recv from back
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<4>((float *)(face.my_fwd_face), (float *)in.spinor,
-		       face.Vs, face.V, face.stride, true, false, fwdIdx);
+		       face.Vs, face.V, face.stride, true, false, sendFwdIdx);
     
     } else {       
       // lower_spins => upper = false, t=0, so tIsZero=true 
       gather12Float<4>((short *)(face.my_back_face), (short *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, true, backIdx);
+		       face.Vs, face.V, face.stride, false, true, sendBackIdx);
     
       gatherNorm((float*)((short*)face.my_back_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true, backIdx);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true, sendBackIdx);
 
       // Not Hermitian conjugate: send upper spinors forward/recv from back
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<4>((short *)(face.my_fwd_face), (short *)in.spinor,
-		       face.Vs, face.V, face.stride, true, false, fwdIdx);
+		       face.Vs, face.V, face.stride, true, false, sendFwdIdx);
 
       gatherNorm((float*)((short*)face.my_fwd_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false, fwdIdx);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false, sendFwdIdx);
     }
  
   } else { 
@@ -521,47 +531,62 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
       // HC: Send upper components back, receive them from front
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<2>((double *)(face.my_back_face), (double *)in.spinor,
-		       face.Vs, face.V, face.stride, true, true, backIdx);
+		       face.Vs, face.V, face.stride, true, true, sendBackIdx);
     
       // HC: send lower components fwd, receive them from back
       // Lower Spins => upper = false, t=Nt-1      => tIsZero = true
       gather12Float<2>((double *)(face.my_fwd_face), (double *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, false, fwdIdx);    
+		       face.Vs, face.V, face.stride, false, false, sendFwdIdx);    
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
       // HC: Send upper components back, receive them from front
       // upper spins => upper = true,t=Nt-1 => tIsZero=false
       gather12Float<4>((float *)(face.my_back_face), (float *)in.spinor,
-		       face.Vs, face.V, face.stride, true, true, backIdx);
+		       face.Vs, face.V, face.stride, true, true, sendBackIdx);
     
       // Lower Spins => upper = false, t=Nt-1      => tIsZero = true
       gather12Float<4>((float *)(face.my_fwd_face), (float *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, false, fwdIdx);
+		       face.Vs, face.V, face.stride, false, false, sendFwdIdx);
     
     } else {       
       // HC: Send upper components back, receive them from front
       //UpperSpins => upper = true, t=0 => tIsZero = true
       gather12Float<4>((short *)(face.my_back_face), (short *)in.spinor,
-		       face.Vs, face.V, face.stride, true, true, backIdx);
+		       face.Vs, face.V, face.stride, true, true, sendBackIdx);
 
       gatherNorm((float*)((short*)face.my_back_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true, backIdx);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, true, sendBackIdx);
 
       // lower_spins => upper = false, t=0, so tIsZero=true 
       gather12Float<4>((short *)(face.my_fwd_face), (short *)in.spinor, 
-		       face.Vs, face.V, face.stride, false, false, fwdIdx);
+		       face.Vs, face.V, face.stride, false, false, sendFwdIdx);
     
       gatherNorm((float*)((short*)face.my_fwd_face+12*face.Vs), 
-		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false, fwdIdx);
+		 (float*)in.spinorNorm, face.Vs, face.V, face.stride, false, sendFwdIdx);
 
     }
 
   }
 }
 
+  // Finish backwards send and forwards receive
+#ifdef QMP_COMMS				
+#define QMP_finish_from_fwd			\
+  QMP_wait(face.mh_send_back);			\
+  QMP_wait(face.mh_from_fwd);			
+
+// Finish forwards send and backwards receive
+#define QMP_finish_from_back			\
+  QMP_wait(face.mh_send_fwd);			\
+  QMP_wait(face.mh_from_back);			
+#else
+#define QMP_finish_from_fwd
+#define QMP_finish_from_back
+#endif
+
+
 void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
 {
  
-
   // I need to gather the faces with opposite Checkerboard
   // Depending on whether I do dagger or not I want top 2 components
   // from forward, and bottom 2 components from backward
@@ -570,73 +595,99 @@ void scatterToPads(ParitySpinor out, FaceBuffer face, int dagger)
     if (out.precision == QUDA_DOUBLE_PRECISION) {
       // Not HC: send lower components back, receive them from forward
       // lower components = buffers 4,5,6
+      QMP_finish_from_fwd;
+
       scatter12Float<2>((double *)out.spinor, (double *)face.from_fwd_face, 
-			face.Vs, face.V, face.stride, false); // LOWER
+			face.Vs, face.V, face.stride, false, recFwdIdx); // LOWER
       
+      QMP_finish_from_back;
+
       // Not H: Send upper components forward, receive them from back
       scatter12Float<2>((double *)out.spinor, (double *)face.from_back_face,
-			face.Vs, face.V, face.stride, true);        // Upper
+			face.Vs, face.V, face.stride, true, recBackIdx);  // Upper
     } else if (out.precision == QUDA_SINGLE_PRECISION) {
+      QMP_finish_from_fwd;
+
       // Not HC: send lower components back, receive them from forward
       // lower components = buffers 4,5,6
       scatter12Float<4>((float *)out.spinor, (float *)face.from_fwd_face, 
-			face.Vs, face.V, face.stride, false); // LOWER
+			face.Vs, face.V, face.stride, false, recFwdIdx); // LOWER
       
+      QMP_finish_from_back;
+
       // Not H: Send upper components forward, receive them from back
       scatter12Float<4>((float *)out.spinor, (float *)face.from_back_face,
-			face.Vs, face.V, face.stride, true);        // Upper
+			face.Vs, face.V, face.stride, true, recBackIdx); // Upper
     } else {
+      QMP_finish_from_fwd;
+
       // Not HC: send lower components back, receive them from forward
       // lower components = buffers 4,5,6
       scatter12Float<4>((short *)out.spinor, (short *)face.from_fwd_face, 
-			face.Vs, face.V, face.stride, false); // LOWER
+			face.Vs, face.V, face.stride, false, recFwdIdx); // LOWER
       
       scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_fwd_face+12*face.Vs), 
-		  face.Vs, face.V, face.stride, false);
+		  face.Vs, face.V, face.stride, false, recFwdIdx);
+
+      QMP_finish_from_back;
 
       // Not H: Send upper components forward, receive them from back
       scatter12Float<4>((short *)out.spinor, (short *)face.from_back_face,
-			face.Vs, face.V, face.stride, true);        // Upper
+			face.Vs, face.V, face.stride, true, recBackIdx); // Upper
 
-      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_back_face+12*face.Vs), 
-		  face.Vs, face.V, face.stride, true);
+      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_back_face+12*face.Vs),
+		  face.Vs, face.V, face.stride, true, recBackIdx); // Lower
 
     }
     
   } else { 
     if (out.precision == QUDA_DOUBLE_PRECISION) {
+      QMP_finish_from_fwd;
+
       // HC: send lower components fwd, receive them from back
-      // lower components = buffers 4,5,6
-      scatter12Float<2>((double *)out.spinor, (double *)face.from_back_face,
-			face.Vs, face.V, face.stride, false);       // Lower
-      
       // upper components = buffers 1, 2,3, go forward (into my_fwd face)
       scatter12Float<2>((double *)out.spinor, (double *)face.from_fwd_face,
-			face.Vs, face.V, face.stride, true );       
-    } else if (out.precision == QUDA_SINGLE_PRECISION) {
-      // HC: send lower components fwd, receive them from back
+			face.Vs, face.V, face.stride, true, recFwdIdx);       
+
+      QMP_finish_from_back;
+
       // lower components = buffers 4,5,6
-      scatter12Float<4>((float *)out.spinor, (float *)face.from_back_face,
-			face.Vs, face.V, face.stride, false);       // Lower
+      scatter12Float<2>((double *)out.spinor, (double *)face.from_back_face,
+			face.Vs, face.V, face.stride, false, recBackIdx);       // Lower
       
+    } else if (out.precision == QUDA_SINGLE_PRECISION) {
+      QMP_finish_from_fwd;
+
+      // HC: send lower components fwd, receive them from back
       // upper components = buffers 1, 2,3, go forward (into my_fwd face)
       scatter12Float<4>((float *)out.spinor, (float *)face.from_fwd_face,
-			face.Vs, face.V, face.stride, true );
-    } else {
-      // HC: send lower components fwd, receive them from back
-      // lower components = buffers 4,5,6
-      scatter12Float<4>((short *)out.spinor, (short *)face.from_back_face,
-			face.Vs, face.V, face.stride, false);       // Lower
-      
-      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_back_face+12*face.Vs), 
-		  face.Vs, face.V, face.stride, false);
+			face.Vs, face.V, face.stride, true, recFwdIdx );
 
+      QMP_finish_from_back;
+
+       // lower components = buffers 4,5,6
+      scatter12Float<4>((float *)out.spinor, (float *)face.from_back_face,
+			face.Vs, face.V, face.stride, false, recBackIdx);       // Lower
+      
+   } else {
+      QMP_finish_from_fwd;
+
+      // HC: send lower components fwd, receive them from back
       // upper components = buffers 1, 2,3, go forward (into my_fwd face)
       scatter12Float<4>((short *)out.spinor, (short *)face.from_fwd_face,
-			face.Vs, face.V, face.stride, true );
+			face.Vs, face.V, face.stride, true, recFwdIdx );
  
       scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_fwd_face+12*face.Vs), 
-		  face.Vs, face.V, face.stride, true);
+		  face.Vs, face.V, face.stride, true, recFwdIdx);
+
+      QMP_finish_from_back;
+
+      // lower components = buffers 4,5,6
+      scatter12Float<4>((short *)out.spinor, (short *)face.from_back_face,
+			face.Vs, face.V, face.stride, false, recBackIdx);       // Lower
+      
+      scatterNorm((float*)out.spinorNorm, (float*)((short*)face.from_back_face+12*face.Vs),
+		  face.Vs, face.V, face.stride, false, recBackIdx);
 
     }
 

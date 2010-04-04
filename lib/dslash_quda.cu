@@ -291,7 +291,7 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     checkCudaError();
   }
 
-  cudaThreadSynchronize();
+  //cudaThreadSynchronize();
 
   dslash_quda_flops += 1320*in.volume;
 }
@@ -556,7 +556,7 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     checkCudaError();
   }
 
-  cudaThreadSynchronize();
+  //cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+48)*in.volume;
 }
@@ -872,7 +872,7 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     checkCudaError();
   }
 
-  cudaThreadSynchronize();
+  //cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+504)*in.volume;
 }
@@ -1429,7 +1429,7 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     checkCudaError();
   }
 
-  cudaThreadSynchronize();
+  //cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+504+48)*in.volume;
 }
