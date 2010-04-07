@@ -1,3 +1,4 @@
+
 #include <quda_internal.h>
 #include <face_quda.h>
 #include <cstdio>
@@ -210,17 +211,17 @@ void exchangeFaces(FaceBuffer bufs)
 #ifdef OVERLAP_COMMS
   cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
 		  cudaMemcpyHostToHost, stream[sendBackIdx]);
-
+  
   cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
-		  cudaMemcpyHostToHost, stream[sendFwdIdx);
+		  cudaMemcpyHostToHost, stream[sendFwdIdx]);
 #else
   cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
 	     cudaMemcpyHostToHost);
-
+  
   cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
 	     cudaMemcpyHostToHost);
 #endif
-
+  
 #else
   memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
   memcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes);
@@ -244,6 +245,10 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
   // Gather into face...
   gatherFromSpinor(face, in, dagger);
 
+}
+
+void exchangeFacesComms(FaceBuffer face) {
+
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
   cudaStreamSynchronize(stream[sendBackIdx]);
@@ -264,23 +269,11 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
   QMP_start(face.mh_send_fwd);
 #endif
 
-}
-
+} 
 
 void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
 {
 
-  /*
-#ifdef QMP_COMMS
-  // Make sure all outstanding sends are done
-  QMP_wait(face.mh_send_back);
-  QMP_wait(face.mh_send_fwd);
-
-  // Finish receives
-  QMP_wait(face.mh_from_fwd);
-  QMP_wait(face.mh_from_back);
-#else
-*/
 #ifndef QMP_COMMS
 // NO QMP -- do copies
 #ifndef __DEVICE_EMULATION__

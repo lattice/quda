@@ -238,6 +238,8 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
 
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, streams);
+  exchangeFacesComms(gauge.faces);
+
   checkCudaError();
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
@@ -527,6 +529,8 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     checkCudaError();
   }
 #endif
+
+  exchangeFacesComms(gauge.faces);
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
@@ -844,6 +848,8 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     checkCudaError();
   }
 #endif
+
+  exchangeFacesComms(gauge.faces);
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
@@ -1401,6 +1407,8 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     checkCudaError();
   }
 #endif
+
+  exchangeFacesComms(gauge.faces);
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor

@@ -132,6 +132,8 @@ void initQuda(int dev)
 
   cudaSetDevice(dev);
 
+  //cudaSetDeviceFlags(0);
+
   cudaGaugePrecise.even = NULL;
   cudaGaugePrecise.odd = NULL;
 
