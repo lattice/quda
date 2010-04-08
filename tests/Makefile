@@ -4,11 +4,14 @@ QUDA = ../lib/libquda.a
 
 INC += -I../include -I.
 
-HDRS = blas_reference.h dslash_reference.h test_util.h
+HDRS = blas_reference.h dslash_reference.h test_util.h  staggered_dslash_reference.h
 
-TESTS = su3_test blas_test pack_test dslash_test invert_test
+TESTS = su3_test blas_test pack_test dslash_test invert_test staggered_dslash_test
 
 all: $(TESTS)
+
+staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 dslash_test: dslash_test.o test_util.o dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
@@ -41,6 +44,8 @@ clean:
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 
 %.o: %.cu $(HDRS)
-	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+	$(NVCC)  $(NVCCFLAGS) $< -c -o $@
 
 .PHONY: all tune clean
+
+
