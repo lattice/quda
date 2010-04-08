@@ -1801,7 +1801,7 @@ double normCuda(const cudaColorSpinorField &a) {
     if (a.subset == QUDA_FULL_FIELD_SUBSET) return normCuda(a.Even()) + normCuda(a.Odd());
     int spinor_bytes = a.length*sizeof(short);
     int half_norm_ratio = (a.nColor*a.nSpin*2*sizeof(short))/sizeof(float);
-    blas_quda_bytes += (2*a.real_length*a.precision) / (a.nColor * a.nSpin);
+    blas_quda_bytes += (a.real_length*a.precision) / (a.nColor * a.nSpin);
     cudaBindTexture(0, texNorm1, a.norm, spinor_bytes/half_norm_ratio);    
     if (a.nSpin == 4){ //wilson
 	cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 
