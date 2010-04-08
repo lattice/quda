@@ -7,14 +7,9 @@
 #include <string.h>
 
 #define QMP_COMMS
+
 #ifdef QMP_COMMS
 #include <qmp.h>
-
-// This is now just for the gauge face.
-QMP_msgmem_t mm_gauge_send_fwd;
-QMP_msgmem_t mm_gauge_from_back;
-QMP_msghandle_t mh_gauge_send_fwd;
-QMP_msghandle_t mh_gauge_from_back;
 #endif
 
 using namespace std;
@@ -717,6 +712,11 @@ void transferGaugeFaces(void *gauge, void *gauge_face, Precision precision,
   // nbytes = Vs*ndim*linksize*precision; /* for contiguous face buffer */
 
 #ifdef QMP_COMMS
+
+  QMP_msgmem_t mm_gauge_send_fwd;
+  QMP_msgmem_t mm_gauge_from_back;
+  QMP_msghandle_t mh_gauge_send_fwd;
+  QMP_msghandle_t mh_gauge_from_back;
 
   g = (void *) ((char *) gauge + offset);
   mm_gauge_send_fwd = QMP_declare_strided_msgmem(g, blocksize, nblocks, stride);

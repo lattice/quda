@@ -334,12 +334,12 @@ int main(int argc, char** argv)
     }
     end();
   }
+  write(names, threads, blocks);
+  endQuda();
+
 #ifdef QMP_COMMS
   QMP_finalize_msg_passing();
 #endif
-
-  write(names, threads, blocks);
-  endQuda();
 }
 
 
