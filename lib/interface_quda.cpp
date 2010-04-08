@@ -20,6 +20,12 @@
 FullGauge cudaGaugePrecise; // precise gauge field
 FullGauge cudaGaugeSloppy; // sloppy gauge field
 
+FullGauge cudaFatLinkPrecise;
+FullGauge cudaFatLinkSloppy;
+
+FullGauge cudaLongLinkPrecise;
+FullGauge cudaLongLinkSloppy;
+
 FullClover cudaCloverPrecise; // clover term
 FullClover cudaCloverSloppy;
 
@@ -107,6 +113,48 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   } else {
     cudaGaugeSloppy = cudaGaugePrecise;
   }
+}
+
+
+void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy)
+{
+    checkGaugeParam(param);
+    FullGauge* cudaLinkPrecise = (FullGauge*)_cudaLinkPrecise;
+    FullGauge* cudaLinkSloppy = (FullGauge*)_cudaLinkSloppy;
+    
+    int packed_size;
+    switch(param->reconstruct){
+    case QUDA_RECONSTRUCT_8:
+        packed_size = 8;
+        break;
+    case QUDA_RECONSTRUCT_12:
+        packed_size = 12;
+        break;
+    case QUDA_RECONSTRUCT_NO:
+        packed_size = 18;
+        break;
+    default:
+        printf("ERROR: %s: reconstruct type not set, exitting\n", __FUNCTION__);
+        exit(1);
+    }
+
+    param->packed_size = packed_size;
+
+    createGaugeField(cudaLinkPrecise, h_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
+		     param->t_boundary, param->X, param->anisotropy, param->ga_pad);
+
+    param->gaugeGiB += 2.0*cudaLinkPrecise->bytes/ (1 << 30);
+    if (param->cuda_prec_sloppy != param->cuda_prec ||
+        param->reconstruct_sloppy != param->reconstruct) {
+    	createGaugeField(cudaLinkSloppy, h_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
+                     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
+                     param->X, param->anisotropy, param->ga_pad);
+
+        param->gaugeGiB += 2.0*cudaLinkSloppy->bytes/ (1 << 30);
+    } else {
+        *cudaLinkSloppy = *cudaLinkPrecise;
+    }
+
 }
 
 /*
@@ -210,6 +258,8 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
+    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH)
+	diracParam.type = QUDA_STAGGERED_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else if (inv_param->solver_type == QUDA_MATPC_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
@@ -238,6 +288,8 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
+    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH)
+	diracParam.type = QUDA_STAGGERED_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else if (inv_param->solver_type == QUDA_MATPC_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
@@ -259,7 +311,7 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
 void massRescale(double &kappa, QudaSolutionType solution_type, 
 		 QudaMassNormalization mass_normalization, 
 		 cudaColorSpinorField &b) {
-
+    
   // multiply the source to get the mass normalization
   if (solution_type == QUDA_MAT_SOLUTION) {
     if (mass_normalization == QUDA_MASS_NORMALIZATION ||

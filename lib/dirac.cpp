@@ -33,6 +33,7 @@ Dirac& Dirac::operator=(const Dirac &dirac) {
 }
 
 void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
+
   if (in.gammaBasis() != QUDA_UKQCD_BASIS || out.gammaBasis() != QUDA_UKQCD_BASIS) {
     errorQuda("Cuda Dirac operator requires UKQCD basis, out = %d, in = %d", 
 	      out.gammaBasis(), in.gammaBasis());
@@ -80,6 +81,9 @@ Dirac* Dirac::create(const DiracParam &param) {
   } else if (param.type == QUDA_CLOVERPC_DIRAC) {
     if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
     return new DiracCloverPC(param);
+  } else if (param.type == QUDA_STAGGERED_DIRAC) {
+      if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
+      return new DiracStaggered(param);
   } else {
     return 0;
   }

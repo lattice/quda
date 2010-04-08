@@ -34,6 +34,7 @@ extern "C" {
 
     int packed_size;
     double gaugeGiB;
+    QudaGaugeType type;
 
   } QudaGaugeParam;
 

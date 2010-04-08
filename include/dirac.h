@@ -17,7 +17,10 @@ class DiracParam {
   FullClover *cloverInv;
   cudaColorSpinorField *tmp1;
   cudaColorSpinorField *tmp2; // used only by Clover operators
-
+  
+  FullGauge* fatGauge; //used by staggered only
+  FullGauge* longGauge;//used by staggered only
+  
   QudaVerbosity verbose;
 
  DiracParam() 
@@ -176,5 +179,36 @@ class DiracCloverPC : public DiracClover {
   void Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 		   const QudaSolutionType, const QudaDagType dagger = QUDA_DAG_NO);
 };
+
+// Full Wilson
+class DiracStaggered : public Dirac {
+
+ protected:
+    FullGauge* fatGauge;
+    FullGauge* longGauge;
+
+ public:
+  DiracStaggered(const DiracParam &param);
+  DiracStaggered(const DiracStaggered &dirac);
+  virtual ~DiracStaggered();
+  DiracStaggered& operator=(const DiracStaggered &dirac);
+
+  virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &);
+  
+  virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		      const int parity, const QudaDagType);
+  virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+			  const int parity, const QudaDagType,
+			  const cudaColorSpinorField &x, const double &k);
+  virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType = QUDA_DAG_NO);
+  virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in);
+
+  virtual void Prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+		       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+		       const QudaSolutionType, const QudaDagType dagger = QUDA_DAG_NO);
+  virtual void Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+			   const QudaSolutionType, const QudaDagType dagger = QUDA_DAG_NO);
+};
+
 
 #endif // _QUDA_DIRAC_H

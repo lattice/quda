@@ -31,6 +31,7 @@ extern "C" {
   typedef enum QudaDslashType_s {
     QUDA_WILSON_DSLASH,
     QUDA_CLOVER_WILSON_DSLASH,
+    QUDA_STAGGERED_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
 
@@ -39,6 +40,7 @@ extern "C" {
     QUDA_WILSONPC_DIRAC,
     QUDA_CLOVER_DIRAC,
     QUDA_CLOVERPC_DIRAC,
+    QUDA_STAGGERED_DIRAC,
     QUDA_INVALID_DIRAC
   } QudaDiracType;
 
@@ -175,6 +177,14 @@ typedef enum QudaSourceType_s {
   QUDA_RANDOM_SOURCE,
   QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
 } QudaSourceType;
+
+typedef enum QudaGaugeType_s{
+    QUDA_WILSON_GAUGE = 0,
+    QUDA_STAGGERED_FAT_GAUGE,
+    QUDA_STAGGERED_LONG_GAUGE,
+    QUDA_STAGGERED_GAUGE,
+    QUDA_INVALID_GAUGE = QUDA_INVALID_ENUM,
+}QudaGaugeType;
 
 #ifdef __cplusplus
 }

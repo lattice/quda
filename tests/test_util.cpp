@@ -298,6 +298,109 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 }
 
 template <typename Float>
+void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
+{
+
+    int X1h=param->X[0]/2;
+    int X1 =param->X[0];
+    int X2 =param->X[1];
+    int X3 =param->X[2];
+    int X4 =param->X[3];
+
+    for(int d =0;d < 4;d++){
+        for(int i=0;i < V*gaugeSiteSize;i++){
+            gauge[d][i] /=(-24* param->anisotropy* param->anisotropy);
+        }
+    }
+
+    // Apply spatial scaling factor (u0) to spatial links
+    for (int d = 0; d < 3; d++) {
+
+        //even
+        for (int i = 0; i < Vh; i++) {
+
+            int index = fullLatticeIndex(i, 0);
+            int i4 = index /(X3*X2*X1);
+            int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
+            int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
+            int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
+            int sign=1;
+
+            if (d == 0) {
+                if (i4 % 2 == 1){
+                    sign= -1;
+                }
+            }
+
+            if (d == 1){
+                if ((i4+i1) % 2 == 1){
+                    sign= -1;
+                }
+            }
+            if (d == 2){
+                if ( (i4+i1+i2) % 2 == 1){
+                    sign= -1;
+                }
+            }
+
+            for (int j=0;j < 6; j++){
+                gauge[d][i*gaugeSiteSize + 12+ j] *= sign;
+            }
+        }
+        //odd
+        for (int i = 0; i < Vh; i++) {
+            int index = fullLatticeIndex(i, 1);
+            int i4 = index /(X3*X2*X1);
+            int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
+            int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
+            int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
+            int sign=1;
+
+            if (d == 0) {
+                if (i4 % 2 == 1){
+                    sign= -1;
+                }
+            }
+
+            if (d == 1){
+                if ((i4+i1) % 2 == 1){
+                    sign= -1;
+                }
+            }
+            if (d == 2){
+                if ( (i4+i1+i2) % 2 == 1){
+                    sign = -1;
+                }
+            }
+
+            for (int j=0;j < 6; j++){
+                gauge[d][(Vh+i)*gaugeSiteSize + 12 + j] *= sign;
+            }
+        }
+
+    }
+
+    // Apply boundary conditions to temporal links
+    if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+        for (int j = 0; j < Vh; j++) {
+            int sign =1;
+            if (j >= (X4-3)*X1h*X2*X3 ){
+                sign= -1;
+            }
+
+            for (int i = 0; i < 6; i++) {
+                gauge[3][j*gaugeSiteSize+ 12+ i ] *= sign;
+                gauge[3][(Vh+j)*gaugeSiteSize+12 +i] *= sign;
+            }
+        }
+    }
+
+
+}
+
+
+
+template <typename Float>
 static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {  
@@ -393,8 +496,13 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
 
     }
   }
-    
-  applyGaugeFieldScaling(res, Vh, param);
+  if (param->type == QUDA_WILSON_GAUGE){  
+      applyGaugeFieldScaling(res, Vh, param);
+  }else if (param->type == QUDA_STAGGERED_LONG_GAUGE){
+      applyGaugeFieldScaling_long(res, Vh, param);      
+  }
+  
+  
 }
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
@@ -406,6 +514,34 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
     else constructGaugeField((float**)gauge, param);
   }
 }
+
+void
+construct_fat_long_gauge_field(void **fatlink, void** longlink,  
+			       int type, QudaPrecision precision, QudaGaugeParam* param)
+{
+    if (type == 0) {
+	if (precision == QUDA_DOUBLE_PRECISION) {
+	    constructUnitGaugeField((double**)fatlink, param);
+	    constructUnitGaugeField((double**)longlink, param);
+	}else {
+	    constructUnitGaugeField((float**)fatlink, param);
+	    constructUnitGaugeField((float**)longlink, param);
+	}
+    } else {
+	if (precision == QUDA_DOUBLE_PRECISION) {
+	    param->type = QUDA_STAGGERED_FAT_GAUGE;
+	    constructGaugeField((double**)fatlink, param);
+	    param->type = QUDA_STAGGERED_LONG_GAUGE;
+	    constructGaugeField((double**)longlink, param);
+	}else {
+	    param->type = QUDA_STAGGERED_FAT_GAUGE;
+	    constructGaugeField((float**)fatlink, param);
+	    param->type = QUDA_STAGGERED_LONG_GAUGE;
+	    constructGaugeField((float**)longlink, param);
+	}
+    }
+}
+
 
 template <typename Float>
 static void constructCloverField(Float *res, double norm, double diag) {

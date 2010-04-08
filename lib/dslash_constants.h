@@ -26,12 +26,14 @@ __constant__ int gauge_fixed;
 
 // single precision constants
 __constant__ float anisotropy_f;
+__constant__ float coeff_f;
 __constant__ float t_boundary_f;
 __constant__ float pi_f;
 
 // double precision constants
 __constant__ double anisotropy;
 __constant__ double t_boundary;
+__constant__ double coeff;
 
 __constant__ float2 An2;
 __constant__ float2 TB2;
@@ -107,11 +109,19 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
   double t_bc = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary", &(t_bc), sizeof(double));
 
+  double coeff = -24.0*gauge.anisotropy*gauge.anisotropy;
+  cudaMemcpyToSymbol("coeff", &(coeff), sizeof(double));
+
+
   float anisotropy_f = gauge.anisotropy;
   cudaMemcpyToSymbol("anisotropy_f", &(anisotropy_f), sizeof(float));
 
   float t_bc_f = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary_f", &(t_bc_f), sizeof(float));
+
+  float coeff_f = -24.0*gauge.anisotropy*gauge.anisotropy;
+  cudaMemcpyToSymbol("coeff_f", &(coeff_f), sizeof(float));
+
 
   float2 An2 = make_float2(gauge.anisotropy, 1.0 / (gauge.anisotropy*gauge.anisotropy));
   cudaMemcpyToSymbol("An2", &(An2), sizeof(float2));

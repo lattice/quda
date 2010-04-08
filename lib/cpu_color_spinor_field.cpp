@@ -146,7 +146,7 @@ cpuColorSpinorField& cpuColorSpinorField::Odd() const {
 
 //sets the elements of the field to random [0, 1]
 template <typename Float>
-void random(Float *v, const int length) {
+void random(Float *v, const int length) {    
   for(int i = 0; i < length; i++) {
     v[i] = rand() / (double)RAND_MAX;
   }

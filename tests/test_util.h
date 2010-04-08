@@ -16,9 +16,10 @@ extern "C" {
   
   int fullLatticeIndex(int i, int oddBit);
   int getOddBit(int X);
-  
+
   void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
-  void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
+    void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, QudaPrecision precision, QudaGaugeParam*);
+    void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
   void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision);
   
   void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);

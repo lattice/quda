@@ -246,6 +246,12 @@ double2 __device__ make_Float2(double2 x) {
   float4 a##5 = tex1Dfetch(tex, i + 5*length);				\
   float a##c = a[i];
 
+#define READ_HALF_SPINOR_ST(a, tex, length)				\
+    float2 a##0 = tex1Dfetch(tex, i + 0*length);			\
+    float2 a##1 = tex1Dfetch(tex, i + 1*length);			\
+    float2 a##2 = tex1Dfetch(tex, i + 2*length);			\
+    float a##c = a[i];
+
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
@@ -316,6 +322,7 @@ __device__ float fast_abs_max(float4 a) {
   h[i+5*length] = make_short4((short)(C*(float)(a##5).x), (short)(C*(float)(a##5).y),	\
   (short)(C*(float)(a##5).z), (short)(C*(float)(a##5).w));}
 
+
   /*
   float C = 1.0f / c0;							\
   h[i+0*length] = float42short4(C, a##0);				\
@@ -357,11 +364,46 @@ __device__ float fast_abs_max(float4 a) {
   h[i+5*length] = make_short4((short)(C*(float)(a##10).x), (short)(C*(float)(a##10).y),	\
 			      (short)(C*(float)(a##11).x), (short)(C*(float)(a##11).y));}
 
+#define RECONSTRUCT_HALF_SPINOR_ST(a, texHalf, texNorm, length)		\
+    float2 a##0 = tex1Dfetch(texHalf, i + 0*length);			\
+    float2 a##1 = tex1Dfetch(texHalf, i + 1*length);			\
+    float2 a##2 = tex1Dfetch(texHalf, i + 2*length);			\
+    {float b = tex1Dfetch(texNorm, i);					\
+	(a##0).x *= b; (a##0).y *= b;					\
+	(a##1).x *= b; (a##1).y *= b;					\
+	(a##2).x *= b; (a##2).y *= b;}
+
+#define CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(h, n, a, length)		\
+    {float c0 = fmaxf(fabsf((a##0).x), fabsf((a##0).y));		\
+	float c1 = fmaxf(fabsf((a##1).x), fabsf((a##1).y));		\
+	float c2 = fmaxf(fabsf((a##2).x), fabsf((a##2).y));		\
+	c0 = fmaxf(c0, c1); c0 = fmaxf(c0, c2);				\
+	n[i] = c0;							\
+	float C = __fdividef(MAX_SHORT, c0);				\
+	h[i+0*length] = make_short2((short)(C*(float)(a##0).x), (short)(C*(float)(a##0).y)); \
+	h[i+1*length] = make_short2((short)(C*(float)(a##1).x), (short)(C*(float)(a##1).y)); \
+	h[i+2*length] = make_short2((short)(C*(float)(a##2).x), (short)(C*(float)(a##2).y));}
+
+#define CONSTRUCT_HALF_SPINOR_FROM_DOUBLE_ST(h, n, a, length)		\
+    {float c0 = fmaxf(fabsf((a##0).x), fabsf((a##0).y));		\
+	float c1 = fmaxf(fabsf((a##1).x), fabsf((a##1).y));		\
+	float c2 = fmaxf(fabsf((a##2).x), fabsf((a##2).y));		\
+	c0 = fmaxf(c0, c1); c0 = fmaxf(c0, c2);				\
+	n[i] = c0;							\
+	float C = __fdividef(MAX_SHORT, c0);				\
+	h[i+0*length] = make_short2((short)(C*(float)(a##0).x), (short)(C*(float)(a##0).y)); \
+	h[i+1*length] = make_short2((short)(C*(float)(a##1).x), (short)(C*(float)(a##1).y)); \
+	h[i+2*length] = make_short2((short)(C*(float)(a##2).x), (short)(C*(float)(a##2).y));}
+
+
 #define SUM_FLOAT4(sum, a)			\
   float sum = a.x + a.y + a.z + a.w;
 
 #define REAL_DOT_FLOAT4(dot, a, b) \
   float dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w
+
+#define REAL_DOT_FLOAT2(dot, a, b)		\
+    float dot = a.x*b.x + a.y*b.y
 
 #define IMAG_DOT_FLOAT4(dot, a, b) \
   float dot = a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z
@@ -438,22 +480,27 @@ texture<float4, 1> xTexSingle4;
 
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf1;
+texture<short2, 1, cudaReadModeNormalizedFloat> texHalfSt1;
 texture<float, 1, cudaReadModeElementType> texNorm1;
 
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf2;
+texture<short2, 1, cudaReadModeNormalizedFloat> texHalfSt2;
 texture<float, 1, cudaReadModeElementType> texNorm2;
 
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf3;
+texture<short2, 1, cudaReadModeNormalizedFloat> texHalfSt3;
 texture<float, 1, cudaReadModeElementType> texNorm3;
 
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf4;
+texture<short2, 1, cudaReadModeNormalizedFloat> texHalfSt4;
 texture<float, 1, cudaReadModeElementType> texNorm4;
 
 // Half precision input spinor field
 texture<short4, 1, cudaReadModeNormalizedFloat> texHalf5;
+texture<short2, 1, cudaReadModeNormalizedFloat> texHalfSt5;
 texture<float, 1, cudaReadModeElementType> texNorm5;
 
 #define checkSpinor(a, b)						\
@@ -487,6 +534,18 @@ __global__ void convertDSKernel(double2 *dst, float4 *src, int length) {
   }   
 }
 
+__global__ void convertDSKernel(double2 *dst, float2 *src, int length) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+      for (int k=0; k<3; k++) {
+	  dst[k*length+i].x = src[k*length+i].x;
+	  dst[k*length+i].y = src[k*length+i].y;
+      }
+      i += gridSize;
+  }   
+}
+
 __global__ void convertSDKernel(float4 *dst, double2 *src, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
@@ -496,6 +555,18 @@ __global__ void convertSDKernel(float4 *dst, double2 *src, int length) {
       dst[k*length+i].y = src[2*k*length+i].y;
       dst[k*length+i].z = src[(2*k+1)*length+i].x;
       dst[k*length+i].w = src[(2*k+1)*length+i].y;
+    }
+    i += gridSize;
+  }   
+}
+
+__global__ void convertSDKernel(float2 *dst, double2 *src, int length) {
+    unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    for (int k=0; k<3; k++) {
+	dst[k*length+i].x = src[k*length+i].x;
+	dst[k*length+i].y = src[k*length+i].y;
     }
     i += gridSize;
   }   
@@ -519,6 +590,22 @@ __global__ void convertHSKernel(short4 *h, float *norm, int length, int real_len
 
 }
 
+__global__ void convertHSKernel(short2 *h, float *norm, int length, int real_length) {
+
+  int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+
+  while(i < real_length) {
+      float2 F0 = tex1Dfetch(xTexSingle2, i + 0*length);
+      float2 F1 = tex1Dfetch(xTexSingle2, i + 1*length);
+      float2 F2 = tex1Dfetch(xTexSingle2, i + 2*length);
+      CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(h, norm, F, length);
+      i += gridSize;
+  }
+
+}
+
+
 __global__ void convertSHKernel(float4 *res, int length, int real_length) {
 
   int i = blockIdx.x*(blockDim.x) + threadIdx.x;
@@ -534,6 +621,20 @@ __global__ void convertSHKernel(float4 *res, int length, int real_length) {
     res[5*length+i] = I5;
     i += gridSize;
   }
+}
+
+__global__ void convertSHKernel(float2 *res, int length, int real_length) {
+
+    int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+    unsigned int gridSize = gridDim.x*blockDim.x;
+    
+    while (i<real_length) {
+	RECONSTRUCT_HALF_SPINOR_ST(I, texHalfSt1, texNorm1, length);
+	res[0*length+i] = I0;
+	res[1*length+i] = I1;
+	res[2*length+i] = I2;
+	i += gridSize;
+    }
 }
 
 __global__ void convertHDKernel(short4 *h, float *norm, int length, int real_length) {
@@ -556,6 +657,20 @@ __global__ void convertHDKernel(short4 *h, float *norm, int length, int real_len
     double2 F11 = fetch_double2(xTexDouble2, i+11*length);
     CONSTRUCT_HALF_SPINOR_FROM_DOUBLE(h, norm, F, length);
     i += gridSize;
+  }
+}
+
+__global__ void convertHDKernel(short2 *h, float *norm, int length, int real_length) {
+
+  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
+  unsigned int gridSize = gridDim.x*blockDim.x;
+
+  while(i < real_length) {
+      double2 F0 = fetch_double2(xTexDouble2, i+0*length);
+      double2 F1 = fetch_double2(xTexDouble2, i+1*length);
+      double2 F2 = fetch_double2(xTexDouble2, i+2*length);
+      CONSTRUCT_HALF_SPINOR_FROM_DOUBLE_ST(h, norm, F, length);
+      i += gridSize;
   }
 }
 
@@ -583,7 +698,28 @@ __global__ void convertDHKernel(double2 *res, int length, int real_length) {
 
 }
 
+__global__ void convertDHKernelSt(double2 *res, int length, int real_length) {
+
+  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  
+  while(i < real_length) {
+      RECONSTRUCT_HALF_SPINOR_ST(I, texHalfSt1, texNorm1, length);
+      res[0*length+i] = make_double2(I0.x, I0.y);
+      res[1*length+i] = make_double2(I1.x, I1.y);
+      res[2*length+i] = make_double2(I2.x, I2.y);
+      i += gridSize;
+  }
+
+}
+
+
+
 void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
+
+    if (src.nSpin != 1 && src.nSpin != 4){
+	errorQuda("nSpin(%d) not supported in function %s, line %d\n", src.nSpin, __FUNCTION__, __LINE__);	
+    }
   if ((dst.precision == QUDA_HALF_PRECISION || src.precision == QUDA_HALF_PRECISION) &&
       (dst.subset == QUDA_FULL_FIELD_SUBSET || src.subset == QUDA_FULL_FIELD_SUBSET)) {
     copyCuda(dst.Even(), src.Even());
@@ -596,32 +732,67 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
   blas_quda_bytes += src.real_length*((int)src.precision + (int)dst.precision);
 
   if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
-    convertDSKernel<<<blasGrid, blasBlock>>>((double2*)dst.v, (float4*)src.v, src.stride);
+      if (src.nSpin == 4){
+	  convertDSKernel<<<blasGrid, blasBlock>>>((double2*)dst.v, (float4*)src.v, src.stride);
+      }else{ //src.nSpin == 1
+	  convertDSKernel<<<blasGrid, blasBlock>>>((double2*)dst.v, (float2*)src.v, src.stride);	  
+      }
+
   } else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
-    convertSDKernel<<<blasGrid, blasBlock>>>((float4*)dst.v, (double2*)src.v, src.stride);
+      if (src.nSpin == 4){
+	  convertSDKernel<<<blasGrid, blasBlock>>>((float4*)dst.v, (double2*)src.v, src.stride);
+      }else{ //src.nSpin ==1
+	  convertSDKernel<<<blasGrid, blasBlock>>>((float2*)dst.v, (double2*)src.v, src.stride);
+      }
   } else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
-    int spinor_bytes = dst.length*sizeof(short);
-    cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/12);
-    convertSHKernel<<<blasGrid, blasBlock>>>((float4*)dst.v, src.stride, src.volume);
+      int spinor_bytes = dst.length*sizeof(short);
+      if (src.nSpin == 4){      
+	  cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
+	  cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/12);
+	  convertSHKernel<<<blasGrid, blasBlock>>>((float4*)dst.v, src.stride, src.volume);
+      }else{ //nSpin== 1;
+	  cudaBindTexture(0, texHalfSt1, src.v, spinor_bytes); 
+	  cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/3);
+	  convertSHKernel<<<blasGrid, blasBlock>>>((float2*)dst.v, src.stride, src.volume);
+      }
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
     int spinor_bytes = dst.length*sizeof(float);
-    cudaBindTexture(0, xTexSingle4, src.v, spinor_bytes); 
-    convertHSKernel<<<blasGrid, blasBlock>>>((short4*)dst.v, (float*)dst.norm, src.stride, src.volume);
+    if (src.nSpin == 4){
+	cudaBindTexture(0, xTexSingle4, src.v, spinor_bytes); 
+	convertHSKernel<<<blasGrid, blasBlock>>>((short4*)dst.v, (float*)dst.norm, src.stride, src.volume);
+    }else{ //nSpinr == 1
+	cudaBindTexture(0, xTexSingle2, src.v, spinor_bytes); 
+	convertHSKernel<<<blasGrid, blasBlock>>>((short2*)dst.v, (float*)dst.norm, src.stride, src.volume);	
+    }
   } else if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
     int spinor_bytes = dst.length*sizeof(short);
-    cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/12);
-    convertDHKernel<<<blasGrid, blasBlock>>>((double2*)dst.v, src.stride, src.volume);
+    if (src.nSpin == 4){
+	cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
+	cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/12);
+	convertDHKernel<<<blasGrid, blasBlock>>>((double2*)dst.v, src.stride, src.volume);
+    }else{//nSpinr == 1
+	cudaBindTexture(0, texHalfSt1, src.v, spinor_bytes); 
+	cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/3);
+	convertDHKernelSt<<<blasGrid, blasBlock>>>((double2*)dst.v, src.stride, src.volume);
+    }
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
-    int spinor_bytes = dst.length*sizeof(double);
-    cudaBindTexture(0, xTexDouble2, src.v, spinor_bytes); 
-    convertHDKernel<<<blasGrid, blasBlock>>>((short4*)dst.v, (float*)dst.norm, src.stride, src.volume);
+      int spinor_bytes = dst.length*sizeof(double);
+      cudaBindTexture(0, xTexDouble2, src.v, spinor_bytes); 
+      if (src.nSpin == 4){
+	  convertHDKernel<<<blasGrid, blasBlock>>>((short4*)dst.v, (float*)dst.norm, src.stride, src.volume);
+      }else{ //nSpinr == 1
+	  convertHDKernel<<<blasGrid, blasBlock>>>((short2*)dst.v, (float*)dst.norm, src.stride, src.volume);
+      }
   } else {
     cudaMemcpy(dst.v, src.v, dst.bytes, cudaMemcpyDeviceToDevice);
     if (dst.precision == QUDA_HALF_PRECISION)
-      cudaMemcpy(dst.norm, src.norm, dst.bytes/(dst.nColor*dst.nSpin), cudaMemcpyDeviceToDevice);
+	cudaMemcpy(dst.norm, src.norm, dst.bytes/(dst.nColor*dst.nSpin), cudaMemcpyDeviceToDevice);
   }
+  
+
+  cudaThreadSynchronize();
+  checkCudaError();
+
 }
 
 
@@ -1601,6 +1772,24 @@ template <int reduce_threads, typename Float>
 #undef REDUCE_AUXILIARY
 #undef REDUCE_OPERATION
 
+template <int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) normHSt##suffix
+#define REDUCE_TYPES Float *a, int stride // dummy type
+#define REDUCE_PARAMS a, stride
+#define REDUCE_AUXILIARY(i)						\
+    READ_HALF_SPINOR_ST(a, texHalfSt1, stride);				\
+    REAL_DOT_FLOAT2(norm0, a0, a0);					\
+    REAL_DOT_FLOAT2(norm1, a1, a1);					\
+    REAL_DOT_FLOAT2(norm2, a2, a2);					\
+    norm0 += norm1; norm0 += norm2; 
+#define REDUCE_OPERATION(i) (ac*ac*norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
 double normCuda(const cudaColorSpinorField &a) {
   blas_quda_flops += 2*a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
@@ -1611,10 +1800,18 @@ double normCuda(const cudaColorSpinorField &a) {
   } else {
     if (a.subset == QUDA_FULL_FIELD_SUBSET) return normCuda(a.Even()) + normCuda(a.Odd());
     int spinor_bytes = a.length*sizeof(short);
-    cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 
-    cudaBindTexture(0, texNorm1, a.norm, spinor_bytes/12);    
+    int half_norm_ratio = (a.nColor*a.nSpin*2*sizeof(short))/sizeof(float);
     blas_quda_bytes += (2*a.real_length*a.precision) / (a.nColor * a.nSpin);
-    return normHCuda((float*)a.norm, a.stride, a.volume, 13, a.precision);
+    cudaBindTexture(0, texNorm1, a.norm, spinor_bytes/half_norm_ratio);    
+    if (a.nSpin == 4){ //wilson
+	cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 
+	return normHCuda((float*)a.norm, a.stride, a.volume, 13, a.precision);
+    }else if (a.nSpin == 1) { //staggered
+        cudaBindTexture(0, texHalfSt1, a.v, spinor_bytes);
+        return normHStCuda((float*)a.norm, a.stride, a.volume, 13, a.precision);	
+    }else{
+	errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, a.nSpin);
+    }
   }
 }
 

@@ -13,6 +13,13 @@ extern "C" {
   extern FullGauge cudaGaugePrecise;
   extern FullGauge cudaGaugeSloppy;
 
+  extern FullGauge cudaFatLinkPrecise;
+  extern FullGauge cudaFatLinkSloppy;
+
+  extern FullGauge cudaLongLinkPrecise;
+  extern FullGauge cudaLongLinkSloppy;
+
+
   extern FullClover cudaCloverPrecise;
   extern FullClover cudaCloverSloppy;
 

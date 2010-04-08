@@ -173,6 +173,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend class DiracWilson;
   friend class DiracClover;
   friend class DiracCloverPC;
+  friend class DiracStaggered;
   friend void zeroCuda(cudaColorSpinorField &a);
   friend void copyCuda(cudaColorSpinorField &, const cudaColorSpinorField &);
   friend double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
@@ -268,6 +269,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   friend double normCpu(const cpuColorSpinorField &);
   friend double dslashCUDA();
   friend void dslashRef();
+  friend void staggeredDslashRef();
 
  private:
   void *v; // the field elements

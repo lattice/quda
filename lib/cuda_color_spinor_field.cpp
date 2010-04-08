@@ -165,7 +165,7 @@ void cudaColorSpinorField::create(const FieldCreate create) {
     if (precision == QUDA_HALF_PRECISION) 
       (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
   }
-
+  
 }
 void cudaColorSpinorField::freeBuffer() {
   if (bufferInit) cudaFree(buffer);
@@ -231,7 +231,6 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
   if (subset != src.subset) {
     errorQuda("Subset types do not match %d %d", subset, src.subset);
   }
-
   if (precision == QUDA_HALF_PRECISION) {
     ColorSpinorParam param;
     fill(param); // acquire all attributes of this
@@ -303,10 +302,11 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
       break;
   default:
       errorQuda("invalid number of spinors in function %s\n", __FUNCTION__);
+
   }
   
 #undef LOAD_SPINOR_CPU_TO_GPU
-  
+
   /*  for (int i=0; i<length; i++) {
     std::cout << i << " " << ((float*)src.v)[i] << " " << ((float*)buffer)[i] << std::endl;
     }*/
@@ -348,6 +348,7 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   memset(buffer, 0, bufferBytes);
 
   cudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
+
 
 #define SAVE_SPINOR_GPU_TO_CPU(myNs)				\
   if (precision == QUDA_DOUBLE_PRECISION) {				\
