@@ -13,7 +13,7 @@ COMMS = overlap     # set to overlap for overalpping comms and computer
 
 BUILD_3D = false    # set to 'true' to build 3D Dslash
 
-DO_QMP = false 
+DO_QMP = true
 
 FECC = gcc	    # Front end CC
 FECXX = g++         # Front end CXX
