@@ -59,7 +59,8 @@
   ACC_CONJ_PROD(g21, -g00, +g12);					\
   ACC_CONJ_PROD(g22, +g00, +g11);					\
   ACC_CONJ_PROD(g22, -g01, +g10);					\
-  double u0 = (dir < 6 ? anisotropy : (ga_idx >= X4X3X2X1hmX3X2X1h ? t_boundary : 1)); \
+  bool do_boundary = (Pt0 && (ga_idx >= Vh)) || ( PtNm1 && (ga_idx >= X4X3X2X1hmX3X2X1h) && (ga_idx < Vh) ) ; \
+  double u0 = (dir < 6 ? anisotropy : ( do_boundary ? t_boundary : 1)); \
   G6.x*=u0; G6.y*=u0; G7.x*=u0; G7.y*=u0; G8.x*=u0; G8.y*=u0;
 
 #define RECONSTRUCT_MATRIX_12_SINGLE(dir)			\
