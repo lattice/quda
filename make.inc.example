@@ -9,17 +9,25 @@ GPU_EMU  = false    # set to 'true' for device emulation
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
 
-BUILD_3D = false      # set to 'true' to build 3D Dslash
-BUILD_MPI = true      # set to 'true' to do MPI based build
-OVERLAP_COMMS = true  # set to 'true' to overlap comms and compute
+COMMS = overlap     # set to overlap for overalpping comms and computer
+
+BUILD_3D = false    # set to 'true' to build 3D Dslash
+
+DO_QMP = false 
+
+FECC = gcc	    # Front end CC
+FECXX = g++         # Front end CXX
 
 OMPI_HOME=/usr/mpi/gcc/openmpi-1.3.2
+MPICC=$(OMPI_HOME)/bin/mpicc
+MPICXX=$(OMPI_HOME)/bin/mpicxx
 QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
-#OMPI_HOME=/usr/lib64/openmpi/1.3.2-gcc
-#QMP_HOME=/home/rbabich/lqcd/install/qmp
+QMP_CFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --cflags)
+QMP_LDFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --ldflags)
+QMP_LIBS=$(shell $(QMP_HOME)/bin/qmp-config --libs)
 
 ######
-
+RUN = $(OMPI_HOME)/bin/mpirun -n 1 
 INC = -I$(CUDA_INSTALL_PATH)/include
 
 ifeq ($(strip $(CPU_ARCH)), x86_64)
@@ -41,25 +49,25 @@ ifeq ($(strip $(BUILD_3D)), true)
   NVCCOPT += -DBUILD_3D_DSLASH
 endif
 
-ifeq ($(strip $(BUILD_MPI)), true)
-  RUN = $(OMPI_HOME)/bin/mpirun -np 1
-else
-  RUN =
-endif
-
-ifeq ($(strip $(OVERLAP_COMMS)), true)
+ifeq ($(strip $(COMMS)), overlap)
   COPT += -DOVERLAP_COMMS
   NVCCOPT += -DOVERLAP_COMMS
 endif
 
-QMP_CFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --cflags)
-QMP_LDFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --ldflags)
-QMP_LIBS=$(shell $(QMP_HOME)/bin/qmp-config --libs)
+ifeq ($(strip $(DO_QMP)), true)
+  RUN = $(OMPI_HOME)/bin/mpirun -n 1
+  CC = $(MPICC)
+  CXX = $(MPICXX)
+  INC += -DQMP_COMMS $(QMP_CFLAGS)
+  LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
+else 
+  RUN =
+  CC  = $(FECC)
+  CXX = $(FECXX)
+endif
 
-CC = $(OMPI_HOME)/bin/mpicc
-CFLAGS = -Wall -O3 -std=c99 $(QMP_CFLAGS) $(COPT) $(INC)
-CXX = $(OMPI_HOME)/bin/mpicxx
-CXXFLAGS = -Wall -O3 $(QMP_CFLAGS) $(COPT) $(INC)
+CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
+CXXFLAGS = -Wall -O3 $(COPT) $(INC)
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) $(QMP_CFLAGS)
-LDFLAGS = -fPIC $(QMP_LDFLAGS) $(LIB) $(QMP_LIBS)
+NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+LDFLAGS = -fPIC $(LIB)

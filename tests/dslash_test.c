@@ -11,7 +11,6 @@
 #include <test_util.h>
 #include <dslash_reference.h>
 
-#define QMP_COMMS
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -58,7 +57,7 @@ void init() {
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
@@ -328,8 +327,8 @@ int main(int argc, char **argv)
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/(secs*(1<<30)));
     
     int res;
-    if (test_type < 2) res = compare_floats(spinorOdd, spinorRef, Vh*4*3*2, 1e-4, inv_param.cpu_prec);
-    else res = compare_floats(spinorGPU, spinorRef, V*4*3*2, 1e-4, inv_param.cpu_prec);
+    if (test_type < 2) res = compare_floats(spinorOdd, spinorRef, Vh*4*3*2, 1e-14, inv_param.cpu_prec);
+    else res = compare_floats(spinorGPU, spinorRef, V*4*3*2, 1e-14, inv_param.cpu_prec);
       
     printf("%d Test %s\n", i, (1 == res) ? "PASSED" : "FAILED");
     
