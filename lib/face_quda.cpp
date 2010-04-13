@@ -242,22 +242,20 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
 
 void exchangeFacesComms(FaceBuffer face) {
 
+#ifdef QMP_COMMS
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
   cudaStreamSynchronize(stream[sendBackIdx]);
 #endif
 
-#ifdef QMP_COMMS
   // Begin backward send
   QMP_start(face.mh_send_back);
-#endif
 
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
   cudaStreamSynchronize(stream[sendFwdIdx]);
 #endif
 
-#ifdef QMP_COMMS
   // Begin forward send
   QMP_start(face.mh_send_fwd);
 #endif
