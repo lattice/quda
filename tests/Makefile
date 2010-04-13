@@ -6,11 +6,14 @@ INC += -I../include -I.
 
 HDRS = blas_reference.h dslash_reference.h test_util.h  staggered_dslash_reference.h
 
-TESTS = su3_test blas_test pack_test dslash_test invert_test staggered_dslash_test
+TESTS = su3_test blas_test pack_test dslash_test invert_test staggered_dslash_test staggered_invert_test
 
 all: $(TESTS)
 
 staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@
+
+staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 dslash_test: dslash_test.o test_util.o dslash_reference.o $(QUDA)

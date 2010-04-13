@@ -8,12 +8,13 @@
 
 ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0) {
   create(param.nDim, param.x, param.nColor, param.nSpin, param.precision, param.pad, 
-	 param.fieldType, param.fieldSubset, param.subsetOrder, param.fieldOrder, param.basis);
+	 param.fieldType, param.fieldSubset, param.subsetOrder, param.fieldOrder, param.basis, 
+	 param.parity);
 }
 
 ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : init(false), even(0), odd(0) {
   create(field.nDim, field.x, field.nColor, field.nSpin, field.precision, field.pad,
-	 field.type, field.subset, field.subset_order, field.order, field.basis);
+	 field.type, field.subset, field.subset_order, field.order, field.basis, field.parity);
 }
 
 ColorSpinorField::~ColorSpinorField() {
@@ -23,7 +24,7 @@ ColorSpinorField::~ColorSpinorField() {
 void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecision Prec, 
 			      int Pad, FieldType Type, FieldSubset Subset, 
 			      SubsetOrder Subset_order, QudaColorSpinorOrder Order,
-			      GammaBasis Basis) {
+			      GammaBasis Basis, QudaParity Parity) {
   if (Ndim > QUDA_MAX_DIM){
     errorQuda("Number of dimensions nDim = %d too great", Ndim);
   }
@@ -57,6 +58,7 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
 
   basis = Basis;
 
+  parity = Parity;
   init = true;
 }
 
@@ -67,7 +69,7 @@ void ColorSpinorField::destroy() {
 ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
   if (&src != this) {
     create(src.nDim, src.x, src.nColor, src.nSpin, src.precision, src.pad,
-	   src.type, src.subset, src.subset_order, src.order, src.basis);    
+	   src.type, src.subset, src.subset_order, src.order, src.basis, src.parity);    
   }
   return *this;
 }

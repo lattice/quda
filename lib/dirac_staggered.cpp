@@ -124,8 +124,8 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
     reset = true;
   }
   
-  //QudaParity parity= in.qudaParity();    
-  QudaParity parity= QUDA_EVEN_PARITY;    
+  QudaParity parity= in.qudaParity();    
+  //QudaParity parity= QUDA_EVEN_PARITY;    
   QudaParity other_parity;
   if (parity == QUDA_EVEN_PARITY){
     other_parity = QUDA_ODD_PARITY;

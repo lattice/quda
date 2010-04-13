@@ -22,13 +22,11 @@ extern void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param,
 				  void* _cudaLinkPrecise, void* _cudaLinkSloppy);
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
-QudaPrecision spinor_prec = QUDA_SINGLE_PRECISION;
-QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision  prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
 
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
-QudaPrecision spinor_prec_sloppy = QUDA_INVALID_PRECISION;
-QudaPrecision  link_prec_sloppy = QUDA_INVALID_PRECISION;
+QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
 static int testtype = 0;
 static int tdim =24;
 static int sdim = 8;
@@ -70,10 +68,10 @@ invert_milc_test(void)
 
   gaugeParam.cpu_prec = cpu_prec;
     
-  gaugeParam.cuda_prec = link_prec;
+  gaugeParam.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
 
-  gaugeParam.cuda_prec_sloppy = link_prec_sloppy;
+  gaugeParam.cuda_prec_sloppy = prec_sloppy;
   gaugeParam.reconstruct_sloppy = link_recon_sloppy;
   
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
@@ -90,13 +88,13 @@ invert_milc_test(void)
   double mass = 0.95;
   inv_param.in_parity = QUDA_EVEN_PARITY;
   inv_param.mass = mass;
-  inv_param.tol = 1e-6;
+  inv_param.tol = 1e-12;
   inv_param.maxiter = 130;
   inv_param.reliable_delta = 1e-3;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = spinor_prec; 
-  inv_param.cuda_prec_sloppy = spinor_prec_sloppy;
+  inv_param.cuda_prec = prec; 
+  inv_param.cuda_prec_sloppy = prec_sloppy;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solver_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
@@ -303,24 +301,27 @@ display_test_info()
 {
   printf("running the following test:\n");
     
-  printf("spinor_prec \t link_prec \tlink_recon\tsloppy_spinor_prec \t sloppy_link_prec \t sloppy_link_recon\ttest_type\t S_dimension T_dimension\n");
-  printf("%s \t\t  %s   \t%s\t\t%s\t\t\t\t%s\t\t\t%s\t\t%s\t\t%d\t\t%d\n", get_prec_str(spinor_prec),
-	 get_prec_str(link_prec), get_recon_str(link_recon), get_prec_str(spinor_prec_sloppy),
-	 get_prec_str(link_prec_sloppy), get_recon_str(link_recon_sloppy), get_test_type(testtype), sdim, tdim);     
+  printf("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
+  printf("%s   %s             %s            %s            %s         %d          %d \n",
+	 get_prec_str(prec),get_prec_str(prec_sloppy),
+	 get_recon_str(link_recon), 
+	 get_recon_str(link_recon_sloppy), get_test_type(testtype), sdim, tdim);     
   return ;
-    
+  
 }
 
 void
 usage(char** argv )
 {
   printf("Usage: %s <args>\n", argv[0]);
-  printf("--sprec <double/single/half> \t Spinor precision\n"); 
-  printf("--gprec <double/single/half> \t Link precision\n"); 
-  printf("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
-  printf("--type <0/1/2/3/4/5> \t\t Testing type(0=even, 1=odd, 2=full, 3=multimass even, 4=multimass odd, 5=multimass full)\n"); 
-  printf("--tdim <n>     \t\t\t T dimension\n");
-  printf("--help \t\t\t\t Print out this message\n"); 
+  printf("--prec         <double/single/half>     Spinor/gauge precision\n"); 
+  printf("--prec_sloppy  <double/single/half>     Spinor/gauge sloppy precision\n"); 
+  printf("--recon        <8/12>                   Long link reconstruction type\n"); 
+  printf("--type         <0/1/2/3/4/5>            Testing type(0=even, 1=odd, 2=full, 3=multimass even,\n" 
+	 "                                                     4=multimass odd, 5=multimass full)\n"); 
+  printf("--tdim                                  T dimension\n");
+  printf("--sdim                                  S dimension\n");
+  printf("--help                                  Print out this message\n"); 
   exit(1);
   return ;
 }
@@ -336,42 +337,25 @@ int main(int argc, char** argv)
       usage(argv);
     }
 	
-    if( strcmp(argv[i], "--sprec") == 0){
+    if( strcmp(argv[i], "--prec") == 0){
       if (i+1 >= argc){
 	usage(argv);
       }	    
-      spinor_prec =  get_prec(argv[i+1]);
+      prec = get_prec(argv[i+1]);
       i++;
       continue;	    
     }
-
-    if( strcmp(argv[i], "--sprec_sloppy") == 0){
+    
+    if( strcmp(argv[i], "--prec_sloppy") == 0){
       if (i+1 >= argc){
 	usage(argv);
       }	    
-      spinor_prec_sloppy =  get_prec(argv[i+1]);
+      prec_sloppy =  get_prec(argv[i+1]);
       i++;
       continue;	    
     }
-	
-    if( strcmp(argv[i], "--gprec") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_prec =  get_prec(argv[i+1]);
-      i++;
-      continue;	    
-    }
-	
-    if( strcmp(argv[i], "--gprec_sloppy") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_prec_sloppy =  get_prec(argv[i+1]);
-      i++;
-      continue;	    
-    }
-		
+    
+    
     if( strcmp(argv[i], "--recon") == 0){
       if (i+1 >= argc){
 	usage(argv);
@@ -439,11 +423,8 @@ int main(int argc, char** argv)
   }
 
 
-  if (spinor_prec_sloppy == QUDA_INVALID_PRECISION){
-    spinor_prec_sloppy = spinor_prec;
-  }
-  if (link_prec_sloppy == QUDA_INVALID_PRECISION){
-    link_prec_sloppy = link_prec;
+  if (prec_sloppy == QUDA_INVALID_PRECISION){
+    prec_sloppy = prec;
   }
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
     link_recon_sloppy = link_recon;

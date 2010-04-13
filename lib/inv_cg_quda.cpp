@@ -83,7 +83,6 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
       axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
     } else {
       axpyCuda(alpha, p, xSloppy);
-      
       if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
       xpyCuda(x, y); // swap these around?
@@ -112,7 +111,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   xpyCuda(y, x);
 
   invert_param->secs = stopwatchReadSeconds();
-  
+
 
   if (k==invert_param->maxiter) 
     warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
@@ -132,7 +131,6 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   dirac.MdagM(r, x);
   //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, y);
   double true_res = xmyNormCuda(b, r);
-  
   printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
 	     k, r2, true_res / b2);
   //#endif

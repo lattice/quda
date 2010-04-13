@@ -32,13 +32,15 @@ class ColorSpinorParam {
  ColorSpinorParam()
    : fieldType(QUDA_INVALID_FIELD), nColor(0), nSpin(0), nDim(0), precision(QUDA_INVALID_PRECISION), 
     pad(0), fieldSubset(QUDA_INVALID_SUBSET), subsetOrder(QUDA_INVALID_SUBSET_ORDER), 
+    parity(QUDA_INVALID_PARITY),
     fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_INVALID_BASIS), create(QUDA_INVALID_CREATE)
   { for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0;}
-
+  
   // used to create cpu params
  ColorSpinorParam(void *V, QudaInvertParam &inv_param, int *X)
    : fieldType(QUDA_CPU_FIELD), nColor(3), nSpin(4), nDim(4), precision(inv_param.cpu_prec), 
     pad(0), fieldSubset(QUDA_INVALID_SUBSET), subsetOrder(QUDA_INVALID_SUBSET_ORDER), 
+    parity(inv_param.in_parity),
     fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_DEGRAND_ROSSI_BASIS), create(QUDA_REFERENCE_CREATE), v(V)
   { 
 
@@ -60,10 +62,11 @@ class ColorSpinorParam {
   }
 
   // used to create cuda param from a cpu param
-  ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
+ ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
     : fieldType(QUDA_CUDA_FIELD), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nDim(cpuParam.nDim), 
-    precision(inv_param.cuda_prec), pad(inv_param.sp_pad), fieldSubset(cpuParam.fieldSubset), 
-    subsetOrder(QUDA_EVEN_ODD_SUBSET_ORDER), fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_UKQCD_BASIS),
+    precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  fieldSubset(cpuParam.fieldSubset),     
+    subsetOrder(QUDA_EVEN_ODD_SUBSET_ORDER), parity(inv_param.in_parity),
+    fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_UKQCD_BASIS),
     create(QUDA_COPY_CREATE), v(0)
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -103,7 +106,8 @@ class ColorSpinorField {
  private:
   void create(int nDim, const int *x, int Nc, int Ns, QudaPrecision precision, 
 	      int pad, FieldType type, FieldSubset subset, 
-	      SubsetOrder subsetOrder, QudaColorSpinorOrder order, GammaBasis basis);
+	      SubsetOrder subsetOrder, QudaColorSpinorOrder order, GammaBasis basis,
+	      QudaParity parity);
   void destroy();  
 
  protected:

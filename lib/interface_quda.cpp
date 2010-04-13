@@ -146,15 +146,15 @@ void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param, void* _cudaLink
     param->gaugeGiB += 2.0*cudaLinkPrecise->bytes/ (1 << 30);
     if (param->cuda_prec_sloppy != param->cuda_prec ||
         param->reconstruct_sloppy != param->reconstruct) {
-    	createGaugeField(cudaLinkSloppy, h_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
-                     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
-                     param->X, param->anisotropy, param->ga_pad);
-
-        param->gaugeGiB += 2.0*cudaLinkSloppy->bytes/ (1 << 30);
+      createGaugeField(cudaLinkSloppy, h_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
+		       param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
+		       param->X, param->anisotropy, param->ga_pad);
+      
+      param->gaugeGiB += 2.0*cudaLinkSloppy->bytes/ (1 << 30);
     } else {
-        *cudaLinkSloppy = *cudaLinkPrecise;
+      *cudaLinkSloppy = *cudaLinkPrecise;
     }
-
+    
 }
 
 /*
@@ -610,8 +610,9 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
   printf("my_norm2 =%f, norm2(h_b)=%f, norm2(b)=%f\n",
 	 my_norm2, norm2(h_b), norm2(b));
     
-  csParam.create = QUDA_NULL_CREATE;
+  csParam.create = QUDA_ZERO_CREATE;
   cudaColorSpinorField x(csParam); // solution
+  
   cudaColorSpinorField tmp(csParam); // temporary
 
   cudaColorSpinorField *in, *out;
@@ -627,20 +628,20 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
   diracParam.longGauge = &cudaLongLinkPrecise;
   
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
+
+  diracParam.fatGauge = &cudaFatLinkSloppy;
+  diracParam.longGauge = &cudaLongLinkSloppy;
   
   setDiracSloppyParam(diracParam, param);
   Dirac *diracSloppy = Dirac::create(diracParam);
-  
-  
+    
   invertCgCuda(*dirac, *diracSloppy, *out, *in, tmp, param);
-
-  
-  std::cout << "Solution = " << norm2(x) << std::endl;
-  
+    
+  printf("Solution = %e\n",norm2(x));
 
   x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
-
-  std::cout << "Solution = " << norm2(h_x) << std::endl;
+  
+  printf("Solution = %e\n",norm2(h_x));
   
 
   delete diracSloppy;
