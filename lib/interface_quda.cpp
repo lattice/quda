@@ -87,7 +87,7 @@ void initQuda(int dev)
   num_QMP=QMP_get_number_of_nodes();
   rank_QMP=QMP_get_node_number();
   
-  dev=rank_QMP % deviceCount;
+  dev += rank_QMP % deviceCount;
   ndim = QMP_get_logical_number_of_dimensions();
   dim = QMP_get_logical_dimensions();
   if (ndim != 4) { 
