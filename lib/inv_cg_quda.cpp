@@ -77,7 +77,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
     if (rNorm > maxrr) maxrr = rNorm;
     int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
     int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-
+    
     if (!(updateR || updateX)) {
       beta = r2 / r2_old;
       axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
@@ -133,7 +133,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, y);
   double true_res = xmyNormCuda(b, r);
   
-  printfQuda("Converged after %d iterations, r2 = %e, true_r2 = %e\n", 
+  printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
 	     k, r2, true_res / b2);
   //#endif
 

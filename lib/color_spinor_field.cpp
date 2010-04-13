@@ -24,7 +24,9 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
 			      int Pad, FieldType Type, FieldSubset Subset, 
 			      SubsetOrder Subset_order, QudaColorSpinorOrder Order,
 			      GammaBasis Basis) {
-  if (Ndim > QUDA_MAX_DIM) errorQuda("Number of dimensions nDim = %d too great", nDim);
+  if (Ndim > QUDA_MAX_DIM){
+    errorQuda("Number of dimensions nDim = %d too great", Ndim);
+  }
   nDim = Ndim;
   nColor = Nc;
   nSpin = Ns;

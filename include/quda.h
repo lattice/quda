@@ -39,10 +39,13 @@ extern "C" {
   } QudaGaugeParam;
 
   typedef struct QudaInvertParam_s {
-    
+
+    QudaGaugeParam* gaugeParam;
     QudaDslashType dslash_type;
     QudaInverterType inv_type;
+    QudaParity in_parity;
 
+    double mass;
     double kappa;  
     double tol;
     int maxiter;
@@ -84,10 +87,12 @@ extern "C" {
 
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+  void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param, void*, void*);
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param);
 
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
+  void invertQudaSt(void *h_x, void *h_b, QudaInvertParam *param);
 
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, QudaDagType dagger);
   void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger);

@@ -49,7 +49,6 @@
 #define DD_XPAY_F 
 #define DD_PARAM5 const int oddBit
 #else            // xpay
-#define DD_XPAY_F Xpay
 #if (DD_PREC == 0)
 #define DD_PARAM5 const int oddBit, const double2 *x, const float *xNorm, const double a
 #elif (DD_PREC == 1) 
@@ -57,7 +56,13 @@
 #else
 #define DD_PARAM5 const int oddBit, const short2 *x, const float *xNorm, const float a
 #endif
+#if (DD_XPAY==1)
+#define DD_XPAY_F Xpay
 #define DSLASH_XPAY
+#else
+#define DD_XPAY_F Axpy
+#define DSLASH_AXPY
+#endif
 #endif
 
 #if (DD_RECON==0) // reconstruct from 8 reals
@@ -243,6 +248,9 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #if (DD_XPAY==0)
 #undef DD_XPAY
 #define DD_XPAY 1
+#elif (DD_XPAY==1)
+#undef DD_XPAY
+#define DD_XPAY 2
 #else
 #undef DD_XPAY
 #define DD_XPAY 0

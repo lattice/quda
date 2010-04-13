@@ -11,6 +11,7 @@ class DiracParam {
  public:
   QudaDiracType type;
   double kappa;
+  double mass;
   MatPCType matpcType;
   FullGauge *gauge;
   FullClover *clover;
@@ -41,6 +42,7 @@ class Dirac {
  protected:
   FullGauge &gauge;
   double kappa;
+  double mass;
   MatPCType matpcType;
   unsigned long long flops;
   cudaColorSpinorField *tmp1;

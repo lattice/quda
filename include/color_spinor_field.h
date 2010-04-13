@@ -20,6 +20,7 @@ class ColorSpinorParam {
 
   FieldSubset fieldSubset; // Full, even or odd
   SubsetOrder subsetOrder; // defined for full fields
+  QudaParity parity;
   
   QudaColorSpinorOrder fieldOrder; // Float, Float2, Float4 etc.
   GammaBasis basis;
@@ -128,6 +129,7 @@ class ColorSpinorField {
   SubsetOrder subset_order;
   QudaColorSpinorOrder order;
   GammaBasis basis;
+  QudaParity parity;
   
   // in the case of full fields, these are references to the even / odd sublattices
   ColorSpinorField *even;
@@ -153,12 +155,15 @@ class ColorSpinorField {
   int Length() const { return length; }
   int Stride() const { return stride; }
   int Volume() const { return volume; }
+  void PrintDims() const { printf("dimensions=%d %d %d %d\n",
+				  x[0], x[1], x[2], x[3]);}
 
   FieldType fieldType() const { return type; }
   FieldSubset fieldSubset() const { return subset; }
   SubsetOrder subsetOrder() const { return subset_order; }
   QudaColorSpinorOrder fieldOrder() const { return order; }
   GammaBasis gammaBasis() const { return basis; }
+  QudaParity qudaParity() const {return parity;}
 };
 
 class cpuColorSpinorField;

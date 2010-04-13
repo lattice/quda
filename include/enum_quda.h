@@ -172,6 +172,13 @@ typedef enum GammaBasis_s {
   QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
 } GammaBasis;
 
+typedef enum QudaParity_s{
+  QUDA_EVEN_PARITY = 0,
+  QUDA_ODD_PARITY,
+  QUDA_FULL_PARITY,
+  QUDA_INVALID_PARITY = QUDA_INVALID_ENUM
+}QudaParity;
+  
 typedef enum QudaSourceType_s {
   QUDA_POINT_SOURCE,
   QUDA_RANDOM_SOURCE,

@@ -299,7 +299,7 @@ mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int dagg
 
 template <typename sFloat, typename gFloat>
 void
-Matdagmat_milc(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat mass, int daggerBit, sFloat* tmp, QudaParity parity) 
+Matdagmat_milc(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat mass, int daggerBit, sFloat* tmp, MyQudaParity parity) 
 {
     
     sFloat msq_x4 = mass*mass*4;
@@ -357,7 +357,7 @@ Matdagmat_milc(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFl
 
 void 
 matdagmat_milc(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
-	       QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, QudaParity parity) 
+	       QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
 {
     
     if (sPrecision == QUDA_DOUBLE_PRECISION){

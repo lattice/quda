@@ -285,20 +285,20 @@ void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *
       
       if (reconstruct == QUDA_RECONSTRUCT_12) {
 	  if (!dagger) {
-	      staggeredDslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+	    staggeredDslash12AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
+	      (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
 	  } else {
-	      staggeredDslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+	    staggeredDslash12DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
+	      (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
 	  }
       } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-	  if (!dagger) {
-	      staggeredDslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
-	  } else {
-	      staggeredDslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
-	  }
+	if (!dagger) {
+	  staggeredDslash8AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
+	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+	} else {
+	  staggeredDslash8DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>>
+	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+	}
       }else{
 	  errorQuda("Invalid reconstruct value in function %s\n", __FUNCTION__);	  
       }    

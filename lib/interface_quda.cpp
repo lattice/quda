@@ -276,12 +276,14 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   diracParam.clover = &cudaCloverPrecise;
   diracParam.cloverInv = &cudaCloverInvPrecise;
   diracParam.kappa = kappa;
+  diracParam.mass = inv_param->mass;
 }
 
 void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   double kappa = inv_param->kappa;
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
     kappa *= cudaGaugePrecise.anisotropy;
+
 
   if (inv_param->solver_type == QUDA_MAT_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
@@ -306,6 +308,7 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   diracParam.clover = &cudaCloverSloppy;
   diracParam.cloverInv = &cudaCloverInvSloppy;
   diracParam.kappa = kappa;
+  diracParam.mass = inv_param->mass;
 }
 
 void massRescale(double &kappa, QudaSolutionType solution_type, 
@@ -531,6 +534,114 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
 
   std::cout << "Solution = " << norm2(h_x) << std::endl;
+
+  delete diracSloppy;
+  delete dirac;
+  
+  return;
+}
+
+
+
+void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
+{
+
+  checkInvertParam(param);
+  /*
+  int slenh = cudaGaugePrecise.volume*spinorSiteSize;
+  param->spinorGiB = (double)slenh * (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
+  if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO)
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 5 : 7)/(double)(1<<30);
+  else
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 8 : 9)/(double)(1<<30);
+  */
+  param->secs = 0;
+  param->gflops = 0;
+  param->iter = 0;
+  
+  
+  ColorSpinorParam csParam;
+  csParam.precision = param->cpu_prec;
+  csParam.fieldType = QUDA_CPU_FIELD;
+  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;  
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
+  csParam.nColor=3;
+  csParam.nSpin=1;
+  csParam.nDim=4;
+  csParam.parity = param->in_parity;
+  if (param->in_parity == QUDA_FULL_PARITY){
+    csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+    csParam.x[0] = param->gaugeParam->X[0];
+  }else{
+    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    csParam.x[0] = param->gaugeParam->X[0]/2;    
+  }
+  csParam.x[1] = param->gaugeParam->X[1];
+  csParam.x[2] = param->gaugeParam->X[2];
+  csParam.x[3] = param->gaugeParam->X[3];
+  csParam.create = QUDA_REFERENCE_CREATE;
+  csParam.v = hp_b;  
+  cpuColorSpinorField h_b(csParam);
+
+  csParam.v = hp_x;
+  cpuColorSpinorField h_x(csParam);
+  
+  csParam.fieldType = QUDA_CUDA_FIELD;
+  csParam.fieldOrder = QUDA_FLOAT2_ORDER;
+  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
+
+  csParam.pad = param->sp_pad;
+  csParam.precision = param->cuda_prec;
+  csParam.create = QUDA_ZERO_CREATE;
+
+  //csParam.basis = QUDA_UKQCD_BASIS;
+
+  cudaColorSpinorField b(csParam);
+
+  b= h_b; //send data from cpu to GPU
+
+  double my_norm2= 0;
+  double*in_data =(double*)hp_b;
+  for(int i =0;i < 8*8*8*24*6;i++){
+    my_norm2 += in_data[i]*in_data[i];
+  }
+  
+  
+  printf("my_norm2 =%f, norm2(h_b)=%f, norm2(b)=%f\n",
+	 my_norm2, norm2(h_b), norm2(b));
+    
+  csParam.create = QUDA_NULL_CREATE;
+  cudaColorSpinorField x(csParam); // solution
+  cudaColorSpinorField tmp(csParam); // temporary
+
+  cudaColorSpinorField *in, *out;
+  in = &b;
+  out = &x;
+
+  
+  // set the Dirac operator parameters
+  DiracParam diracParam;
+  setDiracParam(diracParam, param);
+  diracParam.verbose = QUDA_VERBOSE;
+  diracParam.fatGauge = &cudaFatLinkPrecise;
+  diracParam.longGauge = &cudaLongLinkPrecise;
+  
+  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
+  
+  setDiracSloppyParam(diracParam, param);
+  Dirac *diracSloppy = Dirac::create(diracParam);
+  
+  
+  invertCgCuda(*dirac, *diracSloppy, *out, *in, tmp, param);
+
+  
+  std::cout << "Solution = " << norm2(x) << std::endl;
+  
+
+  x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
+
+  std::cout << "Solution = " << norm2(h_x) << std::endl;
+  
 
   delete diracSloppy;
   delete dirac;

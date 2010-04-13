@@ -77,6 +77,7 @@ init()
     gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
     gaugeParam.gaugeGiB =0;
     
+   // inv_param.gaugeParam = &gaugeParam;
     inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
     inv_param.cuda_prec = spinor_prec;
     if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
@@ -189,7 +190,7 @@ init()
 	
 	printfQuda("Sending spinor field to GPU\n");
 	*cudaSpinor = *spinor;
-
+	
 	cudaThreadSynchronize();
 	checkCudaError();
 	

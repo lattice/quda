@@ -26,6 +26,7 @@ DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac) {
 }
 
 
+
 void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
 
   if (in.Precision() != out.Precision()) {
@@ -103,22 +104,42 @@ void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in
     }
 }
 
-void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) {
-  checkFullSpinor(out, in);
-
+void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) 
+{
+  
+  if (in.fieldSubset() == QUDA_FULL_FIELD_SUBSET){
+    printf("ERORR: full subset not supported yet, line %d\n", __LINE__);
+    return;
+  }
+  
+  if (!initDslash){
+    initDslashConstants(*fatGauge, in.Stride(), 0);
+  }
+  
   ColorSpinorParam param;
   param.create = QUDA_NULL_CREATE;
   bool reset = false;
   if (!tmp1) {
-      tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-      reset = true;
-  } else {
-      checkFullSpinor(*tmp1, in);
+    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
+    reset = true;
   }
+  
+  //QudaParity parity= in.qudaParity();    
+  QudaParity parity= QUDA_EVEN_PARITY;    
+  QudaParity other_parity;
+  if (parity == QUDA_EVEN_PARITY){
+    other_parity = QUDA_ODD_PARITY;
+  }else if (parity == QUDA_ODD_PARITY){
+    other_parity = QUDA_EVEN_PARITY;
+  }else{
+    errorQuda("ERROR: invalid parity(%d) in function\n", parity);
 
-  M(*tmp1, in, QUDA_DAG_NO);
-  M(out, *tmp1, QUDA_DAG_YES);
-
+  }
+  
+  QudaDagType dagger = QUDA_DAG_NO;
+  Dslash(*tmp1, in, other_parity, dagger);  
+  DslashXpay(out, *tmp1, parity, dagger, in, 4*mass*mass);
+  
   if (reset) {
       delete tmp1;
       tmp1 = 0;

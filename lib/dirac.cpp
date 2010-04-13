@@ -2,7 +2,7 @@
 #include <dslash_quda.h>
 
 Dirac::Dirac(const DiracParam &param) 
-  : gauge(*(param.gauge)), kappa(param.kappa), matpcType(param.matpcType), 
+  : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass),matpcType(param.matpcType), 
     flops(0), tmp1(param.tmp1), tmp2(param.tmp2) {
 
 }

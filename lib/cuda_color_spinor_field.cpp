@@ -117,15 +117,16 @@ cudaColorSpinorField::~cudaColorSpinorField() {
   destroy();
 }
 
+
 void cudaColorSpinorField::create(const FieldCreate create) {
 
   if (subset == QUDA_FULL_FIELD_SUBSET && subset_order != QUDA_EVEN_ODD_SUBSET_ORDER) {
     errorQuda("Subset not implemented");
   }
-									     
+
   if (create != QUDA_REFERENCE_CREATE) {
     if (cudaMalloc((void**)&v, bytes) == cudaErrorMemoryAllocation) {
-      errorQuda("Error allocating spinor");
+      errorQuda("Error allocating spinor: bytes=%d", (int)bytes);
     }
     
     if (precision == QUDA_HALF_PRECISION) {
@@ -216,6 +217,7 @@ void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
 
 void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
 
+  
   if (volume != src.volume) {
     errorQuda("Volumes %d %d don't match", volume, src.volume);
   }
