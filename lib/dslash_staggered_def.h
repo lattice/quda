@@ -188,7 +188,8 @@
 // define the kernel
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2,  DD_PARAM4, DD_PARAM5) {
-#if (DD_PREC == 1 || DD_PREC == 2 || DD_PREC == 0)
+//#if (DD_PREC == 2 || DD_PREC == 1)
+#if 1
 #include "dslash_staggered_core.h"
 #endif
 

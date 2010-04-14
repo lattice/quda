@@ -107,11 +107,6 @@ void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in
 void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) 
 {
   
-  if (in.fieldSubset() == QUDA_FULL_FIELD_SUBSET){
-    printf("ERORR: full subset not supported yet, line %d\n", __LINE__);
-    return;
-  }
-  
   if (!initDslash){
     initDslashConstants(*fatGauge, in.Stride(), 0);
   }
@@ -125,21 +120,39 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
   }
   
   QudaParity parity= in.qudaParity();    
-  //QudaParity parity= QUDA_EVEN_PARITY;    
   QudaParity other_parity;
   if (parity == QUDA_EVEN_PARITY){
     other_parity = QUDA_ODD_PARITY;
   }else if (parity == QUDA_ODD_PARITY){
     other_parity = QUDA_EVEN_PARITY;
+  }else if (parity == QUDA_FULL_PARITY){
+    //nothing
   }else{
     errorQuda("ERROR: invalid parity(%d) in function\n", parity);
 
   }
-  
+
   QudaDagType dagger = QUDA_DAG_NO;
-  Dslash(*tmp1, in, other_parity, dagger);  
-  DslashXpay(out, *tmp1, parity, dagger, in, 4*mass*mass);
   
+  if (parity != QUDA_FULL_PARITY){
+    Dslash(*tmp1, in, other_parity, dagger);  
+    DslashXpay(out, *tmp1, parity, dagger, in, 4*mass*mass);
+  }else{
+
+    cudaColorSpinorField* mytmp = dynamic_cast<cudaColorSpinorField*>(tmp1->even);
+    cudaColorSpinorField* ineven = dynamic_cast<cudaColorSpinorField*>(in.even);
+    cudaColorSpinorField* inodd = dynamic_cast<cudaColorSpinorField*>(in.odd);
+    cudaColorSpinorField* outeven = dynamic_cast<cudaColorSpinorField*>(out.even);
+    cudaColorSpinorField* outodd = dynamic_cast<cudaColorSpinorField*>(out.odd);
+    
+    //even
+    Dslash(*mytmp, *ineven, QUDA_ODD_PARITY, dagger);  
+    DslashXpay(*outeven, *mytmp, QUDA_EVEN_PARITY, dagger, *ineven, 4*mass*mass);
+    
+    //odd
+    Dslash(*mytmp, *inodd, QUDA_EVEN_PARITY, dagger);  
+    DslashXpay(*outodd, *mytmp, QUDA_ODD_PARITY, dagger, *inodd, 4*mass*mass);    
+  }
   if (reset) {
       delete tmp1;
       tmp1 = 0;

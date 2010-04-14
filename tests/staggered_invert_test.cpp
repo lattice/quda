@@ -35,7 +35,7 @@ extern int V;
 
 template<typename Float>
 void constructSpinorField(Float *res) {
-  for(int i = 0; i < Vh; i++) {
+  for(int i = 0; i < V; i++) {
     for (int s = 0; s < 1; s++) {
       for (int m = 0; m < 3; m++) {
 	res[i*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
@@ -86,10 +86,9 @@ invert_milc_test(void)
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
     
   double mass = 0.95;
-  inv_param.in_parity = QUDA_EVEN_PARITY;
   inv_param.mass = mass;
-  inv_param.tol = 1e-12;
-  inv_param.maxiter = 130;
+  inv_param.tol = 1e-6;
+  inv_param.maxiter = 100;
   inv_param.reliable_delta = 1e-3;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.cpu_prec = cpu_prec;
@@ -124,21 +123,25 @@ invert_milc_test(void)
     }
   }
     
-  void *spinorIn = malloc(Vh*mySpinorSiteSize*sSize);
-  void *spinorOut = malloc(Vh*mySpinorSiteSize*sSize);
-  void *spinorCheck = malloc(Vh*mySpinorSiteSize*sSize);
-  void *tmp = malloc(Vh*mySpinorSiteSize*sSize);
+  void *spinorIn = malloc(V*mySpinorSiteSize*sSize);
+  void *spinorOut = malloc(V*mySpinorSiteSize*sSize);
+  void *spinorCheck = malloc(V*mySpinorSiteSize*sSize);
+  void *tmp = malloc(V*mySpinorSiteSize*sSize);
     
-  memset(spinorIn, 0, Vh*mySpinorSiteSize*sSize);
-  memset(spinorOut, 0, Vh*mySpinorSiteSize*sSize);
-  memset(spinorCheck, 0, Vh*mySpinorSiteSize*sSize);
-  memset(tmp, 0, Vh*mySpinorSiteSize*sSize);
+  memset(spinorIn, 0, V*mySpinorSiteSize*sSize);
+  memset(spinorOut, 0, V*mySpinorSiteSize*sSize);
+  memset(spinorCheck, 0, V*mySpinorSiteSize*sSize);
+  memset(tmp, 0, V*mySpinorSiteSize*sSize);
 
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
     constructSpinorField((float*)spinorIn);    
   }else{
     constructSpinorField((double*)spinorIn);
   }
+  
+  void* spinorInOdd = ((char*)spinorIn) + Vh*mySpinorSiteSize*sSize;
+  void* spinorOutOdd = ((char*)spinorOut) + Vh*mySpinorSiteSize*sSize;
+  void* spinorCheckOdd = ((char*)spinorCheck) + Vh*mySpinorSiteSize*sSize;
   
   initQuda(device);
   
@@ -158,6 +161,7 @@ invert_milc_test(void)
   case 0: //even
     volume = Vh;
     
+    inv_param.in_parity = QUDA_EVEN_PARITY;    
     invertQudaSt(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); 
@@ -169,36 +173,43 @@ invert_milc_test(void)
     nrm2 = norm_2(spinorCheck, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(spinorIn, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     break;
-    /*	
+
   case 1: //odd
 	
-    volume = Vh;
-    invertQuda_milc(spinorOutOdd, spinorInOdd, &inv_param, mass, QUDA_ODD);	
+    volume = Vh;    
+    inv_param.in_parity = QUDA_ODD_PARITY;  
+    invertQudaSt(spinorOutOdd, spinorInOdd, &inv_param);	
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
-	
-	
+    
+    
     matdagmat_milc(spinorCheckOdd, fatlink, longlink, spinorOutOdd, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);	
     mxpy(spinorInOdd, spinorCheckOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(spinorCheckOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(spinorInOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
 	
     break;
+    
+#if 1    
   case 2: //full spinor
 
     volume = Vh; //FIXME: the time reported is only parity time
-    invertQuda_milc(spinorOut, spinorIn, &inv_param, mass, QUDA_EVENODD);
-	
+    inv_param.in_parity = QUDA_FULL_PARITY;  
+    invertQudaSt(spinorOut, spinorIn, &inv_param);
+    
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
-	
+    
     matdagmat_milc(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVENODD);
-
+    
     mxpy(spinorIn, spinorCheck, V*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(spinorCheck, V*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(spinorIn, V*mySpinorSiteSize, inv_param.cpu_prec);
 
     break;
+#endif
+
+    /*
   case 3: //multi mass CG, even
   case 4:
   case 5:
@@ -317,7 +328,7 @@ usage(char** argv )
   printf("--prec         <double/single/half>     Spinor/gauge precision\n"); 
   printf("--prec_sloppy  <double/single/half>     Spinor/gauge sloppy precision\n"); 
   printf("--recon        <8/12>                   Long link reconstruction type\n"); 
-  printf("--type         <0/1/2/3/4/5>            Testing type(0=even, 1=odd, 2=full, 3=multimass even,\n" 
+  printf("--test         <0/1/2/3/4/5>            Testing type(0=even, 1=odd, 2=full, 3=multimass even,\n" 
 	 "                                                     4=multimass odd, 5=multimass full)\n"); 
   printf("--tdim                                  T dimension\n");
   printf("--sdim                                  S dimension\n");
@@ -374,7 +385,7 @@ int main(int argc, char** argv)
       continue;	    
     }
 	
-    if( strcmp(argv[i], "--type") == 0){
+    if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
 	usage(argv);
       }	    

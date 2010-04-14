@@ -41,12 +41,14 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
   pad = Pad;
   
   if (Subset == QUDA_FULL_FIELD_SUBSET) {
-    stride = volume + 2*pad; // padding is based on half volume
+    stride = volume/2 + pad; // padding is based on half volume
+    length = 2*stride*nColor*nSpin*2;
+    
   } else {
     stride = volume + pad;
+    length = stride*nColor*nSpin*2;
   }
 
-  length = stride*nColor*nSpin*2;
   real_length = volume*nColor*nSpin*2;
 
   bytes = length * precision;
@@ -90,9 +92,17 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   }
   
   if (param.pad != 0) pad = param.pad;
-  stride = volume + pad;
 
-  length = stride*nColor*nSpin*2;
+  if (param.fieldSubset == QUDA_FULL_FIELD_SUBSET){
+    stride = volume/2 + pad;
+    length = 2*stride*nColor*nSpin*2;
+  }else if (param.fieldSubset == QUDA_PARITY_FIELD_SUBSET){
+    stride = volume + pad;
+    length = stride*nColor*nSpin*2;  
+  }else{
+    //do nothing, not an error
+  }
+
   real_length = volume*nColor*nSpin*2;
 
   bytes = length * precision;

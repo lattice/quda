@@ -64,9 +64,8 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
 
     diracSloppy.MdagM(Ap, p);
     //MatVec(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param, tmp);
-
+    
     pAp = reDotProductCuda(p, Ap);
-
     alpha = r2 / pAp;        
     r2_old = r2;
     r2 = axpyNormCuda(-alpha, Ap, rSloppy);

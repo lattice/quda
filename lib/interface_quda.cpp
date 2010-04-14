@@ -569,6 +569,8 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
   csParam.nSpin=1;
   csParam.nDim=4;
   csParam.parity = param->in_parity;
+  csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+
   if (param->in_parity == QUDA_FULL_PARITY){
     csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
     csParam.x[0] = param->gaugeParam->X[0];
@@ -582,7 +584,7 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
   csParam.create = QUDA_REFERENCE_CREATE;
   csParam.v = hp_b;  
   cpuColorSpinorField h_b(csParam);
-
+  
   csParam.v = hp_x;
   cpuColorSpinorField h_x(csParam);
   
@@ -593,34 +595,10 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
   csParam.pad = param->sp_pad;
   csParam.precision = param->cuda_prec;
   csParam.create = QUDA_ZERO_CREATE;
-
-  //csParam.basis = QUDA_UKQCD_BASIS;
-
+  
   cudaColorSpinorField b(csParam);
 
-  b= h_b; //send data from cpu to GPU
-
-  double my_norm2= 0;
-  double*in_data =(double*)hp_b;
-  for(int i =0;i < 8*8*8*24*6;i++){
-    my_norm2 += in_data[i]*in_data[i];
-  }
-  
-  
-  printf("my_norm2 =%f, norm2(h_b)=%f, norm2(b)=%f\n",
-	 my_norm2, norm2(h_b), norm2(b));
-    
-  csParam.create = QUDA_ZERO_CREATE;
-  cudaColorSpinorField x(csParam); // solution
-  
-  cudaColorSpinorField tmp(csParam); // temporary
-
-  cudaColorSpinorField *in, *out;
-  in = &b;
-  out = &x;
-
-  
-  // set the Dirac operator parameters
+ // set the Dirac operator parameters
   DiracParam diracParam;
   setDiracParam(diracParam, param);
   diracParam.verbose = QUDA_VERBOSE;
@@ -634,16 +612,18 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   setDiracSloppyParam(diracParam, param);
   Dirac *diracSloppy = Dirac::create(diracParam);
-    
-  invertCgCuda(*dirac, *diracSloppy, *out, *in, tmp, param);
-    
-  printf("Solution = %e\n",norm2(x));
-
-  x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
   
+  b= h_b; //send data from cpu to GPU
+  
+  csParam.create = QUDA_ZERO_CREATE;
+  cudaColorSpinorField x(csParam); // solution  
+  cudaColorSpinorField tmp(csParam); // temporary
+  invertCgCuda(*dirac, *diracSloppy, x, b, tmp, param);    
+  
+  printf("Solution = %e\n",norm2(x));    
+  x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;    
   printf("Solution = %e\n",norm2(h_x));
   
-
   delete diracSloppy;
   delete dirac;
   

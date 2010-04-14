@@ -2119,9 +2119,9 @@ double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b) {
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
     return reDotProductSCuda((float2*)a.v, (float2*)b.v, a.length/2, 14, a.precision);
   } else {
-    if (a.subset == QUDA_FULL_FIELD_SUBSET) 
+    if (a.subset == QUDA_FULL_FIELD_SUBSET) {
       return reDotProductCuda(a.Even(), b.Even()) + reDotProductCuda(a.Odd(), b.Odd());
-
+    }
     int spinor_bytes = a.length*sizeof(short);
     if (a.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 

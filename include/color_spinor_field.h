@@ -168,6 +168,7 @@ class ColorSpinorField {
   QudaColorSpinorOrder fieldOrder() const { return order; }
   GammaBasis gammaBasis() const { return basis; }
   QudaParity qudaParity() const {return parity;}
+  
 };
 
 class cpuColorSpinorField;

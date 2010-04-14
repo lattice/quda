@@ -45,8 +45,7 @@ int tdim = 16;
 int sdim = 8;
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
-QudaPrecision spinor_prec = QUDA_SINGLE_PRECISION;
-QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision prec = QUDA_SINGLE_PRECISION;
 
 Dirac* dirac;
 
@@ -66,7 +65,7 @@ init()
     gaugeParam.blockDim = 64;
 
     gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-    gaugeParam.cuda_prec = link_prec;
+    gaugeParam.cuda_prec = prec;
     gaugeParam.reconstruct = link_recon;
     gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
     gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
@@ -79,7 +78,7 @@ init()
     
    // inv_param.gaugeParam = &gaugeParam;
     inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.cuda_prec = spinor_prec;
+    inv_param.cuda_prec = prec;
     if (test_type == 2) inv_param.dirac_order = QUDA_DIRAC_ORDER;
     else inv_param.dirac_order = QUDA_DIRAC_ORDER;
     inv_param.kappa = kappa;
@@ -377,9 +376,9 @@ display_test_info()
 {
     printf("running the following test:\n");
  
-    printf("spinor_precision \t link_precision \tlink_reconstruct     test_type     dagger\t   S_dimension \tT_dimension\n");
-    printf("\t%s \t\t\t%s \t\t\t%s \t\t%d \t\t%d\t\t%d\t\t%d \n", get_prec_str(spinor_prec),
-	   get_prec_str(link_prec), get_recon_str(link_recon), 
+    printf("prec recon   test_type     dagger   S_dim     T_dimension\n");
+    printf("%s   %s       %d           %d       %d        %d \n", 
+	   get_prec_str(prec), get_recon_str(link_recon), 
 	   test_type, dagger, sdim, tdim);
     return ;
     
@@ -389,8 +388,7 @@ void
 usage(char** argv )
 {
     printf("Usage: %s <args>\n", argv[0]);
-    printf("--sprec <double/single/half> \t Spinor precision\n"); 
-    printf("--gprec <double/single/half> \t Link precision\n"); 
+    printf("--prec <double/single/half> \t Precision in GPU\n"); 
     printf("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
     printf("--type <0/1/2> \t\t\t Test type\n"); 
     printf("--dagger \t\t\t Set the dagger to 1\n"); 
@@ -411,23 +409,15 @@ main(int argc, char **argv)
             usage(argv);
         }
 	
-        if( strcmp(argv[i], "--sprec") == 0){
-            if (i+1 >= argc){
-                usage(argv);
-            }	    
-	    spinor_prec =  get_prec(argv[i+1]);
-            i++;
-            continue;	    
+        if( strcmp(argv[i], "--prec") == 0){
+	  if (i+1 >= argc){
+	    usage(argv);
+	  }	    
+	  prec =  get_prec(argv[i+1]);
+	  i++;
+	  continue;	    
         }
 	
-	if( strcmp(argv[i], "--gprec") == 0){
-            if (i+1 >= argc){
-                usage(argv);
-            }	    
-	    link_prec =  get_prec(argv[i+1]);
-            i++;
-            continue;	    
-        }
 	
 	if( strcmp(argv[i], "--recon") == 0){
             if (i+1 >= argc){
@@ -438,7 +428,7 @@ main(int argc, char **argv)
             continue;	    
         }
 	
-	if( strcmp(argv[i], "--type") == 0){
+	if( strcmp(argv[i], "--test") == 0){
             if (i+1 >= argc){
                 usage(argv);
             }	    
