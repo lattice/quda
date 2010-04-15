@@ -17,6 +17,10 @@ extern "C" {
 	      int daggerBit, QudaPrecision sPrecision,
 	      QudaPrecision gPrecision);
   
+  void dslash_xpay(void *res, void **gauge, void *spinorField, int oddBit,
+		   double x, int daggerBit, QudaPrecision sPrecision,
+		   QudaPrecision gPrecision);
+  
   void mat(void *out, void **gauge, void *in, double kappa, int daggerBit,
 	   QudaPrecision sPrecision, QudaPrecision gPrecision);
 

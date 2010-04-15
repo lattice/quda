@@ -8,12 +8,12 @@
 extern "C" {
 #endif
 
-  typedef struct double3_s {
+/*  typedef struct double3_s {
     double x;
     double y;
     double z;
   } double3;
-
+*/
   // ---------- blas_quda.cu ----------
   
   // creates and destroys reduction buffers  

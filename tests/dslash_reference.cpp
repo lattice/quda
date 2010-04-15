@@ -266,6 +266,28 @@ void dslash(void *res, void **gaugeFull, void *spinorField, int oddBit, int dagg
 
 }
 
+void dslash_xpay(void *res, void **gaugeFull, void *spinorField, int oddBit, double kappa, 
+		 int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision) {
+  
+  if (sPrecision == QUDA_DOUBLE_PRECISION) 
+    if (gPrecision == QUDA_DOUBLE_PRECISION)
+      dslashReference((double*)res, (double**)gaugeFull, (double*)spinorField, oddBit, daggerBit);
+    else
+      dslashReference((double*)res, (float**)gaugeFull, (double*)spinorField, oddBit, daggerBit);
+  else
+    if (gPrecision == QUDA_DOUBLE_PRECISION)
+      dslashReference((float*)res, (double**)gaugeFull, (float*)spinorField, oddBit, daggerBit);
+    else
+      dslashReference((float*)res, (float**)gaugeFull, (float*)spinorField, oddBit, daggerBit);
+
+  // lastly apply the kappa term
+  if (sPrecision == QUDA_DOUBLE_PRECISION) 
+    xpay((double*)spinorField, kappa, (double*)res, Vh*spinorSiteSize);
+  else
+    xpay((float*)spinorField, (float)kappa, (float*)res, Vh*spinorSiteSize);
+
+}
+
 template <typename sFloat, typename gFloat>
 void Mat(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa, int daggerBit) {
   sFloat *inEven = in;

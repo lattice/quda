@@ -48,13 +48,13 @@
 
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#define DD_PARAM2 int oddBit
+#define DD_PARAM2 int4 param
 #else            // xpay
 #define DD_XPAY_F Xpay
 #if (DD_SPREC == 0)
-#define DD_PARAM2 int oddBit, double a
+#define DD_PARAM2 int4 param, double a
 #else
-#define DD_PARAM2 int oddBit, float a
+#define DD_PARAM2 int4 param, float a
 #endif
 #define DSLASH_XPAY
 #endif

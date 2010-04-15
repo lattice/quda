@@ -336,17 +336,17 @@ volatile spinorFloat o32_im;
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if (sid >= threads) return;
+if (sid >= param.z) return;
 int z1 = FAST_INT_DIVIDE(sid, X1h);
 int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);
 int x2 = z1 - z2*X2;
 int x4 = FAST_INT_DIVIDE(z2, X3);
 int x3 = z2 - x4*X3;
-int x4_new = (x4 + tLocate.x) * tLocate.y;
+int x4_new = (x4 + param.x) * param.y;
 sid += Vs*(x4_new - x4);
 x4 = x4_new;
-int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+int x1odd = (x2 + x3 + x4 + param.w) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
 //int Pad = 2*(sid+Vh);
