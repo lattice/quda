@@ -4,17 +4,16 @@ CUDA_INSTALL_PATH = /usr/local/cuda-3.0
 CUDA_VERSION = 3000
 
 CPU_ARCH = x86_64   # x86 or x86_64
-GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
+GPU_ARCH = sm_12    # sm_10, sm_11, sm_12, or sm_13
 GPU_EMU  = false    # set to 'true' for device emulation
 
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
 
-COMMS = false     # set to overlap for overalpping comms and computer
+BUILD_QMP = true    # whether to build the QMP multi-GPU code or not
+OVERLAP_COMMS = true # set to overlap for overalpping comms and computer
 
 BUILD_3D = false    # set to 'true' to build 3D Dslash
-
-DO_QMP = true
 
 FECC = gcc	    # Front end CC
 FECXX = g++         # Front end CXX
@@ -66,12 +65,12 @@ ifeq ($(strip $(BUILD_3D)), true)
   NVCCOPT += -DBUILD_3D_DSLASH
 endif
 
-ifeq ($(strip $(COMMS)), overlap)
+ifeq ($(strip $(OVERLAP_COMMS)), true)
   COPT += -DOVERLAP_COMMS
   NVCCOPT += -DOVERLAP_COMMS
 endif
 
-ifeq ($(strip $(DO_QMP)), true)
+ifeq ($(strip $(BUILD_QMP)), true)
   RUN = $(OMPI_HOME)/bin/mpirun -n 1
   CC = $(MPICC)
   CXX = $(MPICXX)

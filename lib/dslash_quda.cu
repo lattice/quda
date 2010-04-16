@@ -268,7 +268,6 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
 
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, streams);
-  checkCudaError();
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
   
@@ -288,7 +287,6 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     } else if (in.precision == QUDA_HALF_PRECISION) {
       dslashHCuda(out, gauge, in, parity, dagger, &streams[Nstream-1]);
     }
-    checkCudaError();
   }
 #endif
     
@@ -319,10 +317,11 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     } else if (in.precision == QUDA_HALF_PRECISION) {
       dslashHCuda(out, gauge, in, parity, dagger, &streams[Nstream-2]);
     }
-    checkCudaError();
   }
 
   dslash_quda_flops += 1320*in.volume;
+  cudaThreadSynchronize();
+  checkCudaError();
 }
 
 #ifdef BUILD_3D_DSLASH
@@ -532,7 +531,6 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
 
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, streams);
-  checkCudaError();
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
@@ -552,17 +550,14 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     } else if (in.precision == QUDA_HALF_PRECISION) {
       dslashXpayHCuda(out, gauge, in, parity, dagger, x, a, &streams[Nstream-1]);
     }
-    checkCudaError();
   }
 #endif
 
   exchangeFacesComms(gauge.faces);
-  checkCudaError();
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
   exchangeFacesWait(gauge.faces, in, dagger);
-  checkCudaError();
 
   // do faces
   {
@@ -584,10 +579,11 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     } else if (in.precision == QUDA_HALF_PRECISION) {
       dslashXpayHCuda(out, gauge, in, parity, dagger, x, a, &streams[Nstream-2]);
     }
-    checkCudaError();
   }
 
   dslash_quda_flops += (1320+48)*in.volume;
+  cudaThreadSynchronize();
+  checkCudaError();
 }
 
 
@@ -851,7 +847,6 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
 
   // This gathers from source spinors and starts comms
   exchangeFacesStart(gauge.faces, in, dagger, streams);
-  checkCudaError();
 
   int Vs = gauge.X[0] * gauge.X[1] * gauge.X[2];
 
@@ -871,12 +866,10 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     } else if (in.precision == QUDA_HALF_PRECISION) {
       cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger, &streams[Nstream-1]);
     }
-    checkCudaError();
   }
 #endif
 
   exchangeFacesComms(gauge.faces);
-  checkCudaError();
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
@@ -902,10 +895,11 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     } else if (in.precision == QUDA_HALF_PRECISION) {
       cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger, &streams[Nstream-2]);
     }
-    checkCudaError();
   }
 
   dslash_quda_flops += (1320+504)*in.volume;
+  cudaThreadSynchronize();
+  checkCudaError();
 }
 
 void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
@@ -1429,7 +1423,6 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     } else if (in.precision == QUDA_HALF_PRECISION) {
       cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[Nstream-1]);
     }
-    checkCudaError();
   }
 #endif
 
@@ -1459,10 +1452,11 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     } else if (in.precision == QUDA_HALF_PRECISION) {
       cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[Nstream-2]);
     }
-    checkCudaError();
   }
 
   dslash_quda_flops += (1320+504+48)*in.volume;
+  cudaThreadSynchronize();
+  checkCudaError();
 }
 
 void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv, 
@@ -2086,9 +2080,9 @@ void cloverCuda(ParitySpinor out, FullGauge gauge, FullClover clover,
   } else if (in.precision == QUDA_HALF_PRECISION) {
     cloverHCuda(out, gauge, clover, in, parity);
   }
-  checkCudaError();
 
   dslash_quda_flops += 504*in.volume;
+  checkCudaError();
 }
 
 void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,

@@ -50,7 +50,7 @@ void init() {
   gauge_param.X[0] = 24;
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 64;
+  gauge_param.X[3] = 4;
   setDims(gauge_param.X);
 
   LOOPS /= gauge_param.X[3];
@@ -163,7 +163,7 @@ void init() {
     gauge_param.X[0] /= 2;
     tmp = allocateParitySpinor(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
     cudaSpinor = allocateSpinorField(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
-    cudaSpinorOut = allocateSpinorField(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
+    if (test_type == 2) cudaSpinorOut = allocateSpinorField(gauge_param.X, inv_param.cuda_prec, inv_param.sp_pad);
     gauge_param.X[0] *= 2;
 
     if (test_type !=2 ) {
@@ -189,7 +189,7 @@ void end() {
   free(spinor);
   free(spinorRef);
   if (!transfer) {
-    freeSpinorField(cudaSpinorOut);
+    if (test_type == 2) freeSpinorField(cudaSpinorOut);
     freeSpinorField(cudaSpinor);
     freeParitySpinor(tmp);
   }

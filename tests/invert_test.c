@@ -34,10 +34,10 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 8;
-  gauge_param.X[1] = 8;
-  gauge_param.X[2] = 8;
-  gauge_param.X[3] = 12;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 48;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -61,9 +61,9 @@ int main(int argc, char **argv)
 
   double mass = -0.94;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
-  inv_param.tol = 5e-8;
+  inv_param.tol = 5e-3;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-2;
+  inv_param.reliable_delta = 1e-8;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
