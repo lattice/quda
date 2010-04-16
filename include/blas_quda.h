@@ -8,12 +8,14 @@
 extern "C" {
 #endif
 
-/*  typedef struct double3_s {
+#if (CUDA_VERSION < 3000)
+  typedef struct double3_s {
     double x;
     double y;
     double z;
   } double3;
-*/
+#endif
+
   // ---------- blas_quda.cu ----------
   
   // creates and destroys reduction buffers  

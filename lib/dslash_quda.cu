@@ -258,8 +258,7 @@ static void bindSpinorXTex(ParitySpinor spinor, ParitySpinor x) {
 
 void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, int dagger) {
 
-  if (!initDslash)
-    initDslashConstants(gauge, in.stride, 0);
+  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
 
   checkSpinor(in, out);
   checkGaugeSpinor(in, gauge);
@@ -294,12 +293,10 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
 #endif
     
   exchangeFacesComms(gauge.faces);
-  checkCudaError();
 
   // This waits for comms to finish, and sprays into the 
   // pads of the SOURCE spinor
   exchangeFacesWait(gauge.faces, in, dagger);
-  checkCudaError();
 
   {
     int tOffset = 0;
@@ -316,16 +313,14 @@ void dslashCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int parity, 
     initParam(tOffset, tMul, threads, parity);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashDCuda(out, gauge, in, parity, dagger, &streams[0]);
+      dslashDCuda(out, gauge, in, parity, dagger, &streams[Nstream-2]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashSCuda(out, gauge, in, parity, dagger, &streams[0]);
+      dslashSCuda(out, gauge, in, parity, dagger, &streams[Nstream-2]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashHCuda(out, gauge, in, parity, dagger, &streams[0]);
+      dslashHCuda(out, gauge, in, parity, dagger, &streams[Nstream-2]);
     }
     checkCudaError();
   }
-
-  cudaThreadSynchronize();
 
   dslash_quda_flops += 1320*in.volume;
 }
@@ -583,16 +578,14 @@ void dslashXpayCuda(ParitySpinor out, FullGauge gauge, ParitySpinor in, int pari
     initParam(tOffset, tMul, threads, parity);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a, &streams[0]);
+      dslashXpayDCuda(out, gauge, in, parity, dagger, x, a, &streams[Nstream-2]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a, &streams[0]);
+      dslashXpaySCuda(out, gauge, in, parity, dagger, x, a, &streams[Nstream-2]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a, &streams[0]);
+      dslashXpayHCuda(out, gauge, in, parity, dagger, x, a, &streams[Nstream-2]);
     }
     checkCudaError();
   }
-
-  cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+48)*in.volume;
 }
@@ -903,16 +896,14 @@ void cloverDslashCuda(ParitySpinor out, FullGauge gauge, FullClover cloverInv,
     initParam(tOffset, tMul, threads, parity);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger, &streams[0]);
+      cloverDslashDCuda(out, gauge, cloverInv, in, parity, dagger, &streams[Nstream-2]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger, &streams[0]);
+      cloverDslashSCuda(out, gauge, cloverInv, in, parity, dagger, &streams[Nstream-2]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger, &streams[0]);
+      cloverDslashHCuda(out, gauge, cloverInv, in, parity, dagger, &streams[Nstream-2]);
     }
     checkCudaError();
   }
-
-  //cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+504)*in.volume;
 }
@@ -1462,16 +1453,14 @@ void cloverDslashXpayCuda(ParitySpinor out, FullGauge gauge, FullClover cloverIn
     initParam(tOffset, tMul, threads, parity);
     
     if (in.precision == QUDA_DOUBLE_PRECISION) {
-      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[0]);
+      cloverDslashXpayDCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[Nstream-2]);
     } else if (in.precision == QUDA_SINGLE_PRECISION) {
-      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[0]);
+      cloverDslashXpaySCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[Nstream-2]);
     } else if (in.precision == QUDA_HALF_PRECISION) {
-      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[0]);
+      cloverDslashXpayHCuda(out, gauge, cloverInv, in, parity, dagger, x, a, &streams[Nstream-2]);
     }
     checkCudaError();
   }
-
-  //cudaThreadSynchronize();
 
   dslash_quda_flops += (1320+504+48)*in.volume;
 }

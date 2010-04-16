@@ -174,56 +174,6 @@ void freeFaceBuffer(FaceBuffer f)
 
 }
 
-// This would need to change for going truly parallel..
-// Right now, its just a question of copying faces. My front face
-// is what I send forward so it will be my 'from-back' face
-// and my back face is what I send backward -- will be my from front face
-void exchangeFaces(FaceBuffer bufs)
-{
-
-#ifdef QMP_COMMS
-
-
-  QMP_start(bufs.mh_from_fwd);
-  QMP_start(bufs.mh_from_back);
-
-  QMP_start(bufs.mh_send_back);
-  QMP_start(bufs.mh_send_fwd);
-
-  QMP_wait(bufs.mh_send_back);
-  QMP_wait(bufs.mh_send_fwd);
-
-  QMP_wait(bufs.mh_from_fwd);
-  QMP_wait(bufs.mh_from_back);
-
-  
-#else 
-
-#ifndef __DEVICE_EMULATION__
-
-#ifdef OVERLAP_COMMS
-  cudaMemcpyAsync(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
-		  cudaMemcpyHostToHost, stream[sendBackIdx]);
-  
-  cudaMemcpyAsync(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
-		  cudaMemcpyHostToHost, stream[sendFwdIdx]);
-#else
-  cudaMemcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes, 
-	     cudaMemcpyHostToHost);
-  
-  cudaMemcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes, 
-	     cudaMemcpyHostToHost);
-#endif
-  
-#else
-  memcpy(bufs.from_fwd_face, bufs.my_back_face, bufs.nbytes);
-  memcpy(bufs.from_back_face, bufs.my_fwd_face, bufs.nbytes);
-#endif
-#endif
-   
-}
-
-
 void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger, 
 			cudaStream_t *stream_p)
 {
@@ -242,20 +192,22 @@ void exchangeFacesStart(FaceBuffer face, ParitySpinor in, int dagger,
 
 void exchangeFacesComms(FaceBuffer face) {
 
-#ifdef QMP_COMMS
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
   cudaStreamSynchronize(stream[sendBackIdx]);
 #endif
 
+#ifdef QMP_COMMS
   // Begin backward send
   QMP_start(face.mh_send_back);
+#endif
 
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
   cudaStreamSynchronize(stream[sendFwdIdx]);
 #endif
 
+#ifdef QMP_COMMS
   // Begin forward send
   QMP_start(face.mh_send_fwd);
 #endif
@@ -266,6 +218,7 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
 {
 
 #ifndef QMP_COMMS
+
 // NO QMP -- do copies
 #ifndef __DEVICE_EMULATION__
 
@@ -281,13 +234,13 @@ void exchangeFacesWait(FaceBuffer face, ParitySpinor out, int dagger)
 
   cudaMemcpy(face.from_back_face, face.my_fwd_face, face.nbytes, 
 	     cudaMemcpyHostToHost);
-#endif
+#endif // OVERLAP_COMMS
 
 #else
   memcpy(face.from_fwd_face, face.my_back_face, face.nbytes);
   memcpy(face.from_back_face, face.my_fwd_face, face.nbytes);
 #endif
-#endif
+#endif // QMP_COMMS
 
   // Scatter faces.
   scatterToPads(out, face, dagger);
@@ -403,64 +356,6 @@ template <typename Float>
 
 }
 
-
-
-  // QUDA Memcpy 3 Pad's worth. 
-  //  -- Dest will point to the right beginning PAD. 
-  //  -- Each Pad has size vecLen * Vs Floats. 
-  //  --  There is 4Stride Floats from the
-  //           start of one PAD to the start of the next
-
-template <int vecLen, typename Float>
-  void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, 
-		      bool upper, int strmIdx=0)
-{
-  int Npad = 12/vecLen;
-  int spinor_end = 2*Npad*vecLen*stride;
-  int face_size = Npad*vecLen*Vs;
-  
-#ifdef OVERLAP_COMMS
-  if( upper ) { 
-    cudaMemcpyAsync((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), 
-		    cudaMemcpyHostToDevice, stream[strmIdx]);
-  } else {
-    cudaMemcpyAsync((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), 
-		    cudaMemcpyHostToDevice, stream[strmIdx]);
-#else
-  if( upper ) { 
-    cudaMemcpy((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
-  } else {
-    cudaMemcpy((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
-
-#endif
-  }
-  
-}
-
-// half precision norm version of the above
-template <typename Float>
-  void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
-{
-  int norm_end = stride;
-  int face_size = Vs;
-
-#ifdef OVERLAP_COMMS
-  if (upper) { // upper goes in the first norm zone
-    cudaMemcpyAsync((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), 
-		    cudaMemcpyHostToDevice, stream[strmIdx]);  
-  } else { // lower goes in the second norm zone
-    cudaMemcpyAsync((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), 
-		    cudaMemcpyHostToDevice, stream[strmIdx]);
-  }
-#else
-  if (upper) { // upper goes in the first norm zone
-    cudaMemcpy((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);
-  } else { // lower goes in the second norm zone
-    cudaMemcpy((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);
-  }
-#endif
-}
-
 void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
 {
   
@@ -552,7 +447,65 @@ void gatherFromSpinor(FaceBuffer face, ParitySpinor in, int dagger)
   }
 }
 
-  // Finish backwards send and forwards receive
+
+// QUDA Memcpy 3 Pad's worth. 
+//  -- Dest will point to the right beginning PAD. 
+//  -- Each Pad has size vecLen * Vs Floats. 
+//  --  There is 4Stride Floats from the
+//           start of one PAD to the start of the next
+
+template <int vecLen, typename Float>
+  void scatter12Float(Float* spinor, Float* buf, int Vs, int V, int stride, 
+		      bool upper, int strmIdx=0)
+{
+  int Npad = 12/vecLen;
+  int spinor_end = 2*Npad*vecLen*stride;
+  int face_size = Npad*vecLen*Vs;
+  
+#ifdef OVERLAP_COMMS
+  if( upper ) { 
+    cudaMemcpyAsync((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), 
+		    cudaMemcpyHostToDevice, stream[strmIdx]);
+  } else {
+    cudaMemcpyAsync((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), 
+		    cudaMemcpyHostToDevice, stream[strmIdx]);
+#else
+  if( upper ) { 
+    cudaMemcpy((void *)(spinor + spinor_end), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
+  } else {
+    cudaMemcpy((void *)(spinor + spinor_end + face_size), (void *)(buf), face_size*sizeof(Float), cudaMemcpyHostToDevice);
+
+#endif
+  }
+  
+}
+
+// half precision norm version of the above
+template <typename Float>
+  void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
+{
+  int norm_end = stride;
+  int face_size = Vs;
+
+#ifdef OVERLAP_COMMS
+  if (upper) { // upper goes in the first norm zone
+    cudaMemcpyAsync((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), 
+		    cudaMemcpyHostToDevice, stream[strmIdx]);  
+  } else { // lower goes in the second norm zone
+    cudaMemcpyAsync((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), 
+		    cudaMemcpyHostToDevice, stream[strmIdx]);
+  }
+#else
+  if (upper) { // upper goes in the first norm zone
+    cudaMemcpy((void *)(norm + norm_end), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);
+  } else { // lower goes in the second norm zone
+    cudaMemcpy((void *)(norm + norm_end + face_size), (void *)(buf), Vs*sizeof(Float), cudaMemcpyHostToDevice);
+  }
+#endif
+}
+
+
+// Finish backwards send and forwards receive
 #ifdef QMP_COMMS				
 #define QMP_finish_from_fwd			\
   QMP_wait(face.mh_send_back);			\

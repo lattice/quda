@@ -1,6 +1,7 @@
 ###### Local configuration:
 
-CUDA_INSTALL_PATH = /usr/local/cuda
+CUDA_INSTALL_PATH = /usr/local/cuda-3.0
+CUDA_VERSION = 3000
 
 CPU_ARCH = x86_64   # x86 or x86_64
 GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
@@ -9,7 +10,7 @@ GPU_EMU  = false    # set to 'true' for device emulation
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
 
-COMMS = overlap     # set to overlap for overalpping comms and computer
+COMMS = false     # set to overlap for overalpping comms and computer
 
 BUILD_3D = false    # set to 'true' to build 3D Dslash
 
@@ -18,10 +19,10 @@ DO_QMP = true
 FECC = gcc	    # Front end CC
 FECXX = g++         # Front end CXX
 
-OMPI_HOME=/usr/mpi/gcc/openmpi-1.3.2
+OMPI_HOME=/usr/local/openmpi
 MPICC=$(OMPI_HOME)/bin/mpicc
 MPICXX=$(OMPI_HOME)/bin/mpicxx
-QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
+QMP_HOME=/home/mikec/install
 QMP_CFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --cflags)
 QMP_LDFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --ldflags)
 QMP_LIBS=$(shell $(QMP_HOME)/bin/qmp-config --libs)
@@ -38,6 +39,22 @@ else
   LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
   COPT = -malign-double
 endif
+
+ifeq ($(strip $(GPU_ARCH)), sm_13)
+  COPT += -D__CUDA_ARCH__=130
+  NVCCOPT += -D__CUDA_ARCH__=130
+else
+  ifeq ($(strip $(GPU_ARCH)), sm_12)
+    COPT += -D__CUDA_ARCH__=120
+    NCCOPT += -D__CUDA_ARCH__=120
+  else
+    COPT += -D__CUDA_ARCH__=100
+    NVCCOPT += -D__CUDA_ARCH__=100
+  endif
+endif
+
+COPT += -DCUDA_VERSION=$(CUDA_VERSION)
+NVCCOPT += -DCUDA_VERSION=$(CUDA_VERSION)
 
 ifeq ($(strip $(GPU_EMU)), true)
   COPT += -D__DEVICE_EMULATION__
