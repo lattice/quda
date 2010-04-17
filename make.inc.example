@@ -1,4 +1,6 @@
 ###### Local configuration:
+# CUDA_INSTALL_PATH = /usr/local/cuda-3.0
+# CUDA_VERSION = 3000
 
 CUDA_INSTALL_PATH = /usr/local/cuda
 CUDA_VERSION = 2300
