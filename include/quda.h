@@ -93,7 +93,9 @@ extern "C" {
 
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
   void invertQudaSt(void *h_x, void *h_b, QudaInvertParam *param);
-
+  void invertQudaStMultiMass(void **_hp_x, void *_hp_b, QudaInvertParam *param,
+			     double* offsets, int num_offsets, double* residue_sq);
+    
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, QudaDagType dagger);
   void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger);
   void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);

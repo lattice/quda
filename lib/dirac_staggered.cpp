@@ -27,7 +27,7 @@ DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac) {
 
 
 
-void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
+void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cudaColorSpinorField &out) {
 
   if (in.Precision() != out.Precision()) {
     errorQuda("Input and output spinor precisions don't match in dslash_quda");
@@ -79,29 +79,30 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
     flops += (1320+48)*in.volume;
 }
 
-void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) {
-    double mkappa2 = - kappa*kappa;
-    if (!initDslash){
-	initDslashConstants(*fatGauge, in.Stride(), 0);
-    }
-    ColorSpinorParam param;
-    param.create = QUDA_NULL_CREATE;
-    bool reset = false;
-    if (!tmp1) {
-	tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-	reset = true;
-    }
-
-    int parity= 1;    
-    Dslash(*tmp1, in, parity, dagger);
-
-    parity =0;
-    DslashXpay(out, *tmp1, parity, dagger, in, mkappa2);
-    
-    if (reset) {
-	delete tmp1;
-	tmp1 = 0;
-    }
+void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) 
+{
+  double mkappa2 = - kappa*kappa;
+  if (!initDslash){
+    initDslashConstants(*fatGauge, in.Stride(), 0);
+  }
+  ColorSpinorParam param;
+  param.create = QUDA_NULL_CREATE;
+  bool reset = false;
+  if (!tmp1) {
+    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
+    reset = true;
+  }
+  
+  int parity= 1;    
+  Dslash(*tmp1, in, parity, dagger);
+  
+  parity =0;
+  DslashXpay(out, *tmp1, parity, dagger, in, mkappa2);
+  
+  if (reset) {
+    delete tmp1;
+    tmp1 = 0;
+  }
 }
 
 void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) 

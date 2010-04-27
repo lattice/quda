@@ -103,10 +103,10 @@ invert_milc_test(void)
   gaugeParam.ga_pad = sdim*sdim*sdim;
   inv_param.sp_pad = sdim*sdim*sdim;
   inv_param.cl_pad = sdim*sdim*sdim;
-
+  
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
+  
   for (int dir = 0; dir < 4; dir++) {
     fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
     longlink[dir] = malloc(V*gaugeSiteSize*gSize);
@@ -190,7 +190,6 @@ invert_milc_test(void)
 	
     break;
     
-#if 1    
   case 2: //full spinor
 
     volume = Vh; //FIXME: the time reported is only parity time
@@ -207,72 +206,81 @@ invert_milc_test(void)
     src2 = norm_2(spinorIn, V*mySpinorSiteSize, inv_param.cpu_prec);
 
     break;
-#endif
 
-    /*
   case 3: //multi mass CG, even
   case 4:
   case 5:
 #define NUM_OFFSETS 4
-	
+    
+    
     nflops = 2*(1205 + 15* NUM_OFFSETS); //from MILC's multimass CG routine
     double masses[NUM_OFFSETS] ={1.05, 1.23, 2.64, 2.33};
     double offsets[NUM_OFFSETS];	
-    //int num_offsets =NUM_OFFSETS;
-    int num_offsets =  4;
+    int num_offsets =NUM_OFFSETS;
     void* spinorOutArray[NUM_OFFSETS];
     void* in;
-    int parity;
     int len;
-
+    
     for (int i=0; i< num_offsets;i++){
       offsets[i] = 4*masses[i]*masses[i];
     }
-	    
+    
     if (testtype == 3){
-      parity = QUDA_EVEN;
-      in=spinorInEven;
+      inv_param.in_parity = QUDA_EVEN_PARITY;          
+      in=spinorIn;
       len=Vh;
       volume = Vh;
-		
-      spinorOutArray[0] = spinorOutEven;
+      
+      spinorOutArray[0] = spinorOut;
       for (int i=1; i< num_offsets;i++){
 	spinorOutArray[i] = malloc(Vh*mySpinorSiteSize*sSize);
       }		
-    }else if (testtype ==4){
-      parity = QUDA_ODD;
+    }
+    
+    else if (testtype ==4){
+      inv_param.in_parity = QUDA_ODD_PARITY;        
       in=spinorInOdd;
       len = Vh;
       volume = Vh;
-
+      
       spinorOutArray[0] = spinorOutOdd;
       for (int i=1; i< num_offsets;i++){
 	spinorOutArray[i] = malloc(Vh*mySpinorSiteSize*sSize);
       }
-    }else {
-      parity = QUDA_EVENODD;
+    }else { //testtype ==5
+      inv_param.in_parity = QUDA_FULL_PARITY;        
       in=spinorIn;
       len= V;
       volume = Vh; //FIXME: the time reported is only parity time
-
+      
       spinorOutArray[0] = spinorOut;
       for (int i=1; i< num_offsets;i++){
 	spinorOutArray[i] = malloc(V*mySpinorSiteSize*sSize);
       }		
     }
-	    
+    
     double residue_sq;
-    invertQuda_milc_multi_offset(spinorOutArray, in, &inv_param, offsets, num_offsets, parity, &residue_sq);	
+    invertQudaStMultiMass(spinorOutArray, in, &inv_param, offsets, num_offsets, &residue_sq);	
     cudaThreadSynchronize();
     printf("Final residue squred =%g\n", residue_sq);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
-
+    
     printf("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	   time0, inv_param.iter, inv_param.secs,
-	   1e-9*nflops*volume*(inv_param.iter+inv_param.rUpdate)/inv_param.secs);
-	    
+	   1e-9*nflops*volume*inv_param.iter/inv_param.secs);
+
+    
     printf("checking the solution\n");
+    MyQudaParity parity;
+    if (inv_param.in_parity == QUDA_EVEN_PARITY){
+      parity = QUDA_EVEN;
+    }else if(inv_param.in_parity == QUDA_ODD_PARITY){
+      parity = QUDA_ODD;
+    }else{
+      parity = QUDA_EVENODD;
+    }
+    
     for(int i=0;i < num_offsets;i++){
       printf("%dth solution: ", i);
       matdagmat_milc(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
@@ -281,11 +289,11 @@ invert_milc_test(void)
       double src2 = norm_2(in, len*mySpinorSiteSize, inv_param.cpu_prec);
       printf("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
     }
-	    
+    
     for(int i=1; i < num_offsets;i++){
       free(spinorOutArray[i]);
     }
-    */
+
     
   }//switch
     

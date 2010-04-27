@@ -199,6 +199,9 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
   friend void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, 
 			   cudaColorSpinorField &z, const double &b);
+  friend void axpyBzpcxCuda(double a, cudaColorSpinorField& x, cudaColorSpinorField& y,
+			    double b, cudaColorSpinorField& z, double c); 
+  
   friend void caxpbyCuda(const double2 &a, cudaColorSpinorField &x, const double2 &b, cudaColorSpinorField &y);
   friend void caxpyCuda(const double2 &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
   friend void cxpaypbzCuda(cudaColorSpinorField &, const double2 &b, cudaColorSpinorField &y, 

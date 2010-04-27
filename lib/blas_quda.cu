@@ -1552,6 +1552,149 @@ void cxpaypbzCuda(cudaColorSpinorField &x, const double2 &a, cudaColorSpinorFiel
   }
 }
 
+
+template <typename Float, typename Float2>
+__global__ void axpyBzpcxDKernel(Float a, Float2 *x, Float2 *y, Float b, Float2 *z, Float c, int len)
+{
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 x_i = READ_DOUBLE2_TEXTURE(x, i);
+    Float2 z_i = READ_DOUBLE2_TEXTURE(z, i);
+
+    y[i].x += a*x_i.x;
+    y[i].y += a*x_i.y;
+    
+    x[i].x = b*z_i.x + c*x_i.x;
+    x[i].y = b*z_i.y + c*x_i.y;
+    
+    i += gridSize;
+  }
+}
+
+
+template <typename Float, typename Float2>
+__global__ void axpyBzpcxSKernel(Float a, Float2 *x, Float2 *y, Float b, Float2 *z, Float c, int len)
+{
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 x_i = read_Float2(x, i);
+    Float2 z_i = read_Float2(z, i);
+
+    y[i].x += a*x_i.x;
+    y[i].y += a*x_i.y;
+    
+    x[i].x = b*z_i.x + c*x_i.x;
+    x[i].y = b*z_i.y + c*x_i.y;
+    
+    i += gridSize;
+  }
+}
+
+__global__ void axpyBzpcxHKernel(float a, float b, float c, short4 *xH, float *xN, short4 *yH, float *yN, int stride, int length)
+{
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);
+    RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);
+    RECONSTRUCT_HALF_SPINOR(z, texHalf3, texNorm3, stride);
+    AXPY_FLOAT4(a, x0, y0);
+    AXPBY_FLOAT4(b, z0, c, x0);
+    AXPY_FLOAT4(a, x1, y1);
+    AXPBY_FLOAT4(b, z1, c, x1);
+    AXPY_FLOAT4(a, x2, y2);
+    AXPBY_FLOAT4(b, z2, c, x2);
+    AXPY_FLOAT4(a, x3, y3);
+    AXPBY_FLOAT4(b, z3, c, x3);
+    AXPY_FLOAT4(a, x4, y4);
+    AXPBY_FLOAT4(b, z4, c, x4);
+    AXPY_FLOAT4(a, x5, y5);
+    AXPBY_FLOAT4(b, z5, c, x5);    
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE(xH, xN, x, stride);
+    i += gridSize;
+  }
+}
+
+
+__global__ void axpyBzpcxHKernel(float a, float b, float c, short2 *xH, float *xN, short2 *yH, float *yN, int stride, int length)
+{
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);
+    RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);
+    RECONSTRUCT_HALF_SPINOR_ST(z, texHalfSt3, texNorm3, stride);
+    AXPY_FLOAT2(a, x0, y0);
+    AXPBY_FLOAT2(b, z0, c, x0);
+    AXPY_FLOAT2(a, x1, y1);
+    AXPBY_FLOAT2(b, z1, c, x1);
+    AXPY_FLOAT2(a, x2, y2);
+    AXPBY_FLOAT2(b, z2, c, x2);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(xH, xN, x, stride);
+    i += gridSize;
+  }
+}
+
+
+
+//FIXME: add a new blas routine, need put this one into others so that it will auto-generate an optimized blocks/grid config
+#define REDUCE_THREADS 128
+
+// performs the operations: {y[i] = a x[i] + y[i]; x[i] = b z[i] + c x[i]}
+void axpyBzpcxCuda(double a, cudaColorSpinorField& x, cudaColorSpinorField& y, double b, cudaColorSpinorField& z, double c) 
+{
+  checkSpinor(x,y);
+  checkSpinor(x,z);
+  int blocks = min(REDUCE_MAX_BLOCKS, max(x.length/REDUCE_THREADS, 1));
+  dim3 dimBlock(REDUCE_THREADS, 1, 1);
+  dim3 dimGrid(blocks, 1, 1);
+  if (x.precision == QUDA_DOUBLE_PRECISION) {
+    int spinor_bytes = x.length*sizeof(double);
+    cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
+    cudaBindTexture(0, zTexDouble2, z.v, spinor_bytes); 
+    axpyBzpcxDKernel<<<dimGrid, dimBlock>>>(a, (double2*)x.v, (double2*)y.v, b, (double2*)z.v, c, x.length/2);
+  } else if (x.precision == QUDA_SINGLE_PRECISION) {
+    axpyBzpcxSKernel<<<dimGrid, dimBlock>>>((float)a, (float2*)x.v, (float2*)y.v, (float)b, (float2*)z.v, (float)c, x.length/2);
+  } else {
+    if (x.subset == QUDA_FULL_FIELD_SUBSET){
+      axpyBzpcxCuda(a, x.Even(), y.Even(), b, z.Even(), c);
+      axpyBzpcxCuda(a, x.Odd(), y.Odd(), b, z.Odd(), c);
+      return ;
+    }
+
+    int spinor_bytes = x.length*sizeof(short);
+    if (x.nSpin == 4){ //wilson
+      cudaBindTexture(0, texHalf1, x.v, spinor_bytes);
+      cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);
+      cudaBindTexture(0, texHalf2, y.v, spinor_bytes);
+      cudaBindTexture(0, texNorm2, y.norm, spinor_bytes/12);
+      cudaBindTexture(0, texHalf3, z.v, spinor_bytes);
+      cudaBindTexture(0, texNorm3, z.norm, spinor_bytes/12);
+      axpyBzpcxHKernel<<<dimGrid, dimBlock>>>((float)a, (float)b, (float)c, (short4*)x.v, (float*)x.norm,
+					      (short4*)y.v, (float*)y.norm, z.stride, z.volume);
+    }else if (x.nSpin == 1){ //staggered
+      cudaBindTexture(0, texHalfSt1, x.v, spinor_bytes);
+      cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/3);
+      cudaBindTexture(0, texHalfSt2, y.v, spinor_bytes);
+      cudaBindTexture(0, texNorm2, y.norm, spinor_bytes/3);
+      cudaBindTexture(0, texHalfSt3, z.v, spinor_bytes);
+      cudaBindTexture(0, texNorm3, z.norm, spinor_bytes/3);
+      axpyBzpcxHKernel<<<dimGrid, dimBlock>>>((float)a, (float)b, (float)c, (short2*)x.v, (float*)x.norm,
+					      (short2*)y.v, (float*)y.norm, z.stride, z.volume);
+    }else{
+      errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);    
+    }
+  }
+}
+
+
+
 template <typename Float, typename Float2>
 __global__ void axpyZpbxDKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float b, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;

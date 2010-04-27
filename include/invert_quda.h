@@ -29,7 +29,10 @@ extern "C" {
   // -- inv_cg_cuda.cpp
   void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField &tmp,
 		    QudaInvertParam *param);
-  
+  int invertCgCudaMultiMass(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField** x, cudaColorSpinorField b,
+			    QudaInvertParam *invert_param, 
+			    double* offsets, int num_offsets, double* residue_sq);
+    
   // -- inv_bicgstab_cuda.cpp
   void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField &tmp, 
 			  QudaInvertParam *param, DagType dag_type);
