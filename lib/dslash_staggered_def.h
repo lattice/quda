@@ -83,7 +83,9 @@
 #define READ_FAT_MATRIX READ_FAT_MATRIX_18_HALF
 #define READ_LONG_MATRIX READ_LONG_MATRIX_8_HALF
 #endif
-#else // reconstruct from 12 reals
+
+#elif (DD_RECON ==1)// reconstruct from 12 reals
+
 #define DD_RECON_F 12
 #if (DD_PREC==0)
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_DOUBLE
@@ -101,6 +103,24 @@
 #define READ_FAT_MATRIX READ_FAT_MATRIX_18_HALF
 #define READ_LONG_MATRIX READ_LONG_MATRIX_12_HALF
 #endif
+
+#else //18 reconstruct
+#define DD_RECON_F 18
+#define RECONSTRUCT_GAUGE_MATRIX(dir, gauge, idx, sign)
+#if (DD_PREC==0)
+#define READ_FAT_MATRIX READ_FAT_MATRIX_18_DOUBLE
+#define READ_LONG_MATRIX READ_LONG_MATRIX_18_DOUBLE
+#define DD_PARAM2 const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1
+#elif (DD_PREC==1)
+#define DD_PARAM2 const float2 *fatGauge0, const float2 *fatGauge1, const float2* longGauge0, const float2* longGauge1
+#define READ_FAT_MATRIX READ_FAT_MATRIX_18_SINGLE
+#define READ_LONG_MATRIX READ_LONG_MATRIX_18_SINGLE
+#else 
+#define DD_PARAM2 const short2 *fatGauge0, const short2 *fatGauge1, const short2* longGauge0, const short2* longGauge1
+#define READ_FAT_MATRIX READ_FAT_MATRIX_18_HALF
+#define READ_LONG_MATRIX READ_LONG_MATRIX_18_HALF
+#endif
+
 #endif
 
 #if (DD_PREC==0) // double-precision fields
@@ -136,9 +156,13 @@
 #define DD_PREC_F S
 #define FATLINK0TEX fatGauge0TexSingle
 #define FATLINK1TEX fatGauge1TexSingle
+#if (DD_RECON ==2)
+#define LONGLINK0TEX longGauge0TexSingle_norecon
+#define LONGLINK1TEX longGauge1TexSingle_norecon
+#else
 #define LONGLINK0TEX longGauge0TexSingle
 #define LONGLINK1TEX longGauge1TexSingle
-
+#endif
 // spinor fields
 #define DD_PARAM1 float2* g_out, float *null1
 #define DD_PARAM4 const float2* in, const float *null4
@@ -161,8 +185,14 @@
 #define DD_PREC_F H
 #define FATLINK0TEX fatGauge0TexHalf
 #define FATLINK1TEX fatGauge1TexHalf
+#if (DD_RECON ==2)
+#define LONGLINK0TEX longGauge0TexHalf_norecon
+#define LONGLINK1TEX longGauge1TexHalf_norecon
+#else
 #define LONGLINK0TEX longGauge0TexHalf
 #define LONGLINK1TEX longGauge1TexHalf
+#endif
+
 #define READ_SPINOR READ_ST_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
@@ -188,8 +218,8 @@
 // define the kernel
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2,  DD_PARAM4, DD_PARAM5) {
-//#if (DD_PREC == 2 || DD_PREC == 1)
-#if 1
+#if (DD_PREC == 1 || DD_PREC == 2 || DD_PREC == 0)
+//#if 1
 #include "dslash_staggered_core.h"
 #endif
 
@@ -259,6 +289,9 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #if (DD_RECON==0)
 #undef DD_RECON
 #define DD_RECON 1
+#elif (DD_RECON ==1)
+#undef DD_RECON
+#define DD_RECON 2
 #else
 #undef DD_RECON
 #define DD_RECON 0

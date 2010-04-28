@@ -152,7 +152,7 @@ invert_milc_test(void)
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
   loadGaugeQuda_general(longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy);
   
-  unsigned long volume;
+  unsigned long volume = Vh;
   unsigned long nflops=2*1187; //from MILC's CG routine
   double nrm2=0;
   double src2=0;

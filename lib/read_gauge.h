@@ -423,3 +423,13 @@
 #define READ_LONG_MATRIX_12_HALF(gauge, dir, idx)	\
     READ_GAUGE_MATRIX_12_HALF(gauge, dir, idx, LONG)
 
+#define READ_LONG_MATRIX_18_HALF(gauge, dir, idx)			\
+  float2 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*ga_stride);	\
+  float2 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*ga_stride);	\
+  float2 LONG2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*ga_stride);	\
+  float2 LONG3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*ga_stride);	\
+  float2 LONG4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*ga_stride);	\
+  float2 LONG5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*ga_stride);	\
+  float2 LONG6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*ga_stride);	\
+  float2 LONG7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*ga_stride);	\
+  float2 LONG8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*ga_stride);

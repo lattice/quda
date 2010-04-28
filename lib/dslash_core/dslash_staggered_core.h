@@ -103,7 +103,7 @@
 #define fat22_re FAT8.x
 #define fat22_im FAT8.y
 
-#if (DD_RECON == 2 && DD_PREC == 1) //18 (no) reconstruct
+#if (DD_RECON == 2) //18 (no) reconstruct
 #define long00_re LONG0.x
 #define long00_im LONG0.y
 #define long01_re LONG1.x

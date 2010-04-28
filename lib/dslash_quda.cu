@@ -248,11 +248,11 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
 }
 
 template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
-void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
-			 const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
-			 const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
-			 const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
-			 const double &a, const int volume, const int length) {
+  void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
+			   const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
+			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
+			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
+			   const double &a, const int volume, const int length) {
     
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
@@ -260,54 +260,92 @@ void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
 
   if (x==0) { // not doing xpay
-      if (reconstruct == QUDA_RECONSTRUCT_12) {
-	  if (!dagger) {
-	      staggeredDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
-	  } else {
-	      staggeredDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
-	  }
-      } else if (reconstruct == QUDA_RECONSTRUCT_8){
-	  
-	  if (!dagger) {
-	      staggeredDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
-	  } else {
-	      staggeredDslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-		  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
-	  }
-	  
-      }else{
-	  errorQuda("Invalid reconstruct value(%d) in function %s\n", reconstruct, __FUNCTION__);
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	staggeredDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
+      } else {
+	staggeredDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
       }
+    } else if (reconstruct == QUDA_RECONSTRUCT_8){
+	  
+      if (!dagger) {
+	staggeredDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
+      } else {
+	staggeredDslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
+      }
+    }else{
+      errorQuda("Invalid reconstruct value(%d) in function %s\n", reconstruct, __FUNCTION__);
+    }
   } else { // doing xpay
-      
-      if (reconstruct == QUDA_RECONSTRUCT_12) {
-	  if (!dagger) {
-	    staggeredDslash12AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
-	      (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
-	  } else {
-	    staggeredDslash12DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
-	      (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
-	  }
-      } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-	if (!dagger) {
-	  staggeredDslash8AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
-	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
-	} else {
-	  staggeredDslash8DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>>
-	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
-	}
-      }else{
-	  errorQuda("Invalid reconstruct value in function %s\n", __FUNCTION__);	  
-      }    
+    
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	staggeredDslash12AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+      } else {
+	staggeredDslash12DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+      if (!dagger) {
+	staggeredDslash8AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+      } else {
+	staggeredDslash8DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+      }
+    }else{
+      errorQuda("Invalid reconstruct value in function %s\n", __FUNCTION__);	  
+    }    
   }
   
   cudaThreadSynchronize();
   checkCudaError();
-
+  
 }
+
+
+template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
+  void staggeredDslashNoReconCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
+				  const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
+				  const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
+				  const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
+				  const double &a, const int volume, const int length) 
+{
+  
+  dim3 gridDim(volume/BLOCK_DIM, 1, 1);
+  dim3 blockDim(BLOCK_DIM, 1, 1);
+  
+  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
+  
+  if (x==0) { // not doing xpay
+    if (!dagger) {
+      staggeredDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
+    } else {
+      staggeredDslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
+	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity);
+    }    
+  } else { // doing xpay
+    
+    if (!dagger) {
+      staggeredDslash18AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
+	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+    } else {
+      staggeredDslash18DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>>
+	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, parity, x, xNorm, a);
+    }          
+  }
+  
+  cudaThreadSynchronize();
+  checkCudaError();
+  
+}
+
 
 
 void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, const FullGauge longGauge, 
@@ -315,40 +353,58 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 			 const int parity, const int dagger, const void *x, const void *xNorm, 
 			 const double k, const int volume, const int length, const QudaPrecision precision) 
 {
-    void *fatGauge0, *fatGauge1;
-    void* longGauge0, *longGauge1;
-    bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
-    bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
-
+  void *fatGauge0, *fatGauge1;
+  void* longGauge0, *longGauge1;
+  bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
+  bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
     
-    if (precision != fatGauge.precision || precision != longGauge.precision){
-	errorQuda("Mixing gauge and spinor precision not supported");
-    }
+  if (precision != fatGauge.precision || precision != longGauge.precision){
+    errorQuda("Mixing gauge and spinor precision not supported");
+  }
     
-    if (precision == QUDA_DOUBLE_PRECISION) {
+  if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ == 130)
-	
-	staggeredDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
-			       (double2*)longGauge0, (double2*)longGauge1,
-			       longGauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
-			       (double2*)x, (float*)xNorm, k, volume, length);
-	
-#else
-	errorQuda("Double precision not supported on this GPU");
-#endif
-    } else if (precision == QUDA_SINGLE_PRECISION) {
-	staggeredDslashCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
-			       (float4*)longGauge0, (float4*)longGauge1,
-			       longGauge.reconstruct, (float2*)in, (float*)inNorm, parity, dagger, 
-			       (float2*)x, (float*)xNorm, k, volume, length);
-    } else if (precision == QUDA_HALF_PRECISION) {	
-	staggeredDslashCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
-			       (short4*)longGauge0, (short4*)longGauge1,
-			       longGauge.reconstruct, (short2*)in, (float*)inNorm, parity, dagger, 
-			       (short2*)x, (float*)xNorm, k, volume, length);
-	
+    if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
+      staggeredDslashNoReconCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
+				    (double2*)longGauge0, (double2*)longGauge1,
+				    longGauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
+				    (double2*)x, (float*)xNorm, k, volume, length);
+    }else{
+      staggeredDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
+			     (double2*)longGauge0, (double2*)longGauge1,
+			     longGauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
+			     (double2*)x, (float*)xNorm, k, volume, length);
     }
-    checkCudaError();
+    
+#else
+    errorQuda("Double precision not supported on this GPU");
+#endif
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
+      staggeredDslashNoReconCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
+				    (float2*)longGauge0, (float2*)longGauge1,
+				    longGauge.reconstruct, (float2*)in, (float*)inNorm, parity, dagger, 
+				    (float2*)x, (float*)xNorm, k, volume, length);
+    }else{
+      staggeredDslashCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
+			     (float4*)longGauge0, (float4*)longGauge1,
+			     longGauge.reconstruct, (float2*)in, (float*)inNorm, parity, dagger, 
+			     (float2*)x, (float*)xNorm, k, volume, length);
+    }
+  } else if (precision == QUDA_HALF_PRECISION) {	
+    if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
+      staggeredDslashNoReconCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
+				    (short2*)longGauge0, (short2*)longGauge1,
+				    longGauge.reconstruct, (short2*)in, (float*)inNorm, parity, dagger, 
+				    (short2*)x, (float*)xNorm, k, volume, length);
+    }else{
+      staggeredDslashCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
+			     (short4*)longGauge0, (short4*)longGauge1,
+			     longGauge.reconstruct, (short2*)in, (float*)inNorm, parity, dagger, 
+			     (short2*)x, (float*)xNorm, k, volume, length);
+    }
+  }
+  checkCudaError();
   
 }
 
