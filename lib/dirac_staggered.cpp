@@ -61,7 +61,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
     staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, 
 			0, 0, 0, out.volume, out.length, in.Precision());
     
-    flops += 1320*in.volume;
+    flops += 1187*in.volume;
 }
 
 void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -76,7 +76,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
     staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
 			out.volume, out.length, in.Precision());
     
-    flops += (1320+48)*in.volume;
+    flops += (1187+12)*in.volume;
 }
 
 void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) 

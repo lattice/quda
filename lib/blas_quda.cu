@@ -1646,7 +1646,7 @@ __global__ void axpyBzpcxHKernel(float a, float b, float c, short2 *xH, float *x
 //FIXME: add a new blas routine, need put this one into others so that it will auto-generate an optimized blocks/grid config
 #define REDUCE_THREADS 128
 
-// performs the operations: {y[i] = a x[i] + y[i]; x[i] = b z[i] + c x[i]}
+// performs the operations: {y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]}
 void axpyBzpcxCuda(double a, cudaColorSpinorField& x, cudaColorSpinorField& y, double b, cudaColorSpinorField& z, double c) 
 {
   checkSpinor(x,y);
@@ -1690,7 +1690,10 @@ void axpyBzpcxCuda(double a, cudaColorSpinorField& x, cudaColorSpinorField& y, d
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);    
     }
+    blas_quda_bytes += (5*x.real_length*x.precision) / (x.nColor * x.nSpin);
   }
+  blas_quda_bytes += 5*x.real_length*x.precision;
+  blas_quda_flops += 10*x.real_length;
 }
 
 

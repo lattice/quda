@@ -321,8 +321,7 @@ invertCgCudaMultiMass(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField** 
     printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
   }
     
-  float gflops = 1; //k*(1.0e-9*x[0].volume)*(2*1146+12 + 10*spinorSiteSize);
-  //PRINTF("%f gflops\n", k*gflops / stopwatchReadSeconds());
+  float gflops = (blas_quda_flops + dirac.Flops() + diracSloppy.Flops())*1e-9;
   invert_param->gflops = gflops;
   invert_param->iter = k;
 #if 0
