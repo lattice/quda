@@ -214,6 +214,8 @@
 
 /************* the following is used by staggered *****************/
 
+#ifndef DIRECT_ACCESS_SPINOR //spinor access control
+
 #define READ_1ST_NBR_SPINOR_SINGLE(spinor, idx)			\
     float2 I0 = tex1Dfetch((spinor), idx + 0*sp_stride);	\
     float2 I1 = tex1Dfetch((spinor), idx + 1*sp_stride);	\
@@ -234,23 +236,47 @@
     double2 T1 = fetch_double2((spinor), idx + 1*sp_stride);	\
     double2 T2 = fetch_double2((spinor), idx + 2*sp_stride);
 
+#else //spinor access control
+
+#define READ_1ST_NBR_SPINOR_SINGLE(spinor, idx)		\
+  float2 I0 = spinor[idx + 0*sp_stride];		\
+  float2 I1 = spinor[idx + 1*sp_stride];		\
+  float2 I2 = spinor[idx + 2*sp_stride];
+
+#define READ_3RD_NBR_SPINOR_SINGLE(spinor, idx)		\
+  float2 T0 = spinor[idx + 0*sp_stride];		\
+  float2 T1 = spinor[idx + 1*sp_stride];		\
+  float2 T2 = spinor[idx + 2*sp_stride];
+
+#define READ_1ST_NBR_SPINOR_DOUBLE(spinor, idx)			\
+  double2 I0 = spinor[idx + 0*sp_stride];			\
+  double2 I1 = spinor[idx + 1*sp_stride];			\
+  double2 I2 = spinor[idx + 2*sp_stride];
+
+#define READ_3RD_NBR_SPINOR_DOUBLE(spinor, idx)	\
+  double2 T0 = spinor[idx + 0*sp_stride];	\
+  double2 T1 = spinor[idx + 1*sp_stride];	\
+  double2 T2 = spinor[idx + 2*sp_stride];
+
+#endif //spinor access control
+
 #define READ_1ST_NBR_SPINOR_HALF(spinor, idx)			\
-    float2 I0 = tex1Dfetch((spinor), idx + 0*sp_stride);	\
-    float2 I1 = tex1Dfetch((spinor), idx + 1*sp_stride);	\
-    float2 I2 = tex1Dfetch((spinor), idx + 2*sp_stride);	\
-    {float C = tex1Dfetch((spinorTexNorm), idx);		\
-        I0.x *= C; I0.y *= C;					\
-        I1.x *= C; I1.y *= C;					\
-        I2.x *= C; I2.y *= C;}
+  float2 I0 = tex1Dfetch((spinor), idx + 0*sp_stride);		\
+  float2 I1 = tex1Dfetch((spinor), idx + 1*sp_stride);		\
+  float2 I2 = tex1Dfetch((spinor), idx + 2*sp_stride);		\
+  {float C = tex1Dfetch((spinorTexNorm), idx);			\
+    I0.x *= C; I0.y *= C;					\
+    I1.x *= C; I1.y *= C;					\
+    I2.x *= C; I2.y *= C;}
 
 #define READ_3RD_NBR_SPINOR_HALF(spinor, idx)			\
-    float2 T0 = tex1Dfetch((spinor), idx + 0*sp_stride);	\
-    float2 T1 = tex1Dfetch((spinor), idx + 1*sp_stride);	\
-    float2 T2 = tex1Dfetch((spinor), idx + 2*sp_stride);	\
-    {float C = tex1Dfetch((spinorTexNorm), idx);		\
-        T0.x *= C; T0.y *= C;					\
-        T1.x *= C; T1.y *= C;					\
-        T2.x *= C; T2.y *= C;}
+  float2 T0 = tex1Dfetch((spinor), idx + 0*sp_stride);		\
+  float2 T1 = tex1Dfetch((spinor), idx + 1*sp_stride);		\
+  float2 T2 = tex1Dfetch((spinor), idx + 2*sp_stride);		\
+  {float C = tex1Dfetch((spinorTexNorm), idx);			\
+    T0.x *= C; T0.y *= C;					\
+    T1.x *= C; T1.y *= C;					\
+    T2.x *= C; T2.y *= C;}
 
 
 #define WRITE_ST_SPINOR_DOUBLE2()				\

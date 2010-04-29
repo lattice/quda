@@ -127,10 +127,22 @@
 
 // gauge field
 #define DD_PREC_F D
+#ifndef DIRECT_ACCESS_FAT_LINK
 #define FATLINK0TEX fatGauge0TexDouble
 #define FATLINK1TEX fatGauge1TexDouble
+#else
+#define FATLINK0TEX fatGauge0
+#define FATLINK1TEX fatGauge1
+#endif
+
+#ifndef DIRECT_ACCESS_LONG_LINK //longlink access
 #define LONGLINK0TEX longGauge0TexDouble
 #define LONGLINK1TEX longGauge1TexDouble
+#else
+#define LONGLINK0TEX longGauge0
+#define LONGLINK1TEX longGauge1
+#endif
+
 #define GAUGE_DOUBLE
 
 // spinor fields
@@ -139,7 +151,11 @@
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
+#ifndef DIRECT_ACCESS_SPINOR
 #define SPINORTEX spinorTexDouble
+#else
+#define SPINORTEX in
+#endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_DOUBLE2
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE
@@ -154,8 +170,16 @@
 
 // gauge fields
 #define DD_PREC_F S
+
+#ifndef DIRECT_ACCESS_FAT_LINK
 #define FATLINK0TEX fatGauge0TexSingle
 #define FATLINK1TEX fatGauge1TexSingle
+#else
+#define FATLINK0TEX fatGauge0
+#define FATLINK1TEX fatGauge1
+#endif
+
+#ifndef DIRECT_ACCESS_LONG_LINK //longlink access
 #if (DD_RECON ==2)
 #define LONGLINK0TEX longGauge0TexSingle_norecon
 #define LONGLINK1TEX longGauge1TexSingle_norecon
@@ -163,6 +187,11 @@
 #define LONGLINK0TEX longGauge0TexSingle
 #define LONGLINK1TEX longGauge1TexSingle
 #endif
+#else
+#define LONGLINK0TEX longGauge0
+#define LONGLINK1TEX longGauge1
+#endif
+
 // spinor fields
 #define DD_PARAM1 float2* g_out, float *null1
 #define DD_PARAM4 const float2* in, const float *null4
@@ -171,7 +200,11 @@
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_SINGLE
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_SINGLE
+#ifndef DIRECT_ACCESS_SPINOR
 #define SPINORTEX spinorTexSingle2
+#else
+#define SPINORTEX in
+#endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_FLOAT2
 #if (DD_XPAY==1 || DD_XPAY == 2)
 #define ACCUMTEX accumTexSingle2
@@ -185,6 +218,7 @@
 #define DD_PREC_F H
 #define FATLINK0TEX fatGauge0TexHalf
 #define FATLINK1TEX fatGauge1TexHalf
+
 #if (DD_RECON ==2)
 #define LONGLINK0TEX longGauge0TexHalf_norecon
 #define LONGLINK1TEX longGauge1TexHalf_norecon
@@ -218,7 +252,7 @@
 // define the kernel
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2,  DD_PARAM4, DD_PARAM5) {
-#if (DD_PREC == 1 || DD_PREC == 2 || DD_PREC == 0)
+#if (DD_PREC == 1 || DD_PREC == 0 || DD_PREC ==2 )
 //#if 1
 #include "dslash_staggered_core.h"
 #endif

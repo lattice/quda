@@ -242,7 +242,7 @@ end(void)
 double dslashCUDA() {
     
     // execute kernel
-    const int LOOPS = 100;
+    const int LOOPS = 1;
     printf("Executing %d kernel loops...", LOOPS);
     fflush(stdout);
     stopwatchStart();
@@ -327,8 +327,6 @@ dslashTest()
     for (int i=0; i<attempts; i++) {
 	
 	double secs = dslashCUDA();
-	cudaThreadSynchronize(); 
-	
     
 	if (!TRANSFER) {
 	    *spinorOut = *cudaSpinorOut;
@@ -336,7 +334,7 @@ dslashTest()
       
 	printf("\n%fms per loop\n", 1000*secs);
 	
-	int flops = test_type ? 1146*2 + 12: 1146;
+	int flops = dirac->Flops();
 	int link_floats = 8*gaugeParam.packed_size+8*18;
 	int spinor_floats = 8*6*2 + 6;
 	int link_float_size = 0;
@@ -347,7 +345,7 @@ dslashTest()
 	
 	int bytes_for_one_site = link_floats* link_float_size + spinor_floats * spinor_float_size;
 	
-	printf("GFLOPS = %f\n", 1.0e-9*flops*Vh/secs);
+	printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
 	printf("GiB/s = %f\n\n", Vh*bytes_for_one_site/(secs*(1<<30)));
 	
 	if (!TRANSFER) {

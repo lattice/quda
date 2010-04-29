@@ -1,6 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+//these are access control for staggered action
+#define DIRECT_ACCESS_FAT_LINK
+//#define DIRECT_ACCESS_LONG_LINK
+//#define DIRECT_ACCESS_SPINOR
+
 #include <quda_internal.h>
 #include <dslash_quda.h>
 

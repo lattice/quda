@@ -293,69 +293,90 @@
         gauge##22_re *= -r_inv2;                                        \
         gauge##22_im *= -r_inv2;}
 
-
-
+#ifndef DIRECT_ACCESS_FAT_LINK
 #define READ_FAT_MATRIX_18_SINGLE(gauge, dir, idx)			\
-    float2 FAT0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*ga_stride);	\
-    float2 FAT1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*ga_stride);	\
-    float2 FAT2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*ga_stride);	\
-    float2 FAT3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*ga_stride);	\
-    float2 FAT4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*ga_stride);	\
-    float2 FAT5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*ga_stride);	\
-    float2 FAT6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*ga_stride);	\
-    float2 FAT7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*ga_stride);	\
-    float2 FAT8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*ga_stride);
+  float2 FAT0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*ga_stride);	\
+  float2 FAT1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*ga_stride);	\
+  float2 FAT2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*ga_stride);	\
+  float2 FAT3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*ga_stride);	\
+  float2 FAT4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*ga_stride);	\
+  float2 FAT5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*ga_stride);	\
+  float2 FAT6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*ga_stride);	\
+  float2 FAT7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*ga_stride);	\
+  float2 FAT8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*ga_stride);
 
-#define READ_FAT_MATRIX_18_HALF(gauge, dir, idx)			\
-    float2 FAT0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*ga_stride);	\
-    float2 FAT1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*ga_stride);	\
-    float2 FAT2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*ga_stride);	\
-    float2 FAT3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*ga_stride);	\
-    float2 FAT4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*ga_stride);	\
-    float2 FAT5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*ga_stride);	\
-    float2 FAT6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*ga_stride);	\
-    float2 FAT7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*ga_stride);	\
-    float2 FAT8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*ga_stride);
+
 
 #define READ_FAT_MATRIX_18_DOUBLE(gauge, dir, idx)			\
-    double2 FAT0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*ga_stride); \
-    double2 FAT1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*ga_stride); \
-    double2 FAT2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*ga_stride); \
-    double2 FAT3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*ga_stride); \
-    double2 FAT4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*ga_stride); \
-    double2 FAT5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*ga_stride); \
-    double2 FAT6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*ga_stride); \
-    double2 FAT7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*ga_stride); \
-    double2 FAT8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*ga_stride);
+  double2 FAT0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*ga_stride); \
+  double2 FAT1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*ga_stride); \
+  double2 FAT2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*ga_stride); \
+  double2 FAT3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*ga_stride); \
+  double2 FAT4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*ga_stride); \
+  double2 FAT5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*ga_stride); \
+  double2 FAT6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*ga_stride); \
+  double2 FAT7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*ga_stride); \
+  double2 FAT8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*ga_stride);
 
-#define READ_GAUGE_LINK_12_DOUBLE(gauge, dir, idx, var)			\
-    double2 var##0 = fetch_double2((gauge), idx + ((dir/2)*6+0)*ga_stride); \
-    double2 var##1 = fetch_double2((gauge), idx + ((dir/2)*6+1)*ga_stride); \
-    double2 var##2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*ga_stride); \
-    double2 var##3 = fetch_double2((gauge), idx + ((dir/2)*6+3)*ga_stride); \
-    double2 var##4 = fetch_double2((gauge), idx + ((dir/2)*6+4)*ga_stride); \
-    double2 var##5 = fetch_double2((gauge), idx + ((dir/2)*6+5)*ga_stride); \
-    double2 var##6 = make_double2(0,0);                                 \
-    double2 var##7 = make_double2(0,0);                                 \
-    double2 var##8 = make_double2(0,0);                                 \
-    double2 var##9 = make_double2(0,0);
-
-
-#define READ_LONG_MATRIX_12_DOUBLE(gauge, dir, idx)     \
-    READ_GAUGE_LINK_12_DOUBLE(gauge, dir, idx, LONG)
-
-#define READ_LONG_MATRIX_18_DOUBLE(gauge, dir, idx)                     \
-    double2 LONG0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*ga_stride); \
-    double2 LONG1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*ga_stride); \
-    double2 LONG2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*ga_stride); \
-    double2 LONG3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*ga_stride); \
-    double2 LONG4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*ga_stride); \
-    double2 LONG5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*ga_stride); \
-    double2 LONG6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*ga_stride); \
-    double2 LONG7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*ga_stride); \
-    double2 LONG8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*ga_stride);
+#else
+#define READ_FAT_MATRIX_18_SINGLE(gauge, dir, idx)	\
+  float2 FAT0 = gauge[idx + ((dir/2)*9+0)*ga_stride];	\
+  float2 FAT1 = gauge[idx + ((dir/2)*9+1)*ga_stride];	\
+  float2 FAT2 = gauge[idx + ((dir/2)*9+2)*ga_stride];	\
+  float2 FAT3 = gauge[idx + ((dir/2)*9+3)*ga_stride];	\
+  float2 FAT4 = gauge[idx + ((dir/2)*9+4)*ga_stride];	\
+  float2 FAT5 = gauge[idx + ((dir/2)*9+5)*ga_stride];	\
+  float2 FAT6 = gauge[idx + ((dir/2)*9+6)*ga_stride];	\
+  float2 FAT7 = gauge[idx + ((dir/2)*9+7)*ga_stride];	\
+  float2 FAT8 = gauge[idx + ((dir/2)*9+8)*ga_stride];
 
 
+#define READ_FAT_MATRIX_18_DOUBLE(gauge, dir, idx)		\
+  double2 FAT0 = gauge[idx + ((dir/2)*9+0)*ga_stride];		\
+  double2 FAT1 = gauge[idx + ((dir/2)*9+1)*ga_stride];		\
+  double2 FAT2 = gauge[idx + ((dir/2)*9+2)*ga_stride];		\
+  double2 FAT3 = gauge[idx + ((dir/2)*9+3)*ga_stride];		\
+  double2 FAT4 = gauge[idx + ((dir/2)*9+4)*ga_stride];		\
+  double2 FAT5 = gauge[idx + ((dir/2)*9+5)*ga_stride];		\
+  double2 FAT6 = gauge[idx + ((dir/2)*9+6)*ga_stride];		\
+  double2 FAT7 = gauge[idx + ((dir/2)*9+7)*ga_stride];		\
+  double2 FAT8 = gauge[idx + ((dir/2)*9+8)*ga_stride];
+#endif
+
+
+#define READ_FAT_MATRIX_18_HALF(gauge, dir, idx)			\
+  float2 FAT0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*ga_stride);	\
+  float2 FAT1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*ga_stride);	\
+  float2 FAT2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*ga_stride);	\
+  float2 FAT3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*ga_stride);	\
+  float2 FAT4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*ga_stride);	\
+  float2 FAT5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*ga_stride);	\
+  float2 FAT6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*ga_stride);	\
+  float2 FAT7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*ga_stride);	\
+  float2 FAT8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*ga_stride);
+
+
+
+
+
+
+
+#ifndef DIRECT_ACCESS_LONG_LINK //longlink access
+
+#define READ_LONG_MATRIX_12_SINGLE(gauge, dir, idx)			\
+  float4 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*ga_stride);	\
+  float4 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*ga_stride);	\
+  float4 LONG2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*ga_stride);	\
+  float4 LONG3 = make_float4(0,0,0,0);					\
+  float4 LONG4 = make_float4(0,0,0,0);
+#define READ_LONG_MATRIX_8_SINGLE(gauge, dir, idx)			\
+    float4 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*ga_stride);	\
+    float4 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*ga_stride);	\
+    float4 LONG2 = make_float4(0,0,0,0);				\
+    float4 LONG3 = make_float4(0,0,0,0);				\
+    float4 LONG4 = make_float4(0,0,0,0);				\
+    long21_re = long00_re;						\
+    long21_im = long00_im;
 #define READ_LONG_MATRIX_18_SINGLE(gauge, dir, idx)			\
     float2 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*ga_stride);  \
     float2 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*ga_stride);  \
@@ -367,24 +388,17 @@
     float2 LONG7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*ga_stride);  \
     float2 LONG8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*ga_stride);
 
-
-#define READ_LONG_MATRIX_8_HALF(gauge, dir, idx)                        \
-    float4 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*ga_stride);	\
-    float4 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*ga_stride);	\
-    float4 LONG2 = make_float4(0,0,0,0);                                \
-    float4 LONG3 = make_float4(0,0,0,0);                                \
-    float4 LONG4 = make_float4(0,0,0,0);                                \
-    long00_re=long21_re = pi_f*long00_re;                               \
-    long00_im=long21_im = pi_f*long00_im;
-
-#define READ_LONG_MATRIX_8_SINGLE(gauge, dir, idx)			\
-    float4 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*ga_stride);	\
-    float4 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*ga_stride);	\
-    float4 LONG2 = make_float4(0,0,0,0);				\
-    float4 LONG3 = make_float4(0,0,0,0);				\
-    float4 LONG4 = make_float4(0,0,0,0);				\
-    long21_re = long00_re;						\
-    long21_im = long00_im;
+#define READ_LONG_MATRIX_12_DOUBLE(gauge, dir, idx)			\
+  double2 LONG0 = fetch_double2((gauge), idx + ((dir/2)*6+0)*ga_stride); \
+  double2 LONG1 = fetch_double2((gauge), idx + ((dir/2)*6+1)*ga_stride); \
+  double2 LONG2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*ga_stride); \
+  double2 LONG3 = fetch_double2((gauge), idx + ((dir/2)*6+3)*ga_stride); \
+  double2 LONG4 = fetch_double2((gauge), idx + ((dir/2)*6+4)*ga_stride); \
+  double2 LONG5 = fetch_double2((gauge), idx + ((dir/2)*6+5)*ga_stride); \
+  double2 LONG6 = make_double2(0,0);					\
+  double2 LONG7 = make_double2(0,0);					\
+  double2 LONG8 = make_double2(0,0);					\
+  double2 LONG9 = make_double2(0,0);
 
 #define READ_LONG_MATRIX_8_DOUBLE(gauge, dir, idx)                      \
     double2 LONG0 = fetch_double2((gauge), idx + ((dir/2)*4+0)*ga_stride); \
@@ -400,28 +414,105 @@
     long21_re = long00_re;                                              \
     long21_im = long00_im;
 
-
-#define READ_GAUGE_MATRIX_12_HALF(gauge, dir, idx, var)                 \
-    float4 var##0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*ga_stride);	\
-    float4 var##1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*ga_stride);	\
-    float4 var##2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*ga_stride);	\
-    float4 var##3 = make_float4(0,0,0,0);                               \
-    float4 var##4 = make_float4(0,0,0,0);
-
-#define READ_GAUGE_LINK_12_SINGLE(gauge, dir, idx, var)			\
-    float4 var##0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*ga_stride);	\
-    float4 var##1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*ga_stride);	\
-    float4 var##2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*ga_stride);	\
-    float4 var##3 = make_float4(0,0,0,0);                               \
-    float4 var##4 = make_float4(0,0,0,0);
+#define READ_LONG_MATRIX_18_DOUBLE(gauge, dir, idx)                     \
+    double2 LONG0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*ga_stride); \
+    double2 LONG1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*ga_stride); \
+    double2 LONG2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*ga_stride); \
+    double2 LONG3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*ga_stride); \
+    double2 LONG4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*ga_stride); \
+    double2 LONG5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*ga_stride); \
+    double2 LONG6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*ga_stride); \
+    double2 LONG7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*ga_stride); \
+    double2 LONG8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*ga_stride);
 
 
-#define READ_LONG_MATRIX_12_SINGLE(gauge, dir, idx)	\
-    READ_GAUGE_LINK_12_SINGLE(gauge, dir, idx, LONG)
+#else //longlink access
+
+#define READ_LONG_MATRIX_12_SINGLE(gauge, dir, idx)			\
+  float4 LONG0 = gauge[idx + ((dir/2)*3+0)*ga_stride];	\
+  float4 LONG1 = gauge[idx + ((dir/2)*3+1)*ga_stride];	\
+  float4 LONG2 = gauge[idx + ((dir/2)*3+2)*ga_stride];	\
+  float4 LONG3 = make_float4(0,0,0,0);					\
+  float4 LONG4 = make_float4(0,0,0,0);
+#define READ_LONG_MATRIX_8_SINGLE(gauge, dir, idx)			\
+  float4 LONG0 = gauge[idx + ((dir/2)*2+0)*ga_stride];			\
+  float4 LONG1 = gauge[idx + ((dir/2)*2+1)*ga_stride];			\
+  float4 LONG2 = make_float4(0,0,0,0);					\
+  float4 LONG3 = make_float4(0,0,0,0);					\
+  float4 LONG4 = make_float4(0,0,0,0);					\
+  long21_re = long00_re;						\
+  long21_im = long00_im;
+#define READ_LONG_MATRIX_18_SINGLE(gauge, dir, idx)			\
+  float2 LONG0 = gauge[idx + ((dir/2)*9+0)*ga_stride];			\
+  float2 LONG1 = gauge[idx + ((dir/2)*9+1)*ga_stride];			\
+  float2 LONG2 = gauge[idx + ((dir/2)*9+2)*ga_stride];			\
+  float2 LONG3 = gauge[idx + ((dir/2)*9+3)*ga_stride];			\
+  float2 LONG4 = gauge[idx + ((dir/2)*9+4)*ga_stride];			\
+  float2 LONG5 = gauge[idx + ((dir/2)*9+5)*ga_stride];			\
+  float2 LONG6 = gauge[idx + ((dir/2)*9+6)*ga_stride];			\
+  float2 LONG7 = gauge[idx + ((dir/2)*9+7)*ga_stride];			\
+  float2 LONG8 = gauge[idx + ((dir/2)*9+8)*ga_stride];
+
+#define READ_LONG_MATRIX_12_DOUBLE(gauge, dir, idx)			\
+  double2 LONG0 = gauge[idx + ((dir/2)*6+0)*ga_stride]; \
+  double2 LONG1 = gauge[idx + ((dir/2)*6+1)*ga_stride]; \
+  double2 LONG2 = gauge[idx + ((dir/2)*6+2)*ga_stride]; \
+  double2 LONG3 = gauge[idx + ((dir/2)*6+3)*ga_stride]; \
+  double2 LONG4 = gauge[idx + ((dir/2)*6+4)*ga_stride]; \
+  double2 LONG5 = gauge[idx + ((dir/2)*6+5)*ga_stride]; \
+  double2 LONG6 = make_double2(0,0);					\
+  double2 LONG7 = make_double2(0,0);					\
+  double2 LONG8 = make_double2(0,0);					\
+  double2 LONG9 = make_double2(0,0);
+
+#define READ_LONG_MATRIX_8_DOUBLE(gauge, dir, idx)                      \
+  double2 LONG0 = gauge[idx + ((dir/2)*4+0)*ga_stride];			\
+  double2 LONG1 = gauge[idx + ((dir/2)*4+1)*ga_stride];			\
+  double2 LONG2 = gauge[idx + ((dir/2)*4+2)*ga_stride];			\
+  double2 LONG3 = gauge[idx + ((dir/2)*4+3)*ga_stride];			\
+  double2 LONG4 = make_double2(0,0);					\
+  double2 LONG5 = make_double2(0,0);					\
+  double2 LONG6 = make_double2(0,0);					\
+  double2 LONG7 = make_double2(0,0);					\
+  double2 LONG8 = make_double2(0,0);					\
+  double2 LONG9 = make_double2(0,0);					\
+  long21_re = long00_re;						\
+  long21_im = long00_im;
+
+#define READ_LONG_MATRIX_18_DOUBLE(gauge, dir, idx)	  \
+  double2 LONG0 = gauge[idx + ((dir/2)*9+0)*ga_stride];	  \
+  double2 LONG1 = gauge[idx + ((dir/2)*9+1)*ga_stride];	  \
+  double2 LONG2 = gauge[idx + ((dir/2)*9+2)*ga_stride];	  \
+  double2 LONG3 = gauge[idx + ((dir/2)*9+3)*ga_stride];	  \
+  double2 LONG4 = gauge[idx + ((dir/2)*9+4)*ga_stride];	  \
+  double2 LONG5 = gauge[idx + ((dir/2)*9+5)*ga_stride];	  \
+  double2 LONG6 = gauge[idx + ((dir/2)*9+6)*ga_stride];	  \
+  double2 LONG7 = gauge[idx + ((dir/2)*9+7)*ga_stride];	  \
+  double2 LONG8 = gauge[idx + ((dir/2)*9+8)*ga_stride];
 
 
-#define READ_LONG_MATRIX_12_HALF(gauge, dir, idx)	\
-    READ_GAUGE_MATRIX_12_HALF(gauge, dir, idx, LONG)
+#endif //longlink access
+
+
+
+#define READ_LONG_MATRIX_8_HALF(gauge, dir, idx)                        \
+    float4 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*ga_stride);	\
+    float4 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*ga_stride);	\
+    float4 LONG2 = make_float4(0,0,0,0);                                \
+    float4 LONG3 = make_float4(0,0,0,0);                                \
+    float4 LONG4 = make_float4(0,0,0,0);                                \
+    long00_re=long21_re = pi_f*long00_re;                               \
+    long00_im=long21_im = pi_f*long00_im;
+
+
+#define READ_LONG_MATRIX_12_HALF(gauge, dir, idx)			\
+  float4 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*ga_stride);	\
+  float4 LONG1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*ga_stride);	\
+  float4 LONG2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*ga_stride);	\
+  float4 LONG3 = make_float4(0,0,0,0);					\
+  float4 LONG4 = make_float4(0,0,0,0);
+
+
 
 #define READ_LONG_MATRIX_18_HALF(gauge, dir, idx)			\
   float2 LONG0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*ga_stride);	\

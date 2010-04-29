@@ -87,7 +87,7 @@ invert_milc_test(void)
     
   double mass = 0.95;
   inv_param.mass = mass;
-  inv_param.tol = 1e-6;
+  inv_param.tol = 1e-8;
   inv_param.maxiter = 100;
   inv_param.reliable_delta = 1e-3;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
