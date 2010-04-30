@@ -215,7 +215,7 @@ invert_milc_test(void)
     
     
     nflops = 2*(1205 + 15* NUM_OFFSETS); //from MILC's multimass CG routine
-    double masses[NUM_OFFSETS] ={1.05, 1.23, 2.64, 2.33};
+    double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33};
     double offsets[NUM_OFFSETS];	
     int num_offsets =NUM_OFFSETS;
     void* spinorOutArray[NUM_OFFSETS];
@@ -283,7 +283,7 @@ invert_milc_test(void)
     }
     
     for(int i=0;i < num_offsets;i++){
-      printf("%dth solution: ", i);
+      printf("%dth solution: mass=%f", i, masses[i]);
       matdagmat_milc(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
       mxpy(in, spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);

@@ -725,7 +725,6 @@ void invertQudaStMultiMass(void **_hp_x, void *_hp_b, QudaInvertParam *param,
  // set the Dirac operator parameters
   DiracParam diracParam;
   setDiracParam(diracParam, param);
-  diracParam.verbose = QUDA_VERBOSE;
   diracParam.fatGauge = &cudaFatLinkPrecise;
   diracParam.longGauge = &cudaLongLinkPrecise;
   

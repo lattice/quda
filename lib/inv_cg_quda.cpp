@@ -224,11 +224,8 @@ invertCgCudaMultiMass(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField** 
     
   int k=0;
     
-  printf("%d iterations, r2 = %e\n", k, r2);
   stopwatchStart();
   while (r2 > stop &&  k < invert_param->maxiter) {
-    struct timeval t0, t1;
-    gettimeofday(&t0, NULL);
     //dslashCuda_st(tmp_sloppy, fatlinkSloppy, longlinkSloppy, p[0], 1 - oddBit, 0);
     //dslashAxpyCuda(Ap, fatlinkSloppy, longlinkSloppy, tmp_sloppy, oddBit, 0, p[0], msq_x4);
     diracSloppy.MdagM(*Ap, *p[0]);
@@ -295,8 +292,6 @@ invertCgCudaMultiMass(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField** 
       axpyBzpcxCuda(beta_i[j], *p[j], *x_sloppy[j], zeta_ip1[j], *r_sloppy, alpha[j]);
     }
     
-    gettimeofday(&t1, NULL);
-	
     for(j=0;j<num_offsets_now;j++){
       beta_im1[j] = beta_i[j];
       zeta_im1[j] = zeta_i[j];
@@ -305,9 +300,9 @@ invertCgCudaMultiMass(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField** 
     
     
     k++;
-#define TDIFF(t1, t0) (t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec))
-    printf("%d iterations, r2 = %e, time=%f\n", k, r2,TDIFF(t1, t0));
-
+    if (invert_param->verbosity >= QUDA_VERBOSE){
+      printf("Multimass CG: %d iterations, r2 = %e\n", k, r2);
+    }
   }
     
   if (x[0]->Precision() != x_sloppy[0]->Precision()) {
@@ -336,11 +331,13 @@ invertCgCudaMultiMass(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField** 
   copyCuda(r, source);
   mxpyCuda(Ap, r);
   double true_res = normCuda(r);
-    
-  PRINTF("Converged after %d iterations, res = %e, b2=%e, true_res = %e\n", 
-	 k, true_res, b2, (true_res / b2));
-#endif
+  if (invert_param->verbosity >= QUDA_SUMMARIZE){
+    printf("Converged after %d iterations, res = %e, b2=%e, true_res = %e\n", 
+	   k, true_res, b2, (true_res / b2));
+  }    
 
+#endif
+    
   
   delete r;
   for(i=0;i < num_offsets; i++){
