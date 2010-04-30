@@ -13,36 +13,41 @@
 void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, 
 		  cudaColorSpinorField &y, QudaInvertParam *invert_param)
 {
+  int k=0;
+  int rUpdate = 0;
+    
   cudaColorSpinorField r(b);
-
+  
+  dirac.MdagM(r, x);
+  double r2 = xmyNormCuda(b, r);
+  rUpdate ++;
+  
   ColorSpinorParam param;
   param.create = QUDA_ZERO_CREATE;
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
   cudaColorSpinorField tmp(x, param);
-
+  
   cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
     param.create = QUDA_REFERENCE_CREATE;
     x_sloppy = &x;
     r_sloppy = &r;
-    zeroCuda(*x_sloppy);
   } else {
-    x_sloppy = new cudaColorSpinorField(x, param);
     param.create = QUDA_COPY_CREATE;
+    x_sloppy = new cudaColorSpinorField(x, param);
     r_sloppy = new cudaColorSpinorField(r, param);
   }
 
   cudaColorSpinorField &xSloppy = *x_sloppy;
   cudaColorSpinorField &rSloppy = *r_sloppy;
-  
+
   cudaColorSpinorField p(rSloppy);
   zeroCuda(y);
 
-  double b2 = normCuda(b);
-  double r2 = b2;
   double r2_old;
-  double stop = r2*invert_param->tol*invert_param->tol; // stopping condition of solver
+  double src_norm = norm2(b);;
+  double stop = src_norm*invert_param->tol*invert_param->tol; // stopping condition of solver
 
   double alpha, beta;
   double pAp;
@@ -52,9 +57,6 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   double maxrx = rNorm;
   double maxrr = rNorm;
   double delta = invert_param->reliable_delta;
-
-  int k=0;
-  int rUpdate = 0;
 
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
 
@@ -131,8 +133,10 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   dirac.MdagM(r, x);
   //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, y);
   double true_res = xmyNormCuda(b, r);
-  printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
-	     k, r2, true_res / b2);
+  if (invert_param->verbosity >= QUDA_SUMMARIZE){
+    printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
+	       k, r2, true_res / src_norm);
+  }
   //#endif
 
   if (invert_param->cuda_prec_sloppy != x.Precision()) {

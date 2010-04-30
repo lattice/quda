@@ -149,7 +149,8 @@ invert_milc_test(void)
 
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda_general(fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy);
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
+  gaugeParam.reconstruct= link_recon;
+  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
   loadGaugeQuda_general(longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy);
   
   unsigned long volume = Vh;

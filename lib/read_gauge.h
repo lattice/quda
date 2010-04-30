@@ -318,6 +318,7 @@
   double2 FAT7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*ga_stride); \
   double2 FAT8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*ga_stride);
 
+
 #else
 #define READ_FAT_MATRIX_18_SINGLE(gauge, dir, idx)	\
   float2 FAT0 = gauge[idx + ((dir/2)*9+0)*ga_stride];	\
@@ -341,6 +342,8 @@
   double2 FAT6 = gauge[idx + ((dir/2)*9+6)*ga_stride];		\
   double2 FAT7 = gauge[idx + ((dir/2)*9+7)*ga_stride];		\
   double2 FAT8 = gauge[idx + ((dir/2)*9+8)*ga_stride];
+
+
 #endif
 
 
@@ -354,11 +357,6 @@
   float2 FAT6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*ga_stride);	\
   float2 FAT7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*ga_stride);	\
   float2 FAT8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*ga_stride);
-
-
-
-
-
 
 
 #ifndef DIRECT_ACCESS_LONG_LINK //longlink access

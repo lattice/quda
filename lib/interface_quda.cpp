@@ -49,6 +49,12 @@ FullClover cudaCloverInvSloppy;
 
 void initQuda(int dev)
 {
+  static int initialized = 0;
+  if (initialized){
+    return ;
+  }
+  initialized = 1;
+
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
@@ -277,6 +283,8 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   diracParam.cloverInv = &cudaCloverInvPrecise;
   diracParam.kappa = kappa;
   diracParam.mass = inv_param->mass;
+  diracParam.verbose = inv_param->verbosity;
+
 }
 
 void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
@@ -470,7 +478,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   std::cout << "CPU source = " << norm2(h_b) << ", cuda copy = " << norm2(b) << std::endl;
 
-  cudaParam.create = QUDA_NULL_CREATE;
+  cudaParam.create = QUDA_ZERO_CREATE;
   cudaColorSpinorField x(cudaParam); // solution
 
   // if using preconditioning but solving the full system
@@ -601,7 +609,6 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
  // set the Dirac operator parameters
   DiracParam diracParam;
   setDiracParam(diracParam, param);
-  diracParam.verbose = QUDA_VERBOSE;
   diracParam.fatGauge = &cudaFatLinkPrecise;
   diracParam.longGauge = &cudaLongLinkPrecise;
   
@@ -614,15 +621,14 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
   Dirac *diracSloppy = Dirac::create(diracParam);
   
   b= h_b; //send data from cpu to GPU
-  
+
+  csParam.create = QUDA_COPY_CREATE;  
+  cudaColorSpinorField x(h_x, csParam); // solution  
   csParam.create = QUDA_ZERO_CREATE;
-  cudaColorSpinorField x(csParam); // solution  
   cudaColorSpinorField tmp(csParam); // temporary
   invertCgCuda(*dirac, *diracSloppy, x, b, tmp, param);    
   
-  printf("Solution = %e\n",norm2(x));    
   x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;    
-  printf("Solution = %e\n",norm2(h_x));
   
   delete diracSloppy;
   delete dirac;

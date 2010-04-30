@@ -218,7 +218,6 @@
 #define DD_PREC_F H
 #define FATLINK0TEX fatGauge0TexHalf
 #define FATLINK1TEX fatGauge1TexHalf
-
 #if (DD_RECON ==2)
 #define LONGLINK0TEX longGauge0TexHalf_norecon
 #define LONGLINK1TEX longGauge1TexHalf_norecon
@@ -252,7 +251,7 @@
 // define the kernel
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2,  DD_PARAM4, DD_PARAM5) {
-#if (DD_PREC == 1 || DD_PREC == 0 || DD_PREC ==2 )
+#if (DD_PREC == 1 )
 //#if 1
 #include "dslash_staggered_core.h"
 #endif
