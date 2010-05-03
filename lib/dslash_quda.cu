@@ -95,7 +95,7 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
     errorQuda("Mixing gauge and spinor precision not supported");
 
   if (precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     dslashCuda<2>((double2*)out, (float*)outNorm, (double2*)gauge0, (double2*)gauge1, 
 		  gauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
 		  (double2*)x, (float*)xNorm, k, volume, length);
@@ -140,7 +140,7 @@ void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClove
     errorQuda("Mixing clover and spinor precision not supported");
 
   if (precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     cloverCuda<2>((double2*)out, (float*)outNorm, (double2*)cloverP, 
 		  (float*)cloverNormP, (double2*)in, 
 		  (float*)inNorm, parity, volume, length);
@@ -231,7 +231,7 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
     errorQuda("Mixing clover and spinor precision not supported");
 
   if (precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     cloverDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)gauge0, (double2*)gauge1, 
 			gauge.reconstruct, (double2*)cloverP, (float*)cloverNormP, (double2*)in, 
 			(float*)inNorm, parity, dagger, (double2*)x, (float*)xNorm, a, volume, length);
@@ -368,7 +368,7 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
   }
     
   if (precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
       staggeredDslashNoReconCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
 				    (double2*)longGauge0, (double2*)longGauge1,

@@ -11,7 +11,7 @@
 #define REDUCE_DOUBLE 64
 #define REDUCE_KAHAN 32
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
 #define REDUCE_TYPE REDUCE_DOUBLE
 #define QudaSumFloat double
 #define QudaSumComplex cuDoubleComplex
@@ -186,7 +186,7 @@ void setBlock(int kernel, int length, QudaPrecision precision)
   blasGrid.z = 1;
 }
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
 static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 {
   int4 v = tex1Dfetch(t,i);

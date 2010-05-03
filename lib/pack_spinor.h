@@ -38,7 +38,7 @@
 
 */
 
-#define PRESERVE_SPINOR_NORM 1
+#define PRESERVE_SPINOR_NORM 0
 
 #ifdef PRESERVE_SPINOR_NORM // Preserve the norm regardless of basis
 double kP = (1.0/sqrt(2.0));

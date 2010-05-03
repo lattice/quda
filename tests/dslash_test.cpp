@@ -35,7 +35,7 @@ int parity = 0;   // even or odd? (0 = even, 1 = odd)
 QudaDagType dagger = QUDA_DAG_NO;   // apply Dslash or Dslash dagger?
 int transfer = 0; // include transfer time in the benchmark?
 
-const int LOOPS = 100;
+const int LOOPS = 1000;
 
 Dirac *dirac;
 
@@ -60,7 +60,8 @@ void init() {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_YES;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.type = QUDA_WILSON_GAUGE;
 
   inv_param.kappa = kappa;
 
@@ -73,9 +74,9 @@ void init() {
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
-  gauge_param.ga_pad = 24*24*24;
-  inv_param.sp_pad = 24*24*24;
-  inv_param.cl_pad = 24*24*24;
+  //gauge_param.ga_pad = 24*24*24;
+  //inv_param.sp_pad = 24*24*24;
+  //inv_param.cl_pad = 24*24*24;
 
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   if (test_type == 2) inv_param.solver_type = QUDA_MAT_SOLUTION;

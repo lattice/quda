@@ -39,7 +39,7 @@ void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaC
 	      out.Volume(), clover.odd.volume);
   }
 
-#if (__CUDA_ARCH__ != 130)
+#if (__CUDA_ARCH__ <= 130)
   if ((clover.even.precision == QUDA_DOUBLE_PRECISION) ||
       (clover.odd.precision == QUDA_DOUBLE_PRECISION)) {
     errorQuda("Double precision not supported on this GPU");
