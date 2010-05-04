@@ -62,8 +62,6 @@ init()
 
     setDims(gaugeParam.X);
 
-    gaugeParam.blockDim = 64;
-
     gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
     gaugeParam.cuda_prec = prec;
     gaugeParam.reconstruct = link_recon;

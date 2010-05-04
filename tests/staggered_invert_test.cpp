@@ -63,9 +63,6 @@ invert_milc_test(void)
   gaugeParam.X[3] = tdim;
   setDims(gaugeParam.X);
     
-  gaugeParam.blockDim = 64;
-  gaugeParam.blockDim_sloppy = 64;
-
   gaugeParam.cpu_prec = cpu_prec;
     
   gaugeParam.cuda_prec = prec;

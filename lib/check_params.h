@@ -45,6 +45,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(X[2], INVALID_INT);
   P(X[3], INVALID_INT);
   P(anisotropy, INVALID_DOUBLE);
+  P(type, QUDA_INVALID_GAUGE);
   P(gauge_order, QUDA_INVALID_GAUGE_ORDER);
   P(t_boundary, QUDA_INVALID_T_BOUNDARY);
   P(cpu_prec, QUDA_INVALID_PRECISION);
@@ -80,13 +81,26 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(dslash_type, QUDA_INVALID_DSLASH);
   P(inv_type, QUDA_INVALID_INVERTER);
+
+#if defined INIT_PARAM
+  P(in_parity, QUDA_INVALID_PARITY);
+  P(mass, INVALID_DOUBLE);
   P(kappa, INVALID_DOUBLE);
+#else
+  if (param->dslash_type == QUDA_STAGGERED_DSLASH) {
+    P(in_parity, QUDA_INVALID_PARITY);
+    P(mass, INVALID_DOUBLE);
+  } else {
+    P(kappa, INVALID_DOUBLE);
+  }
+#endif
+
   P(tol, INVALID_DOUBLE);
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
-  P(matpc_type, QUDA_MATPC_INVALID);
-  P(solver_type, QUDA_INVALID_SOLUTION);
   P(solution_type, QUDA_INVALID_SOLUTION);
+  P(solver_type, QUDA_INVALID_SOLUTION);
+  P(matpc_type, QUDA_MATPC_INVALID);
   P(mass_normalization, QUDA_INVALID_NORMALIZATION);
   P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID);
   P(cpu_prec, QUDA_INVALID_PRECISION);
@@ -95,17 +109,15 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
   P(sp_pad, INVALID_INT);
 
-#if defined CHECK_PARAM || defined PRINT_PARAM
+#ifndef INIT_PARAM
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
 #endif
-
     P(clover_cpu_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
-
-#if defined CHECK_PARAM || defined PRINT_PARAM
+#ifndef INIT_PARAM
   }
 #endif
 

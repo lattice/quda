@@ -1,5 +1,5 @@
-#ifndef __SHORT_QUDA_H
-#define __SHORT_QUDA_H
+#ifndef _SHORT_QUDA_H
+#define _SHORT_QUDA_H
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)

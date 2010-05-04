@@ -7,12 +7,16 @@
 extern "C" {
 #endif
 
+  // When adding new members to QudaGaugeParam and QudaInvertParam,
+  // be sure to update lib/check_params.h
+
   typedef struct QudaGaugeParam_s {
 
     int X[4];
 
     double anisotropy;
 
+    QudaGaugeType type;
     QudaGaugeFieldOrder gauge_order;
 
     QudaTboundary t_boundary;
@@ -27,14 +31,13 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix;
 
-    int blockDim; // number of threads in a block
-    int blockDim_sloppy;
-
     int ga_pad;
+
+    // int blockDim; // number of threads in a block
+    // int blockDim_sloppy;
 
     int packed_size;
     double gaugeGiB;
-    QudaGaugeType type;
 
   } QudaGaugeParam;
 
@@ -45,8 +48,8 @@ extern "C" {
     QudaInverterType inv_type;
     QudaParity in_parity;
 
-    double mass;
-    double kappa;  
+    double mass;  // used for staggered only
+    double kappa; // used for Wilson and Wilson-clover
     double tol;
     int maxiter;
     double reliable_delta; // reliable update tolerance

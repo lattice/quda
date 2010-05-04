@@ -4,7 +4,7 @@ QUDA = ../lib/libquda.a
 
 INC += -I../include -I.
 
-HDRS = blas_reference.h dslash_reference.h test_util.h  staggered_dslash_reference.h
+HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h test_util.h
 
 TESTS = su3_test blas_test pack_test dslash_test invert_test staggered_dslash_test staggered_invert_test
 

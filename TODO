@@ -4,9 +4,10 @@ Features
 Staggered operator.
 Domain wall operator.
 
-
 Structure
 =========
+
+Eliminate in_parity in favor of matpc_type?
 
 The use of QUDA_REFERENCE_CREATE to create ColorSpinorFields that
 refer to others is far from perfect.  In particular, a
