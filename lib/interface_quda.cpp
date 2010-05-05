@@ -474,8 +474,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cpuColorSpinorField h_b(cpuParam);
   cudaColorSpinorField b(h_b, cudaParam); // download source
 
-  std::cout << h_b.Volume() << " " << b.Volume() << std::endl;
-
   std::cout << "CPU source = " << norm2(h_b) << ", cuda copy = " << norm2(b) << std::endl;
 
   cudaParam.create = QUDA_ZERO_CREATE;
@@ -512,7 +510,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   dirac->Prepare(in, out, x, b, param->solution_type);
 
   std::cout << "Source preparation complete " << norm2(*in) << " " << norm2(b) << std::endl;
-  std::cout << out->Volume() << " " << tmp.Volume() << " " << in->Volume() << " " << b.Volume() << std::endl;
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:

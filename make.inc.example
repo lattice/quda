@@ -1,6 +1,6 @@
 ###### Local configuration:
 
-CUDA_INSTALL_PATH = /usr/local/cuda-3.0
+CUDA_INSTALL_PATH = /usr/local/cuda
 
 CPU_ARCH = x86_64   # x86 or x86_64
 GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
@@ -22,15 +22,33 @@ else
   COPT = -malign-double
 endif
 
+ifeq ($(strip $(GPU_ARCH)), sm_20)
+  COPT += -D__CUDA_ARCH__=200
+  NVCCOPT += -D__CUDA_ARCH__=200
+else
+  ifeq ($(strip $(GPU_ARCH)), sm_13)
+    COPT += -D__CUDA_ARCH__=130
+    NVCCOPT += -D__CUDA_ARCH__=130
+  else
+    ifeq ($(strip $(GPU_ARCH)), sm_12)
+      COPT += -D__CUDA_ARCH__=120
+      NCCOPT += -D__CUDA_ARCH__=120
+    else
+      COPT += -D__CUDA_ARCH__=100
+      NVCCOPT += -D__CUDA_ARCH__=100
+    endif
+  endif
+endif
+
 ifeq ($(strip $(GPU_EMU)), true)
   COPT += -D__DEVICE_EMULATION__
   NVCCOPT = -deviceemu
 endif
 
 CC = gcc
-CFLAGS = -g -Wall -O3 -std=c99 $(COPT) $(INC) -DCUDA_VERSION=3000
+CFLAGS = -g -Wall -O3 -std=c99 $(COPT) $(INC)
 CXX = g++
-CXXFLAGS = -g -Wall -O3 $(COPT) $(INC) -DCUDA_VERSION=3000
+CXXFLAGS = -g -Wall -O3 $(COPT) $(INC)
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) --ptxas-options=-v -DCUDA_VERSION=3000 -D__CUDA_ARCH__=130
+NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) --ptxas-options=-v
 LDFLAGS = -fPIC $(LIB)

@@ -91,6 +91,13 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
+  /*
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    cudaFuncSetCacheConfig(dslash12Kernel, cudaFuncCachePreferL1);  
+  } else {
+    cudaFuncSetCacheConfig(dslash12Kernel, cudaFuncCachePreferShared);  
+    }*/
+
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");
 

@@ -101,16 +101,6 @@ extern "C" {
     ParitySpinor even;
     } FullSpinor;*/
  
-/* CUDA_VERSION is only defined in cuda.h, not cuda_runtime.h
-#if (CUDA_VERSION < 3000) 
-  typedef struct double3_s {
-    double x;
-    double y;
-    double z;
-  } double3;
-#endif
-*/
-
 #ifdef __cplusplus
 }
 #endif

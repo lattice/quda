@@ -15,7 +15,7 @@
 #include<iostream>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 1;
+int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 int clover_yes = 0;
 
@@ -56,7 +56,7 @@ void init() {
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_HALF_PRECISION;
+  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
@@ -68,7 +68,7 @@ void init() {
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;//_ASYMMETRIC;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_HALF_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
 
   gauge_param.ga_pad = 0;
   inv_param.sp_pad = 0;
@@ -165,7 +165,7 @@ void init() {
 
   if (!transfer) {
     csParam.fieldType = QUDA_CUDA_FIELD;
-    csParam.fieldOrder = QUDA_FLOAT4_ORDER;
+    csParam.fieldOrder = QUDA_FLOAT2_ORDER;
     csParam.basis = QUDA_UKQCD_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
@@ -308,7 +308,7 @@ void dslashRef() {
 int main(int argc, char **argv)
 {
   init();
-  
+
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
   float sharedKB = 0;//(float)dslashCudaSharedBytes(inv_param.cuda_prec) / (1 << 10);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);

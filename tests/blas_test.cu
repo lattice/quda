@@ -7,7 +7,7 @@
 
 #include <test_util.h>
 
-#define Nkernels 22
+#define Nkernels 23
 
 QudaPrecision cuda_prec;
 QudaPrecision other_prec; // Used for copy benchmark
@@ -15,10 +15,10 @@ cudaColorSpinorField *x, *y, *z, *w, *v, *p;
 
 int nIters;
 
-int Nthreads = 3;
-int Ngrids = 7;
-int blockSizes[] = {64, 128, 256};
-int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096};
+int Nthreads = 5;
+int Ngrids = 9;
+int blockSizes[] = {64, 128, 256, 512, 1024};
+int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096, 8092, 16184};
 
 int prec;
 
@@ -93,7 +93,7 @@ void end()
 
 double benchmark(int kernel) {
 
-  double a, b;
+  double a, b, c;
   double2 a2, b2;
 
   cudaEvent_t start, end;
@@ -145,53 +145,57 @@ double benchmark(int kernel) {
       break;
 
     case 10:
-      axpyZpbxCuda(a, *x, *y, *z, b);
+      axpyBzpcxCuda(a, *x, *y, b, *z, c);
       break;
 
     case 11:
+      axpyZpbxCuda(a, *x, *y, *z, b);
+      break;
+
+    case 12:
       caxpbypzYmbwCuda(a2, *x, b2, *y, *z, *w);
       break;
       
       // double
-    case 12:
+    case 13:
       sumCuda(*x);
       break;
 
-    case 13:
+    case 14:
       normCuda(*x);
       break;
 
-    case 14:
+    case 15:
       reDotProductCuda(*x, *y);
       break;
 
-    case 15:
+    case 16:
       axpyNormCuda(a, *x, *y);
       break;
 
-    case 16:
+    case 17:
       xmyNormCuda(*x, *y);
       break;
       
       // double2
-    case 17:
+    case 18:
       cDotProductCuda(*x, *y);
       break;
 
-    case 18:
+    case 19:
       xpaycDotzyCuda(*x, a, *y, *z);
       break;
       
       // double3
-    case 19:
+    case 20:
       cDotProductNormACuda(*x, *y);
       break;
 
-    case 20:
+    case 21:
       cDotProductNormBCuda(*x, *y);
       break;
 
-    case 21:
+    case 22:
       caxpbypzYmbwcDotProductWYNormYCuda(a2, *x, b2, *y, *z, *w, *v);
       break;
       
@@ -250,7 +254,7 @@ int main(int argc, char** argv)
   int threads[Nkernels][3];
   int blocks[Nkernels][3];
 
-  int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21};
+  int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22};
   char *names[] = {
     "copyCuda",
     "axpbyCuda",
@@ -262,6 +266,7 @@ int main(int argc, char** argv)
     "caxpyCuda",
     "caxpbyCuda",
     "cxpaypbzCuda",
+    "axpyBzpcxCudax",
     "axpyZpbxCuda",
     "caxpbypzYmbwCuda",
     "sumCuda",
