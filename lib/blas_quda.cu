@@ -424,7 +424,7 @@ __device__ float fast_abs_max(float4 a) {
   Y.x = X.x - Y.x; Y.y = X.y - X.y; Y.z = X.z - Y.z; Y.w = X.w - Y.w;
 
 #define XMY_FLOAT2(X, Y)		     \
-  Y.x = X.x - Y.x; Y.y = X.y - X.y;
+  Y.x = X.x - Y.x; Y.y = X.y - Y.y;
 
 #define MXPY_FLOAT4(X, Y)		     \
   Y.x -= X.x; Y.y -= X.y; Y.z -= X.z; Y.w -= X.w;
