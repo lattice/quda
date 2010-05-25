@@ -41,12 +41,13 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
   if (tid < 32) 
 #endif
     {
-      if (reduce_threads >=  64) { ZCACC(s[0],s[1],s[64+0],s[64+1]); EMUSYNC; }
-      if (reduce_threads >=  32) { ZCACC(s[0],s[1],s[32+0],s[32+1]); EMUSYNC; }
-      if (reduce_threads >=  16) { ZCACC(s[0],s[1],s[16+0],s[16+1]); EMUSYNC; }
-      if (reduce_threads >=   8) { ZCACC(s[0],s[1], s[8+0], s[8+1]); EMUSYNC; }
-      if (reduce_threads >=   4) { ZCACC(s[0],s[1], s[4+0], s[4+1]); EMUSYNC; }
-      if (reduce_threads >=   2) { ZCACC(s[0],s[1], s[2+0], s[2+1]); EMUSYNC; }
+      volatile QudaSumComplex *sv = s;
+      if (reduce_threads >=  64) { ZCACC(sv[0],sv[1],sv[64+0],sv[64+1]); EMUSYNC; }
+      if (reduce_threads >=  32) { ZCACC(sv[0],sv[1],sv[32+0],sv[32+1]); EMUSYNC; }
+      if (reduce_threads >=  16) { ZCACC(sv[0],sv[1],sv[16+0],sv[16+1]); EMUSYNC; }
+      if (reduce_threads >=   8) { ZCACC(sv[0],sv[1], sv[8+0], sv[8+1]); EMUSYNC; }
+      if (reduce_threads >=   4) { ZCACC(sv[0],sv[1], sv[4+0], sv[4+1]); EMUSYNC; }
+      if (reduce_threads >=   2) { ZCACC(sv[0],sv[1], sv[2+0], sv[2+1]); EMUSYNC; }
     }
   
   // write result for this block to global mem as single QudaSumComplex
@@ -90,12 +91,13 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
   if (tid < 32) 
 #endif
     {
-      if (reduce_threads >=  64) { s[0].x += s[32].x; s[0].y += s[32].y; EMUSYNC; }
-      if (reduce_threads >=  32) { s[0].x += s[16].x; s[0].y += s[16].y; EMUSYNC; }
-      if (reduce_threads >=  16) { s[0].x += s[ 8].x; s[0].y += s[ 8].y; EMUSYNC; }
-      if (reduce_threads >=   8) { s[0].x += s[ 4].x; s[0].y += s[ 4].y; EMUSYNC; }
-      if (reduce_threads >=   4) { s[0].x += s[ 2].x; s[0].y += s[ 2].y; EMUSYNC; }
-      if (reduce_threads >=   2) { s[0].x += s[ 1].x; s[0].y += s[ 1].y; EMUSYNC; }
+      volatile QudaSumComplex *sv = s;
+      if (reduce_threads >=  64) { sv[0].x += sv[32].x; sv[0].y += sv[32].y; EMUSYNC; }
+      if (reduce_threads >=  32) { sv[0].x += sv[16].x; sv[0].y += sv[16].y; EMUSYNC; }
+      if (reduce_threads >=  16) { sv[0].x += sv[ 8].x; sv[0].y += sv[ 8].y; EMUSYNC; }
+      if (reduce_threads >=   8) { sv[0].x += sv[ 4].x; sv[0].y += sv[ 4].y; EMUSYNC; }
+      if (reduce_threads >=   4) { sv[0].x += sv[ 2].x; sv[0].y += sv[ 2].y; EMUSYNC; }
+      if (reduce_threads >=   2) { sv[0].x += sv[ 1].x; sv[0].y += sv[ 1].y; EMUSYNC; }
     }
   
   // write result for this block to global mem 
