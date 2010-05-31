@@ -55,8 +55,8 @@ void init() {
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
-  gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  gauge_param.cpu_prec = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_HALF_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
@@ -67,8 +67,8 @@ void init() {
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;//_ASYMMETRIC;
 
-  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cpu_prec = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = QUDA_HALF_PRECISION;
 
   gauge_param.ga_pad = 0;
   inv_param.sp_pad = 0;
@@ -84,7 +84,7 @@ void init() {
 
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-    inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
+    inv_param.clover_cpu_prec = QUDA_SINGLE_PRECISION;
     inv_param.clover_cuda_prec = QUDA_HALF_PRECISION;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
@@ -165,7 +165,13 @@ void init() {
 
   if (!transfer) {
     csParam.fieldType = QUDA_CUDA_FIELD;
-    csParam.fieldOrder = QUDA_FLOAT2_ORDER;
+    if (csParam.precision == QUDA_DOUBLE_PRECISION ) { 
+      csParam.fieldOrder = QUDA_FLOAT2_ORDER;
+    }
+    else { 
+      /* Single and half */
+      csParam.fieldOrder = QUDA_FLOAT4_ORDER;
+    }
     csParam.basis = QUDA_UKQCD_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
