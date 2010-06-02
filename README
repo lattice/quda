@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.2.2                         16 February 2009
+Release Notes for QUDA v0.2.3                              2 June 2010
 -----------------------------
 
 Overview:
@@ -16,13 +16,15 @@ BiCGstab are provided, with support for double, single, and half
 
 Software compatibility:
 
-The library has been tested under Linux (CentOS 5.3 and Ubuntu 8.04)
+The library has been tested under Linux (CentOS 5.4 and Ubuntu 8.04)
 using release 2.3 of the CUDA toolkit.  There are known issues with
 releases 2.1 and 2.2, but 2.0 should work if one is forced to use an
 older version (for compatibility with an old driver, for example).
 
 Under Mac OS X, the library fails to compile due to bugs in CUDA 2.3.
 It might work with CUDA 2.2 or 2.0, but this hasn't been tested.
+
+CUDA 3.0 is currently not supported.  See "Known issues" below.
 
 
 Hardware compatibility:
@@ -73,6 +75,10 @@ include/enum_quda.h.
 
 
 Known issues:
+
+* Cards based on NVIDIA's "Fermi" architecture are not yet supported, nor
+  is version 3.0 of the CUDA toolkit.  Support will be forthcoming in
+  QUDA 0.3.
 
 * When building for the 'sm_13' GPU architecture (which enables double
   precision support), one of the stages in the build process requires
