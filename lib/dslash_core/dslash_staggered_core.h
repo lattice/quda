@@ -208,7 +208,10 @@ int x3 = z2 - x4*X3;
 int x1odd = (x2 + x3 + x4 + oddBit) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
+
+#if (DD_RECON_F != 18)
 int sign;
+#endif
 
 o00_re = o00_im = 0.f;
 o01_re = o01_im = 0.f;
@@ -234,12 +237,13 @@ o02_re = o02_im = 0.f;
 
 {
     //direction: +X
-
+#if (DD_RECON_F != 18)
     if(x4%2 ==1){
 	sign = -1;
     }else{
 	sign =1;
     }
+#endif
     int sp_idx_1st_nbr = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;
     int sp_idx_3rd_nbr = ((x1 > (X1 -4)) ? X -X1 +3 : X+3) >> 1;
 
@@ -314,11 +318,13 @@ o02_re = o02_im = 0.f;
 
 {
     //direction: +Y
+#if (DD_RECON_F != 18)
     if((x4+x1)%2 ==1){
 	sign = -1;
     }else{
 	sign =1;
     }
+#endif
    
     int ga_idx = sid;
 
@@ -398,11 +404,13 @@ o02_re = o02_im = 0.f;
 {
     //direction: +Z
 
+#if (DD_RECON_F != 18)
     if((x4+x1+x2)%2 ==1){
 	sign = -1;
     }else{
 	sign =1;
     }
+#endif
     
     int ga_idx = sid;
     
@@ -481,11 +489,13 @@ o02_re = o02_im = 0.f;
 
 {
     //direction: +T
+#if (DD_RECON_F != 18)
     if (x4>= (X4-3)){
 	sign = -1;
     }else{
 	sign =1;
     }
+#endif
 
     int ga_idx = sid;
     
@@ -526,11 +536,13 @@ o02_re = o02_im = 0.f;
 
 {
     //direction: -T
+#if (DD_RECON_F != 18)
     if ( ((x4-3+X4)%X4)>= (X4-3) ){
 	sign = -1;
     }else{
 	sign =1;
     }
+#endif
 
     int sp_idx_1st_nbr = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
     int sp_idx_3rd_nbr = ((x4<3) ? X + (X4 -3)*X3X2X1: X - 3*X3X2X1) >> 1;
