@@ -27,6 +27,9 @@ QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
 
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
+
+static double tol=1e-8;
+
 static int testtype = 0;
 static int tdim =24;
 static int sdim = 8;
@@ -49,7 +52,7 @@ void constructSpinorField(Float *res) {
 static int
 invert_milc_test(void)
 {
-  int device = 0;
+  int device = 1;
   
   void *fatlink[4];
   void *longlink[4];
@@ -84,7 +87,7 @@ invert_milc_test(void)
     
   double mass = 0.95;
   inv_param.mass = mass;
-  inv_param.tol = 1e-8;
+  inv_param.tol = tol;
   inv_param.maxiter = 100;
   inv_param.reliable_delta = 1e-3;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
@@ -381,6 +384,22 @@ int main(int argc, char** argv)
       i++;
       continue;	    
     }
+    if( strcmp(argv[i], "--tol") == 0){
+      float tmpf;
+      if (i+1 >= argc){
+        usage(argv);
+      }
+      sscanf(argv[i+1], "%f", &tmpf);
+      if (tol <= 0){
+        PRINTF("ERROR: invalid tol(%f)\n", tmpf);
+        usage(argv);
+      }
+      tol = tmpf;
+      i++;
+      continue;
+    }
+
+
 	
     if( strcmp(argv[i], "--recon_sloppy") == 0){
       if (i+1 >= argc){

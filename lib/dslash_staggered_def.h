@@ -157,6 +157,7 @@
 #define SPINORTEX in
 #endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_DOUBLE2
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE
 #define SPINOR_DOUBLE
@@ -206,6 +207,7 @@
 #define SPINORTEX in
 #endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_FLOAT2
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
 #if (DD_XPAY==1 || DD_XPAY == 2)
 #define ACCUMTEX accumTexSingle2
 #define READ_ACCUM READ_ST_ACCUM_SINGLE
@@ -235,6 +237,7 @@
 #define DD_PARAM1 short2* g_out, float *outNorm
 #define DD_PARAM4 const short2* in, const float *inNorm
 #define WRITE_SPINOR WRITE_ST_SPINOR_SHORT2
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF
 #if (DD_XPAY==1 || DD_XPAY == 2)
 #define ACCUMTEX accumTexHalf2
 #define READ_ACCUM READ_ST_ACCUM_HALF
@@ -251,14 +254,13 @@
 // define the kernel
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2,  DD_PARAM4, DD_PARAM5) {
-//#if (DD_PREC == 1 )
-#if 1
 #include "dslash_staggered_core.h"
-#endif
-
 }
 
 #endif
+
+
+
 
 // clean up
 
@@ -287,6 +289,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
 #undef WRITE_SPINOR
+#undef READ_AND_SUM_SPINOR
 #undef ACCUMTEX
 #undef READ_ACCUM
 #undef CLOVERTEX

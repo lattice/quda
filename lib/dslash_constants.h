@@ -22,6 +22,9 @@ __constant__ int sp_stride;
 __constant__ int ga_stride;
 __constant__ int cl_stride;
 
+__constant__ int fat_ga_stride;
+__constant__ int long_ga_stride;
+
 __constant__ int gauge_fixed;
 
 // single precision constants
@@ -49,6 +52,12 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) {
 
   int ga_stride = gauge.stride;
   cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
+
+  int fat_ga_stride = gauge.stride;
+  int long_ga_stride = gauge.stride;
+
+  cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));
+  cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));
 
   cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 

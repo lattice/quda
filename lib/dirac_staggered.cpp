@@ -117,7 +117,7 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
+    reset = false;
   }
   
   QudaParity parity= in.qudaParity();    
