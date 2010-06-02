@@ -30,6 +30,10 @@ ifeq ($(strip $(GPU_EMU)), true)
   NVCCOPT = -deviceemu
 endif
 
+ifeq ($(strip $(GPU_ARCH)), sm_20)
+  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
+endif
+
 CC = gcc
 CFLAGS = -g -Wall -O3 -std=c99 $(COPT) $(INC)
 CXX = g++
