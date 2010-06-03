@@ -21,7 +21,8 @@ extern "C" {
     void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, QudaPrecision precision, QudaGaugeParam*);
     void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
   void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision);
-  
+  void createSiteLinkCPU(void* link,  QudaPrecision precision, int phase) ;
+
   void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
   void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision, QudaGaugeParam *param);
   //void su3_construct_8_half(float *mat, short *mat_half);
@@ -33,6 +34,9 @@ extern "C" {
 
   void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 
+  void strong_check_link(void * linkA, void *linkB, int len, QudaPrecision prec);
+  void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec);
+  
   // ---------- gauge_read.cpp ----------
   
   //void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]);

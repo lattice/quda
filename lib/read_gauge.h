@@ -31,7 +31,11 @@
     a##_re += b##_re * c##_re - b##_im * c##_im, \
     a##_im -= b##_re * c##_im + b##_im * c##_re
 
-#define READ_GAUGE_MATRIX_12_DOUBLE(gauge, dir) \
+#define ACC_CONJ_PROD_ASSIGN(a, b, c)			\
+    a##_re = (b##_re) * (c##_re) - (b##_im) * (c##_im),	\
+    a##_im = -(b##_re) * (c##_im) - (b##_im) * (c##_re)
+
+#define READ_GAUGE_MATRIX_12_DOUBLE(gauge, dir)				\
   double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*6+0)*ga_stride);	\
   double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*6+1)*ga_stride);	\
   double2 G2 = fetch_double2((gauge), ga_idx + ((dir/2)*6+2)*ga_stride);	\

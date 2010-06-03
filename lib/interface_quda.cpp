@@ -17,6 +17,7 @@
 
 #define spinorSiteSize 24 // real numbers per spinor
 
+
 FullGauge cudaGaugePrecise; // precise gauge field
 FullGauge cudaGaugeSloppy; // sloppy gauge field
 

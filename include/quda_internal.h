@@ -60,6 +60,31 @@ extern "C" {
     ParityGauge even;
     double anisotropy;
   } FullGauge;
+
+  typedef struct {
+    size_t bytes;
+    QudaPrecision precision;
+    int length; // total length
+    int volume; // geometric volume (single parity)
+    int X[4]; // the geometric lengths (single parity)
+    int Nc; // number of colors
+    ParityGauge odd;
+    ParityGauge even;
+    double anisotropy;
+  } FullStaple;
+  
+  typedef struct {
+    size_t bytes;
+    QudaPrecision precision;
+    int length; // total length
+    int volume; // geometric volume (single parity)
+    int X[4]; // the geometric lengths (single parity)
+    int Nc; // number of colors
+    ParityGauge odd;
+    ParityGauge even;
+    double anisotropy;
+  } FullMom;
+    
   
   typedef struct {
     size_t bytes;

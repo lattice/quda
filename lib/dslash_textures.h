@@ -38,6 +38,14 @@ texture<short4, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf;
 texture<short2, 1, cudaReadModeNormalizedFloat> longGauge0TexHalf_norecon;
 texture<short2, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf_norecon;
 
+//Single precision for site link
+texture<float4, 1, cudaReadModeElementType> siteLink0TexSingle;
+texture<float4, 1, cudaReadModeElementType> siteLink1TexSingle;
+
+// Single precision mulink field
+texture<float2, 1, cudaReadModeElementType> muLink0TexSingle;
+texture<float2, 1, cudaReadModeElementType> muLink1TexSingle;
+
 
 // Double precision input spinor field
 texture<int4, 1> spinorTexDouble;

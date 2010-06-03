@@ -442,4 +442,7 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
   
 }
 
-
+#ifdef GPU_FATLINK
+#include "force_kernel_common.cu"
+#include "llfat_quda.cu"
+#endif
