@@ -6,7 +6,8 @@ INC += -I../include -I.
 
 HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h test_util.h
 
-TESTS = su3_test blas_test pack_test dslash_test invert_test staggered_dslash_test staggered_invert_test ${FATLINK_TEST}
+TESTS = su3_test blas_test pack_test dslash_test invert_test staggered_dslash_test staggered_invert_test \
+	${FATLINK_TEST} ${GAUGE_FORCE_TEST} ${FERMION_FORCE_TEST}
 
 all: $(TESTS)
 
@@ -33,7 +34,11 @@ blas_test: blas_test.o $(QUDA)
 
 colorspinor_test: colorspinor_test.o dslash_reference.o blas_reference.o test_util.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
+
 llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o ${QUDA}
+	$(CC) $(LDFLAGS) $^  -o $@ 
+
+gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o ${QUDA}
 	$(CC) $(LDFLAGS) $^  -o $@ 
 	
 tune: blas_test

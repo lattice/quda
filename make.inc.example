@@ -7,6 +7,8 @@ GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, sm_13, or sm_20
 GPU_EMU  = false    # set to 'true' for device emulation
 
 GPU_FATLINK = no    # compile quda code for fatlink computation
+GPU_GAUGE_FORCE   = yes  # compile quda code for gauge force computation
+GPU_FERMION_FORCE = no  # compile quda code for fermion force computation
 
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
@@ -40,6 +42,11 @@ ifeq ($(strip $(GPU_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK
   FATLINK_TEST=llfat_test
 endif
+ifeq ($(strip $(GPU_FERMION_FORCE)), yes)
+  NVCCOPT += -DGPU_FERMION_FORCE
+  FERMION_FORCE_TEST=fermion_foce_test
+endif
+
 
 CC = gcc
 CFLAGS = -g -Wall -O3 -std=c99 $(COPT) $(INC)

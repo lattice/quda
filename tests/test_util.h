@@ -6,11 +6,15 @@
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
 #define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
-
+#define momSiteSize    10 // real numbers per momentum
+#define hwSiteSize    12 // real numbers per half wilson
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
+
+  int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
+  int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) ;
+
   void printSpinorElement(void *spinor, int X, QudaPrecision precision);
   void printGaugeElement(void *gauge, int X, QudaPrecision precision);
   
@@ -36,6 +40,9 @@ extern "C" {
 
   void strong_check_link(void * linkA, void *linkB, int len, QudaPrecision prec);
   void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec);
+  
+  void createMomCPU(void* mom,  QudaPrecision precision);
+  void createHwCPU(void* hw,  QudaPrecision precision);
   
   // ---------- gauge_read.cpp ----------
   

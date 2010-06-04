@@ -34,32 +34,6 @@ void xpay(Float *x, Float a, Float *y, int len) {
 }
 
 
-// i represents a "half index" into an even or odd "half lattice".
-// when oddBit={0,1} the half lattice is {even,odd}.
-// 
-// the displacements, such as dx, refer to the full lattice coordinates. 
-//
-// neighborIndex() takes a "half index", displaces it, and returns the
-// new "half index", which can be an index into either the even or odd lattices.
-// displacements of magnitude one always interchange odd and even lattices.
-//
-
-int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
-  int Y = fullLatticeIndex(i, oddBit);
-  int x4 = Y/(Z[2]*Z[1]*Z[0]);
-  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
-  int x2 = (Y/Z[0]) % Z[1];
-  int x1 = Y % Z[0];
-  
-  // assert (oddBit == (x+y+z+t)%2);
-  
-  x4 = (x4+dx4+Z[3]) % Z[3];
-  x3 = (x3+dx3+Z[2]) % Z[2];
-  x2 = (x2+dx2+Z[1]) % Z[1];
-  x1 = (x1+dx1+Z[0]) % Z[0];
-  
-  return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
-}
 
 template <typename Float>
 Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd) {

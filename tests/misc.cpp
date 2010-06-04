@@ -9,17 +9,6 @@
 #include <test_util.h>
 
 
-#define XUP 0
-#define YUP 1
-#define ZUP 2
-#define TUP 3
-#define TDOWN 4
-#define ZDOWN 5
-#define YDOWN 6
-#define XDOWN 7
-#define OPP_DIR(dir)    (7-(dir))
-#define GOES_FORWARDS(dir) (dir<=3)
-#define GOES_BACKWARDS(dir) (dir>3)
 
 int verbose;
 

@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include <quda.h>
-#include <dslash_reference.h>
 #include <test_util.h>
 #include <gauge_quda.h>
 #include <string.h>

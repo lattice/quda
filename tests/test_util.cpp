@@ -264,6 +264,63 @@ int fullLatticeIndex(int i, int oddBit) {
   return 2*i + (boundaryCrossings + oddBit) % 2;
 }
 
+
+// i represents a "half index" into an even or odd "half lattice".
+// when oddBit={0,1} the half lattice is {even,odd}.
+// 
+// the displacements, such as dx, refer to the full lattice coordinates. 
+//
+// neighborIndex() takes a "half index", displaces it, and returns the
+// new "half index", which can be an index into either the even or odd lattices.
+// displacements of magnitude one always interchange odd and even lattices.
+//
+
+int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
+  int Y = fullLatticeIndex(i, oddBit);
+  int x4 = Y/(Z[2]*Z[1]*Z[0]);
+  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
+  int x2 = (Y/Z[0]) % Z[1];
+  int x1 = Y % Z[0];
+  
+  // assert (oddBit == (x+y+z+t)%2);
+  
+  x4 = (x4+dx4+Z[3]) % Z[3];
+  x3 = (x3+dx3+Z[2]) % Z[2];
+  x2 = (x2+dx2+Z[1]) % Z[1];
+  x1 = (x1+dx1+Z[0]) % Z[0];
+  
+  return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+}
+
+/*  
+ * This is a computation of neighbor using the full index and the displacement in each direction
+ *
+ */
+
+int
+neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) 
+{
+    int oddBit = 0;
+    int half_idx = i;
+    if (i >= Vh){
+	oddBit =1;
+	half_idx = i - Vh;
+    }
+    
+    int nbr_half_idx = neighborIndex(half_idx, oddBit, dx4,dx3,dx2,dx1);
+    int oddBitChanged = (dx4+dx3+dx2+dx1)%2;
+    if (oddBitChanged){
+	oddBit = 1 - oddBit;
+    }
+    int ret = nbr_half_idx;
+    if (oddBit){
+	ret = Vh + nbr_half_idx;
+    }
+    
+    return ret;
+}
+
+
 template <typename Float>
 static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param) {
   // Apply spatial scaling factor (u0) to spatial links
@@ -906,4 +963,138 @@ void strong_check_link(void * linkA, void *linkB, int len, QudaPrecision prec)
     printf("\n");
     
     compare_link(linkA, linkB, len, prec);
+}
+
+
+
+void 
+createMomCPU(void* mom,  QudaPrecision precision) 
+{
+    void* temp;
+    
+    size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+    temp = malloc(4*V*gaugeSiteSize*gSize);
+    if (temp == NULL){
+	fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
+	exit(1);
+    }
+    
+    
+    
+    for(int i=0;i < V;i++){
+	if (precision == QUDA_DOUBLE_PRECISION){
+	    for(int dir=0;dir < 4;dir++){
+		double* thismom = (double*)mom;	    
+		for(int k=0; k < momSiteSize; k++){
+		    thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;				
+		}	    
+	    }	    
+	}else{
+	    for(int dir=0;dir < 4;dir++){
+		float* thismom=(float*)mom;
+		for(int k=0; k < momSiteSize; k++){
+		    thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;		
+		}	    
+	    }
+	}
+    }
+    
+    free(temp);
+    return;
+}
+
+void
+createHwCPU(void* hw,  QudaPrecision precision)
+{
+    for(int i=0;i < V;i++){
+        if (precision == QUDA_DOUBLE_PRECISION){
+            for(int dir=0;dir < 4;dir++){
+                double* thishw = (double*)hw;
+                for(int k=0; k < hwSiteSize; k++){
+                    thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
+                }
+            }
+        }else{
+            for(int dir=0;dir < 4;dir++){
+                float* thishw=(float*)hw;
+                for(int k=0; k < hwSiteSize; k++){
+                    thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
+                }
+            }
+        }
+    }
+
+    return;
+}
+
+
+template <typename Float>
+void compare_mom(Float *momA, Float *momB, int len) {
+  int fail_check = 16;
+  int fail[fail_check];
+  for (int f=0; f<fail_check; f++) fail[f] = 0;
+
+  int iter[momSiteSize];
+  for (int i=0; i<momSiteSize; i++) iter[i] = 0;
+  
+  for (int i=0; i<len; i++) {
+      for (int j=0; j<momSiteSize; j++) {
+	  int is = i*momSiteSize+j;
+	  double diff = fabs(momA[is]-momB[is]);
+	  for (int f=0; f<fail_check; f++)
+	      if (diff > pow(10.0,-(f+1))) fail[f]++;
+	  //if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
+	  if (diff > 1e-3) iter[j]++;
+      }
+  }
+  
+  for (int i=0; i<momSiteSize; i++) printf("%d fails = %d\n", i, iter[i]);
+  
+  for (int f=0; f<fail_check; f++) {
+      printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*momSiteSize, fail[f] / (double)(len*6));
+  }
+  
+}
+
+static void 
+printMomElement(void *mom, int X, QudaPrecision precision) 
+{
+    if (precision == QUDA_DOUBLE_PRECISION){
+	double* thismom = ((double*)mom)+ X*momSiteSize;
+	printVector(thismom);
+	printf("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
+    }else{
+	float* thismom = ((float*)mom)+ X*momSiteSize;
+	printVector(thismom);
+	printf("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);	
+    }
+}
+void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec) 
+{    
+    printf("mom:\n");
+    printMomElement(momA, 0, prec); 
+    printf("\n");
+    printMomElement(momA, 1, prec); 
+    printf("\n");
+    printMomElement(momA, 2, prec); 
+    printf("\n");
+    printMomElement(momA, 3, prec); 
+    printf("...\n");
+
+    printf("\nreference mom:\n");
+    printMomElement(momB, 0, prec); 
+    printf("\n");
+    printMomElement(momB, 1, prec); 
+    printf("\n");
+    printMomElement(momB, 2, prec); 
+    printf("\n");
+    printMomElement(momB, 3, prec); 
+    printf("\n");
+
+    
+    if (prec == QUDA_DOUBLE_PRECISION){
+	compare_mom((double*)momA, (double*)momB, len);
+    }else{
+	compare_mom((float*)momA, (float*)momB, len);
+    }
 }
