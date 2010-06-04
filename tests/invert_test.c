@@ -10,6 +10,11 @@
 // in a typical application, quda.h is the only QUDA header required
 #include <quda.h>
 
+// Pulled these out front so you can set once and forget
+QudaPrecision cpu_prec=QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec=QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_sloppy_prec=QUDA_SINGLE_PRECISION;
+
 int main(int argc, char **argv)
 {
   // set QUDA parameters
@@ -19,24 +24,24 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 8;
-  gauge_param.X[1] = 8;
-  gauge_param.X[2] = 8;
-  gauge_param.X[3] = 16;
+  gauge_param.X[0] = 24; 
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 24;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_GAUGE;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   
-  gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  gauge_param.cpu_prec = cpu_prec;
+  gauge_param.cuda_prec = cuda_prec;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec_sloppy = cuda_sloppy_prec;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
+  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
@@ -52,24 +57,25 @@ int main(int argc, char **argv)
   inv_param.reliable_delta = 1e-2;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.solver_type = QUDA_MAT_SOLUTION;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  // FIXME: If asking for MAT Solution, be careful to allocate even clover part.
+  inv_param.solver_type = QUDA_MATPC_SOLUTION;
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_sloppy_prec;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  gauge_param.ga_pad = 0;//24*24*24;
+  gauge_param.ga_pad = 0; //24*24*24;
   inv_param.sp_pad = 0;//24*24*24;
-  inv_param.cl_pad = 0;//24*24*24;
+  inv_param.cl_pad = 0; // 24*24*24;
 
   if (clover_yes) {
-    inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
-    inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cpu_prec = cpu_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_sloppy_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;
@@ -128,8 +134,15 @@ int main(int argc, char **argv)
   if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
   printf("\nDone: %i iter / %g secs = %g gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-
-  mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+  if ( inv_param.solution_type == QUDA_MAT_SOLUTION ) { 
+   mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec); 
+  }
+  else {
+    // If the solution is MATPC check back with the matPC thing
+    if( inv_param.solution_type == QUDA_MATPC_SOLUTION ) {   
+      matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+    }
+  }
   if  (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
     ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
 

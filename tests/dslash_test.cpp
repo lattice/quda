@@ -19,7 +19,8 @@ int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 int clover_yes = 0;
 
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+// Pulled this out front so you can set once then forget
+QudaPrecision cpu_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
 QudaGaugeParam gauge_param;
