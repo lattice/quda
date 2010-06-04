@@ -17,11 +17,11 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 0;
+int clover_yes = 1;
 
 // Pulled this out front so you can set once then forget
-QudaPrecision cpu_prec = QUDA_SINGLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_HALF_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -51,7 +51,7 @@ void init() {
   gauge_param.X[0] = 24;
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 128;
+  gauge_param.X[3] = 64;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;

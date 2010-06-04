@@ -11,9 +11,9 @@
 #include <quda.h>
 
 // Pulled these out front so you can set once and forget
-QudaPrecision cpu_prec=QUDA_SINGLE_PRECISION;
-QudaPrecision cuda_prec=QUDA_SINGLE_PRECISION;
-QudaPrecision cuda_sloppy_prec=QUDA_SINGLE_PRECISION;
+QudaPrecision cpu_prec=QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec=QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_sloppy_prec=QUDA_HALF_PRECISION;
 
 int main(int argc, char **argv)
 {
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 24; 
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 24;
+  gauge_param.X[3] = 64;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_GAUGE;
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   // FIXME: If asking for MAT Solution, be careful to allocate even clover part.
   inv_param.solver_type = QUDA_MATPC_SOLUTION;
-  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.cpu_prec = cpu_prec;
