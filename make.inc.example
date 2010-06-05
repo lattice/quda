@@ -44,7 +44,7 @@ ifeq ($(strip $(GPU_FATLINK)), yes)
 endif
 ifeq ($(strip $(GPU_FERMION_FORCE)), yes)
   NVCCOPT += -DGPU_FERMION_FORCE
-  FERMION_FORCE_TEST=fermion_foce_test
+  FERMION_FORCE_TEST=fermion_force_test
 endif
 
 

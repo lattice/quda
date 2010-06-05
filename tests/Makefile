@@ -40,6 +40,9 @@ llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o ${QUDA}
 
 gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o ${QUDA}
 	$(CC) $(LDFLAGS) $^  -o $@ 
+fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o ${QUDA}
+	$(CC) $(LDFLAGS) $^  -o $@ 
+
 	
 tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/

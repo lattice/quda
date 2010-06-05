@@ -86,6 +86,8 @@ extern "C" {
 
   } QudaInvertParam;
 
+
+
   // Interface functions, found in interface_quda.cpp
 
   void initQuda(int dev);

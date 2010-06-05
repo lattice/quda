@@ -453,3 +453,7 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 #ifdef GPU_GAUGE_FORCE
 #include "gauge_force_quda.cu"
 #endif
+
+#ifdef GPU_FERMION_FORCE
+#include "fermion_force_quda.cu"
+#endif
