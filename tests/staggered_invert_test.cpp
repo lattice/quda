@@ -21,6 +21,7 @@ extern FullGauge cudaLongLinkSloppy;
 extern void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param,
 				  void* _cudaLinkPrecise, void* _cudaLinkSloppy);
 
+int device = 0;
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaPrecision  prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -52,8 +53,6 @@ void constructSpinorField(Float *res) {
 static int
 invert_milc_test(void)
 {
-  int device = 1;
-  
   void *fatlink[4];
   void *longlink[4];
     
@@ -451,6 +450,18 @@ int main(int argc, char** argv)
       }
       i++;
       continue;
+    }
+    if( strcmp(argv[i], "--device") == 0){
+          if (i+1 >= argc){
+              usage(argv);
+          }
+          device =  atoi(argv[i+1]);
+          if (device < 0){
+              fprintf(stderr, "Error: invalid device number(%d)\n", device);
+              exit(1);
+          }
+          i++;
+          continue;
     }
 
 

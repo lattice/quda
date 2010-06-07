@@ -21,7 +21,7 @@ extern void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param, void* _c
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
-
+int device = 0;
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
 
@@ -41,8 +41,8 @@ double kappa = 1.0;
 int parity = 1;
 QudaDagType dagger = QUDA_DAG_NO;
 int TRANSFER = 0; // include transfer time in the benchmark?
-int tdim = 64;
-int sdim = 24;
+int tdim = 24;
+int sdim = 8;
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
@@ -152,8 +152,7 @@ init()
     //display_spinor(spinor, 10, inv_param.cpu_prec);
 #endif
 
-    int dev = 0;
-    initQuda(dev);
+    initQuda(device);
     
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda_general(fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy);
@@ -403,6 +402,19 @@ main(int argc, char **argv)
 	
         if( strcmp(argv[i], "--help")== 0){
             usage(argv);
+        }
+
+        if( strcmp(argv[i], "--device") == 0){
+            if (i+1 >= argc){
+                usage(argv);
+            }
+            device =  atoi(argv[i+1]);
+            if (device < 0){
+                fprintf(stderr, "Error: invalid device number(%d)\n", device);
+                exit(1);
+            }
+            i++;
+            continue;
         }
 	
         if( strcmp(argv[i], "--prec") == 0){

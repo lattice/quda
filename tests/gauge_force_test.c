@@ -20,6 +20,7 @@ typedef struct { dcomplex e[3][3]; } dsu3_matrix;
 
 extern void initDslashCuda(FullGauge gauge);
 
+int device = 0;
 
 FullGauge cudaSiteLink;
 FullMom cudaMom;
@@ -54,9 +55,7 @@ setDims(int *X) {
 static void
 gauge_force_init()
 { 
-    int dev = 1;
-    
-    initQuda(dev);
+    initQuda(device);
     //cudaSetDevice(dev); CUERR;
     
     gaugeParam.X[0] = sdim;
@@ -584,11 +583,13 @@ static void
 usage(char** argv )
 {
     printf("Usage: %s <args>\n", argv[0]);
-    printf("--gprec <double/single/half> \t Link precision\n"); 
-    printf("--recon <8/12> \t\t\t Link reconstruction type\n"); 
-    printf("--tdim \t\t\t\t Set T dimention size(default 24)\n"); 
-    printf("--verify\n");
-    printf("--help \t\t\t\t Print out this message\n"); 
+    printf("  --device <dev_id>               Set which device to run on\n");
+    printf("  --gprec <double/single/half>    Link precision\n"); 
+    printf("  --recon <8/12>                  Link reconstruction type\n"); 
+    printf("  --sdim <n>                      Set spacial dimention\n");
+    printf("  --tdim                          Set T dimention size(default 24)\n"); 
+    printf("  --verify                        Verify the GPU results using CPU results\n");
+    printf("  --help                          Print out this message\n"); 
     exit(1);
     return ;
 }
@@ -644,6 +645,18 @@ main(int argc, char **argv)
 	    }
             i++;
             continue;	    
+        }
+        if( strcmp(argv[i], "--device") == 0){
+            if (i+1 >= argc){
+                usage(argv);
+            }
+            device =  atoi(argv[i+1]);
+            if (device < 0){
+                fprintf(stderr, "Error: invalid device number(%d)\n", device);
+                exit(1);
+            }
+            i++;
+            continue;
         }
 
 	if( strcmp(argv[i], "--verify") == 0){
