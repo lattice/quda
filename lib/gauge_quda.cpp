@@ -1077,7 +1077,7 @@ packGaugeField(FloatN *res, Float *gauge, int oddBit, ReconstructType reconstruc
 	for (dir = 0; dir < 4; dir++) {
 	    Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
 	    for (i = 0; i < Vh; i++) {
-		pack18(res+i, g+i*gaugeSiteSize+dir, dir*gaugeSiteSize, Vh);
+	      pack18(res+i, g+4*i*gaugeSiteSize+dir*gaugeSiteSize, dir, Vh);
 	    }
 	}      
     }

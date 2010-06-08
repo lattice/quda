@@ -42,6 +42,9 @@ texture<short2, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf_norecon;
 texture<float4, 1, cudaReadModeElementType> siteLink0TexSingle;
 texture<float4, 1, cudaReadModeElementType> siteLink1TexSingle;
 
+texture<float2, 1, cudaReadModeElementType> siteLink0TexSingle_norecon;
+texture<float2, 1, cudaReadModeElementType> siteLink1TexSingle_norecon;
+
 // Single precision mulink field
 texture<float2, 1, cudaReadModeElementType> muLink0TexSingle;
 texture<float2, 1, cudaReadModeElementType> muLink1TexSingle;
