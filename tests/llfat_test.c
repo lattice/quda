@@ -34,6 +34,7 @@ int Vh;
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision  cpu_link_prec = QUDA_SINGLE_PRECISION;
 
 typedef struct {
   double real;
@@ -55,7 +56,7 @@ setDims(int *X) {
 }
 
 static void
-llfat_init(void* act_path_coeff)
+llfat_init(void)
 { 
   initQuda(device);
   //cudaSetDevice(dev); CUERR;
@@ -67,7 +68,7 @@ llfat_init(void* act_path_coeff)
 
   setDims(gaugeParam.X);
     
-  gaugeParam.cpu_prec = QUDA_SINGLE_PRECISION;
+  gaugeParam.cpu_prec = cpu_link_prec;
   gaugeParam.cuda_prec = link_prec;
         
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -107,9 +108,6 @@ llfat_init(void* act_path_coeff)
   createLinkQuda(&cudaFatLink, &gaugeParam);
         
   initDslashConstants(cudaSiteLink, Vh, Vh);
-
-  llfat_init_cuda(&gaugeParam, act_path_coeff); 
-    
     
   return;
 }
@@ -132,33 +130,43 @@ llfat_end()
 static void 
 llfat_test(void) 
 {
+  llfat_init();
+
+
   float act_path_coeff_1[6];
   double act_path_coeff_2[6];
-    
+  
   for(int i=0;i < 6;i++){
     act_path_coeff_1[i]= 0.1*i;
     act_path_coeff_2[i]= 0.1*i;
   }
-    
-  void* act_path_coeff;
-    
+  
+
+ 
+
+  void* act_path_coeff;    
   if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
     act_path_coeff = act_path_coeff_2;
   }else{
     act_path_coeff = act_path_coeff_1;	
   }
-    
-  llfat_init(act_path_coeff);
-    
   if (verify_results){
     llfat_reference(refLink, siteLink, gaugeParam.cpu_prec, act_path_coeff);
   }
+  
+ if(gaugeParam.cuda_prec == QUDA_DOUBLE_PRECISION){
+   act_path_coeff = act_path_coeff_2;
+ }else{
+   act_path_coeff = act_path_coeff_1;
+  }
+ llfat_init_cuda(&gaugeParam, act_path_coeff); 
+
   //The number comes from CPU implementation in MILC, fermion_links_helpers.c    
   int flops= 61632; 
     
   struct timeval t0, t1;
   gettimeofday(&t0, NULL);
-  llfat_cuda(fatLink, siteLink, cudaFatLink, cudaSiteLink, cudaStaple, cudaStaple1, &gaugeParam, act_path_coeff);
+  llfat_cuda(fatLink, siteLink, cudaFatLink, cudaSiteLink, cudaStaple, cudaStaple1, &gaugeParam, act_path_coeff_2);
   cudaThreadSynchronize();
   gettimeofday(&t1, NULL);
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
@@ -225,7 +233,7 @@ main(int argc, char **argv)
       usage(argv);
     }
 	
-    if( strcmp(argv[i], "--gprec") == 0){
+    if( strcmp(argv[i], "--prec") == 0){
       if (i+1 >= argc){
 	usage(argv);
       }	    
@@ -233,7 +241,16 @@ main(int argc, char **argv)
       i++;
       continue;	    
     }
-	
+
+    if( strcmp(argv[i], "--cpu_prec") == 0){
+      if (i+1 >= argc){
+	usage(argv);
+      }	    
+      cpu_link_prec =  get_prec(argv[i+1]);
+      i++;
+      continue;	    
+    }	
+
     if( strcmp(argv[i], "--recon") == 0){
       if (i+1 >= argc){
 	usage(argv);

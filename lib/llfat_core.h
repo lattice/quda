@@ -200,41 +200,41 @@
 
 #define tempa00_re TEMPA0.x
 #define tempa00_im TEMPA0.y
-#define tempa01_re TEMPA0.z
-#define tempa01_im TEMPA0.w
-#define tempa02_re TEMPA1.x
-#define tempa02_im TEMPA1.y
-#define tempa10_re TEMPA1.z
-#define tempa10_im TEMPA1.w
-#define tempa11_re TEMPA2.x
-#define tempa11_im TEMPA2.y
-#define tempa12_re TEMPA2.z
-#define tempa12_im TEMPA2.w
-#define tempa20_re TEMPA3.x
-#define tempa20_im TEMPA3.y
-#define tempa21_re TEMPA3.z
-#define tempa21_im TEMPA3.w
-#define tempa22_re TEMPA4.x
-#define tempa22_im TEMPA4.y
+#define tempa01_re TEMPA1.x
+#define tempa01_im TEMPA1.y
+#define tempa02_re TEMPA2.x
+#define tempa02_im TEMPA2.y
+#define tempa10_re TEMPA3.x
+#define tempa10_im TEMPA3.y
+#define tempa11_re TEMPA4.x
+#define tempa11_im TEMPA4.y
+#define tempa12_re TEMPA5.x
+#define tempa12_im TEMPA5.y
+#define tempa20_re TEMPA6.x
+#define tempa20_im TEMPA6.y
+#define tempa21_re TEMPA7.x
+#define tempa21_im TEMPA7.y
+#define tempa22_re TEMPA8.x
+#define tempa22_im TEMPA8.y
 
 #define tempb00_re TEMPB0.x
 #define tempb00_im TEMPB0.y
-#define tempb01_re TEMPB0.z
-#define tempb01_im TEMPB0.w
-#define tempb02_re TEMPB1.x
-#define tempb02_im TEMPB1.y
-#define tempb10_re TEMPB1.z
-#define tempb10_im TEMPB1.w
-#define tempb11_re TEMPB2.x
-#define tempb11_im TEMPB2.y
-#define tempb12_re TEMPB2.z
-#define tempb12_im TEMPB2.w
-#define tempb20_re TEMPB3.x
-#define tempb20_im TEMPB3.y
-#define tempb21_re TEMPB3.z
-#define tempb21_im TEMPB3.w
-#define tempb22_re TEMPB4.x
-#define tempb22_im TEMPB4.y
+#define tempb01_re TEMPB1.x
+#define tempb01_im TEMPB1.y
+#define tempb02_re TEMPB2.x
+#define tempb02_im TEMPB2.y
+#define tempb10_re TEMPB3.x
+#define tempb10_im TEMPB3.y
+#define tempb11_re TEMPB4.x
+#define tempb11_im TEMPB4.y
+#define tempb12_re TEMPB5.x
+#define tempb12_im TEMPB5.y
+#define tempb20_re TEMPB6.x
+#define tempb20_im TEMPB6.y
+#define tempb21_re TEMPB7.x
+#define tempb21_im TEMPB7.y
+#define tempb22_re TEMPB8.x
+#define tempb22_im TEMPB8.y
 
 
 //fat link is not compressible
@@ -259,13 +259,13 @@
 
 template<int mu, int nu, int odd_bit>
   __global__ void
-LLFAT_KERNEL(do_siteComputeGenStapleParity, RECONSTRUCT)(float2* staple_even, float2* staple_odd, 
-								FloatN* sitelink_even, FloatN* sitelink_odd, 
-								float2* fatlink_even, float2* fatlink_odd,	
-								float mycoeff)
+  LLFAT_KERNEL(do_siteComputeGenStapleParity, RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
+							   FloatN* sitelink_even, FloatN* sitelink_odd, 
+							   FloatM* fatlink_even, FloatM* fatlink_odd,	
+							   Float mycoeff)
 {
-  float4 TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4;
-  float2 STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
+  FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
+  FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
     
   int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -355,7 +355,7 @@ LLFAT_KERNEL(do_siteComputeGenStapleParity, RECONSTRUCT)(float2* staple_even, fl
     LLFAT_ADD_SU3_MATRIX(b, staple, staple);
   }
   
-    LOAD_EVEN_FAT_MATRIX(mu, mem_idx);
+  LOAD_EVEN_FAT_MATRIX(mu, mem_idx);
     SCALAR_MULT_ADD_SU3_MATRIX(fat, staple, mycoeff, fat);
     WRITE_FAT_MATRIX(fatlink_even,mu,  mem_idx);	
     
@@ -367,13 +367,13 @@ LLFAT_KERNEL(do_siteComputeGenStapleParity, RECONSTRUCT)(float2* staple_even, fl
 
 template<int mu, int nu, int odd_bit>
   __global__ void
-LLFAT_KERNEL(do_computeGenStapleFieldParity, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_odd,
-							  float2* fatlink_even, float2* fatlink_odd,			    
-							  float2* mulink_even, float2* mulink_odd, 
-				       float mycoeff)
+  LLFAT_KERNEL(do_computeGenStapleFieldParity, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_odd,
+							    FloatM* fatlink_even, FloatM* fatlink_odd,			    
+							    FloatM* mulink_even, FloatM* mulink_odd, 
+							    Float mycoeff)
 {
-  float4 TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4;
-  float4 TEMPB0, TEMPB1, TEMPB2, TEMPB3, TEMPB4;
+  FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
+  FloatM TEMPB0, TEMPB1, TEMPB2, TEMPB3, TEMPB4, TEMPB5, TEMPB6, TEMPB7, TEMPB8;
 
   int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -473,14 +473,14 @@ LLFAT_KERNEL(do_computeGenStapleFieldParity, RECONSTRUCT)(FloatN* sitelink_even,
 
 template<int mu, int nu, int odd_bit>
   __global__ void
-LLFAT_KERNEL(do_computeGenStapleFieldSaveParity,RECONSTRUCT)(float2* staple_even, float2* staple_odd, 
+LLFAT_KERNEL(do_computeGenStapleFieldSaveParity,RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
 							     FloatN* sitelink_even, FloatN* sitelink_odd,
-							     float2* fatlink_even, float2* fatlink_odd,			    
-							     float2* mulink_even, float2* mulink_odd, 
-					   float mycoeff)
+							     FloatM* fatlink_even, FloatM* fatlink_odd,			    
+							     FloatM* mulink_even, FloatM* mulink_odd, 
+							     Float mycoeff)
 {
-  float4 TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4;
-  float2 STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
+  FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
+  FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
     
   int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -579,11 +579,12 @@ LLFAT_KERNEL(do_computeGenStapleFieldSaveParity,RECONSTRUCT)(float2* staple_even
 
 __global__ void 
 LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_odd,
-					float2* fatlink_even, float2* fatlink_odd)
+					FloatM* fatlink_even, FloatM* fatlink_odd,
+					Float coeff0, Float coeff5)
 {
 
   FloatN* my_sitelink;
-  float2* my_fatlink;
+  FloatM* my_fatlink;
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
   int mem_idx = sid;
 
@@ -614,8 +615,8 @@ LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_
 
     LOAD_FAT_MATRIX(my_fatlink, dir, mem_idx);
 	
-    SCALAR_MULT_SU3_MATRIX((act_path_coeff_f0 - 6.0*act_path_coeff_f5), a, fat); 
-	
+    SCALAR_MULT_SU3_MATRIX((coeff0 - 6.0*coeff5), a, fat); 
+    
     WRITE_FAT_MATRIX(my_fatlink,dir, mem_idx);	
   }
     

@@ -563,12 +563,14 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
       errorQuda("Error allocating even gauge field");
     }
   }
-   
+  cudaMemset(cudaGauge->even, 0, cudaGauge->bytes);
+
   if (!cudaGauge->odd) {
     if (cudaMalloc((void **)&cudaGauge->odd, cudaGauge->bytes) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating even odd gauge field");
     }
   }
+  cudaMemset(cudaGauge->odd, 0, cudaGauge->bytes);
 
 }
 
@@ -1254,30 +1256,35 @@ void
 storeLinkToCPU(void* cpuGauge, FullGauge *cudaGauge, QudaGaugeParam* param)
 {
     
-    QudaPrecision cpu_prec = param->cpu_prec;
-    QudaPrecision cuda_prec= param->cuda_prec;
+  QudaPrecision cpu_prec = param->cpu_prec;
+  QudaPrecision cuda_prec= param->cuda_prec;
     
-    if (cpu_prec != cuda_prec){
-	printf("Error: cpu and gpu precison has to be the same at this moment\n");
-	exit(1);	
+  if (cuda_prec == QUDA_HALF_PRECISION || cpu_prec == QUDA_HALF_PRECISION){
+    printf("ERROR: %s:  half precision is not supported at this moment\n", __FUNCTION__);
+    exit(1);
+  }
+    
+  if (cpu_prec == QUDA_DOUBLE_PRECISION){
+    if (cuda_prec == QUDA_DOUBLE_PRECISION){//double and double
+      storeGaugeToCPUArray( (double*)cpuGauge, (double2*) cudaGauge->even, (double2*)cudaGauge->odd, 
+			    cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+    }else{ //double and single
+      if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO){
+	storeGaugeToCPUArray( (double*)cpuGauge, (float2*) cudaGauge->even, (float2*)cudaGauge->odd, 
+			      cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+      }else{
+	storeGaugeToCPUArray( (double*)cpuGauge, (float4*) cudaGauge->even, (float4*)cudaGauge->odd, 
+			      cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);	    
+      }  
     }
-    
-    if (cpu_prec == QUDA_HALF_PRECISION){
-	printf("ERROR: %s:  half precision is not supported at this moment\n", __FUNCTION__);
-	exit(1);
+  }else { //SINGLE PRECISIONS
+    if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO){
+      storeGaugeToCPUArray( (float*)cpuGauge, (float2*) cudaGauge->even, (float2*)cudaGauge->odd, 
+			    cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
+    }else{
+      storeGaugeToCPUArray( (float*)cpuGauge, (float4*) cudaGauge->even, (float4*)cudaGauge->odd, 
+			    cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);	    
     }
-    
-    if (cpu_prec == QUDA_DOUBLE_PRECISION){
 	
-    }else { //SINGLE PRECISIONS
-	if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO){
-	    storeGaugeToCPUArray( (float*)cpuGauge, (float2*) cudaGauge->even, (float2*)cudaGauge->odd, 
-				  cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);
-	}else{
-	    storeGaugeToCPUArray( (float*)cpuGauge, (float4*) cudaGauge->even, (float4*)cudaGauge->odd, 
-				  cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume);	    
-	}
-	
-    }
-
+  }
 }

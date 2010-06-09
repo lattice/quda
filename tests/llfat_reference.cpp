@@ -282,6 +282,7 @@ void llfat_cpu(su3_matrix* fatlink, su3_matrix* sitelink, Float* act_path_coeff)
       llfat_scalar_mult_su3_matrix(sitelink+ 4*i + dir, one_link, fat1 );
     }
   }
+
   for (int dir=XUP; dir<=TUP; dir++){
     for(int nu=XUP; nu<=TUP; nu++){
       if(nu!=dir){
@@ -313,7 +314,6 @@ void llfat_cpu(su3_matrix* fatlink, su3_matrix* sitelink, Float* act_path_coeff)
     }/* nu */
 	
   }/* dir */      
-    
 
   free(staple);
   free(tempmat1);
@@ -325,12 +325,14 @@ void
 llfat_reference(void* fatlink, void* sitelink, QudaPrecision prec, void* act_path_coeff)
 {
   switch(prec){
-  case QUDA_DOUBLE_PRECISION:
+  case QUDA_DOUBLE_PRECISION:{
     llfat_cpu((dsu3_matrix*)fatlink, (dsu3_matrix*)sitelink, (double*) act_path_coeff);
     break;
-  case QUDA_SINGLE_PRECISION:
+  }
+  case QUDA_SINGLE_PRECISION:{
     llfat_cpu((fsu3_matrix*)fatlink, (fsu3_matrix*)sitelink, (float*) act_path_coeff);
     break;
+  }
   default:
     fprintf(stderr, "ERROR: unsupported precision\n");
     exit(1);

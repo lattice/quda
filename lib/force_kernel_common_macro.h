@@ -168,18 +168,16 @@
 #define stapleT22_im (-staple22_im)
 
 #define LOAD_MATRIX_12_SINGLE(gauge, dir, idx, var)do{			\
-	int start_pos = idx + dir*Vhx3;					\
-	var##0 = gauge[start_pos];					\
-	var##1 = gauge[start_pos + Vh];					\
-	var##2 = gauge[start_pos + Vhx2];				\
-    }while(0)
+    var##0 = gauge[idx + dir*Vhx3];					\
+    var##1 = gauge[idx + dir*Vhx3 + Vh];				\
+    var##2 = gauge[idx + dir*Vhx3 + Vhx2];				\
+  }while(0)
 
 #define LOAD_MATRIX_12_SINGLE_TEX(gauge, dir, idx, var)do{		\
-	int start_pos = idx + dir*Vhx3;					\
-	var##0 = tex1Dfetch(gauge, start_pos);				\
-	var##1 = tex1Dfetch(gauge, start_pos + Vh);			\
-	var##2 = tex1Dfetch(gauge, start_pos + Vhx2);			\
-    }while(0)
+    var##0 = tex1Dfetch(gauge, idx + dir*Vhx3);				\
+    var##1 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vh);			\
+    var##2 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vhx2);			\
+  }while(0)
 
 
 #define MULT_SU3_NN(ma, mb, mc)					\
@@ -614,7 +612,7 @@
     a##22_re = 1.0;				\
     a##22_im = 0;				
 
-#define RECONSTRUCT_LINK_12_SINGLE(dir, idx, sign, var)			\
+#define RECONSTRUCT_LINK_12(dir, idx, sign, var)			\
     ACC_CONJ_PROD_ASSIGN(var##20, +var##01, +var##12);			\
     ACC_CONJ_PROD(var##20, -var##02, +var##11);				\
     ACC_CONJ_PROD_ASSIGN(var##21, +var##02, +var##10);			\

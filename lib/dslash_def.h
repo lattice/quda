@@ -198,11 +198,14 @@
 
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2, DD_PARAM3 DD_PARAM4, DD_PARAM5) {
+#if 0
 #if DD_DAG
 #include "dslash_dagger_core.h"
 #else
 #include "dslash_core.h"
 #endif
+#endif
+
 }
 
 #endif

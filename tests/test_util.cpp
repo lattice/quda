@@ -245,7 +245,10 @@ template <typename Float>
 static int compareFloats(Float *a, Float *b, int len, double epsilon) {
   for (int i = 0; i < len; i++) {
     double diff = fabs(a[i] - b[i]);
-    if (diff > epsilon) return 0;
+    if (diff > epsilon) {
+      printf("error: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
+      return 0;
+    }
   }
   return 1;
 }
@@ -952,12 +955,16 @@ void strong_check_link(void * linkA, void *linkB, int len, QudaPrecision prec)
 {
     printf("LinkA:\n");
     printLinkElement(linkA, 0, prec); 
+    printf("\n");
+    printLinkElement(linkA, 1, prec); 
     printf("...\n");
     printLinkElement(linkA, len-1, prec); 
     printf("\n");    
     
     printf("\nlinkB:\n");
     printLinkElement(linkB, 0, prec); 
+    printf("\n");
+    printLinkElement(linkB, 1, prec); 
     printf("...\n");
     printLinkElement(linkB, len-1, prec); 
     printf("\n");

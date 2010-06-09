@@ -480,7 +480,7 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 	FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKA);
     }
 
-    RECONSTRUCT_LINK_12_SINGLE(mymu, ad_link_nbr_idx, ad_link_sign, linka);	
+    RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, linka);	
     if (mu_positive){
 	ADJ_MAT_MUL_HW(linka, hwa, hwd);
     }else{
@@ -495,7 +495,7 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 	FF_LOAD_MATRIX(linkOdd, mymu, bc_link_nbr_idx, LINKA);
     }
     
-    RECONSTRUCT_LINK_12_SINGLE(mymu, bc_link_nbr_idx, bc_link_sign, linka);
+    RECONSTRUCT_LINK_12(mymu, bc_link_nbr_idx, bc_link_sign, linka);
     if (mu_positive){    
 	ADJ_MAT_MUL_HW(linka, hwa, hwb);
     }else{
@@ -507,7 +507,7 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 	FF_LOAD_MATRIX(linkOdd, mysig, ab_link_nbr_idx, LINKB);
     }
     
-    RECONSTRUCT_LINK_12_SINGLE(mysig, ab_link_nbr_idx, ab_link_sign, linkb);
+    RECONSTRUCT_LINK_12(mysig, ab_link_nbr_idx, ab_link_sign, linkb);
     if (sig_positive){        
 	MAT_MUL_HW(linkb, hwb, hwc);
     }else{
@@ -709,7 +709,7 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
 	FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKA);
     }
 
-    RECONSTRUCT_LINK_12_SINGLE(mymu, ad_link_nbr_idx, ad_link_sign, linka);	
+    RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, linka);	
     if (mu_positive){
 	MAT_MUL_HW(linka, hwa, hwb);
     }else{
@@ -984,7 +984,7 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
 	FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKC);
     }
     
-    RECONSTRUCT_LINK_12_SINGLE(mymu, ad_link_nbr_idx, ad_link_sign, linkc);	
+    RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, linkc);	
     if (mu_positive){
 	ADJ_MAT_MUL_HW(linkc, hwe, hwd);
     }else{
@@ -1000,7 +1000,7 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
 	FF_LOAD_MATRIX(linkOdd, mymu, bc_link_nbr_idx, LINKA);	
     }
 
-    RECONSTRUCT_LINK_12_SINGLE(mymu, bc_link_nbr_idx, bc_link_sign, linka);
+    RECONSTRUCT_LINK_12(mymu, bc_link_nbr_idx, bc_link_sign, linka);
     if (mu_positive){    
 	ADJ_MAT_MUL_HW(linka, hwa, hwb);
     }else{
@@ -1012,7 +1012,7 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
 	FF_LOAD_MATRIX(linkOdd, mysig, ab_link_nbr_idx, LINKA);
     }
 
-    RECONSTRUCT_LINK_12_SINGLE(mysig, ab_link_nbr_idx, ab_link_sign, linka);
+    RECONSTRUCT_LINK_12(mysig, ab_link_nbr_idx, ab_link_sign, linka);
     if (sig_positive){        
 	MAT_MUL_HW(linka, hwb, hwc);
     }else{
@@ -1262,7 +1262,7 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
 	LOAD_HW(otherTempx, new_idx, HWA);
 	LOAD_MATRIX(otherLink, OPP_DIR(mu), new_idx, LINKA);
 	FF_COMPUTE_RECONSTRUCT_SIGN(sign, OPP_DIR(mu), new_x1,new_x2,new_x3,new_x4);
-	RECONSTRUCT_LINK_12_SINGLE(OPP_DIR(mu), new_idx, sign, linka);		
+	RECONSTRUCT_LINK_12(OPP_DIR(mu), new_idx, sign, linka);		
 	ADJ_MAT_MUL_HW(linka, hwa, hwc); //Popmu
 	
 	LOAD_HW(myPnumu, sid, HWD);
@@ -1278,7 +1278,7 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
 	LOAD_HW(otherPnumu, new_idx, HWA);
 	LOAD_MATRIX(myLink, OPP_DIR(mu), sid, LINKA);
 	FF_COMPUTE_RECONSTRUCT_SIGN(sign, OPP_DIR(mu), x1, x2, x3, x4);
-	RECONSTRUCT_LINK_12_SINGLE(OPP_DIR(mu), sid, sign, linka);	
+	RECONSTRUCT_LINK_12(OPP_DIR(mu), sid, sign, linka);	
 	MAT_MUL_HW(linka, hwa, hwc);
 	ADD_FORCE_TO_MOM(hwc, hwb, myMom, sid, OPP_DIR(mu), Naik, oddBit);	
     }else{
@@ -1292,7 +1292,7 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
 	LOAD_HW(otherTempx, new_idx, HWA);
 	LOAD_MATRIX(myLink, mu, sid, LINKA);
 	FF_COMPUTE_RECONSTRUCT_SIGN(sign, mu, x1, x2, x3, x4);
-	RECONSTRUCT_LINK_12_SINGLE(mu, sid, sign, linka);
+	RECONSTRUCT_LINK_12(mu, sid, sign, linka);
 	MAT_MUL_HW(linka, hwa, hwb);
 	
 	LOAD_HW(myPnumu, sid, HWC);
