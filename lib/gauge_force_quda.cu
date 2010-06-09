@@ -1,6 +1,291 @@
 
 #include "gauge_force_quda.h"
 
+#define MULT_SU3_NN_TEST(ma, mb) do{				\
+    float fa_re,fa_im, fb_re, fb_im, fc_re, fc_im;		\
+    fa_re =							\
+      ma##00_re * mb##00_re - ma##00_im * mb##00_im +		\
+	    ma##01_re * mb##10_re - ma##01_im * mb##10_im +	\
+	    ma##02_re * mb##20_re - ma##02_im * mb##20_im;	\
+	fa_im =							\
+	    ma##00_re * mb##00_im + ma##00_im * mb##00_re +	\
+	    ma##01_re * mb##10_im + ma##01_im * mb##10_re +	\
+	    ma##02_re * mb##20_im + ma##02_im * mb##20_re;	\
+	fb_re =							\
+	    ma##00_re * mb##01_re - ma##00_im * mb##01_im +	\
+	    ma##01_re * mb##11_re - ma##01_im * mb##11_im +	\
+	    ma##02_re * mb##21_re - ma##02_im * mb##21_im;	\
+	fb_im =							\
+	    ma##00_re * mb##01_im + ma##00_im * mb##01_re +	\
+	    ma##01_re * mb##11_im + ma##01_im * mb##11_re +	\
+	    ma##02_re * mb##21_im + ma##02_im * mb##21_re;	\
+	fc_re =							\
+	    ma##00_re * mb##02_re - ma##00_im * mb##02_im +	\
+	    ma##01_re * mb##12_re - ma##01_im * mb##12_im +	\
+	    ma##02_re * mb##22_re - ma##02_im * mb##22_im;	\
+	fc_im =							\
+	    ma##00_re * mb##02_im + ma##00_im * mb##02_re +	\
+	    ma##01_re * mb##12_im + ma##01_im * mb##12_re +	\
+	    ma##02_re * mb##22_im + ma##02_im * mb##22_re;	\
+	ma##00_re = fa_re;					\
+	ma##00_im = fa_im;					\
+	ma##01_re = fb_re;					\
+	ma##01_im = fb_im;					\
+	ma##02_re = fc_re;					\
+	ma##02_im = fc_im;					\
+	fa_re =							\
+	    ma##10_re * mb##00_re - ma##10_im * mb##00_im +	\
+	    ma##11_re * mb##10_re - ma##11_im * mb##10_im +	\
+	    ma##12_re * mb##20_re - ma##12_im * mb##20_im;	\
+	fa_im =							\
+	    ma##10_re * mb##00_im + ma##10_im * mb##00_re +	\
+	    ma##11_re * mb##10_im + ma##11_im * mb##10_re +	\
+	    ma##12_re * mb##20_im + ma##12_im * mb##20_re;	\
+	fb_re =							\
+	    ma##10_re * mb##01_re - ma##10_im * mb##01_im +	\
+	    ma##11_re * mb##11_re - ma##11_im * mb##11_im +	\
+	    ma##12_re * mb##21_re - ma##12_im * mb##21_im;	\
+	fb_im =							\
+	    ma##10_re * mb##01_im + ma##10_im * mb##01_re +	\
+	    ma##11_re * mb##11_im + ma##11_im * mb##11_re +	\
+	    ma##12_re * mb##21_im + ma##12_im * mb##21_re;	\
+	fc_re =							\
+	    ma##10_re * mb##02_re - ma##10_im * mb##02_im +	\
+	    ma##11_re * mb##12_re - ma##11_im * mb##12_im +	\
+	    ma##12_re * mb##22_re - ma##12_im * mb##22_im;	\
+	fc_im =							\
+	    ma##10_re * mb##02_im + ma##10_im * mb##02_re +	\
+	    ma##11_re * mb##12_im + ma##11_im * mb##12_re +	\
+	    ma##12_re * mb##22_im + ma##12_im * mb##22_re;	\
+	ma##10_re = fa_re;					\
+	ma##10_im = fa_im;					\
+	ma##11_re = fb_re;					\
+	ma##11_im = fb_im;					\
+	ma##12_re = fc_re;					\
+	ma##12_im = fc_im;					\
+	fa_re =							\
+	    ma##20_re * mb##00_re - ma##20_im * mb##00_im +	\
+	    ma##21_re * mb##10_re - ma##21_im * mb##10_im +	\
+	    ma##22_re * mb##20_re - ma##22_im * mb##20_im;	\
+	fa_im =							\
+	    ma##20_re * mb##00_im + ma##20_im * mb##00_re +	\
+	    ma##21_re * mb##10_im + ma##21_im * mb##10_re +	\
+	    ma##22_re * mb##20_im + ma##22_im * mb##20_re;	\
+	fb_re =							\
+	    ma##20_re * mb##01_re - ma##20_im * mb##01_im +	\
+	    ma##21_re * mb##11_re - ma##21_im * mb##11_im +	\
+	    ma##22_re * mb##21_re - ma##22_im * mb##21_im;	\
+	fb_im =							\
+	    ma##20_re * mb##01_im + ma##20_im * mb##01_re +	\
+	    ma##21_re * mb##11_im + ma##21_im * mb##11_re +	\
+	    ma##22_re * mb##21_im + ma##22_im * mb##21_re;	\
+	fc_re =							\
+	    ma##20_re * mb##02_re - ma##20_im * mb##02_im +	\
+	    ma##21_re * mb##12_re - ma##21_im * mb##12_im +	\
+	    ma##22_re * mb##22_re - ma##22_im * mb##22_im;	\
+	fc_im =							\
+	    ma##20_re * mb##02_im + ma##20_im * mb##02_re +	\
+	    ma##21_re * mb##12_im + ma##21_im * mb##12_re +	\
+	    ma##22_re * mb##22_im + ma##22_im * mb##22_re;	\
+	ma##20_re = fa_re;					\
+	ma##20_im = fa_im;					\
+	ma##21_re = fb_re;					\
+	ma##21_im = fb_im;					\
+	ma##22_re = fc_re;					\
+	ma##22_im = fc_im;					\
+    }while(0)
+
+
+#define MULT_SU3_NA_TEST(ma, mb)	do{				\
+	float fa_re, fa_im, fb_re, fb_im, fc_re, fc_im;			\
+	fa_re =								\
+	    ma##00_re * mb##T00_re - ma##00_im * mb##T00_im +		\
+	    ma##01_re * mb##T10_re - ma##01_im * mb##T10_im +		\
+	    ma##02_re * mb##T20_re - ma##02_im * mb##T20_im;		\
+	fa_im =								\
+	    ma##00_re * mb##T00_im + ma##00_im * mb##T00_re +		\
+	    ma##01_re * mb##T10_im + ma##01_im * mb##T10_re +		\
+	    ma##02_re * mb##T20_im + ma##02_im * mb##T20_re;		\
+	fb_re =								\
+	    ma##00_re * mb##T01_re - ma##00_im * mb##T01_im +		\
+	    ma##01_re * mb##T11_re - ma##01_im * mb##T11_im +		\
+	    ma##02_re * mb##T21_re - ma##02_im * mb##T21_im;		\
+	fb_im =								\
+	    ma##00_re * mb##T01_im + ma##00_im * mb##T01_re +		\
+	    ma##01_re * mb##T11_im + ma##01_im * mb##T11_re +		\
+	    ma##02_re * mb##T21_im + ma##02_im * mb##T21_re;		\
+	fc_re =								\
+	    ma##00_re * mb##T02_re - ma##00_im * mb##T02_im +		\
+	    ma##01_re * mb##T12_re - ma##01_im * mb##T12_im +		\
+	    ma##02_re * mb##T22_re - ma##02_im * mb##T22_im;		\
+	fc_im =								\
+	    ma##00_re * mb##T02_im + ma##00_im * mb##T02_re +		\
+	    ma##01_re * mb##T12_im + ma##01_im * mb##T12_re +		\
+	    ma##02_re * mb##T22_im + ma##02_im * mb##T22_re;		\
+	ma##00_re = fa_re;						\
+	ma##00_im = fa_im;						\
+	ma##01_re = fb_re;						\
+	ma##01_im = fb_im;						\
+	ma##02_re = fc_re;						\
+	ma##02_im = fc_im;						\
+	fa_re =								\
+	    ma##10_re * mb##T00_re - ma##10_im * mb##T00_im +		\
+	    ma##11_re * mb##T10_re - ma##11_im * mb##T10_im +		\
+	    ma##12_re * mb##T20_re - ma##12_im * mb##T20_im;		\
+	fa_im =								\
+	    ma##10_re * mb##T00_im + ma##10_im * mb##T00_re +		\
+	    ma##11_re * mb##T10_im + ma##11_im * mb##T10_re +		\
+	    ma##12_re * mb##T20_im + ma##12_im * mb##T20_re;		\
+	fb_re =								\
+	    ma##10_re * mb##T01_re - ma##10_im * mb##T01_im +		\
+	    ma##11_re * mb##T11_re - ma##11_im * mb##T11_im +		\
+	    ma##12_re * mb##T21_re - ma##12_im * mb##T21_im;		\
+	fb_im =								\
+	    ma##10_re * mb##T01_im + ma##10_im * mb##T01_re +		\
+	    ma##11_re * mb##T11_im + ma##11_im * mb##T11_re +		\
+	    ma##12_re * mb##T21_im + ma##12_im * mb##T21_re;		\
+	fc_re =								\
+	    ma##10_re * mb##T02_re - ma##10_im * mb##T02_im +		\
+	    ma##11_re * mb##T12_re - ma##11_im * mb##T12_im +		\
+	    ma##12_re * mb##T22_re - ma##12_im * mb##T22_im;		\
+	fc_im =								\
+	    ma##10_re * mb##T02_im + ma##10_im * mb##T02_re +		\
+	    ma##11_re * mb##T12_im + ma##11_im * mb##T12_re +		\
+	    ma##12_re * mb##T22_im + ma##12_im * mb##T22_re;		\
+	ma##10_re = fa_re;						\
+	ma##10_im = fa_im;						\
+	ma##11_re = fb_re;						\
+	ma##11_im = fb_im;						\
+	ma##12_re = fc_re;						\
+	ma##12_im = fc_im;						\
+	fa_re =								\
+	    ma##20_re * mb##T00_re - ma##20_im * mb##T00_im +		\
+	    ma##21_re * mb##T10_re - ma##21_im * mb##T10_im +		\
+	    ma##22_re * mb##T20_re - ma##22_im * mb##T20_im;		\
+	fa_im =								\
+	    ma##20_re * mb##T00_im + ma##20_im * mb##T00_re +		\
+	    ma##21_re * mb##T10_im + ma##21_im * mb##T10_re +		\
+	    ma##22_re * mb##T20_im + ma##22_im * mb##T20_re;		\
+	fb_re =								\
+	    ma##20_re * mb##T01_re - ma##20_im * mb##T01_im +		\
+	    ma##21_re * mb##T11_re - ma##21_im * mb##T11_im +		\
+	    ma##22_re * mb##T21_re - ma##22_im * mb##T21_im;		\
+	fb_im =								\
+	    ma##20_re * mb##T01_im + ma##20_im * mb##T01_re +		\
+	    ma##21_re * mb##T11_im + ma##21_im * mb##T11_re +		\
+	    ma##22_re * mb##T21_im + ma##22_im * mb##T21_re;		\
+	fc_re =								\
+	    ma##20_re * mb##T02_re - ma##20_im * mb##T02_im +		\
+	    ma##21_re * mb##T12_re - ma##21_im * mb##T12_im +		\
+	    ma##22_re * mb##T22_re - ma##22_im * mb##T22_im;		\
+	fc_im =								\
+	    ma##20_re * mb##T02_im + ma##20_im * mb##T02_re +		\
+	    ma##21_re * mb##T12_im + ma##21_im * mb##T12_re +		\
+	    ma##22_re * mb##T22_im + ma##22_im * mb##T22_re;		\
+	ma##20_re = fa_re;						\
+	ma##20_im = fa_im;						\
+	ma##21_re = fb_re;						\
+	ma##21_im = fb_im;						\
+	ma##22_re = fc_re;						\
+	ma##22_im = fc_im;						\
+    }while(0)
+
+
+
+#define MULT_SU3_AN_TEST(ma, mb)	do{				\
+	float fa_re, fa_im, fb_re, fb_im, fc_re, fc_im;			\
+	fa_re =								\
+	    ma##T00_re * mb##00_re - ma##T00_im * mb##00_im +		\
+	    ma##T01_re * mb##10_re - ma##T01_im * mb##10_im +		\
+	    ma##T02_re * mb##20_re - ma##T02_im * mb##20_im;		\
+	fa_im =								\
+	    ma##T00_re * mb##00_im + ma##T00_im * mb##00_re +		\
+	    ma##T01_re * mb##10_im + ma##T01_im * mb##10_re +		\
+	    ma##T02_re * mb##20_im + ma##T02_im * mb##20_re;		\
+	fb_re =								\
+	    ma##T10_re * mb##00_re - ma##T10_im * mb##00_im +		\
+	    ma##T11_re * mb##10_re - ma##T11_im * mb##10_im +		\
+	    ma##T12_re * mb##20_re - ma##T12_im * mb##20_im;		\
+	fb_im =								\
+	    ma##T10_re * mb##00_im + ma##T10_im * mb##00_re +		\
+	    ma##T11_re * mb##10_im + ma##T11_im * mb##10_re +		\
+	    ma##T12_re * mb##20_im + ma##T12_im * mb##20_re;		\
+	fc_re =								\
+	    ma##T20_re * mb##00_re - ma##T20_im * mb##00_im +		\
+	    ma##T21_re * mb##10_re - ma##T21_im * mb##10_im +		\
+	    ma##T22_re * mb##20_re - ma##T22_im * mb##20_im;		\
+	fc_im =								\
+	    ma##T20_re * mb##00_im + ma##T20_im * mb##00_re +		\
+	    ma##T21_re * mb##10_im + ma##T21_im * mb##10_re +		\
+	    ma##T22_re * mb##20_im + ma##T22_im * mb##20_re;		\
+	mb##00_re = fa_re;						\
+	mb##00_im = fa_im;						\
+	mb##10_re = fb_re;						\
+	mb##10_im = fb_im;						\
+	mb##20_re = fc_re;						\
+	mb##20_im = fc_im;						\
+	fa_re =								\
+	    ma##T00_re * mb##01_re - ma##T00_im * mb##01_im +		\
+	    ma##T01_re * mb##11_re - ma##T01_im * mb##11_im +		\
+	    ma##T02_re * mb##21_re - ma##T02_im * mb##21_im;		\
+	fa_im =								\
+	    ma##T00_re * mb##01_im + ma##T00_im * mb##01_re +		\
+	    ma##T01_re * mb##11_im + ma##T01_im * mb##11_re +		\
+	    ma##T02_re * mb##21_im + ma##T02_im * mb##21_re;		\
+	fb_re =								\
+	    ma##T10_re * mb##01_re - ma##T10_im * mb##01_im +		\
+	    ma##T11_re * mb##11_re - ma##T11_im * mb##11_im +		\
+	    ma##T12_re * mb##21_re - ma##T12_im * mb##21_im;		\
+	fb_im =								\
+	    ma##T10_re * mb##01_im + ma##T10_im * mb##01_re +		\
+	    ma##T11_re * mb##11_im + ma##T11_im * mb##11_re +		\
+	    ma##T12_re * mb##21_im + ma##T12_im * mb##21_re;		\
+	fc_re =								\
+	    ma##T20_re * mb##01_re - ma##T20_im * mb##01_im +		\
+	    ma##T21_re * mb##11_re - ma##T21_im * mb##11_im +		\
+	    ma##T22_re * mb##21_re - ma##T22_im * mb##21_im;		\
+	fc_im =								\
+	    ma##T20_re * mb##01_im + ma##T20_im * mb##01_re +		\
+	    ma##T21_re * mb##11_im + ma##T21_im * mb##11_re +		\
+	    ma##T22_re * mb##21_im + ma##T22_im * mb##21_re;		\
+	mb##01_re = fa_re;						\
+	mb##01_im = fa_im;						\
+	mb##11_re = fb_re;						\
+	mb##11_im = fb_im;						\
+	mb##21_re = fc_re;						\
+	mb##21_im = fc_im;						\
+	fa_re =								\
+	    ma##T00_re * mb##02_re - ma##T00_im * mb##02_im +		\
+	    ma##T01_re * mb##12_re - ma##T01_im * mb##12_im +		\
+	    ma##T02_re * mb##22_re - ma##T02_im * mb##22_im;		\
+	fa_im =								\
+	    ma##T00_re * mb##02_im + ma##T00_im * mb##02_re +		\
+	    ma##T01_re * mb##12_im + ma##T01_im * mb##12_re +		\
+	    ma##T02_re * mb##22_im + ma##T02_im * mb##22_re;		\
+	fb_re =								\
+	    ma##T10_re * mb##02_re - ma##T10_im * mb##02_im +		\
+	    ma##T11_re * mb##12_re - ma##T11_im * mb##12_im +		\
+	    ma##T12_re * mb##22_re - ma##T12_im * mb##22_im;		\
+	fb_im =								\
+	    ma##T10_re * mb##02_im + ma##T10_im * mb##02_re +		\
+	    ma##T11_re * mb##12_im + ma##T11_im * mb##12_re +		\
+	    ma##T12_re * mb##22_im + ma##T12_im * mb##22_re;		\
+	fc_re =								\
+	    ma##T20_re * mb##02_re - ma##T20_im * mb##02_im +		\
+	    ma##T21_re * mb##12_re - ma##T21_im * mb##12_im +		\
+	    ma##T22_re * mb##22_re - ma##T22_im * mb##22_im;		\
+	fc_im =								\
+	    ma##T20_re * mb##02_im + ma##T20_im * mb##02_re +		\
+	    ma##T21_re * mb##12_im + ma##T21_im * mb##12_re +		\
+	    ma##T22_re * mb##22_im + ma##T22_im * mb##22_re;		\
+	mb##02_re = fa_re;						\
+	mb##02_im = fa_im;						\
+	mb##12_re = fb_re;						\
+	mb##12_im = fb_im;						\
+	mb##22_re = fc_re;						\
+	mb##22_im = fc_im;						\
+    }while(0)
+
 
 #define GF_SITE_MATRIX_LOAD_TEX 1
 
@@ -210,7 +495,7 @@ parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
 	    GF_COMPUTE_RECONSTRUCT_SIGN(sign, lnkdir, new_x1, new_x2, new_x3, new_x4);
 	    RECONSTRUCT_MATRIX(lnkdir, nbr_idx, sign, linkb);
 	    if (GOES_FORWARDS(pathj)){
-		MULT_SU3_NN_TEST(linka, linkb);
+	      MULT_SU3_NN_TEST(linka, linkb);
 		
 		COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(pathj, new_mem_idx);
 		nbr_oddbit = nbr_oddbit^1;
