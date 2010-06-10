@@ -12,6 +12,7 @@ extern "C" {
   int dslashCudaSharedBytes(QudaPrecision spinor_prec, int blockDim);
 
   void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride);
+  void initCommonConstants(FullGauge gauge);
 
   // plain wilson
   

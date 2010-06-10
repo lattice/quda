@@ -213,7 +213,7 @@
 
 
 void
-llfat_init_cuda(QudaGaugeParam* param, void* act_path_coeff)
+llfat_init_cuda(QudaGaugeParam* param)
 {
   static int llfat_init_cuda_flag = 0;
   if (llfat_init_cuda_flag){

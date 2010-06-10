@@ -53,9 +53,9 @@ void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cud
 void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			 const int parity, const QudaDagType dagger) {
 
-    if (!initDslash) {
-	initDslashConstants(*fatGauge, in.Stride(), 0);
-    }
+  if (!initDslash) {
+    initDslashConstants(*fatGauge, in.Stride(), 0);
+  }
     checkParitySpinor(in, out);
     
     staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, 

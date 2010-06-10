@@ -10,7 +10,7 @@ extern "C"{
 		    FullGauge cudaFatLink, FullGauge cudaSiteLink, 
 		    FullStaple cudaStaple, FullStaple cudaStaple1,
 		    QudaGaugeParam* param, double* act_path_coeff);
-    void llfat_init_cuda(QudaGaugeParam* param, void* act_path_coeff);
+    void llfat_init_cuda(QudaGaugeParam* param);
     
 #ifdef __cplusplus
 }

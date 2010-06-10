@@ -107,7 +107,7 @@ llfat_init(void)
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   createLinkQuda(&cudaFatLink, &gaugeParam);
         
-  initDslashConstants(cudaSiteLink, Vh, Vh);
+  initDslashConstants(cudaSiteLink, 0, 0);
     
   return;
 }
@@ -154,12 +154,7 @@ llfat_test(void)
     llfat_reference(refLink, siteLink, gaugeParam.cpu_prec, act_path_coeff);
   }
   
- if(gaugeParam.cuda_prec == QUDA_DOUBLE_PRECISION){
-   act_path_coeff = act_path_coeff_2;
- }else{
-   act_path_coeff = act_path_coeff_1;
-  }
- llfat_init_cuda(&gaugeParam, act_path_coeff); 
+ llfat_init_cuda(&gaugeParam); 
 
   //The number comes from CPU implementation in MILC, fermion_links_helpers.c    
   int flops= 61632; 
