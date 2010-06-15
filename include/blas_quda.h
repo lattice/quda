@@ -8,11 +8,13 @@
 extern "C" {
 #endif
 
+#if (CUDA_VERSION < 3000)
   typedef struct double3_s {
     double x;
     double y;
     double z;
   } double3;
+#endif
 
   // ---------- blas_quda.cu ----------
   

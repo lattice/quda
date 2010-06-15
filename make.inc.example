@@ -15,6 +15,11 @@ BUILD_3D = false    # set to 'true' to build 3D Dslash
 
 INC = -I$(CUDA_INSTALL_PATH)/include
 
+CUDA_VERSION = $(shell awk '/\#define CUDA_VERSION/{print $$3}' \
+                           $(CUDA_INSTALL_PATH)/include/cuda.h)
+OPT = -DCUDA_VERSION=$(CUDA_VERSION)
+OPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
+
 ifeq ($(strip $(CPU_ARCH)), x86_64)
   LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart # for release 2.3 and later
   # LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart # for release 2.2 and earlier
@@ -30,9 +35,11 @@ ifeq ($(strip $(GPU_EMU)), true)
 endif
 
 ifeq ($(strip $(BUILD_3D)), true)
-  COPT += -DBUILD_3D_DSLASH
-  NVCCOPT += -DBUILD_3D_DSLASH
+  OPT += -DBUILD_3D_DSLASH
 endif
+
+COPT += $(OPT)
+NVCCOPT += $(OPT)
 
 CC = gcc
 CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
