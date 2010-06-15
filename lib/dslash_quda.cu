@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -33,6 +34,26 @@
 #include <dslash_staggered_def.h> // kernels for staggered kernels
 
 #include <blas_quda.h>
+
+// do nothing
+__global__ void dummyKernel() {
+
+}
+
+void initCache() {
+
+#if (__CUDA_ARCH__ >= 200)
+
+  static int firsttime = 1;
+  if (firsttime){	
+    cudaFuncSetCacheConfig(dummyKernel, cudaFuncCachePreferL1);
+    dummyKernel<<<1,1>>>();
+    firsttime=0;
+  }
+
+#endif
+
+}
 
 int dslashCudaSharedBytes(QudaPrecision precision) {
   return BLOCK_DIM*SHARED_FLOATS_PER_THREAD*precision;
@@ -96,13 +117,6 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-  /*
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    cudaFuncSetCacheConfig(dslash12Kernel, cudaFuncCachePreferL1);  
-  } else {
-    cudaFuncSetCacheConfig(dslash12Kernel, cudaFuncCachePreferShared);  
-    }*/
 
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");

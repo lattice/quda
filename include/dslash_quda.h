@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+  void initCache();
+
   extern int initDslash;
 
   int dslashCudaSharedBytes(QudaPrecision spinor_prec, int blockDim);

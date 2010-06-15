@@ -80,6 +80,7 @@ void initQuda(int dev)
 
   fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
   cudaSetDevice(dev);
+  initCache();
 
   cudaGaugePrecise.even = NULL;
   cudaGaugePrecise.odd = NULL;
