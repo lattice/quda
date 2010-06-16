@@ -49,8 +49,8 @@ int dslashCudaSharedBytes(Precision precision) {
 static int initDslash = 0;
 static int gridVolume;
 
-const int Nstream = 3;
-cudaStream_t streams[Nstream];
+static const int Nstream = 3;
+static cudaStream_t streams[Nstream];
 
 int4 *h_multi = 0;
 

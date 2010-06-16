@@ -44,13 +44,13 @@ int main(int argc, char **argv)
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec = QUDA_HALF_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  gauge_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  gauge_param.cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
+  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
@@ -70,8 +70,8 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = QUDA_SINGLE_PRECISION;
-  inv_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  inv_param.cuda_prec = gauge_param.cuda_prec;
+  inv_param.cuda_prec_sloppy = gauge_param.cuda_prec_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -81,8 +81,8 @@ int main(int argc, char **argv)
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-    inv_param.clover_cuda_prec = QUDA_SINGLE_PRECISION;
-    inv_param.clover_cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+    inv_param.clover_cuda_prec = gauge_param.cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = gauge_param.cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;

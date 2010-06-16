@@ -1,9 +1,6 @@
 ###### Local configuration:
-# CUDA_INSTALL_PATH = /usr/local/cuda-3.0
-# CUDA_VERSION = 3000
 
 CUDA_INSTALL_PATH = /usr/local/cuda
-CUDA_VERSION = 2300
 
 CPU_ARCH = x86_64   # x86 or x86_64
 GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, or sm_13
@@ -12,29 +9,33 @@ GPU_EMU  = false    # set to 'true' for device emulation
 PYTHON = python     # python 2.5 or later required for 'make gen'
 DEVICE = 0          # CUDA device to use for 'make tune'
 
-BUILD_QMP = true    # whether to build the QMP multi-GPU code or not
-OVERLAP_COMMS = true # set to true for overalpping comms and compute
+BUILD_3D = false      # set to 'true' to build 3D Dslash
+BUILD_QMP = true      # set to 'true' to build the QMP multi-GPU code
+OVERLAP_COMMS = true  # set to 'true' to overlap comms and compute
 
-BUILD_3D = false    # set to 'true' to build 3D Dslash
-
-FECC = gcc	    # Front end CC
-FECXX = g++         # Front end CXX
+FECC = gcc	      # Front end CC
+FECXX = g++           # Front end CXX
 
 OMPI_HOME=/usr/mpi/gcc/openmpi-1.3.2
-# OMPI_HOME=/usr/local/openmpi
+QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
+#OMPI_HOME=/usr/lib64/openmpi/1.3.2-gcc
+#QMP_HOME=/home/rbabich/lqcd/install/qmp
+#QMP_HOME=/home/mikec/install
+
+######
 
 MPICC=$(OMPI_HOME)/bin/mpicc
 MPICXX=$(OMPI_HOME)/bin/mpicxx
-
-QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
-# QMP_HOME=/home/mikec/install
 QMP_CFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --cflags)
 QMP_LDFLAGS=$(shell $(QMP_HOME)/bin/qmp-config --ldflags)
 QMP_LIBS=$(shell $(QMP_HOME)/bin/qmp-config --libs)
 
-######
-RUN = $(OMPI_HOME)/bin/mpirun -n 1 
 INC = -I$(CUDA_INSTALL_PATH)/include
+
+CUDA_VERSION = $(shell awk '/\#define CUDA_VERSION/{print $$3}' \
+                           $(CUDA_INSTALL_PATH)/include/cuda.h)
+OPT = -DCUDA_VERSION=$(CUDA_VERSION)
+OPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
 
 ifeq ($(strip $(CPU_ARCH)), x86_64)
   LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart # for release 2.3 and later
@@ -45,39 +46,24 @@ else
   COPT = -malign-double
 endif
 
-ifeq ($(strip $(GPU_ARCH)), sm_13)
-  COPT += -D__CUDA_ARCH__=130
-  NVCCOPT += -D__CUDA_ARCH__=130
-else
-  ifeq ($(strip $(GPU_ARCH)), sm_12)
-    COPT += -D__CUDA_ARCH__=120
-    NCCOPT += -D__CUDA_ARCH__=120
-  else
-    COPT += -D__CUDA_ARCH__=100
-    NVCCOPT += -D__CUDA_ARCH__=100
-  endif
-endif
-
-COPT += -DCUDA_VERSION=$(CUDA_VERSION)
-NVCCOPT += -DCUDA_VERSION=$(CUDA_VERSION)
-
 ifeq ($(strip $(GPU_EMU)), true)
   COPT += -D__DEVICE_EMULATION__
   NVCCOPT = -deviceemu
 endif
 
 ifeq ($(strip $(BUILD_3D)), true)
-  COPT += -DBUILD_3D_DSLASH
-  NVCCOPT += -DBUILD_3D_DSLASH
+  OPT += -DBUILD_3D_DSLASH
 endif
 
 ifeq ($(strip $(OVERLAP_COMMS)), true)
-  COPT += -DOVERLAP_COMMS
-  NVCCOPT += -DOVERLAP_COMMS
+  OPT += -DOVERLAP_COMMS
 endif
 
+COPT += $(OPT)
+NVCCOPT += $(OPT)
+
 ifeq ($(strip $(BUILD_QMP)), true)
-  RUN = $(OMPI_HOME)/bin/mpirun -n 1
+  RUN = $(OMPI_HOME)/bin/mpirun -np 1
   CC = $(MPICC)
   CXX = $(MPICXX)
   INC += -DQMP_COMMS $(QMP_CFLAGS)
