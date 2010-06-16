@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -36,7 +37,27 @@ unsigned long long dslash_quda_bytes;
 
 #include <clover_def.h> // kernels for applying the clover term alone
 
-int dslashCudaSharedBytes(Precision precision) {
+// do nothing
+__global__ void dummyKernel() {
+
+}
+
+void initCache() {
+
+#if (__CUDA_ARCH__ >= 200)
+
+  static int firsttime = 1;
+  if (firsttime){	
+    cudaFuncSetCacheConfig(dummyKernel, cudaFuncCachePreferL1);
+    dummyKernel<<<1,1>>>();
+    firsttime=0;
+  }
+
+#endif
+
+}
+
+int dslashCudaSharedBytes(QudaPrecision precision) {
   return BLOCK_DIM*SHARED_FLOATS_PER_THREAD*precision;
 }
 

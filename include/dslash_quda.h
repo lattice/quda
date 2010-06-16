@@ -10,6 +10,7 @@ extern "C" {
   extern unsigned long long dslash_quda_flops;
   extern unsigned long long dslash_quda_bytes;
 
+  void initCache(void);
   int dslashCudaSharedBytes(Precision spinor_prec, int blockDim);
 
   // Double precision routines
