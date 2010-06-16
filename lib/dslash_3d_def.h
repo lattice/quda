@@ -159,7 +159,7 @@
 #define DD3D_CPREC_F
 #endif
 
-#if !(__CUDA_ARCH__ != 130 && (DD3D_SPREC == 0 || DD3D_GPREC == 0 || DD3D_CPREC == 0))
+#if !(__CUDA_ARCH__ < 130 && (DD3D_SPREC == 0 || DD3D_GPREC == 0 || DD3D_CPREC == 0))
 
 #define DD3D_CONCAT(g,s,c,r,d,x) dslash3D ## g ## s ## c ## r ## d ## x ## Kernel
 #define DD3D_FUNC(g,s,c,r,d,x) DD3D_CONCAT(g,s,c,r,d,x)
