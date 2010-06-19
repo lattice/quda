@@ -163,7 +163,7 @@
 #define DD_CPREC_F
 #endif
 
-#if !(__CUDA_ARCH__ != 130 && (DD_SPREC == 0 || DD_GPREC == 0 || DD_CPREC == 0))
+#if !(__CUDA_ARCH__ < 130 && (DD_SPREC == 0 || DD_GPREC == 0 || DD_CPREC == 0))
 
 #define DD_CONCAT(g,s,c,r,d,x) dslash ## g ## s ## c ## r ## d ## x ## Kernel
 #define DD_FUNC(g,s,c,r,d,x) DD_CONCAT(g,s,c,r,d,x)

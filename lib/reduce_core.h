@@ -33,12 +33,13 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
   if (tid < 32) 
 #endif
     {
-      if (reduce_threads >=  64) { DSACC(s[0],s[1],s[64+0],s[64+1]); EMUSYNC; }
-      if (reduce_threads >=  32) { DSACC(s[0],s[1],s[32+0],s[32+1]); EMUSYNC; }
-      if (reduce_threads >=  16) { DSACC(s[0],s[1],s[16+0],s[16+1]); EMUSYNC; }
-      if (reduce_threads >=   8) { DSACC(s[0],s[1], s[8+0], s[8+1]); EMUSYNC; }
-      if (reduce_threads >=   4) { DSACC(s[0],s[1], s[4+0], s[4+1]); EMUSYNC; }
-      if (reduce_threads >=   2) { DSACC(s[0],s[1], s[2+0], s[2+1]); EMUSYNC; }
+      volatile QudaSumFloat *sv = s;
+      if (reduce_threads >=  64) { DSACC(sv[0],sv[1],sv[64+0],sv[64+1]); EMUSYNC; }
+      if (reduce_threads >=  32) { DSACC(sv[0],sv[1],sv[32+0],sv[32+1]); EMUSYNC; }
+      if (reduce_threads >=  16) { DSACC(sv[0],sv[1],sv[16+0],sv[16+1]); EMUSYNC; }
+      if (reduce_threads >=   8) { DSACC(sv[0],sv[1], sv[8+0], sv[8+1]); EMUSYNC; }
+      if (reduce_threads >=   4) { DSACC(sv[0],sv[1], sv[4+0], sv[4+1]); EMUSYNC; }
+      if (reduce_threads >=   2) { DSACC(sv[0],sv[1], sv[2+0], sv[2+1]); EMUSYNC; }
     }
   
   // write result for this block to global mem as single float
@@ -75,12 +76,13 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
   if (tid < 32)
 #endif
     {
-      if (reduce_threads >=  64) { s[0] += s[32]; EMUSYNC; }
-      if (reduce_threads >=  32) { s[0] += s[16]; EMUSYNC; }
-      if (reduce_threads >=  16) { s[0] += s[ 8]; EMUSYNC; }
-      if (reduce_threads >=   8) { s[0] += s[ 4]; EMUSYNC; }
-      if (reduce_threads >=   4) { s[0] += s[ 2]; EMUSYNC; }
-      if (reduce_threads >=   2) { s[0] += s[ 1]; EMUSYNC; }
+      volatile QudaSumFloat *sv = s;
+      if (reduce_threads >=  64) { sv[0] += sv[32]; EMUSYNC; }
+      if (reduce_threads >=  32) { sv[0] += sv[16]; EMUSYNC; }
+      if (reduce_threads >=  16) { sv[0] += sv[ 8]; EMUSYNC; }
+      if (reduce_threads >=   8) { sv[0] += sv[ 4]; EMUSYNC; }
+      if (reduce_threads >=   4) { sv[0] += sv[ 2]; EMUSYNC; }
+      if (reduce_threads >=   2) { sv[0] += sv[ 1]; EMUSYNC; }
     }
   
   // write result for this block to global mem 

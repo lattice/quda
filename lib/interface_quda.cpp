@@ -130,6 +130,7 @@ void initQuda(int dev)
 #endif
 
   cudaSetDevice(dev);
+  initCache();
 
   //cudaSetDeviceFlags(0);
 

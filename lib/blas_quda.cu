@@ -4,12 +4,12 @@
 #include <quda_internal.h>
 #include <blas_quda.h>
 
-#define REDUCE_MAX_BLOCKS 4096
+#define REDUCE_MAX_BLOCKS 16384
 
 #define REDUCE_DOUBLE 64
 #define REDUCE_KAHAN 32
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
 #define REDUCE_TYPE REDUCE_DOUBLE
 #define QudaSumFloat double
 #define QudaSumComplex cuDoubleComplex
@@ -180,7 +180,7 @@ void setBlock(int kernel, int length, QudaPrecision precision)
   blasGrid.z = 1;
 }
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
 static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 {
   int4 v = tex1Dfetch(t,i);
@@ -367,7 +367,7 @@ __device__ float fast_abs_max(float4 a) {
   Y.x += X.x; Y.y += X.y; Y.z += X.z; Y.w += X.w;
 
 #define XMY_FLOAT4(X, Y)		     \
-  Y.x = X.x - Y.x; Y.y = X.y - X.y; Y.z = X.z - Y.z; Y.w = X.w - Y.w;
+  Y.x = X.x - Y.x; Y.y = X.y - Y.y; Y.z = X.z - Y.z; Y.w = X.w - Y.w;
 
 #define MXPY_FLOAT4(X, Y)		     \
   Y.x -= X.x; Y.y -= X.y; Y.z -= X.z; Y.w -= X.w;

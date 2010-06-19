@@ -77,7 +77,7 @@
 
 // define the kernel
 
-#if !(__CUDA_ARCH__ != 130 && (DD_SPREC == 0 || DD_CPREC == 0))
+#if !(__CUDA_ARCH__ < 130 && (DD_SPREC == 0 || DD_CPREC == 0))
 
 __global__ void
 DD_FUNC(DD_SPREC_F, DD_CPREC_F, DD_XPAY_F)(DD_PARAM1, DD_PARAM2) {

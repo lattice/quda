@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.2.2                         16 February 2009
+Release Notes for QUDA v0.2.4                             XX June 2010
 -----------------------------
 
 Overview:
@@ -16,13 +16,15 @@ BiCGstab are provided, with support for double, single, and half
 
 Software compatibility:
 
-The library has been tested under Linux (CentOS 5.3 and Ubuntu 8.04)
-using release 2.3 of the CUDA toolkit.  There are known issues with
-releases 2.1 and 2.2, but 2.0 should work if one is forced to use an
-older version (for compatibility with an old driver, for example).
+The library has been tested under Linux (CentOS 5.4 and Ubuntu 8.04)
+using releases 2.3 and 3.0 of the CUDA toolkit.  There are known
+issues with CUDA 2.1 and 2.2, but 2.0 should work if one is forced to
+use an older version (for compatibility with an old driver, for
+example).
 
-Under Mac OS X, the library fails to compile due to bugs in CUDA 2.3.
-It might work with CUDA 2.2 or 2.0, but this hasn't been tested.
+Under Mac OS X, the library fails to compile with CUDA 2.3 due to bugs
+in the toolkit.  It might work with CUDA 3.0, 2.2, or 2.0, but these
+haven't been tested.
 
 
 Hardware compatibility:
@@ -34,8 +36,8 @@ http://www.nvidia.com/object/cuda_learn_products.html
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and set GPU_ARCH in
-make.inc appropriately.  Setting 'GPU_ARCH = sm_13' will enable double
-precision support.
+make.inc appropriately.  Setting GPU_ARCH to 'sm_13' or 'sm_20' will
+enable double precision support.
 
 
 Installation:
@@ -74,13 +76,13 @@ include/enum_quda.h.
 
 Known issues:
 
-* When building for the 'sm_13' GPU architecture (which enables double
-  precision support), one of the stages in the build process requires
-  over 5 GB of memory.  If too little memory is available, the
-  compilation will either take a very long time (given enough swap
-  space) or fail completely.  In addition, the CUDA C compiler
-  requires over 1 GB of disk space in /tmp for the creation of
-  temporary files.
+* When building for the 'sm_13' or 'sm_20' GPU architectures (which
+  enable double precision support), one of the stages in the build
+  process requires over 5 GB of memory.  If too little memory is
+  available, the compilation will either take a very long time (given
+  enough swap space) or fail completely.  In addition, the CUDA C
+  compiler requires over 1 GB of disk space in /tmp for the creation
+  of temporary files.
 
 * For compatibility with CUDA, on 32-bit platforms the library is
   compiled with the GCC option -malign-double.  This differs from the

@@ -20,10 +20,10 @@ ParitySpinor x, y, z, w, v, p;
 
 int nIters;
 
-int Nthreads = 3;
-int Ngrids = 7;
-int blockSizes[] = {64, 128, 256};
-int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096};
+int Nthreads = 5;
+int Ngrids = 9;
+int blockSizes[] = {64, 128, 256, 512, 1024};
+int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384};
 
 int prec;
 
@@ -325,7 +325,7 @@ int main(int argc, char** argv)
 
       if (threads_max == 0) errorQuda("Autotuning failed for %s kernel", names[i]);
       
-      printf("%-36s Performance maximum at %d threads per block, %d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
+      printf("%-32s: %d threads per block, %d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
 	     names[i], threads_max, blocks_max, gflops_max, gbytes_max);
 
       threads[i][prec] = threads_max;

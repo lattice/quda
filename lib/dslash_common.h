@@ -7,7 +7,7 @@ static void checkSpinor(ParitySpinor out, ParitySpinor in) {
     errorQuda("Input and output spinor strides don't match in dslash_quda");
   }
 
-#if (__CUDA_ARCH__ != 130)
+#if (__CUDA_ARCH__ < 130)
   if (in.precision == QUDA_DOUBLE_PRECISION) {
     errorQuda("Double precision not supported on this GPU");
   }
@@ -19,7 +19,7 @@ static void checkGaugeSpinor(ParitySpinor spinor, FullGauge gauge) {
     errorQuda("Spinor volume %d doesn't match gauge volume %d", spinor.volume, gauge.volume);
   }
 
-#if (__CUDA_ARCH__ != 130)
+#if (__CUDA_ARCH__ < 130)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     errorQuda("Double precision not supported on this GPU");
   }
@@ -36,7 +36,7 @@ static void checkCloverSpinor(ParitySpinor spinor, FullClover clover) {
 	      spinor.volume, clover.odd.volume);
   }
 
-#if (__CUDA_ARCH__ != 130)
+#if (__CUDA_ARCH__ < 130)
   if ((clover.even.precision == QUDA_DOUBLE_PRECISION) ||
       (clover.odd.precision == QUDA_DOUBLE_PRECISION)) {
     errorQuda("Double precision not supported on this GPU");

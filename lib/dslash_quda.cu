@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -40,7 +41,27 @@ int4 param;
 
 #include <clover_def.h> // kernels for applying the clover term alone
 
-int dslashCudaSharedBytes(Precision precision) {
+// do nothing
+__global__ void dummyKernel() {
+
+}
+
+void initCache() {
+
+#if (__CUDA_ARCH__ >= 200)
+
+  static int firsttime = 1;
+  if (firsttime){	
+    cudaFuncSetCacheConfig(dummyKernel, cudaFuncCachePreferL1);
+    dummyKernel<<<1,1>>>();
+    firsttime=0;
+  }
+
+#endif
+
+}
+
+int dslashCudaSharedBytes(QudaPrecision precision) {
   return BLOCK_DIM*SHARED_FLOATS_PER_THREAD*precision;
 }
 
@@ -349,8 +370,9 @@ void dslashDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   dim3 gridDim(gridVolume, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-#if (__CUDA_ARCH__ == 130)
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
+
+#if (__CUDA_ARCH__ >= 130)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
@@ -410,7 +432,7 @@ void dslashSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
 	dslashDS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, param);
@@ -469,7 +491,7 @@ void dslashHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
 	dslashDH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, param);
@@ -596,7 +618,7 @@ void dslashXpayDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
@@ -659,7 +681,7 @@ void dslashXpaySCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
 	dslashDS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, param, a);
@@ -721,7 +743,7 @@ void dslashXpayHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
 	dslashDH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
@@ -920,7 +942,7 @@ void cloverDslashDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1079,7 +1101,7 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
@@ -1128,7 +1150,7 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDSS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, param);
@@ -1176,7 +1198,7 @@ void cloverDslashSCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     }
   } else {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDSH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, param);
@@ -1244,7 +1266,7 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
@@ -1293,7 +1315,7 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDHS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, param);
@@ -1341,7 +1363,7 @@ void cloverDslashHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverInv,
     }
   } else {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDHH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, param);
@@ -1477,7 +1499,7 @@ void cloverDslashXpayDCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
@@ -1635,7 +1657,7 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
@@ -1684,7 +1706,7 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDSS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, param, a);
@@ -1732,7 +1754,7 @@ void cloverDslashXpaySCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     }
   } else {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDSH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, param, a);
@@ -1800,7 +1822,7 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
@@ -1861,7 +1883,7 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
 #endif
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDHS12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
@@ -1921,7 +1943,7 @@ void cloverDslashXpayHCuda(ParitySpinor res, FullGauge gauge, FullClover cloverI
     }
   } else {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
       if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!daggerBit) {
 	  dslashDHH12XpayKernel <<<gridDim, blockDim, shared_bytes, *stream>>> 
@@ -2102,7 +2124,7 @@ void cloverDCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
     cloverDDKernel <<<gridDim, blockDim, shared_bytes>>> ((double2 *)res.spinor, param);
   } else if (clover_prec == QUDA_SINGLE_PRECISION) {
@@ -2136,7 +2158,7 @@ void cloverSCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     cloverSDKernel <<<gridDim, blockDim, shared_bytes>>> ((float4 *)res.spinor, param);
 #else
     errorQuda("Double precision not supported on this GPU");
@@ -2171,7 +2193,7 @@ void cloverHCuda(ParitySpinor res, FullGauge gauge, FullClover clover,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (clover_prec == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     cloverHDKernel <<<gridDim, blockDim, shared_bytes>>> ((short4 *)res.spinor, (float *)res.spinorNorm, param);
 #else
     errorQuda("Double precision not supported on this GPU");
@@ -2198,7 +2220,7 @@ void dslash3DDCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(double);
 
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
@@ -2260,7 +2282,7 @@ void dslash3DSCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
 	dslash3DDS12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((float4 *)res.spinor, oddBit);
@@ -2323,7 +2345,7 @@ void dslash3DHCuda(ParitySpinor res, FullGauge gauge, ParitySpinor spinor,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*sizeof(float);
 
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ == 130)
+#if (__CUDA_ARCH__ >= 130)
     if (gauge.reconstruct == QUDA_RECONSTRUCT_12) {
       if (!daggerBit) {
 	dslash3DDH12Kernel <<<gridDim, blockDim, shared_bytes, *stream>>> ((short4*)res.spinor, (float*)res.spinorNorm, oddBit);
