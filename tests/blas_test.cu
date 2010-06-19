@@ -15,10 +15,10 @@ ParitySpinor x, y, z, w, v, p;
 
 int nIters;
 
-int Nthreads = 3;
-int Ngrids = 7;
-int blockSizes[] = {64, 128, 256};
-int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096};
+int Nthreads = 5;
+int Ngrids = 9;
+int blockSizes[] = {64, 128, 256, 512, 1024};
+int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384};
 
 int prec;
 
