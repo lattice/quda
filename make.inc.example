@@ -59,6 +59,10 @@ ifeq ($(strip $(OVERLAP_COMMS)), true)
   OPT += -DOVERLAP_COMMS
 endif
 
+ifeq ($(strip $(GPU_ARCH)), sm_20)
+  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
+endif
+
 COPT += $(OPT)
 NVCCOPT += $(OPT)
 

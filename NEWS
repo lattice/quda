@@ -1,3 +1,10 @@
+Version 0.2.4
+
+- Added initial support for CUDA 3.0 and Fermi (not yet optimized).
+
+- Introduced additional checks to increase stability of the BiCGstab
+  inverter.
+
 
 Version 0.2.3 - 2 June 2010
  
