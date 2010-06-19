@@ -6,7 +6,7 @@
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 
-#define REDUCE_MAX_BLOCKS 16184
+#define REDUCE_MAX_BLOCKS 16384
 
 #define REDUCE_DOUBLE 64
 #define REDUCE_KAHAN 32
