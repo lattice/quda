@@ -98,7 +98,9 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     } else {
       alpha_omega = cuCdiv(alpha, omega);
       rho_rho0 = cuCdiv(rho, rho0);
-      beta = cuCmul(rho_rho0, alpha_omega);
+
+      if (cuCabs(cuCmul(rho, alpha)) == 0.0) beta = make_cuDoubleComplex(0.0, 0.0);
+      else beta = cuCmul(rho_rho0, alpha_omega);
       
       // p = r - beta*omega*v + beta*(p)
       beta_omega = cuCmul(beta, omega); beta_omega.x *= -1.0; beta_omega.y *= -1.0;
@@ -110,8 +112,11 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     // rv = (r0,v)
     rv = cDotProductCuda(r0, v);    
 
-    alpha = cuCdiv(rho, rv);
-    
+    if (cuCabs(rho) == 0.0) alpha = make_cuDoubleComplex(0.0, 0.0);
+    else alpha = cuCdiv(rho, rv);
+
+    //printf("rho %e %e rv %e %e\n", rho.x, rho.y, rv.x, rv.y);
+
     // r -= alpha*v
     alpha.x *= -1.0; alpha.y *= -1.0;
     caxpyCuda(alpha, v, r_sloppy); // 4
@@ -122,10 +127,14 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, r_sloppy); // 6
     omega.x = omega_t2.x / omega_t2.z; omega.y = omega_t2.y/omega_t2.z;
-    
+
     //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
     rho_r2 = caxpbypzYmbwcDotProductWYNormYQuda(alpha, p, omega, r_sloppy, x_sloppy, t, r0);
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
+
+    //double2 mup= cDotProductCuda(r0, rSloppy);
+    //printf("test %e %e %e %e\n", mup.x, mup.y, norm2(r0), norm2(rSloppy));
+    //printf("rho = %e %e %e %e %e\n", rho0.x, rho0.y, rho.x, rho.y, r2);
 
     // reliable updates
     rNorm = sqrt(r2);
@@ -154,7 +163,8 @@ void invertBiCGstabCuda(ParitySpinor x, ParitySpinor b, ParitySpinor r,
     }
     
     k++;
-    if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("%d iterations, r2 = %e\n", k, r2);
+    if (invert_param->verbosity >= QUDA_VERBOSE) 
+      printfQuda("BiCGstab: %d iterations, r2 = %e\n", k, r2);
   }
   
   if (x.precision != x_sloppy.precision) copyCuda(x, x_sloppy);
