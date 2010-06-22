@@ -6,7 +6,7 @@ INC += -I../include -I.
 
 HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h test_util.h
 
-TESTS = su3_test blas_test pack_test dslash_test invert_test staggered_dslash_test staggered_invert_test \
+TESTS = su3_test blas_test pack_test wilson_dslash_test wilson_invert_test staggered_dslash_test staggered_invert_test \
 	${FATLINK_TEST} ${GAUGE_FORCE_TEST} ${FERMION_FORCE_TEST}
 
 all: $(TESTS)
@@ -17,10 +17,10 @@ staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_refe
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-dslash_test: dslash_test.o test_util.o dslash_reference.o $(QUDA)
+wilson_dslash_test: wilson_dslash_test.o test_util.o dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-invert_test: invert_test.o test_util.o dslash_reference.o blas_reference.o $(QUDA)
+wilson_invert_test: wilson_invert_test.o test_util.o dslash_reference.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 su3_test: su3_test.o test_util.o dslash_reference.o $(QUDA)
@@ -40,10 +40,11 @@ llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o ${QUDA}
 
 gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o ${QUDA}
 	$(CC) $(LDFLAGS) $^  -o $@ 
+
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o ${QUDA}
 	$(CC) $(LDFLAGS) $^  -o $@ 
 
-	
+
 tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
 

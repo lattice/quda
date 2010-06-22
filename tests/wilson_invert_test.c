@@ -12,7 +12,7 @@
 
 // Pulled these out front so you can set once and forget
 QudaPrecision cpu_prec=QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec=QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec=QUDA_SINGLE_PRECISION;
 QudaPrecision cuda_sloppy_prec=QUDA_HALF_PRECISION;
 
 int main(int argc, char **argv)
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 24; 
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 64;
+  gauge_param.X[3] = 48;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_GAUGE;
@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   }
   inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
-  double mass = -0.8;
+  double mass = -0.9;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
