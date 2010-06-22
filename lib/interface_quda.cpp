@@ -550,8 +550,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     
     b = new cudaColorSpinorField(*h_b, cudaParam); // download source
     
-    std::cout << "CPU source = " << norm2(*h_b) << ", cuda copy = " << norm2(*b) << std::endl;
-    
+    if(param->verbosity >= QUDA_VERBOSE){
+      printfQuda("CPU source = %f, cuda copy=%f\n", norm2(*h_b),norm2(*b));
+    }
     cudaParam.create = QUDA_ZERO_CREATE;
     x= new cudaColorSpinorField(cudaParam); // solution
     
@@ -579,15 +580,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     diracSloppy = Dirac::create(diracParam);
     
     massRescale(diracParam.kappa, param->solution_type, param->mass_normalization, *out);
-    
-    std::cout << "Mass rescale done" << std::endl;    
+    if (param->verbosity >= QUDA_VERBOSE){
+      printfQuda("Mass rescale done\n");   
+    }
 
   }
   
   dirac->Prepare(in, out, *x, *b, param->solution_type);
-  
-   std::cout << "Source preparation complete " << norm2(*in) << " " << norm2(*b) << std::endl;    
-
+  if (param->verbosity >= QUDA_VERBOSE){  
+    printfQuda( "Source preparation complete %f  %f\n", norm2(*in), norm2(*b));   
+  }
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     if (param->dslash_type != QUDA_STAGGERED_DSLASH && 
@@ -608,13 +610,19 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Inverter type %d not implemented", param->inv_type);
   }
   
-  std::cout << "Solution = " << norm2(*x) << std::endl;
+  if (param->verbosity >= QUDA_VERBOSE){
+    printfQuda("Solution = %f\n",norm2(*x));
+  }
   dirac->Reconstruct(*x, *b, param->solution_type);
-  std::cout << "Solution = " << norm2(*x) << std::endl;
+  if (param->verbosity >= QUDA_VERBOSE){
+    printfQuda("Solution = %f\n", norm2(*x));
+  }
   
   x->saveCPUSpinorField(*h_x);// since this is a reference this won't work: hOut = h_x;
   
-  std::cout << "Solution = " << norm2(*h_x) << std::endl;
+  if (param->verbosity >= QUDA_VERBOSE){
+    printfQuda("Solution = %f\n", norm2(*h_x));
+  }
   
   delete diracSloppy;
   delete dirac;
