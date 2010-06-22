@@ -1,9 +1,13 @@
 Version 0.2.4
 
-- Added initial support for CUDA 3.0 and Fermi (not yet optimized).
+- Added initial support for CUDA 3.x and Fermi (not yet optimized).
 
-- Introduced additional checks to increase stability of the BiCGstab
+- Incorporated look-ahead strategy to increase stability of the BiCGstab
   inverter.
+
+- Added definition of QUDA_VERSION to quda.h.  This is an integer with
+  two digits for each of the major, minor, and subminor version
+  numbers.  For example, QUDA_VERSION is 000204 for version 0.2.4.
 
 
 Version 0.2.3 - 2 June 2010

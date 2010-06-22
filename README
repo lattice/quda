@@ -49,21 +49,24 @@ compatibility" above).  Then type 'make' to build the library.
 
 As an optional step, 'make tune' will invoke tests/blas_test to
 perform autotuning of the various BLAS-like functions needed by the
-inverters.  This involves testing many combinations of parameters
-(corresponding to different numbers of CUDA threads per block and
-blocks per grid for each kernel) and writing the optimal values to
-lib/blas_param.h.  The new values will take effect the next time the
-library is built.  Ideally, the autotuning should be performed on the
-machine where the library is to be used, since the optimal parameters
-will depend on the CUDA device and host hardware.
+inverters.  This involves testing many combinations of launch
+parameters (corresponding to different numbers of CUDA threads per
+block and blocks per grid for each kernel) and writing the optimal
+values to lib/blas_param.h.  The new values will take effect the next
+time the library is built.  Ideally, the autotuning should be
+performed on the machine where the library is to be used, since the
+optimal parameters will depend on the CUDA device and host hardware.
+They will also depend slightly on the lattice volume; if desired, the
+volume used in the autotuning can be changed by editing
+tests/blas_test.cu.
 
 In summary, for an optimized install, run
 
     make && make tune && make
 
-By default, the autotuning is performed using CUDA device 0.  To
-select a different device number, set DEVICE in make.inc
-appropriately.
+(after optionally editing blas_test.cu).  By default, the autotuning
+is performed using CUDA device 0.  To select a different device
+number, set DEVICE in make.inc appropriately.
 
 
 Using the library:
@@ -75,6 +78,13 @@ include/enum_quda.h.
 
 
 Known issues:
+
+* When the library is compiled with version 3.0 of the CUDA toolkit
+  and run on Fermi (cards with compute capability 2.0), RECONSTRUCT_8
+  gives wrong results in double precision.  This appears to be a bug
+  in CUDA 3.0, since CUDA 3.1 beta has no such issue.  Note that this
+  problem isn't likely to matter in practice, since RECONSTRUCT_8
+  generally performs worse in double precision than RECONSTRUCT_12.
 
 * When building for the 'sm_13' or 'sm_20' GPU architectures (which
   enable double precision support), one of the stages in the build
