@@ -6,7 +6,7 @@
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 
-#define REDUCE_MAX_BLOCKS 16384
+#define REDUCE_MAX_BLOCKS 65536
 
 #define REDUCE_DOUBLE 64
 #define REDUCE_KAHAN 32
@@ -239,21 +239,21 @@ double2 __device__ make_Float2(double2 x) {
   float4 a##3 = tex1Dfetch(texHalf, i + 3*length);			\
   float4 a##4 = tex1Dfetch(texHalf, i + 4*length);			\
   float4 a##5 = tex1Dfetch(texHalf, i + 5*length);			\
-  a##0 *= b;								\
-  a##1 *= b;								\
-  a##2 *= b;								\
-  a##3 *= b;								\
-  a##4 *= b;								\
-  a##5 *= b;							
+  a##0 *= a##c;								\
+  a##1 *= a##c;								\
+  a##2 *= a##c;								\
+  a##3 *= a##c;								\
+  a##4 *= a##c;								\
+  a##5 *= a##c;							
 
 #define RECONSTRUCT_HALF_SPINOR_ST(a, texHalf, texNorm, length)		\
   float a##c = tex1Dfetch(texNorm, i);					\
   float2 a##0 = tex1Dfetch(texHalf, i + 0*length);			\
   float2 a##1 = tex1Dfetch(texHalf, i + 1*length);			\
   float2 a##2 = tex1Dfetch(texHalf, i + 2*length);			\
-  (a##0) *= b;							        \
-  (a##1) *= b;								\
-  (a##2) *= b;
+  (a##0) *= a##c;							        \
+  (a##1) *= a##c;								\
+  (a##2) *= a##c;
 
 
 // Some musings on how to clean up the blas code using Boost

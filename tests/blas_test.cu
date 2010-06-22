@@ -16,11 +16,17 @@ cudaColorSpinorField *x, *y, *z, *w, *v, *p;
 int nIters;
 
 int Nthreads = 5;
-int Ngrids = 9;
+int Ngrids = 11;
 int blockSizes[] = {64, 128, 256, 512, 1024};
-int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384};
+int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536};
 
 int prec;
+
+int LX = 24;
+int LY = 24;
+int LZ = 24;
+int LT = 64;
+int niter = 100 * 331776 / (LX * LY * LZ * LT); // 100 iterations on V=24^4
 
 void init()
 {
@@ -29,10 +35,10 @@ void init()
   param.nColor = 3;
   param.nSpin = 4; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   param.nDim = 4; // number of spacetime dimensions
-  param.x[0] = 24;
-  param.x[1] = 24;
-  param.x[2] = 24;
-  param.x[3] = 24;
+  param.x[0] = LX;
+  param.x[1] = LY;
+  param.x[2] = LZ;
+  param.x[3] = LT;
   param.pad = 0;
   param.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
   param.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
@@ -311,7 +317,7 @@ int main(int argc, char** argv)
 	  nIters = 1;
 	  benchmark(kernels[i]);
 	  
-	  nIters = 100;
+	  nIters = niter;
 	  blas_quda_flops = 0;
 	  blas_quda_bytes = 0;
 

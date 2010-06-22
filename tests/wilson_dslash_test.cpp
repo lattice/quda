@@ -21,7 +21,7 @@ int clover_yes = 1;
 
 // Pulled this out front so you can set once then forget
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -174,8 +174,7 @@ void init() {
     csParam.precision = inv_param.cuda_prec;
     if (csParam.precision == QUDA_DOUBLE_PRECISION ) {
       csParam.fieldOrder = QUDA_FLOAT2_ORDER;
-    }
-    else {
+    } else {
       /* Single and half */
       csParam.fieldOrder = QUDA_FLOAT4_ORDER;
     }
