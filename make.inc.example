@@ -7,7 +7,7 @@ GPU_ARCH = sm_13    # sm_10, sm_11, sm_12, sm_13, or sm_20
 GPU_EMU  = false    # set to 'true' for device emulation
 
 GPU_FATLINK = no    # compile quda code for fatlink computation
-GPU_GAUGE_FORCE   = yes  # compile quda code for gauge force computation
+GPU_GAUGE_FORCE   = no  # compile quda code for gauge force computation
 GPU_FERMION_FORCE = no  # compile quda code for fermion force computation
 
 PYTHON = python     # python 2.5 or later required for 'make gen'
