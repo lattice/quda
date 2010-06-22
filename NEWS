@@ -1,4 +1,5 @@
-Version 0.2.4
+
+Version 0.2.4 - 22 June 2010
 
 - Added initial support for CUDA 3.x and Fermi (not yet optimized).
 
@@ -7,7 +8,7 @@ Version 0.2.4
 
 - Added definition of QUDA_VERSION to quda.h.  This is an integer with
   two digits for each of the major, minor, and subminor version
-  numbers.  For example, QUDA_VERSION is 000204 for version 0.2.4.
+  numbers.  For example, QUDA_VERSION is 000204 for this release.
 
 
 Version 0.2.3 - 2 June 2010
