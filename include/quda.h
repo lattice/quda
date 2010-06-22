@@ -97,7 +97,6 @@ extern "C" {
   void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param);
 
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
-  void invertQudaSt(void *h_x, void *h_b, QudaInvertParam *param);
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets, double* residue_sq);
   

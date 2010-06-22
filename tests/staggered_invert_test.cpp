@@ -51,7 +51,7 @@ void constructSpinorField(Float *res) {
 
 
 static int
-invert_milc_test(void)
+invert_test(void)
 {
   void *fatlink[4];
   void *longlink[4];
@@ -162,7 +162,7 @@ invert_milc_test(void)
     volume = Vh;
     
     inv_param.in_parity = QUDA_EVEN_PARITY;    
-    invertQudaSt(spinorOut, spinorIn, &inv_param);
+    invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); 
     time0 /= CLOCKS_PER_SEC;
@@ -178,7 +178,7 @@ invert_milc_test(void)
 	
     volume = Vh;    
     inv_param.in_parity = QUDA_ODD_PARITY;  
-    invertQudaSt(spinorOutOdd, spinorInOdd, &inv_param);	
+    invertQuda(spinorOutOdd, spinorInOdd, &inv_param);	
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     
@@ -194,7 +194,7 @@ invert_milc_test(void)
 
     volume = Vh; //FIXME: the time reported is only parity time
     inv_param.in_parity = QUDA_FULL_PARITY;  
-    invertQudaSt(spinorOut, spinorIn, &inv_param);
+    invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
@@ -478,7 +478,7 @@ int main(int argc, char** argv)
   }
   
   display_test_info();
-  invert_milc_test();
+  invert_test();
     
 
   return 0;

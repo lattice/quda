@@ -161,12 +161,11 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
 }
 
 void DiracStaggered::Prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-			  cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			  const QudaSolutionType solutionType, const QudaDagType dagger) {
-  ColorSpinorParam param;
-  
+			     cudaColorSpinorField &x, cudaColorSpinorField &b, 
+			     const QudaSolutionType solutionType, const QudaDagType dagger) 
+{
   src = &b;
-  sol = &x;
+  sol = &x;  
 }
 
 void DiracStaggered::Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,

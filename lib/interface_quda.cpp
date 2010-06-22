@@ -461,176 +461,169 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   param->gflops = 0;
   param->iter = 0;
 
-  // temporary hack
-  if (param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
-  ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X);
-  if (param->solution_type == QUDA_MAT_SOLUTION) {
-    cudaGaugePrecise.X[0] /= 2;
-    cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
-  } else {
-    cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
-  }
-
-  ColorSpinorParam cudaParam(cpuParam, *param);
-
-  cpuColorSpinorField h_b(cpuParam);
-  cudaColorSpinorField b(h_b, cudaParam); // download source
-
-  std::cout << "CPU source = " << norm2(h_b) << ", cuda copy = " << norm2(b) << std::endl;
-
-  cudaParam.create = QUDA_ZERO_CREATE;
-  cudaColorSpinorField x(cudaParam); // solution
-
-  // if using preconditioning but solving the full system
-  if (param->solver_type == QUDA_MATPC_SOLUTION && 
-      param->solution_type == QUDA_MAT_SOLUTION) {
-    cudaParam.x[0] /= 2;
-    cudaParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
-  }
-  cudaColorSpinorField tmp(cudaParam); // temporary
-
+  Dirac *dirac;
+  Dirac *diracSloppy;
+  cpuColorSpinorField* h_b;
+  cpuColorSpinorField* h_x;
+  cudaColorSpinorField* b;
+  cudaColorSpinorField* x;
+  cudaColorSpinorField* tmp;
   cudaColorSpinorField *in, *out;
 
-  // set the Dirac operator parameters
-  DiracParam diracParam;
-  setDiracParam(diracParam, param);
-  diracParam.verbose = QUDA_VERBOSE;
-  //if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
-  //tmp = cudaColorSpinorField(in, cudaParam);
-  //diracParam.tmp = &tmp;
-  //}
+  if( param->dslash_type == QUDA_STAGGERED_DSLASH){
+    ColorSpinorParam csParam;
+    csParam.precision = param->cpu_prec;
+    csParam.fieldType = QUDA_CPU_FIELD;
+    csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;  
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
+    csParam.nColor=3;
+    csParam.nSpin=1;
+    csParam.nDim=4;
+    csParam.parity = param->in_parity;
+    csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+    
+    if (param->in_parity == QUDA_FULL_PARITY){
+      csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+      csParam.x[0] = param->gaugeParam->X[0];
+    }else{
+      csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+      csParam.x[0] = param->gaugeParam->X[0]/2;    
+    }
+    csParam.x[1] = param->gaugeParam->X[1];
+    csParam.x[2] = param->gaugeParam->X[2];
+    csParam.x[3] = param->gaugeParam->X[3];
+    csParam.create = QUDA_REFERENCE_CREATE;
+    csParam.v = hp_b;  
+    h_b = new  cpuColorSpinorField(csParam);
+    
+    csParam.v = hp_x;
+    h_x= new  cpuColorSpinorField(csParam);
+    
+    csParam.fieldType = QUDA_CUDA_FIELD;
+    csParam.fieldOrder = QUDA_FLOAT2_ORDER;
+    csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
+    
+    csParam.pad = param->sp_pad;
+    csParam.precision = param->cuda_prec;
+    csParam.create = QUDA_ZERO_CREATE;
+    
+    b = new cudaColorSpinorField(csParam);
+    
+    // set the Dirac operator parameters
+    DiracParam diracParam;
+    setDiracParam(diracParam, param);
+    diracParam.fatGauge = &cudaFatLinkPrecise;
+    diracParam.longGauge = &cudaLongLinkPrecise;
+    
+    dirac = Dirac::create(diracParam); // create the Dirac operator
+    
+    diracParam.fatGauge = &cudaFatLinkSloppy;
+    diracParam.longGauge = &cudaLongLinkSloppy;
+    
+    setDiracSloppyParam(diracParam, param);
+    diracSloppy = Dirac::create(diracParam);
+    
+    *b= *h_b; //send data from cpu to GPU
+    
+    csParam.create = QUDA_COPY_CREATE;  
+    x = new cudaColorSpinorField(*h_x, csParam); // solution  
+    csParam.create = QUDA_ZERO_CREATE;
+    tmp =new cudaColorSpinorField(csParam); // temporary
+    //invertCgCuda(*dirac, *diracSloppy, *x, *b, *tmp, param);    
+        
+  }else{
+    // temporary hack
+    if (param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
+    ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X);
+    if (param->solution_type == QUDA_MAT_SOLUTION) {
+      cudaGaugePrecise.X[0] /= 2;
+      cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
+    } else {
+      cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    }
+    
+    ColorSpinorParam cudaParam(cpuParam, *param);
+    
+    h_b = new cpuColorSpinorField(cpuParam);
+    cpuParam.v = hp_x;
+    h_x =new cpuColorSpinorField(cpuParam);
+    
+    b = new cudaColorSpinorField(*h_b, cudaParam); // download source
+    
+    std::cout << "CPU source = " << norm2(*h_b) << ", cuda copy = " << norm2(*b) << std::endl;
+    
+    cudaParam.create = QUDA_ZERO_CREATE;
+    x= new cudaColorSpinorField(cudaParam); // solution
+    
+    // if using preconditioning but solving the full system
+    if (param->solver_type == QUDA_MATPC_SOLUTION && 
+	param->solution_type == QUDA_MAT_SOLUTION) {
+      cudaParam.x[0] /= 2;
+      cudaParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    }
+    tmp= new cudaColorSpinorField(cudaParam); // temporary
+    
+    
+    // set the Dirac operator parameters
+    DiracParam diracParam;
+    setDiracParam(diracParam, param);
+    diracParam.verbose = QUDA_VERBOSE;
+    //if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
+    //tmp = cudaColorSpinorField(in, cudaParam);
+    //diracParam.tmp = &tmp;
+    //}
 
-  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
+    dirac = Dirac::create(diracParam); // create the Dirac operator
+    
+    setDiracSloppyParam(diracParam, param);
+    diracSloppy = Dirac::create(diracParam);
+    
+    massRescale(diracParam.kappa, param->solution_type, param->mass_normalization, *out);
+    
+    std::cout << "Mass rescale done" << std::endl;    
 
-  setDiracSloppyParam(diracParam, param);
-  Dirac *diracSloppy = Dirac::create(diracParam);
-
-  massRescale(diracParam.kappa, param->solution_type, param->mass_normalization, *out);
-
-  std::cout << "Mass rescale done" << std::endl;
-
-  dirac->Prepare(in, out, x, b, param->solution_type);
-
-  std::cout << "Source preparation complete " << norm2(*in) << " " << norm2(b) << std::endl;
+  }
+  
+  dirac->Prepare(in, out, *x, *b, param->solution_type);
+  
+   std::cout << "Source preparation complete " << norm2(*in) << " " << norm2(*b) << std::endl;    
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
-    if (param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
+    if (param->dslash_type != QUDA_STAGGERED_DSLASH && 
+	param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(*out, *in);
       dirac->M(*in, *out, QUDA_DAG_YES); // tmp?
     }
-    invertCgCuda(*dirac, *diracSloppy, *out, *in, tmp, param);
+    invertCgCuda(*dirac, *diracSloppy, *out, *in, *tmp, param);
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, tmp, param, QUDA_DAG_YES);
+      invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, *tmp, param, QUDA_DAG_YES);
       copyCuda(*in, *out);
     }
-    invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, tmp, param, QUDA_DAG_NO);
+    invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, *tmp, param, QUDA_DAG_NO);
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);
   }
-
-  std::cout << "Solution = " << norm2(x) << std::endl;
-  dirac->Reconstruct(x, b, param->solution_type);
-  std::cout << "Solution = " << norm2(x) << std::endl;
-
-  cpuParam.v = hp_x;
-  cpuColorSpinorField h_x(cpuParam);
-  x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;
-
-  std::cout << "Solution = " << norm2(h_x) << std::endl;
-
-  delete diracSloppy;
-  delete dirac;
   
-  return;
-}
-
-
-
-void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
-{
-
-  checkInvertParam(param);
-  /*
-  int slenh = cudaGaugePrecise.volume*spinorSiteSize;
-  param->spinorGiB = (double)slenh * (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
-  if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO)
-    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 5 : 7)/(double)(1<<30);
-  else
-    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 8 : 9)/(double)(1<<30);
-  */
-  param->secs = 0;
-  param->gflops = 0;
-  param->iter = 0;
+  std::cout << "Solution = " << norm2(*x) << std::endl;
+  dirac->Reconstruct(*x, *b, param->solution_type);
+  std::cout << "Solution = " << norm2(*x) << std::endl;
   
+  x->saveCPUSpinorField(*h_x);// since this is a reference this won't work: hOut = h_x;
   
-  ColorSpinorParam csParam;
-  csParam.precision = param->cpu_prec;
-  csParam.fieldType = QUDA_CPU_FIELD;
-  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;  
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
-  csParam.nColor=3;
-  csParam.nSpin=1;
-  csParam.nDim=4;
-  csParam.parity = param->in_parity;
-  csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
-
-  if (param->in_parity == QUDA_FULL_PARITY){
-    csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
-    csParam.x[0] = param->gaugeParam->X[0];
-  }else{
-    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
-    csParam.x[0] = param->gaugeParam->X[0]/2;    
-  }
-  csParam.x[1] = param->gaugeParam->X[1];
-  csParam.x[2] = param->gaugeParam->X[2];
-  csParam.x[3] = param->gaugeParam->X[3];
-  csParam.create = QUDA_REFERENCE_CREATE;
-  csParam.v = hp_b;  
-  cpuColorSpinorField h_b(csParam);
-  
-  csParam.v = hp_x;
-  cpuColorSpinorField h_x(csParam);
-  
-  csParam.fieldType = QUDA_CUDA_FIELD;
-  csParam.fieldOrder = QUDA_FLOAT2_ORDER;
-  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
-
-  csParam.pad = param->sp_pad;
-  csParam.precision = param->cuda_prec;
-  csParam.create = QUDA_ZERO_CREATE;
-  
-  cudaColorSpinorField b(csParam);
-
- // set the Dirac operator parameters
-  DiracParam diracParam;
-  setDiracParam(diracParam, param);
-  diracParam.fatGauge = &cudaFatLinkPrecise;
-  diracParam.longGauge = &cudaLongLinkPrecise;
-  
-  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-
-  diracParam.fatGauge = &cudaFatLinkSloppy;
-  diracParam.longGauge = &cudaLongLinkSloppy;
-  
-  setDiracSloppyParam(diracParam, param);
-  Dirac *diracSloppy = Dirac::create(diracParam);
-  
-  b= h_b; //send data from cpu to GPU
-
-  csParam.create = QUDA_COPY_CREATE;  
-  cudaColorSpinorField x(h_x, csParam); // solution  
-  csParam.create = QUDA_ZERO_CREATE;
-  cudaColorSpinorField tmp(csParam); // temporary
-  invertCgCuda(*dirac, *diracSloppy, x, b, tmp, param);    
-  
-  x.saveCPUSpinorField(h_x);// since this is a reference this won't work: hOut = h_x;    
+  std::cout << "Solution = " << norm2(*h_x) << std::endl;
   
   delete diracSloppy;
   delete dirac;
+  
+  delete h_b;
+  delete h_x;
+  delete b;
+  delete x;
+  delete tmp;
   
   return;
 }
