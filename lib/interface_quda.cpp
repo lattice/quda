@@ -636,8 +636,8 @@ void invertQudaSt(void *hp_x, void *hp_b, QudaInvertParam *param)
 }
 
 
-void invertQudaStMultiMass(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			   double* offsets, int num_offsets, double* residue_sq)
+void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
+			  double* offsets, int num_offsets, double* residue_sq)
 {
   int i;
   
@@ -743,7 +743,7 @@ void invertQudaStMultiMass(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     x[i] = new cudaColorSpinorField(csParam);
   }
   cudaColorSpinorField tmp(csParam); // temporary
-  invertCgCudaMultiMass(*dirac, *diracSloppy, x, b, param, offsets, num_offsets, residue_sq);    
+  invertMultiShiftCgCuda(*dirac, *diracSloppy, x, b, param, offsets, num_offsets, residue_sq);    
   
   for(i=0; i < num_offsets; i++){
     x[i]->saveCPUSpinorField(*h_x[i]);

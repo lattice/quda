@@ -260,7 +260,7 @@ invert_milc_test(void)
     }
     
     double residue_sq;
-    invertQudaStMultiMass(spinorOutArray, in, &inv_param, offsets, num_offsets, &residue_sq);	
+    invertMultiShiftQuda(spinorOutArray, in, &inv_param, offsets, num_offsets, &residue_sq);	
     cudaThreadSynchronize();
     printf("Final residue squred =%g\n", residue_sq);
     time0 += clock(); // stop the timer
