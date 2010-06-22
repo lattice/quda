@@ -94,6 +94,15 @@ __device__ Float2 operator*=(Float2 &x, const Float a) {
   return x;
 }
 
+template <typename Float>
+__device__ float4 operator*=(float4 &a, const Float &b) {
+  a.x *= b;
+  a.y *= b;
+  a.z *= b;
+  a.w *= b;
+  return a;
+}
+
 
 
 void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
@@ -223,29 +232,38 @@ double2 __device__ make_Float2(double2 x) {
 }
 
 #define RECONSTRUCT_HALF_SPINOR(a, texHalf, texNorm, length)		\
+  float a##c = tex1Dfetch(texNorm, i);					\
   float4 a##0 = tex1Dfetch(texHalf, i + 0*length);			\
   float4 a##1 = tex1Dfetch(texHalf, i + 1*length);			\
   float4 a##2 = tex1Dfetch(texHalf, i + 2*length);			\
   float4 a##3 = tex1Dfetch(texHalf, i + 3*length);			\
   float4 a##4 = tex1Dfetch(texHalf, i + 4*length);			\
   float4 a##5 = tex1Dfetch(texHalf, i + 5*length);			\
-  {float b = tex1Dfetch(texNorm, i);					\
-  (a##0).x *= b; (a##0).y *= b; (a##0).z *= b; (a##0).w *= b;		\
-  (a##1).x *= b; (a##1).y *= b; (a##1).z *= b; (a##1).w *= b;		\
-  (a##2).x *= b; (a##2).y *= b; (a##2).z *= b; (a##2).w *= b;		\
-  (a##3).x *= b; (a##3).y *= b; (a##3).z *= b; (a##3).w *= b;		\
-  (a##4).x *= b; (a##4).y *= b; (a##4).z *= b; (a##4).w *= b;		\
-  (a##5).x *= b; (a##5).y *= b; (a##5).z *= b; (a##5).w *= b;}
+  a##0 *= b;								\
+  a##1 *= b;								\
+  a##2 *= b;								\
+  a##3 *= b;								\
+  a##4 *= b;								\
+  a##5 *= b;							
 
 #define RECONSTRUCT_HALF_SPINOR_ST(a, texHalf, texNorm, length)		\
+  float a##c = tex1Dfetch(texNorm, i);					\
   float2 a##0 = tex1Dfetch(texHalf, i + 0*length);			\
   float2 a##1 = tex1Dfetch(texHalf, i + 1*length);			\
   float2 a##2 = tex1Dfetch(texHalf, i + 2*length);			\
-  {float b = tex1Dfetch(texNorm, i);					\
-  (a##0).x *= b; (a##0).y *= b;						\
-  (a##1).x *= b; (a##1).y *= b;						\
-  (a##2).x *= b; (a##2).y *= b;}
+  (a##0) *= b;							        \
+  (a##1) *= b;								\
+  (a##2) *= b;
 
+
+// Some musings on how to clean up the blas code using Boost
+/*#define BOOST_RECONSTRUCT_HALF_SPINOR(z, j, a, texHalf, length)	\
+  float4 a##k tex1Dfetch(texHalf, i + j*length);	\
+  a##k *= a##c;
+
+#define RECONSTRUCT_HALF_SPINOR(a, texHalf, texNorm, length)		\
+  BOOST_PP_REPEAT(6, BOOST_RECONSTRUCT_HALF_SPINOR, a, texHalf, length)	\
+*/
 
 #define READ_HALF_SPINOR(a, tex, length)				\
   float4 a##0 = tex1Dfetch(tex, i + 0*length);				\
@@ -257,10 +275,10 @@ double2 __device__ make_Float2(double2 x) {
   float a##c = a[i];
 
 #define READ_HALF_SPINOR_ST(a, tex, length)				\
-    float2 a##0 = tex1Dfetch(tex, i + 0*length);			\
-    float2 a##1 = tex1Dfetch(tex, i + 1*length);			\
-    float2 a##2 = tex1Dfetch(tex, i + 2*length);			\
-    float a##c = a[i];
+  float2 a##0 = tex1Dfetch(tex, i + 0*length);				\
+  float2 a##1 = tex1Dfetch(tex, i + 1*length);				\
+  float2 a##2 = tex1Dfetch(tex, i + 2*length);				\
+  float a##c = a[i];
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)

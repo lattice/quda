@@ -379,27 +379,11 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 }
 
 
-#if (__CUDA_ARCH__ >= 200)
-__global__ void dummykernel()
-{
-
-}
-
-#endif
-
 void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, const FullGauge longGauge, 
 			 const void *in, const void *inNorm, 
 			 const int parity, const int dagger, const void *x, const void *xNorm, 
 			 const double k, const int volume, const int length, const QudaPrecision precision) 
 {
-#if (__CUDA_ARCH__ >= 200)
-  static int firsttime = 1;
-  if (firsttime){	
-  	cudaFuncSetCacheConfig(dummykernel, cudaFuncCachePreferL1);
-  	dummykernel<<<1,1>>>();
-	firsttime=0;
-  }
-#endif
 
   void *fatGauge0, *fatGauge1;
   void* longGauge0, *longGauge1;
