@@ -81,6 +81,9 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 
 void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) 
 {
+
+  errorQuda("Not implemented");
+
   double mkappa2 = - kappa*kappa;
   if (!initDslash){
     initDslashConstants(*fatGauge, in.Stride(), 0);

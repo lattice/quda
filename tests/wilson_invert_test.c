@@ -12,7 +12,7 @@
 
 // Pulled these out front so you can set once and forget
 QudaPrecision cpu_prec=QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec=QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec=QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_sloppy_prec=QUDA_HALF_PRECISION;
 
 int main(int argc, char **argv)
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 24; 
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[3] = 32;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_GAUGE;
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-2;
 
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   // FIXME: If asking for MAT Solution, be careful to allocate even clover part.
   inv_param.solver_type = QUDA_MATPC_SOLUTION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-  void *gauge[4], *clover_inv;
+  void *gauge[4], *clover_inv, *clover;
 
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
@@ -102,6 +102,16 @@ int main(int argc, char **argv)
     size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     clover_inv = malloc(V*cloverSiteSize*cSize);
     construct_clover_field(clover_inv, norm, diag, inv_param.clover_cpu_prec);
+
+    // only need regular clover term 
+    if ((inv_param.solver_type == QUDA_MAT_SOLUTION &&  // if not preconditioning
+	 (inv_param.solution_type == QUDA_MAT_SOLUTION ||
+	  inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION)) || 
+	(inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || // or using asymmetric preconditioning
+	 inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC))
+      clover = clover_inv;
+    else
+      clover = 0;
   }
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize);
@@ -121,7 +131,8 @@ int main(int argc, char **argv)
   loadGaugeQuda((void*)gauge, &gauge_param);
 
   // load the clover term, if desired
-  if (clover_yes) loadCloverQuda(NULL, clover_inv, &inv_param);
+  if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
+  
 
   // perform the inversion
   invertQuda(spinorOut, spinorIn, &inv_param);

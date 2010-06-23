@@ -177,6 +177,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+
   if (!h_clover && !h_clovinv) {
     errorQuda("loadCloverQuda() called with neither clover term nor inverse");
   }
@@ -188,6 +189,18 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
   if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
     errorQuda("Wrong dslash_type in loadCloverQuda()");
+  }
+
+  // convenience
+  int precondition;
+  if (inv_param->solver_type == QUDA_MAT_SOLUTION &&
+      (inv_param->solution_type == QUDA_MAT_SOLUTION || inv_param->solution_type == QUDA_MATDAG_MAT_SOLUTION))
+    precondition = 0;
+  else
+    precondition = 1;
+
+  if (!h_clover && !precondition) {
+    errorQuda("loadCloverQuda() called with no clover term and no preconditioning");
   }
 
   int X[4];
@@ -202,8 +215,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     loadCloverField(cudaCloverPrecise, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
     inv_param->cloverGiB += 2.0*cudaCloverPrecise.even.bytes / (1<<30);
 
-    if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
-	inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+    if (!precondition || (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
+			  inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC)) {
       if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
 	allocateCloverField(&cudaCloverSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
 	loadCloverField(cudaCloverSloppy, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
@@ -214,21 +227,25 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     } // sloppy precision clover term not needed otherwise
   }
 
-  allocateCloverField(&cudaCloverInvPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
-  if (!h_clovinv) {
-    errorQuda("Clover term inverse not implemented yet");
-  } else {
-    loadCloverField(cudaCloverInvPrecise, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
+  // Only need the inverse clover term if we're using any preconditioning at all
+  if (precondition) {
+    allocateCloverField(&cudaCloverInvPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
+    if (!h_clovinv) {
+      errorQuda("Clover term inverse not implemented yet");
+    } else {
+      loadCloverField(cudaCloverInvPrecise, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
+    }
+    inv_param->cloverGiB += 2.0*cudaCloverInvPrecise.even.bytes / (1<<30);
+    
+    if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
+      allocateCloverField(&cudaCloverInvSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
+      loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
+      inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
+    } else {
+      cudaCloverInvSloppy = cudaCloverInvPrecise;
+    }
   }
-  inv_param->cloverGiB += 2.0*cudaCloverInvPrecise.even.bytes / (1<<30);
 
-  if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-    allocateCloverField(&cudaCloverInvSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
-    loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
-    inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
-  } else {
-    cudaCloverInvSloppy = cudaCloverInvPrecise;
-  }
 }
 
 #if 0
@@ -267,7 +284,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
     else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH)
-	diracParam.type = QUDA_STAGGERED_DIRAC;
+      diracParam.type = QUDA_STAGGERED_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else if (inv_param->solver_type == QUDA_MATPC_SOLUTION) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
@@ -321,10 +338,16 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
   diracParam.mass = inv_param->mass;
 }
 
-void massRescale(double &kappa, QudaSolutionType solution_type, 
+void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
 		 QudaMassNormalization mass_normalization, 
 		 cudaColorSpinorField &b) {
     
+  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+    if (mass_normalization != QUDA_MASS_NORMALIZATION)
+      errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
+    return;
+  }
+
   // multiply the source to get the mass normalization
   if (solution_type == QUDA_MAT_SOLUTION) {
     if (mass_normalization == QUDA_MASS_NORMALIZATION ||
@@ -463,6 +486,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   Dirac *dirac;
   Dirac *diracSloppy;
+
+  // set the Dirac operator parameters
+  DiracParam diracParam;
+  setDiracParam(diracParam, param);
+
   cpuColorSpinorField* h_b;
   cpuColorSpinorField* h_x;
   cudaColorSpinorField* b;
@@ -509,9 +537,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     
     b = new cudaColorSpinorField(csParam);
     
-    // set the Dirac operator parameters
-    DiracParam diracParam;
-    setDiracParam(diracParam, param);
     diracParam.fatGauge = &cudaFatLinkPrecise;
     diracParam.longGauge = &cudaLongLinkPrecise;
     
@@ -529,9 +554,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = new cudaColorSpinorField(*h_x, csParam); // solution  
     csParam.create = QUDA_ZERO_CREATE;
     tmp =new cudaColorSpinorField(csParam); // temporary
-    //invertCgCuda(*dirac, *diracSloppy, *x, *b, *tmp, param);    
         
-  }else{
+  } else {
     // temporary hack
     if (param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
     ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X);
@@ -564,10 +588,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
     tmp= new cudaColorSpinorField(cudaParam); // temporary
     
-    
-    // set the Dirac operator parameters
-    DiracParam diracParam;
-    setDiracParam(diracParam, param);
     diracParam.verbose = QUDA_VERBOSE;
     //if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
     //tmp = cudaColorSpinorField(in, cudaParam);
@@ -579,28 +599,27 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     setDiracSloppyParam(diracParam, param);
     diracSloppy = Dirac::create(diracParam);
     
-    massRescale(diracParam.kappa, param->solution_type, param->mass_normalization, *out);
-    if (param->verbosity >= QUDA_VERBOSE){
-      printfQuda("Mass rescale done\n");   
-    }
-
   }
   
+  massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *out);
+  if (param->verbosity >= QUDA_VERBOSE) printfQuda("Mass rescale done\n");   
+
   dirac->Prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE){  
     printfQuda( "Source preparation complete %f  %f\n", norm2(*in), norm2(*b));   
   }
+  
+
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
-    if (param->dslash_type != QUDA_STAGGERED_DSLASH && 
-	param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
+    if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(*out, *in);
       dirac->M(*in, *out, QUDA_DAG_YES); // tmp?
     }
     invertCgCuda(*dirac, *diracSloppy, *out, *in, *tmp, param);
     break;
   case QUDA_BICGSTAB_INVERTER:
-    if (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
+    if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
       invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, *tmp, param, QUDA_DAG_YES);
       copyCuda(*in, *out);
     }

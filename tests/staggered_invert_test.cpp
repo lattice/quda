@@ -89,11 +89,11 @@ invert_test(void)
   inv_param.tol = tol;
   inv_param.maxiter = 100;
   inv_param.reliable_delta = 1e-3;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = prec; 
   inv_param.cuda_prec_sloppy = prec_sloppy;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
   inv_param.solver_type = QUDA_MAT_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;

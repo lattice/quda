@@ -25,7 +25,7 @@ int prec;
 int LX = 24;
 int LY = 24;
 int LZ = 24;
-int LT = 64;
+int LT = 32;
 int niter = 100 * 331776 / (LX * LY * LZ * LT); // 100 iterations on V=24^4
 
 void init()
