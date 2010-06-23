@@ -1370,7 +1370,7 @@ void caxpbypzYmbwCuda(double2 a, ParitySpinor x, double2 b, ParitySpinor y,
 
 
 // Computes c = a + b in "double single" precision.
-__device__ void dsadd(QudaSumFloat &c0, QudaSumFloat &c1, const QudaSumFloat a0, 
+__device__ void dsadd(volatile QudaSumFloat &c0, volatile QudaSumFloat &c1, const QudaSumFloat a0, 
 		      const QudaSumFloat a1, const float b0, const float b1) {
   // Compute dsa + dsb using Knuth's trick.
   QudaSumFloat t1 = a0 + b0;
@@ -1382,7 +1382,7 @@ __device__ void dsadd(QudaSumFloat &c0, QudaSumFloat &c1, const QudaSumFloat a0,
 }
 
 // Computes c = a + b in "double single" precision (complex version)
-__device__ void zcadd(QudaSumComplex &c0, QudaSumComplex &c1, const QudaSumComplex a0, 
+__device__ void zcadd(volatile QudaSumComplex &c0, volatile QudaSumComplex &c1, const QudaSumComplex a0, 
 		      const QudaSumComplex a1, const QudaSumComplex b0, const QudaSumComplex b1) {
   // Compute dsa + dsb using Knuth's trick.
   QudaSumFloat t1 = a0.x + b0.x;
@@ -1402,7 +1402,7 @@ __device__ void zcadd(QudaSumComplex &c0, QudaSumComplex &c1, const QudaSumCompl
 }
 
 // Computes c = a + b in "double single" precision (float3 version)
-__device__ void dsadd3(QudaSumFloat3 &c0, QudaSumFloat3 &c1, const QudaSumFloat3 a0, 
+__device__ void dsadd3(volatile QudaSumFloat3 &c0, volatile QudaSumFloat3 &c1, const QudaSumFloat3 a0, 
 		       const QudaSumFloat3 a1, const QudaSumFloat3 b0, const QudaSumFloat3 b1) {
   // Compute dsa + dsb using Knuth's trick.
   QudaSumFloat t1 = a0.x + b0.x;
