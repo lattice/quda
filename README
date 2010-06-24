@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.2.4                             22 June 2010
+Release Notes for QUDA v0.2.5                             24 June 2010
 -----------------------------
 
 Overview:
@@ -25,6 +25,8 @@ example).
 Under Mac OS X, the library fails to compile with CUDA 2.3 due to bugs
 in the toolkit.  It might work with CUDA 3.0, 2.2, or 2.0, but these
 haven't been tested.
+
+See also "Known issues" below.
 
 
 Hardware compatibility:
@@ -80,11 +82,17 @@ include/enum_quda.h.
 Known issues:
 
 * When the library is compiled with version 3.0 of the CUDA toolkit
-  and run on Fermi (cards with compute capability 2.0), RECONSTRUCT_8
-  gives wrong results in double precision.  This appears to be a bug
-  in CUDA 3.0, since CUDA 3.1 beta has no such issue.  Note that this
-  problem isn't likely to matter in practice, since RECONSTRUCT_8
-  generally performs worse in double precision than RECONSTRUCT_12.
+  and run on Fermi (GPU architecture sm_20), RECONSTRUCT_8 gives wrong
+  results in double precision.  This appears to be a bug in CUDA 3.0,
+  since CUDA 3.1 beta has no such issue.  Note that this problem isn't
+  likely to matter in practice, since RECONSTRUCT_8 generally performs
+  worse in double precision than RECONSTRUCT_12.
+
+* Compiling in emulation mode with CUDA 3.0 does not with work when
+  the GPU architecture is set to sm_10, sm_11, or sm_12.  As an
+  alternative, one can either compile for sm_13 (recommended) or use
+  CUDA 2.3.  Note that NVIDIA is eliminating emulation mode completely
+  from CUDA 3.1 and later.
 
 * When building for the 'sm_13' or 'sm_20' GPU architectures (which
   enable double precision support), one of the stages in the build

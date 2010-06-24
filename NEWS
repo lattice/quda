@@ -1,4 +1,10 @@
 
+Version 0.2.5 - 24 June 2010
+
+- Fixed regression in 0.2.4 that prevented the library from compiling
+  when GPU_ARCH was set to sm_10, sm_11, or sm_12.
+
+
 Version 0.2.4 - 22 June 2010
 
 - Added initial support for CUDA 3.x and Fermi (not yet optimized).

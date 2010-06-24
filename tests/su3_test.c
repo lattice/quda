@@ -22,8 +22,6 @@ void *gauge[4], *new_gauge[4];
 
 void init() {
 
-  param.blockDim = 64;
-
   param.cpu_prec = QUDA_DOUBLE_PRECISION;
   param.cuda_prec = QUDA_HALF_PRECISION;
   param.reconstruct = QUDA_RECONSTRUCT_12;

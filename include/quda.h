@@ -3,7 +3,7 @@
 
 #include <enum_quda.h>
 
-#define QUDA_VERSION 000204 // version 0.2.4
+#define QUDA_VERSION 000205 // version 0.2.5
 
 #ifdef __cplusplus
 extern "C" {
