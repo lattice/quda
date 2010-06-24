@@ -23,18 +23,18 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   rUpdate ++;
   
   ColorSpinorParam param;
-  param.create = QUDA_ZERO_CREATE;
+  param.create = QUDA_ZERO_FIELD_CREATE;
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
   cudaColorSpinorField tmp(x, param);
   
   cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
-    param.create = QUDA_REFERENCE_CREATE;
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
     x_sloppy = &x;
     r_sloppy = &r;
   } else {
-    param.create = QUDA_COPY_CREATE;
+    param.create = QUDA_COPY_FIELD_CREATE;
     x_sloppy = new cudaColorSpinorField(x, param);
     r_sloppy = new cudaColorSpinorField(r, param);
   }

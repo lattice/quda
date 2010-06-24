@@ -37,13 +37,13 @@ void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cud
     errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", in.Stride(), out.Stride());
   }
 
-  if (in.fieldSubset() != QUDA_PARITY_FIELD_SUBSET || out.fieldSubset() != QUDA_PARITY_FIELD_SUBSET) {
+  if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
     errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
-	      in.fieldSubset(), out.fieldSubset());
+	      in.SiteSubset(), out.SiteSubset());
   }
 
-  if ((out.Volume() != 2*fatGauge->volume && out.fieldSubset() == QUDA_FULL_FIELD_SUBSET) ||
-      (out.Volume() != fatGauge->volume && out.fieldSubset() == QUDA_PARITY_FIELD_SUBSET) ) {
+  if ((out.Volume() != 2*fatGauge->volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+      (out.Volume() != fatGauge->volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
       errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge->volume);
   }
 
@@ -89,7 +89,7 @@ void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in
     initDslashConstants(*fatGauge, in.Stride(), 0);
   }
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
@@ -116,14 +116,14 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
   }
   
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
     reset = false;
   }
   
-  QudaParity parity= in.qudaParity();    
+  QudaParity parity= in.Parity();    
   QudaParity other_parity;
   if (parity == QUDA_EVEN_PARITY){
     other_parity = QUDA_ODD_PARITY;

@@ -8,13 +8,14 @@
 
 ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0) {
   create(param.nDim, param.x, param.nColor, param.nSpin, param.precision, param.pad, 
-	 param.fieldType, param.fieldSubset, param.subsetOrder, param.fieldOrder, param.basis, 
-	 param.parity);
+	 param.fieldLocation, param.siteSubset, param.siteOrder, param.fieldOrder, 
+	 param.gammaBasis, param.parity);
 }
 
 ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : init(false), even(0), odd(0) {
   create(field.nDim, field.x, field.nColor, field.nSpin, field.precision, field.pad,
-	 field.type, field.subset, field.subset_order, field.order, field.basis, field.parity);
+	 field.fieldLocation, field.siteSubset, field.siteOrder, field.fieldOrder, 
+	 field.gammaBasis, field.parity);
 }
 
 ColorSpinorField::~ColorSpinorField() {
@@ -22,9 +23,10 @@ ColorSpinorField::~ColorSpinorField() {
 }
 
 void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecision Prec, 
-			      int Pad, FieldType Type, FieldSubset Subset, 
-			      SubsetOrder Subset_order, QudaColorSpinorOrder Order,
-			      GammaBasis Basis, QudaParity Parity) {
+			      int Pad, QudaFieldLocation fieldLocation, 
+			      QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, 
+			      QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, 
+			      QudaParity parity) {
   if (Ndim > QUDA_MAX_DIM){
     errorQuda("Number of dimensions nDim = %d too great", Ndim);
   }
@@ -40,7 +42,7 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
   }
   pad = Pad;
   
-  if (Subset == QUDA_FULL_FIELD_SUBSET) {
+  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     stride = volume/2 + pad; // padding is based on half volume
     length = 2*stride*nColor*nSpin*2;
     
@@ -53,14 +55,13 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
 
   bytes = length * precision;
 
-  type = Type;
-  subset = Subset;
-  subset_order = Subset_order;
-  order = Order;
+  this->fieldLocation = fieldLocation;
+  this->siteSubset = siteSubset;
+  this->siteOrder = siteOrder;
+  this->fieldOrder = fieldOrder;
+  this->gammaBasis = gammaBasis;
+  this->parity = parity;
 
-  basis = Basis;
-
-  parity = Parity;
   init = true;
 }
 
@@ -71,7 +72,8 @@ void ColorSpinorField::destroy() {
 ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
   if (&src != this) {
     create(src.nDim, src.x, src.nColor, src.nSpin, src.precision, src.pad,
-	   src.type, src.subset, src.subset_order, src.order, src.basis, src.parity);    
+	   src.fieldLocation, src.siteSubset, src.siteOrder, src.fieldOrder, 
+	   src.gammaBasis, src.parity);    
   }
   return *this;
 }
@@ -93,10 +95,10 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   
   if (param.pad != 0) pad = param.pad;
 
-  if (param.fieldSubset == QUDA_FULL_FIELD_SUBSET){
+  if (param.siteSubset == QUDA_FULL_SITE_SUBSET){
     stride = volume/2 + pad;
     length = 2*stride*nColor*nSpin*2;
-  }else if (param.fieldSubset == QUDA_PARITY_FIELD_SUBSET){
+  }else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
     stride = volume + pad;
     length = stride*nColor*nSpin*2;  
   }else{
@@ -107,12 +109,11 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
 
   bytes = length * precision;
 
-  if (param.fieldType != QUDA_INVALID_FIELD) type = param.fieldType;
-  if (param.fieldSubset != QUDA_INVALID_SUBSET) subset = param.fieldSubset;
-  if (param.subsetOrder != QUDA_INVALID_SUBSET_ORDER) subset_order = param.subsetOrder;
-  if (param.fieldOrder != QUDA_INVALID_ORDER) order = param.fieldOrder;
-
-  if (param.basis != QUDA_INVALID_BASIS) basis = param.basis;
+  if (param.fieldLocation != QUDA_INVALID_FIELD_LOCATION) fieldLocation = param.fieldLocation;
+  if (param.siteSubset != QUDA_INVALID_SITE_SUBSET) siteSubset = param.siteSubset;
+  if (param.siteOrder != QUDA_INVALID_SITE_ORDER) siteOrder = param.siteOrder;
+  if (param.fieldOrder != QUDA_INVALID_FIELD_ORDER) fieldOrder = param.fieldOrder;
+  if (param.gammaBasis != QUDA_INVALID_GAMMA_BASIS) gammaBasis = param.gammaBasis;
 
   if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 }
@@ -125,12 +126,12 @@ void ColorSpinorField::fill(ColorSpinorParam &param) {
   param.nDim = nDim;
   memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
   param.pad = pad;
-  param.fieldType = type;
-  param.fieldSubset = subset;
-  param.subsetOrder = subset_order;
-  param.fieldOrder = order;
-  param.basis = basis;
-  param.create = QUDA_INVALID_CREATE;
+  param.fieldLocation = fieldLocation;
+  param.siteSubset = siteSubset;
+  param.siteOrder = siteOrder;
+  param.fieldOrder = fieldOrder;
+  param.gammaBasis = gammaBasis;
+  param.create = QUDA_INVALID_FIELD_CREATE;
 }
 
 // For kernels with precision conversion built in
@@ -150,12 +151,12 @@ void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorFi
 
 double norm2(const ColorSpinorField &a) {
 
-  if (a.fieldType() == QUDA_CUDA_FIELD) {
+  if (a.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
     return normCuda(dynamic_cast<const cudaColorSpinorField&>(a));
-  } else if (a.fieldType() == QUDA_CPU_FIELD) {
+  } else if (a.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
     return normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
   } else {
-    errorQuda("Field type %d not supported", a.fieldType());
+    errorQuda("Field type %d not supported", a.FieldLocation());
   }
 
 }

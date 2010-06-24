@@ -65,7 +65,7 @@ void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, c
   checkFullSpinor(out, in);
 
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
 
   bool reset = false;
   if (!tmp2) {
@@ -88,7 +88,7 @@ void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, c
 void DiracClover::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) {
   checkFullSpinor(out, in);
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
 
   bool reset = false;
   if (!tmp1) {
@@ -187,7 +187,7 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in,
 
   // FIXME: For asymmetric, a "DslashCxpay" kernel would improve performance.
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
@@ -236,7 +236,7 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in,
 void DiracCloverPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) {
   // need extra temporary because of symmetric preconditioning dagger
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
 
   bool reset = false;
   if (!tmp2) {
@@ -266,7 +266,7 @@ void DiracCloverPC::Prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
   }
 
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(b.Even(), param); // only create if necessary
@@ -324,7 +324,7 @@ void DiracCloverPC::Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFi
   checkFullSpinor(x, b);
 
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(b.Even(), param); // only create if necessary

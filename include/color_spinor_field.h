@@ -10,7 +10,7 @@
 
 class ColorSpinorParam {
  public:
-  FieldType fieldType; // cpu, cuda etc. 
+  QudaFieldLocation fieldLocation; // cpu, cuda etc. 
   int nColor; // Number of colors of the field
   int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   int nDim; // number of spacetime dimensions
@@ -18,44 +18,46 @@ class ColorSpinorParam {
   QudaPrecision precision; // Precision of the field
   int pad; // volumetric padding
 
-  FieldSubset fieldSubset; // Full, even or odd
-  SubsetOrder subsetOrder; // defined for full fields
+  QudaSiteSubset siteSubset; // Full, even or odd
+  QudaSiteOrder siteOrder; // defined for full fields
   QudaParity parity;
   
-  QudaColorSpinorOrder fieldOrder; // Float, Float2, Float4 etc.
-  GammaBasis basis;
-  FieldCreate create; // 
+  QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
+  QudaGammaBasis gammaBasis;
+  QudaFieldCreate create; // 
 
   void *v; // pointer to field
   void *norm;
 
  ColorSpinorParam()
-   : fieldType(QUDA_INVALID_FIELD), nColor(0), nSpin(0), nDim(0), precision(QUDA_INVALID_PRECISION), 
-    pad(0), fieldSubset(QUDA_INVALID_SUBSET), subsetOrder(QUDA_INVALID_SUBSET_ORDER), 
-    parity(QUDA_INVALID_PARITY),
-    fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_INVALID_BASIS), create(QUDA_INVALID_CREATE)
+   : fieldLocation(QUDA_INVALID_FIELD_LOCATION), nColor(0), nSpin(0), nDim(0), 
+    precision(QUDA_INVALID_PRECISION), pad(0), siteSubset(QUDA_INVALID_SITE_SUBSET), 
+    siteOrder(QUDA_INVALID_SITE_ORDER), parity(QUDA_INVALID_PARITY),
+    fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
+    create(QUDA_INVALID_FIELD_CREATE)
   { for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0;}
   
   // used to create cpu params
  ColorSpinorParam(void *V, QudaInvertParam &inv_param, int *X)
-   : fieldType(QUDA_CPU_FIELD), nColor(3), nSpin(4), nDim(4), precision(inv_param.cpu_prec), 
-    pad(0), fieldSubset(QUDA_INVALID_SUBSET), subsetOrder(QUDA_INVALID_SUBSET_ORDER), 
-    parity(inv_param.in_parity),
-    fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_DEGRAND_ROSSI_BASIS), create(QUDA_REFERENCE_CREATE), v(V)
+   : fieldLocation(QUDA_CPU_FIELD_LOCATION), nColor(3), nSpin(4), nDim(4), 
+    precision(inv_param.cpu_prec), pad(0), siteSubset(QUDA_INVALID_SITE_SUBSET), 
+    siteOrder(QUDA_INVALID_SITE_ORDER), parity(inv_param.in_parity),
+    fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
+    create(QUDA_REFERENCE_FIELD_CREATE), v(V)
   { 
 
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
 
     if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-      fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
-      subsetOrder = QUDA_ODD_EVEN_SUBSET_ORDER;
+      fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      siteOrder = QUDA_ODD_EVEN_SITE_ORDER;
     } else if (inv_param.dirac_order == QUDA_QDP_DIRAC_ORDER) {
-      fieldOrder = QUDA_SPACE_COLOR_SPIN_ORDER;
-      subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+      fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+      siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     } else if (inv_param.dirac_order == QUDA_DIRAC_ORDER) {
-      fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
-      subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+      fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     } else {
       errorQuda("Dirac order %d not supported", inv_param.dirac_order);
     }
@@ -63,35 +65,35 @@ class ColorSpinorParam {
 
   // used to create cuda param from a cpu param
  ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
-    : fieldType(QUDA_CUDA_FIELD), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), nDim(cpuParam.nDim), 
-    precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  fieldSubset(cpuParam.fieldSubset),     
-    subsetOrder(QUDA_EVEN_ODD_SUBSET_ORDER), parity(inv_param.in_parity),
-    fieldOrder(QUDA_INVALID_ORDER), basis(QUDA_UKQCD_BASIS),
-    create(QUDA_COPY_CREATE), v(0)
+    : fieldLocation(QUDA_CUDA_FIELD_LOCATION), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), 
+    nDim(cpuParam.nDim), precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
+    siteSubset(cpuParam.siteSubset), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), 
+    parity(inv_param.in_parity), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
+    gammaBasis(QUDA_UKQCD_GAMMA_BASIS), create(QUDA_COPY_FIELD_CREATE), v(0)
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
 
     if (precision == QUDA_DOUBLE_PRECISION) {
-      fieldOrder = QUDA_FLOAT2_ORDER;
+      fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     } else {
-      fieldOrder = QUDA_FLOAT4_ORDER;
+      fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     }
 
   }
 
   void print() {
-    printfQuda("fieldType = %d\n", fieldType);
+    printfQuda("fieldLocation = %d\n", fieldLocation);
     printfQuda("nColor = %d\n", nColor);
     printfQuda("nSpin = %d\n", nSpin);
     printfQuda("nDim = %d\n", nDim);
     for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
     printfQuda("precision = %d\n", precision);
     printfQuda("pad = %d\n", pad);
-    printfQuda("fieldSubset = %d\n", fieldSubset);
-    printfQuda("subsetOrder = %d\n", subsetOrder);
+    printfQuda("siteSubset = %d\n", siteSubset);
+    printfQuda("siteOrder = %d\n", siteOrder);
     printfQuda("fieldOrder = %d\n", fieldOrder);
-    printfQuda("basis = %d\n", basis);
+    printfQuda("gammaBasis = %d\n", gammaBasis);
     printfQuda("create = %d\n", create);
     printfQuda("v = %lx\n", (ulong)v);
     printfQuda("norm = %lx\n", (ulong)norm);
@@ -105,8 +107,8 @@ class ColorSpinorField {
 
  private:
   void create(int nDim, const int *x, int Nc, int Ns, QudaPrecision precision, 
-	      int pad, FieldType type, FieldSubset subset, 
-	      SubsetOrder subsetOrder, QudaColorSpinorOrder order, GammaBasis basis,
+	      int pad, QudaFieldLocation location, QudaSiteSubset subset, 
+	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
 	      QudaParity parity);
   void destroy();  
 
@@ -128,11 +130,11 @@ class ColorSpinorField {
   int length;
   size_t bytes;
   
-  FieldType type;
-  FieldSubset subset;
-  SubsetOrder subset_order;
-  QudaColorSpinorOrder order;
-  GammaBasis basis;
+  QudaFieldLocation fieldLocation;
+  QudaSiteSubset siteSubset;
+  QudaSiteOrder siteOrder;
+  QudaFieldOrder fieldOrder;
+  QudaGammaBasis gammaBasis;
   QudaParity parity;
   
   // in the case of full fields, these are references to the even / odd sublattices
@@ -162,12 +164,12 @@ class ColorSpinorField {
   void PrintDims() const { printf("dimensions=%d %d %d %d\n",
 				  x[0], x[1], x[2], x[3]);}
 
-  FieldType fieldType() const { return type; }
-  FieldSubset fieldSubset() const { return subset; }
-  SubsetOrder subsetOrder() const { return subset_order; }
-  QudaColorSpinorOrder fieldOrder() const { return order; }
-  GammaBasis gammaBasis() const { return basis; }
-  QudaParity qudaParity() const {return parity;}
+  QudaFieldLocation FieldLocation() const { return fieldLocation; }
+  QudaSiteSubset SiteSubset() const { return siteSubset; }
+  QudaSiteOrder SiteOrder() const { return siteOrder; }
+  QudaFieldOrder FieldOrder() const { return fieldOrder; }
+  QudaGammaBasis GammaBasis() const { return gammaBasis; }
+  QudaParity Parity() const {return parity;}
   
 };
 
@@ -247,7 +249,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   static bool bufferInit;
   static size_t bufferBytes;
 
-  void create(const FieldCreate);
+  void create(const QudaFieldCreate);
   void destroy();
   void zero();
   void copy(const cudaColorSpinorField &);
@@ -289,7 +291,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   void *norm; // the normalization field
   bool init;
 
-  void create(const FieldCreate);
+  void create(const QudaFieldCreate);
   void destroy();
   void copy(const cpuColorSpinorField&);
   void zero();

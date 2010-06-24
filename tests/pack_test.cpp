@@ -51,18 +51,18 @@ void init() {
   }
   cpsGauge = malloc(4*V*gaugeSiteSize*param.cpu_prec);
 
-  csParam.fieldType = QUDA_CPU_FIELD;
+  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
   csParam.precision = QUDA_SINGLE_PRECISION;
   csParam.pad = 0;
-  csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
-  csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
-  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
-  csParam.create = QUDA_NULL_CREATE;
+  csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  csParam.create = QUDA_NULL_FIELD_CREATE;
 
   spinor = new cpuColorSpinorField(csParam);
   spinor2 = new cpuColorSpinorField(csParam);
@@ -71,9 +71,9 @@ void init() {
 
   initQuda(0);
 
-  csParam.fieldType = QUDA_CUDA_FIELD;
-  csParam.fieldOrder = QUDA_FLOAT4_ORDER;
-  csParam.basis = QUDA_UKQCD_BASIS;
+  csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
+  csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   csParam.pad = 0;
   csParam.precision = QUDA_HALF_PRECISION;
 

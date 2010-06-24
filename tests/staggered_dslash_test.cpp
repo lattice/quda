@@ -88,7 +88,7 @@ init()
     inv_param.cl_pad = sdim*sdim*sdim;
 
     ColorSpinorParam csParam;
-    csParam.fieldType = QUDA_CPU_FIELD;
+    csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
     csParam.nColor=3;
     csParam.nSpin=1;
     csParam.nDim=4;
@@ -98,22 +98,22 @@ init()
     csParam.precision = inv_param.cpu_prec;
     csParam.pad = 0;
     if (test_type < 2){
-	csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+	csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 	csParam.x[0] /= 2;
     }else{
-	csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;	
+	csParam.siteSubset = QUDA_FULL_SITE_SUBSET;	
     }
 
-    csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
-    csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_ORDER;
-    csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
-    csParam.create = QUDA_ZERO_CREATE;    
+    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;    
 
     spinor = new cpuColorSpinorField(csParam);
     spinorOut = new cpuColorSpinorField(csParam);
     spinorRef = new cpuColorSpinorField(csParam);
 
-    csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     csParam.x[0] = gaugeParam.X[0];
     
     printfQuda("Randomizing fields ...\n");
@@ -167,13 +167,13 @@ init()
     
     if (!TRANSFER) {
 	
-	csParam.fieldType = QUDA_CUDA_FIELD;
-	csParam.fieldOrder = QUDA_FLOAT2_ORDER;
-	csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
+	csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
+	csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+	csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 	csParam.pad = inv_param.sp_pad;
 	csParam.precision = inv_param.cuda_prec;
 	if (test_type < 2){
-	    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+	    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 	    csParam.x[0] /=2;
 	}
 
@@ -195,7 +195,7 @@ init()
 	if(test_type == 2){
 	    csParam.x[0] /=2;
 	}
-	csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+	csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 	tmp = new cudaColorSpinorField(csParam);
 
 	DiracParam diracParam;

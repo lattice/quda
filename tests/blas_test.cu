@@ -31,7 +31,7 @@ int niter = 100 * 331776 / (LX * LY * LZ * LT); // 100 iterations on V=24^4
 void init()
 {
   ColorSpinorParam param;
-  param.fieldType = QUDA_CUDA_FIELD;
+  param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   param.nColor = 3;
   param.nSpin = 4; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   param.nDim = 4; // number of spacetime dimensions
@@ -40,27 +40,27 @@ void init()
   param.x[2] = LZ;
   param.x[3] = LT;
   param.pad = 0;
-  param.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
-  param.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+  param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   
-  param.basis = QUDA_UKQCD_BASIS;
-  param.create = QUDA_NULL_CREATE;
+  param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  param.create = QUDA_NULL_FIELD_CREATE;
 
   switch(prec) {
   case 0:
     param.precision = QUDA_HALF_PRECISION;
     other_prec = QUDA_SINGLE_PRECISION;
-    param.fieldOrder = QUDA_FLOAT4_ORDER;
+    param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     break;
   case 1:
     param.precision = QUDA_SINGLE_PRECISION;
     other_prec = QUDA_HALF_PRECISION;
-    param.fieldOrder = QUDA_FLOAT4_ORDER;
+    param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     break;
   case 2:
     param.precision = QUDA_DOUBLE_PRECISION;
     other_prec = QUDA_HALF_PRECISION;
-    param.fieldOrder = QUDA_FLOAT2_ORDER;
+    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     break;
   }
 
@@ -73,7 +73,7 @@ void init()
   z = new cudaColorSpinorField(param);
 
   param.precision = QUDA_SINGLE_PRECISION;
-  param.fieldOrder = QUDA_FLOAT4_ORDER; // always true since this is never double
+  param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER; // always true since this is never double
   p = new cudaColorSpinorField(param);
 
   // check for successful allocation

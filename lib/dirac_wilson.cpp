@@ -60,7 +60,7 @@ void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &i
   checkFullSpinor(out, in);
 
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
@@ -121,7 +121,7 @@ void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in,
   double kappa2 = -kappa*kappa;
 
   ColorSpinorParam param;
-  param.create = QUDA_NULL_CREATE;
+  param.create = QUDA_NULL_FIELD_CREATE;
   bool reset = false;
   if (!tmp1) {
     tmp1 = new cudaColorSpinorField(in, param); // only create if necessary

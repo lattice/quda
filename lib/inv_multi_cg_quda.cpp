@@ -48,7 +48,7 @@ invertMultiShiftCgCuda(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField**
   cudaColorSpinorField *x_sloppy[num_offsets], *r_sloppy;
   
   ColorSpinorParam param;
-  param.create = QUDA_ZERO_CREATE;
+  param.create = QUDA_ZERO_FIELD_CREATE;
   param.precision = invert_param->cuda_prec_sloppy;
   
   if (invert_param->cuda_prec_sloppy == x[0]->Precision()) {
@@ -61,7 +61,7 @@ invertMultiShiftCgCuda(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField**
     for(i=0;i < num_offsets;i++){
       x_sloppy[i] = new cudaColorSpinorField(*x[i], param);
     }
-    param.create = QUDA_COPY_CREATE;
+    param.create = QUDA_COPY_FIELD_CREATE;
     r_sloppy = new cudaColorSpinorField(*r, param);
   }
   
@@ -71,7 +71,7 @@ invertMultiShiftCgCuda(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField**
     p[i]= new cudaColorSpinorField(*r_sloppy);    
   }
   
-  param.create = QUDA_ZERO_CREATE;
+  param.create = QUDA_ZERO_FIELD_CREATE;
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, param);
   

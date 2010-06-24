@@ -379,14 +379,14 @@ void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType sol
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, QudaDagType dagger)
 {
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
-  cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+  cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
  
   cudaColorSpinorField in(hIn, cudaParam);
 
-  cudaParam.create = QUDA_NULL_CREATE;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaColorSpinorField out(in, cudaParam);
 
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
@@ -412,9 +412,9 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
   if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
     cudaGaugePrecise.X[0] /= 2;
-    cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
+    cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;;
   } else {
-    cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   }
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
@@ -423,7 +423,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
 
   cpuColorSpinorField hIn(cpuParam);
   cudaColorSpinorField in(hIn, cudaParam);
-  cudaParam.create = QUDA_NULL_CREATE;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaColorSpinorField out(in, cudaParam);
 
   DiracParam diracParam;
@@ -444,15 +444,15 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
   if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
     cudaGaugePrecise.X[0] /= 2;
-    cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
+    cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;;
   } else {
-    cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   }
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
   cudaColorSpinorField in(hIn, cudaParam);
-  cudaParam.create = QUDA_NULL_CREATE;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaColorSpinorField out(in, cudaParam);
 
   double kappa = inv_param->kappa;
@@ -501,39 +501,39 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if( param->dslash_type == QUDA_STAGGERED_DSLASH){
     ColorSpinorParam csParam;
     csParam.precision = param->cpu_prec;
-    csParam.fieldType = QUDA_CPU_FIELD;
-    csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;  
-    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
+    csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
+    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;  
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.nColor=3;
     csParam.nSpin=1;
     csParam.nDim=4;
     csParam.parity = param->in_parity;
-    csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     
     if (param->in_parity == QUDA_FULL_PARITY){
-      csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+      csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       csParam.x[0] = param->gaugeParam->X[0];
     }else{
-      csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] = param->gaugeParam->X[0]/2;    
     }
     csParam.x[1] = param->gaugeParam->X[1];
     csParam.x[2] = param->gaugeParam->X[2];
     csParam.x[3] = param->gaugeParam->X[3];
-    csParam.create = QUDA_REFERENCE_CREATE;
+    csParam.create = QUDA_REFERENCE_FIELD_CREATE;
     csParam.v = hp_b;  
     h_b = new  cpuColorSpinorField(csParam);
     
     csParam.v = hp_x;
     h_x= new  cpuColorSpinorField(csParam);
     
-    csParam.fieldType = QUDA_CUDA_FIELD;
-    csParam.fieldOrder = QUDA_FLOAT2_ORDER;
-    csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
+    csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
+    csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
     
     csParam.pad = param->sp_pad;
     csParam.precision = param->cuda_prec;
-    csParam.create = QUDA_ZERO_CREATE;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
     
     b = new cudaColorSpinorField(csParam);
     
@@ -550,9 +550,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     
     *b= *h_b; //send data from cpu to GPU
     
-    csParam.create = QUDA_COPY_CREATE;  
+    csParam.create = QUDA_COPY_FIELD_CREATE;  
     x = new cudaColorSpinorField(*h_x, csParam); // solution  
-    csParam.create = QUDA_ZERO_CREATE;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
     tmp =new cudaColorSpinorField(csParam); // temporary
         
   } else {
@@ -561,9 +561,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X);
     if (param->solution_type == QUDA_MAT_SOLUTION) {
       cudaGaugePrecise.X[0] /= 2;
-      cpuParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;;
+      cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;;
     } else {
-      cpuParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     }
     
     ColorSpinorParam cudaParam(cpuParam, *param);
@@ -577,14 +577,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     if(param->verbosity >= QUDA_VERBOSE){
       printfQuda("CPU source = %f, cuda copy=%f\n", norm2(*h_b),norm2(*b));
     }
-    cudaParam.create = QUDA_ZERO_CREATE;
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     x= new cudaColorSpinorField(cudaParam); // solution
     
     // if using preconditioning but solving the full system
     if (param->solver_type == QUDA_MATPC_SOLUTION && 
 	param->solution_type == QUDA_MAT_SOLUTION) {
       cudaParam.x[0] /= 2;
-      cudaParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+      cudaParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     }
     tmp= new cudaColorSpinorField(cudaParam); // temporary
     
@@ -698,26 +698,26 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   ColorSpinorParam csParam;
   csParam.precision = param->cpu_prec;
-  csParam.fieldType = QUDA_CPU_FIELD;
-  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;  
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_ORDER;
+  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
+  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;  
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=4;
   csParam.parity = param->in_parity;
-  csParam.subsetOrder = QUDA_EVEN_ODD_SUBSET_ORDER;
+  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
 
   if (param->in_parity == QUDA_FULL_PARITY){
-    csParam.fieldSubset = QUDA_FULL_FIELD_SUBSET;
+    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     csParam.x[0] = param->gaugeParam->X[0];
   }else{
-    csParam.fieldSubset = QUDA_PARITY_FIELD_SUBSET;
+    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] = param->gaugeParam->X[0]/2;    
   }
   csParam.x[1] = param->gaugeParam->X[1];
   csParam.x[2] = param->gaugeParam->X[2];
   csParam.x[3] = param->gaugeParam->X[3];
-  csParam.create = QUDA_REFERENCE_CREATE;
+  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   csParam.v = hp_b;  
   cpuColorSpinorField h_b(csParam);
   
@@ -728,13 +728,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     h_x[i] = new cpuColorSpinorField(csParam);
   }
   
-  csParam.fieldType = QUDA_CUDA_FIELD;
-  csParam.fieldOrder = QUDA_FLOAT2_ORDER;
-  csParam.basis = QUDA_DEGRAND_ROSSI_BASIS;
+  csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
+  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
   csParam.pad = param->sp_pad;
   csParam.precision = param->cuda_prec;
-  csParam.create = QUDA_ZERO_CREATE;
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
   
   cudaColorSpinorField b(csParam);
   
@@ -757,7 +757,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   b= h_b; //send data from cpu to GPU
   
-  csParam.create = QUDA_ZERO_CREATE;
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField* x[num_offsets]; // solution  
   for(i=0;i < num_offsets;i++){
     x[i] = new cudaColorSpinorField(csParam);

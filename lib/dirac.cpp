@@ -34,9 +34,10 @@ Dirac& Dirac::operator=(const Dirac &dirac) {
 
 void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
 
-  if (in.gammaBasis() != QUDA_UKQCD_BASIS || out.gammaBasis() != QUDA_UKQCD_BASIS) {
+  if (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || 
+      out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) {
     errorQuda("Cuda Dirac operator requires UKQCD basis, out = %d, in = %d", 
-	      out.gammaBasis(), in.gammaBasis());
+	      out.GammaBasis(), in.GammaBasis());
   }
 
   if (in.Precision() != out.Precision()) {
@@ -47,22 +48,22 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
     errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", in.Stride(), out.Stride());
   }
 
-  if (in.fieldSubset() != QUDA_PARITY_FIELD_SUBSET || out.fieldSubset() != QUDA_PARITY_FIELD_SUBSET) {
+  if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
     errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
-	      in.fieldSubset(), out.fieldSubset());
+	      in.SiteSubset(), out.SiteSubset());
   }
 
-  if ((out.Volume() != 2*gauge.volume && out.fieldSubset() == QUDA_FULL_FIELD_SUBSET) ||
-      (out.Volume() != gauge.volume && out.fieldSubset() == QUDA_PARITY_FIELD_SUBSET) ) {
+  if ((out.Volume() != 2*gauge.volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+      (out.Volume() != gauge.volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
     errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
   }
 
 }
 
 void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
-   if (in.fieldSubset() != QUDA_FULL_FIELD_SUBSET || out.fieldSubset() != QUDA_FULL_FIELD_SUBSET) {
+   if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET) {
     errorQuda("ColorSpinorFields are not full fields, in = %d, out = %d", 
-	      in.fieldSubset(), out.fieldSubset());
+	      in.SiteSubset(), out.SiteSubset());
   } 
 }
 

@@ -16,7 +16,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
 			QudaInvertParam *invert_param, DagType dag_type)
 {
   ColorSpinorParam param;
-  param.create = QUDA_ZERO_CREATE;
+  param.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField y(x, param);
 
   param.precision = invert_param->cuda_prec_sloppy;
@@ -27,7 +27,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
 
   cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
-    param.create = QUDA_REFERENCE_CREATE;
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
     x_sloppy = &x;
     r_sloppy = &r;
     r_0 = &b;
@@ -35,7 +35,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
     copyCuda(*r_sloppy, b);
   } else {
     x_sloppy = new cudaColorSpinorField(x, param);
-    param.create = QUDA_COPY_CREATE;
+    param.create = QUDA_COPY_FIELD_CREATE;
     r_sloppy = new cudaColorSpinorField(b, param);
     r_0 = new cudaColorSpinorField(b, param);
   }
