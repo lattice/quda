@@ -242,7 +242,7 @@ void write(char *names[], int threads[][3], int blocks[][3])
   fprintf(fp, "static int blas_blocks[%d][3] = {\n", Nkernels);
 
   for (int i=0; i<Nkernels; i++) {
-    fprintf(fp, "  {%4d, %4d, %4d}%c  // Kernel %2d: %s\n", blocks[i][0], blocks[i][1], blocks[i][2],
+    fprintf(fp, "  {%5d, %5d, %5d}%c  // Kernel %2d: %s\n", blocks[i][0], blocks[i][1], blocks[i][2],
 	    ((i == Nkernels-1) ? ' ' : ','), i, names[i]);
   }
   fprintf(fp, "};\n");
