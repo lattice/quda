@@ -512,14 +512,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     
     if (param->in_parity == QUDA_FULL_PARITY){
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-      csParam.x[0] = param->gaugeParam->X[0];
+      csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
     }else{
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      csParam.x[0] = param->gaugeParam->X[0]/2;    
+      csParam.x[0] = cudaFatLinkPrecise.X[0];
     }
-    csParam.x[1] = param->gaugeParam->X[1];
-    csParam.x[2] = param->gaugeParam->X[2];
-    csParam.x[3] = param->gaugeParam->X[3];
+    csParam.x[1] = cudaFatLinkPrecise.X[1];
+    csParam.x[2] = cudaFatLinkPrecise.X[2];
+    csParam.x[3] = cudaFatLinkPrecise.X[3];
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
     csParam.v = hp_b;  
     h_b = new  cpuColorSpinorField(csParam);
@@ -709,14 +709,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   if (param->in_parity == QUDA_FULL_PARITY){
     csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    csParam.x[0] = param->gaugeParam->X[0];
+    csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
   }else{
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    csParam.x[0] = param->gaugeParam->X[0]/2;    
+    csParam.x[0] = cudaFatLinkPrecise.X[0];
   }
-  csParam.x[1] = param->gaugeParam->X[1];
-  csParam.x[2] = param->gaugeParam->X[2];
-  csParam.x[3] = param->gaugeParam->X[3];
+  csParam.x[1] = cudaFatLinkPrecise.X[1];
+  csParam.x[2] = cudaFatLinkPrecise.X[2];
+  csParam.x[3] = cudaFatLinkPrecise.X[3];
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   csParam.v = hp_b;  
   cpuColorSpinorField h_b(csParam);

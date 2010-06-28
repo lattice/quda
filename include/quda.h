@@ -43,7 +43,6 @@ extern "C" {
 
   typedef struct QudaInvertParam_s {
 
-    QudaGaugeParam* gaugeParam;
     QudaDslashType dslash_type;
     QudaInverterType inv_type;
     QudaParity in_parity;

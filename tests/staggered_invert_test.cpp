@@ -77,7 +77,6 @@ invert_test(void)
 
   gaugeParam.anisotropy = 1.0;
 
-  inv_param.gaugeParam = &gaugeParam;
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.inv_type = QUDA_CG_INVERTER;
 
