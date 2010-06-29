@@ -1,19 +1,12 @@
-#include "llfat_quda.h"
+#include <stdio.h>
+
+#include <quda_internal.h>
+#include <llfat_quda.h>
 #include <cuda_runtime.h>
 #include <cuda.h>
-#include <stdio.h>
-#include "read_gauge.h"
-#include "gauge_quda.h"
-#include "force_kernel_common_macro.h"
-
-
-#define CUERR  do{ cudaError_t cuda_err;				\
-        if ((cuda_err = cudaGetLastError()) != cudaSuccess) {		\
-            fprintf(stderr, "ERROR: CUDA error: %s, line %d, function %s, file %s\n", \
-		    cudaGetErrorString(cuda_err),  __LINE__, __FUNCTION__, __FILE__); \
-            exit(cuda_err);}}while(0) 
-
-
+#include <read_gauge.h>
+#include <gauge_quda.h>
+#include <force_common.h>
 
 #define WRITE_FAT_MATRIX(gauge, dir, idx)do {		\
     gauge[idx + dir*Vhx9] = FAT0;			\
@@ -989,7 +982,7 @@ UNBIND_SITE_AND_FAT_LINK;
     }//nu
   }//dir
   
-  CUERR;
+  checkCudaError();
   return;
 }
 

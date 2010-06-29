@@ -539,8 +539,8 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
     //input_path
     int bytes = num_paths*max_length* sizeof(int);
     int* input_path_d;
-    cudaMalloc((void**)&input_path_d, bytes); CUERR;    
-    cudaMemset(input_path_d, 0, bytes);CUERR;
+    cudaMalloc((void**)&input_path_d, bytes); checkCudaError();    
+    cudaMemset(input_path_d, 0, bytes);checkCudaError();
 
     int* input_path_h = (int*)malloc(bytes);
     if (input_path_h == NULL){
@@ -555,12 +555,12 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
 	}
     }
 
-    cudaMemcpy(input_path_d, input_path_h, bytes, cudaMemcpyHostToDevice); CUERR;
+    cudaMemcpy(input_path_d, input_path_h, bytes, cudaMemcpyHostToDevice); checkCudaError();
     
     //length
     int* length_d;
-    cudaMalloc((void**)&length_d, num_paths*sizeof(int)); CUERR;
-    cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice); CUERR;
+    cudaMalloc((void**)&length_d, num_paths*sizeof(int)); checkCudaError();
+    cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice); checkCudaError();
     
     //path_coeff
     int gsize;
@@ -570,8 +570,8 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
 	gsize= sizeof(float);
     }     
     void* path_coeff_d;
-    cudaMalloc((void**)&path_coeff_d, num_paths*gsize); CUERR;
-    cudaMemcpy(path_coeff_d, path_coeff, num_paths*gsize, cudaMemcpyHostToDevice); CUERR;
+    cudaMalloc((void**)&path_coeff_d, num_paths*gsize); checkCudaError();
+    cudaMemcpy(path_coeff_d, path_coeff, num_paths*gsize, cudaMemcpyHostToDevice); checkCudaError();
 
     //compute the gauge forces
     int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
@@ -606,9 +606,9 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
     cudaUnbindTexture(siteLink0TexSingle);
     cudaUnbindTexture(siteLink1TexSingle);
     
-    CUERR;
+    checkCudaError();
     
-    cudaFree(input_path_d); CUERR;
+    cudaFree(input_path_d); checkCudaError();
     free(input_path_h);
     cudaFree(length_d);
     cudaFree(path_coeff_d);

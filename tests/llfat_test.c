@@ -1,15 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
 
 #include <quda.h>
-#include <test_util.h>
 #include <gauge_quda.h>
-#include <string.h>
+#include <dslash_quda.h>
+#include <llfat_quda.h>
+
+#include <test_util.h>
+#include <llfat_reference.h>
 #include "misc.h"
-#include "llfat_reference.h"
-#include "llfat_quda.h"
-#include "dslash_quda.h"
-#include <sys/time.h>
 
 FullGauge cudaSiteLink;
 FullGauge cudaFatLink;
@@ -154,7 +155,7 @@ llfat_test(void)
     llfat_reference(refLink, siteLink, gaugeParam.cpu_prec, act_path_coeff);
   }
   
- llfat_init_cuda(&gaugeParam); 
+  llfat_init_cuda(&gaugeParam);
 
   //The number comes from CPU implementation in MILC, fermion_links_helpers.c    
   int flops= 61632; 
@@ -182,7 +183,7 @@ llfat_test(void)
     
   if (res == 0){//failed
     printf("\n");
-    printf("Warning: you test failed. \n");
+    printf("Warning: your test failed. \n");
     printf("	Did you use --verify?\n");
     printf("	Did you check the GPU health by running cuda memtest?\n");
   }

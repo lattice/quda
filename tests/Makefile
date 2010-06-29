@@ -4,12 +4,12 @@ QUDA = ../lib/libquda.a
 
 INC += -I../include -I.
 
-HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h \
+HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h    \
 	test_util.h
 
 TESTS = su3_test blas_test pack_test wilson_dslash_test wilson_invert_test \
 	staggered_dslash_test staggered_invert_test			   \
-	${FATLINK_TEST} ${GAUGE_FORCE_TEST} ${FERMION_FORCE_TEST}
+	$(FATLINK_TEST) $(GAUGE_FORCE_TEST) $(FERMION_FORCE_TEST)
 
 all: $(TESTS)
 
@@ -34,13 +34,13 @@ pack_test: pack_test.o test_util.o dslash_reference.o $(QUDA)
 blas_test: blas_test.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o ${QUDA}
+llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o $(QUDA)
 	$(CC) $(LDFLAGS) $^  -o $@ 
 
-gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o ${QUDA}
+gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o $(QUDA)
 	$(CC) $(LDFLAGS) $^  -o $@ 
 
-fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o ${QUDA}
+fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
 	$(CC) $(LDFLAGS) $^  -o $@ 
 
 
@@ -57,7 +57,7 @@ clean:
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 
 %.o: %.cu $(HDRS)
-	$(NVCC)  $(NVCCFLAGS) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 .PHONY: all tune clean
 

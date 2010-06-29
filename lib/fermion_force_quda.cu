@@ -1,6 +1,6 @@
 
 #include "fermion_force_quda.h"
-#include "force_kernel_common_macro.h"
+#include "force_common.h"
 #include "hw_quda.h"
 
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_SINGLE
@@ -1370,7 +1370,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 				(float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd, cudaSiteLink, 
 				(float2*)cudaMom.even, (float2*)cudaMom.odd, 
 				gridDim, blockDim);
-	    CUERR;
+	    checkCudaError();
             for(nu=0; nu < 8; nu++){
                 if (nu == sig || nu == OPP_DIR(sig)
                     || nu == mu || nu == OPP_DIR(mu)){
@@ -1385,7 +1385,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 				    (float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd, cudaSiteLink, 
 				    (float2*)cudaMom.even, (float2*)cudaMom.odd,
 				    gridDim, blockDim);
-		CUERR;
+		checkCudaError();
 		
                 for(rho =0; rho < 8; rho++){
                     if (rho == sig || rho == OPP_DIR(sig)
@@ -1407,7 +1407,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 				    (float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd, cudaSiteLink,
 				    (float2*)cudaMom.even, (float2*)cudaMom.odd,
 				    gridDim, blockDim);	
-		    CUERR;
+		    checkCudaError();
 		    
 		}//rho  		
 		
@@ -1424,7 +1424,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 				 (float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd, cudaSiteLink,
 				 (float2*)cudaMom.even, (float2*)cudaMom.odd,
 				 gridDim, blockDim);
-		CUERR;
+		checkCudaError();
 		
 	    }//nu
 	    
@@ -1437,7 +1437,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 				(float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd, cudaSiteLink, 
 				(float2*)cudaMom.even, (float2*)cudaMom.odd,
 				gridDim, blockDim);	    
-	    CUERR;		
+	    checkCudaError();		
 	    
 	    if(ThreeSt.x != 0)coeff.x = Lepage.x/ThreeSt.x ; else coeff.x = 0;
 	    if(ThreeSt.y != 0)coeff.y = Lepage.y/ThreeSt.y ; else coeff.y = 0;
@@ -1451,7 +1451,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 			     (float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd, cudaSiteLink,
 			     (float2*)cudaMom.even, (float2*)cudaMom.odd,
 			     gridDim, blockDim);
-	    CUERR;		
+	    checkCudaError();		
 	    
 	    //3-link side link
 	    coeff.x=coeff.y=0;
@@ -1464,7 +1464,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 			     (float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd, cudaSiteLink,
 			     (float2*)cudaMom.even, (float2*)cudaMom.odd,
 			     gridDim, blockDim);
-	    CUERR;			    
+	    checkCudaError();			    
 
 	    //1-link and naik term	    
 	    if (!DirectLinks[mu]){
@@ -1476,7 +1476,7 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
 								 mu, OneLink, Naik, mNaik, 
 								 (float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd,
 								 (float2*)cudaMom.even, (float2*)cudaMom.odd);
-		CUERR;		
+		checkCudaError();		
 	    }
 	    
 	}//mu
