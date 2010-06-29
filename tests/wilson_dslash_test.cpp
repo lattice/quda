@@ -34,8 +34,8 @@ cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp=0, *tmp2=0;
 void *hostGauge[4], *hostClover, *hostCloverInv;
 
 double kappa = 1.0;
-int parity = 0;   // even or odd? (0 = even, 1 = odd)
-QudaDagType dagger = QUDA_DAG_NO;   // apply Dslash or Dslash dagger?
+QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
+QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 int transfer = 0; // include transfer time in the benchmark?
 
 const int LOOPS = 1000;
