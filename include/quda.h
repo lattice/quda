@@ -3,6 +3,8 @@
 
 #include <enum_quda.h>
 
+#define QUDA_VERSION 000300 // version 0.3.0
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,9 +34,6 @@ extern "C" {
     QudaGaugeFixed gauge_fix;
 
     int ga_pad;
-
-    // int blockDim; // number of threads in a block
-    // int blockDim_sloppy;
 
     int packed_size;
     double gaugeGiB;

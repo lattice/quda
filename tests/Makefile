@@ -4,9 +4,11 @@ QUDA = ../lib/libquda.a
 
 INC += -I../include -I.
 
-HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h test_util.h
+HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h \
+	test_util.h
 
-TESTS = su3_test blas_test pack_test wilson_dslash_test wilson_invert_test staggered_dslash_test staggered_invert_test \
+TESTS = su3_test blas_test pack_test wilson_dslash_test wilson_invert_test \
+	staggered_dslash_test staggered_invert_test			   \
 	${FATLINK_TEST} ${GAUGE_FORCE_TEST} ${FERMION_FORCE_TEST}
 
 all: $(TESTS)
@@ -30,9 +32,6 @@ pack_test: pack_test.o test_util.o dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 blas_test: blas_test.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
-
-colorspinor_test: colorspinor_test.o dslash_reference.o blas_reference.o test_util.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o ${QUDA}

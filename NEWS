@@ -1,16 +1,105 @@
-Version 0.3 - alpha
 
-- Replaced all field with new ColorSpinorField object.  This will
-  eventually evolve into a heterogeneous environment through the cpu
-  and cuda implementations (and perhaps ocl?).
+Version 0.3.0
 
-- Promoted the Dirac operators to classes.
+- CUDA 3.0 or later is now required to build the library.
 
-- Blas performance improvements and slightly faster 8 reconstruction
-  (single and half)
+- The internals of QUDA have been extensively rewritten.  This is an
+  ongoing process and will continue through the next several releases.
 
-- Rewritten dslash_quda.cu using templates.  This breaks CUDA 2.3,
-  QUDA now requires 3.0+.
+- Removed the unused blockDim and blockDim_sloppy members from
+  QudaInvertParam.
+
+- Added 'solver_type' parameter to QudaInvertParam, complementary to the
+  existing 'solution_type'.  The latter determines the system of equations
+  to be solved (i.e., the system corresponding to the returned
+  solution), while the former determines the method (i.e., the form of
+  the equations used internally by the solver).  For example,
+  'solution_type = QUDA_MAT_SOLUTION' tells invertQuda() to return the
+  solution x of Dx=b, where D is the unpreconditioned Dirac operator.
+  If 'solver_type = QUDA_MATPC_SOLUTION', then behind the scenes this
+  solution will be reconstructed from the solution of the
+  corresponding even/odd preconditioned system.  In QUDA 0.2.x,
+  'solver_type' was always implicitly defined to be
+  QUDA_MATPCDAG_MATPC_SOLUTION (for the CG inverter) or
+  QUDA_MATPC_SOLUTION (for BiCGstab).  These are still the best choices
+  in general, but it is now possible to force QUDA to solve the
+  unpreconditioned system by setting 'solver_type = QUDA_MAT_SOLUTION'.
+  Note that not all solution_type/solver_type combinations are currently
+  supported.
+
+- ***FIXME: Added 'type' parameter to QudaGaugeParam ...
+
+- It is no longer possible to mix different precisions for the
+  spinors, gauge field, and clover term (where applicable).  In other
+  words, it is required that 'cuda_prec' in QudaGaugeParam match both
+  'cuda_prec' and 'clover_cuda_prec' in QudaInvertParam, and likewise
+  for the "sloppy" variants.  This change has greatly reduced the
+  time and memory required to build the library.
+
+- The dslashQuda(), MatPCQuda(), and MatQuda() functions now take
+  enumerated types to specify whether or not to apply the Hermitian
+  conjugate of the operator and (in the case of dslashQuda()) the
+  parity (even or odd) of the input spinor.  In QUDA 0.2.x, these were
+  specified by integers, but the new enums have been defined such that
+  calling code shouldn't have to change.  In other words, QUDA_DAG_NO
+  and QUDA_DAG_YES map to 0 and 1, respectively, and likewise for
+  QUDA_EVEN_PARITY and QUDA_ODD_PARITY.
+
+- Added support for improved staggered fermions (asqtad or HISQ) to
+  the solver.  Code for asqtad link fattening, the asqtad fermion
+  force, and the one-link improved Symanzik gauge force have also
+  been added, but these are not yet exposed through the interface in
+  a consistent way.
+
+- Added a multi-shift solver for staggered fermions, callable via
+  invertMultiShiftQuda().  This function does not yet support Wilson
+  or Wilson-clover.
+
+- Renamed dslash_test to wilson_dslash_test, renamed invert_test to
+  wilson_invert_test, and added staggered variants of these test
+  programs.
+
+- Temporarily removed 3D Wilson Dslash.
+
+
+Version 0.2.5 - 24 June 2010
+
+- Fixed regression in 0.2.4 that prevented the library from compiling
+  when GPU_ARCH was set to sm_10, sm_11, or sm_12.
+
+
+Version 0.2.4 - 22 June 2010
+
+- Added initial support for CUDA 3.x and Fermi (not yet optimized).
+
+- Incorporated look-ahead strategy to increase stability of the BiCGstab
+  inverter.
+
+- Added definition of QUDA_VERSION to quda.h.  This is an integer with
+  two digits for each of the major, minor, and subminor version
+  numbers.  For example, QUDA_VERSION is 000204 for this release.
+
+
+Version 0.2.3 - 2 June 2010
+ 
+- Further improved performance of the blas routines.
+
+- Added 3D Wilson Dslash in anticipation of temporal preconditioning.
+
+
+Version 0.2.2 - 16 February 2010
+
+- Fixed a bug that prevented reductions (and hence the inverter) from working
+  correctly in emulation mode.
+
+
+Version 0.2.1 - 8 February 2010
+
+- Fixed a bug that would sometimes cause the inverter to fail when spinor
+  padding is enabled.
+
+- Significantly improved performance of the blas routines.
+
 
 Version 0.2 - 16 December 2009
 

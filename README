@@ -1,31 +1,33 @@
 
-Release Notes for QUDA v0.2                          16 December 2009
----------------------------
+Release Notes for QUDA v0.3.0                             XX June 2010
+-----------------------------
 
 Overview:
 
 QUDA is a library for performing calculations in lattice QCD on
 graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
 This release includes optimized kernels for applying the Wilson Dirac
-operator and clover-improved Wilson Dirac operator, kernels for
-performing various BLAS-like operations, and full inverters built on
-these kernels.  Mixed-precision implementations of both CG and
-BiCGstab are provided, with support for double, single, and half
-(16-bit fixed-point) precision.
+operator (plain or clover-improved) and improved staggered operator
+(asqtad or HISQ), kernels for performing various BLAS-like operations,
+and full inverters built on these kernels.  Mixed-precision
+implementations of both CG and BiCGstab are provided, with support for
+double, single, and half (16-bit fixed-point) precision.  The
+staggered implementation additionally includes support for asqtad link
+fattening, force terms for the asqtad fermion action and one-loop
+improved Symanzik gauge action, and a multi-shift CG solver.
 
 
-Software compatibility:
+Software Compatibility:
 
-The library has been tested under Linux (CentOS 5.3 and Ubuntu 8.04)
-using release 2.3 of the CUDA toolkit.  There are known issues with
-releases 2.1 and 2.2, but 2.0 should work if one is forced to use an
-older version (for compatibility with an old driver, for example).
+The library has been tested under Linux (CentOS 5.4 and Ubuntu 10.04)
+using release 3.0 of the CUDA toolkit.  CUDA 2.x and earlier are no
+longer supported.  The library should also work under Mac OS X, but
+this hasn't been tested.
 
-Under Mac OS X, the library fails to compile due to bugs in CUDA 2.3.
-It might work with CUDA 2.2 or 2.0, but this hasn't been tested.
+See also "Known Issues" below.
 
 
-Hardware compatibility:
+Hardware Compatibility:
 
 For a list of supported devices, see
 
@@ -34,8 +36,8 @@ http://www.nvidia.com/object/cuda_learn_products.html
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and set GPU_ARCH in
-make.inc appropriately.  Setting 'GPU_ARCH = sm_13' will enable double
-precision support.
+make.inc appropriately.  Setting GPU_ARCH to 'sm_13' or 'sm_20' will
+enable double precision support.
 
 
 Installation:
@@ -47,40 +49,48 @@ compatibility" above).  Then type 'make' to build the library.
 
 As an optional step, 'make tune' will invoke tests/blas_test to
 perform autotuning of the various BLAS-like functions needed by the
-inverters.  This involves testing many combinations of parameters
-(corresponding to different numbers of CUDA threads per block and
-blocks per grid for each kernel) and writing the optimal values to
-lib/blas_param.h.  The new values will take effect the next time the
-library is built.  Ideally, the autotuning should be performed on the
-machine where the library is to be used, since the optimal parameters
-will depend on the CUDA device and host hardware.
+inverters.  This involves testing many combinations of launch
+parameters (corresponding to different numbers of CUDA threads per
+block and blocks per grid for each kernel) and writing the optimal
+values to lib/blas_param.h.  The new values will take effect the next
+time the library is built.  Ideally, the autotuning should be
+performed on the machine where the library is to be used, since the
+optimal parameters will depend on the CUDA device and host hardware.
+They will also depend slightly on the lattice volume; if desired, the
+volume used in the autotuning can be changed by editing
+tests/blas_test.cu.
 
 In summary, for an optimized install, run
 
     make && make tune && make
 
-By default, the autotuning is performed using CUDA device 0.  To
-select a different device number, set DEVICE in make.inc
-appropriately.
+(after optionally editing blas_test.cu).  By default, the autotuning
+is performed using CUDA device 0.  To select a different device
+number, set DEVICE in make.inc appropriately.
 
 
-Using the library:
+Using the Library:
 
 Include the header file include/quda.h in your application, link
-against lib/libquda.a, and study tests/invert_test.c for an example of
-the interface.  The various inverter options are enumerated in
-include/enum_quda.h.
+against lib/libquda.a, and study tests/wilson_invert_test.c or
+tests/staggered_invert_test.c for an example of the interface.  The
+various inverter options are enumerated in include/enum_quda.h.
 
 
-Known issues:
+Known Issues:
 
-* When building for the 'sm_13' GPU architecture (which enables double
-  precision support), one of the stages in the build process requires
-  over 5 GB of memory.  If too little memory is available, the
-  compilation will either take a very long time (given enough swap
-  space) or fail completely.  In addition, the CUDA C compiler
-  requires over 1 GB of disk space in /tmp for the creation of
-  temporary files.
+* When the library is compiled with version 3.0 of the CUDA toolkit
+  and run on Fermi (GPU architecture sm_20), the RECONSTRUCT_8 option
+  (which enables reconstructing gauge matrices from 8 real numbers)
+  gives wrong results in double precision.  This appears to be a bug
+  in CUDA 3.0, since CUDA 3.1 beta has no such issue.  Note that this
+  problem isn't likely to matter in practice, since RECONSTRUCT_8
+  generally performs worse in double precision than RECONSTRUCT_12.
+
+* Compiling in emulation mode with CUDA 3.0 does not with work when
+  the GPU architecture is set to sm_10, sm_11, or sm_12.  One should
+  compile for sm_13 instead.  Note that NVIDIA is eliminating
+  emulation mode completely from CUDA 3.1 and later.
 
 * For compatibility with CUDA, on 32-bit platforms the library is
   compiled with the GCC option -malign-double.  This differs from the
@@ -90,10 +100,13 @@ Known issues:
   be compiled with this option.
 
 
-Contact information:
+Getting Help:
 
-For help or to report a bug, please contact Mike Clark
-(mikec@seas.harvard.edu) or Ron Babich (rbabich@bu.edu).
+Please visit http://lattice.bu.edu/quda for contact information.
+Bug reports are especially welcome.
+
+
+Acknowledging QUDA:
 
 If you find this code useful in your work, please cite:
 
@@ -101,7 +114,19 @@ M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
 Lattice QCD systems of equations using mixed precision solvers on
 GPUs" (2009), arXiv:0911.3191 [hep-lat].
 
-Please also drop us a note so that we may inform you of updates and
-bug-fixes.  The most recent public release will always be available
-online at http://lattice.bu.edu/quda/
+
+Authors:
+
+Ronald Babich (Boston University)
+Kipton Barros (Northwestern University)
+Richard Brower (Boston University)
+Michael Clark (Harvard University)
+Steven Gottlieb (Indiana University, NCSA)
+Balint Joo (Jefferson Laboratory)
+Claudio Rebbi (Boston University)
+Guochun Shi (NCSA)
+
+Portions of this software were developed at the Innovative Systems Lab,
+National Center for Supercomputing Applications
+http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html
 
