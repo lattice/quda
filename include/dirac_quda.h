@@ -1,5 +1,5 @@
-#ifndef _QUDA_DIRAC_H
-#define _QUDA_DIRAC_H
+#ifndef _DIRAC_QUDA_H
+#define _DIRAC_QUDA_H
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -242,5 +242,4 @@ class DiracStaggered : public Dirac {
 			   const QudaSolutionType, const QudaDagType dagger = QUDA_DAG_NO);
 };
 
-
-#endif // _QUDA_DIRAC_H
+#endif // _DIRAC_QUDA_H

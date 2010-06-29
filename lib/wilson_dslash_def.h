@@ -1,35 +1,35 @@
 // dslash_def.h - Dslash kernel definitions
 
-// There are currently 288 different variants of the Dslash kernel,
-// each one characterized by a set of 6 options, where each option can
-// take one of several values (3*3*4*2*2*2 = 288).  This file is
-// structured so that the C preprocessor loops through all 288
+// There are currently 48 different variants of the Wilson Dslash
+// kernel, each one characterized by a set of 5 options, where each
+// option can take one of several values (2*2*2*2*3 = 48).  This file
+// is structured so that the C preprocessor loops through all 48
 // variants (in a manner resembling a counter), sets the appropriate
 // macros, and defines the corresponding functions.
 //
 // As an example of the function naming conventions, consider
 //
-// dslashSHS12DaggerXpayKernel(float4* out, int oddBit, float a).
+// cloverDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a Dslash^dagger kernel where the gauge field is read in single
-// precision (S), the spinor field is read in half precision (H), the clover
-// term is read in single precision (S), each gauge matrix is reconstructed
-// from 12 real numbers, and the result is multiplied by "a" and summed
-// with an input vector (Xpay).  More generally, each function name is given
-// by the concatenation of the following 6 fields, with "dslash" at the
-// beginning and "Kernel" at the end:
+// This is a clover Dslash^dagger kernel where the result is
+// multiplied by "a" and summed with an input vector (Xpay), and the
+// gauge matrix is reconstructed from 12 real numbers.  More
+// generally, each function name is given by the concatenation of the
+// following 4 fields, with "Kernel" at the end:
 //
-// DD_PREC_F = D, S, H
-// DD_CPREC_F = D, S, H, [blank]; the latter corresponds to plain Wilson
+// DD_NAME_F = dslash, cloverDslash
 // DD_RECON_F = 12, 8
 // DD_DAG_F = Dagger, [blank]
 // DD_XPAY_F = Xpay, [blank]
+//
+// In addition, the kernels are templated on the precision of the
+// fields (double, single, or half).
 
 // initialize on first iteration
 
 #ifndef DD_LOOP
 #define DD_LOOP
-//#define DD_DAG 0
+#define DD_DAG 0
 #define DD_XPAY 0
 #define DD_RECON 0
 #define DD_PREC 0
@@ -38,11 +38,11 @@
 
 // set options for current iteration
 
-#if (DD_CLOVER == 0) // no clover
-#define DD_FNAME dslash
-#else // we're doing clover
+#if (DD_CLOVER==0) // no clover
+#define DD_NAME_F dslash
+#else              // clover
 #define DSLASH_CLOVER
-#define DD_FNAME cloverDslash
+#define DD_NAME_F cloverDslash
 #endif
 
 #if (DD_DAG==0) // no dagger
@@ -55,6 +55,7 @@
 #define DD_XPAY_F 
 #define DD_PARAM5 const int oddBit
 #else            // xpay
+#define DSLASH_XPAY
 #define DD_XPAY_F Xpay
 #if (DD_PREC == 0)
 #define DD_PARAM5 const int oddBit, const double2 *x, const float *xNorm, const double a
@@ -63,7 +64,6 @@
 #else
 #define DD_PARAM5 const int oddBit, const short4 *x, const float *xNorm, const float a
 #endif
-#define DSLASH_XPAY
 #endif
 
 #if (DD_RECON==0) // reconstruct from 8 reals
@@ -100,13 +100,12 @@
 
 #if (DD_PREC==0) // double-precision fields
 
-// gauge field
-#define DD_PREC_F D
+// double-precision gauge field
 #define GAUGE0TEX gauge0TexDouble
 #define GAUGE1TEX gauge1TexDouble
 #define GAUGE_DOUBLE
 
-// spinor fields
+// double-precision spinor fields
 #define DD_PARAM1 double2* out, float *null1
 #define DD_PARAM4 const double2* in, const float *null4
 #define READ_SPINOR READ_SPINOR_DOUBLE
@@ -120,7 +119,7 @@
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #endif
 
-// clover field
+// double-precision clover field
 #if (DD_CLOVER==0)
 #define DD_PARAM3
 #else
@@ -132,12 +131,11 @@
 
 #elif (DD_PREC==1) // single-precision fields
 
-// gauge fields
-#define DD_PREC_F S
+// single-precision gauge field
 #define GAUGE0TEX gauge0TexSingle
 #define GAUGE1TEX gauge1TexSingle
 
-// spinor fields
+// single-precision spinor fields
 #define DD_PARAM1 float4* out, float *null1
 #define DD_PARAM4 const float4* in, const float *null4
 #define READ_SPINOR READ_SPINOR_SINGLE
@@ -150,7 +148,7 @@
 #define READ_ACCUM READ_ACCUM_SINGLE
 #endif
 
-// clover field
+// single-precision clover field
 #if (DD_CLOVER==0)
 #define DD_PARAM3
 #else
@@ -161,10 +159,11 @@
 
 #else             // half-precision fields
 
-// gauge fields
-#define DD_PREC_F H
+// half-precision gauge field
 #define GAUGE0TEX gauge0TexHalf
 #define GAUGE1TEX gauge1TexHalf
+
+// half-precision spinor fields
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
@@ -177,7 +176,7 @@
 #define READ_ACCUM READ_ACCUM_HALF
 #endif
 
-// clover fields
+// half-precision clover field
 #if (DD_CLOVER==0)
 #define DD_PARAM3 
 #else
@@ -196,12 +195,12 @@
 
 // define the kernel
 
-__global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2, DD_PARAM3 DD_PARAM4, DD_PARAM5) {
 #if DD_DAG
-#include "dslash_dagger_core.h"
+#include "wilson_dslash_dagger_core.h"
 #else
-#include "dslash_core.h"
+#include "wilson_dslash_core.h"
 #endif
 }
 
@@ -209,7 +208,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 // clean up
 
-#undef DD_PREC_F
+#undef DD_NAME_F
 #undef DD_RECON_F
 #undef DD_DAG_F
 #undef DD_XPAY_F
@@ -218,7 +217,6 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_PARAM3
 #undef DD_PARAM4
 #undef DD_PARAM5
-#undef DD_FNAME
 #undef DD_CONCAT
 #undef DD_FUNC
 
@@ -243,12 +241,12 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 // prepare next set of options, or clean up after final iteration
 
-//#if (DD_DAG==0)
-//#undef DD_DAG
-//#define DD_DAG 1
-//#else
-//#undef DD_DAG
-//#define DD_DAG 0
+#if (DD_DAG==0)
+#undef DD_DAG
+#define DD_DAG 1
+#else
+#undef DD_DAG
+#define DD_DAG 0
 
 #if (DD_XPAY==0)
 #undef DD_XPAY
@@ -291,8 +289,8 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_XPAY
-//#endif // DD_DAG
+#endif // DD_DAG
 
 #ifdef DD_LOOP
-#include "dslash_def.h"
+#include "wilson_dslash_def.h"
 #endif

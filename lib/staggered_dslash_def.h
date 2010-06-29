@@ -254,7 +254,7 @@
 // define the kernel
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2,  DD_PARAM4, DD_PARAM5) {
-#include "dslash_staggered_core.h"
+#include "staggered_dslash_core.h"
 }
 
 #endif
@@ -354,5 +354,5 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #endif // DD_DAG
 
 #ifdef DD_LOOP
-#include "dslash_staggered_def.h"
+#include "staggered_dslash_def.h"
 #endif

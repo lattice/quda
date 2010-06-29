@@ -18,6 +18,4 @@ inline Float shortToFloat(short a) {
   return rtn;
 }
 
-
-
-#endif
+#endif // _SHORT_QUDA_H

@@ -1,10 +1,10 @@
 #ifndef _INVERT_QUDA_H
 #define _INVERT_QUDA_H
 
-#include <quda_internal.h>
 #include <quda.h>
+#include <quda_internal.h>
+#include <dirac_quda.h>
 #include <color_spinor_field.h>
-#include <dirac.h>
 
 #ifdef __cplusplus
 extern "C" {

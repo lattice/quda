@@ -1,4 +1,4 @@
-#include <dirac.h>
+#include <dirac_quda.h>
 #include <dslash_quda.h>
 
 Dirac::Dirac(const DiracParam &param) 

@@ -1,5 +1,5 @@
 // *** CUDA DSLASH ***
-#undef SHARED_FLOATS_PER_THREAD 
+
 #define SHARED_FLOATS_PER_THREAD 0
 // input spinor
 #if (DD_PREC==0)
@@ -696,3 +696,5 @@ WRITE_SPINOR();
 #undef t01_im
 #undef t02_re
 #undef t02_im
+
+#undef SHARED_FLOATS_PER_THREAD

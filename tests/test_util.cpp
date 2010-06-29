@@ -1,11 +1,11 @@
+#include <complex>
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <short_quda.h>
+
 #include <dslash_reference.h>
 #include <test_util.h>
-
-#include <complex>
-#include <short.h>
 
 #define XUP 0
 #define YUP 1

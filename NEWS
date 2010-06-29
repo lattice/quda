@@ -16,16 +16,15 @@ Version 0.3.0
   the equations used internally by the solver).  For example,
   'solution_type = QUDA_MAT_SOLUTION' tells invertQuda() to return the
   solution x of Dx=b, where D is the unpreconditioned Dirac operator.
-  If 'solver_type = QUDA_MATPC_SOLUTION', then behind the scenes this
-  solution will be reconstructed from the solution of the
-  corresponding even/odd preconditioned system.  In QUDA 0.2.x,
-  'solver_type' was always implicitly defined to be
-  QUDA_MATPCDAG_MATPC_SOLUTION (for the CG inverter) or
-  QUDA_MATPC_SOLUTION (for BiCGstab).  These are still the best choices
-  in general, but it is now possible to force QUDA to solve the
-  unpreconditioned system by setting 'solver_type = QUDA_MAT_SOLUTION'.
-  Note that not all solution_type/solver_type combinations are currently
-  supported.
+  If 'solver_type = QUDA_MATPC_SOLUTION', then behind the scenes x
+  will be reconstructed from the solution of the corresponding
+  even/odd preconditioned system.  In QUDA 0.2.x, 'solver_type' was
+  always implicitly defined to be QUDA_MATPCDAG_MATPC_SOLUTION (for
+  the CG inverter) or QUDA_MATPC_SOLUTION (for BiCGstab).  These are
+  still the best choices in general, but it is now possible to force
+  QUDA to solve the unpreconditioned system by setting 'solver_type =
+  QUDA_MAT_SOLUTION'.  Note that not all solution_type/solver_type
+  combinations are currently supported.
 
 - ***FIXME: Added 'type' parameter to QudaGaugeParam ...
 

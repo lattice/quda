@@ -21,23 +21,14 @@
 #include <dslash_textures.h>
 #include <dslash_constants.h>
 
-// kludge to avoid '#include nested too deeply' error
-#define DD_DAG 0
-#include <dslash_def.h>
-#undef DD_DAG
-#define DD_DAG 1
-#include <dslash_def.h>
-#undef DD_DAG
-
-#include <clover_def.h> // kernels for applying the clover term alone
-
-#include <dslash_staggered_def.h> // kernels for staggered kernels
+#include <staggered_dslash_def.h> // staggered Dslash kernels
+#include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
+#include <clover_def.h>           // kernels for applying the clover term alone
 
 #include <blas_quda.h>
 
-// do nothing
 __global__ void dummyKernel() {
-
+  // do nothing
 }
 
 void initCache() {

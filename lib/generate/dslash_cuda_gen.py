@@ -628,13 +628,13 @@ sharedFloats = 8
 
 dagger = False
 print sys.argv[0] + ": generating dslash_core.h";
-f = open('dslash_core/dslash_core.h', 'w')
+f = open('dslash_core/wilson_dslash_core.h', 'w')
 f.write(generate())
 f.close()
 
 dagger = True
 print sys.argv[0] + ": generating dslash_dagger_core.h";
-f = open('dslash_core/dslash_dagger_core.h', 'w')
+f = open('dslash_core/wilson_dslash_dagger_core.h', 'w')
 f.write(generate())
 f.close()
 

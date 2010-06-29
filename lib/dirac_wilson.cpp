@@ -1,4 +1,4 @@
-#include <dirac.h>
+#include <dirac_quda.h>
 #include <blas_quda.h>
 
 DiracWilson::DiracWilson(const DiracParam &param)

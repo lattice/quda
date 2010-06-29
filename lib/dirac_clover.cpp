@@ -1,5 +1,5 @@
-#include <dirac.h>
 #include <iostream>
+#include <dirac_quda.h>
 #include <blas_quda.h>
 
 DiracClover::DiracClover(const DiracParam &param)

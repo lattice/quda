@@ -1,22 +1,20 @@
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 #include <quda.h>
 #include <quda_internal.h>
-#include <gauge_quda.h>
-#include <clover_quda.h>
 #include <blas_quda.h>
+#include <gauge_quda.h>
+#include <dirac_quda.h>
 #include <dslash_quda.h>
+#include <clover_quda.h>
 #include <invert_quda.h>
 
 #include <color_spinor_field.h>
-#include <dirac.h>
-
-#include <iostream>
 
 #define spinorSiteSize 24 // real numbers per spinor
-
 
 FullGauge cudaGaugePrecise; // precise gauge field
 FullGauge cudaGaugeSloppy; // sloppy gauge field

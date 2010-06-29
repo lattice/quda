@@ -1,21 +1,19 @@
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "misc.h"
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <dirac_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>
+
 #include <test_util.h>
-
-#include <string.h>
-#include "misc.h"
-
-#include <dirac.h>
 #include <staggered_dslash_reference.h>
-
-#include <iostream>
 
 extern void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy);
 
