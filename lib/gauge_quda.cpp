@@ -50,12 +50,12 @@ inline void pack8(float4 *res, Float *g, int dir, int V) {
 }
 template <typename Float>
 inline void pack8(float2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported\n", __FUNCTION__);
+    errorQuda("%s is not supported", __FUNCTION__);
 }
 
 template <typename Float>
 inline void pack8(short2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported\n", __FUNCTION__);
+    errorQuda("%s is not supported", __FUNCTION__);
 }
 
 template <typename Float>
@@ -93,12 +93,12 @@ inline void pack12(float4 *res, Float *g, int dir, int V) {
 
 template <typename Float>
 inline void pack12(float2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported\n", __FUNCTION__);
+    errorQuda("%s is not supported", __FUNCTION__);
 }
 
 template <typename Float>
 inline void pack12(short2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported\n", __FUNCTION__);
+    errorQuda("%s is not supported", __FUNCTION__);
 }
 
 
@@ -288,7 +288,7 @@ inline void unpack8(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
 
 template <typename Float>
 inline void unpack8(Float *h_gauge, float2 *d_gauge, int dir, int V, int idx) {
-    errorQuda("%s is not supported yet\n", __FUNCTION__);
+    errorQuda("%s is not supported yet", __FUNCTION__);
 }
 
 template <typename Float>
@@ -348,7 +348,7 @@ inline void unpack12(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
 }
 template <typename Float>
 inline void unpack12(Float *h_gauge, float2 *d_gauge, int dir, int V, int idx) {
-    errorQuda("%s is not supported yet\n", __FUNCTION__);
+    errorQuda("%s is not supported yet", __FUNCTION__);
 }
 
 template <typename Float>
@@ -553,7 +553,7 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
       elements = 18;
       break;
   default:
-      errorQuda("Invalid reconstruct value\n");
+      errorQuda("Invalid reconstruct value");
   }
   
   cudaGauge->bytes = 4*cudaGauge->stride*elements*floatSize;

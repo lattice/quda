@@ -1,4 +1,4 @@
-// dslash_def.h - Dslash kernel definitions
+// wilson_dslash_def.h - Dslash kernel definitions
 
 // There are currently 48 different variants of the Wilson Dslash
 // kernel, each one characterized by a set of 5 options, where each

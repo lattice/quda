@@ -97,7 +97,7 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets, double* residue_sq);
   
-  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, QudaDagType dagger);
+  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, QudaDagType dagger);
   void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger);
   void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger);

@@ -378,7 +378,7 @@ void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType sol
 
 }
 
-void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity, QudaDagType dagger)
+void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, QudaDagType dagger)
 {
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
   cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -392,7 +392,11 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int parity,
   cudaColorSpinorField out(in, cudaParam);
 
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-    parity = (parity+1)%2;
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
     axCuda(cudaGaugePrecise.anisotropy, in);
   }
 

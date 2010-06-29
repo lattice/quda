@@ -51,7 +51,7 @@ void DiracStaggeredPC::checkParitySpinor(const cudaColorSpinorField &in, const c
 
 
 void DiracStaggeredPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			 const int parity, const QudaDagType dagger) {
+			 const QudaParity parity, const QudaDagType dagger) {
 
   if (!initDslash) {
     initDslashConstants(*fatGauge, in.Stride(), 0);
@@ -65,7 +65,7 @@ void DiracStaggeredPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFi
 }
 
 void DiracStaggeredPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				const int parity, const QudaDagType dagger,
+				const QudaParity parity, const QudaDagType dagger,
 				const cudaColorSpinorField &x, const double &k) {
     
     if (!initDslash){
@@ -81,7 +81,7 @@ void DiracStaggeredPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpin
 
 void DiracStaggeredPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) 
 {
-  errorQuda("Error: M function in DiracStaggeredPC is not implemented\n");
+  errorQuda("M function in DiracStaggeredPC is not implemented\n");
 }
 
 void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) 
@@ -108,7 +108,7 @@ void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorFie
     parity = QUDA_ODD_PARITY;
     other_parity = QUDA_EVEN_PARITY;
   }else{
-    errorQuda("ERROR: invalid matpcType(%d) in function\n", matpcType);    
+    errorQuda("Invalid matpcType(%d) in function\n", matpcType);    
   }
   
   QudaDagType dagger = QUDA_DAG_NO;
@@ -188,7 +188,7 @@ void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cud
 
 
 void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			 const int parity, const QudaDagType dagger) {
+			 const QudaParity parity, const QudaDagType dagger) {
 
   if (!initDslash) {
     initDslashConstants(*fatGauge, in.Stride(), 0);
@@ -202,7 +202,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
 }
 
 void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				const int parity, const QudaDagType dagger,
+				const QudaParity parity, const QudaDagType dagger,
 				const cudaColorSpinorField &x, const double &k) {
     
     if (!initDslash){
@@ -218,7 +218,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 
 void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) 
 {
-  errorQuda("Error: M function in DiracStaggeredPC is not implemented\n");  
+  errorQuda("M function in DiracStaggeredPC is not implemented\n");  
 }
 
 void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) 

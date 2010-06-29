@@ -58,9 +58,9 @@ class Dirac {
   virtual void checkFullSpinor(const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		      const int parity, const QudaDagType) = 0;
+		      const QudaParity parity, const QudaDagType) = 0;
   virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			  const int parity, const QudaDagType,
+			  const QudaParity parity, const QudaDagType,
 			  const cudaColorSpinorField &x, const double &k) = 0;
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		 const QudaDagType = QUDA_DAG_NO) = 0;
@@ -91,9 +91,9 @@ class DiracWilson : public Dirac {
   DiracWilson& operator=(const DiracWilson &dirac);
 
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		      const int parity, const QudaDagType);
+		      const QudaParity parity, const QudaDagType);
   virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			  const int parity, const QudaDagType,
+			  const QudaParity parity, const QudaDagType,
 			  const cudaColorSpinorField &x, const double &k);
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType = QUDA_DAG_NO);
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in);
@@ -134,7 +134,7 @@ class DiracClover : public DiracWilson {
   void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
 			 const FullClover &);
   void cloverApply(cudaColorSpinorField &out, const FullClover &clover, const cudaColorSpinorField &in, 
-		   const int parity);
+		   const QudaParity parity);
 
  public:
   DiracClover(const DiracParam &param);
@@ -142,7 +142,7 @@ class DiracClover : public DiracWilson {
   virtual ~DiracClover();
   DiracClover& operator=(const DiracClover &dirac);
 
-  void Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const int parity);
+  void Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity);
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType = QUDA_DAG_NO);
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in);
 
@@ -165,11 +165,11 @@ class DiracCloverPC : public DiracClover {
   virtual ~DiracCloverPC();
   DiracCloverPC& operator=(const DiracCloverPC &dirac);
 
-  void CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const int parity);  
+  void CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity);  
   void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-	      const int parity, const QudaDagType);
+	      const QudaParity parity, const QudaDagType);
   void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		  const int parity, const QudaDagType,
+		  const QudaParity parity, const QudaDagType,
 		  const cudaColorSpinorField &x, const double &k);
 
   void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType = QUDA_DAG_NO);
@@ -198,9 +198,9 @@ class DiracStaggeredPC : public Dirac {
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &);
   
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		      const int parity, const QudaDagType);
+		      const QudaParity parity, const QudaDagType);
   virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			  const int parity, const QudaDagType,
+			  const QudaParity parity, const QudaDagType,
 			  const cudaColorSpinorField &x, const double &k);
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType = QUDA_DAG_NO);
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in);
@@ -228,9 +228,9 @@ class DiracStaggered : public Dirac {
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &);
   
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		      const int parity, const QudaDagType);
+		      const QudaParity parity, const QudaDagType);
   virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			  const int parity, const QudaDagType,
+			  const QudaParity parity, const QudaDagType,
 			  const cudaColorSpinorField &x, const double &k);
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType = QUDA_DAG_NO);
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in);
