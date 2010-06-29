@@ -117,7 +117,8 @@ invertMultiShiftCgCuda(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField**
 	zeta_ip1[j] = 0.0;
 	beta_i[j] = 0.0;
 	finished[j] = 1;
-	printf("SETTING A ZERO, j=%d, num_offsets_now=%d\n",j,num_offsets_now);
+	if (invert_param->verbosity >= QUDA_VERBOSE)
+	  printfQuda("SETTING A ZERO, j=%d, num_offsets_now=%d\n",j,num_offsets_now);
 	//if(j==num_offsets_now-1)node0_PRINTF("REDUCING OFFSETS\n");
 	if(j==num_offsets_now-1)num_offsets_now--;
 	// don't work any more on finished solutions
@@ -163,7 +164,7 @@ invertMultiShiftCgCuda(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField**
     
     k++;
     if (invert_param->verbosity >= QUDA_VERBOSE){
-      printf("Multimass CG: %d iterations, r2 = %e\n", k, r2);
+      printfQuda("Multimass CG: %d iterations, r2 = %e\n", k, r2);
     }
   }
     
@@ -179,26 +180,21 @@ invertMultiShiftCgCuda(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField**
   invert_param->secs = stopwatchReadSeconds();
     
   if (k==invert_param->maxiter) {
-    printf("Exceeded maximum iterations %d\n", invert_param->maxiter);
+    warningQuda("Exceeded maximum iterations %d\n", invert_param->maxiter);
   }
     
   float gflops = (blas_quda_flops + dirac.Flops() + diracSloppy.Flops())*1e-9;
   invert_param->gflops = gflops;
   invert_param->iter = k;
-#if 0
+  //#if 0
   // Calculate the true residual
-  dslashCuda_st(tmp, fatlinkPrecise, longlinkPrecise, x[0],  1-oddBit, 0);
-  dslashAxpyCuda(Ap, fatlinkPrecise, longlinkPrecise, tmp, oddBit, 0, x[0], msq_x4);
- 
-  copyCuda(r, source);
-  mxpyCuda(Ap, r);
-  double true_res = normCuda(r);
+  dirac.MdagM(*r, *x[0]);    
+  double true_res = xmyNormCuda(b, *r);
   if (invert_param->verbosity >= QUDA_SUMMARIZE){
-    printf("Converged after %d iterations, res = %e, b2=%e, true_res = %e\n", 
-	   k, true_res, b2, (true_res / b2));
+    printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
+	       k,r2, (true_res / b2));
   }    
-
-#endif
+  //#endif
     
   
   delete r;
