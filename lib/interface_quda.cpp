@@ -291,6 +291,8 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVERPC_DIRAC;
+    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH) 
+      diracParam.type = QUDA_STAGGEREDPC_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else {
     errorQuda("Unsupported solution type %d", inv_param->solver_type);
@@ -325,6 +327,8 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVERPC_DIRAC;
+    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH)
+	diracParam.type = QUDA_STAGGEREDPC_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else {
     errorQuda("Unsupported solution type %d", inv_param->solution_type);
@@ -507,10 +511,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     csParam.nColor=3;
     csParam.nSpin=1;
     csParam.nDim=4;
-    csParam.parity = param->in_parity;
     csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     
-    if (param->in_parity == QUDA_FULL_PARITY){
+    if (param->solver_type == QUDA_MAT_SOLUTION){
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
     }else{
@@ -704,10 +707,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=4;
-  csParam.parity = param->in_parity;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
 
-  if (param->in_parity == QUDA_FULL_PARITY){
+  if (param->solver_type == QUDA_MAT_SOLUTION){
     csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
   }else{

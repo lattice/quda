@@ -93,8 +93,6 @@ invert_test(void)
   inv_param.cuda_prec = prec; 
   inv_param.cuda_prec_sloppy = prec_sloppy;
   inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
-  inv_param.solver_type = QUDA_MAT_SOLUTION;
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.dslash_type = QUDA_STAGGERED_DSLASH;
@@ -143,13 +141,14 @@ invert_test(void)
   
   initQuda(device);
   
-  double time0 = -((double)clock()); // Start the timer
 
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda_general(fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy);
   gaugeParam.reconstruct= link_recon;
   gaugeParam.reconstruct_sloppy = link_recon_sloppy;
   loadGaugeQuda_general(longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy);
+
+  double time0 = -((double)clock()); // Start the timer
   
   unsigned long volume = Vh;
   unsigned long nflops=2*1187; //from MILC's CG routine
@@ -159,8 +158,9 @@ invert_test(void)
 
   case 0: //even
     volume = Vh;
+    inv_param.solver_type = QUDA_MATPC_SOLUTION;
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
-    inv_param.in_parity = QUDA_EVEN_PARITY;    
     invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); 
@@ -176,7 +176,8 @@ invert_test(void)
   case 1: //odd
 	
     volume = Vh;    
-    inv_param.in_parity = QUDA_ODD_PARITY;  
+    inv_param.solver_type = QUDA_MATPC_SOLUTION;
+    inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
     invertQuda(spinorOutOdd, spinorInOdd, &inv_param);	
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
@@ -192,7 +193,7 @@ invert_test(void)
   case 2: //full spinor
 
     volume = Vh; //FIXME: the time reported is only parity time
-    inv_param.in_parity = QUDA_FULL_PARITY;  
+    inv_param.solver_type = QUDA_MAT_SOLUTION;
     invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); // stop the timer
@@ -225,10 +226,12 @@ invert_test(void)
     }
     
     if (testtype == 3){
-      inv_param.in_parity = QUDA_EVEN_PARITY;          
       in=spinorIn;
       len=Vh;
       volume = Vh;
+      
+      inv_param.solver_type = QUDA_MATPC_SOLUTION;
+      inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
       
       spinorOutArray[0] = spinorOut;
       for (int i=1; i< num_offsets;i++){
@@ -237,21 +240,22 @@ invert_test(void)
     }
     
     else if (testtype ==4){
-      inv_param.in_parity = QUDA_ODD_PARITY;        
       in=spinorInOdd;
       len = Vh;
       volume = Vh;
+
+      inv_param.solver_type = QUDA_MATPC_SOLUTION;
+      inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
       
       spinorOutArray[0] = spinorOutOdd;
       for (int i=1; i< num_offsets;i++){
 	spinorOutArray[i] = malloc(Vh*mySpinorSiteSize*sSize);
       }
     }else { //testtype ==5
-      inv_param.in_parity = QUDA_FULL_PARITY;        
       in=spinorIn;
       len= V;
+      inv_param.solver_type = QUDA_MAT_SOLUTION;
       volume = Vh; //FIXME: the time reported is only parity time
-      
       spinorOutArray[0] = spinorOut;
       for (int i=1; i< num_offsets;i++){
 	spinorOutArray[i] = malloc(V*mySpinorSiteSize*sSize);
@@ -267,17 +271,20 @@ invert_test(void)
     
     printf("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	   time0, inv_param.iter, inv_param.secs,
-	   1e-9*nflops*volume*inv_param.iter/inv_param.secs);
+	   inv_param.gflops/inv_param.secs);
 
     
     printf("checking the solution\n");
     MyQudaParity parity;
-    if (inv_param.in_parity == QUDA_EVEN_PARITY){
+    if (inv_param.solver_type == QUDA_MAT_SOLUTION){
+      parity = QUDA_EVENODD;
+    }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
       parity = QUDA_EVEN;
-    }else if(inv_param.in_parity == QUDA_ODD_PARITY){
+    }else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD){
       parity = QUDA_ODD;
     }else{
-      parity = QUDA_EVENODD;
+      printf("ERROR: invalid spinor parity \n");
+      exit(1);
     }
     
     for(int i=0;i < num_offsets;i++){
@@ -301,7 +308,7 @@ invert_test(void)
 	
     printf("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	   time0, inv_param.iter, inv_param.secs,
-	   1.0e-9*nflops*volume*(inv_param.iter)/(inv_param.secs));
+	   inv_param.gflops/inv_param.secs);
   }
   endQuda();
 

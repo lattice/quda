@@ -83,12 +83,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(inv_type, QUDA_INVALID_INVERTER);
 
 #if defined INIT_PARAM
-  P(in_parity, QUDA_INVALID_PARITY);
   P(mass, INVALID_DOUBLE);
   P(kappa, INVALID_DOUBLE);
 #else
   if (param->dslash_type == QUDA_STAGGERED_DSLASH) {
-    P(in_parity, QUDA_INVALID_PARITY);
     P(mass, INVALID_DOUBLE);
   } else {
     P(kappa, INVALID_DOUBLE);

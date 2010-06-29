@@ -45,7 +45,6 @@ extern "C" {
 
     QudaDslashType dslash_type;
     QudaInverterType inv_type;
-    QudaParity in_parity;
 
     double mass;  // used for staggered only
     double kappa; // used for Wilson and Wilson-clover

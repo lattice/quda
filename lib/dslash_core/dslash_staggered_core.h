@@ -1,6 +1,6 @@
 // *** CUDA DSLASH ***
 #undef SHARED_FLOATS_PER_THREAD 
-#define SHARED_FLOATS_PER_THREAD 8
+#define SHARED_FLOATS_PER_THREAD 0
 // input spinor
 #if (DD_PREC==0)
 #define spinorFloat double

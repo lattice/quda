@@ -20,7 +20,6 @@ class ColorSpinorParam {
 
   QudaSiteSubset siteSubset; // Full, even or odd
   QudaSiteOrder siteOrder; // defined for full fields
-  QudaParity parity;
   
   QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
   QudaGammaBasis gammaBasis;
@@ -32,7 +31,7 @@ class ColorSpinorParam {
  ColorSpinorParam()
    : fieldLocation(QUDA_INVALID_FIELD_LOCATION), nColor(0), nSpin(0), nDim(0), 
     precision(QUDA_INVALID_PRECISION), pad(0), siteSubset(QUDA_INVALID_SITE_SUBSET), 
-    siteOrder(QUDA_INVALID_SITE_ORDER), parity(QUDA_INVALID_PARITY),
+    siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
     create(QUDA_INVALID_FIELD_CREATE)
   { for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0;}
@@ -41,7 +40,7 @@ class ColorSpinorParam {
  ColorSpinorParam(void *V, QudaInvertParam &inv_param, int *X)
    : fieldLocation(QUDA_CPU_FIELD_LOCATION), nColor(3), nSpin(4), nDim(4), 
     precision(inv_param.cpu_prec), pad(0), siteSubset(QUDA_INVALID_SITE_SUBSET), 
-    siteOrder(QUDA_INVALID_SITE_ORDER), parity(inv_param.in_parity),
+    siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
     create(QUDA_REFERENCE_FIELD_CREATE), v(V)
   { 
@@ -68,7 +67,7 @@ class ColorSpinorParam {
     : fieldLocation(QUDA_CUDA_FIELD_LOCATION), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), 
     nDim(cpuParam.nDim), precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
     siteSubset(cpuParam.siteSubset), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), 
-    parity(inv_param.in_parity), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
+    fieldOrder(QUDA_INVALID_FIELD_ORDER), 
     gammaBasis(QUDA_UKQCD_GAMMA_BASIS), create(QUDA_COPY_FIELD_CREATE), v(0)
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -108,8 +107,7 @@ class ColorSpinorField {
  private:
   void create(int nDim, const int *x, int Nc, int Ns, QudaPrecision precision, 
 	      int pad, QudaFieldLocation location, QudaSiteSubset subset, 
-	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-	      QudaParity parity);
+	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
   void destroy();  
 
  protected:
@@ -135,7 +133,6 @@ class ColorSpinorField {
   QudaSiteOrder siteOrder;
   QudaFieldOrder fieldOrder;
   QudaGammaBasis gammaBasis;
-  QudaParity parity;
   
   // in the case of full fields, these are references to the even / odd sublattices
   ColorSpinorField *even;
@@ -169,7 +166,6 @@ class ColorSpinorField {
   QudaSiteOrder SiteOrder() const { return siteOrder; }
   QudaFieldOrder FieldOrder() const { return fieldOrder; }
   QudaGammaBasis GammaBasis() const { return gammaBasis; }
-  QudaParity Parity() const {return parity;}
   
 };
 
@@ -186,6 +182,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend class DiracClover;
   friend class DiracCloverPC;
   friend class DiracStaggered;
+  friend class DiracStaggeredPC;
   friend void zeroCuda(cudaColorSpinorField &a);
   friend void copyCuda(cudaColorSpinorField &, const cudaColorSpinorField &);
   friend double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);

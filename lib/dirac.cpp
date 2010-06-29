@@ -69,7 +69,7 @@ void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpin
 
 // Dirac operator factory
 Dirac* Dirac::create(const DiracParam &param) {
-
+  
   if (param.type == QUDA_WILSON_DIRAC) {
     if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator\n");
     return new DiracWilson(param);
@@ -83,8 +83,11 @@ Dirac* Dirac::create(const DiracParam &param) {
     if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
     return new DiracCloverPC(param);
   } else if (param.type == QUDA_STAGGERED_DIRAC) {
-      if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
-      return new DiracStaggered(param);
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
+    return new DiracStaggered(param);
+  } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
+    if (param.verbose == QUDA_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
+    return new DiracStaggeredPC(param);    
   } else {
     return 0;
   }
