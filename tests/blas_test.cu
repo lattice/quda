@@ -347,7 +347,7 @@ int main(int argc, char** argv)
 	
       }
 
-      printf("%-32s: %d threads per block, %d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
+      printf("%-34s: %4d threads per block, %5d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
 	     names[i], threads_max, blocks_max, gflops_max, gbytes_max);
 
       threads[i][prec] = threads_max;
