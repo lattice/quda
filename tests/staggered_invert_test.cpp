@@ -132,11 +132,11 @@ invert_test(void)
   
   initQuda(device);
 
-  gauge_param.type = QUDA_ASQTAD_FAT_GAUGE;
+  gauge_param.type = QUDA_ASQTAD_FAT_LINKS;
   gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda(fatlink, &gauge_param);
 
-  gauge_param.type = QUDA_ASQTAD_LONG_GAUGE;
+  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
   gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
   loadGaugeQuda(longlink, &gauge_param);

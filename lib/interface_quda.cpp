@@ -134,15 +134,15 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   param->packed_size = packed_size;
 
   switch (param->type) {
-  case QUDA_WILSON_GAUGE:
+  case QUDA_WILSON_LINKS:
     precise = &cudaGaugePrecise;
     sloppy = &cudaGaugeSloppy;
     break;
-  case QUDA_ASQTAD_FAT_GAUGE:
+  case QUDA_ASQTAD_FAT_LINKS:
     precise = &cudaFatLinkPrecise;
     sloppy = &cudaFatLinkSloppy;
     break;
-  case QUDA_ASQTAD_LONG_GAUGE:
+  case QUDA_ASQTAD_LONG_LINKS:
     precise = &cudaLongLinkPrecise;
     sloppy = &cudaLongLinkSloppy;
     break;
@@ -150,7 +150,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
-  if (param->type == QUDA_WILSON_GAUGE) {
+  if (param->type == QUDA_WILSON_LINKS) {
     anisotropy = param->anisotropy;
   } else {
     anisotropy = 1.0;
@@ -177,13 +177,13 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   FullGauge *gauge;
 
   switch (param->type) {
-  case QUDA_WILSON_GAUGE:
+  case QUDA_WILSON_LINKS:
     gauge = &cudaGaugePrecise;
     break;
-  case QUDA_ASQTAD_FAT_GAUGE:
+  case QUDA_ASQTAD_FAT_LINKS:
     gauge = &cudaFatLinkPrecise;
     break;
-  case QUDA_ASQTAD_LONG_GAUGE:
+  case QUDA_ASQTAD_LONG_LINKS:
     gauge = &cudaLongLinkPrecise;
     break;
   default:

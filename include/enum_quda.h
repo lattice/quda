@@ -12,12 +12,12 @@ extern "C" {
   // Types used in QudaGaugeParam
   //
 
-  typedef enum QudaGaugeType_s {
-    QUDA_WILSON_GAUGE,
-    QUDA_ASQTAD_FAT_GAUGE,
-    QUDA_ASQTAD_LONG_GAUGE,
-    QUDA_INVALID_GAUGE = QUDA_INVALID_ENUM
-  } QudaGaugeType;
+  typedef enum QudaLinkType_s {
+    QUDA_WILSON_LINKS,
+    QUDA_ASQTAD_FAT_LINKS,
+    QUDA_ASQTAD_LONG_LINKS,
+    QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
+  } QudaLinkType;
 
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_QDP_GAUGE_ORDER, // expect *gauge[4], even-odd, row-column color

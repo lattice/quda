@@ -19,7 +19,7 @@ extern "C" {
     double anisotropy;    // used for Wilson and Wilson-clover
     double tadpole_coeff; // used for staggered only
 
-    QudaGaugeType type;
+    QudaLinkType type;
     QudaGaugeFieldOrder gauge_order;
 
     QudaTboundary t_boundary;

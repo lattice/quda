@@ -560,9 +560,9 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
 
     }
   }
-  if (param->type == QUDA_WILSON_GAUGE){  
+  if (param->type == QUDA_WILSON_LINKS){  
       applyGaugeFieldScaling(res, Vh, param);
-  }else if (param->type == QUDA_ASQTAD_LONG_GAUGE){
+  }else if (param->type == QUDA_ASQTAD_LONG_LINKS){
       applyGaugeFieldScaling_long(res, Vh, param);      
   }
   
@@ -653,14 +653,14 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink,
 	}
     } else {
 	if (precision == QUDA_DOUBLE_PRECISION) {
-	    param->type = QUDA_ASQTAD_FAT_GAUGE;
+	    param->type = QUDA_ASQTAD_FAT_LINKS;
 	    constructGaugeField((double**)fatlink, param);
-	    param->type = QUDA_ASQTAD_LONG_GAUGE;
+	    param->type = QUDA_ASQTAD_LONG_LINKS;
 	    constructGaugeField((double**)longlink, param);
 	}else {
-	    param->type = QUDA_ASQTAD_FAT_GAUGE;
+	    param->type = QUDA_ASQTAD_FAT_LINKS;
 	    constructGaugeField((float**)fatlink, param);
-	    param->type = QUDA_ASQTAD_LONG_GAUGE;
+	    param->type = QUDA_ASQTAD_LONG_LINKS;
 	    constructGaugeField((float**)longlink, param);
 	}
     }

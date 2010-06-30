@@ -55,7 +55,7 @@ void init() {
 
   gauge_param.anisotropy = 2.3;
 
-  gauge_param.type = QUDA_WILSON_GAUGE;
+  gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
@@ -65,7 +65,7 @@ void init() {
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.type = QUDA_WILSON_GAUGE;
+  gauge_param.type = QUDA_WILSON_LINKS;
 
   inv_param.kappa = kappa;
 
