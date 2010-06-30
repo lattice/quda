@@ -101,7 +101,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(mass, INVALID_DOUBLE);
   P(kappa, INVALID_DOUBLE);
 #else
-  if (param->dslash_type == QUDA_STAGGERED_DSLASH) {
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
     P(mass, INVALID_DOUBLE);
   } else {
     P(kappa, INVALID_DOUBLE);

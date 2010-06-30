@@ -82,10 +82,10 @@ Dirac* Dirac::create(const DiracParam &param) {
   } else if (param.type == QUDA_CLOVERPC_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
     return new DiracCloverPC(param);
-  } else if (param.type == QUDA_STAGGERED_DIRAC) {
+  } else if (param.type == QUDA_ASQTAD_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
     return new DiracStaggered(param);
-  } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
+  } else if (param.type == QUDA_ASQTADPC_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
     return new DiracStaggeredPC(param);    
   } else {

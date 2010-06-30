@@ -72,7 +72,7 @@ void init()
   inv_param.cuda_prec = prec;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.solver_type = QUDA_MATPC_SOLVER;
-  inv_param.dslash_type = QUDA_STAGGERED_DSLASH;
+  inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
     
   gauge_param.ga_pad = sdim*sdim*sdim;
   inv_param.sp_pad = sdim*sdim*sdim;

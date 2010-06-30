@@ -307,16 +307,16 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
-    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH)
-      diracParam.type = QUDA_STAGGERED_DIRAC;
+    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+      diracParam.type = QUDA_ASQTAD_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else if (inv_param->solver_type == QUDA_MATPC_SOLVER) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVERPC_DIRAC;
-    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH) 
-      diracParam.type = QUDA_STAGGEREDPC_DIRAC;
+    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH) 
+      diracParam.type = QUDA_ASQTADPC_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else {
     errorQuda("Unsupported solver type %d", inv_param->solver_type);
@@ -344,16 +344,16 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
       diracParam.type = QUDA_WILSON_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVER_DIRAC;
-    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH)
-	diracParam.type = QUDA_STAGGERED_DIRAC;
+    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+	diracParam.type = QUDA_ASQTAD_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else if (inv_param->solver_type == QUDA_MATPC_SOLVER) {
     if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
       diracParam.type = QUDA_WILSONPC_DIRAC;
     else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
       diracParam.type = QUDA_CLOVERPC_DIRAC;
-    else if (inv_param->dslash_type == QUDA_STAGGERED_DSLASH)
-	diracParam.type = QUDA_STAGGEREDPC_DIRAC;
+    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+	diracParam.type = QUDA_ASQTADPC_DIRAC;
     else errorQuda("Unsupported dslash_type");
   } else {
     errorQuda("Unsupported solver type %d", inv_param->solver_type);
@@ -372,7 +372,7 @@ void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType sol
 		 QudaMassNormalization mass_normalization, 
 		 cudaColorSpinorField &b) {
     
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
     if (mass_normalization != QUDA_MASS_NORMALIZATION) {
       errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
     }
@@ -542,7 +542,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cudaColorSpinorField* tmp;
   cudaColorSpinorField *in, *out;
 
-  if( param->dslash_type == QUDA_STAGGERED_DSLASH){
+  if( param->dslash_type == QUDA_ASQTAD_DSLASH){
     ColorSpinorParam csParam;
     csParam.precision = param->cpu_prec;
     csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
