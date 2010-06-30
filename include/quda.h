@@ -53,7 +53,7 @@ extern "C" {
     double reliable_delta; // reliable update tolerance
 
     QudaSolutionType solution_type; // type of system to solve
-    QudaSolverType solver_type; // how to solve it
+    QudaSolveType solve_type; // how to solve it
     QudaMatPCType matpc_type;
     QudaMassNormalization mass_normalization;
 

@@ -84,9 +84,9 @@ void init() {
 
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   if (test_type == 2) {
-    inv_param.solver_type = QUDA_MAT_SOLVER;
+    inv_param.solve_type = QUDA_DIRECT_SOLVE;
   } else {
-    inv_param.solver_type = QUDA_MATPC_SOLVER;
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   }
 
   if (clover_yes) {

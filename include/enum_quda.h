@@ -78,15 +78,13 @@ extern "C" {
     QUDA_INVALID_SOLUTION = QUDA_INVALID_ENUM
   } QudaSolutionType;
 
-  typedef enum QudaSolverType_s {
-    QUDA_MAT_SOLVER,
-    QUDA_MATDAG_SOLVER,
-    QUDA_MATDAG_MAT_SOLVER,
-    QUDA_MATPC_SOLVER,
-    QUDA_MATPCDAG_SOLVER,
-    QUDA_MATPCDAG_MATPC_SOLVER,
-    QUDA_INVALID_SOLVER = QUDA_INVALID_ENUM
-  } QudaSolverType;
+  typedef enum QudaSolveType_s {
+    QUDA_DIRECT_SOLVE,
+    QUDA_NORMEQ_SOLVE,
+    QUDA_DIRECT_PC_SOLVE,
+    QUDA_NORMEQ_PC_SOLVE,
+    QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
+  } QudaSolveType;
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //

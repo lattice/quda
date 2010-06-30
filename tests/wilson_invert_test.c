@@ -56,7 +56,7 @@ int main(int argc, char **argv)
   inv_param.reliable_delta = 1e-2;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-  inv_param.solver_type = QUDA_MATPC_SOLUTION;
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
@@ -103,9 +103,8 @@ int main(int argc, char **argv)
 
     // The uninverted clover term is only needed when solving the unpreconditioned
     // system or when using "asymmetric" even/odd preconditioning.
-    int preconditioned = (inv_param.solver_type == QUDA_MATPC_SOLVER ||
-			  inv_param.solver_type == QUDA_MATPCDAG_SOLVER ||
-			  inv_param.solver_type == QUDA_MATPCDAG_MATPC_SOLVER);
+    int preconditioned = (inv_param.solve_type == QUDA_DIRECT_PC_SOLVE ||
+			  inv_param.solve_type == QUDA_NORMEQ_PC_SOLVE);
     int asymmetric = preconditioned &&
                          (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
                           inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC);

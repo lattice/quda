@@ -112,7 +112,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
   P(solution_type, QUDA_INVALID_SOLUTION);
-  P(solver_type, QUDA_INVALID_SOLVER);
+  P(solve_type, QUDA_INVALID_SOLVE);
   P(matpc_type, QUDA_MATPC_INVALID);
   P(mass_normalization, QUDA_INVALID_NORMALIZATION);
   P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID);

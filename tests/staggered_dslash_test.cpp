@@ -71,7 +71,7 @@ void init()
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  inv_param.solver_type = QUDA_MATPC_SOLVER;
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
     
   gauge_param.ga_pad = sdim*sdim*sdim;

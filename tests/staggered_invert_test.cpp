@@ -151,7 +151,7 @@ invert_test(void)
 
   case 0: //even
     volume = Vh;
-    inv_param.solver_type = QUDA_MATPC_SOLVER;
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
     invertQuda(spinorOut, spinorIn, &inv_param);
@@ -169,7 +169,7 @@ invert_test(void)
   case 1: //odd
 	
     volume = Vh;    
-    inv_param.solver_type = QUDA_MATPC_SOLVER;
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
     invertQuda(spinorOutOdd, spinorInOdd, &inv_param);	
     time0 += clock(); // stop the timer
@@ -186,7 +186,7 @@ invert_test(void)
   case 2: //full spinor
 
     volume = Vh; //FIXME: the time reported is only parity time
-    inv_param.solver_type = QUDA_MAT_SOLVER;
+    inv_param.solve_type = QUDA_DIRECT_SOLVE;
     invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); // stop the timer
@@ -223,7 +223,7 @@ invert_test(void)
       len=Vh;
       volume = Vh;
       
-      inv_param.solver_type = QUDA_MATPC_SOLVER;
+      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
       
       spinorOutArray[0] = spinorOut;
@@ -237,7 +237,7 @@ invert_test(void)
       len = Vh;
       volume = Vh;
 
-      inv_param.solver_type = QUDA_MATPC_SOLVER;
+      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
       
       spinorOutArray[0] = spinorOutOdd;
@@ -247,7 +247,7 @@ invert_test(void)
     }else { //testtype ==5
       in=spinorIn;
       len= V;
-      inv_param.solver_type = QUDA_MAT_SOLVER;
+      inv_param.solve_type = QUDA_DIRECT_SOLVE;
       volume = Vh; //FIXME: the time reported is only parity time
       spinorOutArray[0] = spinorOut;
       for (int i=1; i< num_offsets;i++){
@@ -269,7 +269,7 @@ invert_test(void)
     
     printf("checking the solution\n");
     MyQudaParity parity;
-    if (inv_param.solver_type == QUDA_MAT_SOLVER){
+    if (inv_param.solve_type == QUDA_DIRECT_SOLVE){
       parity = QUDA_EVENODD;
     }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
       parity = QUDA_EVEN;
