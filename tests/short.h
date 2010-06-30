@@ -1,5 +1,5 @@
-#ifndef _SHORT_QUDA_H
-#define _SHORT_QUDA_H
+#ifndef _SHORT_H
+#define _SHORT_H
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)
@@ -18,4 +18,4 @@ inline Float shortToFloat(short a) {
   return rtn;
 }
 
-#endif // _SHORT_QUDA_H
+#endif // _SHORT_H

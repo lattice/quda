@@ -10,8 +10,7 @@ QUDA_OBJS = blas_quda.o clover_quda.o color_spinor_field.o		     \
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_quda.h color_spinor_field.h dirac_quda.h	     \
 	dslash_quda.h enum_quda.h gauge_force_quda.h gauge_quda.h            \
-	invert_quda.h llfat_quda.h quda.h quda_internal.h short_quda.h       \
-	util_quda.h
+	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h
 
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/

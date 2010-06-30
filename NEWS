@@ -24,7 +24,7 @@ Version 0.3.0
   still the best choices in general, but it is now possible to force
   QUDA to solve the unpreconditioned system by setting 'solver_type =
   QUDA_MAT_SOLUTION'.  Note that not all solution_type/solver_type
-  combinations are currently supported.
+  combinations are supported at present.
 
 - ***FIXME: Added 'type' parameter to QudaGaugeParam ...
 

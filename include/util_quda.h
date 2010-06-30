@@ -39,9 +39,9 @@
   printfQuda("\n");                          \
 } while (0)
 
-#define checkCudaError() do {                          \
-  cudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
+#define checkCudaError() do {                           \
+  cudaError_t error = cudaGetLastError();               \
+  if (error != cudaSuccess)                             \
     errorQuda("(CUDA) %s", cudaGetErrorString(error));  \
 } while (0)
 

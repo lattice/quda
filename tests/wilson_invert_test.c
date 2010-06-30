@@ -7,13 +7,8 @@
 #include <blas_reference.h>
 #include <dslash_reference.h>
 
-// in a typical application, quda.h is the only QUDA header required
+// In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Pulled these out front so you can set once and forget
-QudaPrecision cpu_prec=QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec=QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_sloppy_prec=QUDA_HALF_PRECISION;
 
 int main(int argc, char **argv)
 {
@@ -21,13 +16,17 @@ int main(int argc, char **argv)
 
   int device = 0; // CUDA device number
 
+  QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+  QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
+
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
-
+ 
   gauge_param.X[0] = 24; 
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 24;
+  gauge_param.X[3] = 32;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_GAUGE;
@@ -37,7 +36,7 @@ int main(int argc, char **argv)
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
-  gauge_param.cuda_prec_sloppy = cuda_sloppy_prec;
+  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
@@ -57,25 +56,24 @@ int main(int argc, char **argv)
   inv_param.reliable_delta = 1e-2;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-  // FIXME: If asking for MAT Solution, be careful to allocate even clover part.
   inv_param.solver_type = QUDA_MATPC_SOLUTION;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
-  inv_param.cuda_prec_sloppy = cuda_sloppy_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  gauge_param.ga_pad = 0; //24*24*24;
-  inv_param.sp_pad = 0;//24*24*24;
-  inv_param.cl_pad = 0; // 24*24*24;
+  gauge_param.ga_pad = 0; // 24*24*24;
+  inv_param.sp_pad = 0;   // 24*24*24;
+  inv_param.cl_pad = 0;   // 24*24*24;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_sloppy_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
   inv_param.verbosity = QUDA_VERBOSE;
@@ -103,15 +101,22 @@ int main(int argc, char **argv)
     clover_inv = malloc(V*cloverSiteSize*cSize);
     construct_clover_field(clover_inv, norm, diag, inv_param.clover_cpu_prec);
 
-    // only need regular clover term 
-    if ((inv_param.solver_type == QUDA_MAT_SOLUTION &&  // if not preconditioning
-	 (inv_param.solution_type == QUDA_MAT_SOLUTION ||
-	  inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION)) || 
-	(inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || // or using asymmetric preconditioning
-	 inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC))
+    // The uninverted clover term is only needed when solving the unpreconditioned
+    // system or when using "asymmetric" even/odd preconditioning.
+    int preconditioned = (inv_param.solver_type == QUDA_MATPC_SOLVER ||
+			  inv_param.solver_type == QUDA_MATPCDAG_SOLVER ||
+			  inv_param.solver_type == QUDA_MATPCDAG_MATPC_SOLVER);
+    int asymmetric = preconditioned &&
+                         (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
+                          inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC);
+    if (!preconditioned) {
       clover = clover_inv;
-    else
-      clover = 0;
+      clover_inv = NULL;
+    } else if (asymmetric) { // fake it by using the same random matrix
+      clover = clover_inv;   // for both clover and clover_inv
+    } else {
+      clover = NULL;
+    }
   }
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize);
@@ -122,7 +127,8 @@ int main(int argc, char **argv)
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = 1.0;
   else *((double*)spinorIn) = 1.0;
 
-  double time0 = -((double)clock()); // start the timer
+  // start the timer
+  double time0 = -((double)clock());
 
   // initialize the QUDA library
   initQuda(device);
@@ -133,34 +139,33 @@ int main(int argc, char **argv)
   // load the clover term, if desired
   if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
   
-
   // perform the inversion
   invertQuda(spinorOut, spinorIn, &inv_param);
 
-  time0 += clock(); // stop the timer
+  // stop the timer
+  time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  printf("Cuda Space Required:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
+  printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
   if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
-  printf("\nDone: %i iter / %g secs = %g gflops, total time = %g secs\n", 
+  printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  if ( inv_param.solution_type == QUDA_MAT_SOLUTION ) { 
-   mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec); 
+
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
+    mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec); 
+  } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
+    matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
   }
-  else {
-    // If the solution is MATPC check back with the matPC thing
-    if( inv_param.solution_type == QUDA_MATPC_SOLUTION ) {   
-      matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
-    }
-  }
-  if  (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
+
+  if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
     ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+  }
 
   mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-  printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+  printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
   // finalize the QUDA library
   endQuda();

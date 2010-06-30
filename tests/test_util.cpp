@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <short_quda.h>
+#include <short.h>
 
 #include <dslash_reference.h>
 #include <test_util.h>
@@ -372,13 +372,14 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
     int X3 =param->X[2];
     int X4 =param->X[3];
 
-    for(int d =0;d < 4;d++){
-        for(int i=0;i < V*gaugeSiteSize;i++){
-            gauge[d][i] /=(-24* param->anisotropy* param->anisotropy);
+    // rescale long links by the appropriate coefficient
+    for(int d=0; d<4; d++){
+        for(int i=0; i < V*gaugeSiteSize; i++){
+            gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
         }
     }
 
-    // Apply spatial scaling factor (u0) to spatial links
+    // apply the staggered phases
     for (int d = 0; d < 3; d++) {
 
         //even
@@ -459,8 +460,6 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
             }
         }
     }
-
-
 }
 
 
@@ -563,7 +562,7 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
   }
   if (param->type == QUDA_WILSON_GAUGE){  
       applyGaugeFieldScaling(res, Vh, param);
-  }else if (param->type == QUDA_STAGGERED_LONG_GAUGE){
+  }else if (param->type == QUDA_ASQTAD_LONG_GAUGE){
       applyGaugeFieldScaling_long(res, Vh, param);      
   }
   
@@ -654,14 +653,14 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink,
 	}
     } else {
 	if (precision == QUDA_DOUBLE_PRECISION) {
-	    param->type = QUDA_STAGGERED_FAT_GAUGE;
+	    param->type = QUDA_ASQTAD_FAT_GAUGE;
 	    constructGaugeField((double**)fatlink, param);
-	    param->type = QUDA_STAGGERED_LONG_GAUGE;
+	    param->type = QUDA_ASQTAD_LONG_GAUGE;
 	    constructGaugeField((double**)longlink, param);
 	}else {
-	    param->type = QUDA_STAGGERED_FAT_GAUGE;
+	    param->type = QUDA_ASQTAD_FAT_GAUGE;
 	    constructGaugeField((float**)fatlink, param);
-	    param->type = QUDA_STAGGERED_LONG_GAUGE;
+	    param->type = QUDA_ASQTAD_LONG_GAUGE;
 	    constructGaugeField((float**)longlink, param);
 	}
     }

@@ -10,30 +10,21 @@
 #include <string.h>
 #include "misc.h"
 
-extern FullGauge cudaFatLinkPrecise;
-extern FullGauge cudaFatLinkSloppy;
-extern FullGauge cudaLongLinkPrecise;
-extern FullGauge cudaLongLinkSloppy;
-
 #define mySpinorSiteSize 6
-
-
-extern void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param,
-				  void* _cudaLinkPrecise, void* _cudaLinkSloppy);
 
 int device = 0;
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
-QudaPrecision  prec = QUDA_SINGLE_PRECISION;
-QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
 
-static double tol=1e-8;
+static double tol = 1e-8;
 
 static int testtype = 0;
-static int tdim =24;
 static int sdim = 8;
+static int tdim = 24;
 
 extern int V;
 
@@ -56,32 +47,32 @@ invert_test(void)
   void *fatlink[4];
   void *longlink[4];
     
-  QudaGaugeParam gaugeParam;
+  QudaGaugeParam gauge_param;
   QudaInvertParam inv_param;
 
-  gaugeParam.X[0] = sdim;
-  gaugeParam.X[1] = sdim;
-  gaugeParam.X[2] = sdim;
-  gaugeParam.X[3] = tdim;
-  setDims(gaugeParam.X);
+  gauge_param.X[0] = sdim;
+  gauge_param.X[1] = sdim;
+  gauge_param.X[2] = sdim;
+  gauge_param.X[3] = tdim;
+  setDims(gauge_param.X);
     
-  gaugeParam.cpu_prec = cpu_prec;
+  gauge_param.cpu_prec = cpu_prec;
     
-  gaugeParam.cuda_prec = prec;
-  gaugeParam.reconstruct = link_recon;
+  gauge_param.cuda_prec = prec;
+  gauge_param.reconstruct = link_recon;
 
-  gaugeParam.cuda_prec_sloppy = prec_sloppy;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.cuda_prec_sloppy = prec_sloppy;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
   
-  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  gaugeParam.anisotropy = 1.0;
+  gauge_param.tadpole_coeff = 0.8;
 
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.inv_type = QUDA_CG_INVERTER;
 
-  gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
     
   double mass = 0.95;
   inv_param.mass = mass;
@@ -96,22 +87,22 @@ invert_test(void)
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.dslash_type = QUDA_STAGGERED_DSLASH;
-  gaugeParam.ga_pad = sdim*sdim*sdim;
+  gauge_param.ga_pad = sdim*sdim*sdim;
   inv_param.sp_pad = sdim*sdim*sdim;
   inv_param.cl_pad = sdim*sdim*sdim;
   
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   
   for (int dir = 0; dir < 4; dir++) {
     fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
     longlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
-  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
+  construct_fat_long_gauge_field(fatlink, longlink, 1, gauge_param.cpu_prec, &gauge_param);
     
   for (int dir = 0; dir < 4; dir++) {
     for(int i = 0;i < V*gaugeSiteSize;i++){
-      if (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
+      if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION){
 	((double*)fatlink[dir])[i] = 0.5 *rand()/RAND_MAX;
       }else{
 	((float*)fatlink[dir])[i] = 0.5* rand()/RAND_MAX;
@@ -140,13 +131,15 @@ invert_test(void)
   void* spinorCheckOdd = ((char*)spinorCheck) + Vh*mySpinorSiteSize*sSize;
   
   initQuda(device);
-  
 
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda_general(fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy);
-  gaugeParam.reconstruct= link_recon;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda_general(longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy);
+  gauge_param.type = QUDA_ASQTAD_FAT_GAUGE;
+  gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  loadGaugeQuda(fatlink, &gauge_param);
+
+  gauge_param.type = QUDA_ASQTAD_LONG_GAUGE;
+  gauge_param.reconstruct = link_recon;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  loadGaugeQuda(longlink, &gauge_param);
 
   double time0 = -((double)clock()); // Start the timer
   
@@ -158,7 +151,7 @@ invert_test(void)
 
   case 0: //even
     volume = Vh;
-    inv_param.solver_type = QUDA_MATPC_SOLUTION;
+    inv_param.solver_type = QUDA_MATPC_SOLVER;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
     invertQuda(spinorOut, spinorIn, &inv_param);
@@ -166,7 +159,7 @@ invert_test(void)
     time0 += clock(); 
     time0 /= CLOCKS_PER_SEC;
     
-    matdagmat_milc(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN);
+    matdagmat_milc(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp, QUDA_EVEN);
     
     mxpy(spinorIn, spinorCheck, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(spinorCheck, Vh*mySpinorSiteSize, inv_param.cpu_prec);
@@ -176,14 +169,14 @@ invert_test(void)
   case 1: //odd
 	
     volume = Vh;    
-    inv_param.solver_type = QUDA_MATPC_SOLUTION;
+    inv_param.solver_type = QUDA_MATPC_SOLVER;
     inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
     invertQuda(spinorOutOdd, spinorInOdd, &inv_param);	
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     
     
-    matdagmat_milc(spinorCheckOdd, fatlink, longlink, spinorOutOdd, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);	
+    matdagmat_milc(spinorCheckOdd, fatlink, longlink, spinorOutOdd, mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp, QUDA_ODD);	
     mxpy(spinorInOdd, spinorCheckOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(spinorCheckOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(spinorInOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
@@ -193,13 +186,13 @@ invert_test(void)
   case 2: //full spinor
 
     volume = Vh; //FIXME: the time reported is only parity time
-    inv_param.solver_type = QUDA_MAT_SOLUTION;
+    inv_param.solver_type = QUDA_MAT_SOLVER;
     invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     
-    matdagmat_milc(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVENODD);
+    matdagmat_milc(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp, QUDA_EVENODD);
     
     mxpy(spinorIn, spinorCheck, V*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(spinorCheck, V*mySpinorSiteSize, inv_param.cpu_prec);
@@ -210,9 +203,9 @@ invert_test(void)
   case 3: //multi mass CG, even
   case 4:
   case 5:
+
 #define NUM_OFFSETS 4
-    
-    
+        
     nflops = 2*(1205 + 15* NUM_OFFSETS); //from MILC's multimass CG routine
     double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33};
     double offsets[NUM_OFFSETS];	
@@ -230,7 +223,7 @@ invert_test(void)
       len=Vh;
       volume = Vh;
       
-      inv_param.solver_type = QUDA_MATPC_SOLUTION;
+      inv_param.solver_type = QUDA_MATPC_SOLVER;
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
       
       spinorOutArray[0] = spinorOut;
@@ -244,7 +237,7 @@ invert_test(void)
       len = Vh;
       volume = Vh;
 
-      inv_param.solver_type = QUDA_MATPC_SOLUTION;
+      inv_param.solver_type = QUDA_MATPC_SOLVER;
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
       
       spinorOutArray[0] = spinorOutOdd;
@@ -254,7 +247,7 @@ invert_test(void)
     }else { //testtype ==5
       in=spinorIn;
       len= V;
-      inv_param.solver_type = QUDA_MAT_SOLUTION;
+      inv_param.solver_type = QUDA_MAT_SOLVER;
       volume = Vh; //FIXME: the time reported is only parity time
       spinorOutArray[0] = spinorOut;
       for (int i=1; i< num_offsets;i++){
@@ -276,7 +269,7 @@ invert_test(void)
     
     printf("checking the solution\n");
     MyQudaParity parity;
-    if (inv_param.solver_type == QUDA_MAT_SOLUTION){
+    if (inv_param.solver_type == QUDA_MAT_SOLVER){
       parity = QUDA_EVENODD;
     }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
       parity = QUDA_EVEN;
@@ -289,7 +282,7 @@ invert_test(void)
     
     for(int i=0;i < num_offsets;i++){
       printf("%dth solution: mass=%f", i, masses[i]);
-      matdagmat_milc(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
+      matdagmat_milc(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp, parity);
       mxpy(in, spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(in, len*mySpinorSiteSize, inv_param.cpu_prec);

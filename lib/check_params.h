@@ -44,7 +44,19 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(X[1], INVALID_INT);
   P(X[2], INVALID_INT);
   P(X[3], INVALID_INT);
+
+#if defined INIT_PARAM
   P(anisotropy, INVALID_DOUBLE);
+  P(tadpole_coeff, INVALID_DOUBLE);
+#else
+  if (param->type == QUDA_WILSON_GAUGE) {
+    P(anisotropy, INVALID_DOUBLE);
+  } else if (param->type == QUDA_ASQTAD_FAT_GAUGE ||
+	     param->type == QUDA_ASQTAD_LONG_GAUGE) {
+    P(tadpole_coeff, INVALID_DOUBLE);
+  }
+#endif
+
   P(type, QUDA_INVALID_GAUGE);
   P(gauge_order, QUDA_INVALID_GAUGE_ORDER);
   P(t_boundary, QUDA_INVALID_T_BOUNDARY);
@@ -56,7 +68,10 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
   P(ga_pad, INVALID_INT);
 
-#ifdef PRINT_PARAM
+#if defined INIT_PARAM
+  P(packed_size, 0);
+  P(gaugeGiB, 0.0);
+#elif defined PRINT_PARAM
   P(packed_size, INVALID_INT);
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
@@ -97,7 +112,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
   P(solution_type, QUDA_INVALID_SOLUTION);
-  P(solver_type, QUDA_INVALID_SOLUTION);
+  P(solver_type, QUDA_INVALID_SOLVER);
   P(matpc_type, QUDA_MATPC_INVALID);
   P(mass_normalization, QUDA_INVALID_NORMALIZATION);
   P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID);

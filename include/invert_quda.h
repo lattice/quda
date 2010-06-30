@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+  // defined in interface_quda.cpp
+
   extern FullGauge cudaGaugePrecise;
   extern FullGauge cudaGaugeSloppy;
 
@@ -19,21 +21,25 @@ extern "C" {
   extern FullGauge cudaLongLinkPrecise;
   extern FullGauge cudaLongLinkSloppy;
 
-
   extern FullClover cudaCloverPrecise;
   extern FullClover cudaCloverSloppy;
 
   extern FullClover cudaCloverInvPrecise;
   extern FullClover cudaCloverInvSloppy;
 
-  // -- inv_cg_cuda.cpp
+  // defined in inv_cg_cuda.cpp
+
   void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField &tmp,
 		    QudaInvertParam *param);
+
+  // defined in inv_multi_cg_quda.cpp
+
   int invertMultiShiftCgCuda(Dirac & dirac, Dirac& diracSloppy, cudaColorSpinorField** x, cudaColorSpinorField b,
 			     QudaInvertParam *invert_param, 
 			     double* offsets, int num_offsets, double* residue_sq);
   
-  // -- inv_bicgstab_cuda.cpp
+  // defined in inv_bicgstab_cuda.cpp
+
   void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField &tmp, 
 			  QudaInvertParam *param, DagType dag_type);
 

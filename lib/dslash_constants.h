@@ -127,7 +127,7 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride)
   double t_bc = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary", &(t_bc), sizeof(double));
 
-  double coeff = -24.0*gauge.anisotropy*gauge.anisotropy;
+  double coeff = -24.0*gauge.tadpole_coeff*gauge.tadpole_coeff;
   cudaMemcpyToSymbol("coeff", &(coeff), sizeof(double));
 
 
@@ -137,7 +137,7 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride)
   float t_bc_f = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary_f", &(t_bc_f), sizeof(float));
 
-  float coeff_f = -24.0*gauge.anisotropy*gauge.anisotropy;
+  float coeff_f = -24.0*gauge.tadpole_coeff*gauge.tadpole_coeff;
   cudaMemcpyToSymbol("coeff_f", &(coeff_f), sizeof(float));
 
 

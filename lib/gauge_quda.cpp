@@ -26,13 +26,13 @@ inline void ShortToFloat(Float &a, const short &b) {
 // Routines used to pack the gauge field matrices
 
 template <typename Float>
-inline void pack8(double2 *d_gauge, Float *h_gauge, int dir, int V) {
-  double2 *dg = d_gauge + dir*4*V;
-  dg[0].x = atan2(h_gauge[1], h_gauge[0]);
-  dg[0].y = atan2(h_gauge[13], h_gauge[12]);
+inline void pack8(double2 *res, Float *g, int dir, int V) {
+  double2 *r = res + dir*4*V;
+  r[0].x = atan2(g[1], g[0]);
+  r[0].y = atan2(g[13], g[12]);
   for (int j=1; j<4; j++) {
-    dg[j*V].x = h_gauge[2*j+0];
-    dg[j*V].y = h_gauge[2*j+1];
+    r[j*V].x = g[2*j+0];
+    r[j*V].y = g[2*j+1];
   }
 }
 
@@ -48,27 +48,40 @@ inline void pack8(float4 *res, Float *g, int dir, int V) {
   r[V].z = g[6];
   r[V].w = g[7];
 }
-template <typename Float>
-inline void pack8(float2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported", __FUNCTION__);
-}
 
 template <typename Float>
-inline void pack8(short2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported", __FUNCTION__);
+inline void pack8(float2 *res, Float *g, int dir, int V) {
+  float2 *r = res + dir*4*V;
+  r[0].x = atan2(g[1], g[0]);
+  r[0].y = atan2(g[13], g[12]);
+  for (int j=1; j<4; j++) {
+    r[j*V].x = g[2*j+0];
+    r[j*V].y = g[2*j+1];
+  }
 }
 
 template <typename Float>
 inline void pack8(short4 *res, Float *g, int dir, int V) {
   short4 *r = res + dir*2*V;
-  r[0].x = FloatToShort(atan2(g[1], g[0])/ M_PI);
-  r[0].y = FloatToShort(atan2(g[13], g[12])/ M_PI);
+  r[0].x = FloatToShort(atan2(g[1], g[0]) / M_PI);
+  r[0].y = FloatToShort(atan2(g[13], g[12]) / M_PI);
   r[0].z = FloatToShort(g[2]);
   r[0].w = FloatToShort(g[3]);
   r[V].x = FloatToShort(g[4]);
   r[V].y = FloatToShort(g[5]);
   r[V].z = FloatToShort(g[6]);
   r[V].w = FloatToShort(g[7]);
+}
+
+template <typename Float>
+inline void pack8(short2 *res, Float *g, int dir, int V) {
+  short2 *r = res + dir*4*V;
+  r[0].x = FloatToShort(atan2(g[1], g[0]) / M_PI);
+  r[0].y = FloatToShort(atan2(g[13], g[12]) / M_PI);
+  for (int j=1; j<4; j++) {
+    r[j*V].x = FloatToShort(g[2*j+0]);
+    r[j*V].y = FloatToShort(g[2*j+1]);
+  }
 }
 
 template <typename Float>
@@ -93,14 +106,12 @@ inline void pack12(float4 *res, Float *g, int dir, int V) {
 
 template <typename Float>
 inline void pack12(float2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported", __FUNCTION__);
+  float2 *r = res + dir*6*V;
+  for (int j=0; j<6; j++) {
+    r[j*V].x = g[j*2+0];
+    r[j*V].y = g[j*2+1];
+  }
 }
-
-template <typename Float>
-inline void pack12(short2 *res, Float *g, int dir, int V) {
-    errorQuda("%s is not supported", __FUNCTION__);
-}
-
 
 template <typename Float>
 inline void pack12(short4 *res, Float *g, int dir, int V) {
@@ -114,62 +125,70 @@ inline void pack12(short4 *res, Float *g, int dir, int V) {
 }
 
 template <typename Float>
-inline void pack18(double2 *d_gauge, Float *h_gauge, int dir, int V) {
-  double2 *dg = d_gauge + dir*9*V;
-  for (int j=0; j<9; j++) {
-    dg[j*V].x = h_gauge[j*2+0]; 
-    dg[j*V].y = h_gauge[j*2+1]; 
+inline void pack12(short2 *res, Float *g, int dir, int V) {
+  short2 *r = res + dir*6*V;
+  for (int j=0; j<6; j++) {
+    r[j*V].x = FloatToShort(g[j*2+0]);
+    r[j*V].y = FloatToShort(g[j*2+1]);
   }
 }
 
 template <typename Float>
-inline void pack18(float4 *d_gauge, Float *h_gauge, int dir, int V) {
-  float4 *dg = d_gauge + dir*5*V;
+inline void pack18(double2 *res, Float *g, int dir, int V) {
+  double2 *r = res + dir*9*V;
+  for (int j=0; j<9; j++) {
+    r[j*V].x = g[j*2+0]; 
+    r[j*V].y = g[j*2+1]; 
+  }
+}
+
+template <typename Float>
+inline void pack18(float4 *res, Float *g, int dir, int V) {
+  float4 *r = res + dir*5*V;
   for (int j=0; j<4; j++) {
-    dg[j*V].x = h_gauge[j*4+0]; 
-    dg[j*V].y = h_gauge[j*4+1]; 
-    dg[j*V].z = h_gauge[j*4+2]; 
-    dg[j*V].w = h_gauge[j*4+3]; 
+    r[j*V].x = g[j*4+0]; 
+    r[j*V].y = g[j*4+1]; 
+    r[j*V].z = g[j*4+2]; 
+    r[j*V].w = g[j*4+3]; 
   }
-  dg[16*V].x = h_gauge[16]; 
-  dg[17*V].y = h_gauge[17]; 
-  dg[18*V].z = 0.0;
-  dg[19*V].w = 0.0;
+  r[16*V].x = g[16]; 
+  r[17*V].y = g[17]; 
+  r[18*V].z = 0.0;
+  r[19*V].w = 0.0;
 }
 
 template <typename Float>
-inline void pack18(float2 *d_gauge, Float *h_gauge, int dir, int V) {
-  float2 *dg = d_gauge + dir*9*V;
+inline void pack18(float2 *res, Float *g, int dir, int V) {
+  float2 *r = res + dir*9*V;
   for (int j=0; j<9; j++) {
-    dg[j*V].x = h_gauge[j*2+0]; 
-    dg[j*V].y = h_gauge[j*2+1]; 
+    r[j*V].x = g[j*2+0]; 
+    r[j*V].y = g[j*2+1]; 
   }
 }
 
 template <typename Float>
-inline void pack18(short2 *d_gauge, Float *h_gauge, int dir, int V) 
+inline void pack18(short4 *res, Float *g, int dir, int V) {
+  short4 *r = res + dir*5*V;
+  for (int j=0; j<4; j++) {
+    r[j*V].x = FloatToShort(g[j*4+0]); 
+    r[j*V].y = FloatToShort(g[j*4+1]); 
+    r[j*V].z = FloatToShort(g[j*4+2]); 
+    r[j*V].w = FloatToShort(g[j*4+3]); 
+  }
+  r[16*V].x = FloatToShort(g[16]); 
+  r[17*V].y = FloatToShort(g[17]); 
+  r[18*V].z = (short)0;
+  r[19*V].w = (short)0;
+}
+
+template <typename Float>
+inline void pack18(short2 *res, Float *g, int dir, int V) 
 {
-    short2 *dg = d_gauge + dir*9*V;
+    short2 *r = res + dir*9*V;
     for (int j=0; j<9; j++) {
-	dg[j*V].x = FloatToShort(h_gauge[j*2+0]); 
-	dg[j*V].y = FloatToShort(h_gauge[j*2+1]); 
+	r[j*V].x = FloatToShort(g[j*2+0]); 
+	r[j*V].y = FloatToShort(g[j*2+1]); 
     }
-}
-
-
-template <typename Float>
-inline void pack18(short4 *d_gauge, Float *h_gauge, int dir, int V) {
-  short4 *dg = d_gauge + dir*5*V;
-  for (int j=0; j<4; j++) {
-    dg[j*V].x = FloatToShort(h_gauge[j*4+0]); 
-    dg[j*V].y = FloatToShort(h_gauge[j*4+1]); 
-    dg[j*V].z = FloatToShort(h_gauge[j*4+2]); 
-    dg[j*V].w = FloatToShort(h_gauge[j*4+3]); 
-  }
-  dg[16*V].x = FloatToShort(h_gauge[16]); 
-  dg[17*V].y = FloatToShort(h_gauge[17]); 
-  dg[18*V].z = (short)0;
-  dg[19*V].w = (short)0;
 }
 
 // a += b*c
@@ -288,7 +307,12 @@ inline void unpack8(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
 
 template <typename Float>
 inline void unpack8(Float *h_gauge, float2 *d_gauge, int dir, int V, int idx) {
-    errorQuda("%s is not supported yet", __FUNCTION__);
+  float2 *dg = d_gauge + dir*4*V;
+  for (int j=0; j<4; j++) {
+    h_gauge[2*j+0] = dg[j*V].x;
+    h_gauge[2*j+1] = dg[j*V].y;
+  }
+  reconstruct8(h_gauge, dir, idx);
 }
 
 template <typename Float>
@@ -302,6 +326,18 @@ inline void unpack8(Float *h_gauge, short4 *d_gauge, int dir, int V, int idx) {
   ShortToFloat(h_gauge[5], dg[V].y);
   ShortToFloat(h_gauge[6], dg[V].z);
   ShortToFloat(h_gauge[7], dg[V].w);
+  h_gauge[0] *= M_PI;
+  h_gauge[1] *= M_PI;
+  reconstruct8(h_gauge, dir, idx);
+}
+
+template <typename Float>
+inline void unpack8(Float *h_gauge, short2 *d_gauge, int dir, int V, int idx) {
+  short2 *dg = d_gauge + dir*4*V;
+  for (int j=0; j<4; j++) {
+    ShortToFloat(h_gauge[2*j+0], dg[j*V].x);
+    ShortToFloat(h_gauge[2*j+1], dg[j*V].y);
+  }
   h_gauge[0] *= M_PI;
   h_gauge[1] *= M_PI;
   reconstruct8(h_gauge, dir, idx);
@@ -346,9 +382,15 @@ inline void unpack12(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
   }
   reconstruct12(h_gauge, dir, idx);
 }
+
 template <typename Float>
 inline void unpack12(Float *h_gauge, float2 *d_gauge, int dir, int V, int idx) {
-    errorQuda("%s is not supported yet", __FUNCTION__);
+  float2 *dg = d_gauge + dir*6*V;
+  for (int j=0; j<6; j++) {
+    h_gauge[j*2+0] = dg[j*V].x;
+    h_gauge[j*2+1] = dg[j*V].y; 
+  }
+  reconstruct12(h_gauge, dir, idx);
 }
 
 template <typename Float>
@@ -364,17 +406,18 @@ inline void unpack12(Float *h_gauge, short4 *d_gauge, int dir, int V, int idx) {
 }
 
 template <typename Float>
-inline void unpack18(Float *h_gauge, double2 *d_gauge, int dir, int V) {
-  double2 *dg = d_gauge + dir*9*V;
-  for (int j=0; j<9; j++) {
-    h_gauge[j*2+0] = dg[j*V].x; 
-    h_gauge[j*2+1] = dg[j*V].y;
+inline void unpack12(Float *h_gauge, short2 *d_gauge, int dir, int V, int idx) {
+  short2 *dg = d_gauge + dir*6*V;
+  for (int j=0; j<6; j++) {
+    ShortToFloat(h_gauge[j*2+0], dg[j*V].x);
+    ShortToFloat(h_gauge[j*2+1], dg[j*V].y); 
   }
+  reconstruct12(h_gauge, dir, idx);
 }
 
 template <typename Float>
-inline void unpack18(Float *h_gauge, float2 *d_gauge, int dir, int V) {
-  float2 *dg = d_gauge + dir*9*V;
+inline void unpack18(Float *h_gauge, double2 *d_gauge, int dir, int V) {
+  double2 *dg = d_gauge + dir*9*V;
   for (int j=0; j<9; j++) {
     h_gauge[j*2+0] = dg[j*V].x; 
     h_gauge[j*2+1] = dg[j*V].y;
@@ -395,6 +438,15 @@ inline void unpack18(Float *h_gauge, float4 *d_gauge, int dir, int V) {
 }
 
 template <typename Float>
+inline void unpack18(Float *h_gauge, float2 *d_gauge, int dir, int V) {
+  float2 *dg = d_gauge + dir*9*V;
+  for (int j=0; j<9; j++) {
+    h_gauge[j*2+0] = dg[j*V].x; 
+    h_gauge[j*2+1] = dg[j*V].y;
+  }
+}
+
+template <typename Float>
 inline void unpack18(Float *h_gauge, short4 *d_gauge, int dir, int V) {
   short4 *dg = d_gauge + dir*5*V;
   for (int j=0; j<4; j++) {
@@ -406,6 +458,15 @@ inline void unpack18(Float *h_gauge, short4 *d_gauge, int dir, int V) {
   ShortToFloat(h_gauge[16],dg[4*V].x);
   ShortToFloat(h_gauge[17],dg[4*V].y);
 
+}
+
+template <typename Float>
+inline void unpack18(Float *h_gauge, short2 *d_gauge, int dir, int V) {
+  short2 *dg = d_gauge + dir*9*V;
+  for (int j=0; j<9; j++) {
+    ShortToFloat(h_gauge[j*2+0], dg[j*V].x); 
+    ShortToFloat(h_gauge[j*2+1], dg[j*V].y);
+  }
 }
 
 // Assume the gauge field is "QDP" ordered: directions outside of
@@ -662,7 +723,7 @@ static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, Gauge
 
 void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
 		      GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
-		      Tboundary t_boundary, int *XX, double anisotropy, int pad)
+		      Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad)
 {
   if (cpu_prec == QUDA_HALF_PRECISION) {
     errorQuda("Half precision not supported on CPU");
@@ -672,6 +733,7 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
   tBoundary = t_boundary;
 
   cudaGauge->anisotropy = anisotropy;
+  cudaGauge->tadpole_coeff = tadpole_coeff;
   cudaGauge->volume = 1;
   for (int d=0; d<4; d++) {
     cudaGauge->X[d] = XX[d];
@@ -684,56 +746,59 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
   cudaGauge->stride = cudaGauge->volume + cudaGauge->pad;
   cudaGauge->gauge_fixed = gauge_fixed;
   cudaGauge->t_boundary = t_boundary;
-
   
   allocateGaugeField(cudaGauge, reconstruct, cuda_prec);
 
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
 
-    if (cpu_prec == QUDA_DOUBLE_PRECISION)
+    if (cpu_prec == QUDA_DOUBLE_PRECISION) {
       loadGaugeField((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (double*)cpuGauge, 
 		     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
-    else if (cpu_prec == QUDA_SINGLE_PRECISION)
+    } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
       loadGaugeField((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (float*)cpuGauge, 
 		     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
+    }
 
   } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
 
-      if (cpu_prec == QUDA_DOUBLE_PRECISION){
-	  if (reconstruct == QUDA_RECONSTRUCT_NO){
-	      loadGaugeField((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (double*)cpuGauge, 
-			     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);	      
-	  }else{
-	      loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (double*)cpuGauge, 
-			     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
-	  }
-	  
+    if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+      if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	loadGaugeField((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (double*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);	      
+      } else {
+	loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (double*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
       }
-      else if (cpu_prec == QUDA_SINGLE_PRECISION){
-	  if (reconstruct == QUDA_RECONSTRUCT_NO){
-	      loadGaugeField((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (float*)cpuGauge, 
-			     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
-	  }else{
-	      loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (float*)cpuGauge, 
-			     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
-	  }
+    } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
+      if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	loadGaugeField((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (float*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
+      } else {
+	loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (float*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
       }
+    }
 
   } else if (cuda_prec == QUDA_HALF_PRECISION) {
-      if (cpu_prec == QUDA_DOUBLE_PRECISION){
-	  if (reconstruct == QUDA_RECONSTRUCT_NO){	  
-	      loadGaugeField((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (double*)cpuGauge, 
-			     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
 
-	  }else{
-	      loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (double*)cpuGauge, 
-			     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);	      
-	  }
+    if (cpu_prec == QUDA_DOUBLE_PRECISION){
+      if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	loadGaugeField((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (double*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
+      } else {
+	loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (double*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);	      
       }
-      else if (cpu_prec == QUDA_SINGLE_PRECISION)
-	  loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (float*)cpuGauge,
-			 gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
-      
+    } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
+      if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	loadGaugeField((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (float*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);
+      } else {
+	loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (float*)cpuGauge, 
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad);	      
+      }
+    }
+
   }
 }
 
@@ -745,43 +810,56 @@ void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, QudaPrecision cpu_p
 
   if (cudaGauge->precision == QUDA_DOUBLE_PRECISION) {
 
-    if (cpu_prec == QUDA_DOUBLE_PRECISION)
+    if (cpu_prec == QUDA_DOUBLE_PRECISION) {
       retrieveGaugeField((double*)cpuGauge, (double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), 
 			 gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
-    else if (cpu_prec == QUDA_SINGLE_PRECISION)
+    } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
       retrieveGaugeField((float*)cpuGauge, (double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), 
 			 gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+    }
 
   } else if (cudaGauge->precision == QUDA_SINGLE_PRECISION) {
 
-    if (cpu_prec == QUDA_DOUBLE_PRECISION)
-	if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO){
-	    retrieveGaugeField((double*)cpuGauge, (float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), 
-			       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
-	}else{
-	    retrieveGaugeField((double*)cpuGauge, (float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), 
-			       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
-	}
-    else if (cpu_prec == QUDA_SINGLE_PRECISION){
-	if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO){
-	    retrieveGaugeField((float*)cpuGauge, (float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), 
-			       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
-	}else{
-	    retrieveGaugeField((float*)cpuGauge, (float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), 
-			       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
-	}
+    if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+      if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO) {
+	retrieveGaugeField((double*)cpuGauge, (float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      } else {
+	retrieveGaugeField((double*)cpuGauge, (float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      }
+    } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
+      if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO) {
+	retrieveGaugeField((float*)cpuGauge, (float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      } else {
+	retrieveGaugeField((float*)cpuGauge, (float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      }
     }
 
   } else if (cudaGauge->precision == QUDA_HALF_PRECISION) {
 
-    if (cpu_prec == QUDA_DOUBLE_PRECISION)
-      retrieveGaugeField((double*)cpuGauge, (short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), 
-			 gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
-    else if (cpu_prec == QUDA_SINGLE_PRECISION)
-      retrieveGaugeField((float*)cpuGauge, (short4*)(cudaGauge->even), (short4*)(cudaGauge->odd),
-			 gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+    if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+      if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO) {
+	retrieveGaugeField((double*)cpuGauge, (short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      } else {
+	retrieveGaugeField((double*)cpuGauge, (short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      }
+    } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
+      if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO) {
+	retrieveGaugeField((float*)cpuGauge, (short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      } else {
+	retrieveGaugeField((float*)cpuGauge, (short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), 
+			   gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, cudaGauge->pad);
+      }
+    }
 
   }
+
 }
 
 

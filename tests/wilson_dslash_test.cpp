@@ -55,6 +55,7 @@ void init() {
 
   gauge_param.anisotropy = 2.3;
 
+  gauge_param.type = QUDA_WILSON_GAUGE;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
@@ -68,7 +69,7 @@ void init() {
 
   inv_param.kappa = kappa;
 
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;//_ASYMMETRIC;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -82,8 +83,11 @@ void init() {
   //inv_param.cl_pad = 24*24*24;
 
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  if (test_type == 2) inv_param.solver_type = QUDA_MAT_SOLUTION;
-  else inv_param.solver_type = QUDA_MATPC_SOLUTION;
+  if (test_type == 2) {
+    inv_param.solver_type = QUDA_MAT_SOLVER;
+  } else {
+    inv_param.solver_type = QUDA_MATPC_SOLVER;
+  }
 
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;

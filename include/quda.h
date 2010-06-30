@@ -16,7 +16,8 @@ extern "C" {
 
     int X[4];
 
-    double anisotropy;
+    double anisotropy;    // used for Wilson and Wilson-clover
+    double tadpole_coeff; // used for staggered only
 
     QudaGaugeType type;
     QudaGaugeFieldOrder gauge_order;
@@ -52,7 +53,7 @@ extern "C" {
     double reliable_delta; // reliable update tolerance
 
     QudaSolutionType solution_type; // type of system to solve
-    QudaSolutionType solver_type; // how to solve it
+    QudaSolverType solver_type; // how to solve it
     QudaMatPCType matpc_type;
     QudaMassNormalization mass_normalization;
 
@@ -84,12 +85,10 @@ extern "C" {
   } QudaInvertParam;
 
 
-
   // Interface functions, found in interface_quda.cpp
 
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
-  void loadGaugeQuda_general(void *h_gauge, QudaGaugeParam *param, void*, void*);
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param);
 

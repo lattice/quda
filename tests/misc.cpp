@@ -121,7 +121,7 @@ int link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugePar
     int X4 =gaugeParam->X[3];
     double t_boundary = (gaugeParam->t_boundary ==QUDA_ANTI_PERIODIC_T)? -1.0:1.0;
 
-   double u0 = gaugeParam->anisotropy;
+   double u0 = gaugeParam->tadpole_coeff;
    double coff= -u0*u0*24;
    //coff = (dir < 6) ? coff : ( (ga_idx >= (X4-3)*X1h*X2*X3 )? t_boundary : 1); 
 
@@ -357,7 +357,7 @@ int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugePara
 #define SMALL_NUM 1e-24
     row_sum = (row_sum != 0)?row_sum: SMALL_NUM;
 #if 1
-    Float u0= -gaugeParam->anisotropy*gaugeParam->anisotropy*24;
+    Float u0= -gaugeParam->tadpole_coeff*gaugeParam->tadpole_coeff*24;
     {
 	int X1h=gaugeParam->X[0]/2;
 	int X1 =gaugeParam->X[0];
