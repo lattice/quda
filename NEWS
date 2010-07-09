@@ -11,8 +11,8 @@ Version 0.3.0
   future extensions.  This is an ongoing process and will continue
   through the next several releases.
 
-- The inverters may now require more device memory than they did
-  previously.  This will be corrected in the next release.
+- The inverters might require more device memory than they did before.
+  This will be corrected in the next release.
 
 - The CG inverter now supports improved staggered fermions (asqtad or
   HISQ).  Code has also been added for asqtad link fattening, the asqtad

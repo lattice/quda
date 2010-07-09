@@ -10,15 +10,15 @@
 #include <util_quda.h>
 #include <sys/time.h>
 
-void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cudaColorSpinorField &b, 
-		  cudaColorSpinorField &y, QudaInvertParam *invert_param)
+void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
+		  cudaColorSpinorField &b, cudaColorSpinorField &y, QudaInvertParam *invert_param)
 {
   int k=0;
   int rUpdate = 0;
     
   cudaColorSpinorField r(b);
   
-  dirac.MdagM(r, x);
+  mat(r, x);
   double r2 = xmyNormCuda(b, r);
   rUpdate ++;
   
@@ -65,8 +65,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   stopwatchStart();
   while (r2 > stop && k<invert_param->maxiter) {
 
-    diracSloppy.MdagM(Ap, p);
-    //MatVec(Ap, cudaGaugeSloppy, cudaCloverSloppy, cudaCloverInvSloppy, p, invert_param, tmp);
+    matSloppy(Ap, p);
     
     pAp = reDotProductCuda(p, Ap);
     alpha = r2 / pAp;        
@@ -88,8 +87,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
       if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
       xpyCuda(x, y); // swap these around?
-      dirac.MdagM(r, y);
-      //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, y, invert_param, x);
+      mat(r, y);
       r2 = xmyNormCuda(b, r);
       if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
       zeroCuda(xSloppy);
@@ -121,7 +119,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
     printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
-  float gflops = (blas_quda_flops + dirac.Flops() + diracSloppy.Flops())*1e-9;
+  float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops = gflops;
   invert_param->iter = k;
@@ -130,8 +128,7 @@ void invertCgCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, cud
 
   //#if 0
   // Calculate the true residual
-  dirac.MdagM(r, x);
-  //MatVec(r, cudaGaugePrecise, cudaCloverPrecise, cudaCloverInvPrecise, x, y);
+  mat(r, x);
   double true_res = xmyNormCuda(b, r);
   if (invert_param->verbosity >= QUDA_SUMMARIZE){
     printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 

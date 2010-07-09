@@ -295,82 +295,55 @@ void endQuda(void)
 }
 
 
-void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
-
+void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param)
+{
   double kappa = inv_param->kappa;
-  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
     kappa *= cudaGaugePrecise.anisotropy;
+  }
 
-  if (inv_param->solve_type == QUDA_DIRECT_SOLVE) {
-    if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
-      diracParam.type = QUDA_WILSON_DIRAC;
-    else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
-      diracParam.type = QUDA_CLOVER_DIRAC;
-    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
-      diracParam.type = QUDA_ASQTAD_DIRAC;
-    else errorQuda("Unsupported dslash_type");
-  } else if (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) {
-    if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
-      diracParam.type = QUDA_WILSONPC_DIRAC;
-    else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
-      diracParam.type = QUDA_CLOVERPC_DIRAC;
-    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH) 
-      diracParam.type = QUDA_ASQTADPC_DIRAC;
-    else errorQuda("Unsupported dslash_type");
-  } else {
-    errorQuda("Unsupported solve_type %d", inv_param->solve_type);
+  bool pc = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
+	     inv_param->solve_type == QUDA_NORMEQ_PC_SOLVE);
+
+  switch (inv_param->dslash_type) {
+  case QUDA_WILSON_DSLASH:
+    diracParam.type = pc ? QUDA_WILSONPC_DIRAC : QUDA_WILSON_DIRAC;
+    break;
+  case QUDA_CLOVER_WILSON_DSLASH:
+    diracParam.type = pc ? QUDA_CLOVERPC_DIRAC : QUDA_CLOVER_DIRAC;
+    break;
+  case QUDA_ASQTAD_DSLASH:
+    diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;
+    break;
+  default:
+    errorQuda("Unsupported dslash_type");
   }
 
   diracParam.matpcType = inv_param->matpc_type;
+  diracParam.dagger = inv_param->dagger;
   diracParam.gauge = &cudaGaugePrecise;
   diracParam.clover = &cudaCloverPrecise;
   diracParam.cloverInv = &cudaCloverInvPrecise;
   diracParam.kappa = kappa;
   diracParam.mass = inv_param->mass;
   diracParam.verbose = inv_param->verbosity;
-
 }
 
 
-void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param) {
-  double kappa = inv_param->kappa;
-  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER)
-    kappa *= cudaGaugePrecise.anisotropy;
+void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param)
+{
+  setDiracParam(diracParam, inv_param);
 
-
-  if (inv_param->solve_type == QUDA_DIRECT_SOLVE) {
-    if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
-      diracParam.type = QUDA_WILSON_DIRAC;
-    else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
-      diracParam.type = QUDA_CLOVER_DIRAC;
-    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
-	diracParam.type = QUDA_ASQTAD_DIRAC;
-    else errorQuda("Unsupported dslash_type");
-  } else if (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) {
-    if (inv_param->dslash_type == QUDA_WILSON_DSLASH) 
-      diracParam.type = QUDA_WILSONPC_DIRAC;
-    else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
-      diracParam.type = QUDA_CLOVERPC_DIRAC;
-    else if (inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
-	diracParam.type = QUDA_ASQTADPC_DIRAC;
-    else errorQuda("Unsupported dslash_type");
-  } else {
-    errorQuda("Unsupported solve_type %d", inv_param->solve_type);
-  }
-
-  diracParam.matpcType = inv_param->matpc_type;
   diracParam.gauge = &cudaGaugeSloppy;
   diracParam.clover = &cudaCloverSloppy;
   diracParam.cloverInv = &cudaCloverInvSloppy;
-  diracParam.kappa = kappa;
-  diracParam.mass = inv_param->mass;
 }
 
 
 void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
 		 QudaMassNormalization mass_normalization, 
-		 cudaColorSpinorField &b) {
-    
+		 cudaColorSpinorField &b)
+{    
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     if (mass_normalization != QUDA_MASS_NORMALIZATION) {
       errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
@@ -379,8 +352,7 @@ void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType sol
   }
 
   // multiply the source to get the mass normalization
-  if (solution_type == QUDA_MAT_SOLUTION ||
-      solution_type == QUDA_MATDAG_SOLUTION) {
+  if (solution_type == QUDA_MAT_SOLUTION) {
 
     if (mass_normalization == QUDA_MASS_NORMALIZATION ||
 	mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
@@ -388,7 +360,6 @@ void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType sol
     }
 
   } else if (solution_type == QUDA_MATPC_SOLUTION ||
-	     solution_type == QUDA_MATPCDAG_SOLUTION ||
 	     solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
     if (mass_normalization == QUDA_MASS_NORMALIZATION) {
@@ -412,7 +383,7 @@ void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType sol
 }
 
 
-void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, QudaDagType dagger)
+void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
   cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -438,7 +409,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   setDiracParam(diracParam, inv_param);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-  dirac->Dslash(out, in, parity, dagger); // apply the operator
+  dirac->Dslash(out, in, parity); // apply the operator
   delete dirac; // clean up
 
   cpuParam.v = h_out;
@@ -447,9 +418,11 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 }
 
 
-void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType dagger)
+void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
-  if (inv_param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
+  if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
+    cudaGaugePrecise.X[0] *= 2;
+  }
   ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
   if (inv_param->solution_type == QUDA_MAT_SOLUTION) {
     cudaGaugePrecise.X[0] /= 2;
@@ -471,7 +444,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaDagType da
   setDiracParam(diracParam, inv_param);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-  dirac->M(out, in, dagger); // apply the operator
+  dirac->M(out, in); // apply the operator
   delete dirac; // clean up
 
   cpuParam.v = h_out;
@@ -541,7 +514,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cudaColorSpinorField* tmp;
   cudaColorSpinorField *in, *out;
 
-  if( param->dslash_type == QUDA_ASQTAD_DSLASH){
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
+
     ColorSpinorParam csParam;
     csParam.precision = param->cpu_prec;
     csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
@@ -552,22 +526,24 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     csParam.nDim=4;
     csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     
-    if (param->solve_type == QUDA_DIRECT_SOLVE){
+    if (param->solve_type == QUDA_NORMEQ_SOLVE) {
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
-    }else{
+    } else if (param->solve_type == QUDA_NORMEQ_PC_SOLVE) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] = cudaFatLinkPrecise.X[0];
+    } else {
+      errorQuda("Direct solve_type not supported for staggered");
     }
     csParam.x[1] = cudaFatLinkPrecise.X[1];
     csParam.x[2] = cudaFatLinkPrecise.X[2];
     csParam.x[3] = cudaFatLinkPrecise.X[3];
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
     csParam.v = hp_b;  
-    h_b = new  cpuColorSpinorField(csParam);
+    h_b = new cpuColorSpinorField(csParam);
     
     csParam.v = hp_x;
-    h_x= new  cpuColorSpinorField(csParam);
+    h_x = new cpuColorSpinorField(csParam);
     
     csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -595,11 +571,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     csParam.create = QUDA_COPY_FIELD_CREATE;  
     x = new cudaColorSpinorField(*h_x, csParam); // solution  
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    tmp =new cudaColorSpinorField(csParam); // temporary
+    tmp = new cudaColorSpinorField(csParam); // temporary
         
-  } else {
+  } else if (param->dslash_type == QUDA_WILSON_DSLASH ||
+	     param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+
     // temporary hack
-    if (param->solution_type == QUDA_MAT_SOLUTION) cudaGaugePrecise.X[0] *= 2;
+    if (param->solution_type == QUDA_MAT_SOLUTION) {
+      cudaGaugePrecise.X[0] *= 2;
+    }
     ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X);
     if (param->solution_type == QUDA_MAT_SOLUTION) {
       cudaGaugePrecise.X[0] /= 2;
@@ -612,15 +592,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     
     h_b = new cpuColorSpinorField(cpuParam);
     cpuParam.v = hp_x;
-    h_x =new cpuColorSpinorField(cpuParam);
+    h_x = new cpuColorSpinorField(cpuParam);
     
     b = new cudaColorSpinorField(*h_b, cudaParam); // download source
     
-    if(param->verbosity >= QUDA_VERBOSE){
-      printfQuda("CPU source = %f, cuda copy=%f\n", norm2(*h_b),norm2(*b));
+    if (param->verbosity >= QUDA_VERBOSE) {
+      printfQuda("CPU source = %f, CUDA copy=%f\n", norm2(*h_b),norm2(*b));
     }
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-    x= new cudaColorSpinorField(cudaParam); // solution
+    x = new cudaColorSpinorField(cudaParam); // solution
     
     // if using preconditioning but solving the full system
     if (param->solve_type == QUDA_DIRECT_PC_SOLVE && 
@@ -628,7 +608,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       cudaParam.x[0] /= 2;
       cudaParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     }
-    tmp= new cudaColorSpinorField(cudaParam); // temporary
+    tmp = new cudaColorSpinorField(cudaParam); // temporary
     
     diracParam.verbose = QUDA_VERBOSE;
     //if (diracParam.type == QUDA_WILSONPC_DIRAC || diracParam.type == QUDA_CLOVERPC_DIRAC) {
@@ -641,12 +621,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     setDiracSloppyParam(diracParam, param);
     diracSloppy = Dirac::create(diracParam);
     
+  } else {
+    errorQuda("Invalid dslash_type");
   }
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *out);
   if (param->verbosity >= QUDA_VERBOSE) printfQuda("Mass rescale done\n");   
 
-  dirac->Prepare(in, out, *x, *b, param->solution_type);
+  dirac->prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE){  
     printfQuda( "Source preparation complete %f  %f\n", norm2(*in), norm2(*b));   
   }
@@ -655,16 +637,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(*out, *in);
-      dirac->M(*in, *out, QUDA_DAG_YES); // tmp?
+      dirac->Mdag(*in, *out); // tmp?
     }
-    invertCgCuda(*dirac, *diracSloppy, *out, *in, *tmp, param);
+    invertCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), *out, *in, *tmp, param);
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, *tmp, param, QUDA_DAG_YES);
+      invertBiCGstabCuda(DiracMdag(dirac), DiracMdag(diracSloppy), *out, *in, *tmp, param);
       copyCuda(*in, *out);
     }
-    invertBiCGstabCuda(*dirac, *diracSloppy, *out, *in, *tmp, param, QUDA_DAG_NO);
+    invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), *out, *in, *tmp, param);
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);
@@ -673,12 +655,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->verbosity >= QUDA_VERBOSE){
     printfQuda("Solution = %f\n",norm2(*x));
   }
-  dirac->Reconstruct(*x, *b, param->solution_type);
+  dirac->reconstruct(*x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE){
     printfQuda("Solution = %f\n", norm2(*x));
   }
   
-  x->saveCPUSpinorField(*h_x);// since this is a reference this won't work: hOut = h_x;
+  x->saveCPUSpinorField(*h_x); // since this is a reference this won't work: hOut = h_x;
   
   if (param->verbosity >= QUDA_VERBOSE){
     printfQuda("Solution = %f\n", norm2(*h_x));
@@ -702,6 +684,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 {
   int i;
   
+  if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+    errorQuda("Multi-shift solver only supports staggered");
+  }
+
   if (num_offsets <= 0){
     return;
   }
@@ -746,12 +732,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   csParam.nDim=4;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
 
-  if (param->solve_type == QUDA_DIRECT_SOLVE) {
+  if (param->solve_type == QUDA_NORMEQ_SOLVE) {
     csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
-  } else {
+  } else if (param->solve_type == QUDA_NORMEQ_PC_SOLVE) {
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] = cudaFatLinkPrecise.X[0];
+  } else {
+    errorQuda("Direct solve_type not supported for staggered");
   }
   csParam.x[1] = cudaFatLinkPrecise.X[1];
   csParam.x[2] = cudaFatLinkPrecise.X[2];
@@ -802,7 +790,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     x[i] = new cudaColorSpinorField(csParam);
   }
   cudaColorSpinorField tmp(csParam); // temporary
-  invertMultiShiftCgCuda(*dirac, *diracSloppy, x, b, param, offsets, num_offsets, residue_sq);    
+  invertMultiShiftCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), x, b, param, offsets, num_offsets, residue_sq);    
   
   for(i=0; i < num_offsets; i++){
     x[i]->saveCPUSpinorField(*h_x[i]);

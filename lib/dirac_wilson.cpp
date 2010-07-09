@@ -2,35 +2,37 @@
 #include <blas_quda.h>
 
 DiracWilson::DiracWilson(const DiracParam &param)
-  : Dirac(param) {
+  : Dirac(param)
+{
 
 }
 
 DiracWilson::DiracWilson(const DiracWilson &dirac) 
-  : Dirac(dirac) {
+  : Dirac(dirac)
+{
 
 }
 
-DiracWilson::~DiracWilson() {
+DiracWilson::~DiracWilson()
+{
 
 }
 
-DiracWilson& DiracWilson::operator=(const DiracWilson &dirac) {
-
+DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
+{
   if (&dirac != this) {
     Dirac::operator=(dirac);
-    tmp1=dirac.tmp1;
+    tmp1 = dirac.tmp1;
   }
-
   return *this;
 }
 
 void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			 const QudaParity parity, const QudaDagType dagger) {
-
+			 const QudaParity parity) const
+{
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
-
+  
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
 	     0, 0, 0, out.volume, out.length, in.Precision());
 
@@ -38,9 +40,9 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
 }
 
 void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			     const QudaParity parity, const QudaDagType dagger,
-			     const cudaColorSpinorField &x, const double &k) {
-
+			     const QudaParity parity, const cudaColorSpinorField &x,
+			     const double &k) const
+{
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
 
@@ -50,13 +52,15 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
   flops += (1320+48)*in.volume;
 }
 
-void DiracWilson::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaDagType dagger) {
+void DiracWilson::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
   checkFullSpinor(out, in);
-  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, dagger, in.Odd(), -kappa);
-  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, dagger, in.Even(), -kappa);
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
 }
 
-void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) {
+void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
   checkFullSpinor(out, in);
 
   ColorSpinorParam param;
@@ -69,8 +73,8 @@ void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &i
     checkFullSpinor(*tmp1, in);
   }
 
-  M(*tmp1, in, QUDA_DAG_NO);
-  M(out, *tmp1, QUDA_DAG_YES);
+  M(*tmp1, in);
+  Mdag(out, *tmp1);
 
   if (reset) {
     delete tmp1;
@@ -78,46 +82,48 @@ void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &i
   }
 }
 
-void DiracWilson::Prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+void DiracWilson::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
 			  cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			  const QudaSolutionType solutionType, const QudaDagType dagger) {
-  ColorSpinorParam param;
-
+			  const QudaSolutionType solutionType) const
+{
   src = &b;
   sol = &x;
 }
 
-void DiracWilson::Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-			      const QudaSolutionType solutionType, const QudaDagType dagger) {
+void DiracWilson::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+			      const QudaSolutionType solutionType) const
+{
   // do nothing
 }
 
 DiracWilsonPC::DiracWilsonPC(const DiracParam &param)
-  : DiracWilson(param) {
+  : DiracWilson(param)
+{
 
 }
 
 DiracWilsonPC::DiracWilsonPC(const DiracWilsonPC &dirac) 
-  : DiracWilson(dirac) {
+  : DiracWilson(dirac)
+{
 
 }
 
-DiracWilsonPC::~DiracWilsonPC() {
+DiracWilsonPC::~DiracWilsonPC()
+{
 
 }
 
-DiracWilsonPC& DiracWilsonPC::operator=(const DiracWilsonPC &dirac) {
-
+DiracWilsonPC& DiracWilsonPC::operator=(const DiracWilsonPC &dirac)
+{
   if (&dirac != this) {
     DiracWilson::operator=(dirac);
     tmp1 = dirac.tmp1;
   }
-
   return *this;
 }
 
-void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		      const QudaDagType dagger) {
+void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
   double kappa2 = -kappa*kappa;
 
   ColorSpinorParam param;
@@ -129,11 +135,11 @@ void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in,
   }
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-    Dslash(*tmp1, in, QUDA_ODD_PARITY, dagger);
-    DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, dagger, in, kappa2); 
+    Dslash(*tmp1, in, QUDA_ODD_PARITY);
+    DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
   } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-    Dslash(*tmp1, in, QUDA_EVEN_PARITY, dagger);
-    DslashXpay(out, *tmp1, QUDA_ODD_PARITY, dagger, in, kappa2); 
+    Dslash(*tmp1, in, QUDA_EVEN_PARITY);
+    DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
   } else {
     errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
   }
@@ -145,30 +151,31 @@ void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in,
   
 }
 
-void DiracWilsonPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in){
-  M(out, in, QUDA_DAG_NO);
-  M(out, out, QUDA_DAG_YES);
+void DiracWilsonPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
+  M(out, in);
+  Mdag(out, out);
 }
 
-void DiracWilsonPC::Prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+void DiracWilsonPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
 			    cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			    const QudaSolutionType solType, const QudaDagType dagger) {
-
+			    const QudaSolutionType solType) const
+{
   // we desire solution to preconditioned system
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    DiracWilson::Prepare(src, sol, x, b, solType, dagger);
+    DiracWilson::prepare(src, sol, x, b, solType);
     return;
   }
 
   // we desire solution to full system
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
     // src = b_e + k D_eo b_o
-    DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, dagger, b.Even(), kappa);
+    DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
     src = &(x.Odd());
     sol = &(x.Even());
   } else if (matpcType == QUDA_MATPC_ODD_ODD) {
     // src = b_o + k D_oe b_e
-    DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, dagger, b.Odd(), kappa);
+    DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
     src = &(x.Even());
     sol = &(x.Odd());
   } else {
@@ -177,14 +184,13 @@ void DiracWilsonPC::Prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
 
   // here we use final solution to store parity solution and parity source
   // b is now up for grabs if we want
-
 }
 
-void DiracWilsonPC::Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-				const QudaSolutionType solType, const QudaDagType dagger) {
-
+void DiracWilsonPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+				const QudaSolutionType solType) const
+{
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    return DiracWilson::Reconstruct(x, b, solType, dagger);
+    return DiracWilson::reconstruct(x, b, solType);
   }				
 
   // create full solution
@@ -192,12 +198,11 @@ void DiracWilsonPC::Reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFi
   checkFullSpinor(x, b);
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
     // x_o = b_o + k D_oe x_e
-    DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, dagger, b.Odd(), kappa);
+    DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
   } else if (matpcType == QUDA_MATPC_ODD_ODD) {
     // x_e = b_e + k D_eo x_o
-    DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, dagger, b.Even(), kappa);
+    DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
   } else {
     errorQuda("MatPCType %d not valid for DiracWilson", matpcType);
   }
 }
-

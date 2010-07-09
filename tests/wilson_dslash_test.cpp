@@ -70,6 +70,7 @@ void init() {
   inv_param.kappa = kappa;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param.dagger = dagger;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -250,24 +251,19 @@ double dslashCUDA() {
     switch (test_type) {
     case 0:
       if (transfer) {
-	dslashQuda(spinorOut->v, spinor->v, &inv_param, parity, dagger);
+	dslashQuda(spinorOut->v, spinor->v, &inv_param, parity);
       } else {
-	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity, dagger);
+	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;
     case 1:
-      if (transfer) {
-	MatQuda(spinorOut->v, spinor->v, &inv_param, dagger);
-      } else {
-	dirac->M(*cudaSpinorOut, *cudaSpinor, dagger);
-      }
-      break;
     case 2:
       if (transfer) {
-	MatQuda(spinorOut->v, spinor->v, &inv_param, dagger);
+	MatQuda(spinorOut->v, spinor->v, &inv_param);
       } else {
-	dirac->M(*cudaSpinorOut, *cudaSpinor, dagger);
+	dirac->M(*cudaSpinorOut, *cudaSpinor);
       }
+      break;
     }
   }
     

@@ -35,12 +35,9 @@ extern "C" {
 
   // staggered Dslash
   void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, FullGauge longGauge, const void *in, 
-			     const void *inNorm, const int parity, const int dagger, 
-			     const void *x, const void *xNorm, const double k,
-			     const int volume, const int length, const QudaPrecision precision);
-    
-    
-
+			   const void *inNorm, const int parity, const int dagger, 
+			   const void *x, const void *xNorm, const double k,
+			   const int volume, const int length, const QudaPrecision precision);
 
 #ifdef __cplusplus
 }

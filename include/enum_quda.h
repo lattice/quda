@@ -70,10 +70,8 @@ extern "C" {
 
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
-    QUDA_MATDAG_SOLUTION,
     QUDA_MATDAG_MAT_SOLUTION,
     QUDA_MATPC_SOLUTION,
-    QUDA_MATPCDAG_SOLUTION,
     QUDA_MATPCDAG_MATPC_SOLUTION,
     QUDA_INVALID_SOLUTION = QUDA_INVALID_ENUM
   } QudaSolutionType;
@@ -103,6 +101,12 @@ extern "C" {
     QUDA_MATPC_INVALID = QUDA_INVALID_ENUM
   } QudaMatPCType;
 
+  typedef enum QudaDagType_s {
+    QUDA_DAG_NO,
+    QUDA_DAG_YES,
+    QUDA_DAG_INVALID = QUDA_INVALID_ENUM
+  } QudaDagType;
+  
   typedef enum QudaMassNormalization_s {
     QUDA_KAPPA_NORMALIZATION,
     QUDA_MASS_NORMALIZATION,
@@ -138,15 +142,9 @@ extern "C" {
   } QudaVerbosity;
 
   //
-  // Types used for arguments to the interface functions
+  // Type used for "parity" argument to dslashQuda()
   //
 
-  typedef enum QudaDagType_s {
-    QUDA_DAG_NO,
-    QUDA_DAG_YES,
-    QUDA_DAG_INVALID = QUDA_INVALID_ENUM
-  } QudaDagType;
-  
   typedef enum QudaParity_s {
     QUDA_EVEN_PARITY = 0,
     QUDA_ODD_PARITY,

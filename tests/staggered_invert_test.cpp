@@ -79,11 +79,16 @@ invert_test(void)
   inv_param.tol = tol;
   inv_param.maxiter = 100;
   inv_param.reliable_delta = 1e-3;
+
+  inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
+  inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = prec; 
   inv_param.cuda_prec_sloppy = prec_sloppy;
-  inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
@@ -151,7 +156,7 @@ invert_test(void)
 
   case 0: //even
     volume = Vh;
-    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
     invertQuda(spinorOut, spinorIn, &inv_param);
@@ -169,7 +174,7 @@ invert_test(void)
   case 1: //odd
 	
     volume = Vh;    
-    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
     invertQuda(spinorOutOdd, spinorInOdd, &inv_param);	
     time0 += clock(); // stop the timer
@@ -186,7 +191,8 @@ invert_test(void)
   case 2: //full spinor
 
     volume = Vh; //FIXME: the time reported is only parity time
-    inv_param.solve_type = QUDA_DIRECT_SOLVE;
+    inv_param.solution_type = QUDA_MAT_SOLUTION;
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); // stop the timer
@@ -223,7 +229,7 @@ invert_test(void)
       len=Vh;
       volume = Vh;
       
-      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+      inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
       
       spinorOutArray[0] = spinorOut;
@@ -237,7 +243,7 @@ invert_test(void)
       len = Vh;
       volume = Vh;
 
-      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+      inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
       
       spinorOutArray[0] = spinorOutOdd;

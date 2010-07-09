@@ -71,7 +71,8 @@ void init()
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.dagger = dagger;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
     
   gauge_param.ga_pad = sdim*sdim*sdim;
@@ -236,26 +237,26 @@ double dslashCUDA() {
     case 0:
       parity = QUDA_EVEN_PARITY;
       if (transfer){
-	//dslashQuda(spinorOdd, spinorEven, &inv_param, parity, dagger);
+	//dslashQuda(spinorOdd, spinorEven, &inv_param, parity);
       }
       else {
-	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity, dagger);
+	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }	   
       break;
     case 1:
       parity = QUDA_ODD_PARITY;
       if (transfer){
-	//MatPCQuda(spinorOdd, spinorEven, &inv_param, dagger);
+	//MatPCQuda(spinorOdd, spinorEven, &inv_param);
       }else {
-	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity, dagger);
+	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;
     case 2:
       if (transfer){
-	//MatQuda(spinorGPU, spinor, &inv_param, dagger);
+	//MatQuda(spinorGPU, spinor, &inv_param);
       }
       else {
-	dirac->M(*cudaSpinorOut, *cudaSpinor, dagger);
+	dirac->M(*cudaSpinorOut, *cudaSpinor);
       }
     }
   }

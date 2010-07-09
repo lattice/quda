@@ -1,9 +1,9 @@
 #include <quda_internal.h>
-#include <cuComplex.h>
 #include <quda.h>
+#include <cuComplex.h>
 
-#ifndef __COLORSPINORFIELD_QUDA_H
-#define __COLORSPINORFIELD_QUDA_H
+#ifndef _COLOR_SPINOR_FIELD_H
+#define _COLOR_SPINOR_FIELD_H
 
 // Probably want some checking for this limit
 #define QUDA_MAX_DIM 6
@@ -311,7 +311,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   void PrintVector(int vol);
 };
 
-#endif
+#endif // _COLOR_SPINOR_FIELD_H
 
 /*
 

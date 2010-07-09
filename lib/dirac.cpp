@@ -3,13 +3,13 @@
 
 Dirac::Dirac(const DiracParam &param) 
   : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
-    flops(0), tmp1(param.tmp1), tmp2(param.tmp2) {
+    dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2) {
 
 }
 
 Dirac::Dirac(const Dirac &dirac) 
   : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
-    flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2) {
+    dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2) {
 
 }
 
@@ -17,26 +17,37 @@ Dirac::~Dirac() {
 
 }
 
-Dirac& Dirac::operator=(const Dirac &dirac) {
-
+Dirac& Dirac::operator=(const Dirac &dirac)
+{
   if(&dirac != this) {
     gauge = dirac.gauge;
     kappa = dirac.kappa;
     matpcType = dirac.matpcType;
+    dagger = dirac.dagger;
     flops = 0;
     tmp1 = dirac.tmp1;
     tmp2 = dirac.tmp2;
   }
 
   return *this;
-
 }
 
-void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
+#define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
 
+void Dirac::Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
+  flip(dagger);
+  M(out, in);
+  flip(dagger);
+}
+
+#undef flip
+
+void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
   if (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || 
       out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) {
-    errorQuda("Cuda Dirac operator requires UKQCD basis, out = %d, in = %d", 
+    errorQuda("CUDA Dirac operator requires UKQCD basis, out = %d, in = %d", 
 	      out.GammaBasis(), in.GammaBasis());
   }
 
@@ -49,7 +60,7 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
   }
 
   if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
-    errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
+    errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
 	      in.SiteSubset(), out.SiteSubset());
   }
 
@@ -57,19 +68,19 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
       (out.Volume() != gauge.volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
     errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
   }
-
 }
 
-void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) {
+void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
    if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET) {
-    errorQuda("ColorSpinorFields are not full fields, in = %d, out = %d", 
+    errorQuda("ColorSpinorFields are not full fields: in = %d, out = %d", 
 	      in.SiteSubset(), out.SiteSubset());
   } 
 }
 
 // Dirac operator factory
-Dirac* Dirac::create(const DiracParam &param) {
-  
+Dirac* Dirac::create(const DiracParam &param)
+{
   if (param.type == QUDA_WILSON_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator\n");
     return new DiracWilson(param);
@@ -91,5 +102,4 @@ Dirac* Dirac::create(const DiracParam &param) {
   } else {
     return 0;
   }
-
 }

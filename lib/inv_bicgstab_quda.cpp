@@ -11,9 +11,8 @@
 
 #include <color_spinor_field.h>
 
-void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &x, 
-			cudaColorSpinorField &b, cudaColorSpinorField &r, 
-			QudaInvertParam *invert_param, DagType dag_type)
+void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
+			cudaColorSpinorField &b, cudaColorSpinorField &r, QudaInvertParam *invert_param)
 {
   ColorSpinorParam param;
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -96,7 +95,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
       cxpaypbzCuda(rSloppy, beta_omega, v, beta, p); // 8
     }
     
-    diracSloppy.M(v, p, dag_type);
+    matSloppy(v, p);
 
     // rv = (r0,v)
     rv = cDotProductCuda(r0, v);    
@@ -111,7 +110,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
     caxpyCuda(alpha, v, rSloppy); // 4
     alpha.x *= -1.0; alpha.y *= -1.0;
 
-    diracSloppy.M(t, rSloppy, dag_type);
+    matSloppy(t, rSloppy);
     
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, rSloppy); // 6
@@ -138,7 +137,7 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
       if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
       xpyCuda(x, y); // swap these around?
-      dirac.M(r, y, dag_type);
+      mat(r, y);
       r2 = xmyNormCuda(b, r);
 
       if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
@@ -165,14 +164,14 @@ void invertBiCGstabCuda(Dirac &dirac, Dirac &diracSloppy, cudaColorSpinorField &
   
   invert_param->secs += stopwatchReadSeconds();
   
-  float gflops = (blas_quda_flops + dirac.Flops() + diracSloppy.Flops())*1e-9;
+  float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;
   invert_param->iter += k;
   
   //#if 0
   // Calculate the true residual
-  dirac.M(r, x, dag_type);
+  mat(r, x);
   double true_res = xmyNormCuda(b, r);
     
   if (invert_param->verbosity >= QUDA_SUMMARIZE)

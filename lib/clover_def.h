@@ -1,4 +1,6 @@
 // clover_def.h - clover kernel definitions
+//
+// See comments in wilson_dslash_def.h
 
 // initialize on first iteration
 
