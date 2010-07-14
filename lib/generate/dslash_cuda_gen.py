@@ -282,12 +282,20 @@ int X = 2*sid + x1odd;
     
     if sharedFloats > 0:
         str.append("#ifdef SPINOR_DOUBLE\n")
-        str.append("#define SHARED_STRIDE 8  // to avoid bank conflicts\n")
+        str.append("#if (__CUDA_ARCH__ >= 200)\n")
+        str.append("#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi\n")
+        str.append("#else\n")
+        str.append("#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200\n")
+        str.append("#endif\n")
         str.append("extern __shared__ spinorFloat sd_data[];\n")
         str.append("volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)\n")
         str.append("                                  + (threadIdx.x % SHARED_STRIDE);\n")
         str.append("#else\n")
-        str.append("#define SHARED_STRIDE 16 // to avoid bank conflicts\n")
+        str.append("#if (__CUDA_ARCH__ >= 200)\n")
+        str.append("#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi\n")
+        str.append("#else\n")
+        str.append("#define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200\n")
+        str.append("#endif\n")
         str.append("extern __shared__ spinorFloat ss_data[];\n")
         str.append("volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)\n")
         str.append("                                  + (threadIdx.x % SHARED_STRIDE);\n")
@@ -616,6 +624,16 @@ def epilog():
             cm = m%3
             str.append("#undef "+c_re(0,sm,cm,sn,cn)+"\n")
             str.append("#undef "+c_im(0,sm,cm,sn,cn)+"\n")
+    str.append("\n")
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            if 2*i < sharedFloats:
+                str.append("#undef "+out_re(s,c)+"\n")
+            if 2*i+1 < sharedFloats:
+                str.append("#undef "+out_im(s,c)+"\n")
+    str.append("\n")
 
     return ''.join(str)
 # end def epilog

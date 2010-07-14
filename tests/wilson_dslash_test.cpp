@@ -14,11 +14,16 @@
 #include <dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-int test_type = 0;
+const int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-int clover_yes = 1;
+const int clover_yes = 1;
 
-// Pulled this out front so you can set once then forget
+const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
+const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
+const int transfer = 0; // include transfer time in the benchmark?
+
+const int loops = 1000;
+
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
@@ -32,13 +37,6 @@ cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp=0, *tmp2=0;
 
 void *hostGauge[4], *hostClover, *hostCloverInv;
-
-double kappa = 1.0;
-QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
-QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
-int transfer = 0; // include transfer time in the benchmark?
-
-const int LOOPS = 1000;
 
 Dirac *dirac;
 
@@ -61,13 +59,13 @@ void init() {
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_8;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
-  inv_param.kappa = kappa;
+  inv_param.kappa = 1.0;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = dagger;
@@ -244,10 +242,10 @@ void end() {
 // execute kernel
 double dslashCUDA() {
 
-  printfQuda("Executing %d kernel loops...\n", LOOPS);
+  printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);
   stopwatchStart();
-  for (int i = 0; i < LOOPS; i++) {
+  for (int i = 0; i < loops; i++) {
     switch (test_type) {
     case 0:
       if (transfer) {
@@ -297,11 +295,11 @@ void dslashRef() {
 	   inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   case 1:    
-    matpc(spinorRef->v, hostGauge, spinor->v, kappa, inv_param.matpc_type, dagger, 
+    matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.matpc_type, dagger, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   case 2:
-    mat(spinorRef->v, hostGauge, spinor->v, kappa, dagger, 
+    mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, dagger, 
 	inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   default:
@@ -341,7 +339,7 @@ int main(int argc, char **argv)
       floats += test_type ? 72*2 : 72;
     }
     printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/LOOPS)*(1<<30)));
+    printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/loops)*(1<<30)));
     
     if (!transfer) {
       std::cout << "Results: CPU = " << norm2(*spinorRef) << ", CUDA = " << norm2(*cudaSpinorOut) << 

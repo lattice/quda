@@ -64,6 +64,8 @@ Version 0.3.0
   wilson_invert_test, and added staggered variants of these test
   programs.
 
+- Improved performance of the half-precision Wilson Dslash.
+
 - Temporarily removed 3D Wilson Dslash.
 
 

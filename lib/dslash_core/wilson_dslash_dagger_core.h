@@ -347,12 +347,20 @@ int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
 
 #ifdef SPINOR_DOUBLE
-#define SHARED_STRIDE 8  // to avoid bank conflicts
+#if (__CUDA_ARCH__ >= 200)
+#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
+#else
+#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
+#endif
 extern __shared__ spinorFloat sd_data[];
 volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #else
-#define SHARED_STRIDE 16 // to avoid bank conflicts
+#if (__CUDA_ARCH__ >= 200)
+#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
+#else
+#define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
+#endif
 extern __shared__ spinorFloat ss_data[];
 volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
@@ -1526,6 +1534,7 @@ o32_re = o32_im = 0;
 #undef c12_10_im
 #undef c12_11_re
 #undef c12_11_im
+
 #undef o00_re
 #undef o00_im
 #undef o01_re
