@@ -191,8 +191,8 @@ invert_test(void)
   case 2: //full spinor
 
     volume = Vh; //FIXME: the time reported is only parity time
-    inv_param.solution_type = QUDA_MAT_SOLUTION;
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+    inv_param.solve_type = QUDA_NORMEQ_SOLVE;
+    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
     invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); // stop the timer
@@ -253,7 +253,7 @@ invert_test(void)
     }else { //testtype ==5
       in=spinorIn;
       len= V;
-      inv_param.solve_type = QUDA_DIRECT_SOLVE;
+      inv_param.solve_type = QUDA_NORMEQ_SOLVE;
       volume = Vh; //FIXME: the time reported is only parity time
       spinorOutArray[0] = spinorOut;
       for (int i=1; i< num_offsets;i++){
@@ -275,7 +275,7 @@ invert_test(void)
     
     printf("checking the solution\n");
     MyQudaParity parity;
-    if (inv_param.solve_type == QUDA_DIRECT_SOLVE){
+    if (inv_param.solve_type == QUDA_NORMEQ_SOLVE){
       parity = QUDA_EVENODD;
     }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
       parity = QUDA_EVEN;
