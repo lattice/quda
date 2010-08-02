@@ -5,8 +5,6 @@
 #include "hw_quda.h"
 #include "util_quda.h"
 
-#include <xmmintrin.h>
-
 #define hwSiteSize 12
 
 static ParityHw 
