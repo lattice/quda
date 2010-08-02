@@ -6,35 +6,48 @@
   a##_im += b##_im
 
 #define COMPLEX_PRODUCT(a, b, c)		\
-  a##_re = b##_re*c##_re - b##_im*c##_im,	\
-  a##_im = b##_re*c##_im + b##_im*c##_re
+  a##_re = b##_re*c##_re;			\
+  a##_re -= b##_im*c##_im;			\
+  a##_im = b##_re*c##_im;			\
+  a##_im += b##_im*c##_re
 
 #define COMPLEX_CONJUGATE_PRODUCT(a, b, c)	\
-  a##_re = b##_re*c##_re - b##_im*c##_im,	\
-  a##_im = -b##_re*c##_im - b##_im*c##_re
+  a##_re = b##_re*c##_re;			\
+  a##_re -= b##_im*c##_im;			\
+  a##_im = -b##_re*c##_im;			\
+  a##_im -= b##_im*c##_re
 
 // Performs a complex dot product
 #define COMPLEX_DOT_PRODUCT(a, b, c)	        \
-  a##_re = b##_re*c##_re + b##_im*c##_im,	\
-  a##_im = b##_re*c##_im - b##_im*c##_re
+  a##_re = b##_re*c##_re;			\
+  a##_re += b##_im*c##_im;			\
+  a##_im = b##_re*c##_im;			\
+  a##_im -= b##_im*c##_re
 
 // Performs a complex norm
 #define COMPLEX_NORM(a, b)			\
-  a = b##_re*b##_re + b##_im*b##_im
+  a = b##_re*b##_re;				\
+  a += b##_im*b##_im
 
-#define ACC_COMPLEX_PROD(a, b, c)		\
-  a##_re += b##_re*c##_re - b##_im*c##_im,	\
-  a##_im += b##_re*c##_im + b##_im*c##_re
+#define ACC_COMPLEX_PROD(a, b, c)			\
+  a##_re += b##_re*c##_re;				\
+  a##_re -= b##_im*c##_im;				\
+  a##_im += b##_re*c##_im;				\
+  a##_im += b##_im*c##_re
 
 // Performs the complex conjugated accumulation: a += b* c*
-#define ACC_CONJ_PROD(a, b, c) \
-    a##_re += b##_re * c##_re - b##_im * c##_im, \
-    a##_im -= b##_re * c##_im + b##_im * c##_re
+#define ACC_CONJ_PROD(a, b, c)			\
+  a##_re += b##_re * c##_re;			\
+  a##_re -= b##_im * c##_im;			\
+  a##_im -= b##_re * c##_im;			\
+  a##_im -= b##_im * c##_re
 
-#define ACC_CONJ_PROD_ASSIGN(a, b, c)			\
-    a##_re = (b##_re) * (c##_re) - (b##_im) * (c##_im),	\
-    a##_im = -(b##_re) * (c##_im) - (b##_im) * (c##_re)
-
+/*#define ACC_CONJ_PROD_ASSIGN(a, b, c)			\
+  a##_re = (b##_re) * (c##_re);				\
+  a##_re -= (b##_im) * (c##_im);				\
+  a##_im = -(b##_re) * (c##_im);			\
+  a##_im -= (b##_im) * (c##_re)
+*/
 #define READ_GAUGE_MATRIX_12_DOUBLE(gauge, dir)				\
   double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*6+0)*ga_stride);	\
   double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*6+1)*ga_stride);	\
@@ -110,8 +123,10 @@
   g21_im = pi_f*g00_im;
 
 #define RECONSTRUCT_MATRIX_8_DOUBLE(dir)				\
-  double row_sum = g01_re*g01_re + g01_im*g01_im;			\
-  row_sum += g02_re*g02_re + g02_im*g02_im;				\
+  double row_sum = g01_re*g01_re;					\
+  row_sum += g01_im*g01_im;						\
+  row_sum += g02_re*g02_re;						\
+  row_sum += g02_im*g02_im;						\
   double u0 = (dir < 6 ? anisotropy : (ga_idx >= X4X3X2X1hmX3X2X1h ? t_boundary : 1)); \
   double u02_inv = 1.0 / (u0*u0);					\
   double column_sum = u02_inv - row_sum;				\
@@ -156,8 +171,10 @@
 //  float U20_mag = sqrtf(__saturatef(column_sum));			\
 
 #define RECONSTRUCT_MATRIX_8_SINGLE(dir)				\
-  float row_sum = g01_re*g01_re + g01_im*g01_im;			\
-  row_sum += g02_re*g02_re + g02_im*g02_im;				\
+  float row_sum = g01_re*g01_re;					\
+  row_sum += g01_im*g01_im;						\
+  row_sum += g02_re*g02_re;						\
+  row_sum += g02_im*g02_im;						\
   __sincosf(g21_re, &g00_im, &g00_re);					\
   __sincosf(g21_im, &g20_im, &g20_re);					\
   float2 u0_2 = (dir < 6 ? An2 : (ga_idx >= X4X3X2X1hmX3X2X1h ? TB2 : No2)); \

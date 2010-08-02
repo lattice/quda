@@ -418,13 +418,15 @@ def gen(dir):
     for m in range(0,3):
         mult.append("// multiply row "+`m`+"\n")
         for h in range(0,2):
-            re = ["spinorFloat "+h2_re(h,m)+" ="]
-            im = ["spinorFloat "+h2_im(h,m)+" ="]
+            re = ["spinorFloat "+h2_re(h,m)+" = 0;\n"]
+            im = ["spinorFloat "+h2_im(h,m)+" = 0;\n"]
             for c in range(0,3):
-                re.append(" + ("+g_re(dir,m,c)+" * "+h1_re(h,c)+" - "+g_im(dir,m,c)+" * "+h1_im(h,c)+")")
-                im.append(" + ("+g_re(dir,m,c)+" * "+h1_im(h,c)+" + "+g_im(dir,m,c)+" * "+h1_re(h,c)+")")
-            mult.append(''.join(re)+";\n")
-            mult.append(''.join(im)+";\n")
+                re.append(h2_re(h,m) + " += " + g_re(dir,m,c) + " * "+h1_re(h,c)+";\n")
+                re.append(h2_re(h,m) + " -= " + g_im(dir,m,c) + " * "+h1_im(h,c)+";\n")
+                im.append(h2_im(h,m) + " += " + g_re(dir,m,c) + " * "+h1_im(h,c)+";\n")
+                im.append(h2_im(h,m) + " += " + g_im(dir,m,c) + " * "+h1_re(h,c)+";\n")
+            mult.append(''.join(re))
+            mult.append(''.join(im))
         mult.append("\n")
     
     reconstruct = []
@@ -520,12 +522,14 @@ def cloverMult(chi):
         for cm in range (0,3):
             for sn in range (0,2):
                 for cn in range (0,3):
-                    str.append(a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn))
-                    if (sn != sm) or (cn != cm): str.append(" - "+c_im(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n")
-                    else: str.append(";\n")
-                    str.append(a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn))
-                    if (sn != sm) or (cn != cm): str.append(" + "+c_im(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n")
-                    else: str.append(";\n")
+                    str.append(a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n")
+                    if (sn != sm) or (cn != cm): 
+                        str.append(a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n")
+                    #else: str.append(";\n")
+                    str.append(a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n")
+                    if (sn != sm) or (cn != cm): 
+                        str.append(a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n")
+                    #else: str.append(";\n")
             str.append("\n")
 
     for s in range (0,2):
