@@ -18,7 +18,7 @@
 // following 4 fields, with "Kernel" at the end:
 //
 // DD_NAME_F = dslash, cloverDslash
-// DD_RECON_F = 12, 8
+// DD_RECON_F = 8, 12, 18
 // DD_DAG_F = Dagger, [blank]
 // DD_XPAY_F = Xpay, [blank]
 //
@@ -81,7 +81,7 @@
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_HALF
 #endif
-#else // reconstruct from 12 reals
+#elif (DD_RECON==1) // reconstruct from 12 reals
 #define DD_RECON_F 12
 #if (DD_PREC==0)
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_DOUBLE
@@ -96,14 +96,30 @@
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SINGLE
 #endif
+#else // no reconstruct, load all components
+#define DD_RECON_F 18
+#define GAUGE_FLOAT2
+#if (DD_PREC==0)
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_DOUBLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_DOUBLE
+#define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
+#elif (DD_PREC==1)
+#define DD_PARAM2 const float4 *gauge0, const float4 *gauge1 // FIXME for direct reading, really float2
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_SINGLE
+#else
+#define DD_PARAM2 const short4 *gauge0, const short4 *gauge1 // FIXME for direct reading, really short2
+#define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
+#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_SINGLE
+#endif
 #endif
 
 #if (DD_PREC==0) // double-precision fields
 
 // double-precision gauge field
-#define GAUGE0TEX gauge0TexDouble
-#define GAUGE1TEX gauge1TexDouble
-#define GAUGE_DOUBLE
+#define GAUGE0TEX gauge0TexDouble2
+#define GAUGE1TEX gauge1TexDouble2
+#define GAUGE_FLOAT2
 
 // double-precision spinor fields
 #define DD_PARAM1 double2* out, float *null1
@@ -132,8 +148,13 @@
 #elif (DD_PREC==1) // single-precision fields
 
 // single-precision gauge field
-#define GAUGE0TEX gauge0TexSingle
-#define GAUGE1TEX gauge1TexSingle
+#if (DD_RECON_F == 18)
+#define GAUGE0TEX gauge0TexSingle2
+#define GAUGE1TEX gauge1TexSingle2
+#else
+#define GAUGE0TEX gauge0TexSingle4
+#define GAUGE1TEX gauge1TexSingle4
+#endif
 
 // single-precision spinor fields
 #define DD_PARAM1 float4* out, float *null1
@@ -160,8 +181,13 @@
 #else             // half-precision fields
 
 // half-precision gauge field
-#define GAUGE0TEX gauge0TexHalf
-#define GAUGE1TEX gauge1TexHalf
+#if (DD_RECON_F == 18)
+#define GAUGE0TEX gauge0TexHalf2
+#define GAUGE1TEX gauge1TexHalf2
+#else
+#define GAUGE0TEX gauge0TexHalf4
+#define GAUGE1TEX gauge1TexHalf4
+#endif
 
 // half-precision spinor fields
 #define READ_SPINOR READ_SPINOR_HALF
@@ -235,7 +261,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef CLOVERTEX
 #undef READ_CLOVER
 #undef DSLASH_CLOVER
-#undef GAUGE_DOUBLE
+#undef GAUGE_FLOAT2
 #undef SPINOR_DOUBLE
 #undef CLOVER_DOUBLE
 
@@ -258,6 +284,9 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #if (DD_RECON==0)
 #undef DD_RECON
 #define DD_RECON 1
+#elif (DD_RECON==1)
+#undef DD_RECON
+#define DD_RECON 2
 #else
 #undef DD_RECON
 #define DD_RECON 0

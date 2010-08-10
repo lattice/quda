@@ -62,7 +62,15 @@ void dslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat *gauge0, cons
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
 
   if (x==0) { // not doing xpay
-    if (reconstruct == QUDA_RECONSTRUCT_12) {
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	dslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+      } else {
+	dslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	dslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
 	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
@@ -80,7 +88,15 @@ void dslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat *gauge0, cons
       }
     }
   } else { // doing xpay
-    if (reconstruct == QUDA_RECONSTRUCT_12) {
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	dslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+      } else {
+	dslash18DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	dslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
 	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
@@ -107,7 +123,7 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 		const double k, const int volume, const int length, const QudaPrecision precision) {
 
   void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
 
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");
@@ -192,7 +208,15 @@ void cloverDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm, x, xNorm);
 
   if (x==0) { // not xpay
-    if (reconstruct == QUDA_RECONSTRUCT_12) {
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	cloverDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+      } else {
+	cloverDslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	cloverDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
 	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
@@ -210,7 +234,15 @@ void cloverDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0,
       }
     }
   } else { // doing xpay
-    if (reconstruct == QUDA_RECONSTRUCT_12) {
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	cloverDslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+      } else {
+	cloverDslash18DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	cloverDslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
 	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
@@ -240,7 +272,7 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
   QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
 
   void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
 
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");

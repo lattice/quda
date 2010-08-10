@@ -42,12 +42,34 @@
   a##_im -= b##_re * c##_im;			\
   a##_im -= b##_im * c##_re
 
-/*#define ACC_CONJ_PROD_ASSIGN(a, b, c)			\
-  a##_re = (b##_re) * (c##_re);				\
-  a##_re -= (b##_im) * (c##_im);				\
-  a##_im = -(b##_re) * (c##_im);			\
-  a##_im -= (b##_im) * (c##_re)
-*/
+#define READ_GAUGE_MATRIX_18_DOUBLE(gauge, dir)				\
+  double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*9+0)*ga_stride); \
+  double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*9+1)*ga_stride); \
+  double2 G2 = fetch_double2((gauge), ga_idx + ((dir/2)*9+2)*ga_stride); \
+  double2 G3 = fetch_double2((gauge), ga_idx + ((dir/2)*9+3)*ga_stride); \
+  double2 G4 = fetch_double2((gauge), ga_idx + ((dir/2)*9+4)*ga_stride); \
+  double2 G5 = fetch_double2((gauge), ga_idx + ((dir/2)*9+5)*ga_stride); \
+  double2 G6 = fetch_double2((gauge), ga_idx + ((dir/2)*9+6)*ga_stride); \
+  double2 G7 = fetch_double2((gauge), ga_idx + ((dir/2)*9+7)*ga_stride); \
+  double2 G8 = fetch_double2((gauge), ga_idx + ((dir/2)*9+8)*ga_stride); \
+  double2 G9 = make_double2(0,0);
+
+#define READ_GAUGE_MATRIX_18_SINGLE(gauge, dir)			     \
+  float2 G0 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+0)*ga_stride); \
+  float2 G1 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+1)*ga_stride); \
+  float2 G2 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+2)*ga_stride); \
+  float2 G3 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+3)*ga_stride); \
+  float2 G4 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+4)*ga_stride); \
+  float2 G5 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+5)*ga_stride); \
+  float2 G6 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+6)*ga_stride); \
+  float2 G7 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+7)*ga_stride); \
+  float2 G8 = tex1Dfetch((gauge), ga_idx + ((dir/2)*9+8)*ga_stride); \
+  float2 G9 = make_float2(0,0);
+
+#define RECONSTRUCT_MATRIX_18_DOUBLE(dir)	\
+  
+#define RECONSTRUCT_MATRIX_18_SINGLE(dir)	\
+
 #define READ_GAUGE_MATRIX_12_DOUBLE(gauge, dir)				\
   double2 G0 = fetch_double2((gauge), ga_idx + ((dir/2)*6+0)*ga_stride);	\
   double2 G1 = fetch_double2((gauge), ga_idx + ((dir/2)*6+1)*ga_stride);	\

@@ -59,7 +59,7 @@
 #endif // SPINOR_DOUBLE
 
 // gauge link
-#ifdef GAUGE_DOUBLE
+#ifdef GAUGE_FLOAT2
 #define g00_re G0.x
 #define g00_im G0.y
 #define g01_re G1.x

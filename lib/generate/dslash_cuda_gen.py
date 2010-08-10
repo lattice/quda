@@ -158,7 +158,7 @@ def prolog():
 
     str.append("// gauge link\n")
 
-    str.append("#ifdef GAUGE_DOUBLE\n")
+    str.append("#ifdef GAUGE_FLOAT2\n")
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n

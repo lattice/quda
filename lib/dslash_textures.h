@@ -7,16 +7,20 @@ static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 #endif
 
 // Double precision gauge field
-texture<int4, 1> gauge0TexDouble;
-texture<int4, 1> gauge1TexDouble;
+texture<int4, 1> gauge0TexDouble2;
+texture<int4, 1> gauge1TexDouble2;
 
 // Single precision gauge field
-texture<float4, 1, cudaReadModeElementType> gauge0TexSingle;
-texture<float4, 1, cudaReadModeElementType> gauge1TexSingle;
+texture<float4, 1, cudaReadModeElementType> gauge0TexSingle4;
+texture<float4, 1, cudaReadModeElementType> gauge1TexSingle4;
+texture<float2, 1, cudaReadModeElementType> gauge0TexSingle2;
+texture<float2, 1, cudaReadModeElementType> gauge1TexSingle2;
 
 // Half precision gauge field
-texture<short4, 1, cudaReadModeNormalizedFloat> gauge0TexHalf;
-texture<short4, 1, cudaReadModeNormalizedFloat> gauge1TexHalf;
+texture<short4, 1, cudaReadModeNormalizedFloat> gauge0TexHalf4;
+texture<short4, 1, cudaReadModeNormalizedFloat> gauge1TexHalf4;
+texture<short2, 1, cudaReadModeNormalizedFloat> gauge0TexHalf2;
+texture<short2, 1, cudaReadModeNormalizedFloat> gauge1TexHalf2;
 
 
 texture<int4, 1> fatGauge0TexDouble;
@@ -82,7 +86,7 @@ texture<short2, 1, cudaReadModeNormalizedFloat> accumTexHalf2;
 texture<float, 1, cudaReadModeElementType> accumTexNorm;
 
 static void bindGaugeTex(const FullGauge gauge, const int oddBit, 
-			 void **gauge0, void **gauge1) {
+			 void **gauge0, void **gauge1, QudaReconstructType reconstruct) {
   if(oddBit) {
     *gauge0 = gauge.odd;
     *gauge1 = gauge.even;
@@ -91,16 +95,30 @@ static void bindGaugeTex(const FullGauge gauge, const int oddBit,
     *gauge1 = gauge.odd;
   }
   
-  if (gauge.precision == QUDA_DOUBLE_PRECISION) {
-    cudaBindTexture(0, gauge0TexDouble, *gauge0, gauge.bytes); 
-    cudaBindTexture(0, gauge1TexDouble, *gauge1, gauge.bytes);
-  } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
-    cudaBindTexture(0, gauge0TexSingle, *gauge0, gauge.bytes); 
-    cudaBindTexture(0, gauge1TexSingle, *gauge1, gauge.bytes);
+  if (reconstruct == QUDA_RECONSTRUCT_NO) {
+    if (gauge.precision == QUDA_DOUBLE_PRECISION) {
+      cudaBindTexture(0, gauge0TexDouble2, *gauge0, gauge.bytes); 
+      cudaBindTexture(0, gauge1TexDouble2, *gauge1, gauge.bytes);
+    } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
+      cudaBindTexture(0, gauge0TexSingle2, *gauge0, gauge.bytes); 
+      cudaBindTexture(0, gauge1TexSingle2, *gauge1, gauge.bytes);
+    } else {
+      cudaBindTexture(0, gauge0TexHalf2, *gauge0, gauge.bytes); 
+      cudaBindTexture(0, gauge1TexHalf2, *gauge1, gauge.bytes);
+    }
   } else {
-    cudaBindTexture(0, gauge0TexHalf, *gauge0, gauge.bytes); 
-    cudaBindTexture(0, gauge1TexHalf, *gauge1, gauge.bytes);
+    if (gauge.precision == QUDA_DOUBLE_PRECISION) {
+      cudaBindTexture(0, gauge0TexDouble2, *gauge0, gauge.bytes); 
+      cudaBindTexture(0, gauge1TexDouble2, *gauge1, gauge.bytes);
+    } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
+      cudaBindTexture(0, gauge0TexSingle4, *gauge0, gauge.bytes); 
+      cudaBindTexture(0, gauge1TexSingle4, *gauge1, gauge.bytes);
+    } else {
+      cudaBindTexture(0, gauge0TexHalf4, *gauge0, gauge.bytes); 
+      cudaBindTexture(0, gauge1TexHalf4, *gauge1, gauge.bytes);
+    }
   }
+
 }
 
 static void bindFatGaugeTex(const FullGauge gauge, const int oddBit, 

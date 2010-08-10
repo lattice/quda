@@ -151,10 +151,10 @@ inline void pack18(float4 *res, Float *g, int dir, int V) {
     r[j*V].z = g[j*4+2]; 
     r[j*V].w = g[j*4+3]; 
   }
-  r[16*V].x = g[16]; 
-  r[17*V].y = g[17]; 
-  r[18*V].z = 0.0;
-  r[19*V].w = 0.0;
+  r[4*V].x = g[16]; 
+  r[4*V].y = g[17]; 
+  r[4*V].z = 0.0;
+  r[4*V].w = 0.0;
 }
 
 template <typename Float>
@@ -175,20 +175,20 @@ inline void pack18(short4 *res, Float *g, int dir, int V) {
     r[j*V].z = FloatToShort(g[j*4+2]); 
     r[j*V].w = FloatToShort(g[j*4+3]); 
   }
-  r[16*V].x = FloatToShort(g[16]); 
-  r[17*V].y = FloatToShort(g[17]); 
-  r[18*V].z = (short)0;
-  r[19*V].w = (short)0;
+  r[4*V].x = FloatToShort(g[16]); 
+  r[4*V].y = FloatToShort(g[17]); 
+  r[4*V].z = (short)0;
+  r[4*V].w = (short)0;
 }
 
 template <typename Float>
 inline void pack18(short2 *res, Float *g, int dir, int V) 
 {
-    short2 *r = res + dir*9*V;
-    for (int j=0; j<9; j++) {
-	r[j*V].x = FloatToShort(g[j*2+0]); 
-	r[j*V].y = FloatToShort(g[j*2+1]); 
-    }
+  short2 *r = res + dir*9*V;
+  for (int j=0; j<9; j++) {
+    r[j*V].x = FloatToShort(g[j*2+0]); 
+    r[j*V].y = FloatToShort(g[j*2+1]); 
+  }
 }
 
 // a += b*c
