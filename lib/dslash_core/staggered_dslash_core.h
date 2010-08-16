@@ -217,21 +217,82 @@ o00_re = o00_im = 0.f;
 o01_re = o01_im = 0.f;
 o02_re = o02_im = 0.f;
 
-#define MAT_MUL_V(VOUT, M, V)						\
-    spinorFloat VOUT##0_re = (M##00_re * V##00_re - M##00_im * V##00_im) + (M##01_re * V##01_re - M##01_im * V##01_im) + (M##02_re * V##02_re - M##02_im * V##02_im); \
-    spinorFloat VOUT##0_im = (M##00_re * V##00_im + M##00_im * V##00_re) + (M##01_re * V##01_im + M##01_im * V##01_re) + (M##02_re * V##02_im + M##02_im * V##02_re); \
-    spinorFloat VOUT##1_re = (M##10_re * V##00_re - M##10_im * V##00_im) + (M##11_re * V##01_re - M##11_im * V##01_im) + (M##12_re * V##02_re - M##12_im * V##02_im); \
-    spinorFloat VOUT##1_im = (M##10_re * V##00_im + M##10_im * V##00_re) + (M##11_re * V##01_im + M##11_im * V##01_re) + (M##12_re * V##02_im + M##12_im * V##02_re); \
-    spinorFloat VOUT##2_re = (M##20_re * V##00_re - M##20_im * V##00_im) + (M##21_re * V##01_re - M##21_im * V##01_im) + (M##22_re * V##02_re - M##22_im * V##02_im); \
-    spinorFloat VOUT##2_im = (M##20_re * V##00_im + M##20_im * V##00_re) + (M##21_re * V##01_im + M##21_im * V##01_re) + (M##22_re * V##02_im + M##22_im * V##02_re);
 
-#define ADJ_MAT_MUL_V(VOUT, M, V)						\
-    spinorFloat VOUT##0_re = (M##00_re * V##00_re + M##00_im * V##00_im) + (M##10_re * V##01_re + M##10_im * V##01_im) + (M##20_re * V##02_re + M##20_im * V##02_im); \
-    spinorFloat VOUT##0_im = (M##00_re * V##00_im - M##00_im * V##00_re) + (M##10_re * V##01_im - M##10_im * V##01_re) + (M##20_re * V##02_im - M##20_im * V##02_re); \
-    spinorFloat VOUT##1_re = (M##01_re * V##00_re + M##01_im * V##00_im) + (M##11_re * V##01_re + M##11_im * V##01_im) + (M##21_re * V##02_re + M##21_im * V##02_im); \
-    spinorFloat VOUT##1_im = (M##01_re * V##00_im - M##01_im * V##00_re) + (M##11_re * V##01_im - M##11_im * V##01_re) + (M##21_re * V##02_im - M##21_im * V##02_re); \
-    spinorFloat VOUT##2_re = (M##02_re * V##00_re + M##02_im * V##00_im) + (M##12_re * V##01_re + M##12_im * V##01_im) + (M##22_re * V##02_re + M##22_im * V##02_im); \
-    spinorFloat VOUT##2_im = (M##02_re * V##00_im - M##02_im * V##00_re) + (M##12_re * V##01_im - M##12_im * V##01_re) + (M##22_re * V##02_im - M##22_im * V##02_re);
+#define MAT_MUL_V(VOUT, M, V)                   \
+  spinorFloat VOUT##0_re = M##00_re * V##00_re; \
+  VOUT##0_re -= M##00_im * V##00_im;            \
+  VOUT##0_re += M##01_re * V##01_re;            \
+  VOUT##0_re -= M##01_im * V##01_im;            \
+  VOUT##0_re += M##02_re * V##02_re;            \
+  VOUT##0_re -= M##02_im * V##02_im;            \
+  spinorFloat VOUT##0_im = M##00_re * V##00_im; \
+  VOUT##0_im += M##00_im * V##00_re;            \
+  VOUT##0_im += M##01_re * V##01_im;            \
+  VOUT##0_im += M##01_im * V##01_re;            \
+  VOUT##0_im += M##02_re * V##02_im;            \
+  VOUT##0_im += M##02_im * V##02_re;            \
+  spinorFloat VOUT##1_re = M##10_re * V##00_re; \
+  VOUT##1_re -= M##10_im * V##00_im;            \
+  VOUT##1_re += M##11_re * V##01_re;            \
+  VOUT##1_re -= M##11_im * V##01_im;            \
+  VOUT##1_re += M##12_re * V##02_re;            \
+  VOUT##1_re -= M##12_im * V##02_im;            \
+  spinorFloat VOUT##1_im = M##10_re * V##00_im; \
+  VOUT##1_im += M##10_im * V##00_re;            \
+  VOUT##1_im += M##11_re * V##01_im;            \
+  VOUT##1_im += M##11_im * V##01_re;            \
+  VOUT##1_im += M##12_re * V##02_im;            \
+  VOUT##1_im += M##12_im * V##02_re;            \
+  spinorFloat VOUT##2_re = M##20_re * V##00_re; \
+  VOUT##2_re -= M##20_im * V##00_im;            \
+  VOUT##2_re += M##21_re * V##01_re;            \
+  VOUT##2_re -= M##21_im * V##01_im;            \
+  VOUT##2_re += M##22_re * V##02_re;            \
+  VOUT##2_re -= M##22_im * V##02_im;            \
+  spinorFloat VOUT##2_im = M##20_re * V##00_im; \
+  VOUT##2_im += M##20_im * V##00_re;            \
+  VOUT##2_im += M##21_re * V##01_im;            \
+  VOUT##2_im += M##21_im * V##01_re;            \
+  VOUT##2_im += M##22_re * V##02_im;            \
+  VOUT##2_im += M##22_im * V##02_re;
+
+#define ADJ_MAT_MUL_V(VOUT, M, V)               \
+  spinorFloat VOUT##0_re = M##00_re * V##00_re; \
+  VOUT##0_re += M##00_im * V##00_im;            \
+  VOUT##0_re += M##10_re * V##01_re;            \
+  VOUT##0_re += M##10_im * V##01_im;            \
+  VOUT##0_re += M##20_re * V##02_re;            \
+  VOUT##0_re += M##20_im * V##02_im;            \
+  spinorFloat VOUT##0_im = M##00_re * V##00_im; \
+  VOUT##0_im -= M##00_im * V##00_re;            \
+  VOUT##0_im += M##10_re * V##01_im;            \
+  VOUT##0_im -= M##10_im * V##01_re;            \
+  VOUT##0_im += M##20_re * V##02_im;            \
+  VOUT##0_im -= M##20_im * V##02_re;            \
+  spinorFloat VOUT##1_re = M##01_re * V##00_re; \
+  VOUT##1_re += M##01_im * V##00_im;            \
+  VOUT##1_re += M##11_re * V##01_re;            \
+  VOUT##1_re += M##11_im * V##01_im;            \
+  VOUT##1_re += M##21_re * V##02_re;            \
+  VOUT##1_re += M##21_im * V##02_im;            \
+  spinorFloat VOUT##1_im = M##01_re * V##00_im; \
+  VOUT##1_im -= M##01_im * V##00_re;            \
+  VOUT##1_im += M##11_re * V##01_im;            \
+  VOUT##1_im -= M##11_im * V##01_re;            \
+  VOUT##1_im += M##21_re * V##02_im;            \
+  VOUT##1_im -= M##21_im * V##02_re;            \
+  spinorFloat VOUT##2_re = M##02_re * V##00_re; \
+  VOUT##2_re += M##02_im * V##00_im;            \
+  VOUT##2_re += M##12_re * V##01_re;            \
+  VOUT##2_re += M##12_im * V##01_im;            \
+  VOUT##2_re += M##22_re * V##02_re;            \
+  VOUT##2_re += M##22_im * V##02_im;            \
+  spinorFloat  VOUT##2_im= M##02_re * V##00_im; \
+  VOUT##2_im -= M##02_im * V##00_re;            \
+  VOUT##2_im += M##12_re * V##01_im;            \
+  VOUT##2_im -= M##12_im * V##01_re;            \
+  VOUT##2_im += M##22_re * V##02_im;            \
+  VOUT##2_im -= M##22_im * V##02_re;
 
 
 
