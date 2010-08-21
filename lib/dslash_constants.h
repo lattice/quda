@@ -4,18 +4,36 @@ __constant__ int X2;
 __constant__ int X3;
 __constant__ int X4;
 
+__constant__ int X1_3;
+__constant__ int X2_3;
+__constant__ int X3_3;
+__constant__ int X4_3;
+
 __constant__ int X1m1;
 __constant__ int X2m1;
 __constant__ int X3m1;
 __constant__ int X4m1;
+
+__constant__ int X1m3;
+__constant__ int X2m3;
+__constant__ int X3m3;
+__constant__ int X4m3;
 
 __constant__ int X2X1mX1;
 __constant__ int X3X2X1mX2X1;
 __constant__ int X4X3X2X1mX3X2X1;
 __constant__ int X4X3X2X1hmX3X2X1h;
 
+__constant__ int X2X1m3X1;
+__constant__ int X3X2X1m3X2X1;
+__constant__ int X4X3X2X1m3X3X2X1;
+__constant__ int X4X3X2X1hm3X3X2X1h;
+
 __constant__ int X2X1;
 __constant__ int X3X2X1;
+
+__constant__ int X2X1_3;
+__constant__ int X3X2X1_3;
 
 __constant__ int Vh;
 __constant__ int sp_stride;
@@ -64,11 +82,33 @@ void initCommonConstants(FullGauge gauge) {
   int X4 = gauge.X[3];
   cudaMemcpyToSymbol("X4", &X4, sizeof(int));  
 
+
+  int X1_3 = 3*X1;
+  cudaMemcpyToSymbol("X1_3", &X1_3, sizeof(int));  
+
+  int X2_3 = 3*X2;
+  cudaMemcpyToSymbol("X2_3", &X2_3, sizeof(int));  
+
+  int X3_3 = 3*X3;
+  cudaMemcpyToSymbol("X3_3", &X3_3, sizeof(int));  
+
+  int X4_3 = 3*X4;
+  cudaMemcpyToSymbol("X4_3", &X4_3, sizeof(int));  
+
+
+
   int X2X1 = X2*X1;
   cudaMemcpyToSymbol("X2X1", &X2X1, sizeof(int));  
 
   int X3X2X1 = X3*X2*X1;
   cudaMemcpyToSymbol("X3X2X1", &X3X2X1, sizeof(int));  
+  
+  int X2X1_3 = 3*X2*X1;
+  cudaMemcpyToSymbol("X2X1_3", &X2X1_3, sizeof(int));  
+  
+  int X3X2X1_3 = 3*X3*X2*X1;
+  cudaMemcpyToSymbol("X3X2X1_3", &X3X2X1_3, sizeof(int)); 
+
 
   int X1h = X1/2;
   cudaMemcpyToSymbol("X1h", &X1h, sizeof(int));  
@@ -85,6 +125,19 @@ void initCommonConstants(FullGauge gauge) {
   int X4m1 = X4 - 1;
   cudaMemcpyToSymbol("X4m1", &X4m1, sizeof(int));  
   
+  int X1m3 = X1 - 3;
+  cudaMemcpyToSymbol("X1m3", &X1m3, sizeof(int));  
+
+  int X2m3 = X2 - 3;
+  cudaMemcpyToSymbol("X2m3", &X2m3, sizeof(int));  
+
+  int X3m3 = X3 - 3;
+  cudaMemcpyToSymbol("X3m3", &X3m3, sizeof(int));  
+
+  int X4m3 = X4 - 3;
+  cudaMemcpyToSymbol("X4m3", &X4m3, sizeof(int));  
+
+
   int X2X1mX1 = X2X1 - X1;
   cudaMemcpyToSymbol("X2X1mX1", &X2X1mX1, sizeof(int));  
 
@@ -96,6 +149,18 @@ void initCommonConstants(FullGauge gauge) {
 
   int X4X3X2X1hmX3X2X1h = (X4-1)*X3*X2*X1h;
   cudaMemcpyToSymbol("X4X3X2X1hmX3X2X1h", &X4X3X2X1hmX3X2X1h, sizeof(int));  
+
+  int X2X1m3X1 = X2X1 - 3*X1;
+  cudaMemcpyToSymbol("X2X1m3X1", &X2X1m3X1, sizeof(int));  
+
+  int X3X2X1m3X2X1 = X3X2X1 - 3*X2X1;
+  cudaMemcpyToSymbol("X3X2X1m3X2X1", &X3X2X1m3X2X1, sizeof(int));  
+
+  int X4X3X2X1m3X3X2X1 = (X4-3)*X3X2X1;
+  cudaMemcpyToSymbol("X4X3X2X1m3X3X2X1", &X4X3X2X1m3X3X2X1, sizeof(int));  
+
+  int X4X3X2X1hm3X3X2X1h = (X4-3)*X3*X2*X1h;
+  cudaMemcpyToSymbol("X4X3X2X1hm3X3X2X1h", &X4X3X2X1hm3X3X2X1h, sizeof(int)); 
 
   checkCudaError();
 }
@@ -113,9 +178,11 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride)
 
   int fat_ga_stride = gauge.stride;
   int long_ga_stride = gauge.stride;
-
+    
   cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));
   cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));
+
+
 
   cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 

@@ -307,13 +307,17 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 			   const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
 			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
-			   const double &a, const int volume, const int length) {
+			   const double &a, const int volume, const int length, const QudaPrecision precision) {
     
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
-
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
-
+  if (precision == QUDA_HALF_PRECISION) {
+    blockDim.x = 128;
+    gridDim.x = volume/blockDim.x;
+  }
+  
+  int shared_bytes = blockDim.x*6*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
+  
   if (x==0) { // not doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
@@ -369,13 +373,16 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 				  const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
 				  const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 				  const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
-				  const double &a, const int volume, const int length) 
-{
-  
+				  const double &a, const int volume, const int length, const QudaPrecision precision) 
+{  
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
-  
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
+
+  if (precision == QUDA_HALF_PRECISION) {
+    blockDim.x = 128;
+    gridDim.x = volume/blockDim.x;
+  }
+  int shared_bytes = blockDim.x*6*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
   
   if (x==0) { // not doing xpay
     if (!dagger) {
@@ -423,12 +430,12 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
       staggeredDslashNoReconCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
 				    (double2*)longGauge0, (double2*)longGauge1,
 				    longGauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
-				    (double2*)x, (float*)xNorm, k, volume, length);
+				    (double2*)x, (float*)xNorm, k, volume, length, precision);
     }else{
       staggeredDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
 			     (double2*)longGauge0, (double2*)longGauge1,
 			     longGauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
-			     (double2*)x, (float*)xNorm, k, volume, length);
+			     (double2*)x, (float*)xNorm, k, volume, length, precision);
     }
     
 #else
@@ -439,24 +446,24 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
       staggeredDslashNoReconCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
 				    (float2*)longGauge0, (float2*)longGauge1,
 				    longGauge.reconstruct, (float2*)in, (float*)inNorm, parity, dagger, 
-				    (float2*)x, (float*)xNorm, k, volume, length);
+				    (float2*)x, (float*)xNorm, k, volume, length, precision);
     }else{
       staggeredDslashCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
 			     (float4*)longGauge0, (float4*)longGauge1,
 			     longGauge.reconstruct, (float2*)in, (float*)inNorm, parity, dagger, 
-			     (float2*)x, (float*)xNorm, k, volume, length);
+			     (float2*)x, (float*)xNorm, k, volume, length, precision);
     }
   } else if (precision == QUDA_HALF_PRECISION) {	
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
       staggeredDslashNoReconCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
 				    (short2*)longGauge0, (short2*)longGauge1,
 				    longGauge.reconstruct, (short2*)in, (float*)inNorm, parity, dagger, 
-				    (short2*)x, (float*)xNorm, k, volume, length);
+				    (short2*)x, (float*)xNorm, k, volume, length, precision);
     }else{
       staggeredDslashCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
 			     (short4*)longGauge0, (short4*)longGauge1,
 			     longGauge.reconstruct, (short2*)in, (float*)inNorm, parity, dagger, 
-			     (short2*)x, (float*)xNorm, k, volume, length);
+			     (short2*)x, (float*)xNorm, k, volume, length, precision);
     }
   }
   checkCudaError();

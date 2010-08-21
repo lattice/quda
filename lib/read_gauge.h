@@ -282,7 +282,7 @@
   ACC_CONJ_PROD(gauge##21, -gauge##00, +gauge##12);			\
   ACC_CONJ_PROD(gauge##22, +gauge##00, +gauge##11);			\
   ACC_CONJ_PROD(gauge##22, -gauge##01, +gauge##10);			\
-  if (1){float u0 = coeff_f*sign;					\
+  {float u0 = coeff_f*sign;						\
     gauge##20_re *=u0;gauge##20_im *=u0; gauge##21_re *=u0; gauge##21_im *=u0; \
     gauge##22_re *=u0;gauge##22_im *=u0;}
 
@@ -293,7 +293,7 @@
   ACC_CONJ_PROD(gauge##21, -gauge##00, +gauge##12);			\
   ACC_CONJ_PROD(gauge##22, +gauge##00, +gauge##11);			\
   ACC_CONJ_PROD(gauge##22, -gauge##01, +gauge##10);			\
-  if (1){double u0 = coeff* sign;					\
+  {double u0 = coeff* sign;						\
     gauge##20_re *=u0;gauge##20_im *=u0; gauge##21_re *=u0; gauge##21_im *=u0; \
     gauge##22_re *=u0;gauge##22_im *=u0;}
 
@@ -362,6 +362,7 @@
   double2 FAT8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*fat_ga_stride);
 
 
+
 #else
 #define READ_FAT_MATRIX_18_SINGLE(gauge, dir, idx)		\
   float2 FAT0 = gauge[idx + ((dir/2)*9+0)*fat_ga_stride];	\
@@ -385,7 +386,6 @@
   double2 FAT6 = gauge[idx + ((dir/2)*9+6)*fat_ga_stride];	\
   double2 FAT7 = gauge[idx + ((dir/2)*9+7)*fat_ga_stride];	\
   double2 FAT8 = gauge[idx + ((dir/2)*9+8)*fat_ga_stride];
-
 
 #endif
 

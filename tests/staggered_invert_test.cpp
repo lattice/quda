@@ -94,7 +94,6 @@ invert_test(void)
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
   gauge_param.ga_pad = sdim*sdim*sdim;
   inv_param.sp_pad = sdim*sdim*sdim;
-  inv_param.cl_pad = sdim*sdim*sdim;
   
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

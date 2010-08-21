@@ -1,6 +1,6 @@
 // *** CUDA DSLASH ***
 
-#define SHARED_FLOATS_PER_THREAD 0
+#define SHARED_FLOATS_PER_THREAD 6
 // input spinor
 #if (DD_PREC==0)
 #define spinorFloat double
@@ -186,13 +186,34 @@
 #define longT22_re (+long22_re)
 #define longT22_im (-long22_im)
 
+
+#if (DD_PREC == 0)
+#if (__CUDA_ARCH__ >= 200)
+#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
+#else
+#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
+#endif
+extern __shared__ spinorFloat sd_data[];
+volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
+#else
+#if (__CUDA_ARCH__ >= 200)
+#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
+#else
+#define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
+#endif
+extern __shared__ spinorFloat ss_data[];
+volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
+#endif
+
 // output spinor
-volatile spinorFloat o00_re;
-volatile spinorFloat o00_im;
-volatile spinorFloat o01_re;
-volatile spinorFloat o01_im;
-volatile spinorFloat o02_re;
-volatile spinorFloat o02_im;
+#define o00_re s[0*SHARED_STRIDE]
+#define o00_im s[1*SHARED_STRIDE]
+#define o01_re s[2*SHARED_STRIDE]
+#define o01_im s[3*SHARED_STRIDE]
+#define o02_re s[4*SHARED_STRIDE]
+#define o02_im s[5*SHARED_STRIDE]
 
 
 #include "read_gauge.h"
@@ -293,9 +314,6 @@ o02_re = o02_im = 0.f;
   VOUT##2_im -= M##12_im * V##01_re;            \
   VOUT##2_im += M##22_re * V##02_im;            \
   VOUT##2_im -= M##22_im * V##02_re;
-
-
-
 {
     //direction: +X
 #if (DD_RECON_F != 18)
@@ -306,31 +324,21 @@ o02_re = o02_im = 0.f;
     }
 #endif
     int sp_idx_1st_nbr = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;
-    int sp_idx_3rd_nbr = ((x1 > (X1 -4)) ? X -X1 +3 : X+3) >> 1;
-
-    int ga_idx = sid;
-    
-    // read gauge matrix from device memory
-    READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx);
-    READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx);
-    
-    // read spinor from device memory
+    READ_FAT_MATRIX(FATLINK0TEX, 0, sid);
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
-    
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(0, long, ga_idx, sign);
-      
     MAT_MUL_V(A, fat, i);
-    MAT_MUL_V(B, long, t);    
-    
     o00_re += A0_re;
     o00_im += A0_im;
     o01_re += A1_re;
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
-    
+
+    int sp_idx_3rd_nbr = ((x1 >= X1m3) ? X -X1m3 : X+3) >> 1;
+    READ_LONG_MATRIX(LONGLINK0TEX, 0, sid);
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);    
+    RECONSTRUCT_GAUGE_MATRIX(0, long, sid, sign);      
+    MAT_MUL_V(B, long, t);    
     o00_re += B0_re;
     o00_im += B0_im;
     o01_re += B1_re;
@@ -339,35 +347,27 @@ o02_re = o02_im = 0.f;
     o02_im += B2_im;  
 }
 
-
 {
     // direction: -X
     
     int sp_idx_1st_nbr = ((x1==0) ? X+X1m1 : X-1) >> 1;
-    int sp_idx_3rd_nbr = ((x1<3) ? X + X1-3: X -3)>>1; 
 
-    // read gauge matrix from device memory
+
     READ_FAT_MATRIX(FATLINK1TEX, 1, sp_idx_1st_nbr);
-    READ_LONG_MATRIX(LONGLINK1TEX, 1, sp_idx_3rd_nbr); 
-    
-    // read spinor from device memory
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
-
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, sign);
-   
     ADJ_MAT_MUL_V(A, fat, i);
-    ADJ_MAT_MUL_V(B, long, t);    
-
     o00_re -= A0_re;
     o00_im -= A0_im;
     o01_re -= A1_re;
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
-    
-        
+
+    int sp_idx_3rd_nbr = ((x1<3) ? X + X1m3: X -3)>>1; 
+    READ_LONG_MATRIX(LONGLINK1TEX, 1, sp_idx_3rd_nbr); 
+    RECONSTRUCT_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, sign);
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
+    ADJ_MAT_MUL_V(B, long, t);            
     o00_re -= B0_re;
     o00_im -= B0_im;
     o01_re -= B1_re;
@@ -387,33 +387,22 @@ o02_re = o02_im = 0.f;
     }
 #endif
    
-    int ga_idx = sid;
-
-    int sp_idx_1st_nbr = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;
-    int sp_idx_3rd_nbr = ((x2 >= (X2 - 3) ) ? X + (-X2 + 3)*X1 : X+3*X1) >> 1;
-    
-    // read gauge matrix from device memory
-    READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx);
-    READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx);
-
-    // read spinor from device memory
+    int sp_idx_1st_nbr = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;    
+    READ_FAT_MATRIX(FATLINK0TEX, 2, sid);
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
-
- 
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(2, long, ga_idx, sign);
-
-    MAT_MUL_V(A, fat, i);
-    MAT_MUL_V(B, long, t);    
-    
+    MAT_MUL_V(A, fat, i);    
     o00_re += A0_re;
     o00_im += A0_im;
     o01_re += A1_re;
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
-    
+ 
+    int sp_idx_3rd_nbr = ((x2 >= X2m3 ) ? X  - X2X1m3X1 : X+X1_3) >> 1;
+    READ_LONG_MATRIX(LONGLINK0TEX, 2, sid);
+    RECONSTRUCT_GAUGE_MATRIX(2, long, sid, sign);
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
+    MAT_MUL_V(B, long, t);        
     o00_re += B0_re;
     o00_im += B0_im;
     o01_re += B1_re;
@@ -428,29 +417,23 @@ o02_re = o02_im = 0.f;
     //direction: -Y
     
     int sp_idx_1st_nbr = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;
-    int sp_idx_3rd_nbr = ((x2 < 3) ? X + ( X2 - 3)*X1: X -3*X1 )>> 1; 
     
     // read gauge matrix from device memory
     READ_FAT_MATRIX(FATLINK1TEX, 3, sp_idx_1st_nbr);
-    READ_LONG_MATRIX(LONGLINK1TEX, 3, sp_idx_3rd_nbr); 
-    
-    // read spinor from device memory
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);   
-
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,sign);
-
     ADJ_MAT_MUL_V(A, fat, i);
-    ADJ_MAT_MUL_V(B, long, t);    
-    
     o00_re -= A0_re;
     o00_im -= A0_im;
     o01_re -= A1_re;
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
-    
+
+    int sp_idx_3rd_nbr = ((x2 < 3) ? X + X2X1m3X1: X -X1_3 )>> 1; 
+    READ_LONG_MATRIX(LONGLINK1TEX, 3, sp_idx_3rd_nbr); 
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);   
+    RECONSTRUCT_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,sign);
+    ADJ_MAT_MUL_V(B, long, t);    
     o00_re -= B0_re;
     o00_im -= B0_im;
     o01_re -= B1_re;
@@ -460,7 +443,7 @@ o02_re = o02_im = 0.f;
     
 }
 
-
+#if 1
 
 {
     //direction: +Z
@@ -473,33 +456,23 @@ o02_re = o02_im = 0.f;
     }
 #endif
     
-    int ga_idx = sid;
-    
     int sp_idx_1st_nbr = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
-    int sp_idx_3rd_nbr = ((x3>= (X2 - 3))? X + (-X3 + 3)*X2*X1: X + 3*X2*X1)>> 1;
-    
-    // read gauge matrix from device memory
-    READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx);
-    READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx);
-    
-    // read spinor from device memory
+    READ_FAT_MATRIX(FATLINK0TEX, 4, sid);
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);   
-
-
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(4, long, ga_idx, sign);
-
     MAT_MUL_V(A, fat, i);
-    MAT_MUL_V(B, long, t);    
-    
     o00_re += A0_re;
     o00_im += A0_im;
     o01_re += A1_re;
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
-    
+
+
+    int sp_idx_3rd_nbr = ((x3>= X3m3)? X -X3X2X1m3X2X1: X + X2X1_3)>> 1;    
+    READ_LONG_MATRIX(LONGLINK0TEX, 4, sid);
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);   
+    RECONSTRUCT_GAUGE_MATRIX(4, long, sid, sign);
+    MAT_MUL_V(B, long, t);    
     o00_re += B0_re;
     o00_im += B0_im;
     o01_re += B1_re;
@@ -514,29 +487,21 @@ o02_re = o02_im = 0.f;
     //direction: -Z
     
     int sp_idx_1st_nbr = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
-    int sp_idx_3rd_nbr = ((x3 <3) ? X + (X3 -3)*X2X1: X - 3*X2X1)>>1;
-
-    // read gauge matrix from device memory
     READ_FAT_MATRIX(FATLINK1TEX, 5, sp_idx_1st_nbr);
-    READ_LONG_MATRIX(LONGLINK1TEX, 5, sp_idx_3rd_nbr); 
-    
-    // read spinor from device memory
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);      
-    
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,sign);
-   
-    ADJ_MAT_MUL_V(A, fat, i);
-    ADJ_MAT_MUL_V(B, long, t);    
-    
+    ADJ_MAT_MUL_V(A, fat, i);    
     o00_re -= A0_re;
     o00_im -= A0_im;
     o01_re -= A1_re;
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
-    
+
+    int sp_idx_3rd_nbr = ((x3 <3) ? X + X3X2X1m3X2X1: X - X2X1_3)>>1;
+    READ_LONG_MATRIX(LONGLINK1TEX, 5, sp_idx_3rd_nbr);     
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);          
+    RECONSTRUCT_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,sign);   
+    ADJ_MAT_MUL_V(B, long, t);    
     o00_re -= B0_re;
     o00_im -= B0_im;
     o01_re -= B1_re;
@@ -558,40 +523,28 @@ o02_re = o02_im = 0.f;
     }
 #endif
 
-    int ga_idx = sid;
-    
     int sp_idx_1st_nbr = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
-    int sp_idx_3rd_nbr = ((x4>=(X4-3))? X + ( - X4 +3)*X3X2X1 : X + 3*X3X2X1)>> 1; 
-    
-    // read gauge matrix from device memory
-    READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx);
-    READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx);
-    
+    READ_FAT_MATRIX(FATLINK0TEX, 6, sid);
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride); 
-
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(6, long, ga_idx, sign);
-    
-    MAT_MUL_V(A, fat, i);
-    MAT_MUL_V(B, long, t);    
-
-  
+    MAT_MUL_V(A, fat, i);  
     o00_re += A0_re;
     o00_im += A0_im;
     o01_re += A1_re;
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
-    
+
+    int sp_idx_3rd_nbr = ((x4>= X4m3)? X - X4X3X2X1m3X3X2X1 : X + X3X2X1_3)>> 1;     
+    READ_LONG_MATRIX(LONGLINK0TEX, 6, sid);    
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride); 
+    RECONSTRUCT_GAUGE_MATRIX(6, long, sid, sign);    
+    MAT_MUL_V(B, long, t);    
     o00_re += B0_re;
     o00_im += B0_im;
     o01_re += B1_re;
     o01_im += B1_im;
     o02_re += B2_re;
     o02_im += B2_im;      
-
-
 
 }
 
@@ -606,27 +559,21 @@ o02_re = o02_im = 0.f;
 #endif
 
     int sp_idx_1st_nbr = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
-    int sp_idx_3rd_nbr = ((x4<3) ? X + (X4 -3)*X3X2X1: X - 3*X3X2X1) >> 1;
-    
     READ_FAT_MATRIX(FATLINK1TEX, 7, sp_idx_1st_nbr);
-    READ_LONG_MATRIX(LONGLINK1TEX, 7, sp_idx_3rd_nbr); 
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);       
-    
-    // reconstruct gauge matrix
-    RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);
-    
     ADJ_MAT_MUL_V(A, fat, i);
-    ADJ_MAT_MUL_V(B, long, t);    
-
     o00_re -= A0_re;
     o00_im -= A0_im;
     o01_re -= A1_re;
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
-    
-    
+
+    int sp_idx_3rd_nbr = ((x4<3) ? X + X4X3X2X1m3X3X2X1: X - X3X2X1_3) >> 1;
+    READ_LONG_MATRIX(LONGLINK1TEX, 7, sp_idx_3rd_nbr); 
+    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);       
+    RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
+    ADJ_MAT_MUL_V(B, long, t);    
     o00_re -= B0_re;
     o00_im -= B0_im;
     o01_re -= B1_re;
@@ -636,6 +583,7 @@ o02_re = o02_im = 0.f;
 
     
 }
+#endif
 
 #if (DD_DAG == 1)
 {
@@ -678,6 +626,8 @@ WRITE_SPINOR();
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
+#undef SHARED_STRIDE
+
 #undef A_re
 #undef A_im
 

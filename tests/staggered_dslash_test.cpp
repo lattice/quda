@@ -56,6 +56,8 @@ void init()
 
   setDims(gauge_param.X);
 
+  Vh = sdim*sdim*sdim*tdim/2;
+
   gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   gauge_param.cuda_prec = prec;
   gauge_param.reconstruct = link_recon;
@@ -75,9 +77,9 @@ void init()
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
     
-  gauge_param.ga_pad = sdim*sdim*sdim;
-  inv_param.sp_pad = sdim*sdim*sdim;
-  inv_param.cl_pad = sdim*sdim*sdim;
+  gauge_param.ga_pad = sdim*sdim*sdim/2;
+  inv_param.sp_pad = sdim*sdim*sdim/2;
+  inv_param.cl_pad = sdim*sdim*sdim/2;
 
   ColorSpinorParam csParam;
   csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
@@ -328,13 +330,23 @@ static void dslashTest()
     int link_float_size = 0;
     int spinor_float_size = 0;
 	
+    if(prec == QUDA_DOUBLE_PRECISION){
+	link_float_size = spinor_float_size = 8;
+    }else if(prec == QUDA_SINGLE_PRECISION){
+	link_float_size = spinor_float_size = 4;
+    }else{
+	link_float_size = spinor_float_size = 2;
+    }
     link_floats = test_type? (2*link_floats): link_floats;
     spinor_floats = test_type? (2*spinor_floats): spinor_floats;
 	
+
     int bytes_for_one_site = link_floats* link_float_size + spinor_floats * spinor_float_size;
-	
+    if(prec == QUDA_HALF_PRECISION){
+	bytes_for_one_site += (8*2 + 1)*4;	
+    }
     printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printf("GiB/s = %f\n\n", Vh*bytes_for_one_site/(secs*(1<<30)));
+    printf("GiB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/(secs*(1<<30)));
 	
     if (!transfer) {
       std::cout << "Results: CPU = " << norm2(*spinorRef) << ", CUDA = " << norm2(*cudaSpinorOut) << 
