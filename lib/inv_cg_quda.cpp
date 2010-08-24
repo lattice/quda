@@ -26,7 +26,6 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
-  cudaColorSpinorField tmp(x, param);
   
   cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
