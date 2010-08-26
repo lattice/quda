@@ -169,7 +169,7 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
   
 }
 void cudaColorSpinorField::freeBuffer() {
-  if (bufferInit) cudaFree(buffer);
+  if (bufferInit) cudaFreeHost(buffer);
 }
 
 void cudaColorSpinorField::destroy() {
