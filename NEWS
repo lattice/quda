@@ -68,6 +68,9 @@ Version 0.3.0
 
 - Temporarily removed 3D Wilson Dslash.
 
+- Added an 'OS' option to make.inc.example, to simplify compiling for
+  Mac OS X.
+
 
 Version 0.2.5 - 24 June 2010
 

@@ -428,7 +428,7 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
       // We are copying a parity ordered field
       
       // check what src parity ordering is
-      uint evenOff, oddOff;
+      unsigned int evenOff, oddOff;
       if (siteOrder == QUDA_EVEN_ODD_SITE_ORDER) {
 	evenOff = 0;
 	oddOff = srcLength/2;
@@ -479,7 +479,7 @@ void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int d
       // We are copying a parity ordered field
       
       // check what src parity ordering is
-      uint evenOff, oddOff;
+      unsigned int evenOff, oddOff;
       if (siteOrder == QUDA_EVEN_ODD_SITE_ORDER) {
 	evenOff = 0;
 	oddOff = srcLength/2;

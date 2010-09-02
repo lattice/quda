@@ -94,8 +94,8 @@ class ColorSpinorParam {
     printfQuda("fieldOrder = %d\n", fieldOrder);
     printfQuda("gammaBasis = %d\n", gammaBasis);
     printfQuda("create = %d\n", create);
-    printfQuda("v = %lx\n", (ulong)v);
-    printfQuda("norm = %lx\n", (ulong)norm);
+    printfQuda("v = %lx\n", (unsigned long)v);
+    printfQuda("norm = %lx\n", (unsigned long)norm);
   }
 
   virtual ~ColorSpinorParam() {

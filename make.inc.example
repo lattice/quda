@@ -5,6 +5,7 @@ CUDA_INSTALL_PATH = /usr/local/cuda
 CPU_ARCH = x86_64  # x86 or x86_64
 GPU_ARCH = sm_13   # sm_10, sm_11, sm_12, sm_13, or sm_20
 GPU_EMU  = no      # set to 'yes' for device emulation (CUDA 3.0 only)
+OS       = linux   # linux or osx
 
 PYTHON = python    # python 2.5 or later required for 'make gen'
 DEVICE = 0         # CUDA device to use for 'make tune'
@@ -18,8 +19,12 @@ BUILD_FERMION_FORCE = no  # build code for asqtad fermion force?
 INC = -I$(CUDA_INSTALL_PATH)/include
 
 ifeq ($(strip $(CPU_ARCH)), x86_64)
-  LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
-  COPT =
+  ifeq ($(strip $(OS)), osx)
+    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
+    NVCCOPT = -m64
+  else
+    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
+  endif
 else
   LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
   COPT = -malign-double

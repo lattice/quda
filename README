@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.3.0                             XX June 2010
+Release Notes for QUDA v0.3.0                        XX September 2010
 -----------------------------
 
 Overview:
@@ -19,10 +19,10 @@ improved Symanzik gauge action, and a multi-shift CG solver.
 
 Software Compatibility:
 
-The library has been tested under Linux (CentOS 5.4 and Ubuntu 10.04)
-using release 3.0 of the CUDA toolkit.  CUDA 2.x and earlier are no
-longer supported.  The library should also work under Mac OS X, but
-this hasn't been tested.
+The library has been tested under Linux (CentOS 5.5 and Ubuntu 10.04)
+using release 3.1 of the CUDA toolkit.  CUDA 2.x and earlier are no
+longer supported.  The library also seems to work under Mac OS X
+10.6.4 ("Snow Leopard") on recent 64-bit Intel-based Macs.
 
 See also "Known Issues" below.
 
@@ -83,13 +83,13 @@ Known Issues:
   and run on Fermi (GPU architecture sm_20), the RECONSTRUCT_8 option
   (which enables reconstructing gauge matrices from 8 real numbers)
   gives wrong results in double precision.  This appears to be a bug
-  in CUDA 3.0, since CUDA 3.1 beta has no such issue.  Note that this
+  in CUDA 3.0, since CUDA 3.1 has no such issue.  Note that this
   problem isn't likely to matter in practice, since RECONSTRUCT_8
   generally performs worse in double precision than RECONSTRUCT_12.
 
 * Compiling in emulation mode with CUDA 3.0 does not with work when
   the GPU architecture is set to sm_10, sm_11, or sm_12.  One should
-  compile for sm_13 instead.  Note that NVIDIA is eliminating
+  compile for sm_13 instead.  Note that NVIDIA has eliminated
   emulation mode completely from CUDA 3.1 and later.
 
 * For compatibility with CUDA, on 32-bit platforms the library is
