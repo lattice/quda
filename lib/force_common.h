@@ -612,6 +612,14 @@
     a##22_re = 1.0;				\
     a##22_im = 0;				
 
+// Performs the complex conjugated accumulation: a = b* c*
+#define ACC_CONJ_PROD_ASSIGN(a, b, c)		\
+  a##_re = b##_re * c##_re;			\
+  a##_re -= b##_im * c##_im;			\
+  a##_im = b##_re * c##_im;			\
+  a##_im -= b##_im * c##_re
+
+
 #define RECONSTRUCT_LINK_12(dir, idx, sign, var)			\
     ACC_CONJ_PROD_ASSIGN(var##20, +var##01, +var##12);			\
     ACC_CONJ_PROD(var##20, -var##02, +var##11);				\
