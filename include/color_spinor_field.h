@@ -216,26 +216,6 @@ class cudaColorSpinorField : public ColorSpinorField {
 						    cudaColorSpinorField &y, cudaColorSpinorField &z, 
 						    cudaColorSpinorField &w, cudaColorSpinorField &u);
 
-  friend void dslashCuda(cudaColorSpinorField&, FullGauge, cudaColorSpinorField&, int, int);
-  friend void dslashXpayCuda(cudaColorSpinorField&, FullGauge, cudaColorSpinorField&, int, int, 
-			     cudaColorSpinorField&, double);
-  
-  friend void MatCuda(cudaColorSpinorField&, FullGauge, cudaColorSpinorField &, double, int);
-  friend void MatPCCuda(cudaColorSpinorField&, FullGauge, cudaColorSpinorField &, 
-		 double, cudaColorSpinorField&, MatPCType, int);
-  friend void MatPCDagMatPCCuda(cudaColorSpinorField&, FullGauge, cudaColorSpinorField &, double,
-				cudaColorSpinorField&, MatPCType);
-  friend void cloverDslashCuda(cudaColorSpinorField&, FullGauge, FullClover, cudaColorSpinorField &, int, int);
-  friend void cloverDslashXpayCuda(cudaColorSpinorField&, FullGauge, FullClover, cudaColorSpinorField &, int,
-			    int, cudaColorSpinorField &, double);
-  friend void cloverMatPCCuda(cudaColorSpinorField &, FullGauge, FullClover, FullClover, 
-			      cudaColorSpinorField &, double, cudaColorSpinorField&, MatPCType, int);
-  friend void cloverMatPCDagMatPCCuda(cudaColorSpinorField &, FullGauge, FullClover, FullClover,
-			       cudaColorSpinorField &, double, cudaColorSpinorField &, MatPCType);
-  friend void cloverMatCuda(cudaColorSpinorField &, FullGauge, FullClover,
-			    cudaColorSpinorField &, double, cudaColorSpinorField &, int);
-  friend void cloverCuda(cudaColorSpinorField &, FullGauge, FullClover, cudaColorSpinorField &, int);
-  
  private:
   void *v; // the field elements
   void *norm; // the normalization field
