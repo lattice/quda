@@ -311,7 +311,7 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
     
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
-  if (precision == QUDA_HALF_PRECISION) {
+  if (precision == QUDA_HALF_PRECISION && (volume % 128 == 0)) {
     blockDim.x = 128;
     gridDim.x = volume/blockDim.x;
   }

@@ -1,9 +1,9 @@
 // wilson_dslash_def.h - Dslash kernel definitions
 
-// There are currently 48 different variants of the Wilson Dslash
+// There are currently 72 different variants of the Wilson Dslash
 // kernel, each one characterized by a set of 5 options, where each
-// option can take one of several values (2*2*2*2*3 = 48).  This file
-// is structured so that the C preprocessor loops through all 48
+// option can take one of several values (2*3*2*2*3 = 72).  This file
+// is structured so that the C preprocessor loops through all 72
 // variants (in a manner resembling a counter), sets the appropriate
 // macros, and defines the corresponding functions.
 //
@@ -96,7 +96,7 @@
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SINGLE
 #endif
-#else // no reconstruct, load all components
+#else               // no reconstruct, load all components
 #define DD_RECON_F 18
 #define GAUGE_FLOAT2
 #if (DD_PREC==0)

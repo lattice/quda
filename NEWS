@@ -60,6 +60,13 @@ Version 0.3.0
   QudaParityType to determine the parity (even or odd) of the output
   spinor.  This was previously specified by an integer.
 
+- Added support for loading all elements of the gauge field matrices,
+  without SU(3) reconstruction.  Set the 'reconstruct' member of
+  QudaGaugeParam to 'RECONSTRUCT_NO' to select this option, but note
+  that it should not be combined with half precision unless the
+  elements of the gauge matrices are bounded by 1.  This restriction
+  will be removed in a future release.
+
 - Renamed dslash_test to wilson_dslash_test, renamed invert_test to
   wilson_invert_test, and added staggered variants of these test
   programs.

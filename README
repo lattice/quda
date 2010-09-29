@@ -99,6 +99,10 @@ Known Issues:
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
 
+* At present, combining RECONSTRUCT_NO with half precision will give
+  wrong results unless all elements of the gauge field matrices have
+  magnitude bounded by 1.
+
 
 Getting Help:
 
@@ -111,8 +115,8 @@ Acknowledging QUDA:
 If you find this code useful in your work, please cite:
 
 M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
-Lattice QCD systems of equations using mixed precision solvers on
-GPUs" (2009), arXiv:0911.3191 [hep-lat].
+Lattice QCD systems of equations using mixed precision solvers on GPUs,"
+Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
 
 
 Authors:

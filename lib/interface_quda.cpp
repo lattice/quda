@@ -566,7 +566,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     setDiracSloppyParam(diracParam, param);
     diracSloppy = Dirac::create(diracParam);
     
-    *b= *h_b; //send data from cpu to GPU
+    *b = *h_b; // send data from CPU to GPU
     
     csParam.create = QUDA_COPY_FIELD_CREATE;  
     x = new cudaColorSpinorField(*h_x, csParam); // solution  

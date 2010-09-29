@@ -79,7 +79,6 @@ void init()
     
   gauge_param.ga_pad = sdim*sdim*sdim/2;
   inv_param.sp_pad = sdim*sdim*sdim/2;
-  inv_param.cl_pad = sdim*sdim*sdim/2;
 
   ColorSpinorParam csParam;
   csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
@@ -327,23 +326,15 @@ static void dslashTest()
     int flops = dirac->Flops();
     int link_floats = 8*gauge_param.packed_size+8*18;
     int spinor_floats = 8*6*2 + 6;
-    int link_float_size = 0;
+    int link_float_size = prec;
     int spinor_float_size = 0;
-	
-    if(prec == QUDA_DOUBLE_PRECISION){
-	link_float_size = spinor_float_size = 8;
-    }else if(prec == QUDA_SINGLE_PRECISION){
-	link_float_size = spinor_float_size = 4;
-    }else{
-	link_float_size = spinor_float_size = 2;
-    }
-    link_floats = test_type? (2*link_floats): link_floats;
-    spinor_floats = test_type? (2*spinor_floats): spinor_floats;
-	
+    
+    link_floats = test_type ? (2*link_floats) : link_floats;
+    spinor_floats = test_type ? (2*spinor_floats) : spinor_floats;
 
-    int bytes_for_one_site = link_floats* link_float_size + spinor_floats * spinor_float_size;
-    if(prec == QUDA_HALF_PRECISION){
-	bytes_for_one_site += (8*2 + 1)*4;	
+    int bytes_for_one_site = link_floats * link_float_size + spinor_floats * spinor_float_size;
+    if (prec == QUDA_HALF_PRECISION) {
+      bytes_for_one_site += (8*2 + 1)*4;	
     }
     printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printf("GiB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/(secs*(1<<30)));
@@ -395,8 +386,7 @@ void usage(char** argv )
   return ;
 }
 
-int 
-main(int argc, char **argv) 
+int main(int argc, char **argv) 
 {
   int i;
   for (i =1;i < argc; i++){
