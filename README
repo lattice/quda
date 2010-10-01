@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.3.0                         XX October 2010
+Release Notes for QUDA v0.3.0                          1 October 2010
 -----------------------------
 
 Overview:
@@ -73,7 +73,7 @@ Using the Library:
 
 Include the header file include/quda.h in your application, link
 against lib/libquda.a, and study tests/wilson_invert_test.c or
-tests/staggered_invert_test.c for an example of the interface.  The
+tests/staggered_invert_test.cpp for an example of the interface.  The
 various inverter options are enumerated in include/enum_quda.h.
 
 
@@ -103,7 +103,7 @@ Known Issues:
   wrong results unless all elements of the gauge field matrices have
   magnitude bounded by 1.  In particular, half precision should
   not be used with asqtad or HISQ fermions, since the "fat links" do
-  not satisfy this property in general.
+  not satisfy this condition in general.
 
 
 Getting Help:

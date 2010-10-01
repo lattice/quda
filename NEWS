@@ -1,5 +1,5 @@
 
-Version 0.3.0
+Version 0.3.0 - 1 October 2010
 
 - CUDA 3.0 or later is now required to build the library.
 
@@ -12,7 +12,7 @@ Version 0.3.0
   through the next several releases.
 
 - The inverters might require more device memory than they did before.
-  This will be corrected in the next release.
+  This will be corrected in a future release.
 
 - The CG inverter now supports improved staggered fermions (asqtad or
   HISQ).  Code has also been added for asqtad link fattening, the asqtad
