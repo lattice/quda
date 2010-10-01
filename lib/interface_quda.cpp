@@ -156,6 +156,17 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     anisotropy = 1.0;
   }
 
+  if (param->type != QUDA_WILSON_LINKS &&
+      param->gauge_fix == QUDA_GAUGE_FIXED_YES) {
+    errorQuda("Temporal gauge fixing not supported for staggered");
+  }
+
+  if ((param->cuda_prec == QUDA_HALF_PRECISION && param->reconstruct == QUDA_RECONSTRUCT_NO) ||
+      (param->cuda_prec_sloppy == QUDA_HALF_PRECISION && param->reconstruct_sloppy == QUDA_RECONSTRUCT_NO)) {
+    warningQuda("Loading gauge field in half precision may give wrong results "
+		"unless all elements have magnitude bounded by 1");
+  }
+
   createGaugeField(precise, h_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
 		   param->t_boundary, param->X, anisotropy, param->tadpole_coeff, param->ga_pad);
   param->gaugeGiB += 2.0 * precise->bytes / (1 << 30);

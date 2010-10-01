@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.3.0                        XX September 2010
+Release Notes for QUDA v0.3.0                         XX October 2010
 -----------------------------
 
 Overview:
@@ -101,7 +101,9 @@ Known Issues:
 
 * At present, combining RECONSTRUCT_NO with half precision will give
   wrong results unless all elements of the gauge field matrices have
-  magnitude bounded by 1.
+  magnitude bounded by 1.  In particular, half precision should
+  not be used with asqtad or HISQ fermions, since the "fat links" do
+  not satisfy this property in general.
 
 
 Getting Help:
