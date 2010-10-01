@@ -580,6 +580,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
 
+    if(param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION  
+	&& param->solution_type != QUDA_MATDAG_MAT_SOLUTION){
+	errorQuda("Your solution type not supported for staggered. "
+	"Only QUDA_MATPCDAG_MATPC_SOLUTION and QUDA_MATDAG_MAT_SOLUTION is supported.");
+     }
+
     ColorSpinorParam csParam;
     csParam.precision = param->cpu_prec;
     csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
@@ -750,6 +756,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     warningQuda("invertMultiShiftQuda() called with no offsets");
     return;
   }
+
+  if(param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION
+      && param->solution_type != QUDA_MATDAG_MAT_SOLUTION){
+      errorQuda("Your solution type not supported for staggered. "
+      "Only QUDA_MATPCDAG_MATPC_SOLUTION and QUDA_MATDAG_MAT_SOLUTION is supported.");
+  }
+
+
 
   bool pc_solve = (param->solve_type == QUDA_NORMEQ_PC_SOLVE);
 
