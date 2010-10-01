@@ -82,10 +82,11 @@ void init() {
   //inv_param.cl_pad = 24*24*24;
 
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
   if (test_type == 2) {
-    inv_param.solve_type = QUDA_DIRECT_SOLVE;
+    inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
-    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
 
   if (clover_yes) {
@@ -137,7 +138,7 @@ void init() {
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gauge_param.X[0];
   
-  printfQuda("Randomizing fields...\n");
+  printfQuda("Randomizing fields... ");
 
   construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
   spinor->Source(QUDA_RANDOM_SOURCE);
@@ -203,8 +204,9 @@ void init() {
     std::cout << "Source: CPU = " << norm2(*spinor) << ", CUDA = " << 
       norm2(*cudaSpinor) << std::endl;
 
+    bool pc = (test_type != 2);
     DiracParam diracParam;
-    setDiracParam(diracParam, &inv_param);
+    setDiracParam(diracParam, &inv_param, pc);
     diracParam.verbose = QUDA_VERBOSE;
     diracParam.tmp1 = tmp;
     diracParam.tmp2 = tmp2;

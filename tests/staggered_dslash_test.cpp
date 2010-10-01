@@ -91,9 +91,11 @@ void init()
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
   if (test_type < 2) {
+    inv_param.solution_type = QUDA_MATPC_SOLUTION;
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] /= 2;
   } else {
+    inv_param.solution_type = QUDA_MAT_SOLUTION;
     csParam.siteSubset = QUDA_FULL_SITE_SUBSET;	
   }
 
@@ -167,7 +169,6 @@ void init()
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /=2;
     }
-
 	
     printfQuda("Creating cudaSpinor\n");
     cudaSpinor = new cudaColorSpinorField(csParam);
@@ -189,8 +190,9 @@ void init()
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp = new cudaColorSpinorField(csParam);
 
+    bool pc = (test_type != 2);
     DiracParam diracParam;
-    setDiracParam(diracParam, &inv_param);
+    setDiracParam(diracParam, &inv_param, pc);
     diracParam.fatGauge = &cudaFatLinkPrecise;
     diracParam.longGauge = &cudaLongLinkPrecise;
 
@@ -201,7 +203,6 @@ void init()
   } else {
     printf("ERROR: not suppported\n");
   }
-    
     
   return;
 }
