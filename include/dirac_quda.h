@@ -13,15 +13,14 @@ class DiracParam {
   double kappa;
   double mass;
   MatPCType matpcType;
-  QudaDagType dagger;
+  DagType dagger;
   FullGauge *gauge;
+  FullGauge *fatGauge;  // used by staggered only
+  FullGauge *longGauge; // used by staggered only
   FullClover *clover;
   FullClover *cloverInv;
   cudaColorSpinorField *tmp1;
   cudaColorSpinorField *tmp2; // used only by Clover operators
-  
-  FullGauge* fatGauge;  // used by staggered only
-  FullGauge* longGauge; // used by staggered only
   
   QudaVerbosity verbose;
 
@@ -47,7 +46,7 @@ class Dirac {
   double kappa;
   double mass;
   MatPCType matpcType;
-  mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
+  mutable DagType dagger; // mutable to simplify implementation of Mdag
   mutable unsigned long long flops;
   mutable cudaColorSpinorField *tmp1; // temporary hack
   mutable cudaColorSpinorField *tmp2; // temporary hack
@@ -108,7 +107,7 @@ class DiracWilson : public Dirac {
 			   const QudaSolutionType) const;
 };
 
-// Even-Odd preconditioned Wilson
+// Even-odd preconditioned Wilson
 class DiracWilsonPC : public DiracWilson {
 
  private:
@@ -156,7 +155,7 @@ class DiracClover : public DiracWilson {
 			   const QudaSolutionType) const;
 };
 
-// Even-Odd preconditioned clover
+// Even-odd preconditioned clover
 class DiracCloverPC : public DiracClover {
 
  private:
@@ -184,18 +183,18 @@ class DiracCloverPC : public DiracClover {
 		   const QudaSolutionType) const;
 };
 
-// Parity Staggered
-class DiracStaggeredPC : public Dirac {
+// Full staggered
+class DiracStaggered : public Dirac {
 
  protected:
-  FullGauge* fatGauge;
-  FullGauge* longGauge;
+    FullGauge *fatGauge;
+    FullGauge *longGauge;
 
  public:
-  DiracStaggeredPC(const DiracParam &param);
-  DiracStaggeredPC(const DiracStaggeredPC &dirac);
-  virtual ~DiracStaggeredPC();
-  DiracStaggeredPC& operator=(const DiracStaggeredPC &dirac);
+  DiracStaggered(const DiracParam &param);
+  DiracStaggered(const DiracStaggered &dirac);
+  virtual ~DiracStaggered();
+  DiracStaggered& operator=(const DiracStaggered &dirac);
 
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   
@@ -213,18 +212,18 @@ class DiracStaggeredPC : public Dirac {
 			   const QudaSolutionType) const;
 };
 
-// Full Staggered
-class DiracStaggered : public Dirac {
+// Even-odd preconditioned staggered
+class DiracStaggeredPC : public Dirac {
 
  protected:
-    FullGauge* fatGauge;
-    FullGauge* longGauge;
+  FullGauge *fatGauge;
+  FullGauge *longGauge;
 
  public:
-  DiracStaggered(const DiracParam &param);
-  DiracStaggered(const DiracStaggered &dirac);
-  virtual ~DiracStaggered();
-  DiracStaggered& operator=(const DiracStaggered &dirac);
+  DiracStaggeredPC(const DiracParam &param);
+  DiracStaggeredPC(const DiracStaggeredPC &dirac);
+  virtual ~DiracStaggeredPC();
+  DiracStaggeredPC& operator=(const DiracStaggeredPC &dirac);
 
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   
