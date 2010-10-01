@@ -191,7 +191,7 @@ invert_test(void)
 
     volume = Vh; //FIXME: the time reported is only parity time
     inv_param.solve_type = QUDA_NORMEQ_SOLVE;
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+    inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
     invertQuda(spinorOut, spinorIn, &inv_param);
     
     time0 += clock(); // stop the timer
@@ -252,6 +252,7 @@ invert_test(void)
     }else { //testtype ==5
       in=spinorIn;
       len= V;
+      inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
       inv_param.solve_type = QUDA_NORMEQ_SOLVE;
       volume = Vh; //FIXME: the time reported is only parity time
       spinorOutArray[0] = spinorOut;
