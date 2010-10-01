@@ -85,7 +85,7 @@ void DiracStaggeredPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpin
 
 void DiracStaggeredPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-  errorQuda("M function in DiracStaggeredPC is not implemented\n");
+  errorQuda("DiracStaggeredPC::M() is not implemented\n");
 }
 
 void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
@@ -125,14 +125,14 @@ void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorFie
 
 void DiracStaggeredPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
 			       cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			       const QudaSolutionType solutionType) const
+			       const QudaSolutionType solType) const
 {
   src = &b;
   sol = &x;  
 }
 
 void DiracStaggeredPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-				   const QudaSolutionType solutionType) const
+				   const QudaSolutionType solType) const
 {
   // do nothing
 }
@@ -222,7 +222,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 
 void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-  errorQuda("M function in DiracStaggeredPC is not implemented");  
+  errorQuda("DiracStaggered::M() is not implemented");  
 }
 
 void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
@@ -262,14 +262,18 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
 
 void DiracStaggered::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
 			     cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			     const QudaSolutionType solutionType) const
+			     const QudaSolutionType solType) const
 {
+  if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+    errorQuda("Preconditioned solution requires a preconditioned solve_type");
+  }
+
   src = &b;
   sol = &x;  
 }
 
 void DiracStaggered::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-				 const QudaSolutionType solutionType) const
+				 const QudaSolutionType solType) const
 {
   // do nothing
 }

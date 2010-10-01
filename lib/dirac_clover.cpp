@@ -116,7 +116,9 @@ void DiracClover::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol
 			  cudaColorSpinorField &x, cudaColorSpinorField &b, 
 			  const QudaSolutionType solType) const
 {
-  ColorSpinorParam param;
+  if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+    errorQuda("Preconditioned solution requires a preconditioned solve_type");
+  }
 
   src = &b;
   sol = &x;

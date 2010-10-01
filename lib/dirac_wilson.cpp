@@ -84,14 +84,18 @@ void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &i
 
 void DiracWilson::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
 			  cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			  const QudaSolutionType solutionType) const
+			  const QudaSolutionType solType) const
 {
+  if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+    errorQuda("Preconditioned solution requires a preconditioned solve_type");
+  }
+
   src = &b;
   sol = &x;
 }
 
 void DiracWilson::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-			      const QudaSolutionType solutionType) const
+			      const QudaSolutionType solType) const
 {
   // do nothing
 }
