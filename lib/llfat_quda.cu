@@ -2,11 +2,10 @@
 
 #include <quda_internal.h>
 #include <llfat_quda.h>
-#include <cuda_runtime.h>
-#include <cuda.h>
 #include <read_gauge.h>
 #include <gauge_quda.h>
-#include <force_common.h>
+#include <cuda_runtime.h>
+#include <cuda.h>
 
 #define WRITE_FAT_MATRIX(gauge, dir, idx)do {		\
     gauge[idx + dir*Vhx9] = FAT0;			\

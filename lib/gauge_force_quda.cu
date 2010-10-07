@@ -1,3 +1,5 @@
+#include <read_gauge.h>
+#include <gauge_quda.h>
 
 #include "gauge_force_quda.h"
 

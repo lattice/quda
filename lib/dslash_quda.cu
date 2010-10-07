@@ -471,6 +471,7 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 }
 
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
+#include <force_common.h>
 #include "force_kernel_common.cu"
 #endif
 

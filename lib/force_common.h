@@ -616,7 +616,7 @@
 #define ACC_CONJ_PROD_ASSIGN(a, b, c)		\
   a##_re = b##_re * c##_re;			\
   a##_re -= b##_im * c##_im;			\
-  a##_im = b##_re * c##_im;			\
+  a##_im = - b##_re * c##_im;			\
   a##_im -= b##_im * c##_re
 
 
