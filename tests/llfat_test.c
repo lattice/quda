@@ -34,8 +34,8 @@ int Vh;
 
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
-QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
-QudaPrecision  cpu_link_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision  link_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision  cpu_link_prec = QUDA_DOUBLE_PRECISION;
 
 typedef struct {
   double real;
@@ -169,9 +169,9 @@ llfat_test(void)
     
   storeLinkToCPU(fatLink, &cudaFatLink, &gaugeParam);    
   int res;
-  res = compare_floats(refLink, fatLink, 4*V*gaugeSiteSize, 1e-3, gaugeParam.cpu_prec);
+  res = compare_floats(fatLink, refLink, 4*V*gaugeSiteSize, 1e-3, gaugeParam.cpu_prec);
     
-  strong_check_link(refLink, fatLink, 4*V, gaugeParam.cpu_prec);
+  strong_check_link(fatLink, refLink, 4*V, gaugeParam.cpu_prec);
     
     
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
