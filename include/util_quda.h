@@ -40,6 +40,7 @@
 } while (0)
 
 #define checkCudaError() do {                           \
+    cudaThreadSynchronize();				\
   cudaError_t error = cudaGetLastError();               \
   if (error != cudaSuccess)                             \
     errorQuda("(CUDA) %s", cudaGetErrorString(error));  \

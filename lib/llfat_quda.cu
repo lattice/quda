@@ -97,7 +97,7 @@
   double2 var##8 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx8); 
 
 
-#define SITE_MATRIX_LOAD_TEX 0
+#define SITE_MATRIX_LOAD_TEX 1
 #define MULINK_LOAD_TEX 0
 #define FATLINK_LOAD_TEX 1
 
@@ -861,6 +861,7 @@ llfat_cuda(void* fatLink, void* siteLink,
 						  (float)act_path_coeff[0], (float)act_path_coeff[5]);    
     }
   }
+  checkCudaError();	    
 UNBIND_SITE_AND_FAT_LINK;
 
   for(int dir = 0;dir < 4; dir++){
@@ -875,6 +876,7 @@ UNBIND_SITE_AND_FAT_LINK;
 					 dir, nu,0,
 					 act_path_coeff[2],
 					 halfGridDim, blockDim, recon, prec);
+	checkCudaError();	    
 	UNBIND_SITE_AND_FAT_LINK;
 	
 	//odd
@@ -885,6 +887,7 @@ UNBIND_SITE_AND_FAT_LINK;
 					 dir, nu,1,
 					 act_path_coeff[2],
 					 halfGridDim, blockDim, recon, prec);	
+	checkCudaError();	    
 	UNBIND_SITE_AND_FAT_LINK;	
 	
 	
@@ -898,6 +901,7 @@ UNBIND_SITE_AND_FAT_LINK;
 					  dir, nu,0,
 					  act_path_coeff[5],
 					  halfGridDim, blockDim, recon, prec);							  
+	checkCudaError();	    
 	UNBIND_ALL_TEXTURE;
 	
 	//odd
@@ -910,6 +914,7 @@ UNBIND_SITE_AND_FAT_LINK;
 					  dir, nu,1,
 					  act_path_coeff[5],
 					  halfGridDim, blockDim, recon, prec);	
+	checkCudaError();	    
 	UNBIND_ALL_TEXTURE;
 	
 	
@@ -927,7 +932,7 @@ UNBIND_SITE_AND_FAT_LINK;
 						  dir, rho,0,
 						  act_path_coeff[3],
 						  halfGridDim, blockDim, recon, prec);								      
-	    
+	    checkCudaError();	    
 	    UNBIND_ALL_TEXTURE;
 	    
 	    //odd
@@ -941,6 +946,7 @@ UNBIND_SITE_AND_FAT_LINK;
 						  dir, rho,1,
 						  act_path_coeff[3],
 						  halfGridDim, blockDim, recon, prec);								      
+	    checkCudaError();
 	    UNBIND_ALL_TEXTURE;
 
 			
@@ -957,7 +963,9 @@ UNBIND_SITE_AND_FAT_LINK;
 						  dir, sig, 0, 
 						  act_path_coeff[4],
 						  halfGridDim, blockDim, recon, prec);	
+		checkCudaError();
 		UNBIND_ALL_TEXTURE;
+  
 		
 		//odd
 		BIND_SITE_AND_FAT_LINK_REVERSE;		
@@ -969,7 +977,9 @@ UNBIND_SITE_AND_FAT_LINK;
 						  dir, sig, 1, 
 						  act_path_coeff[4],
 						  halfGridDim, blockDim, recon, prec);	
-		UNBIND_ALL_TEXTURE;				
+		checkCudaError();
+		UNBIND_ALL_TEXTURE;			
+  
 	      }			    
 	    }//sig
 	  }

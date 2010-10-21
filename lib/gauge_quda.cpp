@@ -633,6 +633,7 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
   }
   cudaMemset(cudaGauge->odd, 0, cudaGauge->bytes);
 
+  checkCudaError();
 }
 
 void freeGaugeField(FullGauge *cudaGauge) {
