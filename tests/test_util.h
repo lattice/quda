@@ -47,6 +47,11 @@ extern "C" {
   // ---------- gauge_read.cpp ----------
   
   //void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]);
+
+  // additions for dw (quickly hacked on)
+  int fullLatticeIndex_4d(int i, int oddBit);
+  int fullLatticeIndex_5d(int i, int oddBit);
+
  
 #ifdef __cplusplus
 }

@@ -23,6 +23,7 @@
 
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
+#include <dw_dslash_def.h>        // Domain Wall kernels
 #include <clover_def.h>           // kernels for applying the clover term alone
 
 #include <blas_quda.h>
@@ -296,6 +297,107 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
     cloverDslashCuda<4>((short4*)out, (float*)outNorm, (short4*)gauge0, (short4*)gauge1, 
 			gauge.reconstruct, (short4*)cloverP, (float*)cloverNormP, (short4*)in,
 			(float*)inNorm, parity, dagger, (short4*)x, (float*)xNorm, a, volume, length);
+  }
+
+  checkCudaError();
+
+}
+
+// Domain wall wrappers
+template <int N, typename spinorFloat, typename gaugeFloat>
+void domainWallDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0, 
+			  const gaugeFloat gauge1, const QudaReconstructType reconstruct, 
+			  const spinorFloat *in, const float* inNorm, const int parity, const int dagger, const spinorFloat *x, 
+			  const float* xNorm, const double &m_f, const double &k2, const int volume_5d, const int length)
+{
+  dim3 gridDim(volume_5d/BLOCK_DIM, 1, 1);
+  dim3 blockDim(BLOCK_DIM, 1, 1);
+
+  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm, x, xNorm);
+
+  if (x==0) { // not xpay
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	domainWallDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f);
+      } else {
+	domainWallDslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	domainWallDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f);
+      } else {
+	domainWallDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f);
+      }
+    } else {
+      if (!dagger) {
+	domainWallDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 	
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f);
+      } else {
+	domainWallDslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f);
+      }
+    }
+  } else { // doing xpay
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	domainWallDslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f, x, xNorm, k2);
+      } else {
+	domainWallDslash18DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f, x, xNorm, k2);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	domainWallDslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f, x, xNorm, k2);
+      } else {
+	domainWallDslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f, x, xNorm, k2);
+      }
+    } else {
+      if (!dagger) {
+	domainWallDslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 	
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f, x, xNorm, k2);
+      } else {
+	domainWallDslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, m_f, x, xNorm, k2);
+      }
+    }
+  }
+
+}
+
+void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover cloverInv,
+			  const void *in, const void *inNorm, const int parity, const int dagger, 
+			  const void *x, const void *xNorm, const double m_f, const double k2, const int volume, 
+			  const int length, const QudaPrecision precision) {
+
+  void *gauge0, *gauge1;
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
+
+  if (precision != gauge.precision)
+    errorQuda("Mixing gauge and spinor precision not supported");
+
+  if (precision == QUDA_DOUBLE_PRECISION) {
+#if (__CUDA_ARCH__ >= 130)
+    domainWallDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)gauge0, (double2*)gauge1, 
+			    gauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
+			    (double2*)x, (float*)xNorm, m_f, k2, volume, length);
+#else
+    errorQuda("Double precision not supported on this GPU");
+#endif
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    domainWallDslashCuda<4>((float4*)out, (float*)outNorm, (float4*)gauge0, (float4*)gauge1, 
+			    gauge.reconstruct, (float4*)in, (float*)inNorm, parity, dagger, 
+			    (float4*)x, (float*)xNorm, m_f, k2, volume, length);
+  } else if (precision == QUDA_HALF_PRECISION) {
+    domainWallDslashCuda<4>((short4*)out, (float*)outNorm, (short4*)gauge0, (short4*)gauge1, 
+			    gauge.reconstruct, (short4*)in, (float*)inNorm, parity, dagger, 
+			    (short4*)x, (float*)xNorm, m_f, k2, volume, length);
   }
 
   checkCudaError();

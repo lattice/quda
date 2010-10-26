@@ -45,6 +45,9 @@ __constant__ int long_ga_stride;
 
 __constant__ int gauge_fixed;
 
+// domain wall constants
+__constant__ int Ls;
+
 // single precision constants
 __constant__ float anisotropy_f;
 __constant__ float coeff_f;
@@ -94,7 +97,6 @@ void initCommonConstants(FullGauge gauge) {
 
   int X4_3 = 3*X4;
   cudaMemcpyToSymbol("X4_3", &X4_3, sizeof(int));  
-
 
 
   int X2X1 = X2*X1;
@@ -166,7 +168,7 @@ void initCommonConstants(FullGauge gauge) {
 }
 
 
-void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride) 
+void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride, int Ls) 
 {
 
   initCommonConstants(gauge);
@@ -217,6 +219,8 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride)
 
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
+
+  cudaMemcpyToSymbol("Ls", &Ls, sizeof(int));  
 
   checkCudaError();
 

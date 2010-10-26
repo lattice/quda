@@ -333,6 +333,9 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   case QUDA_CLOVER_WILSON_DSLASH:
     diracParam.type = pc ? QUDA_CLOVERPC_DIRAC : QUDA_CLOVER_DIRAC;
     break;
+  case QUDA_DOMAIN_WALL_WILSON_DSLASH:
+    diracParam.type = pc ? QUDA_DOMAIN_WALLPC_DIRAC : QUDA_DOMAIN_WALL_DIRAC;
+    break;
   case QUDA_ASQTAD_DSLASH:
     diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;
     break;

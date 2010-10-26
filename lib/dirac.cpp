@@ -64,9 +64,17 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
 	      in.SiteSubset(), out.SiteSubset());
   }
 
-  if ((out.Volume() != 2*gauge.volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-      (out.Volume() != gauge.volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-    errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
+  if (out.Ndim() != 5) {
+    if ((out.Volume() != 2*gauge.volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	(out.Volume() != gauge.volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
+    }
+  } else {
+    // Domain wall fermions, compare 4d volumes not 5d
+    if ((out.Volume()/out.X(4) != 2*gauge.volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	(out.Volume()/out.X(4) != gauge.volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
+    }
   }
 }
 
@@ -92,6 +100,12 @@ Dirac* Dirac::create(const DiracParam &param)
     return new DiracClover(param);
   } else if (param.type == QUDA_CLOVERPC_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
+    return new DiracCloverPC(param);
+  } else if (param.type == QUDA_DOMAIN_WALL_DIRAC) {
+    if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWall operator\n");
+    return new DiracClover(param);
+  } else if (param.type == QUDA_DOMAIN_WALLPC_DIRAC) {
+    if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
     return new DiracCloverPC(param);
   } else if (param.type == QUDA_ASQTAD_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");

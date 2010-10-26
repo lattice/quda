@@ -323,6 +323,28 @@ neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
     return ret;
 }
 
+// 4d checkerboard.
+// given a "half index" i into either an even or odd half lattice (corresponding
+// to oddBit = {0, 1}), returns the corresponding full lattice index.
+// Cf. GPGPU code in dslash_core_ante.h.
+// There, i is the thread index.
+int fullLatticeIndex_4d(int i, int oddBit) {
+  if (i >= Vh || i < 0) {printf("i out of range in fullLatticeIndex_4d"); exit(-1);}
+  int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2);
+  return 2*i + (boundaryCrossings + oddBit) % 2;
+}
+
+// 5d checkerboard.
+// given a "half index" i into either an even or odd half lattice (corresponding
+// to oddBit = {0, 1}), returns the corresponding full lattice index.
+// Cf. GPGPU code in dslash_core_ante.h.
+// There, i is the thread index sid.
+// This function is used by neighborIndex_5d in dslash_reference.cpp.
+//ok
+int fullLatticeIndex_5d(int i, int oddBit) {
+  int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2) + i/(Z[3]*Z[2]*Z[1]*Z[0]/2);
+  return 2*i + (boundaryCrossings + oddBit) % 2;
+}
 
 template <typename Float>
 static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param) {

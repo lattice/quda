@@ -13,7 +13,7 @@ extern "C" {
 
   int dslashCudaSharedBytes(QudaPrecision spinor_prec, int blockDim);
 
-  void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride);
+  void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride, int Ls=1);
   void initCommonConstants(FullGauge gauge);
 
   // plain Wilson Dslash  

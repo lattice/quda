@@ -12,6 +12,7 @@ class DiracParam {
   QudaDiracType type;
   double kappa;
   double mass;
+  double m_5; // used by domain wall only
   MatPCType matpcType;
   DagType dagger;
   FullGauge *gauge;
@@ -172,6 +173,51 @@ class DiracCloverPC : public DiracClover {
 	      const QudaParity parity) const;
   void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		  const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+
+  void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+  void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+	       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+	       const QudaSolutionType) const;
+  void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+		   const QudaSolutionType) const;
+};
+
+
+
+// Full domain wall 
+class DiracDomainWall : public DiracWilson {
+
+ protected:
+  double m_5; // domain wall height
+
+ public:
+  DiracDomainWall(const DiracParam &param);
+  DiracDomainWall(const DiracDomainWall &dirac);
+  virtual ~DiracDomainWall();
+  DiracDomainWall& operator=(const DiracDomainWall &dirac);
+
+  virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+  virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  virtual void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+		       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+		       const QudaSolutionType) const;
+  virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+			   const QudaSolutionType) const;
+};
+
+// Even-odd preconditioned domain wall
+class DiracDomainWallPC : public DiracDomainWall {
+
+ private:
+
+ public:
+  DiracDomainWallPC(const DiracParam &param);
+  DiracDomainWallPC(const DiracDomainWallPC &dirac);
+  virtual ~DiracDomainWallPC();
+  DiracDomainWallPC& operator=(const DiracDomainWallPC &dirac);
 
   void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
   void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;

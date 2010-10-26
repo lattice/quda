@@ -155,6 +155,8 @@ class ColorSpinorField {
   QudaPrecision Precision() const { return precision; }
   int Ncolor() const { return nColor; } 
   int Nspin() const { return nSpin; } 
+  int Ndim() const { return nDim; }
+  int X(int d) const { return x[d]; }
   int Length() const { return length; }
   int Stride() const { return stride; }
   int Volume() const { return volume; }
