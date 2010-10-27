@@ -15,7 +15,7 @@
 //#include <myerror.h>
 #include <quda.h>
 #include <test_util.h>
-#include <dw_dslash_reference.h>
+#include <domain_wall_dslash_reference.h>
 
 int Z[4];
 int V;

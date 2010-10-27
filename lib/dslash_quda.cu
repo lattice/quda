@@ -26,6 +26,10 @@
 #include <dw_dslash_def.h>        // Domain Wall kernels
 #include <clover_def.h>           // kernels for applying the clover term alone
 
+#ifndef SHARED_FLOATS_PER_THREAD
+#define SHARED_FLOATS_PER_THREAD 0
+#endif
+
 #include <blas_quda.h>
 
 __global__ void dummyKernel() {

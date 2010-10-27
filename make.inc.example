@@ -10,9 +10,12 @@ OS       = linux   # linux or osx
 PYTHON = python    # python 2.5 or later required for 'make gen'
 DEVICE = 0         # CUDA device to use for 'make tune'
 
-BUILD_FATLINK = no        # build code for computing asqtad fat links?
-BUILD_GAUGE_FORCE = no    # build code for (1-loop Symanzik) gauge force?
-BUILD_FERMION_FORCE = no  # build code for asqtad fermion force?
+BUILD_WILSON_DIRAC = yes      # build Wilson and clover Dirac operators?
+BUILD_DOMAIN_WALL_DIRAC = yes # build Domain Wall Dirac operators?
+BUILD_STAGGERED_DIRAC = yes   # build staggered Dirac operators?
+BUILD_FATLINK = no            # build code for computing asqtad fat links?
+BUILD_GAUGE_FORCE = no        # build code for (1-loop Symanzik) gauge force?
+BUILD_FERMION_FORCE = no      # build code for asqtad fermion force?
 
 ######
 
@@ -42,6 +45,18 @@ ifeq ($(strip $(GPU_ARCH)), sm_20)
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
 endif
 
+ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
+  NVCCOPT += -DGPU_WILSON_DIRAC
+  WILSON_DIRAC_TEST=wilson_dslash_test wilson_invert_test
+endif
+ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
+  NVCCOPT += -DGPU_DOMAIN_WALL_DIRAC
+  DOMAIN_WALL_DIRAC_TEST=domain_wall_dslash_test
+endif
+ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
+  NVCCOPT += -DGPU_STAGGERED_DIRAC
+  STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
+endif
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK
   FATLINK_TEST=llfat_test

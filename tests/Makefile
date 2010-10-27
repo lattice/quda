@@ -7,8 +7,8 @@ INC += -I../include -I.
 HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h    \
 	test_util.h
 
-TESTS = su3_test blas_test pack_test wilson_dslash_test wilson_invert_test \
-	staggered_dslash_test staggered_invert_test domain_wall_dslash_test \
+TESTS = su3_test blas_test pack_test $(WILSON_DIRAC_TEST) 		\
+	$(STAGGERED_DIRAC_TEST) $(DOMAIN_WALL_DIRAC_TEST)		\
 	$(FATLINK_TEST) $(GAUGE_FORCE_TEST) $(FERMION_FORCE_TEST)
 
 all: $(TESTS)
@@ -25,7 +25,7 @@ wilson_dslash_test: wilson_dslash_test.o test_util.o dslash_reference.o $(QUDA)
 wilson_invert_test: wilson_invert_test.o test_util.o dslash_reference.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o dw_dslash_reference.o $(QUDA)
+domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslash_reference.o $(QUDA)
 
 su3_test: su3_test.o test_util.o dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@

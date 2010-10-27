@@ -11,7 +11,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
-#include <dw_dslash_reference.h>
+#include <domain_wall_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 const int test_type = 0;
