@@ -25,7 +25,7 @@ const int loops = 1;
 const int Ls = 8;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -59,7 +59,7 @@ void init() {
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_8;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
@@ -86,7 +86,7 @@ void init() {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
 
-  inv_param.dslash_type = QUDA_WILSON_DSLASH;
+  inv_param.dslash_type = QUDA_DOMAIN_WALL_DSLASH;
 
   inv_param.verbosity = QUDA_VERBOSE;
 
@@ -213,6 +213,7 @@ double dslashCUDA() {
       if (transfer) {
 	dslashQuda(spinorOut->v, spinor->v, &inv_param, parity);
       } else {
+	printf("Calling dslash\n");
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;

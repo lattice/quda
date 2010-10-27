@@ -3,13 +3,13 @@
 #include <blas_quda.h>
 
 DiracDomainWall::DiracDomainWall(const DiracParam &param)
-  : DiracWilson(param), m_5(*(param.m_5))
+  : DiracWilson(param), m_5(param.m_5)
 {
 
 }
 
-DiracDomainWall::DiracDomainWall(const DiracDomwainWall &dirac) 
-  : DiracDomainWall(dirac), m_5(dirac.m_5)
+DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) 
+  : DiracWilson(dirac), m_5(dirac.m_5)
 {
 
 }
@@ -30,7 +30,7 @@ DiracDomainWall& DiracDomainWall::operator=(const DiracDomainWall &dirac)
   return *this;
 }
 
-void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			 const QudaParity parity) const
 {
   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
@@ -40,10 +40,10 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
   domainWallDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 0, 0, 
 		       mass, 0, out.volume, out.length, in.Precision());
 
-  flops += 1320*in.volume; // FIXME
+  flops += 1320*in.volume; // FIXME - need to add 5th dimension flops
 }
 
-void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			     const QudaParity parity, const cudaColorSpinorField &x,
 			     const double &k) const
 {

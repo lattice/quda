@@ -198,6 +198,11 @@ class DiracDomainWall : public DiracWilson {
   virtual ~DiracDomainWall();
   DiracDomainWall& operator=(const DiracDomainWall &dirac);
 
+  void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+	      const QudaParity parity) const;
+  void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		  const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
 

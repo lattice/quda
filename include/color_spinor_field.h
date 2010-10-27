@@ -183,6 +183,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend class DiracWilson;
   friend class DiracClover;
   friend class DiracCloverPC;
+  friend class DiracDomainWall;
+  friend class DiracDomainWallPC;
   friend class DiracStaggered;
   friend class DiracStaggeredPC;
   friend void zeroCuda(cudaColorSpinorField &a);

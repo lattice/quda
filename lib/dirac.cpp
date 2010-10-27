@@ -103,10 +103,10 @@ Dirac* Dirac::create(const DiracParam &param)
     return new DiracCloverPC(param);
   } else if (param.type == QUDA_DOMAIN_WALL_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWall operator\n");
-    return new DiracClover(param);
+    return new DiracDomainWall(param);
   } else if (param.type == QUDA_DOMAIN_WALLPC_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
-    return new DiracCloverPC(param);
+    return new DiracDomainWallPC(param);
   } else if (param.type == QUDA_ASQTAD_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
     return new DiracStaggered(param);

@@ -3,9 +3,9 @@ include ../make.inc
 QUDA = libquda.a
 QUDA_OBJS = blas_quda.o clover_quda.o color_spinor_field.o		     \
 	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	     \
-	dirac_clover.o dirac_wilson.o dirac_staggered.o dslash_quda.o	     \
-	gauge_quda.o inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o   \
-	interface_quda.o util_quda.o hw_quda.o
+	dirac_clover.o dirac_wilson.o dirac_staggered.o dirac_domain_wall.o  \
+	dslash_quda.o gauge_quda.o inv_bicgstab_quda.o inv_cg_quda.o 	     \
+	inv_multi_cg_quda.o interface_quda.o util_quda.o hw_quda.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_quda.h color_spinor_field.h dirac_quda.h	     \

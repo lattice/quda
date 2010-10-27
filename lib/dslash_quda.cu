@@ -375,9 +375,9 @@ void domainWallDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gau
 
 }
 
-void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover cloverInv,
+void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge, 
 			  const void *in, const void *inNorm, const int parity, const int dagger, 
-			  const void *x, const void *xNorm, const double m_f, const double k2, const int volume, 
+			  const void *x, const void *xNorm, const double m_f, const double k2, const int volume5d, 
 			  const int length, const QudaPrecision precision) {
 
   void *gauge0, *gauge1;
@@ -390,18 +390,18 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge, const
 #if (__CUDA_ARCH__ >= 130)
     domainWallDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)gauge0, (double2*)gauge1, 
 			    gauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
-			    (double2*)x, (float*)xNorm, m_f, k2, volume, length);
+			    (double2*)x, (float*)xNorm, m_f, k2, volume5d, length);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
     domainWallDslashCuda<4>((float4*)out, (float*)outNorm, (float4*)gauge0, (float4*)gauge1, 
 			    gauge.reconstruct, (float4*)in, (float*)inNorm, parity, dagger, 
-			    (float4*)x, (float*)xNorm, m_f, k2, volume, length);
+			    (float4*)x, (float*)xNorm, m_f, k2, volume5d, length);
   } else if (precision == QUDA_HALF_PRECISION) {
     domainWallDslashCuda<4>((short4*)out, (float*)outNorm, (short4*)gauge0, (short4*)gauge1, 
 			    gauge.reconstruct, (short4*)in, (float*)inNorm, parity, dagger, 
-			    (short4*)x, (float*)xNorm, m_f, k2, volume, length);
+			    (short4*)x, (float*)xNorm, m_f, k2, volume5d, length);
   }
 
   checkCudaError();
