@@ -8,7 +8,6 @@
 #include "misc.h"
 #include "gauge_force_reference.h"
 #include "gauge_force_quda.h"
-#include "dslash_quda.h"
 #include <sys/time.h>
 
 typedef struct {

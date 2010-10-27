@@ -8,7 +8,6 @@
 #include "misc.h"
 #include "fermion_force_reference.h"
 #include "fermion_force_quda.h"
-#include "dslash_quda.h"
 #include "hw_quda.h"
 #include <sys/time.h>
 

@@ -5,7 +5,6 @@
 
 #include <quda.h>
 #include <gauge_quda.h>
-#include <dslash_quda.h>
 #include <llfat_quda.h>
 
 #include <test_util.h>
