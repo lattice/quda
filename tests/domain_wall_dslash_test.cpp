@@ -14,18 +14,18 @@
 #include <domain_wall_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 1;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int loops = 1;
+const int loops = 100;
 
-const int Ls = 8;
+const int Ls = 16;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_HALF_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -44,10 +44,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 4;
-  gauge_param.X[1] = 4;
-  gauge_param.X[2] = 4;
-  gauge_param.X[3] = 4;
+  gauge_param.X[0] = 16;
+  gauge_param.X[1] = 16;
+  gauge_param.X[2] = 16;
+  gauge_param.X[3] = 16;
   
   setDims(gauge_param.X, Ls);
 
@@ -59,14 +59,15 @@ void init() {
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_8;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_YES;
   gauge_param.type = QUDA_WILSON_LINKS;
 
-  inv_param.kappa = 1.0;
-  inv_param.mass = 0.1;
+  double m_5 = 1.5;
+  inv_param.kappa = 0.5*(5 - m_5);
+  inv_param.mass = 0.01;
   
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = dagger;
@@ -213,7 +214,6 @@ double dslashCUDA() {
       if (transfer) {
 	dslashQuda(spinorOut->v, spinor->v, &inv_param, parity);
       } else {
-	printf("Calling dslash\n");
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;

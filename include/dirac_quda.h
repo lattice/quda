@@ -12,7 +12,6 @@ class DiracParam {
   QudaDiracType type;
   double kappa;
   double mass;
-  double m_5; // used by domain wall only
   MatPCType matpcType;
   DagType dagger;
   FullGauge *gauge;
@@ -190,7 +189,6 @@ class DiracCloverPC : public DiracClover {
 class DiracDomainWall : public DiracWilson {
 
  protected:
-  double m_5; // domain wall height
 
  public:
   DiracDomainWall(const DiracParam &param);
