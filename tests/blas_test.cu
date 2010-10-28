@@ -272,7 +272,7 @@ int main(int argc, char** argv)
     "caxpyCuda",
     "caxpbyCuda",
     "cxpaypbzCuda",
-    "axpyBzpcxCudax",
+    "axpyBzpcxCuda",
     "axpyZpbxCuda",
     "caxpbypzYmbwCuda",
     "sumCuda",
