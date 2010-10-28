@@ -14,7 +14,7 @@
 #include <domain_wall_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 1;
+const int test_type = 0;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
@@ -44,10 +44,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 16;
-  gauge_param.X[1] = 16;
-  gauge_param.X[2] = 16;
-  gauge_param.X[3] = 16;
+  gauge_param.X[0] = 4;
+  gauge_param.X[1] = 4;
+  gauge_param.X[2] = 4;
+  gauge_param.X[3] = 4;
   
   setDims(gauge_param.X, Ls);
 

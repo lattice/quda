@@ -157,7 +157,7 @@ void DiracDomainWallPC::M(cudaColorSpinorField &out, const cudaColorSpinorField 
     Dslash(*tmp1, in, QUDA_EVEN_PARITY);
     DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
   } else {
-    errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
+    errorQuda("MatPCType %d not valid for DiracDomainWallPC", matpcType);
   }
 
   if (reset) {
@@ -179,34 +179,34 @@ void DiracDomainWallPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField
 {
   // we desire solution to preconditioned system
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    DiracWilson::prepare(src, sol, x, b, solType);
-    return;
+    src = &b;
+    sol = &x;
+  } else {  
+    // we desire solution to full system
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      // src = b_e + k D_eo b_o
+      DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
+      src = &(x.Odd());
+      sol = &(x.Even());
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      // src = b_o + k D_oe b_e
+      DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
+      src = &(x.Even());
+      sol = &(x.Odd());
+    } else {
+      errorQuda("MatPCType %d not valid for DiracDomainWallPC", matpcType);
+    }
+    // here we use final solution to store parity solution and parity source
+    // b is now up for grabs if we want
   }
 
-  // we desire solution to full system
-  if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-    // src = b_e + k D_eo b_o
-    DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-    src = &(x.Odd());
-    sol = &(x.Even());
-  } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-    // src = b_o + k D_oe b_e
-    DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-    src = &(x.Even());
-    sol = &(x.Odd());
-  } else {
-    errorQuda("MatPCType %d not valid for DiracWilson", matpcType);
-  }
-
-  // here we use final solution to store parity solution and parity source
-  // b is now up for grabs if we want
 }
 
 void DiracDomainWallPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 				const QudaSolutionType solType) const
 {
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    return DiracWilson::reconstruct(x, b, solType);
+    return;
   }				
 
   // create full solution
@@ -219,7 +219,7 @@ void DiracDomainWallPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpin
     // x_e = b_e + k D_eo x_o
     DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
   } else {
-    errorQuda("MatPCType %d not valid for DiracWilson", matpcType);
+    errorQuda("MatPCType %d not valid for DiracDomainWallPC", matpcType);
   }
 }
 

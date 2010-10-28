@@ -415,7 +415,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
- 
+
   cudaColorSpinorField in(hIn, cudaParam);
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -663,7 +663,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     cpuParam.v = hp_x;
     h_x = new cpuColorSpinorField(cpuParam);
     
-    cudaParam.print();
     b = new cudaColorSpinorField(*h_b, cudaParam); // download source
     
     if (param->verbosity >= QUDA_VERBOSE) {

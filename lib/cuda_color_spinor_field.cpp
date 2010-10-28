@@ -218,6 +218,10 @@ void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
 void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
 
   
+  if (nDim != src.Ndim()) {
+    errorQuda("Number of dimensions %d %d don't match", nDim, src.Ndim());
+  }
+
   if (volume != src.volume) {
     errorQuda("Volumes %d %d don't match", volume, src.volume);
   }
@@ -319,6 +323,10 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
 
 
 void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
+
+  if (nDim != dest.Ndim()) {
+    errorQuda("Number of dimensions %d %d don't match", nDim, dest.Ndim());
+  }
 
   if (volume != dest.volume) {
     errorQuda("Volumes %d %d don't match", volume, dest.volume);

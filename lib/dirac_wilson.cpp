@@ -167,34 +167,34 @@ void DiracWilsonPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
 {
   // we desire solution to preconditioned system
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    DiracWilson::prepare(src, sol, x, b, solType);
-    return;
-  }
-
-  // we desire solution to full system
-  if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-    // src = b_e + k D_eo b_o
-    DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-    src = &(x.Odd());
-    sol = &(x.Even());
-  } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-    // src = b_o + k D_oe b_e
-    DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-    src = &(x.Even());
-    sol = &(x.Odd());
+    src = &b;
+    sol = &x;
   } else {
-    errorQuda("MatPCType %d not valid for DiracWilson", matpcType);
+    // we desire solution to full system
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      // src = b_e + k D_eo b_o
+      DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
+      src = &(x.Odd());
+      sol = &(x.Even());
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      // src = b_o + k D_oe b_e
+      DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
+      src = &(x.Even());
+      sol = &(x.Odd());
+    } else {
+      errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
+    }
+    // here we use final solution to store parity solution and parity source
+    // b is now up for grabs if we want
   }
 
-  // here we use final solution to store parity solution and parity source
-  // b is now up for grabs if we want
 }
 
 void DiracWilsonPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 				const QudaSolutionType solType) const
 {
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    return DiracWilson::reconstruct(x, b, solType);
+    return;
   }				
 
   // create full solution
@@ -207,6 +207,6 @@ void DiracWilsonPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFi
     // x_e = b_e + k D_eo x_o
     DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
   } else {
-    errorQuda("MatPCType %d not valid for DiracWilson", matpcType);
+    errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
   }
 }

@@ -273,7 +273,8 @@ void DiracCloverPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
 {
   // we desire solution to preconditioned system
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    DiracClover::prepare(src, sol, x, b, solType);
+    src = &b;
+    sol = &x;
     return;
   }
 
@@ -284,7 +285,7 @@ void DiracCloverPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
     tmp1 = new cudaColorSpinorField(b.Even(), param); // only create if necessary
     reset = true;
   }
-
+  
   // we desire solution to full system
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
     // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
@@ -313,7 +314,7 @@ void DiracCloverPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
     DiracWilson::DslashXpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa);
     sol = &(x.Odd());
   } else {
-    errorQuda("MatPCType %d not valid for DiracClover", matpcType);
+    errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
   }
 
   // here we use final solution to store parity solution and parity source
@@ -330,7 +331,7 @@ void DiracCloverPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFi
 				const QudaSolutionType solType) const
 {
   if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-    return DiracClover::reconstruct(x, b, solType);
+    return;
   }
 
   checkFullSpinor(x, b);
@@ -356,7 +357,7 @@ void DiracCloverPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFi
     DiracWilson::DslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
     CloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
   } else {
-    errorQuda("MatPCType %d not valid for DiracClover", matpcType);
+    errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
   }
 
   if (reset) {

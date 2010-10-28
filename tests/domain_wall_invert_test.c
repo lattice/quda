@@ -23,10 +23,11 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 8; 
-  gauge_param.X[1] = 8;
-  gauge_param.X[2] = 8;
-  gauge_param.X[3] = 16;
+  gauge_param.X[0] = 16; 
+  gauge_param.X[1] = 16;
+  gauge_param.X[2] = 16;
+  gauge_param.X[3] = 8;
+  inv_param.Ls = 8;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -41,21 +42,19 @@ int main(int argc, char **argv)
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = QUDA_DOMAIN_WALL_DSLASH;
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  inv_param.inv_type = QUDA_CG_INVERTER;
 
   double m_5 = 1.5;
   inv_param.kappa = 1.0 / (2.0*(5 - m_5));
   inv_param.mass = 0.05;
 
-  inv_param.Ls = 16;
-
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-2;
+  inv_param.reliable_delta = 1e-1;
 
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
@@ -86,9 +85,9 @@ int main(int argc, char **argv)
   }
   construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
 
-  void *spinorIn = malloc(V*spinorSiteSize*sSize);
-  void *spinorOut = malloc(V*spinorSiteSize*sSize);
-  void *spinorCheck = malloc(V*spinorSiteSize*sSize);
+  void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
   // create a point source at 0
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = 1.0;
