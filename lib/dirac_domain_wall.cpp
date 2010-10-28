@@ -40,9 +40,9 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
 		       mass, 0, out.volume, out.length, in.Precision());
 
   int Ls = in.X(4);
-  int bulk = (Ls-2)*in.volume/Ls;
-  int wall = 2*in.volume/Ls;
-  flops += 1320*in.volume + 96*bulk + 120*wall;
+  long long unsigned int bulk = (Ls-2)*(in.volume/Ls);
+  long long unsigned int wall = 2*in.volume/Ls;
+  flops += 1320*(long long int)in.volume + 96*bulk + 120*wall;
 }
 
 void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -57,9 +57,9 @@ void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpino
 		       mass, k, out.volume, out.length, in.Precision());
 
   int Ls = in.X(4);
-  int bulk = (Ls-2)*in.volume/Ls;
-  int wall = 2*in.volume/Ls;
-  flops += (1320+48)*in.volume + 96*bulk + 120*wall;
+  long long unsigned int bulk = (Ls-2)*(in.volume/Ls);
+  long long unsigned int wall = 2*in.volume/Ls;
+  flops += (1320+48)*(long long int)in.volume + 96*bulk + 120*wall;
 }
 
 void DiracDomainWall::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
