@@ -1,5 +1,5 @@
-#ifndef _DSLASH_REFERENCE_H
-#define _DSLASH_REFERENCE_H
+#ifndef _DOMAIN_WALL_DSLASH_REFERENCE_H
+#define _DOMAIN_WALL_DSLASH_REFERENCE_H
 
 #include <enum_quda.h>
 

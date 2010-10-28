@@ -5,7 +5,7 @@
 
 #include <test_util.h>
 #include <blas_reference.h>
-#include <wilson_dslash_reference.h>
+#include <domain_wall_dslash_reference.h>
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
@@ -23,10 +23,10 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 24; 
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 32;
+  gauge_param.X[0] = 8; 
+  gauge_param.X[1] = 8;
+  gauge_param.X[2] = 8;
+  gauge_param.X[3] = 16;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -40,17 +40,15 @@ int main(int argc, char **argv)
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
-  
-  if (clover_yes) {
-    inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-  } else {
-    inv_param.dslash_type = QUDA_WILSON_DSLASH;
-  }
+  inv_param.dslash_type = QUDA_DOMAIN_WALL_DSLASH;
   inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
-  double mass = -0.9;
-  inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
+  double m_5 = 1.5;
+  inv_param.kappa = 1.0 / (2.0*(5 - m_5));
+  inv_param.mass = 0.05;
+
+  inv_param.Ls = 16;
+
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-2;
@@ -71,53 +69,22 @@ int main(int argc, char **argv)
   inv_param.sp_pad = 0;   // 24*24*24;
   inv_param.cl_pad = 0;   // 24*24*24;
 
-  if (clover_yes) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-  }
   inv_param.verbosity = QUDA_VERBOSE;
 
   // Everything between here and the call to initQuda() is application-specific.
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
-  setDims(gauge_param.X);
+  setDims(gauge_param.X, inv_param.Ls);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-  void *gauge[4], *clover_inv, *clover;
+  void *gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
   construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-
-  if (clover_yes) {
-    double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
-
-    size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-    clover_inv = malloc(V*cloverSiteSize*cSize);
-    construct_clover_field(clover_inv, norm, diag, inv_param.clover_cpu_prec);
-
-    // The uninverted clover term is only needed when solving the unpreconditioned
-    // system or when using "asymmetric" even/odd preconditioning.
-    int preconditioned = (inv_param.solve_type == QUDA_DIRECT_PC_SOLVE ||
-			  inv_param.solve_type == QUDA_NORMEQ_PC_SOLVE);
-    int asymmetric = preconditioned &&
-                         (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
-                          inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC);
-    if (!preconditioned) {
-      clover = clover_inv;
-      clover_inv = NULL;
-    } else if (asymmetric) { // fake it by using the same random matrix
-      clover = clover_inv;   // for both clover and clover_inv
-    } else {
-      clover = NULL;
-    }
-  }
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize);
   void *spinorOut = malloc(V*spinorSiteSize*sSize);
@@ -136,9 +103,6 @@ int main(int argc, char **argv)
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
 
-  // load the clover term, if desired
-  if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
-  
   // perform the inversion
   invertQuda(spinorOut, spinorIn, &inv_param);
 
@@ -148,14 +112,15 @@ int main(int argc, char **argv)
 
   printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
   printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
-    mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec); 
+    mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, 
+	gauge_param.cpu_prec, inv_param.mass); 
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
-    matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+    matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
   }
 
   if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {

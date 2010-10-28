@@ -100,11 +100,15 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(mass, INVALID_DOUBLE);
   P(kappa, INVALID_DOUBLE);
+  P(Ls, INVALID_INT);
 #else
   if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
     P(mass, INVALID_DOUBLE);
   } else {
     P(kappa, INVALID_DOUBLE);
+  }
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    P(Ls, INVALID_INT);
   }
 #endif
 

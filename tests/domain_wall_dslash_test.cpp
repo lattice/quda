@@ -25,7 +25,7 @@ const int loops = 100;
 const int Ls = 16;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_HALF_PRECISION;
+QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -62,12 +62,14 @@ void init() {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_YES;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
   double m_5 = 1.5;
   inv_param.kappa = 0.5*(5 - m_5);
   inv_param.mass = 0.01;
+
+  inv_param.Ls = Ls;
   
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = dagger;

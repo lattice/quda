@@ -48,6 +48,11 @@ class ColorSpinorParam {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
 
+    if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+      nDim++;
+      x[4] = inv_param.Ls;
+    }
+
     if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       siteOrder = QUDA_ODD_EVEN_SITE_ORDER;

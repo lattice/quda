@@ -459,9 +459,6 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   }
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
-  cpuParam.print(); std::cout << std::endl;
-  cudaParam.print(); std::cout << std::endl;
-
   cpuColorSpinorField hIn(cpuParam);
   cudaColorSpinorField in(hIn, cudaParam);
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -647,7 +644,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     tmp = new cudaColorSpinorField(csParam); // temporary
         
   } else if (param->dslash_type == QUDA_WILSON_DSLASH ||
-	     param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+	     param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
+	     param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
 
     // temporary hack
     if (!pc_solution) cudaGaugePrecise.X[0] *= 2;
@@ -665,6 +663,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     cpuParam.v = hp_x;
     h_x = new cpuColorSpinorField(cpuParam);
     
+    cudaParam.print();
     b = new cudaColorSpinorField(*h_b, cudaParam); // download source
     
     if (param->verbosity >= QUDA_VERBOSE) {

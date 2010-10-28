@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include <test_util.h>
-#include <dslash_reference.h>
+#include <wilson_dslash_reference.h>
 
 QudaGaugeParam param;
 void *gauge[4], *new_gauge[4];

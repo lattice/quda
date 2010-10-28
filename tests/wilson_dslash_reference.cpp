@@ -6,7 +6,7 @@
 
 #include <test_util.h>
 #include <blas_reference.h>
-#include <dslash_reference.h>
+#include <wilson_dslash_reference.h>
 
 int Z[4];
 int V;

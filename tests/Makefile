@@ -4,8 +4,8 @@ QUDA = ../lib/libquda.a
 
 INC += -I../include -I.
 
-HDRS = blas_reference.h dslash_reference.h staggered_dslash_reference.h    \
-	test_util.h
+HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h    \
+	domain_wall_dslash_reference.h test_util.h
 
 TESTS = su3_test blas_test pack_test $(WILSON_DIRAC_TEST) 		\
 	$(STAGGERED_DIRAC_TEST) $(DOMAIN_WALL_DIRAC_TEST)		\
@@ -19,18 +19,21 @@ staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_refe
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-wilson_dslash_test: wilson_dslash_test.o test_util.o dslash_reference.o $(QUDA)
+wilson_dslash_test: wilson_dslash_test.o test_util.o wilson_dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-wilson_invert_test: wilson_invert_test.o test_util.o dslash_reference.o blas_reference.o $(QUDA)
+wilson_invert_test: wilson_invert_test.o test_util.o wilson_dslash_reference.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslash_reference.o $(QUDA)
 
-su3_test: su3_test.o test_util.o dslash_reference.o $(QUDA)
+domain_wall_invert_test: domain_wall_invert_test.o test_util.o domain_wall_dslash_reference.o \
+	blas_reference.o $(QUDA)
+
+su3_test: su3_test.o test_util.o wilson_dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
-pack_test: pack_test.o test_util.o dslash_reference.o $(QUDA)
+pack_test: pack_test.o test_util.o wilson_dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 blas_test: blas_test.o $(QUDA)

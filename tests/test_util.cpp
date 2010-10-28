@@ -4,7 +4,7 @@
 
 #include <short.h>
 
-#include <dslash_reference.h>
+#include <wilson_dslash_reference.h>
 #include <test_util.h>
 
 #define XUP 0

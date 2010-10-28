@@ -16,6 +16,7 @@
 #include <quda.h>
 #include <test_util.h>
 #include <domain_wall_dslash_reference.h>
+#include <blas_reference.h>
 
 int Z[4];
 int V;
