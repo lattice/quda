@@ -13,6 +13,9 @@ Version 0.3.1 - x October 2010
 - Renamed dslash_reference.* to wilson_dslash_reference.* for
   consistency.
 
+- Enabled optional building of Dirac operators, set in make.inc, to
+  keep build time in check.
+
 - Fixed bug with Wilson-like Dirac operators that prevented both MatPC
   solution and solver types.
 

@@ -127,6 +127,7 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 		const int parity, const int dagger, const void *x, const void *xNorm, 
 		const double k, const int volume, const int length, const QudaPrecision precision) {
 
+#ifdef GPU_WILSON_DIRAC
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
 
@@ -151,6 +152,9 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 		  (short4*)x, (float*)xNorm, k, volume, length);
   }
   checkCudaError();
+#else
+  errorQuda("Wilson dslash has not been built");
+#endif
 
 }
 
@@ -172,6 +176,7 @@ void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClove
 		const void *in, const void *inNorm, const int parity, const int volume,
 		const int length, const QudaPrecision precision) {
 
+#ifdef GPU_WILSON_DIRAC
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
 
@@ -196,6 +201,9 @@ void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClove
 		  (float*)inNorm, parity, volume, length);
   }
   checkCudaError();
+#else
+  errorQuda("Clover dslash has not been built");
+#endif
 
 }
 
@@ -273,6 +281,7 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
 		      const void *x, const void *xNorm, const double a, const int volume, 
 		      const int length, const QudaPrecision precision) {
 
+#ifdef GPU_WILSON_DIRAC
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
 
@@ -304,6 +313,10 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
   }
 
   checkCudaError();
+#else
+  errorQuda("Clover dslash has not been built");
+#endif
+
 
 }
 
@@ -314,6 +327,7 @@ void domainWallDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gau
 			  const spinorFloat *in, const float* inNorm, const int parity, const int dagger, const spinorFloat *x, 
 			  const float* xNorm, const double &m_f, const double &k2, const int volume_5d, const int length)
 {
+
   dim3 gridDim(volume_5d/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
@@ -380,6 +394,7 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 			  const void *x, const void *xNorm, const double m_f, const double k2, const int volume5d, 
 			  const int length, const QudaPrecision precision) {
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
 
@@ -405,6 +420,9 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
   }
 
   checkCudaError();
+#else
+  errorQuda("Domain wall dslash has not been built");
+#endif
 
 }
 
@@ -521,6 +539,7 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 			 const double k, const int volume, const int length, const QudaPrecision precision) 
 {
 
+#ifdef GPU_STAGGERED_DIRAC
   void *fatGauge0, *fatGauge1;
   void* longGauge0, *longGauge1;
   bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
@@ -573,7 +592,10 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
     }
   }
   checkCudaError();
-  
+#else
+  errorQuda("Staggered dslash has not been built");
+#endif  
+
 }
 
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)

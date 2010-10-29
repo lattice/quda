@@ -45,10 +45,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 4;
-  gauge_param.X[1] = 4;
-  gauge_param.X[2] = 4;
-  gauge_param.X[3] = 4;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 32;
   
   setDims(gauge_param.X, Ls);
 
