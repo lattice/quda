@@ -39,10 +39,10 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
   domainWallDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 0, 0, 
 		       mass, 0, out.volume, out.length, in.Precision());
 
-  int Ls = in.X(4);
-  long long unsigned int bulk = (Ls-2)*(in.volume/Ls);
-  long long unsigned int wall = 2*in.volume/Ls;
-  flops += 1320*(long long int)in.volume + 96*bulk + 120*wall;
+  long long Ls = in.X(4);
+  long long bulk = (Ls-2)*(in.volume/Ls);
+  long long wall = 2*in.volume/Ls;
+  flops += 1320LL*(long long)in.volume + 96LL*bulk + 120LL*wall;
 }
 
 void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -56,10 +56,10 @@ void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpino
   domainWallDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, 
 		       mass, k, out.volume, out.length, in.Precision());
 
-  int Ls = in.X(4);
-  long long unsigned int bulk = (Ls-2)*(in.volume/Ls);
-  long long unsigned int wall = 2*in.volume/Ls;
-  flops += (1320+48)*(long long int)in.volume + 96*bulk + 120*wall;
+  long long Ls = in.X(4);
+  long long bulk = (Ls-2)*(in.volume/Ls);
+  long long wall = 2*in.volume/Ls;
+  flops += (1320LL+48LL)*(long long)in.volume + 96LL*bulk + 120LL*wall;
 }
 
 void DiracDomainWall::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
