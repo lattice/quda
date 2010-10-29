@@ -97,9 +97,9 @@
   double2 var##8 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx8); 
 
 
-#define SITE_MATRIX_LOAD_TEX 1
+#define SITE_MATRIX_LOAD_TEX 0
 #define MULINK_LOAD_TEX 0
-#define FATLINK_LOAD_TEX 1
+#define FATLINK_LOAD_TEX 0
 
 
 #define LOAD_MATRIX_12_SINGLE_DECLARE(gauge, dir, idx, var)		\
