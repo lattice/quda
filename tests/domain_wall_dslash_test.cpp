@@ -23,6 +23,7 @@ const int transfer = 0; // include transfer time in the benchmark?
 const int loops = 100;
 
 const int Ls = 16;
+double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
@@ -65,9 +66,9 @@ void init() {
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
-  double m_5 = 1.5;
-  inv_param.kappa = 0.5*(5 - m_5);
   inv_param.mass = 0.01;
+  inv_param.m5 = -1.5;
+  kappa5 = 0.5*(5 + inv_param.m5);
 
   inv_param.Ls = Ls;
   
@@ -260,11 +261,11 @@ void dslashRef() {
 	   inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   case 1:    
-    matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.matpc_type, dagger, 
+    matpc(spinorRef->v, hostGauge, spinor->v, kappa5, inv_param.matpc_type, dagger, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   case 2:
-    mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, dagger, 
+    mat(spinorRef->v, hostGauge, spinor->v, kappa5, dagger, 
 	inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   default:

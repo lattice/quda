@@ -350,6 +350,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   diracParam.cloverInv = &cudaCloverInvPrecise;
   diracParam.kappa = kappa;
   diracParam.mass = inv_param->mass;
+  diracParam.m5 = inv_param->m5;
   diracParam.verbose = inv_param->verbosity;
 }
 

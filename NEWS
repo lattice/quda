@@ -1,4 +1,21 @@
 
+Version 0.3.1 - x October 2010
+
+- Added domain wall Dirac operators.  Like for Wilson and clover, the
+  full operator and the (5d) preconditioned operator is available.  As
+  a result, the "Ls" and "m5" parameters have been added to the
+  InvertParam struct.  Note that the convention is to include the
+  negative sign in m5, i.e., m5 = -1.5 is correct. The use of the
+  domain wall Dirac operator is demonstrated in the
+  domain_wall_dslash_test and domain_wall_invert_test in the tests
+  directory.  Thanks to Joel Giedt for this contribution.
+
+- Renamed dslash_reference.* to wilson_dslash_reference.* for
+  consistency.
+
+- Fixed bug with Wilson-like Dirac operators that prevented both MatPC
+  solution and solver types.
+
 Version 0.3.0 - 1 October 2010
 
 - CUDA 3.0 or later is now required to build the library.

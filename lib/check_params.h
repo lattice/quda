@@ -100,14 +100,17 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(mass, INVALID_DOUBLE);
   P(kappa, INVALID_DOUBLE);
+  P(m5, INVALID_DOUBLE);
   P(Ls, INVALID_INT);
 #else
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
+  // asqtad and domain wall use mass parameterization
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     P(mass, INVALID_DOUBLE);
-  } else {
+  } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
   }
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
   }
 #endif

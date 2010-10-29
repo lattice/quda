@@ -26,8 +26,8 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 16; 
   gauge_param.X[1] = 16;
   gauge_param.X[2] = 16;
-  gauge_param.X[3] = 8;
-  inv_param.Ls = 8;
+  gauge_param.X[3] = 16;
+  inv_param.Ls = 48;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -44,9 +44,9 @@ int main(int argc, char **argv)
   inv_param.dslash_type = QUDA_DOMAIN_WALL_DSLASH;
   inv_param.inv_type = QUDA_CG_INVERTER;
 
-  double m_5 = 1.5;
-  inv_param.kappa = 1.0 / (2.0*(5 - m_5));
-  inv_param.mass = 0.05;
+  inv_param.mass = 0.01;
+  inv_param.m5 = -1.5;
+  double kappa5 = 0.5*(5 + inv_param.m5);
 
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
@@ -115,15 +115,15 @@ int main(int argc, char **argv)
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
-    mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, 
+    mat(spinorCheck, gauge, spinorOut, kappa5, 0, inv_param.cpu_prec, 
 	gauge_param.cpu_prec, inv_param.mass); 
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
-    matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+    matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
   }
 
   if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-    ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    ax(0.5/kappa5, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   }
 
   mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);

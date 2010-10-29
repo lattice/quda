@@ -48,6 +48,8 @@ extern "C" {
 
     double mass;  // used for staggered only
     double kappa; // used for Wilson and Wilson-clover
+
+    double m5; // domain wall shift parameter
     int Ls; // domain wall 5th dimension
 
     double tol;

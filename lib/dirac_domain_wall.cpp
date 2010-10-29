@@ -3,13 +3,13 @@
 #include <blas_quda.h>
 
 DiracDomainWall::DiracDomainWall(const DiracParam &param)
-  : DiracWilson(param)
+  : DiracWilson(param), m5(param.m5), kappa5(0.5/(5 + m5))
 {
 
 }
 
 DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) 
-  : DiracWilson(dirac)
+  : DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5 + m5))
 {
 
 }
@@ -24,6 +24,8 @@ DiracDomainWall& DiracDomainWall::operator=(const DiracDomainWall &dirac)
 
   if (&dirac != this) {
     DiracWilson::operator=(dirac);
+    m5 = dirac.m5;
+    kappa5 = dirac.kappa5;
   }
 
   return *this;
@@ -65,8 +67,8 @@ void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpino
 void DiracDomainWall::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   checkFullSpinor(out, in);
-  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
-  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa5);
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa5);
 }
 
 void DiracDomainWall::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
@@ -140,7 +142,7 @@ DiracDomainWallPC& DiracDomainWallPC::operator=(const DiracDomainWallPC &dirac)
 void DiracDomainWallPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-  double kappa2 = -kappa*kappa;
+  double kappa2 = -kappa5*kappa5;
 
   ColorSpinorParam param;
   param.create = QUDA_NULL_FIELD_CREATE;
@@ -185,12 +187,12 @@ void DiracDomainWallPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField
     // we desire solution to full system
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       // src = b_e + k D_eo b_o
-      DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
+      DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa5);
       src = &(x.Odd());
       sol = &(x.Even());
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
       // src = b_o + k D_oe b_e
-      DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
+      DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), kappa5);
       src = &(x.Even());
       sol = &(x.Odd());
     } else {
@@ -214,10 +216,10 @@ void DiracDomainWallPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpin
   checkFullSpinor(x, b);
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
     // x_o = b_o + k D_oe x_e
-    DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
+    DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa5);
   } else if (matpcType == QUDA_MATPC_ODD_ODD) {
     // x_e = b_e + k D_eo x_o
-    DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
+    DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa5);
   } else {
     errorQuda("MatPCType %d not valid for DiracDomainWallPC", matpcType);
   }
