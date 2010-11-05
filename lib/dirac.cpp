@@ -113,6 +113,12 @@ Dirac* Dirac::create(const DiracParam &param)
   } else if (param.type == QUDA_ASQTADPC_DIRAC) {
     if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
     return new DiracStaggeredPC(param);    
+  } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
+    if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator\n");
+    return new DiracTwistedMass(param);
+  } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
+    if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator\n");
+    return new DiracTwistedMassPC(param);    
   } else {
     return 0;
   }

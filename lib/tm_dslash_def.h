@@ -1,23 +1,23 @@
-// dw_dslash_def.h - Domain Wall Dslash kernel definitions
+// tm_dslash_def.h - Twisted Mass Dslash kernel definitions
 
-// There are currently 36 different variants of the Domain Wall Dslash
-// kernel, each one characterized by a set of 4 options, where each
-// option can take one of several values (3*2*2*3 = 72).  This file
-// is structured so that the C preprocessor loops through all 36
+// There are currently 36 different variants of the Twisted Mass
+// Wilson Dslash kernel, each one characterized by a set of 5 options, 
+// where each option can take one of several values (3*2*2*3 = 36).  
+// This file is structured so that the C preprocessor loops through all 36
 // variants (in a manner resembling a counter), sets the appropriate
 // macros, and defines the corresponding functions.
 //
 // As an example of the function naming conventions, consider
 //
-// domainWallDslash12DaggerXpayKernel(float4* out, ...).
+// twistedMassDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a dw Dslash^dagger kernel where the result is
+// This is a twsited mass Dslash^dagger kernel where the result is
 // multiplied by "a" and summed with an input vector (Xpay), and the
 // gauge matrix is reconstructed from 12 real numbers.  More
 // generally, each function name is given by the concatenation of the
 // following 4 fields, with "Kernel" at the end:
 //
-// DD_NAME_F = domainWallDslash
+// DD_NAME_F = twistedMassDslash
 // DD_RECON_F = 8, 12, 18
 // DD_DAG_F = Dagger, [blank]
 // DD_XPAY_F = Xpay, [blank]
@@ -37,7 +37,7 @@
 
 // set options for current iteration
 
-#define DD_NAME_F domainWallDslash
+#define DD_NAME_F twistedMassDslash
 
 #if (DD_DAG==0) // no dagger
 #define DD_DAG_F
@@ -48,19 +48,19 @@
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
 #if (DD_PREC == 0)
-#define DD_PARAM4 const int oddBit, const double mferm
+#define DD_PARAM4 const int oddBit, const double kappa, const double mu
 #else
-#define DD_PARAM4 const int oddBit, const float mferm
+#define DD_PARAM4 const int oddBit, const float kappa, const float mu
 #endif
 #else            // xpay
 #define DSLASH_XPAY
 #define DD_XPAY_F Xpay
 #if (DD_PREC == 0)
-#define DD_PARAM4 const int oddBit, const double mferm, const double2 *x, const float *xNorm, const double a
+#define DD_PARAM4 const int oddBit, const double kappa, const double mu, const double2 *x, const float *xNorm, const double a
 #elif (DD_PREC == 1) 
-#define DD_PARAM4 const int oddBit, const float mferm, const float4 *x, const float *xNorm, const float a
+#define DD_PARAM4 const int oddBit, const float kappa, const float mu, const float4 *x, const float *xNorm, const float a
 #else
-#define DD_PARAM4 const int oddBit, const float mferm, const short4 *x, const float *xNorm, const float a
+#define DD_PARAM4 const int oddBit, const float kappa, const float mu, const short4 *x, const float *xNorm, const float a
 #endif
 #endif
 
@@ -192,13 +192,13 @@
 // define the kernel
 
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-  (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 
-#ifdef GPU_DOMAIN_WALL_DIRAC
+#ifdef GPU_TWISTED_MASS_DIRAC
 #if DD_DAG
-#include "dw_dslash_dagger_core.h"
+#include "tm_dslash_dagger_core.h"
 #else
-#include "dw_dslash_core.h"
+#include "tm_dslash_core.h"
 #endif
 #endif
 
@@ -266,9 +266,6 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #elif (DD_PREC==1)
 #undef DD_PREC
 #define DD_PREC 2
-//#else
-//#undef DD_PREC
-//#define DD_PREC 0
 
 #else
 
@@ -284,5 +281,5 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #endif // DD_DAG
 
 #ifdef DD_LOOP
-#include "dw_dslash_def.h"
+#include "tm_dslash_def.h"
 #endif

@@ -25,6 +25,8 @@
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #include <dw_dslash_def.h>        // Domain Wall kernels
 #include <clover_def.h>           // kernels for applying the clover term alone
+#include <tm_dslash_def.h>               // Twisted Mass kernels
+#include <dslash_core/tm_core.h>  // solo twisted mass kernel
 
 #ifndef SHARED_FLOATS_PER_THREAD
 #define SHARED_FLOATS_PER_THREAD 0
@@ -595,6 +597,166 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 #else
   errorQuda("Staggered dslash has not been built");
 #endif  
+
+}
+
+template <int N, typename spinorFloat>
+void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in, 
+		     const float *inNorm, const double &a, const double &b,
+		     const int volume, const int length)
+{
+  dim3 gridDim(volume/BLOCK_DIM, 1, 1);
+  dim3 blockDim(BLOCK_DIM, 1, 1);
+
+  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm);
+  twistGamma5Kernel<<<gridDim, blockDim, shared_bytes>>> (out, outNorm, volume, a, b);
+}
+
+void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
+		     const double kappa, const double mu, const int volume, 
+		     const int length, const QudaPrecision precision, 
+		     const QudaTwistGamma5Type twist) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+
+  double a=0.0,b=0.0;
+  if (twist == QUDA_TWIST_GAMMA5_DIRECT) { // applying the twist
+    a = 2.0 * kappa * mu; // mu already includes the flavor
+    b = 1.0;
+  } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) { // applying the inverse twist
+    a = -2.0 * kappa * mu;
+    b = 1.0 / (1.0 + a*a);
+  } else {
+    errorQuda("Twist type %d not defined\n", twist);
+  }
+
+  if (precision == QUDA_DOUBLE_PRECISION) {
+#if (__CUDA_ARCH__ >= 130)
+    twistGamma5Cuda<2>((double2*)out, (float*)outNorm, (double2*)in, 
+		       (float*)inNorm, a, b, volume, length);
+#else
+    errorQuda("Double precision not supported on this GPU");
+#endif
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    twistGamma5Cuda<4>((float4*)out, (float*)outNorm, (float4*)in, 
+		       (float*)inNorm, a, b, volume, length);
+  } else if (precision == QUDA_HALF_PRECISION) {
+    twistGamma5Cuda<4>((short4*)out, (float*)outNorm, (short4*)in,
+		       (float*)inNorm, a, b, volume, length);
+  }
+  checkCudaError();
+#else
+  errorQuda("Twisted mass dslash has not been built");
+#endif
+
+}
+
+// Twisted mass wrappers
+template <int N, typename spinorFloat, typename gaugeFloat>
+void twistedMassDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0, 
+			   const gaugeFloat gauge1, const QudaReconstructType reconstruct, 
+			   const spinorFloat *in, const float* inNorm, const int parity, 
+			   const int dagger, const spinorFloat *x, const float* xNorm, 
+			   const double &kappa, const double &mu, const double &a, 
+			   const int volume, const int length)
+{
+
+  dim3 gridDim(volume/BLOCK_DIM, 1, 1);
+  dim3 blockDim(BLOCK_DIM, 1, 1);
+
+  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm, x, xNorm);
+
+  if (x==0) { // not xpay
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	twistedMassDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu);
+      } else {
+	twistedMassDslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	twistedMassDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu);
+      } else {
+	twistedMassDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu);
+      }
+    } else {
+      if (!dagger) {
+	twistedMassDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 	
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu);
+      } else {
+	twistedMassDslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu);
+      }
+    }
+  } else { // doing xpay
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {
+      if (!dagger) {
+	twistedMassDslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu, x, xNorm, a);
+      } else {
+	twistedMassDslash18DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu, x, xNorm, a);
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	twistedMassDslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu, x, xNorm, a);
+      } else {
+	twistedMassDslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu, x, xNorm, a);
+      }
+    } else {
+      if (!dagger) {
+	twistedMassDslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 	
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu, x, xNorm, a);
+      } else {
+	twistedMassDslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
+	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, kappa, mu, x, xNorm, a);
+      }
+    }
+  }
+
+}
+
+void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge, 
+			   const void *in, const void *inNorm, const int parity, const int dagger, 
+			   const void *x, const void *xNorm, const double kappa, const double mu, 
+			   const double a, const int volume, const int length, 
+			   const QudaPrecision precision) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+  void *gauge0, *gauge1;
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
+
+  if (precision != gauge.precision)
+    errorQuda("Mixing gauge and spinor precision not supported");
+
+  if (precision == QUDA_DOUBLE_PRECISION) {
+#if (__CUDA_ARCH__ >= 130)
+    twistedMassDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)gauge0, (double2*)gauge1, 
+			     gauge.reconstruct, (double2*)in, (float*)inNorm, parity, dagger, 
+			     (double2*)x, (float*)xNorm, kappa, mu, a, volume, length);
+#else
+    errorQuda("Double precision not supported on this GPU");
+#endif
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    twistedMassDslashCuda<4>((float4*)out, (float*)outNorm, (float4*)gauge0, (float4*)gauge1, 
+			     gauge.reconstruct, (float4*)in, (float*)inNorm, parity, dagger, 
+			     (float4*)x, (float*)xNorm, kappa, mu, a, volume, length);
+  } else if (precision == QUDA_HALF_PRECISION) {
+    twistedMassDslashCuda<4>((short4*)out, (float*)outNorm, (short4*)gauge0, (short4*)gauge1, 
+			     gauge.reconstruct, (short4*)in, (float*)inNorm, parity, dagger, 
+			     (short4*)x, (float*)xNorm, kappa, mu, a, volume, length);
+  }
+
+  checkCudaError();
+#else
+  errorQuda("Twisted mass dslash has not been built");
+#endif
 
 }
 

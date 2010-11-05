@@ -45,6 +45,18 @@ extern "C" {
 			   const void *x, const void *xNorm, const double k,
 			   const int volume, const int length, const QudaPrecision precision);
 
+  // twisted mass Dslash  
+  void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 
+			     const void *inNorm, const int parity, const int dagger, 
+			     const void *x, const void *xNorm, const double kappa, const double mu,
+			     const double a, const int volume, const int length, 
+			     const QudaPrecision precision);
+
+  // solo twist term
+  void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
+		       const double kappa, const double mu, const int volume, 
+		       const int length, const QudaPrecision precision, const QudaTwistGamma5Type);
+
 #ifdef __cplusplus
 }
 #endif

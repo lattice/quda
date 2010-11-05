@@ -20,15 +20,18 @@ class DiracParam {
   FullGauge *longGauge; // used by staggered only
   FullClover *clover;
   FullClover *cloverInv;
+  
+  double mu; // used by twisted mass only
+
   cudaColorSpinorField *tmp1;
   cudaColorSpinorField *tmp2; // used only by Clover operators
-  
+
   QudaVerbosity verbose;
 
   DiracParam() 
-   : type(QUDA_INVALID_DIRAC), kappa(0.0), matpcType(QUDA_MATPC_INVALID),
-   dagger(QUDA_DAG_INVALID), gauge(0), clover(0), cloverInv(0), tmp1(0),
-   tmp2(0), verbose(QUDA_SILENT)
+    : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
+    dagger(QUDA_DAG_INVALID), gauge(0), clover(0), cloverInv(0), mu(0.0), 
+    tmp1(0), tmp2(0), verbose(QUDA_SILENT)
   {
 
   }
@@ -214,7 +217,7 @@ class DiracDomainWall : public DiracWilson {
 			   const QudaSolutionType) const;
 };
 
-// Even-odd preconditioned domain wall
+// 5d Even-odd preconditioned domain wall
 class DiracDomainWallPC : public DiracDomainWall {
 
  private:
@@ -291,6 +294,59 @@ class DiracStaggeredPC : public Dirac {
 		       const QudaSolutionType) const;
   virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 			   const QudaSolutionType) const;
+};
+
+// Full twisted mass
+class DiracTwistedMass : public DiracWilson {
+
+ protected:
+  double mu;
+  void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaTwistGamma5Type twistType) const;
+
+ public:
+  DiracTwistedMass(const DiracParam &param);
+  DiracTwistedMass(const DiracTwistedMass &dirac);
+  virtual ~DiracTwistedMass();
+  DiracTwistedMass& operator=(const DiracTwistedMass &dirac);
+
+  void Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+  virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  virtual void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+		       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+		       const QudaSolutionType) const;
+  virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+			   const QudaSolutionType) const;
+};
+
+// Even-odd preconditioned twisted mass
+class DiracTwistedMassPC : public DiracTwistedMass {
+
+ private:
+
+ public:
+  DiracTwistedMassPC(const DiracParam &param);
+  DiracTwistedMassPC(const DiracTwistedMassPC &dirac);
+  virtual ~DiracTwistedMassPC();
+  DiracTwistedMassPC& operator=(const DiracTwistedMassPC &dirac);
+
+  void TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		      const QudaParity parity) const;
+  virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+			  const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+  void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+  void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+	       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+	       const QudaSolutionType) const;
+  void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+		   const QudaSolutionType) const;
 };
 
 // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)

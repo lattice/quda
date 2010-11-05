@@ -62,12 +62,13 @@ gamma4 = complexify([
     0, 0, -1, 0,
     0, 0, 0, -1
 ])
-#gamma4 = complexify([
-#    0, 0, 1, 0,
-#    0, 0, 0, 1,
-#    1, 0, 0, 0,
-#    0, 1, 0, 0
-#])
+
+igamma5 = complexify([
+    0, 0, 1j, 0,
+    0, 0, 0, 1j,
+    1j, 0, 0, 0,
+    0, 1j, 0, 0
+])
 
 
 def gplus(g1, g2):
@@ -88,9 +89,8 @@ projectors = [
     gminus(id,gamma1), gplus(id,gamma1),
     gminus(id,gamma2), gplus(id,gamma2),
     gminus(id,gamma3), gplus(id,gamma3),
-    gminus(id,gamma4), gplus(id,gamma4)
+    gminus(id,gamma4), gplus(id,gamma4),
 ]
-
 
 ### code generation  ########################################################################
 
@@ -128,6 +128,9 @@ def c_re(b, sm, cm, sn, cn): return "c"+`(sm+2*b)`+`cm`+"_"+`(sn+2*b)`+`cn`+"_re
 def c_im(b, sm, cm, sn, cn): return "c"+`(sm+2*b)`+`cm`+"_"+`(sn+2*b)`+`cn`+"_im"
 def a_re(b, s, c): return "a"+`(s+2*b)`+`c`+"_re"
 def a_im(b, s, c): return "a"+`(s+2*b)`+`c`+"_im"
+
+def tmp_re(s, c): return "tmp"+`s`+`c`+"_re"
+def tmp_im(s, c): return "tmp"+`s`+`c`+"_im"
 
 
 def prolog():
@@ -190,61 +193,62 @@ def prolog():
             str.append("#define "+g_im(1,m,n)+" (-"+g_im(0,n,m)+")\n")
     str.append("\n")
 
-    str.append("// first chiral block of inverted clover term\n")
-    str.append("#ifdef CLOVER_DOUBLE\n")
-    i = 0
-    for m in range(0,6):
-        s = m/3
-        c = m%3
-        str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat2(i)+"\n")
-        i += 1
-    for n in range(0,6):
-        sn = n/3
-        cn = n%3
-        for m in range(n+1,6):
-            sm = m/3
-            cm = m%3
-            str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat2(i)+"\n")
-            str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat2(i+1)+"\n")
-            i += 2
-    str.append("#else\n")
-    i = 0
-    for m in range(0,6):
-        s = m/3
-        c = m%3
-        str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat4(i)+"\n")
-        i += 1
-    for n in range(0,6):
-        sn = n/3
-        cn = n%3
-        for m in range(n+1,6):
-            sm = m/3
-            cm = m%3
-            str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat4(i)+"\n")
-            str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat4(i+1)+"\n")
-            i += 2
-    str.append("#endif // CLOVER_DOUBLE\n\n")    
-
-    for n in range(0,6):
-        sn = n/3
-        cn = n%3
-        for m in range(0,n):
-            sm = m/3
-            cm = m%3
-            str.append("#define "+c_re(0,sm,cm,sn,cn)+" (+"+c_re(0,sn,cn,sm,cm)+")\n")
-            str.append("#define "+c_im(0,sm,cm,sn,cn)+" (-"+c_im(0,sn,cn,sm,cm)+")\n")
-    str.append("\n")
-
-    str.append("// second chiral block of inverted clover term (reuses C0,...,C9)\n")
-    for n in range(0,6):
-        sn = n/3
-        cn = n%3
+    if twist == False:
+        str.append("// first chiral block of inverted clover term\n")
+        str.append("#ifdef CLOVER_DOUBLE\n")
+        i = 0
         for m in range(0,6):
-            sm = m/3
-            cm = m%3
-            str.append("#define "+c_re(1,sm,cm,sn,cn)+" "+c_re(0,sm,cm,sn,cn)+"\n")
-            if m != n: str.append("#define "+c_im(1,sm,cm,sn,cn)+" "+c_im(0,sm,cm,sn,cn)+"\n")
-    str.append("\n")
+            s = m/3
+            c = m%3
+            str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat2(i)+"\n")
+            i += 1
+        for n in range(0,6):
+            sn = n/3
+            cn = n%3
+            for m in range(n+1,6):
+                sm = m/3
+                cm = m%3
+                str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat2(i)+"\n")
+                str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat2(i+1)+"\n")
+                i += 2
+        str.append("#else\n")
+        i = 0
+        for m in range(0,6):
+            s = m/3
+            c = m%3
+            str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat4(i)+"\n")
+            i += 1
+        for n in range(0,6):
+            sn = n/3
+            cn = n%3
+            for m in range(n+1,6):
+                sm = m/3
+                cm = m%3
+                str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat4(i)+"\n")
+                str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat4(i+1)+"\n")
+                i += 2
+        str.append("#endif // CLOVER_DOUBLE\n\n")    
+
+        for n in range(0,6):
+            sn = n/3
+            cn = n%3
+            for m in range(0,n):
+                sm = m/3
+                cm = m%3
+                str.append("#define "+c_re(0,sm,cm,sn,cn)+" (+"+c_re(0,sn,cn,sm,cm)+")\n")
+                str.append("#define "+c_im(0,sm,cm,sn,cn)+" (-"+c_im(0,sn,cn,sm,cm)+")\n")
+        str.append("\n")
+
+        str.append("// second chiral block of inverted clover term (reuses C0,...,C9)\n")
+        for n in range(0,6):
+            sn = n/3
+            cn = n%3
+            for m in range(0,6):
+                sm = m/3
+                cm = m%3
+                str.append("#define "+c_re(1,sm,cm,sn,cn)+" "+c_re(0,sm,cm,sn,cn)+"\n")
+                if m != n: str.append("#define "+c_im(1,sm,cm,sn,cn)+" "+c_im(0,sm,cm,sn,cn)+"\n")
+        str.append("\n")
 
     str.append("// output spinor\n")
     for s in range(0,4):
@@ -470,6 +474,7 @@ def gen(dir):
 
 def toChiralBasis(c):
     str = []
+
     str.append("spinorFloat "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
     str.append("spinorFloat "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
     str.append("spinorFloat "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n")
@@ -541,7 +546,6 @@ def cloverMult(chi):
     return block(''.join(str))+"\n"
 # end def cloverMult
 
-
 def clover():
     str = []
     str.append("#ifdef DSLASH_CLOVER\n\n")
@@ -559,6 +563,59 @@ def clover():
     return ''.join(str)+"\n"
 # end def clover
 
+def twisted_rotate(x):
+    str = []
+    str.append("// apply twisted mass " + sign(x) + "ve rotation\n")
+
+    str.append("spinorFloat km2 = 2 * kappa * mu;\n")
+
+    for h in range(0, 4):
+        for c in range(0, 3):
+            strRe = []
+            strIm = []
+            for s in range(0, 4):
+                # identity
+                re = id[4*h+s].real
+                im = id[4*h+s].imag
+                if re==0 and im==0: ()
+                elif im==0:
+                    strRe.append(sign(re)+out_re(s,c))
+                    strIm.append(sign(re)+out_im(s,c))
+                elif re==0:
+                    strRe.append(sign(-im)+out_im(s,c))
+                    strIm.append(sign(im)+out_re(s,c))
+                
+                # sign(x)*i*mu*gamma_5
+                re = igamma5[4*h+s].real
+                im = igamma5[4*h+s].imag
+                if re==0 and im==0: ()
+                elif im==0:
+                    strRe.append(sign(re*x)+out_re(s,c) + "*km2")
+                    strIm.append(sign(re*x)+out_im(s,c) + "*km2")
+                elif re==0:
+                    strRe.append(sign(-im*x)+out_im(s,c) + "*km2")
+                    strIm.append(sign(im*x)+out_re(s,c) + "*km2")
+
+            str.append("volatile spinorFloat "+tmp_re(h,c)+ " = "+''.join(strRe)+";\n")
+            str.append("volatile spinorFloat "+tmp_im(h,c)+ " = "+''.join(strIm)+";\n")
+        str.append("\n")
+    
+    return ''.join(str)+"\n"
+
+def twisted():
+    str = []
+    str.append(twisted_rotate(-1))
+
+    str.append("//scale by 1/(1 + (2*mu*kappa)^2) and copy back\n")
+    str.append("spinorFloat inv = 1 / (1 + km2 * km2);\n\n")
+    for s in range(0,4):
+        for c in range(0,3):
+            str.append(out_re(s,c) + " = inv*" + tmp_re(s,c) + ";\n")
+            str.append(out_im(s,c) + " = inv*" + tmp_im(s,c) + ";\n")
+    str.append("\n")
+
+    return block(''.join(str))+"\n"
+# end def twisted
 
 def epilog():
     str = []
@@ -645,19 +702,36 @@ def epilog():
 def generate():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + clover() + epilog()
 
+def generate_twisted():
+    return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + twisted() + epilog()
+
 # To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
 sharedFloats = 8
 
+twist = False
 dagger = False
-print sys.argv[0] + ": generating dslash_core.h";
+print sys.argv[0] + ": generating wilson_dslash_core.h";
 f = open('dslash_core/wilson_dslash_core.h', 'w')
 f.write(generate())
 f.close()
 
 dagger = True
-print sys.argv[0] + ": generating dslash_dagger_core.h";
+print sys.argv[0] + ": generating wilson_dslash_dagger_core.h";
 f = open('dslash_core/wilson_dslash_dagger_core.h', 'w')
 f.write(generate())
+f.close()
+
+twist = True
+dagger = False
+print sys.argv[0] + ": generating tm_dslash_core.h";
+f = open('dslash_core/tm_dslash_core.h', 'w')
+f.write(generate_twisted())
+f.close()
+
+dagger = True
+print sys.argv[0] + ": generating tm_dslash_dagger_core.h";
+f = open('dslash_core/tm_dslash_dagger_core.h', 'w')
+f.write(generate_twisted())
 f.close()
 
 #f = open('clover_core.h', 'w')

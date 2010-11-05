@@ -60,6 +60,7 @@ extern "C" {
     QUDA_CLOVER_WILSON_DSLASH,
     QUDA_DOMAIN_WALL_DSLASH,
     QUDA_ASQTAD_DSLASH,
+    QUDA_TWISTED_MASS_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
 
@@ -165,6 +166,8 @@ extern "C" {
     QUDA_DOMAIN_WALLPC_DIRAC,
     QUDA_ASQTAD_DIRAC,
     QUDA_ASQTADPC_DIRAC,
+    QUDA_TWISTED_MASS_DIRAC,
+    QUDA_TWISTED_MASSPC_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 
@@ -220,6 +223,19 @@ extern "C" {
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
+  typedef enum QudaTwistFlavorType_s {
+    QUDA_TWIST_MNS = -1,
+    QUDA_TWIST_PLS = +1,
+    QUDA_TWIST_NO  = 0,
+    QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
+  } QudaTwistFlavorType;  
+
+  typedef enum QudaTwistGamma5Type_s {
+    QUDA_TWIST_GAMMA5_DIRECT,
+    QUDA_TWIST_GAMMA5_INVERSE,
+    QUDA_TWIST_GAMMA5_INVALID = QUDA_INVALID_ENUM
+  } QudaTwistGamma5Type;
+
 #ifdef __cplusplus
 }
 #endif

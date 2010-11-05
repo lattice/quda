@@ -10,12 +10,13 @@ OS       = linux   # linux or osx
 PYTHON = python    # python 2.5 or later required for 'make gen'
 DEVICE = 0         # CUDA device to use for 'make tune'
 
-BUILD_WILSON_DIRAC = yes      # build Wilson and clover Dirac operators?
-BUILD_DOMAIN_WALL_DIRAC = yes # build Domain Wall Dirac operators?
-BUILD_STAGGERED_DIRAC = yes   # build staggered Dirac operators?
-BUILD_FATLINK = no            # build code for computing asqtad fat links?
-BUILD_GAUGE_FORCE = no        # build code for (1-loop Symanzik) gauge force?
-BUILD_FERMION_FORCE = no      # build code for asqtad fermion force?
+BUILD_WILSON_DIRAC = yes       # build Wilson and clover Dirac operators?
+BUILD_DOMAIN_WALL_DIRAC = yes  # build Domain Wall Dirac operators?
+BUILD_STAGGERED_DIRAC = yes    # build staggered Dirac operators?
+BUILD_TWISTED_MASS_DIRAC = yes # build twisted mass Dirac operators?
+BUILD_FATLINK = no             # build code for computing asqtad fat links?
+BUILD_GAUGE_FORCE = no         # build code for (1-loop Symanzik) gauge force?
+BUILD_FERMION_FORCE = no       # build code for asqtad fermion force?
 
 ######
 
@@ -56,6 +57,10 @@ endif
 ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   NVCCOPT += -DGPU_STAGGERED_DIRAC
   STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
+endif
+ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
+  NVCCOPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+  TWISTED_MASS_DIRAC_TEST=twisted_mass_dslash_test twisted_mass_invert_test
 endif
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK

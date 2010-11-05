@@ -339,6 +339,9 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   case QUDA_ASQTAD_DSLASH:
     diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;
     break;
+  case QUDA_TWISTED_MASS_DSLASH:
+    diracParam.type = pc ? QUDA_TWISTED_MASSPC_DIRAC : QUDA_TWISTED_MASS_DIRAC;
+    break;
   default:
     errorQuda("Unsupported dslash_type");
   }
@@ -351,6 +354,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   diracParam.kappa = kappa;
   diracParam.mass = inv_param->mass;
   diracParam.m5 = inv_param->m5;
+  diracParam.mu = inv_param->mu;
   diracParam.verbose = inv_param->verbosity;
 }
 

@@ -52,6 +52,9 @@ extern "C" {
     double m5; // domain wall shift parameter
     int Ls; // domain wall 5th dimension
 
+    double mu; // twisted mass parameter
+    QudaTwistFlavorType twist_flavor; // twisted mass flavor
+
     double tol;
     int maxiter;
     double reliable_delta; // reliable update tolerance

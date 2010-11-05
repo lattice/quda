@@ -18,6 +18,8 @@ class ColorSpinorParam {
   QudaPrecision precision; // Precision of the field
   int pad; // volumetric padding
 
+  QudaTwistFlavorType twistFlavor; // used by twisted mass
+
   QudaSiteSubset siteSubset; // Full, even or odd
   QudaSiteOrder siteOrder; // defined for full fields
   
@@ -30,8 +32,8 @@ class ColorSpinorParam {
 
  ColorSpinorParam()
    : fieldLocation(QUDA_INVALID_FIELD_LOCATION), nColor(0), nSpin(0), nDim(0), 
-    precision(QUDA_INVALID_PRECISION), pad(0), siteSubset(QUDA_INVALID_SITE_SUBSET), 
-    siteOrder(QUDA_INVALID_SITE_ORDER), 
+    precision(QUDA_INVALID_PRECISION), pad(0), twistFlavor(QUDA_TWIST_INVALID),
+    siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
     create(QUDA_INVALID_FIELD_CREATE)
   { for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0;}
@@ -39,8 +41,8 @@ class ColorSpinorParam {
   // used to create cpu params
  ColorSpinorParam(void *V, QudaInvertParam &inv_param, int *X)
    : fieldLocation(QUDA_CPU_FIELD_LOCATION), nColor(3), nSpin(4), nDim(4), 
-    precision(inv_param.cpu_prec), pad(0), siteSubset(QUDA_INVALID_SITE_SUBSET), 
-    siteOrder(QUDA_INVALID_SITE_ORDER), 
+    precision(inv_param.cpu_prec), pad(0), twistFlavor(inv_param.twist_flavor), 
+    siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
     create(QUDA_REFERENCE_FIELD_CREATE), v(V)
   { 
@@ -71,8 +73,8 @@ class ColorSpinorParam {
  ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
     : fieldLocation(QUDA_CUDA_FIELD_LOCATION), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), 
     nDim(cpuParam.nDim), precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
-    siteSubset(cpuParam.siteSubset), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), 
-    fieldOrder(QUDA_INVALID_FIELD_ORDER), 
+    twistFlavor(cpuParam.twistFlavor), siteSubset(cpuParam.siteSubset), 
+    siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
     gammaBasis(QUDA_UKQCD_GAMMA_BASIS), create(QUDA_COPY_FIELD_CREATE), v(0)
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -128,6 +130,8 @@ class ColorSpinorField {
   int volume;
   int pad;
   int stride;
+
+  QudaTwistFlavorType twistFlavor;
   
   int real_length;
   int length;
@@ -192,6 +196,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend class DiracDomainWallPC;
   friend class DiracStaggered;
   friend class DiracStaggeredPC;
+  friend class DiracTwistedMass;
+  friend class DiracTwistedMassPC;
   friend void zeroCuda(cudaColorSpinorField &a);
   friend void copyCuda(cudaColorSpinorField &, const cudaColorSpinorField &);
   friend double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
