@@ -608,8 +608,12 @@ void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in,
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm);
-  twistGamma5Kernel<<<gridDim, blockDim, shared_bytes>>> (out, outNorm, volume, a, b);
+  printf("%d %d %d %d\n", gridDim.x, blockDim.x, volume, length);
+  checkCudaError();
+
+  bindSpinorTex<N>(length, in, inNorm);
+  checkCudaError();
+  twistGamma5Kernel<<<gridDim, blockDim, 0>>> (out, outNorm, a, b);
 }
 
 void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,

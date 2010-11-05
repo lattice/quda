@@ -1,5 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <iostream>
 
 DiracTwistedMass::DiracTwistedMass(const DiracParam &param)
   : DiracWilson(param), mu(param.mu)
@@ -31,9 +32,17 @@ DiracTwistedMass& DiracTwistedMass::operator=(const DiracTwistedMass &dirac)
 void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in,
 				    const QudaTwistGamma5Type twistType) const {
   
+  if (!initDslash) initDslashConstants(gauge, in.stride, 0);
+
+  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
+    errorQuda("Twist flavor not set %d\n", in.twistFlavor);
+
   double flavor_mu = in.twistFlavor * mu;
+  
+  std::cout << "flavor mu = " << flavor_mu << std::endl;
+
   twistGamma5Cuda(out.x, out.norm, in.x, in.norm, kappa, flavor_mu, 
-		  in.volume, in.length, in.precision, twistType);
+  		  in.volume, in.length, in.precision, twistType);
 }
 
 
@@ -48,6 +57,10 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
   if (in.twistFlavor != out.twistFlavor) 
     errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
 
+  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID) {
+    errorQuda("Twist flavor not set %d\n", in.twistFlavor);
+  }
+
   ColorSpinorParam param;
   param.create = QUDA_NULL_FIELD_CREATE;
 
@@ -57,6 +70,8 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
     tmp2 = new cudaColorSpinorField(in.Even(), param); // only create if necessary
     reset = true;
   }
+
+  printf("length = %d %d %d\n", in.length, in.Odd().length, in.Even().length);
 
   Twist(*tmp2, in.Odd());
   DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp2, -kappa);
@@ -72,7 +87,6 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
 
 void DiracTwistedMass::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-  checkFullSpinor(out, in);
 
   ColorSpinorParam param;
   param.create = QUDA_NULL_FIELD_CREATE;
@@ -151,6 +165,9 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   checkParitySpinor(in, out);
   if (in.twistFlavor != out.twistFlavor) 
     errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
+  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
+    errorQuda("Twist flavor not set %d\n", in.twistFlavor);
+
 
   twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
 			0, 0, kappa, mu, 0.0, out.volume, out.length, in.Precision());
@@ -167,6 +184,9 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   checkParitySpinor(in, out);
   if (in.twistFlavor != out.twistFlavor) 
     errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
+  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
+    errorQuda("Twist flavor not set %d\n", in.twistFlavor);
+  
 
   twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
 			x.v, x.norm, kappa, mu, k, out.volume, out.length, in.Precision());

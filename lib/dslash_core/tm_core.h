@@ -26,7 +26,7 @@ __device__ float4 operator*(const float &x, const float4 &y)
 #define tmp3_re tmp3.x
 #define tmp3_im tmp3.y
 
-__global__ void twistGamma5Kernel(double2 *spinor, float *null, int sp_stride, double a, double b)
+__global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b)
 {
    int sp_idx = blockIdx.x * blockDim.x + threadIdx.x;
   
@@ -150,9 +150,9 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, int sp_stride, d
 #define tmp3_re tmp1.z
 #define tmp3_im tmp1.w
 
-__global__ void twistGamma5Kernel(float4 *spinor, float *null, int sp_stride, float a, float b)
+__global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b)
 {
-   int sp_idx    = blockIdx.x * blockDim.x + threadIdx.x;
+   int sp_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
    float4 I0 = tex1Dfetch(spinorTexSingle, sp_idx + 0 * sp_stride);   
    float4 I1 = tex1Dfetch(spinorTexSingle, sp_idx + 1 * sp_stride);   
@@ -245,7 +245,7 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, int sp_stride, fl
 }
 
 
-__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, int sp_stride, float a, float b)
+__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b)
 {
    int sp_idx    = blockIdx.x * blockDim.x + threadIdx.x;
     

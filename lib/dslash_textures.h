@@ -185,6 +185,7 @@ template <int N, typename spinorFloat>
     if (x) cudaBindTexture(0, accumTexDouble, x, spinor_bytes); 
     return sizeof(double);
   } else if (N==4 && sizeof(spinorFloat) == sizeof(float4)) {
+    printf("where it should be\n");
     int spinor_bytes = length*sizeof(float);
     cudaBindTexture(0, spinorTexSingle, in, spinor_bytes); 
     if (x) cudaBindTexture(0, accumTexSingle, x, spinor_bytes); 

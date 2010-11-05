@@ -7,13 +7,13 @@
 }*/
 
 ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0) {
-  create(param.nDim, param.x, param.nColor, param.nSpin, param.precision, param.pad, 
+  create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
 	 param.fieldLocation, param.siteSubset, param.siteOrder, param.fieldOrder, 
 	 param.gammaBasis);
 }
 
 ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : init(false), even(0), odd(0) {
-  create(field.nDim, field.x, field.nColor, field.nSpin, field.precision, field.pad,
+  create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
 	 field.fieldLocation, field.siteSubset, field.siteOrder, field.fieldOrder, 
 	 field.gammaBasis);
 }
@@ -22,8 +22,8 @@ ColorSpinorField::~ColorSpinorField() {
   destroy();
 }
 
-void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecision Prec, 
-			      int Pad, QudaFieldLocation fieldLocation, 
+void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
+			      QudaPrecision Prec, int Pad, QudaFieldLocation fieldLocation, 
 			      QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, 
 			      QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis) {
   if (Ndim > QUDA_MAX_DIM){
@@ -32,6 +32,7 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
   nDim = Ndim;
   nColor = Nc;
   nSpin = Ns;
+  twistFlavor = Twistflavor;
 
   precision = Prec;
   volume = 1;
@@ -43,8 +44,7 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaPrecis
   
   if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     stride = volume/2 + pad; // padding is based on half volume
-    length = 2*stride*nColor*nSpin*2;
-    
+    length = 2*stride*nColor*nSpin*2;    
   } else {
     stride = volume + pad;
     length = stride*nColor*nSpin*2;
@@ -69,9 +69,9 @@ void ColorSpinorField::destroy() {
 
 ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
   if (&src != this) {
-    create(src.nDim, src.x, src.nColor, src.nSpin, src.precision, src.pad,
-	   src.fieldLocation, src.siteSubset, src.siteOrder, src.fieldOrder, 
-	   src.gammaBasis);    
+    create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
+	   src.precision, src.pad, src.fieldLocation, src.siteSubset, 
+	   src.siteOrder, src.fieldOrder, src.gammaBasis);    
   }
   return *this;
 }
@@ -81,6 +81,7 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
 
   if (param.nColor != 0) nColor = param.nColor;
   if (param.nSpin != 0) nSpin = param.nSpin;
+  if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
   if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
   if (param.nDim != 0) nDim = param.nDim;
@@ -96,10 +97,11 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.siteSubset == QUDA_FULL_SITE_SUBSET){
     stride = volume/2 + pad;
     length = 2*stride*nColor*nSpin*2;
-  }else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
+  } else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
     stride = volume + pad;
     length = stride*nColor*nSpin*2;  
-  }else{
+  } else {
+    errorQuda("SiteSubset not defined %d", param.siteSubset);
     //do nothing, not an error
   }
 
@@ -120,6 +122,7 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
 void ColorSpinorField::fill(ColorSpinorParam &param) {
   param.nColor = nColor;
   param.nSpin = nSpin;
+  param.twistFlavor = twistFlavor;
   param.precision = precision;
   param.nDim = nDim;
   memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
@@ -144,6 +147,10 @@ void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorFi
 
   if (a.Nspin() != b.Nspin()) {
     errorQuda("checkSpinor: spins do not match: %d %d", a.Nspin(), b.Nspin());
+  }
+
+  if (a.TwistFlavor() != b.TwistFlavor()) {
+    errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
   }
 }
 
