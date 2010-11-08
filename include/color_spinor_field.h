@@ -92,6 +92,7 @@ class ColorSpinorParam {
     printfQuda("fieldLocation = %d\n", fieldLocation);
     printfQuda("nColor = %d\n", nColor);
     printfQuda("nSpin = %d\n", nSpin);
+    printfQuda("twistFlavor = %d\n", twistFlavor);
     printfQuda("nDim = %d\n", nDim);
     for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
     printfQuda("precision = %d\n", precision);
@@ -112,8 +113,8 @@ class ColorSpinorParam {
 class ColorSpinorField {
 
  private:
-  void create(int nDim, const int *x, int Nc, int Ns, QudaPrecision precision, 
-	      int pad, QudaFieldLocation location, QudaSiteSubset subset, 
+  void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
+	      QudaPrecision precision, int pad, QudaFieldLocation location, QudaSiteSubset subset, 
 	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
   void destroy();  
 
@@ -164,6 +165,7 @@ class ColorSpinorField {
   QudaPrecision Precision() const { return precision; }
   int Ncolor() const { return nColor; } 
   int Nspin() const { return nSpin; } 
+  int TwistFlavor() const { return twistFlavor; } 
   int Ndim() const { return nDim; }
   int X(int d) const { return x[d]; }
   int Length() const { return length; }

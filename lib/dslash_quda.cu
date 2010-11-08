@@ -121,7 +121,9 @@ void dslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat *gauge0, cons
       }
     }
   }
-  
+ 
+  unbindSpinorTex<spinorN>(in, inNorm, x, xNorm);
+ 
 }
 
 // Wilson wrappers
@@ -131,7 +133,7 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 
 #ifdef GPU_WILSON_DIRAC
   void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");
@@ -153,6 +155,8 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 		  gauge.reconstruct, (short4*)in, (float*)inNorm, parity, dagger, 
 		  (short4*)x, (float*)xNorm, k, volume, length);
   }
+  unbindGaugeTex(gauge);
+
   checkCudaError();
 #else
   errorQuda("Wilson dslash has not been built");
@@ -172,6 +176,7 @@ void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm);
   cloverKernel<<<gridDim, blockDim, shared_bytes>>> 
     (out, outNorm, clover, cloverNorm, in, inNorm, parity);
+  unbindSpinorTex<N>(in, inNorm);
 }
 
 void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover clover, 
@@ -202,6 +207,8 @@ void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClove
 		  (float*)cloverNormP, (short4*)in,
 		  (float*)inNorm, parity, volume, length);
   }
+  unbindCloverTex(clover);
+
   checkCudaError();
 #else
   errorQuda("Clover dslash has not been built");
@@ -276,6 +283,7 @@ void cloverDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0,
     }
   }
 
+  unbindSpinorTex<N>(in, inNorm, x, xNorm);
 }
 
 void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover cloverInv,
@@ -288,7 +296,8 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
   QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
 
   void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
+
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");
@@ -313,6 +322,9 @@ void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, const Ful
 			gauge.reconstruct, (short4*)cloverP, (float*)cloverNormP, (short4*)in,
 			(float*)inNorm, parity, dagger, (short4*)x, (float*)xNorm, a, volume, length);
   }
+
+  unbindGaugeTex(gauge);
+  unbindCloverTex(cloverInv);
 
   checkCudaError();
 #else
@@ -389,6 +401,7 @@ void domainWallDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gau
     }
   }
 
+  unbindSpinorTex<N>(in, inNorm, x, xNorm);
 }
 
 void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge, 
@@ -398,7 +411,7 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
   void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");
@@ -420,6 +433,8 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 			    gauge.reconstruct, (short4*)in, (float*)inNorm, parity, dagger, 
 			    (short4*)x, (float*)xNorm, m_f, k2, volume5d, length);
   }
+
+  unbindGaugeTex(gauge);
 
   checkCudaError();
 #else
@@ -489,8 +504,8 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   }
   
   cudaThreadSynchronize();
-  checkCudaError();
   
+  unbindSpinorTex<spinorN>(in, inNorm, x, xNorm);
 }
 
 
@@ -530,8 +545,8 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   }
   
   cudaThreadSynchronize();
-  checkCudaError();
-  
+
+  unbindSpinorTex<spinorN>(in, inNorm, x, xNorm);
 }
 
 
@@ -593,6 +608,10 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 			     (short2*)x, (float*)xNorm, k, volume, length, precision);
     }
   }
+
+  unbindLongGaugeTex(longGauge);
+  unbindFatGaugeTex(fatGauge);
+
   checkCudaError();
 #else
   errorQuda("Staggered dslash has not been built");
@@ -611,9 +630,10 @@ void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in,
   printf("%d %d %d %d\n", gridDim.x, blockDim.x, volume, length);
   checkCudaError();
 
-  bindSpinorTex<N>(length, in, inNorm);
-  checkCudaError();
+  bindSpinorTex<N>(4, in, inNorm);
   twistGamma5Kernel<<<gridDim, blockDim, 0>>> (out, outNorm, a, b);
+  checkCudaError();
+  unbindSpinorTex<N>(in, inNorm);
 }
 
 void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
@@ -723,7 +743,8 @@ void twistedMassDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat ga
       }
     }
   }
-
+  
+  unbindSpinorTex<N>(in, inNorm, x, xNorm);
 }
 
 void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge, 
@@ -734,7 +755,7 @@ void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 
 #ifdef GPU_TWISTED_MASS_DIRAC
   void *gauge0, *gauge1;
-  bindGaugeTex(gauge, parity, &gauge0, &gauge1, gauge.reconstruct);
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (precision != gauge.precision)
     errorQuda("Mixing gauge and spinor precision not supported");
@@ -756,6 +777,8 @@ void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 			     gauge.reconstruct, (short4*)in, (float*)inNorm, parity, dagger, 
 			     (short4*)x, (float*)xNorm, kappa, mu, a, volume, length);
   }
+
+  unbindGaugeTex(gauge);
 
   checkCudaError();
 #else
