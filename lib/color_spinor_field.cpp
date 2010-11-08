@@ -101,7 +101,7 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
     stride = volume + pad;
     length = stride*nColor*nSpin*2;  
   } else {
-    errorQuda("SiteSubset not defined %d", param.siteSubset);
+    //errorQuda("SiteSubset not defined %d", param.siteSubset);
     //do nothing, not an error
   }
 

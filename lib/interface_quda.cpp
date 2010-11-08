@@ -650,7 +650,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
         
   } else if (param->dslash_type == QUDA_WILSON_DSLASH ||
 	     param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
-	     param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+	     param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+	     param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 
     // temporary hack
     if (!pc_solution) cudaGaugePrecise.X[0] *= 2;

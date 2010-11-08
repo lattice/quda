@@ -14,9 +14,9 @@
 #include <wilson_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 2;
 // clover-improved? (0 = plain Wilson, 1 = clover)
-const int clover_yes = 1;
+const int clover_yes = 0;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
@@ -45,10 +45,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 32;
+  gauge_param.X[0] = 4;
+  gauge_param.X[1] = 4;
+  gauge_param.X[2] = 4;
+  gauge_param.X[3] = 4;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;

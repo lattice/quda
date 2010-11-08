@@ -39,9 +39,7 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 
   double flavor_mu = in.twistFlavor * mu;
   
-  std::cout << "flavor mu = " << flavor_mu << std::endl;
-
-  twistGamma5Cuda(out.x, out.norm, in.x, in.norm, kappa, flavor_mu, 
+  twistGamma5Cuda(out.v, out.norm, in.v, in.norm, kappa, flavor_mu, 
   		  in.volume, in.length, in.precision, twistType);
 }
 
@@ -70,8 +68,6 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
     tmp2 = new cudaColorSpinorField(in.Even(), param); // only create if necessary
     reset = true;
   }
-
-  printf("length = %d %d %d\n", in.length, in.Odd().length, in.Even().length);
 
   Twist(*tmp2, in.Odd());
   DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp2, -kappa);

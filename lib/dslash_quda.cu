@@ -126,6 +126,21 @@ void dslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat *gauge0, cons
  
 }
 
+template <int N, typename spinorFloat>
+void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in, 
+		     const float *inNorm, const double &a, const double &b,
+		     const int volume, const int length)
+{
+  dim3 gridDim(volume/BLOCK_DIM, 1, 1);
+  dim3 blockDim(BLOCK_DIM, 1, 1);
+
+  bindSpinorTex<N>(length, in, inNorm);
+  twistGamma5Kernel<<<gridDim, blockDim, 0>>> (out, outNorm, a, b);
+  unbindSpinorTex<N>(in, inNorm);
+}
+
+
+
 // Wilson wrappers
 void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, const void *inNorm, 
 		const int parity, const int dagger, const void *x, const void *xNorm, 
@@ -148,7 +163,7 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
     dslashCuda<4>((float4*)out, (float*)outNorm, (float4*)gauge0, (float4*)gauge1,
-		  gauge.reconstruct, (float4*)in, (float*)inNorm, parity, dagger, 
+    		  gauge.reconstruct, (float4*)in, (float*)inNorm, parity, dagger, 
 		  (float4*)x, (float*)xNorm, k, volume, length);
   } else if (precision == QUDA_HALF_PRECISION) {
     dslashCuda<4>((short4*)out, (float*)outNorm, (short4*)gauge0, (short4*)gauge1,
@@ -160,7 +175,7 @@ void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in,
   checkCudaError();
 #else
   errorQuda("Wilson dslash has not been built");
-#endif
+#endif // GPU_WILSON_DIRAC
 
 }
 
@@ -619,23 +634,6 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 
 }
 
-template <int N, typename spinorFloat>
-void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in, 
-		     const float *inNorm, const double &a, const double &b,
-		     const int volume, const int length)
-{
-  dim3 gridDim(volume/BLOCK_DIM, 1, 1);
-  dim3 blockDim(BLOCK_DIM, 1, 1);
-
-  printf("%d %d %d %d\n", gridDim.x, blockDim.x, volume, length);
-  checkCudaError();
-
-  bindSpinorTex<N>(4, in, inNorm);
-  twistGamma5Kernel<<<gridDim, blockDim, 0>>> (out, outNorm, a, b);
-  checkCudaError();
-  unbindSpinorTex<N>(in, inNorm);
-}
-
 void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
 		     const double kappa, const double mu, const int volume, 
 		     const int length, const QudaPrecision precision, 
@@ -663,7 +661,7 @@ void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNor
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
     twistGamma5Cuda<4>((float4*)out, (float*)outNorm, (float4*)in, 
-		       (float*)inNorm, a, b, volume, length);
+    		       (float*)inNorm, a, b, volume, length);
   } else if (precision == QUDA_HALF_PRECISION) {
     twistGamma5Cuda<4>((short4*)out, (float*)outNorm, (short4*)in,
 		       (float*)inNorm, a, b, volume, length);
@@ -671,7 +669,7 @@ void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNor
   checkCudaError();
 #else
   errorQuda("Twisted mass dslash has not been built");
-#endif
+#endif // GPU_TWISTED_MASS_DIRAC
 
 }
 

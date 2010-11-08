@@ -165,8 +165,6 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((unsigned long)v + bytes/2);
     if (precision == QUDA_HALF_PRECISION) 
       (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
-
-    std::cout << "length check " << even->Length() << " " << odd->Length() << std::endl;
   }
   
 }

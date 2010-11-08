@@ -45,7 +45,7 @@ void init() {
   gauge_param.X[0] = 4;
   gauge_param.X[1] = 4;
   gauge_param.X[2] = 4;
-  gauge_param.X[3] = 8;
+  gauge_param.X[3] = 4;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -63,7 +63,7 @@ void init() {
   gauge_param.type = QUDA_WILSON_LINKS;
 
   inv_param.kappa = 1.0;
-  inv_param.mu = 0.1;
+  inv_param.mu = 0.05;
   inv_param.twist_flavor = QUDA_TWIST_MNS;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;

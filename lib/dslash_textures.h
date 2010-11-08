@@ -242,7 +242,6 @@ static void unbindLongGaugeTex(const FullGauge gauge){
 template <int N, typename spinorFloat>
   int bindSpinorTex(const int length, const spinorFloat *in, const float *inNorm,
 		    const spinorFloat *x=0, const float *xNorm=0) {
-  printf("Binding Texture start\n");
 
   if (N==2 && sizeof(spinorFloat) == sizeof(double2)) {
     int spinor_bytes = length*sizeof(double);
@@ -279,7 +278,6 @@ template <int N, typename spinorFloat>
     errorQuda("Unsupported precision and short vector type");
   }
 
-  printf("Binding Texture done\n");
 }
 
 template <int N, typename spinorFloat>
