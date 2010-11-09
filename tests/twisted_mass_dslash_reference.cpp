@@ -336,12 +336,12 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
     dslashReference(tmp, gauge, inEven, 1, daggerBit);
     twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     dslashReference(outEven, gauge, tmp, 0, daggerBit);
-    twistGamma5(outEven, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+    twistGamma5(outEven, outEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
   } else {
     dslashReference(tmp, gauge, inEven, 0, daggerBit);
     twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     dslashReference(outEven, gauge, tmp, 1, daggerBit);
-    twistGamma5(outEven, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+    twistGamma5(outEven, outEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
   }    
   
   // lastly apply the kappa term

@@ -565,7 +565,7 @@ def clover():
 
 def twisted_rotate(x):
     str = []
-    str.append("// apply twisted mass " + sign(x) + "ve rotation\n")
+    str.append("// apply twisted mass rotation\n")
 
     for h in range(0, 4):
         for c in range(0, 3):
@@ -615,7 +615,7 @@ def twisted():
         for c in range(0,3):
             str.append(out_re(s,c) + " = " + tmp_re(s,c) + ";\n")
             str.append(out_im(s,c) + " = " + tmp_im(s,c) + ";\n")
-    str.append("#endif\n")
+    str.append("#endif // DSLASH_XPAY\n")
     str.append("\n")
 
     return block(''.join(str))+"\n"

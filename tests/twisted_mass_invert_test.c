@@ -53,7 +53,7 @@ int main(int argc, char **argv)
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-2;
 
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   inv_param.dagger = QUDA_DAG_NO;
@@ -119,8 +119,6 @@ int main(int argc, char **argv)
     mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
 	0, inv_param.cpu_prec, gauge_param.cpu_prec); 
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
-    printf("Not implemented\n");
-    exit(0);
     matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
 	  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
   }

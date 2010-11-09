@@ -1494,7 +1494,7 @@ o32_re = o32_im = 0;
 }
 
 {
-    // apply twisted mass +ve rotation
+    // apply twisted mass rotation
     volatile spinorFloat tmp00_re = +o00_re-o20_im*a;
     volatile spinorFloat tmp00_im = +o00_im+o20_re*a;
     volatile spinorFloat tmp01_re = +o01_re-o21_im*a;
@@ -1575,7 +1575,7 @@ o32_re = o32_im = 0;
     o31_im = tmp31_im;
     o32_re = tmp32_re;
     o32_im = tmp32_im;
-    #endif
+    #endif // DSLASH_XPAY
     
 }
 
