@@ -567,8 +567,6 @@ def twisted_rotate(x):
     str = []
     str.append("// apply twisted mass " + sign(x) + "ve rotation\n")
 
-    str.append("spinorFloat km2 = 2 * kappa * mu;\n")
-
     for h in range(0, 4):
         for c in range(0, 3):
             strRe = []
@@ -590,11 +588,11 @@ def twisted_rotate(x):
                 im = igamma5[4*h+s].imag
                 if re==0 and im==0: ()
                 elif im==0:
-                    strRe.append(sign(re*x)+out_re(s,c) + "*km2")
-                    strIm.append(sign(re*x)+out_im(s,c) + "*km2")
+                    strRe.append(sign(re*x)+out_re(s,c) + "*b")
+                    strIm.append(sign(re*x)+out_im(s,c) + "*b")
                 elif re==0:
-                    strRe.append(sign(-im*x)+out_im(s,c) + "*km2")
-                    strIm.append(sign(im*x)+out_re(s,c) + "*km2")
+                    strRe.append(sign(-im*x)+out_im(s,c) + "*b")
+                    strIm.append(sign(im*x)+out_re(s,c) + "*b")
 
             str.append("volatile spinorFloat "+tmp_re(h,c)+ " = "+''.join(strRe)+";\n")
             str.append("volatile spinorFloat "+tmp_im(h,c)+ " = "+''.join(strIm)+";\n")
@@ -604,14 +602,20 @@ def twisted_rotate(x):
 
 def twisted():
     str = []
-    str.append(twisted_rotate(-1))
+    str.append(twisted_rotate(+1))
 
-    str.append("//scale by 1/(1 + (2*mu*kappa)^2) and copy back\n")
-    str.append("spinorFloat inv = 1 / (1 + km2 * km2);\n\n")
+    str.append("#ifndef DSLASH_XPAY\n")
+    str.append("//scale by a = 1/(1 + b*b) \n")
     for s in range(0,4):
         for c in range(0,3):
-            str.append(out_re(s,c) + " = inv*" + tmp_re(s,c) + ";\n")
-            str.append(out_im(s,c) + " = inv*" + tmp_im(s,c) + ";\n")
+            str.append(out_re(s,c) + " = a*" + tmp_re(s,c) + ";\n")
+            str.append(out_im(s,c) + " = a*" + tmp_im(s,c) + ";\n")
+    str.append("#else\n")
+    for s in range(0,4):
+        for c in range(0,3):
+            str.append(out_re(s,c) + " = " + tmp_re(s,c) + ";\n")
+            str.append(out_im(s,c) + " = " + tmp_im(s,c) + ";\n")
+    str.append("#endif\n")
     str.append("\n")
 
     return block(''.join(str))+"\n"
@@ -673,28 +677,29 @@ def epilog():
             str.append("#undef "+in_im(s,c)+"\n")
     str.append("\n")
 
-    for m in range(0,6):
-        s = m/3
-        c = m%3
-        str.append("#undef "+c_re(0,s,c,s,c)+"\n")
-    for n in range(0,6):
-        sn = n/3
-        cn = n%3
-        for m in range(n+1,6):
-            sm = m/3
-            cm = m%3
-            str.append("#undef "+c_re(0,sm,cm,sn,cn)+"\n")
-            str.append("#undef "+c_im(0,sm,cm,sn,cn)+"\n")
-    str.append("\n")
+    if twist == False:
+        for m in range(0,6):
+            s = m/3
+            c = m%3
+            str.append("#undef "+c_re(0,s,c,s,c)+"\n")
+            for n in range(0,6):
+                sn = n/3
+                cn = n%3
+                for m in range(n+1,6):
+                    sm = m/3
+                    cm = m%3
+                    str.append("#undef "+c_re(0,sm,cm,sn,cn)+"\n")
+                    str.append("#undef "+c_im(0,sm,cm,sn,cn)+"\n")
+        str.append("\n")
 
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            if 2*i < sharedFloats:
-                str.append("#undef "+out_re(s,c)+"\n")
-            if 2*i+1 < sharedFloats:
-                str.append("#undef "+out_im(s,c)+"\n")
-    str.append("\n")
+        for s in range(0,4):
+            for c in range(0,3):
+                i = 3*s+c
+                if 2*i < sharedFloats:
+                    str.append("#undef "+out_re(s,c)+"\n")
+                    if 2*i+1 < sharedFloats:
+                        str.append("#undef "+out_im(s,c)+"\n")
+        str.append("\n")
 
     return ''.join(str)
 # end def epilog

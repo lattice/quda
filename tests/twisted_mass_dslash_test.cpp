@@ -14,7 +14,7 @@
 #include <twisted_mass_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 2;
+const int test_type = 0;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
@@ -22,8 +22,8 @@ const int transfer = 0; // include transfer time in the benchmark?
 
 const int loops = 1000;
 
-QudaPrecision cpu_prec = QUDA_SINGLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -63,7 +63,7 @@ void init() {
   gauge_param.type = QUDA_WILSON_LINKS;
 
   inv_param.kappa = 1.0;
-  inv_param.mu = 0.05;
+  inv_param.mu = 0.00;
   inv_param.twist_flavor = QUDA_TWIST_MNS;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
@@ -250,15 +250,13 @@ void dslashRef() {
   fflush(stdout);
   switch (test_type) {
   case 0:
-    dslash(spinorRef->v, hostGauge, spinor->v, parity, dagger, 
-	   inv_param.cpu_prec, gauge_param.cpu_prec);
+    dslash(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+	   parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec);
     break;
   case 1:    
-    printf("Test type not defined\n");
-    exit(-1);    
-    //matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.matpc_type, dagger, 
-    //	  inv_param.cpu_prec, gauge_param.cpu_prec);
-    //break;
+    matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+	  inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param.cpu_prec);
+    break;
   case 2:
     mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	dagger, inv_param.cpu_prec, gauge_param.cpu_prec);
@@ -267,6 +265,8 @@ void dslashRef() {
     printf("Test type not defined\n");
     exit(-1);
   }
+
+  std::cout << "Source preservation check " << norm2(*spinor) << std::endl;
 
   printf("done.\n");
     

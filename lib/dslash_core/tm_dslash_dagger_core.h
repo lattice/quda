@@ -1494,64 +1494,88 @@ o32_re = o32_im = 0;
 }
 
 {
-    // apply twisted mass -ve rotation
-    spinorFloat km2 = 2 * kappa * mu;
-    volatile spinorFloat tmp00_re = +o00_re+o20_im*km2;
-    volatile spinorFloat tmp00_im = +o00_im-o20_re*km2;
-    volatile spinorFloat tmp01_re = +o01_re+o21_im*km2;
-    volatile spinorFloat tmp01_im = +o01_im-o21_re*km2;
-    volatile spinorFloat tmp02_re = +o02_re+o22_im*km2;
-    volatile spinorFloat tmp02_im = +o02_im-o22_re*km2;
+    // apply twisted mass +ve rotation
+    volatile spinorFloat tmp00_re = +o00_re-o20_im*b;
+    volatile spinorFloat tmp00_im = +o00_im+o20_re*b;
+    volatile spinorFloat tmp01_re = +o01_re-o21_im*b;
+    volatile spinorFloat tmp01_im = +o01_im+o21_re*b;
+    volatile spinorFloat tmp02_re = +o02_re-o22_im*b;
+    volatile spinorFloat tmp02_im = +o02_im+o22_re*b;
     
-    volatile spinorFloat tmp10_re = +o10_re+o30_im*km2;
-    volatile spinorFloat tmp10_im = +o10_im-o30_re*km2;
-    volatile spinorFloat tmp11_re = +o11_re+o31_im*km2;
-    volatile spinorFloat tmp11_im = +o11_im-o31_re*km2;
-    volatile spinorFloat tmp12_re = +o12_re+o32_im*km2;
-    volatile spinorFloat tmp12_im = +o12_im-o32_re*km2;
+    volatile spinorFloat tmp10_re = +o10_re-o30_im*b;
+    volatile spinorFloat tmp10_im = +o10_im+o30_re*b;
+    volatile spinorFloat tmp11_re = +o11_re-o31_im*b;
+    volatile spinorFloat tmp11_im = +o11_im+o31_re*b;
+    volatile spinorFloat tmp12_re = +o12_re-o32_im*b;
+    volatile spinorFloat tmp12_im = +o12_im+o32_re*b;
     
-    volatile spinorFloat tmp20_re = +o00_im*km2+o20_re;
-    volatile spinorFloat tmp20_im = -o00_re*km2+o20_im;
-    volatile spinorFloat tmp21_re = +o01_im*km2+o21_re;
-    volatile spinorFloat tmp21_im = -o01_re*km2+o21_im;
-    volatile spinorFloat tmp22_re = +o02_im*km2+o22_re;
-    volatile spinorFloat tmp22_im = -o02_re*km2+o22_im;
+    volatile spinorFloat tmp20_re = -o00_im*b+o20_re;
+    volatile spinorFloat tmp20_im = +o00_re*b+o20_im;
+    volatile spinorFloat tmp21_re = -o01_im*b+o21_re;
+    volatile spinorFloat tmp21_im = +o01_re*b+o21_im;
+    volatile spinorFloat tmp22_re = -o02_im*b+o22_re;
+    volatile spinorFloat tmp22_im = +o02_re*b+o22_im;
     
-    volatile spinorFloat tmp30_re = +o10_im*km2+o30_re;
-    volatile spinorFloat tmp30_im = -o10_re*km2+o30_im;
-    volatile spinorFloat tmp31_re = +o11_im*km2+o31_re;
-    volatile spinorFloat tmp31_im = -o11_re*km2+o31_im;
-    volatile spinorFloat tmp32_re = +o12_im*km2+o32_re;
-    volatile spinorFloat tmp32_im = -o12_re*km2+o32_im;
+    volatile spinorFloat tmp30_re = -o10_im*b+o30_re;
+    volatile spinorFloat tmp30_im = +o10_re*b+o30_im;
+    volatile spinorFloat tmp31_re = -o11_im*b+o31_re;
+    volatile spinorFloat tmp31_im = +o11_re*b+o31_im;
+    volatile spinorFloat tmp32_re = -o12_im*b+o32_re;
+    volatile spinorFloat tmp32_im = +o12_re*b+o32_im;
     
     
-    //scale by 1/(1 + (2*mu*kappa)^2) and copy back
-    spinorFloat inv = 1 / (1 + km2 * km2);
-    
-    o00_re = inv*tmp00_re;
-    o00_im = inv*tmp00_im;
-    o01_re = inv*tmp01_re;
-    o01_im = inv*tmp01_im;
-    o02_re = inv*tmp02_re;
-    o02_im = inv*tmp02_im;
-    o10_re = inv*tmp10_re;
-    o10_im = inv*tmp10_im;
-    o11_re = inv*tmp11_re;
-    o11_im = inv*tmp11_im;
-    o12_re = inv*tmp12_re;
-    o12_im = inv*tmp12_im;
-    o20_re = inv*tmp20_re;
-    o20_im = inv*tmp20_im;
-    o21_re = inv*tmp21_re;
-    o21_im = inv*tmp21_im;
-    o22_re = inv*tmp22_re;
-    o22_im = inv*tmp22_im;
-    o30_re = inv*tmp30_re;
-    o30_im = inv*tmp30_im;
-    o31_re = inv*tmp31_re;
-    o31_im = inv*tmp31_im;
-    o32_re = inv*tmp32_re;
-    o32_im = inv*tmp32_im;
+    #ifndef DSLASH_XPAY
+    //scale by a = 1/(1 + b*b) 
+    o00_re = a*tmp00_re;
+    o00_im = a*tmp00_im;
+    o01_re = a*tmp01_re;
+    o01_im = a*tmp01_im;
+    o02_re = a*tmp02_re;
+    o02_im = a*tmp02_im;
+    o10_re = a*tmp10_re;
+    o10_im = a*tmp10_im;
+    o11_re = a*tmp11_re;
+    o11_im = a*tmp11_im;
+    o12_re = a*tmp12_re;
+    o12_im = a*tmp12_im;
+    o20_re = a*tmp20_re;
+    o20_im = a*tmp20_im;
+    o21_re = a*tmp21_re;
+    o21_im = a*tmp21_im;
+    o22_re = a*tmp22_re;
+    o22_im = a*tmp22_im;
+    o30_re = a*tmp30_re;
+    o30_im = a*tmp30_im;
+    o31_re = a*tmp31_re;
+    o31_im = a*tmp31_im;
+    o32_re = a*tmp32_re;
+    o32_im = a*tmp32_im;
+    #else
+    o00_re = tmp00_re;
+    o00_im = tmp00_im;
+    o01_re = tmp01_re;
+    o01_im = tmp01_im;
+    o02_re = tmp02_re;
+    o02_im = tmp02_im;
+    o10_re = tmp10_re;
+    o10_im = tmp10_im;
+    o11_re = tmp11_re;
+    o11_im = tmp11_im;
+    o12_re = tmp12_re;
+    o12_im = tmp12_im;
+    o20_re = tmp20_re;
+    o20_im = tmp20_im;
+    o21_re = tmp21_re;
+    o21_im = tmp21_im;
+    o22_re = tmp22_re;
+    o22_im = tmp22_im;
+    o30_re = tmp30_re;
+    o30_im = tmp30_im;
+    o31_re = tmp31_re;
+    o31_im = tmp31_im;
+    o32_re = tmp32_re;
+    o32_im = tmp32_im;
+    #endif
     
 }
 
@@ -1665,50 +1689,4 @@ o32_re = o32_im = 0;
 #undef i31_im
 #undef i32_re
 #undef i32_im
-
-#undef c00_00_re
-#undef c01_01_re
-#undef c02_02_re
-#undef c10_10_re
-#undef c11_11_re
-#undef c12_12_re
-#undef c01_00_re
-#undef c01_00_im
-#undef c02_00_re
-#undef c02_00_im
-#undef c10_00_re
-#undef c10_00_im
-#undef c11_00_re
-#undef c11_00_im
-#undef c12_00_re
-#undef c12_00_im
-#undef c02_01_re
-#undef c02_01_im
-#undef c10_01_re
-#undef c10_01_im
-#undef c11_01_re
-#undef c11_01_im
-#undef c12_01_re
-#undef c12_01_im
-#undef c10_02_re
-#undef c10_02_im
-#undef c11_02_re
-#undef c11_02_im
-#undef c12_02_re
-#undef c12_02_im
-#undef c11_10_re
-#undef c11_10_im
-#undef c12_10_re
-#undef c12_10_im
-#undef c12_11_re
-#undef c12_11_im
-
-#undef o00_re
-#undef o00_im
-#undef o01_re
-#undef o01_im
-#undef o02_re
-#undef o02_im
-#undef o10_re
-#undef o10_im
 

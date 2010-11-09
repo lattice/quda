@@ -13,7 +13,8 @@ extern "C" {
 
   void setDims(int *);
 
-  void dslash(void *res, void **gauge, void *spinorField, int oddBit,
+  void dslash(void *res, void **gauge, void *spinorField, double kappa,
+	      double mu, QudaTwistFlavorType flavor, int oddBit,
 	      int daggerBit, QudaPrecision sPrecision,
 	      QudaPrecision gPrecision);
   
