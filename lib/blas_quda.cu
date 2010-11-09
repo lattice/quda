@@ -1082,7 +1082,7 @@ void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y)
 }
 
 template <typename Float, typename Float2>
-__global__ void xpayKernel(Float2 *x, Float a, Float2 *y, int len) {
+__global__ void xpayKernel(const Float2 *x, Float a, Float2 *y, int len) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < len) {
@@ -1124,7 +1124,7 @@ __global__ void xpayHKernel(float a, short2 *yH, float *yN, int stride, int leng
 
 
 // performs the operation y[i] = x[i] + a*y[i]
-void xpayCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y) {
+void xpayCuda(const cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y) {
   checkSpinor(x,y);
   setBlock(4, x.length, x.precision);
   if (x.precision == QUDA_DOUBLE_PRECISION) {

@@ -588,11 +588,11 @@ def twisted_rotate(x):
                 im = igamma5[4*h+s].imag
                 if re==0 and im==0: ()
                 elif im==0:
-                    strRe.append(sign(re*x)+out_re(s,c) + "*b")
-                    strIm.append(sign(re*x)+out_im(s,c) + "*b")
+                    strRe.append(sign(re*x)+out_re(s,c) + "*a")
+                    strIm.append(sign(re*x)+out_im(s,c) + "*a")
                 elif re==0:
-                    strRe.append(sign(-im*x)+out_im(s,c) + "*b")
-                    strIm.append(sign(im*x)+out_re(s,c) + "*b")
+                    strRe.append(sign(-im*x)+out_im(s,c) + "*a")
+                    strIm.append(sign(im*x)+out_re(s,c) + "*a")
 
             str.append("volatile spinorFloat "+tmp_re(h,c)+ " = "+''.join(strRe)+";\n")
             str.append("volatile spinorFloat "+tmp_im(h,c)+ " = "+''.join(strIm)+";\n")
@@ -605,11 +605,11 @@ def twisted():
     str.append(twisted_rotate(+1))
 
     str.append("#ifndef DSLASH_XPAY\n")
-    str.append("//scale by a = 1/(1 + b*b) \n")
+    str.append("//scale by b = 1/(1 + a*a) \n")
     for s in range(0,4):
         for c in range(0,3):
-            str.append(out_re(s,c) + " = a*" + tmp_re(s,c) + ";\n")
-            str.append(out_im(s,c) + " = a*" + tmp_im(s,c) + ";\n")
+            str.append(out_re(s,c) + " = b*" + tmp_re(s,c) + ";\n")
+            str.append(out_im(s,c) + " = b*" + tmp_im(s,c) + ";\n")
     str.append("#else\n")
     for s in range(0,4):
         for c in range(0,3):
@@ -634,17 +634,24 @@ def epilog():
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n")
-            str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n")
+            if twist == False:
+                str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n")
+                str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n")
+            else:
+                str.append("    "+out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n")
+                str.append("    "+out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n")
 
     str.append("#else\n")
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
-            str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
-
+            if twist == False:
+                str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
+                str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
+            else:
+                str.append("    "+out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
+                str.append("    "+out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
     str.append("#endif // SPINOR_DOUBLE\n")
 
     str.append("#endif // DSLASH_XPAY\n\n")

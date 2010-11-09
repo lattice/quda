@@ -255,7 +255,7 @@ void twistGamma5(sFloat *out, sFloat *in, const sFloat kappa, const sFloat mu,
   
 }
 
-// this actually applies the preconditioned dslasj, e.g., D_ee D_eo or D_oo D_oe
+// this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
 void dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double mu, 
 	    QudaTwistFlavorType flavor, int oddBit, int daggerBit,
 	    QudaPrecision sPrecision, QudaPrecision gPrecision) {
@@ -334,14 +334,14 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
   // full dslash operator
   if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
     dslashReference(tmp, gauge, inEven, 1, daggerBit);
-    twistGamma5(tmp, tmp, kappa, mu, flavor, V, QUDA_TWIST_GAMMA5_INVERSE);
+    twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     dslashReference(outEven, gauge, tmp, 0, daggerBit);
-    twistGamma5(outEven, tmp, kappa, mu, flavor, V, QUDA_TWIST_GAMMA5_INVERSE);
+    twistGamma5(outEven, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
   } else {
     dslashReference(tmp, gauge, inEven, 0, daggerBit);
-    twistGamma5(tmp, tmp, kappa, mu, flavor, V, QUDA_TWIST_GAMMA5_INVERSE);
+    twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     dslashReference(outEven, gauge, tmp, 1, daggerBit);
-    twistGamma5(outEven, tmp, kappa, mu, flavor, V, QUDA_TWIST_GAMMA5_INVERSE);
+    twistGamma5(outEven, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
   }    
   
   // lastly apply the kappa term

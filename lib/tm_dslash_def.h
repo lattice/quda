@@ -50,7 +50,7 @@
 #if (DD_PREC == 0)
 #define DD_PARAM4 const int oddBit, const double a, const double b
 #else
-#define DD_PARAM4 const int oddBit, const double a, const float b
+#define DD_PARAM4 const int oddBit, const float a, const float b
 #endif
 #else            // xpay
 #define DSLASH_XPAY

@@ -56,14 +56,14 @@ void init() {
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
   inv_param.kappa = 1.0;
-  inv_param.mu = 0.00;
+  inv_param.mu = 0.01;
   inv_param.twist_flavor = QUDA_TWIST_MNS;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
@@ -180,6 +180,12 @@ void init() {
     diracParam.tmp2 = tmp2;
     
     dirac = Dirac::create(diracParam);
+    DiracTwistedMassPC *diracTM = (DiracTwistedMassPC*)dirac;
+
+    diracTM->TwistInv(*tmp1, *cudaSpinor);
+    diracTM->Twist(*tmp1, *tmp1);
+
+    std::cout << "Source preservation check " << norm2(*tmp1) << " " << norm2(*tmp2) << std::endl;
 
   } else {
     std::cout << "Source: CPU = " << norm2(*spinor) << std::endl;
@@ -265,8 +271,6 @@ void dslashRef() {
     printf("Test type not defined\n");
     exit(-1);
   }
-
-  std::cout << "Source preservation check " << norm2(*spinor) << std::endl;
 
   printf("done.\n");
     
