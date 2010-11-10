@@ -344,7 +344,7 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
     twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     dslashReference(outEven, gauge, tmp, 1, daggerBit);
     twistGamma5(outEven, outEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
-  } else 
+  }
 
   // lastly apply the kappa term
   sFloat kappa2 = -kappa*kappa;
