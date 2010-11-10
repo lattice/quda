@@ -1690,3 +1690,12 @@ o32_re = o32_im = 0;
 #undef i32_re
 #undef i32_im
 
+#undef o00_re
+#undef o00_im
+#undef o01_re
+#undef o01_im
+#undef o02_re
+#undef o02_im
+#undef o10_re
+#undef o10_im
+

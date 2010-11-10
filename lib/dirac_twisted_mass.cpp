@@ -153,7 +153,7 @@ void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpin
 }
 
 // apply hopping term, then inverse twist: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
-// and likewise for dagger: (A_ee^-1 D^dagger_eo) or (A_oo^-1 D^dagger_oe)
+// and likewise for dagger: (D^dagger_eo D_ee^-1) or (D^dagger_oe A_oo^-1)
 void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 				const QudaParity parity) const
 {
@@ -164,23 +164,20 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);
 
-  // FIXME - true twisted mass kernels
-  if (!dagger) {
-    DiracWilson::Dslash(out, in, parity);
-    TwistInv(out, out);
+  if (!dagger) {// broken for dagger since order isn't changed
+    double flavor_mu = in.twistFlavor * mu;
+    twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
+			  0, 0, kappa, flavor_mu, 0.0, out.volume, out.length, in.Precision());
+    flops += (1320+72)*in.volume;
   } else {
     ColorSpinorParam param;
     param.create = QUDA_NULL_FIELD_CREATE;
     cudaColorSpinorField tmp3(in, param);
     TwistInv(tmp3, in);
     DiracWilson::Dslash(out, tmp3, parity);
+    flops += 72*in.volume;
   }
-  flops += 72*in.volume;
 
-  /*double flavor_mu = in.twistFlavor * mu;
-  twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
-  			0, 0, kappa, flavor_mu, 0.0, out.volume, out.length, in.Precision());
-			flops += (1320+72)*in.volume;*/
 }
 
 // xpay version of the above
@@ -195,21 +192,18 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);  
 
-  // FIXME - true twisted mass kernels
   if (!dagger) {
-    DiracWilson::Dslash(out, in, parity);
-    TwistInv(out, out);
+    double flavor_mu = in.twistFlavor * mu;
+    twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
+  			x.v, x.norm, kappa, flavor_mu, k, out.volume, out.length, in.Precision());
+    flops += (1320+96)*in.volume;
   } else {
     TwistInv(*tmp1, in);
     DiracWilson::Dslash(out, *tmp1, parity);
+    xpayCuda(x, k, out);
+    flops += 96*in.volume;
   }
-  xpayCuda(x, k, out);
-  flops += 96*in.volume;
 
-  //double flavor_mu = in.twistFlavor * mu;
-  //twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
-  //			x.v, x.norm, kappa, flavor_mu, k, out.volume, out.length, in.Precision());
-  //flops += (1320+96)*in.volume;
 }
 
 void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const

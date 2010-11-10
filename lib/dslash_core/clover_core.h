@@ -694,3 +694,4 @@ READ_SPINOR(SPINORTEX);
 #undef o10_re
 #undef o10_im
 
+#undef sp_idx // alias needed by READ_SPINOR()

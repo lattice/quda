@@ -11,7 +11,7 @@
 //
 // twistedMassDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a twsited mass Dslash^dagger kernel where the result is
+// This is a twisted mass Dslash^dagger kernel where the result is
 // multiplied by "a" and summed with an input vector (Xpay), and the
 // gauge matrix is reconstructed from 12 real numbers.  More
 // generally, each function name is given by the concatenation of the

@@ -193,7 +193,7 @@ def prolog():
             str.append("#define "+g_im(1,m,n)+" (-"+g_im(0,n,m)+")\n")
     str.append("\n")
 
-    if twist == False:
+    if clover == True:
         str.append("// first chiral block of inverted clover term\n")
         str.append("#ifdef CLOVER_DOUBLE\n")
         i = 0
@@ -546,7 +546,7 @@ def cloverMult(chi):
     return block(''.join(str))+"\n"
 # end def cloverMult
 
-def clover():
+def applyClover():
     str = []
     str.append("#ifdef DSLASH_CLOVER\n\n")
     str.append("// change to chiral basis\n")
@@ -684,7 +684,7 @@ def epilog():
             str.append("#undef "+in_im(s,c)+"\n")
     str.append("\n")
 
-    if twist == False:
+    if clover == True:
         for m in range(0,6):
             s = m/3
             c = m%3
@@ -699,20 +699,21 @@ def epilog():
                     str.append("#undef "+c_im(0,sm,cm,sn,cn)+"\n")
         str.append("\n")
 
-        for s in range(0,4):
-            for c in range(0,3):
-                i = 3*s+c
-                if 2*i < sharedFloats:
-                    str.append("#undef "+out_re(s,c)+"\n")
-                    if 2*i+1 < sharedFloats:
-                        str.append("#undef "+out_im(s,c)+"\n")
-        str.append("\n")
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            if 2*i < sharedFloats:
+                str.append("#undef "+out_re(s,c)+"\n")
+                if 2*i+1 < sharedFloats:
+                    str.append("#undef "+out_im(s,c)+"\n")
+    str.append("\n")
 
     return ''.join(str)
 # end def epilog
 
 def generate():
-    return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + clover() + epilog()
+    return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + applyClover() + epilog()
+    #return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + epilog()
 
 def generate_twisted():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + twisted() + epilog()
@@ -721,6 +722,7 @@ def generate_twisted():
 sharedFloats = 8
 
 twist = False
+clover = True
 dagger = False
 print sys.argv[0] + ": generating wilson_dslash_core.h";
 f = open('dslash_core/wilson_dslash_core.h', 'w')
@@ -734,6 +736,7 @@ f.write(generate())
 f.close()
 
 twist = True
+clover = False
 dagger = False
 print sys.argv[0] + ": generating tm_dslash_core.h";
 f = open('dslash_core/tm_dslash_core.h', 'w')

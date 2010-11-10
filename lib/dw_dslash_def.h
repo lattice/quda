@@ -266,9 +266,6 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #elif (DD_PREC==1)
 #undef DD_PREC
 #define DD_PREC 2
-//#else
-//#undef DD_PREC
-//#define DD_PREC 0
 
 #else
 

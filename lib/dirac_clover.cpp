@@ -168,6 +168,7 @@ void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorFi
 
 // apply hopping term, then clover: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
 // and likewise for dagger: (A_ee^-1 D^dagger_eo) or (A_oo^-1 D^dagger_oe)
+// NOTE - this isn't Dslash dagger since order should be reversed!
 void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			   const QudaParity parity) const
 {

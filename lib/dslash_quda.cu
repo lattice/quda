@@ -24,9 +24,9 @@
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #include <dw_dslash_def.h>        // Domain Wall kernels
-#include <clover_def.h>           // kernels for applying the clover term alone
-#include <tm_dslash_def.h>               // Twisted Mass kernels
+#include <tm_dslash_def.h>        // Twisted Mass kernels
 #include <dslash_core/tm_core.h>  // solo twisted mass kernel
+#include <clover_def.h>           // kernels for applying the clover term alone
 
 #ifndef SHARED_FLOATS_PER_THREAD
 #define SHARED_FLOATS_PER_THREAD 0
@@ -631,6 +631,7 @@ void setTwistParam(double &a, double &b, const double &kappa, const double &mu,
     errorQuda("Twist type %d not defined\n", twist);
   }
   if (dagger) a *= -1.0;
+
 }
 
 template <int N, typename spinorFloat>
