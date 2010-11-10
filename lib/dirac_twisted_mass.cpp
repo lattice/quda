@@ -164,8 +164,16 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);
 
-  DiracWilson::Dslash(out, in, parity);
-  TwistInv(out, out);
+  if (!dagger) {
+    DiracWilson::Dslash(out, in, parity);
+    TwistInv(out, out);
+  } else {
+    ColorSpinorParam param;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    cudaColorSpinorField tmp3(in, param);
+    TwistInv(tmp3, in);
+    DiracWilson::Dslash(out, tmp3, parity);
+  }
 
   //double flavor_mu = in.twistFlavor * mu;
   //twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
@@ -186,8 +194,13 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);  
 
-  DiracWilson::Dslash(out, in, parity);
-  TwistInv(out, out);
+  if (!dagger) {
+    DiracWilson::Dslash(out, in, parity);
+    TwistInv(out, out);
+  } else {
+    TwistInv(*tmp1, in);
+    DiracWilson::Dslash(out, *tmp1, parity);
+  }
   xpayCuda(x, k, out);
 
   //double flavor_mu = in.twistFlavor * mu;
@@ -217,7 +230,7 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
     Dslash(*tmp1, in, QUDA_EVEN_PARITY);
     Twist(out, in);
     DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, out, kappa2);
-  } else if (!dagger) { // symmetric preconditioning
+  } else /*if (!dagger)*/ { // symmetric preconditioning
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
       DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
@@ -227,11 +240,13 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
     } else {
       errorQuda("Invalid matpcType");
     }
-  } else { // symmetric preconditioning, dagger
+  } /*else { // symmetric preconditioning, dagger
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       TwistInv(out, in); 
       Dslash(*tmp1, out, QUDA_ODD_PARITY);
+      std::cout << "GPU g " << norm2(out) << " gDg " << norm2(*tmp1);
       DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
+      std::cout << " final " << norm2(out) << std::endl;
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
       TwistInv(out, in); 
       Dslash(*tmp1, out, QUDA_EVEN_PARITY);
@@ -239,7 +254,7 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
     } else {
       errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
     }
-  }
+    }*/
   
   if (reset) {
     delete tmp1;

@@ -1,5 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <iostream>
 
 DiracWilson::DiracWilson(const DiracParam &param)
   : Dirac(param)
@@ -32,7 +33,7 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
 {
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
-  
+
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
 	     0, 0, 0, out.volume, out.length, in.Precision());
 

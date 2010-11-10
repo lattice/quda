@@ -14,16 +14,16 @@
 #include <twisted_mass_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 1;
+const int test_type = 0;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
-const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
+const QudaDagType dagger = QUDA_DAG_YES;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int loops = 1;
+const int loops = 100;
 
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cpu_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_HALF_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
