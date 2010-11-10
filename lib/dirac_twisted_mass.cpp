@@ -169,12 +169,9 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
     twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
 			  0, 0, kappa, flavor_mu, 0.0, out.volume, out.length, in.Precision());
     flops += (1320+72)*in.volume;
-  } else {
-    ColorSpinorParam param;
-    param.create = QUDA_NULL_FIELD_CREATE;
-    cudaColorSpinorField tmp3(in, param);
-    TwistInv(tmp3, in);
-    DiracWilson::Dslash(out, tmp3, parity);
+  } else { // safe to use tmp2 here which may alias in
+    TwistInv(*tmp2, in);
+    DiracWilson::Dslash(out, *tmp2, parity);
     flops += 72*in.volume;
   }
 
@@ -197,7 +194,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
     twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
   			x.v, x.norm, kappa, flavor_mu, k, out.volume, out.length, in.Precision());
     flops += (1320+96)*in.volume;
-  } else {
+  } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
     TwistInv(*tmp1, in);
     DiracWilson::Dslash(out, *tmp1, parity);
     xpayCuda(x, k, out);

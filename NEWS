@@ -1,6 +1,15 @@
 
 Version 0.3.1 - x November 2010
 
+- Implemented twisted mass fermions with example reference code, with
+  invert and dslash tests.  Added to the InvertParam, the twisted mass
+  parameter mu the QudaTwistFlavorType which specificies the flavor
+  (QUDA_TWIST_FLAVOR_MNS or QUDA_TWIST_FLAVOR_PLUS).  Similar to
+  clover fermions, the type of preconditioning is optional between
+  symmetric or asymmetric.  Symmetric preconditioning for MatPC is
+  implemented using kernel fusion and so is the fastest (and is
+  expected to converge fastest.
+
 - Improved code hygene by ensuring all textures bound in
   dslash_quda.cu and unbound after kernel execution.
 
