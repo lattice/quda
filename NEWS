@@ -1,5 +1,8 @@
 
-Version 0.3.1 - x October 2010
+Version 0.3.1 - x November 2010
+
+- Improved code hygene by ensuring all textures bound in
+  dslash_quda.cu and unbound after kernel execution.
 
 - Added domain wall Dirac operators.  Like for Wilson and clover, the
   full operator and the (5d) preconditioned operator is available.  As

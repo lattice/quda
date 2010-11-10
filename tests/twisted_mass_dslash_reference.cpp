@@ -259,27 +259,23 @@ void twistGamma5(sFloat *out, sFloat *in, const sFloat kappa, const sFloat mu,
 void dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double mu, 
 	    QudaTwistFlavorType flavor, int oddBit, int daggerBit,
 	    QudaPrecision sPrecision, QudaPrecision gPrecision) {
-  
+
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
-    twistGamma5((double*)spinorField, (double*)spinorField, kappa, mu, 
-		flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
       dslashReference((double*)res, (double**)gaugeFull, (double*)spinorField, oddBit, daggerBit);
     } else {
       dslashReference((double*)res, (float**)gaugeFull, (double*)spinorField, oddBit, daggerBit);
     } 
-    twistGamma5((double*)spinorField, (double*)spinorField, kappa, mu, 
-		flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT); // undoes twist of source
+    twistGamma5((double*)res, (double*)res, kappa, mu, 
+    		flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
   } else {
-    twistGamma5((float*)spinorField, (float*)spinorField, (float)kappa, (float)mu, 
-		flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
       dslashReference((float*)res, (double**)gaugeFull, (float*)spinorField, oddBit, daggerBit);
     } else {
       dslashReference((float*)res, (float**)gaugeFull, (float*)spinorField, oddBit, daggerBit);
     }
-    twistGamma5((float*)spinorField, (float*)spinorField, (float)kappa, (float)mu, 
-		flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT); // undoes twist of source
+    twistGamma5((float*)res, (float*)res, (float)kappa, (float)mu, 
+		flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
   }
 
 }
@@ -298,7 +294,6 @@ void Mat(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa, sFloat mu,
   // full dslash operator
   dslashReference(outOdd, gauge, inEven, 1, daggerBit);
   dslashReference(outEven, gauge, inOdd, 0, daggerBit);
-  
   // apply the twist term
   twistGamma5(tmp, in, kappa, mu, flavor, V, QUDA_TWIST_GAMMA5_DIRECT);
 
@@ -324,6 +319,13 @@ void mat(void *out, void **gauge, void *in, double kappa, double mu,
       Mat((float*)out, (float**)gauge, (float*)in, (float)kappa, (float)mu, flavor, dagger_bit);
 }
 
+template <typename Float>
+double norm2(Float *v, int len) {
+  double sum=0.0;
+  for (int i=0; i<len; i++) sum += v[i]*v[i];
+  return sum;
+}
+
 // Apply the even-odd preconditioned Dirac operator
 template <typename sFloat, typename gFloat>
 void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat mu, 
@@ -337,21 +339,27 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
     twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     dslashReference(outEven, gauge, tmp, 0, daggerBit);
     twistGamma5(outEven, outEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
-  } else {
+  } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
     dslashReference(tmp, gauge, inEven, 0, daggerBit);
     twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     dslashReference(outEven, gauge, tmp, 1, daggerBit);
     twistGamma5(outEven, outEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
-  }    
-  
+  } else 
+
   // lastly apply the kappa term
   sFloat kappa2 = -kappa*kappa;
   xpay(inEven, kappa2, outEven, Vh*spinorSiteSize);
   free(tmp);
+
 }
 
 void matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, QudaTwistFlavorType flavor,
 	   QudaMatPCType matpc_type, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision) {
+
+  if (matpc_type != QUDA_MATPC_EVEN_EVEN || matpc_type != QUDA_MATPC_ODD_ODD) {
+    printf("Only symmetric preconditioning is implemented in reference\n");
+    exit(-1);
+  }
 
   if (sPrecision == QUDA_DOUBLE_PRECISION)
     if (gPrecision == QUDA_DOUBLE_PRECISION) 
