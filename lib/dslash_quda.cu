@@ -620,34 +620,30 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 }
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
-		   const QudaTwistGamma5Type twist) {
+		   const int dagger, const QudaTwistGamma5Type twist) {
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
     a = 2.0 * kappa * mu;
     b = 1.0;
   } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
     a = -2.0 * kappa * mu;
     b = 1.0 / (1.0 + a*a);
-  } else if (twist == QUDA_TWIST_GAMMA5_DIRECT_DAG) {
-    a = -2.0 * kappa * mu;
-    b = 1.0;
-  } else if (twist == QUDA_TWIST_GAMMA5_INVERSE_DAG) {
-    a = 2.0 * kappa * mu;
-    b = 1.0 / (1.0 + a*a);
   } else {
     errorQuda("Twist type %d not defined\n", twist);
   }
+  if (dagger) a *= -1.0;
 }
 
 template <int N, typename spinorFloat>
 void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in, 
-		     const float *inNorm, const double &kappa, const double &mu,
-		     const int volume, const int length, const QudaTwistGamma5Type twist)
+		     const float *inNorm, const int dagger, const double &kappa, 
+		     const double &mu, const int volume, const int length, 
+		     const QudaTwistGamma5Type twist)
 {
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
   double a=0.0, b=0.0;
-  setTwistParam(a, b, kappa, mu, twist);
+  setTwistParam(a, b, kappa, mu, dagger, twist);
 
   bindSpinorTex<N>(length, in, inNorm);
   twistGamma5Kernel<<<gridDim, blockDim, 0>>> (out, outNorm, a, b);
@@ -655,25 +651,24 @@ void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in,
 }
 
 void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
-		     const double kappa, const double mu, const int volume, 
+		     const int dagger, const double kappa, const double mu, const int volume, 
 		     const int length, const QudaPrecision precision, 
 		     const QudaTwistGamma5Type twist) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
-
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
     twistGamma5Cuda<2>((double2*)out, (float*)outNorm, (double2*)in, 
-		       (float*)inNorm, kappa, mu, volume, length, twist);
+		       (float*)inNorm, dagger, kappa, mu, volume, length, twist);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
     twistGamma5Cuda<4>((float4*)out, (float*)outNorm, (float4*)in, 
-    		       (float*)inNorm, kappa, mu, volume, length, twist);
+    		       (float*)inNorm, dagger, kappa, mu, volume, length, twist);
   } else if (precision == QUDA_HALF_PRECISION) {
     twistGamma5Cuda<4>((short4*)out, (float*)outNorm, (short4*)in,
-		       (float*)inNorm, kappa, mu, volume, length, twist);
+		       (float*)inNorm, dagger, kappa, mu, volume, length, twist);
   }
   checkCudaError();
 #else
@@ -697,10 +692,10 @@ void twistedMassDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat ga
 
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm, x, xNorm);
 
-  double a = -2.0*kappa*mu;
+  double a=0.0, b=0.0;
+  setTwistParam(a, b, kappa, mu, dagger, QUDA_TWIST_GAMMA5_INVERSE);
 
   if (x==0) { // not xpay
-    double b = 1.0/(1.0 + a*a);
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	twistedMassDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
@@ -727,7 +722,7 @@ void twistedMassDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat ga
       }
     }
   } else { // doing xpay
-    double b = k/(1.0 + a*a);
+    b *= k;
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	twistedMassDslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 

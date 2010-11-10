@@ -54,7 +54,7 @@ extern "C" {
 
   // solo twist term
   void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
-		       const double kappa, const double mu, const int volume, 
+		       const int dagger, const double kappa, const double mu, const int volume, 
 		       const int length, const QudaPrecision precision, const QudaTwistGamma5Type);
 
 #ifdef __cplusplus

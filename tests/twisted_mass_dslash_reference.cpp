@@ -226,7 +226,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 
 // applies b*(1 + i*a*gamma_5)
 template <typename sFloat>
-void twistGamma5(sFloat *out, sFloat *in, const sFloat kappa, const sFloat mu, 
+void twistGamma5(sFloat *out, sFloat *in, const int dagger, const sFloat kappa, const sFloat mu, 
 		 const QudaTwistFlavorType flavor, const int V, QudaTwistGamma5Type twist) {
 
   sFloat a=0.0,b=0.0;
@@ -240,6 +240,8 @@ void twistGamma5(sFloat *out, sFloat *in, const sFloat kappa, const sFloat mu,
     printf("Twist type %d not defined\n", twist);
     exit(0);
   }
+
+  if (dagger) a *= -1.0;
 
   for(int i = 0; i < V; i++) {
     sFloat tmp[24];
@@ -267,7 +269,7 @@ void dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double
       } else {
 	dslashReference((double*)res, (float**)gaugeFull, (double*)spinorField, oddBit, daggerBit);
       } 
-      twistGamma5((double*)res, (double*)res, kappa, mu, 
+      twistGamma5((double*)res, (double*)res, daggerBit, kappa, mu, 
 		  flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     } else {
       if (gPrecision == QUDA_DOUBLE_PRECISION) {
@@ -275,29 +277,29 @@ void dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double
       } else {
 	dslashReference((float*)res, (float**)gaugeFull, (float*)spinorField, oddBit, daggerBit);
       }
-      twistGamma5((float*)res, (float*)res, (float)kappa, (float)mu, 
+      twistGamma5((float*)res, (float*)res, daggerBit, (float)kappa, (float)mu, 
 		  flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     }
   } else {
     if (sPrecision == QUDA_DOUBLE_PRECISION) {
-      twistGamma5((double*)spinorField, (double*)spinorField, kappa, mu, 
+      twistGamma5((double*)spinorField, (double*)spinorField, daggerBit, kappa, mu, 
 		  flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       if (gPrecision == QUDA_DOUBLE_PRECISION) {
 	dslashReference((double*)res, (double**)gaugeFull, (double*)spinorField, oddBit, daggerBit);
       } else {
 	dslashReference((double*)res, (float**)gaugeFull, (double*)spinorField, oddBit, daggerBit);
       }
-      twistGamma5((double*)spinorField, (double*)spinorField, kappa, mu, 
+      twistGamma5((double*)spinorField, (double*)spinorField, daggerBit, kappa, mu, 
 		  flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT);
     } else {
-      twistGamma5((float*)spinorField, (float*)spinorField, (float)kappa, (float)mu, 
+      twistGamma5((float*)spinorField, (float*)spinorField, daggerBit, (float)kappa, (float)mu, 
 		  flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       if (gPrecision == QUDA_DOUBLE_PRECISION) {
 	dslashReference((float*)res, (double**)gaugeFull, (float*)spinorField, oddBit, daggerBit);
       } else {
 	dslashReference((float*)res, (float**)gaugeFull, (float*)spinorField, oddBit, daggerBit);
       }
-      twistGamma5((float*)spinorField, (float*)spinorField, (float)kappa, (float)mu, 
+      twistGamma5((float*)spinorField, (float*)spinorField, daggerBit, (float)kappa, (float)mu, 
 		  flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT);
     }
   }
@@ -318,7 +320,7 @@ void Mat(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa, sFloat mu,
   dslashReference(outOdd, gauge, inEven, 1, daggerBit);
   dslashReference(outEven, gauge, inOdd, 0, daggerBit);
   // apply the twist term
-  twistGamma5(tmp, in, kappa, mu, flavor, V, QUDA_TWIST_GAMMA5_DIRECT);
+  twistGamma5(tmp, in, daggerBit, kappa, mu, flavor, V, QUDA_TWIST_GAMMA5_DIRECT);
 
   // combine
   xpay(tmp, -kappa, out, V*spinorSiteSize);
@@ -359,28 +361,28 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
   if (!daggerBit) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashReference(tmp, gauge, inEven, 1, daggerBit);
-      twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(tmp, tmp, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       dslashReference(outEven, gauge, tmp, 0, daggerBit);
-      twistGamma5(outEven, outEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(outEven, outEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
       dslashReference(tmp, gauge, inEven, 0, daggerBit);
-      twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(tmp, tmp, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       dslashReference(outEven, gauge, tmp, 1, daggerBit);
-      twistGamma5(outEven, outEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(outEven, outEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
     }
   } else {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      twistGamma5(inEven, inEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(inEven, inEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       dslashReference(tmp, gauge, inEven, 1, daggerBit);
-      twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(tmp, tmp, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       dslashReference(outEven, gauge, tmp, 0, daggerBit);
-      twistGamma5(inEven, inEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT);
+      twistGamma5(inEven, inEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT);
     } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
-      twistGamma5(inEven, inEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(inEven, inEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       dslashReference(tmp, gauge, inEven, 0, daggerBit);
-      twistGamma5(tmp, tmp, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      twistGamma5(tmp, tmp, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
       dslashReference(outEven, gauge, tmp, 1, daggerBit);
-      twistGamma5(inEven, inEven, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT); // undo
+      twistGamma5(inEven, inEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT); // undo
     }
   }
   // lastly apply the kappa term
