@@ -46,7 +46,8 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 
 // Public method to apply the twist
 void DiracTwistedMass::Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const {
-  twistedApply(out, in, QUDA_TWIST_GAMMA5_DIRECT);
+  if (dagger) twistedApply(out, in, QUDA_TWIST_GAMMA5_DIRECT_DAG);
+  else twistedApply(out, in, QUDA_TWIST_GAMMA5_DIRECT);
 }
 
 void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
@@ -149,7 +150,8 @@ DiracTwistedMassPC& DiracTwistedMassPC::operator=(const DiracTwistedMassPC &dira
 
 // Public method to apply the inverse twist
 void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const {
-  twistedApply(out, in, QUDA_TWIST_GAMMA5_INVERSE);
+  if (dagger) twistedApply(out, in, QUDA_TWIST_GAMMA5_INVERSE_DAG);
+  else twistedApply(out, in, QUDA_TWIST_GAMMA5_INVERSE);
 }
 
 // apply hopping term, then inverse twist: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),

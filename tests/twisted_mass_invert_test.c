@@ -54,7 +54,7 @@ int main(int argc, char **argv)
   inv_param.reliable_delta = 1e-2;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.solve_type = QUDA_DIRECT_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
