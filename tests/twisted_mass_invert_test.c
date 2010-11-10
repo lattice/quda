@@ -17,16 +17,16 @@ int main(int argc, char **argv)
   int device = 0; // CUDA device number
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 24; 
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 32;
+  gauge_param.X[0] = 4; 
+  gauge_param.X[1] = 4;
+  gauge_param.X[2] = 4;
+  gauge_param.X[3] = 4;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -42,15 +42,15 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  inv_param.inv_type = QUDA_CG_INVERTER;
 
-  double mass = -0.95;
+  double mass = -0.9;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
-  inv_param.mu = 0.01;
+  inv_param.mu = 0.1;
   inv_param.twist_flavor = QUDA_TWIST_MNS;
 
   inv_param.tol = 5e-8;
-  inv_param.maxiter = 1000;
+  inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-2;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;

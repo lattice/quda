@@ -47,7 +47,7 @@ int main(int argc, char **argv)
   } else {
     inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  inv_param.inv_type = QUDA_CG_INVERTER;
 
   double mass = -0.9;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));

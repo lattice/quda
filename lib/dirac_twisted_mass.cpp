@@ -164,6 +164,7 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);
 
+  // FIXME - true twisted mass kernels
   if (!dagger) {
     DiracWilson::Dslash(out, in, parity);
     TwistInv(out, out);
@@ -194,6 +195,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);  
 
+  // FIXME - true twisted mass kernels
   if (!dagger) {
     DiracWilson::Dslash(out, in, parity);
     TwistInv(out, out);
@@ -230,7 +232,7 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
     Dslash(*tmp1, in, QUDA_EVEN_PARITY);
     Twist(out, in);
     DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, out, kappa2);
-  } else /*if (!dagger)*/ { // symmetric preconditioning
+  } else { // symmetric preconditioning
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
       DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
@@ -240,27 +242,7 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
     } else {
       errorQuda("Invalid matpcType");
     }
-  } /*else { // symmetric preconditioning, dagger
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      TwistInv(out, in); 
-      Dslash(*tmp1, out, QUDA_ODD_PARITY);
-      std::cout << "GPU g " << norm2(out) << " gDg " << norm2(*tmp1);
-      DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
-      std::cout << " final " << norm2(out) << std::endl;
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      TwistInv(out, in); 
-      Dslash(*tmp1, out, QUDA_EVEN_PARITY);
-      DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
-    } else {
-      errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
-    }
-    }*/
-  
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
   }
-  
 }
 
 void DiracTwistedMassPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
