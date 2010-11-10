@@ -42,10 +42,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 4;
-  gauge_param.X[1] = 4;
-  gauge_param.X[2] = 4;
-  gauge_param.X[3] = 4;
+  gauge_param.X[0] = 16;
+  gauge_param.X[1] = 16;
+  gauge_param.X[2] = 16;
+  gauge_param.X[3] = 16;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;

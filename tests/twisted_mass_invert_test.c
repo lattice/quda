@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 
   inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
-  double mass = -0.9;
+  double mass = -0.95;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.mu = 0.01;
   inv_param.twist_flavor = QUDA_TWIST_MNS;
@@ -53,9 +53,9 @@ int main(int argc, char **argv)
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-2;
 
-  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 

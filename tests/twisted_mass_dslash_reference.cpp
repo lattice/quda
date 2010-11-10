@@ -356,7 +356,7 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
 void matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, QudaTwistFlavorType flavor,
 	   QudaMatPCType matpc_type, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision) {
 
-  if (matpc_type != QUDA_MATPC_EVEN_EVEN || matpc_type != QUDA_MATPC_ODD_ODD) {
+  if (matpc_type != QUDA_MATPC_EVEN_EVEN && matpc_type != QUDA_MATPC_ODD_ODD) {
     printf("Only symmetric preconditioning is implemented in reference\n");
     exit(-1);
   }

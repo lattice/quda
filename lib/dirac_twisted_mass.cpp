@@ -221,7 +221,6 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
       DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
-      std::cout << " final " << norm2(out) << std::endl;
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
       Dslash(*tmp1, in, QUDA_EVEN_PARITY);
       DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
