@@ -3178,6 +3178,10 @@ double3 caxpbypzYmbwcDotProductWYNormYCuda(const double2 &a, cudaColorSpinorFiel
     return caxpbypzYmbwcDotProductWYNormYSCuda(af2, (float2*)x.v, bf2, (float2*)y.v, (float2*)z.v,
 					       (float2*)w.v, (float2*)u.v, length, 22, x.precision);
   } else {
+#if (__CUDA_ARCH__ >= 200) // fused kernel is slow on Fermi
+    caxpbypzYmbwCuda(a, x, b, y, z, w);
+    return cDotProductNormBCuda(w, y);
+#else
     if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
       return caxpbypzYmbwcDotProductWYNormYCuda(a, x.Even(), b, y.Even(), z.Even(), w.Even(), u.Even()) + 
 	caxpbypzYmbwcDotProductWYNormYCuda(a, x.Odd(), b, y.Odd(), z.Odd(), w.Odd(), u.Odd());
@@ -3199,9 +3203,10 @@ double3 caxpbypzYmbwcDotProductWYNormYCuda(const double2 &a, cudaColorSpinorFiel
       return caxpbypzYmbwcDotProductWYNormYHCuda(af2, bf2, (short4*)y.v, (float*)y.norm, 
 						 (short4*)z.v, (float*)z.norm, (float*)u.norm, 
 						 y.stride, y.volume, 22, x.precision);
-    }else{
+    } else {
       errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.nSpin);            
     }
+#endif
   }
 
 }

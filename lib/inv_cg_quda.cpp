@@ -20,7 +20,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
     
   cudaColorSpinorField r(b);
   
-  mat(r, x);
+  mat(r, x); // y as tmp
 
   double r2 = xmyNormCuda(b, r);
   rUpdate ++;
@@ -29,6 +29,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
+  cudaColorSpinorField tmp(x, param);
   
   cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
@@ -67,7 +68,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   stopwatchStart();
   while (r2 > stop && k<invert_param->maxiter) {
 
-    matSloppy(Ap, p);
+    matSloppy(Ap, p, tmp); // tmp as tmp
     
     pAp = reDotProductCuda(p, Ap);
     alpha = r2 / pAp;        
@@ -91,7 +92,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
       if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
       xpyCuda(x, y); // swap these around?
-      mat(r, y);
+      mat(r, y, x); // here we can use x as tmp
       r2 = xmyNormCuda(b, r);
       if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
       zeroCuda(xSloppy);

@@ -41,9 +41,17 @@ class DiracParam {
 void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
 void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
 
+// forward declarations
+class DiracM;
+class DiracMdagM;
+class DiracMdag;
 
 // Abstract base class
 class Dirac {
+
+  friend class DiracM;
+  friend class DiracMdagM;
+  friend class DiracMdag;
 
  protected:
   FullGauge &gauge;
@@ -365,6 +373,8 @@ class DiracMatrix {
   virtual ~DiracMatrix() = 0;
 
   virtual void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const = 0;
+  virtual void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in,
+			  cudaColorSpinorField &tmp) const = 0;
 
   unsigned long long flops() const { return dirac->Flops(); }
 };
@@ -384,6 +394,13 @@ class DiracM : public DiracMatrix {
   {
     dirac->M(out, in);
   }
+
+  void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, cudaColorSpinorField &tmp) const
+  {
+    dirac->tmp1 = &tmp;
+    dirac->M(out, in);
+    dirac->tmp1 = NULL;
+  }
 };
 
 class DiracMdagM : public DiracMatrix {
@@ -396,6 +413,13 @@ class DiracMdagM : public DiracMatrix {
   {
     dirac->MdagM(out, in);
   }
+
+  void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, cudaColorSpinorField &tmp) const
+  {
+    dirac->tmp1 = &tmp;
+    dirac->MdagM(out, in);
+    dirac->tmp1 = NULL;
+  }
 };
 
 class DiracMdag : public DiracMatrix {
@@ -407,6 +431,13 @@ class DiracMdag : public DiracMatrix {
   void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
     dirac->Mdag(out, in);
+  }
+
+  void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, cudaColorSpinorField &tmp) const
+  {
+    dirac->tmp1 = &tmp;
+    dirac->Mdag(out, in);
+    dirac->tmp1 = NULL;
   }
 };
 

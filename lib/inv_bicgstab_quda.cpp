@@ -57,11 +57,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   cuDoubleComplex rho0 = rho;
   cuDoubleComplex alpha = make_cuDoubleComplex(1.0, 0.0);
   cuDoubleComplex omega = make_cuDoubleComplex(1.0, 0.0);
-  cuDoubleComplex beta;
-  cuDoubleComplex rv;
-  cuDoubleComplex rho_rho0;
-  cuDoubleComplex alpha_omega;
-  cuDoubleComplex beta_omega;
+  cuDoubleComplex beta, rv, rho_rho0, alpha_omega, beta_omega;
   cuDoubleComplex one = make_cuDoubleComplex(1.0, 0.0);
   
   double3 rho_r2;
@@ -95,7 +91,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
       cxpaypbzCuda(rSloppy, beta_omega, v, beta, p); // 8
     }
     
-    matSloppy(v, p);
+    matSloppy(v, p, tmp);
 
     // rv = (r0,v)
     rv = cDotProductCuda(r0, v);    
@@ -103,14 +99,12 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     if (cuCabs(rho) == 0.0) alpha = make_cuDoubleComplex(0.0, 0.0);
     else alpha = cuCdiv(rho, rv);
 
-    //printf("rho %e %e rv %e %e\n", rho.x, rho.y, rv.x, rv.y);
-
     // r -= alpha*v
     alpha.x *= -1.0; alpha.y *= -1.0;
     caxpyCuda(alpha, v, rSloppy); // 4
     alpha.x *= -1.0; alpha.y *= -1.0;
 
-    matSloppy(t, rSloppy);
+    matSloppy(t, rSloppy, tmp);
     
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, rSloppy); // 6
@@ -121,8 +115,6 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
 
     double2 mup= cDotProductCuda(r0, rSloppy);
-    //printf("test %e %e %e %e\n", mup.x, mup.y, norm2(r0), norm2(rSloppy));
-    //printf("rho = %e %e %e %e %e\n", rho0.x, rho0.y, rho.x, rho.y, r2);
 
     // reliable updates
     rNorm = sqrt(r2);
@@ -137,7 +129,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
       if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
       xpyCuda(x, y); // swap these around?
-      mat(r, y);
+      mat(r, y, x);
       r2 = xmyNormCuda(b, r);
 
       if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
