@@ -69,47 +69,27 @@ void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &
 void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   checkFullSpinor(out, in);
-
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-
-  bool reset = false;
-  if (!tmp2) {
-    tmp2 = new cudaColorSpinorField(in.Even(), param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp2, in.Even());
 
   Clover(*tmp2, in.Odd(), QUDA_ODD_PARITY);
   DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp2, -kappa);
   Clover(*tmp2, in.Even(), QUDA_EVEN_PARITY);
   DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp2, -kappa);
 
-  if (reset) {
-    delete tmp2;
-    tmp2 = 0;
-  }
+  deleteTmp(&tmp2, reset);
 }
 
 void DiracClover::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   checkFullSpinor(out, in);
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
 
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, in);
+  checkFullSpinor(*tmp1, in);
 
   M(*tmp1, in);
   Mdag(out, *tmp1);
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
-
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracClover::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
@@ -152,8 +132,6 @@ DiracCloverPC& DiracCloverPC::operator=(const DiracCloverPC &dirac)
   if (&dirac != this) {
     DiracClover::operator=(dirac);
     cloverInv = dirac.cloverInv;
-    tmp1 = dirac.tmp1;
-    tmp2 = dirac.tmp2;
   }
 
   return *this;
@@ -174,6 +152,7 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
 {
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkParitySpinor(in, out, cloverInv);
+  checkSpinorAlias(in, out);
 
   cloverDslashCuda(out.v, out.norm, gauge, cloverInv, in.v, in.norm, parity, dagger, 
 		   0, 0, 0.0, out.volume, out.length, in.Precision());
@@ -188,6 +167,7 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
 {
   if (!initDslash) initDslashConstants(gauge, in.stride, cloverInv.even.stride);
   checkParitySpinor(in, out, cloverInv);
+  checkSpinorAlias(in, out);
 
   cloverDslashCuda(out.v, out.norm, gauge, cloverInv, in.v, in.norm, parity, dagger, 
 		   x.v, x.norm, k, out.volume, out.length, in.Precision());
@@ -201,13 +181,7 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
   double kappa2 = -kappa*kappa;
 
   // FIXME: For asymmetric, a "DslashCxpay" kernel would improve performance.
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
@@ -241,31 +215,18 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
     }
   }
   
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracCloverPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   // need extra temporary because of symmetric preconditioning dagger
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-
-  bool reset = false;
-  if (!tmp2) {
-    tmp2 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp2, in);
 
   M(*tmp2, in);
   Mdag(out, *tmp2);
 
-  if (reset) {
-    delete tmp2;
-    tmp2 = 0;
-  }
+  deleteTmp(&tmp2, reset);
 }
 
 void DiracCloverPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol, 
@@ -279,13 +240,7 @@ void DiracCloverPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
     return;
   }
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(b.Even(), param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, b.Even());
   
   // we desire solution to full system
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -321,10 +276,7 @@ void DiracCloverPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &s
   // here we use final solution to store parity solution and parity source
   // b is now up for grabs if we want
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+  deleteTmp(&tmp1, reset);
 
 }
 
@@ -337,13 +289,7 @@ void DiracCloverPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFi
 
   checkFullSpinor(x, b);
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(b.Even(), param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, b.Even());
 
   // create full solution
 
@@ -361,9 +307,7 @@ void DiracCloverPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFi
     errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
   }
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+  deleteTmp(&tmp1, reset);
+
 }
 

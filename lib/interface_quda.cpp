@@ -105,7 +105,7 @@ void initQuda(int dev)
   cudaCloverInvSloppy.even.clover = NULL;
   cudaCloverInvSloppy.odd.clover = NULL;
 
-  initCache();
+  //initCache();
   initBlas();
 }
 
@@ -672,7 +672,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     b = new cudaColorSpinorField(*h_b, cudaParam); // download source
     
     if (param->verbosity >= QUDA_VERBOSE) {
-      printfQuda("CPU source = %f, CUDA copy=%f\n", norm2(*h_b),norm2(*b));
+      printfQuda("Source: CPU = %f, CUDA copy = %f\n", norm2(*h_b),norm2(*b));
     }
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     x = new cudaColorSpinorField(cudaParam); // solution
@@ -697,9 +697,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->verbosity >= QUDA_VERBOSE) printfQuda("Mass rescale done\n");   
 
   dirac->prepare(in, out, *x, *b, param->solution_type);
-  if (param->verbosity >= QUDA_VERBOSE) {  
-    printfQuda( "Source preparation complete %f  %f\n", norm2(*in), norm2(*b));   
-  }
+  if (param->verbosity >= QUDA_VERBOSE) printfQuda("Prepared source = %f\n", norm2(*in));   
   
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
@@ -724,14 +722,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Solution = %f\n",norm2(*x));
   }
   dirac->reconstruct(*x, *b, param->solution_type);
-  if (param->verbosity >= QUDA_VERBOSE){
-    printfQuda("Solution = %f\n", norm2(*x));
-  }
   
   x->saveCPUSpinorField(*h_x); // since this is a reference, this won't work: h_x = x;
   
   if (param->verbosity >= QUDA_VERBOSE){
-    printfQuda("Solution = %f\n", norm2(*h_x));
+    printfQuda("Reconstructed: CUDA solution = %f, CPU copy = %f\n", norm2(*x), norm2(*h_x));
   }
   
   delete diracSloppy;

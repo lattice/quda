@@ -1,6 +1,7 @@
 #include <quda_internal.h>
 #include <quda.h>
 #include <cuComplex.h>
+#include <iostream>
 
 #ifndef _COLOR_SPINOR_FIELD_H
 #define _COLOR_SPINOR_FIELD_H
@@ -180,6 +181,7 @@ class ColorSpinorField {
   QudaFieldOrder FieldOrder() const { return fieldOrder; }
   QudaGammaBasis GammaBasis() const { return gammaBasis; }
   
+  friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
 };
 
 class cpuColorSpinorField;
@@ -191,6 +193,7 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   friend double normEven(const cudaColorSpinorField &b);
 
+  friend class Dirac;
   friend class DiracWilson;
   friend class DiracClover;
   friend class DiracCloverPC;

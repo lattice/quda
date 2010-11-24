@@ -77,20 +77,12 @@ void DiracDomainWall::MdagM(cudaColorSpinorField &out, const cudaColorSpinorFiel
   ColorSpinorParam param;
   param.create = QUDA_NULL_FIELD_CREATE;
 
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, in);
 
   M(*tmp1, in);
   Mdag(out, *tmp1);
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
-
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracDomainWall::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
@@ -132,7 +124,6 @@ DiracDomainWallPC& DiracDomainWallPC::operator=(const DiracDomainWallPC &dirac)
 {
   if (&dirac != this) {
     DiracDomainWall::operator=(dirac);
-    tmp1 = dirac.tmp1;
   }
 
   return *this;
@@ -144,13 +135,7 @@ void DiracDomainWallPC::M(cudaColorSpinorField &out, const cudaColorSpinorField 
   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
   double kappa2 = -kappa5*kappa5;
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
@@ -162,11 +147,7 @@ void DiracDomainWallPC::M(cudaColorSpinorField &out, const cudaColorSpinorField 
     errorQuda("MatPCType %d not valid for DiracDomainWallPC", matpcType);
   }
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
-
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracDomainWallPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const

@@ -10,6 +10,8 @@
 #include <util_quda.h>
 #include <sys/time.h>
 
+#include <iostream>
+
 void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
 		  cudaColorSpinorField &b, cudaColorSpinorField &y, QudaInvertParam *invert_param)
 {
@@ -19,6 +21,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   cudaColorSpinorField r(b);
   
   mat(r, x);
+
   double r2 = xmyNormCuda(b, r);
   rUpdate ++;
   
@@ -45,7 +48,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   zeroCuda(y);
 
   double r2_old;
-  double src_norm = norm2(b);;
+  double src_norm = norm2(b);
   double stop = src_norm*invert_param->tol*invert_param->tol; // stopping condition of solver
 
   double alpha, beta;
@@ -70,6 +73,8 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
     alpha = r2 / pAp;        
     r2_old = r2;
     r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+
+    double2 c2 = cDotProductCuda(p, Ap);
 
     // reliable update conditions
     rNorm = sqrt(r2);

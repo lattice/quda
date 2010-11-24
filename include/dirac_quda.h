@@ -24,7 +24,7 @@ class DiracParam {
   double mu; // used by twisted mass only
 
   cudaColorSpinorField *tmp1;
-  cudaColorSpinorField *tmp2; // used only by Clover operators
+  cudaColorSpinorField *tmp2; // used only by Clover and TM
 
   QudaVerbosity verbose;
 
@@ -55,6 +55,9 @@ class Dirac {
   mutable cudaColorSpinorField *tmp1; // temporary hack
   mutable cudaColorSpinorField *tmp2; // temporary hack
 
+  bool newTmp(cudaColorSpinorField **, const cudaColorSpinorField &) const;
+  void deleteTmp(cudaColorSpinorField **, const bool &reset) const;
+
  public:
   Dirac(const DiracParam &param);
   Dirac(const Dirac &dirac);
@@ -63,6 +66,7 @@ class Dirac {
 
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   virtual void checkFullSpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
+  void checkSpinorAlias(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
 
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaParity parity) const = 0;

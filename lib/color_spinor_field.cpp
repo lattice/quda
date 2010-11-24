@@ -165,3 +165,19 @@ double norm2(const ColorSpinorField &a) {
   }
 
 }
+
+std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
+  out << "fieldLocation = " << a.fieldLocation << std::endl;
+  out << "nColor = " << a.nColor << std::endl;
+  out << "nSpin = " << a.nSpin << std::endl;
+  out << "twistFlavor = " << a.twistFlavor << std::endl;
+  out << "nDim = " << a.nDim << std::endl;
+  for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
+  out << "precision = " << a.precision << std::endl;
+  out << "pad = " << a.pad << std::endl;
+  out << "siteSubset = " << a.siteSubset << std::endl;
+  out << "siteOrder = " << a.siteOrder << std::endl;
+  out << "fieldOrder = " << a.fieldOrder << std::endl;
+  out << "gammaBasis = " << a.gammaBasis << std::endl;
+  return out;
+}

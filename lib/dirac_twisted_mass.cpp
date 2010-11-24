@@ -23,7 +23,6 @@ DiracTwistedMass& DiracTwistedMass::operator=(const DiracTwistedMass &dirac)
 {
   if (&dirac != this) {
     DiracWilson::operator=(dirac);
-    tmp1 = dirac.tmp1;
   }
   return *this;
 }
@@ -59,48 +58,27 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);
   }
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-
   // We can elimiate this temporary at the expense of more kernels (like clover)
-  bool reset = false;
-  if (!tmp2) {
-    tmp2 = new cudaColorSpinorField(in.Even(), param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp2, in.Even());
 
   Twist(*tmp2, in.Odd());
   DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp2, -kappa);
   Twist(*tmp2, in.Even());
   DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp2, -kappa);
 
-  if (reset) {
-    delete tmp2;
-    tmp2 = 0;
-  }
+  deleteTmp(&tmp2, reset);
 
 }
 
 void DiracTwistedMass::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  } else {
-    checkFullSpinor(*tmp1, in);
-  }
+  checkFullSpinor(out, in);
+  bool reset = newTmp(&tmp1, in);
 
   M(*tmp1, in);
   Mdag(out, *tmp1);
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracTwistedMass::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
@@ -142,7 +120,6 @@ DiracTwistedMassPC& DiracTwistedMassPC::operator=(const DiracTwistedMassPC &dira
 {
   if (&dirac != this) {
     DiracTwistedMass::operator=(dirac);
-    tmp1 = dirac.tmp1;
   }
   return *this;
 }
@@ -159,6 +136,8 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
 {
   if (!initDslash) initDslashConstants(gauge, in.stride, 0);
   checkParitySpinor(in, out);
+  checkSpinorAlias(in, out);
+
   if (in.twistFlavor != out.twistFlavor) 
     errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
@@ -167,12 +146,20 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (!dagger) {// broken for dagger since order isn't changed
     double flavor_mu = in.twistFlavor * mu;
     twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
-			  0, 0, kappa, flavor_mu, 0.0, out.volume, out.length, in.Precision());
+    			  0, 0, kappa, flavor_mu, 0.0, out.volume, out.length, in.Precision());
     flops += (1320+72)*in.volume;
   } else { // safe to use tmp2 here which may alias in
+    bool reset = newTmp(&tmp2, in);
+
     TwistInv(*tmp2, in);
     DiracWilson::Dslash(out, *tmp2, parity);
+
     flops += 72*in.volume;
+
+    // if the pointers alias, undo the twist
+    if (tmp2->v == in.v) Twist(*tmp2, *tmp2); 
+
+    deleteTmp(&tmp2, reset);
   }
 
 }
@@ -184,6 +171,9 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
 {
   if (!initDslash) initDslashConstants(gauge, in.stride, 0);
   checkParitySpinor(in, out);
+  checkSpinorAlias(in, out);
+  checkSpinorAlias(out, x);
+
   if (in.twistFlavor != out.twistFlavor) 
     errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
@@ -195,10 +185,17 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   			x.v, x.norm, kappa, flavor_mu, k, out.volume, out.length, in.Precision());
     flops += (1320+96)*in.volume;
   } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
+    bool reset = newTmp(&tmp1, in);
+
     TwistInv(*tmp1, in);
     DiracWilson::Dslash(out, *tmp1, parity);
     xpayCuda(x, k, out);
     flops += 96*in.volume;
+
+    // if the pointers alias, undo the twist
+    if (tmp1->v == in.v) Twist(*tmp1, *tmp1); 
+
+    deleteTmp(&tmp1, reset);
   }
 
 }
@@ -207,13 +204,7 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
 {
   double kappa2 = -kappa*kappa;
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
@@ -234,27 +225,20 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
       errorQuda("Invalid matpcType");
     }
   }
+
+  deleteTmp(&tmp1, reset);
+
 }
 
 void DiracTwistedMassPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   // need extra temporary because of symmetric preconditioning dagger
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-
-  bool reset = false;
-  if (!tmp2) {
-    tmp2 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp2, in);
 
   M(*tmp2, in);
   Mdag(out, *tmp2);
 
-  if (reset) {
-    delete tmp2;
-    tmp2 = 0;
-  }
+  deleteTmp(&tmp2, reset);
 }
 
 void DiracTwistedMassPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
@@ -268,13 +252,7 @@ void DiracTwistedMassPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorFiel
     return;
   }
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(b.Even(), param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, b.Even());
   
   // we desire solution to full system
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -310,11 +288,7 @@ void DiracTwistedMassPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorFiel
   // here we use final solution to store parity solution and parity source
   // b is now up for grabs if we want
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
-
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracTwistedMassPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
@@ -325,33 +299,23 @@ void DiracTwistedMassPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpi
   }				
 
   checkFullSpinor(x, b);
-
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(b.Even(), param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, b.Even());
 
   // create full solution
-
+  
   if (matpcType == QUDA_MATPC_EVEN_EVEN ||
       matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     // x_o = A_oo^-1 (b_o + k D_oe x_e)
     DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
     TwistInv(x.Odd(), *tmp1);
   } else if (matpcType == QUDA_MATPC_ODD_ODD ||
-      matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+	     matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     // x_e = A_ee^-1 (b_e + k D_eo x_o)
     DiracWilson::DslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
     TwistInv(x.Even(), *tmp1);
   } else {
     errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
   }
-
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+  
+  deleteTmp(&tmp1, reset);
 }

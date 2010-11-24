@@ -23,7 +23,6 @@ DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
 {
   if (&dirac != this) {
     Dirac::operator=(dirac);
-    tmp1 = dirac.tmp1;
   }
   return *this;
 }
@@ -33,6 +32,7 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
 {
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
+  checkSpinorAlias(in, out);
 
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
 	     0, 0, 0, out.volume, out.length, in.Precision());
@@ -46,6 +46,8 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
 {
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
+  checkSpinorAlias(in, out);
+  checkSpinorAlias(out, x);
 
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
 	     out.volume, out.length, in.Precision());
@@ -64,23 +66,13 @@ void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &i
 {
   checkFullSpinor(out, in);
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  } else {
-    checkFullSpinor(*tmp1, in);
-  }
+  bool reset = newTmp(&tmp1, in);
+  checkFullSpinor(*tmp1, in);
 
   M(*tmp1, in);
   Mdag(out, *tmp1);
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracWilson::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
@@ -122,7 +114,6 @@ DiracWilsonPC& DiracWilsonPC::operator=(const DiracWilsonPC &dirac)
 {
   if (&dirac != this) {
     DiracWilson::operator=(dirac);
-    tmp1 = dirac.tmp1;
   }
   return *this;
 }
@@ -131,13 +122,7 @@ void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
 {
   double kappa2 = -kappa*kappa;
 
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = true;
-  }
+  bool reset = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN) {
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
@@ -149,11 +134,7 @@ void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
     errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
   }
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
-  
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracWilsonPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const

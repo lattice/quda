@@ -1,5 +1,7 @@
 #include <dirac_quda.h>
 #include <dslash_quda.h>
+#include <blas_quda.h>
+#include <iostream>
 
 Dirac::Dirac(const DiracParam &param) 
   : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
@@ -32,6 +34,21 @@ Dirac& Dirac::operator=(const Dirac &dirac)
   return *this;
 }
 
+bool Dirac::newTmp(cudaColorSpinorField **tmp, const cudaColorSpinorField &a) const {
+  if (*tmp) return false;
+  ColorSpinorParam param;
+  param.create = QUDA_ZERO_FIELD_CREATE; // need to zero elements else padded region will be junk
+  *tmp = new cudaColorSpinorField(a, param);
+  return true;
+}
+
+void Dirac::deleteTmp(cudaColorSpinorField **a, const bool &reset) const {
+  if (reset) {
+    delete *a;
+    *a = NULL;
+  }
+}
+
 #define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
 
 void Dirac::Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
@@ -52,11 +69,13 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
   }
 
   if (in.Precision() != out.Precision()) {
-    errorQuda("Input and output spinor precisions don't match in dslash_quda");
+    errorQuda("Input precision %d and output spinor precision %d don't match in dslash_quda",
+	      in.Precision(), out.Precision());
   }
 
   if (in.Stride() != out.Stride()) {
-    errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", in.Stride(), out.Stride());
+    errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", 
+	      in.Stride(), out.Stride());
   }
 
   if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
@@ -84,6 +103,10 @@ void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpin
     errorQuda("ColorSpinorFields are not full fields: in = %d, out = %d", 
 	      in.SiteSubset(), out.SiteSubset());
   } 
+}
+
+void Dirac::checkSpinorAlias(const cudaColorSpinorField &a, const cudaColorSpinorField &b) const {
+  if (a.v == b.v) errorQuda("Aliasing pointers");
 }
 
 // Dirac operator factory
