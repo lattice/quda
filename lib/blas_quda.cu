@@ -457,12 +457,12 @@ __device__ float fast_abs_max(float4 a) {
 #define AXPY_FLOAT2(a, X, Y)		     \
   Y.x += a*X.x;	Y.y += a*X.y;		     
 
-#define AXPBY_FLOAT4(a, X, b, Y)		\
-  Y.x = a*X.x + b*Y.x; Y.y = a*X.y + b*Y.y;	\
-  Y.z = a*X.z + b*Y.z; Y.w = a*X.w + b*Y.w;
+#define AXPBY_FLOAT4(a, X, b, Y)				\
+  Y.x = b*Y.x; Y.x += a*X.x; Y.y = b*Y.y; Y.y += a*X.y;		\
+  Y.z = b*Y.z; Y.z += a*X.z; Y.w = b*Y.w; Y.w += a*X.w; 
 
-#define AXPBY_FLOAT2(a, X, b, Y)		\
-  Y.x = a*X.x + b*Y.x; Y.y = a*X.y + b*Y.y;	
+#define AXPBY_FLOAT2(a, X, b, Y)			\
+  Y.x = b*Y.x; Y.x += a*X.x; Y.y = b*Y.y; Y.y += a*X.y;		\
 
 #define XPAY_FLOAT4(X, a, Y)			     \
   Y.x = X.x + a*Y.x; Y.y = X.y + a*Y.y;		     \
@@ -471,38 +471,47 @@ __device__ float fast_abs_max(float4 a) {
 #define XPAY_FLOAT2(X, a, Y)			     \
   Y.x = X.x + a*Y.x; Y.y = X.y + a*Y.y;		     
 
-#define CAXPY_FLOAT4(a, X, Y) \
-  Y.x += a.x*X.x - a.y*X.y;   \
-  Y.y += a.y*X.x + a.x*X.y;   \
-  Y.z += a.x*X.z - a.y*X.w;   \
-  Y.w += a.y*X.z + a.x*X.w;
+#define CAXPY_FLOAT4(a, X, Y)			   \
+  Y.x += a.x*X.x; Y.x -= a.y*X.y;		   \
+  Y.y += a.y*X.x; Y.y += a.x*X.y;		   \
+  Y.z += a.x*X.z; Y.z -= a.y*X.w;		   \
+  Y.w += a.y*X.z; Y.w += a.x*X.w;
 
 #define CMAXPY_FLOAT4(a, X, Y)			\
-  Y.x -= (a.x*X.x - a.y*X.y);			\
-  Y.y -= (a.y*X.x + a.x*X.y);			\
-  Y.z -= (a.x*X.z - a.y*X.w);			\
-  Y.w -= (a.y*X.z + a.x*X.w);
+  Y.x -= a.x*X.x; Y.x += a.y*X.y;		\
+  Y.y -= a.y*X.x; Y.y -= a.x*X.y;		\
+  Y.z -= a.x*X.z; Y.z += a.y*X.w;		\
+  Y.w -= a.y*X.z; Y.w -= a.x*X.w;
 
-#define CAXPBY_FLOAT4(a, X, b, Y)		 \
-  Y.x = a.x*X.x - a.y*X.y + b.x*Y.x - b.y*Y.y;   \
-  Y.y = a.y*X.x + a.x*X.y + b.y*Y.x + b.x*Y.y;   \
-  Y.z = a.x*X.z - a.y*X.w + b.x*Y.z - b.y*Y.w;   \
-  Y.w = a.y*X.z + a.x*X.w + b.y*Y.z + b.x*Y.w;
+#define CAXPBY_FLOAT4(a, X, b, Y)					\
+  { float2 y;								\
+  y.x = a.x*X.x; y.x -= a.y*X.y; y.x += b.x*Y.x; y.x -= b.y*Y.y;	\
+  y.y = a.y*X.x; y.y += a.x*X.y; y.y += b.y*Y.x; y.y += b.x*Y.y;	\
+  Y.x = y.x; Y.y = y.y;							\
+  y.x = a.x*X.z; y.x -= a.y*X.w; y.x += b.x*Y.z; y.x -= b.y*Y.w;	\
+  y.y = a.y*X.z; y.y += a.x*X.w; y.y += b.y*Y.z; y.y += b.x*Y.w;	\
+  Y.z = y.x; Y.w = y.y;}
 
-#define CXPAYPBZ_FLOAT4(X, a, Y, b, Z)		\
-  {float2 z;					       \
-  z.x = X.x + a.x*Y.x - a.y*Y.y + b.x*Z.x - b.y*Z.y;   \
-  z.y = X.y + a.y*Y.x + a.x*Y.y + b.y*Z.x + b.x*Z.y;   \
-  Z.x = z.x; Z.y = z.y;				       \
-  z.x = X.z + a.x*Y.z - a.y*Y.w + b.x*Z.z - b.y*Z.w;   \
-  z.y = X.w + a.y*Y.z + a.x*Y.w + b.y*Z.z + b.x*Z.w;   \
+#define CXPAYPBZ_FLOAT4(X, a, Y, b, Z)				       \
+  {float2 z;							       \
+  z.x = X.x + a.x*Y.x; z.x -= a.y*Y.y; z.x += b.x*Z.x; z.x -= b.y*Z.y; \
+  z.y = X.y + a.y*Y.x; z.y += a.x*Y.y; z.y += b.y*Z.x; z.y += b.x*Z.y; \
+  Z.x = z.x; Z.y = z.y;						       \
+  z.x = X.z + a.x*Y.z; z.x -= a.y*Y.w; z.x += b.x*Z.z; z.x -= b.y*Z.w; \
+  z.y = X.w + a.y*Y.z; z.y += a.x*Y.w; z.y += b.y*Z.z; z.y += b.x*Z.w; \
   Z.z = z.x; Z.w = z.y;}
 
-#define CAXPBYPZ_FLOAT4(a, X, b, Y, Z)		  \
+#define CAXPBYPZ_FLOAT4(a, X, b, Y, Z)	  \
   Z.x += a.x*X.x - a.y*X.y + b.x*Y.x - b.y*Y.y;   \
   Z.y += a.y*X.x + a.x*X.y + b.y*Y.x + b.x*Y.y;   \
   Z.z += a.x*X.z - a.y*X.w + b.x*Y.z - b.y*Y.w;   \
   Z.w += a.y*X.z + a.x*X.w + b.y*Y.z + b.x*Y.w;
+
+/*#define CAXPBYPZ_FLOAT4(a, X, b, Y, Z)				\
+  Z.x += a.x*X.x; Z.x -= a.y*X.y; Z.x += b.x*Y.x; Z.x -= b.y*Y.y;	\
+  Z.y += a.y*X.x; Z.y += a.x*X.y; Z.y += b.y*Y.x; Z.y += b.x*Y.y;	\
+  Z.z += a.x*X.z; Z.z -= a.y*X.w; Z.z += b.x*Y.z; Z.z -= b.y*Y.w;	\
+  Z.w += a.y*X.z; Z.w += a.x*X.w; Z.w += b.y*Y.z; Z.w += b.x*Y.w;*/
 
 // Double precision input spinor field
 texture<int4, 1> xTexDouble2;
@@ -3077,6 +3086,12 @@ template <int reduce_threads, typename Float2>
 // double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
 // float2 *z, float2 *w, float2 *u, int len)
 //
+
+/*
+  READ_HALF_SPINOR(x, texHalf1, stride);				\
+  a.x *= xc; a.y *= xc;							\
+*/
+
 template <int reduce_threads, typename Float2>
 #define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductWYNormYH##suffix
 #define REDUCE_TYPES Float2 a, Float2 b, short4 *yH, float *yN, short4 *zH, float *zN, float *u, int stride

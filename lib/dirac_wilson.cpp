@@ -47,7 +47,6 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
-  checkSpinorAlias(out, x);
 
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
 	     out.volume, out.length, in.Precision());

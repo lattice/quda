@@ -172,7 +172,6 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   if (!initDslash) initDslashConstants(gauge, in.stride, 0);
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
-  checkSpinorAlias(out, x);
 
   if (in.twistFlavor != out.twistFlavor) 
     errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
@@ -182,7 +181,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   if (!dagger) {
     double flavor_mu = in.twistFlavor * mu;
     twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
-  			x.v, x.norm, kappa, flavor_mu, k, out.volume, out.length, in.Precision());
+			  x.v, x.norm, kappa, flavor_mu, k, out.volume, out.length, in.Precision());
     flops += (1320+96)*in.volume;
   } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
     bool reset = newTmp(&tmp1, in);
