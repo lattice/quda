@@ -69,12 +69,12 @@ void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &
 void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   checkFullSpinor(out, in);
-  bool reset = newTmp(&tmp2, in.Even());
+  bool reset = newTmp(&tmp2, in); // we only need single parity, so wastes some memory
 
-  Clover(*tmp2, in.Odd(), QUDA_ODD_PARITY);
-  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp2, -kappa);
-  Clover(*tmp2, in.Even(), QUDA_EVEN_PARITY);
-  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp2, -kappa);
+  Clover(tmp2->Even(), in.Odd(), QUDA_ODD_PARITY);
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, tmp2->Even(), -kappa);
+  Clover(tmp2->Even(), in.Even(), QUDA_EVEN_PARITY);
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, tmp2->Even(), -kappa);
 
   deleteTmp(&tmp2, reset);
 }

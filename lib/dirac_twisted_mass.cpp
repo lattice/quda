@@ -59,12 +59,12 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
   }
 
   // We can elimiate this temporary at the expense of more kernels (like clover)
-  bool reset = newTmp(&tmp2, in.Even());
+  bool reset = newTmp(&tmp2, in); // we only need single parity, so wastes some memory
 
-  Twist(*tmp2, in.Odd());
-  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp2, -kappa);
-  Twist(*tmp2, in.Even());
-  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp2, -kappa);
+  Twist(tmp2->Even(), in.Odd());
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, tmp2->Even(), -kappa);
+  Twist(tmp2->Even(), in.Even());
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, tmp2->Even(), -kappa);
 
   deleteTmp(&tmp2, reset);
 
