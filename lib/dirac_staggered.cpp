@@ -22,7 +22,6 @@ DiracStaggeredPC& DiracStaggeredPC::operator=(const DiracStaggeredPC &dirac)
 {
   if (&dirac != this) {
     Dirac::operator=(dirac);
-    tmp1 = dirac.tmp1;
   }
  
   return *this;
@@ -94,13 +93,7 @@ void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorFie
     initDslashConstants(*fatGauge, in.Stride(), 0);
   }
   
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = false;
-  }
+  bool reset = newTmp(&tmp1, in);
   
   QudaParity parity;
   QudaParity other_parity;
@@ -117,10 +110,7 @@ void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorFie
   Dslash(*tmp1, in, other_parity);  
   DslashXpay(out, *tmp1, parity, in, 4*mass*mass);
 
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracStaggeredPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
@@ -161,7 +151,6 @@ DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac)
 {
   if (&dirac != this) {
     Dirac::operator=(dirac);
-    tmp1 = dirac.tmp1;
   }
  
   return *this;
@@ -232,13 +221,7 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
     initDslashConstants(*fatGauge, in.Stride(), 0);
   }
   
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
-  bool reset = false;
-  if (!tmp1) {
-    tmp1 = new cudaColorSpinorField(in, param); // only create if necessary
-    reset = false;
-  }
+  bool reset = newTmp(&tmp1, in);
   
   cudaColorSpinorField* mytmp = dynamic_cast<cudaColorSpinorField*>(tmp1->even);
   cudaColorSpinorField* ineven = dynamic_cast<cudaColorSpinorField*>(in.even);
@@ -253,11 +236,8 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
   //odd
   Dslash(*mytmp, *inodd, QUDA_EVEN_PARITY);  
   DslashXpay(*outodd, *mytmp, QUDA_ODD_PARITY, *inodd, 4*mass*mass);    
-  
-  if (reset) {
-    delete tmp1;
-    tmp1 = 0;
-  }
+
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracStaggered::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
