@@ -13,24 +13,26 @@
 #include <iostream>
 
 void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
-		  cudaColorSpinorField &b, cudaColorSpinorField &y, QudaInvertParam *invert_param)
+		  cudaColorSpinorField &b, QudaInvertParam *invert_param)
 {
   int k=0;
   int rUpdate = 0;
     
   cudaColorSpinorField r(b);
+
+  ColorSpinorParam param;
+  param.create = QUDA_ZERO_FIELD_CREATE;
+  cudaColorSpinorField y(b, param); 
   
-  mat(r, x); // y as tmp
+  mat(r, x, y);
 
   double r2 = xmyNormCuda(b, r);
   rUpdate ++;
   
-  ColorSpinorParam param;
-  param.create = QUDA_ZERO_FIELD_CREATE;
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
   cudaColorSpinorField tmp(x, param);
-  
+
   cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
     param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -46,7 +48,6 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   cudaColorSpinorField &rSloppy = *r_sloppy;
 
   cudaColorSpinorField p(rSloppy);
-  zeroCuda(y);
 
   double r2_old;
   double src_norm = norm2(b);
@@ -74,8 +75,6 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
     alpha = r2 / pAp;        
     r2_old = r2;
     r2 = axpyNormCuda(-alpha, Ap, rSloppy);
-
-    double2 c2 = cDotProductCuda(p, Ap);
 
     // reliable update conditions
     rNorm = sqrt(r2);
@@ -133,7 +132,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
 
   //#if 0
   // Calculate the true residual
-  mat(r, x);
+  mat(r, x, y);
   double true_res = xmyNormCuda(b, r);
   if (invert_param->verbosity >= QUDA_SUMMARIZE){
     printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 

@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <cuComplex.h>
+
+#include <complex>
 
 #include <quda_internal.h>
 #include <blas_quda.h>
@@ -12,11 +13,14 @@
 #include <color_spinor_field.h>
 
 void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
-			cudaColorSpinorField &b, cudaColorSpinorField &r, QudaInvertParam *invert_param)
+			cudaColorSpinorField &b, QudaInvertParam *invert_param)
 {
+  typedef std::complex<double> Complex;
+
   ColorSpinorParam param;
   param.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField y(x, param);
+  cudaColorSpinorField r(x, param); 
 
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField p(x, param);
@@ -53,13 +57,12 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   int k = 0;
   int rUpdate = 0;
   
-  cuDoubleComplex rho = make_cuDoubleComplex(1.0, 0.0);
-  cuDoubleComplex rho0 = rho;
-  cuDoubleComplex alpha = make_cuDoubleComplex(1.0, 0.0);
-  cuDoubleComplex omega = make_cuDoubleComplex(1.0, 0.0);
-  cuDoubleComplex beta, rv, rho_rho0, alpha_omega, beta_omega;
-  cuDoubleComplex one = make_cuDoubleComplex(1.0, 0.0);
-  
+  Complex rho(1.0, 0.0);
+  Complex rho0 = rho;
+  Complex alpha(1.0, 0.0);
+  Complex omega(1.0, 0.0);
+  Complex beta;
+
   double3 rho_r2;
   double3 omega_t2;
   
@@ -77,44 +80,35 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   while (r2 > stop && k<invert_param->maxiter) {
     
     if (k==0) {
-      rho = make_cuDoubleComplex(r2, 0.0); // cDotProductCuda(r0, r_sloppy); // BiCRstab
+      rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
       copyCuda(p, rSloppy);
     } else {
-      alpha_omega = cuCdiv(alpha, omega);
-      rho_rho0 = cuCdiv(rho, rho0);
+      if (abs(rho*alpha) == 0.0) beta = 0.0;
+      else beta = (rho/rho0) * (alpha/omega);
 
-      if (cuCabs(cuCmul(rho, alpha)) == 0.0) beta = make_cuDoubleComplex(0.0, 0.0);
-      else beta = cuCmul(rho_rho0, alpha_omega);
-      
-      // p = r - beta*omega*v + beta*(p)
-      beta_omega = cuCmul(beta, omega); beta_omega.x *= -1.0; beta_omega.y *= -1.0;
-      cxpaypbzCuda(rSloppy, beta_omega, v, beta, p); // 8
+      cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
     }
     
     matSloppy(v, p, tmp);
 
-    // rv = (r0,v)
-    rv = cDotProductCuda(r0, v);    
-
-    if (cuCabs(rho) == 0.0) alpha = make_cuDoubleComplex(0.0, 0.0);
-    else alpha = cuCdiv(rho, rv);
+    if (abs(rho) == 0.0) alpha = 0.0;
+    else alpha = rho / cDotProductCuda(r0, v);
 
     // r -= alpha*v
-    alpha.x *= -1.0; alpha.y *= -1.0;
-    caxpyCuda(alpha, v, rSloppy); // 4
-    alpha.x *= -1.0; alpha.y *= -1.0;
+    caxpyCuda(-alpha, v, rSloppy);
 
     matSloppy(t, rSloppy, tmp);
     
     // omega = (t, r) / (t, t)
-    omega_t2 = cDotProductNormACuda(t, rSloppy); // 6
-    omega.x = omega_t2.x / omega_t2.z; omega.y = omega_t2.y/omega_t2.z;
+    omega_t2 = cDotProductNormACuda(t, rSloppy);
+    omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
     //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
     rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
-    rho0 = rho; rho.x = rho_r2.x; rho.y = rho_r2.y; r2 = rho_r2.z;
 
-    double2 mup= cDotProductCuda(r0, rSloppy);
+    rho0 = rho;
+    rho = Complex(rho_r2.x, rho_r2.y);
+    r2 = rho_r2.z;
 
     // reliable updates
     rNorm = sqrt(r2);

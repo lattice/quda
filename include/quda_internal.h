@@ -135,8 +135,6 @@ extern "C" {
     ParityHw even;
   } FullHw;
   
-
-
 #ifdef __cplusplus
 }
 #endif

@@ -580,7 +580,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cpuColorSpinorField* h_x;
   cudaColorSpinorField* b;
   cudaColorSpinorField* x;
-  cudaColorSpinorField* tmp;
   cudaColorSpinorField *in, *out;
 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -646,7 +645,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     csParam.create = QUDA_COPY_FIELD_CREATE;  
     x = new cudaColorSpinorField(*h_x, csParam); // solution  
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    tmp = new cudaColorSpinorField(csParam); // temporary
         
   } else if (param->dslash_type == QUDA_WILSON_DSLASH ||
 	     param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
@@ -682,7 +680,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       cudaParam.x[0] /= 2;
       cudaParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     }
-    tmp = new cudaColorSpinorField(cudaParam); // temporary
     
     dirac = Dirac::create(diracParam); // create the Dirac operator
     
@@ -703,16 +700,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(*out, *in);
-      dirac->Mdag(*in, *out); // tmp?
+      dirac->Mdag(*in, *out);
     }
-    invertCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), *out, *in, *tmp, param);
+    invertCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), *out, *in, param);
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(DiracMdag(dirac), DiracMdag(diracSloppy), *out, *in, *tmp, param);
+      invertBiCGstabCuda(DiracMdag(dirac), DiracMdag(diracSloppy), *out, *in, param);
       copyCuda(*in, *out);
     }
-    invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), *out, *in, *tmp, param);
+    invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), *out, *in, param);
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);
@@ -736,7 +733,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_x;
   delete b;
   delete x;
-  delete tmp;
   
   return;
 }

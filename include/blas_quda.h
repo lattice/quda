@@ -1,9 +1,9 @@
 #ifndef _QUDA_BLAS_H
 #define _QUDA_BLAS_H
 
-#include <cuComplex.h>
 #include <quda_internal.h>
 #include <color_spinor_field.h>
+
 
 // keep these with C-linkage for the moment
 
@@ -52,19 +52,19 @@ void xpayCuda(const cudaColorSpinorField &x, const double &a, cudaColorSpinorFie
 void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
 
 void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z, const double &b);
-void axpyBzpcxCuda(double a, cudaColorSpinorField& x, cudaColorSpinorField& y, double b, cudaColorSpinorField& z, double c); 
+void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, cudaColorSpinorField& z, const double &c); 
 
-void caxpbyCuda(const double2 &a, cudaColorSpinorField &x, const double2 &b, cudaColorSpinorField &y);
-void caxpyCuda(const double2 &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-void cxpaypbzCuda(cudaColorSpinorField &, const double2 &b, cudaColorSpinorField &y, const double2 &c, cudaColorSpinorField &z);
-void caxpbypzYmbwCuda(const double2 &, cudaColorSpinorField &, const double2 &, cudaColorSpinorField &, cudaColorSpinorField &, cudaColorSpinorField &);
+void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y);
+void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+void cxpaypbzCuda(cudaColorSpinorField &, const Complex &b, cudaColorSpinorField &y, const Complex &c, cudaColorSpinorField &z);
+void caxpbypzYmbwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, cudaColorSpinorField &, cudaColorSpinorField &);
 
-cuDoubleComplex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
-cuDoubleComplex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z);
+Complex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
+Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z);
 
 double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-double3 caxpbypzYmbwcDotProductWYNormYCuda(const double2 &a, cudaColorSpinorField &x, const double2 &b, cudaColorSpinorField &y, 
+double3 caxpbypzYmbwcDotProductWYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y, 
 					   cudaColorSpinorField &z, cudaColorSpinorField &w, cudaColorSpinorField &u);
 
 // CPU variants

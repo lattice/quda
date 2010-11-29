@@ -30,17 +30,18 @@ extern "C" {
   // defined in inv_cg_cuda.cpp
 
   void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
-		    cudaColorSpinorField &b, cudaColorSpinorField &tmp, QudaInvertParam *param);
+		    cudaColorSpinorField &b, QudaInvertParam *param);
 
   // defined in inv_multi_cg_quda.cpp
 
-  int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField **x, cudaColorSpinorField b,
-			     QudaInvertParam *param, double *offsets, int num_offsets, double *residue_sq);
+  int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField **x, 
+			     cudaColorSpinorField b, QudaInvertParam *param, double *offsets, 
+			     int num_offsets, double *residue_sq);
   
   // defined in inv_bicgstab_cuda.cpp
 
   void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
-			  cudaColorSpinorField &b, cudaColorSpinorField &tmp, QudaInvertParam *param);
+			  cudaColorSpinorField &b, QudaInvertParam *param);
 
 #ifdef __cplusplus
 }

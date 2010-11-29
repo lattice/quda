@@ -1,7 +1,9 @@
 #include <quda_internal.h>
 #include <quda.h>
-#include <cuComplex.h>
+
 #include <iostream>
+#include <complex>
+typedef std::complex<double> Complex;
 
 #ifndef _COLOR_SPINOR_FIELD_H
 #define _COLOR_SPINOR_FIELD_H
@@ -218,21 +220,21 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
   friend void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, 
 			   cudaColorSpinorField &z, const double &b);
-  friend void axpyBzpcxCuda(double a, cudaColorSpinorField& x, cudaColorSpinorField& y,
-			    double b, cudaColorSpinorField& z, double c); 
+  friend void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y,
+			    const double &b, cudaColorSpinorField& z, const double &c); 
   
-  friend void caxpbyCuda(const double2 &a, cudaColorSpinorField &x, const double2 &b, cudaColorSpinorField &y);
-  friend void caxpyCuda(const double2 &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend void cxpaypbzCuda(cudaColorSpinorField &, const double2 &b, cudaColorSpinorField &y, 
-			   const double2 &c, cudaColorSpinorField &z);
-  friend void caxpbypzYmbwCuda(const double2 &, cudaColorSpinorField &, const double2 &, cudaColorSpinorField &, 
+  friend void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y);
+  friend void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+  friend void cxpaypbzCuda(cudaColorSpinorField &, const Complex &b, cudaColorSpinorField &y, 
+			   const Complex &c, cudaColorSpinorField &z);
+  friend void caxpbypzYmbwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
 			       cudaColorSpinorField &, cudaColorSpinorField &); 
-  friend cuDoubleComplex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
-  friend cuDoubleComplex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, 
+  friend Complex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
+  friend Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, 
 					cudaColorSpinorField &z);
   friend double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   friend double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  friend double3 caxpbypzYmbwcDotProductWYNormYCuda(const double2 &a, cudaColorSpinorField &x, const double2 &b, 
+  friend double3 caxpbypzYmbwcDotProductWYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 						    cudaColorSpinorField &y, cudaColorSpinorField &z, 
 						    cudaColorSpinorField &w, cudaColorSpinorField &u);
 
