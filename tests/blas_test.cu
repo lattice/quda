@@ -100,7 +100,7 @@ void end()
 double benchmark(int kernel) {
 
   double a, b, c;
-  double2 a2, b2;
+  Complex a2, b2;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);

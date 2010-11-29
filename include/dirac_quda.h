@@ -375,6 +375,8 @@ class DiracMatrix {
   virtual void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const = 0;
   virtual void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in,
 			  cudaColorSpinorField &tmp) const = 0;
+  virtual void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in,
+			  cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const = 0;
 
   unsigned long long flops() const { return dirac->Flops(); }
 };
@@ -401,6 +403,16 @@ class DiracM : public DiracMatrix {
     dirac->M(out, in);
     dirac->tmp1 = NULL;
   }
+
+  void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		  cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const
+  {
+    dirac->tmp1 = &Tmp1;
+    dirac->tmp2 = &Tmp2;
+    dirac->M(out, in);
+    dirac->tmp2 = NULL;
+    dirac->tmp1 = NULL;
+  }
 };
 
 class DiracMdagM : public DiracMatrix {
@@ -420,6 +432,16 @@ class DiracMdagM : public DiracMatrix {
     dirac->MdagM(out, in);
     dirac->tmp1 = NULL;
   }
+
+  void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		  cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const
+  {
+    dirac->tmp1 = &Tmp1;
+    dirac->tmp2 = &Tmp2;
+    dirac->MdagM(out, in);
+    dirac->tmp2 = NULL;
+    dirac->tmp1 = NULL;
+  }
 };
 
 class DiracMdag : public DiracMatrix {
@@ -437,6 +459,16 @@ class DiracMdag : public DiracMatrix {
   {
     dirac->tmp1 = &tmp;
     dirac->Mdag(out, in);
+    dirac->tmp1 = NULL;
+  }
+
+  void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		  cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const
+  {
+    dirac->tmp1 = &Tmp1;
+    dirac->tmp2 = &Tmp2;
+    dirac->Mdag(out, in);
+    dirac->tmp2 = NULL;
     dirac->tmp1 = NULL;
   }
 };

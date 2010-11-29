@@ -25,6 +25,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   cudaColorSpinorField y(b, param); 
   
   mat(r, x, y);
+  zeroCuda(y);
 
   double r2 = xmyNormCuda(b, r);
   rUpdate ++;
@@ -32,6 +33,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
   cudaColorSpinorField tmp(x, param);
+  cudaColorSpinorField tmp2(x, param); // only needed for clover and twisted mass
 
   cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
@@ -69,7 +71,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   stopwatchStart();
   while (r2 > stop && k<invert_param->maxiter) {
 
-    matSloppy(Ap, p, tmp); // tmp as tmp
+    matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
     pAp = reDotProductCuda(p, Ap);
     alpha = r2 / pAp;        

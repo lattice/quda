@@ -2,8 +2,9 @@
 Version 0.3.1 - x November 2010
 
 - Added temporary arguments to Dirac container class.  This removes
-  continual allocation / freeing of temporaries, and reduces overall
-  memory footprint.
+  continual allocation / freeing of temporaries, and significantly
+  improve performance.  This is a temporary measure, as it unnecessary
+  increases memory footprint of Wilson / domain wall fermions in CG.
 
 - Removed temporary cudaColorSpinorField argument to solver interface functions.
 
