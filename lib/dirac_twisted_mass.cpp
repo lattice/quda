@@ -143,7 +143,7 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);
 
-  if (!dagger) {// broken for dagger since order isn't changed
+  if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     double flavor_mu = in.twistFlavor * mu;
     twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
     			  0, 0, kappa, flavor_mu, 0.0, out.volume, out.length, in.Precision());
@@ -206,11 +206,11 @@ void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField
   bool reset = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-    Dslash(*tmp1, in, QUDA_ODD_PARITY);
+    Dslash(*tmp1, in, QUDA_ODD_PARITY); // fused kernel
     Twist(out, in);
     DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, out, kappa2); // safe since out is not read after writing
   } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-    Dslash(*tmp1, in, QUDA_EVEN_PARITY);
+    Dslash(*tmp1, in, QUDA_EVEN_PARITY); // fused kernel
     Twist(out, in);
     DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, out, kappa2);
   } else { // symmetric preconditioning
