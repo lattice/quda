@@ -114,9 +114,6 @@ cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPre
 
   setBlock(kernel, n, precision);
   
-  if (n % blasBlock.x != 0) {
-    errorQuda("reduce_complex: length %d must be a multiple of %d", n, blasBlock.x);
-  }
   if (blasGrid.x > REDUCE_MAX_BLOCKS) {
     errorQuda("reduce_complex: grid size %d must be smaller than %d", blasGrid.x, REDUCE_MAX_BLOCKS);
   }
