@@ -690,11 +690,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Invalid dslash_type");
   }
   
-  massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *out);
-  if (param->verbosity >= QUDA_VERBOSE) printfQuda("Mass rescale done\n");   
-
   dirac->prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE) printfQuda("Prepared source = %f\n", norm2(*in));   
+
+  massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *out);
+  if (param->verbosity >= QUDA_VERBOSE) printfQuda("Mass rescale done\n");   
   
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:

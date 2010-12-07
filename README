@@ -1,15 +1,14 @@
 
-Release Notes for QUDA v0.3.1                          x November 2010
+Release Notes for QUDA v0.3.1                           x December 2010
 -----------------------------
 
 Overview:
 
 QUDA is a library for performing calculations in lattice QCD on
 graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
-This release includes optimized kernels for applying the Wilson Dirac
-operator (plain or clover-improved), domain wall fermions (with
-optional 5d preconditioning), twisted mass fermions and improved
-staggered operator (asqtad or HISQ), kernels for performing various
+This release includes optimized kernels for applying several different
+Dirac operators (Wilson, clover-improved Wilson, twisted mass,
+improved staggered, and domain wall), kernels for performing various
 BLAS-like operations, and full inverters built on these kernels.
 Mixed-precision implementations of both CG and BiCGstab are provided,
 with support for double, single, and half (16-bit fixed-point)
@@ -22,9 +21,9 @@ solver.
 Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.5 and Ubuntu 10.04)
-using release 3.1 of the CUDA toolkit.  CUDA 2.x and earlier are no
+using release 3.2 of the CUDA toolkit.  CUDA 2.x and earlier are no
 longer supported.  The library also seems to work under Mac OS X
-10.6.4 ("Snow Leopard") on recent 64-bit Intel-based Macs.
+10.6.5 ("Snow Leopard") on recent 64-bit Intel-based Macs.
 
 See also "Known Issues" below.
 
@@ -74,9 +73,10 @@ number, set DEVICE in make.inc appropriately.
 Using the Library:
 
 Include the header file include/quda.h in your application, link
-against lib/libquda.a, and study tests/wilson_invert_test.c or
-tests/staggered_invert_test.cpp for an example of the interface.  The
-various inverter options are enumerated in include/enum_quda.h.
+against lib/libquda.a, and study tests/wilson_invert_test.c (or the
+corresponding tests for staggered, domain wall, and twisted mass) for
+an example of the interface.  The various inverter options are
+enumerated in include/enum_quda.h.
 
 
 Known Issues:
@@ -126,13 +126,15 @@ Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
 Authors:
 
 Ronald Babich (Boston University)
-Kipton Barros (Northwestern University)
+Kipton Barros (Los Alamos National Laboratory)
 Richard Brower (Boston University)
 Michael Clark (Harvard University)
-Steven Gottlieb (Indiana University, NCSA)
+Joel Giedt (Rensselaer Polytechnic Institute)
+Steven Gottlieb (Indiana University)
 Balint Joo (Jefferson Laboratory)
 Claudio Rebbi (Boston University)
 Guochun Shi (NCSA)
+Alexei Strelchenko (Cyprus Institute)
 
 Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications
