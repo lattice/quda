@@ -22,7 +22,7 @@ Version 0.3.1
 - Fixed a bug in the Wilson and Wilson-clover Dirac operators that
   prevented the use of MatPC solution types.
 
-- Fixed a bug with Wilson and Wilson-clover Dirac operators that
+- Fixed a bug in the Wilson and Wilson-clover Dirac operators that
   would cause a crash when QUDA_MASS_NORMALIZATION is used.
 
 - Fixed an allocation bug in the Wilson and Wilson-clover

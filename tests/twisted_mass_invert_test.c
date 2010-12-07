@@ -47,7 +47,7 @@ int main(int argc, char **argv)
   double mass = -0.9;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.mu = 0.1;
-  inv_param.twist_flavor = QUDA_TWIST_MNS;
+  inv_param.twist_flavor = QUDA_TWIST_MINUS;
 
   inv_param.tol = 5e-8;
   inv_param.maxiter = 10000;

@@ -64,7 +64,7 @@ void init() {
 
   inv_param.kappa = 1.0;
   inv_param.mu = 0.01;
-  inv_param.twist_flavor = QUDA_TWIST_MNS;
+  inv_param.twist_flavor = QUDA_TWIST_MINUS;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = dagger;

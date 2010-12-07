@@ -13,7 +13,7 @@ extern "C" {
   //
 
   typedef enum QudaLinkType_s {
-    QUDA_WILSON_LINKS,
+    QUDA_WILSON_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS,
     QUDA_ASQTAD_LONG_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
@@ -224,8 +224,8 @@ extern "C" {
   } QudaSourceType;
   
   typedef enum QudaTwistFlavorType_s {
-    QUDA_TWIST_MNS = -1,
-    QUDA_TWIST_PLS = +1,
+    QUDA_TWIST_MINUS = -1,
+    QUDA_TWIST_PLUS = +1,
     QUDA_TWIST_NO  = 0,
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
   } QudaTwistFlavorType;  
