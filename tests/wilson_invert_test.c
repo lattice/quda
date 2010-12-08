@@ -26,7 +26,7 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 24; 
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 32;
+  gauge_param.X[3] = 64;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -35,31 +35,32 @@ int main(int argc, char **argv)
   
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_8;
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
+  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_8;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  int clover_yes = 1; // 0 for plain Wilson, 1 for clover
+  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
   
   if (clover_yes) {
     inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
   } else {
     inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
-  inv_param.inv_type = QUDA_CG_INVERTER;
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
   double mass = -0.9;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-2;
+  inv_param.reliable_delta = 3e-1;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;  
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -68,7 +69,7 @@ int main(int argc, char **argv)
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   gauge_param.ga_pad = 0; // 24*24*24;
-  inv_param.sp_pad = 0;   // 24*24*24;
+  inv_param.sp_pad = 24*24*24;
   inv_param.cl_pad = 0;   // 24*24*24;
 
   if (clover_yes) {
@@ -153,14 +154,17 @@ int main(int argc, char **argv)
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
-    mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec); 
+    mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, 
+	inv_param.cpu_prec, gauge_param.cpu_prec); 
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
+      ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
-    matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+    matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+	  inv_param.cpu_prec, gauge_param.cpu_prec);
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
+      ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   }
 
-  if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-    ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-  }
 
   mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);

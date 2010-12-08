@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  QudaPrecision cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -26,8 +26,8 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 16; 
   gauge_param.X[1] = 16;
   gauge_param.X[2] = 16;
-  gauge_param.X[3] = 16;
-  inv_param.Ls = 48;
+  gauge_param.X[3] = 32;
+  inv_param.Ls = 16;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -52,7 +52,7 @@ int main(int argc, char **argv)
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-1;
 
-  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
@@ -117,13 +117,13 @@ int main(int argc, char **argv)
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
     mat(spinorCheck, gauge, spinorOut, kappa5, 0, inv_param.cpu_prec, 
 	gauge_param.cpu_prec, inv_param.mass); 
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
+      ax(0.5/kappa5, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
     matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
-  }
-
-  if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-    ax(0.5/kappa5, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
+      ax(0.25/(kappa5*kappa5), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
   }
 
   mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
