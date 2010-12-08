@@ -58,15 +58,20 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
     errorQuda("Twist flavor not set %d\n", in.twistFlavor);
   }
 
-  // We can elimiate this temporary at the expense of more kernels (like clover)
-  bool reset = newTmp(&tmp2, in); // we only need single parity, so wastes some memory
+  // We can eliminate this temporary at the expense of more kernels (like clover)
+  cudaColorSpinorField *tmp=0; // this hack allows for tmp2 to be full or parity field
+  if (tmp2) {
+    if (tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) tmp = &(tmp2->Even());
+    else tmp = tmp2;
+  }
+  bool reset = newTmp(&tmp, in);
 
-  Twist(tmp2->Even(), in.Odd());
-  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, tmp2->Even(), -kappa);
-  Twist(tmp2->Even(), in.Even());
-  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, tmp2->Even(), -kappa);
+  Twist(*tmp, in.Odd());
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp, -kappa);
+  Twist(*tmp, in.Even());
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp, -kappa);
 
-  deleteTmp(&tmp2, reset);
+  deleteTmp(&tmp, reset);
 
 }
 
