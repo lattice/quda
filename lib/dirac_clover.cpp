@@ -76,10 +76,10 @@ void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) c
   }
   bool reset = newTmp(&tmp, in);
 
-  Clover(*tmp2, in.Odd(), QUDA_ODD_PARITY);
-  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp2, -kappa);
-  Clover(*tmp2, in.Even(), QUDA_EVEN_PARITY);
-  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp2, -kappa);
+  Clover(*tmp, in.Odd(), QUDA_ODD_PARITY);
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp, -kappa);
+  Clover(*tmp, in.Even(), QUDA_EVEN_PARITY);
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp, -kappa);
 
   deleteTmp(&tmp, reset);
 }
