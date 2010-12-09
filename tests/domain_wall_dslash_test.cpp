@@ -14,7 +14,7 @@
 #include <domain_wall_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 2;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
@@ -26,7 +26,7 @@ const int Ls = 16;
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -45,10 +45,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 32;
+  gauge_param.X[0] = 8;
+  gauge_param.X[1] = 8;
+  gauge_param.X[2] = 8;
+  gauge_param.X[3] = 8;
   
   setDims(gauge_param.X, Ls);
 
@@ -66,9 +66,11 @@ void init() {
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
+  inv_param.inv_type = QUDA_CG_INVERTER;
+
   inv_param.mass = 0.01;
   inv_param.m5 = -1.5;
-  kappa5 = 0.5*(5 + inv_param.m5);
+  kappa5 = 0.5/(5 + inv_param.m5);
 
   inv_param.Ls = Ls;
   

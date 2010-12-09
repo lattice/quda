@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 
   inv_param.mass = 0.01;
   inv_param.m5 = -1.5;
-  double kappa5 = 0.5*(5 + inv_param.m5);
+  double kappa5 = 0.5/(5 + inv_param.m5);
 
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
