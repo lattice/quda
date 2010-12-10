@@ -15,18 +15,22 @@ cudaColorSpinorField *x, *y, *z, *w, *v, *p;
 
 int nIters;
 
-int Nthreads = 5;
-int Ngrids = 11;
-int blockSizes[] = {64, 128, 256, 512, 1024};
-int gridSizes[] = {64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536};
+unsigned int gridMax = 65526;
+unsigned int gridMin = 1;
+
+unsigned int threadMax = 1024;
+unsigned int threadMin = 32;
 
 int prec;
 
-int LX = 24;
-int LY = 24;
-int LZ = 24;
-int LT = 32;
-int niter = 100 * 331776 / (LX * LY * LZ * LT); // 100 iterations on V=24^4
+unsigned int LX = 20;
+unsigned int LY = 20;
+unsigned int LZ = 20;
+unsigned int LT = 64;
+unsigned long long volume;
+unsigned long long length;
+
+int niter = 5 * 331776 / (LX * LY * LZ * LT); // 100 iterations on V=24^4
 
 void init()
 {
@@ -39,7 +43,11 @@ void init()
   param.x[1] = LY;
   param.x[2] = LZ;
   param.x[3] = LT;
-  param.pad = 0;
+
+  volume = LX*LY*LZ*LT; // used for half precision grid sizes
+  length = 2*param.nColor*param.nSpin*volume; // used for single/double grid sizes
+
+  param.pad = LX*LY*LZ/2;
   param.siteSubset = QUDA_PARITY_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   
@@ -72,7 +80,7 @@ void init()
   y = new cudaColorSpinorField(param);
   z = new cudaColorSpinorField(param);
 
-  param.precision = QUDA_SINGLE_PRECISION;
+  param.precision = other_prec;
   param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER; // always true since this is never double
   p = new cudaColorSpinorField(param);
 
@@ -81,7 +89,6 @@ void init()
 
   // turn off error checking in blas kernels
   setBlasTuning(1);
-
 }
 
 
@@ -284,7 +291,7 @@ int main(int argc, char** argv)
     "xpaycDotzyCuda",
     "cDotProductNormACuda",
     "cDotProductNormBCuda",
-    "caxpbypzYmbwcDotProductWYNormYQuda"
+    "caxpbypzYmbwcDotProductWYNormYCuda"
   };
   
   // Only benchmark double precision if supported
@@ -301,7 +308,7 @@ int main(int argc, char** argv)
     printf("\nBenchmarking %d bit precision\n", (int)(pow(2.0,prec)*16));
 
     for (int i = 0; i < Nkernels; i++) {
- 
+
       double gflops_max = 0.0;
       double gbytes_max = 0.0;
       int threads_max = 0; 
@@ -309,10 +316,12 @@ int main(int argc, char** argv)
 
       cudaError_t error;
 
-      for (int thread = 0; thread < Nthreads; thread++) {
-	for (int grid = 0; grid < Ngrids; grid++) {
-	  setBlasParam(i, prec, blockSizes[thread], gridSizes[grid]);
+      for (unsigned int thread = threadMin; thread <= threadMax; thread+=32) {
+	if ((thread & (thread-1)) && i >= 13) continue; // test for power of two for the reduction kernels
 
+	for (unsigned int grid = gridMin; grid <= gridMax; grid*=2) {
+	  setBlasParam(i, prec, thread, grid);
+	  
 	  // first do warmup run
 	  nIters = 1;
 	  benchmark(kernels[i]);
@@ -329,25 +338,37 @@ int main(int argc, char** argv)
 	  double gflops = (flops*1e-9)/(secs);
 	  double gbytes = bytes/(secs*(1<<30));
 
-	  if (gbytes > gbytes_max && error == cudaSuccess) { // prevents selection of failed parameters
+	  // prevents selection of failed parameters
+	  if (gbytes > gbytes_max && error == cudaSuccess) { 
 	    gflops_max = gflops;
 	    gbytes_max = gbytes;
-	    threads_max = blockSizes[thread];
-	    blocks_max = gridSizes[grid];
+	    threads_max = thread;
+	    blocks_max = grid;
 	  }
 	  
-	  //printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n\n", 
-	  //    blockSizes[thread], gridSizes[grid], names[i], secs, flops, gflops, gbytes);
+	  /* printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
+	     blockSizes[thread], gridSizes[grid], names[i], secs, flops, gflops, gbytes);*/
 	}
       }
 
       if (threads_max == 0) {
 	errorQuda("Autotuning failed for %s kernel: %s", names[i], cudaGetErrorString(error));
       } else {
+	// now rerun with more iterations to get accurate speed measurements
+	setBlasParam(i, prec, threads_max, blocks_max);
+	nIters = 1;
+	benchmark(kernels[i]);
+	nIters = niter*100;
+	blas_quda_flops = 0;
+	blas_quda_bytes = 0;
 	
+	double secs = benchmark(kernels[i]);  
+	
+	gflops_max = (blas_quda_flops*1e-9)/(secs);
+	gbytes_max = blas_quda_bytes/(secs*(1<<30));
       }
 
-      printf("%-34s: %4d threads per block, %5d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
+      printf("%-35s: %4d threads per block, %5d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
 	     names[i], threads_max, blocks_max, gflops_max, gbytes_max);
 
       threads[i][prec] = threads_max;

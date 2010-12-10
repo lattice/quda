@@ -53,9 +53,6 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
   unsigned int i = blockIdx.x*reduce_threads + threadIdx.x;
   unsigned int gridSize = reduce_threads*gridDim.x;
   
-  extern __shared__ QudaSumFloat sdata[];
-  QudaSumFloat *s = sdata + tid;
-  
   QudaSumFloat sum = 0;
 
   while (i < n) {
@@ -63,6 +60,10 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat *g_odata, u
     sum += REDUCE_OPERATION(i);
     i += gridSize;
   }
+
+  extern __shared__ QudaSumFloat sdata[];
+  QudaSumFloat *s = sdata + tid;
+  
   s[0] = sum;
   __syncthreads();
   
@@ -102,13 +103,17 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision pr
     errorQuda("reduce_core: grid size %d must be smaller than %d", blasGrid.x, REDUCE_MAX_BLOCKS);
   }
   
+  // when there is only one warp per block, we need to allocate two warps 
+  // worth of shared memory so that we don't index shared memory out of bounds
 #if (REDUCE_TYPE == REDUCE_KAHAN)
-  int smemSize = blasBlock.x * 2 * sizeof(QudaSumFloat);
+  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 4 * sizeof(QudaSumFloat) : blasBlock.x * 2 * sizeof(QudaSumFloat);
 #else
-  int smemSize = blasBlock.x * sizeof(QudaSumFloat);
+  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 2 * sizeof(QudaSumFloat) : blasBlock.x * sizeof(QudaSumFloat);
 #endif
 
-  if (blasBlock.x == 64) {
+  if (blasBlock.x == 32) {
+    REDUCE_FUNC_NAME(Kernel)<32><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat, n);
+  } else if (blasBlock.x == 64) {
     REDUCE_FUNC_NAME(Kernel)<64><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat, n);
   } else if (blasBlock.x == 128) {
     REDUCE_FUNC_NAME(Kernel)<128><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat, n);
@@ -129,7 +134,7 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision pr
   if (!blasTuning) checkCudaError();
 
   double cpu_sum = 0;
-  for (int i = 0; i < blasGrid.x; i++) cpu_sum += h_reduceFloat[i];
+  for (unsigned int i = 0; i < blasGrid.x; i++) cpu_sum += h_reduceFloat[i];
 
   return cpu_sum;
 }

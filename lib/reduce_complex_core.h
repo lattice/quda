@@ -64,9 +64,6 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
   unsigned int i = blockIdx.x*reduce_threads + threadIdx.x;
   unsigned int gridSize = reduce_threads*gridDim.x;
   
-  extern __shared__ QudaSumComplex cdata[];
-  QudaSumComplex *s = cdata + tid;
-
   QudaSumComplex sum;
   sum.x = 0.0;
   sum.y = 0.0;
@@ -78,32 +75,40 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
     sum.y += REDUCE_IMAG_OPERATION(i);
     i += gridSize;
   }
-  s[0] = sum;
+
+  // all real then imaginary to avoid bank conflicts
+  extern __shared__ QudaSumFloat cdata[];
+  QudaSumFloat *sx = cdata + tid;
+  QudaSumFloat *sy = cdata + tid + reduce_threads;
+
+  sx[0] = sum.x;
+  sy[0] = sum.y;
   __syncthreads();
   
   // do reduction in shared mem
-  if (reduce_threads >= 1024) { if (tid < 512) { s[0].x += s[512].x; s[0].y += s[512].y; } __syncthreads(); }
-  if (reduce_threads >= 512) { if (tid < 256) { s[0].x += s[256].x; s[0].y += s[256].y; } __syncthreads(); }
-  if (reduce_threads >= 256) { if (tid < 128) { s[0].x += s[128].x; s[0].y += s[128].y; } __syncthreads(); }
-  if (reduce_threads >= 128) { if (tid <  64) { s[0].x += s[ 64].x; s[0].y += s[ 64].y; } __syncthreads(); }
+  if (reduce_threads >= 1024) { if (tid < 512) { sx[0] += sx[512]; sy[0] += sy[512]; } __syncthreads(); }
+  if (reduce_threads >= 512) { if (tid < 256) { sx[0] += sx[256]; sy[0] += sy[256]; } __syncthreads(); }
+  if (reduce_threads >= 256) { if (tid < 128) { sx[0] += sx[128]; sy[0] += sy[128]; } __syncthreads(); }
+  if (reduce_threads >= 128) { if (tid <  64) { sx[0] += sx[ 64]; sy[0] += sy[ 64]; } __syncthreads(); }
   
 #ifndef __DEVICE_EMULATION__
   if (tid < 32) 
 #endif
     {
-      volatile QudaSumComplex *sv = s;
-      if (reduce_threads >=  64) { sv[0].x += sv[32].x; sv[0].y += sv[32].y; EMUSYNC; }
-      if (reduce_threads >=  32) { sv[0].x += sv[16].x; sv[0].y += sv[16].y; EMUSYNC; }
-      if (reduce_threads >=  16) { sv[0].x += sv[ 8].x; sv[0].y += sv[ 8].y; EMUSYNC; }
-      if (reduce_threads >=   8) { sv[0].x += sv[ 4].x; sv[0].y += sv[ 4].y; EMUSYNC; }
-      if (reduce_threads >=   4) { sv[0].x += sv[ 2].x; sv[0].y += sv[ 2].y; EMUSYNC; }
-      if (reduce_threads >=   2) { sv[0].x += sv[ 1].x; sv[0].y += sv[ 1].y; EMUSYNC; }
+      volatile QudaSumFloat *svx = sx;
+      volatile QudaSumFloat *svy = sy;
+      if (reduce_threads >=  64) { svx[0] += svx[32]; svy[0] += svy[32]; EMUSYNC; }
+      if (reduce_threads >=  32) { svx[0] += svx[16]; svy[0] += svy[16]; EMUSYNC; }
+      if (reduce_threads >=  16) { svx[0] += svx[ 8]; svy[0] += svy[ 8]; EMUSYNC; }
+      if (reduce_threads >=   8) { svx[0] += svx[ 4]; svy[0] += svy[ 4]; EMUSYNC; }
+      if (reduce_threads >=   4) { svx[0] += svx[ 2]; svy[0] += svy[ 2]; EMUSYNC; }
+      if (reduce_threads >=   2) { svx[0] += svx[ 1]; svy[0] += svy[ 1]; EMUSYNC; }
     }
   
   // write result for this block to global mem 
   if (tid == 0) {
-    g_odata[blockIdx.x].x = s[0].x;
-    g_odata[blockIdx.x].y = s[0].y;
+    g_odata[blockIdx.x].x = sx[0];
+    g_odata[blockIdx.x].y = sy[0];
   }
 }
 
@@ -119,12 +124,14 @@ cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPre
   }
   
 #if (REDUCE_TYPE == REDUCE_KAHAN)
-  int smemSize = blasBlock.x * 2 * sizeof(QudaSumComplex);
+  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 4 * sizeof(QudaSumComplex) : blasBlock.x * 2 * sizeof(QudaSumComplex);
 #else
-  int smemSize = blasBlock.x * sizeof(QudaSumComplex);
+  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 2 * sizeof(QudaSumComplex) : blasBlock.x * sizeof(QudaSumComplex);
 #endif
 
-  if (blasBlock.x == 64) {
+  if (blasBlock.x == 32) {
+    REDUCE_FUNC_NAME(Kernel)<32><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceComplex, n);
+  } else if (blasBlock.x == 64) {
     REDUCE_FUNC_NAME(Kernel)<64><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceComplex, n);
   } else if (blasBlock.x == 128) {
     REDUCE_FUNC_NAME(Kernel)<128><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceComplex, n);
@@ -147,7 +154,7 @@ cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPre
   cuDoubleComplex gpu_result;
   gpu_result.x = 0;
   gpu_result.y = 0;
-  for (int i = 0; i < blasGrid.x; i++) {
+  for (unsigned int i = 0; i < blasGrid.x; i++) {
     gpu_result.x += h_reduceComplex[i].x;
     gpu_result.y += h_reduceComplex[i].y;
   }

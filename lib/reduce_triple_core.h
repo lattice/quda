@@ -65,29 +65,37 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
 
 #else
 
-#define SUM_DOUBLE3(s, i, j)			\
+/*#define SUM_DOUBLE3(s, i, j)			\
   s[i].x += s[j].x;				\
   s[i].y += s[j].y;				\
-  s[i].z += s[j].z;
+  s[i].z += s[j].z;*/
+
+#define SUM_DOUBLE3(s, i, j)			\
+  s##x[i] += s##x[j];				\
+  s##y[i] += s##y[j];				\
+  s##z[i] += s##z[j];
 
 __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, unsigned int n) {
   unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x*reduce_threads + threadIdx.x;
   unsigned int gridSize = reduce_threads*gridDim.x;
 
-  extern __shared__ QudaSumFloat3 tdata[];
-  QudaSumFloat3 *s = tdata + tid;
-  s[0].x = 0;
-  s[0].y = 0;
-  s[0].z = 0;
+  // all x, y then z to avoid bank conflicts
+  extern __shared__ QudaSumFloat tdata[];
+  QudaSumFloat *sx = tdata + tid;
+  QudaSumFloat *sy = tdata + tid + reduce_threads;
+  QudaSumFloat *sz = tdata + tid + 2*reduce_threads;
+  sx[0] = 0;
+  sy[0] = 0;
+  sz[0] = 0;
 
   while (i < n) {
     REDUCE_X_AUXILIARY(i);
     REDUCE_Y_AUXILIARY(i);
     REDUCE_Z_AUXILIARY(i);
-    s[0].x += REDUCE_X_OPERATION(i);
-    s[0].y += REDUCE_Y_OPERATION(i);
-    s[0].z += REDUCE_Z_OPERATION(i);
+    sx[0] += REDUCE_X_OPERATION(i);
+    sy[0] += REDUCE_Y_OPERATION(i);
+    sz[0] += REDUCE_Z_OPERATION(i);
     i += gridSize;
   }
   
@@ -107,7 +115,9 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
   if (tid < 32) 
 #endif
     {
-      volatile QudaSumFloat3 *sv = s;
+      volatile QudaSumFloat *svx = sx;
+      volatile QudaSumFloat *svy = sy;
+      volatile QudaSumFloat *svz = sz;
       if (reduce_threads >=  64) { SUM_DOUBLE3(sv, 0,32); EMUSYNC; }
       if (reduce_threads >=  32) { SUM_DOUBLE3(sv, 0,16); EMUSYNC; }
       if (reduce_threads >=  16) { SUM_DOUBLE3(sv, 0,8); EMUSYNC; }
@@ -118,9 +128,9 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
     
   // write result for this block to global mem 
   if (tid == 0) {
-    g_odata[blockIdx.x].x = s[0].x;
-    g_odata[blockIdx.x].y = s[0].y;
-    g_odata[blockIdx.x].z = s[0].z;
+    g_odata[blockIdx.x].x = sx[0];
+    g_odata[blockIdx.x].y = sy[0];
+    g_odata[blockIdx.x].z = sz[0];
   }
 }
 
@@ -138,12 +148,14 @@ double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision p
   }
   
 #if (REDUCE_TYPE == REDUCE_KAHAN)
-  int smemSize = blasBlock.x * 2 * sizeof(QudaSumFloat3);
+  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 4 * sizeof(QudaSumFloat3) : blasBlock.x * 2 * sizeof(QudaSumFloat3);
 #else
-  int smemSize = blasBlock.x * sizeof(QudaSumFloat3);
+  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 2 * sizeof(QudaSumFloat3) : blasBlock.x * sizeof(QudaSumFloat3);
 #endif
 
-  if (blasBlock.x == 64) {
+  if (blasBlock.x == 32) {
+    REDUCE_FUNC_NAME(Kernel)<32><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
+  } else if (blasBlock.x == 64) {
     REDUCE_FUNC_NAME(Kernel)<64><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
   } else if (blasBlock.x == 128) {
     REDUCE_FUNC_NAME(Kernel)<128><<< blasGrid, blasBlock, smemSize >>>(REDUCE_PARAMS, d_reduceFloat3, n);
@@ -167,7 +179,7 @@ double3 REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision p
   gpu_result.x = 0;
   gpu_result.y = 0;
   gpu_result.z = 0;
-  for (int i = 0; i < blasGrid.x; i++) {
+  for (unsigned int i = 0; i < blasGrid.x; i++) {
     gpu_result.x += h_reduceFloat3[i].x;
     gpu_result.y += h_reduceFloat3[i].y;
     gpu_result.z += h_reduceFloat3[i].z;
