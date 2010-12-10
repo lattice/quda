@@ -3,13 +3,13 @@
 #include <blas_quda.h>
 
 DiracDomainWall::DiracDomainWall(const DiracParam &param)
-  : DiracWilson(param), m5(param.m5), kappa5(0.5/(5 + m5))
+  : DiracWilson(param), m5(param.m5), kappa5(0.5/(5.0 + m5))
 {
 
 }
 
 DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) 
-  : DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5 + m5))
+  : DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5))
 {
 
 }
@@ -76,8 +76,6 @@ void DiracDomainWall::M(cudaColorSpinorField &out, const cudaColorSpinorField &i
 void DiracDomainWall::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   checkFullSpinor(out, in);
-  ColorSpinorParam param;
-  param.create = QUDA_NULL_FIELD_CREATE;
 
   bool reset = newTmp(&tmp1, in);
 
