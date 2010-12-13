@@ -17,15 +17,15 @@ int main(int argc, char **argv)
   int device = 0; // CUDA device number
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 24; 
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
+  gauge_param.X[0] = 20; 
+  gauge_param.X[1] = 20;
+  gauge_param.X[2] = 20;
   gauge_param.X[3] = 64;
 
   gauge_param.anisotropy = 1.0;

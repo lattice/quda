@@ -9,13 +9,12 @@
 
 #define Nkernels 23
 
-QudaPrecision cuda_prec;
 QudaPrecision other_prec; // Used for copy benchmark
 cudaColorSpinorField *x, *y, *z, *w, *v, *p;
 
 int nIters;
 
-unsigned int gridMax = 65526;
+unsigned int gridMax = 65536;
 unsigned int gridMin = 1;
 
 unsigned int threadMax = 1024;
@@ -119,6 +118,9 @@ double benchmark(int kernel) {
 
     case 0:
       copyCuda(*y, *p);
+      if (y->Precision() == QUDA_DOUBLE_PRECISION) {
+	copyCuda(*p, *y); // check double-to-half, in addition to half-to-double
+      }
       break;
 
     case 1:
@@ -379,5 +381,4 @@ int main(int argc, char** argv)
   write(names, threads, blocks);
   endQuda();
 }
-
 
