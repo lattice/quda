@@ -797,9 +797,9 @@ __global__ void convertDHKernelSt(double2 *res, int length, int real_length) {
 
 void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 
-    if (src.nSpin != 1 && src.nSpin != 4){
-	errorQuda("nSpin(%d) not supported in function %s, line %d\n", src.nSpin, __FUNCTION__, __LINE__);	
-    }
+  if (src.nSpin != 1 && src.nSpin != 4){
+    errorQuda("nSpin(%d) not supported in function %s, line %d\n", src.nSpin, __FUNCTION__, __LINE__);	
+  }
   if ((dst.precision == QUDA_HALF_PRECISION || src.precision == QUDA_HALF_PRECISION) &&
       (dst.siteSubset == QUDA_FULL_SITE_SUBSET || src.siteSubset == QUDA_FULL_SITE_SUBSET)) {
     copyCuda(dst.Even(), src.Even());
@@ -831,10 +831,14 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 	cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
 	cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/12);
 	convertSHKernel<<<blasGrid, blasBlock>>>((float4*)dst.v, src.stride, src.volume);
+	cudaUnbindTexture(texHalf1); 
+	cudaUnbindTexture(texNorm1);
       }else{ //nSpin== 1;
 	cudaBindTexture(0, texHalfSt1, src.v, spinor_bytes); 
 	cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/3);
 	convertSHKernel<<<blasGrid, blasBlock>>>((float2*)dst.v, src.stride, src.volume);
+	cudaUnbindTexture(texHalfSt1); 
+	cudaUnbindTexture(texNorm1);
       }
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
     blas_quda_bytes += dst.volume*sizeof(float);
@@ -842,9 +846,11 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     if (src.nSpin == 4){
 	cudaBindTexture(0, xTexSingle4, src.v, spinor_bytes); 
 	convertHSKernel<<<blasGrid, blasBlock>>>((short4*)dst.v, (float*)dst.norm, src.stride, src.volume);
+	cudaUnbindTexture(xTexSingle4); 
     }else{ //nSpinr == 1
 	cudaBindTexture(0, xTexSingle2, src.v, spinor_bytes); 
 	convertHSKernel<<<blasGrid, blasBlock>>>((short2*)dst.v, (float*)dst.norm, src.stride, src.volume);	
+	cudaUnbindTexture(xTexSingle2); 
     }
   } else if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
     blas_quda_bytes += src.volume*sizeof(float);
@@ -853,10 +859,14 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 	cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
 	cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/12);
 	convertDHKernel<<<blasGrid, blasBlock>>>((double2*)dst.v, src.stride, src.volume);
+	cudaUnbindTexture(texHalf1); 
+	cudaUnbindTexture(texNorm1);
     }else{//nSpinr == 1
 	cudaBindTexture(0, texHalfSt1, src.v, spinor_bytes); 
 	cudaBindTexture(0, texNorm1, src.norm, spinor_bytes/3);
 	convertDHKernelSt<<<blasGrid, blasBlock>>>((double2*)dst.v, src.stride, src.volume);
+	cudaUnbindTexture(texHalfSt1); 
+	cudaUnbindTexture(texNorm1);
     }
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
     blas_quda_bytes += dst.volume*sizeof(float);
@@ -867,6 +877,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     }else{ //nSpinr == 1
       convertHDKernel<<<blasGrid, blasBlock>>>((short2*)dst.v, (float*)dst.norm, src.stride, src.volume);
     }
+    cudaUnbindTexture(xTexDouble2); 
   } else {
     cudaMemcpy(dst.v, src.v, dst.bytes, cudaMemcpyDeviceToDevice);
     if (dst.precision == QUDA_HALF_PRECISION) {
@@ -875,7 +886,6 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     }
   }
   
-
   cudaThreadSynchronize();
   if (!blasTuning) checkCudaError();
 
