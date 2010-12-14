@@ -411,14 +411,30 @@ __device__ float fast_abs_max(float4 a) {
 #define SUM_FLOAT4(sum, a)			\
   float sum = a.x + a.y + a.z + a.w;
 
+#if (__CUDA_ARCH__ < 200) 
 #define REAL_DOT_FLOAT4(dot, a, b) \
-  float dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w
+  float dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
+#else
+#define REAL_DOT_FLOAT4(dot, a, b)		\
+  float dot = fmaf(a.x, b.x, 0.0f);		\
+  dot = fmaf(a.y, b.y, dot);			\
+  dot = fmaf(a.z, b.z, dot);			\
+  dot = fmaf(a.w, b.w, dot)
+#endif
 
 #define REAL_DOT_FLOAT2(dot, a, b) \
   float dot = a.x*b.x + a.y*b.y;
 
-#define IMAG_DOT_FLOAT4(dot, a, b) \
-  float dot = a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z
+#if (__CUDA_ARCH__ < 200) 
+#define IMAG_DOT_FLOAT4(dot, a, b)			\
+  float dot = a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z;
+#else
+#define IMAG_DOT_FLOAT4(dot, a, b)		\
+  float dot = fmaf(a.x, b.y, 0.0f);		\
+  dot = fmaf(-a.y, b.x, dot);			\
+  dot = fmaf(a.z, b.w, dot);			\
+  dot = fmaf(-a.w, b.w, dot)
+#endif
 
 #define AX_FLOAT4(a, X)				\
   X.x *= a; X.y *= a; X.z *= a; X.w *= a;

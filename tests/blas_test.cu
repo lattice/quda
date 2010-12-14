@@ -22,17 +22,21 @@ unsigned int threadMin = 32;
 
 int prec;
 
-unsigned int LX = 20;
-unsigned int LY = 20;
-unsigned int LZ = 20;
+// volume per GPU
+unsigned int LX = 24;
+unsigned int LY = 24;
+unsigned int LZ = 24;
 unsigned int LT = 64;
 unsigned long long volume;
 unsigned long long length;
 
-int niter = 5 * 331776 / (LX * LY * LZ * LT); // 100 iterations on V=24^4
+int niter = 10 * 331776 / (LX * LY * LZ * LT); // 10 iterations on V=24^4 at half precision
 
 void init()
 {
+
+  printf("niter = %d\n", niter);
+
   ColorSpinorParam param;
   param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   param.nColor = 3;
@@ -93,6 +97,10 @@ void init()
 
 void end()
 {
+  // half the number of iterations for the next precision
+  niter /= 2; 
+  if (niter==0) niter = 1;
+
   // release memory
   delete p;
   delete v;
@@ -307,7 +315,7 @@ int main(int argc, char** argv)
 
     init();
 
-    printf("\nBenchmarking %d bit precision\n", (int)(pow(2.0,prec)*16));
+    printf("\nBenchmarking %d bit precision with %d iterations\n", (int)(pow(2.0,prec)*16), niter);
 
     for (int i = 0; i < Nkernels; i++) {
 
@@ -348,8 +356,8 @@ int main(int argc, char** argv)
 	    blocks_max = grid;
 	  }
 	  
-	  /* printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
-	     blockSizes[thread], gridSizes[grid], names[i], secs, flops, gflops, gbytes);*/
+	  //printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
+	  // thread, grid, names[i], secs, flops, gflops, gbytes);
 	}
       }
 
