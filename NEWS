@@ -13,11 +13,15 @@ Version 0.3.1
   case is better optimized and generally also exhibits faster
   convergence.
 
+- Significantly improved performance of several BLAS routines on Fermi.
+
+- Improved performance in the CG solver for Wilson-like (and domain
+  wall) fermions by avoiding unnecessary allocation and deallocation
+  of temporaries, at the expense of increased memory usage.  This will
+  be improved in a future release.
+
 - Enabled optional building of Dirac operators, set in make.inc, to
   keep build time in check.
-
-- Renamed tests/dslash_reference.* to tests/wilson_dslash_reference.* for
-  consistency.
 
 - Fixed a bug in the Wilson and Wilson-clover Dirac operators that
   prevented the use of MatPC solution types.
@@ -29,10 +33,8 @@ Version 0.3.1
   Dirac operators that might have led to undefined behaviour for
   non-zero padding.
 
-- Improved performance in the CG solver for Wilson-like (and domain
-  wall) fermions by avoiding unnecessary allocation and deallocation
-  of temporaries, at the expense of increased memory usage.  This will
-  be improved in a future release.
+- Fixed a bug in blas_test that might have led to incorrect autotuning
+  for the copyCuda() routine.
 
 - Various internal changes: removed temporary cudaColorSpinorField
   argument to solver functions; modified blas functions to use C++

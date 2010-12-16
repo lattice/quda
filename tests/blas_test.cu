@@ -7,35 +7,50 @@
 
 #include <test_util.h>
 
-#define Nkernels 23
-
-QudaPrecision other_prec; // Used for copy benchmark
-cudaColorSpinorField *x, *y, *z, *w, *v, *p;
-
-int nIters;
-
-unsigned int gridMax = 65536;
-unsigned int gridMin = 1;
-
-unsigned int threadMax = 1024;
-unsigned int threadMin = 32;
-
-int prec;
-
 // volume per GPU
-unsigned int LX = 24;
-unsigned int LY = 24;
-unsigned int LZ = 24;
-unsigned int LT = 64;
-unsigned long long volume;
-unsigned long long length;
+const int LX = 24;
+const int LY = 24;
+const int LZ = 24;
+const int LT = 24;
 
-int niter = 10 * 331776 / (LX * LY * LZ * LT); // 10 iterations on V=24^4 at half precision
+// corresponds to 10 iterations for V=24^4 at half precision
+const int Niter = 10 * 331776 / (LX * LY * LZ * LT);
 
-void init()
+const int Nkernels = 24;
+const int ThreadMin = 32;
+const int ThreadMax = 1024;
+const int GridMin = 1;
+const int GridMax = 65536;
+
+cudaColorSpinorField *x, *y, *z, *w, *v, *h, *l;
+
+
+void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
 {
+  param.precision = precision;
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  } else {
+    param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  }
+}
 
-  printf("niter = %d\n", niter);
+
+// returns true if the specified kernel performs a reduction
+bool isReduction(int kernel)
+{
+  return (kernel > 13);
+}
+
+
+void initFields(int prec)
+{
+  // precisions used for the source field in the copyCuda() benchmark
+  QudaPrecision high_aux_prec;
+  QudaPrecision low_aux_prec;
+
+  //long long volume = LX*LY*LZ*LT; // used for half precision grid sizes
+  //long long length = 2*param.nColor*param.nSpin*volume; // used for single/double grid sizes
 
   ColorSpinorParam param;
   param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
@@ -47,9 +62,6 @@ void init()
   param.x[2] = LZ;
   param.x[3] = LT;
 
-  volume = LX*LY*LZ*LT; // used for half precision grid sizes
-  length = 2*param.nColor*param.nSpin*volume; // used for single/double grid sizes
-
   param.pad = LX*LY*LZ/2;
   param.siteSubset = QUDA_PARITY_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -59,19 +71,19 @@ void init()
 
   switch(prec) {
   case 0:
-    param.precision = QUDA_HALF_PRECISION;
-    other_prec = QUDA_SINGLE_PRECISION;
-    param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+    setPrec(param, QUDA_HALF_PRECISION);
+    high_aux_prec = QUDA_DOUBLE_PRECISION;
+    low_aux_prec = QUDA_SINGLE_PRECISION;
     break;
   case 1:
-    param.precision = QUDA_SINGLE_PRECISION;
-    other_prec = QUDA_HALF_PRECISION;
-    param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+    setPrec(param, QUDA_SINGLE_PRECISION);
+    high_aux_prec = QUDA_DOUBLE_PRECISION;
+    low_aux_prec = QUDA_HALF_PRECISION;
     break;
   case 2:
-    param.precision = QUDA_DOUBLE_PRECISION;
-    other_prec = QUDA_HALF_PRECISION;
-    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    setPrec(param, QUDA_DOUBLE_PRECISION);
+    high_aux_prec = QUDA_SINGLE_PRECISION;
+    low_aux_prec = QUDA_HALF_PRECISION;
     break;
   }
 
@@ -83,9 +95,11 @@ void init()
   y = new cudaColorSpinorField(param);
   z = new cudaColorSpinorField(param);
 
-  param.precision = other_prec;
-  param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER; // always true since this is never double
-  p = new cudaColorSpinorField(param);
+  setPrec(param, high_aux_prec);
+  h = new cudaColorSpinorField(param);
+
+  setPrec(param, low_aux_prec);
+  l = new cudaColorSpinorField(param);
 
   // check for successful allocation
   checkCudaError();
@@ -95,23 +109,20 @@ void init()
 }
 
 
-void end()
+void freeFields()
 {
-  // half the number of iterations for the next precision
-  niter /= 2; 
-  if (niter==0) niter = 1;
-
   // release memory
-  delete p;
   delete v;
   delete w;
   delete x;
   delete y;
   delete z;
+  delete h;
+  delete l;
 }
 
 
-double benchmark(int kernel) {
+double benchmark(int kernel, int niter) {
 
   double a, b, c;
   Complex a2, b2;
@@ -121,110 +132,111 @@ double benchmark(int kernel) {
   cudaEventRecord(start, 0);
   cudaEventSynchronize(start);
 
-  for (int i=0; i < nIters; ++i) {
+  for (int i=0; i < niter; ++i) {
+
     switch (kernel) {
 
     case 0:
-      copyCuda(*y, *p);
-      if (y->Precision() == QUDA_DOUBLE_PRECISION) {
-	copyCuda(*p, *y); // check double-to-half, in addition to half-to-double
-      }
+      copyCuda(*y, *h);
       break;
 
     case 1:
+      copyCuda(*y, *l);
+      break;
+      
+    case 2:
       axpbyCuda(a, *x, b, *y);
       break;
 
-    case 2:
+    case 3:
       xpyCuda(*x, *y);
       break;
 
-    case 3:
+    case 4:
       axpyCuda(a, *x, *y);
       break;
 
-    case 4:
+    case 5:
       xpayCuda(*x, a, *y);
       break;
 
-    case 5:
+    case 6:
       mxpyCuda(*x, *y);
       break;
 
-    case 6:
+    case 7:
       axCuda(a, *x);
       break;
 
-    case 7:
+    case 8:
       caxpyCuda(a2, *x, *y);
       break;
 
-    case 8:
+    case 9:
       caxpbyCuda(a2, *x, b2, *y);
       break;
 
-    case 9:
+    case 10:
       cxpaypbzCuda(*x, a2, *y, b2, *z);
       break;
 
-    case 10:
+    case 11:
       axpyBzpcxCuda(a, *x, *y, b, *z, c);
       break;
 
-    case 11:
+    case 12:
       axpyZpbxCuda(a, *x, *y, *z, b);
       break;
 
-    case 12:
+    case 13:
       caxpbypzYmbwCuda(a2, *x, b2, *y, *z, *w);
       break;
       
-      // double
-    case 13:
+    // double
+    case 14:
       sumCuda(*x);
       break;
 
-    case 14:
+    case 15:
       normCuda(*x);
       break;
 
-    case 15:
+    case 16:
       reDotProductCuda(*x, *y);
       break;
 
-    case 16:
+    case 17:
       axpyNormCuda(a, *x, *y);
       break;
 
-    case 17:
+    case 18:
       xmyNormCuda(*x, *y);
       break;
       
-      // double2
-    case 18:
+    // double2
+    case 19:
       cDotProductCuda(*x, *y);
       break;
 
-    case 19:
+    case 20:
       xpaycDotzyCuda(*x, a, *y, *z);
       break;
       
-      // double3
-    case 20:
+    // double3
+    case 21:
       cDotProductNormACuda(*x, *y);
       break;
 
-    case 21:
+    case 22:
       cDotProductNormBCuda(*x, *y);
       break;
 
-    case 22:
+    case 23:
       caxpbypzYmbwcDotProductWYNormYCuda(a2, *x, b2, *y, *z, *w, *v);
       break;
-      
+
     default:
-      printf("Undefined blas kernel %d\n", kernel);
-      exit(1);
+      errorQuda("Undefined blas kernel %d\n", kernel);
     }
   }
   
@@ -277,9 +289,9 @@ int main(int argc, char** argv)
   int threads[Nkernels][3];
   int blocks[Nkernels][3];
 
-  int kernels[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22};
   char *names[] = {
-    "copyCuda",
+    "copyCuda (high source precision)",
+    "copyCuda (low source precision)",
     "axpbyCuda",
     "xpyCuda",
     "axpyCuda",
@@ -303,6 +315,8 @@ int main(int argc, char** argv)
     "cDotProductNormBCuda",
     "caxpbypzYmbwcDotProductWYNormYCuda"
   };
+
+  char *prec_str[] = {"half", "single", "double"};
   
   // Only benchmark double precision if supported
 #if (__CUDA_ARCH__ >= 130)
@@ -311,13 +325,14 @@ int main(int argc, char** argv)
   int Nprec = 2;
 #endif
 
-  for (prec = 0; prec < Nprec; prec++) {
+  int niter = Niter;
 
-    init();
+  for (int prec = 0; prec < Nprec; prec++) {
 
-    printf("\nBenchmarking %d bit precision with %d iterations\n", (int)(pow(2.0,prec)*16), niter);
+    printf("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
+    initFields(prec);
 
-    for (int i = 0; i < Nkernels; i++) {
+    for (int kernel = 0; kernel < Nkernels; kernel++) {
 
       double gflops_max = 0.0;
       double gbytes_max = 0.0;
@@ -326,21 +341,24 @@ int main(int argc, char** argv)
 
       cudaError_t error;
 
-      for (unsigned int thread = threadMin; thread <= threadMax; thread+=32) {
-	if ((thread & (thread-1)) && i >= 13) continue; // test for power of two for the reduction kernels
+      // only benchmark "high precision" copyCuda() if double is supported
+      if ((Nprec < 3) && (kernel == 0)) continue;
 
-	for (unsigned int grid = gridMin; grid <= gridMax; grid*=2) {
-	  setBlasParam(i, prec, thread, grid);
+      for (unsigned int thread = ThreadMin; thread <= ThreadMax; thread+=32) {
+
+	// for reduction kernels, the number of threads must be a power of two
+	if (isReduction(kernel) && (thread & (thread-1))) continue;
+
+	for (unsigned int grid = GridMin; grid <= GridMax; grid *= 2) {
+	  setBlasParam(kernel, prec, thread, grid);
 	  
 	  // first do warmup run
-	  nIters = 1;
-	  benchmark(kernels[i]);
+	  benchmark(kernel, 1);
 	  
-	  nIters = niter;
 	  blas_quda_flops = 0;
 	  blas_quda_bytes = 0;
 
-	  double secs = benchmark(kernels[i]);
+	  double secs = benchmark(kernel, niter);
 	  error = cudaGetLastError();
 	  double flops = blas_quda_flops;
 	  double bytes = blas_quda_bytes;
@@ -355,38 +373,38 @@ int main(int argc, char** argv)
 	    threads_max = thread;
 	    blocks_max = grid;
 	  }
-	  
-	  //printf("%d %d %-36s %f s, flops = %e, Gflops/s = %f, GiB/s = %f\n", 
-	  // thread, grid, names[i], secs, flops, gflops, gbytes);
+	  //printf("%d %d %-35s %f s, flops = %e, Gflop/s = %f, GiB/s = %f\n", 
+	  // thread, grid, names[kernel], secs, flops, gflops, gbytes);
 	}
       }
 
       if (threads_max == 0) {
-	errorQuda("Autotuning failed for %s kernel: %s", names[i], cudaGetErrorString(error));
+	errorQuda("Autotuning failed for %s kernel: %s", names[kernel], cudaGetErrorString(error));
       } else {
 	// now rerun with more iterations to get accurate speed measurements
-	setBlasParam(i, prec, threads_max, blocks_max);
-	nIters = 1;
-	benchmark(kernels[i]);
-	nIters = niter*100;
+	setBlasParam(kernel, prec, threads_max, blocks_max);
+	benchmark(kernel, 1);
 	blas_quda_flops = 0;
 	blas_quda_bytes = 0;
 	
-	double secs = benchmark(kernels[i]);  
+	double secs = benchmark(kernel, 100*niter);
 	
 	gflops_max = (blas_quda_flops*1e-9)/(secs);
 	gbytes_max = blas_quda_bytes/(secs*(1<<30));
       }
 
-      printf("%-35s: %4d threads per block, %5d blocks per grid, Gflops/s = %f, GiB/s = %f\n", 
-	     names[i], threads_max, blocks_max, gflops_max, gbytes_max);
+      printf("%-35s: %4d threads per block, %5d blocks per grid, Gflop/s = %8.4f, GiB/s = %8.4f\n", 
+	     names[kernel], threads_max, blocks_max, gflops_max, gbytes_max);
 
-      threads[i][prec] = threads_max;
-      blocks[i][prec] = blocks_max;
+      threads[kernel][prec] = threads_max;
+      blocks[kernel][prec] = blocks_max;
     }
-    end();
+    freeFields();
+
+    // halve the number of iterations for the next precision
+    niter /= 2; 
+    if (niter==0) niter = 1;
   }
   write(names, threads, blocks);
   endQuda();
 }
-
