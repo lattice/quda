@@ -24,6 +24,9 @@ const int GridMax = 65536;
 
 cudaColorSpinorField *x, *y, *z, *w, *v, *h, *l;
 
+// defines blas_threads[][] and blas_blocks[][]
+#include "../lib/blas_param.h"
+
 
 void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
 {
@@ -48,9 +51,6 @@ void initFields(int prec)
   // precisions used for the source field in the copyCuda() benchmark
   QudaPrecision high_aux_prec;
   QudaPrecision low_aux_prec;
-
-  //long long volume = LX*LY*LZ*LT; // used for half precision grid sizes
-  //long long length = 2*param.nColor*param.nSpin*volume; // used for single/double grid sizes
 
   ColorSpinorParam param;
   param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
@@ -286,9 +286,6 @@ int main(int argc, char** argv)
   if (argc == 2) dev = atoi(argv[1]);
   initQuda(dev);
 
-  int threads[Nkernels][3];
-  int blocks[Nkernels][3];
-
   char *names[] = {
     "copyCuda (high source precision)",
     "copyCuda (low source precision)",
@@ -396,8 +393,8 @@ int main(int argc, char** argv)
       printf("%-35s: %4d threads per block, %5d blocks per grid, Gflop/s = %8.4f, GiB/s = %8.4f\n", 
 	     names[kernel], threads_max, blocks_max, gflops_max, gbytes_max);
 
-      threads[kernel][prec] = threads_max;
-      blocks[kernel][prec] = blocks_max;
+      blas_threads[kernel][prec] = threads_max;
+      blas_blocks[kernel][prec] = blocks_max;
     }
     freeFields();
 
@@ -405,6 +402,6 @@ int main(int argc, char** argv)
     niter /= 2; 
     if (niter==0) niter = 1;
   }
-  write(names, threads, blocks);
+  write(names, blas_threads, blas_blocks);
   endQuda();
 }
