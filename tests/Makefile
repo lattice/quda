@@ -27,14 +27,18 @@ wilson_invert_test: wilson_invert_test.o test_util.o wilson_dslash_reference.o b
 	$(CXX) $(LDFLAGS) $^ -o $@
 
 domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslash_reference.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 domain_wall_invert_test: domain_wall_invert_test.o test_util.o domain_wall_dslash_reference.o \
 	blas_reference.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 twisted_mass_dslash_test: twisted_mass_dslash_test.o test_util.o twisted_mass_dslash_reference.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 twisted_mass_invert_test: twisted_mass_invert_test.o test_util.o twisted_mass_dslash_reference.o \
 	blas_reference.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@
 
 su3_test: su3_test.o test_util.o wilson_dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@
@@ -54,7 +58,6 @@ gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
 	$(CC) $(LDFLAGS) $^  -o $@ 
 
-
 tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
 
@@ -71,5 +74,3 @@ clean:
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 .PHONY: all tune clean
-
-

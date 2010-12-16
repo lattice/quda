@@ -1,18 +1,8 @@
-// dslash_reference.cpp
-// Ver. 09.10.f
-
-// 10/19/09:  Most recent now on memstick.
-// 10/22/09:  Added some error checking, myerror.h so I can call my error function.
-// 10/28/09:  Began to enable single precision.
-// 12/26/09:  Modifications needed for the 5dPC.  Began editing process.
-//   Will also need all of the Mat and MatPC ref. code working for testing
-//   the GPU code.
-
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-//#include <myerror.h>
 #include <quda.h>
 #include <test_util.h>
 #include <domain_wall_dslash_reference.h>
@@ -282,7 +272,7 @@ const double projector[10][4][4][2] = {
 // todo pass projector
 template <typename Float>
 void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
-  for (uint i=0; i<4*3*2; i++) res[i] = 0.0;
+  for (int i=0; i<4*3*2; i++) res[i] = 0.0;
 
   for (int s = 0; s < 4; s++) {
     for (int t = 0; t < 4; t++) {
@@ -358,9 +348,9 @@ void dslashReference_4d(sFloat *res, gFloat **gaugeFull, sFloat *spinorField,
 	        if (dir % 2 == 0) {
         	  su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
 #ifdef DBUG_VERBOSE            
-            cout << "spinor:" << endl;
-            printSpinorElement(&projectedSpinor[s*(3*2)],0,QUDA_DOUBLE_PRECISION);
-            cout << "gauge:" << endl;
+		  std::cout << "spinor:" << std::endl;
+		  printSpinorElement(&projectedSpinor[s*(3*2)],0,QUDA_DOUBLE_PRECISION);
+		  std::cout << "gauge:" << std::endl;
 #endif
           } else {
         	  su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
