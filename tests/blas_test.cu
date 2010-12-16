@@ -12,9 +12,10 @@ const int LX = 24;
 const int LY = 24;
 const int LZ = 24;
 const int LT = 24;
+const int nSpin = 4;
 
-// corresponds to 10 iterations for V=24^4 at half precision
-const int Niter = 10 * 331776 / (LX * LY * LZ * LT);
+// corresponds to 10 iterations for V=24^4, nSpin = 4, at half precision
+const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * nSpin);
 
 const int Nkernels = 24;
 const int ThreadMin = 32;
@@ -55,7 +56,7 @@ void initFields(int prec)
   ColorSpinorParam param;
   param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   param.nColor = 3;
-  param.nSpin = 4; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+  param.nSpin = nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   param.nDim = 4; // number of spacetime dimensions
   param.x[0] = LX;
   param.x[1] = LY;
