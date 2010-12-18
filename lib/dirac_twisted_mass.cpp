@@ -29,7 +29,9 @@ DiracTwistedMass& DiracTwistedMass::operator=(const DiracTwistedMass &dirac)
 
 // Protected method for applying twist
 void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in,
-				    const QudaTwistGamma5Type twistType) const {
+				    const QudaTwistGamma5Type twistType) const
+{
+  checkParitySpinor(out, in);
   
   if (!initDslash) initDslashConstants(gauge, in.stride, 0);
 
@@ -44,7 +46,8 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 
 
 // Public method to apply the twist
-void DiracTwistedMass::Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const {
+void DiracTwistedMass::Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
   twistedApply(out, in, QUDA_TWIST_GAMMA5_DIRECT);
 }
 
@@ -64,7 +67,7 @@ void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &
     if (tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) tmp = &(tmp2->Even());
     else tmp = tmp2;
   }
-  bool reset = newTmp(&tmp, in);
+  bool reset = newTmp(&tmp, in.Even());
 
   Twist(*tmp, in.Odd());
   DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp, -kappa);
@@ -130,7 +133,8 @@ DiracTwistedMassPC& DiracTwistedMassPC::operator=(const DiracTwistedMassPC &dira
 }
 
 // Public method to apply the inverse twist
-void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const {
+void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+{
   twistedApply(out, in, QUDA_TWIST_GAMMA5_INVERSE);
 }
 

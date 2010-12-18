@@ -74,7 +74,7 @@ void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) c
     if (tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) tmp = &(tmp2->Even());
     else tmp = tmp2;
   }
-  bool reset = newTmp(&tmp, in);
+  bool reset = newTmp(&tmp, in.Even());
 
   Clover(*tmp, in.Odd(), QUDA_ODD_PARITY);
   DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp, -kappa);
