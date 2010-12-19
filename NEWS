@@ -1,3 +1,14 @@
+Version 0.2.6
+
+- This is a maintenance release.  Please use QUDA 0.3.x for the latest
+  features and bugfixes.
+
+- Fixed a long-standing bug in the MatQuda() interface function that
+  caused the kappa parameter to be interpreted with the wrong sign for
+  plain Wilson fermions.  MatQuda() for clover fermions, as well as
+  all other interface functions (including the inverters) were
+  unaffected.
+
 
 Version 0.2.5 - 24 June 2010
 

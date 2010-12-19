@@ -351,7 +351,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
     kappa *= cudaGaugePrecise.anisotropy;
 
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
-    MatCuda(out, cudaGaugePrecise, in, -kappa, dagger);
+    MatCuda(out, cudaGaugePrecise, in, kappa, dagger);
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
     cloverMatCuda(out, cudaGaugePrecise, cudaCloverPrecise, in, kappa, tmp, dagger);
