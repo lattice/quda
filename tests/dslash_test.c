@@ -66,6 +66,9 @@ void init() {
 
   inv_param.kappa = kappa;
 
+  // reference code and "transfer=0" only support kappa normalization
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+
   inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
