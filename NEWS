@@ -1,13 +1,18 @@
+
 Version 0.2.6
 
-- This is a maintenance release.  Please use QUDA 0.3.x for the latest
-  features and bugfixes.
+- This is a maintenance release.  Please use QUDA 0.3.x or newer to
+  take advantage of the latest features and bugfixes.
 
 - Fixed a long-standing bug in the MatQuda() interface function that
-  caused the kappa parameter to be interpreted with the wrong sign for
-  plain Wilson fermions.  MatQuda() for clover fermions, as well as
-  all other interface functions (including the inverters) were
+  caused the sign of the kappa parameter to be flipped for plain
+  Wilson fermions.  MatQuda() for clover fermions, as well as all
+  other interface functions (including the inverters), were
   unaffected.
+
+- The MatPCQuda(), MatPCDagMatPCQuda(), and MatQuda() interface
+  functions now respect the mass_normalization parameter set in
+  InvertParam.  Previously, "kappa normalization" was always assumed.
 
 
 Version 0.2.5 - 24 June 2010
