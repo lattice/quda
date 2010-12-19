@@ -98,16 +98,18 @@ extern "C" {
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
-  void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param);
+  void loadCloverQuda(void *h_clover, void *h_clovinv,
+		      QudaInvertParam *inv_param);
 
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			    double* offsets, int num_offsets, double* residue_sq);
+			    double* offsets, int num_offsets,
+			    double* residue_sq);
   
-  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
-  void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
-  void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
+  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
+		  QudaParity parity);
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
+  void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
   void endQuda(void);
 

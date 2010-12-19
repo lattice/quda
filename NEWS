@@ -23,6 +23,13 @@ Version 0.3.1
 - Enabled optional building of Dirac operators, set in make.inc, to
   keep build time in check.
 
+- Added declaration for MatDagMatQuda() to the quda.h header file and
+  removed the non-existent functions MatPCQuda() and
+  MatPCDagMatPCQuda().  The latter two functions have been absorbed
+  into MatQuda() and MatDagMatQuda(), respectively, since
+  preconditioning may be selected via the solution_type member of
+  InvertParam.
+
 - Fixed a bug in the Wilson and Wilson-clover Dirac operators that
   prevented the use of MatPC solution types.
 
