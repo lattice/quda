@@ -120,7 +120,11 @@ void cpuColorSpinorField::destroy() {
 
 void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
   checkField(*this, src);
-  memcpy(v, src.v, bytes);
+  if (fieldOrder == src.fieldOrder) {
+    memcpy(v, src.v, bytes);
+  } else {
+    errorQuda("Copying between CPU fields with different color/spin ordering is not supported");
+  }
 }
 
 void cpuColorSpinorField::zero() {
@@ -265,7 +269,7 @@ void print_vector(const Float *v, const int vol, const int Ns, const int Nc,
 
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-	std::cout << "( " << v[((vol*Ns+s)*Nc+c)*2] << " , " << v[((vol*Ns+s)*Nc+c)*2+1] << " ) ";
+	std::cout << "( " << v[((vol*Nc+c)*Ns+s)*2] << " , " << v[((vol*Nc+c)*Ns+s)*2+1] << " ) ";
       }
       std::cout << std::endl;
     }
