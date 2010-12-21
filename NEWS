@@ -10,6 +10,10 @@ Version 0.2.6
   other interface functions (including the inverters), were
   unaffected.
 
+- Fixed a long-standing bug in the spinor input/output routines that
+  resulted in QUDA_DIRAC_ORDER being used when
+  QUDA_QDP_DIRAC_ORDER was requested.
+
 - The MatPCQuda(), MatPCDagMatPCQuda(), and MatQuda() interface
   functions now respect the mass_normalization parameter set in
   InvertParam.  Previously, "kappa normalization" was always assumed.
