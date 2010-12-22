@@ -17,8 +17,8 @@ int main(int argc, char **argv)
   int device = 0; // CUDA device number
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy = QUDA_DOUBLE_PRECISION;
+  QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -26,7 +26,7 @@ int main(int argc, char **argv)
   gauge_param.X[0] = 24; 
   gauge_param.X[1] = 24;
   gauge_param.X[2] = 24;
-  gauge_param.X[3] = 48;
+  gauge_param.X[3] = 24;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;

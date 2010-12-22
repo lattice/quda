@@ -14,15 +14,15 @@
 #include <wilson_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 1;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 const int clover_yes = 0;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
-const QudaDagType dagger = QUDA_DAG_YES;     // apply Dslash or Dslash dagger?
+const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int loops = 1000;
+const int loops = 100;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
@@ -45,10 +45,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 4;
-  gauge_param.X[1] = 4;
-  gauge_param.X[2] = 4;
-  gauge_param.X[3] = 4;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 24;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -63,9 +63,8 @@ void init() {
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.type = QUDA_WILSON_LINKS;
 
-  inv_param.kappa = 1.0;
+  inv_param.kappa = 0.1;
 
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = dagger;

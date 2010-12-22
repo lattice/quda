@@ -26,7 +26,7 @@ const int Ls = 16;
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -45,10 +45,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 8;
-  gauge_param.X[1] = 8;
-  gauge_param.X[2] = 8;
-  gauge_param.X[3] = 8;
+  gauge_param.X[0] = 12;
+  gauge_param.X[1] = 12;
+  gauge_param.X[2] = 12;
+  gauge_param.X[3] = 12;
   
   setDims(gauge_param.X, Ls);
 

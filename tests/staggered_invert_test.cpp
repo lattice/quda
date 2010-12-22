@@ -23,7 +23,7 @@ QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
 static double tol = 1e-8;
 
 static int testtype = 0;
-static int sdim = 8;
+static int sdim = 24;
 static int tdim = 24;
 
 extern int V;

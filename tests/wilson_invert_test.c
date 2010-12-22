@@ -17,16 +17,16 @@ int main(int argc, char **argv)
   int device = 0; // CUDA device number
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+  QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
   QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 20; 
-  gauge_param.X[1] = 20;
-  gauge_param.X[2] = 20;
-  gauge_param.X[3] = 64;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 24;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -35,9 +35,9 @@ int main(int argc, char **argv)
   
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_8;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_8;
+  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   int clover_yes = 0; // 0 for plain Wilson, 1 for clover
@@ -53,11 +53,10 @@ int main(int argc, char **argv)
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 3e-1;
+  inv_param.reliable_delta = 0.1;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;  
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
@@ -69,7 +68,7 @@ int main(int argc, char **argv)
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   gauge_param.ga_pad = 0; // 24*24*24;
-  inv_param.sp_pad = 24*24*24;
+  inv_param.sp_pad = 0;   // 24*24*24;
   inv_param.cl_pad = 0;   // 24*24*24;
 
   if (clover_yes) {

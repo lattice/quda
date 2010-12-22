@@ -1,5 +1,5 @@
 
-Version 0.3.1
+Version 0.3.1 - 22 December 2010
 
 - Added support for domain wall fermions.  The length of the fifth
   dimension and the domain wall height are set via the 'Ls' and 'm5'
@@ -13,7 +13,8 @@ Version 0.3.1
   case is better optimized and generally also exhibits faster
   convergence.
 
-- Significantly improved performance of several BLAS routines on Fermi.
+- Improved performance in several of the BLAS routines, particularly
+  on Fermi.
 
 - Improved performance in the CG solver for Wilson-like (and domain
   wall) fermions by avoiding unnecessary allocation and deallocation
@@ -28,7 +29,7 @@ Version 0.3.1
   MatPCDagMatPCQuda().  The latter two functions have been absorbed
   into MatQuda() and MatDagMatQuda(), respectively, since
   preconditioning may be selected via the solution_type member of
-  InvertParam.
+  QudaInvertParam.
 
 - Fixed a bug in the Wilson and Wilson-clover Dirac operators that
   prevented the use of MatPC solution types.
@@ -37,7 +38,7 @@ Version 0.3.1
   would cause a crash when QUDA_MASS_NORMALIZATION is used.
 
 - Fixed an allocation bug in the Wilson and Wilson-clover
-  Dirac operators that might have led to undefined behaviour for
+  Dirac operators that might have led to undefined behavior for
   non-zero padding.
 
 - Fixed a bug in blas_test that might have led to incorrect autotuning
@@ -58,7 +59,7 @@ Version 0.3.0 - 1 October 2010
   new parameters in QudaInvertParam and QudaGaugeParam.  See below for
   details.
 
-- The internals of QUDA have been signficantly restructured to facilitate
+- The internals of QUDA have been significantly restructured to facilitate
   future extensions.  This is an ongoing process and will continue
   through the next several releases.
 

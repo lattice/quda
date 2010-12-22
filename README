@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.3.1                           x December 2010
+Release Notes for QUDA v0.3.1                         22 December 2010
 -----------------------------
 
 Overview:
@@ -46,7 +46,7 @@ Installation:
 In the source directory, copy 'make.inc.example' to 'make.inc', and
 edit the first few lines to specify the CUDA install path, the
 platform (x86 or x86_64), and the GPU architecture (see "Hardware
-compatibility" above).  Then type 'make' to build the library.
+Compatibility" above).  Then type 'make' to build the library.
 
 As an optional step, 'make tune' will invoke tests/blas_test to
 perform autotuning of the various BLAS-like functions needed by the

@@ -18,15 +18,15 @@ int main(int argc, char **argv)
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 16; 
-  gauge_param.X[1] = 16;
-  gauge_param.X[2] = 16;
-  gauge_param.X[3] = 32;
+  gauge_param.X[0] = 12; 
+  gauge_param.X[1] = 12;
+  gauge_param.X[2] = 12;
+  gauge_param.X[3] = 12;
   inv_param.Ls = 16;
 
   gauge_param.anisotropy = 1.0;
@@ -50,10 +50,10 @@ int main(int argc, char **argv)
 
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = 0.1;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;

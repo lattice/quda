@@ -37,7 +37,7 @@ QudaParity parity;
 QudaDagType dagger = QUDA_DAG_NO;
 int transfer = 0; // include transfer time in the benchmark?
 int tdim = 24;
-int sdim = 8;
+int sdim = 24;
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
