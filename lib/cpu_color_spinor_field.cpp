@@ -3,6 +3,7 @@
 #include <string.h>
 #include <iostream>
 #include <color_spinor_field.h>
+#include <color_spinor_field_order.h>
 
 /*
 Maybe this will be useful at some point
@@ -27,7 +28,7 @@ aligned_malloc(size_t n, void **m0)
   }*/
 
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
-  ColorSpinorField(param), init(false) {
+  ColorSpinorField(param), init(false), order_double(NULL), order_single(NULL) {
   create(param.create);
   if (param.create == QUDA_NULL_FIELD_CREATE) {
     // do nothing
@@ -41,13 +42,13 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) : 
-  ColorSpinorField(src), init(false) {
+  ColorSpinorField(src), init(false), order_double(NULL), order_single(NULL) {
   create(QUDA_COPY_FIELD_CREATE);
   memcpy(v,src.v,bytes);
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) : 
-  ColorSpinorField(src), init(false) {
+  ColorSpinorField(src), init(false), order_double(NULL), order_single(NULL) {
   create(QUDA_COPY_FIELD_CREATE);
   if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
     memcpy(v, dynamic_cast<const cpuColorSpinorField&>(src).v, bytes);
@@ -106,14 +107,60 @@ void cpuColorSpinorField::create(const QudaFieldCreate create) {
     v = (void*)malloc(bytes);
     init = true;
   }
+ 
+  createOrder(); // need to do this for references?
+}
+
+void cpuColorSpinorField::createOrder() {
+
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    if (fieldOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) 
+      order_double = new SpaceSpinColorOrder<double>(*this);
+    else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
+      order_double = new SpaceColorSpinOrder<double>(*this);
+    else
+      errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    if (fieldOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) 
+      order_single = new SpaceSpinColorOrder<float>(*this);
+    else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
+      order_single = new SpaceColorSpinOrder<float>(*this);
+    else
+      errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
+  } else {
+    errorQuda("Precision %d not supported", precision);
+  }
   
 }
 
 void cpuColorSpinorField::destroy() {
-
+  
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    delete order_double;
+  } else if (precision == QUDA_SINGLE_PRECISION) {
+    delete order_single;
+  } else {
+    errorQuda("Precision %d not supported", precision);
+  }
+  
   if (init) {
     free(v);
     init = false;
+  }
+
+}
+
+template <class D, class S>
+void genericCopy(D &dst, const S &src) {
+
+  for (int x=0; x<dst.Volume(); x++) {
+    for (int s=0; s<dst.Nspin(); s++) {
+      for (int c=0; c<dst.Ncolor(); c++) {
+	for (int z=0; z<2; z++) {
+	  dst(x, s, c, z) = src(x, s, c, z);
+	}
+      }
+    }
   }
 
 }
@@ -123,7 +170,19 @@ void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
   if (fieldOrder == src.fieldOrder) {
     memcpy(v, src.v, bytes);
   } else {
-    errorQuda("Copying between CPU fields with different color/spin ordering is not supported");
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if (src.precision == QUDA_DOUBLE_PRECISION) {
+	genericCopy(*order_double, *(src.order_double));
+      } else {
+	genericCopy(*order_double, *(src.order_single));
+      }
+    } else {
+      if (src.precision == QUDA_DOUBLE_PRECISION) {
+	genericCopy(*order_single, *(src.order_double));
+      } else {
+	genericCopy(*order_single, *(src.order_single));
+      }
+    }
   }
 }
 

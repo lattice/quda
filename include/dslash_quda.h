@@ -10,11 +10,13 @@ extern "C" {
   void initCache();
 
   extern int initDslash;
+  extern bool qudaPt0;
+  extern bool qudaPtNm1;
 
   int dslashCudaSharedBytes(QudaPrecision spinor_prec, int blockDim);
 
-  void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride, int Ls=1);
-  void initCommonConstants(FullGauge gauge);
+  void initCommonConstants(const FullGauge gauge);
+  void initDslashConstants(const FullGauge gauge, const int sp_stride, const int cl_stride, const int Ls=1);
 
   // plain Wilson Dslash  
   void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 

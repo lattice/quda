@@ -262,8 +262,6 @@ volatile spinorFloat o32_im;
 #include "read_clover.h"
 #include "io_spinor.h"
 
-#define sp_idx sid // alias needed by READ_SPINOR()
-
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 
 #ifdef SPINOR_DOUBLE
@@ -287,7 +285,7 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #endif
 
 // read spinor from device memory                                                                                                           
-READ_SPINOR(SPINORTEX);
+READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
 
 // change to chiral basis
 {
@@ -562,7 +560,7 @@ READ_SPINOR(SPINORTEX);
 }
 
 #ifdef DSLASH_XPAY
-    READ_ACCUM(ACCUMTEX)
+READ_ACCUM(ACCUMTEX, sp_stride)
 #ifdef SPINOR_DOUBLE
     o00_re = a*o00_re + accum0.x;
     o00_im = a*o00_im + accum0.y;
@@ -617,7 +615,7 @@ READ_SPINOR(SPINORTEX);
 #endif // DSLASH_XPAY
 
     // write spinor field back to device memory
-    WRITE_SPINOR();
+    WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
@@ -694,4 +692,3 @@ READ_SPINOR(SPINORTEX);
 #undef o10_re
 #undef o10_im
 
-#undef sp_idx // alias needed by READ_SPINOR()

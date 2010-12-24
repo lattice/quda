@@ -336,13 +336,22 @@ volatile spinorFloat o32_im;
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= param.threads) return;
 int z1 = FAST_INT_DIVIDE(sid, X1h);
 int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);
 int x2 = z1 - z2*X2;
 int x4 = FAST_INT_DIVIDE(z2, X3);
 int x3 = z2 - x4*X3;
-int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+
+#ifdef MULTI_GPU
+// now calculate the new x4 given the T offset and space between T slices
+int x4_new = (x4 + param.tOffset) * param.tMul;
+sid += Vs*(x4_new - x4); // new spatial index
+x4 = x4_new;
+#endif
+
+int x1odd = (x2 + x3 + x4 + param.parity) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
 
@@ -393,7 +402,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE0TEX, 0);
     
     // read spinor from device memory
-    READ_SPINOR(SPINORTEX);
+    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(0);
@@ -546,7 +555,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE1TEX, 1);
     
     // read spinor from device memory
-    READ_SPINOR(SPINORTEX);
+    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(1);
@@ -699,7 +708,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE0TEX, 2);
     
     // read spinor from device memory
-    READ_SPINOR(SPINORTEX);
+    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(2);
@@ -852,7 +861,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE1TEX, 3);
     
     // read spinor from device memory
-    READ_SPINOR(SPINORTEX);
+    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(3);
@@ -1005,7 +1014,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE0TEX, 4);
     
     // read spinor from device memory
-    READ_SPINOR(SPINORTEX);
+    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(4);
@@ -1158,7 +1167,7 @@ o32_re = o32_im = 0;
     READ_GAUGE_MATRIX(GAUGE1TEX, 5);
     
     // read spinor from device memory
-    READ_SPINOR(SPINORTEX);
+    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(5);
@@ -1304,12 +1313,30 @@ o32_re = o32_im = 0;
     // 0 0 2 0 
     // 0 0 0 2 
     
-    int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+    #ifndef MULTI_GPU
+        int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+    #define sp_stride_t sp_stride
+    #define sp_norm_idx sp_idx
+    #else
+        int sp_idx;
+        int sp_stride_t;
+        int sp_norm_idx;
+        if (x4 == X4m1) { // front face (lower spin components)
+          sp_stride_t = Vs;
+          sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)
+          sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer
+        } else {
+          sp_stride_t = sp_stride;
+          sp_idx = (X+X3X2X1) >> 1;
+          sp_norm_idx = sp_idx;
+        }
+    #endif
+    
     int ga_idx = sid;
     
     if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
-        READ_SPINOR_DOWN(SPINORTEX);
+        READ_SPINOR_DOWN(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);
         
         // project spinor into half spinors
         spinorFloat a0_re = +2*i20_re;
@@ -1355,25 +1382,25 @@ o32_re = o32_im = 0;
         READ_GAUGE_MATRIX(GAUGE0TEX, 6);
         
         // read spinor from device memory
-        READ_SPINOR_DOWN(SPINORTEX);
+        READ_SPINOR_DOWN(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);
         
         // reconstruct gauge matrix
         RECONSTRUCT_GAUGE_MATRIX(6);
         
         // project spinor into half spinors
-        spinorFloat a0_re = +2*i20_re;
-        spinorFloat a0_im = +2*i20_im;
-        spinorFloat a1_re = +2*i21_re;
-        spinorFloat a1_im = +2*i21_im;
-        spinorFloat a2_re = +2*i22_re;
-        spinorFloat a2_im = +2*i22_im;
+        spinorFloat a0_re = i20_re;
+        spinorFloat a0_im = i20_im;
+        spinorFloat a1_re = i21_re;
+        spinorFloat a1_im = i21_im;
+        spinorFloat a2_re = i22_re;
+        spinorFloat a2_im = i22_im;
         
-        spinorFloat b0_re = +2*i30_re;
-        spinorFloat b0_im = +2*i30_im;
-        spinorFloat b1_re = +2*i31_re;
-        spinorFloat b1_im = +2*i31_im;
-        spinorFloat b2_re = +2*i32_re;
-        spinorFloat b2_im = +2*i32_im;
+        spinorFloat b0_re = i30_re;
+        spinorFloat b0_im = i30_im;
+        spinorFloat b1_re = i31_re;
+        spinorFloat b1_im = i31_im;
+        spinorFloat b2_re = i32_re;
+        spinorFloat b2_im = i32_im;
         
         // multiply row 0
         spinorFloat A0_re = 0;
@@ -1465,20 +1492,20 @@ o32_re = o32_im = 0;
         B2_im += g22_re * b2_im;
         B2_im += g22_im * b2_re;
         
-        o20_re += A0_re;
-        o20_im += A0_im;
-        o30_re += B0_re;
-        o30_im += B0_im;
+        o20_re += 2*A0_re;
+        o20_im += 2*A0_im;
+        o30_re += 2*B0_re;
+        o30_im += 2*B0_im;
         
-        o21_re += A1_re;
-        o21_im += A1_im;
-        o31_re += B1_re;
-        o31_im += B1_im;
+        o21_re += 2*A1_re;
+        o21_im += 2*A1_im;
+        o31_re += 2*B1_re;
+        o31_im += 2*B1_im;
         
-        o22_re += A2_re;
-        o22_im += A2_im;
-        o32_re += B2_re;
-        o32_im += B2_im;
+        o22_re += 2*A2_re;
+        o22_im += 2*A2_im;
+        o32_re += 2*B2_re;
+        o32_im += 2*B2_im;
         
     }
 }
@@ -1490,12 +1517,31 @@ o32_re = o32_im = 0;
     // 0 0 0 0 
     // 0 0 0 0 
     
-    int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
-    int ga_idx = sp_idx;
+    #ifndef MULTI_GPU
+        int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
+    #define sp_stride_t sp_stride
+    #define sp_norm_idx sp_idx
+        int ga_idx = sp_idx;
+    #else
+        int sp_idx;
+        int sp_stride_t;
+        int sp_norm_idx;
+        if (x4 == 0) { // back face (upper spin components)
+          sp_stride_t = Vs;
+          sp_idx = sid + SPINOR_HOP*sp_stride;
+          sp_norm_idx = sid + sp_stride + Vs;
+        } else {
+          sp_stride_t = sp_stride;
+          sp_idx = (X - X3X2X1) >> 1;
+          sp_norm_idx = sp_idx;
+        }
+        // back links in pad, which is offset by Vh+sid from buffer start
+        int ga_idx = (x4==0) ? sid+Vh : sp_idx;
+    #endif
     
     if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
-        READ_SPINOR_UP(SPINORTEX);
+        READ_SPINOR_UP(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);
         
         // project spinor into half spinors
         spinorFloat a0_re = +2*i00_re;
@@ -1541,25 +1587,25 @@ o32_re = o32_im = 0;
         READ_GAUGE_MATRIX(GAUGE1TEX, 7);
         
         // read spinor from device memory
-        READ_SPINOR_UP(SPINORTEX);
+        READ_SPINOR_UP(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);
         
         // reconstruct gauge matrix
         RECONSTRUCT_GAUGE_MATRIX(7);
         
         // project spinor into half spinors
-        spinorFloat a0_re = +2*i00_re;
-        spinorFloat a0_im = +2*i00_im;
-        spinorFloat a1_re = +2*i01_re;
-        spinorFloat a1_im = +2*i01_im;
-        spinorFloat a2_re = +2*i02_re;
-        spinorFloat a2_im = +2*i02_im;
+        spinorFloat a0_re = i00_re;
+        spinorFloat a0_im = i00_im;
+        spinorFloat a1_re = i01_re;
+        spinorFloat a1_im = i01_im;
+        spinorFloat a2_re = i02_re;
+        spinorFloat a2_im = i02_im;
         
-        spinorFloat b0_re = +2*i10_re;
-        spinorFloat b0_im = +2*i10_im;
-        spinorFloat b1_re = +2*i11_re;
-        spinorFloat b1_im = +2*i11_im;
-        spinorFloat b2_re = +2*i12_re;
-        spinorFloat b2_im = +2*i12_im;
+        spinorFloat b0_re = i10_re;
+        spinorFloat b0_im = i10_im;
+        spinorFloat b1_re = i11_re;
+        spinorFloat b1_im = i11_im;
+        spinorFloat b2_re = i12_re;
+        spinorFloat b2_im = i12_im;
         
         // multiply row 0
         spinorFloat A0_re = 0;
@@ -1651,20 +1697,20 @@ o32_re = o32_im = 0;
         B2_im += gT22_re * b2_im;
         B2_im += gT22_im * b2_re;
         
-        o00_re += A0_re;
-        o00_im += A0_im;
-        o10_re += B0_re;
-        o10_im += B0_im;
+        o00_re += 2*A0_re;
+        o00_im += 2*A0_im;
+        o10_re += 2*B0_re;
+        o10_im += 2*B0_im;
         
-        o01_re += A1_re;
-        o01_im += A1_im;
-        o11_re += B1_re;
-        o11_im += B1_im;
+        o01_re += 2*A1_re;
+        o01_im += 2*A1_im;
+        o11_re += 2*B1_re;
+        o11_im += 2*B1_im;
         
-        o02_re += A2_re;
-        o02_im += A2_im;
-        o12_re += B2_re;
-        o12_im += B2_im;
+        o02_re += 2*A2_re;
+        o02_im += 2*A2_im;
+        o12_re += 2*B2_re;
+        o12_im += 2*B2_im;
         
     }
 }
@@ -2085,7 +2131,7 @@ o32_re = o32_im = 0;
 
 
 #ifdef DSLASH_XPAY
-    READ_ACCUM(ACCUMTEX)
+    READ_ACCUM(ACCUMTEX, sp_stride)
 #ifdef SPINOR_DOUBLE
     o00_re = a*o00_re + accum0.x;
     o00_im = a*o00_im + accum0.y;
@@ -2141,7 +2187,7 @@ o32_re = o32_im = 0;
 
 
     // write spinor field back to device memory
-    WRITE_SPINOR();
+    WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

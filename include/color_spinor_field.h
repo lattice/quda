@@ -191,6 +191,7 @@ class cpuColorSpinorField;
 // CUDA implementation
 class cudaColorSpinorField : public ColorSpinorField {
 
+  friend class FaceBuffer; // class for QMP communication
   friend class cpuColorSpinorField;
 
   friend double normEven(const cudaColorSpinorField &b);
@@ -274,6 +275,10 @@ class cudaColorSpinorField : public ColorSpinorField {
 
 };
 
+// Forward declaration of accessor functors
+template <typename Float> class ColorSpinorFieldOrder;
+template <typename Float> class SpaceColorSpinOrder;
+template <typename Float> class SpaceSpinColorOrder;
 
 // CPU implementation
 class cpuColorSpinorField : public ColorSpinorField {
@@ -285,6 +290,9 @@ class cpuColorSpinorField : public ColorSpinorField {
   friend void dslashRef();
   friend void staggeredDslashRef();
 
+  template <typename Float> friend class SpaceColorSpinOrder;
+  template <typename Float> friend class SpaceSpinColorOrder;
+
  private:
   void *v; // the field elements
   void *norm; // the normalization field
@@ -294,6 +302,10 @@ class cpuColorSpinorField : public ColorSpinorField {
   void destroy();
   void copy(const cpuColorSpinorField&);
   void zero();
+
+  void createOrder(); // create the accessor for a given field ordering
+  ColorSpinorFieldOrder<double> *order_double; // accessor functor used to access fp64 elements
+  ColorSpinorFieldOrder<float> *order_single; // accessor functor used to access fp32 elements
 
  public:
   //cpuColorSpinorField();
@@ -313,71 +325,6 @@ class cpuColorSpinorField : public ColorSpinorField {
   void PrintVector(int vol);
 };
 
+
+
 #endif // _COLOR_SPINOR_FIELD_H
-
-/*
-
-// experimenting with functors for arbitrary ordering
-class spinorFunctor {
-
- protected:
-  const void *v;
-  const int nColor;
-  const int nSpin;
-  const int volume;
-  const Precision precision;
-
- public:
- spinorFunctor(void *V, int Volume, int Nc, int Ns, Precision prec)
-   : v(V), nColor(Nc), nSpin(Ns), volume(Volume), precision(prec) { ; }
-  virtual ~spinorFunctor();
-  // return element at parity p, linear index x, spin s, color c and complexity z
-  
-  virtual void* operator()(int p, int x, int s, int c, int z) const = 0;
-};
-
-// accessor for SPACE_SPIN_COLOR_ORDER
-class SSCfunctor : public spinorFunctor {
-  
- public:
- SSCfunctor(void *V, int volume, int Nc, int Ns, Precision prec)
-   : spinorFunctor(V, volume, Nc, Ns, prec) { ; }
-  virtual ~SSCfunctor();
-
-  void* operator()(int p, int x, int s, int c, int z) const {
-    switch (precision) {
-      case QUDA_DOUBLE_PRECISION:
-	return ((double*)v)+(((p*volume+x)*nSpin+s)*nColor+c)*2+z;
-      case QUDA_SINGLE_PRECISION:
-	return ((float*)v)+(((p*volume+x)*nSpin+s)*nColor+c)*2+z;
-      default:
-	errorQuda("Precision not defined");
-    }
-  }
-
-};
-
-// accessor for SPACE_COLOR_SPIN_ORDER
-class SCSfunctor : public spinorFunctor {
-  
- public:
-  SCSfunctor(void *V, int volume, int Nc, int Ns, Precision prec)
-    : spinorFunctor(V, volume, Nc, Ns, prec) { ; }
-  virtual ~SCSfunctor();
-
-  void* operator()(int p, int x, int s, int c, int z) const {
-    switch (precision) {
-      case QUDA_DOUBLE_PRECISION:
-	return ((double*)v)+(((p*volume+x)*nColor+c)*nSpin+s)*2+z;
-      case QUDA_SINGLE_PRECISION:
-	return ((float*)v)+(((p*volume+x)*nColor+c)*nSpin+s)*2+z;
-      default:
-	errorQuda("Precision not defined");
-    }
-  }
-
-};
-
-*/
-
-

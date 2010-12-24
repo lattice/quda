@@ -36,6 +36,7 @@ __constant__ int X2X1_3;
 __constant__ int X3X2X1_3;
 
 __constant__ int Vh;
+__constant__ int Vs;
 __constant__ int sp_stride;
 __constant__ int ga_stride;
 __constant__ int cl_stride;
@@ -63,15 +64,26 @@ __constant__ float2 An2;
 __constant__ float2 TB2;
 __constant__ float2 No2;
 
-int initDslash = 0;
+// Are we processor 0 in time?
+__constant__ bool Pt0;
 
-void initCommonConstants(FullGauge gauge) {
+// Are we processor Nt-1 in time?
+__constant__ bool PtNm1;
+
+int initDslash = 0;
+bool qudaPt0 = true;   // Single core versions always to Boundary
+bool qudaPtNm1 = true;
+
+void initCommonConstants(const FullGauge gauge) {
   int Vh = gauge.volume;
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
   
   if (Vh%BLOCK_DIM != 0) {
     errorQuda("Error, Volume not a multiple of the thread block size");
   }
+
+  int Vs = gauge.X[0]*gauge.X[1]*gauge.X[2];
+  cudaMemcpyToSymbol("Vs", &Vs, sizeof(int));
 
   int X1 = 2*gauge.X[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
@@ -164,11 +176,14 @@ void initCommonConstants(FullGauge gauge) {
   int X4X3X2X1hm3X3X2X1h = (X4-3)*X3*X2*X1h;
   cudaMemcpyToSymbol("X4X3X2X1hm3X3X2X1h", &X4X3X2X1hm3X3X2X1h, sizeof(int)); 
 
+  cudaMemcpyToSymbol("Pt0", &(qudaPt0), sizeof(bool)); 
+  cudaMemcpyToSymbol("PtNm1", &(qudaPtNm1), sizeof(bool)); 
+
   checkCudaError();
 }
 
 
-void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride, int Ls) 
+void initDslashConstants(const FullGauge gauge, const int sp_stride, const int cl_stride, const int Ls) 
 {
 
   initCommonConstants(gauge);
@@ -183,8 +198,6 @@ void initDslashConstants(FullGauge gauge, int sp_stride, int cl_stride, int Ls)
     
   cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));
   cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));
-
-
 
   cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 

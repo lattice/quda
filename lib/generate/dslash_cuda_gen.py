@@ -272,13 +272,22 @@ def prolog():
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= param.threads) return;
 int z1 = FAST_INT_DIVIDE(sid, X1h);
 int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);
 int x2 = z1 - z2*X2;
 int x4 = FAST_INT_DIVIDE(z2, X3);
 int x3 = z2 - x4*X3;
-int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+
+#ifdef MULTI_GPU
+// now calculate the new x4 given the T offset and space between T slices
+int x4_new = (x4 + param.tOffset) * param.tMul;
+sid += Vs*(x4_new - x4); // new spatial index
+x4 = x4_new;
+#endif
+
+int x1odd = (x2 + x3 + x4 + param.parity) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
 
@@ -344,11 +353,51 @@ def gen(dir):
     if dir == 3: str.append("int sp_idx = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;\n")
     if dir == 4: str.append("int sp_idx = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;\n")
     if dir == 5: str.append("int sp_idx = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;\n")
-    if dir == 6: str.append("int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;\n")
-    if dir == 7: str.append("int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;\n")
+    if dir == 6: 
+        str.append("#ifndef MULTI_GPU\n")
+        str.append("    int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;\n")
+        str.append("#define sp_stride_t sp_stride\n")
+        str.append("#define sp_norm_idx sp_idx\n")
+        str.append("#else\n")
+        str.append("    int sp_idx;\n")
+        str.append("    int sp_stride_t;\n")
+        str.append("    int sp_norm_idx;\n")
+        str.append("    if (x4 == X4m1) { // front face (lower spin components)\n")
+        str.append("      sp_stride_t = Vs;\n")
+        str.append("      sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)\n")
+        str.append("      sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer\n")
+        str.append("    } else {\n")
+        str.append("      sp_stride_t = sp_stride;\n")
+        str.append("      sp_idx = (X+X3X2X1) >> 1;\n")
+        str.append("      sp_norm_idx = sp_idx;\n")
+        str.append("    }\n")
+        str.append("#endif\n\n")
+    if dir == 7: 
+        str.append("#ifndef MULTI_GPU\n")
+        str.append("    int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;\n")
+        str.append("#define sp_stride_t sp_stride\n")
+        str.append("#define sp_norm_idx sp_idx\n")
+        str.append("    int ga_idx = sp_idx;\n")
+        str.append("#else\n")
+        str.append("    int sp_idx;\n")
+        str.append("    int sp_stride_t;\n")
+        str.append("    int sp_norm_idx;\n")
+        str.append("    if (x4 == 0) { // back face (upper spin components)\n")
+        str.append("      sp_stride_t = Vs;\n")
+        str.append("      sp_idx = sid + SPINOR_HOP*sp_stride;\n")
+        str.append("      sp_norm_idx = sid + sp_stride + Vs;\n")
+        str.append("    } else {\n")
+        str.append("      sp_stride_t = sp_stride;\n")
+        str.append("      sp_idx = (X - X3X2X1) >> 1;\n")
+        str.append("      sp_norm_idx = sp_idx;\n")
+        str.append("    }\n")
+        str.append("    // back links in pad, which is offset by Vh+sid from buffer start\n")
+        str.append("    int ga_idx = (x4==0) ? sid+Vh : sp_idx;\n")
+        str.append("#endif\n\n")
     
-    ga_idx = "sid" if dir % 2 == 0 else "sp_idx"
-    str.append("int ga_idx = "+ga_idx+";\n\n")
+    if dir != 7:
+        ga_idx = "sid" if dir % 2 == 0 else "sp_idx"
+        str.append("int ga_idx = "+ga_idx+";\n\n")
     
     # scan the projector to determine which loads are required
     row_cnt = ([0,0,0,0])
@@ -364,11 +413,11 @@ def gen(dir):
     load_spinor = []
     load_spinor.append("// read spinor from device memory\n")
     if row_cnt[0] == 0:
-        load_spinor.append("READ_SPINOR_DOWN(SPINORTEX);\n\n")
+        load_spinor.append("READ_SPINOR_DOWN(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);\n\n")
     elif row_cnt[2] == 0:
-        load_spinor.append("READ_SPINOR_UP(SPINORTEX);\n\n")
+        load_spinor.append("READ_SPINOR_UP(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);\n\n")
     else:
-        load_spinor.append("READ_SPINOR(SPINORTEX);\n\n")
+        load_spinor.append("READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n\n")
 
     load_gauge = []
     load_gauge.append("// read gauge matrix from device memory\n")
@@ -626,7 +675,7 @@ def epilog():
     str.append(
 """
 #ifdef DSLASH_XPAY
-    READ_ACCUM(ACCUMTEX)
+    READ_ACCUM(ACCUMTEX, sp_stride)
 """)
 
     str.append("#ifdef SPINOR_DOUBLE\n")
@@ -659,7 +708,7 @@ def epilog():
     str.append(
 """
     // write spinor field back to device memory
-    WRITE_SPINOR();
+    WRITE_SPINOR(sp_stride);
 
 """)
 

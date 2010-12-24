@@ -18,6 +18,15 @@
 
 #define BLOCK_DIM 64
 
+struct DslashParam {
+  int tOffset; // offset into the T dimension (multi gpu only)
+  int tMul;    // spatial volume distance between the T faces being updated (multi gpu only)
+  int threads; // the desired number of active threads
+  int parity;  // Even-Odd or Odd-Even
+};
+
+DslashParam dslashParam;
+
 #include <dslash_textures.h>
 #include <dslash_constants.h>
 
@@ -66,58 +75,63 @@ void dslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat *gauge0, cons
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
+  dslashParam.tOffset = 0;
+  dslashParam.tMul = 1;
+  dslashParam.threads = volume;
+  dslashParam.parity = parity;
+
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<spinorN>(length, in, inNorm, x, xNorm);
 
   if (x==0) { // not doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	dslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam);
       } else {
 	dslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam);
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	dslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam);
       } else {
 	dslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam);
       }
     } else {
       if (!dagger) {
 	dslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam);
       } else {
 	dslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam);
       }
     }
   } else { // doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	dslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, x, xNorm, a);
       } else {
 	dslash18DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, x, xNorm, a);
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	dslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, x, xNorm, a);
       } else {
 	dslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, x, xNorm, a);
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {
       if (!dagger) {
 	dslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, x, xNorm, a);
       } else {
 	dslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, x, xNorm, a);
       }
     }
   }
@@ -227,58 +241,63 @@ void cloverDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat gauge0,
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
+  dslashParam.tOffset = 0;
+  dslashParam.tMul = 1;
+  dslashParam.threads = volume;
+  dslashParam.parity = parity;
+
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm, x, xNorm);
 
   if (x==0) { // not xpay
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	cloverDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam);
       } else {
 	cloverDslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam);
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	cloverDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam);
       } else {
 	cloverDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam);
       }
     } else {
       if (!dagger) {
 	cloverDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 	
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam);
       } else {
 	cloverDslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam);
       }
     }
   } else { // doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	cloverDslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam, x, xNorm, a);
       } else {
 	cloverDslash18DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam, x, xNorm, a);
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	cloverDslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam, x, xNorm, a);
       } else {
 	cloverDslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam, x, xNorm, a);
       }
     } else {
       if (!dagger) {
 	cloverDslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 	
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam, x, xNorm, a);
       } else {
 	cloverDslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, parity, x, xNorm, a);
+	  (out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, dslashParam, x, xNorm, a);
       }
     }
   }
@@ -691,6 +710,11 @@ void twistedMassDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat ga
   dim3 gridDim(volume/BLOCK_DIM, 1, 1);
   dim3 blockDim(BLOCK_DIM, 1, 1);
 
+  dslashParam.tOffset = 0;
+  dslashParam.tMul = 1;
+  dslashParam.threads = volume;
+  dslashParam.parity = parity;
+
   int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex<N>(length, in, inNorm, x, xNorm);
 
   double a=0.0, b=0.0;
@@ -700,26 +724,26 @@ void twistedMassDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat ga
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	twistedMassDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b);
       } else {
 	twistedMassDslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b);
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	twistedMassDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b);
       } else {
 	twistedMassDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b);
       }
     } else {
       if (!dagger) {
 	twistedMassDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 	
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b);
       } else {
 	twistedMassDslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b);
       }
     }
   } else { // doing xpay
@@ -727,26 +751,26 @@ void twistedMassDslashCuda(spinorFloat *out, float *outNorm, const gaugeFloat ga
     if (reconstruct == QUDA_RECONSTRUCT_NO) {
       if (!dagger) {
 	twistedMassDslash18XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b, x, xNorm);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b, x, xNorm);
       } else {
 	twistedMassDslash18DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b, x, xNorm);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b, x, xNorm);
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	twistedMassDslash12XpayKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b, x, xNorm);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b, x, xNorm);
       } else {
 	twistedMassDslash12DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b, x, xNorm);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b, x, xNorm);
       }
     } else {
       if (!dagger) {
 	twistedMassDslash8XpayKernel <<<gridDim, blockDim, shared_bytes>>> 	
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b, x, xNorm);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b, x, xNorm);
       } else {
 	twistedMassDslash8DaggerXpayKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, gauge0, gauge1, in, inNorm, parity, a, b, x, xNorm);
+	  (out, outNorm, gauge0, gauge1, in, inNorm, dslashParam, a, b, x, xNorm);
       }
     }
   }

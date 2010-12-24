@@ -118,6 +118,7 @@ extern "C" {
     ParitySpinor even;
     } FullSpinor;*/
 
+  // replace below with ColorSpinorField
   typedef struct {
     size_t bytes;
     QudaPrecision precision;
