@@ -5,6 +5,8 @@
 #include <gauge_quda.h>
 #include <quda_internal.h>
 
+#include <face_quda.h>
+
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
@@ -597,11 +599,6 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
 
   cudaGauge->Nc = 3;
 
-  int floatSize;
-  if (precision == QUDA_DOUBLE_PRECISION) floatSize = sizeof(double);
-  else if (precision == QUDA_SINGLE_PRECISION) floatSize = sizeof(float);
-  else floatSize = sizeof(float)/2;
-
   int elements;
   switch(reconstruct){
   case QUDA_RECONSTRUCT_8:
@@ -617,7 +614,7 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
       errorQuda("Invalid reconstruct value");
   }
   
-  cudaGauge->bytes = 4*cudaGauge->stride*elements*floatSize;
+  cudaGauge->bytes = 4*cudaGauge->stride*elements*precision;
 
   if (!cudaGauge->even) {
     if (cudaMalloc((void **)&cudaGauge->even, cudaGauge->bytes) == cudaErrorMemoryAllocation) {
@@ -650,6 +647,9 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
     
+  QudaPrecision precision = (QudaPrecision) sizeof(even->x);
+  int veclength = sizeof(FloatN)/precision;
+
 #ifndef __DEVICE_EMULATION__
   cudaMallocHost((void**)&packedEven, bytes);
   cudaMallocHost((void**)&packedOdd, bytes);
@@ -667,6 +667,14 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   } else {
     errorQuda("Invalid gauge_order");
   }
+
+#ifdef MULTI_GPU
+  // assume pad is Vs
+  transferGaugeFaces((void *)packedEven, (void *)(packedEven + Vh), precision,
+		     veclength, reconstruct, Vh, pad);
+  transferGaugeFaces((void *)packedOdd, (void *)(packedOdd + Vh), precision,
+		     veclength, reconstruct, Vh, pad);
+#endif
 
   cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
   checkCudaError();
@@ -744,6 +752,13 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
   cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
   cudaGauge->volume /= 2;
   cudaGauge->pad = pad;
+
+#ifdef MULTI_GPU
+  if (pad != cudaGauge->X[0]*cudaGauge->X[1]*cudaGauge->X[2]) {
+    errorQuda("Gauge padding must match spatial volume");
+  }
+#endif
+
   cudaGauge->stride = cudaGauge->volume + cudaGauge->pad;
   cudaGauge->gauge_fixed = gauge_fixed;
   cudaGauge->t_boundary = t_boundary;

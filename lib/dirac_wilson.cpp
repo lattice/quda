@@ -2,14 +2,13 @@
 #include <blas_quda.h>
 #include <iostream>
 
-DiracWilson::DiracWilson(const DiracParam &param)
-  : Dirac(param)
+DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param),
+face(param.gauge->volume/param.gauge->X[3], param.gauge->volume, param.gauge->precision)
 {
 
 }
 
-DiracWilson::DiracWilson(const DiracWilson &dirac) 
-  : Dirac(dirac)
+DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac), face(dirac.face)
 {
 
 }
@@ -34,6 +33,8 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
+  setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
+
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
 	     0, 0, 0, out.volume, out.length, in.Precision());
 
@@ -47,6 +48,8 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
   if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
+
+  setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
 	     out.volume, out.length, in.Precision());

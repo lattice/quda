@@ -135,6 +135,8 @@
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #endif
 
+#define SPINOR_HOP 12
+
 // double-precision clover field
 #if (DD_CLOVER==0)
 #define DD_PARAM3
@@ -169,6 +171,8 @@
 #define READ_ACCUM READ_ACCUM_SINGLE
 #endif
 
+#define SPINOR_HOP 6
+
 // single-precision clover field
 #if (DD_CLOVER==0)
 #define DD_PARAM3
@@ -201,6 +205,8 @@
 #define ACCUMTEX accumTexHalf
 #define READ_ACCUM READ_ACCUM_HALF
 #endif
+
+#define SPINOR_HOP 6
 
 // half-precision clover field
 #if (DD_CLOVER==0)
@@ -268,6 +274,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef GAUGE_FLOAT2
 #undef SPINOR_DOUBLE
 #undef CLOVER_DOUBLE
+#undef SPINOR_HOP
 
 // prepare next set of options, or clean up after final iteration
 

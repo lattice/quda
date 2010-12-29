@@ -46,7 +46,7 @@ endif
 
 all: $(QUDA)
 
-$(QUDA): $(QUDA_OBJS)
+$(QUDA): $(QUDA_OBJS) ../make.inc
 	ar cru $@ $(QUDA_OBJS)
 
 gen:

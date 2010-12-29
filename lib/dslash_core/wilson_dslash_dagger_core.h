@@ -1320,17 +1320,25 @@ o32_re = o32_im = 0;
     #else
         int sp_idx;
         int sp_stride_t;
+    #if (DD_PREC==2)
         int sp_norm_idx;
+    #else
+    #define sp_norm_idx sp_idx
+    #endif
         if (x4 == X4m1) { // front face (lower spin components)
           sp_stride_t = Vs;
           sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)
+    #if (DD_PREC==2)
           sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer
+    #endif
         } else {
           sp_stride_t = sp_stride;
           sp_idx = (X+X3X2X1) >> 1;
+    #if (DD_PREC==2)
           sp_norm_idx = sp_idx;
-        }
     #endif
+        }
+    #endif // MULTI_GPU
     
     int ga_idx = sid;
     
@@ -1525,19 +1533,27 @@ o32_re = o32_im = 0;
     #else
         int sp_idx;
         int sp_stride_t;
+    #if (DD_PREC==2)
         int sp_norm_idx;
+    #else
+    #define sp_norm_idx sp_idx
+    #endif
         if (x4 == 0) { // back face (upper spin components)
           sp_stride_t = Vs;
           sp_idx = sid + SPINOR_HOP*sp_stride;
+    #if (DD_PREC==2)
           sp_norm_idx = sid + sp_stride + Vs;
+    #endif
         } else {
           sp_stride_t = sp_stride;
           sp_idx = (X - X3X2X1) >> 1;
+    #if (DD_PREC==2)
           sp_norm_idx = sp_idx;
+    #endif
         }
         // back links in pad, which is offset by Vh+sid from buffer start
         int ga_idx = (x4==0) ? sid+Vh : sp_idx;
-    #endif
+    #endif // MULTI_GPU
     
     if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) {
         // read spinor from device memory
@@ -2196,6 +2212,9 @@ o32_re = o32_im = 0;
 #undef A_re
 #undef A_im
 
+#ifdef sp_norm_idx
+#undef sp_norm_idx
+#endif
 #undef g00_re
 #undef g00_im
 #undef g01_re

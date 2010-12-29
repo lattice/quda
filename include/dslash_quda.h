@@ -2,6 +2,9 @@
 #define _DSLASH_QUDA_H
 
 #include <quda_internal.h>
+#include <face_quda.h>
+
+void setFace(const FaceBuffer &face, const int stride);
 
 #ifdef __cplusplus
 extern "C" {

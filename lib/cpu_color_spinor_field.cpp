@@ -209,6 +209,7 @@ cpuColorSpinorField& cpuColorSpinorField::Odd() const {
 */
 
 //sets the elements of the field to random [0, 1]
+// FIXME: needs to be made "order safe"
 template <typename Float>
 void random(Float *v, const int length) {    
   for(int i = 0; i < length; i++) {
@@ -217,6 +218,7 @@ void random(Float *v, const int length) {
 }
 
 // create a point source at spacetime point st, spin s and colour c
+// FIXME: Use accessors to make generic
 template <typename Float>
 void point(Float *v, const int st, const int s, const int c, const int nSpin, 
 	   const int nColor, const QudaFieldOrder fieldOrder) {
@@ -308,47 +310,29 @@ void cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSp
       compareSpinor((float*)a.v, (float*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
 }
 
-template <typename Float>
-void print_vector(const Float *v, const int vol, const int Ns, const int Nc, 
-		  const QudaFieldOrder fieldOrder) {
+template <class Order>
+void print_vector(const Order &o, unsigned int x) {
 
-  switch(fieldOrder) {
-
-  case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER:
-
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-	std::cout << "( " << v[((vol*Ns+s)*Nc+c)*2] << " , " << v[((vol*Ns+s)*Nc+c)*2+1] << " ) ";
+  for (int s=0; s<o.Nspin(); s++) {
+    for (int c=0; c<o.Ncolor(); c++) {
+      for (int z=0; z<2; z++) {
+	std::cout << o(x, s, c, z) << std::endl;
       }
-      std::cout << std::endl;
     }
-    break;
-
-  case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
-
-    for (int s=0; s<Ns; s++) {
-      for (int c=0; c<Nc; c++) {
-	std::cout << "( " << v[((vol*Nc+c)*Ns+s)*2] << " , " << v[((vol*Nc+c)*Ns+s)*2+1] << " ) ";
-      }
-      std::cout << std::endl;
-    }
-    break;
-
-  default:
-    errorQuda("Field oredring not supported");
-      
+    std::cout << std::endl;
   }
+
 }
 
-// print out the vector at volume point vol
-void cpuColorSpinorField::PrintVector(int vol) {
+// print out the vector at volume point x
+void cpuColorSpinorField::PrintVector(unsigned int x) {
   
   switch(precision) {
   case QUDA_DOUBLE_PRECISION:
-    print_vector((double*)v, vol, nSpin, nColor, fieldOrder);
+    print_vector(*order_double, x);
     break;
   case QUDA_SINGLE_PRECISION:
-    print_vector((float*)v, vol, nSpin, nColor, fieldOrder);
+    print_vector(*order_single, x);
     break;
   default:
     errorQuda("Precision %d not implemented", precision); 

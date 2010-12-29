@@ -322,7 +322,7 @@ class cpuColorSpinorField : public ColorSpinorField {
 
   void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
   static void Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
-  void PrintVector(int vol);
+  void PrintVector(unsigned int x);
 };
 
 

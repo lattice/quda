@@ -22,7 +22,6 @@ class FaceBuffer {
   void *from_fwd_face;
   int Vs; 
   int V;
-  int stride; 
   QudaPrecision precision;
   size_t nbytes;
 #ifdef QMP_COMMS
@@ -37,17 +36,19 @@ class FaceBuffer {
   QMP_msghandle_t mh_from_back;
 #endif
 
+ private:
+  void gatherFromSpinor(void *in, void *inNorm, int stride, int dagger);
+  void scatterToEndZone(void *out, void *outNorm, int stride, int dagger);
+
  public:
-  FaceBuffer(int Vs, int V, int stride, QudaPrecision precision);
+  FaceBuffer(int Vs, int V, QudaPrecision precision);
+  FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void gatherFromSpinor(cudaColorSpinorField &in,  int dagger);
-
-  void exchangeFacesStart(cudaColorSpinorField &in, int dagger, cudaStream_t *stream);
+  void exchangeFacesStart(void *in, void *inNorm, int stride, int dagger, cudaStream_t *stream);
   void exchangeFacesComms();
-  void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
+  void exchangeFacesWait(void *out, void *outNorm, int stride, int dagger);
 
-  void scatterToPads(cudaColorSpinorField &out, int dagger);
 
 };
 

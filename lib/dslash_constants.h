@@ -82,8 +82,8 @@ void initCommonConstants(const FullGauge gauge) {
     errorQuda("Error, Volume not a multiple of the thread block size");
   }
 
-  int Vs = gauge.X[0]*gauge.X[1]*gauge.X[2];
-  cudaMemcpyToSymbol("Vs", &Vs, sizeof(int));
+  Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2];
+  cudaMemcpyToSymbol("Vs", &Vspatial, sizeof(int));
 
   int X1 = 2*gauge.X[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
@@ -238,5 +238,9 @@ void initDslashConstants(const FullGauge gauge, const int sp_stride, const int c
   checkCudaError();
 
   initDslash = 1;
+
+  // create the streams
+  for (int i=0; i<Nstream; i++) cudaStreamCreate(&streams[i]);
+
 }
 

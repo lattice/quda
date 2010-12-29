@@ -5,6 +5,8 @@
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
 
+#include <face_quda.h>
+
 // Params for Dirac operator
 class DiracParam {
 
@@ -100,6 +102,9 @@ class Dirac {
 
 // Full Wilson
 class DiracWilson : public Dirac {
+
+ private:
+  FaceBuffer face; // multi-gpu communication buffers
 
  protected:
 

@@ -18,6 +18,17 @@ BUILD_FATLINK = no             # build code for computing asqtad fat links?
 BUILD_GAUGE_FORCE = no         # build code for (1-loop Symanzik) gauge force?
 BUILD_FERMION_FORCE = no       # build code for asqtad fermion force?
 
+# Multiple GPU option
+BUILD_MULTI_GPU = no # set to 'yes' to build the multi-GPU code
+BUILD_QMP = no      # set to 'yes' to build the QMP multi-GPU code
+OVERLAP_COMMS = no  # set to 'yes' to overlap comms and compute
+
+FECC = gcc	      # Front end CC
+FECXX = g++           # Front end CXX
+
+OMPI_HOME=/usr/mpi/gcc/openmpi-1.3.2
+QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
+
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include
@@ -37,13 +48,30 @@ endif
 COPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
 NVCCOPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
 
-ifeq ($(strip $(GPU_EMU)), true)
+ifeq ($(strip $(GPU_EMU)), yes)
   COPT += -D__DEVICE_EMULATION__
   NVCCOPT = -deviceemu
 endif
 
 ifeq ($(strip $(GPU_ARCH)), sm_20)
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
+endif
+
+ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
+  COPT += -DMULTI_GPU
+  NVCCOPT += -DMULTI_GPU
+endif
+
+ifeq ($(strip $(BUILD_QMP)), yes)
+  RUN = $(OMPI_HOME)/bin/mpirun -np 1
+  CC = $(MPICC)
+  CXX = $(MPICXX)
+  INC += -DQMP_COMMS $(QMP_CFLAGS)
+  LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
+else 
+  RUN =
+  CC  = $(FECC)
+  CXX = $(FECXX)
 endif
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
@@ -75,9 +103,7 @@ ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
   FERMION_FORCE_TEST=fermion_force_test
 endif
 
-CC = gcc
 CFLAGS = -g -Wall -O3 -std=c99 $(COPT) $(INC)
-CXX = g++
 CXXFLAGS = -g -Wall -O3 $(COPT) $(INC)
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
 NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) #--ptxas-options=-v

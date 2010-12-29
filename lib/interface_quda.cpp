@@ -14,6 +14,10 @@
 
 #include <color_spinor_field.h>
 
+#ifdef QMP_COMMS
+#include <qmp.h>
+#endif
+
 #define spinorSiteSize 24 // real numbers per spinor
 
 FullGauge cudaGaugePrecise;      // Wilson links
@@ -46,6 +50,14 @@ FullClover cudaCloverInvSloppy;
 #include "check_params.h"
 #undef PRINT_PARAM
 
+#ifdef QMP_COMMS
+int rank_QMP;
+int num_QMP;
+extern bool qudaPt0;
+extern bool qudaPtNm1;
+#endif
+
+#include "face_quda.h"
 
 void initQuda(int dev)
 {
@@ -67,9 +79,36 @@ void initQuda(int dev)
     fprintf(stderr, "QUDA: Found device %d: %s\n", i, deviceProp.name);
   }
 
-  if (dev < 0) {
-    dev = deviceCount - 1;
+#ifdef QMP_COMMS
+  int ndim;
+  const int *dim;
+  const int *coords;
+
+  if ( QMP_is_initialized() != QMP_TRUE ) {
+    errorQuda("QMP is not initialized");
   }
+  num_QMP=QMP_get_number_of_nodes();
+  rank_QMP=QMP_get_node_number();
+  
+  dev += rank_QMP % deviceCount;
+  ndim = QMP_get_logical_number_of_dimensions();
+  dim = QMP_get_logical_dimensions();
+  if (ndim != 4) { 
+    errorQuda("This code needs 4 logical dimensions");
+  }
+  if(  (dim[0] != 1) || (dim[1] != 1) || (dim[2] != 1) )  { 
+    errorQuda("This code needs all spatial dimensions local for now");
+  }
+  coords = QMP_get_logical_coordinates();
+  if( coords[3] == 0 ) qudaPt0=true;
+  else qudaPt0=false;
+
+  if( coords[3] == dim[3]-1 ) qudaPtNm1=true;
+  else qudaPtNm1=false;
+
+#else 
+  if (dev < 0) dev = deviceCount - 1;
+#endif
 
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
@@ -77,7 +116,12 @@ void initQuda(int dev)
     errorQuda("Device %d does not support CUDA", dev);
   }
 
+#ifdef QMP_COMMS
+  QMP_fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
+#else						
   fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
+#endif
+
   cudaSetDevice(dev);
 
   cudaGaugePrecise.even = NULL;
@@ -105,7 +149,7 @@ void initQuda(int dev)
   cudaCloverInvSloppy.even.clover = NULL;
   cudaCloverInvSloppy.odd.clover = NULL;
 
-  //initCache();
+  initCache();
   initBlas();
 }
 
