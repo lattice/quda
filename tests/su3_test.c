@@ -10,20 +10,23 @@ void *gauge[4], *new_gauge[4];
 void init() {
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  param.cuda_prec = QUDA_HALF_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_8;
+  param.cuda_prec = QUDA_SINGLE_PRECISION;
+  param.reconstruct = QUDA_RECONSTRUCT_12;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
   param.X[0] = 8;
   param.X[1] = 8;
   param.X[2] = 8;
-  param.X[3] = 4;
+  param.X[3] = 8;
   setDims(param.X);
 
-  param.anisotropy = 2.3;
+  param.anisotropy = 1.0;
   param.t_boundary = QUDA_ANTI_PERIODIC_T;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+#ifdef MULTI_GPU
+  param.ga_pad = param.X[0]*param.X[1]*param.X[2]/2;
+#endif
 
   // construct gauge fields
   for (int dir = 0; dir < 4; dir++) {
