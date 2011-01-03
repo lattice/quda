@@ -67,7 +67,11 @@ int main(int argc, char **argv)
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  gauge_param.ga_pad = 0; // 24*24*24;
+#ifndef MULTI_GPU // free parameter for single GPU
+  gauge_param.ga_pad = 0;
+#else // must be this one c/b face for multi gpu
+  gauge_param.ga_pad = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+#endif
   inv_param.sp_pad = 0;   // 24*24*24;
   inv_param.cl_pad = 0;   // 24*24*24;
 

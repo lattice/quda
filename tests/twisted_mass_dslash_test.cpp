@@ -72,7 +72,11 @@ void init() {
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
 
+#ifndef MULTI_GPU // free parameter for single GPU
   gauge_param.ga_pad = 0;
+#else // must be this one c/b face for multi gpu
+  gauge_param.ga_pad = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+#endif
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
