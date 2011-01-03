@@ -358,7 +358,17 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
   
   sFloat *tmp = (sFloat*)malloc(Vh*spinorSiteSize*sizeof(sFloat));
     
-  if (!daggerBit) {
+  if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      dslashReference(tmp, gauge, inEven, 1, daggerBit);
+      twistGamma5(tmp, tmp, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      dslashReference(outEven, gauge, tmp, 0, daggerBit);
+      twistGamma5(tmp, inEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT);
+  } else if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      dslashReference(tmp, gauge, inEven, 0, daggerBit);
+      twistGamma5(tmp, tmp, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
+      dslashReference(outEven, gauge, tmp, 1, daggerBit);
+      twistGamma5(tmp, inEven, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_DIRECT);
+  } else if (!daggerBit) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
       dslashReference(tmp, gauge, inEven, 1, daggerBit);
       twistGamma5(tmp, tmp, daggerBit, kappa, mu, flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE);
@@ -387,7 +397,12 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
   }
   // lastly apply the kappa term
   sFloat kappa2 = -kappa*kappa;
-  xpay(inEven, kappa2, outEven, Vh*spinorSiteSize);
+  if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD) {
+    xpay(inEven, kappa2, outEven, Vh*spinorSiteSize);
+  } else {
+    xpay(tmp, kappa2, outEven, Vh*spinorSiteSize);
+  }
+
   free(tmp);
 
 }
@@ -395,10 +410,10 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, sFloat
 void matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, QudaTwistFlavorType flavor,
 	   QudaMatPCType matpc_type, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision) {
 
-  if (matpc_type != QUDA_MATPC_EVEN_EVEN && matpc_type != QUDA_MATPC_ODD_ODD) {
+  /*  if (matpc_type != QUDA_MATPC_EVEN_EVEN && matpc_type != QUDA_MATPC_ODD_ODD) {
     printf("Only symmetric preconditioning is implemented in reference\n");
     exit(-1);
-  }
+    }*/
 
   if (sPrecision == QUDA_DOUBLE_PRECISION)
     if (gPrecision == QUDA_DOUBLE_PRECISION) 
