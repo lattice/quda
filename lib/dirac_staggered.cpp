@@ -62,7 +62,7 @@ void DiracStaggeredPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFi
   checkParitySpinor(in, out);
     
   staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, 
-		      0, 0, 0, out.volume, out.length, in.Precision());
+		      0, 0, 0, out.volume, out.bytes, out.norm_bytes, in.Precision());
     
   flops += 1146*in.volume;
 }
@@ -77,7 +77,7 @@ void DiracStaggeredPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpin
   checkParitySpinor(in, out);
   
   staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
-		      out.volume, out.length, in.Precision());
+		      out.volume, out.bytes, out.norm_bytes, in.Precision());
     
   flops += (1146+12)*in.volume;
 }
@@ -189,7 +189,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
   checkParitySpinor(in, out);
     
   staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, 
-		      0, 0, 0, out.volume, out.length, in.Precision());
+		      0, 0, 0, out.volume, out.bytes, out.norm_bytes, in.Precision());
     
   flops += 1187*in.volume;
 }
@@ -204,7 +204,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
   checkParitySpinor(in, out);
   
   staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
-		      out.volume, out.length, in.Precision());
+		      out.volume, out.bytes, out.norm_bytes, in.Precision());
   
   flops += (1187+12)*in.volume;
 }

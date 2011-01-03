@@ -74,6 +74,11 @@ else
   CXX = $(FECXX)
 endif
 
+ifeq ($(strip $(OVERLAP_COMMS)), yes)
+  COPT += -DOVERLAP_COMMS
+  NVCCOPT += -DOVERLAP_COMMS
+endif
+
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
   WILSON_DIRAC_TEST=wilson_dslash_test wilson_invert_test

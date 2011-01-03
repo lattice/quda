@@ -36,23 +36,52 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
 
   precision = Prec;
   volume = 1;
+  int Vs = 1;
   for (int d=0; d<nDim; d++) {
     x[d] = X[d];
     volume *= x[d];
+    if (d<nDim-1) Vs *= x[d];
   }
   pad = Pad;
   
   if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     stride = volume/2 + pad; // padding is based on half volume
     length = 2*stride*nColor*nSpin*2;    
+#ifdef MULTI_GPU
+    ghost_length = Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+#else
+    ghost_length = 0;
+    ghost_norm_length = 0;
+#endif
+    total_length = length + 2*ghost_length; // 2 ghost zones in a full field
+    total_norm_length = 2*(stride + ghost_norm_length); // norm stride and length are the same
   } else {
     stride = volume + pad;
     length = stride*nColor*nSpin*2;
+#ifdef MULTI_GPU
+    ghost_length = Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+#else
+    ghost_length = 0;
+    ghost_norm_length = 0;
+#endif
+    total_length = length + ghost_length;
+    total_norm_length = stride + ghost_norm_length; // norm stride and length are the same
   }
 
-  real_length = volume*nColor*nSpin*2;
+  // no ghost zones for cpu fields (yet?)
+  if (fieldLocation == QUDA_CPU_FIELD_LOCATION) {
+    ghost_length = 0;
+    ghost_norm_length = 0;
+    total_length = length;
+    total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
+  }
 
-  bytes = length * precision;
+  real_length = volume*nColor*nSpin*2; // physical length
+
+  bytes = total_length * precision; // includes pads and ghost zones
+  norm_bytes = total_norm_length * sizeof(float);
 
   this->fieldLocation = fieldLocation;
   this->siteSubset = siteSubset;
@@ -87,9 +116,11 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.nDim != 0) nDim = param.nDim;
 
   volume = 1;
+  int Vs = 1;
   for (int d=0; d<nDim; d++) {
     if (param.x[0] != 0) x[d] = param.x[d];
     volume *= x[d];
+    if (d<nDim-1) Vs *= x[d];
   }
   
   if (param.pad != 0) pad = param.pad;
@@ -97,17 +128,44 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.siteSubset == QUDA_FULL_SITE_SUBSET){
     stride = volume/2 + pad;
     length = 2*stride*nColor*nSpin*2;
+#ifdef MULTI_GPU
+    ghost_length = Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+#else
+    ghost_length = 0;
+    ghost_norm_length = 0;
+#endif
+    total_length = length + 2*ghost_length; // 2 ghost zones in a full field
+    total_norm_length = 2*(stride + ghost_norm_length); // norm stride and length are the same
   } else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
     stride = volume + pad;
     length = stride*nColor*nSpin*2;  
+#ifdef MULTI_GPU
+    ghost_length = Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+#else
+    ghost_length = 0;
+    ghost_norm_length = 0;
+#endif
+    total_length = length + ghost_length;
+    total_norm_length = stride + ghost_norm_length; // norm stride and length are the same
   } else {
     //errorQuda("SiteSubset not defined %d", param.siteSubset);
-    //do nothing, not an error
+    //do nothing, not an error (can't remember why - need to document this sometime! )
+  }
+
+  // no ghost zones for cpu fields (yet?)
+  if (fieldLocation == QUDA_CPU_FIELD_LOCATION) {
+    ghost_length = 0;
+    ghost_norm_length = 0;
+    total_length = length;
+    total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
   }
 
   real_length = volume*nColor*nSpin*2;
 
-  bytes = length * precision;
+  bytes = total_length * precision;
+  norm_bytes = total_norm_length * sizeof(float);
 
   if (param.fieldLocation != QUDA_INVALID_FIELD_LOCATION) fieldLocation = param.fieldLocation;
   if (param.siteSubset != QUDA_INVALID_SITE_SUBSET) siteSubset = param.siteSubset;
@@ -173,8 +231,16 @@ std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
   out << "twistFlavor = " << a.twistFlavor << std::endl;
   out << "nDim = " << a.nDim << std::endl;
   for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
+  out << "volume = " << a.volume << std::endl;
   out << "precision = " << a.precision << std::endl;
   out << "pad = " << a.pad << std::endl;
+  out << "stride = " << a.stride << std::endl;
+  out << "real_length = " << a.real_length << std::endl;
+  out << "length = " << a.length << std::endl;
+  out << "ghost_length = " << a.ghost_length << std::endl;
+  out << "total_length = " << a.total_length << std::endl;
+  out << "ghost_norm_length = " << a.ghost_norm_length << std::endl;
+  out << "total_norm_length = " << a.total_norm_length << std::endl;
   out << "siteSubset = " << a.siteSubset << std::endl;
   out << "siteOrder = " << a.siteOrder << std::endl;
   out << "fieldOrder = " << a.fieldOrder << std::endl;

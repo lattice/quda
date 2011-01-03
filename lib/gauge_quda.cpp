@@ -596,7 +596,6 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
 
   cudaGauge->reconstruct = reconstruct;
   cudaGauge->precision = precision;
-
   cudaGauge->Nc = 3;
 
   int elements;
@@ -647,9 +646,6 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
     
-  QudaPrecision precision = (QudaPrecision) sizeof(even->x);
-  int veclength = sizeof(FloatN)/precision;
-
 #ifndef __DEVICE_EMULATION__
   cudaMallocHost((void**)&packedEven, bytes);
   cudaMallocHost((void**)&packedOdd, bytes);
@@ -669,6 +665,9 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   }
 
 #ifdef MULTI_GPU
+  QudaPrecision precision = (QudaPrecision) sizeof(even->x);
+  int veclength = sizeof(FloatN)/precision;
+
   // assume pad is Vs
   transferGaugeFaces((void *)packedEven, (void *)(packedEven + Vh), precision,
 		     veclength, reconstruct, Vh, pad);

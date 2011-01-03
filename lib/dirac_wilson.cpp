@@ -35,10 +35,10 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
 
   setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-  dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
-	     0, 0, 0, out.volume, out.length, in.Precision());
+  dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 0, 0, 0,
+	     out.volume, out.bytes, out.norm_bytes, in.Precision());
 
-  flops += 1320*in.volume;
+  flops += 1320ll*in.volume;
 }
 
 void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -52,9 +52,9 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
   setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
-	     out.volume, out.length, in.Precision());
+	     out.volume, out.bytes, out.norm_bytes, in.Precision());
 
-  flops += (1320+48)*in.volume;
+  flops += 1368ll*in.volume;
 }
 
 void DiracWilson::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const

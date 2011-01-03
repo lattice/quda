@@ -2335,6 +2335,7 @@ template <unsigned int reduce_threads, typename Float>
 #undef REDUCE_OPERATION
 
 double sumCuda(cudaColorSpinorField &a) {
+  if (a.siteSubset == QUDA_FULL_SITE_SUBSET) return sumCuda(a.Even()) + sumCuda(a.Odd());
   const int id = 14;
   blas_quda_flops += a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
@@ -2343,7 +2344,6 @@ double sumCuda(cudaColorSpinorField &a) {
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
     return sumSCuda((float2*)a.v, a.length/2, id, a.precision);
   } else {
-    if (a.siteSubset == QUDA_FULL_SITE_SUBSET) return sumCuda(a.Even()) + sumCuda(a.Odd());
     int spinor_bytes = a.length*sizeof(short);
     blas_quda_bytes += a.volume*sizeof(float);
     if (a.nSpin ==4) { // wilson
@@ -2433,6 +2433,7 @@ template <unsigned int reduce_threads, typename Float>
 #undef REDUCE_OPERATION
 
 double normCuda(const cudaColorSpinorField &a) {
+  if (a.siteSubset == QUDA_FULL_SITE_SUBSET) return normCuda(a.Even()) + normCuda(a.Odd());
   const int id = 15;
   blas_quda_flops += 2*a.real_length;
   blas_quda_bytes += a.real_length*a.precision;
@@ -2441,7 +2442,6 @@ double normCuda(const cudaColorSpinorField &a) {
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
     return normSCuda((float2*)a.v, a.length/2, id, a.precision);
   } else {
-    if (a.siteSubset == QUDA_FULL_SITE_SUBSET) return normCuda(a.Even()) + normCuda(a.Odd());
     int spinor_bytes = a.length*sizeof(short);
     int half_norm_ratio = (a.nColor*a.nSpin*2*sizeof(short))/sizeof(float);
     blas_quda_bytes += (a.real_length*a.precision) / (a.nColor * a.nSpin);
@@ -2534,6 +2534,9 @@ template <unsigned int reduce_threads, typename Float>
 #undef REDUCE_OPERATION  
 
 double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b) {
+  if (a.siteSubset == QUDA_FULL_SITE_SUBSET) {
+    return reDotProductCuda(a.Even(), b.Even()) + reDotProductCuda(a.Odd(), b.Odd());
+  }
   const int id = 16;
   blas_quda_flops += 2*a.real_length;
   checkSpinor(a, b);
@@ -2543,9 +2546,6 @@ double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b) {
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
     return reDotProductSCuda((float2*)a.v, (float2*)b.v, a.length/2, id, a.precision);
   } else {
-    if (a.siteSubset == QUDA_FULL_SITE_SUBSET) {
-      return reDotProductCuda(a.Even(), b.Even()) + reDotProductCuda(a.Odd(), b.Odd());
-    }
     blas_quda_bytes += 2*a.volume*sizeof(float);
     int spinor_bytes = a.length*sizeof(short);
     if (a.nSpin == 4){ //wilson
@@ -2641,6 +2641,9 @@ template <unsigned int reduce_threads, typename Float>
 #undef REDUCE_OPERATION
 
 double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return axpyNormCuda(a, x.Even(), y.Even()) + axpyNormCuda(a, x.Odd(), y.Odd());
+
   const int id = 17;
   blas_quda_flops += 4*x.real_length;
   checkSpinor(x,y);
@@ -2650,9 +2653,6 @@ double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorFie
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     return axpyNormFCuda((float)a, (float*)x.v, (float*)y.v, x.length, id, x.precision);
   } else {
-    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
-      return axpyNormCuda(a, x.Even(), y.Even()) + axpyNormCuda(a, x.Odd(), y.Odd());
-
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
     blas_quda_bytes += 3*x.volume*sizeof(float);
@@ -2747,6 +2747,9 @@ template <unsigned int reduce_threads, typename Float>
 
 
 double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return xmyNormCuda(x.Even(), y.Even()) + xmyNormCuda(x.Odd(), y.Odd());
+
   const int id = 18;
   blas_quda_flops += 3*x.real_length;
   checkSpinor(x,y);
@@ -2756,9 +2759,6 @@ double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     return xmyNormFCuda((float*)x.v, (float*)y.v, x.length, id, x.precision);
   } else { 
-    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
-      return xmyNormCuda(x.Even(), y.Even()) + xmyNormCuda(x.Odd(), y.Odd());
-
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
     blas_quda_bytes += 3*x.volume*sizeof(float);
@@ -2877,6 +2877,9 @@ template <unsigned int reduce_threads, typename Float, typename Float2>
 #undef REDUCE_IMAG_OPERATION
 
 Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return cDotProductCuda(x.Even(), y.Even()) + cDotProductCuda(x.Odd(), y.Odd());
+
   const int id = 19;
   blas_quda_flops += 4*x.real_length;
   checkSpinor(x,y);
@@ -2896,8 +2899,6 @@ Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     cudaBindTexture(0, yTexSingle2, y.v, spinor_bytes); 
     dot = cDotProductSCuda((float2*)x.v, (float2*)y.v, c, length, id, x.precision);
   } else {
-    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
-      return cDotProductCuda(x.Even(), y.Even()) + cDotProductCuda(x.Odd(), y.Odd());
     int spinor_bytes = x.length*sizeof(short);
     blas_quda_bytes += 2*x.volume*sizeof(float);
     if (x.nSpin == 4){
@@ -3038,6 +3039,9 @@ template <unsigned int reduce_threads, typename Float, typename Float2>
 #undef REDUCE_IMAG_OPERATION
 
 Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return xpaycDotzyCuda(x.Even(), a, y.Even(), z.Even()) + xpaycDotzyCuda(x.Odd(), a, y.Odd(), z.Odd());
+
   const int id = 20;
   blas_quda_flops += 6*x.real_length;
   checkSpinor(x,y);
@@ -3054,8 +3058,6 @@ Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinor
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     dot = xpaycDotzySCuda((float2*)x.v, (float)a, (float2*)y.v, (float2*)z.v, length, id, x.precision);
   } else {
-    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
-      return xpaycDotzyCuda(x.Even(), a, y.Even(), z.Even()) + xpaycDotzyCuda(x.Odd(), a, y.Odd(), z.Odd());
     int spinor_bytes = x.length*sizeof(short);
     blas_quda_bytes += 4*x.volume*sizeof(float);
     if (x.nSpin ==4 ){//wilson
@@ -3207,6 +3209,9 @@ template <unsigned int reduce_threads, typename Float2>
 #undef REDUCE_Z_OPERATION
 
 double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return cDotProductNormACuda(x.Even(), y.Even()) + cDotProductNormACuda(x.Odd(), y.Odd());
+
   const int id = 21;
   blas_quda_flops += 6*x.real_length;
   checkSpinor(x,y);
@@ -3220,8 +3225,6 @@ double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     return cDotProductNormASCuda((float2*)x.v, (float2*)y.v, length, id, x.precision);
   } else {
-    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
-      return cDotProductNormACuda(x.Even(), y.Even()) + cDotProductNormACuda(x.Odd(), y.Odd());
     int spinor_bytes = x.length*sizeof(short);
     blas_quda_bytes += 2*x.volume*sizeof(float);
     if (x.nSpin == 4){ //wilson
@@ -3368,6 +3371,9 @@ template <unsigned int reduce_threads, typename Float2>
 #undef REDUCE_Z_OPERATION
 
 double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return cDotProductNormBCuda(x.Even(), y.Even()) + cDotProductNormBCuda(x.Odd(), y.Odd());
+
   const int id = 22;
   blas_quda_flops += 6*x.real_length;
   checkSpinor(x,y);
@@ -3381,8 +3387,6 @@ double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
     return cDotProductNormBSCuda((float2*)x.v, (float2*)y.v, length, id, x.precision);
   } else {
-    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
-      return cDotProductNormBCuda(x.Even(), y.Even()) + cDotProductNormBCuda(x.Odd(), y.Odd());
     int spinor_bytes = x.length*sizeof(short);
     blas_quda_bytes += 2*x.volume*sizeof(float);
     if (x.nSpin == 4){ //wilson
@@ -3596,6 +3600,10 @@ template <unsigned int reduce_threads, typename Float2>
 // This convoluted kernel does the following: z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
 double3 caxpbypzYmbwcDotProductWYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y,
 					   cudaColorSpinorField &z, cudaColorSpinorField &w, cudaColorSpinorField &u) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return caxpbypzYmbwcDotProductWYNormYCuda(a, x.Even(), b, y.Even(), z.Even(), w.Even(), u.Even()) + 
+      caxpbypzYmbwcDotProductWYNormYCuda(a, x.Odd(), b, y.Odd(), z.Odd(), w.Odd(), u.Odd());
+
   const int id = 23;
   blas_quda_flops += 18*x.real_length;
   checkSpinor(x,y);
@@ -3628,9 +3636,6 @@ double3 caxpbypzYmbwcDotProductWYNormYCuda(const Complex &a, cudaColorSpinorFiel
       return cDotProductNormBCuda(u, y);
     }
       
-    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
-      return caxpbypzYmbwcDotProductWYNormYCuda(a, x.Even(), b, y.Even(), z.Even(), w.Even(), u.Even()) + 
-	caxpbypzYmbwcDotProductWYNormYCuda(a, x.Odd(), b, y.Odd(), z.Odd(), w.Odd(), u.Odd());
     int spinor_bytes = x.length*sizeof(short);
     blas_quda_bytes += 7*x.volume*sizeof(float);
     if (x.nSpin == 4) { // wilson

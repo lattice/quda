@@ -27,22 +27,24 @@ __device__ float4 operator*(const float &x, const float4 &y)
 #define tmp3_im tmp3.y
 
 #if (__CUDA_ARCH__ >= 130)
-__global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b)
+__global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, DslashParam param)
 {
-   int sp_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  
-   double2 I0  = fetch_double2(spinorTexDouble, sp_idx + 0 * sp_stride);   
-   double2 I1  = fetch_double2(spinorTexDouble, sp_idx + 1 * sp_stride);   
-   double2 I2  = fetch_double2(spinorTexDouble, sp_idx + 2 * sp_stride);   
-   double2 I3  = fetch_double2(spinorTexDouble, sp_idx + 3 * sp_stride);   
-   double2 I4  = fetch_double2(spinorTexDouble, sp_idx + 4 * sp_stride);   
-   double2 I5  = fetch_double2(spinorTexDouble, sp_idx + 5 * sp_stride);   
-   double2 I6  = fetch_double2(spinorTexDouble, sp_idx + 6 * sp_stride);   
-   double2 I7  = fetch_double2(spinorTexDouble, sp_idx + 7 * sp_stride);   
-   double2 I8  = fetch_double2(spinorTexDouble, sp_idx + 8 * sp_stride);   
-   double2 I9  = fetch_double2(spinorTexDouble, sp_idx + 9 * sp_stride);   
-   double2 I10 = fetch_double2(spinorTexDouble, sp_idx + 10 * sp_stride); 
-   double2 I11 = fetch_double2(spinorTexDouble, sp_idx + 11 * sp_stride);
+
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+   double2 I0  = fetch_double2(spinorTexDouble, sid + 0 * sp_stride);   
+   double2 I1  = fetch_double2(spinorTexDouble, sid + 1 * sp_stride);   
+   double2 I2  = fetch_double2(spinorTexDouble, sid + 2 * sp_stride);   
+   double2 I3  = fetch_double2(spinorTexDouble, sid + 3 * sp_stride);   
+   double2 I4  = fetch_double2(spinorTexDouble, sid + 4 * sp_stride);   
+   double2 I5  = fetch_double2(spinorTexDouble, sid + 5 * sp_stride);   
+   double2 I6  = fetch_double2(spinorTexDouble, sid + 6 * sp_stride);   
+   double2 I7  = fetch_double2(spinorTexDouble, sid + 7 * sp_stride);   
+   double2 I8  = fetch_double2(spinorTexDouble, sid + 8 * sp_stride);   
+   double2 I9  = fetch_double2(spinorTexDouble, sid + 9 * sp_stride);   
+   double2 I10 = fetch_double2(spinorTexDouble, sid + 10 * sp_stride); 
+   double2 I11 = fetch_double2(spinorTexDouble, sid + 11 * sp_stride);
 
    volatile double2 tmp0, tmp1, tmp2, tmp3;
    
@@ -117,18 +119,18 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
    I11.x = b * tmp3_re;
    I11.y = b * tmp3_im;
       
-   spinor[sp_idx + 0  * sp_stride] = I0;   
-   spinor[sp_idx + 1  * sp_stride] = I1;   
-   spinor[sp_idx + 2  * sp_stride] = I2;   
-   spinor[sp_idx + 3  * sp_stride] = I3;   
-   spinor[sp_idx + 4  * sp_stride] = I4;   
-   spinor[sp_idx + 5  * sp_stride] = I5;   
-   spinor[sp_idx + 6  * sp_stride] = I6;   
-   spinor[sp_idx + 7  * sp_stride] = I7;   
-   spinor[sp_idx + 8  * sp_stride] = I8;   
-   spinor[sp_idx + 9  * sp_stride] = I9;   
-   spinor[sp_idx + 10 * sp_stride] = I10;   
-   spinor[sp_idx + 11 * sp_stride] = I11;
+   spinor[sid + 0  * sp_stride] = I0;   
+   spinor[sid + 1  * sp_stride] = I1;   
+   spinor[sid + 2  * sp_stride] = I2;   
+   spinor[sid + 3  * sp_stride] = I3;   
+   spinor[sid + 4  * sp_stride] = I4;   
+   spinor[sid + 5  * sp_stride] = I5;   
+   spinor[sid + 6  * sp_stride] = I6;   
+   spinor[sid + 7  * sp_stride] = I7;   
+   spinor[sid + 8  * sp_stride] = I8;   
+   spinor[sid + 9  * sp_stride] = I9;   
+   spinor[sid + 10 * sp_stride] = I10;   
+   spinor[sid + 11 * sp_stride] = I11;
 
    return;  
 }
@@ -152,16 +154,17 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 #define tmp3_re tmp1.z
 #define tmp3_im tmp1.w
 
-__global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b)
+__global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, DslashParam param)
 {
-   int sp_idx = blockIdx.x * blockDim.x + threadIdx.x;
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
 
-   float4 I0 = tex1Dfetch(spinorTexSingle, sp_idx + 0 * sp_stride);   
-   float4 I1 = tex1Dfetch(spinorTexSingle, sp_idx + 1 * sp_stride);   
-   float4 I2 = tex1Dfetch(spinorTexSingle, sp_idx + 2 * sp_stride);   
-   float4 I3 = tex1Dfetch(spinorTexSingle, sp_idx + 3 * sp_stride);   
-   float4 I4 = tex1Dfetch(spinorTexSingle, sp_idx + 4 * sp_stride);   
-   float4 I5 = tex1Dfetch(spinorTexSingle, sp_idx + 5 * sp_stride);
+   float4 I0 = tex1Dfetch(spinorTexSingle, sid + 0 * sp_stride);   
+   float4 I1 = tex1Dfetch(spinorTexSingle, sid + 1 * sp_stride);   
+   float4 I2 = tex1Dfetch(spinorTexSingle, sid + 2 * sp_stride);   
+   float4 I3 = tex1Dfetch(spinorTexSingle, sid + 3 * sp_stride);   
+   float4 I4 = tex1Dfetch(spinorTexSingle, sid + 4 * sp_stride);   
+   float4 I5 = tex1Dfetch(spinorTexSingle, sid + 5 * sp_stride);
 
    volatile float4 tmp0, tmp1;
     
@@ -236,29 +239,30 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b)
    I5.z = b * tmp3_re;
    I5.w = b * tmp3_im;
    
-   spinor[sp_idx + 0  * sp_stride] = I0;   
-   spinor[sp_idx + 1  * sp_stride] = I1;   
-   spinor[sp_idx + 2  * sp_stride] = I2;   
-   spinor[sp_idx + 3  * sp_stride] = I3;   
-   spinor[sp_idx + 4  * sp_stride] = I4;   
-   spinor[sp_idx + 5  * sp_stride] = I5;   
+   spinor[sid + 0  * sp_stride] = I0;   
+   spinor[sid + 1  * sp_stride] = I1;   
+   spinor[sid + 2  * sp_stride] = I2;   
+   spinor[sid + 3  * sp_stride] = I3;   
+   spinor[sid + 4  * sp_stride] = I4;   
+   spinor[sid + 5  * sp_stride] = I5;   
 
    return;  
 }
 
 
-__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b)
+__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, DslashParam param)
 {
-   int sp_idx    = blockIdx.x * blockDim.x + threadIdx.x;
-    
-   float4 I0 = tex1Dfetch(spinorTexHalf, sp_idx + 0 * sp_stride);   
-   float4 I1 = tex1Dfetch(spinorTexHalf, sp_idx + 1 * sp_stride);   
-   float4 I2 = tex1Dfetch(spinorTexHalf, sp_idx + 2 * sp_stride);   
-   float4 I3 = tex1Dfetch(spinorTexHalf, sp_idx + 3 * sp_stride);   
-   float4 I4 = tex1Dfetch(spinorTexHalf, sp_idx + 4 * sp_stride);   
-   float4 I5 = tex1Dfetch(spinorTexHalf, sp_idx + 5 * sp_stride);
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+   float4 I0 = tex1Dfetch(spinorTexHalf, sid + 0 * sp_stride);   
+   float4 I1 = tex1Dfetch(spinorTexHalf, sid + 1 * sp_stride);   
+   float4 I2 = tex1Dfetch(spinorTexHalf, sid + 2 * sp_stride);   
+   float4 I3 = tex1Dfetch(spinorTexHalf, sid + 3 * sp_stride);   
+   float4 I4 = tex1Dfetch(spinorTexHalf, sid + 4 * sp_stride);   
+   float4 I5 = tex1Dfetch(spinorTexHalf, sid + 5 * sp_stride);
    
-   float C = tex1Dfetch(spinorTexNorm, sp_idx);
+   float C = tex1Dfetch(spinorTexNorm, sid);
    
    I0 = C * I0;
    I1 = C * I1;
@@ -364,7 +368,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    c2 = fmaxf(c4, c5);							
    c0 = fmaxf(c0, c1);							
    c0 = fmaxf(c0, c2);							
-   spinorNorm[sp_idx] = c0;								
+   spinorNorm[sid] = c0;								
    float scale = __fdividef(MAX_SHORT, c0);
    
    I0 = scale * I0; 	
@@ -374,12 +378,12 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    I4 = scale * I4;
    I5 = scale * I5;
    
-   spinor[sp_idx+0*(sp_stride)] = make_short4((short)I0.x, (short)I0.y, (short)I0.z, (short)I0.w); 
-   spinor[sp_idx+1*(sp_stride)] = make_short4((short)I1.x, (short)I1.y, (short)I1.z, (short)I1.w); 
-   spinor[sp_idx+2*(sp_stride)] = make_short4((short)I2.x, (short)I2.y, (short)I2.z, (short)I2.w); 
-   spinor[sp_idx+3*(sp_stride)] = make_short4((short)I3.x, (short)I3.y, (short)I3.z, (short)I3.w); 
-   spinor[sp_idx+4*(sp_stride)] = make_short4((short)I4.x, (short)I4.y, (short)I4.z, (short)I4.w); 
-   spinor[sp_idx+5*(sp_stride)] = make_short4((short)I5.x, (short)I5.y, (short)I5.z, (short)I5.w);
+   spinor[sid+0*(sp_stride)] = make_short4((short)I0.x, (short)I0.y, (short)I0.z, (short)I0.w); 
+   spinor[sid+1*(sp_stride)] = make_short4((short)I1.x, (short)I1.y, (short)I1.z, (short)I1.w); 
+   spinor[sid+2*(sp_stride)] = make_short4((short)I2.x, (short)I2.y, (short)I2.z, (short)I2.w); 
+   spinor[sid+3*(sp_stride)] = make_short4((short)I3.x, (short)I3.y, (short)I3.z, (short)I3.w); 
+   spinor[sid+4*(sp_stride)] = make_short4((short)I4.x, (short)I4.y, (short)I4.z, (short)I4.w); 
+   spinor[sid+5*(sp_stride)] = make_short4((short)I5.x, (short)I5.y, (short)I5.z, (short)I5.w);
 
    return;  
 }

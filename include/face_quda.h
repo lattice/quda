@@ -6,15 +6,17 @@
 
 class FaceBuffer {
 
- private:
-  cudaStream_t *stream;
-  
+ private:  
   // set these both = 0 `for no overlap of qmp and cudamemcpyasync
   // sendBackIdx = 0, and sendFwdIdx = 1 for overlap
   int sendBackStrmIdx; // = 0;
   int sendFwdStrmIdx; // = 1;
   int recFwdStrmIdx; // = sendBackIdx;
   int recBackStrmIdx; // = sendFwdIdx;
+
+  // Device memory buffer for coalescing the gathered messages
+  void *gather_fwd_face;
+  void *gather_back_face;
 
   void *my_fwd_face;
   void *my_back_face;
@@ -36,7 +38,12 @@ class FaceBuffer {
   QMP_msghandle_t mh_from_back;
 #endif
 
- private:
+  // used for timing
+  cudaEvent_t start[2];
+  cudaEvent_t gather[2];
+  cudaEvent_t qmp[2];
+  cudaEvent_t stop[2];
+
   void gatherFromSpinor(void *in, void *inNorm, int stride, int dagger);
   void scatterToEndZone(void *out, void *outNorm, int stride, int dagger);
 

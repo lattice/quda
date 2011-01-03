@@ -125,12 +125,13 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
   }
 
   if (create != QUDA_REFERENCE_FIELD_CREATE) {
+    // Overallocate to hold tface bytes extra
     if (cudaMalloc((void**)&v, bytes) == cudaErrorMemoryAllocation) {
-      errorQuda("Error allocating spinor: bytes=%d", (int)bytes);
+      errorQuda("Error allocating spinor: bytes=%lu", (unsigned long)bytes);
     }
     
     if (precision == QUDA_HALF_PRECISION) {
-      if (cudaMalloc((void**)&norm, bytes/(nColor*nSpin)) == cudaErrorMemoryAllocation) {
+      if (cudaMalloc((void**)&norm, norm_bytes) == cudaErrorMemoryAllocation) {
 	errorQuda("Error allocating norm");
       }
     }
@@ -164,7 +165,7 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     // need this hackery for the moment (need to locate the odd pointer half way into the full field)
     (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((unsigned long)v + bytes/2);
     if (precision == QUDA_HALF_PRECISION) 
-      (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + bytes/(2*nColor*nSpin));
+      (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + norm_bytes/2);
   }
   
 }
@@ -254,20 +255,20 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
   if (precision == QUDA_DOUBLE_PRECISION) {				\
       if (src.precision == QUDA_DOUBLE_PRECISION) {			\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      packSpinor<3,myNs,1>((double*)buffer, (double*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,1>((double*)buffer, (double*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      packSpinor<3,myNs,2>((double*)buffer, (double*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,2>((double*)buffer, (double*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
 	      errorQuda("double4 not supported");			\
 	  }								\
       } else {								\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      packSpinor<3,myNs,1>((double*)buffer, (float*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,1>((double*)buffer, (float*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      packSpinor<3,myNs,2>((double*)buffer, (float*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,2>((double*)buffer, (float*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
 	      errorQuda("double4 not supported");			\
@@ -276,24 +277,24 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
   } else {								\
       if (src.precision == QUDA_DOUBLE_PRECISION) {			\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      packSpinor<3,myNs,1>((float*)buffer, (double*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,1>((float*)buffer, (double*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      packSpinor<3,myNs,2>((float*)buffer, (double*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,2>((float*)buffer, (double*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      packSpinor<3,myNs,4>((float*)buffer, (double*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,4>((float*)buffer, (double*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  }								\
       } else {								\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      packSpinor<3,myNs,1>((float*)buffer, (float*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,1>((float*)buffer, (float*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      packSpinor<3,myNs,2>((float*)buffer, (float*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,2>((float*)buffer, (float*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      packSpinor<3,myNs,4>((float*)buffer, (float*)src.v, volume, pad, x, length, src.length, \
+	      packSpinor<3,myNs,4>((float*)buffer, (float*)src.v, volume, pad, x, total_length, src.total_length, \
 				src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder()); \
 	  }								\
       }									\
@@ -364,20 +365,20 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   if (precision == QUDA_DOUBLE_PRECISION) {				\
       if (dest.precision == QUDA_DOUBLE_PRECISION) {			\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((double*)dest.v, (double*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,1>((double*)dest.v, (double*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder());	\
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((double*)dest.v, (double*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,2>((double*)dest.v, (double*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder());	\
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
 	      errorQuda("double4 not supported");			\
 	  }								\
       } else {								\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((float*)dest.v, (double*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,1>((float*)dest.v, (double*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((float*)dest.v, (double*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,2>((float*)dest.v, (double*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
 	      errorQuda("double4 not supported");			\
@@ -386,24 +387,24 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   } else {								\
       if (dest.precision == QUDA_DOUBLE_PRECISION) {			\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((double*)dest.v, (float*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,1>((double*)dest.v, (float*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder());	\
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((double*)dest.v, (float*)buffer, volume, pad, x, dest.length, length,	\
+	      unpackSpinor<3,myNs,2>((double*)dest.v, (float*)buffer, volume, pad, x, dest.total_length, total_length,	\
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,4>((double*)dest.v, (float*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,4>((double*)dest.v, (float*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder()); \
 	  }								\
       } else {								\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((float*)dest.v, (float*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,1>((float*)dest.v, (float*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder()); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((float*)dest.v, (float*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,2>((float*)dest.v, (float*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder());	\
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,4>((float*)dest.v, (float*)buffer, volume, pad, x, dest.length, length, \
+	      unpackSpinor<3,myNs,4>((float*)dest.v, (float*)buffer, volume, pad, x, dest.total_length, total_length, \
 				  dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder());	\
 	  }								\
       }									\

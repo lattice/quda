@@ -14,13 +14,13 @@
 
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#define DD_PARAM4 int oddBit
+#define DD_PARAM4 DslashParam param
 #else            // xpay
 #define DD_XPAY_F Xpay
 #if (DD_PREC == 0)
-#define DD_PARAM4 int oddBit, double a
+#define DD_PARAM4 DslashParam param, double a
 #else
-#define DD_PARAM4 int oddBit, float a
+#define DD_PARAM4 DslashParam param, float a
 #endif
 #define DSLASH_XPAY
 #endif

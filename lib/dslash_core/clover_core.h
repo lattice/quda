@@ -263,6 +263,7 @@ volatile spinorFloat o32_im;
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= param.threads) return;
 
 #ifdef SPINOR_DOUBLE
 #if (__CUDA_ARCH__ >= 200)

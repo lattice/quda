@@ -103,10 +103,8 @@ class Dirac {
 // Full Wilson
 class DiracWilson : public Dirac {
 
- private:
-  FaceBuffer face; // multi-gpu communication buffers
-
  protected:
+  FaceBuffer face; // multi-gpu communication buffers
 
  public:
   DiracWilson(const DiracParam &param);
@@ -259,8 +257,8 @@ class DiracDomainWallPC : public DiracDomainWall {
 class DiracStaggered : public Dirac {
 
  protected:
-    FullGauge *fatGauge;
-    FullGauge *longGauge;
+  FullGauge *fatGauge;
+  FullGauge *longGauge;
 
  public:
   DiracStaggered(const DiracParam &param);

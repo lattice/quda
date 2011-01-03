@@ -137,10 +137,17 @@ class ColorSpinorField {
 
   QudaTwistFlavorType twistFlavor;
   
-  int real_length;
-  int length;
-  size_t bytes;
-  
+  int real_length; // physical length only
+  int length; // length including pads, but not ghost zone - used for BLAS
+
+  int ghost_length; // length of ghost zone
+  int ghost_norm_length; // length of ghost zone for norm
+  int total_length; // total length of spinor (physical + pad + ghost)
+  int total_norm_length; // total length of norm
+
+  size_t bytes; // size in bytes of spinor field
+  size_t norm_bytes; // size in bytes of norm field
+
   QudaFieldLocation fieldLocation;
   QudaSiteSubset siteSubset;
   QudaSiteOrder siteOrder;

@@ -418,7 +418,7 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
     if (siteOrder == QUDA_LEXICOGRAPHIC_SITE_ORDER) {
       // We are copying from a full spinor field that is not parity ordered
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	  packFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
+	packFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
 	packQLAFullSpinor<Nc,Ns,N>(dest, src, V, pad, x, destLength, destBasis, srcBasis);
       } else {
