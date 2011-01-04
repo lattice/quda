@@ -60,7 +60,7 @@ clean:
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
-	$(NVCC) -Xptxas -abi=no $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 %.o: %.cu $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 

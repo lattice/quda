@@ -3,7 +3,7 @@
 CUDA_INSTALL_PATH = /usr/local/cuda
 
 CPU_ARCH = x86_64  # x86 or x86_64
-GPU_ARCH = sm_13   # sm_10, sm_11, sm_12, sm_13, sm_20 or sm_21
+GPU_ARCH = sm_20   # sm_10, sm_11, sm_12, sm_13, sm_20 or sm_21
 GPU_EMU  = no      # set to 'yes' for device emulation (CUDA 3.0 only)
 OS       = linux   # linux or osx
 
@@ -16,22 +16,25 @@ DEVICE_DEBUG = no              # compile deivce debug code for cuda-gdb
 VERBOSE = no                   # display kernel register useage
 
 BUILD_WILSON_DIRAC = yes       # build Wilson and clover Dirac operators?
-BUILD_DOMAIN_WALL_DIRAC = yes  # build domain wall Dirac operators?
-BUILD_STAGGERED_DIRAC = yes    # build staggered Dirac operators?
-BUILD_TWISTED_MASS_DIRAC = yes # build twisted mass Dirac operators?
+BUILD_DOMAIN_WALL_DIRAC = no  # build domain wall Dirac operators?
+BUILD_STAGGERED_DIRAC = no    # build staggered Dirac operators?
+BUILD_TWISTED_MASS_DIRAC = no  # build twisted mass Dirac operators?
 BUILD_FATLINK = no             # build code for computing asqtad fat links?
 BUILD_GAUGE_FORCE = no         # build code for (1-loop Symanzik) gauge force?
 BUILD_FERMION_FORCE = no       # build code for asqtad fermion force?
 
 # Multiple GPU options
-BUILD_MULTI_GPU = no # set to 'yes' to build the multi-GPU code
-BUILD_QMP = no      # set to 'yes' to build the QMP multi-GPU code
+BUILD_MULTI_GPU = yes # set to 'yes' to build the multi-GPU code
+BUILD_QMP = yes      # set to 'yes' to build the QMP multi-GPU code
 OVERLAP_COMMS = yes  # set to 'yes' to overlap comms and compute
 
 FECC = gcc	      # Front end CC
 FECXX = g++           # Front end CXX
 
-OMPI_HOME=/usr/mpi/gcc/openmpi-1.3.2
+OMPI_HOME=/home/bjoo/Toolchain/install/openmpi-1.5
+MPICC = $(OMPI_HOME)/bin/mpicc
+MPICXX = $(OMPI_HOME)/bin/mpicxx
+
 QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
 
 ######
@@ -71,6 +74,9 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   RUN = $(OMPI_HOME)/bin/mpirun -np 1
   CC = $(MPICC)
   CXX = $(MPICXX)
+  QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
+  QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
+  QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
 else 

@@ -7,11 +7,22 @@
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
 
+#ifdef QMP_COMMS
+#include <qmp.h>
+#endif
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
 int main(int argc, char **argv)
 {
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif`
   // set QUDA parameters
 
   int device = 0; // CUDA device number
@@ -176,6 +187,8 @@ int main(int argc, char **argv)
 
   // finalize the QUDA library
   endQuda();
-
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
   return 0;
 }

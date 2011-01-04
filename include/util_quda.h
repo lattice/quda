@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef USE_QMP
+#ifdef QMP_COMMS
 
 #include <qmp.h>
 

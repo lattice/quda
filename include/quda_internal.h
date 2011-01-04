@@ -3,7 +3,7 @@
 
 #include <cuda_runtime.h>
 
-#ifdef USE_QMP
+#ifdef QMP_COMMS
 #include <qmp.h>
 #endif
 

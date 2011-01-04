@@ -15,48 +15,48 @@ TESTS = su3_test blas_test pack_test $(WILSON_DIRAC_TEST) 		\
 all: $(TESTS)
 
 staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 wilson_dslash_test: wilson_dslash_test.o test_util.o wilson_dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 wilson_invert_test: wilson_invert_test.o test_util.o wilson_dslash_reference.o blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 domain_wall_invert_test: domain_wall_invert_test.o test_util.o domain_wall_dslash_reference.o \
 	blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 twisted_mass_dslash_test: twisted_mass_dslash_test.o test_util.o twisted_mass_dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 twisted_mass_invert_test: twisted_mass_invert_test.o test_util.o twisted_mass_dslash_reference.o \
 	blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 su3_test: su3_test.o test_util.o wilson_dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 pack_test: pack_test.o test_util.o wilson_dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 blas_test: blas_test.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o $(QUDA)
-	$(CC) $(LDFLAGS) $^  -o $@ 
+	$(CC) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o $(QUDA)
-	$(CC) $(LDFLAGS) $^  -o $@ 
+	$(CC) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
-	$(CC) $(LDFLAGS) $^  -o $@ 
+	$(CC) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
