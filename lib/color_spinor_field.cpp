@@ -108,6 +108,8 @@ ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
 // Resets the attributes of this field if param disagrees (and is defined)
 void ColorSpinorField::reset(const ColorSpinorParam &param) {
 
+  if (param.fieldLocation != QUDA_INVALID_FIELD_LOCATION) fieldLocation = param.fieldLocation;
+
   if (param.nColor != 0) nColor = param.nColor;
   if (param.nSpin != 0) nSpin = param.nSpin;
   if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
@@ -167,7 +169,6 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   bytes = total_length * precision;
   norm_bytes = total_norm_length * sizeof(float);
 
-  if (param.fieldLocation != QUDA_INVALID_FIELD_LOCATION) fieldLocation = param.fieldLocation;
   if (param.siteSubset != QUDA_INVALID_SITE_SUBSET) siteSubset = param.siteSubset;
   if (param.siteOrder != QUDA_INVALID_SITE_ORDER) siteOrder = param.siteOrder;
   if (param.fieldOrder != QUDA_INVALID_FIELD_ORDER) fieldOrder = param.fieldOrder;
