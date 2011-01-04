@@ -10,6 +10,10 @@ OS       = linux   # linux or osx
 PYTHON = python    # python 2.5 or later required for 'make gen'
 DEVICE = 0         # CUDA device to use for 'make tune'
 
+HOST_DEBUG = no                # compile host debug code
+DEVICE_DEBUG = yes             # compile deivce debug code for cuda-gdb 
+VERBOSE = no                   # display kernel register useage
+
 BUILD_WILSON_DIRAC = yes       # build Wilson and clover Dirac operators?
 BUILD_DOMAIN_WALL_DIRAC = yes  # build domain wall Dirac operators?
 BUILD_STAGGERED_DIRAC = yes    # build staggered Dirac operators?
@@ -18,7 +22,7 @@ BUILD_FATLINK = no             # build code for computing asqtad fat links?
 BUILD_GAUGE_FORCE = no         # build code for (1-loop Symanzik) gauge force?
 BUILD_FERMION_FORCE = no       # build code for asqtad fermion force?
 
-# Multiple GPU option
+# Multiple GPU options
 BUILD_MULTI_GPU = no # set to 'yes' to build the multi-GPU code
 BUILD_QMP = no      # set to 'yes' to build the QMP multi-GPU code
 OVERLAP_COMMS = no  # set to 'yes' to overlap comms and compute
@@ -108,8 +112,19 @@ ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
   FERMION_FORCE_TEST=fermion_force_test
 endif
 
-CFLAGS = -g -Wall -O3 -std=c99 $(COPT) $(INC)
-CXXFLAGS = -g -Wall -O3 $(COPT) $(INC)
+ifeq ($(strip $(HOST_DEBUG)), yes)
+  NVCCOPT += -g
+  COPY += -g
+endif
+ifeq ($(strip $(DEVICE_DEBUG)), yes)
+  NVCCOPT += -G
+endif
+ifeq ($(strip $(VERBOSE)), yes)
+  NVCCOPT += --ptxas-options=-v
+endif
+
+CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
+CXXFLAGS = -Wall -O3 $(COPT) $(INC)
 NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC) #--ptxas-options=-v
+NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
 LDFLAGS = -fPIC $(LIB)
