@@ -1,4 +1,13 @@
 
+Version 0.3.2 - x January 2011
+
+- Merged in the multi-GPU branch.  This parallelizes between multiple
+  GPUs through splitting in the temporal dimension only.  The QMP
+  library is required to enable this functionality.  Currently, only
+  Wilson, clover and twisted mass fermions are supported.  Future
+  revisions will enable this functionality for domain wall and
+  staggered fermions.
+
 Version 0.3.1 - 22 December 2010
 
 - Added support for domain wall fermions.  The length of the fifth

@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.3.1                         22 December 2010
+Release Notes for QUDA v0.3.2                         x January 2011
 -----------------------------
 
 Overview:
@@ -15,8 +15,9 @@ with support for double, single, and half (16-bit fixed-point)
 precision.  The staggered implementation additionally includes support
 for asqtad link fattening, force terms for the asqtad fermion action
 and one-loop improved Symanzik gauge action, and a multi-shift CG
-solver.
-
+solver.  Initial support for multiple GPUs is enabled in this release,
+however, this is currently limited to Wilson, clover and twisted mass
+Dirac operators.
 
 Software Compatibility:
 
@@ -69,6 +70,14 @@ In summary, for an optimized install, run
 is performed using CUDA device 0.  To select a different device
 number, set DEVICE in make.inc appropriately.
 
+Building the multiple GPU library requires the enabling of the
+appropriate flags in the make.inc file.  Specifically, the
+BUILD_MULTI_GPU and BUILD_QMP flags must be set to 'yes'.
+Additionally, optimum performance will generally be obtained if the
+OVERLAP_COMMS option is enabled to overlap kernel computation and
+inter-GPU communication.  Multiple GPUs are controlled using QMP, and
+so QMP and MPI must be installed on the host systems, and the QMP_HOME
+and OMPI_HOME paths must be set.
 
 Using the Library:
 
@@ -122,6 +131,12 @@ M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
 Lattice QCD systems of equations using mixed precision solvers on GPUs,"
 Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
 
+Additionally, if you use the multiple GPU version, please additionally cite:
+
+R. Babich, M. A. Clark and B. Joo, "Parallelizing the QUDA Library for
+Multi-GPU Calculations in Lattice Quantum Chromodynamics,"
+International Conference for High Performance Computing, Networking,
+Storage and Analysis (SC), 2010 [arXiv:1011.0024[ hep-lat]].
 
 Authors:
 
