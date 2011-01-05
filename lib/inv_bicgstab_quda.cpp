@@ -17,11 +17,10 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
 {
   typedef std::complex<double> Complex;
 
-  ColorSpinorParam param;
+  ColorSpinorParam param(x);
   param.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField y(x, param);
   cudaColorSpinorField r(x, param); 
-
   param.precision = invert_param->cuda_prec_sloppy;
   cudaColorSpinorField p(x, param);
   cudaColorSpinorField v(x, param);
@@ -29,6 +28,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   cudaColorSpinorField t(x, param);
 
   cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
+
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     x_sloppy = &x;
@@ -89,7 +89,12 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
       cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
     }
     
+    checkCudaError();
+    std::cout << v;
+    std::cout << p;
+    std::cout << tmp;
     matSloppy(v, p, tmp);
+    checkCudaError();
 
     if (abs(rho) == 0.0) alpha = 0.0;
     else alpha = rho / cDotProductCuda(r0, v);
@@ -151,6 +156,10 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   invert_param->secs += stopwatchReadSeconds();
   
   float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+#ifdef QMP_COMMS
+  QMP_sum_float(&gflops);
+#endif
+
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;
   invert_param->iter += k;

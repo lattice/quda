@@ -175,6 +175,10 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy,
   }
     
   float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+#ifdef QMP_COMMS
+  QMP_sum_float(&gflops);
+#endif
+
   invert_param->gflops = gflops;
   invert_param->iter = k;
   //#if 0

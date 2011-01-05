@@ -20,7 +20,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
     
   cudaColorSpinorField r(b);
 
-  ColorSpinorParam param;
+  ColorSpinorParam param(x);
   param.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField y(b, param); 
   
@@ -126,6 +126,10 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
     printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
   float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+#ifdef QMP_COMMS
+  QMP_sum_float(&gflops);
+#endif
+
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops = gflops;
   invert_param->iter = k;
