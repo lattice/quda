@@ -206,6 +206,9 @@ void end() {
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
   endQuda();
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
 }
 
 // execute kernel
@@ -275,6 +278,14 @@ void dslashRef() {
 
 int main(int argc, char **argv)
 {
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif
   init();
 
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);

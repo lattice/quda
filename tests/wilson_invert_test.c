@@ -22,7 +22,7 @@ int main(int argc, char **argv)
   dims[0] = dims[1] = dims[2] = 1;
   dims[3] = QMP_get_number_of_nodes();
   QMP_declare_logical_topology(dims, ndim);
-#endif`
+#endif
   // set QUDA parameters
 
   int device = 0; // CUDA device number
@@ -83,8 +83,8 @@ int main(int argc, char **argv)
 #else // must be this one c/b face for multi gpu
   gauge_param.ga_pad = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
 #endif
-  inv_param.sp_pad = 0;   // 24*24*24;
-  inv_param.cl_pad = 0;   // 24*24*24;
+  inv_param.sp_pad = 0; // 24*24*24/2;
+  inv_param.cl_pad = 0; // 24*24*24/2;
 
   if (clover_yes) {
     inv_param.clover_cpu_prec = cpu_prec;

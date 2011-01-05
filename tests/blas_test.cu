@@ -63,7 +63,7 @@ void initFields(int prec)
   param.x[2] = LZ;
   param.x[3] = LT;
 
-  param.pad = LX*LY*LZ/2;
+  param.pad = 0; //LX*LY*LZ/2;
   param.siteSubset = QUDA_PARITY_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   
@@ -283,6 +283,16 @@ void write(char *names[], int threads[][3], int blocks[][3])
 
 int main(int argc, char** argv)
 {
+
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif
+
   int dev = 0;
   if (argc == 2) dev = atoi(argv[1]);
   initQuda(dev);
@@ -405,4 +415,9 @@ int main(int argc, char** argv)
   }
   write(names, blas_threads, blas_blocks);
   endQuda();
+
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
+
 }
