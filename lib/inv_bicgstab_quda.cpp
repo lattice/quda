@@ -89,12 +89,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
       cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
     }
     
-    checkCudaError();
-    std::cout << v;
-    std::cout << p;
-    std::cout << tmp;
     matSloppy(v, p, tmp);
-    checkCudaError();
 
     if (abs(rho) == 0.0) alpha = 0.0;
     else alpha = rho / cDotProductCuda(r0, v);

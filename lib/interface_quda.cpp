@@ -739,7 +739,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *in);
   if (param->verbosity >= QUDA_VERBOSE) printfQuda("Mass rescale done\n");   
-  
+
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {

@@ -398,7 +398,7 @@ def gen(dir):
         str.append("      sp_stride_t = Vs;\n")
         str.append("      sp_idx = sid + SPINOR_HOP*sp_stride;\n")
         str.append("#if (DD_PREC==2)\n")
-        str.append("      sp_norm_idx = sid + sp_stride + Vs;\n")
+        str.append("      sp_norm_idx = sid + sp_stride;\n")
         str.append("#endif\n")
         str.append("    } else {\n")
         str.append("      sp_stride_t = sp_stride;\n")

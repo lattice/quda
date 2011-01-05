@@ -240,8 +240,8 @@ static void unbindLongGaugeTex(const FullGauge gauge){
     
 
 template <int N, typename spinorFloat>
-  int bindSpinorTex(const size_t spinor_bytes, const size_t norm_bytes, const spinorFloat *in, const float *inNorm,
-		    const spinorFloat *x=0, const float *xNorm=0) {
+int bindSpinorTex(const size_t spinor_bytes, const size_t norm_bytes, const spinorFloat *in, 
+		  const float *inNorm, const spinorFloat *x=0, const float *xNorm=0) {
 
   int size;
 
@@ -280,7 +280,7 @@ template <int N, typename spinorFloat>
 
 template <int N, typename spinorFloat>
 void unbindSpinorTex(const spinorFloat *in, const float *inNorm,
-		    const spinorFloat *x=0, const float *xNorm=0) {
+		     const spinorFloat *x=0, const float *xNorm=0) {
 
   if (N==2 && sizeof(spinorFloat) == sizeof(double2)) {
     cudaUnbindTexture(spinorTexDouble); 

@@ -1542,7 +1542,7 @@ o32_re = o32_im = 0;
           sp_stride_t = Vs;
           sp_idx = sid + SPINOR_HOP*sp_stride;
     #if (DD_PREC==2)
-          sp_norm_idx = sid + sp_stride + Vs;
+          sp_norm_idx = sid + sp_stride;
     #endif
         } else {
           sp_stride_t = sp_stride;

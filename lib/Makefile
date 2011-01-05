@@ -60,7 +60,7 @@ clean:
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
-	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@ #-Xptxas -abi=no # CUDA 3.1 and up only
 %.o: %.cu $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 

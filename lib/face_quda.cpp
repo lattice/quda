@@ -12,7 +12,7 @@
 /*
   Multi-GPU TODOs
   - test qmp code
-  - implement as OpenMP?
+  - implement OpenMP version?
   - split face kernels
   - separate block sizes for body and face
   - single coalesced D->H copy - first pass implemented, enable with GATHER_COALESCE 
@@ -401,7 +401,7 @@ template <int vecLen, typename Float>
 
 // half precision norm version of the above
 template <typename Float>
-  void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
+void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
 {
   int norm_end = stride;
   int face_size = Vs;
