@@ -40,6 +40,7 @@ cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
   ColorSpinorField(src), v(0), norm(0), alloc(false), init(true) {  
 // can only overide if we are not using a reference or parity special case
+
   if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
       (param.create == QUDA_REFERENCE_FIELD_CREATE && 
        src.SiteSubset() == QUDA_FULL_SITE_SUBSET && 
@@ -206,7 +207,7 @@ cudaColorSpinorField& cudaColorSpinorField::Odd() const {
 // zero as 4 zero bytes
 void cudaColorSpinorField::zero() {
   cudaMemset(v, 0, bytes);
-  if (precision == QUDA_HALF_PRECISION) cudaMemset(norm, 0, bytes/(nColor*nSpin));
+  if (precision == QUDA_HALF_PRECISION) cudaMemset(norm, 0, norm_bytes);
 }
 
 void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
@@ -239,8 +240,7 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
     errorQuda("Subset types do not match %d %d", siteSubset, src.siteSubset);
   }
   if (precision == QUDA_HALF_PRECISION) {
-    ColorSpinorParam param;
-    fill(param); // acquire all attributes of this
+    ColorSpinorParam param(*this); // acquire all attributes of this
     param.precision = QUDA_SINGLE_PRECISION; // change precision
     param.create = QUDA_COPY_FIELD_CREATE;
     cudaColorSpinorField tmp(src, param);
@@ -347,9 +347,9 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   }
 
   if (precision == QUDA_HALF_PRECISION) {
-    ColorSpinorParam param;
-    param.create = QUDA_COPY_FIELD_CREATE;
-    param.precision = QUDA_SINGLE_PRECISION;
+    ColorSpinorParam param(*this); // acquire all attributes of this
+    param.precision = QUDA_SINGLE_PRECISION; // change precision
+    param.create = QUDA_COPY_FIELD_CREATE; 
     cudaColorSpinorField tmp(*this, param);
     tmp.saveCPUSpinorField(dest);
     return;

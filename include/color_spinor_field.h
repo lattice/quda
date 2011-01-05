@@ -11,6 +11,9 @@ typedef std::complex<double> Complex;
 // Probably want some checking for this limit
 #define QUDA_MAX_DIM 6
 
+// forward declaration
+class ColorSpinorField;
+
 class ColorSpinorParam {
  public:
   QudaFieldLocation fieldLocation; // cpu, cuda etc. 
@@ -32,6 +35,8 @@ class ColorSpinorParam {
 
   void *v; // pointer to field
   void *norm;
+
+  ColorSpinorParam(const ColorSpinorField &a);
 
  ColorSpinorParam()
    : fieldLocation(QUDA_INVALID_FIELD_LOCATION), nColor(0), nSpin(0), nDim(0), 
@@ -160,7 +165,7 @@ class ColorSpinorField {
 
   // resets the above attributes based on contents of param
   void reset(const ColorSpinorParam &);
-  void fill(ColorSpinorParam &);
+  void fill(ColorSpinorParam &) const;
   static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
  public:
@@ -191,6 +196,7 @@ class ColorSpinorField {
   QudaGammaBasis GammaBasis() const { return gammaBasis; }
   
   friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
+  friend class ColorSpinorParam;
 };
 
 class cpuColorSpinorField;

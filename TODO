@@ -20,5 +20,7 @@ Optimizations
 =============
 
 Optimized domain wall fermions (gauge field load sharing across Ls).
-Dslash auto-tuning.
+Dslash auto-tuning (block sizes, padding).
+Enable the BLAS autotuning through the interface.
+
 

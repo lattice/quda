@@ -121,7 +121,7 @@ endif
 
 ifeq ($(strip $(HOST_DEBUG)), yes)
   NVCCOPT += -g
-  COPY += -g
+  COPT += -g
 endif
 ifeq ($(strip $(DEVICE_DEBUG)), yes)
   NVCCOPT += -G

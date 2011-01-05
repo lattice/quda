@@ -6,6 +6,10 @@
 
 }*/
 
+ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
+  field.fill(*this);
+}
+
 ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0) {
   create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
 	 param.fieldLocation, param.siteSubset, param.siteOrder, param.fieldOrder, 
@@ -144,7 +148,7 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
     length = stride*nColor*nSpin*2;  
 #ifdef MULTI_GPU
     ghost_length = Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs*2 : 0; // ghost norm zone is 2 c/b spatial volumes
 #else
     ghost_length = 0;
     ghost_norm_length = 0;
@@ -178,7 +182,7 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
 }
 
 // Fills the param with the contents of this field
-void ColorSpinorField::fill(ColorSpinorParam &param) {
+void ColorSpinorField::fill(ColorSpinorParam &param) const {
   param.nColor = nColor;
   param.nSpin = nSpin;
   param.twistFlavor = twistFlavor;
