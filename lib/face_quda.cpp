@@ -34,6 +34,7 @@ cudaStream_t *stream;
 #endif
 
 FaceBuffer::FaceBuffer(int Vs, int V, QudaPrecision precision) :
+  my_fwd_face(0), my_back_face(0), from_back_face(0), from_fwd_face(0), 
   Vs(Vs), V(V), precision(precision)
 {
 
@@ -52,10 +53,10 @@ FaceBuffer::FaceBuffer(int Vs, int V, QudaPrecision precision) :
   
   unsigned int flag = cudaHostAllocDefault;
   cudaHostAlloc(&(my_fwd_face), nbytes, flag);
-  if( !my_fwd_face ) errorQuda("Unable to allocate my_fwd_face");
+  if( !my_fwd_face ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes);
   
   cudaHostAlloc(&(my_back_face), nbytes, flag);
-  if( !my_back_face ) errorQuda("Unable to allocate my_back_face");
+  if( !my_back_face ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes);
   
 #ifdef GATHER_COALESCE
   cudaMalloc(&(gather_fwd_face), nbytes);
@@ -64,10 +65,10 @@ FaceBuffer::FaceBuffer(int Vs, int V, QudaPrecision precision) :
 
 #ifdef QMP_COMMS
   cudaHostAlloc(&(from_fwd_face), nbytes, flag);
-  if( !from_fwd_face ) errorQuda("Unable to allocate from_fwd_face");
+  if( !from_fwd_face ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes);
   
   cudaHostAlloc(&(from_back_face), nbytes, flag);
-  if( !from_back_face ) errorQuda("Unable to allocate from_back_face");   
+  if( !from_back_face ) errorQuda("Unable to allocate from_back_face with size %lu", nbytes);   
 #else
   from_fwd_face = my_back_face;
   from_back_face = my_fwd_face;
@@ -125,12 +126,11 @@ FaceBuffer::~FaceBuffer()
   QMP_free_msgmem(mm_send_back);
   QMP_free_msgmem(mm_from_fwd);
   QMP_free_msgmem(mm_from_back);
-#else
+  cudaFreeHost(from_fwd_face); // these are aliasing pointers for non-qmp case
+  cudaFreeHost(from_back_face);// these are aliasing pointers for non-qmp case
+#endif
   cudaFreeHost(my_fwd_face);
   cudaFreeHost(my_back_face);
-  cudaFreeHost(from_fwd_face);
-  cudaFreeHost(from_back_face);
-#endif
 
 #ifdef GATHER_COALESCE
   cudaFree(gather_fwd_face);
