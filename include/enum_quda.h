@@ -140,8 +140,21 @@ extern "C" {
     QUDA_SILENT,
     QUDA_SUMMARIZE,
     QUDA_VERBOSE,
+    QUDA_DEBUG_VERBOSE,
     QUDA_INVALID_VERBOSITY = QUDA_INVALID_ENUM
   } QudaVerbosity;
+
+  typedef enum QudaTune_s {
+    QUDA_TUNE_NO,
+    QUDA_TUNE_YES,
+    QUDA_TUNE_INVALID = QUDA_INVALID_ENUM
+  } QudaTune;
+
+  typedef enum QudaPreserveDirac_s {
+    QUDA_PRESERVE_DIRAC_NO,
+    QUDA_PRESERVE_DIRAC_YES,
+    QUDA_PRESERVE_DIRAC_INVALID = QUDA_INVALID_ENUM
+  } QudaPreserveDirac;
 
   //
   // Type used for "parity" argument to dslashQuda()
@@ -210,7 +223,7 @@ extern "C" {
     QUDA_REFERENCE_FIELD_CREATE, // create reference to field
     QUDA_INVALID_FIELD_CREATE = QUDA_INVALID_ENUM
   } QudaFieldCreate;
-  
+
   typedef enum QudaGammaBasis_s {
     QUDA_DEGRAND_ROSSI_GAMMA_BASIS,
     QUDA_UKQCD_GAMMA_BASIS,

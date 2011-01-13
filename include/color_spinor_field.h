@@ -47,8 +47,9 @@ class ColorSpinorParam {
   { for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0;}
   
   // used to create cpu params
- ColorSpinorParam(void *V, QudaInvertParam &inv_param, int *X)
-   : fieldLocation(QUDA_CPU_FIELD_LOCATION), nColor(3), nSpin(4), nDim(4), 
+ ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
+   : fieldLocation(QUDA_CPU_FIELD_LOCATION), nColor(3), 
+    nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
     precision(inv_param.cpu_prec), pad(0), twistFlavor(inv_param.twist_flavor), 
     siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
@@ -57,6 +58,13 @@ class ColorSpinorParam {
 
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
+
+    if (!pc_solution) {
+      x[0] *= 2;
+      siteSubset = QUDA_FULL_SITE_SUBSET;;
+    } else {
+      siteSubset = QUDA_PARITY_SITE_SUBSET;
+    }
 
     if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
       nDim++;
@@ -83,12 +91,13 @@ class ColorSpinorParam {
     nDim(cpuParam.nDim), precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
     twistFlavor(cpuParam.twistFlavor), siteSubset(cpuParam.siteSubset), 
     siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
-    gammaBasis(QUDA_UKQCD_GAMMA_BASIS), create(QUDA_COPY_FIELD_CREATE), v(0)
+    gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
+    create(QUDA_COPY_FIELD_CREATE), v(0)
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
 
-    if (precision == QUDA_DOUBLE_PRECISION) {
+    if (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) {
       fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     } else {
       fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
@@ -222,7 +231,6 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend void zeroCuda(cudaColorSpinorField &a);
   friend void copyCuda(cudaColorSpinorField &, const cudaColorSpinorField &);
   friend double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend double sumCuda(cudaColorSpinorField &b);
   friend double normCuda(const cudaColorSpinorField &b);
   friend double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   friend double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
@@ -248,7 +256,7 @@ class cudaColorSpinorField : public ColorSpinorField {
 					cudaColorSpinorField &z);
   friend double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   friend double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  friend double3 caxpbypzYmbwcDotProductWYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
+  friend double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 						    cudaColorSpinorField &y, cudaColorSpinorField &z, 
 						    cudaColorSpinorField &w, cudaColorSpinorField &u);
 
@@ -298,7 +306,38 @@ class cpuColorSpinorField : public ColorSpinorField {
 
   friend class cudaColorSpinorField;
 
-  friend double normCpu(const cpuColorSpinorField &);
+  friend void copyCpu(cpuColorSpinorField&, const cpuColorSpinorField &);
+  friend double axpyNormCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
+  friend double normCpu(const cpuColorSpinorField &b);
+  friend double reDotProductCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
+  friend double xmyNormCpu(const cpuColorSpinorField &a, cpuColorSpinorField &b);
+  friend void axpbyCpu(const double &a, const cpuColorSpinorField &x, const double &b, cpuColorSpinorField &y);
+  friend void axpyCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
+  friend void axCpu(const double &a, cpuColorSpinorField &x);
+  friend void xpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y);
+  friend void xpayCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y);
+  friend void mxpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y);
+  friend void axpyZpbxCpu(const double &a, cpuColorSpinorField &x, cpuColorSpinorField &y, 
+			   const cpuColorSpinorField &z, const double &b);
+  friend void axpyBzpcxCpu(const double &a, cpuColorSpinorField& x, cpuColorSpinorField& y,
+			   const double &b, const cpuColorSpinorField& z, const double &c); 
+  
+  friend void caxpbyCpu(const Complex &a, const cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y);
+  friend void caxpyCpu(const Complex &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
+  friend void cxpaypbzCpu(const cpuColorSpinorField &x, const Complex &b, const cpuColorSpinorField &y, 
+			   const Complex &c, cpuColorSpinorField &z);
+  friend void caxpbypzYmbwCpu(const Complex &, const cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
+			       cpuColorSpinorField &, const cpuColorSpinorField &); 
+  friend Complex cDotProductCpu(const cpuColorSpinorField &, const cpuColorSpinorField &);
+  friend Complex xpaycDotzyCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y, 
+			       const cpuColorSpinorField &z);
+  friend double3 cDotProductNormACpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
+  friend double3 cDotProductNormBCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
+  friend double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinorField &x, 
+						   const Complex &b, cpuColorSpinorField &y, 
+						   cpuColorSpinorField &z, const cpuColorSpinorField &w, 
+						   const cpuColorSpinorField &u);
+
   friend double dslashCUDA();
   friend void dslashRef();
   friend void staggeredDslashRef();

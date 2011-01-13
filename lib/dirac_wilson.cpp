@@ -2,13 +2,19 @@
 #include <blas_quda.h>
 #include <iostream>
 
+#include <tune_quda.h>
+
 DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param),
-face(param.gauge->volume/param.gauge->X[3], param.gauge->volume, param.gauge->precision)
+  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
+  face(param.gauge->volume/param.gauge->X[3], param.gauge->volume, param.gauge->precision)
+ 
 {
 
 }
 
-DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac), face(dirac.face)
+DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac), 
+  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
+  face(dirac.face)
 {
 
 }
@@ -22,6 +28,10 @@ DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
 {
   if (&dirac != this) {
     Dirac::operator=(dirac);
+    blockDslash = dirac.blockDslash;
+    blockDslashXpay = dirac.blockDslashXpay;
+    blockDslashFace = dirac.blockDslashFace;
+    blockDslashXpayFace = dirac.blockDslashXpayFace;
   }
   return *this;
 }
@@ -29,14 +39,14 @@ DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
 void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			 const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
   setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 0, 0, 0,
-	     out.volume, out.bytes, out.norm_bytes, in.Precision());
+	     out.volume, out.bytes, out.norm_bytes, in.Precision(), blockDslash, blockDslashFace);
 
   flops += 1320ll*in.volume;
 }
@@ -45,14 +55,14 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
 			     const QudaParity parity, const cudaColorSpinorField &x,
 			     const double &k) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride(), 0);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
   setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   dslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, k, 
-	     out.volume, out.bytes, out.norm_bytes, in.Precision());
+	     out.volume, out.bytes, out.norm_bytes, in.Precision(), blockDslashXpay, blockDslashXpayFace);
 
   flops += 1368ll*in.volume;
 }
@@ -93,6 +103,31 @@ void DiracWilson::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFiel
 			      const QudaSolutionType solType) const
 {
   // do nothing
+}
+
+// Find the best block size parameters for the Dslash and DslashXpay kernels
+void DiracWilson::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		       const cudaColorSpinorField &x) {
+  setDslashTuning(QUDA_TUNE_YES);
+
+  { // Tune Dslash
+    TuneDiracWilsonDslash dslashTune(*this, out, in);
+    dslashTune.Benchmark(blockDslash);
+#ifdef OVERLAP_COMMS
+    dslashTune.Benchmark(blockDslashFace);
+#endif
+  }
+
+  { // Tune DslashXpay
+    TuneDiracWilsonDslashXpay dslashXpayTune(*this, out, in, x);
+    dslashXpayTune.Benchmark(blockDslashXpay);
+#ifdef OVERLAP_COMMS
+    dslashXpayTune.Benchmark(blockDslashXpayFace);
+#endif
+  }
+
+  setDslashTuning(QUDA_TUNE_NO);
+
 }
 
 DiracWilsonPC::DiracWilsonPC(const DiracParam &param)

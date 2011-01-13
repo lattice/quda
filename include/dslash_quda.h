@@ -13,53 +13,63 @@ extern "C" {
   void initCache();
 
   extern int initDslash;
+  extern int initClover;
+  extern int initDomainWall;
   extern bool qudaPt0;
   extern bool qudaPtNm1;
 
-  int dslashCudaSharedBytes(QudaPrecision spinor_prec, int blockDim);
+  void setDslashTuning(QudaTune tune);
 
   void initCommonConstants(const FullGauge gauge);
-  void initDslashConstants(const FullGauge gauge, const int sp_stride, const int cl_stride, const int Ls=1);
+  void initDslashConstants(const FullGauge gauge, const int sp_stride);
+  void initCloverConstants(const int cl_stride);
+  void initDomainWallConstants(const int Ls);
 
   // plain Wilson Dslash  
   void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, const void *inNorm,
 		  const int oddBit, const int daggerBit, const void *x, const void *xNorm,
-		  const double k, const int volume, const size_t bytes, const size_t norm_bytes, const QudaPrecision precision);
+		  const double k, const int volume, const size_t bytes, const size_t norm_bytes, 
+		  const QudaPrecision precision, const dim3 block, const dim3 blockFace);
     
   // clover Dslash
   void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, 
 			const FullClover cloverInv, const void *in, const void *inNorm,
 			const int oddBit, const int daggerBit, const void *x, const void *xNorm,
-			const double k, const int volume, const size_t bytes, const size_t norm_bytes, const QudaPrecision precision);
+			const double k, const int volume, const size_t bytes, const size_t norm_bytes, 
+			const QudaPrecision precision, const dim3 block, const dim3 blockFace);
     
   // solo clover term
   void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover clover, 
 		  const void *in, const void *inNorm, const int oddBit, const int volume, 
-		  const size_t bytes, const size_t norm_bytes, const QudaPrecision precision);
+		  const size_t bytes, const size_t norm_bytes, const QudaPrecision precision,
+		  const dim3 block);
 
   // domain wall Dslash  
   void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 
 			    const void *inNorm, const int parity, const int dagger, 
 			    const void *x, const void *xNorm, const double m_f, const double k,
-			    const int volume5d, const size_t bytes, const size_t norm_bytes, const QudaPrecision precision);
+			    const int volume5d, const size_t bytes, const size_t norm_bytes, 
+			    const QudaPrecision precision, const dim3 block, const dim3 blockFace);
     
   // staggered Dslash
   void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, FullGauge longGauge, const void *in, 
 			   const void *inNorm, const int parity, const int dagger, 
 			   const void *x, const void *xNorm, const double k,
-			   const int volume, const size_t bytes, const size_t norm_bytes, const QudaPrecision precision);
+			   const int volume, const size_t bytes, const size_t norm_bytes, 
+			   const QudaPrecision precision, const dim3 block, const dim3 blockFace);
 
   // twisted mass Dslash  
   void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 
 			     const void *inNorm, const int parity, const int dagger, 
 			     const void *x, const void *xNorm, const double kappa, const double mu,
 			     const double a, const int volume, const size_t bytes, const size_t norm_bytes,
-			     const QudaPrecision precision);
+			     const QudaPrecision precision, const dim3 block, const dim3 blockFace);
 
   // solo twist term
   void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
 		       const int dagger, const double kappa, const double mu, const int volume, 
-		       const size_t bytes, const size_t norm_bytes, const QudaPrecision precision, const QudaTwistGamma5Type);
+		       const size_t bytes, const size_t norm_bytes, const QudaPrecision precision, 
+		       const QudaTwistGamma5Type, const dim3 block);
 
 #ifdef __cplusplus
 }

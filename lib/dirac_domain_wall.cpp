@@ -1,15 +1,18 @@
 #include <iostream>
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <tune_quda.h>
 
-DiracDomainWall::DiracDomainWall(const DiracParam &param)
-  : DiracWilson(param), m5(param.m5), kappa5(0.5/(5.0 + m5))
+DiracDomainWall::DiracDomainWall(const DiracParam &param) : DiracWilson(param),
+  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
+  m5(param.m5), kappa5(0.5/(5.0 + m5))
 {
 
 }
 
-DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) 
-  : DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5))
+DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) : DiracWilson(dirac),
+  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
+  m5(dirac.m5), kappa5(0.5/(5.0 + m5))
 {
 
 }
@@ -26,21 +29,53 @@ DiracDomainWall& DiracDomainWall::operator=(const DiracDomainWall &dirac)
     DiracWilson::operator=(dirac);
     m5 = dirac.m5;
     kappa5 = dirac.kappa5;
+
+    blockDslash = dirac.blockDslash;
+    blockDslashXpay = dirac.blockDslashXpay;
+    blockDslashFace = dirac.blockDslashFace;
+    blockDslashXpayFace = dirac.blockDslashXpayFace;
   }
 
   return *this;
 }
 
+// Find the best block size parameters for the Dslash and DslashXpay kernels
+void DiracDomainWall::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+			   const cudaColorSpinorField &x) {
+
+  setDslashTuning(QUDA_TUNE_YES);
+
+  { // Tune Dslash
+    TuneDiracDomainWallDslash dslashTune(*this, out, in);
+    dslashTune.Benchmark(blockDslash);
+#ifdef OVERLAP_COMMS
+    dslashTune.Benchmark(blockDslashFace);
+#endif
+  }
+
+  { // Tune DslashXpay
+    TuneDiracDomainWallDslashXpay dslashXpayTune(*this, out, in, x);
+    dslashXpayTune.Benchmark(blockDslashXpay);
+#ifdef OVERLAP_COMMS
+    dslashXpayTune.Benchmark(blockDslashXpayFace);
+#endif
+  }
+
+  setDslashTuning(QUDA_TUNE_NO);
+}
+
 void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			 const QudaParity parity) const
+			     const QudaParity parity) const
 {
   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-  if (!initDslash) initDslashConstants(gauge, in.Stride(), 0, in.X(4));
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDomainWall) initDomainWallConstants(in.X(4));
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
   
   domainWallDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 0, 0, 
-		       mass, 0, out.volume, out.bytes, out.norm_bytes, in.Precision());
+		       mass, 0, out.volume, out.bytes, out.norm_bytes, in.Precision(),
+		       blockDslash, blockDslashFace);
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.volume/Ls);
@@ -49,16 +84,18 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
 }
 
 void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			     const QudaParity parity, const cudaColorSpinorField &x,
-			     const double &k) const
+				 const QudaParity parity, const cudaColorSpinorField &x,
+				 const double &k) const
 {
   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-  if (!initDslash) initDslashConstants(gauge, in.Stride(), 0, in.X(4));
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDomainWall) initDomainWallConstants(in.X(4));
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
   domainWallDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, 
-		       mass, k, out.volume, out.bytes, out.norm_bytes, in.Precision());
+		       mass, k, out.volume, out.bytes, out.norm_bytes, in.Precision(),
+		       blockDslashXpay, blockDslashXpayFace);
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.volume/Ls);

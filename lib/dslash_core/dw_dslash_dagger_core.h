@@ -186,10 +186,11 @@ volatile spinorFloat o32_im;
 //#include "read_clover.h"
 #include "io_spinor.h"
 
-int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
+int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= param.threads) return;
 int boundaryCrossings = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h) + sid/(X4*X3*X2*X1h);
 int boundaryCrossings4d = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-int X = 2*sid + (boundaryCrossings + oddBit) % 2;
+int X = 2*sid + (boundaryCrossings + param.parity) % 2;
 int xs = X/(X4*X3*X2*X1);
 int x4 = (X/(X3*X2*X1)) % X4;
 int x3 = (X/(X2*X1)) % X3;
@@ -1767,7 +1768,7 @@ o32_re = o32_im = 0;
 
 
 #ifdef DSLASH_XPAY
-    READ_ACCUM(ACCUMTEX)
+READ_ACCUM(ACCUMTEX, sp_stride)
 #ifdef SPINOR_DOUBLE
     o00_re = a*o00_re + accum0.x;
     o00_im = a*o00_im + accum0.y;
@@ -1823,7 +1824,7 @@ o32_re = o32_im = 0;
 
 
     // write spinor field back to device memory
-    WRITE_SPINOR();
+    WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

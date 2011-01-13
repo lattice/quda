@@ -90,6 +90,9 @@ extern "C" {
     double gflops;
     double secs;
 
+    QudaTune dirac_tune; // tune the Dirac operator when it is first created?
+    QudaPreserveDirac preserve_dirac; // free the Dirac operator or keep it resident?
+
   } QudaInvertParam;
 
 
@@ -105,6 +108,8 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets,
 			    double* residue_sq);
+
+  void endInvertQuda(); // frees the Dirac operator
   
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity parity);

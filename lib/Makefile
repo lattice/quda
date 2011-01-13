@@ -1,18 +1,18 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = blas_quda.o clover_quda.o color_spinor_field.o		     \
+QUDA_OBJS = blas_quda.o blas_cpu.o clover_quda.o color_spinor_field.o	\
 	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	     \
 	dirac_clover.o dirac_wilson.o dirac_staggered.o dirac_domain_wall.o  \
-	dirac_twisted_mass.o dslash_quda.o gauge_quda.o inv_bicgstab_quda.o \
+	dirac_twisted_mass.o tune.o gauge_quda.o inv_bicgstab_quda.o \
 	inv_cg_quda.o inv_multi_cg_quda.o interface_quda.o util_quda.o hw_quda.o \
-	face_quda.o
+	face_quda.o dslash_quda.o 
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_quda.h color_spinor_field.h dirac_quda.h	     \
 	dslash_quda.h enum_quda.h gauge_force_quda.h gauge_quda.h            \
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h        \
-	face_quda.h
+	face_quda.h tune_quda.h
 
 # These are only inlined into blas_quad.cu
 BLAS_INLN = blas_param.h reduce_complex_core.h reduce_core.h reduce_triple_core.h 

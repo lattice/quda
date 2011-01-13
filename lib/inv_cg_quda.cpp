@@ -136,15 +136,12 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
 
   blas_quda_flops = 0;
 
-  //#if 0
-  // Calculate the true residual
-  mat(r, x, y);
-  double true_res = xmyNormCuda(b, r);
   if (invert_param->verbosity >= QUDA_SUMMARIZE){
-    printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
-	       k, r2, true_res / src_norm);
+    mat(r, x, y);
+    double true_res = xmyNormCuda(b, r);
+    printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+	       k, sqrt(r2/src_norm), sqrt(true_res / src_norm));    
   }
-  //#endif
 
   if (invert_param->cuda_prec_sloppy != x.Precision()) {
     delete r_sloppy;

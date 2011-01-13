@@ -220,13 +220,14 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= param.threads) return;
 int z1 = FAST_INT_DIVIDE(sid, X1h);
 int x1h = sid - z1*X1h;
 int z2 = FAST_INT_DIVIDE(z1, X2);
 int x2 = z1 - z2*X2;
 int x4 = FAST_INT_DIVIDE(z2, X3);
 int x3 = z2 - x4*X3;
-int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+int x1odd = (x2 + x3 + x4 + param.parity) & 1;
 int x1 = 2*x1h + x1odd;
 int X = 2*sid + x1odd;
 
@@ -601,7 +602,7 @@ o02_re = o02_im = 0.f;
 
 
 #ifdef DSLASH_XPAY
-READ_ACCUM(ACCUMTEX)
+READ_ACCUM(ACCUMTEX, sp_stride)
 o00_re = a*o00_re + accum0.x;
 o00_im = a*o00_im + accum0.y;
 o01_re = a*o01_re + accum1.x;
@@ -611,7 +612,7 @@ o02_im = a*o02_im + accum2.y;
 #endif // DSLASH_XPAY
 
 #ifdef DSLASH_AXPY
-READ_ACCUM(ACCUMTEX)
+READ_ACCUM(ACCUMTEX, sp_stride)
 o00_re = -o00_re + a*accum0.x;
 o00_im = -o00_im + a*accum0.y;
 o01_re = -o01_re + a*accum1.x;

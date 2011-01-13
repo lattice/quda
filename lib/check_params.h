@@ -136,6 +136,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
   P(sp_pad, INVALID_INT);
 
+  P(dirac_tune, QUDA_TUNE_INVALID);
+  P(preserve_dirac, QUDA_PRESERVE_DIRAC_INVALID);
+
 #ifndef INIT_PARAM
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
 #endif

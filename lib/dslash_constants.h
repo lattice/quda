@@ -71,6 +71,9 @@ __constant__ bool Pt0;
 __constant__ bool PtNm1;
 
 int initDslash = 0;
+int initClover = 0;
+int initDomainWall = 0;
+
 bool qudaPt0 = true;   // Single core versions always to Boundary
 bool qudaPtNm1 = true;
 
@@ -78,10 +81,6 @@ void initCommonConstants(const FullGauge gauge) {
   int Vh = gauge.volume;
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
   
-  if (Vh%BLOCK_DIM != 0) {
-    errorQuda("Error, Volume not a multiple of the thread block size");
-  }
-
   Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2];
   cudaMemcpyToSymbol("Vs", &Vspatial, sizeof(int));
 
@@ -183,7 +182,7 @@ void initCommonConstants(const FullGauge gauge) {
 }
 
 
-void initDslashConstants(const FullGauge gauge, const int sp_stride, const int cl_stride, const int Ls) 
+void initDslashConstants(const FullGauge gauge, const int sp_stride) 
 {
 
   initCommonConstants(gauge);
@@ -198,8 +197,6 @@ void initDslashConstants(const FullGauge gauge, const int sp_stride, const int c
     
   cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));
   cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));
-
-  cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
 
   int gf = (gauge.gauge_fixed == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
   cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
@@ -233,8 +230,6 @@ void initDslashConstants(const FullGauge gauge, const int sp_stride, const int c
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
 
-  cudaMemcpyToSymbol("Ls", &Ls, sizeof(int));  
-
   checkCudaError();
 
   initDslash = 1;
@@ -244,3 +239,14 @@ void initDslashConstants(const FullGauge gauge, const int sp_stride, const int c
 
 }
 
+void initCloverConstants (const int cl_stride) {
+  cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
+
+  initClover = 1;
+}
+
+void initDomainWallConstants(const int Ls) {
+  cudaMemcpyToSymbol("Ls", &Ls, sizeof(int));  
+
+  initDomainWall = 1;
+}

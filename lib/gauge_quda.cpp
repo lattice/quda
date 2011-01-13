@@ -598,7 +598,7 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
   cudaGauge->precision = precision;
   cudaGauge->Nc = 3;
 
-  int elements;
+  int elements = 0;
   switch(reconstruct){
   case QUDA_RECONSTRUCT_8:
       elements = 8;

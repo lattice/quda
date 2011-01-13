@@ -104,7 +104,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
     //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-    rho_r2 = caxpbypzYmbwcDotProductWYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
+    rho_r2 = caxpbypzYmbwcDotProductUYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
 
     rho0 = rho;
     rho = Complex(rho_r2.x, rho_r2.y);
@@ -159,14 +159,14 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   invert_param->gflops += gflops;
   invert_param->iter += k;
   
-  //#if 0
-  // Calculate the true residual
-  mat(r, x);
-  double true_res = xmyNormCuda(b, r);
+  if (invert_param->verbosity >= QUDA_SUMMARIZE) {
+    // Calculate the true residual
+    mat(r, x);
+    double true_res = xmyNormCuda(b, r);
     
-  if (invert_param->verbosity >= QUDA_SUMMARIZE)
-    printfQuda("BiCGstab: Converged after %d iterations, r2 = %e, true_r2 = %e\n", k, sqrt(r2/b2), sqrt(true_res / b2));    
-  //#endif
+    printfQuda("BiCGstab: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+	       k, sqrt(r2/b2), sqrt(true_res / b2));    
+  }
 
   if (invert_param->cuda_prec_sloppy != x.Precision()) {
     delete r_0;

@@ -200,7 +200,8 @@ volatile spinorFloat o32_im;
 //J  associated with a pair of sites.  They are paired
 //J  in the x1 direction.  They are ordered red/black or
 //J  black/red, depending on the number of boundary crossings.
-int sid = BLOCK_DIM*blockIdx.x + threadIdx.x;
+int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= param.threads) return;
 //J  Boundary crossings has to do with the red/black checkerboard.
 //J  We keep track of how many of those boundaries we cross in going
 //J  from the origin to the location associated with THIS thread.
@@ -220,7 +221,7 @@ int boundaryCrossings4d = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 // which gaugetex is used in the operations below.
 
 //J  Define the linear index X to checkerboard sites on the lattice.
-int X = 2*sid + (boundaryCrossings + oddBit) % 2;
+int X = 2*sid + (boundaryCrossings + param.parity) % 2;
 //J  Coordinates of the checkerboard (sublattice) site.
 //J  This is for the output spinor.
 int xs = X/(X4*X3*X2*X1);
@@ -1836,7 +1837,7 @@ o32_re = o32_im = 0;
 //  such as occurs in Lines near 666 of dslash_quda.cu.
 
 #ifdef DSLASH_XPAY
-    READ_ACCUM(ACCUMTEX)
+READ_ACCUM(ACCUMTEX, sp_stride)
 #ifdef SPINOR_DOUBLE
     //J  This all looks like diagonal terms,
     //J  out = a*out+in.
@@ -1897,7 +1898,7 @@ o32_re = o32_im = 0;
 
 
     // write spinor field back to device memory
-    WRITE_SPINOR();
+    WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

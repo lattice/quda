@@ -48,19 +48,19 @@
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
 #if (DD_PREC == 0)
-#define DD_PARAM4 const int oddBit, const double mferm
+#define DD_PARAM4 const DslashParam param, const double mferm
 #else
-#define DD_PARAM4 const int oddBit, const float mferm
+#define DD_PARAM4 const DslashParam param, const float mferm
 #endif
 #else            // xpay
 #define DSLASH_XPAY
 #define DD_XPAY_F Xpay
 #if (DD_PREC == 0)
-#define DD_PARAM4 const int oddBit, const double mferm, const double2 *x, const float *xNorm, const double a
+#define DD_PARAM4 const DslashParam param, const double mferm, const double2 *x, const float *xNorm, const double a
 #elif (DD_PREC == 1) 
-#define DD_PARAM4 const int oddBit, const float mferm, const float4 *x, const float *xNorm, const float a
+#define DD_PARAM4 const DslashParam param, const float mferm, const float4 *x, const float *xNorm, const float a
 #else
-#define DD_PARAM4 const int oddBit, const float mferm, const short4 *x, const float *xNorm, const float a
+#define DD_PARAM4 const DslashParam param, const float mferm, const short4 *x, const float *xNorm, const float a
 #endif
 #endif
 

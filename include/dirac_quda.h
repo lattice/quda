@@ -44,6 +44,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
 void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
 
 // forward declarations
+class DiracMatrix;
 class DiracM;
 class DiracMdagM;
 class DiracMdag;
@@ -68,11 +69,17 @@ class Dirac {
   bool newTmp(cudaColorSpinorField **, const cudaColorSpinorField &) const;
   void deleteTmp(cudaColorSpinorField **, const bool &reset) const;
 
+  QudaTune tune;
+  QudaVerbosity verbose;  
+
  public:
   Dirac(const DiracParam &param);
   Dirac(const Dirac &dirac);
   virtual ~Dirac();
   Dirac& operator=(const Dirac &dirac);
+
+  // Autotunes the block sizes for optimum performance
+  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &) = 0;
 
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   virtual void checkFullSpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
@@ -98,10 +105,17 @@ class Dirac {
   static Dirac* create(const DiracParam &param);
 
   unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
+  QudaVerbosity Verbose() const { return verbose; }
 };
 
 // Full Wilson
 class DiracWilson : public Dirac {
+
+ private:
+  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
 
  protected:
   FaceBuffer face; // multi-gpu communication buffers
@@ -111,6 +125,8 @@ class DiracWilson : public Dirac {
   DiracWilson(const DiracWilson &dirac);
   virtual ~DiracWilson();
   DiracWilson& operator=(const DiracWilson &dirac);
+
+  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaParity parity) const;
@@ -150,6 +166,9 @@ class DiracWilsonPC : public DiracWilson {
 // Full clover
 class DiracClover : public DiracWilson {
 
+ private:
+  dim3 blockClover; // thread block size for applying clover (or inverse) term
+
  protected:
   FullClover &clover;
   void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
@@ -162,6 +181,8 @@ class DiracClover : public DiracWilson {
   DiracClover(const DiracClover &dirac);
   virtual ~DiracClover();
   DiracClover& operator=(const DiracClover &dirac);
+
+  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
@@ -178,6 +199,10 @@ class DiracClover : public DiracWilson {
 class DiracCloverPC : public DiracClover {
 
  private:
+  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
   FullClover &cloverInv;
 
  public:
@@ -185,6 +210,8 @@ class DiracCloverPC : public DiracClover {
   DiracCloverPC(const DiracCloverPC &dirac);
   virtual ~DiracCloverPC();
   DiracCloverPC& operator=(const DiracCloverPC &dirac);
+
+  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
   void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -207,6 +234,12 @@ class DiracCloverPC : public DiracClover {
 // Full domain wall 
 class DiracDomainWall : public DiracWilson {
 
+ private:
+  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
+
  protected:
   double m5;
   double kappa5;
@@ -216,6 +249,8 @@ class DiracDomainWall : public DiracWilson {
   DiracDomainWall(const DiracDomainWall &dirac);
   virtual ~DiracDomainWall();
   DiracDomainWall& operator=(const DiracDomainWall &dirac);
+
+  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 	      const QudaParity parity) const;
@@ -253,8 +288,78 @@ class DiracDomainWallPC : public DiracDomainWall {
 		   const QudaSolutionType) const;
 };
 
+// Full twisted mass
+class DiracTwistedMass : public DiracWilson {
+
+ private:
+  dim3 blockTwist; // thread block size for applying the twist kernel
+
+ protected:
+  double mu;
+  void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaTwistGamma5Type twistType) const;
+
+ public:
+  DiracTwistedMass(const DiracParam &param);
+  DiracTwistedMass(const DiracTwistedMass &dirac);
+  virtual ~DiracTwistedMass();
+  DiracTwistedMass& operator=(const DiracTwistedMass &dirac);
+
+  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
+
+  void Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+  virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  virtual void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+		       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+		       const QudaSolutionType) const;
+  virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+			   const QudaSolutionType) const;
+};
+
+// Even-odd preconditioned twisted mass
+class DiracTwistedMassPC : public DiracTwistedMass {
+
+ private:
+  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
+
+ public:
+  DiracTwistedMassPC(const DiracParam &param);
+  DiracTwistedMassPC(const DiracTwistedMassPC &dirac);
+  virtual ~DiracTwistedMassPC();
+  DiracTwistedMassPC& operator=(const DiracTwistedMassPC &dirac);
+
+  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
+
+  void TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		      const QudaParity parity) const;
+  virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+			  const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+  void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+  void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+  void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+	       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+	       const QudaSolutionType) const;
+  void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+		   const QudaSolutionType) const;
+};
+
 // Full staggered
 class DiracStaggered : public Dirac {
+
+ private:
+  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
 
  protected:
   FullGauge *fatGauge;
@@ -265,6 +370,8 @@ class DiracStaggered : public Dirac {
   DiracStaggered(const DiracStaggered &dirac);
   virtual ~DiracStaggered();
   DiracStaggered& operator=(const DiracStaggered &dirac);
+
+  void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   
@@ -283,11 +390,9 @@ class DiracStaggered : public Dirac {
 };
 
 // Even-odd preconditioned staggered
-class DiracStaggeredPC : public Dirac {
+class DiracStaggeredPC : public DiracStaggered {
 
  protected:
-  FullGauge *fatGauge;
-  FullGauge *longGauge;
 
  public:
   DiracStaggeredPC(const DiracParam &param);
@@ -295,8 +400,6 @@ class DiracStaggeredPC : public Dirac {
   virtual ~DiracStaggeredPC();
   DiracStaggeredPC& operator=(const DiracStaggeredPC &dirac);
 
-  virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
-  
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaParity parity) const;
   virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -309,59 +412,6 @@ class DiracStaggeredPC : public Dirac {
 		       const QudaSolutionType) const;
   virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 			   const QudaSolutionType) const;
-};
-
-// Full twisted mass
-class DiracTwistedMass : public DiracWilson {
-
- protected:
-  double mu;
-  void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		    const QudaTwistGamma5Type twistType) const;
-
- public:
-  DiracTwistedMass(const DiracParam &param);
-  DiracTwistedMass(const DiracTwistedMass &dirac);
-  virtual ~DiracTwistedMass();
-  DiracTwistedMass& operator=(const DiracTwistedMass &dirac);
-
-  void Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-
-  virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-  virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-
-  virtual void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-		       cudaColorSpinorField &x, cudaColorSpinorField &b, 
-		       const QudaSolutionType) const;
-  virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-			   const QudaSolutionType) const;
-};
-
-// Even-odd preconditioned twisted mass
-class DiracTwistedMassPC : public DiracTwistedMass {
-
- private:
-
- public:
-  DiracTwistedMassPC(const DiracParam &param);
-  DiracTwistedMassPC(const DiracTwistedMassPC &dirac);
-  virtual ~DiracTwistedMassPC();
-  DiracTwistedMassPC& operator=(const DiracTwistedMassPC &dirac);
-
-  void TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-
-  virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		      const QudaParity parity) const;
-  virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			  const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
-  void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-  void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-
-  void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-	       cudaColorSpinorField &x, cudaColorSpinorField &b, 
-	       const QudaSolutionType) const;
-  void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-		   const QudaSolutionType) const;
 };
 
 // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
@@ -382,6 +432,7 @@ class DiracMatrix {
 			  cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const = 0;
 
   unsigned long long flops() const { return dirac->Flops(); }
+
 };
 
 inline DiracMatrix::~DiracMatrix()
@@ -392,8 +443,8 @@ inline DiracMatrix::~DiracMatrix()
 class DiracM : public DiracMatrix {
 
  public:
-  DiracM(const Dirac &d) : DiracMatrix(d) { }
-  DiracM(const Dirac *d) : DiracMatrix(d) { }
+ DiracM(const Dirac &d) : DiracMatrix(d) { }
+ DiracM(const Dirac *d) : DiracMatrix(d) { }
 
   void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {

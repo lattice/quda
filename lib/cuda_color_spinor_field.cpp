@@ -190,17 +190,19 @@ void cudaColorSpinorField::destroy() {
 cudaColorSpinorField& cudaColorSpinorField::Even() const { 
   if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     return *(dynamic_cast<cudaColorSpinorField*>(even)); 
-  } else {
-    errorQuda("Cannot return even subset of %d subset", siteSubset);
   }
+
+  errorQuda("Cannot return even subset of %d subset", siteSubset);
+  exit(-1);
 }
 
 cudaColorSpinorField& cudaColorSpinorField::Odd() const {
   if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     return *(dynamic_cast<cudaColorSpinorField*>(odd)); 
-  } else {
-    errorQuda("Cannot return odd subset of %d subset", siteSubset);
   }
+
+  errorQuda("Cannot return odd subset of %d subset", siteSubset);
+  exit(-1);
 }
 
 // cuda's floating point format, IEEE-754, represents the floating point

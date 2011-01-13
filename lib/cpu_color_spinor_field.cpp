@@ -37,7 +37,7 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
   } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
     v = param.v;
   } else {
-    errorQuda("Creation type not supported");
+    errorQuda("Creation type %d not supported", param.create);
   }
 }
 
@@ -340,14 +340,4 @@ void cpuColorSpinorField::PrintVector(unsigned int x) {
 
 }
 
-double normCpu(const cpuColorSpinorField &a) {
-  double norm2 = 0.0;
-  if (a.precision == QUDA_DOUBLE_PRECISION)
-    for (int i=0; i<a.length; i++) norm2 += ((double*)a.v)[i]*((double*)a.v)[i];
-  else if (a.precision == QUDA_SINGLE_PRECISION)
-    for (int i=0; i<a.length; i++) norm2 += ((float*)a.v)[i]*((float*)a.v)[i];
-  else
-    errorQuda("Precision type %d not implemented", a.precision);
 
-  return norm2;
-}

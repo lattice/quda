@@ -133,6 +133,8 @@
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #endif
 
+#define SPINOR_HOP 12
+
 #elif (DD_PREC==1) // single-precision fields
 
 // single-precision gauge field
@@ -157,6 +159,8 @@
 #define READ_ACCUM READ_ACCUM_SINGLE
 #endif
 
+#define SPINOR_HOP 6
+
 #else             // half-precision fields
 
 // half-precision gauge field
@@ -180,6 +184,8 @@
 #define ACCUMTEX accumTexHalf
 #define READ_ACCUM READ_ACCUM_HALF
 #endif
+
+#define SPINOR_HOP 6
 
 #endif
 
@@ -233,6 +239,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_ACCUM
 #undef GAUGE_FLOAT2
 #undef SPINOR_DOUBLE
+
+#undef SPINOR_HOP
 
 // prepare next set of options, or clean up after final iteration
 

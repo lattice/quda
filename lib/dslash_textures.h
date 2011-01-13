@@ -273,8 +273,6 @@ int bindSpinorTex(const size_t spinor_bytes, const size_t norm_bytes, const spin
     errorQuda("Unsupported precision and short vector type");
   }
 
-  checkCudaError();
-
   return size;
 }
 
@@ -305,7 +303,6 @@ void unbindSpinorTex(const spinorFloat *in, const float *inNorm,
     errorQuda("Unsupported precision and short vector type");
   }
    
-  checkCudaError();
 }
 
 // Double precision clover term

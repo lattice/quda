@@ -18,16 +18,10 @@
   3. Abuse the C preprocessor to define arbitrary mappings
   4. Something else
 
-  I probably prefer option 2., the problem with 1.) and and 2.) as far
-  as I can see it is that the fields are defined using void*, and cast
-  at runtime as appropriate.  This doesn't mesh well with defining
-  return types based on inheritance which is decided at compile time.
-  I could hack it returing void* and casting as appropriate (see
-  functor examples in color_spinor_field.h, but this is going to be
-  S..L..O..W.
-
-  While I think about this, I shall leave in the verbose state it is
-  in, and come back to this in the future.
+  Solution is to use class inheritance to defined different mappings,
+  and combine it with templating on the return type.  Initial attempt
+  at this is in the cpuColorSpinorField, but this will eventually roll
+  out here too.
 
 */
 
@@ -38,7 +32,7 @@
 
 */
 
-#define PRESERVE_SPINOR_NORM 1
+#define PRESERVE_SPINOR_NORM
 
 #ifdef PRESERVE_SPINOR_NORM // Preserve the norm regardless of basis
 double kP = (1.0/sqrt(2.0));
@@ -118,6 +112,7 @@ void packParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
       packSpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+    if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
       packNonRelSpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
@@ -135,6 +130,7 @@ void packQLAParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
       packQLASpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+    if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
       packNonRelQLASpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
@@ -164,6 +160,7 @@ void packFullSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int
       }
     }
   } else if (destBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+    if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i=0; i<V/2; i++) {
       
       int boundaryCrossings = i/(x[0]/2) + i/(x[1]*(x[0]/2)) + i/(x[2]*x[1]*(x[0]/2));
@@ -302,6 +299,7 @@ void unpackParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
       unpackSpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && destBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+    if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
       unpackNonRelSpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
@@ -319,6 +317,7 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
       unpackQLASpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && destBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+    if (Ns != 4) errorQuda("Can only change basus with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
       unpackNonRelQLASpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
@@ -348,6 +347,7 @@ void unpackFullSpinor(Float *dest, FloatN *src, int V, int pad, const int x[],
       }
     }
   } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && destBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+    if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i=0; i<V/2; i++) {
       
       int boundaryCrossings = i/(x[0]/2) + i/(x[1]*(x[0]/2)) + i/(x[2]*x[1]*(x[0]/2));

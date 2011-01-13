@@ -2,16 +2,21 @@
 #include <dslash_quda.h>
 #include <blas_quda.h>
 #include <iostream>
+#include <tune_quda.h>
 
 Dirac::Dirac(const DiracParam &param) 
   : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
-    dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2) {
+    dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
+    verbose(param.verbose)
+{
 
 }
 
 Dirac::Dirac(const Dirac &dirac) 
   : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
-    dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2) {
+    dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
+    verbose(dirac.verbose)
+{
 
 }
 
@@ -29,6 +34,9 @@ Dirac& Dirac::operator=(const Dirac &dirac)
     flops = 0;
     tmp1 = dirac.tmp1;
     tmp2 = dirac.tmp2;
+    verbose = dirac.verbose;
+
+    tune = dirac.tune;
   }
 
   return *this;

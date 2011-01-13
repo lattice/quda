@@ -219,14 +219,16 @@ void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorFi
 
 double norm2(const ColorSpinorField &a) {
 
+  double rtn = 0.0;
   if (a.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
-    return normCuda(dynamic_cast<const cudaColorSpinorField&>(a));
+    rtn = normCuda(dynamic_cast<const cudaColorSpinorField&>(a));
   } else if (a.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
-    return normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
+    rtn = normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
   } else {
     errorQuda("Field type %d not supported", a.FieldLocation());
   }
 
+  return rtn;
 }
 
 std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {

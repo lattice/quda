@@ -59,6 +59,13 @@ extern bool qudaPtNm1;
 
 #include "face_quda.h"
 
+QudaVerbosity verbosity;
+
+Dirac *d = NULL;
+Dirac *dSloppy = NULL;
+bool diracCreation = false;
+bool diracTune = false;
+
 void initQuda(int dev)
 {
   static int initialized = 0;
@@ -156,7 +163,7 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  int packed_size;
+  int packed_size = 0;
   double anisotropy;
   FullGauge *precise, *sloppy;
 
@@ -229,7 +236,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  FullGauge *gauge;
+  FullGauge *gauge = NULL;
 
   switch (param->type) {
   case QUDA_WILSON_LINKS:
@@ -348,6 +355,8 @@ void discardCloverQuda(QudaInvertParam *inv_param)
 
 void endQuda(void)
 {
+  endInvertQuda();
+
   cudaColorSpinorField::freeBuffer();
   freeGaugeField(&cudaGaugePrecise);
   freeGaugeField(&cudaGaugeSloppy);
@@ -363,7 +372,7 @@ void endQuda(void)
 }
 
 
-void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
+void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
 {
   double kappa = inv_param->kappa;
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
@@ -393,6 +402,8 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
   diracParam.matpcType = inv_param->matpc_type;
   diracParam.dagger = inv_param->dagger;
   diracParam.gauge = &cudaGaugePrecise;
+  diracParam.fatGauge = &cudaFatLinkPrecise;
+  diracParam.longGauge = &cudaLongLinkPrecise;    
   diracParam.clover = &cudaCloverPrecise;
   diracParam.cloverInv = &cudaCloverInvPrecise;
   diracParam.kappa = kappa;
@@ -403,11 +414,13 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
 }
 
 
-void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc)
+void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
 {
   setDiracParam(diracParam, inv_param, pc);
 
   diracParam.gauge = &cudaGaugeSloppy;
+  diracParam.fatGauge = &cudaFatLinkSloppy;
+  diracParam.longGauge = &cudaLongLinkSloppy;    
   diracParam.clover = &cudaCloverSloppy;
   diracParam.cloverInv = &cudaCloverInvSloppy;
 }
@@ -454,13 +467,14 @@ static void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionT
   default:
     errorQuda("Solution type %d not supported", solution_type);
   }
+
+  if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
 }
 
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
-  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
-  cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X, 1);
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -498,14 +512,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  if (!pc) cudaGaugePrecise.X[0] *= 2;
-  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
-  if (!pc) {
-    cudaGaugePrecise.X[0] /= 2;
-    cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;;
-  } else {
-    cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  }
+  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X, pc);
+
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -545,14 +553,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  if (!pc) cudaGaugePrecise.X[0] *= 2;
-  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X);
-  if (!pc) {
-    cudaGaugePrecise.X[0] /= 2;
-    cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;;
-  } else {
-    cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  }
+  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X, pc);
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -589,10 +590,43 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
 }
 
+void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) {
+  if (!diracCreation) {
+    setDiracParam(diracParam, &param, pc_solve);
+    d = Dirac::create(diracParam); // create the Dirac operator    
+    setDiracSloppyParam(diracParam, &param, pc_solve);
+    dSloppy = Dirac::create(diracParam);
+    diracCreation = true;
+  }
+}
+
+// tune the dirac operators
+void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
+  if (param.dirac_tune == QUDA_TUNE_YES && !diracTune) {
+    { // tune Dirac operator
+      cudaColorSpinorField a = x;
+      cudaColorSpinorField b = x;
+      cudaColorSpinorField c = x;
+      d->Tune(a, b, c);
+    }
+
+    { // tune slopppy Dirac operator
+      ColorSpinorParam CSparam(x);
+      CSparam.precision = param.cuda_prec_sloppy;
+      CSparam.create = QUDA_NULL_FIELD_CREATE;
+      cudaColorSpinorField a(x, CSparam);
+      cudaColorSpinorField b(x, CSparam);
+      cudaColorSpinorField c(x, CSparam);
+      dSloppy->Tune(a, b, c);
+    }
+    diracTune = true;
+  }
+}
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   checkInvertParam(param);
+  verbosity = param->verbosity;
 
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE ||
 		   param->solve_type == QUDA_NORMEQ_PC_SOLVE);
@@ -613,138 +647,61 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   param->gflops = 0;
   param->iter = 0;
 
-  Dirac *dirac;
-  Dirac *diracSloppy;
-
-  // set the Dirac operator parameters
+  // create the dirac operator
   DiracParam diracParam;
-  setDiracParam(diracParam, param, pc_solve);
+  createDirac(diracParam, *param, pc_solve);
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
 
-  cpuColorSpinorField* h_b;
-  cpuColorSpinorField* h_x;
-  cudaColorSpinorField* b;
-  cudaColorSpinorField* x;
-  cudaColorSpinorField *in, *out;
+  cpuColorSpinorField *h_b = NULL;
+  cpuColorSpinorField *h_x = NULL;
+  cudaColorSpinorField *b = NULL;
+  cudaColorSpinorField *x = NULL;
+  cudaColorSpinorField *in = NULL;
+  cudaColorSpinorField *out = NULL;
 
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH) {
+  int *X = param->dslash_type == QUDA_ASQTAD_DSLASH ? 
+    cudaFatLinkPrecise.X : cudaGaugePrecise.X;
 
-    if(param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION  
-	&& param->solution_type != QUDA_MATDAG_MAT_SOLUTION){
-	errorQuda("Your solution type not supported for staggered. "
-	"Only QUDA_MATPCDAG_MATPC_SOLUTION and QUDA_MATDAG_MAT_SOLUTION is supported.");
-     }
-
-    ColorSpinorParam csParam;
-    csParam.precision = param->cpu_prec;
-    csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
-    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;  
-    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    csParam.nColor=3;
-    csParam.nSpin=1;
-    csParam.nDim=4;
-    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
+  h_b = new cpuColorSpinorField(cpuParam);
+  cpuParam.v = hp_x;
+  h_x = new cpuColorSpinorField(cpuParam);
     
-    if (param->solve_type == QUDA_NORMEQ_SOLVE) {
-      csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-      csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
-    } else if (param->solve_type == QUDA_NORMEQ_PC_SOLVE) {
-      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      csParam.x[0] = cudaFatLinkPrecise.X[0];
-    } else {
-      errorQuda("Direct solve_type not supported for staggered");
-    }
-    csParam.x[1] = cudaFatLinkPrecise.X[1];
-    csParam.x[2] = cudaFatLinkPrecise.X[2];
-    csParam.x[3] = cudaFatLinkPrecise.X[3];
-    csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    csParam.v = hp_b;  
-    h_b = new cpuColorSpinorField(csParam);
-    
-    csParam.v = hp_x;
-    h_x = new cpuColorSpinorField(csParam);
-    
-    csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
-    csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-    
-    csParam.pad = param->sp_pad;
-    csParam.precision = param->cuda_prec;
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    
-    b = new cudaColorSpinorField(csParam);
-    
-    diracParam.fatGauge = &cudaFatLinkPrecise;
-    diracParam.longGauge = &cudaLongLinkPrecise;
-    
-    dirac = Dirac::create(diracParam); // create the Dirac operator
-    
-    diracParam.fatGauge = &cudaFatLinkSloppy;
-    diracParam.longGauge = &cudaLongLinkSloppy;
-    
-    setDiracSloppyParam(diracParam, param, pc_solve);
-    diracSloppy = Dirac::create(diracParam);
-    
-    *b = *h_b; // send data from CPU to GPU
-    
-    csParam.create = QUDA_COPY_FIELD_CREATE;  
-    x = new cudaColorSpinorField(*h_x, csParam); // solution  
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-        
-  } else if (param->dslash_type == QUDA_WILSON_DSLASH ||
-	     param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
-	     param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-	     param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-
-    // temporary hack
-    if (!pc_solution) cudaGaugePrecise.X[0] *= 2;
-    ColorSpinorParam cpuParam(hp_b, *param, cudaGaugePrecise.X);
-    if (!pc_solution) {
-      cudaGaugePrecise.X[0] /= 2;
-      cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;;
-    } else {
-      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    }
-    
-    ColorSpinorParam cudaParam(cpuParam, *param);
-    
-    h_b = new cpuColorSpinorField(cpuParam);
-    cpuParam.v = hp_x;
-    h_x = new cpuColorSpinorField(cpuParam);
-    
-    b = new cudaColorSpinorField(*h_b, cudaParam); // download source
-    
-    if (param->verbosity >= QUDA_VERBOSE) {
-      printfQuda("Source: CPU = %f, CUDA copy = %f\n", norm2(*h_b),norm2(*b));
-    }
+  // download source
+  ColorSpinorParam cudaParam(cpuParam, *param);     
+  cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  b = new cudaColorSpinorField(*h_b, cudaParam); 
+  
+  if (0) { // download initial guess
+    x = new cudaColorSpinorField(*h_x, cudaParam); // solution  
+  } else { // zero initial guess
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     x = new cudaColorSpinorField(cudaParam); // solution
-    
-    // if using preconditioning but solving the full system
-    if (pc_solve && !pc_solution) {
-      cudaParam.x[0] /= 2;
-      cudaParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    }
-    
-    dirac = Dirac::create(diracParam); // create the Dirac operator
-    
-    setDiracSloppyParam(diracParam, param, pc_solve);
-    diracSloppy = Dirac::create(diracParam);
-    
-  } else {
-    errorQuda("Invalid dslash_type");
   }
-  
-  dirac->prepare(in, out, *x, *b, param->solution_type);
-  if (param->verbosity >= QUDA_VERBOSE) printfQuda("Prepared source = %f\n", norm2(*in));   
+    
+  if (param->verbosity >= QUDA_VERBOSE) {
+    double nh_b = norm2(*h_b);
+    double nb = norm2(*b);
+    printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
+  }
+
+  tuneDirac(*param, pc_solution ? *x : x->Even());
+
+  dirac.prepare(in, out, *x, *b, param->solution_type);
+  if (param->verbosity >= QUDA_VERBOSE) {
+    double nin = norm2(*in);
+    printfQuda("Prepared source = %f\n", nin);   
+  }
 
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *in);
-  if (param->verbosity >= QUDA_VERBOSE) printfQuda("Mass rescale done\n");   
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(*out, *in);
-      dirac->Mdag(*in, *out);
+      dirac.Mdag(*in, *out);
     }
     invertCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), *out, *in, param);
     break;
@@ -760,19 +717,26 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   
   if (param->verbosity >= QUDA_VERBOSE){
-    printfQuda("Solution = %f\n",norm2(*x));
+   double nx = norm2(*x);
+   printfQuda("Solution = %f\n",nx);
   }
-  dirac->reconstruct(*x, *b, param->solution_type);
+  dirac.reconstruct(*x, *b, param->solution_type);
   
   x->saveCPUSpinorField(*h_x); // since this is a reference, this won't work: h_x = x;
   
   if (param->verbosity >= QUDA_VERBOSE){
-    printfQuda("Reconstructed: CUDA solution = %f, CPU copy = %f\n", norm2(*x), norm2(*h_x));
+    double nx = norm2(*x);
+    double nh_x = norm2(*h_x);
+    printfQuda("Reconstructed: CUDA solution = %f, CPU copy = %f\n", nx, nh_x);
   }
   
-  delete diracSloppy;
-  delete dirac;
-  
+  if (!param->preserve_dirac) {
+    delete d;
+    delete dSloppy;
+    diracCreation = false;
+    diracTune = false;
+  }  
+
   delete h_b;
   delete h_x;
   delete b;
@@ -884,19 +848,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // set the mass in the invert_param
   param->mass = sqrt(offsets[0]/4);
   
-  // set the Dirac operator parameters
+  // create the Dirac operators
   DiracParam diracParam;
-  setDiracParam(diracParam, param, pc_solve);
-  diracParam.fatGauge = &cudaFatLinkPrecise;
-  diracParam.longGauge = &cudaLongLinkPrecise;
-  
-  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-
-  diracParam.fatGauge = &cudaFatLinkSloppy;
-  diracParam.longGauge = &cudaLongLinkSloppy;
-  
-  setDiracSloppyParam(diracParam, param, pc_solve);
-  Dirac *diracSloppy = Dirac::create(diracParam);
+  createDirac(diracParam, *param, pc_solve);
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
   
   b = h_b; //send data from CPU to GPU
   
@@ -916,8 +872,18 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     delete h_x[i];
     delete x[i];
   }
-  delete diracSloppy;
-  delete dirac;
+
+  delete dSloppy;
+  delete d;
   
   return;
+}
+
+void endInvertQuda() {
+  if (diracCreation) {
+    delete d;
+    delete dSloppy;
+    diracCreation = false;
+    diracTune = false;
+  }
 }

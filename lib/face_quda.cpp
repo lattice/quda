@@ -571,9 +571,9 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 			 int veclength, ReconstructType reconstruct, int V, int Vs)
 {
   int nblocks, ndim=4;
-  size_t linksize, blocksize;//, nbytes;
+  size_t linksize=0, blocksize;//, nbytes;
   ptrdiff_t offset, stride;
-  void *g, *gf;
+  void *g;
 
   switch (reconstruct) {
   case QUDA_RECONSTRUCT_NO:
@@ -634,6 +634,8 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
   QMP_free_msgmem(mm_gauge_from_back);
 
 #else 
+
+  void *gf;
 
   for (int i=0; i<nblocks; i++) {
     g = (void *) ((char *) gauge + offset + i*stride);
