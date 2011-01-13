@@ -231,6 +231,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   } else {
     *sloppy = *precise;
   }
+
+  endInvertQuda(); // need to delete any persistant dirac operators
 }
 
 
