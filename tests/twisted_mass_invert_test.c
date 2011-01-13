@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 
   inv_param.tol = 5e-8;
   inv_param.maxiter = 10000;
-  inv_param.reliable_delta = 1e-2;
+  inv_param.reliable_delta = 1e-1;
 
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -75,6 +75,9 @@ int main(int argc, char **argv)
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  inv_param.dirac_tune = QUDA_TUNE_YES;
+  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_YES;
 
 #ifndef MULTI_GPU // free parameter for single GPU
   gauge_param.ga_pad = 0;

@@ -23,10 +23,10 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 12; 
-  gauge_param.X[1] = 12;
-  gauge_param.X[2] = 12;
-  gauge_param.X[3] = 12;
+  gauge_param.X[0] = 16; 
+  gauge_param.X[1] = 16;
+  gauge_param.X[2] = 16;
+  gauge_param.X[3] = 16;
   inv_param.Ls = 16;
 
   gauge_param.anisotropy = 1.0;
@@ -63,6 +63,9 @@ int main(int argc, char **argv)
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  inv_param.dirac_tune = QUDA_TUNE_YES;
+  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_YES;
 
   gauge_param.ga_pad = 0; // 24*24*24;
   inv_param.sp_pad = 0;   // 24*24*24;
