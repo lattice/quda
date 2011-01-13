@@ -421,7 +421,6 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
   diracParam.mu = inv_param->mu;
   diracParam.verbose = inv_param->verbosity;
 
-  printf("clover volume = %d\n", diracParam.clover->even.volume);
 }
 
 

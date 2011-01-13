@@ -8,7 +8,7 @@
 #include <test_util.h>
 
 // volume per GPU
-const int LX = 24;
+const int LX = 12; // Has to be checkerboarded value... (so 24->12)
 const int LY = 24;
 const int LZ = 24;
 const int LT = 24;
