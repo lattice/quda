@@ -12,18 +12,19 @@ const int LX = 24;
 const int LY = 24;
 const int LZ = 24;
 const int LT = 24;
-const int Nspin = 4;
+const int Nspin = 1;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
 const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
-const int Nkernels = 24;
+const int Nkernels = 23;
 const int ThreadMin = 32;
 const int ThreadMax = 1024;
 const int GridMin = 1;
 const int GridMax = 65536;
 
-cudaColorSpinorField *x, *y, *z, *w, *v, *h, *l;
+cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
+cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
 
 // defines blas_threads[][] and blas_blocks[][]
 #include "../lib/blas_param.h"
@@ -32,7 +33,7 @@ cudaColorSpinorField *x, *y, *z, *w, *v, *h, *l;
 void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
 {
   param.precision = precision;
-  if (precision == QUDA_DOUBLE_PRECISION) {
+  if (Nspin == 1 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else {
     param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
@@ -54,7 +55,7 @@ void initFields(int prec)
   QudaPrecision low_aux_prec;
 
   ColorSpinorParam param;
-  param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
+  param.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   param.nColor = 3;
   param.nSpin = Nspin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   param.nDim = 4; // number of spacetime dimensions
@@ -63,12 +64,37 @@ void initFields(int prec)
   param.x[2] = LZ;
   param.x[3] = LT;
 
-  param.pad = 0; //LX*LY*LZ/2;
+  param.pad = 0; // padding must be zero for cpu fields
   param.siteSubset = QUDA_PARITY_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  param.precision = QUDA_DOUBLE_PRECISION;
+  param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+  param.create = QUDA_ZERO_FIELD_CREATE;
+
+  vH = new cpuColorSpinorField(param);
+  wH = new cpuColorSpinorField(param);
+  xH = new cpuColorSpinorField(param);
+  yH = new cpuColorSpinorField(param);
+  zH = new cpuColorSpinorField(param);
+  hH = new cpuColorSpinorField(param);
+  lH = new cpuColorSpinorField(param);
+
+  vH->Source(QUDA_RANDOM_SOURCE);
+  wH->Source(QUDA_RANDOM_SOURCE);
+  xH->Source(QUDA_RANDOM_SOURCE);
+  yH->Source(QUDA_RANDOM_SOURCE);
+  zH->Source(QUDA_RANDOM_SOURCE);
+  hH->Source(QUDA_RANDOM_SOURCE);
+  lH->Source(QUDA_RANDOM_SOURCE);
+
+  // Now set the parameters for the cuda fields
+  param.pad = 0; //LX*LY*LZ/2;
   
-  param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  param.create = QUDA_NULL_FIELD_CREATE;
+  if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
+  param.create = QUDA_ZERO_FIELD_CREATE;
 
   switch(prec) {
   case 0:
@@ -88,38 +114,60 @@ void initFields(int prec)
     break;
   }
 
-  v = new cudaColorSpinorField(param);
+  vD = new cudaColorSpinorField(param);
   checkCudaError();
 
-  w = new cudaColorSpinorField(param);
-  x = new cudaColorSpinorField(param);
-  y = new cudaColorSpinorField(param);
-  z = new cudaColorSpinorField(param);
+  wD = new cudaColorSpinorField(param);
+  xD = new cudaColorSpinorField(param);
+  yD = new cudaColorSpinorField(param);
+  zD = new cudaColorSpinorField(param);
 
   setPrec(param, high_aux_prec);
-  h = new cudaColorSpinorField(param);
+  hD = new cudaColorSpinorField(param);
 
   setPrec(param, low_aux_prec);
-  l = new cudaColorSpinorField(param);
+  lD = new cudaColorSpinorField(param);
 
   // check for successful allocation
   checkCudaError();
 
+  //std::cout << *vD << *vH;
+  //exit(0);
+
+  *vD = *vH;
+  *wD = *wH;
+  *xD = *xH;
+  *yD = *yH;
+  *zD = *zH;
+  *hD = *hH;
+  *lD = *lH;
+  
+
   // turn off error checking in blas kernels
-  setBlasTuning(1);
+  setBlasTuning(QUDA_TUNE_YES);
 }
 
 
 void freeFields()
 {
+
   // release memory
-  delete v;
-  delete w;
-  delete x;
-  delete y;
-  delete z;
-  delete h;
-  delete l;
+  delete vD;
+  delete wD;
+  delete xD;
+  delete yD;
+  delete zD;
+  delete hD;
+  delete lD;
+
+  // release memory
+  delete vH;
+  delete wH;
+  delete xH;
+  delete yH;
+  delete zH;
+  delete hH;
+  delete lH;
 }
 
 
@@ -138,102 +186,98 @@ double benchmark(int kernel, int niter) {
     switch (kernel) {
 
     case 0:
-      copyCuda(*y, *h);
+      copyCuda(*yD, *hD);
       break;
 
     case 1:
-      copyCuda(*y, *l);
+      copyCuda(*yD, *lD);
       break;
       
     case 2:
-      axpbyCuda(a, *x, b, *y);
+      axpbyCuda(a, *xD, b, *yD);
       break;
 
     case 3:
-      xpyCuda(*x, *y);
+      xpyCuda(*xD, *yD);
       break;
 
     case 4:
-      axpyCuda(a, *x, *y);
+      axpyCuda(a, *xD, *yD);
       break;
 
     case 5:
-      xpayCuda(*x, a, *y);
+      xpayCuda(*xD, a, *yD);
       break;
 
     case 6:
-      mxpyCuda(*x, *y);
+      mxpyCuda(*xD, *yD);
       break;
 
     case 7:
-      axCuda(a, *x);
+      axCuda(a, *xD);
       break;
 
     case 8:
-      caxpyCuda(a2, *x, *y);
+      caxpyCuda(a2, *xD, *yD);
       break;
 
     case 9:
-      caxpbyCuda(a2, *x, b2, *y);
+      caxpbyCuda(a2, *xD, b2, *yD);
       break;
 
     case 10:
-      cxpaypbzCuda(*x, a2, *y, b2, *z);
+      cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
       break;
 
     case 11:
-      axpyBzpcxCuda(a, *x, *y, b, *z, c);
+      axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
       break;
 
     case 12:
-      axpyZpbxCuda(a, *x, *y, *z, b);
+      axpyZpbxCuda(a, *xD, *yD, *zD, b);
       break;
 
     case 13:
-      caxpbypzYmbwCuda(a2, *x, b2, *y, *z, *w);
+      caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
       break;
       
-    // double
+      // double
     case 14:
-      sumCuda(*x);
+      normCuda(*xD);
       break;
 
     case 15:
-      normCuda(*x);
+      reDotProductCuda(*xD, *yD);
       break;
 
     case 16:
-      reDotProductCuda(*x, *y);
+      axpyNormCuda(a, *xD, *yD);
       break;
 
     case 17:
-      axpyNormCuda(a, *x, *y);
-      break;
-
-    case 18:
-      xmyNormCuda(*x, *y);
+      xmyNormCuda(*xD, *yD);
       break;
       
     // double2
-    case 19:
-      cDotProductCuda(*x, *y);
+    case 18:
+      cDotProductCuda(*xD, *yD);
       break;
 
-    case 20:
-      xpaycDotzyCuda(*x, a, *y, *z);
+    case 19:
+      xpaycDotzyCuda(*xD, a, *yD, *zD);
       break;
       
     // double3
+    case 20:
+      cDotProductNormACuda(*xD, *yD);
+      break;
+
     case 21:
-      cDotProductNormACuda(*x, *y);
+      cDotProductNormBCuda(*xD, *yD);
       break;
 
     case 22:
-      cDotProductNormBCuda(*x, *y);
-      break;
-
-    case 23:
-      caxpbypzYmbwcDotProductWYNormYCuda(a2, *x, b2, *y, *z, *w, *v);
+      caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
     default:
@@ -253,6 +297,210 @@ double benchmark(int kernel, int niter) {
   return secs;
 }
 
+#define ERROR(a) fabs(norm2(*a##D) - norm2(*a##H)) / norm2(*a##H)
+
+double test(int kernel) {
+
+  double a = 1.5, b = 2.5, c = 3.5;
+  Complex a2(a, b), b2(b, -c);
+  double error = 0;
+
+  switch (kernel) {
+
+  case 0:
+    *hD = *hH;
+    copyCuda(*yD, *hD);
+    copyCpu(*yH, *hH);
+    error = ERROR(y);
+    break;
+
+  case 1:
+    *lD = *lH;
+    copyCuda(*yD, *lD);
+    copyCpu(*yH, *lH);
+    error = ERROR(y);
+    break;
+      
+  case 2:
+    *xD = *xH;
+    *yD = *yH;
+    axpbyCuda(a, *xD, b, *yD);
+    axpbyCpu(a, *xH, b, *yH);
+    error = ERROR(y);
+    break;
+
+  case 3:
+    *xD = *xH;
+    *yD = *yH;
+    xpyCuda(*xD, *yD);
+    xpyCpu(*xH, *yH);
+    error = ERROR(y);
+    break;
+
+  case 4:
+    *xD = *xH;
+    *yD = *yH;
+    axpyCuda(a, *xD, *yD);
+    axpyCpu(a, *xH, *yH);
+    error = ERROR(y);
+    break;
+
+  case 5:
+    *xD = *xH;
+    *yD = *yH;
+    xpayCuda(*xD, a, *yD);
+    xpayCpu(*xH, a, *yH);
+    error = ERROR(y);
+    break;
+
+  case 6:
+    *xD = *xH;
+    *yD = *yH;
+    mxpyCuda(*xD, *yD);
+    mxpyCpu(*xH, *yH);
+    error = ERROR(y);
+    break;
+
+  case 7:
+    *xD = *xH;
+    axCuda(a, *xD);
+    axCpu(a, *xH);
+    error = ERROR(x);
+    break;
+
+  case 8:
+    *xD = *xH;
+    *yD = *yH;
+    caxpyCuda(a2, *xD, *yD);
+    caxpyCpu(a2, *xH, *yH);
+    error = ERROR(y);
+    break;
+
+  case 9:
+    *xD = *xH;
+    *yD = *yH;
+    caxpbyCuda(a2, *xD, b2, *yD);
+    caxpbyCpu(a2, *xH, b2, *yH);
+    error = ERROR(y);
+    break;
+
+  case 10:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
+    cxpaypbzCpu(*xH, a2, *yH, b2, *zH);
+    error = ERROR(z);
+    break;
+
+  case 11:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
+    axpyBzpcxCpu(a, *xH, *yH, b, *zH, c);
+    error = ERROR(x) + ERROR(y);
+    break;
+
+  case 12:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    axpyZpbxCuda(a, *xD, *yD, *zD, b);
+    axpyZpbxCpu(a, *xH, *yH, *zH, b);
+    error = ERROR(x) + ERROR(y);
+    break;
+
+  case 13:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *wD = *wH;
+    caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
+    caxpbypzYmbwCpu(a2, *xH, b2, *yH, *zH, *wH);
+    error = ERROR(z) + ERROR(y);
+    break;
+      
+    // double
+  case 14:
+    *xD = *xH;
+    error = fabs(normCuda(*xD) - normCpu(*xH)) / normCpu(*xH);
+    break;
+    
+  case 15:
+    *xD = *xH;
+    *yD = *yH;
+    error = fabs(reDotProductCuda(*xD, *yD) - reDotProductCpu(*xH, *yH)) / fabs(reDotProductCpu(*xH, *yH));
+    break;
+
+  case 16:
+    *xD = *xH;
+    *yD = *yH;
+    {double d = axpyNormCuda(a, *xD, *yD);
+    double h = axpyNormCpu(a, *xH, *yH);
+    error = ERROR(y) + fabs(d-h)/fabs(h);}
+    break;
+
+  case 17:
+    *xD = *xH;
+    *yD = *yH;
+    {double d = xmyNormCuda(*xD, *yD);
+    double h = xmyNormCpu(*xH, *yH);
+    error = ERROR(y) + fabs(d-h)/fabs(h);}
+    break;
+    
+    // double2
+  case 18:
+    *xD = *xH;
+    *yD = *yH;
+    error = abs(cDotProductCuda(*xD, *yD) - cDotProductCpu(*xH, *yH)) / abs(cDotProductCpu(*xH, *yH));
+    break;
+    
+  case 19:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    { Complex d = xpaycDotzyCuda(*xD, a, *yD, *zD);
+      Complex h = xpaycDotzyCpu(*xH, a, *yH, *zH);
+      error =  fabs(norm2(*yD) - norm2(*yH)) / norm2(*yH) + abs(d-h)/abs(h);
+    }
+    break;
+    
+    // double3
+  case 20:
+    *xD = *xH;
+    *yD = *yH;
+    { double3 d = cDotProductNormACuda(*xD, *yD);
+      double3 h = cDotProductNormACpu(*xH, *yH);
+      error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+    
+  case 21:
+    *xD = *xH;
+    *yD = *yH;
+    { double3 d = cDotProductNormBCuda(*xD, *yD);
+      double3 h = cDotProductNormBCpu(*xH, *yH);
+      error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+    
+  case 22:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *wD = *wH;
+    *vD = *vH;
+    { double3 d = caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      double3 h = caxpbypzYmbwcDotProductUYNormYCpu(a2, *xH, b2, *yH, *zH, *wH, *vH);
+      error = ERROR(z) + ERROR(y) + fabs(d.x - h.x) / fabs(h.x) + 
+	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+
+  default:
+    errorQuda("Undefined blas kernel %d\n", kernel);
+  }
+
+  return error;
+}
 
 void write(char *names[], int threads[][3], int blocks[][3])
 {
@@ -312,7 +560,6 @@ int main(int argc, char** argv)
     "axpyBzpcxCuda",
     "axpyZpbxCuda",
     "caxpbypzYmbwCuda",
-    "sumCuda",
     "normCuda",
     "reDotProductCuda",
     "axpyNormCuda",
@@ -333,6 +580,17 @@ int main(int argc, char** argv)
   int Nprec = 2;
 #endif
 
+  // first check for correctness
+  for (int prec = 0; prec < Nprec; prec++) {
+    printf("\nTesting %s precision...\n\n", prec_str[prec]);
+    initFields(prec);
+    for (int kernel = 0; kernel < Nkernels; kernel++) {
+      double error = test(kernel);
+      printfQuda("%-35s error = %e, \n", names[kernel], error);
+    }
+    freeFields();
+  }
+
   int niter = Niter;
 
   for (int prec = 0; prec < Nprec; prec++) {
@@ -341,6 +599,8 @@ int main(int argc, char** argv)
     initFields(prec);
 
     for (int kernel = 0; kernel < Nkernels; kernel++) {
+
+      test(kernel);
 
       double gflops_max = 0.0;
       double gbytes_max = 0.0;
