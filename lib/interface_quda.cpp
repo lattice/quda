@@ -336,8 +336,15 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     } else {
       cudaCloverInvSloppy = cudaCloverInvPrecise;
     }
+
+    // FIXME: hack to allow tuning of DiracClover with only cloverInv defined
+    if (!h_clover) {
+      cudaCloverPrecise = cudaCloverInvPrecise;
+      cudaCloverSloppy = cudaCloverInvSloppy;
+    }
   }
 
+  endInvertQuda(); // need to delete any persistant dirac operators
 }
 
 
@@ -413,6 +420,8 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
   diracParam.m5 = inv_param->m5;
   diracParam.mu = inv_param->mu;
   diracParam.verbose = inv_param->verbosity;
+
+  printf("clover volume = %d\n", diracParam.clover->even.volume);
 }
 
 
@@ -602,7 +611,6 @@ void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) 
   }
 }
 
-// FIXME bug with persistance, if the gauge field changes
 // tune the Dirac operators
 void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
   if (param.dirac_tune == QUDA_TUNE_YES && !diracTune) {
