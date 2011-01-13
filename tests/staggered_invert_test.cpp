@@ -47,8 +47,8 @@ invert_test(void)
   void *fatlink[4];
   void *longlink[4];
     
-  QudaGaugeParam gauge_param;
-  QudaInvertParam inv_param;
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  QudaInvertParam inv_param = newQudaInvertParam();
 
   gauge_param.X[0] = sdim;
   gauge_param.X[1] = sdim;
@@ -68,7 +68,7 @@ invert_test(void)
 
   gauge_param.tadpole_coeff = 0.8;
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = QUDA_DEBUG_VERBOSE;
   inv_param.inv_type = QUDA_CG_INVERTER;
 
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -95,6 +95,9 @@ invert_test(void)
   gauge_param.ga_pad = sdim*sdim*sdim;
   inv_param.sp_pad = sdim*sdim*sdim;
   
+  inv_param.dirac_tune = QUDA_TUNE_YES;
+  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
+
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   
@@ -309,6 +312,7 @@ invert_test(void)
 	   time0, inv_param.iter, inv_param.secs,
 	   inv_param.gflops/inv_param.secs);
   }
+
   endQuda();
 
   if (tmp){
