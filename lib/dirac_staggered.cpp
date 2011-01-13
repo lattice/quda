@@ -183,21 +183,6 @@ DiracStaggeredPC& DiracStaggeredPC::operator=(const DiracStaggeredPC &dirac)
   return *this;
 }
 
-void DiracStaggeredPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			      const QudaParity parity) const
-{
-  DiracStaggered::Dslash(out, in, parity);
-  flops += 1146*in.volume;
-}
-
-void DiracStaggeredPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				  const QudaParity parity, const cudaColorSpinorField &x,
-				  const double &k) const
-{    
-  DiracStaggered::DslashXpay(out, in, parity, x, k);
-  flops += (1146+12)*in.volume;
-}
-
 void DiracStaggeredPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   errorQuda("DiracStaggeredPC::M() is not implemented\n");
