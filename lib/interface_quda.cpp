@@ -600,7 +600,8 @@ void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) 
   }
 }
 
-// tune the dirac operators
+// FIXME bug with persistance, if the gauge field changes
+// tune the Dirac operators
 void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
   if (param.dirac_tune == QUDA_TUNE_YES && !diracTune) {
     { // tune Dirac operator
