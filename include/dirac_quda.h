@@ -400,10 +400,6 @@ class DiracStaggeredPC : public DiracStaggered {
   virtual ~DiracStaggeredPC();
   DiracStaggeredPC& operator=(const DiracStaggeredPC &dirac);
 
-  virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		      const QudaParity parity) const;
-  virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			  const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
 
