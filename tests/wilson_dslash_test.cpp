@@ -14,7 +14,7 @@
 #include <wilson_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 1;
+const int test_type = 0;
 // clover-improved? (0 = plain Wilson, 1 = clover)
 const int clover_yes = 0;
 
@@ -25,7 +25,7 @@ const int transfer = 0; // include transfer time in the benchmark?
 const int loops = 100;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -59,7 +59,7 @@ void init() {
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
@@ -97,18 +97,18 @@ void init() {
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    if (test_type > 0) {
+    //if (test_type > 0) {
       hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
       hostCloverInv = hostClover; // fake it
-    } else {
+      /*} else {
       hostClover = NULL;
       hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
-    }
+      }*/
   } else {
     inv_param.dslash_type = QUDA_WILSON_DSLASH;
   }
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = QUDA_DEBUG_VERBOSE;
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
@@ -209,12 +209,11 @@ void init() {
     bool pc = (test_type != 2);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.verbose = QUDA_VERBOSE;
+    diracParam.verbose = QUDA_DEBUG_VERBOSE;
     diracParam.tmp1 = tmp;
     diracParam.tmp2 = tmp2;
     
     dirac = Dirac::create(diracParam);
-
   } else {
     std::cout << "Source: CPU = " << norm2(*spinor) << std::endl;
   }
@@ -252,7 +251,12 @@ double dslashCUDA() {
 
   printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);
-  stopwatchStart();
+
+  cudaEvent_t start, end;
+  cudaEventCreate(&start);
+  cudaEventRecord(start, 0);
+  cudaEventSynchronize(start);
+
   for (int i = 0; i < loops; i++) {
     switch (test_type) {
     case 0:
@@ -273,13 +277,21 @@ double dslashCUDA() {
     }
   }
     
+  cudaEventCreate(&end);
+  cudaEventRecord(end, 0);
+  cudaEventSynchronize(end);
+  float runTime;
+  cudaEventElapsedTime(&runTime, start, end);
+  cudaEventDestroy(start);
+  cudaEventDestroy(end);
+
+  double secs = runTime / 1000; //stopwatchReadSeconds();
+
   // check for errors
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     printf("with ERROR: %s\n", cudaGetErrorString(stat));
 
-  cudaThreadSynchronize();
-  double secs = stopwatchReadSeconds();
   printf("done.\n\n");
 
   return secs;
@@ -333,10 +345,8 @@ int main(int argc, char **argv)
   init();
 
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
-  float sharedKB = 0;//(float)dslashCudaSharedBytes(inv_param.cuda_prec) / (1 << 10);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
-  printf("Shared mem: %.3f KB\n", sharedKB);
   
   int attempts = 1;
   dslashRef();
@@ -355,6 +365,7 @@ int main(int argc, char **argv)
     if (clover_yes) {
       floats += test_type ? 72*2 : 72;
     }
+    printf("flops = %e\n", (double)flops);
     printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/loops)*(1<<30)));
     

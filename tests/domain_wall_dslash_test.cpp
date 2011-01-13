@@ -178,7 +178,7 @@ void init() {
     bool pc = (test_type != 2);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.verbose = QUDA_VERBOSE;
+    diracParam.verbose = QUDA_DEBUG_VERBOSE;
     diracParam.tmp1 = tmp;
     diracParam.tmp2 = tmp2;
     
@@ -212,7 +212,17 @@ double dslashCUDA() {
 
   printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);
-  stopwatchStart();
+
+  if (test_type < 2)
+    dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp);
+  else
+    dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp);
+
+  cudaEvent_t start, end;
+  cudaEventCreate(&start);
+  cudaEventRecord(start, 0);
+  cudaEventSynchronize(start);
+
   for (int i = 0; i < loops; i++) {
     switch (test_type) {
     case 0:
@@ -233,13 +243,21 @@ double dslashCUDA() {
     }
   }
     
+  cudaEventCreate(&end);
+  cudaEventRecord(end, 0);
+  cudaEventSynchronize(end);
+  float runTime;
+  cudaEventElapsedTime(&runTime, start, end);
+  cudaEventDestroy(start);
+  cudaEventDestroy(end);
+
+  double secs = runTime / 1000; //stopwatchReadSeconds();
+
   // check for errors
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     printf("with ERROR: %s\n", cudaGetErrorString(stat));
 
-  cudaThreadSynchronize();
-  double secs = stopwatchReadSeconds();
   printf("done.\n\n");
 
   return secs;
@@ -284,10 +302,8 @@ int main(int argc, char **argv)
   init();
 
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
-  float sharedKB = 0;//(float)dslashCudaSharedBytes(inv_param.cuda_prec) / (1 << 10);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
-  printf("Shared mem: %.3f KB\n", sharedKB);
   
   int attempts = 1;
   dslashRef();
