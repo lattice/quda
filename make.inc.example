@@ -31,9 +31,9 @@ OVERLAP_COMMS = yes  # set to 'yes' to overlap comms and compute
 FECC = gcc	      # Front end CC
 FECXX = g++           # Front end CXX
 
-OMPI_HOME=/home/bjoo/Toolchain/install/openmpi-1.5
-MPICC = $(OMPI_HOME)/bin/mpicc
-MPICXX = $(OMPI_HOME)/bin/mpicxx
+MPI_HOME=/home/bjoo/Toolchain/install/openmpi-1.5
+MPICC = $(MPI_HOME)/bin/mpicc
+MPICXX = $(MPI_HOME)/bin/mpicxx
 
 QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
 
@@ -71,7 +71,7 @@ ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
 endif
 
 ifeq ($(strip $(BUILD_QMP)), yes)
-  RUN = $(OMPI_HOME)/bin/mpirun -np 1
+  RUN = $(MPI_HOME)/bin/mpirun -np 1
   CC = $(MPICC)
   CXX = $(MPICXX)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
