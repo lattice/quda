@@ -49,6 +49,15 @@ edit the first few lines to specify the CUDA install path, the
 platform (x86 or x86_64), and the GPU architecture (see "Hardware
 Compatibility" above).  Then type 'make' to build the library.
 
+Optionally you can now generate a 'make.inc' using the Autoconf
+./configure script. See ./configure --help for the options available.
+The ./configure script allows you to sed most User configurable features
+(hardware capability, multi-gpu build, QMP and MPI locatioN) with the
+usual barrage of --enable-feature and --with-package options.
+Once ./configure has created your make.inc, you can run 'make' to build
+the library
+
+
 As an optional step, 'make tune' will invoke tests/blas_test to
 perform autotuning of the various BLAS-like functions needed by the
 inverters.  This involves testing many combinations of launch

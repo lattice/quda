@@ -21,5 +21,5 @@ gen:
 clean:
 	$(MAKE) -C lib/ clean
 	$(MAKE) -C tests/ clean
-
+	rm -rf ./config.log ./config.status ./autom4te.cache
 .PHONY: all lib tests tune gen clean
