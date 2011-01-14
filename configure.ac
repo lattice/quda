@@ -281,11 +281,21 @@ if test "X${multi_gpu}X" = "XyesX";
 then 
   AC_MSG_NOTICE([Enabling Multi-GPU])
   
-  if test "X${build_dwf_dirac}X" = "XyesX";
-  then 
-    AC_MSG_NOTICE([Domain Wall Dirac doesnt support multi-GPU yet. Disabling])
-    build_dwf_dirac="no";
-  fi
+  AC_MSG_NOTICE([Multi-GPU doesnt support Domain-Wall Dirac Op  yet: disabling ])
+  build_dwf_dirac="no";
+
+  AC_MSG_NOTICE([Multi-GPU doesnt support Staggered Dirac Op  yet: disabling ])
+  build_staggered_dirac="no"
+
+  AC_MSG_NOTICE([Multi-GPU doesnt support Fat-links yet: disabling ])
+  build_staggered_fatlink="no"
+
+  AC_MSG_NOTICE([Multi-GPU doesnt support Gauge Force yet: disabling ])
+  build_gauge_force="no"
+
+  AC_MSG_NOTICE([Multi-GPU doesnt support Staggered Force yet:disabling ])
+  build_staggered_force="no"
+
 
   if test "X${qmp_home}X" = "XX";
   then
@@ -320,16 +330,16 @@ AC_SUBST( QUDA_OS,  [${quda_os}]  )
 AC_MSG_NOTICE([Setting QUDA_PYTHON = ${quda_python} ])
 AC_SUBST( QUDA_PYTHON,   [${quda_python}] )
 
-dnl AC_MSG_NOTICE([Setting DEVICE = ${tune_device} ])
+AC_MSG_NOTICE([Setting DEVICE = ${tune_device} ])
 AC_SUBST( DEVICE,[${tune_device}] )
 
-dnl AC_MSG_NOTICE([Setting HOST_DEBUG = ${quda_host_debug} ])
+AC_MSG_NOTICE([Setting HOST_DEBUG = ${quda_host_debug} ])
 AC_SUBST( HOST_DEBUG,    [${quda_host_debug}] )
 
-dnl AC_MSG_NOTICE([Setting DEVICE_DEBUG = ${quda_device_debug} ])
+AC_MSG_NOTICE([Setting DEVICE_DEBUG = ${quda_device_debug} ])
 AC_SUBST( DEVICE_DEBUG,  [${quda_device_debug}] )
 
-dnl AC_MSG_NOTICE([Setting VERBOSE = ${quda_verbose_build} ])
+AC_MSG_NOTICE([Setting VERBOSE = ${quda_verbose_build} ])
 AC_SUBST( VERBOSE,	 [${quda_verbose_build}] )
 
 AC_MSG_NOTICE([Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} ])

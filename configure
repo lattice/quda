@@ -2720,12 +2720,26 @@ then
   { echo "$as_me:$LINENO: Enabling Multi-GPU" >&5
 echo "$as_me: Enabling Multi-GPU" >&6;}
 
-  if test "X${build_dwf_dirac}X" = "XyesX";
-  then
-    { echo "$as_me:$LINENO: Domain Wall Dirac doesnt support multi-GPU yet. Disabling" >&5
-echo "$as_me: Domain Wall Dirac doesnt support multi-GPU yet. Disabling" >&6;}
-    build_dwf_dirac="no";
-  fi
+  { echo "$as_me:$LINENO: Multi-GPU doesnt support Domain-Wall Dirac Op  yet: disabling " >&5
+echo "$as_me: Multi-GPU doesnt support Domain-Wall Dirac Op  yet: disabling " >&6;}
+  build_dwf_dirac="no";
+
+  { echo "$as_me:$LINENO: Multi-GPU doesnt support Staggered Dirac Op  yet: disabling " >&5
+echo "$as_me: Multi-GPU doesnt support Staggered Dirac Op  yet: disabling " >&6;}
+  build_staggered_dirac="no"
+
+  { echo "$as_me:$LINENO: Multi-GPU doesnt support Fat-links yet: disabling " >&5
+echo "$as_me: Multi-GPU doesnt support Fat-links yet: disabling " >&6;}
+  build_staggered_fatlink="no"
+
+  { echo "$as_me:$LINENO: Multi-GPU doesnt support Gauge Force yet: disabling " >&5
+echo "$as_me: Multi-GPU doesnt support Gauge Force yet: disabling " >&6;}
+  build_gauge_force="no"
+
+  { echo "$as_me:$LINENO: Multi-GPU doesnt support Staggered Force yet:disabling " >&5
+echo "$as_me: Multi-GPU doesnt support Staggered Force yet:disabling " >&6;}
+  build_staggered_force="no"
+
 
   if test "X${qmp_home}X" = "XX";
   then
@@ -2771,15 +2785,23 @@ echo "$as_me: Setting QUDA_PYTHON = ${quda_python} " >&6;}
 QUDA_PYTHON=${quda_python}
 
 
+{ echo "$as_me:$LINENO: Setting DEVICE = ${tune_device} " >&5
+echo "$as_me: Setting DEVICE = ${tune_device} " >&6;}
 DEVICE=${tune_device}
 
 
+{ echo "$as_me:$LINENO: Setting HOST_DEBUG = ${quda_host_debug} " >&5
+echo "$as_me: Setting HOST_DEBUG = ${quda_host_debug} " >&6;}
 HOST_DEBUG=${quda_host_debug}
 
 
+{ echo "$as_me:$LINENO: Setting DEVICE_DEBUG = ${quda_device_debug} " >&5
+echo "$as_me: Setting DEVICE_DEBUG = ${quda_device_debug} " >&6;}
 DEVICE_DEBUG=${quda_device_debug}
 
 
+{ echo "$as_me:$LINENO: Setting VERBOSE = ${quda_verbose_build} " >&5
+echo "$as_me: Setting VERBOSE = ${quda_verbose_build} " >&6;}
 VERBOSE=${quda_verbose_build}
 
 
