@@ -77,7 +77,7 @@ Additionally, optimum performance will generally be obtained if the
 OVERLAP_COMMS option is enabled to overlap kernel computation and
 inter-GPU communication.  Multiple GPUs are controlled using QMP, and
 so QMP and MPI must be installed on the host systems, and the QMP_HOME
-and OMPI_HOME paths must be set.
+and MPI_HOME paths must be set.
 
 Using the Library:
 
