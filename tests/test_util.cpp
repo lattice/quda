@@ -12,6 +12,7 @@
 #define ZUP 2
 #define TUP 3
 
+extern float fat_link_max;
 using namespace std;
 
 template <typename Float>
@@ -586,6 +587,22 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
       applyGaugeFieldScaling(res, Vh, param);
   }else if (param->type == QUDA_ASQTAD_LONG_LINKS){
       applyGaugeFieldScaling_long(res, Vh, param);      
+  }else if (param->type == QUDA_ASQTAD_FAT_LINKS){
+    for (int dir = 0; dir < 4; dir++){ 
+      for (int i = 0; i < Vh; i++) {
+	for (int m = 0; m < 3; m++) { // last 2 rows
+	  for (int n = 0; n < 3; n++) { // 3 columns
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] =1.0* rand() / (Float)RAND_MAX;
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] =2.0* rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 3.0*rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 4.0*rand() / (Float)RAND_MAX;
+	  }
+	}
+      }
+    }
+    
+    fat_link_max = 4.0;
+      
   }
   
   

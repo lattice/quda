@@ -219,14 +219,14 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 
   createGaugeField(precise, h_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
-		   param->t_boundary, param->X, anisotropy, param->tadpole_coeff, param->ga_pad);
+		   param->t_boundary, param->X, anisotropy, param->tadpole_coeff, param->ga_pad, param->type);
   param->gaugeGiB += 2.0 * precise->bytes / (1 << 30);
 
   if (param->cuda_prec_sloppy != param->cuda_prec ||
       param->reconstruct_sloppy != param->reconstruct) {
     createGaugeField(sloppy, h_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
 		     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
-		     param->X, anisotropy, param->tadpole_coeff, param->ga_pad);
+		     param->X, anisotropy, param->tadpole_coeff, param->ga_pad, param->type);
     param->gaugeGiB += 2.0 * sloppy->bytes / (1 << 30);
   } else {
     *sloppy = *precise;

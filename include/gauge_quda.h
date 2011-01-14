@@ -10,7 +10,8 @@ extern "C" {
 
   void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
 			GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
-			Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad);
+			Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, 
+			QudaLinkType type);
 
   void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, QudaPrecision cpu_prec, GaugeFieldOrder gauge_order);
 

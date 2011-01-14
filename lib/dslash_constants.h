@@ -43,6 +43,7 @@ __constant__ int cl_stride;
 
 __constant__ int fat_ga_stride;
 __constant__ int long_ga_stride;
+__constant__ float fat_ga_max;
 
 __constant__ int gauge_fixed;
 
@@ -73,9 +74,11 @@ __constant__ bool PtNm1;
 int initDslash = 0;
 int initClover = 0;
 int initDomainWall = 0;
+int initStaggered = 0;
 
 bool qudaPt0 = true;   // Single core versions always to Boundary
 bool qudaPtNm1 = true;
+float fat_link_max; //it is set somewhere else
 
 void initCommonConstants(const FullGauge gauge) {
   int Vh = gauge.volume;
@@ -250,3 +253,12 @@ void initDomainWallConstants(const int Ls) {
 
   initDomainWall = 1;
 }
+
+void
+initStaggeredConstants()
+{
+  cudaMemcpyToSymbol("fat_ga_max", &fat_link_max, sizeof(float));
+  initStaggered = 1;
+  return;
+}
+  

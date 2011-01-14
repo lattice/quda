@@ -402,8 +402,16 @@
   float2 FAT5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*fat_ga_stride);	\
   float2 FAT6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*fat_ga_stride);	\
   float2 FAT7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*fat_ga_stride);	\
-  float2 FAT8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*fat_ga_stride);
-
+  float2 FAT8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*fat_ga_stride); \
+  FAT0.x *= fat_ga_max; FAT0.y *= fat_ga_max;				\
+  FAT1.x *= fat_ga_max; FAT1.y *= fat_ga_max;				\
+  FAT2.x *= fat_ga_max; FAT2.y *= fat_ga_max;				\
+  FAT3.x *= fat_ga_max; FAT3.y *= fat_ga_max;				\
+  FAT4.x *= fat_ga_max; FAT4.y *= fat_ga_max;				\
+  FAT5.x *= fat_ga_max; FAT5.y *= fat_ga_max;				\
+  FAT6.x *= fat_ga_max; FAT6.y *= fat_ga_max;				\
+  FAT7.x *= fat_ga_max; FAT7.y *= fat_ga_max;				\
+  FAT8.x *= fat_ga_max; FAT8.y *= fat_ga_max;			
 
 #ifndef DIRECT_ACCESS_LONG_LINK //longlink access
 
