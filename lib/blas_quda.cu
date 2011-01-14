@@ -3539,11 +3539,11 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorFiel
   } else {
     // fused nSpin=4 kernel is slow on Fermi
     // N.B. this introduces an extra half truncation so will affect convergence (for the better?)
-    /*if (!blasTuning && (__CUDA_ARCH__ >= 200) && x.nSpin == 4) {
+    if (!blasTuning && (__CUDA_ARCH__ >= 200) && x.nSpin == 4) {
       caxpbypzYmbwCuda(a, x, b, y, z, w);
       return cDotProductNormBCuda(u, y);
-      }
-     */ 
+    }
+     
     int spinor_bytes = x.length*sizeof(short);
     blas_quda_bytes += 7*x.volume*sizeof(float);
     if (x.nSpin == 4) { // wilson
