@@ -31,11 +31,11 @@ OVERLAP_COMMS = @OVERLAP_COMMS@  # set to 'yes' to overlap comms and compute
 FECC = @FECC@ 	      # Front end CC
 FECXX = @FECXX@           # Front end CXX
 
-MPI_HOME=/home/bjoo/Toolchain/install/openmpi-1.5
+MPI_HOME=@MPI_HOME@
 MPICC = $(MPI_HOME)/bin/mpicc
 MPICXX = $(MPI_HOME)/bin/mpicxx
 
-QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
+QMP_HOME=@QMP_HOME@
 
 ######
 
