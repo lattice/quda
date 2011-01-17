@@ -1,11 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+
+#include <typeinfo>
 #include <quda.h>
 #include <gauge_quda.h>
 #include <quda_internal.h>
 
 #include <face_quda.h>
+
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)

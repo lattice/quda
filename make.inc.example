@@ -12,7 +12,7 @@ DEVICE = 0         # CUDA device to use for 'make tune'
 
 # compilation options
 HOST_DEBUG = no                # compile host debug code
-DEVICE_DEBUG = no              # compile deivce debug code for cuda-gdb 
+DEVICE_DEBUG = no              # compile device debug code for cuda-gdb 
 VERBOSE = no                   # display kernel register useage
 
 BUILD_WILSON_DIRAC = yes       # build Wilson and clover Dirac operators?
@@ -121,7 +121,7 @@ endif
 
 ifeq ($(strip $(HOST_DEBUG)), yes)
   NVCCOPT += -g
-  COPT += -g
+  COPT += -g -fno-inline
 endif
 ifeq ($(strip $(DEVICE_DEBUG)), yes)
   NVCCOPT += -G

@@ -121,7 +121,7 @@ endif
 
 ifeq ($(strip $(HOST_DEBUG)), yes)
   NVCCOPT += -g
-  COPT += -g
+  COPT += -g -fno-inline
 endif
 ifeq ($(strip $(DEVICE_DEBUG)), yes)
   NVCCOPT += -G

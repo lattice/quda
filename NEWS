@@ -1,6 +1,20 @@
 
 Version 0.3.2 - x January 2011
 
+- Enabled arbitrary volumes for all Dirac operators.
+
+- Added auto-tuning for the Dirac operators.  This is controlled with
+  a new InvertParam member, "dirac_tune".  For multiple inversions,
+  this tuning can be remembered between solves setting "preserve_dirac".
+
+- Added debug compile options to make.inc.example to allow for easier
+  debugging.
+
+- Fixed a critical bug in the half precision complex reductions.
+
+- Added CPU versions of all blas functions and added unit tests for
+  each one to the blas_test.cu.
+
 - Merged in the multi-GPU branch.  This parallelizes between multiple
   GPUs through splitting in the temporal dimension only.  The QMP
   library is required to enable this functionality.  Currently, only
