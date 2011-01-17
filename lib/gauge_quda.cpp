@@ -617,23 +617,7 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
   cudaGauge->reconstruct = reconstruct;
   cudaGauge->precision = precision;
   cudaGauge->Nc = 3;
-
-  int elements = 0;
-  switch(reconstruct){
-  case QUDA_RECONSTRUCT_8:
-      elements = 8;
-      break;
-  case QUDA_RECONSTRUCT_12:
-      elements = 12;
-      break;
-  case QUDA_RECONSTRUCT_NO:
-      elements = 18;
-      break;
-  default:
-      errorQuda("Invalid reconstruct value");
-  }
-  
-  cudaGauge->bytes = 4*cudaGauge->stride*elements*precision;
+  cudaGauge->bytes = 4*cudaGauge->stride*reconstruct*precision;
 
   if (!cudaGauge->even) {
     if (cudaMalloc((void **)&cudaGauge->even, cudaGauge->bytes) == cudaErrorMemoryAllocation) {

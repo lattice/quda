@@ -323,7 +323,7 @@ int main(int argc, char **argv)
     
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    int floats = test_type ? 2*(7*24+8*gauge_param.packed_size+24)+24 : 7*24+8*gauge_param.packed_size+24;
+    int floats = test_type ? 2*(7*24+8*gauge_param.reconstruct+24)+24 : 7*24+8*gauge_param.reconstruct+24;
 
     printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/loops)*(1<<30)));

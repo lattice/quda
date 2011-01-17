@@ -163,26 +163,12 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  int packed_size = 0;
   double anisotropy;
   FullGauge *precise, *sloppy;
 
   checkGaugeParam(param);
 
-  switch (param->reconstruct) {
-  case QUDA_RECONSTRUCT_8:
-    packed_size = 8;
-    break;
-  case QUDA_RECONSTRUCT_12:
-    packed_size = 12;
-    break;
-  case QUDA_RECONSTRUCT_NO:
-    packed_size = 18;
-    break;
-  default:
-    errorQuda("Invalid reconstruct type");
-  }
-  param->packed_size = packed_size;
+  param->packed_size = param->reconstruct;
 
   switch (param->type) {
   case QUDA_WILSON_LINKS:

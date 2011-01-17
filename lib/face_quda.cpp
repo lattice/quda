@@ -571,24 +571,11 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 			 int veclength, ReconstructType reconstruct, int V, int Vs)
 {
   int nblocks, ndim=4;
-  size_t linksize=0, blocksize;//, nbytes;
+  size_t blocksize;//, nbytes;
   ptrdiff_t offset, stride;
   void *g;
 
-  switch (reconstruct) {
-  case QUDA_RECONSTRUCT_NO:
-    linksize = 18;
-    break;
-  case QUDA_RECONSTRUCT_12:
-    linksize = 12;
-    break;
-  case QUDA_RECONSTRUCT_8:
-    linksize = 8;
-    break;
-  default:
-    errorQuda("Invalid reconstruct type");
-  }
-  nblocks = ndim*linksize/veclength;
+  nblocks = ndim*reconstruct/veclength;
   blocksize = Vs*veclength*precision;
   offset = (V-Vs)*veclength*precision;
   stride = (V+Vs)*veclength*precision; // assume that pad = Vs

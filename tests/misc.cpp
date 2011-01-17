@@ -692,7 +692,6 @@ get_recon_str(QudaReconstructType recon)
     default:
 	ret="unknown";
 	break;
-	
     }
     
     return ret;

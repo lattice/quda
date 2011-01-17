@@ -325,7 +325,7 @@ static void dslashTest()
     printf("\n%fms per loop\n", 1000*secs);
 	
     int flops = dirac->Flops();
-    int link_floats = 8*gauge_param.packed_size+8*18;
+    int link_floats = 8*gauge_param.reconstruct+8*18;
     int spinor_floats = 8*6*2 + 6;
     int link_float_size = prec;
     int spinor_float_size = 0;

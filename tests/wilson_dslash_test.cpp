@@ -361,7 +361,7 @@ int main(int argc, char **argv)
     
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    int floats = test_type ? 2*(7*24+8*gauge_param.packed_size+24)+24 : 7*24+8*gauge_param.packed_size+24;
+    int floats = test_type ? 2*(7*24+8*gauge_param.reconstruct+24)+24 : 7*24+8*gauge_param.reconstruct+24;
     if (clover_yes) {
       floats += test_type ? 72*2 : 72;
     }
