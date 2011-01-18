@@ -1,4 +1,10 @@
 
+Version 0.3.2 - 18 January 2011
+
+- Fixed a regression in 0.3.1 that prevented the BiCGstab solver from
+  working correctly with half precision on Fermi.
+
+
 Version 0.3.1 - 22 December 2010
 
 - Added support for domain wall fermions.  The length of the fifth
