@@ -426,7 +426,7 @@ __device__ float fast_abs_max(float4 a) {
   float dot = fmaf(a.x, b.y, 0.0f);		\
   dot = fmaf(-a.y, b.x, dot);			\
   dot = fmaf(a.z, b.w, dot);			\
-  dot = fmaf(-a.w, b.w, dot)
+  dot = fmaf(-a.w, b.z, dot)
 #endif
 
 #define IMAG_DOT_FLOAT2(dot, a, b)			\
