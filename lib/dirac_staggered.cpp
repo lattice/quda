@@ -81,7 +81,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
 {
   if (!initDslash) {
     initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants();
+    initStaggeredConstants(*fatGauge, *longGauge);
   }
   checkParitySpinor(in, out);
     
@@ -98,7 +98,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 {    
   if (!initDslash){
     initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants();
+    initStaggeredConstants(*fatGauge, *longGauge);
   }
   checkParitySpinor(in, out);
   
@@ -119,7 +119,7 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
   
   if (!initDslash){
     initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants();
+    initStaggeredConstants(*fatGauge, *longGauge);
   }
   
   bool reset = newTmp(&tmp1, in);
@@ -195,7 +195,7 @@ void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorFie
 {
   if (!initDslash){
     initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants();
+    initStaggeredConstants(*fatGauge, *longGauge);
   }
   
   bool reset = newTmp(&tmp1, in);

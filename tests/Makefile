@@ -62,7 +62,9 @@ tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
 
 clean:
-	-rm -f *.o $(TESTS)
+	-rm -f *.o staggered_dslash_test staggered_invert_test wilson_dslash_test wilson_invert_test \
+	domain_wall_dslash_test  domain_wall_invert_test twisted_mass_dslash_test twisted_mass_invert_test \
+        su3_test pack_test blas_test llfat_test gauge_force_test fermion_force_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

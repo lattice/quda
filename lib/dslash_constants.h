@@ -195,12 +195,6 @@ void initDslashConstants(const FullGauge gauge, const int sp_stride)
   int ga_stride = gauge.stride;
   cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
 
-  int fat_ga_stride = gauge.stride;
-  int long_ga_stride = gauge.stride;
-    
-  cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));
-  cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));
-
   int gf = (gauge.gauge_fixed == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
   cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
 
@@ -255,8 +249,19 @@ void initDomainWallConstants(const int Ls) {
 }
 
 void
-initStaggeredConstants()
+initStaggeredConstants(FullGauge fatgauge, FullGauge longgauge)
 {
+  
+  int fat_ga_stride = fatgauge.stride;
+  int long_ga_stride = longgauge.stride;
+  
+  printf("fat_ga_stride=%d, long_ga_stride=%d\n", 
+	 fat_ga_stride,
+	 long_ga_stride);
+  
+  cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));  
+  cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));  
+  
   cudaMemcpyToSymbol("fat_ga_max", &fat_link_max, sizeof(float));
   initStaggered = 1;
   return;

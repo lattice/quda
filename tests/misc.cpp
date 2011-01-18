@@ -10,7 +10,7 @@
 
 
 
-int verbose;
+extern int verbose;
 
 #define stSpinorSiteSize 6
 

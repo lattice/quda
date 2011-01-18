@@ -517,6 +517,69 @@ static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit,
   }
 }
 
+template <typename Float, typename FloatN>
+static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_gauge, int oddBit, 
+				 ReconstructType reconstruct, int V, int pad, int Vsh, int num_faces, 
+				 int flag) 
+{
+
+    
+  if (reconstruct == QUDA_RECONSTRUCT_12) {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *g = h_gauge[dir] + oddBit*V*18;
+      for (int i = 0; i < V; i++) pack12(d_gauge+i, g+i*18, dir, V+pad);
+    }
+    //ghost gauge
+    //we only need one direction, let's put it in the dir=0 space
+    Float* g = ghost_gauge + oddBit*num_faces*Vsh*18;
+    for(int i=0; i < num_faces*Vsh; i++){
+      pack12(d_gauge+V+i, g + i*18, 0, V+pad);
+    } 
+
+  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *g = h_gauge[dir] + oddBit*V*18;
+      for (int i = 0; i < V; i++) pack8(d_gauge+i, g+i*18, dir, V+pad);
+    }
+    //ghost gauge
+    //we only need one direction, let's put it in the dir=0 space
+    Float* g = ghost_gauge + oddBit*num_faces*Vsh*18;
+    for(int i=0; i < num_faces*Vsh; i++){
+      pack8(d_gauge+V+i, g + i*18, 0, V+pad);
+    } 
+
+  } else { //18 reconstruct
+
+    for (int dir = 0; dir < 4; dir++) {
+      Float *g = h_gauge[dir] + oddBit*V*18;
+      if ((flag & GAUGE_STAGGERED_FAT) && (typeid(FloatN) == typeid(short2))){
+	for (int i = 0; i < V; i++) {
+	  //we know it is half precison with fatlink at this stage
+	  fatlink_short_pack18((short2*)(d_gauge+i), g+i*18, dir, V+pad);
+	}
+      }else{
+	for (int i = 0; i < V; i++) pack18(d_gauge+i, g+i*18, dir, V+pad);
+      }
+    }
+    //ghost gauge
+    //we only need one direction, let's put it in the dir=0 space
+    Float* g = ghost_gauge + oddBit*num_faces*Vsh*18;
+    
+    if ((flag & GAUGE_STAGGERED_FAT) && (typeid(FloatN) == typeid(short2))){
+      for(int i=0; i < num_faces*Vsh; i++){
+	  //we know it is half precison with fatlink at this stage
+	fatlink_short_pack18((short2*)(d_gauge+V+i), g + i*18, 0, V+pad);
+      }           
+    }else{
+      for(int i=0; i < num_faces*Vsh; i++){
+	pack18(d_gauge+V+i, g + i*18, 0, V+pad);
+      }     
+    }   
+  }
+}
+
+
+
 // Assume the gauge field is "QDP" ordered: directions outside of
 // space-time, row-column ordering, even-odd space-time
 template <typename Float, typename FloatN>
@@ -699,6 +762,39 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
 }
 
 template <typename Float, typename FloatN>
+static void loadGaugeField_mg(FloatN *even, FloatN *odd, Float *cpuGauge, Float* ghost_gauge, GaugeFieldOrder gauge_order,
+			      ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh, int num_faces, int flag) 
+{
+
+  // Use pinned memory
+  FloatN *packedEven, *packedOdd;
+    
+  cudaMallocHost((void**)&packedEven, bytes);
+  cudaMallocHost((void**)&packedOdd, bytes);
+    
+  if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
+    packQDPGaugeField_mg(packedEven, (Float**)cpuGauge, (Float*)ghost_gauge, 0, reconstruct, Vh, pad, Vsh, num_faces, flag);
+    packQDPGaugeField_mg(packedOdd,  (Float**)cpuGauge, (Float*)ghost_gauge, 1, reconstruct, Vh, pad, Vsh, num_faces, flag);
+  } else {
+    errorQuda("Invalid gauge_order");
+  }
+
+
+  cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
+  checkCudaError();
+    
+  cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);
+  checkCudaError();
+  
+
+  cudaFreeHost(packedEven);
+  cudaFreeHost(packedOdd);
+}
+
+
+
+
+template <typename Float, typename FloatN>
 static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, GaugeFieldOrder gauge_order,
 			       ReconstructType reconstruct, int bytes, int Vh, int pad) {
 
@@ -823,6 +919,88 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
 
   }
 }
+
+void createGaugeField_mg(FullGauge *cudaGauge, void *cpuGauge, void* ghost_gauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
+			 GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
+			 Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, int num_faces, int flag)
+{
+
+  Anisotropy = anisotropy;
+  tBoundary = t_boundary;
+  
+  cudaGauge->anisotropy = anisotropy;
+  cudaGauge->tadpole_coeff = tadpole_coeff;
+  cudaGauge->volume = 1;
+  for (int d=0; d<4; d++) {
+    cudaGauge->X[d] = XX[d];
+    cudaGauge->volume *= XX[d];
+    X[d] = XX[d];
+  }
+  cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
+  cudaGauge->volume /= 2;
+  cudaGauge->pad = pad;
+  cudaGauge->stride = cudaGauge->volume + cudaGauge->pad;
+  cudaGauge->gauge_fixed = gauge_fixed;
+  cudaGauge->t_boundary = t_boundary;
+
+  allocateGaugeField(cudaGauge, reconstruct, cuda_prec);
+
+  int Vsh = XX[0]*XX[1]*XX[2]/2;
+  if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+
+    if (cpu_prec == QUDA_DOUBLE_PRECISION)
+      loadGaugeField_mg((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (double*)cpuGauge,(double*)ghost_gauge,  
+			gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+    else if (cpu_prec == QUDA_SINGLE_PRECISION)
+      loadGaugeField_mg((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge, 
+			gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+
+  } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
+
+      if (cpu_prec == QUDA_DOUBLE_PRECISION){
+	  if (reconstruct == QUDA_RECONSTRUCT_NO){
+	    loadGaugeField_mg((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge,
+			      gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);	      
+	  }else{
+	    loadGaugeField_mg((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge,
+			      gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+	  }
+	  
+      }
+      else if (cpu_prec == QUDA_SINGLE_PRECISION){
+	if (reconstruct == QUDA_RECONSTRUCT_NO){
+	  loadGaugeField_mg((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge,
+			    gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+	}else{
+	  loadGaugeField_mg((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge, 
+			    gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+	}
+      }
+      
+  } else if (cuda_prec == QUDA_HALF_PRECISION) {
+    if (cpu_prec == QUDA_DOUBLE_PRECISION){
+      if (reconstruct == QUDA_RECONSTRUCT_NO){	  
+	loadGaugeField_mg((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge, 
+			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+	
+      }else{
+	loadGaugeField_mg((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge,
+			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);	      
+      }
+      }
+    else if (cpu_prec == QUDA_SINGLE_PRECISION){
+      if (reconstruct == QUDA_RECONSTRUCT_NO){	  
+	loadGaugeField_mg((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge,
+			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+      }else{
+	loadGaugeField_mg((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge,
+			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, flag);
+      }
+    }
+  }
+}
+
+
 
 void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, QudaPrecision cpu_prec, GaugeFieldOrder gauge_order)
 {
@@ -957,6 +1135,122 @@ freeStapleQuda(FullStaple *cudaStaple)
     cudaStaple->odd = NULL;
 }
 
+void
+packGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
+		void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream)
+{
+  //FIXME: ignore half precision for now
+  void* even = cudaStaple->even;
+  void* odd = cudaStaple->odd;
+  int Vh = cudaStaple->volume;
+  int Vsh = cudaStaple->X[0]*cudaStaple->X[1]*cudaStaple->X[2];
+  int prec= cudaStaple->precision;
+  int sizeOfFloatN = 2*prec;
+  int len = Vsh*sizeOfFloatN;
+  int i;
+
+
+  if(cudaStaple->X[3] %2 == 0){
+  //back,even
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)back_nbr_buf) + i*len ; 
+    void* src = ((char*)even) + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+  //back, odd
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)back_nbr_buf) + 9*len + i*len ; 
+    void* src = ((char*)odd) + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+
+  //fwd,even
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)fwd_nbr_buf) + i*len ; 
+    void* src = ((char*)even) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+  //fwd, odd
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)fwd_nbr_buf) + 9*len + i*len ; 
+    void* src = ((char*)odd) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+ }else{
+   //reverse even and odd position
+  //back,odd
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)back_nbr_buf) + i*len ; 
+    void* src = ((char*)odd) + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+  //back, even
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)back_nbr_buf) + 9*len + i*len ; 
+    void* src = ((char*)even) + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+
+  //fwd,odd
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)fwd_nbr_buf) + i*len ; 
+    void* src = ((char*)odd) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+  //fwd, even
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)fwd_nbr_buf) + 9*len + i*len ; 
+    void* src = ((char*)even) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+
+ } 
+  
+  
+}
+
+
+void 
+unpackGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
+		  void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream)
+{
+  //FIXME: ignore half precision for now  
+  void* even = cudaStaple->even;
+  void* odd = cudaStaple->odd;
+  int Vh = cudaStaple->volume;
+  int Vsh = cudaStaple->X[0]*cudaStaple->X[1]*cudaStaple->X[2];
+  int prec= cudaStaple->precision;
+  int sizeOfFloatN = 2*prec;
+  int len = Vsh*sizeOfFloatN;
+  int i;
+
+  //back,even
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)even) + Vh*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    void* src = ((char*)back_nbr_buf) + i*len ; 
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  //back, odd
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)odd) + Vh*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    void* src = ((char*)back_nbr_buf) + 9*len + i*len ; 
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  
+  //fwd,even
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)even) + (Vh+Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    void* src = ((char*)fwd_nbr_buf) + i*len ; 
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  //fwd, odd
+  for(i=0;i < 9; i++){
+    void* dst = ((char*)odd) + (Vh+Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+    void* src = ((char*)fwd_nbr_buf) + 9*len + i*len ; 
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  
+}
 
 
 

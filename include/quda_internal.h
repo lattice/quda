@@ -62,6 +62,8 @@ extern "C" {
     int Nc; // number of colors
     ParityGauge odd;
     ParityGauge even;
+    int pad;
+    int stride;
     double anisotropy;
   } FullStaple;
   

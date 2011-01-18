@@ -97,13 +97,14 @@ extern "C" {
 
 
   // Interface functions, found in interface_quda.cpp
-
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void loadCloverQuda(void *h_clover, void *h_clovinv,
 		      QudaInvertParam *inv_param);
-
+  void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge,
+				QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy, int num_faces, int flag);
+  
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets,
@@ -123,6 +124,15 @@ extern "C" {
 
   void printQudaGaugeParam(QudaGaugeParam *param);
   void printQudaInvertParam(QudaInvertParam *param);
+
+#define CUERR  do{ cudaError_t cuda_err;                                \
+    if ((cuda_err = cudaGetLastError()) != cudaSuccess) {               \
+      fprintf(stderr, "ERROR: CUDA error: %s, line %d, function %s, file %s\n", \
+              cudaGetErrorString(cuda_err),  __LINE__, __FUNCTION__, __FILE__); \
+      exit(cuda_err);}}while(0)
+
+
+
 
 #ifdef __cplusplus
 }

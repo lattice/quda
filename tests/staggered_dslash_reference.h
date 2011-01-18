@@ -21,9 +21,14 @@ extern "C" {
     
     void setDims(int *);
     
-    void staggered_dslash(void *res, void ** fatlink, void** longlink, void *spinorField,
-		int oddBit, int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision);
-    
+  void staggered_dslash(void *res, void ** fatlink, void** longlink, void *spinorField,
+			int oddBit, int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision);
+  void staggered_dslash_mg(void *res, void **fatlink, void** longlink, void* ghost_fatlink, void* ghost_longlink,
+			   void *spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor, 
+			   int oddBit, int daggerBit,
+			   QudaPrecision sPrecision, QudaPrecision gPrecision);
+  
+  
     void mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int daggerBit,
 	     QudaPrecision sPrecision, QudaPrecision gPrecision);
     
@@ -32,9 +37,12 @@ extern "C" {
     void matdagmat_milc(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
 			QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);    
   void mymatdagmat_milc(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
-			  QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);    
-
-    
+			QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);    
+  void 
+  matdagmat_milc_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, void* ghost_longlink, 
+		    void *in, void* fwd_nbr_spinor, void* back_nbr_spinor, double mass, int dagger_bit,
+		    QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);
+  
 
 #ifdef __cplusplus
 }

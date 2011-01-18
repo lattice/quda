@@ -66,6 +66,16 @@ Dirac *dSloppy = NULL;
 bool diracCreation = false;
 bool diracTune = false;
 
+int getGpuCount()
+{
+  int count;
+  cudaGetDeviceCount(&count);
+  if (count <= 0){
+    errorQuda("No devices supporting CUDA");
+  }
+  return count;
+}
+
 void initQuda(int dev)
 {
   static int initialized = 0;
@@ -161,6 +171,7 @@ void initQuda(int dev)
 }
 
 
+
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   double anisotropy;
@@ -220,6 +231,51 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   endInvertQuda(); // need to delete any persistant dirac operators
 }
+
+
+
+void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge, QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy, int num_faces, int flag)
+{
+
+  checkGaugeParam(param);
+  FullGauge* cudaLinkPrecise = (FullGauge*)_cudaLinkPrecise;
+  FullGauge* cudaLinkSloppy = (FullGauge*)_cudaLinkSloppy;
+  
+  int packed_size;
+  switch(param->reconstruct){
+  case QUDA_RECONSTRUCT_8:
+    packed_size = 8;
+    break;
+  case QUDA_RECONSTRUCT_12:
+    packed_size = 12;
+    break;
+  case QUDA_RECONSTRUCT_NO:
+    packed_size = 18;
+    break;
+  default:
+    printf("ERROR: %s: reconstruct type not set, exitting\n", __FUNCTION__);
+    exit(1);
+  }
+  
+  param->packed_size = packed_size;
+
+  createGaugeField_mg(cudaLinkPrecise, h_gauge, ghost_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
+		      param->t_boundary, param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, flag);
+  param->gaugeGiB += 2.0*cudaLinkPrecise->bytes/ (1 << 30);
+  if (param->cuda_prec_sloppy != param->cuda_prec ||
+      param->reconstruct_sloppy != param->reconstruct) {
+    createGaugeField_mg(cudaLinkSloppy, h_gauge, ghost_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
+			param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
+			param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, flag);    
+    param->gaugeGiB += 2.0*cudaLinkSloppy->bytes/ (1 << 30);
+  } else {
+    *cudaLinkSloppy = *cudaLinkPrecise;
+  }
+  
+}
+
+
+
 
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)

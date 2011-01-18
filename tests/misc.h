@@ -24,13 +24,6 @@ extern "C" {
 
 extern int verbose;
 
-#define PRINTF(fmt,...) do{                                             \
-	if (verbose){							\
-	    printf("GPU:"fmt, ##__VA_ARGS__);				\
-	}								\
-    } while(0) 
-
-
 #define XUP 0
 #define YUP 1
 #define ZUP 2

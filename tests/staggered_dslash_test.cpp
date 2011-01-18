@@ -14,12 +14,17 @@
 #include <misc.h>
 #include <test_util.h>
 #include <staggered_dslash_reference.h>
+#include "exchange_face.h"
+#include "gauge_quda.h"
+#include <mpi.h>
+#include "mpicomm.h"
 
+#define staggeredSpinorSiteSize 6
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
 int device = 0;
 
-QudaGaugeParam gauge_param;
+QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
 
 FullGauge cudaFatLink;
@@ -27,17 +32,21 @@ FullGauge cudaLongLink;
 
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
+void *cpu_fwd_nbr_spinor, *cpu_back_nbr_spinor;
 
 cudaColorSpinorField* tmp;
 
 void *hostGauge[4];
 void *fatlink[4], *longlink[4];
+void* ghost_fatlink, *ghost_longlink;
+
 
 QudaParity parity;
 QudaDagType dagger = QUDA_DAG_NO;
 int transfer = 0; // include transfer time in the benchmark?
 int tdim = 24;
 int sdim = 24;
+int X[4];
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
@@ -46,29 +55,40 @@ Dirac* dirac;
 
 void init()
 {    
-  gauge_param = newQudaGaugeParam();
+
+  initQuda(device);
+
+  int Vs = sdim*sdim*sdim;
+  int Vsh = Vs/2;
+
+  gaugeParam = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
+  
+  gaugeParam.X[0] = X[0] = sdim;
+  gaugeParam.X[1] = X[1] = sdim;
+  gaugeParam.X[2] = X[2] = sdim;
+  gaugeParam.X[3] = X[3] = tdim;
 
-  gauge_param.X[0] = sdim;
-  gauge_param.X[1] = sdim;
-  gauge_param.X[2] = sdim;
-  gauge_param.X[3] = tdim;
+  gaugeParam.X[0] = sdim;
+  gaugeParam.X[1] = sdim;
+  gaugeParam.X[2] = sdim;
+  gaugeParam.X[3] = tdim;
 
-  setDims(gauge_param.X);
+  setDims(gaugeParam.X);
 
   Vh = sdim*sdim*sdim*tdim/2;
 
-  gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
-  gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
+  gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
+  gaugeParam.cuda_prec = prec;
+  gaugeParam.reconstruct = link_recon;
+  gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
+  gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
     
-  gauge_param.tadpole_coeff = 0.8;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.gaugeGiB = 0;
+  gaugeParam.tadpole_coeff = 0.8;
+  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gaugeParam.gaugeGiB = 0;
     
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
@@ -77,7 +97,7 @@ void init()
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
     
-  gauge_param.ga_pad = sdim*sdim*sdim/2;
+  gaugeParam.ga_pad = sdim*sdim*sdim/2;
   inv_param.sp_pad = sdim*sdim*sdim/2;
 
   ColorSpinorParam csParam;
@@ -86,7 +106,7 @@ void init()
   csParam.nSpin=1;
   csParam.nDim=4;
   for(int d = 0; d < 4; d++) {
-    csParam.x[d] = gauge_param.X[d];
+    csParam.x[d] = gaugeParam.X[d];
   }
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
@@ -109,13 +129,22 @@ void init()
   spinorRef = new cpuColorSpinorField(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  csParam.x[0] = gauge_param.X[0];
+  csParam.x[0] = gaugeParam.X[0];
     
   printfQuda("Randomizing fields ...\n");
     
   spinor->Source(QUDA_RANDOM_SOURCE);
 
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  //create ghost spinors
+  cpu_fwd_nbr_spinor = malloc(Vsh* staggeredSpinorSiteSize *3*sizeof(double));
+  cpu_back_nbr_spinor = malloc(Vsh*staggeredSpinorSiteSize *3*sizeof(double));
+  if (cpu_fwd_nbr_spinor == NULL || cpu_back_nbr_spinor == NULL){
+    PRINTF("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
+    exit(1);
+  }
+
+
+  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     
   for (int dir = 0; dir < 4; dir++) {
     fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
@@ -125,33 +154,64 @@ void init()
     fprintf(stderr, "ERROR: malloc failed for fatlink/longlink\n");
     exit(1);
   }
-    
-  construct_fat_long_gauge_field(fatlink, longlink, 1, gauge_param.cpu_prec, &gauge_param);
+
+  ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
+  ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
+  if (ghost_fatlink == NULL || ghost_longlink == NULL){
+    PRINTF("ERROR: malloc failed for ghost fatlink/longlink\n");
+    exit(1);
+  }
+   
+  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
+  
+  exchange_cpu_links(X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  
+
+
 
 #if 0
   //printf("links are:\n");
-  //display_link(fatlink[0], 1, gauge_param.cpu_prec);
-  //display_link(longlink[0], 1, gauge_param.cpu_prec);
+  //display_link(fatlink[0], 1, gaugeParam.cpu_prec);
+  //display_link(longlink[0], 1, gaugeParam.cpu_prec);
     
   for (int i =0;i < 4 ;i++){
     int dir = 2*i;
-    link_sanity_check(fatlink[i], V, gauge_param.cpu_prec, dir, &gauge_param);
-    link_sanity_check(longlink[i], V, gauge_param.cpu_prec, dir, &gauge_param);
+    link_sanity_check(fatlink[i], V, gaugeParam.cpu_prec, dir, &gaugeParam);
+    link_sanity_check(longlink[i], V, gaugeParam.cpu_prec, dir, &gaugeParam);
   }
 
   //printf("spinors are:\n");  
   //display_spinor(spinor, 10, inv_param.cpu_prec);
 #endif
 
-  initQuda(device);
 
-  gauge_param.type = QUDA_ASQTAD_FAT_LINKS;
-  gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(fatlink, &gauge_param);
+#if 0
+  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  loadGaugeQuda(fatlink, &gaugeParam);
 
-  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  gauge_param.reconstruct = gauge_param.reconstruct_sloppy = link_recon;
-  loadGaugeQuda(longlink, &gauge_param);
+#else
+  
+  int num_faces =1;
+  gaugeParam.ga_pad = sdim*sdim*sdim/2;    
+  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces, GAUGE_STAGGERED_FAT);
+  
+  
+#endif
+  
+
+#if 0
+  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+  loadGaugeQuda(longlink, &gaugeParam);
+#else
+  num_faces =3;
+  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;    
+  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
+  loadGaugeQuda_general_mg(longlink, ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces, GAUGE_STAGGERED_LONG);
+
+#endif
 
   cudaFatLink = cudaFatLinkPrecise;
   cudaLongLink = cudaLongLinkPrecise;
@@ -283,18 +343,25 @@ void staggeredDslashRef()
   fflush(stdout);
   switch (test_type) {
   case 0:    
+    /*
     cpu_parity = 0; //EVEN
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
-		     inv_param.cpu_prec, gauge_param.cpu_prec);
+		     inv_param.cpu_prec, gaugeParam.cpu_prec);
+    */
+    
+    staggered_dslash_mg(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+			inv_param.cpu_prec, gaugeParam.cpu_prec);
+
     break;
   case 1: 
     cpu_parity=1; //ODD
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
-		     inv_param.cpu_prec, gauge_param.cpu_prec);
+		     inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   case 2:
     //mat(spinorRef->v, fatlink, longlink, spinor->v, kappa, dagger, 
-    //inv_param.cpu_prec, gauge_param.cpu_prec);
+    //inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   default:
     printf("Test type not defined\n");
@@ -325,7 +392,7 @@ static void dslashTest()
     printf("\n%fms per loop\n", 1000*secs);
 	
     int flops = dirac->Flops();
-    int link_floats = 8*gauge_param.reconstruct+8*18;
+    int link_floats = 8*gaugeParam.reconstruct+8*18;
     int spinor_floats = 8*6*2 + 6;
     int link_float_size = prec;
     int spinor_float_size = 0;
@@ -348,13 +415,6 @@ static void dslashTest()
     }
 	
     cpuColorSpinorField::Compare(*spinorRef, *spinorOut);	
-	
-    printf("Output spinor:\n");
-    spinorOut->PrintVector(0);
-
-    printf("Ref spinor:\n");
-    spinorRef->PrintVector(0);
-	
   }
   end();
   
@@ -389,6 +449,9 @@ void usage(char** argv )
 
 int main(int argc, char **argv) 
 {
+  MPI_Init (&argc, &argv);
+  comm_init();
+  
   int i;
   for (i =1;i < argc; i++){
 	

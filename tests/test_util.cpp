@@ -296,6 +296,37 @@ int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
   return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
 }
 
+int
+neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
+{
+  int ret;
+  
+  int Y = fullLatticeIndex(i, oddBit);
+  int x4 = Y/(Z[2]*Z[1]*Z[0]);
+  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
+  int x2 = (Y/Z[0]) % Z[1];
+  int x1 = Y % Z[0];
+  
+  int ghost_x4 = x4+ dx4;
+  
+  // assert (oddBit == (x+y+z+t)%2);
+  
+  x4 = (x4+dx4+Z[3]) % Z[3];
+  x3 = (x3+dx3+Z[2]) % Z[2];
+  x2 = (x2+dx2+Z[1]) % Z[1];
+  x1 = (x1+dx1+Z[0]) % Z[0];
+  
+  if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
+    ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+  }else{
+    ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;    
+  }
+
+  
+  return ret;
+}
+
+
 /*  
  * This is a computation of neighbor using the full index and the displacement in each direction
  *

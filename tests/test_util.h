@@ -14,6 +14,7 @@ extern "C" {
 
   int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) ;
+  int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
 
   void printSpinorElement(void *spinor, int X, QudaPrecision precision);
   void printGaugeElement(void *gauge, int X, QudaPrecision precision);

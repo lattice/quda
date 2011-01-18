@@ -259,6 +259,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 						    cudaColorSpinorField &y, cudaColorSpinorField &z, 
 						    cudaColorSpinorField &w, cudaColorSpinorField &u);
+  
 
  private:
   void *v; // the field elements
@@ -288,6 +289,10 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   void loadCPUSpinorField(const cpuColorSpinorField &src);
   void saveCPUSpinorField (cpuColorSpinorField &src) const;
+  void packGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, void*f_norm, void*b_norm, cudaStream_t* stream);
+  void unpackGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, void*f_norm, void* b_norm, cudaStream_t* stream);  
+  void* getV(){ return v;}
+  void* getNorm(){return norm;}
 
   cudaColorSpinorField& Even() const;
   cudaColorSpinorField& Odd() const;

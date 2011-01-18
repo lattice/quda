@@ -694,11 +694,15 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 			 const QudaPrecision precision, const dim3 block, const dim3 blockFace) 
 {
 
-#ifdef MULTI_GPU
-  errorQuda("Multi-GPU staggered not implemented\n");
-#endif
+
 
 #ifdef GPU_STAGGERED_DIRAC
+
+#ifdef MULTI_GPU
+  //errorQuda("Multi-GPU staggered not implemented\n");
+#endif
+
+
   dslashParam.parity = parity;
   dslashParam.threads = volume;
 

@@ -24,7 +24,8 @@ extern "C" {
   void initDslashConstants(const FullGauge gauge, const int sp_stride);
   void initCloverConstants(const int cl_stride);
   void initDomainWallConstants(const int Ls);
-  void initStaggeredConstants(void);
+  void initStaggeredConstants(FullGauge fatgauge, FullGauge longgauge);
+
 
   // plain Wilson Dslash  
   void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, const void *inNorm,

@@ -12,6 +12,9 @@ extern "C" {
 			GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
 			Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, 
 			QudaLinkType type);
+  void createGaugeField_mg(FullGauge *cudaGauge, void *cpuGauge, void* ghost_gauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
+			   GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
+			   Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, int num_faces, int flag);
 
   void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, QudaPrecision cpu_prec, GaugeFieldOrder gauge_order);
 
@@ -26,11 +29,20 @@ extern "C" {
   void freeMomQuda(FullMom *cudaMom);
   void storeMomToCPU(void* mom, FullMom cudaMom, QudaGaugeParam* param);
   void loadMomToGPU(FullMom cudaMom, void* mom, QudaGaugeParam* param);
+  void packGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf, 
+		       void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream);
+  void  unpackGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf, 
+			  void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream);
+
 
 #define freeLinkQuda freeGaugeField
 
 #define momSiteSize   10 // real numbers per momentum
 #define gaugeSiteSize 18 // real numbers per gauge field
+
+#define GAUGE_STAGGERED_FAT  1
+#define GAUGE_STAGGERED_LONG 2 
+
   
 #ifdef __cplusplus
 }
