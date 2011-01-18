@@ -397,6 +397,12 @@ void MatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
   } else {
     errorQuda("Unsupported dslash_type");
   }
+
+  if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
+    axCuda(0.25/(kappa*kappa), out);
+  } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+    axCuda(0.5/kappa, out);
+  }
   retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
   freeParitySpinor(tmp);
@@ -426,6 +432,12 @@ void MatPCDagMatPCQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   } else {
     errorQuda("Unsupported dslash_type");
   }
+
+  if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
+    axCuda(1.0/pow(2.0*kappa,4), out);
+  } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+    axCuda(0.25/(kappa*kappa), out);
+  }
   retrieveParitySpinor(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
   freeParitySpinor(tmp);
@@ -447,13 +459,19 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, int dagger)
     kappa *= cudaGaugePrecise.anisotropy;
 
   if (inv_param->dslash_type == QUDA_WILSON_DSLASH) {
-    MatCuda(out, cudaGaugePrecise, in, -kappa, dagger);
+    MatCuda(out, cudaGaugePrecise, in, kappa, dagger);
   } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     ParitySpinor tmp = allocateParitySpinor(cudaGaugePrecise.X, inv_param->cuda_prec, inv_param->sp_pad);
     cloverMatCuda(out, cudaGaugePrecise, cudaCloverPrecise, in, kappa, tmp, dagger);
     freeParitySpinor(tmp);
   } else {
     errorQuda("Unsupported dslash_type");
+  }
+
+  if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION ||
+      inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+    axCuda(0.5/kappa, out.even);
+    axCuda(0.5/kappa, out.odd);
   }
   retrieveSpinorField(h_out, out, inv_param->cpu_prec, inv_param->dirac_order);
 
@@ -570,7 +588,6 @@ void invertQuda(void *h_x, void *h_b, QudaInvertParam *param)
       }
     }
   }
-
   
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:

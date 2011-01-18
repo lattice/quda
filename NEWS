@@ -1,9 +1,40 @@
-Version 0.2.4
 
-- Added initial support for CUDA 3.0 and Fermi (not yet optimized).
+Version 0.2.6 - 18 January 2011
 
-- Introduced additional checks to increase stability of the BiCGstab
+- This is a maintenance release.  Please use QUDA 0.3.x or newer to
+  take advantage of the latest features and bugfixes.
+
+- Fixed a long-standing bug in the MatQuda() interface function that
+  caused the sign of the kappa parameter to be flipped for plain
+  Wilson fermions.  MatQuda() for clover fermions, as well as all
+  other interface functions (including the inverters), were
+  unaffected.
+
+- Fixed a long-standing bug in the spinor input/output routines that
+  resulted in QUDA_DIRAC_ORDER being used when
+  QUDA_QDP_DIRAC_ORDER was requested.
+
+- The MatPCQuda(), MatPCDagMatPCQuda(), and MatQuda() interface
+  functions now respect the mass_normalization parameter set in
+  InvertParam.  Previously, "kappa normalization" was always assumed.
+
+
+Version 0.2.5 - 24 June 2010
+
+- Fixed regression in 0.2.4 that prevented the library from compiling
+  when GPU_ARCH was set to sm_10, sm_11, or sm_12.
+
+
+Version 0.2.4 - 22 June 2010
+
+- Added initial support for CUDA 3.x and Fermi (not yet optimized).
+
+- Incorporated look-ahead strategy to increase stability of the BiCGstab
   inverter.
+
+- Added definition of QUDA_VERSION to quda.h.  This is an integer with
+  two digits for each of the major, minor, and subminor version
+  numbers.  For example, QUDA_VERSION is 000204 for this release.
 
 
 Version 0.2.3 - 2 June 2010

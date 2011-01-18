@@ -3,6 +3,8 @@
 
 #include <enum_quda.h>
 
+#define QUDA_VERSION 000206 // version 0.2.6
+
 #ifdef __cplusplus
 extern "C" {
 #endif

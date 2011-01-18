@@ -407,7 +407,7 @@ void loadParitySpinor(ParitySpinor ret, void *spinor, Precision cpu_prec,
 
     allocateBuffer(&packedSpinor1, ret.bytes);
     
-    if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (dirac_order == QUDA_DIRAC_ORDER || dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (ret.precision == QUDA_DOUBLE_PRECISION) {
 	packParitySpinor((double2*)packedSpinor1, (double*)spinor, ret.volume, ret.pad);
       } else {
@@ -489,7 +489,7 @@ void retrieveParitySpinor(void *res, ParitySpinor spinor, Precision cpu_prec, Di
     allocateBuffer(&packedSpinor1, spinor.bytes);
     cudaMemcpy(packedSpinor1, spinor.spinor, spinor.bytes, cudaMemcpyDeviceToHost);
 
-    if (dirac_order == QUDA_DIRAC_ORDER || QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (dirac_order == QUDA_DIRAC_ORDER || dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       if (spinor.precision == QUDA_DOUBLE_PRECISION) {
 	unpackParitySpinor((double*)res, (double2*)packedSpinor1, spinor.volume, spinor.pad);
       } else {
