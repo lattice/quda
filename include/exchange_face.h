@@ -1,5 +1,7 @@
 #ifndef __EXCHANGE_FACE_H__
 #define __EXCHANGE_FACE_H__
+#include "enum_quda.h"
+#include "quda_internal.h"
 
 #ifdef __cplusplus
 extern "C" {

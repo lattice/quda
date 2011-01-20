@@ -38,6 +38,13 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
   nSpin = Ns;
   twistFlavor = Twistflavor;
 
+  int num_faces = 1;
+  int num_norm_faces=2;
+  if (nSpin == 1) { //staggered
+    num_faces=6;
+    num_norm_faces=6;
+  }
+
   precision = Prec;
   volume = 1;
   int Vs = 1;
@@ -52,8 +59,8 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
     stride = volume/2 + pad; // padding is based on half volume
     length = 2*stride*nColor*nSpin*2;    
 #ifdef MULTI_GPU
-    ghost_length = Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+    ghost_length = num_faces*Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (num_norm_faces*Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
 #else
     ghost_length = 0;
     ghost_norm_length = 0;
@@ -64,8 +71,8 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
     stride = volume + pad;
     length = stride*nColor*nSpin*2;
 #ifdef MULTI_GPU
-    ghost_length = Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+    ghost_length = num_faces*Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs * num_norm_faces : 0; // ghost norm zone is 2 c/b spatial volumes
 #else
     ghost_length = 0;
     ghost_norm_length = 0;
@@ -121,6 +128,14 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
   if (param.nDim != 0) nDim = param.nDim;
 
+  int num_faces = 1;
+  int num_norm_faces=2;
+  if (nSpin == 1) { //staggered
+    num_faces=6;
+    num_norm_faces=6;
+  }
+
+
   volume = 1;
   int Vs = 1;
   for (int d=0; d<nDim; d++) {
@@ -135,8 +150,8 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
     stride = volume/2 + pad;
     length = 2*stride*nColor*nSpin*2;
 #ifdef MULTI_GPU
-    ghost_length = Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+    ghost_length = num_faces*Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (num_norm_faces*Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
 #else
     ghost_length = 0;
     ghost_norm_length = 0;
@@ -147,8 +162,8 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
     stride = volume + pad;
     length = stride*nColor*nSpin*2;  
 #ifdef MULTI_GPU
-    ghost_length = Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs*2 : 0; // ghost norm zone is 2 c/b spatial volumes
+    ghost_length = num_faces*Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs*num_norm_faces : 0; // ghost norm zone is 2 c/b spatial volumes
 #else
     ghost_length = 0;
     ghost_norm_length = 0;

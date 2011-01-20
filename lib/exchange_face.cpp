@@ -138,6 +138,7 @@ void exchange_init(cudaColorSpinorField* cudaSpinor)
 
 void exchange_dslash_cleanup(void)
 {
+  
   if(fwd_nbr_spinor_sendbuf){
     cudaFreeHost(fwd_nbr_spinor_sendbuf);
   }
@@ -391,7 +392,6 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
     comm_wait(send_request3);
     comm_wait(send_request4);
   }
-  
   cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream);  
   cudaStreamSynchronize(*mystream);
   

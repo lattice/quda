@@ -4,7 +4,7 @@ OUTFILE=/tmp/quda_test.txt
 echo "" > $OUTFILE
 
 fail_msg="Sanity check for quda failed!"
-success_msg="Sanity check for quda succeeded!"
+success_msg="Sanity check for quda passed!"
 
 progs="staggered_dslash_test staggered_invert_test"
 precs="double single"

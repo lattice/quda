@@ -530,10 +530,11 @@ static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_
       for (int i = 0; i < V; i++) pack12(d_gauge+i, g+i*18, dir, V+pad);
     }
     //ghost gauge
-    //we only need one direction, let's put it in the dir=0 space
+    //we only need one direction, let's put it in the dir=3 space
+    int dir =3;
     Float* g = ghost_gauge + oddBit*num_faces*Vsh*18;
     for(int i=0; i < num_faces*Vsh; i++){
-      pack12(d_gauge+V+i, g + i*18, 0, V+pad);
+      pack12(d_gauge+V+i, g + i*18, dir, V+pad);
     } 
 
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {
@@ -542,10 +543,11 @@ static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_
       for (int i = 0; i < V; i++) pack8(d_gauge+i, g+i*18, dir, V+pad);
     }
     //ghost gauge
-    //we only need one direction, let's put it in the dir=0 space
+    //we only need one direction, let's put it in the dir=3 space
+    int dir =3;
     Float* g = ghost_gauge + oddBit*num_faces*Vsh*18;
     for(int i=0; i < num_faces*Vsh; i++){
-      pack8(d_gauge+V+i, g + i*18, 0, V+pad);
+      pack8(d_gauge+V+i, g + i*18, dir, V+pad);
     } 
 
   } else { //18 reconstruct
@@ -562,17 +564,18 @@ static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_
       }
     }
     //ghost gauge
-    //we only need one direction, let's put it in the dir=0 space
+    //we only need one direction, let's put it in the dir=3 space
+    int dir =3;
     Float* g = ghost_gauge + oddBit*num_faces*Vsh*18;
     
     if ((flag & GAUGE_STAGGERED_FAT) && (typeid(FloatN) == typeid(short2))){
       for(int i=0; i < num_faces*Vsh; i++){
 	  //we know it is half precison with fatlink at this stage
-	fatlink_short_pack18((short2*)(d_gauge+V+i), g + i*18, 0, V+pad);
+	fatlink_short_pack18((short2*)(d_gauge+V+i), g + i*18, dir, V+pad);
       }           
     }else{
       for(int i=0; i < num_faces*Vsh; i++){
-	pack18(d_gauge+V+i, g + i*18, 0, V+pad);
+	pack18(d_gauge+V+i, g + i*18, dir, V+pad);
       }     
     }   
   }

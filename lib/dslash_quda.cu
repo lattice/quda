@@ -1,6 +1,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include "exchange_face.h"
 
 //these are access control for staggered action
 #if (__CUDA_ARCH__ >= 200)
@@ -596,7 +597,8 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 }
 
 template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
-void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
+void staggeredDslashCuda(cudaColorSpinorField* inSpinor, 
+			 spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
 			 const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
 			 const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 			 const int dagger, const spinorFloat *x, const float *xNorm, 
@@ -605,6 +607,10 @@ void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *
     
   dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
   int shared_bytes = blockDim.x*6*bindSpinorTex<spinorN>(bytes, norm_bytes, in, inNorm, x, xNorm);
+
+  exchange_gpu_spinor_start(inSpinor, &streams[1]);   
+  exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
+  cudaThreadSynchronize();
   
   if (x==0) { // not doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_12) {
@@ -655,7 +661,8 @@ void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *
 
 
 template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
-  void staggeredDslashNoReconCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
+  void staggeredDslashNoReconCuda(cudaColorSpinorField* inSpinor, 
+				  spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
 				  const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
 				  const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 				  const int dagger, const spinorFloat *x, const float *xNorm, 
@@ -664,6 +671,12 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 {  
   dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
   int shared_bytes = blockDim.x*6*bindSpinorTex<spinorN>(bytes, norm_bytes, in, inNorm, x, xNorm);
+  
+  exchange_gpu_spinor_start(inSpinor, &streams[1]);   
+  exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
+  cudaThreadSynchronize();
+  
+
   
   if (x==0) { // not doing xpay
     if (!dagger) {
@@ -687,7 +700,8 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 }
 
 
-void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, const FullGauge longGauge, 
+void staggeredDslashCuda(cudaColorSpinorField* inSpinor, 
+			 void *out, void *outNorm, const FullGauge fatGauge, const FullGauge longGauge, 			 
 			 const void *in, const void *inNorm, 
 			 const int parity, const int dagger, const void *x, const void *xNorm, 
 			 const double k, const int volume, const size_t bytes, const size_t norm_bytes, 
@@ -702,6 +716,10 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
   //errorQuda("Multi-GPU staggered not implemented\n");
 #endif
 
+  for(int i=0;i < 2 ;i ++){
+    cudaStreamCreate(&streams[i]); CUERR;
+  }
+  
 
   dslashParam.parity = parity;
   dslashParam.threads = volume;
@@ -718,12 +736,14 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
   if (precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
-      staggeredDslashNoReconCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
+      staggeredDslashNoReconCuda<2>(inSpinor, 
+				    (double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
 				    (double2*)longGauge0, (double2*)longGauge1,
 				    longGauge.reconstruct, (double2*)in, (float*)inNorm, dagger, 
 				    (double2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
     }else{
-      staggeredDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
+      staggeredDslashCuda<2>(inSpinor, 
+			     (double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
 			     (double2*)longGauge0, (double2*)longGauge1,
 			     longGauge.reconstruct, (double2*)in, (float*)inNorm, dagger, 
 			     (double2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
@@ -734,24 +754,28 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 #endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
-      staggeredDslashNoReconCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
+      staggeredDslashNoReconCuda<2>(inSpinor, 
+				    (float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
 				    (float2*)longGauge0, (float2*)longGauge1,
 				    longGauge.reconstruct, (float2*)in, (float*)inNorm, dagger, 
 				    (float2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
     }else{
-      staggeredDslashCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
+      staggeredDslashCuda<2>(inSpinor, 
+			     (float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
 			     (float4*)longGauge0, (float4*)longGauge1,
 			     longGauge.reconstruct, (float2*)in, (float*)inNorm, dagger, 
 			     (float2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
     }
   } else if (precision == QUDA_HALF_PRECISION) {	
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
-      staggeredDslashNoReconCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
+      staggeredDslashNoReconCuda<2>(inSpinor, 
+				    (short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
 				    (short2*)longGauge0, (short2*)longGauge1,
 				    longGauge.reconstruct, (short2*)in, (float*)inNorm, dagger, 
 				    (short2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
     }else{
-      staggeredDslashCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
+      staggeredDslashCuda<2>(inSpinor, 
+			     (short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
 			     (short4*)longGauge0, (short4*)longGauge1,
 			     longGauge.reconstruct, (short2*)in, (float*)inNorm, dagger, 
 			     (short2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
@@ -760,6 +784,10 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 
   unbindLongGaugeTex(longGauge);
   unbindFatGaugeTex(fatGauge);
+  
+  for (int i = 0; i < 2; i++) {
+    cudaStreamDestroy(streams[i]);
+  }
 
   if (!dslashTuning) checkCudaError();
 #else

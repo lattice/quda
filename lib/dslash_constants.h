@@ -37,6 +37,7 @@ __constant__ int X3X2X1_3;
 
 __constant__ int Vh;
 __constant__ int Vs;
+__constant__ int Vsh;
 __constant__ int sp_stride;
 __constant__ int ga_stride;
 __constant__ int cl_stride;
@@ -86,6 +87,9 @@ void initCommonConstants(const FullGauge gauge) {
   
   Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2];
   cudaMemcpyToSymbol("Vs", &Vspatial, sizeof(int));
+
+  int half_Vspatial = Vspatial;
+  cudaMemcpyToSymbol("Vsh", &half_Vspatial, sizeof(int));
 
   int X1 = 2*gauge.X[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
@@ -254,10 +258,6 @@ initStaggeredConstants(FullGauge fatgauge, FullGauge longgauge)
   
   int fat_ga_stride = fatgauge.stride;
   int long_ga_stride = longgauge.stride;
-  
-  printf("fat_ga_stride=%d, long_ga_stride=%d\n", 
-	 fat_ga_stride,
-	 long_ga_stride);
   
   cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));  
   cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));  
