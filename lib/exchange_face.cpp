@@ -68,8 +68,8 @@ void exchange_init(cudaColorSpinorField* cudaSpinor)
   //int len = 3*Vsh*mySpinorSiteSize*cudaSpinor->Precision();
   int len = 3*Vsh*mySpinorSiteSize*QUDA_DOUBLE_PRECISION; //use maximum precision size
   int normlen = 3*Vsh*sizeof(float);
-
-  if (!exchange_initialized){
+   
+  if (!exchange_initialized){    
     cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf, len); CUERR;
     cudaMallocHost((void**)&back_nbr_spinor_sendbuf, len); CUERR;
     if (fwd_nbr_spinor_sendbuf == NULL || back_nbr_spinor_sendbuf == NULL){
@@ -271,7 +271,7 @@ exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
   int normlen = 3*Vsh*sizeof(float);
 
   gettimeofday(&t0, NULL);
-  cudaSpinor->packGhostSpinor(fwd_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, f_norm_sendbuf, b_norm_sendbuf, mystream);
+  cudaSpinor->packGhostSpinor(fwd_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, f_norm_sendbuf, b_norm_sendbuf, mystream); CUERR;
   cudaStreamSynchronize(*mystream);
   gettimeofday(&t1, NULL);
  
@@ -308,7 +308,7 @@ exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
   }
   
   gettimeofday(&t2, NULL);
-  cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream);
+  cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream); CUERR;
   
   cudaStreamSynchronize(*mystream);
   gettimeofday(&t3, NULL);
@@ -383,15 +383,16 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
   memcpy(back_nbr_spinor, pagable_back_nbr_spinor, len);
 
   if (cudaSpinor->Precision() == QUDA_HALF_PRECISION){
-
-    memcpy(f_norm, pagable_f_norm, normlen);
-    memcpy(b_norm, pagable_b_norm, normlen);
-
+    
     comm_wait(recv_request3);
     comm_wait(recv_request4);
     comm_wait(send_request3);
     comm_wait(send_request4);
-  }
+    
+    memcpy(f_norm, pagable_f_norm, normlen);
+    memcpy(b_norm, pagable_b_norm, normlen);
+
+    }
   cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream);  
   cudaStreamSynchronize(*mystream);
   

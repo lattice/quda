@@ -362,19 +362,29 @@ invert_test(void)
     
   }//switch
     
+  int ret = 0;
+
   if (testtype <=2){
+
     printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 	
     printf("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	   time0, inv_param.iter, inv_param.secs,
 	   inv_param.gflops/inv_param.secs);
+
+    //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+    if (sqrt(nrm2/src2) > 10*inv_param.tol){
+      ret = 1;
+      printf("Convergence failed!\n");
+    }
   }
 
   end();
   if (tmp){
     free(tmp);
   }
-  return 0;
+  
+  return ret;
 }
 
 
@@ -552,8 +562,7 @@ int main(int argc, char** argv)
   }
   
   display_test_info();
-  invert_test();
-    
 
-  return 0;
+  return invert_test();
+  
 }

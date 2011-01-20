@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include "exchange_face.h"
 
+#define BLOCK_DIM 64
+
 //these are access control for staggered action
 #if (__CUDA_ARCH__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
@@ -34,7 +36,6 @@ static const int Nstream = 3;
 static const int Nstream = 1;
 #endif
 static cudaStream_t streams[Nstream];
-
 FaceBuffer *face;
 int stride;
 
@@ -596,39 +597,48 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 
 }
 
-template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
-void staggeredDslashCuda(cudaColorSpinorField* inSpinor, 
-			 spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
-			 const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
-			 const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
-			 const int dagger, const spinorFloat *x, const float *xNorm, 
-			 const double &a, const size_t bytes, const size_t norm_bytes, 
-			 const QudaPrecision precision, const dim3 &blockDim) {
-    
-  dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-  int shared_bytes = blockDim.x*6*bindSpinorTex<spinorN>(bytes, norm_bytes, in, inNorm, x, xNorm);
 
-  exchange_gpu_spinor_start(inSpinor, &streams[1]);   
-  exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
-  cudaThreadSynchronize();
-  
+static void
+initTLocation(int toffset, int tmul, int threads) 
+{
+  short2 tLocate = make_short2((short)toffset, (short)tmul);
+  cudaMemcpyToSymbol("tLocate", &(tLocate), sizeof(short2));
+  cudaMemcpyToSymbol("threads", &(threads), sizeof(threads));
+
+}
+
+template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
+  void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
+			   const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
+			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
+			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
+			   const double &a, const int volume, const int Vsh, const int tdim,
+			   const int length, const int ghost_length,
+			   cudaColorSpinorField* inSpinor, dim3 blockDim) {
+    
+  dim3 interiorGridDim( (dslashParam.threads + blockDim.x -1)/blockDim.x, 1, 1);
+  dim3 exteriorGridDim( (6*Vsh + blockDim.x -1)/blockDim.x, 1, 1);
+
+  int shared_bytes = blockDim.x*6*bindSpinorTex_mg<spinorN>(length, ghost_length, in, inNorm, x, xNorm); CUERR;
+
+  initTLocation(0, INTERIOR_KERNEL, volume);  CUERR;
   if (x==0) { // not doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
-	staggeredDslash12Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);
+	staggeredDslash12Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+											 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       } else {
-	staggeredDslash12DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);
+	staggeredDslash12DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
+												 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_8){
 	  
       if (!dagger) {
-	staggeredDslash8Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);
+	staggeredDslash8Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
+											 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       } else {
-	staggeredDslash8DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);
+	staggeredDslash8DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+											      longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       }
     }else{
       errorQuda("Invalid reconstruct value(%d) in function %s\n", reconstruct, __FUNCTION__);
@@ -637,78 +647,151 @@ void staggeredDslashCuda(cudaColorSpinorField* inSpinor,
     
     if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
-	staggeredDslash12AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a);
+	staggeredDslash12AxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
+											      longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       } else {
-	staggeredDslash12DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a);
+	staggeredDslash12DaggerAxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+												   longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {
       if (!dagger) {
-	staggeredDslash8AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a);
+	staggeredDslash8AxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+											    longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       } else {
-	staggeredDslash8DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>>
-	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a);
+	staggeredDslash8DaggerAxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1, 
+												  longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       }
     }else{
       errorQuda("Invalid reconstruct value in function %s\n", __FUNCTION__);	  
     }    
   }
-  
-  unbindSpinorTex<spinorN>(in, inNorm, x, xNorm);
+
+
+  exchange_gpu_spinor_start(inSpinor, &streams[1]); CUERR;
+  exchange_gpu_spinor_wait(inSpinor, &streams[1]); CUERR;
+  cudaStreamSynchronize(streams[0]); CUERR;
+
+  initTLocation(tdim-6,EXTERIOR_KERNEL , 6*Vsh);  
+  if (x==0) { // not doing xpay
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	staggeredDslash12Kernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1, 
+											 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
+      } else {
+	staggeredDslash12DaggerKernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1,
+												longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_8){
+      
+      if (!dagger) {
+	staggeredDslash8Kernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
+											 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
+      } else {
+	staggeredDslash8DaggerKernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1, 
+											      longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
+      }
+    }else{
+      errorQuda("Invalid reconstruct value(%d) in function %s\n", reconstruct, __FUNCTION__);
+    }
+  } else { // doing xpay
+    
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+      if (!dagger) {
+	staggeredDslash12AxpyKernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
+											      longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
+      } else {
+	staggeredDslash12DaggerAxpyKernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+												   longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
+      }
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+      if (!dagger) {
+	staggeredDslash8AxpyKernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+											    longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
+      } else {
+	staggeredDslash8DaggerAxpyKernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1, 
+												  longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
+      }
+    }else{
+      errorQuda("Invalid reconstruct value in function %s\n", __FUNCTION__);	  
+    }    
+  }
+  cudaThreadSynchronize(); CUERR;    
 }
 
+//This function is a special case for 18(no) reconstruct long link
+//The reason is to make the type match easier(e.g float2 instead of float4)
 
 template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
-  void staggeredDslashNoReconCuda(cudaColorSpinorField* inSpinor, 
-				  spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
+  void staggeredDslashNoReconCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
 				  const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
 				  const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
-				  const int dagger, const spinorFloat *x, const float *xNorm, 
-				  const double &a, const size_t bytes, const size_t norm_bytes, 
-				  const QudaPrecision precision, const dim3 &blockDim) 
-{  
-  dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-  int shared_bytes = blockDim.x*6*bindSpinorTex<spinorN>(bytes, norm_bytes, in, inNorm, x, xNorm);
+				  const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
+				  const double &a, const int volume, const int Vsh, const int tdim,
+				  const int length, const int ghost_length,
+				  cudaColorSpinorField* inSpinor, dim3 blockDim) 
+{
   
-  exchange_gpu_spinor_start(inSpinor, &streams[1]);   
-  exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
-  cudaThreadSynchronize();
   
-
+  dim3 interiorGridDim( (dslashParam.threads + blockDim.x -1)/blockDim.x, 1, 1);
+  dim3 exteriorGridDim( (6*Vsh + blockDim.x -1)/blockDim.x, 1, 1);
   
+  int shared_bytes = blockDim.x*6*bindSpinorTex_mg<spinorN>(length, ghost_length, in, inNorm, x, xNorm);
+  
+  initTLocation(0, INTERIOR_KERNEL, volume);  
   if (x==0) { // not doing xpay
     if (!dagger) {
-      staggeredDslash18Kernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);
+      staggeredDslash18Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+											       longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
     } else {
-      staggeredDslash18DaggerKernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);
+      staggeredDslash18DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
+												      longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
     }    
   } else { // doing xpay
+    
     if (!dagger) {
-      staggeredDslash18AxpyKernel <<<gridDim, blockDim, shared_bytes>>> 
-	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a);
+      staggeredDslash18AxpyKernel<<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+												  longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
     } else {
-      staggeredDslash18DaggerAxpyKernel <<<gridDim, blockDim, shared_bytes>>>
-	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a);
+      staggeredDslash18DaggerAxpyKernel<<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+													longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
+    }          
+  }
+  exchange_gpu_spinor_start(inSpinor, &streams[1]);   
+  exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
+  
+  initTLocation(tdim-6,EXTERIOR_KERNEL , 6*Vsh);  
+  if (x==0) { // not doing xpay
+    if (!dagger) {
+      staggeredDslash18Kernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1, 
+										       longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
+    } else {
+      staggeredDslash18DaggerKernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
+												      longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
+    }    
+  } else { // doing xpay
+    
+    if (!dagger) {
+      staggeredDslash18AxpyKernel<<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,      
+												 longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
+    } else {
+      staggeredDslash18AxpyKernel<<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
+												  longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
     }          
   }
   
-  unbindSpinorTex<spinorN>(in, inNorm, x, xNorm);
+  cudaThreadSynchronize();
 }
 
 
-void staggeredDslashCuda(cudaColorSpinorField* inSpinor, 
-			 void *out, void *outNorm, const FullGauge fatGauge, const FullGauge longGauge, 			 
-			 const void *in, const void *inNorm, 
+
+void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, const FullGauge longGauge, 
+			 cudaColorSpinorField *in,
 			 const int parity, const int dagger, const void *x, const void *xNorm, 
-			 const double k, const int volume, const size_t bytes, const size_t norm_bytes, 
-			 const QudaPrecision precision, const dim3 block, const dim3 blockFace) 
+			 const double k, const int volume, const int Vsh, const int tdim, 
+			 const int length, const int ghost_length, const QudaPrecision precision,
+			 const dim3 block, const dim3 blockFace)
 {
-
-
+  
 
 #ifdef GPU_STAGGERED_DIRAC
 
@@ -719,7 +802,6 @@ void staggeredDslashCuda(cudaColorSpinorField* inSpinor,
   for(int i=0;i < 2 ;i ++){
     cudaStreamCreate(&streams[i]); CUERR;
   }
-  
 
   dslashParam.parity = parity;
   dslashParam.threads = volume;
@@ -733,68 +815,61 @@ void staggeredDslashCuda(cudaColorSpinorField* inSpinor,
     errorQuda("Mixing gauge and spinor precision not supported");
   }
     
+
+
   if (precision == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
-      staggeredDslashNoReconCuda<2>(inSpinor, 
-				    (double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
+      staggeredDslashNoReconCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
 				    (double2*)longGauge0, (double2*)longGauge1,
-				    longGauge.reconstruct, (double2*)in, (float*)inNorm, dagger, 
-				    (double2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
+				    longGauge.reconstruct, (double2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
+				    (double2*)x, (float*)xNorm, k, volume, Vsh, tdim, length, ghost_length, in, block);
     }else{
-      staggeredDslashCuda<2>(inSpinor, 
-			     (double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
+      staggeredDslashCuda<2>((double2*)out, (float*)outNorm, (double2*)fatGauge0, (double2*)fatGauge1, 			       
 			     (double2*)longGauge0, (double2*)longGauge1,
-			     longGauge.reconstruct, (double2*)in, (float*)inNorm, dagger, 
-			     (double2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
+			     longGauge.reconstruct, (double2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
+			     (double2*)x, (float*)xNorm, k, volume, Vsh, tdim, length, ghost_length, in, block);
     }
     
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
   } else if (precision == QUDA_SINGLE_PRECISION) {
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
-      staggeredDslashNoReconCuda<2>(inSpinor, 
-				    (float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
+      staggeredDslashNoReconCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
 				    (float2*)longGauge0, (float2*)longGauge1,
-				    longGauge.reconstruct, (float2*)in, (float*)inNorm, dagger, 
-				    (float2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
+				    longGauge.reconstruct, (float2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
+				    (float2*)x, (float*)xNorm, k, volume, Vsh, tdim, length, ghost_length, in, block);
     }else{
-      staggeredDslashCuda<2>(inSpinor, 
-			     (float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
+      staggeredDslashCuda<2>((float2*)out, (float*)outNorm, (float2*)fatGauge0, (float2*)fatGauge1,
 			     (float4*)longGauge0, (float4*)longGauge1,
-			     longGauge.reconstruct, (float2*)in, (float*)inNorm, dagger, 
-			     (float2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
+			     longGauge.reconstruct, (float2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
+			     (float2*)x, (float*)xNorm, k, volume, Vsh, tdim, length, ghost_length, in, block);
     }
   } else if (precision == QUDA_HALF_PRECISION) {	
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
-      staggeredDslashNoReconCuda<2>(inSpinor, 
-				    (short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
+      staggeredDslashNoReconCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
 				    (short2*)longGauge0, (short2*)longGauge1,
-				    longGauge.reconstruct, (short2*)in, (float*)inNorm, dagger, 
-				    (short2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
+				    longGauge.reconstruct, (short2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
+				    (short2*)x, (float*)xNorm, k, volume, Vsh, tdim, length, ghost_length, in, block);
     }else{
-      staggeredDslashCuda<2>(inSpinor, 
-			     (short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
+      staggeredDslashCuda<2>((short2*)out, (float*)outNorm, (short2*)fatGauge0, (short2*)fatGauge1,
 			     (short4*)longGauge0, (short4*)longGauge1,
-			     longGauge.reconstruct, (short2*)in, (float*)inNorm, dagger, 
-			     (short2*)x, (float*)xNorm, k, bytes, norm_bytes, precision, block);
+			     longGauge.reconstruct, (short2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
+			     (short2*)x, (float*)xNorm, k, volume, Vsh, tdim, length, ghost_length, in, block);
     }
   }
 
-  unbindLongGaugeTex(longGauge);
-  unbindFatGaugeTex(fatGauge);
-  
   for (int i = 0; i < 2; i++) {
     cudaStreamDestroy(streams[i]);
   }
-
+  
   if (!dslashTuning) checkCudaError();
+  
 #else
   errorQuda("Staggered dslash has not been built");
 #endif  
-
 }
+
+
+
+
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
 		   const int dagger, const QudaTwistGamma5Type twist) {
@@ -1033,7 +1108,6 @@ void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 
 }
 
-#define BLOCK_DIM 64
 
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 #include <force_common.h>

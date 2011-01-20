@@ -16,6 +16,8 @@ for prog in $progs ; do
     for recon in $recons ; do
 	cmd="$prog --sdim 8 --tdim 16 --recon $recon --prec $prec"
 	echo running $cmd
+	echo "----------------------------------------------------------" >>$OUTFILE
+        echo $cmd >> $OUTFILE
 	./$cmd >> $OUTFILE 2>&1|| (echo "$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
     done
   done

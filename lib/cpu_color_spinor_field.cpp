@@ -258,7 +258,7 @@ void cpuColorSpinorField::Source(const QudaSourceType sourceType, const int st, 
 }
 
 template <typename FloatA, typename FloatB>
-static void compareSpinor(const FloatA *u, const FloatB *v, const int volume, 
+static int  compareSpinor(const FloatA *u, const FloatB *v, const int volume, 
 			  const int N, const int resolution) {
   int fail_check = 16*resolution;
   int *fail = new int[fail_check];
@@ -280,34 +280,48 @@ static void compareSpinor(const FloatA *u, const FloatB *v, const int volume,
     
   for (int i=0; i<N; i++) printf("%d fails = %d\n", i, iter[i]);
     
+  int accuracy_level =0;
+  for (int f=0; f<fail_check; f++) {
+    if (fail[f] == 0){
+      accuracy_level = f;
+    }
+  }
+
   for (int f=0; f<fail_check; f++) {
     printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)resolution), 
 	   fail[f], volume*N, fail[f] / (double)(volume*N));
   }
-
+  
   delete []iter;
   delete []fail;
+  
+  return accuracy_level;
 }
 
-void cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, 
+int cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, 
 				  const int resolution) {
+  int ret = 0;
+  
   checkField(a, b);
   if (a.precision == QUDA_HALF_PRECISION || b.precision == QUDA_HALF_PRECISION) 
     errorQuda("Half precision not implemented");
   if (a.fieldOrder != b.fieldOrder || 
       (a.fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && a.fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER))
     errorQuda("Field ordering not supported");
-
+  
   if (a.precision == QUDA_DOUBLE_PRECISION) 
     if (b.precision == QUDA_DOUBLE_PRECISION)
-      compareSpinor((double*)a.v, (double*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+      ret = compareSpinor((double*)a.v, (double*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
     else
-      compareSpinor((double*)a.v, (float*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+      ret = compareSpinor((double*)a.v, (float*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
   else 
     if (b.precision == QUDA_DOUBLE_PRECISION)
-      compareSpinor((float*)a.v, (double*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+      ret = compareSpinor((float*)a.v, (double*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
     else
-      compareSpinor((float*)a.v, (float*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+      ret =compareSpinor((float*)a.v, (float*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+
+
+  return ret;
 }
 
 template <class Order>

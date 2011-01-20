@@ -378,7 +378,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   //cpuColorSpinorField& Odd() const;
 
   void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
-  static void Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
+  static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
   void PrintVector(unsigned int x);
 };
 

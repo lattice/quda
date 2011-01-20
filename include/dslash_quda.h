@@ -54,12 +54,21 @@ extern "C" {
 			    const QudaPrecision precision, const dim3 block, const dim3 blockFace);
     
   // staggered Dslash
+  /*
   void staggeredDslashCuda(cudaColorSpinorField* inSpinor,
 			   void *out, void *outNorm, const FullGauge fatGauge, FullGauge longGauge, const void *in, 
 			   const void *inNorm, const int parity, const int dagger, 
 			   const void *x, const void *xNorm, const double k,
 			   const int volume, const size_t bytes, const size_t norm_bytes, 
 			   const QudaPrecision precision, const dim3 block, const dim3 blockFace);
+  */
+  void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, FullGauge longGauge,
+			   cudaColorSpinorField *in,
+			   const int parity, const int dagger, 
+			   const void *x, const void *xNorm, const double k,
+			   const int volume, const int Vsh, const int tdim,
+			   const int length, const int ghost_length, const QudaPrecision precision,
+			   const dim3 block, const dim3 blockFace);
 
   // twisted mass Dslash  
   void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 

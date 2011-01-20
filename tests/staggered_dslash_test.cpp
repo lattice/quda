@@ -372,9 +372,10 @@ void staggeredDslashRef()
     
 }
 
-static void dslashTest() 
+static int dslashTest() 
 {
-    
+  int accuracy_level = 0;
+  
   init();
     
   int attempts = 1;
@@ -413,11 +414,12 @@ static void dslashTest()
     } else {
       std::cout << "Result: CPU = " << norm2(*spinorRef) << ", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
     }
-	
-    cpuColorSpinorField::Compare(*spinorRef, *spinorOut);	
+    
+    accuracy_level = cpuColorSpinorField::Compare(*spinorRef, *spinorOut);	
   }
   end();
   
+  return accuracy_level;
 }
 
 
@@ -541,5 +543,14 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  dslashTest();
+  int ret =1;
+  int accuracy_level = dslashTest();
+
+  printf("accuracy_level =%d\n", accuracy_level);
+  if (accuracy_level >= 3){
+    //probably no error 
+    ret = 0;
+  }
+
+  return ret;
 }

@@ -179,6 +179,7 @@
   out[sid+5*(stride)] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
 
 /************* the following is used by staggered *****************/
+#if 0
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)
@@ -358,3 +359,156 @@
   I2.x *= C; I2.y *= C;                                  
 
 
+#endif
+
+
+
+
+#ifndef DIRECT_ACCESS_SPINOR //spinor access control
+
+#define READ_1ST_NBR_SPINOR_SINGLE(spinor, idx, mystride)	\
+  float2 I0 = tex1Dfetch((spinor), idx + 0*mystride);		\
+  float2 I1 = tex1Dfetch((spinor), idx + 1*mystride);		\
+  float2 I2 = tex1Dfetch((spinor), idx + 2*mystride);
+
+#define READ_3RD_NBR_SPINOR_SINGLE(spinor, idx, mystride)	\
+  float2 T0 = tex1Dfetch((spinor), idx + 0*mystride);		\
+  float2 T1 = tex1Dfetch((spinor), idx + 1*mystride);		\
+  float2 T2 = tex1Dfetch((spinor), idx + 2*mystride);
+
+#define READ_1ST_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
+  double2 I0 = fetch_double2((spinor), idx + 0*mystride);	\
+  double2 I1 = fetch_double2((spinor), idx + 1*mystride);	\
+  double2 I2 = fetch_double2((spinor), idx + 2*mystride);
+
+#define READ_3RD_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
+  double2 T0 = fetch_double2((spinor), idx + 0*mystride);	\
+  double2 T1 = fetch_double2((spinor), idx + 1*mystride);	\
+  double2 T2 = fetch_double2((spinor), idx + 2*mystride);
+
+#else //spinor access control
+
+#define READ_1ST_NBR_SPINOR_SINGLE(spinor, idx, mystride)	\
+  float2 I0 = spinor[idx + 0*mystride];				\
+  float2 I1 = spinor[idx + 1*mystride];				\
+  float2 I2 = spinor[idx + 2*mystride];
+
+#define READ_3RD_NBR_SPINOR_SINGLE(spinor, idx, mystride)	\
+  float2 T0 = spinor[idx + 0*mystride];				\
+  float2 T1 = spinor[idx + 1*mystride];				\
+  float2 T2 = spinor[idx + 2*mystride];
+
+#define READ_1ST_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
+  double2 I0 = spinor[idx + 0*mystride];			\
+  double2 I1 = spinor[idx + 1*mystride];			\
+  double2 I2 = spinor[idx + 2*mystride];
+
+#define READ_3RD_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
+  double2 T0 = spinor[idx + 0*mystride];			\
+  double2 T1 = spinor[idx + 1*mystride];			\
+  double2 T2 = spinor[idx + 2*mystride];
+
+#endif //spinor access control
+
+#define READ_1ST_NBR_SPINOR_HALF(spinor, idx, mystride)			\
+  float2 I0 = tex1Dfetch((spinor), idx + 0*mystride);			\
+  float2 I1 = tex1Dfetch((spinor), idx + 1*mystride);			\
+  float2 I2 = tex1Dfetch((spinor), idx + 2*mystride);			\
+  {  int moffset = 0;							\
+    if (idx >=(3*sp_stride +3*(3*Vsh))){					\
+      moffset = 2*sp_stride + 6*Vsh;					\
+    }else if (idx >= (3*sp_stride)){					\
+      moffset = 2*sp_stride ;						\
+    }									\
+    float C = tex1Dfetch((spinorTexNorm), idx - moffset);		\
+    I0.x *= C; I0.y *= C;						\
+    I1.x *= C; I1.y *= C;						\
+    I2.x *= C; I2.y *= C;}
+
+#define READ_3RD_NBR_SPINOR_HALF(spinor, idx, mystride)			\
+  float2 T0 = tex1Dfetch((spinor), idx + 0*mystride);			\
+  float2 T1 = tex1Dfetch((spinor), idx + 1*mystride);			\
+  float2 T2 = tex1Dfetch((spinor), idx + 2*mystride);			\
+  { int moffset = 0;							\
+    if (idx >=(3*sp_stride +3*(3*Vsh) )){				\
+      moffset = 2*sp_stride + 6*Vsh;					\
+    }else if (idx >= (3*sp_stride)){					\
+      moffset = 2*sp_stride ;						\
+    }									\
+    float C = tex1Dfetch((spinorTexNorm), idx-moffset);			\
+    T0.x *= C; T0.y *= C;						\
+    T1.x *= C; T1.y *= C;						\
+    T2.x *= C; T2.y *= C;}
+
+
+#define WRITE_ST_SPINOR_DOUBLE2()				\
+  g_out[0*sp_stride+sid] = make_double2(o00_re, o00_im);	\
+  g_out[1*sp_stride+sid] = make_double2(o01_re, o01_im);	\
+  g_out[2*sp_stride+sid] = make_double2(o02_re, o02_im);
+
+#define WRITE_ST_SPINOR_FLOAT2()			\
+  g_out[0*sp_stride+sid] = make_float2(o00_re, o00_im);	\
+  g_out[1*sp_stride+sid] = make_float2(o01_re, o01_im);	\
+  g_out[2*sp_stride+sid] = make_float2(o02_re, o02_im);
+
+#define WRITE_ST_SPINOR_SHORT2()					\
+  float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));			\
+  float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im));			\
+  float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im));			\
+  c0 = fmaxf(c0, c1);							\
+  c0 = fmaxf(c0, c2);							\
+  outNorm[sid] = c0;							\
+  float scale = __fdividef(MAX_SHORT, c0);				\
+  o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
+  o02_re *= scale; o02_im *= scale;					\
+  g_out[sid+0*sp_stride] = make_short2((short)o00_re, (short)o00_im);	\
+  g_out[sid+1*sp_stride] = make_short2((short)o01_re, (short)o01_im);	\
+  g_out[sid+2*sp_stride] = make_short2((short)o02_re, (short)o02_im);
+
+#define READ_AND_SUM_ST_SPINOR()					\
+  o00_re += g_out[0*sp_stride+sid].x; o00_im += g_out[0*sp_stride+sid].y; \
+  o01_re += g_out[1*sp_stride+sid].x; o01_im += g_out[1*sp_stride+sid].y; \
+  o02_re += g_out[2*sp_stride+sid].x; o02_im += g_out[2*sp_stride+sid].y; \
+  
+#define SHORT_LENGTH 65536
+#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)
+#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
+#define short2float(a) ( __fdividef(a, SCALE_FLOAT) - SHIFT_FLOAT)
+
+#define READ_AND_SUM_ST_SPINOR_HALF()			\
+  float C = outNorm[sid];				\
+  o00_re += C*short2float(g_out[0*sp_stride + sid].x);	\
+  o00_im += C*short2float(g_out[0*sp_stride + sid].y);	\
+  o01_re += C*short2float(g_out[1*sp_stride + sid].x);	\
+  o01_im += C*short2float(g_out[1*sp_stride + sid].y);	\
+  o02_re += C*short2float(g_out[2*sp_stride + sid].x);	\
+  o02_im += C*short2float(g_out[2*sp_stride + sid].y);	
+  
+#define READ_ST_ACCUM_SINGLE(spinor)				\
+  float2 accum0 = tex1Dfetch((spinor), sid + 0*sp_stride);	\
+  float2 accum1 = tex1Dfetch((spinor), sid + 1*sp_stride);	\
+  float2 accum2 = tex1Dfetch((spinor), sid + 2*sp_stride);     
+
+#define READ_ST_SPINOR_HALF(spinor)				\
+  float2 I0 = tex1Dfetch((spinor), sp_idx + 0*sp_stride);	\
+  float2 I1 = tex1Dfetch((spinor), sp_idx + 1*sp_stride);	\
+  float2 I2 = tex1Dfetch((spinor), sp_idx + 2*sp_stride);	\
+  float C = tex1Dfetch((spinorTexNorm), sp_idx);		\
+  I0.x *= C; I0.y *= C;						\
+  I1.x *= C; I1.y *= C;						\
+  I2.x *= C; I2.y *= C;                                  
+
+
+#define READ_ST_ACCUM_HALF(spinor)				\
+  float2 accum0 = tex1Dfetch((spinor), sid + 0*sp_stride);	\
+  float2 accum1 = tex1Dfetch((spinor), sid + 1*sp_stride);	\
+  float2 accum2 = tex1Dfetch((spinor), sid + 2*sp_stride);	\
+  float C = tex1Dfetch((accumTexNorm), sid);			\
+  accum0.x *= C; accum0.y *= C;					\
+  accum1.x *= C; accum1.y *= C;					\
+  accum2.x *= C; accum2.y *= C;       
+
+#define READ_ST_ACCUM_DOUBLE(spinor)				   \
+  double2 accum0 = fetch_double2((spinor), sid + 0*(sp_stride));   \
+  double2 accum1 = fetch_double2((spinor), sid + 1*(sp_stride));   \
+  double2 accum2 = fetch_double2((spinor), sid + 2*(sp_stride));   

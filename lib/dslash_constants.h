@@ -72,6 +72,9 @@ __constant__ bool Pt0;
 // Are we processor Nt-1 in time?
 __constant__ bool PtNm1;
 
+__constant__ short2 tLocate;
+__constant__ int threads;
+
 int initDslash = 0;
 int initClover = 0;
 int initDomainWall = 0;
@@ -258,7 +261,7 @@ initStaggeredConstants(FullGauge fatgauge, FullGauge longgauge)
   
   int fat_ga_stride = fatgauge.stride;
   int long_ga_stride = longgauge.stride;
-  
+    
   cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));  
   cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));  
   

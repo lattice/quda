@@ -426,6 +426,7 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   return;
 }
 
+
 void
 cudaColorSpinorField::packGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, 
 				      void* f_norm, void* b_norm, cudaStream_t* stream) 

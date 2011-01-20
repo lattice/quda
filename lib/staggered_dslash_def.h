@@ -1,6 +1,29 @@
-// staggered_dslash_def.h - Dslash kernel definitions
+// dslash_def.h - Dslash kernel definitions
+
+// There are currently 288 different variants of the Dslash kernel,
+// each one characterized by a set of 6 options, where each option can
+// take one of several values (3*3*4*2*2*2 = 288).  This file is
+// structured so that the C preprocessor loops through all 288
+// variants (in a manner resembling a counter), sets the appropriate
+// macros, and defines the corresponding functions.
 //
-// See comments in wilson_dslash_def.h
+// As an example of the function naming conventions, consider
+//
+// dslashSHS12DaggerXpayKernel(float4* out, int oddBit, float a).
+//
+// This is a Dslash^dagger kernel where the gauge field is read in single
+// precision (S), the spinor field is read in half precision (H), the clover
+// term is read in single precision (S), each gauge matrix is reconstructed
+// from 12 real numbers, and the result is multiplied by "a" and summed
+// with an input vector (Xpay).  More generally, each function name is given
+// by the concatenation of the following 6 fields, with "dslash" at the
+// beginning and "Kernel" at the end:
+//
+// DD_PREC_F = D, S, H
+// DD_CPREC_F = D, S, H, [blank]; the latter corresponds to plain Wilson
+// DD_RECON_F = 12, 8
+// DD_DAG_F = Dagger, [blank]
+// DD_XPAY_F = Xpay, [blank]
 
 // initialize on first iteration
 
@@ -140,7 +163,7 @@
 #define SPINOR_DOUBLE
 #if (DD_XPAY==1 || DD_XPAY == 2)
 #define ACCUMTEX accumTexDouble
-#define READ_ACCUM READ_ACCUM_DOUBLE
+#define READ_ACCUM READ_ST_ACCUM_DOUBLE
 #endif
 
 
@@ -231,12 +254,9 @@
 // define the kernel
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2,  DD_PARAM4, DD_PARAM5) {
-
-#ifdef GPU_STAGGERED_DIRAC
-#include "staggered_dslash_core.h"
-#endif
-
+  #include "staggered_dslash_core.h"
 }
+
 
 #endif
 

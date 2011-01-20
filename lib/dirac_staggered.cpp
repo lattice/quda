@@ -85,10 +85,18 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
   }
   checkParitySpinor(in, out);
   //FIXME: ugly cast, must be fixed
+  /*
   staggeredDslashCuda((cudaColorSpinorField*)&in, out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, dagger, 
 		      0, 0, 0, out.volume, out.bytes, out.norm_bytes, in.Precision(), 
 		      blockDslash, blockDslashFace);
-    
+
+  */
+
+  int Vsh = out.x[0]*out.x[1]*out.x[2];
+  staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, (cudaColorSpinorField*)&in, parity, dagger, 
+		     0, 0, 0, out.volume,Vsh , out.x[3],
+		      out.length, out.ghost_length, in.Precision(), blockDslash, blockDslashFace);
+  
   flops += 1146*in.volume;
 }
 
@@ -102,9 +110,16 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
   }
   checkParitySpinor(in, out);
   //FIXME: ugly cast, must be fixed  
-  staggeredDslashCuda((cudaColorSpinorField*)&in, out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, 
-		      dagger, x.v, x.norm, k, out.volume, out.bytes, out.norm_bytes, 
-		      in.Precision(), blockDslashXpay, blockDslashXpayFace);
+  /*
+    staggeredDslashCuda((cudaColorSpinorField*)&in, out.v, out.norm, *fatGauge, *longGauge, in.v, in.norm, parity, 
+    dagger, x.v, x.norm, k, out.volume, out.bytes, out.norm_bytes, 
+    in.Precision(), blockDslashXpay, blockDslashXpayFace);
+  */
+
+  int Vsh = out.x[0]*out.x[1]*out.x[2];
+  staggeredDslashCuda(out.v, out.norm, *fatGauge, *longGauge, (cudaColorSpinorField*)&in, parity, dagger, x.v, x.norm, k, 
+		      out.volume, Vsh, out.x[3],
+		      out.length, out.ghost_length, in.Precision(), blockDslashXpay, blockDslashXpayFace);
   
   flops += (1146+12)*in.volume;
 }
