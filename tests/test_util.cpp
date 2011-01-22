@@ -355,6 +355,50 @@ neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
     return ret;
 }
 
+
+int
+neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1) 
+{
+    int ret;
+    int oddBit = 0;
+    int half_idx = i;
+    if (i >= Vh){
+	oddBit =1;
+	half_idx = i - Vh;
+    }
+    
+    int Y = fullLatticeIndex(half_idx, oddBit);
+    int x4 = Y/(Z[2]*Z[1]*Z[0]);
+    int x3 = (Y/(Z[1]*Z[0])) % Z[2];
+    int x2 = (Y/Z[0]) % Z[1];
+    int x1 = Y % Z[0];
+    int ghost_x4 = x4+ dx4;
+    
+    x4 = (x4+dx4+Z[3]) % Z[3];
+    x3 = (x3+dx3+Z[2]) % Z[2];
+    x2 = (x2+dx2+Z[1]) % Z[1];
+    x1 = (x1+dx1+Z[0]) % Z[0];
+
+    if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
+      ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+    }else{
+      ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;    
+      return ret;
+    }
+
+    int oddBitChanged = (dx4+dx3+dx2+dx1)%2;
+    if (oddBitChanged){
+	oddBit = 1 - oddBit;
+    }
+    
+    if (oddBit){
+      ret += Vh;
+    }
+    
+    return ret;
+}
+
+
 // 4d checkerboard.
 // given a "half index" i into either an even or odd half lattice (corresponding
 // to oddBit = {0, 1}), returns the corresponding full lattice index.
@@ -376,6 +420,22 @@ int fullLatticeIndex_4d(int i, int oddBit) {
 int fullLatticeIndex_5d(int i, int oddBit) {
   int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2) + i/(Z[3]*Z[2]*Z[1]*Z[0]/2);
   return 2*i + (boundaryCrossings + oddBit) % 2;
+}
+
+int 
+x4_from_full_index(int i)
+{
+  int oddBit = 0;
+  int half_idx = i;
+  if (i >= Vh){
+    oddBit =1;
+    half_idx = i - Vh;
+  }
+  
+  int Y = fullLatticeIndex(half_idx, oddBit);
+  int x4 = Y/(Z[2]*Z[1]*Z[0]);
+  
+  return x4;
 }
 
 template <typename Float>
@@ -812,45 +872,15 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
 }
 
 
+
 void 
-createSiteLinkCPU(void* link,  QudaPrecision precision, int phase) 
+createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) 
 {
-    void* temp[4];
-    
-    size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-    for(int i=0;i < 4;i++){
-	temp[i] = malloc(V*gaugeSiteSize*gSize);
-	if (temp[i] == NULL){
-	    fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
-	    exit(1);
-	}
-    }
     
     if (precision == QUDA_DOUBLE_PRECISION) {
-	constructUnitaryGaugeField((double**)temp);
+	constructUnitaryGaugeField((double**)link);
     }else {
-	constructUnitaryGaugeField((float**)temp);
-    }
-        
-    for(int i=0;i < V;i++){
-	for(int dir=0;dir < 4;dir++){
-	    if (precision == QUDA_DOUBLE_PRECISION){
-		double** src= (double**)temp;
-		double* dst = (double*)link;
-		for(int k=0; k < gaugeSiteSize; k++){
-		    dst[ (4*i+dir)*gaugeSiteSize + k ] = src[dir][i*gaugeSiteSize + k];
-
-		}
-	    }else{
-		float** src= (float**)temp;
-		float* dst = (float*)link;
-		for(int k=0; k < gaugeSiteSize; k++){
-		    dst[ (4*i+dir)*gaugeSiteSize + k ] = src[dir][i*gaugeSiteSize + k];
-		    
-		}
-		
-	    }
-	}
+	constructUnitaryGaugeField((float**)link);
     }
 
     if(phase){
@@ -908,9 +938,11 @@ createSiteLinkCPU(void* link,  QudaPrecision precision, int phase)
 	    
 	    
 		if (precision == QUDA_DOUBLE_PRECISION){
-		    double* mylink = (double*)link;
-		    mylink = mylink + (4*i + dir)*gaugeSiteSize;
-		
+		  //double* mylink = (double*)link;
+		  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
+		  double* mylink = (double*)link[dir];
+		  mylink = mylink + i*gaugeSiteSize;
+
 		    mylink[12] *= coeff;
 		    mylink[13] *= coeff;
 		    mylink[14] *= coeff;
@@ -919,9 +951,11 @@ createSiteLinkCPU(void* link,  QudaPrecision precision, int phase)
 		    mylink[17] *= coeff;
 		
 		}else{
-		    float* mylink = (float*)link;
-		    mylink = mylink + (4*i + dir)*gaugeSiteSize;
-		
+		  //float* mylink = (float*)link;
+		  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
+		  float* mylink = (float*)link[dir];
+		  mylink = mylink + i*gaugeSiteSize;
+		  
 		    mylink[12] *= coeff;
 		    mylink[13] *= coeff;
 		    mylink[14] *= coeff;
@@ -936,37 +970,33 @@ createSiteLinkCPU(void* link,  QudaPrecision precision, int phase)
 
     
 #if 1
-    for(int i=0;i< 4*V*gaugeSiteSize;i++){
+    for(int dir= 0;dir < 4;dir++){
+      for(int i=0;i< V*gaugeSiteSize;i++){
 	if (precision ==QUDA_SINGLE_PRECISION){
-	    float* f = (float*)link;
-	    if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3) ){
-		fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
-		exit(1);
-	    }
+	  float* f = (float*)link[dir];
+	  if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3) ){
+	    fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
+	    exit(1);
+	  }
 	}else{
-	    double* f = (double*)link;
-	    if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)){
-		fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
-		exit(1);
-	    }
-	    
+	  double* f = (double*)link[dir];
+	  if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)){
+	    fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
+	    exit(1);
+	  }
+	  
 	}
 	
+      }
     }
 #endif
 
-    for(int i=0;i < 4;i++){
-	free(temp[i]);
-    }
     return;
 }
 
 
-
-
-
 template <typename Float>
-void compareLink(Float *linkA, Float *linkB, int len) {
+void compareLink(Float **linkA, Float **linkB, int len) {
   int fail_check = 16;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
@@ -974,15 +1004,17 @@ void compareLink(Float *linkA, Float *linkB, int len) {
   int iter[18];
   for (int i=0; i<18; i++) iter[i] = 0;
   
-  for (int i=0; i<len; i++) {
+  for(int dir=0;dir < 4; dir++){
+    for (int i=0; i<len; i++) {
       for (int j=0; j<18; j++) {
-	  int is = i*18+j;
-	  double diff = fabs(linkA[is]-linkB[is]);
-	  for (int f=0; f<fail_check; f++)
+	int is = i*18+j;
+	double diff = fabs(linkA[dir][is]-linkB[dir][is]);
+	for (int f=0; f<fail_check; f++)
 	      if (diff > pow(10.0,-(f+1))) fail[f]++;
-	  //if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-	  if (diff > 1e-3) iter[j]++;
+	//if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
+	if (diff > 1e-3) iter[j]++;
       }
+    }
   }
   
   for (int i=0; i<18; i++) printf("%d fails = %d\n", i, iter[i]);
@@ -994,12 +1026,15 @@ void compareLink(Float *linkA, Float *linkB, int len) {
 }
 
 static void 
-compare_link(void *linkA, void *linkB, int len, QudaPrecision precision)
+compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 {
-    if (precision == QUDA_DOUBLE_PRECISION) compareLink((double*)linkA, (double*)linkB, len);
-    else compareLink((float*)linkA, (float*)linkB, len);
-    
-    return;
+  if (precision == QUDA_DOUBLE_PRECISION){    
+    compareLink((double**)linkA, (double**)linkB, len);
+  }else {
+    compareLink((float**)linkA, (float**)linkB, len);
+  }    
+
+  return;
 }
 
 
@@ -1020,27 +1055,27 @@ printLinkElement(void *link, int X, QudaPrecision precision)
     }
 }
 
-void strong_check_link(void * linkA, void *linkB, int len, QudaPrecision prec) 
+
+void strong_check_link(void** linkA, void **linkB, int len, QudaPrecision prec) 
 {
     printf("LinkA:\n");
-    printLinkElement(linkA, 0, prec); 
+    printLinkElement(linkA[0], 0, prec); 
     printf("\n");
-    printLinkElement(linkA, 1, prec); 
+    printLinkElement(linkA[0], 1, prec); 
     printf("...\n");
-    printLinkElement(linkA, len-1, prec); 
+    printLinkElement(linkA[3], len-1, prec); 
     printf("\n");    
     
     printf("\nlinkB:\n");
-    printLinkElement(linkB, 0, prec); 
+    printLinkElement(linkB[0], 0, prec); 
     printf("\n");
-    printLinkElement(linkB, 1, prec); 
+    printLinkElement(linkB[0], 1, prec); 
     printf("...\n");
-    printLinkElement(linkB, len-1, prec); 
+    printLinkElement(linkB[3], len-1, prec); 
     printf("\n");
     
     compare_link(linkA, linkB, len, prec);
 }
-
 
 
 void 

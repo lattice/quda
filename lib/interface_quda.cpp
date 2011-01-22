@@ -18,6 +18,9 @@
 #include <qmp.h>
 #endif
 
+#include "mpicomm.h"
+
+
 #define spinorSiteSize 24 // real numbers per spinor
 
 FullGauge cudaGaugePrecise;      // Wilson links
@@ -84,6 +87,7 @@ void initQuda(int dev)
   }
   initialized = 1;
 
+
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
@@ -123,9 +127,15 @@ void initQuda(int dev)
   if( coords[3] == dim[3]-1 ) qudaPtNm1=true;
   else qudaPtNm1=false;
 
-#else 
+#elif defined(MPI_COMMS)
+
+  comm_init();
+  dev=comm_gpuid();
+
+#else
   if (dev < 0) dev = deviceCount - 1;
 #endif
+
 
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);

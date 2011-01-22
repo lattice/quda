@@ -35,7 +35,9 @@ extern "C" {
     QudaGaugeFixed gauge_fix;
 
     int ga_pad;
-
+    int site_ga_pad;  //used in link fattening
+    int staple_pad;   //used in link fattening
+    int llfat_ga_pad; //used in link fattening
     int packed_size;
     double gaugeGiB;
 

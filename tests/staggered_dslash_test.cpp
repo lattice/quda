@@ -551,6 +551,6 @@ int main(int argc, char **argv)
     //probably no error 
     ret = 0;
   }
-
+  comm_cleanup();
   return ret;
 }

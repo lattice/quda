@@ -2,33 +2,39 @@
 
 #include <quda_internal.h>
 #include <llfat_quda.h>
-#include <read_gauge.h>
-#include <gauge_quda.h>
 #include <cuda_runtime.h>
 #include <cuda.h>
+#include <read_gauge.h>
+#include <gauge_quda.h>
+#include <force_common.h>
 
-#define WRITE_FAT_MATRIX(gauge, dir, idx)do {		\
-    gauge[idx + dir*Vhx9] = FAT0;			\
-    gauge[idx + dir*Vhx9 + Vh  ] = FAT1;		\
-    gauge[idx + dir*Vhx9 + Vhx2] = FAT2;		\
-    gauge[idx + dir*Vhx9 + Vhx3] = FAT3;		\
-    gauge[idx + dir*Vhx9 + Vhx4] = FAT4;		\
-    gauge[idx + dir*Vhx9 + Vhx5] = FAT5;		\
-    gauge[idx + dir*Vhx9 + Vhx6] = FAT6;		\
-    gauge[idx + dir*Vhx9 + Vhx7] = FAT7;		\
-    gauge[idx + dir*Vhx9 + Vhx8] = FAT8;} while(0)			
+#define SITE_MATRIX_LOAD_TEX 0
+#define MULINK_LOAD_TEX 0
+#define FATLINK_LOAD_TEX 0
 
 
-#define WRITE_STAPLE_MATRIX(gauge, idx)		\
-  gauge[idx] = STAPLE0;				\
-  gauge[idx + Vh] = STAPLE1;			\
-  gauge[idx + Vhx2] = STAPLE2;			\
-  gauge[idx + Vhx3] = STAPLE3;			\
-  gauge[idx + Vhx4] = STAPLE4;			\
-  gauge[idx + Vhx5] = STAPLE5;			\
-  gauge[idx + Vhx6] = STAPLE6;			\
-  gauge[idx + Vhx7] = STAPLE7;			\
-  gauge[idx + Vhx8] = STAPLE8;					
+#define WRITE_FAT_MATRIX(gauge, dir, idx)do {		       \
+    gauge[idx + dir*9*llfat_ga_stride] = FAT0;			\
+    gauge[idx + (dir*9+1) * llfat_ga_stride] = FAT1;			\
+    gauge[idx + (dir*9+2) * llfat_ga_stride] = FAT2;			\
+    gauge[idx + (dir*9+3) * llfat_ga_stride] = FAT3;			\
+    gauge[idx + (dir*9+4) * llfat_ga_stride] = FAT4;		\
+    gauge[idx + (dir*9+5) * llfat_ga_stride] = FAT5;		\
+    gauge[idx + (dir*9+6) * llfat_ga_stride] = FAT6;		\
+    gauge[idx + (dir*9+7) * llfat_ga_stride] = FAT7;		\
+    gauge[idx + (dir*9+8) * llfat_ga_stride] = FAT8;} while(0)			
+
+
+#define WRITE_STAPLE_MATRIX(gauge, idx)				\
+  gauge[idx] = STAPLE0;						\
+  gauge[idx + staple_stride] = STAPLE1;				\
+  gauge[idx + 2*staple_stride] = STAPLE2;			\
+  gauge[idx + 3*staple_stride] = STAPLE3;			\
+  gauge[idx + 4*staple_stride] = STAPLE4;			\
+  gauge[idx + 5*staple_stride] = STAPLE5;			\
+  gauge[idx + 6*staple_stride] = STAPLE6;			\
+  gauge[idx + 7*staple_stride] = STAPLE7;			\
+  gauge[idx + 8*staple_stride] = STAPLE8;					
     
 
 #define SCALAR_MULT_SU3_MATRIX(a, b, c) \
@@ -52,115 +58,111 @@
   c##22_im = a*b##22_im;		\
     
 
-#define LOAD_MATRIX_18_SINGLE(gauge, dir, idx, var)			\
-  float2 var##0 = gauge[idx + dir*Vhx9];				\
-  float2 var##1 = gauge[idx + dir*Vhx9 + Vh];				\
-  float2 var##2 = gauge[idx + dir*Vhx9 + Vhx2];				\
-  float2 var##3 = gauge[idx + dir*Vhx9 + Vhx3];				\
-  float2 var##4 = gauge[idx + dir*Vhx9 + Vhx4];				\
-  float2 var##5 = gauge[idx + dir*Vhx9 + Vhx5];				\
-  float2 var##6 = gauge[idx + dir*Vhx9 + Vhx6];				\
-  float2 var##7 = gauge[idx + dir*Vhx9 + Vhx7];				\
-  float2 var##8 = gauge[idx + dir*Vhx9 + Vhx8];
+#define LOAD_MATRIX_18_SINGLE(gauge, dir, idx, var, stride)		\
+  float2 var##0 = gauge[idx + dir*9*stride];				\
+  float2 var##1 = gauge[idx + dir*9*stride + stride];			\
+  float2 var##2 = gauge[idx + dir*9*stride + 2*stride];			\
+  float2 var##3 = gauge[idx + dir*9*stride + 3*stride];			\
+  float2 var##4 = gauge[idx + dir*9*stride + 4*stride];			\
+  float2 var##5 = gauge[idx + dir*9*stride + 5*stride];			\
+  float2 var##6 = gauge[idx + dir*9*stride + 6*stride];			\
+  float2 var##7 = gauge[idx + dir*9*stride + 7*stride];			\
+  float2 var##8 = gauge[idx + dir*9*stride + 8*stride];			
 
-#define LOAD_MATRIX_18_SINGLE_TEX(gauge, dir, idx, var)			\
-  float2 var##0 = tex1Dfetch(gauge, idx + dir*Vhx9);			\
-  float2 var##1 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vh);		\
-  float2 var##2 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx2);		\
-  float2 var##3 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx3);		\
-  float2 var##4 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx4);		\
-  float2 var##5 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx5);		\
-  float2 var##6 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx6);		\
-  float2 var##7 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx7);		\
-  float2 var##8 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx8); 
+#define LOAD_MATRIX_18_SINGLE_TEX(gauge, dir, idx, var, stride)		\
+  float2 var##0 = tex1Dfetch(gauge, idx + dir*9*stride);		\
+  float2 var##1 = tex1Dfetch(gauge, idx + dir*9*stride + stride);	\
+  float2 var##2 = tex1Dfetch(gauge, idx + dir*9*stride + 2*stride);	\
+  float2 var##3 = tex1Dfetch(gauge, idx + dir*9*stride + 3*stride);	\
+  float2 var##4 = tex1Dfetch(gauge, idx + dir*9*stride + 4*stride);	\
+  float2 var##5 = tex1Dfetch(gauge, idx + dir*9*stride + 5*stride);	\
+  float2 var##6 = tex1Dfetch(gauge, idx + dir*9*stride + 6*stride);	\
+  float2 var##7 = tex1Dfetch(gauge, idx + dir*9*stride + 7*stride);	\
+  float2 var##8 = tex1Dfetch(gauge, idx + dir*9*stride + 8*stride);	
 
-#define LOAD_MATRIX_18_DOUBLE(gauge, dir, idx, var)			\
-  double2 var##0 = gauge[idx + dir*Vhx9];				\
-  double2 var##1 = gauge[idx + dir*Vhx9 + Vh];				\
-  double2 var##2 = gauge[idx + dir*Vhx9 + Vhx2];				\
-  double2 var##3 = gauge[idx + dir*Vhx9 + Vhx3];				\
-  double2 var##4 = gauge[idx + dir*Vhx9 + Vhx4];				\
-  double2 var##5 = gauge[idx + dir*Vhx9 + Vhx5];				\
-  double2 var##6 = gauge[idx + dir*Vhx9 + Vhx6];				\
-  double2 var##7 = gauge[idx + dir*Vhx9 + Vhx7];				\
-  double2 var##8 = gauge[idx + dir*Vhx9 + Vhx8];
+#define LOAD_MATRIX_18_DOUBLE(gauge, dir, idx, var, stride)		\
+  double2 var##0 = gauge[idx + dir*9*stride];				\
+  double2 var##1 = gauge[idx + dir*9*stride + stride];			\
+  double2 var##2 = gauge[idx + dir*9*stride + 2*stride];		\
+  double2 var##3 = gauge[idx + dir*9*stride + 3*stride];		\
+  double2 var##4 = gauge[idx + dir*9*stride + 4*stride];		\
+  double2 var##5 = gauge[idx + dir*9*stride + 5*stride];		\
+  double2 var##6 = gauge[idx + dir*9*stride + 6*stride];		\
+  double2 var##7 = gauge[idx + dir*9*stride + 7*stride];		\
+  double2 var##8 = gauge[idx + dir*9*stride + 8*stride];		
 
-#define LOAD_MATRIX_18_DOUBLE_TEX(gauge, dir, idx, var)			\
-  double2 var##0 = fetch_double2(gauge, idx + dir*Vhx9);			\
-  double2 var##1 = fetch_double2(gauge, idx + dir*Vhx9 + Vh);		\
-  double2 var##2 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx2);		\
-  double2 var##3 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx3);		\
-  double2 var##4 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx4);		\
-  double2 var##5 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx5);		\
-  double2 var##6 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx6);		\
-  double2 var##7 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx7);		\
-  double2 var##8 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx8); 
-
-
-#define SITE_MATRIX_LOAD_TEX 0
-#define MULINK_LOAD_TEX 0
-#define FATLINK_LOAD_TEX 0
+#define LOAD_MATRIX_18_DOUBLE_TEX(gauge, dir, idx, var, stride)		\
+  double2 var##0 = fetch_double2(gauge, idx + dir*9*stride);		\
+  double2 var##1 = fetch_double2(gauge, idx + dir*9*stride + stride);	\
+  double2 var##2 = fetch_double2(gauge, idx + dir*9*stride + 2*stride);	\
+  double2 var##3 = fetch_double2(gauge, idx + dir*9*stride + 3*stride);	\
+  double2 var##4 = fetch_double2(gauge, idx + dir*9*stride + 4*stride);	\
+  double2 var##5 = fetch_double2(gauge, idx + dir*9*stride + 5*stride);	\
+  double2 var##6 = fetch_double2(gauge, idx + dir*9*stride + 6*stride);	\
+  double2 var##7 = fetch_double2(gauge, idx + dir*9*stride + 7*stride);	\
+  double2 var##8 = fetch_double2(gauge, idx + dir*9*stride + 8*stride);	
 
 
-#define LOAD_MATRIX_12_SINGLE_DECLARE(gauge, dir, idx, var)		\
-  float4 var##0 = gauge[idx + dir*Vhx3];				\
-  float4 var##1 = gauge[idx + dir*Vhx3 + Vh];				\
-  float4 var##2 = gauge[idx + dir*Vhx3 + Vhx2];				\
+
+#define LOAD_MATRIX_12_SINGLE_DECLARE(gauge, dir, idx, var, stride)	\
+  float4 var##0 = gauge[idx + dir*3*stride];				\
+  float4 var##1 = gauge[idx + dir*3*stride + stride];			\
+  float4 var##2 = gauge[idx + dir*3*stride + 2*stride];			\
   float4 var##3, var##4;
 
-#define LOAD_MATRIX_12_SINGLE_TEX_DECLARE(gauge, dir, idx, var)		\
-  float4 var##0 = tex1Dfetch(gauge, idx + dir* Vhx3);			\
-  float4 var##1 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vh);		\
-  float4 var##2 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vhx2);		\
+#define LOAD_MATRIX_12_SINGLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
+  float4 var##0 = tex1Dfetch(gauge, idx + dir*3*stride);		\
+  float4 var##1 = tex1Dfetch(gauge, idx + dir*3*stride + stride);	\
+  float4 var##2 = tex1Dfetch(gauge, idx + dir*3*stride + 2*stride);	\
   float4 var##3, var##4;
 
-#define LOAD_MATRIX_18_SINGLE_DECLARE(gauge, dir, idx, var)		\
-  float2 var##0 = gauge[idx + dir*Vhx9];				\
-  float2 var##1 = gauge[idx + dir*Vhx9 + Vh];				\
-  float2 var##2 = gauge[idx + dir*Vhx9 + Vhx2];				\
-  float2 var##3 = gauge[idx + dir*Vhx9 + Vhx3];				\
-  float2 var##4 = gauge[idx + dir*Vhx9 + Vhx4];				\
-  float2 var##5 = gauge[idx + dir*Vhx9 + Vhx5];				\
-  float2 var##6 = gauge[idx + dir*Vhx9 + Vhx6];				\
-  float2 var##7 = gauge[idx + dir*Vhx9 + Vhx7];				\
-  float2 var##8 = gauge[idx + dir*Vhx9 + Vhx8];				
+#define LOAD_MATRIX_18_SINGLE_DECLARE(gauge, dir, idx, var, stride)	\
+  float2 var##0 = gauge[idx + dir*9*stride];				\
+  float2 var##1 = gauge[idx + dir*9*stride + stride];			\
+  float2 var##2 = gauge[idx + dir*9*stride + 2*stride];			\
+  float2 var##3 = gauge[idx + dir*9*stride + 3*stride];			\
+  float2 var##4 = gauge[idx + dir*9*stride + 4*stride];			\
+  float2 var##5 = gauge[idx + dir*9*stride + 5*stride];			\
+  float2 var##6 = gauge[idx + dir*9*stride + 6*stride];			\
+  float2 var##7 = gauge[idx + dir*9*stride + 7*stride];			\
+  float2 var##8 = gauge[idx + dir*9*stride + 8*stride];			
 
 
-#define LOAD_MATRIX_18_SINGLE_TEX_DECLARE(gauge, dir, idx, var)		\
-  float2 var##0 = tex1Dfetch(gauge, idx + dir*Vhx9);			\
-  float2 var##1 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vh);		\
-  float2 var##2 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx2);		\
-  float2 var##3 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx3);		\
-  float2 var##4 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx4);		\
-  float2 var##5 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx5);		\
-  float2 var##6 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx6);		\
-  float2 var##7 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx7);		\
-  float2 var##8 = tex1Dfetch(gauge, idx + dir*Vhx9 + Vhx8);		
+#define LOAD_MATRIX_18_SINGLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
+  float2 var##0 = tex1Dfetch(gauge, idx + dir*9*stride);		\
+  float2 var##1 = tex1Dfetch(gauge, idx + dir*9*stride + stride);	\
+  float2 var##2 = tex1Dfetch(gauge, idx + dir*9*stride + 2*stride);	\
+  float2 var##3 = tex1Dfetch(gauge, idx + dir*9*stride + 3*stride);	\
+  float2 var##4 = tex1Dfetch(gauge, idx + dir*9*stride + 4*stride);	\
+  float2 var##5 = tex1Dfetch(gauge, idx + dir*9*stride + 5*stride);	\
+  float2 var##6 = tex1Dfetch(gauge, idx + dir*9*stride + 6*stride);	\
+  float2 var##7 = tex1Dfetch(gauge, idx + dir*9*stride + 7*stride);	\
+  float2 var##8 = tex1Dfetch(gauge, idx + dir*9*stride + 8*stride);			
 
 
 
-#define LOAD_MATRIX_18_DOUBLE_DECLARE(gauge, dir, idx, var)		\
-  double2 var##0 = gauge[idx + dir*Vhx9];				\
-  double2 var##1 = gauge[idx + dir*Vhx9 + Vh];				\
-  double2 var##2 = gauge[idx + dir*Vhx9 + Vhx2];			\
-  double2 var##3 = gauge[idx + dir*Vhx9 + Vhx3];			\
-  double2 var##4 = gauge[idx + dir*Vhx9 + Vhx4];			\
-  double2 var##5 = gauge[idx + dir*Vhx9 + Vhx5];			\
-  double2 var##6 = gauge[idx + dir*Vhx9 + Vhx6];			\
-  double2 var##7 = gauge[idx + dir*Vhx9 + Vhx7];			\
-  double2 var##8 = gauge[idx + dir*Vhx9 + Vhx8];				
+#define LOAD_MATRIX_18_DOUBLE_DECLARE(gauge, dir, idx, var, stride)	\
+  double2 var##0 = gauge[idx + dir*9*stride];				\
+  double2 var##1 = gauge[idx + dir*9*stride + stride];			\
+  double2 var##2 = gauge[idx + dir*9*stride + 2*stride];		\
+  double2 var##3 = gauge[idx + dir*9*stride + 3*stride];		\
+  double2 var##4 = gauge[idx + dir*9*stride + 4*stride];		\
+  double2 var##5 = gauge[idx + dir*9*stride + 5*stride];		\
+  double2 var##6 = gauge[idx + dir*9*stride + 6*stride];		\
+  double2 var##7 = gauge[idx + dir*9*stride + 7*stride];		\
+  double2 var##8 = gauge[idx + dir*9*stride + 8*stride];			
 
 
-#define LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(gauge, dir, idx, var)		\
-  double2 var##0 = fetch_double2(gauge, idx + dir*Vhx9);		\
-  double2 var##1 = fetch_double2(gauge, idx + dir*Vhx9 + Vh);		\
-  double2 var##2 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx2);		\
-  double2 var##3 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx3);		\
-  double2 var##4 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx4);		\
-  double2 var##5 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx5);		\
-  double2 var##6 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx6);		\
-  double2 var##7 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx7);		\
-  double2 var##8 = fetch_double2(gauge, idx + dir*Vhx9 + Vhx8);		
+#define LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
+  double2 var##0 = fetch_double2(gauge, idx + dir*9*stride);		\
+  double2 var##1 = fetch_double2(gauge, idx + dir*9*stride + stride);	\
+  double2 var##2 = fetch_double2(gauge, idx + dir*9*stride + 2*stride);	\
+  double2 var##3 = fetch_double2(gauge, idx + dir*9*stride + 3*stride);	\
+  double2 var##4 = fetch_double2(gauge, idx + dir*9*stride + 4*stride);	\
+  double2 var##5 = fetch_double2(gauge, idx + dir*9*stride + 5*stride);	\
+  double2 var##6 = fetch_double2(gauge, idx + dir*9*stride + 6*stride);	\
+  double2 var##7 = fetch_double2(gauge, idx + dir*9*stride + 7*stride);	\
+  double2 var##8 = fetch_double2(gauge, idx + dir*9*stride + 8*stride);	
 
 
 #define LOAD_MATRIX_12_DOUBLE_DECLARE(gauge, dir, idx, var)		\
@@ -203,6 +205,9 @@
   mc##22_im = ma##22_im + mb##22_im;		
 
 
+__constant__ int site_ga_stride;
+__constant__ int staple_stride;
+__constant__ int llfat_ga_stride;
 
 void
 llfat_init_cuda(QudaGaugeParam* param)
@@ -211,58 +216,23 @@ llfat_init_cuda(QudaGaugeParam* param)
   if (llfat_init_cuda_flag){
     return;
   }
-    
+  
   llfat_init_cuda_flag = 1;
   
   init_kernel_cuda(param);
+  int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
+  int site_ga_stride = param->site_ga_pad + Vh;
+  int staple_stride = param->staple_pad + Vh;
+  int llfat_ga_stride = param->llfat_ga_pad + Vh;
 
+  printf("site_ga_stride=%d, staple_stride=%d, llfat_ga_stride=%d\n",
+	 site_ga_stride, staple_stride, llfat_ga_stride);
+
+
+  cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));  
+  cudaMemcpyToSymbol("staple_stride", &staple_stride, sizeof(int));  
+  cudaMemcpyToSymbol("llfat_ga_stride", &llfat_ga_stride, sizeof(int));
 }
-
-
- 
-#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {		\
-    new_x1 = x1;							\
-    new_x2 = x2;							\
-    new_x3 = x3;							\
-    new_x4 = x4;							\
-    switch(mydir1){							\
-    case 0:								\
-      new_mem_idx = ( (x1==0)?X+X1m1:X-1);				\
-      new_x1 = (x1==0)?X1m1:x1 - 1;					\
-      break;								\
-    case 1:								\
-      new_mem_idx = ( (x2==0)?X+X2X1mX1:X-X1);				\
-      new_x2 = (x2==0)?X2m1:x2 - 1;					\
-      break;								\
-    case 2:								\
-      new_mem_idx = ( (x3==0)?X+X3X2X1mX2X1:X-X2X1);			\
-      new_x3 = (x3==0)?X3m1:x3 - 1;					\
-      break;								\
-    case 3:								\
-      new_mem_idx = ( (x4==0)?X+X4X3X2X1mX3X2X1:X-X3X2X1);		\
-      new_x4 = (x4==0)?X4m1:x4 - 1;					\
-      break;								\
-    }									\
-    switch(mydir2){							\
-    case 0:								\
-      new_mem_idx = ( (x1==X1m1)?new_mem_idx-X1m1:new_mem_idx+1)>> 1;	\
-      new_x1 = (x1==X1m1)?0:x1+1;					\
-      break;								\
-    case 1:								\
-      new_mem_idx = ( (x2==X2m1)?new_mem_idx-X2X1mX1:new_mem_idx+X1) >> 1; \
-      new_x2 = (x2==X2m1)?0:x2+1;					\
-      break;								\
-    case 2:								\
-      new_mem_idx = ( (x3==X3m1)?new_mem_idx-X3X2X1mX2X1:new_mem_idx+X2X1) >> 1; \
-      new_x3 = (x3==X3m1)?0:x3+1;					\
-      break;								\
-    case 3:								\
-      new_mem_idx = ( (x4==X4m1)?new_mem_idx-X4X3X2X1mX3X2X1:new_mem_idx+X3X2X1) >> 1; \
-      new_x4 = (x4==X4m1)?0:x4+1;					\
-      break;								\
-    }									\
-  }while(0)
-
 
 
 #define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {			\
@@ -352,21 +322,21 @@ llfat_init_cuda(QudaGaugeParam* param)
 //single precision, common macro
 #define PRECISION 1
 #define Float  float
-#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_SINGLE(gauge, dir, idx, FAT)
+#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_SINGLE(gauge, dir, idx, FAT, llfat_ga_stride)
 #if (MULINK_LOAD_TEX == 1)
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink0TexSingle, dir, idx, var)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink1TexSingle, dir, idx, var)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink0TexSingle, dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink1TexSingle, dir, idx, var, staple_stride)
 #else
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_even, dir, idx, var)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_odd, dir, idx, var)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_even, dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_odd, dir, idx, var, staple_stride)
 #endif
 
 #if (FATLINK_LOAD_TEX == 1)
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge0TexSingle, dir, idx, FAT)
-#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge1TexSingle, dir, idx, FAT)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge0TexSingle, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge1TexSingle, dir, idx, FAT, llfat_ga_stride)
 #else
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE(fatlink_even, dir, idx, FAT)
-#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_SINGLE(fatlink_odd, dir, idx, FAT)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_SINGLE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
 #endif
 
 
@@ -374,13 +344,13 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define SITELINK0TEX siteLink0TexSingle
 #define SITELINK1TEX siteLink1TexSingle
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var, site_ga_stride)
 #else
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink_even, dir, idx, var)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink_odd, dir, idx, var)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink, dir, idx, var)
+#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
 
 #define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  RECONSTRUCT_LINK_12(dir, idx, sign, var);
 #define FloatN float4
@@ -401,13 +371,13 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define SITELINK0TEX siteLink0TexSingle_norecon
 #define SITELINK1TEX siteLink1TexSingle_norecon
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var, site_ga_stride)
 #else
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_even, dir, idx, var)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_odd, dir, idx, var)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_SINGLE(sitelink, dir, idx, var)
+#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_SINGLE(sitelink, dir, idx, var, site_ga_stride)
 #define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  
 #define FloatN float2
 #define FloatM float2
@@ -436,34 +406,34 @@ llfat_init_cuda(QudaGaugeParam* param)
 //double precision, common macro
 #define PRECISION 0
 #define Float double
-#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_DOUBLE(gauge, dir, idx, FAT)
+#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_DOUBLE(gauge, dir, idx, FAT, llfat_ga_stride)
 #if (MULINK_LOAD_TEX == 1)
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(muLink0TexDouble, dir, idx, var)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(muLink1TexDouble, dir, idx, var)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(muLink0TexDouble, dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(muLink1TexDouble, dir, idx, var, staple_stride)
 #else
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_even, dir, idx, var)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_odd, dir, idx, var)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_even, dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_odd, dir, idx, var, staple_stride)
 #endif
 
 #if (FATLINK_LOAD_TEX == 1)
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX(fatGauge0TexDouble, dir, idx, FAT)
-#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX(fatGauge1TexDouble, dir, idx, FAT)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX(fatGauge0TexDouble, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX(fatGauge1TexDouble, dir, idx, FAT, llfat_ga_stride)
 #else
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE(fatlink_even, dir, idx, FAT)
-#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_DOUBLE(fatlink_odd, dir, idx, FAT)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_DOUBLE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
 #endif
 
 //double precision,  18-reconstruct
 #define SITELINK0TEX siteLink0TexDouble
 #define SITELINK1TEX siteLink1TexDouble
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var, site_ga_stride)
 #else
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_even, dir, idx, var)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_odd, dir, idx, var)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_DOUBLE(sitelink, dir, idx, var)
+#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_DOUBLE(sitelink, dir, idx, var, site_ga_stride)
 #define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  
 #define FloatN double2
 #define FloatM double2
@@ -679,165 +649,286 @@ llfat_init_cuda(QudaGaugeParam* param)
     break;								\
   }
 
+#define ENUMERATE_FUNCS_SAVE(mu,nu,odd_bit, save_staple) if(save_staple){ \
+    switch(mu) {							\
+    case 0:								\
+      switch(nu){							\
+      case 0:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      case 1:								\
+	if (!odd_bit) { CALL_FUNCTION(0,1,0,1); }			\
+	else {CALL_FUNCTION(0,1,1,1); }					\
+	break;								\
+      case 2:								\
+	if (!odd_bit) { CALL_FUNCTION(0,2,0,1); }			\
+	else {CALL_FUNCTION(0,2,1,1); }					\
+	break;								\
+      case 3:								\
+	if (!odd_bit) { CALL_FUNCTION(0,3,0,1); }			\
+	else {CALL_FUNCTION(0,3,1,1); }					\
+	break;								\
+      }									\
+      break;								\
+    case 1:								\
+      switch(nu){							\
+      case 0:								\
+	if (!odd_bit) { CALL_FUNCTION(1,0,0,1); }			\
+	else {CALL_FUNCTION(1,0,1,1); }					\
+	break;								\
+      case 1:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      case 2:								\
+	if (!odd_bit) { CALL_FUNCTION(1,2,0,1); }			\
+	else {CALL_FUNCTION(1,2,1,1); }					\
+	break;								\
+      case 3:								\
+	if (!odd_bit) { CALL_FUNCTION(1,3,0,1); }			\
+	else {CALL_FUNCTION(1,3,1,1); }					\
+	break;								\
+      }									\
+      break;								\
+    case 2:								\
+      switch(nu){							\
+      case 0:								\
+	if (!odd_bit) { CALL_FUNCTION(2,0,0,1); }			\
+	else {CALL_FUNCTION(2,0,1,1); }					\
+	break;								\
+      case 1:								\
+	if (!odd_bit) { CALL_FUNCTION(2,1,0,1); }			\
+	else {CALL_FUNCTION(2,1,1,1); }					\
+	break;								\
+      case 2:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      case 3:								\
+	if (!odd_bit) { CALL_FUNCTION(2,3,0,1); }			\
+	else {CALL_FUNCTION(2,3,1,1); }					\
+	break;								\
+      }									\
+      break;								\
+    case 3:								\
+      switch(nu){							\
+      case 0:								\
+	if (!odd_bit) { CALL_FUNCTION(3,0,0,1); }			\
+	else {CALL_FUNCTION(3,0,1,1); }					\
+	break;								\
+      case 1:								\
+	if (!odd_bit) { CALL_FUNCTION(3,1,0,1); }			\
+	else {CALL_FUNCTION(3,1,1,1); }					\
+	break;								\
+      case 2:								\
+	if (!odd_bit) { CALL_FUNCTION(3,2,0,1); }			\
+	else {CALL_FUNCTION(3,2,1,1); }					\
+	break;								\
+      case 3:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      }									\
+      break;								\
+    }									\
+  }else{								\
+    switch(mu) {							\
+    case 0:								\
+      switch(nu){							\
+      case 0:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      case 1:								\
+	if (!odd_bit) { CALL_FUNCTION(0,1,0,0); }			\
+	else {CALL_FUNCTION(0,1,1,0); }					\
+	break;								\
+      case 2:								\
+	if (!odd_bit) { CALL_FUNCTION(0,2,0,0); }			\
+	else {CALL_FUNCTION(0,2,1,0); }					\
+	break;								\
+      case 3:								\
+	if (!odd_bit) { CALL_FUNCTION(0,3,0,0); }			\
+	else {CALL_FUNCTION(0,3,1,0); }					\
+	break;								\
+      }									\
+      break;								\
+    case 1:								\
+      switch(nu){							\
+      case 0:								\
+	if (!odd_bit) { CALL_FUNCTION(1,0,0,0); }			\
+	else {CALL_FUNCTION(1,0,1,0); }					\
+	break;								\
+      case 1:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      case 2:								\
+	if (!odd_bit) { CALL_FUNCTION(1,2,0,0); }			\
+	else {CALL_FUNCTION(1,2,1,0); }					\
+	break;								\
+      case 3:								\
+	if (!odd_bit) { CALL_FUNCTION(1,3,0,0); }			\
+	else {CALL_FUNCTION(1,3,1,0); }					\
+	break;								\
+      }									\
+      break;								\
+    case 2:								\
+      switch(nu){							\
+      case 0:								\
+	if (!odd_bit) { CALL_FUNCTION(2,0,0,0); }			\
+	else {CALL_FUNCTION(2,0,1,0); }					\
+	break;								\
+      case 1:								\
+	if (!odd_bit) { CALL_FUNCTION(2,1,0,0); }			\
+	else {CALL_FUNCTION(2,1,1,0); }					\
+	break;								\
+      case 2:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      case 3:								\
+	if (!odd_bit) { CALL_FUNCTION(2,3,0,0); }			\
+	else {CALL_FUNCTION(2,3,1,0); }					\
+	break;								\
+      }									\
+      break;								\
+    case 3:								\
+      switch(nu){							\
+      case 0:								\
+	if (!odd_bit) { CALL_FUNCTION(3,0,0,0); }			\
+	else {CALL_FUNCTION(3,0,1,0); }					\
+	break;								\
+      case 1:								\
+	if (!odd_bit) { CALL_FUNCTION(3,1,0,0); }			\
+	else {CALL_FUNCTION(3,1,1,0); }					\
+	break;								\
+      case 2:								\
+	if (!odd_bit) { CALL_FUNCTION(3,2,0,0); }			\
+	else {CALL_FUNCTION(3,2,1,0); }					\
+	break;								\
+      case 3:								\
+	printf("ERROR: invalid direction combination\n"); exit(1);	\
+	break;								\
+      }									\
+      break;								\
+    }									\
+  }
+
 void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd, 
 				      void* sitelink_even, void* sitelink_odd, 
 				      void* fatlink_even, void* fatlink_odd,	
 				      int mu, int nu,int odd_bit,
 				      double mycoeff,
-				      dim3 halfGridDim, dim3 blockDim, 
-				      QudaReconstructType recon, QudaPrecision prec)
+				      QudaReconstructType recon, QudaPrecision prec,
+				      int2 tloc, dim3 halfGridDim, 
+				      cudaStream_t* stream)
 {
-    
+
+  
 #define  CALL_FUNCTION(mu, nu, odd_bit)					\
   if (prec == QUDA_DOUBLE_PRECISION){					\
     if(recon == QUDA_RECONSTRUCT_NO){					\
       do_siteComputeGenStapleParity18Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((double2*)staple_even, (double2*)staple_odd, \
-				    (double2*)sitelink_even, (double2*)sitelink_odd, \
-				    (double2*)fatlink_even, (double2*)fatlink_odd, \
-				    (double)mycoeff);			\
+	<<<halfGridDim, blockDim, 0, *stream>>>((double2*)staple_even, (double2*)staple_odd, \
+						(double2*)sitelink_even, (double2*)sitelink_odd, \
+						(double2*)fatlink_even, (double2*)fatlink_odd, \
+						(double)mycoeff, tloc);	\
     }else{								\
       do_siteComputeGenStapleParity12Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((double2*)staple_even, (double2*)staple_odd, \
-				    (double2*)sitelink_even, (double2*)sitelink_odd, \
-				    (double2*)fatlink_even, (double2*)fatlink_odd, \
-				    (double)mycoeff);			\
+	<<<halfGridDim, blockDim, 0, *stream>>>((double2*)staple_even, (double2*)staple_odd, \
+						(double2*)sitelink_even, (double2*)sitelink_odd, \
+						(double2*)fatlink_even, (double2*)fatlink_odd, \
+						(double)mycoeff, tloc);	\
     }									\
   }else {								\
     if(recon == QUDA_RECONSTRUCT_NO){					\
       do_siteComputeGenStapleParity18Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((float2*)staple_even, (float2*)staple_odd, \
-				    (float2*)sitelink_even, (float2*)sitelink_odd, \
-				    (float2*)fatlink_even, (float2*)fatlink_odd, \
-				    (float)mycoeff);			\
+	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
+						(float2*)sitelink_even, (float2*)sitelink_odd, \
+						(float2*)fatlink_even, (float2*)fatlink_odd, \
+						(float)mycoeff, tloc);	\
     }else{								\
       do_siteComputeGenStapleParity12Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((float2*)staple_even, (float2*)staple_odd, \
-				    (float4*)sitelink_even, (float4*)sitelink_odd, \
-				    (float2*)fatlink_even, (float2*)fatlink_odd, \
-				    (float)mycoeff);			\
+	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
+						(float4*)sitelink_even, (float4*)sitelink_odd, \
+						(float2*)fatlink_even, (float2*)fatlink_odd, \
+						(float)mycoeff, tloc);	\
     }									\
   }
   
-  ENUMERATE_FUNCS(mu,nu,odd_bit);
-  
+
+  dim3 blockDim(BLOCK_DIM , 1, 1);  
+  ENUMERATE_FUNCS(mu,nu,odd_bit);  
+
 #undef CALL_FUNCTION
     
     
 }
 
+
 void
-computeGenStapleFieldParityKernel(void* sitelink_even, void* sitelink_odd,
+computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd, 
+				  void* sitelink_even, void* sitelink_odd,
 				  void* fatlink_even, void* fatlink_odd,			    
 				  void* mulink_even, void* mulink_odd, 
-				  int mu, int nu, int odd_bit,
+				  int mu, int nu, int odd_bit, int save_staple,
 				  double mycoeff,
-				  dim3 halfGridDim, dim3 blockDim, 
-				  QudaReconstructType recon, QudaPrecision prec)
-{    
-#define  CALL_FUNCTION(mu, nu, odd_bit)					\
+				  QudaReconstructType recon, QudaPrecision prec,
+				  int2 tloc, dim3 halfGridDim, 
+				  cudaStream_t* stream)
+{
+
+#define  CALL_FUNCTION(mu, nu, odd_bit, save_staple)			\
   if (prec == QUDA_DOUBLE_PRECISION){					\
     if(recon == QUDA_RECONSTRUCT_NO){					\
-      do_computeGenStapleFieldParity18Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((double2*)sitelink_even, (double2*)sitelink_odd, \
-				    (double2*)fatlink_even, (double2*)fatlink_odd, \
-				    (double2*)mulink_even, (double2*)mulink_odd, \
-				    (double)mycoeff);			\
+      do_computeGenStapleFieldParity18Kernel<mu,nu, odd_bit, save_staple> \
+	<<<halfGridDim, blockDim, 0, *stream>>>((double2*)staple_even, (double2*)staple_odd, \
+						(double2*)sitelink_even, (double2*)sitelink_odd, \
+						(double2*)fatlink_even, (double2*)fatlink_odd, \
+						(double2*)mulink_even, (double2*)mulink_odd, \
+						(double)mycoeff, tloc);	\
     }else{								\
-      do_computeGenStapleFieldParity12Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((double2*)sitelink_even, (double2*)sitelink_odd, \
-				    (double2*)fatlink_even, (double2*)fatlink_odd, \
-				    (double2*)mulink_even, (double2*)mulink_odd, \
-				    (double)mycoeff);			\
+      do_computeGenStapleFieldParity12Kernel<mu,nu, odd_bit, save_staple> \
+	<<<halfGridDim, blockDim, 0, *stream>>>((double2*)staple_even, (double2*)staple_odd, \
+						(double2*)sitelink_even, (double2*)sitelink_odd, \
+						(double2*)fatlink_even, (double2*)fatlink_odd, \
+						(double2*)mulink_even, (double2*)mulink_odd, \
+						(double)mycoeff, tloc);	\
     }									\
   }else{								\
     if(recon == QUDA_RECONSTRUCT_NO){					\
-      do_computeGenStapleFieldParity18Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((float2*)sitelink_even, (float2*)sitelink_odd, \
-				    (float2*)fatlink_even, (float2*)fatlink_odd, \
-				    (float2*)mulink_even, (float2*)mulink_odd, \
-				    (float)mycoeff);			\
+      do_computeGenStapleFieldParity18Kernel<mu,nu, odd_bit, save_staple> \
+	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
+						(float2*)sitelink_even, (float2*)sitelink_odd, \
+						(float2*)fatlink_even, (float2*)fatlink_odd, \
+						(float2*)mulink_even, (float2*)mulink_odd, \
+						(float)mycoeff, tloc);	\
     }else{								\
-      do_computeGenStapleFieldParity12Kernel<mu,nu, odd_bit>		\
-	<<<halfGridDim, blockDim>>>((float4*)sitelink_even, (float4*)sitelink_odd, \
-				    (float2*)fatlink_even, (float2*)fatlink_odd, \
-				    (float2*)mulink_even, (float2*)mulink_odd, \
-				    (float)mycoeff);			\
+      do_computeGenStapleFieldParity12Kernel<mu,nu, odd_bit, save_staple> \
+	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
+						(float4*)sitelink_even, (float4*)sitelink_odd, \
+						(float2*)fatlink_even, (float2*)fatlink_odd, \
+						(float2*)mulink_even, (float2*)mulink_odd, \
+						(float)mycoeff, tloc);	\
     }									\
   }
   
-  ENUMERATE_FUNCS(mu,nu,odd_bit);
-
-#undef CALL_FUNCTION 
-    
-}
-
-void
-computeGenStapleFieldSaveParityKernel(void* staple_even, void* staple_odd, 
-				      void* sitelink_even, void* sitelink_odd,
-				      void* fatlink_even, void* fatlink_odd,			    
-				      void* mulink_even, void* mulink_odd, 
-				      int mu, int nu, int odd_bit,
-				      double mycoeff,
-				      dim3 halfGridDim, dim3 blockDim,
-				      QudaReconstructType recon, QudaPrecision prec)
-{
-#define  CALL_FUNCTION(mu, nu, odd_bit)					\
-  if (prec == QUDA_DOUBLE_PRECISION){					\
-    if(recon == QUDA_RECONSTRUCT_NO){					\
-      do_computeGenStapleFieldSaveParity18Kernel<mu,nu, odd_bit>	\
-	<<<halfGridDim, blockDim>>>((double2*)staple_even, (double2*)staple_odd, \
-				    (double2*)sitelink_even, (double2*)sitelink_odd, \
-				    (double2*)fatlink_even, (double2*)fatlink_odd, \
-				    (double2*)mulink_even, (double2*)mulink_odd, \
-				    (double)mycoeff);			\
-    }else{								\
-      do_computeGenStapleFieldSaveParity12Kernel<mu,nu, odd_bit>	\
-	<<<halfGridDim, blockDim>>>((double2*)staple_even, (double2*)staple_odd, \
-				    (double2*)sitelink_even, (double2*)sitelink_odd, \
-				    (double2*)fatlink_even, (double2*)fatlink_odd, \
-				    (double2*)mulink_even, (double2*)mulink_odd, \
-				    (double)mycoeff);			\
-    }									\
-  }else{								\
-    if(recon == QUDA_RECONSTRUCT_NO){					\
-      do_computeGenStapleFieldSaveParity18Kernel<mu,nu, odd_bit>	\
-	<<<halfGridDim, blockDim>>>((float2*)staple_even, (float2*)staple_odd, \
-				    (float2*)sitelink_even, (float2*)sitelink_odd, \
-				    (float2*)fatlink_even, (float2*)fatlink_odd, \
-				    (float2*)mulink_even, (float2*)mulink_odd, \
-				    (float)mycoeff);			\
-  }else{								\
-      do_computeGenStapleFieldSaveParity12Kernel<mu,nu, odd_bit>	\
-	<<<halfGridDim, blockDim>>>((float2*)staple_even, (float2*)staple_odd, \
-				    (float4*)sitelink_even, (float4*)sitelink_odd, \
-				    (float2*)fatlink_even, (float2*)fatlink_odd, \
-				    (float2*)mulink_even, (float2*)mulink_odd, \
-				    (float)mycoeff);			\
-    }									\
-  }
-
-  ENUMERATE_FUNCS(mu,nu,odd_bit);
-
-#undef CALL_FUNCTION 
-    
-}
-
-void
-llfat_cuda(void* fatLink, void* siteLink,
-	   FullGauge cudaFatLink, FullGauge cudaSiteLink, 
-	   FullStaple cudaStaple, FullStaple cudaStaple1,
-	   QudaGaugeParam* param, double* act_path_coeff)
-{
-
-  int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
-  dim3 gridDim(volume/BLOCK_DIM,1,1);
-  dim3 halfGridDim(volume/(2*BLOCK_DIM),1,1);
   dim3 blockDim(BLOCK_DIM , 1, 1);
-  
+  ENUMERATE_FUNCS_SAVE(mu,nu,odd_bit, save_staple);
+
+
+#undef CALL_FUNCTION 
+    
+}
+
+
+
+void llfatOneLinkKernel(FullGauge cudaFatLink, FullGauge cudaSiteLink,
+           FullStaple cudaStaple, FullStaple cudaStaple1,
+           QudaGaugeParam* param, double* act_path_coeff)
+{  
   QudaPrecision prec = cudaSiteLink.precision;
   QudaReconstructType recon = cudaSiteLink.reconstruct;
-  BIND_SITE_AND_FAT_LINK;
+  
+  int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];  
+  dim3 gridDim(volume/BLOCK_DIM,1,1);
+  dim3 blockDim(BLOCK_DIM , 1, 1);
+
   if(prec == QUDA_DOUBLE_PRECISION){
     if(recon == QUDA_RECONSTRUCT_NO){
       llfatOneLink18Kernel<<<gridDim, blockDim>>>((double2*)cudaSiteLink.even, (double2*)cudaSiteLink.odd,
@@ -861,137 +952,4 @@ llfat_cuda(void* fatLink, void* siteLink,
 						  (float)act_path_coeff[0], (float)act_path_coeff[5]);    
     }
   }
-  checkCudaError();	    
-UNBIND_SITE_AND_FAT_LINK;
-
-  for(int dir = 0;dir < 4; dir++){
-    for(int nu = 0; nu < 4; nu++){
-      if (nu != dir){
-		
-	//even
-	BIND_SITE_AND_FAT_LINK;		
-	siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
-					 (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
-					 (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
-					 dir, nu,0,
-					 act_path_coeff[2],
-					 halfGridDim, blockDim, recon, prec);
-	checkCudaError();	    
-	UNBIND_SITE_AND_FAT_LINK;
-	
-	//odd
-	BIND_SITE_AND_FAT_LINK_REVERSE;
-	siteComputeGenStapleParityKernel((void*)cudaStaple.odd, (void*)cudaStaple.even,
-					 (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
-					 (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
-					 dir, nu,1,
-					 act_path_coeff[2],
-					 halfGridDim, blockDim, recon, prec);	
-	checkCudaError();	    
-	UNBIND_SITE_AND_FAT_LINK;	
-	
-	
-	//even
-	BIND_SITE_AND_FAT_LINK;		
-	cudaBindTexture(0, muLink0TexSingle, cudaStaple.even, cudaStaple.bytes);
-	cudaBindTexture(0, muLink1TexSingle, cudaStaple.odd, cudaStaple.bytes);
-	computeGenStapleFieldParityKernel((void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
-					  (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
-					  (void*)cudaStaple.even, (void*)cudaStaple.odd,
-					  dir, nu,0,
-					  act_path_coeff[5],
-					  halfGridDim, blockDim, recon, prec);							  
-	checkCudaError();	    
-	UNBIND_ALL_TEXTURE;
-	
-	//odd
-	BIND_SITE_AND_FAT_LINK_REVERSE;		
-	cudaBindTexture(0, muLink1TexSingle, cudaStaple.even, cudaStaple.bytes);
-	cudaBindTexture(0, muLink0TexSingle, cudaStaple.odd, cudaStaple.bytes);
-	computeGenStapleFieldParityKernel((void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
-					  (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
-					  (void*)cudaStaple.odd, (void*)cudaStaple.even,
-					  dir, nu,1,
-					  act_path_coeff[5],
-					  halfGridDim, blockDim, recon, prec);	
-	checkCudaError();	    
-	UNBIND_ALL_TEXTURE;
-	
-	
-	for(int rho = 0; rho < 4; rho++){
-	  if (rho != dir && rho != nu){
-	    
-	    //even
-	    BIND_SITE_AND_FAT_LINK;		
-	    cudaBindTexture(0, muLink0TexSingle, cudaStaple.even, cudaStaple.bytes);
-	    cudaBindTexture(0, muLink1TexSingle, cudaStaple.odd, cudaStaple.bytes);			
-	    computeGenStapleFieldSaveParityKernel((void*)cudaStaple1.even, (void*)cudaStaple1.odd,
-						  (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
-						  (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
-						  (void*)cudaStaple.even, (void*)cudaStaple.odd,
-						  dir, rho,0,
-						  act_path_coeff[3],
-						  halfGridDim, blockDim, recon, prec);								      
-	    checkCudaError();	    
-	    UNBIND_ALL_TEXTURE;
-	    
-	    //odd
-	    BIND_SITE_AND_FAT_LINK_REVERSE;		
-	    cudaBindTexture(0, muLink1TexSingle, cudaStaple.even, cudaStaple.bytes);
-	    cudaBindTexture(0, muLink0TexSingle, cudaStaple.odd, cudaStaple.bytes);						
-	    computeGenStapleFieldSaveParityKernel((void*)cudaStaple1.odd, (void*)cudaStaple1.even,
-						  (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
-						  (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
-						  (void*)cudaStaple.odd, (void*)cudaStaple.even,
-						  dir, rho,1,
-						  act_path_coeff[3],
-						  halfGridDim, blockDim, recon, prec);								      
-	    checkCudaError();
-	    UNBIND_ALL_TEXTURE;
-
-			
-	    for(int sig = 0; sig < 4; sig++){
-	      if (sig != dir && sig != nu && sig != rho){				
-				
-		//even				
-		BIND_SITE_AND_FAT_LINK;		
-		cudaBindTexture(0, muLink0TexSingle, cudaStaple1.even, cudaStaple1.bytes);
-		cudaBindTexture(0, muLink1TexSingle, cudaStaple1.odd,  cudaStaple1.bytes);
-		computeGenStapleFieldParityKernel((void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
-						  (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
-						  (void*)cudaStaple1.even, (void*)cudaStaple1.odd,
-						  dir, sig, 0, 
-						  act_path_coeff[4],
-						  halfGridDim, blockDim, recon, prec);	
-		checkCudaError();
-		UNBIND_ALL_TEXTURE;
-  
-		
-		//odd
-		BIND_SITE_AND_FAT_LINK_REVERSE;		
-		cudaBindTexture(0, muLink1TexSingle, cudaStaple1.even, cudaStaple1.bytes);
-		cudaBindTexture(0, muLink0TexSingle, cudaStaple1.odd,  cudaStaple1.bytes);
-		computeGenStapleFieldParityKernel((void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
-						  (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
-						  (void*)cudaStaple1.odd, (void*)cudaStaple1.even,
-						  dir, sig, 1, 
-						  act_path_coeff[4],
-						  halfGridDim, blockDim, recon, prec);	
-		checkCudaError();
-		UNBIND_ALL_TEXTURE;			
-  
-	      }			    
-	    }//sig
-	  }
-	}//rho
-
-
-
-      }
-    }//nu
-  }//dir
-  
-  checkCudaError();
-  return;
 }
-

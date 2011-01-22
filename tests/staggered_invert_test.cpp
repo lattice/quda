@@ -563,6 +563,9 @@ int main(int argc, char** argv)
   
   display_test_info();
 
-  return invert_test();
+  int ret = invert_test();
   
+  comm_cleanup();
+
+  return ret;
 }

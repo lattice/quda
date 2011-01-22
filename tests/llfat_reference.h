@@ -5,7 +5,8 @@
 extern "C"{
 #endif
     
-    void llfat_reference(void* fatlink, void* sitelink, QudaPrecision prec, void* act_path_coeff);
+    void llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_path_coeff);
+  void llfat_reference_mg(void** fatlink, void** sitelink, void* ghost_sitelink, QudaPrecision prec, void* act_path_coeff);
     
 #ifdef __cplusplus
 }

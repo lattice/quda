@@ -192,8 +192,10 @@
 
 
 // use __saturate ?
-//  float U00_mag = sqrtf(__saturatef(column_sum));			\
-//  float U20_mag = sqrtf(__saturatef(column_sum));			\
+/*
+  float U00_mag = sqrtf(__saturatef(column_sum));			\
+  float U20_mag = sqrtf(__saturatef(column_sum));			\
+*/
 
 #define RECONSTRUCT_MATRIX_8_SINGLE(dir)				\
   float row_sum = g01_re*g01_re;					\

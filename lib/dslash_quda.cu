@@ -598,6 +598,10 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 }
 
 
+#define INTERIOR_KERNEL 0
+#define EXTERIOR_KERNEL 1
+
+
 static void
 initTLocation(int toffset, int tmul, int threads) 
 {
@@ -1115,6 +1119,7 @@ void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 #endif
 
 #ifdef GPU_FATLINK
+#include "misc_helpers.cu"
 #include "llfat_quda.cu"
 #endif
 

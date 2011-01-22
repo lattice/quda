@@ -3,20 +3,27 @@
 #include <string.h>
 #include <sys/time.h>
 
+#include <quda_internal.h>
+
 #include <quda.h>
 #include <gauge_quda.h>
+#include <dslash_quda.h>
 #include <llfat_quda.h>
+#include "mpicomm.h"
+#include <mpi.h>
 
 #include <test_util.h>
 #include <llfat_reference.h>
 #include "misc.h"
+#include "exchange_face.h"
 
 FullGauge cudaSiteLink;
 FullGauge cudaFatLink;
 FullStaple cudaStaple;
 FullStaple cudaStaple1;
 QudaGaugeParam gaugeParam;
-void *fatLink, *siteLink, *refLink;
+void *fatlink, *sitelink[4], *reflink[4];
+void* ghost_sitelink;
 int verify_results = 0;
 
 extern void initDslashCuda(FullGauge gauge);
@@ -30,11 +37,13 @@ int sdim = 16;
 int Z[4];
 int V;
 int Vh;
-
+int Vs;
+int Vsh;
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaPrecision  link_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision  cpu_link_prec = QUDA_DOUBLE_PRECISION;
+size_t gSize;
 
 typedef struct {
   double real;
@@ -53,6 +62,8 @@ setDims(int *X) {
     Z[d] = X[d];
   }
   Vh = V/2;
+  Vs = X[0]*X[1]*X[2];
+  Vsh= Vs/2;
 }
 
 static void
@@ -71,58 +82,84 @@ llfat_init(void)
   gaugeParam.cpu_prec = cpu_link_prec;
   gaugeParam.cuda_prec = link_prec;
         
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     
-  fatLink = malloc(4*V*gaugeSiteSize* gSize);
-  if (fatLink == NULL){
-    fprintf(stderr, "ERROR: malloc failed for fatLink\n");
+  int i;
+  fatlink = malloc(4*V*gaugeSiteSize* gSize);
+  if (fatlink == NULL){
+    fprintf(stderr, "ERROR: malloc failed for fatlink\n");
     exit(1);
   }
-  siteLink = malloc(4*V*gaugeSiteSize* gSize);
-  if (siteLink == NULL){
-    fprintf(stderr, "ERROR: malloc failed for sitelink\n");
+  
+  for(i=0;i < 4;i++){
+    sitelink[i] = malloc(V*gaugeSiteSize* gSize);
+    if (sitelink[i] == NULL){
+      fprintf(stderr, "ERROR: malloc failed for sitelink[%d]\n", i);
+      exit(1);
+    }
+  }
+
+  //we need x,y,z site links in the back and forward T slice
+  // so it is 3*2*Vs
+  ghost_sitelink = malloc(8*Vs*gaugeSiteSize*gSize);
+  if (ghost_sitelink == NULL){
+    printf("ERROR: malloc failed for ghost_sitelink \n");
     exit(1);
   }
-    
-  refLink = malloc(4*V*gaugeSiteSize* gSize);
-  if (refLink == NULL){
-    fprintf(stderr, "ERROR: malloc failed for refLink\n");
-    exit(1);
+
+  for(i=0;i < 4;i++){
+    reflink[i] = malloc(V*gaugeSiteSize* gSize);
+    if (reflink[i] == NULL){
+      fprintf(stderr, "ERROR: malloc failed for reflink[%d]\n", i);
+      exit(1);
+    }
   }
     
     
-  createSiteLinkCPU(siteLink, gaugeParam.cpu_prec, 1);
-    
-#if 1
-  site_link_sanity_check(siteLink, V, gaugeParam.cpu_prec, &gaugeParam);
+  createSiteLinkCPU(sitelink, gaugeParam.cpu_prec, 1);
+  
+#if 0
+  site_link_sanity_check(sitelink, V, gaugeParam.cpu_prec, &gaugeParam);
 #endif
 
+  exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, gaugeParam.cpu_prec);
+  
+  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*Vsh;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, siteLink, &gaugeParam);
+  //loadLinkToGPU(cudaSiteLink, sitelink, &gaugeParam);
+  loadLinkToGPU_mg(cudaSiteLink, sitelink, ghost_sitelink, &gaugeParam);
     
+  gaugeParam.staple_pad = 3*Vsh;
   createStapleQuda(&cudaStaple, &gaugeParam);
   createStapleQuda(&cudaStaple1, &gaugeParam);
-    
+  
+  gaugeParam.llfat_ga_pad = gaugeParam.ga_pad = Vsh;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   createLinkQuda(&cudaFatLink, &gaugeParam);
-        
-  initDslashConstants(cudaSiteLink, 0, 0);
+  
+  initDslashConstants(cudaSiteLink, 0);
     
   return;
 }
 
 void 
-llfat_end() 
-{
-  free(fatLink);
-  free(siteLink);
-  free(refLink);
-    
+llfat_end()  
+{  
+  int i;
+  free(fatlink);
+  for(i=0;i < 4 ;i++){
+    free(sitelink[i]);
+  }
+  for(i=0;i < 4;i++){
+    free(reflink[i]);
+  }
+  
   freeLinkQuda(&cudaSiteLink);
   freeLinkQuda(&cudaFatLink);
   freeStapleQuda(&cudaStaple);
   freeStapleQuda(&cudaStaple1);
+  exchange_cleanup();
 }
 
 
@@ -151,33 +188,60 @@ llfat_test(void)
     act_path_coeff = act_path_coeff_1;	
   }
   if (verify_results){
-    llfat_reference(refLink, siteLink, gaugeParam.cpu_prec, act_path_coeff);
+    //llfat_reference(reflink, sitelink, gaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference_mg(reflink, sitelink, ghost_sitelink, gaugeParam.cpu_prec, act_path_coeff);
   }
   
   llfat_init_cuda(&gaugeParam);
-
   //The number comes from CPU implementation in MILC, fermion_links_helpers.c    
   int flops= 61632; 
     
   struct timeval t0, t1;
   gettimeofday(&t0, NULL);
-  llfat_cuda(fatLink, siteLink, cudaFatLink, cudaSiteLink, cudaStaple, cudaStaple1, &gaugeParam, act_path_coeff_2);
+  llfat_cuda(cudaFatLink, cudaSiteLink, cudaStaple, cudaStaple1, &gaugeParam, act_path_coeff_2);
   cudaThreadSynchronize();
   gettimeofday(&t1, NULL);
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
     
-  storeLinkToCPU(fatLink, &cudaFatLink, &gaugeParam);    
-  int res;
-  res = compare_floats(fatLink, refLink, 4*V*gaugeSiteSize, 1e-3, gaugeParam.cpu_prec);
-    
-  strong_check_link(fatLink, refLink, 4*V, gaugeParam.cpu_prec);
-    
+  gaugeParam.ga_pad = gaugeParam.llfat_ga_pad;
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  storeLinkToCPU(fatlink, &cudaFatLink, &gaugeParam);    
+ 
+  int i;
+  void* myfatlink[4];
+  for(i=0;i < 4;i++){
+	myfatlink[i] = malloc(V*gaugeSiteSize*gSize);
+	if(myfatlink[i] == NULL){
+	  printf("Error: malloc failed for myfatlink[%d]\n", i);
+	  exit(1);
+	}
+  }
+
+ for(i=0;i < V; i++){
+	for(int dir=0; dir< 4; dir++){
+	  char* src = ((char*)fatlink)+ (4*i+dir)*gaugeSiteSize*gSize;
+	  char* dst = ((char*)myfatlink[dir]) + i*gaugeSiteSize*gSize;
+	  memcpy(dst, src, gaugeSiteSize*gSize);
+	}
+ }  
+
+
+
+  int res=1;
+  for(int i=0;i < 4;i++){
+    res &= compare_floats(reflink[i], myfatlink[i], V*gaugeSiteSize, 1e-3, gaugeParam.cpu_prec);
+  }
+  strong_check_link(reflink, myfatlink, V, gaugeParam.cpu_prec);  
     
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
   int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
   double perf = 1.0* flops*volume/(secs*1024*1024*1024);
   printf("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
 
+
+  for(i=0;i < 4;i++){
+	free(myfatlink[i]);
+  }
   llfat_end();
     
   if (res == 0){//failed
@@ -194,10 +258,11 @@ display_test_info()
 {
   printf("running the following test:\n");
     
-  printf("link_precision           link_reconstruct           T_dimension\n");
-  printf("%s                       %s                         %d \n", 
+  printf("link_precision           link_reconstruct           space_dimension        T_dimension\n");
+  printf("%s                       %s                         %d                     %d\n", 
 	 get_prec_str(link_prec),
 	 get_recon_str(link_recon), 
+	 sdim, 
 	 tdim);
   return ;
     
@@ -221,6 +286,9 @@ usage(char** argv )
 int 
 main(int argc, char **argv) 
 {
+  MPI_Init(&argc, &argv);
+  comm_init();
+
   int i;
   for (i =1;i < argc; i++){
 	
@@ -307,6 +375,8 @@ main(int argc, char **argv)
     
   llfat_test();
     
-    
+  comm_exit(0);
   return 0;
 }
+
+
