@@ -40,7 +40,7 @@ extern "C" {
 
   void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 
-  void strong_check_link(void ** linkA, void **linkB, int len, QudaPrecision prec);
+  int strong_check_link(void ** linkA, void **linkB, int len, QudaPrecision prec);
   void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec);
   
   void createMomCPU(void* mom,  QudaPrecision precision);

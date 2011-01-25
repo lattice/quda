@@ -996,7 +996,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 
 
 template <typename Float>
-void compareLink(Float **linkA, Float **linkB, int len) {
+int compareLink(Float **linkA, Float **linkB, int len) {
   int fail_check = 16;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
@@ -1019,22 +1019,32 @@ void compareLink(Float **linkA, Float **linkB, int len) {
   
   for (int i=0; i<18; i++) printf("%d fails = %d\n", i, iter[i]);
   
+  int accuracy_level = 0;
+  for(int f =0; f < fail_check; f++){
+    if(fail[f] == 0){
+      accuracy_level =f;
+    }
+  }
+
   for (int f=0; f<fail_check; f++) {
       printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*gaugeSiteSize, fail[f] / (double)(len*6));
   }
   
+  return accuracy_level;
 }
 
-static void 
+static int
 compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 {
+  int ret;
+
   if (precision == QUDA_DOUBLE_PRECISION){    
-    compareLink((double**)linkA, (double**)linkB, len);
+    ret = compareLink((double**)linkA, (double**)linkB, len);
   }else {
-    compareLink((float**)linkA, (float**)linkB, len);
+    ret = compareLink((float**)linkA, (float**)linkB, len);
   }    
 
-  return;
+  return ret;
 }
 
 
@@ -1055,8 +1065,7 @@ printLinkElement(void *link, int X, QudaPrecision precision)
     }
 }
 
-
-void strong_check_link(void** linkA, void **linkB, int len, QudaPrecision prec) 
+int strong_check_link(void** linkA, void **linkB, int len, QudaPrecision prec) 
 {
     printf("LinkA:\n");
     printLinkElement(linkA[0], 0, prec); 
@@ -1074,7 +1083,8 @@ void strong_check_link(void** linkA, void **linkB, int len, QudaPrecision prec)
     printLinkElement(linkB[3], len-1, prec); 
     printf("\n");
     
-    compare_link(linkA, linkB, len, prec);
+    int ret = compare_link(linkA, linkB, len, prec);
+    return ret;
 }
 
 

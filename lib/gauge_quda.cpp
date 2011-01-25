@@ -1621,16 +1621,17 @@ loadGaugeFromCPUArrayQuda_mg(FloatN *even, FloatN *odd, Float **cpuGauge, Float*
 }
 
 
-
+template<typename FloatN, typename Float>
 void 
-loadGaugeFromCPUArrayQuda_mg_opt(double2 *even, double2 *odd, double **cpuGauge, double* ghost_cpuGauge,
-				 ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh) 
+loadGaugeFromCPUArrayQuda_mg_opt(FloatN *even, FloatN *odd, Float **cpuGauge, Float* ghost_cpuGauge,
+				 ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh,
+				 QudaPrecision prec) 
 {
   // Use pinned memory
   int i;
   char* tmp;
-  int len = Vh*gaugeSiteSize*sizeof(double);
-  int glen = Vsh*gaugeSiteSize*sizeof(double);
+  int len = Vh*gaugeSiteSize*sizeof(Float);
+  int glen = Vsh*gaugeSiteSize*sizeof(Float);
   
   cudaMalloc(&tmp, 4*(len+2*glen)); CUERR;
 
@@ -1640,7 +1641,8 @@ loadGaugeFromCPUArrayQuda_mg_opt(double2 *even, double2 *odd, double **cpuGauge,
       cudaMemcpy(tmp + i*(len+2*glen)+len, ((char*)ghost_cpuGauge)+i*2*glen, glen, cudaMemcpyHostToDevice); 
       cudaMemcpy(tmp + i*(len+2*glen)+len + glen, ((char*)ghost_cpuGauge)+8*glen+i*2*glen, glen, cudaMemcpyHostToDevice); 
   }    
-  link_format_cpu_to_gpu((double*)even, (double*)tmp,  reconstruct, bytes, Vh, pad, Vsh); 
+  
+  link_format_cpu_to_gpu((void*)even, (void*)tmp,  reconstruct, bytes, Vh, pad, Vsh, prec); CUERR;
   
   //odd links
   for(i=0;i < 4; i++){
@@ -1648,7 +1650,7 @@ loadGaugeFromCPUArrayQuda_mg_opt(double2 *even, double2 *odd, double **cpuGauge,
       cudaMemcpy(tmp + i*(len+2*glen)+len, ((char*)ghost_cpuGauge)+glen +i*2*glen, glen, cudaMemcpyHostToDevice); CUERR;
       cudaMemcpy(tmp + i*(len+2*glen)+len + glen, ((char*)ghost_cpuGauge)+8*glen+glen +i*2*glen, glen, cudaMemcpyHostToDevice); CUERR;
   }
-  link_format_cpu_to_gpu((double*)odd, (double*)tmp, reconstruct, bytes, Vh, pad, Vsh); CUERR;
+  link_format_cpu_to_gpu((void*)odd, (void*)tmp, reconstruct, bytes, Vh, pad, Vsh, prec); CUERR;
   
   cudaFree(tmp);
   CUERR;
@@ -1747,49 +1749,23 @@ loadLinkToGPU_mg(FullGauge cudaGauge, void **cpuGauge, void* ghost_cpuGauge, Qud
   int pad = param->ga_pad;
   int Vsh = param->X[0]*param->X[1]*param->X[2]/2;
   
+  
+  if (cpu_prec  != cuda_prec){
+    printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
+    exit(1);
+  }
+
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
-      //loadGaugeFromCPUArrayQuda_mg((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
-      //(double*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume, pad, Vsh);
-      loadGaugeFromCPUArrayQuda_mg_opt((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
-				       (double*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume, pad, Vsh);
+    loadGaugeFromCPUArrayQuda_mg_opt((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
+				     (double*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume, pad, Vsh, 
+				     cuda_prec);
   } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
-      if (cpu_prec == QUDA_DOUBLE_PRECISION){
-      if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
-	//loadGaugeFromCPUArrayQuda((float4*)(cudaGauge.even), (float4*)(cudaGauge.odd), (double**)cpuGauge, 
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);
-      }else{
-	//loadGaugeFromCPUArrayQuda((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (double**)cpuGauge, 
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);		
-      }
-    }
-    else if (cpu_prec == QUDA_SINGLE_PRECISION){
-      if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
-	//loadGaugeFromCPUArrayQuda((float4*)(cudaGauge.even), (float4*)(cudaGauge.odd), (float**)cpuGauge, 
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);
-      }else{
-	//loadGaugeFromCPUArrayQuda((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);
-      }
-    }
-  } else if (cuda_prec == QUDA_HALF_PRECISION) {
-    if (cpu_prec == QUDA_DOUBLE_PRECISION){
-      if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
-	//loadGaugeFromCPUArrayQuda((short4*)(cudaGauge.even), (short4*)(cudaGauge.odd), (double**)cpuGauge, 
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);
-      }else{
-	//loadGaugeFromCPUArrayQuda((short2*)(cudaGauge.even), (short2*)(cudaGauge.odd), (double**)cpuGauge, 
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);
-      }
-    }
-    else if (cpu_prec == QUDA_SINGLE_PRECISION){
-      if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
-	//loadGaugeFromCPUArrayQuda((short4*)(cudaGauge.even), (short4*)(cudaGauge.odd), (float**)cpuGauge,
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);
-      }else{
-	//loadGaugeFromCPUArrayQuda((short2*)(cudaGauge.even), (short2*)(cudaGauge.odd), (float**)cpuGauge,
-	//cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume);		
-      }
-    }
+    loadGaugeFromCPUArrayQuda_mg_opt((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
+				     (float*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume, pad, Vsh, 
+				     cuda_prec);
+  }else{
+    printf("ERROR: half precision not supported in this funciton %s\n", __FUNCTION__);
+    exit(1);
   }
 }
 
@@ -1853,20 +1829,21 @@ storeGaugeToCPUArray(Float* cpuGauge, FloatN *even, FloatN *odd,
     cudaFreeHost(packedOdd); 
 }
 
+template<typename FloatN, typename Float>
 void 
-storeGaugeToCPUArray_opt(double* cpuGauge, double2 *even, double2 *odd, 
-			       ReconstructType reconstruct, int bytes, int Vh, int stride) 
-{
+storeGaugeToCPUArray_opt(Float* cpuGauge, FloatN *even, FloatN *odd, 
+			 int bytes, int Vh, int stride, QudaPrecision prec) 
+{  
   double* unpackedData;
-  int datalen = 4*Vh*gaugeSiteSize*sizeof(double);
+  int datalen = 4*Vh*gaugeSiteSize*sizeof(Float);
   cudaMalloc(&unpackedData, datalen); CUERR;
-
+  
   //unpack even data kernel
-  link_format_gpu_to_cpu(unpackedData, (double*)even, reconstruct, bytes, Vh, stride);
+  link_format_gpu_to_cpu((void*)unpackedData, (void*)even, bytes, Vh, stride, prec);
   cudaMemcpy(cpuGauge, unpackedData, datalen, cudaMemcpyDeviceToHost);
   
   //unpack odd data kernel
-  link_format_gpu_to_cpu(unpackedData, (double*)odd, reconstruct, bytes, Vh, stride);
+  link_format_gpu_to_cpu((void*)unpackedData, (void*)odd,  bytes, Vh, stride, prec);
   cudaMemcpy(cpuGauge + 4*Vh*gaugeSiteSize, unpackedData, datalen, cudaMemcpyDeviceToHost);  
   
   cudaFree(unpackedData);
@@ -1882,36 +1859,28 @@ storeLinkToCPU(void* cpuGauge, FullGauge *cudaGauge, QudaGaugeParam* param)
     
   QudaPrecision cpu_prec = param->cpu_prec;
   QudaPrecision cuda_prec= param->cuda_prec;
-    
-  if (cuda_prec == QUDA_HALF_PRECISION || cpu_prec == QUDA_HALF_PRECISION){
-    printf("ERROR: %s:  half precision is not supported at this moment\n", __FUNCTION__);
+
+  if (cpu_prec  != cuda_prec){
+    printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
     exit(1);
   }
     
+  if (cudaGauge->reconstruct != QUDA_RECONSTRUCT_NO){
+    printf("ERROR: it makes no sense to get data back to cpu for 8/12 reconstruct, function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  
   int stride = cudaGauge->volume + param->ga_pad;
   
-  if (cpu_prec == QUDA_DOUBLE_PRECISION){
-    if (cuda_prec == QUDA_DOUBLE_PRECISION){//double and double
-      storeGaugeToCPUArray_opt( (double*)cpuGauge, (double2*) cudaGauge->even, (double2*)cudaGauge->odd, 
-				cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, stride);
-    }else{ //double and single
-      if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO){
-	storeGaugeToCPUArray( (double*)cpuGauge, (float2*) cudaGauge->even, (float2*)cudaGauge->odd, 
-			      cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, stride );
-      }else{
-	storeGaugeToCPUArray( (double*)cpuGauge, (float4*) cudaGauge->even, (float4*)cudaGauge->odd, 
-			      cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, stride);	    
-      }  
-    }
-  }else { //SINGLE PRECISIONS
-    if (cudaGauge->reconstruct == QUDA_RECONSTRUCT_NO){
-      storeGaugeToCPUArray( (float*)cpuGauge, (float2*) cudaGauge->even, (float2*)cudaGauge->odd, 
-			    cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, stride);
-    }else{
-      storeGaugeToCPUArray( (float*)cpuGauge, (float4*) cudaGauge->even, (float4*)cudaGauge->odd, 
-			    cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, stride);	    
-    }
-	
+  if (cuda_prec == QUDA_DOUBLE_PRECISION){
+    storeGaugeToCPUArray_opt( (double*)cpuGauge, (double2*) cudaGauge->even, (double2*)cudaGauge->odd, 
+			      cudaGauge->bytes, cudaGauge->volume, stride, cuda_prec);
+  }else if (cuda_prec == QUDA_SINGLE_PRECISION){
+    storeGaugeToCPUArray_opt( (float*)cpuGauge, (float2*) cudaGauge->even, (float2*)cudaGauge->odd, 
+			      cudaGauge->bytes, cudaGauge->volume, stride, cuda_prec);
+  }else{
+    printf("ERROR: half precision not supported in this function %s\n", __FUNCTION__);
+    exit(1);
   }
 }
 

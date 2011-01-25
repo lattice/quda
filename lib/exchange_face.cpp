@@ -802,16 +802,30 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream)
 static void
 exchange_llfat_cleanup(void)
 {
-  
-  free(fwd_nbr_staple_cpu);      
-  free(back_nbr_staple_cpu);
-  free(fwd_nbr_staple_sendbuf_cpu);
-  free(back_nbr_staple_sendbuf_cpu);    
-  cudaFreeHost(fwd_nbr_staple);
-  cudaFreeHost(back_nbr_staple);
-  cudaFreeHost(fwd_nbr_staple_sendbuf);
-  cudaFreeHost(back_nbr_staple_sendbuf);
-  
+  if(fwd_nbr_staple_cpu){
+    free(fwd_nbr_staple_cpu); fwd_nbr_staple_cpu =NULL;
+  }      
+  if(back_nbr_staple_cpu){
+    free(back_nbr_staple_cpu);back_nbr_staple_cpu = NULL;
+  }
+  if(fwd_nbr_staple_sendbuf_cpu){
+    free(fwd_nbr_staple_sendbuf_cpu); fwd_nbr_staple_sendbuf_cpu = NULL;
+  }
+  if(back_nbr_staple_sendbuf_cpu){
+    free(back_nbr_staple_sendbuf_cpu); back_nbr_staple_sendbuf_cpu = NULL;
+  }    
+  if(fwd_nbr_staple){
+    cudaFreeHost(fwd_nbr_staple); fwd_nbr_staple = NULL;
+  }
+  if(back_nbr_staple){
+    cudaFreeHost(back_nbr_staple); back_nbr_staple = NULL;
+  }
+  if(fwd_nbr_staple_sendbuf){
+    cudaFreeHost(fwd_nbr_staple_sendbuf); fwd_nbr_staple_sendbuf = NULL;
+  }
+  if(back_nbr_staple_sendbuf){
+    cudaFreeHost(back_nbr_staple_sendbuf); back_nbr_staple_sendbuf = NULL;
+  }
 
 }
 

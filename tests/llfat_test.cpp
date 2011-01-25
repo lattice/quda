@@ -33,7 +33,7 @@ extern void initDslashCuda(FullGauge gauge);
 int device = 0;
 int ODD_BIT = 1;
 int tdim = 16;
-int sdim = 16;
+int sdim = 8;
 int Z[4];
 int V;
 int Vh;
@@ -118,16 +118,11 @@ llfat_init(void)
     
   createSiteLinkCPU(sitelink, gaugeParam.cpu_prec, 1);
   
-#if 0
-  site_link_sanity_check(sitelink, V, gaugeParam.cpu_prec, &gaugeParam);
-#endif
-
   exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, gaugeParam.cpu_prec);
   
   gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*Vsh;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  //loadLinkToGPU(cudaSiteLink, sitelink, &gaugeParam);
   loadLinkToGPU_mg(cudaSiteLink, sitelink, ghost_sitelink, &gaugeParam);
     
   gaugeParam.staple_pad = 3*Vsh;
@@ -151,6 +146,8 @@ llfat_end()
   for(i=0;i < 4 ;i++){
     free(sitelink[i]);
   }
+  free(ghost_sitelink);
+
   for(i=0;i < 4;i++){
     free(reflink[i]);
   }
@@ -164,7 +161,7 @@ llfat_end()
 
 
 
-static void 
+static int
 llfat_test(void) 
 {
   llfat_init();
@@ -231,7 +228,9 @@ llfat_test(void)
   for(int i=0;i < 4;i++){
     res &= compare_floats(reflink[i], myfatlink[i], V*gaugeSiteSize, 1e-3, gaugeParam.cpu_prec);
   }
-  strong_check_link(reflink, myfatlink, V, gaugeParam.cpu_prec);  
+  int accuracy_level;
+  
+  accuracy_level = strong_check_link(reflink, myfatlink, V, gaugeParam.cpu_prec);  
     
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
   int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
@@ -250,6 +249,9 @@ llfat_test(void)
     printf("	Did you use --verify?\n");
     printf("	Did you check the GPU health by running cuda memtest?\n");
   }
+
+
+  return accuracy_level;
 }            
 
 
@@ -373,10 +375,19 @@ main(int argc, char **argv)
     
   display_test_info();
     
-  llfat_test();
+  int accuracy_level = llfat_test();
     
-  comm_exit(0);
-  return 0;
+  printf("accuracy_level=%d\n", accuracy_level);
+  comm_cleanup();
+
+  int ret;
+  if(accuracy_level >=3 ){
+    ret = 0; 
+  }else{
+    ret = 1; //we delclare the test failed
+  }
+
+  return ret;
 }
 
 

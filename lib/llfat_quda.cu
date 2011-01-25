@@ -224,11 +224,7 @@ llfat_init_cuda(QudaGaugeParam* param)
   int site_ga_stride = param->site_ga_pad + Vh;
   int staple_stride = param->staple_pad + Vh;
   int llfat_ga_stride = param->llfat_ga_pad + Vh;
-
-  printf("site_ga_stride=%d, staple_stride=%d, llfat_ga_stride=%d\n",
-	 site_ga_stride, staple_stride, llfat_ga_stride);
-
-
+  
   cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));  
   cudaMemcpyToSymbol("staple_stride", &staple_stride, sizeof(int));  
   cudaMemcpyToSymbol("llfat_ga_stride", &llfat_ga_stride, sizeof(int));
