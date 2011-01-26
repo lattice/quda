@@ -630,19 +630,19 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
     if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
 	staggeredDslash12Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
-											 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
+											  longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       } else {
 	staggeredDslash12DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
 												 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_8){
-	  
+      
       if (!dagger) {
 	staggeredDslash8Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> (out, outNorm, fatGauge0, fatGauge1, 
-											 longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
+											  longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       } else {
 	staggeredDslash8DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
-											      longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
+											       longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       }
     }else{
       errorQuda("Invalid reconstruct value(%d) in function %s\n", reconstruct, __FUNCTION__);
@@ -670,6 +670,7 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
     }    
   }
 
+#ifdef MULTI_GPU
 
   exchange_gpu_spinor_start(inSpinor, &streams[1]); CUERR;
   exchange_gpu_spinor_wait(inSpinor, &streams[1]); CUERR;
@@ -719,7 +720,8 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
       errorQuda("Invalid reconstruct value in function %s\n", __FUNCTION__);	  
     }    
   }
-  cudaThreadSynchronize(); CUERR;    
+
+#endif
 }
 
 //This function is a special case for 18(no) reconstruct long link
@@ -760,6 +762,9 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 													longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
     }          
   }
+
+#ifdef MULTI_GPU
+
   exchange_gpu_spinor_start(inSpinor, &streams[1]);   
   exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
   
@@ -781,9 +786,10 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
       staggeredDslash18AxpyKernel<<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1,
 												  longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
     }          
-  }
+  }     
+    
+#endif
   
-  cudaThreadSynchronize();
 }
 
 
@@ -798,10 +804,6 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
   
 
 #ifdef GPU_STAGGERED_DIRAC
-
-#ifdef MULTI_GPU
-  //errorQuda("Multi-GPU staggered not implemented\n");
-#endif
 
   for(int i=0;i < 2 ;i ++){
     cudaStreamCreate(&streams[i]); CUERR;
@@ -859,6 +861,8 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
 			     (short2*)x, (float*)xNorm, k, volume, Vsh, tdim, length, ghost_length, in, block);
     }
   }
+
+  cudaThreadSynchronize(); CUERR;    
 
   for (int i = 0; i < 2; i++) {
     cudaStreamDestroy(streams[i]);

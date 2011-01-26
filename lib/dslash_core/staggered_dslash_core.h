@@ -318,7 +318,10 @@ o02_re = o02_im = 0.f;
 
 #define INTERIOR_KERNEL 0
 #define EXTERIOR_KERNEL 1
+
+#ifdef MULTI_GPU
 if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
+#endif
 {
     //direction: +X
 
@@ -563,14 +566,19 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
     o02_im -= B2_im;    
     
 }
+#ifdef MULTI_GPU
 }//if interior kernel
-
+#endif
 
 // if interior kernel and x4 < X4 -3
 // or 
 //    exterior kernel and x4 >= X4 -3
+
+#ifdef MULTI_GPU
 if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
      (tLocate.y == EXTERIOR_KERNEL && x4 >= X4 -3))
+#endif
+
 {
     //direction: +T
     if (x4>= (X4-3)){
@@ -594,6 +602,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
     int stride3 = sp_stride;
     
     //if exterior kernel, we need to read from ghost slices
+#ifdef MULTI_GPU
     if (tLocate.y == EXTERIOR_KERNEL){
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       
@@ -607,6 +616,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
 	stride3 = 3*Vsh;
       }
     }
+#endif
 
     READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);    
     READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3); 
@@ -636,8 +646,10 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
 //if interior kernel and x4 >=3 
 //or 
 //  exterior kernel and x4 < 3  
+#ifdef MULTI_GPU
 if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
      (tLocate.y == EXTERIOR_KERNEL && x4 < 3))
+#endif
 {
     //direction: -T
     if ( ((x4-3+X4)%X4)>= (X4-3) ){
@@ -659,7 +671,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
     int stride1 = sp_stride;
     int stride3 = sp_stride;
     
-
+#ifdef MULTI_GPU
     if (tLocate.y == EXTERIOR_KERNEL){
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       // read gauge matrix from device memory    
@@ -684,6 +696,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
       stride3 = 3*Vsh;
       }
     }
+#endif
 
     READ_FAT_MATRIX(FATLINK1TEX, fat_dir, fat_idx);
     READ_LONG_MATRIX(LONGLINK1TEX, long_dir, long_idx);
@@ -727,29 +740,8 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
 
 #endif
 
-
-
-
-#ifdef DSLASH_XPAY
-if (tLocate.y == INTERIOR_KERNEL ){
-  READ_ACCUM(ACCUMTEX);
-  o00_re = a*o00_re + accum0.x;
-  o00_im = a*o00_im + accum0.y;
-  o01_re = a*o01_re + accum1.x;
-  o01_im = a*o01_im + accum1.y;
-  o02_re = a*o02_re + accum2.x;
-  o02_im = a*o02_im + accum2.y; 
- }else{
-  o00_re = a*o00_re; 
-  o00_im = a*o00_im;
-  o01_re = a*o01_re;
-  o01_im = a*o01_im;
-  o02_re = a*o02_re;
-  o02_im = a*o02_im;
- }
-#endif // DSLASH_XPAY
-
 #ifdef DSLASH_AXPY
+#ifdef MULTI_GPU
 if (tLocate.y == INTERIOR_KERNEL){
    READ_ACCUM(ACCUMTEX);
    o00_re = -o00_re + a*accum0.x;
@@ -766,11 +758,22 @@ if (tLocate.y == INTERIOR_KERNEL){
    o02_re = -o02_re;
    o02_im = -o02_im;
  }
+#else
+READ_ACCUM(ACCUMTEX);
+o00_re = -o00_re + a*accum0.x;
+o00_im = -o00_im + a*accum0.y;
+o01_re = -o01_re + a*accum1.x;
+o01_im = -o01_im + a*accum1.y;
+o02_re = -o02_re + a*accum2.x;
+o02_im = -o02_im + a*accum2.y;
+#endif //MULTI_GPU
 #endif // DSLASH_AXPY
- 
+
+#ifdef MULTI_GPU
 if (tLocate.y == EXTERIOR_KERNEL){
   READ_AND_SUM_SPINOR();
  }
+#endif
 
 
 // write spinor field back to device memory

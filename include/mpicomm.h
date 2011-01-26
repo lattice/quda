@@ -26,17 +26,6 @@ int		comm_gpuid();
 }
 #endif
 
-extern int verbose;
-
-#define PRINTF(fmt,...) do{						\
-    if (verbose){							\
-      printf("[%d]"fmt, comm_rank(), ##__VA_ARGS__);			\
-    }else{								\
-      if (comm_rank()==0){						\
-	printf("[%d]"fmt, comm_rank(), ##__VA_ARGS__);			\
-      }									\
-    }									\
-  }while(0)	
 
 
 #endif

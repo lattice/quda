@@ -1,5 +1,5 @@
-#include <stdio.h>
 
+#include <stdio.h>
 #include <quda_internal.h>
 #include <cuda_runtime.h>
 #include <cuda.h>

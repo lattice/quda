@@ -133,7 +133,21 @@ extern "C" {
               cudaGetErrorString(cuda_err),  __LINE__, __FUNCTION__, __FILE__); \
       exit(cuda_err);}}while(0)
 
-
+extern int verbose;
+  
+#ifdef MULTI_GPU
+#define PRINTF(fmt,...) do{						\
+    if (verbose){							\
+      printf("[%d]"fmt, comm_rank(), ##__VA_ARGS__);			\
+    }else{								\
+      if (comm_rank()==0){						\
+	printf("[%d]"fmt, comm_rank(), ##__VA_ARGS__);			\
+      }									\
+    }									\
+  }while(0)	
+#else
+#define PRINTF printf
+#endif
 
 
 #ifdef __cplusplus

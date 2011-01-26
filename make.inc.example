@@ -26,6 +26,7 @@ BUILD_FERMION_FORCE = no       # build code for asqtad fermion force?
 # Multiple GPU options
 BUILD_MULTI_GPU = yes # set to 'yes' to build the multi-GPU code
 BUILD_QMP = yes      # set to 'yes' to build the QMP multi-GPU code
+BUILD_MPI = no        # set to 'yes' to build the MPI multi-GPU code
 OVERLAP_COMMS = yes  # set to 'yes' to overlap comms and compute
 
 FECC = gcc	      # Front end CC
@@ -70,6 +71,10 @@ ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
   NVCCOPT += -DMULTI_GPU
 endif
 
+RUN =
+CC  = $(FECC)
+CXX = $(FECXX)
+
 ifeq ($(strip $(BUILD_QMP)), yes)
   RUN = $(MPI_HOME)/bin/mpirun -np 1
   CC = $(MPICC)
@@ -79,10 +84,19 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
-else 
-  RUN =
-  CC  = $(FECC)
-  CXX = $(FECXX)
+endif
+ 
+ifeq ($(strip $(BUILD_MPI)), yes)
+  RUN = $(MPI_HOME)/bin/mpirun -np 1
+  CC = $(MPICC)
+  CXX = $(MPICXX)
+  MPI_CFLAGS = 
+  MPI_LDFLAGS =
+  MPI_LIBS = 
+  INC += -DMPI_COMMS $(MPI_CFLAGS)
+  LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
+  EXCHANGE_FACE=exchange_face.o
+  MPICOMM=mpicomm.o
 endif
 
 ifeq ($(strip $(OVERLAP_COMMS)), yes)
@@ -109,6 +123,8 @@ endif
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK
   FATLINK_TEST=llfat_test
+  FATLINK_TEST=llfat_test
+  FATLINK_QUDA_ITF=llfat_quda_itf.o
 endif
 ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   NVCCOPT += -DGPU_GAUGE_FORCE

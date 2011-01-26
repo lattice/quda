@@ -398,6 +398,123 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
   
 }
 
+
+void exchange_cpu_links(int* X,
+			void** fatlink, void* ghost_fatlink, 
+			void** longlink, void* ghost_longlink,
+			QudaPrecision gPrecision)
+{
+  
+  
+  V = 1;
+  for (int d=0; d< 4; d++) {
+    V *= X[d];
+    dims[d] = X[d];
+  }
+  Vh = V/2;
+  
+  Vs = X[0]*X[1]*X[2];
+  Vsh = Vs/2;
+  
+  void*  fatlink_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
+  void*  longlink_sendbuf = malloc(3*Vs*gaugeSiteSize*gPrecision);
+  if (fatlink_sendbuf == NULL || longlink_sendbuf == NULL){
+    printf("ERROR: malloc failed for fatlink_sendbuf/longlink_sendbuf\n");
+    exit(1);
+  }
+  
+ 
+  if (gPrecision == QUDA_DOUBLE_PRECISION){
+    exchange_fatlink((double**)fatlink, (double*)ghost_fatlink, (double*)fatlink_sendbuf);
+    exchange_longlink((double**)longlink, (double*)ghost_longlink, (double*)longlink_sendbuf);
+  }else{ //single
+    exchange_fatlink((float**)fatlink, (float*)ghost_fatlink, (float*)fatlink_sendbuf);
+    exchange_longlink((float**)longlink, (float*)ghost_longlink, (float*)longlink_sendbuf);    
+  }
+  
+  free(fatlink_sendbuf);
+  free(longlink_sendbuf);
+
+}
+
+
+void exchange_cpu_spinor(int* X,
+			 void* spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor,
+			 QudaPrecision sPrecision)
+{
+  
+  V = 1;
+  for (int d=0; d< 4; d++) {
+    V *= X[d];
+    dims[d] = X[d];
+  }
+  Vh = V/2;
+  
+  Vs = X[0]*X[1]*X[2];
+  Vsh = Vs/2;
+
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    exchange_cpu_spinor((double*)spinorField, (double*)fwd_nbr_spinor, (double*)back_nbr_spinor);
+  }else{//single
+    exchange_cpu_spinor((float*)spinorField, (float*)fwd_nbr_spinor, (float*)back_nbr_spinor);    
+  }
+
+}
+
+
+/**************************************************************
+ * Staple exchange routine
+ * used in fat link computation
+ ***************************************************************/
+#ifdef GPU_FATLINK
+
+static void* fwd_nbr_staple_cpu = NULL;
+static void* back_nbr_staple_cpu = NULL;
+static void* fwd_nbr_staple_sendbuf_cpu = NULL;
+static void* back_nbr_staple_sendbuf_cpu = NULL;
+
+static void* fwd_nbr_staple = NULL;
+static void* back_nbr_staple = NULL;
+static void* fwd_nbr_staple_sendbuf = NULL;
+static void* back_nbr_staple_sendbuf = NULL;
+
+void 
+exchange_llfat_init(FullStaple* cudaStaple)
+{
+  static int initialized = 0;
+  if (initialized){
+    return;
+  }
+  initialized = 1;
+  
+  QudaPrecision prec = cudaStaple->precision;
+
+  cudaMallocHost((void**)&fwd_nbr_staple, Vs*gaugeSiteSize*prec);
+  cudaMallocHost((void**)&back_nbr_staple, Vs*gaugeSiteSize*prec);
+  cudaMallocHost((void**)&fwd_nbr_staple_sendbuf, Vs*gaugeSiteSize*prec);
+  cudaMallocHost((void**)&back_nbr_staple_sendbuf, Vs*gaugeSiteSize*prec);
+
+  CUERR;
+
+  fwd_nbr_staple_cpu = malloc(Vs*gaugeSiteSize*prec);
+  back_nbr_staple_cpu = malloc(Vs*gaugeSiteSize*prec);
+  if (fwd_nbr_staple_cpu == NULL||back_nbr_staple_cpu == NULL){
+    printf("ERROR: malloc failed for fwd_nbr_staple/back_nbr_staple\n");
+    comm_exit(1);
+  }
+  
+  fwd_nbr_staple_sendbuf_cpu = malloc(Vs*gaugeSiteSize*prec);
+  back_nbr_staple_sendbuf_cpu = malloc(Vs*gaugeSiteSize*prec);
+  if (fwd_nbr_staple_sendbuf_cpu == NULL || back_nbr_staple_sendbuf_cpu == NULL){
+    printf("ERROR: malloc failed for fwd_nbr_staple_sendbuf/back_nbr_staple_sendbuf\n");
+    comm_exit(1);
+  }
+  
+  return;
+}
+
+
+
 template<typename Float>
 void
 exchange_sitelink(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_sendbuf, Float* sitelink_back_sendbuf)
@@ -486,6 +603,8 @@ void exchange_cpu_sitelink(int* X,
 }
 
 
+
+
 template<typename Float>
 void
 exchange_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sendbuf, Float* staple_back_sendbuf)
@@ -568,117 +687,7 @@ void exchange_cpu_staple(int* X,
   free(staple_back_sendbuf);
 }
 
-void exchange_cpu_links(int* X,
-			void** fatlink, void* ghost_fatlink, 
-			void** longlink, void* ghost_longlink,
-			QudaPrecision gPrecision)
-{
-  
-  
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    dims[d] = X[d];
-  }
-  Vh = V/2;
-  
-  Vs = X[0]*X[1]*X[2];
-  Vsh = Vs/2;
-  
-  void*  fatlink_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
-  void*  longlink_sendbuf = malloc(3*Vs*gaugeSiteSize*gPrecision);
-  if (fatlink_sendbuf == NULL || longlink_sendbuf == NULL){
-    printf("ERROR: malloc failed for fatlink_sendbuf/longlink_sendbuf\n");
-    exit(1);
-  }
-  
- 
-  if (gPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_fatlink((double**)fatlink, (double*)ghost_fatlink, (double*)fatlink_sendbuf);
-    exchange_longlink((double**)longlink, (double*)ghost_longlink, (double*)longlink_sendbuf);
-  }else{ //single
-    exchange_fatlink((float**)fatlink, (float*)ghost_fatlink, (float*)fatlink_sendbuf);
-    exchange_longlink((float**)longlink, (float*)ghost_longlink, (float*)longlink_sendbuf);    
-  }
-  
-  free(fatlink_sendbuf);
-  free(longlink_sendbuf);
 
-}
-
-
-void exchange_cpu_spinor(int* X,
-			 void* spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor,
-			 QudaPrecision sPrecision)
-{
-  
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    dims[d] = X[d];
-  }
-  Vh = V/2;
-  
-  Vs = X[0]*X[1]*X[2];
-  Vsh = Vs/2;
-
-  if (sPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_cpu_spinor((double*)spinorField, (double*)fwd_nbr_spinor, (double*)back_nbr_spinor);
-  }else{//single
-    exchange_cpu_spinor((float*)spinorField, (float*)fwd_nbr_spinor, (float*)back_nbr_spinor);    
-  }
-
-}
-
-/**************************************************************
- * Staple exchange routine
- * used in fat link computation
- */
-
-static void* fwd_nbr_staple_cpu = NULL;
-static void* back_nbr_staple_cpu = NULL;
-static void* fwd_nbr_staple_sendbuf_cpu = NULL;
-static void* back_nbr_staple_sendbuf_cpu = NULL;
-
-static void* fwd_nbr_staple = NULL;
-static void* back_nbr_staple = NULL;
-static void* fwd_nbr_staple_sendbuf = NULL;
-static void* back_nbr_staple_sendbuf = NULL;
-
-void 
-exchange_llfat_init(FullStaple* cudaStaple)
-{
-  static int initialized = 0;
-  if (initialized){
-    return;
-  }
-  initialized = 1;
-  
-  QudaPrecision prec = cudaStaple->precision;
-
-  cudaMallocHost((void**)&fwd_nbr_staple, Vs*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&back_nbr_staple, Vs*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&fwd_nbr_staple_sendbuf, Vs*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&back_nbr_staple_sendbuf, Vs*gaugeSiteSize*prec);
-
-  CUERR;
-
-  fwd_nbr_staple_cpu = malloc(Vs*gaugeSiteSize*prec);
-  back_nbr_staple_cpu = malloc(Vs*gaugeSiteSize*prec);
-  if (fwd_nbr_staple_cpu == NULL||back_nbr_staple_cpu == NULL){
-    printf("ERROR: malloc failed for fwd_nbr_staple/back_nbr_staple\n");
-    comm_exit(1);
-  }
-  
-  fwd_nbr_staple_sendbuf_cpu = malloc(Vs*gaugeSiteSize*prec);
-  back_nbr_staple_sendbuf_cpu = malloc(Vs*gaugeSiteSize*prec);
-  if (fwd_nbr_staple_sendbuf_cpu == NULL || back_nbr_staple_sendbuf_cpu == NULL){
-    printf("ERROR: malloc failed for fwd_nbr_staple_sendbuf/back_nbr_staple_sendbuf\n");
-    comm_exit(1);
-  }
-  
-  return;
-}
 
 void
 exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream)
@@ -829,10 +838,15 @@ exchange_llfat_cleanup(void)
 
 }
 
+#endif
+
 /*****************************************************************/ 
 
 void exchange_cleanup()
-{  
+{
+#ifdef GPU_FATLINK  
   exchange_llfat_cleanup();
+#endif
   exchange_dslash_cleanup();
 }
+

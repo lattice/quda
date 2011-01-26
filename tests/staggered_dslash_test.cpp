@@ -14,10 +14,13 @@
 #include <misc.h>
 #include <test_util.h>
 #include <staggered_dslash_reference.h>
-#include "exchange_face.h"
 #include "gauge_quda.h"
+
+#ifdef MULTI_GPU
 #include <mpi.h>
 #include "mpicomm.h"
+#include "exchange_face.h"
+#endif
 
 #define staggeredSpinorSiteSize 6
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
@@ -32,13 +35,16 @@ FullGauge cudaLongLink;
 
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
-void *cpu_fwd_nbr_spinor, *cpu_back_nbr_spinor;
 
 cudaColorSpinorField* tmp;
 
 void *hostGauge[4];
 void *fatlink[4], *longlink[4];
+
+#ifdef MULTI_GPU
+void *cpu_fwd_nbr_spinor, *cpu_back_nbr_spinor;
 void* ghost_fatlink, *ghost_longlink;
+#endif
 
 
 QudaParity parity;
@@ -57,7 +63,7 @@ void init()
 {    
 
   initQuda(device);
-
+  
   int Vs = sdim*sdim*sdim;
   int Vsh = Vs/2;
 
@@ -136,12 +142,14 @@ void init()
   spinor->Source(QUDA_RANDOM_SOURCE);
 
   //create ghost spinors
+#ifdef MULTI_GPU
   cpu_fwd_nbr_spinor = malloc(Vsh* staggeredSpinorSiteSize *3*sizeof(double));
   cpu_back_nbr_spinor = malloc(Vsh*staggeredSpinorSiteSize *3*sizeof(double));
   if (cpu_fwd_nbr_spinor == NULL || cpu_back_nbr_spinor == NULL){
     PRINTF("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
     exit(1);
   }
+#endif
 
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -154,68 +162,45 @@ void init()
     fprintf(stderr, "ERROR: malloc failed for fatlink/longlink\n");
     exit(1);
   }
+  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
+  
 
+#ifdef MULTI_GPU
   ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
   ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
   if (ghost_fatlink == NULL || ghost_longlink == NULL){
     PRINTF("ERROR: malloc failed for ghost fatlink/longlink\n");
     exit(1);
   }
-   
-  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
-  
   exchange_cpu_links(X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+#endif   
   
 
-
-
-#if 0
-  //printf("links are:\n");
-  //display_link(fatlink[0], 1, gaugeParam.cpu_prec);
-  //display_link(longlink[0], 1, gaugeParam.cpu_prec);
-    
-  for (int i =0;i < 4 ;i++){
-    int dir = 2*i;
-    link_sanity_check(fatlink[i], V, gaugeParam.cpu_prec, dir, &gaugeParam);
-    link_sanity_check(longlink[i], V, gaugeParam.cpu_prec, dir, &gaugeParam);
-  }
-
-  //printf("spinors are:\n");  
-  //display_spinor(spinor, 10, inv_param.cpu_prec);
-#endif
-
-
-#if 0
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(fatlink, &gaugeParam);
-
-#else
+#ifdef MULTI_GPU
   
   int num_faces =1;
   gaugeParam.ga_pad = sdim*sdim*sdim/2;    
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces, GAUGE_STAGGERED_FAT);
-  
-  
-#endif
-  
 
-#if 0
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
-  loadGaugeQuda(longlink, &gaugeParam);
-#else
   num_faces =3;
   gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;    
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
   loadGaugeQuda_general_mg(longlink, ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces, GAUGE_STAGGERED_LONG);
+#else
+  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  loadGaugeQuda(fatlink, &gaugeParam);
 
+  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+  loadGaugeQuda(longlink, &gaugeParam);
+  
 #endif
-
+  
   cudaFatLink = cudaFatLinkPrecise;
   cudaLongLink = cudaLongLinkPrecise;
-    
+  
   printf("Sending fields to GPU..."); fflush(stdout);
     
   if (!transfer) {
@@ -273,6 +258,12 @@ void end(void)
     free(fatlink[dir]);
     free(longlink[dir]);
   }
+
+#ifdef MULTI_GPU
+  free(ghost_fatlink);
+  free(ghost_longlink);
+#endif
+
   if (!transfer){
     delete dirac;
     delete cudaSpinor;
@@ -343,15 +334,19 @@ void staggeredDslashRef()
   fflush(stdout);
   switch (test_type) {
   case 0:    
-    /*
-    cpu_parity = 0; //EVEN
-    staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
-		     inv_param.cpu_prec, gaugeParam.cpu_prec);
-    */
-    
+#ifdef MULTI_GPU    
     staggered_dslash_mg(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
 			spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
 			inv_param.cpu_prec, gaugeParam.cpu_prec);
+
+#else
+    
+    cpu_parity = 0; //EVEN
+    staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
+		     inv_param.cpu_prec, gaugeParam.cpu_prec);
+    
+#endif    
+
 
     break;
   case 1: 
@@ -451,9 +446,11 @@ void usage(char** argv )
 
 int main(int argc, char **argv) 
 {
+#ifdef MULTI_GPU
   MPI_Init (&argc, &argv);
   comm_init();
-  
+#endif
+
   int i;
   for (i =1;i < argc; i++){
 	
@@ -551,6 +548,9 @@ int main(int argc, char **argv)
     //probably no error 
     ret = 0;
   }
+#ifdef MULTI_GPU
   comm_cleanup();
+#endif
+
   return ret;
 }

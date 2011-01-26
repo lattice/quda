@@ -56,13 +56,8 @@
 #else
 #define DD_PARAM5 const DslashParam param, const short2 *x, const float *xNorm, const float a
 #endif
-#if (DD_XPAY==1)
-#define DD_XPAY_F Xpay
-#define DSLASH_XPAY
-#else
 #define DD_XPAY_F Axpy
 #define DSLASH_AXPY
-#endif
 #endif
 
 #if (DD_RECON==0) // reconstruct from 8 reals
@@ -161,7 +156,7 @@
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE
 #define SPINOR_DOUBLE
-#if (DD_XPAY==1 || DD_XPAY == 2)
+#if (DD_XPAY==1)
 #define ACCUMTEX accumTexDouble
 #define READ_ACCUM READ_ST_ACCUM_DOUBLE
 #endif
@@ -208,7 +203,7 @@
 #endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_FLOAT2
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
-#if (DD_XPAY==1 || DD_XPAY == 2)
+#if (DD_XPAY==1)
 #define ACCUMTEX accumTexSingle2
 #define READ_ACCUM READ_ST_ACCUM_SINGLE
 #endif
@@ -238,7 +233,7 @@
 #define DD_PARAM4 const short2* in, const float *inNorm
 #define WRITE_SPINOR WRITE_ST_SPINOR_SHORT2
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF
-#if (DD_XPAY==1 || DD_XPAY == 2)
+#if (DD_XPAY==1)
 #define ACCUMTEX accumTexHalf2
 #define READ_ACCUM READ_ST_ACCUM_HALF
 #endif
@@ -316,9 +311,6 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #if (DD_XPAY==0)
 #undef DD_XPAY
 #define DD_XPAY 1
-#elif (DD_XPAY==1)
-#undef DD_XPAY
-#define DD_XPAY 2
 #else
 #undef DD_XPAY
 #define DD_XPAY 0

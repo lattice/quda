@@ -15,7 +15,7 @@ for prog in $progs ; do
   for prec in $precs ; do 
     for recon in $recons ; do
 	cmd="$prog --sdim 8 --tdim 16 --recon $recon --prec $prec"
-	echo running $cmd
+	echo running ./$cmd
 	echo "----------------------------------------------------------" >>$OUTFILE
         echo $cmd >> $OUTFILE
 	./$cmd >> $OUTFILE 2>&1|| (echo "$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
@@ -28,13 +28,18 @@ echo "Testing link fattening code"
 precs="double single"
 recons="18"
 
-for prec in $precs ; do
-  for recon in $recons ; do
-        cmd="llfat_test --sdim 8 --tdim 16 --recon $recon --cpu_prec ${prec} --prec ${prec} --verify"
-	echo running $cmd
-	echo $cmd >>$OUTFILE
-	./$cmd >>  $OUTFILE 2>&1|| (echo "$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
+file=./llfat_test
+if [  -e "$file" ]; then
+  for prec in $precs ; do
+    for recon in $recons ; do
+      cmd="$file --sdim 8 --tdim 16 --recon $recon --cpu_prec ${prec} --prec ${prec} --verify"
+      echo running $cmd
+      echo $cmd >>$OUTFILE
+      $cmd >>  $OUTFILE 2>&1|| (echo "$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
+    done
   done
-done
+else
+  echo "The program $file does not exist; this program will not be tested!"
+fi
 
 echo $success_msg

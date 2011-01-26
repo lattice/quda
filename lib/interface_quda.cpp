@@ -63,6 +63,7 @@ extern bool qudaPtNm1;
 #include "face_quda.h"
 
 QudaVerbosity verbosity;
+int verbose = 0;
 
 Dirac *d = NULL;
 Dirac *dSloppy = NULL;

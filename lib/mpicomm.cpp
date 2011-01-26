@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -10,7 +9,7 @@ static int fwd_nbr=-1;
 static int back_nbr=-1;
 static int rank = -1;
 static int size = -1;
-int verbose = 0;
+extern int verbose;
 static int num_nodes;
 extern int getGpuCount();
 static int which_gpu =-1;
