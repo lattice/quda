@@ -1,0 +1,203 @@
+
+Version 0.3.2 - 18 January 2011
+
+- Fixed a regression in 0.3.1 that prevented the BiCGstab solver from
+  working correctly with half precision on Fermi.
+
+
+Version 0.3.1 - 22 December 2010
+
+- Added support for domain wall fermions.  The length of the fifth
+  dimension and the domain wall height are set via the 'Ls' and 'm5'
+  members of QudaInvertParam.  Note that the convention is to include
+  the minus sign in m5 (e.g., m5 = -1.8 would be a typical value).
+
+- Added support for twisted mass fermions.  The twisted mass parameter
+  and flavor are set via the 'mu' and 'twist_flavor' members of
+  QudaInvertParam.  Similar to clover fermions, both symmetric and
+  asymmetric even/odd preconditioning are supported.  The symmetric
+  case is better optimized and generally also exhibits faster
+  convergence.
+
+- Improved performance in several of the BLAS routines, particularly
+  on Fermi.
+
+- Improved performance in the CG solver for Wilson-like (and domain
+  wall) fermions by avoiding unnecessary allocation and deallocation
+  of temporaries, at the expense of increased memory usage.  This will
+  be improved in a future release.
+
+- Enabled optional building of Dirac operators, set in make.inc, to
+  keep build time in check.
+
+- Added declaration for MatDagMatQuda() to the quda.h header file and
+  removed the non-existent functions MatPCQuda() and
+  MatPCDagMatPCQuda().  The latter two functions have been absorbed
+  into MatQuda() and MatDagMatQuda(), respectively, since
+  preconditioning may be selected via the solution_type member of
+  QudaInvertParam.
+
+- Fixed a bug in the Wilson and Wilson-clover Dirac operators that
+  prevented the use of MatPC solution types.
+
+- Fixed a bug in the Wilson and Wilson-clover Dirac operators that
+  would cause a crash when QUDA_MASS_NORMALIZATION is used.
+
+- Fixed an allocation bug in the Wilson and Wilson-clover
+  Dirac operators that might have led to undefined behavior for
+  non-zero padding.
+
+- Fixed a bug in blas_test that might have led to incorrect autotuning
+  for the copyCuda() routine.
+
+- Various internal changes: removed temporary cudaColorSpinorField
+  argument to solver functions; modified blas functions to use C++
+  complex<double> type instead of cuDoubleComplex type; improved code
+  hygiene by ensuring that all textures are bound in dslash_quda.cu
+  and unbound after kernel execution; etc.
+
+
+Version 0.3.0 - 1 October 2010
+
+- CUDA 3.0 or later is now required to build the library.
+
+- Several changes have been made to the interface that require setting
+  new parameters in QudaInvertParam and QudaGaugeParam.  See below for
+  details.
+
+- The internals of QUDA have been significantly restructured to facilitate
+  future extensions.  This is an ongoing process and will continue
+  through the next several releases.
+
+- The inverters might require more device memory than they did before.
+  This will be corrected in a future release.
+
+- The CG inverter now supports improved staggered fermions (asqtad or
+  HISQ).  Code has also been added for asqtad link fattening, the asqtad
+  fermion force, and the one-loop improved Symanzik gauge force, but
+  these are not yet exposed through the interface in a consistent way.
+
+- A multi-shift CG solver for improved staggered fermions has been
+  added, callable via invertMultiShiftQuda().  This function does not
+  yet support Wilson or Wilson-clover.
+
+- It is no longer possible to mix different precisions for the
+  spinors, gauge field, and clover term (where applicable).  In other
+  words, it is required that the 'cuda_prec' member of QudaGaugeParam
+  match both the 'cuda_prec' and 'clover_cuda_prec' members of
+  QudaInvertParam, and likewise for the "sloppy" variants.  This
+  change has greatly reduced the time and memory required to build the
+  library.
+
+- Added 'solve_type' to QudaInvertParam.  This determines how the linear
+  system is solved, in contrast to solution_type which determines what
+  system is being solved.  When using the CG inverter, solve_type should
+  generally be set to 'QUDA_NORMEQ_PC_SOLVE', which will solve the
+  even/odd-preconditioned normal equations via CGNR.  (The full
+  solution will be reconstructed if necessary based on solution_type.)
+  For BiCGstab, 'QUDA_DIRECT_PC_SOLVE' is generally best.  These choices
+  correspond to what was done by default in earlier versions of QUDA.
+
+- Added 'dagger' option to QudaInvertParam.  If 'dagger' is set to
+  QUDA_DAG_YES, then the matrices appearing in the chosen solution_type
+  will be conjugated when determining the system to be solved by
+  invertQuda() or invertMultiShiftQuda().  This option must also be set
+  (typically to QUDA_DAG_NO) before calling dslashQuda(), MatPCQuda(),
+  MatPCDagMatPCQuda(), or MatQuda().
+
+- Eliminated 'dagger' argument to dslashQuda(), MatPCQuda(), and MatQuda()
+  in favor of the new 'dagger' member of QudaInvertParam described above.
+
+- Removed the unused blockDim and blockDim_sloppy members from
+  QudaInvertParam.
+
+- Added 'type' parameter to QudaGaugeParam.  For Wilson or Wilson-clover,
+  this should be set to QUDA_WILSON_LINKS.
+
+- The dslashQuda() function now takes takes an argument of type
+  QudaParityType to determine the parity (even or odd) of the output
+  spinor.  This was previously specified by an integer.
+
+- Added support for loading all elements of the gauge field matrices,
+  without SU(3) reconstruction.  Set the 'reconstruct' member of
+  QudaGaugeParam to 'RECONSTRUCT_NO' to select this option, but note
+  that it should not be combined with half precision unless the
+  elements of the gauge matrices are bounded by 1.  This restriction
+  will be removed in a future release.
+
+- Renamed dslash_test to wilson_dslash_test, renamed invert_test to
+  wilson_invert_test, and added staggered variants of these test
+  programs.
+
+- Improved performance of the half-precision Wilson Dslash.
+
+- Temporarily removed 3D Wilson Dslash.
+
+- Added an 'OS' option to make.inc.example, to simplify compiling for
+  Mac OS X.
+
+
+Version 0.2.5 - 24 June 2010
+
+- Fixed regression in 0.2.4 that prevented the library from compiling
+  when GPU_ARCH was set to sm_10, sm_11, or sm_12.
+
+
+Version 0.2.4 - 22 June 2010
+
+- Added initial support for CUDA 3.x and Fermi (not yet optimized).
+
+- Incorporated look-ahead strategy to increase stability of the BiCGstab
+  inverter.
+
+- Added definition of QUDA_VERSION to quda.h.  This is an integer with
+  two digits for each of the major, minor, and subminor version
+  numbers.  For example, QUDA_VERSION is 000204 for this release.
+
+
+Version 0.2.3 - 2 June 2010
+ 
+- Further improved performance of the blas routines.
+
+- Added 3D Wilson Dslash in anticipation of temporal preconditioning.
+
+
+Version 0.2.2 - 16 February 2010
+
+- Fixed a bug that prevented reductions (and hence the inverter) from working
+  correctly in emulation mode.
+
+
+Version 0.2.1 - 8 February 2010
+
+- Fixed a bug that would sometimes cause the inverter to fail when spinor
+  padding is enabled.
+
+- Significantly improved performance of the blas routines.
+
+
+Version 0.2 - 16 December 2009
+
+- Introduced new interface functions newQudaGaugeParam() and
+  newQudaInvertParam() to allow for enhanced error checking.  See
+  invert_test for an example of their use.
+
+- Added auto-tuning blas to improve performance (see README for details).
+
+- Improved stability of the half precision 8-parameter SU(3)
+  reconstruction (with thanks to Guochun Shi).
+
+- Cleaned up the invert_test example to remove unnecessary dependencies.
+
+- Fixed bug affecting saveGaugeQuda() that caused su3_test to fail.
+
+- Tuned parameters to improve performance of the half-precision clover
+  Dslash on sm_13 hardware.
+
+- Formally adopted the MIT/X11 license.
+
+
+Version 0.1 - 17 November 2009
+
+- Initial public release.
+
