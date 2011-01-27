@@ -197,15 +197,17 @@ invert_test(void)
 
 #ifdef MULTI_GPU
   int num_faces =1;
+  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = sdim*sdim*sdim/2;
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces, GAUGE_STAGGERED_FAT);
+  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces);
   
   num_faces =3;
+  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;
   gaugeParam.reconstruct= link_recon;
   gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda_general_mg(longlink,ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces, GAUGE_STAGGERED_LONG);
+  loadGaugeQuda_general_mg(longlink,ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces);
 
 #else
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
@@ -237,11 +239,11 @@ invert_test(void)
     time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU    
-    matdagmat_milc_mg(spinorCheck, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+    matdagmat_mg(spinorCheck, fatlink, ghost_fatlink, longlink, ghost_longlink, 
 		      spinorOut, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN);
     
 #else
-    matdagmat_milc(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN);
+    matdagmat(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN);
 #endif
     
     mxpy(spinorIn, spinorCheck, Vh*mySpinorSiteSize, inv_param.cpu_prec);
@@ -260,7 +262,7 @@ invert_test(void)
     
 #ifdef MULTI_GPU
 #else
-    matdagmat_milc(spinorCheckOdd, fatlink, longlink, spinorOutOdd, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);	
+    matdagmat(spinorCheckOdd, fatlink, longlink, spinorOutOdd, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);	
 #endif
     mxpy(spinorInOdd, spinorCheckOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(spinorCheckOdd, Vh*mySpinorSiteSize, inv_param.cpu_prec);
@@ -280,7 +282,7 @@ invert_test(void)
 
 #ifdef MULTI_GPU    
 #else
-    matdagmat_milc(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVENODD);
+    matdagmat(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVENODD);
 #endif    
     mxpy(spinorIn, spinorCheck, V*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(spinorCheck, V*mySpinorSiteSize, inv_param.cpu_prec);
@@ -373,7 +375,7 @@ invert_test(void)
       printf("%dth solution: mass=%f", i, masses[i]);
 #ifdef MULTI_GPU
 #else
-      matdagmat_milc(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
+      matdagmat(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
 #endif
       mxpy(in, spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);

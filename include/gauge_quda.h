@@ -14,7 +14,7 @@ extern "C" {
 			QudaLinkType type);
   void createGaugeField_mg(FullGauge *cudaGauge, void *cpuGauge, void* ghost_gauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
 			   GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
-			   Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, int num_faces, int flag);
+			   Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, int num_faces, QudaLinkType flag);
 
   void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, QudaPrecision cpu_prec, GaugeFieldOrder gauge_order);
 
@@ -39,10 +39,6 @@ extern "C" {
 
 #define momSiteSize   10 // real numbers per momentum
 #define gaugeSiteSize 18 // real numbers per gauge field
-
-#define GAUGE_STAGGERED_FAT  1
-#define GAUGE_STAGGERED_LONG 2 
-
   
 #ifdef __cplusplus
 }

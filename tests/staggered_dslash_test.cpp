@@ -179,14 +179,16 @@ void init()
 #ifdef MULTI_GPU
   
   int num_faces =1;
+  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = sdim*sdim*sdim/2;    
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces, GAUGE_STAGGERED_FAT);
-
+  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces);
+  
   num_faces =3;
-  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;    
+  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
+  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;  
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
-  loadGaugeQuda_general_mg(longlink, ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces, GAUGE_STAGGERED_LONG);
+  loadGaugeQuda_general_mg(longlink, ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces);
 #else
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;

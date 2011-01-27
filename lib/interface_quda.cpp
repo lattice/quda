@@ -245,7 +245,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 
 
-void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge, QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy, int num_faces, int flag)
+void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge, QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy, int num_faces)
 {
 
   checkGaugeParam(param);
@@ -271,13 +271,13 @@ void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge, QudaGaugeParam *
   param->packed_size = packed_size;
 
   createGaugeField_mg(cudaLinkPrecise, h_gauge, ghost_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
-		      param->t_boundary, param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, flag);
+		      param->t_boundary, param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, param->type);
   param->gaugeGiB += 2.0*cudaLinkPrecise->bytes/ (1 << 30);
   if (param->cuda_prec_sloppy != param->cuda_prec ||
       param->reconstruct_sloppy != param->reconstruct) {
     createGaugeField_mg(cudaLinkSloppy, h_gauge, ghost_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
 			param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
-			param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, flag);    
+			param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, param->type);    
     param->gaugeGiB += 2.0*cudaLinkSloppy->bytes/ (1 << 30);
   } else {
     *cudaLinkSloppy = *cudaLinkPrecise;

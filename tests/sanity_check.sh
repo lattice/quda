@@ -12,6 +12,10 @@ recons="18 12 8"
 
 echo "Testing staggered dslash and inverter:"
 for prog in $progs ; do 
+  if [ ! -e "$prog" ]; then
+	echo "The program $prog does not exist; this program will not be tested!"
+	continue
+  fi
   for prec in $precs ; do 
     for recon in $recons ; do
 	cmd="$prog --sdim 8 --tdim 16 --recon $recon --prec $prec"

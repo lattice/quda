@@ -248,6 +248,110 @@ llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu,
 } /* compute_gen_staple_site */
 
 
+
+/*  Optimized fattening code for the Asq and Asqtad actions.           
+ *  I assume that: 
+ *  path 0 is the one link
+ *  path 2 the 3-staple
+ *  path 3 the 5-staple 
+ *  path 4 the 7-staple
+ *  path 5 the Lapage term.
+ *  Path 1 is the Naik term
+ *
+ */
+template <typename su3_matrix, typename Float>
+void llfat_cpu(void** fatlink, su3_matrix** sitelink, Float* act_path_coeff)
+{
+
+  su3_matrix* staple = (su3_matrix *)malloc(V*sizeof(su3_matrix));
+  if(staple == NULL){
+    fprintf(stderr, "Error: malloc failed for staple in function %s\n", __FUNCTION__);
+    exit(1);
+  }
+    
+  su3_matrix* tempmat1 = (su3_matrix *)malloc(V*sizeof(su3_matrix));
+  if(tempmat1 == NULL){
+    fprintf(stderr, "ERROR:  malloc failed for tempmat1 in function %s\n", __FUNCTION__);
+    exit(1);
+  }
+    
+  /* to fix up the Lepage term, included by a trick below */
+  Float one_link = (act_path_coeff[0] - 6.0*act_path_coeff[5]);
+    
+
+  for (int dir=XUP; dir<=TUP; dir++){
+
+    /* Intialize fat links with c_1*U_\mu(x) */
+    for(int i=0;i < V;i ++){
+      su3_matrix* fat1 = ((su3_matrix*)fatlink[dir]) +  i;
+      llfat_scalar_mult_su3_matrix(sitelink[dir] + i, one_link, fat1 );
+    }
+  }
+
+  for (int dir=XUP; dir<=TUP; dir++){
+    for(int nu=XUP; nu<=TUP; nu++){
+      if(nu!=dir){
+	llfat_compute_gen_staple_field(staple,dir,nu,sitelink[dir], sitelink,fatlink, act_path_coeff[2], 0);
+
+	/* The Lepage term */
+	/* Note this also involves modifying c_1 (above) */
+
+		
+	llfat_compute_gen_staple_field((su3_matrix*)NULL,dir,nu,staple,sitelink, fatlink, act_path_coeff[5],1);
+		
+	for(int rho=XUP; rho<=TUP; rho++) {
+	  if((rho!=dir)&&(rho!=nu)){
+	    llfat_compute_gen_staple_field( tempmat1, dir, rho, staple,sitelink,fatlink, act_path_coeff[3], 1);
+	    
+	    for(int sig=XUP; sig<=TUP; sig++){
+	      if((sig!=dir)&&(sig!=nu)&&(sig!=rho)){
+		llfat_compute_gen_staple_field((su3_matrix*)NULL,dir,sig,tempmat1,sitelink,fatlink, act_path_coeff[4], 1);
+	      } 
+	    }/* sig */
+
+	  } 
+
+	}/* rho */
+
+
+      } 
+
+    }/* nu */
+	
+  }/* dir */      
+
+  free(staple);
+  free(tempmat1);
+
+}
+
+
+
+void
+llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_path_coeff)
+{
+  switch(prec){
+  case QUDA_DOUBLE_PRECISION:{
+    llfat_cpu((void**)fatlink, (dsu3_matrix**)sitelink, (double*) act_path_coeff);
+    break;
+  }
+  case QUDA_SINGLE_PRECISION:{
+    llfat_cpu((void**)fatlink, (fsu3_matrix**)sitelink, (float*) act_path_coeff);
+    break;
+  }
+  default:
+    fprintf(stderr, "ERROR: unsupported precision\n");
+    exit(1);
+    break;
+	
+  }
+
+  return;
+
+}
+
+#ifdef MULTI_GPU
+
 template<typename su3_matrix, typename Real>
 void 
 llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, 
@@ -421,83 +525,6 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
 } /* compute_gen_staple_site */
 
 
-
-/*  Optimized fattening code for the Asq and Asqtad actions.           
- *  I assume that: 
- *  path 0 is the one link
- *  path 2 the 3-staple
- *  path 3 the 5-staple 
- *  path 4 the 7-staple
- *  path 5 the Lapage term.
- *  Path 1 is the Naik term
- *
- */
-template <typename su3_matrix, typename Float>
-void llfat_cpu(void** fatlink, su3_matrix** sitelink, Float* act_path_coeff)
-{
-
-  su3_matrix* staple = (su3_matrix *)malloc(V*sizeof(su3_matrix));
-  if(staple == NULL){
-    fprintf(stderr, "Error: malloc failed for staple in function %s\n", __FUNCTION__);
-    exit(1);
-  }
-    
-  su3_matrix* tempmat1 = (su3_matrix *)malloc(V*sizeof(su3_matrix));
-  if(tempmat1 == NULL){
-    fprintf(stderr, "ERROR:  malloc failed for tempmat1 in function %s\n", __FUNCTION__);
-    exit(1);
-  }
-    
-  /* to fix up the Lepage term, included by a trick below */
-  Float one_link = (act_path_coeff[0] - 6.0*act_path_coeff[5]);
-    
-
-  for (int dir=XUP; dir<=TUP; dir++){
-
-    /* Intialize fat links with c_1*U_\mu(x) */
-    for(int i=0;i < V;i ++){
-      su3_matrix* fat1 = ((su3_matrix*)fatlink[dir]) +  i;
-      llfat_scalar_mult_su3_matrix(sitelink[dir] + i, one_link, fat1 );
-    }
-  }
-
-  for (int dir=XUP; dir<=TUP; dir++){
-    for(int nu=XUP; nu<=TUP; nu++){
-      if(nu!=dir){
-	llfat_compute_gen_staple_field(staple,dir,nu,sitelink[dir], sitelink,fatlink, act_path_coeff[2], 0);
-
-	/* The Lepage term */
-	/* Note this also involves modifying c_1 (above) */
-
-		
-	llfat_compute_gen_staple_field((su3_matrix*)NULL,dir,nu,staple,sitelink, fatlink, act_path_coeff[5],1);
-		
-	for(int rho=XUP; rho<=TUP; rho++) {
-	  if((rho!=dir)&&(rho!=nu)){
-	    llfat_compute_gen_staple_field( tempmat1, dir, rho, staple,sitelink,fatlink, act_path_coeff[3], 1);
-	    
-	    for(int sig=XUP; sig<=TUP; sig++){
-	      if((sig!=dir)&&(sig!=nu)&&(sig!=rho)){
-		llfat_compute_gen_staple_field((su3_matrix*)NULL,dir,sig,tempmat1,sitelink,fatlink, act_path_coeff[4], 1);
-	      } 
-	    }/* sig */
-
-	  } 
-
-	}/* rho */
-
-
-      } 
-
-    }/* nu */
-	
-  }/* dir */      
-
-  free(staple);
-  free(tempmat1);
-
-}
-
 template <typename su3_matrix, typename Float>
 void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitelink, Float* act_path_coeff)
 {
@@ -520,6 +547,12 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitel
     exit(1);
   }
     
+  su3_matrix* ghost_staple1 = (su3_matrix*)malloc(2*Vs*sizeof(su3_matrix));
+  if (ghost_staple1 == NULL){ 
+    fprintf(stderr, "Error: malloc failed for ghost staple in function %s\n", __FUNCTION__);
+    exit(1);
+  } 
+
   su3_matrix* tempmat1 = (su3_matrix *)malloc(V*sizeof(su3_matrix));
   if(tempmat1 == NULL){
     fprintf(stderr, "ERROR:  malloc failed for tempmat1 in function %s\n", __FUNCTION__);
@@ -553,13 +586,12 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitel
 		
 	for(int rho=XUP; rho<=TUP; rho++) {
 	  if((rho!=dir)&&(rho!=nu)){
-	    exchange_cpu_staple(Z, staple, ghost_staple, prec);
 	    llfat_compute_gen_staple_field_mg( tempmat1, dir, rho, staple,ghost_staple, sitelink, ghost_sitelink, fatlink, act_path_coeff[3], 1);
-	    
+	    exchange_cpu_staple(Z, tempmat1, ghost_staple1, prec);
+
 	    for(int sig=XUP; sig<=TUP; sig++){
 	      if((sig!=dir)&&(sig!=nu)&&(sig!=rho)){
-		exchange_cpu_staple(Z, tempmat1, ghost_staple, prec);
-		llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,sig,tempmat1, ghost_staple, sitelink, ghost_sitelink, fatlink, act_path_coeff[4], 1);
+		llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,sig,tempmat1, ghost_staple1, sitelink, ghost_sitelink, fatlink, act_path_coeff[4], 1);
 	      } 
 	    }/* sig */
 
@@ -576,34 +608,12 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitel
 
   free(staple);
   free(ghost_staple);
+  free(ghost_staple1);
   free(tempmat1);
 
 }
 
 
-
-void
-llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_path_coeff)
-{
-  switch(prec){
-  case QUDA_DOUBLE_PRECISION:{
-    llfat_cpu((void**)fatlink, (dsu3_matrix**)sitelink, (double*) act_path_coeff);
-    break;
-  }
-  case QUDA_SINGLE_PRECISION:{
-    llfat_cpu((void**)fatlink, (fsu3_matrix**)sitelink, (float*) act_path_coeff);
-    break;
-  }
-  default:
-    fprintf(stderr, "ERROR: unsupported precision\n");
-    exit(1);
-    break;
-	
-  }
-
-  return;
-
-}
 
 void
 llfat_reference_mg(void** fatlink, void** sitelink, void* ghost_sitelink, QudaPrecision prec, void* act_path_coeff)
@@ -627,3 +637,6 @@ llfat_reference_mg(void** fatlink, void** sitelink, void* ghost_sitelink, QudaPr
   return;
 
 }
+
+
+#endif

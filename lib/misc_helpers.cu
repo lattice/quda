@@ -34,7 +34,11 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
   int j;
   
   for(dir = 0; dir < 4; dir++){
+#ifdef MULTI_GPU
       FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh+2*Vsh) + thread0_tid*gaugeSiteSize);   
+#else
+      FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh) + thread0_tid*gaugeSiteSize);   
+#endif
       for(j=0; j < gaugeSiteSize/2; j++){
 	  buf[j*blockDim.x + threadIdx.x] =  src_start[j*blockDim.x + threadIdx.x];
       }
@@ -58,7 +62,11 @@ link_format_cpu_to_gpu(void* dst, void* src,
 		       QudaPrecision prec)
 {
   dim3 blockDim(BLOCKSIZE);
+#ifdef MULTI_GPU  
   dim3 gridDim((Vh+2*Vsh)/blockDim.x);
+#else
+  dim3 gridDim(Vh/blockDim.x);
+#endif
   //(Vh+2*Vsh) must be multipl of BLOCKSIZE or the kernel does not work
     //because the intermediae GPU data has stride=Vh+2*Vsh and the extra two
     //Vsh is occupied by the back and forward neighbor

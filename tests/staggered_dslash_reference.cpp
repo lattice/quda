@@ -295,7 +295,7 @@ mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int dagg
 
 template <typename sFloat, typename gFloat>
 void
-Matdagmat_milc(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat mass, int daggerBit, sFloat* tmp, MyQudaParity parity) 
+Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat mass, int daggerBit, sFloat* tmp, MyQudaParity parity) 
 {
     
     sFloat msq_x4 = mass*mass*4;
@@ -353,23 +353,23 @@ Matdagmat_milc(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFl
 
 
 void 
-matdagmat_milc(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
-	       QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
+matdagmat(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
+	  QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
 {
-    
-    if (sPrecision == QUDA_DOUBLE_PRECISION){
-	if (gPrecision == QUDA_DOUBLE_PRECISION) {
-	    Matdagmat_milc((double*)out, (double**)fatlink, (double**)longlink, (double*)in, (double)mass, dagger_bit, (double*)tmp, parity);
-	}else {
-	    Matdagmat_milc((double*)out, (float**)fatlink, (float**)longlink, (double*)in, (double)mass, dagger_bit, (double*) tmp, parity);
-	}
-    }else{
-	if (gPrecision == QUDA_DOUBLE_PRECISION){ 
-	    Matdagmat_milc((float*)out, (double**)fatlink, (double**)longlink, (float*)in, (float)mass, dagger_bit, (float*)tmp, parity);
-	}else {
-	    Matdagmat_milc((float*)out, (float**)fatlink, (float**)longlink, (float*)in, (float)mass, dagger_bit, (float*)tmp, parity);
-	}
+  
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+      Matdagmat((double*)out, (double**)fatlink, (double**)longlink, (double*)in, (double)mass, dagger_bit, (double*)tmp, parity);
+    }else {
+      Matdagmat((double*)out, (float**)fatlink, (float**)longlink, (double*)in, (double)mass, dagger_bit, (double*) tmp, parity);
     }
+  }else{
+    if (gPrecision == QUDA_DOUBLE_PRECISION){ 
+      Matdagmat((float*)out, (double**)fatlink, (double**)longlink, (float*)in, (float)mass, dagger_bit, (float*)tmp, parity);
+    }else {
+      Matdagmat((float*)out, (float**)fatlink, (float**)longlink, (float*)in, (float)mass, dagger_bit, (float*)tmp, parity);
+    }
+  }
 }
 
 
@@ -622,7 +622,7 @@ void staggered_dslash_mg(void *res, void **fatlink, void** longlink, void* ghost
 
 template <typename sFloat, typename gFloat>
 void
-Matdagmat_milc_mg(sFloat *out, gFloat **fatlink, gFloat* ghost_fatlink, gFloat** longlink, gFloat* ghost_longlink,
+Matdagmat_mg(sFloat *out, gFloat **fatlink, gFloat* ghost_fatlink, gFloat** longlink, gFloat* ghost_longlink,
 		  sFloat *in, sFloat* fwd_nbr_spinor, sFloat* back_nbr_spinor, sFloat mass, int daggerBit,
 		  sFloat* tmp, MyQudaParity parity) 
 {
@@ -688,25 +688,25 @@ Matdagmat_milc_mg(sFloat *out, gFloat **fatlink, gFloat* ghost_fatlink, gFloat**
 }
 
 void 
-matdagmat_milc_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, void* ghost_longlink, 
+matdagmat_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, void* ghost_longlink, 
 		  void *in, void* fwd_nbr_spinor, void* back_nbr_spinor, double mass, int dagger_bit,
 		  QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
 {
   
   if (sPrecision == QUDA_DOUBLE_PRECISION){
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      Matdagmat_milc_mg((double*)out, (double**)fatlink, (double*)ghost_fatlink, (double**)longlink, (double*)ghost_longlink,
+      Matdagmat_mg((double*)out, (double**)fatlink, (double*)ghost_fatlink, (double**)longlink, (double*)ghost_longlink,
 			(double*)in, (double*)fwd_nbr_spinor, (double*)back_nbr_spinor, (double)mass, dagger_bit, (double*)tmp, parity);
     }else {
-      Matdagmat_milc_mg((double*)out, (float**)fatlink, (float*)ghost_fatlink, (float**)longlink, (float*)ghost_longlink, 
+      Matdagmat_mg((double*)out, (float**)fatlink, (float*)ghost_fatlink, (float**)longlink, (float*)ghost_longlink, 
 			(double*)in, (double*)fwd_nbr_spinor, (double*)back_nbr_spinor, (double)mass, dagger_bit, (double*) tmp, parity);
     }
   }else{
     if (gPrecision == QUDA_DOUBLE_PRECISION){ 
-      Matdagmat_milc_mg((float*)out, (double**)fatlink, (double*)ghost_fatlink, (double**)longlink, (double*)ghost_longlink,
+      Matdagmat_mg((float*)out, (double**)fatlink, (double*)ghost_fatlink, (double**)longlink, (double*)ghost_longlink,
 			(float*)in, (float*)fwd_nbr_spinor, (float*)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
     }else {
-      Matdagmat_milc_mg((float*)out, (float**)fatlink, (float*)ghost_fatlink, (float**)longlink, (float*)ghost_longlink, 
+      Matdagmat_mg((float*)out, (float**)fatlink, (float*)ghost_fatlink, (float**)longlink, (float*)ghost_longlink, 
 			(float*)in, (float*)fwd_nbr_spinor, (float*)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
     }
   }

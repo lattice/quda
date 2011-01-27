@@ -26,10 +26,17 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   int Vh = volume/2;
   dim3 gridDim(volume/BLOCK_DIM,1,1);
   dim3 halfGridDim(Vh/BLOCK_DIM,1,1);
+#ifdef MULTI_GPU
   dim3 halfInteriorGridDim((Vh - 2*Vsh)/BLOCK_DIM, 1, 1);
+#else
+  //for single GPU, half interior kernel covers engire half
+  dim3 halfInteriorGridDim(Vh/BLOCK_DIM, 1, 1); 
+#endif
+  
   dim3 halfExteriorGridDim(2*Vsh/BLOCK_DIM, 1,1);
   dim3 blockDim(BLOCK_DIM , 1, 1);
   
+
   QudaPrecision prec = cudaSiteLink.precision;
   QudaReconstructType recon = cudaSiteLink.reconstruct;
   int even = 0;
@@ -46,8 +53,13 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   int2 tloc, tloc_interior, tloc_exterior;
   tloc.x = 0;
   tloc.y = 1;
+#ifdef MULTI_GPU
   tloc_interior.x = 1;
   tloc_interior.y = 1;
+#else
+  tloc_interior.x = 0;
+  tloc_interior.y = 1;
+#endif
   tloc_exterior.x = 0;
   tloc_exterior.y = param->X[3] - 1;
   
@@ -55,6 +67,7 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
     for(int nu = 0; nu < 4; nu++){
       if (nu != dir){
 
+#ifdef MULTI_GPU
 	//even exterior kernel
 	siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
 					 (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
@@ -69,7 +82,9 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					 dir, nu,1,
 					 act_path_coeff[2],
 					 recon, prec, tloc_exterior, halfExteriorGridDim, &stream[0]); CUERR;
+
 	exchange_gpu_staple_start(param->X, &cudaStaple, &stream[0]);  CUERR;
+#endif
 	//even interior kernel
 	siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
 					 (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
@@ -84,9 +99,9 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					 dir, nu,1,
 					 act_path_coeff[2],
 					 recon, prec, tloc_interior, halfInteriorGridDim, &stream[1]); CUERR;
-	
+#ifdef MULTI_GPU	
 	exchange_gpu_staple_wait(param->X, &cudaStaple, &stream[0]); CUERR;
-	
+#endif	
 	//even
 	computeGenStapleFieldParityKernel((void*)NULL, (void*)NULL,
 					  (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
@@ -107,6 +122,7 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 	for(int rho = 0; rho < 4; rho++){
 	  if (rho != dir && rho != nu){
 	    
+#ifdef MULTI_GPU
 	    //even exterior
 
 	    computeGenStapleFieldParityKernel((void*)cudaStaple1.even, (void*)cudaStaple1.odd,
@@ -124,8 +140,9 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					      dir, rho,odd,1,
 					      act_path_coeff[3],
 					      recon, prec, tloc_exterior, halfExteriorGridDim, &stream[0]); CUERR;
+
 	    exchange_gpu_staple_start(param->X, &cudaStaple1, &stream[0]); CUERR;
-	    
+#endif	    
 	    //even interior
 
 	    computeGenStapleFieldParityKernel((void*)cudaStaple1.even, (void*)cudaStaple1.odd,
@@ -143,8 +160,9 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					      dir, rho,odd,1,
 					      act_path_coeff[3],
 					      recon, prec, tloc_interior,  halfInteriorGridDim,&stream[1]); CUERR;
+#ifdef MULTI_GPU
 	    exchange_gpu_staple_wait(param->X, &cudaStaple1, &stream[0]); CUERR;
-	    
+#endif	    
 	    for(int sig = 0; sig < 4; sig++){
 	      if (sig != dir && sig != nu && sig != rho){				
 		

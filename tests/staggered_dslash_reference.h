@@ -34,16 +34,13 @@ extern "C" {
     
     void staggered_matpc(void *out, void **fatlink, void ** longlink, void *in, double kappa, MatPCType matpc_type, 
 			 int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision);
-    void matdagmat_milc(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
-			QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);    
-  void mymatdagmat_milc(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
-			QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);    
-  void 
-  matdagmat_milc_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, void* ghost_longlink, 
+  void matdagmat(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
+		 QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);    
+  void matdagmat_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, void* ghost_longlink, 
 		    void *in, void* fwd_nbr_spinor, void* back_nbr_spinor, double mass, int dagger_bit,
 		    QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);
   
-
+  
 #ifdef __cplusplus
 }
 #endif
