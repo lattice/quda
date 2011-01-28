@@ -129,8 +129,8 @@ AC_ARG_ENABLE(overlap-comms,
 
 AC_ARG_WITH(mpi,
  AC_HELP_STRING([--with-mpi= MPIDIR], [ Specify installation directory for MPI ]),
- [ mpi_home=${withval} ],
- [ mpi_home="" ]
+ [ mpi_home=${withval}; build_mpi="yes" ],
+ [ mpi_home=""; build_mpi="no" ]
 ) 
 
 AC_ARG_WITH(qmp,
@@ -284,12 +284,6 @@ then
   AC_MSG_NOTICE([Multi-GPU doesnt support Domain-Wall Dirac Op  yet: disabling ])
   build_dwf_dirac="no";
 
-  AC_MSG_NOTICE([Multi-GPU doesnt support Staggered Dirac Op  yet: disabling ])
-  build_staggered_dirac="no"
-
-  AC_MSG_NOTICE([Multi-GPU doesnt support Fat-links yet: disabling ])
-  build_staggered_fatlink="no"
-
   AC_MSG_NOTICE([Multi-GPU doesnt support Gauge Force yet: disabling ])
   build_gauge_force="no"
 
@@ -369,6 +363,9 @@ AC_SUBST( BUILD_MULTI_GPU, [${multi_gpu}])
 AC_MSG_NOTICE([Setting BUILD_QMP = ${build_qmp} ])
 AC_SUBST( BUILD_QMP, [${build_qmp}])
 
+AC_MSG_NOTICE([Setting BUILD_MPI = ${build_mpi} ])
+AC_SUBST( BUILD_MPI, [${build_mpi}])
+
 AC_MSG_NOTICE([Setting OVERLAP_COMMS= ${overlap_comms}])
 AC_SUBST( OVERLAP_COMMS, [${overlap_comms}])
 
@@ -383,6 +380,9 @@ AC_SUBST( MPI_HOME, [${mpi_home}] )
 
 AC_MSG_NOTICE([Setting QMP_HOME=${qmp_home}])
 AC_SUBST( QMP_HOME, [${qmp_home}] )
+
+AC_MSG_NOTICE([Setting MPI_HOME=${mpi_home}])
+AC_SUBST( MPI_HOME, [${mpi_home}] )
 
 
 AC_CONFIG_FILES(make.inc)
