@@ -146,8 +146,7 @@ void init()
   cpu_fwd_nbr_spinor = malloc(Vsh* staggeredSpinorSiteSize *3*sizeof(double));
   cpu_back_nbr_spinor = malloc(Vsh*staggeredSpinorSiteSize *3*sizeof(double));
   if (cpu_fwd_nbr_spinor == NULL || cpu_back_nbr_spinor == NULL){
-    PRINTF("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
-    exit(1);
+    errorQuda("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
   }
 #endif
 
@@ -159,8 +158,7 @@ void init()
     longlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
   if (fatlink == NULL || longlink == NULL){
-    fprintf(stderr, "ERROR: malloc failed for fatlink/longlink\n");
-    exit(1);
+    errorQuda("ERROR: malloc failed for fatlink/longlink\n");
   }
   construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
   
@@ -169,8 +167,7 @@ void init()
   ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
   ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
   if (ghost_fatlink == NULL || ghost_longlink == NULL){
-    PRINTF("ERROR: malloc failed for ghost fatlink/longlink\n");
-    exit(1);
+    errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
   exchange_cpu_links(X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif   
@@ -203,7 +200,7 @@ void init()
   cudaFatLink = cudaFatLinkPrecise;
   cudaLongLink = cudaLongLinkPrecise;
   
-  printf("Sending fields to GPU..."); fflush(stdout);
+  printfQuda("Sending fields to GPU..."); 
     
   if (!transfer) {
 	
@@ -229,7 +226,9 @@ void init()
     cudaThreadSynchronize();
     checkCudaError();
 	
-    printf("Source CPU = %f, CUDA=%f\n", norm2(*spinor), norm2(*cudaSpinor));
+    double spinor_norm2 = norm2(*spinor);
+    double cuda_spinor_norm2=  norm2(*cudaSpinor);
+    printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 	
     if(test_type == 2){
       csParam.x[0] /=2;
@@ -248,7 +247,7 @@ void init()
     dirac = Dirac::create(diracParam);
 	
   } else {
-    printf("ERROR: not suppported\n");
+    errorQuda("Error not suppported\n");
   }
     
   return;
@@ -284,7 +283,7 @@ double dslashCUDA() {
     
   // execute kernel
   const int LOOPS = 1;
-  printf("Executing %d kernel loops...", LOOPS);
+  printfQuda("Executing %d kernel loops...", LOOPS);
   fflush(stdout);
   stopwatchStart();
   for (int i = 0; i < LOOPS; i++) {
@@ -319,11 +318,11 @@ double dslashCUDA() {
   // check for errors
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
-    printf("with ERROR: %s\n", cudaGetErrorString(stat));
+    errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
     
   cudaThreadSynchronize();
   double secs = stopwatchReadSeconds() / LOOPS;
-  printf("done.\n\n");
+  printfQuda("done.\n\n");
     
   return secs;
 }
@@ -332,7 +331,7 @@ void staggeredDslashRef()
 {
   int cpu_parity;
   // compare to dslash reference implementation
-  printf("Calculating reference implementation...");
+  printfQuda("Calculating reference implementation...");
   fflush(stdout);
   switch (test_type) {
   case 0:    
@@ -361,11 +360,10 @@ void staggeredDslashRef()
     //inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   default:
-    printf("Test type not defined\n");
-    exit(-1);
+    errorQuda("Test type not defined\n");
   }
     
-  printf("done.\n");
+  printfQuda("done.\n");
     
 }
 
@@ -387,7 +385,7 @@ static int dslashTest()
       *spinorOut = *cudaSpinorOut;
     }
       
-    printf("\n%fms per loop\n", 1000*secs);
+    printfQuda("\n%fms per loop\n", 1000*secs);
 	
     int flops = dirac->Flops();
     int link_floats = 8*gaugeParam.reconstruct+8*18;
@@ -402,14 +400,19 @@ static int dslashTest()
     if (prec == QUDA_HALF_PRECISION) {
       bytes_for_one_site += (8*2 + 1)*4;	
     }
-    printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printf("GiB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/(secs*(1<<30)));
+    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printfQuda("GiB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/(secs*(1<<30)));
 	
     if (!transfer) {
-      std::cout << "Results: CPU = " << norm2(*spinorRef) << ", CUDA = " << norm2(*cudaSpinorOut) << 
-	", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
+      double spinor_ref_norm2 = norm2(*spinorRef);
+      double cuda_spinor_out_norm2 =  norm2(*cudaSpinorOut);
+      double spinor_out_norm2 =  norm2(*spinorOut);
+      printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n",  spinor_ref_norm2, cuda_spinor_out_norm2,
+		 spinor_out_norm2);
     } else {
-      std::cout << "Result: CPU = " << norm2(*spinorRef) << ", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
+      double spinor_ref_norm2 = norm2(*spinorRef);
+      double spinor_out_norm2 =  norm2(*spinorOut);
+      printf("Result: CPU=%f , CPU-CUDA=%f", spinor_ref_norm2, spinor_out_norm2);
     }
     
     accuracy_level = cpuColorSpinorField::Compare(*spinorRef, *spinorOut);	
@@ -422,26 +425,26 @@ static int dslashTest()
 
 void display_test_info()
 {
-  printf("running the following test:\n");
+  printfQuda("running the following test:\n");
  
-  printf("prec recon   test_type     dagger   S_dim     T_dimension\n");
-  printf("%s   %s       %d           %d       %d        %d \n", 
-	 get_prec_str(prec), get_recon_str(link_recon), 
-	 test_type, dagger, sdim, tdim);
+  printfQuda("prec recon   test_type     dagger   S_dim     T_dimension\n");
+  printfQuda("%s   %s       %d           %d       %d        %d \n", 
+	     get_prec_str(prec), get_recon_str(link_recon), 
+	     test_type, dagger, sdim, tdim);
   return ;
     
 }
 
 void usage(char** argv )
 {
-  printf("Usage: %s <args>\n", argv[0]);
-  printf("--prec <double/single/half> \t Precision in GPU\n"); 
-  printf("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
-  printf("--type <0/1/2> \t\t\t Test type\n"); 
-  printf("--dagger \t\t\t Set the dagger to 1\n"); 
-  printf("--tdim \t\t\t\t Set T dimention size(default 24)\n");     
-  printf("--sdim \t\t\t\t Set space dimention size\n"); 
-  printf("--help \t\t\t\t Print out this message\n"); 
+  printfQuda("Usage: %s <args>\n", argv[0]);
+  printfQuda("--prec <double/single/half> \t Precision in GPU\n"); 
+  printfQuda("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
+  printfQuda("--type <0/1/2> \t\t\t Test type\n"); 
+  printfQuda("--dagger \t\t\t Set the dagger to 1\n"); 
+  printfQuda("--tdim \t\t\t\t Set T dimention size(default 24)\n");     
+  printfQuda("--sdim \t\t\t\t Set space dimention size\n"); 
+  printfQuda("--help \t\t\t\t Print out this message\n"); 
   exit(1);
   return ;
 }
@@ -466,7 +469,7 @@ int main(int argc, char **argv)
       }
       device =  atoi(argv[i+1]);
       if (device < 0){
-	fprintf(stderr, "Error: invalid device number(%d)\n", device);
+	errorQuda("Error: invalid device number(%d)\n", device);
 	exit(1);
       }
       i++;
@@ -498,7 +501,7 @@ int main(int argc, char **argv)
       }	    
       test_type =  atoi(argv[i+1]);
       if (test_type < 0 || test_type >= 2){
-	fprintf(stderr, "Error: invalid test type\n");
+	errorQuda("Error: invalid test type\n");
 	exit(1);
       }
       i++;
@@ -511,7 +514,7 @@ int main(int argc, char **argv)
       }	    
       tdim =  atoi(argv[i+1]);
       if (tdim < 0 || tdim > 128){
-	fprintf(stderr, "Error: invalid t dimention\n");
+	errorQuda("Error: invalid t dimention\n");
 	exit(1);
       }
       i++;
@@ -524,7 +527,7 @@ int main(int argc, char **argv)
       }	    
       sdim =  atoi(argv[i+1]);
       if (sdim < 0 || sdim > 128){
-	fprintf(stderr, "Error: invalid S dimention\n");
+	printfQuda("Error: invalid S dimention\n");
 	exit(1);
       }
       i++;
@@ -545,7 +548,7 @@ int main(int argc, char **argv)
   int ret =1;
   int accuracy_level = dslashTest();
 
-  printf("accuracy_level =%d\n", accuracy_level);
+  printfQuda("accuracy_level =%d\n", accuracy_level);
   if (accuracy_level >= 3){
     //probably no error 
     ret = 0;

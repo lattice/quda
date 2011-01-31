@@ -182,6 +182,22 @@ comm_allreduce(double* data)
   return;
 } 
 
+//reduce n double value
+void
+comm_allreduce_array(double* data, size_t size)
+{
+  double recvbuf[size];
+  int rc = MPI_Allreduce ( data, &recvbuf,size,MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  if (rc != MPI_SUCCESS){
+    printf("ERROR: MPI_Allreduce failed\n");
+    comm_exit(1);
+  }
+  
+  memcpy(data, recvbuf, sizeof(recvbuf));
+  
+  return;
+}
+
 //we always reduce one double value
 void
 comm_allreduce_max(double* data)

@@ -161,6 +161,9 @@ cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPre
   
 #ifdef QMP_COMMS
   QMP_sum_double_array(&(gpu_result.x),2);
+#elif defined(MPI_COMMS)
+  comm_allreduce_array(&(gpu_result.x), 2);
+#else
 #endif
 
   return gpu_result;

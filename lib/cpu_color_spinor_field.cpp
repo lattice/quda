@@ -278,7 +278,7 @@ static int  compareSpinor(const FloatA *u, const FloatB *v, const int volume,
     }
   }
     
-  for (int i=0; i<N; i++) printf("%d fails = %d\n", i, iter[i]);
+  for (int i=0; i<N; i++) printfQuda("%d fails = %d\n", i, iter[i]);
     
   int accuracy_level =0;
   for (int f=0; f<fail_check; f++) {
@@ -288,8 +288,8 @@ static int  compareSpinor(const FloatA *u, const FloatB *v, const int volume,
   }
 
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)resolution), 
-	   fail[f], volume*N, fail[f] / (double)(volume*N));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)resolution), 
+	       fail[f], volume*N, fail[f] / (double)(volume*N));
   }
   
   delete []iter;

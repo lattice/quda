@@ -108,7 +108,7 @@ invert_test(void)
   double mass = 0.95;
   inv_param.mass = mass;
   inv_param.tol = tol;
-  inv_param.maxiter = 100;
+  inv_param.maxiter = 500;
   inv_param.reliable_delta = 1e-3;
 
   inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
@@ -126,7 +126,7 @@ invert_test(void)
   gaugeParam.ga_pad = sdim*sdim*sdim;
   inv_param.sp_pad = sdim*sdim*sdim;
   
-  inv_param.dirac_tune = QUDA_TUNE_YES;
+  inv_param.dirac_tune = QUDA_TUNE_NO;
   inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -155,8 +155,7 @@ invert_test(void)
   ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
   ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
   if (ghost_fatlink == NULL || ghost_longlink == NULL){
-    PRINTF("ERROR: malloc failed for ghost fatlink/longlink\n");
-    exit(1);
+    errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
   exchange_cpu_links(X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif
@@ -190,8 +189,7 @@ invert_test(void)
   cpu_fwd_nbr_spinor = malloc(Vsh* mySpinorSiteSize *3*sizeof(double));
   cpu_back_nbr_spinor = malloc(Vsh*mySpinorSiteSize *3*sizeof(double));
   if (cpu_fwd_nbr_spinor == NULL || cpu_back_nbr_spinor == NULL){
-    PRINTF("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
-    exit(1);
+    errorQuda("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
   }
 #endif
 
@@ -349,16 +347,16 @@ invert_test(void)
     double residue_sq;
     invertMultiShiftQuda(spinorOutArray, in, &inv_param, offsets, num_offsets, &residue_sq);	
     cudaThreadSynchronize();
-    printf("Final residue squred =%g\n", residue_sq);
+    printfQuda("Final residue squred =%g\n", residue_sq);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     
-    printf("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
-	   time0, inv_param.iter, inv_param.secs,
-	   inv_param.gflops/inv_param.secs);
-
+    printfQuda("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
+	       time0, inv_param.iter, inv_param.secs,
+	       inv_param.gflops/inv_param.secs);
     
-    printf("checking the solution\n");
+    
+    printfQuda("checking the solution\n");
     MyQudaParity parity;
     if (inv_param.solve_type == QUDA_NORMEQ_SOLVE){
       parity = QUDA_EVENODD;
@@ -367,12 +365,12 @@ invert_test(void)
     }else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD){
       parity = QUDA_ODD;
     }else{
-      printf("ERROR: invalid spinor parity \n");
+      errorQuda("ERROR: invalid spinor parity \n");
       exit(1);
     }
     
     for(int i=0;i < num_offsets;i++){
-      printf("%dth solution: mass=%f", i, masses[i]);
+      printfQuda("%dth solution: mass=%f", i, masses[i]);
 #ifdef MULTI_GPU
 #else
       matdagmat(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
@@ -380,7 +378,7 @@ invert_test(void)
       mxpy(in, spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(in, len*mySpinorSiteSize, inv_param.cpu_prec);
-      printf("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+      printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
     }
     
     for(int i=1; i < num_offsets;i++){
@@ -394,16 +392,16 @@ invert_test(void)
 
   if (testtype <=2){
 
-    printf("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+    printfQuda("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 	
-    printf("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
-	   time0, inv_param.iter, inv_param.secs,
+    printfQuda("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
+	       time0, inv_param.iter, inv_param.secs,
 	   inv_param.gflops/inv_param.secs);
-
+    
     //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
     if (sqrt(nrm2/src2) > 10*inv_param.tol){
       ret = 1;
-      printf("Convergence failed!\n");
+      errorQuda("Convergence failed!\n");
     }
   }
 
@@ -441,10 +439,10 @@ end(void)
 void
 display_test_info()
 {
-  printf("running the following test:\n");
+  printfQuda("running the following test:\n");
     
-  printf("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
-  printf("%s   %s             %s            %s            %s         %d          %d \n",
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
+  printfQuda("%s   %s             %s            %s            %s         %d          %d \n",
 	 get_prec_str(prec),get_prec_str(prec_sloppy),
 	 get_recon_str(link_recon), 
 	 get_recon_str(link_recon_sloppy), get_test_type(testtype), sdim, tdim);     
@@ -455,15 +453,15 @@ display_test_info()
 void
 usage(char** argv )
 {
-  printf("Usage: %s <args>\n", argv[0]);
-  printf("--prec         <double/single/half>     Spinor/gauge precision\n"); 
-  printf("--prec_sloppy  <double/single/half>     Spinor/gauge sloppy precision\n"); 
-  printf("--recon        <8/12>                   Long link reconstruction type\n"); 
-  printf("--test         <0/1/2/3/4/5>            Testing type(0=even, 1=odd, 2=full, 3=multimass even,\n" 
+  printfQuda("Usage: %s <args>\n", argv[0]);
+  printfQuda("--prec         <double/single/half>     Spinor/gauge precision\n"); 
+  printfQuda("--prec_sloppy  <double/single/half>     Spinor/gauge sloppy precision\n"); 
+  printfQuda("--recon        <8/12>                   Long link reconstruction type\n"); 
+  printfQuda("--test         <0/1/2/3/4/5>            Testing type(0=even, 1=odd, 2=full, 3=multimass even,\n" 
 	 "                                                     4=multimass odd, 5=multimass full)\n"); 
-  printf("--tdim                                  T dimension\n");
-  printf("--sdim                                  S dimension\n");
-  printf("--help                                  Print out this message\n"); 
+  printfQuda("--tdim                                  T dimension\n");
+  printfQuda("--sdim                                  S dimension\n");
+  printfQuda("--help                                  Print out this message\n"); 
   exit(1);
   return ;
 }
@@ -517,7 +515,7 @@ int main(int argc, char** argv)
       }
       sscanf(argv[i+1], "%f", &tmpf);
       if (tol <= 0){
-        PRINTF("ERROR: invalid tol(%f)\n", tmpf);
+        printfQuda("ERROR: invalid tol(%f)\n", tmpf);
         usage(argv);
       }
       tol = tmpf;
@@ -560,7 +558,7 @@ int main(int argc, char** argv)
       }
       tdim= atoi(argv[i+1]);
       if (tdim < 0 || tdim > 128){
-	printf("ERROR: invalid T dimention (%d)\n", tdim);
+	printfQuda("ERROR: invalid T dimention (%d)\n", tdim);
 	usage(argv);
       }
       i++;
@@ -572,7 +570,7 @@ int main(int argc, char** argv)
       }
       sdim= atoi(argv[i+1]);
       if (sdim < 0 || sdim > 128){
-	printf("ERROR: invalid S dimention (%d)\n", sdim);
+	printfQuda("ERROR: invalid S dimention (%d)\n", sdim);
 	usage(argv);
       }
       i++;
@@ -584,7 +582,7 @@ int main(int argc, char** argv)
           }
           device =  atoi(argv[i+1]);
           if (device < 0){
-              fprintf(stderr, "Error: invalid device number(%d)\n", device);
+	    printfQuda("Error: invalid device number(%d)\n", device);
               exit(1);
           }
           i++;
@@ -592,7 +590,7 @@ int main(int argc, char** argv)
     }
 
 
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
 

@@ -98,7 +98,7 @@ void initQuda(int dev)
   for(int i=0; i<deviceCount; i++) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
-    fprintf(stderr, "QUDA: Found device %d: %s\n", i, deviceProp.name);
+    printfQuda("QUDA: Found device %d: %s\n", i, deviceProp.name);
   }
 
 #ifdef QMP_COMMS
@@ -144,11 +144,8 @@ void initQuda(int dev)
     errorQuda("Device %d does not support CUDA", dev);
   }
 
-#ifdef QMP_COMMS
-  QMP_fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
-#else						
-  fprintf(stderr, "QUDA: Using device %d: %s\n", dev, deviceProp.name);
-#endif
+  
+  printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
 
   cudaSetDevice(dev);
 

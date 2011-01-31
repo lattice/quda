@@ -9,7 +9,7 @@
 #include <qmp.h>
 
 #define printfQuda(...) do {	     \
-  if (QMP_get_node_number() == 0) {  \
+ if (QMP_get_node_number() == 0) {	\
     printf(__VA_ARGS__);             \
     fflush(stdout);                  \
   }                                  \
@@ -22,9 +22,28 @@
   QMP_abort(1);				    \
 } while (0)
 
+#elif defined(MPI_COMMS)
+#include "mpicomm.h"
+#define printfQuda(...) do {			\
+    if (comm_rank() == 0) {			\
+      printf(__VA_ARGS__);			\
+      fflush(stdout);				\
+    }						\
+  } while (0)
+
+#define errorQuda(...) do {		    \
+  printf("QUDA error: " __VA_ARGS__);       \
+  printf(" (node %d, " __FILE__ ":%d)\n",   \
+         comm_rank(), __LINE__);  \
+  comm_exit(1);				    \
+} while (0)
+
 #else
 
-#define printfQuda(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
+#define printfQuda(...) do {				\
+    printf(__VA_ARGS__);				\
+    fflush(stdout); } while (0)				
+
 
 #define errorQuda(...) do {		     \
   printf("QUDA error: " __VA_ARGS__);        \
