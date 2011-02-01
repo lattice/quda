@@ -1,5 +1,8 @@
 #include <blas_reference.h>
-
+#include <stdio.h>
+#ifdef MPI_COMMS
+#include "mpicomm.h"
+#endif
 // performs the operation x[i] *= a
 template <typename Float>
 inline void aX(Float a, Float *x, int len) {
@@ -28,6 +31,9 @@ template <typename Float>
 inline double norm2(Float *v, int len) {
   double sum=0.0;
   for (int i=0; i<len; i++) sum += v[i]*v[i];
+#ifdef MPI_COMMS
+  comm_allreduce(&sum);
+#endif
   return sum;
 }
 

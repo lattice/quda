@@ -384,6 +384,7 @@ invert_test(void)
       mxpy(in, spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(in, len*mySpinorSiteSize, inv_param.cpu_prec);
+
       printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
       //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge

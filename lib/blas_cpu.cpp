@@ -161,6 +161,9 @@ template <typename Float>
 double norm(const Float *a, const int N) {
   double norm2 = 0;
   for (int i=0; i<N; i++) norm2 += a[i]*a[i];
+#ifdef MPI_COMMS
+  comm_allreduce(&norm2);
+#endif
   return norm2;
 }
 
@@ -186,6 +189,10 @@ template <typename Float>
 double reDotProduct(const Float *a, const Float *b, const int N) {
   double dot = 0;
   for (int i=0; i<N; i++) dot += a[i]*b[i];
+#ifdef MPI_COMMS
+  comm_allreduce(&dot);
+#endif
+
   return dot;
 }
 
@@ -212,6 +219,13 @@ template <typename Float>
 Complex cDotProduct(const std::complex<Float> *a, const std::complex<Float> *b, const int N) {
   Complex dot = 0;
   for (int i=0; i<N; i++) dot += conj(a[i])*b[i];
+#ifdef MPI_COMMS
+  double buf[2];
+  buf[0]=dot.real();
+  buf[1]=dot.imag();
+  comm_allreduce_array(buf,2);
+  dot = Complex(buf[0], buf[1]);
+#endif  
   return dot;
 }
 
