@@ -7,8 +7,8 @@ fail_msg="Sanity check for quda failed!"
 success_msg="Sanity check for quda passed!"
 
 progs="staggered_dslash_test staggered_invert_test"
-precs="double single"
-recons="18 12 8"
+precs="double"
+recons="18"
 
 echo "Testing staggered dslash and inverter:"
 for prog in $progs ; do 
@@ -29,7 +29,7 @@ done
 
 
 echo "Testing link fattening code"
-precs="double single"
+precs="double"
 recons="18"
 
 file=./llfat_test

@@ -127,7 +127,7 @@ invert_test(void)
   inv_param.sp_pad = sdim*sdim*sdim;
   
   inv_param.dirac_tune = QUDA_TUNE_NO;
-  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
+  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_YES;
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -224,8 +224,10 @@ invert_test(void)
   unsigned long nflops=2*1187; //from MILC's CG routine
   double nrm2=0;
   double src2=0;
-  switch(testtype){
+  int ret = 0;
 
+
+  switch(testtype){
   case 0: //even
     volume = Vh;
     inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
@@ -259,6 +261,8 @@ invert_test(void)
     time0 /= CLOCKS_PER_SEC;
     
 #ifdef MULTI_GPU
+    matdagmat_mg(spinorCheckOdd, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+		 spinorOutOdd, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);
 #else
     matdagmat(spinorCheckOdd, fatlink, longlink, spinorOutOdd, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);	
 #endif
@@ -320,7 +324,7 @@ invert_test(void)
       }		
     }
     
-    else if (testtype ==4){
+    else if (testtype == 4){
       in=spinorInOdd;
       len = Vh;
       volume = Vh;
@@ -370,8 +374,10 @@ invert_test(void)
     }
     
     for(int i=0;i < num_offsets;i++){
-      printfQuda("%dth solution: mass=%f", i, masses[i]);
+      printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU
+      matdagmat_mg(spinorCheck, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+		   spinorOutArray[i], cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
 #else
       matdagmat(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
 #endif
@@ -379,6 +385,12 @@ invert_test(void)
       double nrm2 = norm_2(spinorCheck, len*mySpinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(in, len*mySpinorSiteSize, inv_param.cpu_prec);
       printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+
+      //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
+      if (sqrt(nrm2/src2) > 100*inv_param.tol){
+	ret |=1;
+	errorQuda("Converge failed!\n");
+      }
     }
     
     for(int i=1; i < num_offsets;i++){
@@ -388,7 +400,6 @@ invert_test(void)
     
   }//switch
     
-  int ret = 0;
 
   if (testtype <=2){
 
@@ -396,10 +407,10 @@ invert_test(void)
 	
     printfQuda("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	       time0, inv_param.iter, inv_param.secs,
-	   inv_param.gflops/inv_param.secs);
+	       inv_param.gflops/inv_param.secs);
     
-    //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-    if (sqrt(nrm2/src2) > 10*inv_param.tol){
+    //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
+    if (sqrt(nrm2/src2) > 100*inv_param.tol){
       ret = 1;
       errorQuda("Convergence failed!\n");
     }

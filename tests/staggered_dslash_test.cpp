@@ -500,7 +500,7 @@ int main(int argc, char **argv)
 	usage(argv);
       }	    
       test_type =  atoi(argv[i+1]);
-      if (test_type < 0 || test_type >= 2){
+      if (test_type < 0 || test_type > 2){
 	errorQuda("Error: invalid test type\n");
 	exit(1);
       }

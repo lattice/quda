@@ -932,9 +932,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     delete h_x[i];
     delete x[i];
   }
-
-  delete dSloppy;
-  delete d;
+  if (!param->preserve_dirac) {
+    delete d;
+    delete dSloppy;
+    diracCreation = false;
+    diracTune = false;
+  }  
   
   return;
 }
