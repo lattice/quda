@@ -100,7 +100,7 @@ class Dirac {
 		       const QudaSolutionType) const = 0;
   virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 			   const QudaSolutionType) const = 0;
-
+  void setMass(double mass){ this->mass = mass;}
   // Dirac operator factory
   static Dirac* create(const DiracParam &param);
 

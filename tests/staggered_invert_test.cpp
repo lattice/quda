@@ -193,25 +193,34 @@ invert_test(void)
   }
 #endif
 
+
 #ifdef MULTI_GPU
-  int num_faces =1;
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.ga_pad = sdim*sdim*sdim/2;
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces);
-  
-  num_faces =3;
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;
-  gaugeParam.reconstruct= link_recon;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda_general_mg(longlink,ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces);
+
+  if(testtype == 6){
+    record_gauge(fatlink, ghost_fatlink, X[0]*X[1]*X[2]/2,
+		 longlink, ghost_longlink, 3*X[0]*X[1]*X[2]/2,
+		 link_recon, link_recon_sloppy,
+		 &gaugeParam);
+   }else{
+    int num_faces =1;
+    gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+    gaugeParam.ga_pad = sdim*sdim*sdim/2;
+    gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces);
+    
+    num_faces =3;
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+    gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;
+    gaugeParam.reconstruct= link_recon;
+    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    loadGaugeQuda_general_mg(longlink,ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces);
+  }
 
 #else
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda(fatlink, &gaugeParam);
-
+  
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.reconstruct_sloppy = link_recon_sloppy;
@@ -295,6 +304,7 @@ invert_test(void)
   case 3: //multi mass CG, even
   case 4:
   case 5:
+  case 6:
 
 #define NUM_OFFSETS 4
         
@@ -324,7 +334,7 @@ invert_test(void)
       }		
     }
     
-    else if (testtype == 4){
+    else if (testtype == 4||testtype == 6){
       in=spinorInOdd;
       len = Vh;
       volume = Vh;
@@ -349,7 +359,11 @@ invert_test(void)
     }
     
     double residue_sq;
-    invertMultiShiftQuda(spinorOutArray, in, &inv_param, offsets, num_offsets, &residue_sq);	
+    if (testtype == 6){
+      invertMultiShiftQudaMixed(spinorOutArray, in, &inv_param, offsets, num_offsets, &residue_sq);
+    }else{      
+      invertMultiShiftQuda(spinorOutArray, in, &inv_param, offsets, num_offsets, &residue_sq);	
+    }
     cudaThreadSynchronize();
     printfQuda("Final residue squred =%g\n", residue_sq);
     time0 += clock(); // stop the timer

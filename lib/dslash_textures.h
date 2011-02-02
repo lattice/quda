@@ -315,6 +315,7 @@ template <int N, typename spinorFloat>
     errorQuda("Unsupported precision and short vector type");
   }
 
+  return -1;
 }
 
 

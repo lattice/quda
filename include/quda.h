@@ -111,6 +111,9 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets,
 			    double* residue_sq);
+  void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
+				 double* offsets, int num_offsets, double* residue_sq);
+    
 
   void endInvertQuda(); // frees the Dirac operator
   
@@ -127,8 +130,13 @@ extern "C" {
   void printQudaGaugeParam(QudaGaugeParam *param);
   void printQudaInvertParam(QudaInvertParam *param);
 
+
+  void  record_gauge(void *_fatlink, void* _ghost_fatlink, int _fatlink_pad, 
+		     void* _longlink, void* _ghost_longlink, int _longlink_pad, 
+		     QudaReconstructType _longlink_recon,QudaReconstructType _longlink_recon_sloppy,
+		     QudaGaugeParam *_param);
+
 #define CUERR  do{ cudaError_t cuda_err;                                \
-    cudaThreadSynchronize();						\
     if ((cuda_err = cudaGetLastError()) != cudaSuccess) {               \
       fprintf(stderr, "ERROR: CUDA error: %s, line %d, function %s, file %s\n", \
               cudaGetErrorString(cuda_err),  __LINE__, __FUNCTION__, __FILE__); \

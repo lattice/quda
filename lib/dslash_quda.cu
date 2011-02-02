@@ -818,7 +818,9 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
   bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
     
   if (precision != fatGauge.precision || precision != longGauge.precision){
-    errorQuda("Mixing gauge and spinor precision not supported");
+    errorQuda("Mixing gauge and spinor precision not supported"
+	      "(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
+	      precision, fatGauge.precision, longGauge.precision);
   }
     
 
