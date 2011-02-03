@@ -80,8 +80,9 @@ extern "C" {
     QudaPrecision clover_cuda_prec_sloppy;
 
     QudaCloverFieldOrder clover_order;
+    QudaUseInitGuess use_init_guess;
 
-    QudaVerbosity verbosity;
+    QudaVerbosity verbosity;    
 
     int sp_pad;
     int cl_pad;

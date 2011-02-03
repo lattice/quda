@@ -249,6 +249,12 @@ extern "C" {
     QUDA_TWIST_GAMMA5_INVALID = QUDA_INVALID_ENUM
   } QudaTwistGamma5Type;
 
+  typedef enum QudaUseInitGuess_s {
+    QUDA_USE_INIT_GUESS_YES,
+    QUDA_USE_INIT_GUESS_NO,    
+    QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
+  } QudaUseInitGuess;
+
 #ifdef __cplusplus
 }
 #endif

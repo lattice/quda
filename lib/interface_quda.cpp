@@ -734,7 +734,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam); 
   
-  if (0) { // download initial guess
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     x = new cudaColorSpinorField(*h_x, cudaParam); // solution  
   } else { // zero initial guess
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -921,7 +921,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   for (int i=0; i < num_offsets; i++) {
     x[i] = new cudaColorSpinorField(csParam);
   }
-  cudaColorSpinorField tmp(csParam); // temporary
   invertMultiShiftCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), x, b, param, offsets, num_offsets, residue_sq);    
   
   for (int i=0; i < num_offsets; i++) {

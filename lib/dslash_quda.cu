@@ -864,7 +864,6 @@ void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, con
     }
   }
 
-  cudaThreadSynchronize(); CUERR;    
 
   for (int i = 0; i < 2; i++) {
     cudaStreamDestroy(streams[i]);

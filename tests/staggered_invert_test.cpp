@@ -70,6 +70,57 @@ void constructSpinorField(Float *res) {
 }
 
 
+static void
+set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
+	   int X1, int  X2, int X3, int X4,
+	   QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
+	   QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
+	   double mass, double tol, int maxiter, double reliable_delta,
+	   double tadpole_coeff
+	   )
+{
+  gaugeParam->X[0] = X1;
+  gaugeParam->X[1] = X2;
+  gaugeParam->X[2] = X3;
+  gaugeParam->X[3] = X4;
+
+  gaugeParam->cpu_prec = cpu_prec;    
+  gaugeParam->cuda_prec = prec;
+  gaugeParam->reconstruct = link_recon;  
+  gaugeParam->cuda_prec_sloppy = prec_sloppy;
+  gaugeParam->reconstruct_sloppy = link_recon_sloppy;
+  gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gaugeParam->tadpole_coeff = tadpole_coeff;
+  gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
+  gaugeParam->gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gaugeParam->ga_pad = X1*X2*X3/2;
+
+  inv_param->verbosity = QUDA_DEBUG_VERBOSE;
+  inv_param->inv_type = QUDA_CG_INVERTER;    
+  inv_param->mass = mass;
+  inv_param->tol = tol;
+  inv_param->maxiter = 500;
+  inv_param->reliable_delta = 1e-3;
+
+  inv_param->solution_type = QUDA_MATDAG_MAT_SOLUTION;
+  inv_param->solve_type = QUDA_NORMEQ_PC_SOLVE;
+  inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param->dagger = QUDA_DAG_NO;
+  inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;
+
+  inv_param->cpu_prec = cpu_prec;
+  inv_param->cuda_prec = prec; 
+  inv_param->cuda_prec_sloppy = prec_sloppy;
+  inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+  inv_param->dirac_order = QUDA_DIRAC_ORDER;
+  inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
+  inv_param->dirac_tune = QUDA_TUNE_NO;
+  inv_param->preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
+  inv_param->sp_pad = X1*X2*X3/2;
+  inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    
+}
+
 static int
 invert_test(void)
 {
@@ -78,56 +129,17 @@ invert_test(void)
 
   int Vs = sdim*sdim*sdim;
   int Vsh = Vs/2;  
-  int X[4];
-
   
-  gaugeParam.X[0] = X[0] = sdim;
-  gaugeParam.X[1] = X[1] = sdim;
-  gaugeParam.X[2] = X[2] = sdim;
-  gaugeParam.X[3] = X[3] = tdim;
-  setDims(gaugeParam.X);
-  
-  gaugeParam.cpu_prec = cpu_prec;
-    
-  gaugeParam.cuda_prec = prec;
-  gaugeParam.reconstruct = link_recon;
-
-  gaugeParam.cuda_prec_sloppy = prec_sloppy;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  
-  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gaugeParam.tadpole_coeff = 0.8;
-
-  inv_param.verbosity = QUDA_DEBUG_VERBOSE;
-  inv_param.inv_type = QUDA_CG_INVERTER;
-
-  gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-    
   double mass = 0.95;
-  inv_param.mass = mass;
-  inv_param.tol = tol;
-  inv_param.maxiter = 500;
-  inv_param.reliable_delta = 1e-3;
 
-  inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
-
-  inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = prec; 
-  inv_param.cuda_prec_sloppy = prec_sloppy;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
-  gaugeParam.ga_pad = sdim*sdim*sdim;
-  inv_param.sp_pad = sdim*sdim*sdim;
+  set_params(&gaugeParam, &inv_param,
+	     sdim, sdim, sdim, tdim,
+	     cpu_prec, prec, prec_sloppy,
+	     link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
+	     0.8);
   
-  inv_param.dirac_tune = QUDA_TUNE_NO;
-  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_YES;
+
+  setDims(gaugeParam.X);
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -157,7 +169,7 @@ invert_test(void)
   if (ghost_fatlink == NULL || ghost_longlink == NULL){
     errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
-  exchange_cpu_links(X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  exchange_cpu_links(gaugeParam.X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif
 
  
@@ -197,20 +209,20 @@ invert_test(void)
 #ifdef MULTI_GPU
 
   if(testtype == 6){
-    record_gauge(fatlink, ghost_fatlink, X[0]*X[1]*X[2]/2,
-		 longlink, ghost_longlink, 3*X[0]*X[1]*X[2]/2,
+    record_gauge(fatlink, ghost_fatlink, Vsh,
+		 longlink, ghost_longlink, 3*Vsh,
 		 link_recon, link_recon_sloppy,
 		 &gaugeParam);
    }else{
     int num_faces =1;
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-    gaugeParam.ga_pad = sdim*sdim*sdim/2;
+    gaugeParam.ga_pad = Vsh;
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces);
     
     num_faces =3;
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-    gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;
+    gaugeParam.ga_pad = 3*Vsh;
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     loadGaugeQuda_general_mg(longlink,ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces);

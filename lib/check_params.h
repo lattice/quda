@@ -67,7 +67,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(reconstruct_sloppy, QUDA_RECONSTRUCT_INVALID);
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
   P(ga_pad, INVALID_INT);
-
+  
 #if defined INIT_PARAM
   P(packed_size, 0);
   P(gaugeGiB, 0.0);
@@ -138,6 +138,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(dirac_tune, QUDA_TUNE_INVALID);
   P(preserve_dirac, QUDA_PRESERVE_DIRAC_INVALID);
+
+  //set the default to no
+  P(use_init_guess, QUDA_USE_INIT_GUESS_NO);
 
 #ifndef INIT_PARAM
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
