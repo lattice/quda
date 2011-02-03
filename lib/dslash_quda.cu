@@ -602,7 +602,7 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 #define EXTERIOR_KERNEL 1
 
 
-static void
+void
 initTLocation(int toffset, int tmul, int threads) 
 {
   short2 tLocate = make_short2((short)toffset, (short)tmul);
