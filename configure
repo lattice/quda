@@ -2715,6 +2715,13 @@ esac
 
 
 
+
+
+if test "X${build_qmp}X" = "XyesX";
+then
+  build_mpi="no"
+fi
+
 if test "X${multi_gpu}X" = "XyesX";
 then
   { echo "$as_me:$LINENO: Enabling Multi-GPU" >&5

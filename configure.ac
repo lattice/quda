@@ -277,6 +277,16 @@ dnl ===================
 dnl
 dnl Currently DWF doesnt support parallelism -- that needs a different structure
 dnl so if Multi-GPU is turned on I should disable this
+
+dnl QMP/MPI: It is legal to have both --with-qmp and --with-mpi
+dnl defined together. This means that: Use QMP with the MPI in MPIHOME.
+dnl but we have to disable mpi_comms
+
+if test "X${build_qmp}X" = "XyesX";
+then 
+  build_mpi="no"
+fi
+   
 if test "X${multi_gpu}X" = "XyesX";
 then 
   AC_MSG_NOTICE([Enabling Multi-GPU])
