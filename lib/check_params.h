@@ -140,7 +140,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(preserve_dirac, QUDA_PRESERVE_DIRAC_INVALID);
 
   //set the default to no
+#ifdef INIT_PARAM
   P(use_init_guess, QUDA_USE_INIT_GUESS_NO);
+#else
+  P(use_init_guess, QUDA_USE_INIT_GUESS_INVALID);
+#endif
 
 #ifndef INIT_PARAM
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
