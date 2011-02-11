@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-  // When adding new members to QudaGaugeParam and QudaInvertParam,
+  // When adding new members to QudaGaugeParam and QudaInvertParam, 
   // be sure to update lib/check_params.h
 
   typedef struct QudaGaugeParam_s {
@@ -102,14 +102,21 @@ extern "C" {
   // Interface functions, found in interface_quda.cpp
   void initQuda(int dev);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+  void freeGaugeQuda(void);
+
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void loadCloverQuda(void *h_clover, void *h_clovinv,
 		      QudaInvertParam *inv_param);
+  void freeCloverQuda(void);
+
   void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge,
 				QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy, int num_faces);
   
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
+			    double* offsets, int num_offsets,
+			    double* residue_sq);
+ void invertMultiShiftQudaGeneric(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets,
 			    double* residue_sq);
   void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,

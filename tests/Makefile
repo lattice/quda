@@ -26,6 +26,9 @@ wilson_dslash_test: wilson_dslash_test.o test_util.o wilson_dslash_reference.o $
 wilson_invert_test: wilson_invert_test.o test_util.o wilson_dslash_reference.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
+wilson_multi_invert_test: wilson_multi_invert_test.o test_util.o wilson_dslash_reference.o blas_reference.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+
 domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 

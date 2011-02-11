@@ -3,6 +3,18 @@
 #ifdef MPI_COMMS
 #include "mpicomm.h"
 #endif
+
+template <typename Float>
+inline void aXpY(Float a, Float *x, Float *y, int len)
+{
+  for(int i=0; i < len; i++){ y[i] += a*x[i]; }
+}
+
+void axpy(double a, void *x, void *y, int len, QudaPrecision precision) { 
+  if( precision == QUDA_DOUBLE_PRECISION ) aXpY(a, (double *)x, (double *)y, len);
+  else aXpY((float)a, (float *)x, (float *)y, len);
+}
+
 // performs the operation x[i] *= a
 template <typename Float>
 inline void aX(Float a, Float *x, int len) {

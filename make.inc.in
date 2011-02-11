@@ -107,7 +107,7 @@ endif
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
-  WILSON_DIRAC_TEST=wilson_dslash_test wilson_invert_test
+  WILSON_DIRAC_TEST=wilson_dslash_test wilson_invert_test wilson_multi_invert_test
 endif
 ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
   NVCCOPT += -DGPU_DOMAIN_WALL_DIRAC

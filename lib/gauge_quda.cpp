@@ -710,7 +710,7 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
   }
  
   if (cudaGauge->even || cudaGauge->odd){
-       errorQuda("Error: even/odd field is not null, probably already allocated(even=%p, odd=%p)\n", cudaGauge->even, cudaGauge->odd);
+    errorQuda("Error: even/odd field is not null, probably already allocated(even=%p, odd=%p)\n", cudaGauge->even, cudaGauge->odd);
   }
  
   cudaGauge->bytes = 4*cudaGauge->stride*elements*floatSize;
@@ -774,6 +774,12 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   packedOdd = (FloatN*)malloc(bytes);
 #endif
     
+  if( ! packedEven ) errorQuda( "packedEven is borked\n");
+  if( ! packedOdd ) errorQuda( "packedOdd is borked\n");
+  if( ! even ) errorQuda( "even is borked\n");
+  if( ! odd ) errorQuda( "odd is borked\n");
+  if( ! cpuGauge ) errorQuda( "cpuGauge is borked\n");
+
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, Vh, pad, type);
     packQDPGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, Vh, pad, type);

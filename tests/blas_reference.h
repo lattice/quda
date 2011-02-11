@@ -11,7 +11,7 @@ extern "C" {
   double norm_2(void *vector, int len, QudaPrecision precision);
   void mxpy(void *x, void *y, int len, QudaPrecision precision);
   void ax(double a, void *x, int len, QudaPrecision precision);
-   
+  void axpy(double a, void *x, void *y, int len, QudaPrecision precision);
   /*  void zero(float* a, int cnt);
       void copy(float* a, float *b, int len);*/
   
