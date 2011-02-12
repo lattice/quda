@@ -234,6 +234,10 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 		     param->X, anisotropy, param->tadpole_coeff, param->ga_pad, param->type);
     param->gaugeGiB += 2.0 * sloppy->bytes / (1 << 30);
   } else {
+    // This has copy semantics... 
+    // It is equivalent to 
+    // qudaGaugeSloppy = qudaGaugePrecise
+    //   NB: even and odd in qudaGaugeSloppy point to even and odd in qudaGaugePrecise... 
     *sloppy = *precise;
   }
 
@@ -413,48 +417,74 @@ void discardCloverQuda(QudaInvertParam *inv_param)
 
 void freeGaugeQuda(void) 
 {
-  if( &cudaGaugePrecise == &cudaGaugeSloppy ) { 
-    freeGaugeField(&cudaGaugePrecise);
-  }
-  else {
-    freeGaugeField(&cudaGaugePrecise);
-    freeGaugeField(&cudaGaugeSloppy);
-  }
-
-  if( &cudaFatLinkPrecise == &cudaFatLinkSloppy ) { 
-    freeGaugeField(&cudaFatLinkPrecise);
+  if ( cudaGaugeSloppy.even == cudaGaugePrecise.even ) { 
+	// Buffer shared between precise and sloppy.
+	// Free the precise one, and set the sloppy pointers to NULL
+	freeGaugeField(&cudaGaugePrecise);
+	cudaGaugeSloppy.even = NULL;
+	cudaGaugeSloppy.odd = NULL;
   }
   else { 
-    freeGaugeField(&cudaFatLinkPrecise);
-    freeGaugeField(&cudaFatLinkSloppy);
+	freeGaugeField(&cudaGaugePrecise);
+        freeGaugeField(&cudaGaugeSloppy);
   }
 
-  if( &cudaLongLinkPrecise == &cudaLongLinkSloppy ) {
-    freeGaugeField(&cudaLongLinkPrecise);
+  if ( cudaFatLinkSloppy.even == cudaFatLinkPrecise.even ) {
+        // Buffer shared between precise and sloppy.
+        // Free the precise one, and set the sloppy pointers to NULL
+        freeGaugeField(&cudaFatLinkPrecise);
+        cudaFatLinkSloppy.even = NULL;
+        cudaFatLinkSloppy.odd = NULL;
   }
   else {
-    freeGaugeField(&cudaLongLinkPrecise);
-    freeGaugeField(&cudaLongLinkSloppy);
+        freeGaugeField(&cudaFatLinkPrecise);
+        freeGaugeField(&cudaFatLinkSloppy);
   }
+
+  if ( cudaLongLinkSloppy.even == cudaLongLinkPrecise.even ) {
+        // Buffer shared between precise and sloppy.
+        // Free the precise one, and set the sloppy pointers to NULL
+        freeGaugeField(&cudaLongLinkPrecise);
+        cudaLongLinkSloppy.even = NULL;
+        cudaLongLinkSloppy.odd = NULL;
+  }
+  else {
+        freeGaugeField(&cudaLongLinkPrecise);
+        freeGaugeField(&cudaLongLinkSloppy);
+  }
+
 }
 
 void freeCloverQuda(void)
 {
-  if (cudaCloverPrecise.even.clover) {
-    freeCloverField(&cudaCloverPrecise);
-  }
+    bool sameCloverEven = ( cudaCloverPrecise.even.clover == cudaCloverSloppy.even.clover );
+    bool sameCloverOdd = ( cudaCloverPrecise.odd.clover == cudaCloverSloppy.odd.clover );
+    bool sameCloverInvEven = ( cudaCloverInvPrecise.even.clover == cudaCloverInvSloppy.even.clover );
+    bool sameCloverInvOdd = ( cudaCloverInvPrecise.odd.clover == cudaCloverInvSloppy.odd.clover ) ; 
 
-  if (cudaCloverSloppy.even.clover) {
-    freeCloverField(&cudaCloverSloppy);
-  }
-
-  if (cudaCloverInvPrecise.even.clover) {
-    freeCloverField(&cudaCloverInvPrecise);
-  }
-
-  if (cudaCloverInvSloppy.even.clover) {
-    freeCloverField(&cudaCloverInvSloppy);
-  }
+    if ( sameCloverEven || sameCloverOdd ) { 
+      freeCloverField(&cudaCloverPrecise);
+      cudaCloverSloppy.even.clover = NULL;
+      cudaCloverSloppy.even.cloverNorm = NULL;
+      cudaCloverSloppy.odd.clover = NULL;
+      cudaCloverSloppy.odd.cloverNorm = NULL;
+    }
+    else { 
+      freeCloverField(&cudaCloverPrecise);
+      freeCloverField(&cudaCloverSloppy);
+    }
+ 
+    if ( sameCloverInvEven || sameCloverInvOdd ) {
+      freeCloverField(&cudaCloverInvPrecise ); 
+      cudaCloverInvSloppy.even.clover = NULL;
+      cudaCloverInvSloppy.odd.clover = NULL;
+      cudaCloverInvSloppy.odd.cloverNorm = NULL;
+      cudaCloverInvSloppy.even.cloverNorm = NULL;
+    }
+    else { 
+	freeCloverField(&cudaCloverInvPrecise);
+        freeCloverField(&cudaCloverInvSloppy);
+    } 
 }
 
 void endQuda(void)

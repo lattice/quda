@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  QudaPrecision cuda_prec_sloppy =QUDA_SINGLE_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -151,44 +151,48 @@ int main(int argc, char **argv)
   // initialize the QUDA library
   initQuda(device);
 
-  // load the gauge field
-  loadGaugeQuda((void*)gauge, &gauge_param);
+  for(int i=0; i < 2; i++) { 
+    // load the gauge field
+    loadGaugeQuda((void*)gauge, &gauge_param);
 
-  // load the clover term, if desired
-  if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
-  
-  // perform the inversion
-  invertQuda(spinorOut, spinorIn, &inv_param);
+    // load the clover term, if desired
+    if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
+    
+    // perform the inversion
+    invertQuda(spinorOut, spinorIn, &inv_param);
 
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-
-  printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
-	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
-  printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-
-  if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
-    mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, 
-	inv_param.cpu_prec, gauge_param.cpu_prec); 
-    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-      ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-  } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
-    matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
-	  inv_param.cpu_prec, gauge_param.cpu_prec);
-    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-      ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    
+    printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
+	   inv_param.spinorGiB, gauge_param.gaugeGiB);
+    if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
+    printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+	   inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+    
+    if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
+      mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, 
+	  inv_param.cpu_prec, gauge_param.cpu_prec); 
+      if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
+	ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
+      matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+	    inv_param.cpu_prec, gauge_param.cpu_prec);
+      if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
+	ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    }
+    
+    
+    mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
+    printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+    
+    freeGaugeQuda();
+    if (clover_yes) freeCloverQuda();
   }
-
-
-  mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-  double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-  double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-  printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
-
-  // finalize the QUDA library
+    // finalize the QUDA library
   endQuda();
 #ifdef QMP_COMMS
   QMP_finalize_msg_passing();

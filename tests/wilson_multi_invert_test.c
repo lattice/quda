@@ -159,6 +159,7 @@ int main(int argc, char **argv)
   // initialize the QUDA library
   initQuda(device);
 
+  for(int i=0; i < 2; i++) { 
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
 
@@ -193,7 +194,10 @@ int main(int argc, char **argv)
     double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
     printf("Shift i=%d Relative residual: requested = %g, actual = %g\n", i, inv_param.tol, sqrt(nrm2/src2));
   }
-
+ 
+  freeGaugeQuda();
+  if( clover ) freeCloverQuda();
+  } // For
   free(spinorCheck);
   free(spinorCheck2);
 
