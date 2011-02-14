@@ -1069,19 +1069,13 @@ void invertMultiShiftQudaGeneric(void **_hp_x, void *_hp_b, QudaInvertParam *par
 
   // Are we doing a preconditioned solve */
   /* What does NormEq solve mean in the shifted case? 
-   *
-   * The Direct solve here is  [ (M^\dag M) + shift_i ] x_i = b
-   * The NormEq would be [ M^\dag M + shift_i ] x_i = M^\dag b 
-   *    which is odd to do... isn't it?
-   * 
-   * So just a direct solve but with M\dag M
    */
-  if (param->solve_type != QUDA_DIRECT_PC_SOLVE &&
-      param->solve_type != QUDA_DIRECT_SOLVE) { 
+  if (param->solve_type != QUDA_NORMEQ_PC_SOLVE &&
+      param->solve_type != QUDA_NORMEQ_SOLVE) { 
     errorQuda("Only direct solves are supported for multi-shift\n");
   }
 
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool pc_solve = (param->solve_type == QUDA_NORMEQ_PC_SOLVE);
 
   // In principle one can do a MATPC Solution for a hermitian M_pc
   // In practice most of the time I guess one will do a M^\dagger_pc M_pc solution.
