@@ -49,8 +49,15 @@ void allocateCloverField(FullClover *ret, int *X, int pad, QudaPrecision precisi
 
 void freeParityClover(ParityClover *clover)
 {
-  cudaFree(clover->clover);
+  if( clover->clover ) { 
+    cudaFree(clover->clover);
+  }
   clover->clover = NULL;
+  if( clover->cloverNorm ) { 
+     cudaFree(clover->cloverNorm);
+  }
+  clover->cloverNorm = NULL;
+
 }
 
 void freeCloverField(FullClover *clover)
