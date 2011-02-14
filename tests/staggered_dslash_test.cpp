@@ -164,39 +164,32 @@ void init()
   
 
 #ifdef MULTI_GPU
+  exchange_init_dims(X);
   ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
   ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
   if (ghost_fatlink == NULL || ghost_longlink == NULL){
     errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
-  exchange_cpu_links(X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  exchange_cpu_links(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif   
   
 
-#ifdef MULTI_GPU
-  
-  int num_faces =1;
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.ga_pad = sdim*sdim*sdim/2;    
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces);
-  
-  num_faces =3;
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
-  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;  
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
-  loadGaugeQuda_general_mg(longlink, ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces);
-#else
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(fatlink, &gaugeParam);
 
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
-  loadGaugeQuda(longlink, &gaugeParam);
   
+  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+#ifdef MULTI_GPU
+  gaugeParam.ga_pad = sdim*sdim*sdim/2;    
 #endif
+  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  loadGaugeQuda(fatlink, &gaugeParam);
   
+  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
+#ifdef MULTI_GPU
+  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;  
+#endif
+  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
+  loadGaugeQuda(longlink, &gaugeParam);
+
   cudaFatLink = cudaFatLinkPrecise;
   cudaLongLink = cudaLongLinkPrecise;
   

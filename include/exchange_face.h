@@ -6,10 +6,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  void exchange_cpu_links(int* X,
-			  void** fatlink, void* ghost_fatlink, 
+  void exchange_init_dims(int* X);
+  void exchange_cpu_links(void** fatlink, void* ghost_fatlink, 
 			  void** longlink, void* ghost_longlink,
 			  QudaPrecision gPrecision);
+  void exchange_fat_link(void** fatlink, void* ghost_fatlink, QudaPrecision gPrecision);
+  void exchange_long_link(void** longlink, void* ghost_longlink, QudaPrecision gPrecision);
+
   void exchange_cpu_spinor(int* X,
 			   void* spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor,
 			   QudaPrecision sPrecision);

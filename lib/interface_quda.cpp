@@ -242,49 +242,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 
 
-void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge, QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy, int num_faces)
-{
-
-  checkGaugeParam(param);
-  FullGauge* cudaLinkPrecise = (FullGauge*)_cudaLinkPrecise;
-  FullGauge* cudaLinkSloppy = (FullGauge*)_cudaLinkSloppy;
-  
-  int packed_size;
-  switch(param->reconstruct){
-  case QUDA_RECONSTRUCT_8:
-    packed_size = 8;
-    break;
-  case QUDA_RECONSTRUCT_12:
-    packed_size = 12;
-    break;
-  case QUDA_RECONSTRUCT_NO:
-    packed_size = 18;
-    break;
-  default:
-    printf("ERROR: %s: reconstruct type not set, exitting\n", __FUNCTION__);
-    exit(1);
-  }
-  
-  param->packed_size = packed_size;
-
-  createGaugeField_mg(cudaLinkPrecise, h_gauge, ghost_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
-		      param->t_boundary, param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, param->type);
-  param->gaugeGiB += 2.0*cudaLinkPrecise->bytes/ (1 << 30);
-  if (param->cuda_prec_sloppy != param->cuda_prec ||
-      param->reconstruct_sloppy != param->reconstruct) {
-    createGaugeField_mg(cudaLinkSloppy, h_gauge, ghost_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
-			param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
-			param->X, param->anisotropy, param->tadpole_coeff, param->ga_pad, num_faces, param->type);    
-    param->gaugeGiB += 2.0*cudaLinkSloppy->bytes/ (1 << 30);
-  } else {
-    *cudaLinkSloppy = *cudaLinkPrecise;
-  }
-  
-}
-
-
-
-
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
@@ -993,20 +950,18 @@ do_create_precise_cuda_gauge(void)
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;
   
   //create precise links
-  int num_faces = 1;
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec;
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
   gauge_param->ga_pad = fatlink_pad;
   gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, gauge_param, &cudaFatLinkPrecise, &cudaFatLinkPrecise, num_faces);
+  loadGaugeQuda(fatlink, gauge_param);
 
   
-  num_faces = 3;
   gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
   gauge_param->ga_pad = longlink_pad;
   gauge_param->reconstruct = longlink_recon;
   gauge_param->reconstruct_sloppy = longlink_recon_sloppy;
-  loadGaugeQuda_general_mg(longlink, ghost_longlink, gauge_param, &cudaLongLinkPrecise, &cudaLongLinkPrecise, num_faces);
+  loadGaugeQuda(longlink, gauge_param);
 
   //set prec/prec_sloppy it back
   gauge_param->cuda_prec = prec;
@@ -1023,18 +978,16 @@ do_create_sloppy_cuda_gauge(void)
 
   //create sloppy links
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec_sloppy; 
-  int num_faces = 1;
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
   gauge_param->ga_pad = fatlink_pad;
   gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda_general_mg(fatlink, ghost_fatlink, gauge_param, &cudaFatLinkSloppy, &cudaFatLinkSloppy, num_faces);
+  loadGaugeQuda(fatlink, gauge_param);
   
-  num_faces = 3;
   gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
   gauge_param->ga_pad = longlink_pad;
   gauge_param->reconstruct = longlink_recon;
   gauge_param->reconstruct_sloppy = longlink_recon_sloppy;
-  loadGaugeQuda_general_mg(longlink, ghost_longlink, gauge_param, &cudaLongLinkSloppy, &cudaLongLinkSloppy, num_faces);
+  loadGaugeQuda(longlink, gauge_param);
   
   //set prec/prec_sloppy it back
   gauge_param->cuda_prec = prec;

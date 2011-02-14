@@ -105,9 +105,6 @@ extern "C" {
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void loadCloverQuda(void *h_clover, void *h_clovinv,
 		      QudaInvertParam *inv_param);
-  void loadGaugeQuda_general_mg(void *h_gauge, void* ghost_gauge,
-				QudaGaugeParam *param, void* _cudaLinkPrecise, void* _cudaLinkSloppy, int num_faces);
-  
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets,

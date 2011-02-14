@@ -56,6 +56,11 @@ setup_dims(int* X)
   Vs = X[0]*X[1]*X[2];
   Vsh = Vs/2;
 }
+
+void exchange_init_dims(int* X)
+{
+  setup_dims(X);
+}
 void exchange_init(cudaColorSpinorField* cudaSpinor)
 {
   
@@ -398,42 +403,54 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
   
 }
 
-
-void exchange_cpu_links(int* X,
-			void** fatlink, void* ghost_fatlink, 
-			void** longlink, void* ghost_longlink,
-			QudaPrecision gPrecision)
+void exchange_fat_link(void** fatlink, void* ghost_fatlink,
+		       QudaPrecision gPrecision)
 {
-  
-  
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    dims[d] = X[d];
-  }
-  Vh = V/2;
-  
-  Vs = X[0]*X[1]*X[2];
-  Vsh = Vs/2;
-  
-  void*  fatlink_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
-  void*  longlink_sendbuf = malloc(3*Vs*gaugeSiteSize*gPrecision);
-  if (fatlink_sendbuf == NULL || longlink_sendbuf == NULL){
-    printf("ERROR: malloc failed for fatlink_sendbuf/longlink_sendbuf\n");
+
+  void*  fatlink_sendbuf = malloc(Vs*gaugeSiteSize* gPrecision);
+  if (fatlink_sendbuf == NULL){
+    printf("ERROR: malloc failed for fatlink_sendbuf\n");
     exit(1);
   }
   
  
   if (gPrecision == QUDA_DOUBLE_PRECISION){
     exchange_fatlink((double**)fatlink, (double*)ghost_fatlink, (double*)fatlink_sendbuf);
-    exchange_longlink((double**)longlink, (double*)ghost_longlink, (double*)longlink_sendbuf);
   }else{ //single
     exchange_fatlink((float**)fatlink, (float*)ghost_fatlink, (float*)fatlink_sendbuf);
+  }
+
+  free(fatlink_sendbuf);
+}
+
+void exchange_long_link(void** longlink, void* ghost_longlink,
+			QudaPrecision gPrecision)
+{
+  void*  longlink_sendbuf = malloc(3*Vs*gaugeSiteSize*gPrecision);
+  if (longlink_sendbuf == NULL ){
+    printf("ERROR: malloc failed for fatlink_sendbuf\n");
+    exit(1);
+  }
+   
+  if (gPrecision == QUDA_DOUBLE_PRECISION){
+    exchange_longlink((double**)longlink, (double*)ghost_longlink, (double*)longlink_sendbuf);
+  }else{ //single
     exchange_longlink((float**)longlink, (float*)ghost_longlink, (float*)longlink_sendbuf);    
   }
   
-  free(fatlink_sendbuf);
   free(longlink_sendbuf);
+
+}
+
+void exchange_cpu_links(void** fatlink, void* ghost_fatlink, 
+			void** longlink, void* ghost_longlink,
+			QudaPrecision gPrecision)
+{
+ 
+  exchange_fat_link(fatlink, ghost_fatlink, gPrecision);
+  exchange_long_link(longlink, ghost_longlink, gPrecision);
+
+  return;
 
 }
 
