@@ -133,10 +133,12 @@ ifeq ($(strip $(BUILD_FATLINK)), yes)
 endif
 ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   NVCCOPT += -DGPU_GAUGE_FORCE
+  COPT += -DGPU_GAUGE_FORCE
   GAUGE_FORCE_TEST=gauge_force_test
 endif
 ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
   NVCCOPT += -DGPU_FERMION_FORCE
+  COPT += -DGPU_FERMION_FORCE
   FERMION_FORCE_TEST=fermion_force_test
 endif
 
