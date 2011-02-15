@@ -25,9 +25,6 @@ wilson_dslash_test: wilson_dslash_test.o test_util.o wilson_dslash_reference.o $
 wilson_invert_test: wilson_invert_test.o test_util.o wilson_dslash_reference.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-wilson_multi_invert_test: wilson_multi_invert_test.o test_util.o wilson_dslash_reference.o blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
-
 domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslash_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
@@ -57,9 +54,10 @@ tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
 
 clean:
-	-rm -f *.o staggered_dslash_test staggered_invert_test wilson_dslash_test wilson_invert_test wilson_multi_invert_test \
-	domain_wall_dslash_test  domain_wall_invert_test twisted_mass_dslash_test twisted_mass_invert_test \
-        su3_test pack_test blas_test llfat_test gauge_force_test fermion_force_test
+	-rm -f *.o staggered_dslash_test staggered_invert_test		\
+	wilson_dslash_test wilson_invert_test domain_wall_dslash_test	\
+	domain_wall_invert_test su3_test pack_test blas_test		\
+	llfat_test gauge_force_test fermion_force_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

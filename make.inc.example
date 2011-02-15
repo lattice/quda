@@ -106,7 +106,7 @@ endif
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
-  WILSON_DIRAC_TEST=wilson_dslash_test wilson_invert_test wilson_multi_invert_test
+  WILSON_DIRAC_TEST=wilson_dslash_test wilson_invert_test
 endif
 ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
   NVCCOPT += -DGPU_DOMAIN_WALL_DIRAC
@@ -118,7 +118,6 @@ ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
 endif
 ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
   NVCCOPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-  TWISTED_MASS_DIRAC_TEST=twisted_mass_dslash_test twisted_mass_invert_test
 endif
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK
