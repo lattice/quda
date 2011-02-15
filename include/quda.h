@@ -113,9 +113,6 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets,
 			    double* residue_sq);
- void invertMultiShiftQudaGeneric(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			    double* offsets, int num_offsets,
-			    double* residue_sq);
   void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 				 double* offsets, int num_offsets, double* residue_sq);
     

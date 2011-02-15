@@ -875,151 +875,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   return;
 }
 
-/*! The 'original' staggered only multi-shift solver from Guochun
- *
- */
-void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			  double* offsets, int num_offsets, double* residue_sq)
-{
-  checkInvertParam(param);
-
-  if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
-    errorQuda("Multi-shift solver only supports staggered");
-  }
-  if (param->solve_type != QUDA_NORMEQ_SOLVE &&
-      param->solve_type != QUDA_NORMEQ_PC_SOLVE) {
-    errorQuda("Direct solve_type not supported for staggered");
-  }
-  if (num_offsets <= 0){
-    warningQuda("invertMultiShiftQuda() called with no offsets");
-    return;
-  }
-
-  if(param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION
-      && param->solution_type != QUDA_MATDAG_MAT_SOLUTION){
-      errorQuda("Your solution type not supported for staggered. "
-      "Only QUDA_MATPCDAG_MATPC_SOLUTION and QUDA_MATDAG_MAT_SOLUTION is supported.");
-  }
-
-
-
-  bool pc_solve = (param->solve_type == QUDA_NORMEQ_PC_SOLVE);
-
-  param->secs = 0;
-  param->gflops = 0;
-  param->iter = 0;
-  
-  double low_offset = offsets[0];
-  int low_index = 0;
-  for (int i=1;i < num_offsets;i++){
-    if (offsets[i] < low_offset){
-      low_offset = offsets[i];
-      low_index = i;
-    }
-  }
-  
-  void* hp_x[num_offsets];
-  void* hp_b = _hp_b;
-  for(int i=0;i < num_offsets;i++){
-    hp_x[i] = _hp_x[i];
-  }
-  
-  if (low_index != 0){
-    void* tmp = hp_x[0];
-    hp_x[0] = hp_x[low_index] ;
-    hp_x[low_index] = tmp;
-    
-    double tmp1 = offsets[0];
-    offsets[0]= offsets[low_index];
-    offsets[low_index] =tmp1;
-  }
-    
-  ColorSpinorParam csParam;
-  csParam.precision = param->cpu_prec;
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;  
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.nColor=3;
-  csParam.nSpin=1;
-  csParam.nDim=4;
-  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-
-  if (param->solve_type == QUDA_NORMEQ_SOLVE) {
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    csParam.x[0] = 2*cudaFatLinkPrecise.X[0];
-  } else if (param->solve_type == QUDA_NORMEQ_PC_SOLVE) {
-    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    csParam.x[0] = cudaFatLinkPrecise.X[0];
-  } else {
-    errorQuda("Direct solve_type not supported for staggered");
-  }
-  csParam.x[1] = cudaFatLinkPrecise.X[1];
-  csParam.x[2] = cudaFatLinkPrecise.X[2];
-  csParam.x[3] = cudaFatLinkPrecise.X[3];
-  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  csParam.v = hp_b;  
-  cpuColorSpinorField h_b(csParam);
-  
-  cpuColorSpinorField* h_x[num_offsets];
-  
-  for (int i=0; i<num_offsets; i++) {
-    csParam.v = hp_x[i];
-    h_x[i] = new cpuColorSpinorField(csParam);
-  }
-  
-  csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
-  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-
-  csParam.pad = param->sp_pad;
-  csParam.precision = param->cuda_prec;
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  
-  cudaColorSpinorField b(csParam);
-  
-  // set the mass in the invert_param
-  param->mass = sqrt(offsets[0]/4);
-  
-  // create the Dirac operators
-  DiracParam diracParam;
-  createDirac(diracParam, *param, pc_solve);
-  Dirac &dirac = *d;
-  Dirac &diracSloppy = *dSloppy;
-  
-  b = h_b; //send data from CPU to GPU
-  
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaColorSpinorField* x[num_offsets]; // solution  
-  for (int i=0; i < num_offsets; i++) {
-    x[i] = new cudaColorSpinorField(csParam);
-  }
-  invertMultiShiftCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), x, b, param, offsets, num_offsets, residue_sq);    
-  
-  for (int i=0; i < num_offsets; i++) {
-    x[i]->saveCPUSpinorField(*h_x[i]);
-  }
-  
-  for(int i=0; i<num_offsets; i++) {
-    delete h_x[i];
-    delete x[i];
-  }
-  if (!param->preserve_dirac) {
-    delete d;
-    delete dSloppy;
-    diracCreation = false;
-    diracTune = false;
-  }  
-  
-  return;
-}
 
 /*! 
  *
  * Generic version of the multi-shift solver. Should work for
  * most fermions. Note, offset[0] is not folded into the mass parameter 
  */
-void invertMultiShiftQudaGeneric(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-				 double* offsets, int num_offsets, double* residue_sq)
+void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
+			  double* offsets, int num_offsets, double* residue_sq)
 {
   checkInvertParam(param);
   verbosity = param->verbosity;
@@ -1097,6 +960,9 @@ void invertMultiShiftQudaGeneric(void **_hp_x, void *_hp_b, QudaInvertParam *par
   // Balint: Isn't there a  nice construction pattern we could use here? This is 
   // expedient but yucky.
   DiracParam diracParam; 
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH){
+    param->mass = sqrt(offsets[0]/4);  
+  }
   createDirac(diracParam, *param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
@@ -1147,15 +1013,17 @@ void invertMultiShiftQudaGeneric(void **_hp_x, void *_hp_b, QudaInvertParam *par
 
   // tune the Dirac Kernel
   tuneDirac(*param, pc_solution ? *(x[0]) : (x[0])->Even());
-
+  
+  
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [num_offsets];
   for(int i=0; i < num_offsets; i++){ 
     rescaled_shifts[i] = offsets[i];
     massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
   }
-  invertMultiShiftCgCudaGeneric(DiracMdagM(dirac), DiracMdagM(diracSloppy), x, *b, param, rescaled_shifts, num_offsets, residue_sq);
-
+  invertMultiShiftCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), x, *b, param, rescaled_shifts, num_offsets, residue_sq);
+  
+  
   delete [] rescaled_shifts;
 
   for(int i=0; i < num_offsets; i++) { 
