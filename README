@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.3.2                         x January 2011
+Release Notes for QUDA v0.4.0                         XX February 2011
 -----------------------------
 
 Overview:
@@ -15,9 +15,10 @@ with support for double, single, and half (16-bit fixed-point)
 precision.  The staggered implementation additionally includes support
 for asqtad link fattening, force terms for the asqtad fermion action
 and one-loop improved Symanzik gauge action, and a multi-shift CG
-solver.  Initial support for multiple GPUs is enabled in this release,
-however, this is currently limited to Wilson, clover and twisted mass
+solver.  Initial support for multiple GPUs is enabled in this release;
+however, this is currently limited to Wilson, clover, and twisted mass
 Dirac operators.
+
 
 Software Compatibility:
 
@@ -52,11 +53,10 @@ Compatibility" above).  Then type 'make' to build the library.
 Optionally you can now generate a 'make.inc' using the Autoconf
 ./configure script. See ./configure --help for the options available.
 The ./configure script allows you to sed most User configurable features
-(hardware capability, multi-gpu build, QMP and MPI locatioN) with the
+(hardware capability, multi-gpu build, QMP and MPI location) with the
 usual barrage of --enable-feature and --with-package options.
 Once ./configure has created your make.inc, you can run 'make' to build
 the library
-
 
 As an optional step, 'make tune' will invoke tests/blas_test to
 perform autotuning of the various BLAS-like functions needed by the
@@ -87,6 +87,7 @@ OVERLAP_COMMS option is enabled to overlap kernel computation and
 inter-GPU communication.  Multiple GPUs are controlled using QMP, and
 so QMP and MPI must be installed on the host systems, and the QMP_HOME
 and MPI_HOME paths must be set.
+
 
 Using the Library:
 
@@ -146,6 +147,7 @@ R. Babich, M. A. Clark and B. Joo, "Parallelizing the QUDA Library for
 Multi-GPU Calculations in Lattice Quantum Chromodynamics,"
 International Conference for High Performance Computing, Networking,
 Storage and Analysis (SC), 2010 [arXiv:1011.0024[ hep-lat]].
+
 
 Authors:
 
