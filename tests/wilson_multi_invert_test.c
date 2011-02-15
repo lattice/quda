@@ -27,16 +27,19 @@ int main(int argc, char **argv)
 
   int device = 0; // CUDA device number
 
-  QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+  int num_offsets=4;
+  double offsets[4]={0.01, 0.02, 0.03, 0.04};
+
+  QudaPrecision cpu_prec = QUDA_SINGLE_PRECISION;
   QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy =QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = cuda_prec;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
+  gauge_param.X[0] = 12;
+  gauge_param.X[1] = 12;
+  gauge_param.X[2] = 12;
   gauge_param.X[3] = 24;
 
   gauge_param.anisotropy = 1.0;
@@ -64,10 +67,10 @@ int main(int argc, char **argv)
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 0.001;
+  inv_param.reliable_delta = 0.001; /* This is ignored */
 
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+  inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
@@ -138,8 +141,13 @@ int main(int argc, char **argv)
   }
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize);
-  void *spinorOut = malloc(V*spinorSiteSize*sSize);
+  void *spinorOut[4];
+  for(int i=0; i < 4; i++) { 
+    spinorOut[i] = malloc(V*spinorSiteSize*sSize);
+  }
+
   void *spinorCheck = malloc(V*spinorSiteSize*sSize);
+  void *spinorCheck2 = malloc(V*spinorSiteSize*sSize);
 
   // create a point source at 0
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = 1.0;
@@ -152,47 +160,48 @@ int main(int argc, char **argv)
   initQuda(device);
 
   for(int i=0; i < 2; i++) { 
-    // load the gauge field
-    loadGaugeQuda((void*)gauge, &gauge_param);
+  // load the gauge field
+  loadGaugeQuda((void*)gauge, &gauge_param);
 
-    // load the clover term, if desired
-    if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
-    
-    // perform the inversion
-    invertQuda(spinorOut, spinorIn, &inv_param);
+  // load the clover term, if desired
+  if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
+  
+  // perform the inversion
+  double resid_sq;
+  invertMultiShiftQuda(spinorOut, spinorIn, &inv_param,
+			      offsets, num_offsets, &resid_sq);
 
-    // stop the timer
-    time0 += clock();
-    time0 /= CLOCKS_PER_SEC;
-    
-    printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
-	   inv_param.spinorGiB, gauge_param.gaugeGiB);
-    if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
-    printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-	   inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-    
-    if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
-      mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, 
-	  inv_param.cpu_prec, gauge_param.cpu_prec); 
-      if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-	ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-    } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
-      matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
-	    inv_param.cpu_prec, gauge_param.cpu_prec);
-      if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-	ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-    }
-    
-    
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+
+  printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
+	 inv_param.spinorGiB, gauge_param.gaugeGiB);
+  if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
+  printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+
+
+  printf("Host residuum checks: \n");
+  for(int i=0; i < num_offsets; i++) {
+    ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+
+    matpc(spinorCheck2, gauge, spinorOut[i], inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+    matpc(spinorCheck, gauge, spinorCheck2, inv_param.kappa, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param.cpu_prec);
+    axpy(offsets[i], spinorOut[i], spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-    printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
-    
-    freeGaugeQuda();
-    if (clover_yes) freeCloverQuda();
+    printf("Shift i=%d Relative residual: requested = %g, actual = %g\n", i, inv_param.tol, sqrt(nrm2/src2));
   }
-    // finalize the QUDA library
+ 
+  freeGaugeQuda();
+  if( clover ) freeCloverQuda();
+  } // For
+  free(spinorCheck);
+  free(spinorCheck2);
+
+  // finalize the QUDA library
   endQuda();
 #ifdef QMP_COMMS
   QMP_finalize_msg_passing();

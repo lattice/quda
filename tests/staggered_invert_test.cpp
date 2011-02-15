@@ -162,14 +162,16 @@ invert_test(void)
       }
     }
   }
-   
+
+  
 #ifdef MULTI_GPU
+  exchange_init_dims(gaugeParam.X);
   ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
   ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
   if (ghost_fatlink == NULL || ghost_longlink == NULL){
     errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
-  exchange_cpu_links(gaugeParam.X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  exchange_cpu_links(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif
 
  
@@ -214,18 +216,16 @@ invert_test(void)
 		 link_recon, link_recon_sloppy,
 		 &gaugeParam);
    }else{
-    int num_faces =1;
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.ga_pad = Vsh;
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda_general_mg(fatlink, ghost_fatlink, &gaugeParam, &cudaFatLinkPrecise, &cudaFatLinkSloppy, num_faces);
+    loadGaugeQuda(fatlink, &gaugeParam);
     
-    num_faces =3;
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
     gaugeParam.ga_pad = 3*Vsh;
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-    loadGaugeQuda_general_mg(longlink,ghost_longlink, &gaugeParam, &cudaLongLinkPrecise, &cudaLongLinkSloppy, num_faces);
+    loadGaugeQuda(longlink, &gaugeParam);
   }
 
 #else

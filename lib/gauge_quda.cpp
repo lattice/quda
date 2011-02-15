@@ -9,6 +9,10 @@
 #include <face_quda.h>
 #include "misc_helpers.h"
 
+#ifdef MPI_COMMS
+#include "exchange_face.h"
+#endif
+
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
@@ -517,18 +521,15 @@ static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit,
   }
 }
 
+
 template <typename Float, typename FloatN>
-static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_gauge, int oddBit, 
+static void packQDPGaugeField_ghost(FloatN *d_gauge, Float **h_gauge, Float* ghost_gauge, int oddBit, 
 				 ReconstructType reconstruct, int V, int pad, int Vsh, int num_faces, 
 				 QudaLinkType type) 
 {
 
     
   if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge[dir] + oddBit*V*18;
-      for (int i = 0; i < V; i++) pack12(d_gauge+i, g+i*18, dir, V+pad);
-    }
     //ghost gauge
     //we only need one direction, let's put it in the dir=3 space
     int dir =3;
@@ -538,10 +539,6 @@ static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_
     } 
 
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge[dir] + oddBit*V*18;
-      for (int i = 0; i < V; i++) pack8(d_gauge+i, g+i*18, dir, V+pad);
-    }
     //ghost gauge
     //we only need one direction, let's put it in the dir=3 space
     int dir =3;
@@ -552,17 +549,6 @@ static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_
 
   } else { //18 reconstruct
 
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge[dir] + oddBit*V*18;
-      if ((type ==  QUDA_ASQTAD_FAT_LINKS) && (typeid(FloatN) == typeid(short2))){
-	for (int i = 0; i < V; i++) {
-	  //we know it is half precison with fatlink at this stage
-	  fatlink_short_pack18((short2*)(d_gauge+i), g+i*18, dir, V+pad);
-	}
-      }else{
-	for (int i = 0; i < V; i++) pack18(d_gauge+i, g+i*18, dir, V+pad);
-      }
-    }
     //ghost gauge
     //we only need one direction, let's put it in the dir=3 space
     int dir =3;
@@ -580,6 +566,9 @@ static void packQDPGaugeField_mg(FloatN *d_gauge, Float **h_gauge, Float* ghost_
     }   
   }
 }
+
+
+
 
 
 
@@ -710,7 +699,7 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
   }
  
   if (cudaGauge->even || cudaGauge->odd){
-       errorQuda("Error: even/odd field is not null, probably already allocated(even=%p, odd=%p)\n", cudaGauge->even, cudaGauge->odd);
+    errorQuda("Error: even/odd field is not null, probably already allocated(even=%p, odd=%p)\n", cudaGauge->even, cudaGauge->odd);
   }
  
   cudaGauge->bytes = 4*cudaGauge->stride*elements*floatSize;
@@ -728,29 +717,6 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
 
 }
 
-static void allocateGaugeField2(FullGauge *cudaGauge, ReconstructType reconstruct, QudaPrecision precision) {
-
-  cudaGauge->reconstruct = reconstruct;
-  cudaGauge->precision = precision;
-  cudaGauge->Nc = 3;
-  cudaGauge->bytes = 4*cudaGauge->stride*reconstruct*precision;
-
-  if (!cudaGauge->even) {
-    if (cudaMalloc((void **)&cudaGauge->even, cudaGauge->bytes) == cudaErrorMemoryAllocation) {
-      errorQuda("Error allocating even gauge field");
-    }
-  }
-  cudaMemset(cudaGauge->even, 0, cudaGauge->bytes);
-
-  if (!cudaGauge->odd) {
-    if (cudaMalloc((void **)&cudaGauge->odd, cudaGauge->bytes) == cudaErrorMemoryAllocation) {
-      errorQuda("Error allocating even odd gauge field");
-    }
-  }
-  cudaMemset(cudaGauge->odd, 0, cudaGauge->bytes);
-
-  checkCudaError();
-}
 
 void freeGaugeField(FullGauge *cudaGauge) {
   if (cudaGauge->even) cudaFree(cudaGauge->even);
@@ -761,7 +727,7 @@ void freeGaugeField(FullGauge *cudaGauge) {
 
 template <typename Float, typename FloatN>
 static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFieldOrder gauge_order,
-			   ReconstructType reconstruct, int bytes, int Vh, int pad, QudaLinkType type) {
+			   ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh, QudaLinkType type) {
   
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
@@ -774,6 +740,12 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   packedOdd = (FloatN*)malloc(bytes);
 #endif
     
+  if( ! packedEven ) errorQuda( "packedEven is borked\n");
+  if( ! packedOdd ) errorQuda( "packedOdd is borked\n");
+  if( ! even ) errorQuda( "even is borked\n");
+  if( ! odd ) errorQuda( "odd is borked\n");
+  if( ! cpuGauge ) errorQuda( "cpuGauge is borked\n");
+
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, Vh, pad, type);
     packQDPGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, Vh, pad, type);
@@ -785,6 +757,32 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   }
 
 #ifdef MULTI_GPU
+#ifdef GPU_STAGGERED_DIRAC
+  QudaPrecision precision = (QudaPrecision) sizeof(Float);
+  void*  ghost_link = NULL;
+  int num_faces=1;
+  if(type == QUDA_ASQTAD_FAT_LINKS){
+    num_faces=1;
+    ghost_link = malloc(2*Vsh*gaugeSiteSize*precision);
+    if(ghost_link == NULL){
+      errorQuda("malloc failed for ghost_fatlink\n");
+    }
+    exchange_fat_link((void**)cpuGauge, ghost_link, precision);
+
+  }else if(type == QUDA_ASQTAD_LONG_LINKS){
+    num_faces=3;
+    ghost_link = malloc(6*Vsh*gaugeSiteSize*precision);
+    if(ghost_link == NULL){
+      errorQuda("malloc failed for ghost longlink\n");
+    }
+    exchange_long_link((void**)cpuGauge, ghost_link, precision);
+  }
+
+  packQDPGaugeField_ghost(packedEven, (Float**)cpuGauge, (Float*)ghost_gauge, 0, reconstruct, Vh, pad, Vsh, num_faces, type);
+  packQDPGaugeField_ghost(packedOdd,  (Float**)cpuGauge, (Float*)ghost_gauge, 1, reconstruct, Vh, pad, Vsh, num_faces, type);
+  
+  free(ghost_link);
+#else
   QudaPrecision precision = (QudaPrecision) sizeof(even->x);
   int veclength = sizeof(FloatN)/precision;
 
@@ -793,6 +791,7 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
 		     veclength, reconstruct, Vh, pad);
   transferGaugeFaces((void *)packedOdd, (void *)(packedOdd + Vh), precision,
 		     veclength, reconstruct, Vh, pad);
+#endif
 #endif
 
   cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
@@ -810,38 +809,6 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
 #endif
 
 }
-
-template <typename Float, typename FloatN>
-static void loadGaugeField_mg(FloatN *even, FloatN *odd, Float *cpuGauge, Float* ghost_gauge, GaugeFieldOrder gauge_order,
-			      ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh, int num_faces, QudaLinkType type) 
-{
-
-  // Use pinned memory
-  FloatN *packedEven, *packedOdd;
-    
-  cudaMallocHost((void**)&packedEven, bytes);
-  cudaMallocHost((void**)&packedOdd, bytes);
-    
-  if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    packQDPGaugeField_mg(packedEven, (Float**)cpuGauge, (Float*)ghost_gauge, 0, reconstruct, Vh, pad, Vsh, num_faces, type);
-    packQDPGaugeField_mg(packedOdd,  (Float**)cpuGauge, (Float*)ghost_gauge, 1, reconstruct, Vh, pad, Vsh, num_faces, type);
-  } else {
-    errorQuda("Invalid gauge_order");
-  }
-
-
-  cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
-  checkCudaError();
-    
-  cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);
-  checkCudaError();
-  
-
-  cudaFreeHost(packedEven);
-  cudaFreeHost(packedOdd);
-}
-
-
 
 
 template <typename Float, typename FloatN>
@@ -905,25 +872,29 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
   cudaGauge->volume /= 2;
   cudaGauge->pad = pad;
 
+  /* test disabled because of staggered pad won't pass
 #ifdef MULTI_GPU
   if (pad != cudaGauge->X[0]*cudaGauge->X[1]*cudaGauge->X[2]) {
     errorQuda("Gauge padding must match spatial volume");
   }
 #endif
+  */
+
   cudaGauge->stride = cudaGauge->volume + cudaGauge->pad;
   cudaGauge->gauge_fixed = gauge_fixed;
   cudaGauge->t_boundary = t_boundary;
   
   allocateGaugeField(cudaGauge, reconstruct, cuda_prec);
 
+  int Vsh = XX[0]*XX[1]*XX[2]/2;
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
 
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
       loadGaugeField((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (double*)cpuGauge, 
-		     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);
+		     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);
     } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
       loadGaugeField((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (float*)cpuGauge, 
-		     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);
+		     gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);
     }
 
   } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
@@ -931,18 +902,18 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
       if (reconstruct == QUDA_RECONSTRUCT_NO) {
 	loadGaugeField((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (double*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);	      
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);	      
       } else {
 	loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (double*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);
       }
     } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
       if (reconstruct == QUDA_RECONSTRUCT_NO) {
 	loadGaugeField((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (float*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);
       } else {
 	loadGaugeField((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (float*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);
       }
     }
 
@@ -951,103 +922,24 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
     if (cpu_prec == QUDA_DOUBLE_PRECISION){
       if (reconstruct == QUDA_RECONSTRUCT_NO) {
 	loadGaugeField((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (double*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);
       } else {
 	loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (double*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);	      
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);	      
       }
     } else if (cpu_prec == QUDA_SINGLE_PRECISION) {
       if (reconstruct == QUDA_RECONSTRUCT_NO) {
 	loadGaugeField((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (float*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);
       } else {
 	loadGaugeField((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (float*)cpuGauge, 
-		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, type);	      
+		       gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, type);	      
       }
     }
 
   }
 }
 
-void createGaugeField_mg(FullGauge *cudaGauge, void *cpuGauge, void* ghost_gauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
-			 GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
-			 Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, int num_faces, QudaLinkType type)
-{
-
-  Anisotropy = anisotropy;
-  tBoundary = t_boundary;
-  
-  cudaGauge->anisotropy = anisotropy;
-  cudaGauge->tadpole_coeff = tadpole_coeff;
-  cudaGauge->volume = 1;
-  for (int d=0; d<4; d++) {
-    cudaGauge->X[d] = XX[d];
-    cudaGauge->volume *= XX[d];
-    X[d] = XX[d];
-  }
-  cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
-  cudaGauge->volume /= 2;
-  cudaGauge->pad = pad;
-  cudaGauge->stride = cudaGauge->volume + cudaGauge->pad;
-  cudaGauge->gauge_fixed = gauge_fixed;
-  cudaGauge->t_boundary = t_boundary;
-
-  allocateGaugeField(cudaGauge, reconstruct, cuda_prec);
-
-  int Vsh = XX[0]*XX[1]*XX[2]/2;
-  if (cuda_prec == QUDA_DOUBLE_PRECISION) {
-
-    if (cpu_prec == QUDA_DOUBLE_PRECISION)
-      loadGaugeField_mg((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (double*)cpuGauge,(double*)ghost_gauge,  
-			gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-    else if (cpu_prec == QUDA_SINGLE_PRECISION)
-      loadGaugeField_mg((double2*)(cudaGauge->even), (double2*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge, 
-			gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-
-  } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
-
-      if (cpu_prec == QUDA_DOUBLE_PRECISION){
-	  if (reconstruct == QUDA_RECONSTRUCT_NO){
-	    loadGaugeField_mg((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge,
-			      gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);	      
-	  }else{
-	    loadGaugeField_mg((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge,
-			      gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-	  }
-	  
-      }
-      else if (cpu_prec == QUDA_SINGLE_PRECISION){
-	if (reconstruct == QUDA_RECONSTRUCT_NO){
-	  loadGaugeField_mg((float2*)(cudaGauge->even), (float2*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge,
-			    gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-	}else{
-	  loadGaugeField_mg((float4*)(cudaGauge->even), (float4*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge, 
-			    gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-	}
-      }
-      
-  } else if (cuda_prec == QUDA_HALF_PRECISION) {
-    if (cpu_prec == QUDA_DOUBLE_PRECISION){
-      if (reconstruct == QUDA_RECONSTRUCT_NO){	  
-	loadGaugeField_mg((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge, 
-			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-	
-      }else{
-	loadGaugeField_mg((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (double*)cpuGauge, (double*)ghost_gauge,
-			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);	      
-      }
-      }
-    else if (cpu_prec == QUDA_SINGLE_PRECISION){
-      if (reconstruct == QUDA_RECONSTRUCT_NO){	  
-	loadGaugeField_mg((short2*)(cudaGauge->even), (short2*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge,
-			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-      }else{
-	loadGaugeField_mg((short4*)(cudaGauge->even), (short4*)(cudaGauge->odd), (float*)cpuGauge, (float*)ghost_gauge,
-			  gauge_order, cudaGauge->reconstruct, cudaGauge->bytes, cudaGauge->volume, pad, Vsh, num_faces, type);
-      }
-    }
-  }
-}
 
 
 

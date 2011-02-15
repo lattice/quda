@@ -37,7 +37,7 @@ extern "C" {
   int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField **x, 
 			     cudaColorSpinorField b, QudaInvertParam *param, double *offsets, 
 			     int num_offsets, double *residue_sq);
-  
+
   // defined in inv_bicgstab_cuda.cpp
 
   void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,

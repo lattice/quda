@@ -10,12 +10,26 @@
 #include <util_quda.h>
 #include <sys/time.h>
 
-/* 
- * The lowest mass is in offsets[0]
- * The calling function must take care of that
+
+
+/*!
+ * Generic Multi Shift Solver 
+ * 
+ * For staggered, the mass is folded into the dirac operator
+ * Otherwise the matrix mass is 'unmodified'. 
+ *
+ * THe lowest offset is in offsets[0]
+ *
  */
-int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField **x, cudaColorSpinorField b,
-			   QudaInvertParam *invert_param, double *offsets, int num_offsets, double *residue_sq)
+
+int invertMultiShiftCgCuda(const DiracMatrix &mat, 
+			   const DiracMatrix &matSloppy, 
+			   cudaColorSpinorField **x, 
+			   cudaColorSpinorField b,
+			   QudaInvertParam *invert_param, 
+			   double *offsets, 
+			   int num_offsets, 
+			   double *residue_sq)
 {
   
   if (num_offsets == 0) {
@@ -23,7 +37,6 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy,
   }
 
   int finished[num_offsets];
-  double shifts[num_offsets];
   double zeta_i[num_offsets], zeta_im1[num_offsets], zeta_ip1[num_offsets];
   double beta_i[num_offsets], beta_im1[num_offsets], alpha[num_offsets];
   int i, j;
@@ -32,7 +45,6 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy,
   int num_offsets_now = num_offsets;
   for (i=0; i<num_offsets; i++) {
     finished[i] = 0;
-    shifts[i] = offsets[i] - offsets[0];
     zeta_im1[i] = zeta_i[i] = 1.0;
     beta_im1[i] = -1.0;
     alpha[i] = 0.0;
@@ -87,7 +99,9 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy,
     //dslashCuda_st(tmp_sloppy, fatlinkSloppy, longlinkSloppy, p[0], 1 - oddBit, 0);
     //dslashAxpyCuda(Ap, fatlinkSloppy, longlinkSloppy, tmp_sloppy, oddBit, 0, p[0], msq_x4);
     matSloppy(*Ap, *p[0]);
-    
+    if (invert_param->dslash_type != QUDA_ASQTAD_DSLASH){
+      axpyCuda(offsets[0], *p[0], *Ap);
+    }
     pAp = reDotProductCuda(*p[0], *Ap);
     beta_i[0] = r2 / pAp;        
 
@@ -95,7 +109,7 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy,
     for (j=1; j<num_offsets_now; j++) {
       zeta_ip1[j] = zeta_i[j] * zeta_im1[j] * beta_im1[j_low];
       double c1 = beta_i[j_low] * alpha[j_low] * (zeta_im1[j]-zeta_i[j]);
-      double c2 = zeta_im1[j] * beta_im1[j_low] * (1.0+shifts[j]*beta_i[j_low]);
+      double c2 = zeta_im1[j] * beta_im1[j_low] * (1.0+(offsets[j]-offsets[0])*beta_i[j_low]);
       /*THISBLOWSUP
 	zeta_ip1[j] /= c1 + c2;
 	beta_i[j] = beta_i[j_low] * zeta_ip1[j] / zeta_i[j];
@@ -169,7 +183,7 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy,
   *residue_sq = r2;
 
   invert_param->secs = stopwatchReadSeconds();
-    
+     
   if (k==invert_param->maxiter) {
     warningQuda("Exceeded maximum iterations %d\n", invert_param->maxiter);
   }
@@ -181,14 +195,28 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy,
 
   invert_param->gflops = gflops;
   invert_param->iter = k;
-  //#if 0
-  // Calculate the true residual
-  mat(*r, *x[0]);    
+  
+  // Calculate the true residual of the system with the smallest shift
+  mat(*r, *x[0]); 
+  axpyCuda(offsets[0],*x[0], *r); // Offset it.
+
   double true_res = xmyNormCuda(b, *r);
   if (invert_param->verbosity >= QUDA_SUMMARIZE){
     printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
 	       k,r2, (true_res / b2));
   }    
+  if (invert_param->verbosity >= QUDA_VERBOSE){
+    printfQuda("Converged after %d iterations\n", k);
+    printfQuda(" shift=0 resid_rel=%e\n", sqrt(true_res/b2));
+    for(int i=1; i < num_offsets; i++) { 
+      mat(*r, *x[i]); 
+      axpyCuda(offsets[i],*x[i], *r); // Offset it.
+      true_res = xmyNormCuda(b, *r);
+      printfQuda(" shift=%d resid_rel=%e\n",i, sqrt(true_res/b2));
+    }
+  }
+  
+
   //#endif
     
   
