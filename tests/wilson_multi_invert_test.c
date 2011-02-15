@@ -168,7 +168,7 @@ int main(int argc, char **argv)
   
   // perform the inversion
   double resid_sq;
-  invertMultiShiftQudaGeneric(spinorOut, spinorIn, &inv_param,
+  invertMultiShiftQuda(spinorOut, spinorIn, &inv_param,
 			      offsets, num_offsets, &resid_sq);
 
   // stop the timer
