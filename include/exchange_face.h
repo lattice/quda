@@ -10,12 +10,18 @@ extern "C" {
   void exchange_cpu_links(void** fatlink, void* ghost_fatlink, 
 			  void** longlink, void* ghost_longlink,
 			  QudaPrecision gPrecision);
-  void exchange_cpu_links4dir(int* X,
-			      void** fatlink,
+  void exchange_cpu_links4dir(void** fatlink,
 			      void** ghost_fatlink,
 			      void** longlink,
 			      void** ghost_longlink,
 			      QudaPrecision gPrecision);
+  void exchange_fat_link4dir( void** fatlink,
+			      void** ghost_fatlink,
+			      QudaPrecision gPrecision);
+  void exchange_long_link4dir(void** longlink,
+			      void** ghost_longlink,
+			      QudaPrecision gPrecision);
+
   void exchange_fat_link(void** fatlink, void* ghost_fatlink, QudaPrecision gPrecision);
   void exchange_long_link(void** longlink, void* ghost_longlink, QudaPrecision gPrecision);
 

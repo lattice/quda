@@ -569,6 +569,47 @@ static void packQDPGaugeField_ghost(FloatN *d_gauge, Float **h_gauge, Float* gho
 
 
 
+template <typename Float, typename FloatN>
+static void packQDPGaugeField_ghost4dir(FloatN *d_gauge, Float **h_gauge,
+					Float** ghost_gauge,
+					int oddBit,  ReconstructType reconstruct, int Vh, int pad,
+					int* Vsh,
+					int num_faces,
+					QudaLinkType type)
+{
+  if (reconstruct == QUDA_RECONSTRUCT_12) {
+    //ghost gauge
+    int dir;
+    for(dir=0;dir < 4;dir++){
+      Float* g = ghost_gauge[dir] + oddBit*num_faces*Vsh[dir]*18;
+      for(int i=0; i < num_faces*Vsh[dir]; i++){
+        pack12(d_gauge+Vh+i, g + i*18, dir, Vh+pad);
+      }
+    }
+
+  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+    //ghost gauge
+    int dir;
+    for(dir=0; dir < 4; dir++){
+      Float* g = ghost_gauge[dir] + oddBit*num_faces*Vsh[dir]*18;
+      for(int i=0; i < num_faces*Vsh[dir]; i++){
+        pack8(d_gauge+Vh+i, g + i*18, dir, Vh+pad);
+      }
+    }
+  } else { //18 reconstruct
+    int dir;
+    Float* g;
+    //FIXME: half precision not supported yet
+    //ghost gauge
+    for(dir =0; dir < 4; dir++){
+      g = ghost_gauge[dir] + oddBit*num_faces*Vsh[dir]*18;
+      for(int i=0; i < num_faces*Vsh[dir]; i++){
+        pack18(d_gauge+Vh+i, g + i*18, dir, Vh+pad);
+      }
+    }
+    
+  }// 18 reconstruct
+}
 
 
 
@@ -727,7 +768,7 @@ void freeGaugeField(FullGauge *cudaGauge) {
 
 template <typename Float, typename FloatN>
 static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFieldOrder gauge_order,
-			   ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh, QudaLinkType type) {
+			   ReconstructType reconstruct, int bytes, int Vh, int pad, int* Vsh, QudaLinkType type) {
   
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
@@ -759,29 +800,37 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
 #ifdef MULTI_GPU
 #ifdef GPU_STAGGERED_DIRAC
   QudaPrecision precision = (QudaPrecision) sizeof(Float);
-  void*  ghost_link = NULL;
+  void*  ghost_link[4];
   int num_faces=1;
   if(type == QUDA_ASQTAD_FAT_LINKS){
     num_faces=1;
-    ghost_link = malloc(2*Vsh*gaugeSiteSize*precision);
-    if(ghost_link == NULL){
-      errorQuda("malloc failed for ghost_fatlink\n");
+    for(int i=0;i < 4;i++){
+      ghost_link[i] = malloc(2*Vsh[i]*gaugeSiteSize*precision);
+      if(ghost_link[i] == NULL){
+	errorQuda("malloc failed for ghost_fatlink\n");
+      }
     }
-    exchange_fat_link((void**)cpuGauge, ghost_link, precision);
+    exchange_fat_link4dir((void**)cpuGauge, ghost_link, precision);
 
   }else if(type == QUDA_ASQTAD_LONG_LINKS){
     num_faces=3;
-    ghost_link = malloc(6*Vsh*gaugeSiteSize*precision);
-    if(ghost_link == NULL){
-      errorQuda("malloc failed for ghost longlink\n");
+    for(int i=0;i < 4; i++){
+      ghost_link[i] = malloc(6*Vsh[i]*gaugeSiteSize*precision);
+      if(ghost_link[i] == NULL){
+	errorQuda("malloc failed for ghost longlink\n");
+      }
     }
-    exchange_long_link((void**)cpuGauge, ghost_link, precision);
+    exchange_long_link4dir((void**)cpuGauge, ghost_link, precision);
   }
 
-  packQDPGaugeField_ghost(packedEven, (Float**)cpuGauge, (Float*)ghost_link, 0, reconstruct, Vh, pad, Vsh, num_faces, type);
-  packQDPGaugeField_ghost(packedOdd,  (Float**)cpuGauge, (Float*)ghost_link, 1, reconstruct, Vh, pad, Vsh, num_faces, type);
+  //packQDPGaugeField_ghost(packedEven, (Float**)cpuGauge, (Float*)ghost_link[3], 0, reconstruct, Vh, pad, Vsh[3], num_faces, type);
+  //packQDPGaugeField_ghost(packedOdd,  (Float**)cpuGauge, (Float*)ghost_link[3], 1, reconstruct, Vh, pad, Vsh[3], num_faces, type);
+  packQDPGaugeField_ghost4dir(packedEven, (Float**)cpuGauge, (Float**)ghost_link, 0, reconstruct, Vh, pad, Vsh, num_faces, type);
+  packQDPGaugeField_ghost4dir(packedOdd,  (Float**)cpuGauge, (Float**)ghost_link, 1, reconstruct, Vh, pad, Vsh, num_faces, type);
   
-  free(ghost_link);
+  for(int i=0;i < 4;i++){
+    free(ghost_link[i]);
+  }
 #else
   QudaPrecision precision = (QudaPrecision) sizeof(even->x);
   int veclength = sizeof(FloatN)/precision;
@@ -886,7 +935,12 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
   
   allocateGaugeField(cudaGauge, reconstruct, cuda_prec);
 
-  int Vsh = XX[0]*XX[1]*XX[2]/2;
+  int Vsh[4];
+  Vsh[0]= XX[1]*XX[2]*XX[3]/2;
+  Vsh[1]= XX[0]*XX[2]*XX[3]/2;
+  Vsh[2]= XX[0]*XX[1]*XX[3]/2;
+  Vsh[3]= XX[0]*XX[1]*XX[2]/2;
+
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
 
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {

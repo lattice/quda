@@ -17,7 +17,7 @@
 #include <mpi.h>
 #endif
 
-
+#define MAX(a,b) ((a)>(b)?(a):(b))
 #define mySpinorSiteSize 6
 
 void *fatlink[4];
@@ -217,12 +217,12 @@ invert_test(void)
 		 &gaugeParam);
    }else{
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-    gaugeParam.ga_pad = Vsh;
+    gaugeParam.ga_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(fatlink, &gaugeParam);
     
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-    gaugeParam.ga_pad = 3*Vsh;
+    gaugeParam.ga_pad = 3*MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);

@@ -592,39 +592,37 @@ do_exchange_cpu_link(Float** cpulink,
 }
 
 
-void exchange_cpu_links4dir(int* X,
-			    void** fatlink,
-			    void** ghost_fatlink,
-			    void** longlink,
-			    void** ghost_longlink,
-			    QudaPrecision gPrecision)
+void exchange_fat_link4dir(void** fatlink,
+			   void** ghost_fatlink,
+			   QudaPrecision gPrecision)
 {
-
-
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    dims[d] = X[d];
-  }
-  Vh = V/2;
-
-  Vs_x = X[1]*X[2]*X[3];
-  Vs_y = X[0]*X[2]*X[3];
-  Vs_z = X[0]*X[1]*X[3];
-  Vs_t = X[0]*X[1]*X[2];
-
-  Vsh_x = Vs_x/2;
-  Vsh_y = Vs_y/2;
-  Vsh_z = Vs_z/2;
-  Vsh_t = Vs_t/2;
-
-  Vs = Vs_t;
-
   void* fatlink_sendbuf[4];
   fatlink_sendbuf[0] = malloc(Vs_x*gaugeSiteSize*gPrecision);
   fatlink_sendbuf[1] = malloc(Vs_y*gaugeSiteSize*gPrecision);
   fatlink_sendbuf[2] = malloc(Vs_z*gaugeSiteSize*gPrecision);
   fatlink_sendbuf[3] = malloc(Vs_t*gaugeSiteSize*gPrecision);
+
+  if (fatlink_sendbuf[0]==NULL || fatlink_sendbuf[1]==NULL ||
+      fatlink_sendbuf[2]==NULL || fatlink_sendbuf[3]==NULL){
+    printfQuda("ERROR: malloc failed for fatlink_sendbuf\n");
+  }
+
+  if (gPrecision == QUDA_DOUBLE_PRECISION){    
+    do_exchange_cpu_link((double**)fatlink, (double**)ghost_fatlink, (double**)fatlink_sendbuf, 1);
+  }else{ //single
+    do_exchange_cpu_link((float**)fatlink, (float**)ghost_fatlink, (float**)fatlink_sendbuf, 1);
+  }
+  
+  for(int i=0;i < 4;i++){
+    free(fatlink_sendbuf[i]);
+  }
+}
+
+void exchange_long_link4dir(void** longlink,
+			    void** ghost_longlink,
+			    QudaPrecision gPrecision)
+{
+  
 
   void* longlink_sendbuf[4];
   longlink_sendbuf[0] = malloc(3*Vs_x*gaugeSiteSize*gPrecision);
@@ -632,28 +630,29 @@ void exchange_cpu_links4dir(int* X,
   longlink_sendbuf[2] = malloc(3*Vs_z*gaugeSiteSize*gPrecision);
   longlink_sendbuf[3] = malloc(3*Vs_t*gaugeSiteSize*gPrecision);
   
-  if (fatlink_sendbuf[0]==NULL || fatlink_sendbuf[1]==NULL ||
-      fatlink_sendbuf[2]==NULL || fatlink_sendbuf[3]==NULL || 
-      longlink_sendbuf[0]==NULL || longlink_sendbuf[1]==NULL ||
+  if (longlink_sendbuf[0]==NULL || longlink_sendbuf[1]==NULL ||
       longlink_sendbuf[2]==NULL || longlink_sendbuf[3]==NULL){
-    printf("ERROR: malloc failed for fatlink_sendbuf/longlink_sendbuf\n");
-    exit(1);
-  }
-
-
+    printfQuda("ERROR: malloc failed for longlink_sendbuf\n");
+  }  
 
   if (gPrecision == QUDA_DOUBLE_PRECISION){    
-    do_exchange_cpu_link((double**)fatlink, (double**)ghost_fatlink, (double**)fatlink_sendbuf, 1);
     do_exchange_cpu_link((double**)longlink, (double**)ghost_longlink, (double**)longlink_sendbuf, 3);
   }else{ //single
-    do_exchange_cpu_link((float**)fatlink, (float**)ghost_fatlink, (float**)fatlink_sendbuf, 1);
     do_exchange_cpu_link((float**)longlink, (float**)ghost_longlink, (float**)longlink_sendbuf, 3);
   }
   
   for(int i=0;i < 4;i++){
-    free(fatlink_sendbuf[i]);
     free(longlink_sendbuf[i]);
   }
+}
+void exchange_cpu_links4dir(void** fatlink,
+			    void** ghost_fatlink,
+			    void** longlink,
+			    void** ghost_longlink,
+			    QudaPrecision gPrecision)
+{
+  exchange_fat_link4dir(fatlink, ghost_fatlink, gPrecision);
+  exchange_long_link4dir(longlink, ghost_longlink, gPrecision);
 }
 
 

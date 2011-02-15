@@ -17,6 +17,7 @@ extern "C" {
 #define Z_FWD_NBR  7
 #define T_FWD_NBR  8
 
+void            comm_set_gridsize(int x, int y, int z, int t);
 void		comm_init(void);
 int		comm_rank(void);
 int		comm_size(void);

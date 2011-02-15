@@ -209,7 +209,7 @@ void init()
     errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
   //exchange_cpu_links(fatlink, ghost_fatlink[3], longlink, ghost_longlink[3], gaugeParam.cpu_prec);
-  exchange_cpu_links4dir(gaugeParam.X, fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif   
 
   
@@ -229,7 +229,7 @@ void init()
   
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
 #ifdef MULTI_GPU
-  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;  
+  gaugeParam.ga_pad = 3*pad_size;
 #endif
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
   loadGaugeQuda(longlink, &gaugeParam);
@@ -495,10 +495,11 @@ void usage(char** argv )
 
 int main(int argc, char **argv) 
 {
-#ifdef MULTI_GPU
-  MPI_Init (&argc, &argv);
-  comm_init();
-#endif
+
+  int xsize=1;
+  int ysize=1;
+  int zsize=1;
+  int tsize=1;
 
   int i;
   for (i =1;i < argc; i++){
@@ -583,11 +584,73 @@ int main(int argc, char **argv)
       continue;	    
     }	
 
+    if( strcmp(argv[i], "--xgridsize") == 0){
+      if (i+1 >= argc){ 
+        usage(argv);
+      }     
+      xsize =  atoi(argv[i+1]);
+      if (xsize <= 0 ){
+        fprintf(stderr, "Error: invalid X grid size\n");
+        exit(1);
+      }
+      i++;
+      continue;     
+    }
+
+    if( strcmp(argv[i], "--ygridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      ysize =  atoi(argv[i+1]);
+      if (ysize <= 0 ){
+        fprintf(stderr, "Error: invalid Y grid size\n");
+        exit(1); 
+      }
+      i++;
+      continue;     
+    }
+
+    if( strcmp(argv[i], "--zgridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      zsize =  atoi(argv[i+1]);
+      if (zsize <= 0 ){
+        fprintf(stderr, "Error: invalid Z grid size\n");
+        exit(1);
+      }
+      i++;
+      continue;
+    }
+
+    if( strcmp(argv[i], "--tgridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      tsize =  atoi(argv[i+1]);
+      if (tsize <= 0 ){
+        fprintf(stderr, "Error: invalid T grid size\n");
+        exit(1); 
+      }
+      i++;
+      continue;
+    }
+
+
+
+
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
 
   display_test_info();
+
+#ifdef MULTI_GPU
+  MPI_Init (&argc, &argv);  
+  comm_set_gridsize(xsize, ysize, zsize, tsize);  
+  comm_init();
+#endif
+
 
   int ret =1;
   int accuracy_level = dslashTest();
