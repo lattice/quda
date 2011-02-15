@@ -1,26 +1,28 @@
 
-Version 0.3.2 - x January 2011
+Version 0.4.0
 
 - Enabled arbitrary volumes for all Dirac operators.
 
 - Added auto-tuning for the Dirac operators.  This is controlled with
   a new InvertParam member, "dirac_tune".  For multiple inversions,
-  this tuning can be remembered between solves setting "preserve_dirac".
+  this tuning can be remembered between solves by setting
+  "preserve_dirac".
 
 - Added debug compile options to make.inc.example to allow for easier
   debugging.
 
-- Fixed a critical bug in the half precision complex reductions.
-
 - Added CPU versions of all blas functions and added unit tests for
-  each one to the blas_test.cu.
+  each one to tests/blas_test.cu.
 
-- Merged in the multi-GPU branch.  This parallelizes between multiple
-  GPUs through splitting in the temporal dimension only.  The QMP
-  library is required to enable this functionality.  Currently, only
-  Wilson, clover and twisted mass fermions are supported.  Future
-  revisions will enable this functionality for domain wall and
-  staggered fermions.
+- Added support for using multiple GPUs in parallel via MPI or QMP.
+  [TODO: details]
+
+
+Version 0.3.2 - 18 January 2011
+
+- Fixed a regression in 0.3.1 that prevented the BiCGstab solver from
+  working correctly with half precision on Fermi.
+
 
 Version 0.3.1 - 22 December 2010
 
