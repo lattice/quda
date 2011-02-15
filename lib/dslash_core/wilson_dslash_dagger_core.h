@@ -1329,7 +1329,7 @@ o32_re = o32_im = 0;
           sp_stride_t = Vs;
           sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)
     #if (DD_PREC==2)
-          sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer
+          sp_norm_idx = sid - (Vh - Vs) + sp_stride;
     #endif
         } else {
           sp_stride_t = sp_stride;
@@ -1538,11 +1538,11 @@ o32_re = o32_im = 0;
     #else
     #define sp_norm_idx sp_idx
     #endif
-        if (x4 == 0) { // back face (upper spin components)
+        if (x4 == 0) { // back face
           sp_stride_t = Vs;
           sp_idx = sid + SPINOR_HOP*sp_stride;
     #if (DD_PREC==2)
-          sp_norm_idx = sid + sp_stride;
+          sp_norm_idx = sid + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer
     #endif
         } else {
           sp_stride_t = sp_stride;

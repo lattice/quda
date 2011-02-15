@@ -370,7 +370,10 @@ def gen(dir):
         str.append("      sp_stride_t = Vs;\n")
         str.append("      sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)\n")
         str.append("#if (DD_PREC==2)\n")
-        str.append("      sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer\n")
+        if not dagger:
+            str.append("      sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer\n")
+        else:
+            str.append("      sp_norm_idx = sid - (Vh - Vs) + sp_stride;\n")
         str.append("#endif\n")
         str.append("    } else {\n")
         str.append("      sp_stride_t = sp_stride;\n")
@@ -394,11 +397,14 @@ def gen(dir):
         str.append("#else\n")
         str.append("#define sp_norm_idx sp_idx\n")
         str.append("#endif\n")
-        str.append("    if (x4 == 0) { // back face (upper spin components)\n")
+        str.append("    if (x4 == 0) { // back face\n")
         str.append("      sp_stride_t = Vs;\n")
         str.append("      sp_idx = sid + SPINOR_HOP*sp_stride;\n")
         str.append("#if (DD_PREC==2)\n")
-        str.append("      sp_norm_idx = sid + sp_stride;\n")
+        if not dagger:
+            str.append("      sp_norm_idx = sid + sp_stride;\n")
+        else:
+            str.append("      sp_norm_idx = sid + sp_stride + Vs; // need extra Vs addition since we require the lower norm buffer\n")
         str.append("#endif\n")
         str.append("    } else {\n")
         str.append("      sp_stride_t = sp_stride;\n")
