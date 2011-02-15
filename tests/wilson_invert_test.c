@@ -10,6 +10,7 @@
 #ifdef QMP_COMMS
 #include <qmp.h>
 #endif
+
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
@@ -26,6 +27,10 @@ int main(int argc, char **argv)
   // set QUDA parameters
 
   int device = 0; // CUDA device number
+
+  QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
+  //QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+  //QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
@@ -51,17 +56,17 @@ int main(int argc, char **argv)
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  int clover_yes = 0; // 0 for plain Wilson, 1 for clover
-  
-  if (clover_yes) {
-    inv_param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-  } else {
-    inv_param.dslash_type = QUDA_WILSON_DSLASH;
-  }
+  inv_param.dslash_type = dslash_type;
   inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
   double mass = -0.9;
   inv_param.kappa = 1.0 / (2.0*(1 + 3/gauge_param.anisotropy + mass));
+
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+    inv_param.mu = 0.1;
+    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+  }
+
   inv_param.tol = 5e-8;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 0.001;
@@ -89,7 +94,7 @@ int main(int argc, char **argv)
   inv_param.sp_pad = 0; // 24*24*24/2;
   inv_param.cl_pad = 0; // 24*24*24/2;
 
-  if (clover_yes) {
+  if (dslash_type = QUDA_CLOVER_WILSON_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
@@ -112,7 +117,7 @@ int main(int argc, char **argv)
   }
   construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
 
-  if (clover_yes) {
+  if (dslash_type = QUDA_CLOVER_WILSON_DSLASH) {
     double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
@@ -151,49 +156,60 @@ int main(int argc, char **argv)
   // initialize the QUDA library
   initQuda(device);
 
-  for(int i=0; i < 2; i++) { 
-    // load the gauge field
-    loadGaugeQuda((void*)gauge, &gauge_param);
+  // load the gauge field
+  loadGaugeQuda((void*)gauge, &gauge_param);
 
-    // load the clover term, if desired
-    if (clover_yes) loadCloverQuda(clover, clover_inv, &inv_param);
-    
-    // perform the inversion
-    invertQuda(spinorOut, spinorIn, &inv_param);
+  // load the clover term, if desired
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
+  
+  // perform the inversion
+  invertQuda(spinorOut, spinorIn, &inv_param);
 
-    // stop the timer
-    time0 += clock();
-    time0 /= CLOCKS_PER_SEC;
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
     
-    printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
-	   inv_param.spinorGiB, gauge_param.gaugeGiB);
-    if (clover_yes) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
-    printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-	   inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
+	 inv_param.spinorGiB, gauge_param.gaugeGiB);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
+  printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
     
-    if (inv_param.solution_type == QUDA_MAT_SOLUTION) { 
-      mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, 
-	  inv_param.cpu_prec, gauge_param.cpu_prec); 
-      if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-	ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-    } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
-      matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
-	    inv_param.cpu_prec, gauge_param.cpu_prec);
-      if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION)
-	ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
+    if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+      tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
+	     0, inv_param.cpu_prec, gauge_param.cpu_prec); 
+    } else {
+      wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, 
+	      inv_param.cpu_prec, gauge_param.cpu_prec);
     }
-    
-    
-    mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-    double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-    double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-    printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
-    
-    freeGaugeQuda();
-    if (clover_yes) freeCloverQuda();
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+      ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    }
+  } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
+    if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+      tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
+	    inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+    } else {
+      wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+		inv_param.cpu_prec, gauge_param.cpu_prec);
+    }
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+      ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    }
   }
-    // finalize the QUDA library
+
+  mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+  double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+  double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
+  printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+    
+  freeGaugeQuda();
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) freeCloverQuda();
+
+  // finalize the QUDA library
   endQuda();
+
 #ifdef QMP_COMMS
   QMP_finalize_msg_passing();
 #endif

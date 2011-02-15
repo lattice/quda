@@ -9,7 +9,6 @@ HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h  
 
 TESTS = su3_test blas_test pack_test $(WILSON_DIRAC_TEST) 		\
 	$(STAGGERED_DIRAC_TEST) $(DOMAIN_WALL_DIRAC_TEST)		\
-	$(TWISTED_MASS_DIRAC_TEST) \
 	$(FATLINK_TEST) $(GAUGE_FORCE_TEST) $(FERMION_FORCE_TEST)
 
 all: $(TESTS)
@@ -33,13 +32,6 @@ domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslas
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 domain_wall_invert_test: domain_wall_invert_test.o test_util.o domain_wall_dslash_reference.o \
-	blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
-
-twisted_mass_dslash_test: twisted_mass_dslash_test.o test_util.o twisted_mass_dslash_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
-
-twisted_mass_invert_test: twisted_mass_invert_test.o test_util.o twisted_mass_dslash_reference.o \
 	blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 

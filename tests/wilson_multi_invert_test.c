@@ -186,8 +186,8 @@ int main(int argc, char **argv)
   for(int i=0; i < num_offsets; i++) {
     ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
 
-    matpc(spinorCheck2, gauge, spinorOut[i], inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
-    matpc(spinorCheck, gauge, spinorCheck2, inv_param.kappa, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param.cpu_prec);
+    wil_matpc(spinorCheck2, gauge, spinorOut[i], inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+    wil_matpc(spinorCheck, gauge, spinorCheck2, inv_param.kappa, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param.cpu_prec);
     axpy(offsets[i], spinorOut[i], spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
