@@ -1538,7 +1538,7 @@ o32_re = o32_im = 0;
     #else
     #define sp_norm_idx sp_idx
     #endif
-        if (x4 == 0) { // back face (upper spin components)
+        if (x4 == 0) { // back face
           sp_stride_t = Vs;
           sp_idx = sid + SPINOR_HOP*sp_stride;
     #if (DD_PREC==2)
