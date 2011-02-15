@@ -14,6 +14,113 @@ static int num_nodes;
 extern int getGpuCount();
 static int which_gpu =-1;
 
+static int x_fwd_nbr=-1;
+static int y_fwd_nbr=-1;
+static int z_fwd_nbr=-1;
+static int t_fwd_nbr=-1;
+static int x_back_nbr=-1;
+static int y_back_nbr=-1;
+static int z_back_nbr=-1;
+static int t_back_nbr=-1;
+
+static int xgridsize=1;
+static int ygridsize=1;
+static int zgridsize=1;
+static int tgridsize=1;
+static int xgridid = -1;
+static int ygridid = -1;
+static int zgridid = -1;
+static int tgridid = -1;
+
+void
+comm_set_gridsize(int x, int y, int z, int t)
+{
+  xgridsize = x;
+  ygridsize = y;
+  zgridsize = z;
+  tgridsize = t;
+
+  return;
+}
+
+
+static void
+comm_partition(void)
+{
+  /*
+  printf("xgridsize=%d\n", xgridsize);
+  printf("ygridsize=%d\n", ygridsize);
+  printf("zgridsize=%d\n", zgridsize);
+  printf("tgridsize=%d\n", tgridsize);
+  */
+  if(xgridsize*ygridsize*zgridsize*tgridsize != size){
+    if (rank ==0){
+      printf("ERROR: Invalid configuration (t,z,y,x gridsize=%d %d %d %d) "
+             "but # of MPI processes is %d\n", tgridsize, zgridsize, ygridsize, xgridsize, size);
+    }
+    comm_exit(1);
+  }
+
+  int leftover;
+
+  tgridid  = rank/(zgridsize*ygridsize*xgridsize);
+  leftover = rank%(zgridsize*ygridsize*xgridsize);
+  zgridid  = leftover/(ygridsize*xgridsize);
+  leftover = leftover%(ygridsize*xgridsize);
+  ygridid  = leftover/xgridsize;
+  xgridid  = leftover%xgridsize;
+
+  //printf("My rank: %d, gridid(t,z,y,x): %d %d %d %d\n", rank, tgridid, zgridid, ygridid, xgridid);
+
+
+  int xid, yid, zid, tid;
+  //X direction neighbors
+  yid =ygridid;
+  zid =zgridid;
+  tid =tgridid;
+  xid=(xgridid +1)%xgridsize;
+  x_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  xid=(xgridid -1+xgridsize)%xgridsize;
+  x_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+
+  //Y direction neighbors
+  xid =xgridid;
+  zid =zgridid;
+  tid =tgridid;
+  yid =(ygridid+1)%ygridsize;
+  y_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  yid=(ygridid -1+ygridsize)%ygridsize;
+  y_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+
+  //Z direction neighbors
+  xid =xgridid;
+  yid =ygridid;
+  tid =tgridid;
+  zid =(zgridid+1)%zgridsize;
+  z_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  zid=(zgridid -1+zgridsize)%zgridsize;
+  z_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+
+  //Z direction neighbors
+  xid =xgridid;
+  yid =ygridid;
+  zid =zgridid;
+  tid =(tgridid+1)%tgridsize;
+  t_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  tid=(tgridid -1+tgridsize)%tgridsize;
+  t_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+
+  /*
+  printf("MPI rank: x_fwd_nbr=%d, x_back_nbr=%d\n", x_fwd_nbr, x_back_nbr);
+  printf("MPI rank: y_fwd_nbr=%d, y_back_nbr=%d\n", y_fwd_nbr, y_back_nbr);
+  printf("MPI rank: z_fwd_nbr=%d, z_back_nbr=%d\n", z_fwd_nbr, z_back_nbr);
+  printf("MPI rank: t_fwd_nbr=%d, t_back_nbr=%d\n", t_fwd_nbr, t_back_nbr);
+  */
+
+}
+
+
+
 void 
 comm_init()
 {
@@ -30,6 +137,7 @@ comm_init()
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  comm_partition();
 
   back_nbr = (rank -1 + size)%size;
   fwd_nbr = (rank +1)%size;
@@ -122,6 +230,53 @@ comm_send(void* buf, int len, int dst)
 }
 
 unsigned long
+comm_send_with_tag(void* buf, int len, int dst, int tag)
+{
+
+  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  if (request == NULL){
+    printf("ERROR: malloc failed for mpi request\n");
+    comm_exit(1);
+  }
+
+  int dstproc = -1;
+  switch(dst){
+  case X_BACK_NBR:
+    dstproc = x_back_nbr;
+    break;
+  case X_FWD_NBR:
+    dstproc = x_fwd_nbr;
+    break;
+  case Y_BACK_NBR:
+    dstproc = y_back_nbr;
+    break;
+  case Y_FWD_NBR:
+    dstproc = y_fwd_nbr;
+    break;
+  case Z_BACK_NBR:
+    dstproc = z_back_nbr;
+    break;
+  case Z_FWD_NBR:
+    dstproc = z_fwd_nbr;
+    break;
+  case T_BACK_NBR:
+    dstproc = t_back_nbr;
+    break;
+  case T_FWD_NBR:
+    dstproc = t_fwd_nbr;
+    break;
+  default:
+    printf("ERROR: invalid dest, line %d, file %s\n", __LINE__, __FILE__);
+    comm_exit(1);
+  }
+
+  MPI_Isend(buf, len, MPI_BYTE, dstproc, tag, MPI_COMM_WORLD, request);
+  return (unsigned long)request;
+}
+
+
+
+unsigned long
 comm_recv(void* buf, int len, int src)
 {
   MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
@@ -147,6 +302,51 @@ comm_recv(void* buf, int len, int src)
   
   return (unsigned long)request;
 }
+
+unsigned long
+comm_recv_with_tag(void* buf, int len, int src, int tag)
+{ 
+  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  if (request == NULL){
+    printf("ERROR: malloc failed for mpi request\n");
+    comm_exit(1);
+  }
+  
+  int srcproc=-1;
+  switch (src){
+  case X_BACK_NBR:
+    srcproc = x_back_nbr;
+    break;
+  case X_FWD_NBR:
+    srcproc = x_fwd_nbr;
+    break;
+  case Y_BACK_NBR:
+    srcproc = y_back_nbr;
+    break;
+  case Y_FWD_NBR:
+    srcproc = y_fwd_nbr;
+    break;
+  case Z_BACK_NBR:
+    srcproc = z_back_nbr;
+    break;
+  case Z_FWD_NBR:
+    srcproc = z_fwd_nbr;
+    break;
+  case T_BACK_NBR:
+    srcproc = t_back_nbr;
+    break;
+  case T_FWD_NBR:
+    srcproc = t_fwd_nbr;
+    break;
+  default:
+    printf("ERROR: invalid source, line %d, file %s\n", __LINE__, __FILE__);
+    comm_exit(1);
+  }
+  MPI_Irecv(buf, len, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);
+  
+  return (unsigned long)request;
+}
+
 
 
 //this request should be some return value from comm_recv

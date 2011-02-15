@@ -778,8 +778,8 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
     exchange_long_link((void**)cpuGauge, ghost_link, precision);
   }
 
-  packQDPGaugeField_ghost(packedEven, (Float**)cpuGauge, (Float*)ghost_gauge, 0, reconstruct, Vh, pad, Vsh, num_faces, type);
-  packQDPGaugeField_ghost(packedOdd,  (Float**)cpuGauge, (Float*)ghost_gauge, 1, reconstruct, Vh, pad, Vsh, num_faces, type);
+  packQDPGaugeField_ghost(packedEven, (Float**)cpuGauge, (Float*)ghost_link, 0, reconstruct, Vh, pad, Vsh, num_faces, type);
+  packQDPGaugeField_ghost(packedOdd,  (Float**)cpuGauge, (Float*)ghost_link, 1, reconstruct, Vh, pad, Vsh, num_faces, type);
   
   free(ghost_link);
 #else
