@@ -329,28 +329,23 @@ void FaceBuffer::scatterToEndZone(void *out, void *outNorm, int stride, int dagg
   // dagger: receive upper components forwards, receive lower components backwards
   bool upperBack = dagger? false : true;
 
-  if (!dagger) { 
-    // Not HC: send lower components back, receive them from forward
-    // lower components = buffers 4,5,6
-    QMP_finish_from_fwd;
-    
-    scatter12Float((char*)out, (char*)from_fwd_face, vecLength,
-		   Vs, V, stride, !upperBack, recFwdStrmIdx, precision); // LOWER
-    
-    if (precision == QUDA_HALF_PRECISION)
-      scatterNorm((float*)outNorm, (float*)((short*)from_fwd_face+12*Vs), 
-		  Vs, V, stride, !upperBack, recFwdStrmIdx);
-
-    QMP_finish_from_back;
-    
-    // Not H: Send upper components forward, receive them from back
-    scatter12Float((char*)out, (char*)from_back_face, vecLength,
-		   Vs, V, stride, upperBack, recBackStrmIdx, precision);  // Upper
-      
-    if (precision == QUDA_HALF_PRECISION)
-      scatterNorm((float*)outNorm, (float*)((short*)from_back_face+12*Vs),
-		  Vs, V, stride, upperBack, recBackStrmIdx); // Lower
-  }
+  QMP_finish_from_fwd;
+  
+  scatter12Float((char*)out, (char*)from_fwd_face, vecLength,
+		 Vs, V, stride, !upperBack, recFwdStrmIdx, precision); // LOWER
+  
+  if (precision == QUDA_HALF_PRECISION)
+    scatterNorm((float*)outNorm, (float*)((short*)from_fwd_face+12*Vs), 
+		Vs, V, stride, !upperBack, recFwdStrmIdx);
+  
+  QMP_finish_from_back;
+  
+  scatter12Float((char*)out, (char*)from_back_face, vecLength,
+		 Vs, V, stride, upperBack, recBackStrmIdx, precision);  // Upper
+  
+  if (precision == QUDA_HALF_PRECISION)
+    scatterNorm((float*)outNorm, (float*)((short*)from_back_face+12*Vs),
+		Vs, V, stride, upperBack, recBackStrmIdx); // Lower
 
 }
 
