@@ -395,9 +395,16 @@ void staggeredDslashRef()
 
     break;
   case 1: 
+#ifdef MULTI_GPU
+    staggered_dslash_mg4dir(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			    spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+			    inv_param.cpu_prec, gaugeParam.cpu_prec);    
+
+#else
     cpu_parity=1; //ODD
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
 		     inv_param.cpu_prec, gaugeParam.cpu_prec);
+#endif
     break;
   case 2:
     //mat(spinorRef->v, fatlink, longlink, spinor->v, kappa, dagger, 
@@ -418,8 +425,6 @@ static int dslashTest()
   init();
     
   int attempts = 1;
-
-  staggeredDslashRef();
     
   for (int i=0; i<attempts; i++) {
 	
@@ -430,6 +435,7 @@ static int dslashTest()
     }
       
     printfQuda("\n%fms per loop\n", 1000*secs);
+    staggeredDslashRef();
 	
     int flops = dirac->Flops();
     int link_floats = 8*gaugeParam.reconstruct+8*18;
