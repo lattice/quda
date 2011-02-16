@@ -36,15 +36,24 @@ class ColorSpinorParam {
   void *v; // pointer to field
   void *norm;
 
+  bool ghostDim[QUDA_MAX_DIM]; // which of the dimensions are we parallelizing
+
   ColorSpinorParam(const ColorSpinorField &a);
+
+  QudaVerbosity verbose;
 
  ColorSpinorParam()
    : fieldLocation(QUDA_INVALID_FIELD_LOCATION), nColor(0), nSpin(0), nDim(0), 
     precision(QUDA_INVALID_PRECISION), pad(0), twistFlavor(QUDA_TWIST_INVALID),
     siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
-    create(QUDA_INVALID_FIELD_CREATE)
-  { for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0;}
+    create(QUDA_INVALID_FIELD_CREATE), verbose(QUDA_SILENT)
+    { 
+      for(int d=0; d<QUDA_MAX_DIM; d++) {
+	x[d] = 0; 
+	ghostDim[d] = false;
+      }
+    }
   
   // used to create cpu params
  ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
@@ -53,11 +62,12 @@ class ColorSpinorParam {
     precision(inv_param.cpu_prec), pad(0), twistFlavor(inv_param.twist_flavor), 
     siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-    create(QUDA_REFERENCE_FIELD_CREATE), v(V)
+    create(QUDA_REFERENCE_FIELD_CREATE), v(V), verbose(inv_param.verbosity)
   { 
 
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
+    for (int d=0; d<nDim; d++) ghostDim[d] = false;
 
     if (!pc_solution) {
       x[0] *= 2;
@@ -92,10 +102,14 @@ class ColorSpinorParam {
     twistFlavor(cpuParam.twistFlavor), siteSubset(cpuParam.siteSubset), 
     siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
     gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-    create(QUDA_COPY_FIELD_CREATE), v(0)
+    create(QUDA_COPY_FIELD_CREATE), v(0), verbose(cpuParam.verbose)
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
+    for (int d=0; d<nDim; d++) ghostDim[d] = false;
+#ifdef MULTI_GPU
+    ghostDim[nDim-1] = true; // currently only parallelizing over outer most dimension
+#endif
 
     if (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) {
       fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -112,6 +126,7 @@ class ColorSpinorParam {
     printfQuda("twistFlavor = %d\n", twistFlavor);
     printfQuda("nDim = %d\n", nDim);
     for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
+    for (int d=0; d<nDim; d++) printfQuda("ghostDim[%d] = %d\n", d, ghostDim[d]);
     printfQuda("precision = %d\n", precision);
     printfQuda("pad = %d\n", pad);
     printfQuda("siteSubset = %d\n", siteSubset);
@@ -132,8 +147,11 @@ class ColorSpinorField {
  private:
   void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 	      QudaPrecision precision, int pad, QudaFieldLocation location, QudaSiteSubset subset, 
-	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
+	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
+	      const bool *ghostDim);
   void destroy();  
+
+  QudaVerbosity verbose;
 
  protected:
   bool init;
@@ -154,6 +172,11 @@ class ColorSpinorField {
   int real_length; // physical length only
   int length; // length including pads, but not ghost zone - used for BLAS
 
+  // multi-GPU parameters
+  bool ghostDim[QUDA_MAX_DIM];// which dimensions we are parallelizing
+  int ghostFace[QUDA_MAX_DIM];// the size of each face
+  int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
+
   int ghost_length; // length of ghost zone
   int ghost_norm_length; // length of ghost zone for norm
   int total_length; // total length of spinor (physical + pad + ghost)
@@ -171,6 +194,8 @@ class ColorSpinorField {
   // in the case of full fields, these are references to the even / odd sublattices
   ColorSpinorField *even;
   ColorSpinorField *odd;
+
+  void createGhostZone();
 
   // resets the above attributes based on contents of param
   void reset(const ColorSpinorParam &);
@@ -260,6 +285,31 @@ class cudaColorSpinorField : public ColorSpinorField {
 						    cudaColorSpinorField &y, cudaColorSpinorField &z, 
 						    cudaColorSpinorField &w, cudaColorSpinorField &u);
   
+  friend void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+			 const int parity, const int dagger, const cudaColorSpinorField *x,
+			 const double &k, const dim3 &block, const dim3 &blockFace);
+  friend void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover cloverInv,
+			       const cudaColorSpinorField *in, const int parity, const int dagger, 
+			       const cudaColorSpinorField *x, const double &a,
+			       const dim3 &block, const dim3 &blockFace);
+  friend void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
+				   const cudaColorSpinorField *in, const int parity, const int dagger, 
+				   const cudaColorSpinorField *x, const double &m_f, const double &k2,
+				   const dim3 &block, const dim3 &blockFace);
+  friend void staggeredDslashCuda(cudaColorSpinorField *out, void *outNorm, const FullGauge fatGauge, 
+				  const FullGauge longGauge, cudaColorSpinorField *in,
+				  const int parity, const int dagger, const cudaColorSpinorField *x,
+				  const double &k, const dim3 &block, const dim3 &blockFace);
+  friend void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
+				    const cudaColorSpinorField *in, const int parity, const int dagger, 
+				    const cudaColorSpinorField *x, const double &kappa, const double &mu, 
+				    const double &a, const dim3 &block, const dim3 &blockFace);
+
+  friend void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover clover, 
+			 const cudaColorSpinorField *in, const int parity, const dim3 &blockDim);
+  friend void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
+			      const int dagger, const double &kappa, const double &mu,
+			      const QudaTwistGamma5Type twist, const dim3 &block);
 
  private:
   void *v; // the field elements

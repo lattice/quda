@@ -3,8 +3,8 @@
 //
 
 static int blas_threads[23][3] = {
-  {  64,   96,   64},  // Kernel  0: copyCuda (high source precision)
-  {  96,  992,   64},  // Kernel  1: copyCuda (low source precision)
+  {  64,   64,   64},  // Kernel  0: copyCuda (high source precision)
+  {  64,  64,   64},  // Kernel  1: copyCuda (low source precision)
   { 128,  128,  128},  // Kernel  2: axpbyCuda
   { 128,  128,  128},  // Kernel  3: xpyCuda
   { 128,  128,  128},  // Kernel  4: axpyCuda

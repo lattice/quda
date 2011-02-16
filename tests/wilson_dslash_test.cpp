@@ -25,7 +25,7 @@ const int transfer = 0; // include transfer time in the benchmark?
 const int loops = 100;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_HALF_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -133,6 +133,10 @@ void init() {
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
   
+  for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
+  csParam.ghostDim[3] = true;
+  //csParam.verbose = QUDA_DEBUG_VERBOSE;
+
   spinor = new cpuColorSpinorField(csParam);
   spinorOut = new cpuColorSpinorField(csParam);
   spinorRef = new cpuColorSpinorField(csParam);

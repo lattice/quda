@@ -59,9 +59,7 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 
   double flavor_mu = in.twistFlavor * mu;
   
-  twistGamma5Cuda(out.v, out.norm, in.v, in.norm, dagger, kappa, flavor_mu, 
-  		  in.volume, in.bytes, in.norm_bytes, in.precision, twistType,
-		  blockTwist);
+  twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType, blockTwist);
 
   flops += 24*in.volume;
 }
@@ -208,9 +206,8 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     double flavor_mu = in.twistFlavor * mu;
     setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
-    twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
-    			  0, 0, kappa, flavor_mu, 0.0, out.volume, out.bytes, out.norm_bytes, 
-			  in.Precision(), blockDslash, blockDslashFace);
+    twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, 
+			  flavor_mu, 0.0, blockDslash, blockDslashFace);
     flops += (1320+72)*in.volume;
   } else { // safe to use tmp2 here which may alias in
     bool reset = newTmp(&tmp2, in);
@@ -245,9 +242,8 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   if (!dagger) {
     double flavor_mu = in.twistFlavor * mu;
     setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
-    twistedMassDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 
-			  x.v, x.norm, kappa, flavor_mu, k, out.volume, out.bytes, out.norm_bytes, 
-			  in.Precision(), blockDslashXpay, blockDslashXpayFace);
+    twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, 
+			  flavor_mu, k, blockDslashXpay, blockDslashXpayFace);
     flops += (1320+96)*in.volume;
   } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
     bool reset = newTmp(&tmp1, in);
