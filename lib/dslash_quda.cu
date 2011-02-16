@@ -836,44 +836,44 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
       staggeredDslashNoReconCuda<2>((double2*)out->v, (float*)out->norm, (double2*)fatGauge0, (double2*)fatGauge1,       
 				    (double2*)longGauge0, (double2*)longGauge1, longGauge.reconstruct, 
-				    (double2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
-				    (double2*)xv, (float*)xnorm, k, in->volume, Vsh, 
-				    in->x[3], in->length, in->ghost_length, in, block);
+				    (double2*)in->v, (float*)in->norm, parity, dagger, 
+				    (double2*)xv, (float*)x, k, in->volume, Vsh, 
+				    in->x[3], in->length, in->ghost_length, (cudaColorSpinorField*)in, block);
     }else{
       staggeredDslashCuda<2>((double2*)out->v, (float*)out->norm, (double2*)fatGauge0, (double2*)fatGauge1,
 			     (double2*)longGauge0, (double2*)longGauge1, longGauge.reconstruct, 
-			     (double2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
-			     (double2*)xv, (float*)xnorm, k, in->volume, Vsh, 
-			     in->x[3], in->length, in->ghost_length, in, block);
+			     (double2*)in->v, (float*)in->norm, parity, dagger, 
+			     (double2*)xv, (float*)x, k, in->volume, Vsh, 
+			     in->x[3], in->length, in->ghost_length, (cudaColorSpinorField*)in, block);
     }
     
   } else if (in->precision == QUDA_SINGLE_PRECISION) {
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
       staggeredDslashNoReconCuda<2>((float2*)out->v, (float*)out->norm, (float2*)fatGauge0, (float2*)fatGauge1,
 				    (float2*)longGauge0, (float2*)longGauge1, longGauge.reconstruct, 
-				    (float2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
-				    (float2*)xv, (float*)xnorm, k, in->volume, Vsh, 
-				    in->x[3], in->length, in->ghost_length, in, block);
+				    (float2*)in->v, (float*)in->norm, parity, dagger, 
+				    (float2*)xv, (float*)xn, k, in->volume, Vsh, 
+				    in->x[3], in->length, in->ghost_length, (cudaColorSpinorField*)in, block);
     }else{
       staggeredDslashCuda<2>((float2*)out->v, (float*)out->norm, (float2*)fatGauge0, (float2*)fatGauge1,
 			     (float4*)longGauge0, (float4*)longGauge1, longGauge.reconstruct, 
-			     (float2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
-			     (float2*)xv, (float*)xnorm, k, in->volume, Vsh, 
-			     in->x[3], in->length, in->ghost_length, in, block);
+			     (float2*)in->v, (float*)in->norm, parity, dagger, 
+			     (float2*)xv, (float*)xn, k, in->volume, Vsh, 
+			     in->x[3], in->length, in->ghost_length, (cudaColorSpinorField*)in, block);
     }
   } else if (in->precision == QUDA_HALF_PRECISION) {	
     if (longGauge.reconstruct == QUDA_RECONSTRUCT_NO){
       staggeredDslashNoReconCuda<2>((short2*)out->v, (float*)out->norm, (short2*)fatGauge0, (short2*)fatGauge1,
 				    (short2*)longGauge0, (short2*)longGauge1, longGauge.reconstruct, 
-				    (short2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
-				    (short2*)xv, (float*)xnorm, k, in->volume, Vsh, 
-				    in->x[3], in->length, in->ghost_length, in, block);
+				    (short2*)in->v, (float*)in->norm, parity, dagger, 
+				    (short2*)xv, (float*)xn, k, in->volume, Vsh, 
+				    in->x[3], in->length, in->ghost_length, (cudaColorSpinorField*)in, block);
     }else{
       staggeredDslashCuda<2>((short2*)out->v, (float*)out->norm, (short2*)fatGauge0, (short2*)fatGauge1,
 			     (short4*)longGauge0, (short4*)longGauge1, longGauge.reconstruct, 
-			     (short2*)in->getV(), (float*)in->getNorm(), parity, dagger, 
-			     (short2*)xv, (float*)xnorm, k, in->volume, Vsh, 
-			     in->x[3], in->length, in->ghost_length, in, block);
+			     (short2*)in->v, (float*)in->norm, parity, dagger, 
+			     (short2*)xv, (float*)xn, k, in->volume, Vsh, 
+			     in->x[3], in->length, in->ghost_length, (cudaColorSpinorField*)in, block);
     }
   }
 

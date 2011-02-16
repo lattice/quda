@@ -296,8 +296,8 @@ class cudaColorSpinorField : public ColorSpinorField {
 				   const cudaColorSpinorField *in, const int parity, const int dagger, 
 				   const cudaColorSpinorField *x, const double &m_f, const double &k2,
 				   const dim3 &block, const dim3 &blockFace);
-  friend void staggeredDslashCuda(cudaColorSpinorField *out, void *outNorm, const FullGauge fatGauge, 
-				  const FullGauge longGauge, cudaColorSpinorField *in,
+  friend void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, 
+				  const FullGauge longGauge, const cudaColorSpinorField *in,
 				  const int parity, const int dagger, const cudaColorSpinorField *x,
 				  const double &k, const dim3 &block, const dim3 &blockFace);
   friend void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
