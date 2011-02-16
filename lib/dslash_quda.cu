@@ -285,19 +285,19 @@ void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClov
   if (in->precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
     cloverCuda<2>((double2*)out->v, (float*)out->norm, (double2*)cloverP, 
-		  (float*)cloverNormP, (double2*)in, 
-		  (float*)in->norm, in->bytes, in->norm_bytes, blockDim);
+		  (float*)cloverNormP, (double2*)in->v, (float*)in->norm, 
+		  in->bytes, in->norm_bytes, blockDim);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->precision == QUDA_SINGLE_PRECISION) {
     cloverCuda<4>((float4*)out->v, (float*)out->norm, (float4*)cloverP, 
-		  (float*)cloverNormP, (float4*)in, 
-		  (float*)in->norm, in->bytes, in->norm_bytes, blockDim);
+		  (float*)cloverNormP, (float4*)in->v, (float*)in->norm,
+		  in->bytes, in->norm_bytes, blockDim);
   } else if (in->precision == QUDA_HALF_PRECISION) {
     cloverCuda<4>((short4*)out->v, (float*)out->norm, (short4*)cloverP, 
-		  (float*)cloverNormP, (short4*)in,
-		  (float*)in->norm, in->bytes, in->norm_bytes, blockDim);
+		  (float*)cloverNormP, (short4*)in->v, (float*)in->norm, 
+		  in->bytes, in->norm_bytes, blockDim);
   }
   unbindCloverTex(clover);
 
@@ -580,7 +580,7 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
   if (in->precision == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
     domainWallDslashCuda<2>((double2*)out->v, (float*)out->norm, (double2*)gauge0, (double2*)gauge1, 
-			    gauge.reconstruct, (double2*)in, (float*)in->norm, dagger, 
+			    gauge.reconstruct, (double2*)in->v, (float*)in->norm, dagger, 
 			    (double2*)xv, (float*)xnorm, m_f, k2, in->bytes, in->norm_bytes, block);
 #else
     errorQuda("Double precision not supported on this GPU");
