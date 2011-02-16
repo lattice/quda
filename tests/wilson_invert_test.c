@@ -164,7 +164,7 @@ int main(int argc, char **argv)
       spinorOutMulti[i] = malloc(V*spinorSiteSize*sSize);
     }
   } else {
-    spinorOut = malloc(num_offsets*sizeof(void *));
+    spinorOut = malloc(V*spinorSiteSize*sSize);
   }
 
   // create a point source at 0
