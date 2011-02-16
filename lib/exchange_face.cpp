@@ -10,12 +10,25 @@
 #include <sys/time.h>
 #include <color_spinor_field.h>
 #include "gauge_quda.h"
+#include <assert.h>
+
+#define XUP 0
+#define YUP 1
+#define ZUP 2
+#define TUP 3
+#define TDOWN 4
+#define ZDOWN 5
+#define YDOWN 6
+#define XDOWN 7
 
 static int V;
 static int Vh;
 static int Vs;
-static int Vsh;
+static int Vs_x, Vs_y, Vs_z, Vs_t;
+static int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 static int dims[4];
+
+static int X1,X2,X3,X4;
 
 void* fwd_nbr_spinor_sendbuf = NULL;
 void* back_nbr_spinor_sendbuf = NULL;
@@ -54,7 +67,25 @@ setup_dims(int* X)
   Vh = V/2;
   
   Vs = X[0]*X[1]*X[2];
-  Vsh = Vs/2;
+  Vsh_t = Vs/2;
+
+  X1=X[0];
+  X2=X[1];
+  X3=X[2];
+  X4=X[3];
+
+
+  Vs_x = X[1]*X[2]*X[3];
+  Vs_y = X[0]*X[2]*X[3];
+  Vs_z = X[0]*X[1]*X[3];
+  Vs_t = X[0]*X[1]*X[2];
+
+  Vsh_x = Vs_x/2;
+  Vsh_y = Vs_y/2;
+  Vsh_z = Vs_z/2;
+  Vsh_t = Vs_t/2;
+
+
 }
 
 void exchange_init_dims(int* X)
@@ -70,9 +101,9 @@ void exchange_init(cudaColorSpinorField* cudaSpinor)
     return;
   }
   
-  //int len = 3*Vsh*mySpinorSiteSize*cudaSpinor->Precision();
-  int len = 3*Vsh*mySpinorSiteSize*QUDA_DOUBLE_PRECISION; //use maximum precision size
-  int normlen = 3*Vsh*sizeof(float);
+  //int len = 3*Vsh_t*mySpinorSiteSize*cudaSpinor->Precision();
+  int len = 3*Vsh_t*mySpinorSiteSize*QUDA_DOUBLE_PRECISION; //use maximum precision size
+  int normlen = 3*Vsh_t*sizeof(float);
    
   if (!exchange_initialized){    
     cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf, len); CUERR;
@@ -179,13 +210,13 @@ template<typename Float>
 void
 exchange_fatlink(Float** fatlink, Float* ghost_fatlink, Float* fatlink_sendbuf)
 {
-  Float* even_fatlink_src = fatlink[3] + (Vh - Vsh)*gaugeSiteSize;
-  Float* odd_fatlink_src = fatlink[3] + (V -Vsh)*gaugeSiteSize;
+  Float* even_fatlink_src = fatlink[3] + (Vh - Vsh_t)*gaugeSiteSize;
+  Float* odd_fatlink_src = fatlink[3] + (V -Vsh_t)*gaugeSiteSize;
   
   Float* even_fatlink_dst = fatlink_sendbuf;
-  Float* odd_fatlink_dst = fatlink_sendbuf + Vsh*gaugeSiteSize;
+  Float* odd_fatlink_dst = fatlink_sendbuf + Vsh_t*gaugeSiteSize;
 
-  int len = Vsh*gaugeSiteSize*sizeof(Float);
+  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
   if(dims[3] % 2 == 0){
     memcpy(even_fatlink_dst, even_fatlink_src, len); 
     memcpy(odd_fatlink_dst, odd_fatlink_src, len);
@@ -219,12 +250,12 @@ template<typename Float>
 void
 exchange_longlink(Float** longlink, Float* ghost_longlink, Float* longlink_sendbuf)
 {
-  Float* even_longlink_src = longlink[3] + (Vh -3*Vsh)*gaugeSiteSize;
-  Float* odd_longlink_src = longlink[3] + (V - 3*Vsh)*gaugeSiteSize;
+  Float* even_longlink_src = longlink[3] + (Vh -3*Vsh_t)*gaugeSiteSize;
+  Float* odd_longlink_src = longlink[3] + (V - 3*Vsh_t)*gaugeSiteSize;
   
   Float* even_longlink_dst = longlink_sendbuf;
-  Float* odd_longlink_dst = longlink_sendbuf + 3*Vsh*gaugeSiteSize;
-  int len  = 3*Vsh*gaugeSiteSize*sizeof(Float);
+  Float* odd_longlink_dst = longlink_sendbuf + 3*Vsh_t*gaugeSiteSize;
+  int len  = 3*Vsh_t*gaugeSiteSize*sizeof(Float);
   if (dims[3] % 2 == 0){
     memcpy(even_longlink_dst, even_longlink_src, len);
     memcpy(odd_longlink_dst, odd_longlink_src, len);
@@ -245,9 +276,9 @@ template<typename Float>
 void
 exchange_cpu_spinor(Float* spinorField, Float* fwd_nbr_spinor, Float* back_nbr_spinor)
 {
-  Float* fwd_nbr_spinor_send = spinorField + (Vh -3*Vsh)*mySpinorSiteSize;
+  Float* fwd_nbr_spinor_send = spinorField + (Vh -3*Vsh_t)*mySpinorSiteSize;
   Float* back_nbr_spinor_send = spinorField;
-  int len = 3*Vsh*mySpinorSiteSize*sizeof(Float);
+  int len = 3*Vsh_t*mySpinorSiteSize*sizeof(Float);
   
 
   unsigned long recv_request1 = comm_recv(back_nbr_spinor, len, BACK_NBR);
@@ -272,8 +303,8 @@ exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
   exchange_init(cudaSpinor);
   struct timeval t0, t1, t2, t3;
   
-  int len = 3*Vsh*mySpinorSiteSize*cudaSpinor->Precision();
-  int normlen = 3*Vsh*sizeof(float);
+  int len = 3*Vsh_t*mySpinorSiteSize*cudaSpinor->Precision();
+  int normlen = 3*Vsh_t*sizeof(float);
 
   gettimeofday(&t0, NULL);
   cudaSpinor->packGhostSpinor(fwd_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, f_norm_sendbuf, b_norm_sendbuf, mystream); CUERR;
@@ -347,8 +378,8 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
 {
   cudaColorSpinorField* cudaSpinor = (cudaColorSpinorField*) _cudaSpinor;
  
-  int len = 3*Vsh*mySpinorSiteSize*cudaSpinor->Precision();
-  int normlen = 3*Vsh*sizeof(float);
+  int len = 3*Vsh_t*mySpinorSiteSize*cudaSpinor->Precision();
+  int normlen = 3*Vsh_t*sizeof(float);
   
   cudaStreamSynchronize(*mystream); //required the data to be there before sending out
 
@@ -454,6 +485,176 @@ void exchange_cpu_links(void** fatlink, void* ghost_fatlink,
 
 }
 
+template<typename Float>
+void
+do_exchange_cpu_link(Float** cpulink, 
+                     Float** ghost_cpulink, 
+                     Float** cpulink_sendbuf,
+                     int num_faces)
+{
+
+  int X= dims[0];
+  int Y= dims[1];
+  int Z= dims[2];
+  int T= dims[3];
+
+  int XY=X*Y;
+  int XYZ=X*Y*Z;
+
+  if(dims[3] % 2 == 0){
+  }else{
+    //FIXME: switching odd and even ghost cpulink      
+  }
+
+
+  int Vsh_xyzt[4];
+  Vsh_xyzt[0] = Vsh_x;
+  Vsh_xyzt[1] = Vsh_y;
+  Vsh_xyzt[2] = Vsh_z;
+  Vsh_xyzt[3] = Vsh_t;
+
+  int uptags[4] = {XUP, YUP, ZUP,TUP};
+  int fwd_nbrs[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
+  int back_nbrs[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
+
+  //loop variables: a, b, c with a the most signifcant and c the least significant
+  //A, B, C the maximum value
+  //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
+  int A[4], B[4], C[4];
+  
+  //X dimension
+  A[0] = T; B[0] = Z; C[0] = Y;
+  
+  //Y dimension
+  A[1] = T; B[1] = Z; C[1] = X ;
+
+  //Z dimension
+  A[2] = T; B[2] = Y; C[2] = X;
+
+  //T dimension
+  A[3] = Z; B[3] = Y; C[3] = X;
+
+
+  //multiplication factor to compute index in originial cpu memory
+  int f[4][4]={
+    {XYZ, XY, X, 1},
+    {XYZ, XY, 1, X},
+    {XYZ, X, 1, XY},
+    {XY, X, 1, XYZ}
+  };
+
+  for(int dir =0; dir < 4; dir++)
+    {
+      Float* even_src = cpulink[dir];
+      Float* odd_src = cpulink[dir] + Vh*gaugeSiteSize;
+
+      Float* even_dst = cpulink_sendbuf[dir];
+      Float* odd_dst = cpulink_sendbuf[dir] + num_faces*Vsh_xyzt[dir]*gaugeSiteSize;
+
+      int even_dst_index = 0;
+      int odd_dst_index = 0;
+
+      int d;
+      int a,b,c;
+      for(d = dims[dir]- num_faces; d < dims[dir]; d++){
+        for(a = 0; a < A[dir]; a++){
+          for(b = 0; b < B[dir]; b++){
+            for(c = 0; c < C[dir]; c++){
+              int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
+              int oddness = (a+b+c+d)%2;
+              if (oddness == 0){ //even
+                for(int i=0;i < 18;i++){
+                  even_dst[18*even_dst_index+i] = even_src[18*index + i];
+                }
+                even_dst_index++;
+              }else{ //odd
+                for(int i=0;i < 18;i++){
+                  odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
+                }
+                odd_dst_index++;
+              }
+            }//c
+          }//b
+        }//a
+      }//d
+
+      assert( even_dst_index ==  num_faces*Vsh_xyzt[dir]);
+      assert( odd_dst_index ==  num_faces*Vsh_xyzt[dir]);
+
+      int len = num_faces*Vsh_xyzt[dir]*gaugeSiteSize*sizeof(Float);
+
+      unsigned long recv_request = comm_recv_with_tag(ghost_cpulink[dir], 2*len, back_nbrs[dir], uptags[dir]);
+      unsigned long send_request = comm_send_with_tag(cpulink_sendbuf[dir], 2*len, fwd_nbrs[dir], uptags[dir]);
+      comm_wait(recv_request);
+      comm_wait(send_request);
+    }
+
+}
+
+
+void exchange_fat_link4dir(void** fatlink,
+			   void** ghost_fatlink,
+			   QudaPrecision gPrecision)
+{
+  void* fatlink_sendbuf[4];
+  fatlink_sendbuf[0] = malloc(Vs_x*gaugeSiteSize*gPrecision);
+  fatlink_sendbuf[1] = malloc(Vs_y*gaugeSiteSize*gPrecision);
+  fatlink_sendbuf[2] = malloc(Vs_z*gaugeSiteSize*gPrecision);
+  fatlink_sendbuf[3] = malloc(Vs_t*gaugeSiteSize*gPrecision);
+
+  if (fatlink_sendbuf[0]==NULL || fatlink_sendbuf[1]==NULL ||
+      fatlink_sendbuf[2]==NULL || fatlink_sendbuf[3]==NULL){
+    printfQuda("ERROR: malloc failed for fatlink_sendbuf\n");
+  }
+
+  if (gPrecision == QUDA_DOUBLE_PRECISION){    
+    do_exchange_cpu_link((double**)fatlink, (double**)ghost_fatlink, (double**)fatlink_sendbuf, 1);
+  }else{ //single
+    do_exchange_cpu_link((float**)fatlink, (float**)ghost_fatlink, (float**)fatlink_sendbuf, 1);
+  }
+  
+  for(int i=0;i < 4;i++){
+    free(fatlink_sendbuf[i]);
+  }
+}
+
+void exchange_long_link4dir(void** longlink,
+			    void** ghost_longlink,
+			    QudaPrecision gPrecision)
+{
+  
+
+  void* longlink_sendbuf[4];
+  longlink_sendbuf[0] = malloc(3*Vs_x*gaugeSiteSize*gPrecision);
+  longlink_sendbuf[1] = malloc(3*Vs_y*gaugeSiteSize*gPrecision);
+  longlink_sendbuf[2] = malloc(3*Vs_z*gaugeSiteSize*gPrecision);
+  longlink_sendbuf[3] = malloc(3*Vs_t*gaugeSiteSize*gPrecision);
+  
+  if (longlink_sendbuf[0]==NULL || longlink_sendbuf[1]==NULL ||
+      longlink_sendbuf[2]==NULL || longlink_sendbuf[3]==NULL){
+    printfQuda("ERROR: malloc failed for longlink_sendbuf\n");
+  }  
+
+  if (gPrecision == QUDA_DOUBLE_PRECISION){    
+    do_exchange_cpu_link((double**)longlink, (double**)ghost_longlink, (double**)longlink_sendbuf, 3);
+  }else{ //single
+    do_exchange_cpu_link((float**)longlink, (float**)ghost_longlink, (float**)longlink_sendbuf, 3);
+  }
+  
+  for(int i=0;i < 4;i++){
+    free(longlink_sendbuf[i]);
+  }
+}
+void exchange_cpu_links4dir(void** fatlink,
+			    void** ghost_fatlink,
+			    void** longlink,
+			    void** ghost_longlink,
+			    QudaPrecision gPrecision)
+{
+  exchange_fat_link4dir(fatlink, ghost_fatlink, gPrecision);
+  exchange_long_link4dir(longlink, ghost_longlink, gPrecision);
+}
+
 
 void exchange_cpu_spinor(int* X,
 			 void* spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor,
@@ -468,7 +669,7 @@ void exchange_cpu_spinor(int* X,
   Vh = V/2;
   
   Vs = X[0]*X[1]*X[2];
-  Vsh = Vs/2;
+  Vsh_t = Vs/2;
 
   if (sPrecision == QUDA_DOUBLE_PRECISION){
     exchange_cpu_spinor((double*)spinorField, (double*)fwd_nbr_spinor, (double*)back_nbr_spinor);
@@ -477,6 +678,160 @@ void exchange_cpu_spinor(int* X,
   }
 
 }
+
+template<typename Float>
+void
+exchange_cpu_spinor4dir(Float* spinorField, Float** cpu_fwd_nbr_spinor, Float** cpu_back_nbr_spinor, int oddBit)
+{
+
+
+  //fast way for T dimension
+#if 0
+  Float* cpu_fwd_nbr_spinor_t_send = spinorField + (Vh -3*Vsh_t)*mySpinorSiteSize;
+  Float* cpu_back_nbr_spinor_t_send = spinorField;
+  int len_t = 3*Vsh_t*mySpinorSiteSize*sizeof(Float);
+  
+  unsigned long recv_request_1 = comm_recv_with_tag(cpu_back_nbr_spinor[3], len_t, T_BACK_NBR, TUP);
+  unsigned long recv_request_2 = comm_recv_with_tag(cpu_fwd_nbr_spinor[3], len_t, T_FWD_NBR, TDOWN);  
+  unsigned long send_request_1= comm_send_with_tag(cpu_fwd_nbr_spinor_t_send, len_t, T_FWD_NBR, TUP);
+  unsigned long send_request_2 = comm_send_with_tag(cpu_back_nbr_spinor_t_send, len_t, T_BACK_NBR, TDOWN);
+  
+  comm_wait(recv_request_1);
+  comm_wait(recv_request_2);  
+  comm_wait(send_request_1);
+  comm_wait(send_request_2);
+#endif
+
+  //for all dimensions
+  int len[4] = {
+    3*Vsh_x*6*sizeof(Float),
+    3*Vsh_y*6*sizeof(Float),
+    3*Vsh_z*6*sizeof(Float),
+    3*Vsh_t*6*sizeof(Float)
+  };
+
+  Float* cpu_fwd_nbr_spinor_sendbuf[4];
+  Float* cpu_back_nbr_spinor_sendbuf[4];
+  for(int i=0;i < 4;i++){
+    cpu_fwd_nbr_spinor_sendbuf[i] = (Float*)malloc(len[i]);
+    cpu_back_nbr_spinor_sendbuf[i] = (Float*)malloc(len[i]);
+  }
+
+
+  for( int i=0;i < Vh;i++){
+    //compute full index
+    int boundaryCrossings = i/(X1/2) + i/(X1*X2/2) + i/(X1*X2*X3/2);
+    int Y = 2*i + (boundaryCrossings + oddBit) % 2;
+    int x4 = Y/(X3*X2*X1);
+    int x3 = (Y/(X2*X1)) % X3;
+    int x2 = (Y/X1) % X2;
+    int x1 = Y % X1;
+
+    int ghost_face_idx ;
+
+    //X dimension
+    if (x1 < 3){
+      ghost_face_idx =  (x1*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+      for(int j=0; j < 6;j++){
+        cpu_back_nbr_spinor_sendbuf[0][6*ghost_face_idx+j]=spinorField[6*i+j];
+      }
+    }
+    if (x1 >=X1 -3){
+      ghost_face_idx = ((x1-X1+3)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+      for(int j=0; j < 6;j++){
+        cpu_fwd_nbr_spinor_sendbuf[0][6*ghost_face_idx+j]=spinorField[6*i+j];
+      }
+    }
+
+    //Y dimension
+    if (x2 < 3){
+      ghost_face_idx = (x2*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
+      for(int j=0; j < 6;j++){
+        cpu_back_nbr_spinor_sendbuf[1][6*ghost_face_idx+j]=spinorField[6*i+j];
+      }
+    }
+    if (x2 >= X2 - 3){
+      ghost_face_idx = ((x2-X2+3)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
+      for(int j=0; j < 6;j++){
+        cpu_fwd_nbr_spinor_sendbuf[1][6*ghost_face_idx+j]=spinorField[6*i+j];
+      }
+    }
+
+    //Z dimension
+    if (x3 < 3){
+      ghost_face_idx = (x3*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
+      for(int j=0; j < 6;j++){
+        cpu_back_nbr_spinor_sendbuf[2][6*ghost_face_idx+j]=spinorField[6*i+j];
+      }
+    }
+    if (x3 >= X3 - 3){
+      ghost_face_idx = ((x3-X3+3)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
+      for(int j=0; j < 6;j++){
+        cpu_fwd_nbr_spinor_sendbuf[2][6*ghost_face_idx+j]=spinorField[6*i+j];
+      }
+    }
+
+    //T dimension
+     if (x4 < 3){
+       ghost_face_idx = (x4*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+       for(int j=0; j < 6;j++){
+         cpu_back_nbr_spinor_sendbuf[3][6*ghost_face_idx+j]=spinorField[6*i+j];
+       }
+     }
+     if (x4 >= X4 - 3){
+       ghost_face_idx = ((x4-X4+3)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+       for(int j=0; j < 6;j++){
+         cpu_fwd_nbr_spinor_sendbuf[3][6*ghost_face_idx+j]=spinorField[6*i+j];
+       }
+     }
+
+  }//i
+
+  unsigned long recv_request1[4], recv_request2[4];
+  unsigned long send_request1[4], send_request2[4];
+  int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
+  int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
+  int uptags[4] = {XUP, YUP, ZUP, TUP};
+  int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+  
+  for(int i=0;i < 4; i++){
+    recv_request1[i] = comm_recv_with_tag(cpu_back_nbr_spinor[i], len[i], back_nbr[i], uptags[i]);
+    recv_request2[i] = comm_recv_with_tag(cpu_fwd_nbr_spinor[i], len[i], fwd_nbr[i], downtags[i]);
+    send_request1[i]= comm_send_with_tag(cpu_fwd_nbr_spinor_sendbuf[i], len[i], fwd_nbr[i], uptags[i]);
+    send_request2[i] = comm_send_with_tag(cpu_back_nbr_spinor_sendbuf[i], len[i], back_nbr[i], downtags[i]);
+  }
+
+  for(int i=0;i < 4;i++){
+    comm_wait(recv_request1[i]);
+    comm_wait(recv_request2[i]);
+    comm_wait(send_request1[i]);
+    comm_wait(send_request2[i]);
+  }
+
+  for(int i=0;i < 4;i++){
+    free(cpu_fwd_nbr_spinor_sendbuf[i]);
+    free(cpu_back_nbr_spinor_sendbuf[i]);
+  }
+
+
+}
+
+
+void exchange_cpu_spinor4dir(int* X,
+			     void* spinorField, void** cpu_fwd_nbr_spinor, void** cpu_back_nbr_spinor,
+			     QudaPrecision sPrecision, int oddBit)
+{
+
+  setup_dims(X);
+
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    exchange_cpu_spinor4dir((double*)spinorField, (double**)cpu_fwd_nbr_spinor, (double**)cpu_back_nbr_spinor, oddBit);
+  }else{//single
+    exchange_cpu_spinor4dir((float*)spinorField, (float**)cpu_fwd_nbr_spinor, (float**)cpu_back_nbr_spinor, oddBit);
+  }
+
+}
+
 
 
 /**************************************************************
@@ -538,39 +893,39 @@ exchange_sitelink(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_s
 {
 
   int i;
-  int len = Vsh*gaugeSiteSize*sizeof(Float);
+  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
   for(i=0;i < 4;i++){
     Float* even_sitelink_back_src = sitelink[i];
     Float* odd_sitelink_back_src = sitelink[i] + Vh*gaugeSiteSize;
-    Float* sitelink_back_dst = sitelink_back_sendbuf + 2*i*Vsh*gaugeSiteSize;
+    Float* sitelink_back_dst = sitelink_back_sendbuf + 2*i*Vsh_t*gaugeSiteSize;
 
     if(dims[3] % 2 == 0){    
       memcpy(sitelink_back_dst, even_sitelink_back_src, len);
-      memcpy(sitelink_back_dst + Vsh*gaugeSiteSize, odd_sitelink_back_src, len);
+      memcpy(sitelink_back_dst + Vsh_t*gaugeSiteSize, odd_sitelink_back_src, len);
     }else{
       //switching odd and even ghost sitelink
       memcpy(sitelink_back_dst, odd_sitelink_back_src, len);
-      memcpy(sitelink_back_dst + Vsh*gaugeSiteSize, even_sitelink_back_src, len);
+      memcpy(sitelink_back_dst + Vsh_t*gaugeSiteSize, even_sitelink_back_src, len);
     }
   }
 
   for(i=0;i < 4;i++){
-    Float* even_sitelink_fwd_src = sitelink[i] + (Vh - Vsh)*gaugeSiteSize;
-    Float* odd_sitelink_fwd_src = sitelink[i] + Vh*gaugeSiteSize + (Vh - Vsh)*gaugeSiteSize;
-    Float* sitelink_fwd_dst = sitelink_fwd_sendbuf + 2*i*Vsh*gaugeSiteSize;
+    Float* even_sitelink_fwd_src = sitelink[i] + (Vh - Vsh_t)*gaugeSiteSize;
+    Float* odd_sitelink_fwd_src = sitelink[i] + Vh*gaugeSiteSize + (Vh - Vsh_t)*gaugeSiteSize;
+    Float* sitelink_fwd_dst = sitelink_fwd_sendbuf + 2*i*Vsh_t*gaugeSiteSize;
     if(dims[3] % 2 == 0){    
       memcpy(sitelink_fwd_dst, even_sitelink_fwd_src, len);
-      memcpy(sitelink_fwd_dst + Vsh*gaugeSiteSize, odd_sitelink_fwd_src, len);
+      memcpy(sitelink_fwd_dst + Vsh_t*gaugeSiteSize, odd_sitelink_fwd_src, len);
     }else{
       //switching odd and even ghost sitelink
       memcpy(sitelink_fwd_dst, odd_sitelink_fwd_src, len);
-      memcpy(sitelink_fwd_dst + Vsh*gaugeSiteSize, even_sitelink_fwd_src, len);
+      memcpy(sitelink_fwd_dst + Vsh_t*gaugeSiteSize, even_sitelink_fwd_src, len);
     }
     
   }
   
   Float* ghost_sitelink_back = ghost_sitelink;
-  Float* ghost_sitelink_fwd = ghost_sitelink + 8*Vsh*gaugeSiteSize;
+  Float* ghost_sitelink_fwd = ghost_sitelink + 8*Vsh_t*gaugeSiteSize;
 
   unsigned long recv_request1 = comm_recv(ghost_sitelink_back, 8*len, BACK_NBR);
   unsigned long recv_request2 = comm_recv(ghost_sitelink_fwd, 8*len, FWD_NBR);
@@ -597,7 +952,7 @@ void exchange_cpu_sitelink(int* X,
   Vh = V/2;
 
   Vs = X[0]*X[1]*X[2];
-  Vsh = Vs/2;
+  Vsh_t = Vs/2;
 
   void*  sitelink_fwd_sendbuf = malloc(4*Vs*gaugeSiteSize*gPrecision);
   void*  sitelink_back_sendbuf = malloc(4*Vs*gaugeSiteSize*gPrecision);
@@ -627,7 +982,7 @@ void
 exchange_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sendbuf, Float* staple_back_sendbuf)
 {
   
-  int len = Vsh*gaugeSiteSize*sizeof(Float);
+  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
 
   Float* even_staple_back_src = staple;
   Float* odd_staple_back_src = staple + Vh*gaugeSiteSize;
@@ -635,29 +990,29 @@ exchange_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sendbuf, F
   
   if(dims[3] % 2 == 0){    
     memcpy(staple_back_dst, even_staple_back_src, len);
-    memcpy(staple_back_dst + Vsh*gaugeSiteSize, odd_staple_back_src, len);
+    memcpy(staple_back_dst + Vsh_t*gaugeSiteSize, odd_staple_back_src, len);
   }else{
     //switching odd and even ghost staple
     memcpy(staple_back_dst, odd_staple_back_src, len);
-    memcpy(staple_back_dst + Vsh*gaugeSiteSize, even_staple_back_src, len);
+    memcpy(staple_back_dst + Vsh_t*gaugeSiteSize, even_staple_back_src, len);
   }
   
   
-  Float* even_staple_fwd_src = staple + (Vh - Vsh)*gaugeSiteSize;
-  Float* odd_staple_fwd_src = staple + Vh*gaugeSiteSize + (Vh - Vsh)*gaugeSiteSize;
+  Float* even_staple_fwd_src = staple + (Vh - Vsh_t)*gaugeSiteSize;
+  Float* odd_staple_fwd_src = staple + Vh*gaugeSiteSize + (Vh - Vsh_t)*gaugeSiteSize;
   Float* staple_fwd_dst = staple_fwd_sendbuf;
   if(dims[3] % 2 == 0){    
     memcpy(staple_fwd_dst, even_staple_fwd_src, len);
-    memcpy(staple_fwd_dst + Vsh*gaugeSiteSize, odd_staple_fwd_src, len);
+    memcpy(staple_fwd_dst + Vsh_t*gaugeSiteSize, odd_staple_fwd_src, len);
   }else{
     //switching odd and even ghost staple
     memcpy(staple_fwd_dst, odd_staple_fwd_src, len);
-    memcpy(staple_fwd_dst + Vsh*gaugeSiteSize, even_staple_fwd_src, len);
+    memcpy(staple_fwd_dst + Vsh_t*gaugeSiteSize, even_staple_fwd_src, len);
   }
   
   
   Float* ghost_staple_back = ghost_staple;
-  Float* ghost_staple_fwd = ghost_staple + 2*Vsh*gaugeSiteSize;
+  Float* ghost_staple_fwd = ghost_staple + 2*Vsh_t*gaugeSiteSize;
 
   unsigned long recv_request1 = comm_recv(ghost_staple_back, 2*len, BACK_NBR);
   unsigned long recv_request2 = comm_recv(ghost_staple_fwd, 2*len, FWD_NBR);
@@ -683,7 +1038,7 @@ void exchange_cpu_staple(int* X,
   Vh = V/2;
   
   Vs = X[0]*X[1]*X[2];
-  Vsh = Vs/2;
+  Vsh_t = Vs/2;
   
   void*  staple_fwd_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
   void*  staple_back_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);

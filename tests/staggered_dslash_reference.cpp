@@ -18,8 +18,8 @@ static int mySpinorSiteSize = 6;
 int Z[4];
 int V;
 int Vh;
-int Vs;
-int Vsh;
+int Vs_t;
+int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 
 void setDims(int *X) {
   V = 1;
@@ -29,8 +29,8 @@ void setDims(int *X) {
   }
   Vh = V/2;
 
-  Vs = Z[0]*Z[1]*Z[2];
-  Vsh = Vs/2;
+  Vs_t = Z[0]*Z[1]*Z[2];
+  Vsh_t = Vs_t/2;
 }
 
 template <typename Float>
@@ -490,7 +490,7 @@ Float *spinorNeighbor_mg(int i, int dir, int oddBit, Float *spinorField,
     j = neighborIndex_mg(i, oddBit, +nb, 0, 0, 0);
     int x4 = x4_mg(i, oddBit);
     if ( (x4 + nb) >= Z[3]){
-      int offset = (x4+nb - Z[3])*Vsh;
+      int offset = (x4+nb - Z[3])*Vsh_t;
       return &fwd_nbr_spinor[(offset+j)*mySpinorSiteSize];
     }
     break;
@@ -499,7 +499,7 @@ Float *spinorNeighbor_mg(int i, int dir, int oddBit, Float *spinorField,
     j = neighborIndex_mg(i, oddBit, -nb, 0, 0, 0);
     int x4 = x4_mg(i, oddBit);
     if ( (x4 - nb) < 0){
-      int offset = ( x4 - nb +3)*Vsh;
+      int offset = ( x4 - nb +3)*Vsh_t;
       return &back_nbr_spinor[(offset+j)*mySpinorSiteSize];
     }
     break;
@@ -543,9 +543,9 @@ void dslashReference_mg(sFloat *res, gFloat **fatlink, gFloat* ghost_fatlink, gF
   }
   
   ghost_fatlink_even = ghost_fatlink;
-  ghost_fatlink_odd = ghost_fatlink + Vsh*gaugeSiteSize;
+  ghost_fatlink_odd = ghost_fatlink + Vsh_t*gaugeSiteSize;
   ghost_longlink_even = ghost_longlink;
-  ghost_longlink_odd = ghost_longlink + 3*Vsh*gaugeSiteSize;
+  ghost_longlink_odd = ghost_longlink + 3*Vsh_t*gaugeSiteSize;
 
   
   for (int i = 0; i < Vh; i++) {
@@ -712,6 +712,402 @@ matdagmat_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, vo
   }
 }
 
+template <typename Float>
+Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
+			Float** ghostGaugeEven, Float** ghostGaugeOdd, int n_ghost_faces, int nbr_distance) {
+  Float **gaugeField;
+  int j;
+  int d = nbr_distance;
+  if (dir % 2 == 0) {
+    j = i;
+    gaugeField = (oddBit ? gaugeOdd : gaugeEven);
+  }
+  else {
+
+    int Y = fullLatticeIndex(i, oddBit);
+    int x4 = Y/(Z[2]*Z[1]*Z[0]);
+    int x3 = (Y/(Z[1]*Z[0])) % Z[2];
+    int x2 = (Y/Z[0]) % Z[1];
+    int x1 = Y % Z[0];
+    int X1= Z[0];
+    int X2= Z[1];
+    int X3= Z[2];
+    int X4= Z[3];
+    Float* ghostGaugeField;
+
+    switch (dir) {
+    case 1:
+      { //-X direction
+        int new_x1 = (x1 - d + X1 )% X1;
+        if (x1 -d < 0){
+        ghostGaugeField = (oddBit?ghostGaugeEven[0]: ghostGaugeOdd[0]);
+        int offset = (n_ghost_faces + x1 -d)*X4*X3*X2/2 + (x4*X3*X2 + x3*X2+x2)/2;
+        return &ghostGaugeField[offset*(3*3*2)];
+        }
+        j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
+        break;
+      }
+    case 3:
+      { //-Y direction
+        int new_x2 = (x2 - d + X2 )% X2;
+        if (x2 -d < 0){
+          ghostGaugeField = (oddBit?ghostGaugeEven[1]: ghostGaugeOdd[1]);
+          int offset = (n_ghost_faces + x2 -d)*X4*X3*X1/2 + (x4*X3*X1 + x3*X1+x1)/2;
+          return &ghostGaugeField[offset*(3*3*2)];
+        }
+        j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
+        break;
+
+      }
+    case 5:
+      { //-Z direction
+        int new_x3 = (x3 - d + X3 )% X3;
+        if (x3 -d < 0){
+          ghostGaugeField = (oddBit?ghostGaugeEven[2]: ghostGaugeOdd[2]);
+          int offset = (n_ghost_faces + x3 -d)*X4*X2*X1/2 + (x4*X2*X1 + x2*X1+x1)/2;
+          return &ghostGaugeField[offset*(3*3*2)];
+        }
+        j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
+        break;
+      }
+    case 7:
+      { //-T direction
+        int new_x4 = (x4 - d + X4)% X4;
+        if (x4 -d < 0){
+          ghostGaugeField = (oddBit?ghostGaugeEven[3]: ghostGaugeOdd[3]);
+          int offset = (n_ghost_faces + x4 -d)*X1*X2*X3/2 + (x3*X2*X1 + x2*X2+x1)/2;
+          return &ghostGaugeField[offset*(3*3*2)];
+        }
+        j = (new_x4*(X3*X2*X1) + x3*(X2*X1) + x2*(X1) + x1) / 2;
+        break;
+      }//7
+
+    default: j = -1; printf("ERROR: wrong dir \n"); exit(1);
+    }
+    gaugeField = (oddBit ? gaugeEven : gaugeOdd);
+
+  }
+
+  return &gaugeField[dir/2][j*(3*3*2)];
+}
+
+template <typename Float>
+Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField,
+			     Float** fwd_nbr_spinor, Float** back_nbr_spinor, int neighbor_distance)
+{
+  int j;
+  int nb = neighbor_distance;
+  int Y = fullLatticeIndex(i, oddBit);
+  int x4 = Y/(Z[2]*Z[1]*Z[0]);
+  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
+  int x2 = (Y/Z[0]) % Z[1];
+  int x1 = Y % Z[0];
+  int X1= Z[0];
+  int X2= Z[1];
+  int X3= Z[2];
+  int X4= Z[3];
+
+  switch (dir) {
+  case 0://+X
+    {
+      int new_x1 = (x1 + nb)% X1;
+      if(x1+nb >=X1){
+        int offset = ( x1 + nb -X1)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
+        return fwd_nbr_spinor[0] + offset*mySpinorSiteSize;
+      }
+      j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
+      break;
+
+    }
+  case 1://-X
+    {
+      int new_x1 = (x1 - nb + X1)% X1;
+      if(x1 - nb < 0){ 
+        int offset = ( x1+3- nb)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
+        return back_nbr_spinor[0] + offset*mySpinorSiteSize;
+      } 
+      j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
+      break;
+    }
+  case 2://+Y
+    {
+      int new_x2 = (x2 + nb)% X2;
+      if(x2+nb >=X2){
+        int offset = ( x2 + nb -X2)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
+        return fwd_nbr_spinor[1] + offset*mySpinorSiteSize;
+      } 
+      j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
+      break;
+    }
+  case 3:// -Y
+    {
+      int new_x2 = (x2 - nb + X2)% X2;
+      if(x2 - nb < 0){ 
+        int offset = ( x2 + 3 -nb)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
+        return back_nbr_spinor[1] + offset*mySpinorSiteSize;
+      } 
+      j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
+      break;
+    }
+  case 4://+Z
+    {
+      int new_x3 = (x3 + nb)% X3;
+      if(x3+nb >=X3){
+        int offset = ( x3 + nb -X3)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
+        return fwd_nbr_spinor[2] + offset*mySpinorSiteSize;
+      } 
+      j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
+      break;
+    }
+  case 5://-Z
+    {
+      int new_x3 = (x3 - nb + X3)% X3;
+      if(x3 - nb < 0){ 
+        int offset = ( x3 + 3 -nb)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
+        return back_nbr_spinor[2] + offset*mySpinorSiteSize;
+      }
+      j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
+      break;
+    }
+  case 6://+T 
+    {
+      j = neighborIndex_mg(i, oddBit, +nb, 0, 0, 0);
+      int x4 = x4_mg(i, oddBit);
+      if ( (x4 + nb) >= Z[3]){
+        int offset = (x4+nb - Z[3])*Vsh_t;
+        return &fwd_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
+      }
+      break;
+    }
+  case 7://-T 
+    {
+      j = neighborIndex_mg(i, oddBit, -nb, 0, 0, 0);
+      int x4 = x4_mg(i, oddBit);
+      if ( (x4 - nb) < 0){
+        int offset = ( x4 - nb +3)*Vsh_t;
+        return &back_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
+      }
+      break;
+  }
+  default: j = -1; printf("ERROR: wrong dir\n"); exit(1);
+  }
+
+  return &spinorField[j*(mySpinorSiteSize)];
+}
+
+
+
+
+template <typename sFloat, typename gFloat>
+void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink, gFloat** longlink,  gFloat** ghostLonglink,
+                        sFloat *spinorField, sFloat** fwd_nbr_spinor, sFloat** back_nbr_spinor, int oddBit, int daggerBit)
+{
+
+  QudaPrecision prec; 
+  QudaParity otherparity;
+
+  if(sizeof(sFloat) == 4){
+    prec = QUDA_SINGLE_PRECISION;
+  }else{
+    prec = QUDA_DOUBLE_PRECISION;
+  }
+  if (oddBit == QUDA_EVEN_PARITY){
+    otherparity = QUDA_ODD_PARITY;
+  }else if (oddBit == QUDA_ODD_PARITY){
+    otherparity = QUDA_EVEN_PARITY;
+  }else{
+    printf("ERROR: full parity not supported in function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  exchange_cpu_spinor4dir(Z, spinorField, (void**)fwd_nbr_spinor, (void**)back_nbr_spinor, prec, otherparity);
+
+
+  for (int i=0; i<Vh*1*3*2; i++) res[i] = 0.0;
+
+  int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
+  gFloat *fatlinkEven[4], *fatlinkOdd[4];
+  gFloat *longlinkEven[4], *longlinkOdd[4];
+  gFloat *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
+  gFloat *ghostLonglinkEven[4], *ghostLonglinkOdd[4];
+
+  for (int dir = 0; dir < 4; dir++) {
+    fatlinkEven[dir] = fatlink[dir];
+    fatlinkOdd[dir] = fatlink[dir] + Vh*gaugeSiteSize;
+    longlinkEven[dir] =longlink[dir];
+    longlinkOdd[dir] = longlink[dir] + Vh*gaugeSiteSize;
+
+    ghostFatlinkEven[dir] = ghostFatlink[dir];
+    ghostFatlinkOdd[dir] = ghostFatlink[dir] + Vsh[dir]*gaugeSiteSize;
+    ghostLonglinkEven[dir] = ghostLonglink[dir];
+    ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3*Vsh[dir]*gaugeSiteSize;
+  }
+
+
+
+  for (int i = 0; i < Vh; i++) {
+    memset(res + i*mySpinorSiteSize, 0, mySpinorSiteSize*sizeof(sFloat));
+    for (int dir = 0; dir < 8; dir++) {
+#if 1
+      gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
+      gFloat* longlnk = gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3);
+
+      sFloat *first_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1);
+      sFloat *third_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3);
+
+#else
+      gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
+      gFloat* longlnk = gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3);
+
+      sFloat *first_neighbor_spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
+      sFloat *third_neighbor_spinor = spinorNeighbor(i, dir, oddBit, spinorField, 3);
+#endif
+
+      sFloat gaugedSpinor[mySpinorSiteSize];
+
+
+      if (dir % 2 == 0){
+        su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+        sum(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
+        su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
+        sum(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);                                                        
+      }
+      else{
+        su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+        sub(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
+
+        su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
+        sub(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
+
+      }
+    }
+    if (daggerBit){
+      negx(&res[i*mySpinorSiteSize], mySpinorSiteSize);
+    }
+  }
+
+}
+
+
+
+void staggered_dslash_mg4dir(void *res, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink,
+			     void *spinorField, void** fwd_nbr_spinor, void** back_nbr_spinor,
+			     int oddBit, int daggerBit,
+			     QudaPrecision sPrecision, QudaPrecision gPrecision)
+{
+
+  if (sPrecision == QUDA_DOUBLE_PRECISION) {
+    if (gPrecision == QUDA_DOUBLE_PRECISION){
+      dslashReference_mg4dir((double*)res, (double**)fatlink, (double**)ghost_fatlink,(double**)longlink,  (double**)ghost_longlink,
+                         (double*)spinorField, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+    }else{
+      dslashReference_mg4dir((double*)res, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink,  (float**)ghost_longlink,
+                         (double*)spinorField, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+    }
+  }
+  else{
+    if (gPrecision == QUDA_DOUBLE_PRECISION){
+      dslashReference_mg4dir((float*)res, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink,  (double**)ghost_longlink,
+                         (float*)spinorField, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+    }else{
+      dslashReference_mg4dir((float*)res, (float**)fatlink, (float**)ghost_fatlink,  (float**)longlink, (float**)ghost_longlink,
+                         (float*)spinorField, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+    }
+  }
+
+
+}
+
+template <typename sFloat, typename gFloat>
+void
+Matdagmat_mg4dir(sFloat *out, gFloat **fatlink, gFloat** ghost_fatlink, gFloat** longlink, gFloat** ghost_longlink,
+                  sFloat *in, sFloat** fwd_nbr_spinor, sFloat** back_nbr_spinor, sFloat mass, int daggerBit,
+                  sFloat* tmp, MyQudaParity parity)
+{
+
+  sFloat msq_x4 = mass*mass*4;
+
+  switch(parity){
+  case QUDA_EVEN:
+    {
+      sFloat *inEven = in;
+      sFloat *outEven = out;
+      dslashReference_mg4dir(tmp, fatlink,   ghost_fatlink,longlink, ghost_longlink, inEven,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+      dslashReference_mg4dir(outEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmp,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+
+      // lastly apply the mass term
+      axmy(inEven, msq_x4, outEven, Vh*mySpinorSiteSize);
+      break;
+    }
+  case QUDA_ODD:
+    {
+      sFloat *inOdd = in;
+      sFloat *outOdd = out;
+      dslashReference_mg4dir(tmp, fatlink, ghost_fatlink, longlink,  ghost_longlink, inOdd,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+      dslashReference_mg4dir(outOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmp,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+
+      // lastly apply the mass term
+      axmy(inOdd, msq_x4, outOdd, Vh*mySpinorSiteSize);
+      break;    
+    }
+     
+  case QUDA_EVENODD:
+    {
+      sFloat *inEven = in;
+      sFloat *inOdd = in + Vh*mySpinorSiteSize;
+      sFloat *outEven = out;
+      sFloat *outOdd = out + Vh*mySpinorSiteSize;
+      sFloat *tmpEven = tmp; 
+      sFloat *tmpOdd = tmp + Vh*mySpinorSiteSize;
+             
+      dslashReference_mg4dir(tmpOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, inEven,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+      dslashReference_mg4dir(tmpEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, inOdd,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+
+      dslashReference_mg4dir(outOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmpEven,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+      dslashReference_mg4dir(outEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmpOdd,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+
+      // lastly apply the mass term
+      axmy(in, msq_x4, out, V*mySpinorSiteSize);
+      break;
+    }
+  default:
+    fprintf(stderr, "ERROR: invalid parity in %s,line %d\n", __FUNCTION__, __LINE__);
+    break;
+  } 
+   
+}
+
+void 
+matdagmat_mg4dir(void *out, void **fatlink, void** ghost_fatlink, void** longlink, void** ghost_longlink, 
+		 void *in, void** fwd_nbr_spinor, void** back_nbr_spinor, double mass, int dagger_bit,
+		 QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
+{
+  
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+      Matdagmat_mg4dir((double*)out, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink, (double**)ghost_longlink,
+                        (double*)in, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, (double)mass, dagger_bit, (double*)tmp, parity);
+    }else {
+      Matdagmat_mg4dir((double*)out, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink, (float**)ghost_longlink, 
+                        (double*)in, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, (double)mass, dagger_bit, (double*) tmp, parity);
+    }
+  }else{
+    if (gPrecision == QUDA_DOUBLE_PRECISION){ 
+      Matdagmat_mg4dir((float*)out, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink, (double**)ghost_longlink,
+                        (float*)in, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
+    }else {
+      Matdagmat_mg4dir((float*)out, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink, (float**)ghost_longlink, 
+                        (float*)in, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
+    }
+  }
+}
 
 
 #endif

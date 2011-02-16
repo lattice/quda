@@ -22,6 +22,7 @@
 #include "exchange_face.h"
 #endif
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
@@ -42,8 +43,8 @@ void *hostGauge[4];
 void *fatlink[4], *longlink[4];
 
 #ifdef MULTI_GPU
-void *cpu_fwd_nbr_spinor, *cpu_back_nbr_spinor;
-void* ghost_fatlink, *ghost_longlink;
+void *cpu_fwd_nbr_spinor[4], *cpu_back_nbr_spinor[4];
+void* ghost_fatlink[4], *ghost_longlink[4];
 #endif
 
 
@@ -59,13 +60,44 @@ QudaPrecision prec = QUDA_SINGLE_PRECISION;
 
 Dirac* dirac;
 
+extern int Z[4];
+extern int V;
+extern int Vh;
+static int Vs_x, Vs_y, Vs_z, Vs_t;
+extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+static int Vsh[4];
+
+void
+setDimConstants(int *X)
+{
+  V = 1;
+  for (int d=0; d< 4; d++) {
+    V *= X[d];
+    Z[d] = X[d];
+  }
+  Vh = V/2;
+
+  Vs_x = X[1]*X[2]*X[3];
+  Vs_y = X[0]*X[2]*X[3];
+  Vs_z = X[0]*X[1]*X[3];
+  Vs_t = X[0]*X[1]*X[2];
+
+
+  Vsh_x = Vs_x/2;
+  Vsh_y = Vs_y/2;
+  Vsh_z = Vs_z/2;
+  Vsh_t = Vs_t/2;
+
+  Vsh[0] = Vsh_x;
+  Vsh[1] = Vsh_y;
+  Vsh[2] = Vsh_z;
+  Vsh[3] = Vsh_t;
+}
+
 void init()
 {    
 
   initQuda(device);
-  
-  int Vs = sdim*sdim*sdim;
-  int Vsh = Vs/2;
 
   gaugeParam = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -75,14 +107,9 @@ void init()
   gaugeParam.X[2] = X[2] = sdim;
   gaugeParam.X[3] = X[3] = tdim;
 
-  gaugeParam.X[0] = sdim;
-  gaugeParam.X[1] = sdim;
-  gaugeParam.X[2] = sdim;
-  gaugeParam.X[3] = tdim;
-
   setDims(gaugeParam.X);
 
-  Vh = sdim*sdim*sdim*tdim/2;
+  setDimConstants(gaugeParam.X);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.cuda_prec = prec;
@@ -143,10 +170,12 @@ void init()
 
   //create ghost spinors
 #ifdef MULTI_GPU
-  cpu_fwd_nbr_spinor = malloc(Vsh* staggeredSpinorSiteSize *3*sizeof(double));
-  cpu_back_nbr_spinor = malloc(Vsh*staggeredSpinorSiteSize *3*sizeof(double));
-  if (cpu_fwd_nbr_spinor == NULL || cpu_back_nbr_spinor == NULL){
-    errorQuda("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
+  for(int i=0;i < 4;i++){
+    cpu_fwd_nbr_spinor[i] = malloc(Vsh[i]* staggeredSpinorSiteSize *3*sizeof(double));
+    cpu_back_nbr_spinor[i] = malloc(Vsh[i]*staggeredSpinorSiteSize *3*sizeof(double));
+    if (cpu_fwd_nbr_spinor[i] == NULL || cpu_back_nbr_spinor[i] == NULL){
+      errorQuda("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
+    }
   }
 #endif
 
@@ -165,27 +194,42 @@ void init()
 
 #ifdef MULTI_GPU
   exchange_init_dims(X);
-  ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
-  ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
-  if (ghost_fatlink == NULL || ghost_longlink == NULL){
+  ghost_fatlink[0] = malloc(Vs_x*gaugeSiteSize*gSize);
+  ghost_fatlink[1] = malloc(Vs_y*gaugeSiteSize*gSize);
+  ghost_fatlink[2] = malloc(Vs_z*gaugeSiteSize*gSize);
+  ghost_fatlink[3] = malloc(Vs_t*gaugeSiteSize*gSize);
+  ghost_longlink[0] = malloc(3*Vs_x*gaugeSiteSize*gSize);
+  ghost_longlink[1] = malloc(3*Vs_y*gaugeSiteSize*gSize);
+  ghost_longlink[2] = malloc(3*Vs_z*gaugeSiteSize*gSize);
+  ghost_longlink[3] = malloc(3*Vs_t*gaugeSiteSize*gSize);
+  if (ghost_fatlink[0] == NULL || ghost_longlink[0] == NULL ||
+      ghost_fatlink[1] == NULL || ghost_longlink[1] == NULL ||
+      ghost_fatlink[2] == NULL || ghost_longlink[2] == NULL ||
+      ghost_fatlink[3] == NULL || ghost_longlink[3] == NULL){
     errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
-  exchange_cpu_links(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  //exchange_cpu_links(fatlink, ghost_fatlink[3], longlink, ghost_longlink[3], gaugeParam.cpu_prec);
+  exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif   
-  
-
 
   
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
 #ifdef MULTI_GPU
-  gaugeParam.ga_pad = sdim*sdim*sdim/2;    
+  int x_face_size = X[1]*X[2]*X[3]/2;
+  int y_face_size = X[0]*X[2]*X[3]/2;
+  int z_face_size = X[0]*X[1]*X[3]/2;
+  int t_face_size = X[0]*X[1]*X[2]/2;
+  int pad_size =MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+  gaugeParam.ga_pad = pad_size;    
 #endif
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda(fatlink, &gaugeParam);
   
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
 #ifdef MULTI_GPU
-  gaugeParam.ga_pad = 3*sdim*sdim*sdim/2;  
+  gaugeParam.ga_pad = 3*pad_size;
 #endif
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
   loadGaugeQuda(longlink, &gaugeParam);
@@ -254,8 +298,15 @@ void end(void)
   }
 
 #ifdef MULTI_GPU
-  free(ghost_fatlink);
-  free(ghost_longlink);
+  for(int i=0;i < 4;i++){
+    free(ghost_fatlink[i]);
+    free(ghost_longlink[i]);
+  }
+  for(int i=0;i < 4;i++){
+    free(cpu_fwd_nbr_spinor[i]);
+    free(cpu_back_nbr_spinor[i]);
+  }
+
 #endif
 
   if (!transfer){
@@ -329,9 +380,9 @@ void staggeredDslashRef()
   switch (test_type) {
   case 0:    
 #ifdef MULTI_GPU    
-    staggered_dslash_mg(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-			spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
-			inv_param.cpu_prec, gaugeParam.cpu_prec);
+    staggered_dslash_mg4dir(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			    spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+			    inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
     
@@ -344,9 +395,16 @@ void staggeredDslashRef()
 
     break;
   case 1: 
+#ifdef MULTI_GPU
+    staggered_dslash_mg4dir(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			    spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+			    inv_param.cpu_prec, gaugeParam.cpu_prec);    
+
+#else
     cpu_parity=1; //ODD
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
 		     inv_param.cpu_prec, gaugeParam.cpu_prec);
+#endif
     break;
   case 2:
     //mat(spinorRef->v, fatlink, longlink, spinor->v, kappa, dagger, 
@@ -367,8 +425,6 @@ static int dslashTest()
   init();
     
   int attempts = 1;
-
-  staggeredDslashRef();
     
   for (int i=0; i<attempts; i++) {
 	
@@ -379,6 +435,7 @@ static int dslashTest()
     }
       
     printfQuda("\n%fms per loop\n", 1000*secs);
+    staggeredDslashRef();
 	
     int flops = dirac->Flops();
     int link_floats = 8*gaugeParam.reconstruct+8*18;
@@ -444,10 +501,11 @@ void usage(char** argv )
 
 int main(int argc, char **argv) 
 {
-#ifdef MULTI_GPU
-  MPI_Init (&argc, &argv);
-  comm_init();
-#endif
+
+  int xsize=1;
+  int ysize=1;
+  int zsize=1;
+  int tsize=1;
 
   int i;
   for (i =1;i < argc; i++){
@@ -532,11 +590,73 @@ int main(int argc, char **argv)
       continue;	    
     }	
 
+    if( strcmp(argv[i], "--xgridsize") == 0){
+      if (i+1 >= argc){ 
+        usage(argv);
+      }     
+      xsize =  atoi(argv[i+1]);
+      if (xsize <= 0 ){
+        fprintf(stderr, "Error: invalid X grid size\n");
+        exit(1);
+      }
+      i++;
+      continue;     
+    }
+
+    if( strcmp(argv[i], "--ygridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      ysize =  atoi(argv[i+1]);
+      if (ysize <= 0 ){
+        fprintf(stderr, "Error: invalid Y grid size\n");
+        exit(1); 
+      }
+      i++;
+      continue;     
+    }
+
+    if( strcmp(argv[i], "--zgridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      zsize =  atoi(argv[i+1]);
+      if (zsize <= 0 ){
+        fprintf(stderr, "Error: invalid Z grid size\n");
+        exit(1);
+      }
+      i++;
+      continue;
+    }
+
+    if( strcmp(argv[i], "--tgridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      tsize =  atoi(argv[i+1]);
+      if (tsize <= 0 ){
+        fprintf(stderr, "Error: invalid T grid size\n");
+        exit(1); 
+      }
+      i++;
+      continue;
+    }
+
+
+
+
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
 
   display_test_info();
+
+#ifdef MULTI_GPU
+  MPI_Init (&argc, &argv);  
+  comm_set_gridsize(xsize, ysize, zsize, tsize);  
+  comm_init();
+#endif
+
 
   int ret =1;
   int accuracy_level = dslashTest();

@@ -368,12 +368,27 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 {
     // direction: -X
     
+    int dir =1;
+    int space_con = (x4*X3*X2 + x3*X2+ x2) >>1;
     int sp_idx_1st_nbr = ((x1==0) ? X+X1m1 : X-1) >> 1;
     int sp_idx_3rd_nbr = ((x1<3) ? X + X1-3: X -3)>>1; 
 
+    int fat_idx = sp_idx_1st_nbr;
     // read gauge matrix from device memory
-    READ_FAT_MATRIX(FATLINK1TEX, 1, sp_idx_1st_nbr);
-    READ_LONG_MATRIX(LONGLINK1TEX, 1, sp_idx_3rd_nbr); 
+#ifdef MULTI_GPU
+    if ((x1 -1) < 0){
+      fat_idx = Vh + space_con;
+    }
+#endif
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+    
+    int long_idx = sp_idx_3rd_nbr;
+#ifdef MULTI_GPU
+    if ((x1 -3) < 0){
+      long_idx =Vh + x1*X4*X3*X2/2 + space_con;
+    }    
+#endif
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
     
     // read spinor from device memory
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
@@ -449,13 +464,26 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 
 {
     //direction: -Y
-    
+    int dir=3;
+    int space_con = (x4*X3*X1 + x3*X1+ x1) >>1;    
     int sp_idx_1st_nbr = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;
     int sp_idx_3rd_nbr = ((x2 < 3) ? X + ( X2 - 3)*X1: X -3*X1 )>> 1; 
-    
+
+    int fat_idx=sp_idx_1st_nbr;
     // read gauge matrix from device memory
-    READ_FAT_MATRIX(FATLINK1TEX, 3, sp_idx_1st_nbr);
-    READ_LONG_MATRIX(LONGLINK1TEX, 3, sp_idx_3rd_nbr); 
+#ifdef MULTI_GPU
+    if ((x2 -1) < 0){
+      fat_idx = Vh + space_con;
+    }    
+#endif
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+    int long_idx = sp_idx_3rd_nbr;
+#ifdef MULTI_GPU
+    if ((x2-3) < 0){
+      long_idx = Vh+ x2*X4*X3*X1/2 + space_con;
+    }    
+#endif
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
     
     // read spinor from device memory
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
@@ -533,13 +561,28 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 
 {
     //direction: -Z
-    
+    int dir = 5;
+    int space_con = (x4*X2*X1 + x2*X1+ x1) >>1;    
     int sp_idx_1st_nbr = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
     int sp_idx_3rd_nbr = ((x3 <3) ? X + (X3 -3)*X2X1: X - 3*X2X1)>>1;
 
+    int fat_idx = sp_idx_1st_nbr;
+
     // read gauge matrix from device memory
-    READ_FAT_MATRIX(FATLINK1TEX, 5, sp_idx_1st_nbr);
-    READ_LONG_MATRIX(LONGLINK1TEX, 5, sp_idx_3rd_nbr); 
+#ifdef MULTI_GPU
+    if ((x3 -1) < 0){
+      fat_idx = Vh + space_con;
+    }    
+#endif
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+
+    int long_idx = sp_idx_3rd_nbr;
+#ifdef MULTI_GPU
+    if ((x3 -3) < 0){
+      long_idx = Vh + x3*X4*X2*X1/2 + space_con;
+    }    
+#endif
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
     
     // read spinor from device memory
     READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
@@ -662,8 +705,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
     int sp_idx_3rd_nbr = ((x4<3) ? X + (X4 -3)*X3X2X1: X - 3*X3X2X1) >> 1;
 
 
-    int fat_dir = 7;
-    int long_dir = 7;
+    int dir = 7;
     int fat_idx = sp_idx_1st_nbr;    
     int long_idx = sp_idx_3rd_nbr;
     int nbr_idx1 = sp_idx_1st_nbr;
@@ -676,12 +718,10 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       // read gauge matrix from device memory    
       if ( (x4 - 1) < 0){
-	fat_dir = 7;
 	fat_idx = Vh + space_con;
       }
       
       if ( (x4 - 3) < 0){
-	long_dir = 7;
 	long_idx = Vh + x4*Vsh+ space_con;
     }
       
@@ -698,8 +738,8 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
     }
 #endif
 
-    READ_FAT_MATRIX(FATLINK1TEX, fat_dir, fat_idx);
-    READ_LONG_MATRIX(LONGLINK1TEX, long_dir, long_idx);
+    READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx);
     READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
     READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);       
 

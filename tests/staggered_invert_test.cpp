@@ -17,15 +17,15 @@
 #include <mpi.h>
 #endif
 
-
+#define MAX(a,b) ((a)>(b)?(a):(b))
 #define mySpinorSiteSize 6
 
 void *fatlink[4];
 void *longlink[4];  
 
 #ifdef MULTI_GPU
-void *cpu_fwd_nbr_spinor, *cpu_back_nbr_spinor;
-void* ghost_fatlink, *ghost_longlink;
+void *cpu_fwd_nbr_spinor[4], *cpu_back_nbr_spinor[4];
+void* ghost_fatlink[4], *ghost_longlink[4];
 #endif
 
 void *spinorIn;
@@ -53,9 +53,15 @@ static int testtype = 0;
 static int sdim = 24;
 static int tdim = 24;
 
-extern int V;
+
 static void end();
 
+extern int Z[4];
+extern int V;
+extern int Vh;
+static int Vs_x, Vs_y, Vs_z, Vs_t;
+extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+static int Vsh[4];
 
 template<typename Float>
 void constructSpinorField(Float *res) {
@@ -69,6 +75,32 @@ void constructSpinorField(Float *res) {
   }
 }
 
+void
+setDimConstants(int *X)
+{
+  V = 1;
+  for (int d=0; d< 4; d++) {
+    V *= X[d];
+    Z[d] = X[d];
+  }
+  Vh = V/2;
+
+  Vs_x = X[1]*X[2]*X[3];
+  Vs_y = X[0]*X[2]*X[3];
+  Vs_z = X[0]*X[1]*X[3];
+  Vs_t = X[0]*X[1]*X[2];
+
+
+  Vsh_x = Vs_x/2;
+  Vsh_y = Vs_y/2;
+  Vsh_z = Vs_z/2;
+  Vsh_t = Vs_t/2;
+
+  Vsh[0] = Vsh_x;
+  Vsh[1] = Vsh_y;
+  Vsh[2] = Vsh_z;
+  Vsh[3] = Vsh_t;
+}
 
 static void
 set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
@@ -127,9 +159,6 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  int Vs = sdim*sdim*sdim;
-  int Vsh = Vs/2;  
-  
   double mass = 0.95;
 
   set_params(&gaugeParam, &inv_param,
@@ -140,6 +169,7 @@ invert_test(void)
   
 
   setDims(gaugeParam.X);
+  setDimConstants(gaugeParam.X);
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -166,12 +196,24 @@ invert_test(void)
   
 #ifdef MULTI_GPU
   exchange_init_dims(gaugeParam.X);
-  ghost_fatlink = malloc(Vs*gaugeSiteSize*gSize);
-  ghost_longlink = malloc(3*Vs*gaugeSiteSize*gSize);
-  if (ghost_fatlink == NULL || ghost_longlink == NULL){
-    errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
+  int ghost_link_len[4] = {
+    Vs_x*gaugeSiteSize*gSize,
+    Vs_y*gaugeSiteSize*gSize,
+    Vs_z*gaugeSiteSize*gSize,
+    Vs_t*gaugeSiteSize*gSize
+  };
+
+  for(int i=0;i < 4;i++){
+    ghost_fatlink[i] = malloc(ghost_link_len[i]);
+    ghost_longlink[i] = malloc(3*ghost_link_len[i]);
+    if (ghost_fatlink[i] == NULL || ghost_longlink[i] == NULL){
+      printf("ERROR: malloc failed for ghost fatlink or ghost longlink\n");
+      exit(1);
+    }
   }
-  exchange_cpu_links(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+
+  //exchange_cpu_links(fatlink, ghost_fatlink[3], longlink, ghost_longlink[3], gaugeParam.cpu_prec);
+  exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
 #endif
 
  
@@ -200,29 +242,40 @@ invert_test(void)
   
 #ifdef MULTI_GPU
   //create ghost spinors
-  cpu_fwd_nbr_spinor = malloc(Vsh* mySpinorSiteSize *3*sizeof(double));
-  cpu_back_nbr_spinor = malloc(Vsh*mySpinorSiteSize *3*sizeof(double));
-  if (cpu_fwd_nbr_spinor == NULL || cpu_back_nbr_spinor == NULL){
-    errorQuda("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
+  int ghost_spinor_len[4] ={
+    3* Vsh_x* mySpinorSiteSize*sSize,
+    3* Vsh_y* mySpinorSiteSize*sSize,
+    3* Vsh_z* mySpinorSiteSize*sSize,
+    3* Vsh_t* mySpinorSiteSize*sSize
+  };
+  
+  for(int i=0;i < 4;i++){ 
+    cpu_fwd_nbr_spinor[i] = malloc(ghost_spinor_len[i]);
+    cpu_back_nbr_spinor[i] = malloc(ghost_spinor_len[i]);
+    if (cpu_fwd_nbr_spinor[i] ==  NULL || cpu_back_nbr_spinor[i] == NULL){
+      printf("ERROR: malloc failed for cpu ghost spinors\n");
+      exit(1);
+    }
   }
+
 #endif
 
 
 #ifdef MULTI_GPU
 
   if(testtype == 6){
-    record_gauge(fatlink, ghost_fatlink, Vsh,
-		 longlink, ghost_longlink, 3*Vsh,
+    record_gauge(fatlink, ghost_fatlink[3], Vsh_t,
+		 longlink, ghost_longlink[3], 3*Vsh_t,
 		 link_recon, link_recon_sloppy,
 		 &gaugeParam);
    }else{
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-    gaugeParam.ga_pad = Vsh;
+    gaugeParam.ga_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(fatlink, &gaugeParam);
     
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-    gaugeParam.ga_pad = 3*Vsh;
+    gaugeParam.ga_pad = 3*MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);
@@ -260,9 +313,8 @@ invert_test(void)
     time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU    
-    matdagmat_mg(spinorCheck, fatlink, ghost_fatlink, longlink, ghost_longlink, 
-		      spinorOut, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN);
-    
+    matdagmat_mg4dir(spinorCheck, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+		     spinorOut, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN);
 #else
     matdagmat(spinorCheck, fatlink, longlink, spinorOut, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN);
 #endif
@@ -282,8 +334,8 @@ invert_test(void)
     time0 /= CLOCKS_PER_SEC;
     
 #ifdef MULTI_GPU
-    matdagmat_mg(spinorCheckOdd, fatlink, ghost_fatlink, longlink, ghost_longlink, 
-		 spinorOutOdd, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);
+    matdagmat_mg4dir(spinorCheckOdd, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+		     spinorOutOdd, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);
 #else
     matdagmat(spinorCheckOdd, fatlink, longlink, spinorOutOdd, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD);	
 #endif
@@ -402,8 +454,8 @@ invert_test(void)
     for(int i=0;i < num_offsets;i++){
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU
-      matdagmat_mg(spinorCheck, fatlink, ghost_fatlink, longlink, ghost_longlink, 
-		   spinorOutArray[i], cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
+      matdagmat_mg4dir(spinorCheck, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+		       spinorOutArray[i], cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
 #else
       matdagmat(spinorCheck, fatlink, longlink, spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
 #endif
@@ -457,8 +509,10 @@ end(void)
     free(longlink[i]);
   }
 #ifdef MULTI_GPU
-  free(ghost_fatlink);
-  free(ghost_longlink);
+  for(int i=0;i < 4;i++){
+    free(ghost_fatlink[i]);
+    free(ghost_longlink[i]);
+  }
 #endif  
   
   free(spinorIn);
@@ -467,8 +521,10 @@ end(void)
   free(tmp);
 
 #ifdef MULTI_GPU
-  free(cpu_fwd_nbr_spinor);
-  free(cpu_back_nbr_spinor);
+  for(int i=0;i < 4;i++){
+    free(cpu_fwd_nbr_spinor[i]);
+    free(cpu_back_nbr_spinor[i]);
+  }
 #endif
   endQuda();
 }
