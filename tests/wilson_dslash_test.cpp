@@ -18,8 +18,8 @@ const int test_type = 0;
 
 // Dirac operator type
 const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
-//const QudaDslashType = QUDA_CLOVER_WILSON_DSLASH;
-//const QudaDslashType = QUDA_TWISTED_MASS_DSLASH;
+//const QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+//const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?

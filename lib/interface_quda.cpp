@@ -892,7 +892,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
    */
   if (param->solve_type != QUDA_NORMEQ_PC_SOLVE &&
       param->solve_type != QUDA_NORMEQ_SOLVE) { 
-    errorQuda("Only direct solves are supported for multi-shift\n");
+    errorQuda("Direct solve_type is not supported in invertMultiShiftQuda()\n");
   }
 
   bool pc_solve = (param->solve_type == QUDA_NORMEQ_PC_SOLVE);
