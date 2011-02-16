@@ -73,9 +73,7 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
   
-  domainWallDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, 0, 0, 
-		       mass, 0, out.volume, out.bytes, out.norm_bytes, in.Precision(),
-		       blockDslash, blockDslashFace);
+  domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, blockDslash, blockDslashFace);
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.volume/Ls);
@@ -93,9 +91,7 @@ void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpino
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
-  domainWallDslashCuda(out.v, out.norm, gauge, in.v, in.norm, parity, dagger, x.v, x.norm, 
-		       mass, k, out.volume, out.bytes, out.norm_bytes, in.Precision(),
-		       blockDslashXpay, blockDslashXpayFace);
+  domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, blockDslashXpay, blockDslashXpayFace);
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.volume/Ls);

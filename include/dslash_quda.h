@@ -25,66 +25,45 @@ extern "C" {
   void initCloverConstants(const int cl_stride);
   void initDomainWallConstants(const int Ls);
   void initStaggeredConstants(FullGauge fatgauge, FullGauge longgauge);
-
-
-  // plain Wilson Dslash  
-  void dslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, const void *inNorm,
-		  const int oddBit, const int daggerBit, const void *x, const void *xNorm,
-		  const double k, const int volume, const size_t bytes, const size_t norm_bytes, 
-		  const QudaPrecision precision, const dim3 block, const dim3 blockFace);
-    
-  // clover Dslash
-  void cloverDslashCuda(void *out, void *outNorm, const FullGauge gauge, 
-			const FullClover cloverInv, const void *in, const void *inNorm,
-			const int oddBit, const int daggerBit, const void *x, const void *xNorm,
-			const double k, const int volume, const size_t bytes, const size_t norm_bytes, 
-			const QudaPrecision precision, const dim3 block, const dim3 blockFace);
-    
-  // solo clover term
-  void cloverCuda(void *out, void *outNorm, const FullGauge gauge, const FullClover clover, 
-		  const void *in, const void *inNorm, const int oddBit, const int volume, 
-		  const size_t bytes, const size_t norm_bytes, const QudaPrecision precision,
-		  const dim3 block);
-
-  // domain wall Dslash  
-  void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 
-			    const void *inNorm, const int parity, const int dagger, 
-			    const void *x, const void *xNorm, const double m_f, const double k,
-			    const int volume5d, const size_t bytes, const size_t norm_bytes, 
-			    const QudaPrecision precision, const dim3 block, const dim3 blockFace);
-    
-  // staggered Dslash
-  /*
-  void staggeredDslashCuda(cudaColorSpinorField* inSpinor,
-			   void *out, void *outNorm, const FullGauge fatGauge, FullGauge longGauge, const void *in, 
-			   const void *inNorm, const int parity, const int dagger, 
-			   const void *x, const void *xNorm, const double k,
-			   const int volume, const size_t bytes, const size_t norm_bytes, 
-			   const QudaPrecision precision, const dim3 block, const dim3 blockFace);
-  */
-  void staggeredDslashCuda(void *out, void *outNorm, const FullGauge fatGauge, FullGauge longGauge,
-			   cudaColorSpinorField *in,
-			   const int parity, const int dagger, 
-			   const void *x, const void *xNorm, const double k,
-			   const int volume, const int Vsh, const int tdim,
-			   const int length, const int ghost_length, const QudaPrecision precision,
-			   const dim3 block, const dim3 blockFace);
-
-  // twisted mass Dslash  
-  void twistedMassDslashCuda(void *out, void *outNorm, const FullGauge gauge, const void *in, 
-			     const void *inNorm, const int parity, const int dagger, 
-			     const void *x, const void *xNorm, const double kappa, const double mu,
-			     const double a, const int volume, const size_t bytes, const size_t norm_bytes,
-			     const QudaPrecision precision, const dim3 block, const dim3 blockFace);
-
-  // solo twist term
-  void twistGamma5Cuda(void *out, void *outNorm, const void *in, const void *inNorm,
-		       const int dagger, const double kappa, const double mu, const int volume, 
-		       const size_t bytes, const size_t norm_bytes, const QudaPrecision precision, 
-		       const QudaTwistGamma5Type, const dim3 block);
-
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _DLASH_QUDA_H
+// plain Wilson Dslash  
+void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+		const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
+		const double &k, const dim3 &block, const dim3 &blockFace);
+
+// clover Dslash
+void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
+		      const FullClover cloverInv, const cudaColorSpinorField *in, 
+		      const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
+		      const double &k, const dim3 &block, const dim3 &blockFace);
+
+// solo clover term
+void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover clover, 
+		const cudaColorSpinorField *in, const int oddBit, const dim3 &block);
+
+// domain wall Dslash  
+void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in, 
+			  const int parity, const int dagger, const cudaColorSpinorField *x, 
+			  const double &m_f, const double &k, const dim3 &block, const dim3 &blockFace);
+
+// staggered Dslash    
+void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, FullGauge longGauge,
+			 const cudaColorSpinorField *in, const int parity, const int dagger, 
+			 const cudaColorSpinorField *x, const double &k,
+			 const dim3 &block, const dim3 &blockFace);
+
+// twisted mass Dslash  
+void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+			   const int parity, const int dagger, const cudaColorSpinorField *x, 
+			   const double &kappa, const double &mu, const double &a, 
+			   const dim3 &block, const dim3 &blockFace);
+
+// solo twist term
+void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
+		     const int dagger, const double &kappa, const double &mu,
+		     const QudaTwistGamma5Type, const dim3 &block);
+
+#endif // _DSLASH_QUDA_H

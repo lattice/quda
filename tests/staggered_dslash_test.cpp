@@ -251,6 +251,9 @@ void init()
       csParam.x[0] /=2;
     }
 	
+    for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
+    csParam.ghostDim[3] = true;
+
     printfQuda("Creating cudaSpinor\n");
     cudaSpinor = new cudaColorSpinorField(csParam);
 

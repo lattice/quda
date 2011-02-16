@@ -44,7 +44,7 @@ Dirac& Dirac::operator=(const Dirac &dirac)
 
 bool Dirac::newTmp(cudaColorSpinorField **tmp, const cudaColorSpinorField &a) const {
   if (*tmp) return false;
-  ColorSpinorParam param;
+  ColorSpinorParam param(a);
   param.create = QUDA_ZERO_FIELD_CREATE; // need to zero elements else padded region will be junk
   *tmp = new cudaColorSpinorField(a, param);
   return true;

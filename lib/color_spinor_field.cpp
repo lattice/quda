@@ -10,33 +10,29 @@ ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
   field.fill(*this);
 }
 
-ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0) {
+ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbose), init(false), 
+								    even(0), odd(0) 
+{
   create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
 	 param.fieldLocation, param.siteSubset, param.siteOrder, param.fieldOrder, 
-	 param.gammaBasis);
+	 param.gammaBasis, param.ghostDim);
+
 }
 
-ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : init(false), even(0), odd(0) {
+ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
+								    even(0), odd(0)
+{
   create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
 	 field.fieldLocation, field.siteSubset, field.siteOrder, field.fieldOrder, 
-	 field.gammaBasis);
+	 field.gammaBasis, field.ghostDim);
+
 }
 
 ColorSpinorField::~ColorSpinorField() {
   destroy();
 }
 
-void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
-			      QudaPrecision Prec, int Pad, QudaFieldLocation fieldLocation, 
-			      QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, 
-			      QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis) {
-  if (Ndim > QUDA_MAX_DIM){
-    errorQuda("Number of dimensions nDim = %d too great", Ndim);
-  }
-  nDim = Ndim;
-  nColor = Nc;
-  nSpin = Ns;
-  twistFlavor = Twistflavor;
+void ColorSpinorField::createGhostZone() {
 
   int num_faces = 1;
   int num_norm_faces=2;
@@ -45,22 +41,30 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
     num_norm_faces=6;
   }
 
-  precision = Prec;
-  volume = 1;
-  int Vs = 1;
-  for (int d=0; d<nDim; d++) {
-    x[d] = X[d];
-    volume *= x[d];
-    if (d<nDim-1) Vs *= x[d];
+  // calculate size of ghost zone required
+  int ghostVolume = 0;
+  for (int i=0; i<nDim; i++) {
+    ghostFace[i] = 0;
+    if (ghostDim[i]) {
+      ghostFace[i] = 1;
+      for (int j=0; j<nDim; j++) {
+	if (i==j) continue;
+	ghostFace[i] *= x[j];
+      }
+      if (i==0 && siteSubset == QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
+      ghostVolume += ghostFace[i];
+    }
+    if (verbose == QUDA_DEBUG_VERBOSE) printf("face %d = %d %d\n", i, ghostFace[i], ghostDim[i]);
   }
-  pad = Pad;
-  
+  ghostVolume *= num_faces;
+  int ghostNormVolume = num_norm_faces * ghostVolume;
+
+  if (verbose == QUDA_DEBUG_VERBOSE) printfQuda("Allocated ghost volume = %d\n", ghostVolume);
+
   if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-    stride = volume/2 + pad; // padding is based on half volume
-    length = 2*stride*nColor*nSpin*2;    
 #ifdef MULTI_GPU
-    ghost_length = num_faces*Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (num_norm_faces*Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
+    ghost_length = ghostVolume*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
 #else
     ghost_length = 0;
     ghost_norm_length = 0;
@@ -68,11 +72,9 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
     total_length = length + 2*ghost_length; // 2 ghost zones in a full field
     total_norm_length = 2*(stride + ghost_norm_length); // norm stride and length are the same
   } else {
-    stride = volume + pad;
-    length = stride*nColor*nSpin*2;
 #ifdef MULTI_GPU
-    ghost_length = num_faces*Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs * num_norm_faces : 0; // ghost norm zone is 2 c/b spatial volumes
+    ghost_length = ghostVolume*nColor*nSpin*2; // ghost zone is one c/b spatial volume
+    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0; // ghost norm zone is 1 c/b spatial volumes
 #else
     ghost_length = 0;
     ghost_norm_length = 0;
@@ -89,16 +91,51 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
     total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
   }
 
-  real_length = volume*nColor*nSpin*2; // physical length
+  if (verbose == QUDA_DEBUG_VERBOSE) 
+    printf("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
 
-  bytes = total_length * precision; // includes pads and ghost zones
-  norm_bytes = total_norm_length * sizeof(float);
+}
 
+void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
+			      QudaPrecision Prec, int Pad, QudaFieldLocation fieldLocation, 
+			      QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, 
+			      QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, const bool *ghostDim) {
   this->fieldLocation = fieldLocation;
   this->siteSubset = siteSubset;
   this->siteOrder = siteOrder;
   this->fieldOrder = fieldOrder;
   this->gammaBasis = gammaBasis;
+
+  if (Ndim > QUDA_MAX_DIM){
+    errorQuda("Number of dimensions nDim = %d too great", Ndim);
+  }
+  nDim = Ndim;
+  nColor = Nc;
+  nSpin = Ns;
+  twistFlavor = Twistflavor;
+
+  precision = Prec;
+  volume = 1;
+  for (int d=0; d<nDim; d++) {
+    x[d] = X[d];
+    volume *= x[d];
+    this->ghostDim[d] = ghostDim[d];
+  }
+  pad = Pad;
+  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+    stride = volume/2 + pad; // padding is based on half volume
+    length = 2*stride*nColor*nSpin*2;    
+  } else {
+    stride = volume + pad;
+    length = stride*nColor*nSpin*2;
+  }
+
+  createGhostZone();
+
+  real_length = volume*nColor*nSpin*2; // physical length
+
+  bytes = total_length * precision; // includes pads and ghost zones
+  norm_bytes = total_norm_length * sizeof(float);
 
   init = true;
 }
@@ -111,7 +148,7 @@ ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
   if (&src != this) {
     create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
 	   src.precision, src.pad, src.fieldLocation, src.siteSubset, 
-	   src.siteOrder, src.fieldOrder, src.gammaBasis);    
+	   src.siteOrder, src.fieldOrder, src.gammaBasis, src.ghostDim);    
   }
   return *this;
 }
@@ -128,60 +165,30 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
   if (param.nDim != 0) nDim = param.nDim;
 
-  int num_faces = 1;
-  int num_norm_faces=2;
-  if (nSpin == 1) { //staggered
-    num_faces=6;
-    num_norm_faces=6;
-  }
-
-
   volume = 1;
-  int Vs = 1;
   for (int d=0; d<nDim; d++) {
     if (param.x[0] != 0) x[d] = param.x[d];
     volume *= x[d];
-    if (d<nDim-1) Vs *= x[d];
   }
+  for (int d=0; d<nDim; d++) {
+    ghostDim[d] = param.ghostDim[d];
+  }
+  
   
   if (param.pad != 0) pad = param.pad;
 
   if (param.siteSubset == QUDA_FULL_SITE_SUBSET){
     stride = volume/2 + pad;
     length = 2*stride*nColor*nSpin*2;
-#ifdef MULTI_GPU
-    ghost_length = num_faces*Vs/2*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? (num_norm_faces*Vs/2) * 2 : 0; // ghost norm zone is 2 c/b spatial volumes
-#else
-    ghost_length = 0;
-    ghost_norm_length = 0;
-#endif
-    total_length = length + 2*ghost_length; // 2 ghost zones in a full field
-    total_norm_length = 2*(stride + ghost_norm_length); // norm stride and length are the same
   } else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
     stride = volume + pad;
     length = stride*nColor*nSpin*2;  
-#ifdef MULTI_GPU
-    ghost_length = num_faces*Vs*nColor*nSpin*2; // ghost zone is one c/b spatial volume
-    ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? Vs*num_norm_faces : 0; // ghost norm zone is 2 c/b spatial volumes
-#else
-    ghost_length = 0;
-    ghost_norm_length = 0;
-#endif
-    total_length = length + ghost_length;
-    total_norm_length = stride + ghost_norm_length; // norm stride and length are the same
   } else {
     //errorQuda("SiteSubset not defined %d", param.siteSubset);
     //do nothing, not an error (can't remember why - need to document this sometime! )
   }
 
-  // no ghost zones for cpu fields (yet?)
-  if (fieldLocation == QUDA_CPU_FIELD_LOCATION) {
-    ghost_length = 0;
-    ghost_norm_length = 0;
-    total_length = length;
-    total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
-  }
+  createGhostZone();
 
   real_length = volume*nColor*nSpin*2;
 
@@ -211,6 +218,8 @@ void ColorSpinorField::fill(ColorSpinorParam &param) const {
   param.fieldOrder = fieldOrder;
   param.gammaBasis = gammaBasis;
   param.create = QUDA_INVALID_FIELD_CREATE;
+  memcpy(param.ghostDim, ghostDim, QUDA_MAX_DIM*sizeof(bool));
+  param.verbose = verbose;
 }
 
 // For kernels with precision conversion built in
