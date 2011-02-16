@@ -255,6 +255,11 @@ extern "C" {
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
 
+  typedef enum QudaDirection_s {
+    QUDA_BACKWARDS,
+    QUDA_FORWARDS
+  } QudaDirection;
+
 #ifdef __cplusplus
 }
 #endif

@@ -427,6 +427,62 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
 }
 
 
+void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
+				     const int dim, const QudaDirection dir,
+				     cudaStream_t *stream) {
+
+  if (dim != 3) errorQuda("Not supported");
+
+  int num_faces = 3; //3 faces for asqtad
+  int FloatN = 2; // always use Float2 for staggered
+  int M = nColor * nSpin * 2 / FloatN; // number FloatN buffers we have
+
+  int Vh = this->volume;
+  int Vsh = x[0]*x[1]*x[2];
+  int sizeOfFloatN = FloatN*precision;
+  int len = num_faces*Vsh*sizeOfFloatN; 
+
+  int offset = (dir == QUDA_BACKWARDS) ? 0 : Vh - num_faces*Vsh;
+
+  for (int i=0; i<M; i++) {
+    void *dst = (char*)ghost_spinor + i*len;
+    void *src = (char*)v + (offset + i*stride) * sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+  }
+
+}
+
+void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm, 
+				       const int dim, const QudaDirection dir, 
+				       cudaStream_t* stream) 
+{
+
+  if (dim != 3) errorQuda("Not supported");
+
+  int num_faces = 3; //3 faces for asqtad
+  int FloatN = 2; // always use Float2 for staggered
+  int M = nColor * nSpin * 2 / FloatN; // number FloatN buffers we have
+
+  int Vsh = x[0]*x[1]*x[2];  
+  int sizeOfFloatN = FloatN*precision;
+  int len = num_faces*Vsh*sizeOfFloatN;
+  
+  int offset = (dir == QUDA_BACKWARDS) ? 0 : M*len;
+  void* dst = ((char*)v) + M*stride*sizeOfFloatN + offset; // into the endzone
+  void* src = ghost_spinor;
+  cudaMemcpyAsync(dst, src, M*len, cudaMemcpyHostToDevice, *stream);CUERR;
+  
+  if (precision == QUDA_HALF_PRECISION){
+    int normlen = num_faces*Vsh*sizeof(float);
+    int offset = (dir == QUDA_BACKWARDS) ? 0 : normlen;
+    void* dst = ((char*)norm) + stride*sizeof(float) + offset;
+    void* src = ghost_norm;
+    cudaMemcpyAsync(dst, src, normlen, cudaMemcpyHostToDevice, *stream); CUERR;
+  }  
+
+  return;
+}
+
 void
 cudaColorSpinorField::packGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, 
 				      void* f_norm, void* b_norm, cudaStream_t* stream) 

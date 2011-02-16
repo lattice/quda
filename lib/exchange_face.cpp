@@ -307,7 +307,8 @@ exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
   int normlen = 3*Vsh_t*sizeof(float);
 
   gettimeofday(&t0, NULL);
-  cudaSpinor->packGhostSpinor(fwd_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, f_norm_sendbuf, b_norm_sendbuf, mystream); CUERR;
+  cudaSpinor->packGhost(fwd_nbr_spinor_sendbuf, f_norm_sendbuf, 3, QUDA_FORWARDS, mystream); CUERR;
+  cudaSpinor->packGhost(back_nbr_spinor_sendbuf, b_norm_sendbuf, 3, QUDA_BACKWARDS, mystream); CUERR;
   cudaStreamSynchronize(*mystream);
   gettimeofday(&t1, NULL);
  
@@ -344,7 +345,8 @@ exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
   }
   
   gettimeofday(&t2, NULL);
-  cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream); CUERR;
+  cudaSpinor->unpackGhost(fwd_nbr_spinor, f_norm, 3, QUDA_FORWARDS, mystream); CUERR;
+  cudaSpinor->unpackGhost(back_nbr_spinor, b_norm, 3, QUDA_BACKWARDS, mystream); CUERR;
   
   cudaStreamSynchronize(*mystream);
   gettimeofday(&t3, NULL);

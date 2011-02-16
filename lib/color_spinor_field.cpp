@@ -10,16 +10,18 @@ ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
   field.fill(*this);
 }
 
-ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : init(false), even(0), odd(0), 
-								    verbose(param.verbose) {
+ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbose), init(false), 
+								    even(0), odd(0) 
+{
   create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
 	 param.fieldLocation, param.siteSubset, param.siteOrder, param.fieldOrder, 
 	 param.gammaBasis, param.ghostDim);
 
 }
 
-ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : init(false), even(0), odd(0),
-								    verbose(field.verbose) {
+ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
+								    even(0), odd(0)
+{
   create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
 	 field.fieldLocation, field.siteSubset, field.siteOrder, field.fieldOrder, 
 	 field.gammaBasis, field.ghostDim);
