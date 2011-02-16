@@ -122,7 +122,6 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
     this->ghostDim[d] = ghostDim[d];
   }
   pad = Pad;
-  
   if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     stride = volume/2 + pad; // padding is based on half volume
     length = 2*stride*nColor*nSpin*2;    
@@ -171,6 +170,10 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
     if (param.x[0] != 0) x[d] = param.x[d];
     volume *= x[d];
   }
+  for (int d=0; d<nDim; d++) {
+    ghostDim[d] = param.ghostDim[d];
+  }
+  
   
   if (param.pad != 0) pad = param.pad;
 
