@@ -1017,6 +1017,98 @@ void staggered_dslash_mg4dir(void *res, void **fatlink, void** longlink, void** 
 
 }
 
+template <typename sFloat, typename gFloat>
+void
+Matdagmat_mg4dir(sFloat *out, gFloat **fatlink, gFloat** ghost_fatlink, gFloat** longlink, gFloat** ghost_longlink,
+                  sFloat *in, sFloat** fwd_nbr_spinor, sFloat** back_nbr_spinor, sFloat mass, int daggerBit,
+                  sFloat* tmp, MyQudaParity parity)
+{
+
+  sFloat msq_x4 = mass*mass*4;
+
+  switch(parity){
+  case QUDA_EVEN:
+    {
+      sFloat *inEven = in;
+      sFloat *outEven = out;
+      dslashReference_mg4dir(tmp, fatlink,   ghost_fatlink,longlink, ghost_longlink, inEven,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+      dslashReference_mg4dir(outEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmp,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+
+      // lastly apply the mass term
+      axmy(inEven, msq_x4, outEven, Vh*mySpinorSiteSize);
+      break;
+    }
+  case QUDA_ODD:
+    {
+      sFloat *inOdd = in;
+      sFloat *outOdd = out;
+      dslashReference_mg4dir(tmp, fatlink, ghost_fatlink, longlink,  ghost_longlink, inOdd,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+      dslashReference_mg4dir(outOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmp,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+
+      // lastly apply the mass term
+      axmy(inOdd, msq_x4, outOdd, Vh*mySpinorSiteSize);
+      break;    
+    }
+     
+  case QUDA_EVENODD:
+    {
+      sFloat *inEven = in;
+      sFloat *inOdd = in + Vh*mySpinorSiteSize;
+      sFloat *outEven = out;
+      sFloat *outOdd = out + Vh*mySpinorSiteSize;
+      sFloat *tmpEven = tmp; 
+      sFloat *tmpOdd = tmp + Vh*mySpinorSiteSize;
+             
+      dslashReference_mg4dir(tmpOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, inEven,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+      dslashReference_mg4dir(tmpEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, inOdd,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+
+      dslashReference_mg4dir(outOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmpEven,
+                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
+      dslashReference_mg4dir(outEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmpOdd,
+                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
+
+      // lastly apply the mass term
+      axmy(in, msq_x4, out, V*mySpinorSiteSize);
+      break;
+    }
+  default:
+    fprintf(stderr, "ERROR: invalid parity in %s,line %d\n", __FUNCTION__, __LINE__);
+    break;
+  } 
+   
+}
+
+void 
+matdagmat_mg4dir(void *out, void **fatlink, void** ghost_fatlink, void** longlink, void** ghost_longlink, 
+		 void *in, void** fwd_nbr_spinor, void** back_nbr_spinor, double mass, int dagger_bit,
+		 QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
+{
+  
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+      Matdagmat_mg4dir((double*)out, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink, (double**)ghost_longlink,
+                        (double*)in, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, (double)mass, dagger_bit, (double*)tmp, parity);
+    }else {
+      Matdagmat_mg4dir((double*)out, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink, (float**)ghost_longlink, 
+                        (double*)in, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, (double)mass, dagger_bit, (double*) tmp, parity);
+    }
+  }else{
+    if (gPrecision == QUDA_DOUBLE_PRECISION){ 
+      Matdagmat_mg4dir((float*)out, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink, (double**)ghost_longlink,
+                        (float*)in, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
+    }else {
+      Matdagmat_mg4dir((float*)out, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink, (float**)ghost_longlink, 
+                        (float*)in, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
+    }
+  }
+}
+
 
 #endif
 

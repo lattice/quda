@@ -42,6 +42,9 @@ extern "C" {
   void matdagmat_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, void* ghost_longlink, 
 		    void *in, void* fwd_nbr_spinor, void* back_nbr_spinor, double mass, int dagger_bit,
 		    QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);
+  void matdagmat_mg4dir(void *out, void **fatlink, void** ghost_fatlink, void** longlink, void** ghost_longlink, 
+			void *in, void** fwd_nbr_spinor, void** back_nbr_spinor, double mass, int dagger_bit,
+			QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity);
   
   
 #ifdef __cplusplus
