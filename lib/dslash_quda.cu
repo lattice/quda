@@ -599,7 +599,10 @@ void domainWallDslashCuda(void *out, void *outNorm, const FullGauge gauge,
 
 
 #define INTERIOR_KERNEL 0
-#define EXTERIOR_KERNEL 1
+#define EXTERIOR_KERNEL_X 1
+#define EXTERIOR_KERNEL_Y 2
+#define EXTERIOR_KERNEL_Z 3
+#define EXTERIOR_KERNEL_T 4
 
 
 void
@@ -676,7 +679,7 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   exchange_gpu_spinor_wait(inSpinor, &streams[1]); CUERR;
   cudaStreamSynchronize(streams[0]); CUERR;
 
-  initTLocation(tdim-6,EXTERIOR_KERNEL , 6*Vsh);  
+  initTLocation(tdim-6,EXTERIOR_KERNEL_T , 6*Vsh);  
   if (x==0) { // not doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
@@ -768,7 +771,7 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   exchange_gpu_spinor_start(inSpinor, &streams[1]);   
   exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
   
-  initTLocation(tdim-6,EXTERIOR_KERNEL , 6*Vsh);  
+  initTLocation(tdim-6,EXTERIOR_KERNEL_T , 6*Vsh);  
   if (x==0) { // not doing xpay
     if (!dagger) {
       staggeredDslash18Kernel <<<exteriorGridDim, blockDim, shared_bytes, streams[0]>>>(out, outNorm, fatGauge0, fatGauge1, 

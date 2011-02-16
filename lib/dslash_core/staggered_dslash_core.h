@@ -219,27 +219,6 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #include "read_gauge.h"
 #include "io_spinor.h"
 
-int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if(sid >= threads) return;
-int z1 = FAST_INT_DIVIDE(sid, X1h);
-int x1h = sid - z1*X1h;
-int z2 = FAST_INT_DIVIDE(z1, X2);
-int x2 = z1 - z2*X2;
-int x4 = FAST_INT_DIVIDE(z2, X3);
-int x3 = z2 - x4*X3;
-int af = (x4 >= 3)?tLocate.x:0;
-int x4_new = x4 + af;
-sid +=Vsh*(x4_new -x4);
-x4=x4_new;
-int x1odd = (x2 + x3 + x4 + param.parity) & 1;
-int x1 = 2*x1h + x1odd;
-int X = 2*sid + x1odd;
-int sign;
-
-o00_re = o00_im = 0.f;
-o01_re = o01_im = 0.f;
-o02_re = o02_im = 0.f;
-
 #define MAT_MUL_V(VOUT, M, V)                   \
   spinorFloat VOUT##0_re = M##00_re * V##00_re; \
   VOUT##0_re -= M##00_im * V##00_im;            \
@@ -317,7 +296,96 @@ o02_re = o02_im = 0.f;
   VOUT##2_im -= M##22_im * V##02_re;
 
 #define INTERIOR_KERNEL 0
-#define EXTERIOR_KERNEL 1
+#define EXTERIOR_KERNEL_X 1
+#define EXTERIOR_KERNEL_Y 2
+#define EXTERIOR_KERNEL_Z 3
+#define EXTERIOR_KERNEL_T 4
+
+int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if(sid >= threads) return;
+
+int za,zb; 
+int x1h, x2h;
+int x1,x2,x3,x4;
+int x1_new, x4_new;
+int af;
+int x1odd,x2odd;
+int X;
+
+
+int X2h=X2/2;
+
+/* template for X4 X3 X2 X1h
+  za = FAST_INT_DIVIDE(sid, X_one_h);
+  x_one_h = sid - za*X_one_h;
+  zb = FAST_INT_DIVIDE(za, X_two_);
+  x_two_ = za - zb*X_two_;
+  x_four_ = FAST_INT_DIVIDE(zb, X_three_);
+  x_three_ = zb - x_four_*X_three_;
+  af = (x_four_ >= 3)?(X_four_-6):0;
+  x_four__new = x_four_ + af;
+  sid +=Vsh*(x_four__new -x_four_);
+  x_four_=x_four__new;
+  x_one_odd = (x_two_ + x_three_ + x_four_ + param.parity) & 1;
+  x_one_ = 2*x_one_h + x_one_odd;
+  X = 2*sid + x_one_odd;
+*/
+
+if(tLocate.y == INTERIOR_KERNEL){
+  //data order: X4 X3 X2 X1h
+  za = FAST_INT_DIVIDE(sid, X1h);
+  x1h = sid - za*X1h;
+  zb = FAST_INT_DIVIDE(za, X2);
+  x2 = za - zb*X2;
+  x4 = FAST_INT_DIVIDE(zb, X3);
+  x3 = zb - x4*X3;
+  x1odd = (x2 + x3 + x4 + param.parity) & 1;
+  x1 = 2*x1h + x1odd;
+  X = 2*sid + x1odd;
+ }else if (tLocate.y == EXTERIOR_KERNEL_X){
+  //data order: X1 X4 X3 X2h
+  za = FAST_INT_DIVIDE(sid, X2h);
+  x2h = sid - za*X2h;
+  zb = FAST_INT_DIVIDE(za, X3);
+  x3 = za - zb*X3;
+  x1 = FAST_INT_DIVIDE(zb, X4);
+  x4 = zb - x1*X4;
+  af = (x1 >= 3)?(X1-6):0;
+  x1_new = x1 + af;
+  sid +=Vsh*(x1_new -x1);
+  x1=x1_new;
+  x2odd = (x3 + x4 + x1 + param.parity) & 1;
+  x2 = 2*x2h + x2odd;
+  X = 2*sid + x2odd;
+ }else if (tLocate.y == EXTERIOR_KERNEL_Y){
+  //data order: X2 X4 X3 X1h
+
+ }else if (tLocate.y == EXTERIOR_KERNEL_Z){
+  //data order: X3 X4 X2 X1h
+
+ }else if (tLocate.y == EXTERIOR_KERNEL_T){
+  //data order: X4 X3 X2 X1h
+  za = FAST_INT_DIVIDE(sid, X1h);
+  x1h = sid - za*X1h;
+  zb = FAST_INT_DIVIDE(za, X2);
+  x2 = za - zb*X2;
+  x4 = FAST_INT_DIVIDE(zb, X3);
+  x3 = zb - x4*X3;
+  af = (x4 >= 3)?(X4-6):0;
+  x4_new = x4 + af;
+  sid +=Vsh*(x4_new -x4);
+  x4=x4_new;
+  x1odd = (x2 + x3 + x4 + param.parity) & 1;
+  x1 = 2*x1h + x1odd;
+  X = 2*sid + x1odd;
+ }
+
+int sign;
+
+o00_re = o00_im = 0.f;
+o01_re = o01_im = 0.f;
+o02_re = o02_im = 0.f;
+
 
 #ifdef MULTI_GPU
 if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
@@ -619,7 +687,7 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 
 #ifdef MULTI_GPU
 if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
-     (tLocate.y == EXTERIOR_KERNEL && x4 >= X4 -3))
+     (tLocate.y == EXTERIOR_KERNEL_T && x4 >= X4 -3))
 #endif
 
 {
@@ -646,7 +714,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
     
     //if exterior kernel, we need to read from ghost slices
 #ifdef MULTI_GPU
-    if (tLocate.y == EXTERIOR_KERNEL){
+    if (tLocate.y == EXTERIOR_KERNEL_T){
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       
       if (x4 + 1 >= X4){
@@ -691,7 +759,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
 //  exterior kernel and x4 < 3  
 #ifdef MULTI_GPU
 if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
-     (tLocate.y == EXTERIOR_KERNEL && x4 < 3))
+     (tLocate.y == EXTERIOR_KERNEL_T && x4 < 3))
 #endif
 {
     //direction: -T
@@ -714,7 +782,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
     int stride3 = sp_stride;
     
 #ifdef MULTI_GPU
-    if (tLocate.y == EXTERIOR_KERNEL){
+    if (tLocate.y == EXTERIOR_KERNEL_T){
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       // read gauge matrix from device memory    
       if ( (x4 - 1) < 0){
@@ -810,7 +878,7 @@ o02_im = -o02_im + a*accum2.y;
 #endif // DSLASH_AXPY
 
 #ifdef MULTI_GPU
-if (tLocate.y == EXTERIOR_KERNEL){
+if (tLocate.y == EXTERIOR_KERNEL_T){
   READ_AND_SUM_SPINOR();
  }
 #endif
