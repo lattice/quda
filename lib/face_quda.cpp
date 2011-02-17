@@ -180,10 +180,10 @@ void gatherNorm(float* dest, float* norm, int Vs, int V, int stride, bool tIsZer
   QudaPrecision precision = QUDA_HALF_PRECISION;
 
 #ifndef GATHER_COALESCE
-  CUDAMEMCPY((void *)(dest + 12*Vs*precision), (void *)(norm + offset),
+  CUDAMEMCPY((void *)((char*)dest + 12*Vs*precision), (void *)(norm + offset),
 	     Vs*sizeof(float), cudaMemcpyDeviceToHost, stream[strmIdx]); 
 #else
-  CUDAMEMCPY((void *)(buffer + 12*Vs*precision, (void *)(norm + offset),
+  CUDAMEMCPY((void *)((char*)buffer + 12*Vs*precision, (void *)(norm + offset),
 		      Vs*sizeof(float), cudaMemcpyDeviceToDevice, stream[strmIdx]); 
 #endif
 
