@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <face_quda.h>
 
-void setFace(const FaceBuffer &face, const int stride);
+void setFace(const FaceBuffer &face);
 
 #ifdef __cplusplus
 extern "C" {

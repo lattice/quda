@@ -210,7 +210,7 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
   checkParitySpinor(in, out, cloverInv);
   checkSpinorAlias(in, out);
 
-  setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
+  setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, 0, 0.0, 
 		   blockDslash, blockDslashFace);
@@ -228,7 +228,7 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
   checkParitySpinor(in, out, cloverInv);
   checkSpinorAlias(in, out);
 
-  setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
+  setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, &x, k, 
 		   blockDslashXpay, blockDslashXpayFace);

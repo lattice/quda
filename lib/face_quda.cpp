@@ -194,8 +194,7 @@ void FaceBuffer::gatherFromSpinor(void *in, void *inNorm, int stride, int dagger
  
 }
 
-void FaceBuffer::exchangeFacesStart(void *in, void *inNorm, int stride, int dagger, 
-				    cudaStream_t *stream_p)
+void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, cudaStream_t *stream_p)
 {
   stream = stream_p;
 
@@ -206,7 +205,7 @@ void FaceBuffer::exchangeFacesStart(void *in, void *inNorm, int stride, int dagg
 #endif
 
   // Gather into face...
-  gatherFromSpinor(in, inNorm, stride, dagger);
+  gatherFromSpinor(in.v, in.norm, in.stride, dagger);
 
 #ifdef GATHER_COALESCE  
   // Copy to host if we are coalescing into single face messages to reduce latency
@@ -283,7 +282,7 @@ void scatter(char* spinor, float *norm, char* buf, int vecLen, int Vs, int V, in
 #endif
 
 
-void FaceBuffer::scatterToEndZone(void *out, void *outNorm, int stride, int dagger)
+void FaceBuffer::scatterToEndZone(cudaColorSpinorField &out, int dagger)
 {
   int vecLength = (precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
 
@@ -296,16 +295,16 @@ void FaceBuffer::scatterToEndZone(void *out, void *outNorm, int stride, int dagg
 
   QMP_finish_from_fwd;
   
-  scatter((char*)out, (float*)outNorm, (char*)from_fwd_face, vecLength,
-	  Vs, V, stride, !upperBack, recFwdStrmIdx, precision); // LOWER
+  scatter((char*)out.v, (float*)out.norm, (char*)from_fwd_face, vecLength,
+	  Vs, V, out.stride, !upperBack, recFwdStrmIdx, precision); // LOWER
   
   QMP_finish_from_back;
   
-  scatter((char*)out, (float*)outNorm, (char*)from_back_face, vecLength,
-	  Vs, V, stride, upperBack, recBackStrmIdx, precision);  // Upper
+  scatter((char*)out.v, (float*)out.norm, (char*)from_back_face, vecLength,
+	  Vs, V, out.stride, upperBack, recBackStrmIdx, precision);  // Upper
 }
 
-void FaceBuffer::exchangeFacesWait(void *out, void *outNorm, int stride, int dagger)
+void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
 {
 
   // replaced this memcopy with aliasing pointers - useful benchmarking
@@ -316,7 +315,7 @@ void FaceBuffer::exchangeFacesWait(void *out, void *outNorm, int stride, int dag
 #endif // QMP_COMMS
 
   // Scatter faces.
-  scatterToEndZone(out, outNorm, stride, dagger);
+  scatterToEndZone(out, dagger);
 }
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,

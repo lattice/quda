@@ -205,7 +205,7 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
 
   if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     double flavor_mu = in.twistFlavor * mu;
-    setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
+    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, 
 			  flavor_mu, 0.0, blockDslash, blockDslashFace);
     flops += (1320+72)*in.volume;
@@ -241,7 +241,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
 
   if (!dagger) {
     double flavor_mu = in.twistFlavor * mu;
-    setFace(face, in.stride); // FIXME: temporary hack maintain C linkage for dslashCuda
+    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, 
 			  flavor_mu, k, blockDslashXpay, blockDslashXpayFace);
     flops += (1320+96)*in.volume;
