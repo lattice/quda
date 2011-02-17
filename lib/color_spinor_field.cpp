@@ -54,7 +54,7 @@ void ColorSpinorField::createGhostZone() {
 	if (i==j) continue;
 	ghostFace[i] *= x[j];
       }
-      if (i!=0 && siteSubset == QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
+      if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
       ghostVolume += ghostFace[i];
     }
     if (verbose == QUDA_DEBUG_VERBOSE) printf("face %d = %d %d\n", i, ghostFace[i], ghostDim[i]);

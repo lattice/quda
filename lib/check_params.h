@@ -76,6 +76,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
 
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -167,6 +168,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(cloverGiB, INVALID_DOUBLE);
   P(gflops, INVALID_DOUBLE);
   P(secs, INVALID_DOUBLE);
+#endif
+
+
+#ifdef INIT_PARAM
+  //p(ghostDim[0],0);
+  //p(ghostDim[1],0);
+  //p(ghostDim[2],0);
+  //p(ghostDim[3],0);
 #endif
 
 #ifdef INIT_PARAM

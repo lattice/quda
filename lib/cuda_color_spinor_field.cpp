@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <iostream>
+#include "misc_helpers.h"
 
 void* cudaColorSpinorField::buffer = 0;
 bool cudaColorSpinorField::bufferInit = false;
@@ -430,7 +431,8 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
 
 void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
 				     const int dim, const QudaDirection dir,
-				     const int dagger, cudaStream_t *stream) {
+				     const QudaParity parity, const int dagger,
+				     cudaStream_t *stream) {
 
   if (dim != 3) errorQuda("Not supported");
 
@@ -467,6 +469,8 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
 
   if (dim != 3) errorQuda("Not supported");
 
+
+
   int num_faces = 3; //3 faces for asqtad
   int FloatN = 2; // always use Float2 for staggered
   int Npad = nColor * nSpin * 2 / FloatN; // number FloatN buffers we have
@@ -491,75 +495,3 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
   return;
 }
 
-void
-cudaColorSpinorField::packGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, 
-				      void* f_norm, void* b_norm, cudaStream_t* stream) 
-{
-  int Vh = this->volume;
-  int Vsh = x[0]*x[1]*x[2];
-  int i;
-  
-  int sizeOfFloatN = 2*precision;
-  int len = 3*Vsh*sizeOfFloatN; //3 faces
-
-  for (i =0; i < 3;i ++){
-    void* dst = ((char*)back_ghost_spinor) + i*len; 
-    void* src = ((char*)v) + i*stride*sizeOfFloatN;
-    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
-  }
-
-  
-  for (i =0; i < 3;i ++){
-    void* dst = ((char*)fwd_ghost_spinor) + i*len; 
-    void* src = ((char*)v) + (Vh - 3*Vsh + i*stride)*sizeOfFloatN;
-    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
-  }  
-  
-  if (precision == QUDA_HALF_PRECISION){
-    int normlen = 3*Vsh*sizeof(float);
-    void* dst = b_norm;
-    void* src = norm;
-    cudaMemcpyAsync(dst, src, normlen, cudaMemcpyDeviceToHost, *stream); CUERR;
-    
-    dst = f_norm;
-    src = ((char*)norm) + (Vh-3*Vsh)*sizeof(float);
-    cudaMemcpyAsync(dst, src, normlen, cudaMemcpyDeviceToHost, *stream); CUERR;
-  }  
-  
-
-  return;
-}
-
-void
-cudaColorSpinorField::unpackGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, 
-					void* f_norm, void* b_norm, cudaStream_t* stream) 
-{
-  int Vsh = x[0]*x[1]*x[2];
-  
-  int sizeOfFloatN = 2*precision;
-  int len = 3*Vsh*sizeOfFloatN; //3 faces
-  
-  void* dst = ((char*)v) + 3*stride*sizeOfFloatN;
-  void* src =back_ghost_spinor;
-  cudaMemcpyAsync(dst, src, 3*len, cudaMemcpyHostToDevice, *stream); CUERR;
-  
-  dst = ((char*)v) + 3*stride*sizeOfFloatN + 3*len;
-  src = fwd_ghost_spinor;
-  cudaMemcpyAsync(dst, src, 3*len, cudaMemcpyHostToDevice, *stream);CUERR;
-  
-  if (precision == QUDA_HALF_PRECISION){
-    int normlen = 3*Vsh*sizeof(float);
-    void* dst = ((char*)norm) + stride*sizeof(float);
-    void* src = b_norm;
-    cudaMemcpyAsync(dst, src, normlen, cudaMemcpyHostToDevice, *stream); CUERR;
-    
-    dst = ((char*)norm) + (stride + 3*Vsh)*sizeof(float);
-    src = f_norm;
-    cudaMemcpyAsync(dst, src, normlen, cudaMemcpyHostToDevice, *stream); CUERR;
-  }  
-  
-
-
-  return;
-
-}

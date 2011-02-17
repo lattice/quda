@@ -295,6 +295,7 @@ exchange_cpu_spinor(Float* spinorField, Float* fwd_nbr_spinor, Float* back_nbr_s
 
 }
 
+#if 0
 void
 exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
 {
@@ -362,16 +363,20 @@ exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
 
 }
 
-
+#endif
 
 
 void
-exchange_gpu_spinor_start(void* _cudaSpinor,cudaStream_t* mystream)
+exchange_gpu_spinor_start(void* _cudaSpinor, int parity, cudaStream_t* mystream)
 {
   cudaColorSpinorField* cudaSpinor = (cudaColorSpinorField*) _cudaSpinor;
  
   exchange_init(cudaSpinor);
-  cudaSpinor->packGhostSpinor(fwd_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, f_norm_sendbuf, b_norm_sendbuf, mystream);
+  int dagger = -1; //dagger is not used in packGhost() for staggered
+
+  //cudaSpinor->packGhostSpinor(fwd_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, f_norm_sendbuf, b_norm_sendbuf, mystream);
+  cudaSpinor->packGhost(fwd_nbr_spinor_sendbuf, f_norm_sendbuf, 3, QUDA_FORWARDS, (QudaParity)parity, dagger, mystream); CUERR;
+  cudaSpinor->packGhost(back_nbr_spinor_sendbuf, b_norm_sendbuf, 3, QUDA_BACKWARDS, (QudaParity)parity, dagger, mystream); CUERR;
   
 }
 
@@ -431,7 +436,10 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
     memcpy(b_norm, pagable_b_norm, normlen);
 
     }
-  cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream);  
+  int dagger = -1; //daggered is not used in unapckGhost() for staggered
+  //cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream);  
+  cudaSpinor->unpackGhost(fwd_nbr_spinor, f_norm, 3, QUDA_FORWARDS,  dagger, mystream); CUERR;
+  cudaSpinor->unpackGhost(back_nbr_spinor, b_norm, 3, QUDA_BACKWARDS,  dagger, mystream); CUERR;
   cudaStreamSynchronize(*mystream);
   
 }

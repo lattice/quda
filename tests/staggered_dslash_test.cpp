@@ -240,6 +240,8 @@ void init()
   printfQuda("Sending fields to GPU..."); 
     
   if (!transfer) {
+
+    csParam.verbose = QUDA_DEBUG_VERBOSE;
 	
     csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -252,6 +254,9 @@ void init()
     }
 	
     for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
+    //csParam.ghostDim[0] = true;
+    //csParam.ghostDim[1] = true;
+    //csParam.ghostDim[2] = true;
     csParam.ghostDim[3] = true;
 
     printfQuda("Creating cudaSpinor\n");
@@ -282,7 +287,7 @@ void init()
     diracParam.fatGauge = &cudaFatLinkPrecise;
     diracParam.longGauge = &cudaLongLinkPrecise;
 
-    diracParam.verbose = QUDA_VERBOSE;
+    diracParam.verbose = QUDA_DEBUG_VERBOSE;
     diracParam.tmp1=tmp;
     dirac = Dirac::create(diracParam);
 	
