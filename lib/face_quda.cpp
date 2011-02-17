@@ -186,11 +186,11 @@ void FaceBuffer::gatherFromSpinor(void *in, void *inNorm, int stride, int dagger
     
   // gather for backwards send, tIsZero=true
   gather((char*)back_face, (char*)in, (float*)inNorm, vecLength, Vs, V, stride, upperBack, true, 
-	 sendBackStrmIdx, precision);
+  	 sendBackStrmIdx, precision);
 
   // gather for forwards send, tIsZero=false
   gather((char*)fwd_face, (char*)in, (float*)inNorm, vecLength, Vs, V, stride, !upperBack, false, 
-	 sendFwdStrmIdx, precision);
+  	 sendFwdStrmIdx, precision);
  
 }
 
@@ -255,11 +255,13 @@ void scatter(char* spinor, float *norm, char* buf, int vecLen, int Vs, int V, in
   CUDAMEMCPY((void *)(spinor + precision*offset), (void *)(buf), face_size*precision, 
 	     cudaMemcpyHostToDevice, stream[strmIdx]);
   
-  // upper goes in the 1st norm zone, lower in the 2nd norm zone
-  int norm_offset = stride + (upper ? 0 : Vs); 
+  if (precision == QUDA_HALF_PRECISION) {
+    // upper goes in the 1st norm zone, lower in the 2nd norm zone
+    int norm_offset = stride + (upper ? 0 : Vs);     
+    CUDAMEMCPY((void *)(norm + norm_offset), (void *)(buf+12*Vs*precision), Vs*sizeof(float), 
+	       cudaMemcpyHostToDevice, stream[strmIdx]);  
+  }
 
-  CUDAMEMCPY((void *)(norm + norm_offset), (void *)(buf+12*Vs*precision), Vs*sizeof(float), 
-	     cudaMemcpyHostToDevice, stream[strmIdx]);  
 }
 
 
@@ -296,12 +298,12 @@ void FaceBuffer::scatterToEndZone(cudaColorSpinorField &out, int dagger)
   QMP_finish_from_fwd;
   
   scatter((char*)out.v, (float*)out.norm, (char*)from_fwd_face, vecLength,
-	  Vs, V, out.stride, !upperBack, recFwdStrmIdx, precision); // LOWER
+  	  Vs, V, out.stride, !upperBack, recFwdStrmIdx, precision); // LOWER
   
   QMP_finish_from_back;
   
   scatter((char*)out.v, (float*)out.norm, (char*)from_back_face, vecLength,
-	  Vs, V, out.stride, upperBack, recBackStrmIdx, precision);  // Upper
+  	  Vs, V, out.stride, upperBack, recBackStrmIdx, precision);  // Upper
 }
 
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
