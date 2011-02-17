@@ -28,7 +28,7 @@ const int transfer = 0; // include transfer time in the benchmark?
 const int loops = 100;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_HALF_PRECISION;
+QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -268,10 +268,12 @@ void end() {
 // execute kernel
 double dslashCUDA() {
 
-  if (test_type < 2) {
-    dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp1);
-  } else {
-    dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp1);
+  if (!transfer) {
+    if (test_type < 2) {
+      dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp1);
+    } else {
+      dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp1);
+    }
   }
 
   printfQuda("Executing %d kernel loops...\n", loops);
