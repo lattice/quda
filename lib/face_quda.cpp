@@ -24,6 +24,7 @@ using namespace std;
 
 cudaStream_t *stream;
 
+// enabling this coalseces all per face transactions into a single buffer before the PCIe transfer
 //#define GATHER_COALESCE
 
 // Easy to switch between overlapping communication or not
@@ -136,21 +137,19 @@ FaceBuffer::~FaceBuffer()
   from_back_face=NULL;
 }
 
-//templating here is overkill
-//template <typename Float>
-void gather12Float(char* dest, char* spinor, int vecLen, int Vs, int V, int stride, 
-		   bool upper, bool tIsZero, int strmIdx, char *buffer, QudaPrecision precision)
+void gather(char* dest, char* spinor, float *norm, int vecLen, int Vs, int V, int stride, 
+	    bool upper, bool tIsZero, int strmIdx, QudaPrecision precision)
 {
   int Npad = 12/vecLen;  // Number of Pad's in one half spinor... generalize based on floatN, precision, nspin, ncolor etc.
   int lower_spin_offset=vecLen*Npad*stride;	
   int t0_offset=0; // T=0 is the first VS block
-  int Nt_minus1_offset = vecLen*(V - Vs); // N_t -1 = V-Vs & vecLen is from FloatN.
+  int Nt_minus1_offset = (V - Vs); // N_t -1 = V-Vs
  
   int offset = 0;
-  if (upper) offset = tIsZero ? t0_offset : Nt_minus1_offset;
-  else offset = lower_spin_offset + (tIsZero ? t0_offset : Nt_minus1_offset);
+  if (upper) offset = tIsZero ? t0_offset : vecLen * Nt_minus1_offset;
+  else offset = lower_spin_offset + (tIsZero ? t0_offset : vecLen * Nt_minus1_offset);
+  int norm_offset = tIsZero ? t0_offset : Nt_minus1_offset;
 
-#ifndef GATHER_COALESCE
   // QUDA Memcpy NPad's worth. 
   //  -- Dest will point to the right beginning PAD. 
   //  -- Each Pad has size vecLen*Vs Floats. 
@@ -159,39 +158,22 @@ void gather12Float(char* dest, char* spinor, int vecLen, int Vs, int V, int stri
     CUDAMEMCPY((void *)(dest + precision*vecLen*i*Vs), (void *)(spinor + precision*(offset + i*vecLen*stride)),
 	       vecLen*Vs*precision, cudaMemcpyDeviceToHost, stream[strmIdx]);
   }
-#else
-  // Coalesce into a single gather
-  // Much better to do this as a kernel to allow for some overlapping?
-  for(int i=0; i < Npad; i++) {
-    CUDAMEMCPY((void *)(buffer + precision*vecLen*i*Vs), (void *)(spinor + precision*(offset + i*vecLen*stride)),
-	       vecLen*Vs*precision, cudaMemcpyDeviceToDevice, stream[strmIdx]);
-  }
-#endif
-
-}
-
-// like the above but for the norms required for QUDA_HALF_PRECISION
-void gatherNorm(float* dest, float* norm, int Vs, int V, int stride, bool tIsZero, 
-		int strmIdx, float *buffer)
-{
-  int t0_offset=0; // T=0 is the first VS block
-  int Nt_minus1_offset=V - Vs; // N_t -1 = V-Vs.
-  int offset = tIsZero ? t0_offset : Nt_minus1_offset;
-  QudaPrecision precision = QUDA_HALF_PRECISION;
-
-#ifndef GATHER_COALESCE
-  CUDAMEMCPY((void *)((char*)dest + 12*Vs*precision), (void *)(norm + offset),
-	     Vs*sizeof(float), cudaMemcpyDeviceToHost, stream[strmIdx]); 
-#else
-  CUDAMEMCPY((void *)((char*)buffer + 12*Vs*precision, (void *)(norm + offset),
-		      Vs*sizeof(float), cudaMemcpyDeviceToDevice, stream[strmIdx]); 
-#endif
-
+  if (precision == QUDA_HALF_PRECISION)
+    CUDAMEMCPY((void *)(dest + 12*Vs*precision), (void *)(norm + norm_offset),
+	       Vs*sizeof(float), cudaMemcpyDeviceToHost, stream[strmIdx]); 
 }
 
 void FaceBuffer::gatherFromSpinor(void *in, void *inNorm, int stride, int dagger)
 {
   
+#ifdef GATHER_COALESCE
+  void *back_face = gather_back_face;
+  void *fwd_face = gather_fwd_face;
+#else
+  void *back_face = my_back_face;
+  void *fwd_face = my_fwd_face;
+#endif
+
   // I need to gather the faces with opposite Checkerboard
   // Depending on whether I do dagger or not I want top 2 components
   // from forward, and bottom 2 components from backward
@@ -203,20 +185,12 @@ void FaceBuffer::gatherFromSpinor(void *in, void *inNorm, int stride, int dagger
   bool upperBack = dagger ? true : false; // Fwd is !Back
     
   // gather for backwards send, tIsZero=true
-  gather12Float((char*)(my_back_face), (char*)in, vecLength, Vs, V, stride, upperBack, true, 
-		sendBackStrmIdx, (char*)gather_back_face, precision);
+  gather((char*)back_face, (char*)in, (float*)inNorm, vecLength, Vs, V, stride, upperBack, true, 
+	 sendBackStrmIdx, precision);
 
-  if (precision == QUDA_HALF_PRECISION)
-    gatherNorm((float*)((short*)my_back_face), (float*)inNorm, Vs, V, 
-	       stride, true, sendBackStrmIdx, (float*)((short *)gather_back_face));
-    
   // gather for forwards send, tIsZero=false
-  gather12Float((char*)(my_fwd_face), (char*)in, vecLength, Vs, V, stride, !upperBack, false, 
-		sendFwdStrmIdx, (char*)gather_fwd_face, precision);
-
-  if (precision == QUDA_HALF_PRECISION)
-    gatherNorm((float*)((short*)my_fwd_face), (float*)inNorm, Vs, V, 
-	       stride, false, sendFwdStrmIdx, (float*)((short *)gather_fwd_face));
+  gather((char*)fwd_face, (char*)in, (float*)inNorm, vecLength, Vs, V, stride, !upperBack, false, 
+	 sendFwdStrmIdx, precision);
  
 }
 
@@ -271,8 +245,8 @@ void FaceBuffer::exchangeFacesComms() {
 //  --  There is 4Stride Floats from the
 //           start of one PAD to the start of the next
 
-void scatter12Float(char* spinor, char* buf, int vecLen, int Vs, int V, int stride, 
-		    bool upper, int strmIdx, QudaPrecision precision)
+void scatter(char* spinor, float *norm, char* buf, int vecLen, int Vs, int V, int stride, 
+	     bool upper, int strmIdx, QudaPrecision precision)
 {
   int Npad = 12/vecLen;
   int spinor_end = 2*Npad*vecLen*stride;
@@ -282,18 +256,10 @@ void scatter12Float(char* spinor, char* buf, int vecLen, int Vs, int V, int stri
   CUDAMEMCPY((void *)(spinor + precision*offset), (void *)(buf), face_size*precision, 
 	     cudaMemcpyHostToDevice, stream[strmIdx]);
   
-}
-
-// half precision norm version of the above
-template <typename Float>
-void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper, int strmIdx=0)
-{
-  int norm_end = stride;
-  int face_size = Vs;
   // upper goes in the 1st norm zone, lower in the 2nd norm zone
-  int offset = norm_end + (upper ? 0 : face_size); 
+  int norm_offset = stride + (upper ? 0 : Vs); 
 
-  CUDAMEMCPY((void *)(norm + offset), (void *)(buf), Vs*sizeof(Float), 
+  CUDAMEMCPY((void *)(norm + norm_offset), (void *)(buf+12*Vs*precision), Vs*sizeof(float), 
 	     cudaMemcpyHostToDevice, stream[strmIdx]);  
 }
 
@@ -319,7 +285,6 @@ void scatterNorm(Float* norm, Float* buf, int Vs, int V, int stride, bool upper,
 
 void FaceBuffer::scatterToEndZone(void *out, void *outNorm, int stride, int dagger)
 {
- 
   int vecLength = (precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
 
   // I need to gather the faces with opposite Checkerboard
@@ -331,22 +296,13 @@ void FaceBuffer::scatterToEndZone(void *out, void *outNorm, int stride, int dagg
 
   QMP_finish_from_fwd;
   
-  scatter12Float((char*)out, (char*)from_fwd_face, vecLength,
-		 Vs, V, stride, !upperBack, recFwdStrmIdx, precision); // LOWER
-  
-  if (precision == QUDA_HALF_PRECISION)
-    scatterNorm((float*)outNorm, (float*)((short*)from_fwd_face+12*Vs), 
-		Vs, V, stride, !upperBack, recFwdStrmIdx);
+  scatter((char*)out, (float*)outNorm, (char*)from_fwd_face, vecLength,
+	  Vs, V, stride, !upperBack, recFwdStrmIdx, precision); // LOWER
   
   QMP_finish_from_back;
   
-  scatter12Float((char*)out, (char*)from_back_face, vecLength,
-		 Vs, V, stride, upperBack, recBackStrmIdx, precision);  // Upper
-  
-  if (precision == QUDA_HALF_PRECISION)
-    scatterNorm((float*)outNorm, (float*)((short*)from_back_face+12*Vs),
-		Vs, V, stride, upperBack, recBackStrmIdx); // Lower
-
+  scatter((char*)out, (float*)outNorm, (char*)from_back_face, vecLength,
+	  Vs, V, stride, upperBack, recBackStrmIdx, precision);  // Upper
 }
 
 void FaceBuffer::exchangeFacesWait(void *out, void *outNorm, int stride, int dagger)
