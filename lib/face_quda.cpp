@@ -171,20 +171,20 @@ void gather12Float(char* dest, char* spinor, int vecLen, int Vs, int V, int stri
 }
 
 // like the above but for the norms required for QUDA_HALF_PRECISION
-template <typename Float>
-  void gatherNorm(Float* dest, Float* norm, int Vs, int V, int stride, bool tIsZero, 
-		  int strmIdx, Float *buffer)
+void gatherNorm(float* dest, float* norm, int Vs, int V, int stride, bool tIsZero, 
+		int strmIdx, float *buffer)
 {
   int t0_offset=0; // T=0 is the first VS block
   int Nt_minus1_offset=V - Vs; // N_t -1 = V-Vs.
   int offset = tIsZero ? t0_offset : Nt_minus1_offset;
- 
+  QudaPrecision precision = QUDA_HALF_PRECISION;
+
 #ifndef GATHER_COALESCE
-  CUDAMEMCPY((void *)dest, (void *)(norm + offset),
-	     Vs*sizeof(Float), cudaMemcpyDeviceToHost, stream[strmIdx]); 
+  CUDAMEMCPY((void *)(dest + 12*Vs*precision), (void *)(norm + offset),
+	     Vs*sizeof(float), cudaMemcpyDeviceToHost, stream[strmIdx]); 
 #else
-  CUDAMEMCPY((void *)buffer, (void *)(norm + offset),
-	     Vs*sizeof(Float), cudaMemcpyDeviceToDevice, stream[strmIdx]); 
+  CUDAMEMCPY((void *)(buffer + 12*Vs*precision, (void *)(norm + offset),
+		      Vs*sizeof(float), cudaMemcpyDeviceToDevice, stream[strmIdx]); 
 #endif
 
 }
@@ -207,16 +207,16 @@ void FaceBuffer::gatherFromSpinor(void *in, void *inNorm, int stride, int dagger
 		sendBackStrmIdx, (char*)gather_back_face, precision);
 
   if (precision == QUDA_HALF_PRECISION)
-    gatherNorm((float*)((short*)my_back_face+12*Vs), (float*)inNorm, Vs, V, 
-	       stride, true, sendBackStrmIdx, (float*)((short *)gather_back_face+12*Vs));
+    gatherNorm((float*)((short*)my_back_face), (float*)inNorm, Vs, V, 
+	       stride, true, sendBackStrmIdx, (float*)((short *)gather_back_face));
     
   // gather for forwards send, tIsZero=false
   gather12Float((char*)(my_fwd_face), (char*)in, vecLength, Vs, V, stride, !upperBack, false, 
 		sendFwdStrmIdx, (char*)gather_fwd_face, precision);
 
   if (precision == QUDA_HALF_PRECISION)
-    gatherNorm((float*)((short*)my_fwd_face+12*Vs), (float*)inNorm, Vs, V, 
-	       stride, false, sendFwdStrmIdx, (float*)((short *)gather_fwd_face+12*Vs));
+    gatherNorm((float*)((short*)my_fwd_face), (float*)inNorm, Vs, V, 
+	       stride, false, sendFwdStrmIdx, (float*)((short *)gather_fwd_face));
  
 }
 
