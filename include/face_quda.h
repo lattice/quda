@@ -38,9 +38,6 @@ class FaceBuffer {
   QMP_msghandle_t mh_from_back;
 #endif
 
-  void gatherFromSpinor(void *in, void *inNorm, int stride, int dagger);
-  void scatterToEndZone(cudaColorSpinorField &out, int dagger);
-
  public:
   FaceBuffer(int Vs, int V, QudaPrecision precision);
   FaceBuffer(const FaceBuffer &);
