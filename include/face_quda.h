@@ -38,23 +38,17 @@ class FaceBuffer {
   QMP_msghandle_t mh_from_back;
 #endif
 
-  // used for timing
-  cudaEvent_t start[2];
-  cudaEvent_t gather[2];
-  cudaEvent_t qmp[2];
-  cudaEvent_t stop[2];
-
   void gatherFromSpinor(void *in, void *inNorm, int stride, int dagger);
-  void scatterToEndZone(void *out, void *outNorm, int stride, int dagger);
+  void scatterToEndZone(cudaColorSpinorField &out, int dagger);
 
  public:
   FaceBuffer(int Vs, int V, QudaPrecision precision);
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void exchangeFacesStart(void *in, void *inNorm, int stride, int dagger, cudaStream_t *stream);
+  void exchangeFacesStart(cudaColorSpinorField &in, int dagger, cudaStream_t *stream);
   void exchangeFacesComms();
-  void exchangeFacesWait(void *out, void *outNorm, int stride, int dagger);
+  void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
 
 
 };

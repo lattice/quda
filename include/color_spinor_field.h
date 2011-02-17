@@ -351,9 +351,9 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   // these routines replace Guochun's ones below
   void packGhost(void* ghost_spinor, void* ghost_norm, const int dim, 
-		 const QudaDirection dir, const QudaParity parity, cudaStream_t* stream);
+		 const QudaDirection dir, const QudaParity parity, const int dagger, cudaStream_t* stream);
   void unpackGhost(void* ghost_spinor, void* ghost_norm, const int dim, 
-		   const QudaDirection dir, cudaStream_t* stream);
+		   const QudaDirection dir, const int dagger, cudaStream_t* stream);
   void* getV(){ return v;}
   void* getNorm(){return norm;}
 

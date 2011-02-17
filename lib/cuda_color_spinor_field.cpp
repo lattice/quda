@@ -162,6 +162,7 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     param.v = v;
     param.norm = norm;
+    memcpy(param.ghostDim, ghostDim, nDim*sizeof(bool));
     even = new cudaColorSpinorField(*this, param);
     odd = new cudaColorSpinorField(*this, param);
     // need this hackery for the moment (need to locate the odd pointer half way into the full field)
@@ -430,14 +431,14 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
 
 void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
 				     const int dim, const QudaDirection dir,
-				     const QudaParity parity,
+				     const QudaParity parity, const int dagger,
 				     cudaStream_t *stream) {
 
   if (dim != 3) errorQuda("Not supported");
 
   int num_faces = 3; //3 faces for asqtad
   int FloatN = 2; // always use Float2 for staggered
-  int M = nColor * nSpin * 2 / FloatN; // number FloatN buffers we have
+  int Npad = nColor * nSpin * 2 / FloatN; // number FloatN buffers we have
 
   int Vh = this->volume;
   int Vsh = x[0]*x[1]*x[2];
@@ -446,17 +447,24 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
 
   int offset = (dir == QUDA_BACKWARDS) ? 0 : Vh - num_faces*Vsh;
 
-  for (int i=0; i<M; i++) {
+  for (int i=0; i<Npad; i++) {
     void *dst = (char*)ghost_spinor + i*len;
     void *src = (char*)v + (offset + i*stride) * sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
 
+  if (precision == QUDA_HALF_PRECISION){
+    int normlen = num_faces*Vsh*sizeof(float);
+    void* dst = ghost_norm;
+    int norm_offset = (dir == QUDA_BACKWARDS)? 0 : (Vh-num_faces*Vsh)*sizeof(float); 
+    void* src = (char*)norm + norm_offset;
+    cudaMemcpyAsync(dst, src, normlen, cudaMemcpyDeviceToHost, *stream); CUERR;    
+  }  
 }
 
 void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm, 
 				       const int dim, const QudaDirection dir, 
-				       cudaStream_t* stream) 
+				       const int dagger, cudaStream_t* stream) 
 {
 
   if (dim != 3) errorQuda("Not supported");
@@ -465,16 +473,16 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
 
   int num_faces = 3; //3 faces for asqtad
   int FloatN = 2; // always use Float2 for staggered
-  int M = nColor * nSpin * 2 / FloatN; // number FloatN buffers we have
+  int Npad = nColor * nSpin * 2 / FloatN; // number FloatN buffers we have
 
   int Vsh = x[0]*x[1]*x[2];  
   int sizeOfFloatN = FloatN*precision;
   int len = num_faces*Vsh*sizeOfFloatN;
   
-  int offset = (dir == QUDA_BACKWARDS) ? 0 : M*len;
-  void* dst = ((char*)v) + M*stride*sizeOfFloatN + offset; // into the endzone
+  int offset = (dir == QUDA_BACKWARDS) ? 0 : Npad*len;
+  void* dst = ((char*)v) + Npad*stride*sizeOfFloatN + offset; // into the endzone
   void* src = ghost_spinor;
-  cudaMemcpyAsync(dst, src, M*len, cudaMemcpyHostToDevice, *stream);CUERR;
+  cudaMemcpyAsync(dst, src, Npad*len, cudaMemcpyHostToDevice, *stream);CUERR;
   
   if (precision == QUDA_HALF_PRECISION){
     int normlen = num_faces*Vsh*sizeof(float);
@@ -483,14 +491,6 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
     void* src = ghost_norm;
     cudaMemcpyAsync(dst, src, normlen, cudaMemcpyHostToDevice, *stream); CUERR;
   }  
-
-  if (precision == QUDA_HALF_PRECISION){
-    int normlen = num_faces*Vsh*sizeof(float);
-    int offset = (dir == QUDA_BACKWARDS) ? 0 : normlen;
-    void* dst = ((char*)norm) + stride*sizeof(float) + offset;
-    void* src = ghost_norm;
-    cudaMemcpyAsync(dst, src, normlen, cudaMemcpyHostToDevice, *stream); CUERR;
-  } 
 
   return;
 }
