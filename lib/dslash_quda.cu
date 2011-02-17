@@ -28,6 +28,7 @@ struct DslashParam {
   int threads; // the desired number of active threads
   int parity;  // Even-Odd or Odd-Even
   int ghostDim[QUDA_MAX_DIM];
+  int ghostOffset[QUDA_MAX_DIM];
 };
 
 DslashParam dslashParam;
@@ -828,6 +829,7 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
   dslashParam.threads = in->volume;
   for(int i=0;i < 4;i++){
     dslashParam.ghostDim[i] = in->ghostDim[i];
+    dslashParam.ghostOffset[i] = in->ghostOffset[i];
   }
   void *fatGauge0, *fatGauge1;
   void* longGauge0, *longGauge1;
