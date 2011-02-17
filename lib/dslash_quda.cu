@@ -682,8 +682,9 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 
 #ifdef MULTI_GPU
 
-  exchange_gpu_spinor_start(inSpinor, &streams[1]); CUERR;
-  exchange_gpu_spinor_wait(inSpinor, &streams[1]); CUERR;
+  //this is the inSpinor's parity, not the out spinor's
+  exchange_gpu_spinor_start(inSpinor, 1-parity, &streams[1]); CUERR;
+  exchange_gpu_spinor_wait(inSpinor,  &streams[1]); CUERR;
   cudaStreamSynchronize(streams[0]); CUERR;
 
   initTLocation(tdim-6,EXTERIOR_KERNEL_T , 6*Vsh);  
@@ -775,8 +776,9 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 
 #ifdef MULTI_GPU
 
-  exchange_gpu_spinor_start(inSpinor, &streams[1]);   
-  exchange_gpu_spinor_wait(inSpinor, &streams[1]); 
+  //this is the inSpinor's parity, not the out spinor's
+  exchange_gpu_spinor_start(inSpinor, 1 - parity,  &streams[1]);   
+  exchange_gpu_spinor_wait(inSpinor,  &streams[1]); 
   
   initTLocation(tdim-6,EXTERIOR_KERNEL_T , 6*Vsh);  
   if (x==0) { // not doing xpay
@@ -1140,7 +1142,6 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 #endif
 
 }
-
 
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 #include <force_common.h>

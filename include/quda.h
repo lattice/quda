@@ -11,7 +11,7 @@ extern "C" {
 
   // When adding new members to QudaGaugeParam and QudaInvertParam, 
   // be sure to update lib/check_params.h
-
+#define QUDA_MAX_DIM 6
   typedef struct QudaGaugeParam_s {
 
     int X[4];
@@ -96,6 +96,7 @@ extern "C" {
     QudaTune dirac_tune; // tune the Dirac operator when it is first created?
     QudaPreserveDirac preserve_dirac; // free the Dirac operator or keep it resident?
 
+    int ghostDim[QUDA_MAX_DIM];
   } QudaInvertParam;
 
 

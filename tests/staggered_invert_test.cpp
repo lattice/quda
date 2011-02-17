@@ -150,7 +150,11 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    
+  inv_param->ghostDim[0] = false;
+  inv_param->ghostDim[1] = false;
+  inv_param->ghostDim[2] = false;
+  inv_param->ghostDim[3] = true;
+
 }
 
 static int

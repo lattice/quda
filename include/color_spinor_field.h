@@ -67,7 +67,7 @@ class ColorSpinorParam {
 
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
-    for (int d=0; d<nDim; d++) ghostDim[d] = false;
+    for (int d=0; d<nDim; d++) ghostDim[d] = inv_param.ghostDim[d];
 
     if (!pc_solution) {
       x[0] *= 2;
@@ -106,10 +106,15 @@ class ColorSpinorParam {
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
+    /*
     for (int d=0; d<nDim; d++) ghostDim[d] = false;
 #ifdef MULTI_GPU
     ghostDim[nDim-1] = true; // currently only parallelizing over outer most dimension
 #endif
+    */
+    for(int d=0; d < nDim; d++) {
+      ghostDim[d] = inv_param.ghostDim[d];
+    }
 
     if (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) {
       fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -321,6 +326,10 @@ class cudaColorSpinorField : public ColorSpinorField {
   static bool bufferInit;
   static size_t bufferBytes;
 
+  void* fwdGhostFaceBuffer[4]; //gpu memory
+  void* backGhostFaceBuffer[4]; //gpu memory
+  int initGhostFaceBuffer;
+
   void create(const QudaFieldCreate);
   void destroy();
   void zero();
@@ -342,12 +351,9 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   // these routines replace Guochun's ones below
   void packGhost(void* ghost_spinor, void* ghost_norm, const int dim, 
-		 const QudaDirection dir, cudaStream_t* stream);
+		 const QudaDirection dir, const QudaParity parity, cudaStream_t* stream);
   void unpackGhost(void* ghost_spinor, void* ghost_norm, const int dim, 
 		   const QudaDirection dir, cudaStream_t* stream);
-
-  void packGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, void*f_norm, void*b_norm, cudaStream_t* stream);
-  void unpackGhostSpinor(void* fwd_ghost_spinor, void* back_ghost_spinor, void*f_norm, void* b_norm, cudaStream_t* stream);  
   void* getV(){ return v;}
   void* getNorm(){return norm;}
 

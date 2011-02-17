@@ -33,7 +33,7 @@ extern "C" {
 			       QudaPrecision sPrecision, int oddBit);
 
   void exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* stream);
-  void exchange_gpu_spinor_start(void* _cudaSpinor, cudaStream_t* stream);
+  void exchange_gpu_spinor_start(void* _cudaSpinor, int parity, cudaStream_t* stream);
   void exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* stream);
   void exchange_cpu_sitelink(int* X,
 			     void** sitelink, void* ghost_sitelink,
