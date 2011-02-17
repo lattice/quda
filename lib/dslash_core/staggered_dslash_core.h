@@ -301,6 +301,16 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define EXTERIOR_KERNEL_Z 3
 #define EXTERIOR_KERNEL_T 4
 
+int ghostOffset[4];
+int Vsh_xyzt[4]= {X2*X3*X4/2, X1*X3*X4/2, X1*X2*X4/2, X1*X2*X3/2};
+for(int i=0;i < 4;i++){
+  if(i==0){
+    ghostOffset[i] = 0;
+  }else{
+    ghostOffset[i] = ghostOffset[i-1] + ((param.ghostDim[i-1])?(6*Vsh_xyzt[i-1]):0);
+  }
+ }
+
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if(sid >= threads) return;
 
@@ -718,12 +728,12 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       
       if (x4 + 1 >= X4){
-	nbr_idx1 = 3*sp_stride + 3*(3*Vsh) +(x4+1-X4)*(Vsh)+ space_con;
+	nbr_idx1 = 3*sp_stride + 3*ghostOffset[3] + 3*(3*Vsh) +(x4+1-X4)*(Vsh)+ space_con;
 	stride1 = 3*Vsh;
       }
       
       if (x4 + 3 >= X4){
-	nbr_idx3 = 3*sp_stride + 3*(3*Vsh) +(x4+3-X4)*(Vsh)+ space_con;
+	nbr_idx3 = 3*sp_stride + 3*ghostOffset[3] + 3*(3*Vsh) +(x4+3-X4)*(Vsh)+ space_con;
 	stride3 = 3*Vsh;
       }
     }
@@ -795,13 +805,13 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
       
       // read spinor from device memory
       if (x4 - 1 < 0){
-	nbr_idx1 = 3*sp_stride +(x4-1+3)*(Vsh)+ space_con;
-      stride1 = 3*Vsh;
+	nbr_idx1 = 3*sp_stride + 3*ghostOffset[3] + (x4-1+3)*Vsh+ space_con;
+	stride1 = 3*Vsh;
       }        
       
       if (x4 - 3 < 0){
-      nbr_idx3 = 3*sp_stride + (x4 - 3 +3)*(Vsh)+ space_con;
-      stride3 = 3*Vsh;
+	nbr_idx3 = 3*sp_stride + 3*ghostOffset[3] + (x4 - 3 +3)*Vsh+ space_con;
+	stride3 = 3*Vsh;
       }
     }
 #endif

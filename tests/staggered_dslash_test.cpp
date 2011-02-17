@@ -254,9 +254,9 @@ void init()
     }
 	
     for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
-    //csParam.ghostDim[0] = true;
-    //csParam.ghostDim[1] = true;
-    //csParam.ghostDim[2] = true;
+    csParam.ghostDim[0] = true;
+    csParam.ghostDim[1] = true;
+    csParam.ghostDim[2] = true;
     csParam.ghostDim[3] = true;
 
     printfQuda("Creating cudaSpinor\n");

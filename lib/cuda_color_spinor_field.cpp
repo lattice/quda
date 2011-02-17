@@ -478,9 +478,9 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
   int Vsh = x[0]*x[1]*x[2];  
   int sizeOfFloatN = FloatN*precision;
   int len = num_faces*Vsh*sizeOfFloatN;
-  
   int offset = (dir == QUDA_BACKWARDS) ? 0 : Npad*len;
-  void* dst = ((char*)v) + Npad*stride*sizeOfFloatN + offset; // into the endzone
+  void* dst = ((char*)v) + this->ghostOffset[dim]*Npad*sizeOfFloatN +  Npad*stride*sizeOfFloatN + offset; // into the endzone
+  //void* dst = ((char*)v) +  Npad*stride*sizeOfFloatN + offset; // into the endzone
   void* src = ghost_spinor;
   cudaMemcpyAsync(dst, src, Npad*len, cudaMemcpyHostToDevice, *stream);CUERR;
   
