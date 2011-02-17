@@ -803,7 +803,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   ColorSpinorParam cudaParam(cpuParam, *param);     
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam); 
-  
+
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     x = new cudaColorSpinorField(*h_x, cudaParam); // solution  
   } else { // zero initial guess
