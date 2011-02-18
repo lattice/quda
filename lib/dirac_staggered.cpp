@@ -4,14 +4,16 @@
 
 DiracStaggered::DiracStaggered(const DiracParam &param) : Dirac(param),
   blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
-  fatGauge(param.fatGauge), longGauge(param.longGauge)
+  fatGauge(param.fatGauge), longGauge(param.longGauge), 
+  face(param.gauge->volume/param.gauge->X[3], 6, param.fatGauge->precision)
 {
 
 }
 
 DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
   blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
-  fatGauge(dirac.fatGauge), longGauge(dirac.longGauge)
+  fatGauge(dirac.fatGauge), longGauge(dirac.longGauge),
+  face(dirac.face)
 {
 
 }
@@ -31,6 +33,7 @@ DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac)
     blockDslashXpayFace = dirac.blockDslashXpayFace;
     fatGauge = dirac.fatGauge;
     longGauge = dirac.longGauge;
+    face = dirac.face;
   }
  
   return *this;
@@ -85,6 +88,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
   }
   checkParitySpinor(in, out);
 
+  setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
   staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, 
 		     0, 0, blockDslash, blockDslashFace);
   
@@ -101,6 +105,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
   }
   checkParitySpinor(in, out);
 
+  setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
   staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, &x, k, 
 		      blockDslashXpay, blockDslashXpayFace);
   

@@ -34,9 +34,9 @@ cudaStream_t *stream;
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
 #endif
 
-FaceBuffer::FaceBuffer(int Vs, int V, QudaPrecision precision) :
+FaceBuffer::FaceBuffer(int Vs, int Ninternal, QudaPrecision precision) :
   my_fwd_face(0), my_back_face(0), from_back_face(0), from_fwd_face(0), 
-  Vs(Vs), V(V), precision(precision)
+  Vs(Vs), Ninternal(Ninternal), precision(precision)
 {
 
   // set these both = 0 `for no overlap of qmp and cudamemcpyasync
@@ -47,7 +47,7 @@ FaceBuffer::FaceBuffer(int Vs, int V, QudaPrecision precision) :
   recBackStrmIdx = sendFwdStrmIdx;
   
   // Buffers hold half spinors
-  nbytes = Vs*12*precision;
+  nbytes = Vs*Ninternal*precision;
   
   // add extra space for the norms for half precision
   if (precision == QUDA_HALF_PRECISION) nbytes += Vs*sizeof(float);
@@ -137,43 +137,6 @@ FaceBuffer::~FaceBuffer()
   from_back_face=NULL;
 }
 
-  // I need to gather the faces with opposite Checkerboard
-  // Depending on whether I do dagger or not I want top 2 components
-  // from forward, and bottom 2 components from backward
-
-void gather(char* dest, char* spinor, float *norm, int Vs, int V, int stride, 
-	    int dagger, const QudaDirection dir, cudaStream_t *stream, QudaPrecision precision)
-{
-  int vecLen = (precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-
-  // !dagger: send lower components backwards, send upper components forwards
-  // dagger: send upper components backwards, send lower components forwards
-  bool upper = dagger ? true : false; // Fwd is !Back  
-  if (dir == QUDA_FORWARDS) upper = !upper;
-
-  int Npad = 12/vecLen;  // Number of Pad's in one half spinor... generalize based on floatN, precision, nspin, ncolor etc.
-  int lower_spin_offset=vecLen*Npad*stride;	
-  int t0_offset=0; // T=0 is the first VS block
-  int Nt_minus1_offset = (V - Vs); // N_t -1 = V-Vs
- 
-  int offset = 0;
-  if (upper) offset = (dir == QUDA_BACKWARDS ? t0_offset : vecLen * Nt_minus1_offset);
-  else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? t0_offset : vecLen * Nt_minus1_offset);
-  int norm_offset = (dir == QUDA_BACKWARDS) ? t0_offset : Nt_minus1_offset;
-
-  // QUDA Memcpy NPad's worth. 
-  //  -- Dest will point to the right beginning PAD. 
-  //  -- Each Pad has size vecLen*Vs Floats. 
-  //  --  There is vecLen*Stride Floats from the start of one PAD to the start of the next
-  for(int i=0; i < Npad; i++) {
-    CUDAMEMCPY((void *)(dest + precision*vecLen*i*Vs), (void *)(spinor + precision*(offset + i*vecLen*stride)),
-	       vecLen*Vs*precision, cudaMemcpyDeviceToHost, *stream);
-  }
-  if (precision == QUDA_HALF_PRECISION)
-    CUDAMEMCPY((void *)(dest + 12*Vs*precision), (void *)(norm + norm_offset),
-	       Vs*sizeof(float), cudaMemcpyDeviceToHost, *stream); 
-}
-
 void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, cudaStream_t *stream_p)
 {
   stream = stream_p;
@@ -192,13 +155,13 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, cudaSt
   void *fwd_face = my_fwd_face;
 #endif
 
-  // gather for backwards send, tIsZero=true
-  gather((char*)back_face, (char*)in.v, (float*)in.norm, Vs, V, in.stride, dagger, QUDA_BACKWARDS, 
-  	 &stream[sendBackStrmIdx], precision);
+  QudaParity parity = QUDA_INVALID_PARITY; // not yet used
 
-  // gather for forwards send, tIsZero=false
-  gather((char*)fwd_face, (char*)in.v, (float*)in.norm, Vs, V, in.stride, dagger, QUDA_FORWARDS, 
-  	 &stream[sendFwdStrmIdx], precision);
+  // gather for backwards send
+  in.packGhost(back_face, 0, 3, QUDA_BACKWARDS, parity, dagger, &stream[sendBackStrmIdx]);
+
+  // gather for forwards send
+  in.packGhost(fwd_face, 0, 3, QUDA_FORWARDS, parity, dagger, &stream[sendFwdStrmIdx]);
  
 #ifdef GATHER_COALESCE  
   // Copy to host if we are coalescing into single face messages to reduce latency
@@ -231,45 +194,6 @@ void FaceBuffer::exchangeFacesComms() {
 
 } 
 
-// QUDA Memcpy 3 Pad's worth. 
-//  -- Dest will point to the right beginning PAD. 
-//  -- Each Pad has size vecLen * Vs Floats. 
-//  --  There is 4Stride Floats from the
-//           start of one PAD to the start of the next
-
-  // I need to gather the faces with opposite Checkerboard
-  // Depending on whether I do dagger or not I want top 2 components
-  // from forward, and bottom 2 components from backward
-
-void scatter(char* spinor, float *norm, char* buf, const QudaDirection dir, 
-	     const int dagger, int Vs, int V, int stride, 
-	     cudaStream_t *stream, QudaPrecision precision)
-{
-  int vecLen = (precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-
-  // !dagger: receive lower components forwards, receive upper components backwards
-  // dagger: receive upper components forwards, receive lower components backwards
-  bool upper = dagger? false : true;
-  if (dir == QUDA_FORWARDS) upper = !upper;
-
-  int Npad = 12/vecLen;
-  int spinor_end = 2*Npad*vecLen*stride;
-  int face_size = Npad*vecLen*Vs;
-  int offset = spinor_end + (upper ? 0 : face_size);
-
-  CUDAMEMCPY((void *)(spinor + precision*offset), (void *)(buf), face_size*precision, 
-	     cudaMemcpyHostToDevice, *stream);
-  
-  if (precision == QUDA_HALF_PRECISION) {
-    // upper goes in the 1st norm zone, lower in the 2nd norm zone
-    int norm_offset = stride + (upper ? 0 : Vs);     
-    CUDAMEMCPY((void *)(norm + norm_offset), (void *)(buf+12*Vs*precision), Vs*sizeof(float), 
-	       cudaMemcpyHostToDevice, *stream);  
-  }
-
-}
-
-
 // Finish backwards send and forwards receive
 #ifdef QMP_COMMS				
 #define QMP_finish_from_fwd					\
@@ -290,7 +214,6 @@ void scatter(char* spinor, float *norm, char* buf, const QudaDirection dir,
 
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
 {
-
   // replaced this memcopy with aliasing pointers - useful benchmarking
 #ifndef QMP_COMMS
   // NO QMP -- do copies
@@ -301,13 +224,11 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
   // Scatter faces.
   QMP_finish_from_fwd;
   
-  scatter((char*)out.v, (float*)out.norm, (char*)from_fwd_face, QUDA_FORWARDS, dagger,
-  	  Vs, V, out.stride, &stream[recFwdStrmIdx], precision); // LOWER
-  
+  out.unpackGhost(from_fwd_face, 0, 3, QUDA_FORWARDS, dagger, &stream[recFwdStrmIdx]);
+
   QMP_finish_from_back;
   
-  scatter((char*)out.v, (float*)out.norm, (char*)from_back_face, QUDA_BACKWARDS, dagger,
-  	  Vs, V, out.stride, &stream[recBackStrmIdx], precision);  // Upper
+  out.unpackGhost(from_back_face, 0, 3, QUDA_BACKWARDS, dagger, &stream[recBackStrmIdx]);
 }
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
