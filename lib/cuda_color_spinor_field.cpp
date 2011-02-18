@@ -444,7 +444,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
   int FloatN = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Vh = this->volume;
-  int Vsh = x[0]*x[1]*x[3];
+  int Vsh = x[0]*x[1]*x[2];
   int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
   if (nSpin == 4) Nint /= 2; // spin projection for Wilson
   int Npad = Nint / FloatN; // number FloatN buffers we have
@@ -489,6 +489,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
 
 }
 
+
 void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm, 
 				       const int dim, const QudaDirection dir, 
 				       const int dagger, cudaStream_t* stream) 
@@ -496,7 +497,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
   CUERR;
   int FloatN = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
-  int Vsh = x[0]*x[1]*x[3];
+  int Vsh = x[0]*x[1]*x[2];
   int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
   if (nSpin == 4) Nint /= 2; // spin projection for Wilson
   int Npad = Nint / FloatN; // number FloatN buffers we have
@@ -511,7 +512,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
     
   int len = num_faces*Vsh*FloatN*Npad;
 
-  int offset = real_length + ghostOffset[dim]*nColor*nSpin*2;
+  int offset = length + ghostOffset[dim]*nColor*nSpin*2;
   if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len;
   else offset += (upper ? 0 : len);    
   void *dst = (char*)v + precision*offset;

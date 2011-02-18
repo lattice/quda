@@ -5,7 +5,8 @@
 DiracStaggered::DiracStaggered(const DiracParam &param) : Dirac(param),
   blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
   fatGauge(param.fatGauge), longGauge(param.longGauge), 
-  face(param.gauge->volume/param.gauge->X[3], 6, param.fatGauge->precision)
+  face(param.fatGauge->volume/param.fatGauge->X[3], 6, param.fatGauge->precision) 
+  //FIXME: this may break mixed precision multishift solver since may not have fatGauge inited
 {
 
 }
