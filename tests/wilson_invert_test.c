@@ -81,7 +81,7 @@ int main(int argc, char **argv)
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 0.001; // ignored by multi-shift solver
 
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
@@ -111,6 +111,12 @@ int main(int argc, char **argv)
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
+
+  inv_param.ghostDim[0] = 0;
+  inv_param.ghostDim[1] = 0;
+  inv_param.ghostDim[2] = 0;
+  inv_param.ghostDim[3] = 1;
+
   inv_param.verbosity = QUDA_VERBOSE;
 
   // *** Everything between here and the call to initQuda() is
