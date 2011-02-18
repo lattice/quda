@@ -718,12 +718,12 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       
       if (x4 + 1 >= X4){
-	nbr_idx1 = 3*sp_stride + 3*(3*Vsh) +(x4+1-X4)*(Vsh)+ space_con;
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh) +(x4+1-X4)*(Vsh)+ space_con;
 	stride1 = 3*Vsh;
       }
       
       if (x4 + 3 >= X4){
-	nbr_idx3 = 3*sp_stride + 3*(3*Vsh) +(x4+3-X4)*(Vsh)+ space_con;
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh) +(x4+3-X4)*(Vsh)+ space_con;
 	stride3 = 3*Vsh;
       }
     }
@@ -795,13 +795,13 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
       
       // read spinor from device memory
       if (x4 - 1 < 0){
-	nbr_idx1 = 3*sp_stride +(x4-1+3)*(Vsh)+ space_con;
-      stride1 = 3*Vsh;
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + (x4-1+3)*Vsh+ space_con;
+	stride1 = 3*Vsh;
       }        
       
       if (x4 - 3 < 0){
-      nbr_idx3 = 3*sp_stride + (x4 - 3 +3)*(Vsh)+ space_con;
-      stride3 = 3*Vsh;
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + (x4 - 3 +3)*Vsh+ space_con;
+	stride3 = 3*Vsh;
       }
     }
 #endif

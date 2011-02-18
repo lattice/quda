@@ -493,7 +493,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
 				       const int dim, const QudaDirection dir, 
 				       const int dagger, cudaStream_t* stream) 
 {
-
+  CUERR;
   int FloatN = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Vsh = x[0]*x[1]*x[3];
@@ -511,12 +511,12 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
     
   int len = num_faces*Vsh*FloatN*Npad;
 
-  int offset = real_length;
+  int offset = real_length + ghostOffset[dim]*nColor*nSpin*2;
   if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len;
   else offset += (upper ? 0 : len);    
-
   void *dst = (char*)v + precision*offset;
   void *src = ghost_spinor;
+
   CUDAMEMCPY(dst, src, len*precision, cudaMemcpyHostToDevice, *stream); CUERR;
     
   if (precision == QUDA_HALF_PRECISION) {
@@ -526,6 +526,9 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
     int normlen = num_faces*Vsh*sizeof(float);
     int norm_offset = (nSpin == 1) ? ((dir == QUDA_BACKWARDS) ? 0 : normlen ) : (upper ? 0 : normlen);
     void *dst = (char*)norm + stride*sizeof(float) + norm_offset;
+    // FIXME: Convention difference
+    // Staggered: separate spinor and norm buffers for communication
+    // Wilson: uses a single buffer for both spinor and norm 
     void *src = (nSpin == 1) ? ghost_norm : (char*)ghost_spinor+num_faces*Nint*Vsh*precision;
     CUDAMEMCPY(dst, src, normlen, cudaMemcpyHostToDevice, *stream);  CUERR;
   }

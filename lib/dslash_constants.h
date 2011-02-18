@@ -41,6 +41,7 @@ __constant__ int Vsh;
 __constant__ int sp_stride;
 __constant__ int ga_stride;
 __constant__ int cl_stride;
+__constant__ int ghostFace[QUDA_MAX_DIM];
 
 __constant__ int fat_ga_stride;
 __constant__ int long_ga_stride;
@@ -106,6 +107,13 @@ void initCommonConstants(const FullGauge gauge) {
   int X4 = gauge.X[3];
   cudaMemcpyToSymbol("X4", &X4, sizeof(int));  
 
+
+  int ghostFace[4];
+  ghostFace[0] = X2*X3*X4/2;
+  ghostFace[1] = X1*X3*X4/2;
+  ghostFace[2] = X1*X2*X4/2;
+  ghostFace[3] = X1*X2*X3/2;
+  cudaMemcpyToSymbol("ghostFace", ghostFace, 4*sizeof(int));  
 
   int X1_3 = 3*X1;
   cudaMemcpyToSymbol("X1_3", &X1_3, sizeof(int));  
