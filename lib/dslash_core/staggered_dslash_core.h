@@ -288,7 +288,7 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
   VOUT##2_re += M##12_im * V##01_im;            \
   VOUT##2_re += M##22_re * V##02_re;            \
   VOUT##2_re += M##22_im * V##02_im;            \
-  spinorFloat  VOUT##2_im= M##02_re * V##00_im; \
+  spinorFloat VOUT##2_im = M##02_re * V##00_im; \
   VOUT##2_im -= M##02_im * V##00_re;            \
   VOUT##2_im += M##12_re * V##01_im;            \
   VOUT##2_im -= M##12_im * V##01_re;            \
@@ -307,7 +307,7 @@ if(sid >= threads) return;
 int za,zb; 
 int x1h, x2h;
 int x1,x2,x3,x4;
-int x1_new, x4_new;
+int x1_new, x2_new, x3_new, x4_new;
 int af;
 int x1odd,x2odd;
 int X;
@@ -324,12 +324,15 @@ int X2h=X2/2;
   x_three_ = zb - x_four_*X_three_;
   af = (x_four_ >= 3)?(X_four_-6):0;
   x_four__new = x_four_ + af;
-  sid +=Vsh*(x_four__new -x_four_);
   x_four_=x_four__new;
   x_one_odd = (x_two_ + x_three_ + x_four_ + param.parity) & 1;
   x_one_ = 2*x_one_h + x_one_odd;
-  X = 2*sid + x_one_odd;
+  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  sid = X>>1;
+
 */
+
+
 
 if(tLocate.y == INTERIOR_KERNEL){
   //data order: X4 X3 X2 X1h
@@ -352,17 +355,42 @@ if(tLocate.y == INTERIOR_KERNEL){
   x4 = zb - x1*X4;
   af = (x1 >= 3)?(X1-6):0;
   x1_new = x1 + af;
-  sid +=Vsh*(x1_new -x1);
   x1=x1_new;
   x2odd = (x3 + x4 + x1 + param.parity) & 1;
   x2 = 2*x2h + x2odd;
-  X = 2*sid + x2odd;
+  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  sid = X>>1;
  }else if (tLocate.y == EXTERIOR_KERNEL_Y){
   //data order: X2 X4 X3 X1h
+  za = FAST_INT_DIVIDE(sid, X1h);
+  x1h = sid - za*X1h;
+  zb = FAST_INT_DIVIDE(za, X3);
+  x3 = za - zb*X3;
+  x2 = FAST_INT_DIVIDE(zb, X4);
+  x4 = zb - x2*X4;
+  af = (x2 >= 3)?(X2-6):0;
+  x2_new = x2 + af;
+  x2=x2_new;
+  x1odd = (x3 + x4 + x2 + param.parity) & 1;
+  x1 = 2*x1h + x1odd;
+  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  sid = X>>1;
 
  }else if (tLocate.y == EXTERIOR_KERNEL_Z){
   //data order: X3 X4 X2 X1h
-
+  za = FAST_INT_DIVIDE(sid, X1h);
+  x1h = sid - za*X1h;
+  zb = FAST_INT_DIVIDE(za, X2);
+  x2 = za - zb*X2;
+  x3 = FAST_INT_DIVIDE(zb, X4);
+  x4 = zb - x3*X4;
+  af = (x3 >= 3)?(X3-6):0;
+  x3_new = x3 + af;
+  x3=x3_new;
+  x1odd = (x2 + x4 + x3 + param.parity) & 1;
+  x1 = 2*x1h + x1odd;
+  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  sid = X>>1;
  }else if (tLocate.y == EXTERIOR_KERNEL_T){
   //data order: X4 X3 X2 X1h
   za = FAST_INT_DIVIDE(sid, X1h);
@@ -389,6 +417,15 @@ o02_re = o02_im = 0.f;
 
 #ifdef MULTI_GPU
 if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
+#endif
+
+#ifdef MULTI_GPU
+}//if interior kernel
+#endif
+
+#ifdef MULTI_GPU
+if ( (tLocate.y == INTERIOR_KERNEL && x1 < X1 -3)|| (tLocate.y == EXTERIOR_KERNEL_X && x1 >= X1 -3))
+  //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
 {
     //direction: +X
@@ -432,10 +469,17 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
     o02_im += B2_im;  
 }
 
-
+#ifdef MULTI_GPU
+if ( (tLocate.y == INTERIOR_KERNEL && x1 >= 3) || (tLocate.y == EXTERIOR_KERNEL_X && x1 < 3))
+//if ( (tLocate.y == INTERIOR_KERNEL))
+#endif
 {
     // direction: -X
-    
+    if(x4%2 ==1){
+	sign = -1;
+    }else{
+	sign =1;
+    }    
     int dir =1;
     int space_con = (x4*X3*X2 + x3*X2+ x2) >>1;
     int sp_idx_1st_nbr = ((x1==0) ? X+X1m1 : X-1) >> 1;
@@ -485,6 +529,11 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
         
 }
 
+
+#ifdef MULTI_GPU
+if ( (tLocate.y == INTERIOR_KERNEL && x2 < X2 -3)|| (tLocate.y == EXTERIOR_KERNEL_Y && x2 >= X2 -3))
+  //if ( (tLocate.y == INTERIOR_KERNEL ))
+#endif
 {
     //direction: +Y
     if((x4+x1)%2 ==1){
@@ -529,9 +578,19 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 
 }
 
-
+#ifdef MULTI_GPU
+if ( (tLocate.y == INTERIOR_KERNEL && x2 >= 3) || (tLocate.y == EXTERIOR_KERNEL_Y && x2 < 3))
+  //if ( (tLocate.y == INTERIOR_KERNEL))
+#endif
 {
     //direction: -Y
+
+    if((x4+x1)%2 ==1){
+	sign = -1;
+    }else{
+	sign =1;
+    }
+
     int dir=3;
     int space_con = (x4*X3*X1 + x3*X1+ x1) >>1;    
     int sp_idx_1st_nbr = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;
@@ -580,7 +639,10 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 }
 
 
-
+#ifdef MULTI_GPU
+if ( (tLocate.y == INTERIOR_KERNEL && x3 < X3 -3)|| (tLocate.y == EXTERIOR_KERNEL_Z && x3 >= X3 -3))
+//if ( (tLocate.y == INTERIOR_KERNEL ))
+#endif
 {
     //direction: +Z
 
@@ -609,7 +671,13 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 
     MAT_MUL_V(A, fat, i);
     MAT_MUL_V(B, long, t);    
-    
+
+    if ( B0_re > 100.0 || B0_re < - 100.0 || B0_im > 100.0 || B0_im < - 100.0 ||
+	 B1_re > 100.0 || B1_re < - 100.0 || B1_im > 100.0 || B1_im < - 100.0 ||
+	 B2_re > 100.0 || B2_re < - 100.0 || B2_im > 100.0 || B2_im < - 100.0 ){
+      printf("***********************RROR: wrong vlaue\n");
+    }
+	 
     o00_re += A0_re;
     o00_im += A0_im;
     o01_re += A1_re;
@@ -623,12 +691,22 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
     o01_im += B1_im;
     o02_re += B2_re;
     o02_im += B2_im;      
- 
+    
 }
 
-
+#ifdef MULTI_GPU
+if ( (tLocate.y == INTERIOR_KERNEL && x3 >= 3) || (tLocate.y == EXTERIOR_KERNEL_Z && x3 < 3))
+  //if ( (tLocate.y == INTERIOR_KERNEL))
+#endif
 {
     //direction: -Z
+
+    if((x4+x1+x2)%2 ==1){
+	sign = -1;
+    }else{
+	sign =1;
+    }
+
     int dir = 5;
     int space_con = (x4*X2*X1 + x2*X1+ x1) >>1;    
     int sp_idx_1st_nbr = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
@@ -658,10 +736,10 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,sign);
-   
+
     ADJ_MAT_MUL_V(A, fat, i);
     ADJ_MAT_MUL_V(B, long, t);    
-    
+
     o00_re -= A0_re;
     o00_im -= A0_im;
     o01_re -= A1_re;
@@ -677,9 +755,7 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
     o02_im -= B2_im;    
     
 }
-#ifdef MULTI_GPU
-}//if interior kernel
-#endif
+
 
 // if interior kernel and x4 < X4 -3
 // or 
@@ -878,7 +954,8 @@ o02_im = -o02_im + a*accum2.y;
 #endif // DSLASH_AXPY
 
 #ifdef MULTI_GPU
-if (tLocate.y == EXTERIOR_KERNEL_T){
+//if (tLocate.y == EXTERIOR_KERNEL_T){
+if (tLocate.y != INTERIOR_KERNEL){
   READ_AND_SUM_SPINOR();
  }
 #endif
