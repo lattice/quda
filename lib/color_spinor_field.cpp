@@ -55,6 +55,7 @@ void ColorSpinorField::createGhostZone() {
 	ghostFace[i] *= x[j];
       }
       if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
+      if (siteSubset == QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
       ghostVolume += ghostFace[i];
     }
     if(i==0){
@@ -62,7 +63,8 @@ void ColorSpinorField::createGhostZone() {
     }else{
       ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1];
     }
-    if (verbose == QUDA_DEBUG_VERBOSE) printf("face %d = %d %d %d\n", i, ghostFace[i], ghostDim[i], ghostOffset[i]);
+    if (verbose == QUDA_DEBUG_VERBOSE) 
+      printfQuda("face %d = %6d ghostDim = %6d ghostOffset = %6d\n", i, ghostFace[i], ghostDim[i], ghostOffset[i]);
   }
   int ghostNormVolume = num_norm_faces * ghostVolume;
   ghostVolume *= num_faces;

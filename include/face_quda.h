@@ -22,8 +22,8 @@ class FaceBuffer {
   void *my_back_face;
   void *from_back_face;
   void *from_fwd_face;
-  int Vs; 
-  int V;
+  int Vs;
+  int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
   size_t nbytes;
 #ifdef QMP_COMMS
@@ -38,11 +38,8 @@ class FaceBuffer {
   QMP_msghandle_t mh_from_back;
 #endif
 
-  void gatherFromSpinor(void *in, void *inNorm, int stride, int dagger);
-  void scatterToEndZone(cudaColorSpinorField &out, int dagger);
-
  public:
-  FaceBuffer(int Vs, int V, QudaPrecision precision);
+  FaceBuffer(int Vs, int Ninternal, QudaPrecision precision);
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 

@@ -364,6 +364,7 @@ class DiracStaggered : public Dirac {
  protected:
   FullGauge *fatGauge;
   FullGauge *longGauge;
+  FaceBuffer face; // multi-gpu communication buffers
 
  public:
   DiracStaggered(const DiracParam &param);

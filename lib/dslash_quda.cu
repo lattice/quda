@@ -648,22 +648,33 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   int shared_bytes = blockDim.x*6*bindSpinorTex_mg<spinorN>(length, ghost_length, in, inNorm, x, xNorm); CUERR;
 
   initTLocation(0, INTERIOR_KERNEL, volume);  CUERR;
+
+#ifdef MULTI_GPU
+#ifdef QMP_COMMS
+  // Gather from source spinor
+  face->exchangeFacesStart(*inSpinor, dagger, streams);
+#define STRM streams[Nstream-1]
+#else
+#define STRM streams[0]
+#endif
+#endif
+
   if (x==0) { // not doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
-	staggeredDslash12Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash12Kernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       } else {
-	staggeredDslash12DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> 
+	staggeredDslash12DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>> 
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_8){
       
       if (!dagger) {
-	staggeredDslash8Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> 
+	staggeredDslash8Kernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>> 
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       } else {
-	staggeredDslash8DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash8DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
       }
     }else{
@@ -673,18 +684,18 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
     
     if (reconstruct == QUDA_RECONSTRUCT_12) {
       if (!dagger) {
-	staggeredDslash12AxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> 
+	staggeredDslash12AxpyKernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>> 
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       } else {
-	staggeredDslash12DaggerAxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash12DaggerAxpyKernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       }
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {
       if (!dagger) {
-	staggeredDslash8AxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash8AxpyKernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       } else {
-	staggeredDslash8DaggerAxpyKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash8DaggerAxpyKernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       }
     }else{
@@ -694,9 +705,16 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 
 #ifdef MULTI_GPU
 
+#ifdef QMP_COMMS
+  // Finish gather and start comms
+  face->exchangeFacesComms();
+  // Wait for comms to finish, and scatter into the end zone
+  face->exchangeFacesWait(*inSpinor, dagger);
+#else
   //this is the inSpinor's parity, not the out spinor's
   exchange_gpu_spinor_start(inSpinor, 1-parity, &streams[1]); CUERR;
   exchange_gpu_spinor_wait(inSpinor,  &streams[1]); CUERR;
+#endif
 
   int exterior_kernel_flag[4]={
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
@@ -706,19 +724,19 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
     if (x==0) { // not doing xpay
       if (reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!dagger) {
-	  staggeredDslash12Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	  staggeredDslash12Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
 	} else {
-	  staggeredDslash12DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>> 
+	  staggeredDslash12DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>> 
 	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
 	}
       } else if (reconstruct == QUDA_RECONSTRUCT_8){
 	
 	if (!dagger) {
-	  staggeredDslash8Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>> 
+	  staggeredDslash8Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>> 
 	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
 	} else {
-	  staggeredDslash8DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	  staggeredDslash8DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam); CUERR;
 	}
       }else{
@@ -728,18 +746,18 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
       
       if (reconstruct == QUDA_RECONSTRUCT_12) {
 	if (!dagger) {
-	  staggeredDslash12AxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>> 
+	  staggeredDslash12AxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>> 
 	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
 	} else {
-	  staggeredDslash12DaggerAxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	  staggeredDslash12DaggerAxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
 	}
       } else if (reconstruct == QUDA_RECONSTRUCT_8) {
 	if (!dagger) {
-	  staggeredDslash8AxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	  staggeredDslash8AxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	    (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
 	} else {
-	  staggeredDslash8DaggerAxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	  staggeredDslash8DaggerAxpyKernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
 	}
       }else{
@@ -778,31 +796,48 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   int shared_bytes = blockDim.x*6*bindSpinorTex_mg<spinorN>(length, ghost_length, in, inNorm, x, xNorm);
   
   initTLocation(0, INTERIOR_KERNEL, volume);  
+
+#ifdef MULTI_GPU
+#ifdef QMP_COMMS
+  // Gather from source spinor
+  face->exchangeFacesStart(*inSpinor, dagger, streams);
+#define STRM streams[Nstream-1]
+#else
+#define STRM streams[0]
+#endif
+#endif
+
   if (x==0) { // not doing xpay
     if (!dagger) {
-      staggeredDslash18Kernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+      staggeredDslash18Kernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
     } else {
-      staggeredDslash18DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, streams[0]>>> 
+      staggeredDslash18DaggerKernel <<<interiorGridDim, blockDim, shared_bytes, STRM>>> 
 	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
     }    
   } else { // doing xpay
     
     if (!dagger) {
-      staggeredDslash18AxpyKernel<<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+      staggeredDslash18AxpyKernel<<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
     } else {
-      staggeredDslash18DaggerAxpyKernel<<<interiorGridDim, blockDim, shared_bytes, streams[0]>>>
+      staggeredDslash18DaggerAxpyKernel<<<interiorGridDim, blockDim, shared_bytes, STRM>>>
 	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
     }          
   }
 
 #ifdef MULTI_GPU
 
+#ifdef QMP_COMMS
+  // Finish gather and start comms
+  face->exchangeFacesComms();
+  // Wait for comms to finish, and scatter into the end zone
+  face->exchangeFacesWait(*inSpinor, dagger);
+#else
   //this is the inSpinor's parity, not the out spinor's
   exchange_gpu_spinor_start(inSpinor, 1 - parity,  &streams[1]);   
   exchange_gpu_spinor_wait(inSpinor,  &streams[1]); 
-
+#endif
   int exterior_kernel_flag[4]={
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
   };
@@ -810,19 +845,19 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
     initTLocation(dims[i] -6,exterior_kernel_flag[i] , 6*Vsh[i]);  
     if (x==0) { // not doing xpay
       if (!dagger) {
-	staggeredDslash18Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash18Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
       } else {
-	staggeredDslash18DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>> 
+	staggeredDslash18DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>> 
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
       }    
     } else { // doing xpay
       
       if (!dagger) {
-	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       } else {
-	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, streams[0]>>>
+	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, STRM>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       }          
     }     
@@ -843,9 +878,9 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
 
 #ifdef GPU_STAGGERED_DIRAC
 
-  for(int i=0;i < 2 ;i ++){
+  /*for(int i=0;i < 2 ;i ++){
     cudaStreamCreate(&streams[i]); CUERR;
-  }
+    }*/
 
   dslashParam.parity = parity;
   dslashParam.threads = in->volume;
@@ -919,9 +954,9 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
   }
 
 
-  for (int i = 0; i < 2; i++) {
+  /*for (int i = 0; i < 2; i++) {
     cudaStreamDestroy(streams[i]);
-  }
+    }*/
   
   if (!dslashTuning) checkCudaError();
   
