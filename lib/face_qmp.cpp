@@ -34,10 +34,12 @@ cudaStream_t *stream;
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
 #endif
 
-FaceBuffer::FaceBuffer(int Vs, int Ninternal, QudaPrecision precision) :
+FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, const int num_faces,
+		       const QudaPrecision precision) :
   my_fwd_face(0), my_back_face(0), from_back_face(0), from_fwd_face(0), 
-  Vs(Vs), Ninternal(Ninternal), precision(precision)
+  nDim(nDim), Ninternal(Ninternal), num_faces(num_faces), precision(precision)
 {
+  setupDims(X);
 
   // set these both = 0 `for no overlap of qmp and cudamemcpyasync
   // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
@@ -47,10 +49,10 @@ FaceBuffer::FaceBuffer(int Vs, int Ninternal, QudaPrecision precision) :
   recBackStrmIdx = sendFwdStrmIdx;
   
   // Buffers hold half spinors
-  nbytes = Vs*Ninternal*precision;
+  nbytes = num_faces*faceVolumeCB[3]*Ninternal*precision;
   
   // add extra space for the norms for half precision
-  if (precision == QUDA_HALF_PRECISION) nbytes += Vs*sizeof(float);
+  if (precision == QUDA_HALF_PRECISION) nbytes += num_faces*faceVolumeCB[3]*sizeof(float);
   
   unsigned int flag = cudaHostAllocDefault;
   cudaHostAlloc(&(my_fwd_face), nbytes, flag);
@@ -108,6 +110,27 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
   errorQuda("FaceBuffer copy constructor not implemented");
 }
 
+// X here is a checkboarded volume
+void FaceBuffer::setupDims(const int* X)
+{
+  Volume = 1;
+  for (int d=0; d< 4; d++) {
+    this->X[d] = X[d];
+    if (d==0) this->X[d] *= 2;
+    Volume *= this->X[d];    
+  }
+  VolumeCB = Volume/2;
+
+  for (int i=0; i<nDim; i++) {
+    for (int j=0; j<nDim; j++) {
+      if (i==j) continue;
+      faceVolume[i] *= X[d];
+    }
+    faceVolumeCB[i] /= 2;
+  }
+  
+}
+
 FaceBuffer::~FaceBuffer()
 {
   
@@ -137,7 +160,8 @@ FaceBuffer::~FaceBuffer()
   from_back_face=NULL;
 }
 
-void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, cudaStream_t *stream_p)
+void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
+				    int dagger, cudaStream_t *stream_p)
 {
   stream = stream_p;
 
@@ -154,8 +178,6 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, cudaSt
   void *back_face = my_back_face;
   void *fwd_face = my_fwd_face;
 #endif
-
-  QudaParity parity = QUDA_INVALID_PARITY; // not yet used
 
   // gather for backwards send
   in.packGhost(back_face, 0, 3, QUDA_BACKWARDS, parity, dagger, &stream[sendBackStrmIdx]);
