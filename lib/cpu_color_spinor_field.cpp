@@ -371,7 +371,6 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
   int X2 = this->x[1];
   int X3 = this->x[2];
   int X4 = this->x[3];
-  int sSize = (int)this->precision;
 
   for(int i=0;i < this->volume;i++){    
     int boundaryCrossings = i/(X1/2) + i/(X1*X2/2) + i/(X1*X2*X3/2);
@@ -391,8 +390,8 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);
 	}
       }else{  // QUDA_FORWARDS
-	if (x1 >=X1 -3){
-	  ghost_face_idx = ((x1-X1+3)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+	if (x1 >=X1 - num_faces){
+	  ghost_face_idx = ((x1-X1+num_faces)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }
@@ -402,13 +401,13 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
       
     case 1: //Y dimension
       if (dir == QUDA_BACKWARDS){
-	if (x2 < 3){
+	if (x2 < num_faces){
 	  ghost_face_idx = (x2*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }else{ // QUDA_FORWARDS      
-	if (x2 >= X2 - 3){
-	  ghost_face_idx = ((x2-X2+3)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
+	if (x2 >= X2 - num_faces){
+	  ghost_face_idx = ((x2-X2+num_faces)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }
@@ -416,13 +415,13 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
 
     case 2: //Z dimension      
       if (dir == QUDA_BACKWARDS){
-	if (x3 < 3){
+	if (x3 < num_faces){
 	  ghost_face_idx = (x3*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }else{ // QUDA_FORWARDS     
-	if (x3 >= X3 - 3){
-	  ghost_face_idx = ((x3-X3+3)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
+	if (x3 >= X3 - num_faces){
+	  ghost_face_idx = ((x3-X3+num_faces)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }
@@ -430,13 +429,13 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
       
     case 3:  //T dimension      
       if (dir == QUDA_BACKWARDS){
-	if (x4 < 3){
+	if (x4 < num_faces){
 	  ghost_face_idx = (x4*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }else{ // QUDA_FORWARDS     
-	if (x4 >= X4 - 3){
-	  ghost_face_idx = ((x4-X4+3)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+	if (x4 >= X4 - num_faces){
+	  ghost_face_idx = ((x4-X4+num_faces)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }
