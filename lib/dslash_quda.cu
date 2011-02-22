@@ -657,6 +657,8 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 #else
 #define STRM streams[0]
 #endif
+#else
+#define STRM 0
 #endif
 
   if (x==0) { // not doing xpay
@@ -805,6 +807,8 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 #else
 #define STRM streams[0]
 #endif
+#else
+#define STRM 0
 #endif
 
   if (x==0) { // not doing xpay

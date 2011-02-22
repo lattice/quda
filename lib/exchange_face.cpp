@@ -272,98 +272,6 @@ exchange_longlink(Float** longlink, Float* ghost_longlink, Float* longlink_sendb
   
 }
 
-template<typename Float>
-void
-exchange_cpu_spinor(Float* spinorField, Float* fwd_nbr_spinor, Float* back_nbr_spinor)
-{
-  Float* fwd_nbr_spinor_send = spinorField + (Vh -3*Vsh_t)*mySpinorSiteSize;
-  Float* back_nbr_spinor_send = spinorField;
-  int len = 3*Vsh_t*mySpinorSiteSize*sizeof(Float);
-  
-
-  unsigned long recv_request1 = comm_recv(back_nbr_spinor, len, BACK_NBR);
-  unsigned long recv_request2 = comm_recv(fwd_nbr_spinor, len, FWD_NBR);
-  
-  unsigned long send_request1= comm_send(fwd_nbr_spinor_send, len, FWD_NBR);
-  unsigned long send_request2 = comm_send(back_nbr_spinor_send, len, BACK_NBR);
-  
-  comm_wait(recv_request1);
-  comm_wait(recv_request2);
-  
-  comm_wait(send_request1);
-  comm_wait(send_request2);
-
-}
-
-#if 0
-void
-exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* mystream)
-{
-  
-  cudaColorSpinorField* cudaSpinor = (cudaColorSpinorField*) _cudaSpinor;
-  exchange_init(cudaSpinor);
-  struct timeval t0, t1, t2, t3;
-  
-  int len = 3*Vsh_t*mySpinorSiteSize*cudaSpinor->Precision();
-  int normlen = 3*Vsh_t*sizeof(float);
-
-  gettimeofday(&t0, NULL);
-  cudaSpinor->packGhost(fwd_nbr_spinor_sendbuf, f_norm_sendbuf, 3, QUDA_FORWARDS, mystream); CUERR;
-  cudaSpinor->packGhost(back_nbr_spinor_sendbuf, b_norm_sendbuf, 3, QUDA_BACKWARDS, mystream); CUERR;
-  cudaStreamSynchronize(*mystream);
-  gettimeofday(&t1, NULL);
- 
-  unsigned long recv_request1 = comm_recv(back_nbr_spinor, len, BACK_NBR);
-  unsigned long recv_request2 = comm_recv(fwd_nbr_spinor, len, FWD_NBR);
-  
-  unsigned long send_request1= comm_send(fwd_nbr_spinor_sendbuf, len, FWD_NBR);
-  unsigned long send_request2 = comm_send(back_nbr_spinor_sendbuf, len, BACK_NBR);
-
-  unsigned long recv_request3 = 0;
-  unsigned long recv_request4 = 0;
-  unsigned long send_request3 = 0;
-  unsigned long send_request4 = 0;
-  
-  if (cudaSpinor->Precision() == QUDA_HALF_PRECISION){
-    recv_request3 = comm_recv(b_norm, normlen, BACK_NBR);
-    recv_request4 = comm_recv(f_norm, normlen, FWD_NBR);
-    send_request3 = comm_send(f_norm_sendbuf, normlen, FWD_NBR);
-    send_request4 = comm_send(b_norm_sendbuf, normlen, BACK_NBR);
-  }
-  
-  
-  
-  comm_wait(recv_request1);
-  comm_wait(recv_request2);  
-  comm_wait(send_request1);
-  comm_wait(send_request2);
-  
-  if (cudaSpinor->Precision() == QUDA_HALF_PRECISION){
-    comm_wait(recv_request3);
-    comm_wait(recv_request4);
-    comm_wait(send_request3);
-    comm_wait(send_request4);
-  }
-  
-  gettimeofday(&t2, NULL);
-  cudaSpinor->unpackGhost(fwd_nbr_spinor, f_norm, 3, QUDA_FORWARDS, mystream); CUERR;
-  cudaSpinor->unpackGhost(back_nbr_spinor, b_norm, 3, QUDA_BACKWARDS, mystream); CUERR;
-  
-  cudaStreamSynchronize(*mystream);
-  gettimeofday(&t3, NULL);
-
-  float pack_time = TDIFF(t1, t0)*1000;
-  float send_recv_time = TDIFF(t2, t1)*1000;
-  float unpack_time = TDIFF(t3, t2)*1000;
-  
-  PRINTF("Pack_time=%.2f(ms)(%.2f GB/s), send_recv_time=%.2f(ms)(%.2f GB/s), unpack_time=%.2f(ms)(%.2f GB/s)\n",
-	 pack_time, 2*len/pack_time*1e-6, send_recv_time, 2*len/send_recv_time*1e-6, 
-	 unpack_time, 2*len/unpack_time*1e-6);
-  
-
-}
-
-#endif
 
 
 void
@@ -374,7 +282,6 @@ exchange_gpu_spinor_start(void* _cudaSpinor, int parity, cudaStream_t* mystream)
   exchange_init(cudaSpinor);
   int dagger = -1; //dagger is not used in packGhost() for staggered
 
-  //cudaSpinor->packGhostSpinor(fwd_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, f_norm_sendbuf, b_norm_sendbuf, mystream);
   cudaSpinor->packGhost(fwd_nbr_spinor_sendbuf, f_norm_sendbuf, 3, QUDA_FORWARDS, (QudaParity)parity, dagger, mystream); CUERR;
   cudaSpinor->packGhost(back_nbr_spinor_sendbuf, b_norm_sendbuf, 3, QUDA_BACKWARDS, (QudaParity)parity, dagger, mystream); CUERR;
   
@@ -437,7 +344,6 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
 
     }
   int dagger = -1; //daggered is not used in unapckGhost() for staggered
-  //cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream);  
   cudaSpinor->unpackGhost(fwd_nbr_spinor, f_norm, 3, QUDA_FORWARDS,  dagger, mystream); CUERR;
   cudaSpinor->unpackGhost(back_nbr_spinor, b_norm, 3, QUDA_BACKWARDS,  dagger, mystream); CUERR;
   cudaStreamSynchronize(*mystream);
@@ -666,33 +572,9 @@ void exchange_cpu_links4dir(void** fatlink,
 }
 
 
-void exchange_cpu_spinor(int* X,
-			 void* spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor,
-			 QudaPrecision sPrecision)
-{
-  
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    dims[d] = X[d];
-  }
-  Vh = V/2;
-  
-  Vs = X[0]*X[1]*X[2];
-  Vsh_t = Vs/2;
-
-  if (sPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_cpu_spinor((double*)spinorField, (double*)fwd_nbr_spinor, (double*)back_nbr_spinor);
-  }else{//single
-    exchange_cpu_spinor((float*)spinorField, (float*)fwd_nbr_spinor, (float*)back_nbr_spinor);    
-  }
-
-}
-
 
 void exchange_cpu_spinor4dir(cpuColorSpinorField* spinor, 
 			     int* X,
-			     void** cpu_fwd_nbr_spinor, void** cpu_back_nbr_spinor,
 			     QudaParity oddBit)
 {
 
@@ -705,19 +587,16 @@ void exchange_cpu_spinor4dir(cpuColorSpinorField* spinor,
     3*Vsh_t*6*spinor->Precision()
   };
 
-  void* cpu_fwd_nbr_spinor_sendbuf[4];
-  void* cpu_back_nbr_spinor_sendbuf[4];
-  for(int i=0;i < 4;i++){
-    cpu_fwd_nbr_spinor_sendbuf[i] = malloc(len[i]);
-    cpu_back_nbr_spinor_sendbuf[i] = malloc(len[i]);
-  }
+  //allocate the ghost buffer if not allocated yet
+  spinor->allocateGhostBuffer();
 
-  int dagger = -1; //not used for staggered in packGhost() function
+  //dagger is not used for staggered in packGhost() function
+  int dagger = -1; 
   for(int i=0;i < 4; i++){
-    spinor->packGhost(cpu_back_nbr_spinor_sendbuf[i], i, QUDA_BACKWARDS, oddBit, dagger);
-    spinor->packGhost(cpu_fwd_nbr_spinor_sendbuf[i], i, QUDA_FORWARDS, oddBit, dagger);
+    spinor->packGhost(spinor->backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, oddBit, dagger);
+    spinor->packGhost(spinor->fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, oddBit, dagger);
   }
-
+  
   unsigned long recv_request1[4], recv_request2[4];
   unsigned long send_request1[4], send_request2[4];
   int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
@@ -726,25 +605,18 @@ void exchange_cpu_spinor4dir(cpuColorSpinorField* spinor,
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
   for(int i=0;i < 4; i++){
-    recv_request1[i] = comm_recv_with_tag(cpu_back_nbr_spinor[i], len[i], back_nbr[i], uptags[i]);
-    recv_request2[i] = comm_recv_with_tag(cpu_fwd_nbr_spinor[i], len[i], fwd_nbr[i], downtags[i]);
-    send_request1[i]= comm_send_with_tag(cpu_fwd_nbr_spinor_sendbuf[i], len[i], fwd_nbr[i], uptags[i]);
-    send_request2[i] = comm_send_with_tag(cpu_back_nbr_spinor_sendbuf[i], len[i], back_nbr[i], downtags[i]);
+    recv_request1[i] = comm_recv_with_tag(spinor->backGhostFaceBuffer[i], len[i], back_nbr[i], uptags[i]);
+    recv_request2[i] = comm_recv_with_tag(spinor->fwdGhostFaceBuffer[i], len[i], fwd_nbr[i], downtags[i]);    
+    send_request1[i]= comm_send_with_tag(spinor->fwdGhostFaceSendBuffer[i], len[i], fwd_nbr[i], uptags[i]);
+    send_request2[i] = comm_send_with_tag(spinor->backGhostFaceSendBuffer[i], len[i], back_nbr[i], downtags[i]);
   }
-
+  
   for(int i=0;i < 4;i++){
     comm_wait(recv_request1[i]);
     comm_wait(recv_request2[i]);
     comm_wait(send_request1[i]);
     comm_wait(send_request2[i]);
   }
-
-
-  for(int i=0;i < 4;i++){
-    free(cpu_fwd_nbr_spinor_sendbuf[i]);
-    free(cpu_back_nbr_spinor_sendbuf[i]);
-  }
-
 
 }
 

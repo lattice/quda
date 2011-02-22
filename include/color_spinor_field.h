@@ -410,22 +410,28 @@ class cpuColorSpinorField : public ColorSpinorField {
   friend void dslashRef();
   friend void staggeredDslashRef();
   friend void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink,
-				      cpuColorSpinorField* in, void** fwd_nbr_spinor, void** back_nbr_spinor,
-				      int oddBit, int daggerBit,
+				      cpuColorSpinorField* in, int oddBit, int daggerBit,
 				      QudaPrecision sPrecision, QudaPrecision gPrecision);
   friend void  matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** ghost_fatlink, void** longlink, void** ghost_longlink, 
-				cpuColorSpinorField* in, void** fwd_nbr_spinor, void** back_nbr_spinor, double mass, int dagger_bit,
+				cpuColorSpinorField* in, double mass, int dagger_bit,
 				QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity);
   friend int invert_test(void);
   
   template <typename Float> friend class SpaceColorSpinOrder;
   template <typename Float> friend class SpaceSpinColorOrder;
 
+ public:
+  static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; //cpu memory
+  static void* backGhostFaceBuffer[QUDA_MAX_DIM]; //cpu memory
+  static void* fwdGhostFaceSendBuffer[QUDA_MAX_DIM]; //cpu memory
+  static void* backGhostFaceSendBuffer[QUDA_MAX_DIM]; //cpu memory
+  static int initGhostFaceBuffer;
+
  private:
   void *v; // the field elements
   void *norm; // the normalization field
   bool init;
-
+  
   void create(const QudaFieldCreate);
   void destroy();
   void copy(const cpuColorSpinorField&);
@@ -451,6 +457,10 @@ class cpuColorSpinorField : public ColorSpinorField {
   void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
   static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
   void PrintVector(unsigned int x);
+
+  void allocateGhostBuffer(void);
+  void freeGhostBuffer(void);
+	
   void packGhost(void* ghost_spinor, const int dim, 
 		 const QudaDirection dir, const QudaParity parity, const int dagger);
   void unpackGhost(void* ghost_spinor, const int dim, 

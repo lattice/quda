@@ -30,7 +30,6 @@ extern "C" {
 			   void* spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor,
 			   QudaPrecision sPrecision);
   void exchange_cpu_spinor4dir(cpuColorSpinorField* spinor, int* X,
-			       void** cpu_fwd_nbr_spinor, void** cpu_back_nbr_spinor,
 			       QudaParity oddBit);
 
   void exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* stream);
