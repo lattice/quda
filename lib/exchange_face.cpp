@@ -689,113 +689,34 @@ void exchange_cpu_spinor(int* X,
 
 }
 
-template<typename Float>
-void
-exchange_cpu_spinor4dir(Float* spinorField, Float** cpu_fwd_nbr_spinor, Float** cpu_back_nbr_spinor, int oddBit)
+
+void exchange_cpu_spinor4dir(cpuColorSpinorField* spinor, 
+			     int* X,
+			     void** cpu_fwd_nbr_spinor, void** cpu_back_nbr_spinor,
+			     QudaParity oddBit)
 {
 
+  setup_dims(X);
 
-  //fast way for T dimension
-#if 0
-  Float* cpu_fwd_nbr_spinor_t_send = spinorField + (Vh -3*Vsh_t)*mySpinorSiteSize;
-  Float* cpu_back_nbr_spinor_t_send = spinorField;
-  int len_t = 3*Vsh_t*mySpinorSiteSize*sizeof(Float);
-  
-  unsigned long recv_request_1 = comm_recv_with_tag(cpu_back_nbr_spinor[3], len_t, T_BACK_NBR, TUP);
-  unsigned long recv_request_2 = comm_recv_with_tag(cpu_fwd_nbr_spinor[3], len_t, T_FWD_NBR, TDOWN);  
-  unsigned long send_request_1= comm_send_with_tag(cpu_fwd_nbr_spinor_t_send, len_t, T_FWD_NBR, TUP);
-  unsigned long send_request_2 = comm_send_with_tag(cpu_back_nbr_spinor_t_send, len_t, T_BACK_NBR, TDOWN);
-  
-  comm_wait(recv_request_1);
-  comm_wait(recv_request_2);  
-  comm_wait(send_request_1);
-  comm_wait(send_request_2);
-#endif
-
-  //for all dimensions
   int len[4] = {
-    3*Vsh_x*6*sizeof(Float),
-    3*Vsh_y*6*sizeof(Float),
-    3*Vsh_z*6*sizeof(Float),
-    3*Vsh_t*6*sizeof(Float)
+    3*Vsh_x*6*spinor->Precision(),
+    3*Vsh_y*6*spinor->Precision(),
+    3*Vsh_z*6*spinor->Precision(),
+    3*Vsh_t*6*spinor->Precision()
   };
 
-  Float* cpu_fwd_nbr_spinor_sendbuf[4];
-  Float* cpu_back_nbr_spinor_sendbuf[4];
+  void* cpu_fwd_nbr_spinor_sendbuf[4];
+  void* cpu_back_nbr_spinor_sendbuf[4];
   for(int i=0;i < 4;i++){
-    cpu_fwd_nbr_spinor_sendbuf[i] = (Float*)malloc(len[i]);
-    cpu_back_nbr_spinor_sendbuf[i] = (Float*)malloc(len[i]);
+    cpu_fwd_nbr_spinor_sendbuf[i] = malloc(len[i]);
+    cpu_back_nbr_spinor_sendbuf[i] = malloc(len[i]);
   }
 
-
-  for( int i=0;i < Vh;i++){
-    //compute full index
-    int boundaryCrossings = i/(X1/2) + i/(X1*X2/2) + i/(X1*X2*X3/2);
-    int Y = 2*i + (boundaryCrossings + oddBit) % 2;
-    int x4 = Y/(X3*X2*X1);
-    int x3 = (Y/(X2*X1)) % X3;
-    int x2 = (Y/X1) % X2;
-    int x1 = Y % X1;
-
-    int ghost_face_idx ;
-
-    //X dimension
-    if (x1 < 3){
-      ghost_face_idx =  (x1*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-      for(int j=0; j < 6;j++){
-        cpu_back_nbr_spinor_sendbuf[0][6*ghost_face_idx+j]=spinorField[6*i+j];
-      }
-    }
-    if (x1 >=X1 -3){
-      ghost_face_idx = ((x1-X1+3)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-      for(int j=0; j < 6;j++){
-        cpu_fwd_nbr_spinor_sendbuf[0][6*ghost_face_idx+j]=spinorField[6*i+j];
-      }
-    }
-
-    //Y dimension
-    if (x2 < 3){
-      ghost_face_idx = (x2*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
-      for(int j=0; j < 6;j++){
-        cpu_back_nbr_spinor_sendbuf[1][6*ghost_face_idx+j]=spinorField[6*i+j];
-      }
-    }
-    if (x2 >= X2 - 3){
-      ghost_face_idx = ((x2-X2+3)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
-      for(int j=0; j < 6;j++){
-        cpu_fwd_nbr_spinor_sendbuf[1][6*ghost_face_idx+j]=spinorField[6*i+j];
-      }
-    }
-
-    //Z dimension
-    if (x3 < 3){
-      ghost_face_idx = (x3*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
-      for(int j=0; j < 6;j++){
-        cpu_back_nbr_spinor_sendbuf[2][6*ghost_face_idx+j]=spinorField[6*i+j];
-      }
-    }
-    if (x3 >= X3 - 3){
-      ghost_face_idx = ((x3-X3+3)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
-      for(int j=0; j < 6;j++){
-        cpu_fwd_nbr_spinor_sendbuf[2][6*ghost_face_idx+j]=spinorField[6*i+j];
-      }
-    }
-
-    //T dimension
-     if (x4 < 3){
-       ghost_face_idx = (x4*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-       for(int j=0; j < 6;j++){
-         cpu_back_nbr_spinor_sendbuf[3][6*ghost_face_idx+j]=spinorField[6*i+j];
-       }
-     }
-     if (x4 >= X4 - 3){
-       ghost_face_idx = ((x4-X4+3)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-       for(int j=0; j < 6;j++){
-         cpu_fwd_nbr_spinor_sendbuf[3][6*ghost_face_idx+j]=spinorField[6*i+j];
-       }
-     }
-
-  }//i
+  int dagger = -1; //not used for staggered in packGhost() function
+  for(int i=0;i < 4; i++){
+    spinor->packGhost(cpu_back_nbr_spinor_sendbuf[i], i, QUDA_BACKWARDS, oddBit, dagger);
+    spinor->packGhost(cpu_fwd_nbr_spinor_sendbuf[i], i, QUDA_FORWARDS, oddBit, dagger);
+  }
 
   unsigned long recv_request1[4], recv_request2[4];
   unsigned long send_request1[4], send_request2[4];
@@ -818,27 +739,12 @@ exchange_cpu_spinor4dir(Float* spinorField, Float** cpu_fwd_nbr_spinor, Float** 
     comm_wait(send_request2[i]);
   }
 
+
   for(int i=0;i < 4;i++){
     free(cpu_fwd_nbr_spinor_sendbuf[i]);
     free(cpu_back_nbr_spinor_sendbuf[i]);
   }
 
-
-}
-
-
-void exchange_cpu_spinor4dir(int* X,
-			     void* spinorField, void** cpu_fwd_nbr_spinor, void** cpu_back_nbr_spinor,
-			     QudaPrecision sPrecision, int oddBit)
-{
-
-  setup_dims(X);
-
-  if (sPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_cpu_spinor4dir((double*)spinorField, (double**)cpu_fwd_nbr_spinor, (double**)cpu_back_nbr_spinor, oddBit);
-  }else{//single
-    exchange_cpu_spinor4dir((float*)spinorField, (float**)cpu_fwd_nbr_spinor, (float**)cpu_back_nbr_spinor, oddBit);
-  }
 
 }
 

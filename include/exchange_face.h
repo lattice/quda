@@ -2,6 +2,7 @@
 #define __EXCHANGE_FACE_H__
 #include "enum_quda.h"
 #include "quda_internal.h"
+#include "color_spinor_field.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,9 +29,9 @@ extern "C" {
   void exchange_cpu_spinor(int* X,
 			   void* spinorField, void* fwd_nbr_spinor, void* back_nbr_spinor,
 			   QudaPrecision sPrecision);
-  void exchange_cpu_spinor4dir(int* X,
-			       void* spinorField, void** cpu_fwd_nbr_spinor, void** cpu_back_nbr_spinor,
-			       QudaPrecision sPrecision, int oddBit);
+  void exchange_cpu_spinor4dir(cpuColorSpinorField* spinor, int* X,
+			       void** cpu_fwd_nbr_spinor, void** cpu_back_nbr_spinor,
+			       QudaParity oddBit);
 
   void exchange_gpu_spinor(void* _cudaSpinor, cudaStream_t* stream);
   void exchange_gpu_spinor_start(void* _cudaSpinor, int parity, cudaStream_t* stream);

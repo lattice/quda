@@ -388,8 +388,8 @@ void staggeredDslashRef()
   switch (test_type) {
   case 0:    
 #ifdef MULTI_GPU    
-    staggered_dslash_mg4dir(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-			    spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			    spinor, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
@@ -404,13 +404,13 @@ void staggeredDslashRef()
     break;
   case 1: 
 #ifdef MULTI_GPU
-    staggered_dslash_mg4dir(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-			    spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			    spinor, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);    
 
 #else
     cpu_parity=1; //ODD
-    staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
+    staggered_dslash(spinorRef, fatlink, longlink, spinor, cpu_parity, dagger, 
 		     inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif
     break;
