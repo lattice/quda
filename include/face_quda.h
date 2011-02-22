@@ -24,9 +24,18 @@ class FaceBuffer {
   void *my_back_face;
   void *from_back_face;
   void *from_fwd_face;
-  int Vs;
+
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
+
+  int Volume;
+  int VolumeCB;
+  int faceVolume[QUDA_MAX_DIM];
+  int faceVolumeCB[QUDA_MAX_DIM];
+  int X[QUDA_MAX_DIM];
+  int nDim;
+  int nFace;
+
   size_t nbytes;
 #ifdef QMP_COMMS
   QMP_msgmem_t mm_send_fwd;
@@ -40,8 +49,10 @@ class FaceBuffer {
   QMP_msghandle_t mh_from_back;
 #endif
 
+  void setupDims(const int *X);
  public:
-  FaceBuffer(const int *X, const int nDim, const int Ninternal, QudaPrecision precision);
+  FaceBuffer(const int *X, const int nDim, const int Ninternal,
+	     const int nFace, const QudaPrecision precision);
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
@@ -49,6 +60,8 @@ class FaceBuffer {
 			  int dagger, cudaStream_t *stream);
   void exchangeFacesComms();
   void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
+
+  void exchangeCpuSpinor(char *spinor, char **fwd, char **back, int parity);
 };
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
@@ -86,6 +99,7 @@ class FaceBuffer {
   int faceVolumeCB[QUDA_MAX_DIM];
   int X[QUDA_MAX_DIM];
   int nDim;
+  int nFace;
 
   void* fwd_nbr_spinor_sendbuf = NULL;
   void* back_nbr_spinor_sendbuf = NULL;
@@ -113,7 +127,8 @@ class FaceBuffer {
   void setupDims(const int *X);
   
  public:
-  FaceBuffer(const int *X, const int nDim, const int Ninternal, QudaPrecision precision)
+  FaceBuffer(const int *X, const int nDim, const int Ninternal,
+	     const int nFace, const QudaPrecision precision);
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
@@ -121,6 +136,8 @@ class FaceBuffer {
 			  int dagger, cudaStream_t *stream);
   void exchangeFacesComms();
   void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
+
+  void exchangeCpuSpinor(char *spinor, char **fwd, char **back, int parity);
 };
 
 #endif // MPI_COMMS

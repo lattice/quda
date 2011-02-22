@@ -4,9 +4,10 @@
 
 #include <tune_quda.h>
 
-DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param),
-  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
-  face(param.gauge->X, 4, 12, param.gauge->precision)
+DiracWilson::DiracWilson(const DiracParam &param) : 
+  Dirac(param), blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), 
+  blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
+  face(param.gauge->X, 4, 12, 1, param.gauge->precision)
 {
 
 }

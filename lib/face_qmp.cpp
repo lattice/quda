@@ -34,10 +34,10 @@ cudaStream_t *stream;
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
 #endif
 
-FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, const int num_faces,
-		       const QudaPrecision precision) :
+FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
+		       const int nFace, const QudaPrecision precision) :
   my_fwd_face(0), my_back_face(0), from_back_face(0), from_fwd_face(0), 
-  nDim(nDim), Ninternal(Ninternal), num_faces(num_faces), precision(precision)
+  Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
 {
   setupDims(X);
 
@@ -49,10 +49,10 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, const 
   recBackStrmIdx = sendFwdStrmIdx;
   
   // Buffers hold half spinors
-  nbytes = num_faces*faceVolumeCB[3]*Ninternal*precision;
+  nbytes = nFace*faceVolumeCB[3]*Ninternal*precision;
   
   // add extra space for the norms for half precision
-  if (precision == QUDA_HALF_PRECISION) nbytes += num_faces*faceVolumeCB[3]*sizeof(float);
+  if (precision == QUDA_HALF_PRECISION) nbytes += nFace*faceVolumeCB[3]*sizeof(float);
   
   unsigned int flag = cudaHostAllocDefault;
   cudaHostAlloc(&(my_fwd_face), nbytes, flag);
@@ -122,13 +122,13 @@ void FaceBuffer::setupDims(const int* X)
   VolumeCB = Volume/2;
 
   for (int i=0; i<nDim; i++) {
+    faceVolume[i] = 1;
     for (int j=0; j<nDim; j++) {
       if (i==j) continue;
-      faceVolume[i] *= X[d];
+      faceVolume[i] *= this->X[j];
     }
-    faceVolumeCB[i] /= 2;
+    faceVolumeCB[i] = faceVolume[i]/2;
   }
-  
 }
 
 FaceBuffer::~FaceBuffer()
@@ -180,10 +180,10 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 #endif
 
   // gather for backwards send
-  in.packGhost(back_face, 0, 3, QUDA_BACKWARDS, parity, dagger, &stream[sendBackStrmIdx]);
+  in.packGhost(back_face, 0, 3, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[sendBackStrmIdx]);
 
   // gather for forwards send
-  in.packGhost(fwd_face, 0, 3, QUDA_FORWARDS, parity, dagger, &stream[sendFwdStrmIdx]);
+  in.packGhost(fwd_face, 0, 3, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[sendFwdStrmIdx]);
  
 #ifdef GATHER_COALESCE  
   // Copy to host if we are coalescing into single face messages to reduce latency
@@ -251,6 +251,151 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
   QMP_finish_from_back;
   
   out.unpackGhost(from_back_face, 0, 3, QUDA_BACKWARDS, dagger, &stream[recBackStrmIdx]);
+}
+
+// This is just an initial hack for CPU comms
+void FaceBuffer::exchangeCpuSpinor(char *spinor, char **fwd, char **back, int oddBit)
+{
+
+  //for all dimensions
+  int len[4] = {
+    nFace*faceVolumeCB[0]*Ninternal*precision,
+    nFace*faceVolumeCB[1]*Ninternal*precision,
+    nFace*faceVolumeCB[2]*Ninternal*precision,
+    nFace*faceVolumeCB[3]*Ninternal*precision
+  };
+
+  char* fwd_sendbuf[4];
+  char* back_sendbuf[4];
+#ifdef QMP_COMMS
+  for(int i=0;i < 4;i++){
+    fwd_sendbuf[i] = (char*)malloc(len[i]);
+    back_sendbuf[i] = (char*)malloc(len[i]);
+  }
+#else
+  for(int i=0;i < 4;i++){
+    fwd_sendbuf[i] = fwd[i];
+    back_sendbuf[i] = back[i];
+  }  
+#endif
+
+  int bytes = Ninternal*precision;
+
+  for(int i=0; i<VolumeCB; i++){
+    //compute full index
+    int boundaryCrossings = i/(X[0]/2) + i/(X[0]*X[1]/2) + i/(X[0]*X[1]*X[2]/2);
+    int Y = 2*i + (boundaryCrossings + oddBit) % 2;
+    int x[4];
+    x[3] = Y/(X[2]*X[1]*X[0]);
+    x[2] = (Y/(X[1]*X[0])) % X[2];
+    x[1] = (Y/X[0]) % X[1];
+    x[0] = Y % X[0];
+
+    int ghost_face_idx ;
+
+    int offset = Ninternal*i*precision;
+
+    //X dimension
+    if (x[0] < nFace){
+      ghost_face_idx = (x[0]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] +x[1])>>1 * precision;
+      memcpy(&back_sendbuf[0][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+    if (x[0] >=X[0]-nFace){
+      ghost_face_idx = ((x[0]-X[0]+nFace)*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] +x[1])>>1 * precision;
+      memcpy(&fwd_sendbuf[0][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+
+    //Y dimension
+    if (x[1] < nFace){
+      ghost_face_idx = (x[1]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1 * precision;
+      memcpy(&back_sendbuf[1][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+    if (x[1] >= X[1]-nFace){
+      ghost_face_idx = ((x[1]-X[1]+nFace)*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1 * precision;
+      memcpy(&fwd_sendbuf[1][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+
+    //Z dimension
+    if (x[2] < nFace){
+      ghost_face_idx = (x[2]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1 * precision;
+      memcpy(&back_sendbuf[2][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+    if (x[2] >= X[2] - nFace){
+      ghost_face_idx = ((x[2]-X[2]+nFace)*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1 * precision;
+      memcpy(&fwd_sendbuf[2][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+
+    //T dimension
+    if (x[3] < nFace){
+      ghost_face_idx = (x[3]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1 * precision;
+      memcpy(&back_sendbuf[3][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+    if (x[3] >= X[3] - nFace){
+      ghost_face_idx = ((x[3]-X[3]+nFace)*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1 * precision;
+      memcpy(&fwd_sendbuf[3][Ninternal*ghost_face_idx], &spinor[offset], bytes);
+    }
+
+  }//i
+
+#ifdef QMP_COMMS
+
+  QMP_msgmem_t mm_send_fwd[4];
+  QMP_msgmem_t mm_send_back[4];
+  QMP_msgmem_t mm_from_fwd[4];
+  QMP_msgmem_t mm_from_back[4];
+  QMP_msghandle_t mh_send_fwd[4];
+  QMP_msghandle_t mh_send_back[4];
+  QMP_msghandle_t mh_from_fwd[4];
+  QMP_msghandle_t mh_from_back[4];
+
+  for (int i=0; i<4; i++) {
+    mm_send_fwd[i] = QMP_declare_msgmem(fwd_sendbuf[i], len[i]);
+    if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
+    
+    mm_send_back[i] = QMP_declare_msgmem(back_sendbuf[i], len[i]);
+    if( mm_send_back == NULL ) errorQuda("Unable to allocate send back message mem");
+    
+    mm_from_fwd[i] = QMP_declare_msgmem(fwd[i], len[i]);
+    if( mm_from_fwd[i] == NULL ) errorQuda("Unable to allocate recv from fwd message mem");
+    
+    mm_from_back[i] = QMP_declare_msgmem(back[i], len[i]);
+    if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
+    
+    mh_send_fwd[i] = QMP_declare_send_relative(mm_send_fwd[i], i, +1, 0);
+    if( mh_send_fwd[i] == NULL ) errorQuda("Unable to allocate forward send");
+    
+    mh_send_back[i] = QMP_declare_send_relative(mm_send_back[i], i, -1, 0);
+    if( mh_send_back[i] == NULL ) errorQuda("Unable to allocate backward send");
+    
+    mh_from_fwd[i] = QMP_declare_receive_relative(mm_from_fwd[i], i, +1, 0);
+    if( mh_from_fwd[i] == NULL ) errorQuda("Unable to allocate forward recv");
+    
+    mh_from_back[i] = QMP_declare_receive_relative(mm_from_back[i], i, -1, 0);
+    if( mh_from_back[i] == NULL ) errorQuda("Unable to allocate backward recv");
+  }
+
+  for (int i=0; i<4; i++) {
+    QMP_start(mh_send_fwd[i]);
+    QMP_start(mh_from_back[i]);
+  }
+
+  for (int i=0; i<4; i++) {
+    QMP_wait(mh_send_fwd[i]);
+    QMP_wait(mh_from_back[i]);
+  }
+
+  for (int i=0; i<4; i++) {
+    QMP_free_msghandle(mh_send_fwd);
+    QMP_free_msghandle(mh_from_back);
+    QMP_free_msgmem(mm_send_fwd);
+    QMP_free_msgmem(mm_from_back);
+  }
+
+  for(int i=0;i < 4;i++){
+    free(fwd_sendbuf[i]);
+    free(back_sendbuf[i]);
+  }
+#endif
 }
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,

@@ -4,8 +4,6 @@
 
 #include <color_spinor_field.h>
 
-#include "exchange_face.h"
-
 #define BLOCK_DIM 64
 
 //these are access control for staggered action
@@ -703,11 +701,6 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   face->exchangeFacesComms();
   // Wait for comms to finish, and scatter into the end zone
   face->exchangeFacesWait(*inSpinor, dagger);
-#else
-  //this is the inSpinor's parity, not the out spinor's
-  exchange_gpu_spinor_start(inSpinor, 1-parity, &streams[1]); CUERR;
-  exchange_gpu_spinor_wait(inSpinor,  &streams[1]); CUERR;
-#endif
 
   int exterior_kernel_flag[4]={
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
@@ -817,25 +810,24 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
   face->exchangeFacesComms();
   // Wait for comms to finish, and scatter into the end zone
   face->exchangeFacesWait(*inSpinor, dagger);
-#endif
 
   int exterior_kernel_flag[4]={EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T};
   for(int i=0; i< 4; i++){
     initTLocation(dims[i] -6,exterior_kernel_flag[i] , 6*Vsh[i]);  
     if (x==0) { // not doing xpay
       if (!dagger) {
-	staggeredDslash18Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1]>>>
+	staggeredDslash18Kernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-2]>>>
 	(out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
       } else {
-	staggeredDslash18DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1]>>> 
+	staggeredDslash18DaggerKernel <<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-2]>>> 
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam);CUERR;
       }    
     } else { // doing xpay
       if (!dagger) {
-	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1]>>>
+	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-2]>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       } else {
-	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1]>>>
+	staggeredDslash18AxpyKernel<<<exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-2]>>>
 	  (out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, dslashParam, x, xNorm, a); CUERR;
       }          
     }     

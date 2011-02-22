@@ -724,26 +724,11 @@ static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct
   else if (precision == QUDA_SINGLE_PRECISION) floatSize = sizeof(float);
   else floatSize = sizeof(float)/2;
 
-  int elements;
-  switch(reconstruct){
-  case QUDA_RECONSTRUCT_8:
-      elements = 8;
-      break;
-  case QUDA_RECONSTRUCT_12:
-      elements = 12;
-      break;
-  case QUDA_RECONSTRUCT_NO:
-      elements = 18;
-      break;
-  default:
-      errorQuda("Invalid reconstruct value\n");
-  }
- 
   if (cudaGauge->even || cudaGauge->odd){
     errorQuda("Error: even/odd field is not null, probably already allocated(even=%p, odd=%p)\n", cudaGauge->even, cudaGauge->odd);
   }
  
-  cudaGauge->bytes = 4*cudaGauge->stride*elements*floatSize;
+  cudaGauge->bytes = 4*cudaGauge->stride*reconstruct*floatSize;
   if (!cudaGauge->even) {
     if (cudaMalloc((void **)&cudaGauge->even, cudaGauge->bytes) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating even gauge field");
