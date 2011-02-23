@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <quda.h>
 #include <string.h>
+#include <gauge_quda.h>
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -110,7 +111,7 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
   errorQuda("FaceBuffer copy constructor not implemented");
 }
 
-// X here is a checkboarded volume
+// The input X here is already checkboarded so need to undo this
 void FaceBuffer::setupDims(const int* X)
 {
   Volume = 1;
@@ -375,6 +376,62 @@ void FaceBuffer::exchangeCpuSpinor(char *spinor, char **fwd, char **back, int od
   }
 
   for (int i=0; i<4; i++) {
+    QMP_start(mh_from_back[i]);
+    QMP_start(mh_from_fwd[i]);
+    QMP_start(mh_send_fwd[i]);
+    QMP_start(mh_send_back[i]);
+  }
+
+  for (int i=0; i<4; i++) {
+    QMP_wait(mh_send_fwd[i]);
+    QMP_wait(mh_send_back[i]);
+    QMP_wait(mh_from_back[i]);
+    QMP_wait(mh_from_fwd[i]);
+  }
+
+  for (int i=0; i<4; i++) {
+    QMP_free_msghandle(mh_send_fwd);
+    QMP_free_msghandle(mh_from_back);
+    QMP_free_msghandle(mh_from_fwd);
+    QMP_free_msghandle(mh_send_back);
+    QMP_free_msgmem(mm_send_fwd);
+    QMP_free_msgmem(mm_from_back);
+    QMP_free_msgmem(mm_from_fwd);
+    QMP_free_msgmem(mm_send_back);
+  }
+
+  for(int i=0;i < 4;i++){
+    free(fwd_sendbuf[i]);
+    free(back_sendbuf[i]);
+  }
+#endif
+}
+
+void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace) {
+
+#ifdef QMP_COMMS
+
+  QMP_msgmem_t mm_send_fwd[4];
+  QMP_msgmem_t mm_from_back[4];
+  QMP_msghandle_t mh_send_fwd[4];
+  QMP_msghandle_t mh_from_back[4];
+
+  for (int i=0; i<4; i++) {
+    int len = nFace*faceVolumeCB[i]*gaugeSiteSize*precision;
+    mm_send_fwd[i] = QMP_declare_msgmem(link_sendbuf[i], 2*len);
+    if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
+    
+    mm_from_back[i] = QMP_declare_msgmem(ghost_link[i], 2*len);
+    if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
+    
+    mh_send_fwd[i] = QMP_declare_send_relative(mm_send_fwd[i], i, +1, 0);
+    if( mh_send_fwd[i] == NULL ) errorQuda("Unable to allocate forward send");
+    
+    mh_from_back[i] = QMP_declare_receive_relative(mm_from_back[i], i, -1, 0);
+    if( mh_from_back[i] == NULL ) errorQuda("Unable to allocate backward recv");
+  }
+
+  for (int i=0; i<4; i++) {
     QMP_start(mh_send_fwd[i]);
     QMP_start(mh_from_back[i]);
   }
@@ -391,12 +448,18 @@ void FaceBuffer::exchangeCpuSpinor(char *spinor, char **fwd, char **back, int od
     QMP_free_msgmem(mm_from_back);
   }
 
-  for(int i=0;i < 4;i++){
-    free(fwd_sendbuf[i]);
-    free(back_sendbuf[i]);
+#else
+
+  for(int dir =0; dir < 4; dir++) {
+    int len = nFace*faceVolumeCB[dir]*gaugeSiteSize*precision;
+    memcpy(ghost_link[dir], link_sendbuf[i], 2*len);
   }
+
 #endif
+
 }
+
+
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 			 int veclength, ReconstructType reconstruct, int V, int Vs)
@@ -410,8 +473,6 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
   blocksize = Vs*veclength*precision;
   offset = (V-Vs)*veclength*precision;
   stride = (V+Vs)*veclength*precision; // assume that pad = Vs
-  // stride = V*veclength*precision;
-  // nbytes = Vs*ndim*linksize*precision; /* for contiguous face buffer */
 
 #ifdef QMP_COMMS
 
@@ -425,7 +486,7 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
   if (!mm_gauge_send_fwd) {
     errorQuda("Unable to allocate gauge message mem");
   }
-  // mm_gauge_from_back = QMP_declare_msgmem(gauge_face, nbytes); /* for contiguous face buffer */
+
   mm_gauge_from_back = QMP_declare_strided_msgmem(gauge_face, blocksize, nblocks, stride);
   if (!mm_gauge_from_back) { 
     errorQuda("Unable to allocate gauge face message mem");
@@ -458,14 +519,7 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
   for (int i=0; i<nblocks; i++) {
     g = (void *) ((char *) gauge + offset + i*stride);
     gf = (void *) ((char *) gauge_face + i*stride);
-    // gf = (void *) ((char *) gauge_face + i*blocksize); /* for contiguous face buffer */
-
-    // I don't think stream has been set here so can't use async copy
-    /*#ifdef OVERLAP_COMMS
-    cudaMemcpyAsync(gf, g, blocksize, cudaMemcpyHostToHost, *stream);
-    #else*/
     cudaMemcpy(gf, g, blocksize, cudaMemcpyHostToHost);
-    //#endif
   }
 
 #endif // QMP_COMMS

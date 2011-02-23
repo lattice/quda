@@ -62,6 +62,8 @@ class FaceBuffer {
   void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
 
   void exchangeCpuSpinor(char *spinor, char **fwd, char **back, int parity);
+
+  void exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace);
 };
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
@@ -138,6 +140,8 @@ class FaceBuffer {
   void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
 
   void exchangeCpuSpinor(char *spinor, char **fwd, char **back, int parity);
+
+  void exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace);
 };
 
 #endif // MPI_COMMS

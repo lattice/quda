@@ -139,6 +139,8 @@ extern "C" {
 		     QudaReconstructType _longlink_recon,QudaReconstructType _longlink_recon_sloppy,
 		     QudaGaugeParam *_param);
 
+  void pack_ghost(void **cpuLink, void **cpuGhost, int nFace, QudaPrecision precision);
+
 #define CUERR  do{ cudaError_t cuda_err;                                \
     if ((cuda_err = cudaGetLastError()) != cudaSuccess) {               \
       fprintf(stderr, "ERROR: CUDA error: %s, line %d, function %s, file %s\n", \

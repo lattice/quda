@@ -12,8 +12,9 @@
 #include "gauge_quda.h"
 
 #ifdef MULTI_GPU
-#include "exchange_face.h"
-#include "mpicomm.h"
+#include <face_quda.h>
+//#include "exchange_face.h"
+//#include "mpicomm.h"
 #include <mpi.h>
 #endif
 
@@ -32,6 +33,8 @@ void *spinorIn;
 void *spinorOut;
 void *spinorCheck;
 void *tmp;
+
+FaceBuffer *faceBuf;
 
 int device = 0;
 
@@ -199,7 +202,12 @@ invert_test(void)
 
   
 #ifdef MULTI_GPU
-  exchange_init_dims(gaugeParam.X);
+  int dummy = 1;
+  int dummyFace = 1;
+  int X[4] = {Z[0]/2, Z[1], Z[2], Z[3]};
+  faceBuf = new FaceBuffer(X, 4, dummy, dummyFace, prec);
+
+  //exchange_init_dims(gaugeParam.X);
   int ghost_link_len[4] = {
     Vs_x*gaugeSiteSize*gSize,
     Vs_y*gaugeSiteSize*gSize,
@@ -217,7 +225,25 @@ invert_test(void)
   }
 
   //exchange_cpu_links(fatlink, ghost_fatlink[3], longlink, ghost_longlink[3], gaugeParam.cpu_prec);
-  exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  //exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+
+  void *fat_send[4], *long_send[4];
+  for(int i=0;i < 4;i++){
+    fat_send[i] = malloc(ghost_link_len[i]);
+    long_send[i] = malloc(3*ghost_link_len[i]);
+  }
+
+  pack_ghost(fatlink, fat_send, 1, prec);
+  pack_ghost(longlink, long_send, 3, prec);
+
+  faceBuf->exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
+  faceBuf->exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
+
+  for (int i=0; i<4; i++) {
+    free(fat_send[i]);
+    free(long_send[i]);
+  }
+
 #endif
 
  
@@ -567,9 +593,22 @@ usage(char** argv )
 
 int main(int argc, char** argv)
 {
+
 #ifdef MULTI_GPU
-  MPI_Init(&argc, &argv);
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif
+
+#ifdef MPI_COMMS
+  MPI_Init (&argc, &argv);  
   comm_init();
+#endif
+
 #endif
   
   int i;
@@ -705,7 +744,12 @@ int main(int argc, char** argv)
   int ret = invert_test();
 
 #ifdef MULTI_GPU  
+  delete faceBuf;
+
+#ifdef MPI_COMMS
   comm_cleanup();
+#endif
+
 #endif
 
   return ret;

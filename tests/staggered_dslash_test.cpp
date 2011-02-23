@@ -16,11 +16,13 @@
 #include <staggered_dslash_reference.h>
 #include "gauge_quda.h"
 
-#ifdef MULTI_GPU
+#include <face_quda.h>
+
+/*#ifdef MULTI_GPU
 #include <mpi.h>
 #include "mpicomm.h"
 #include "exchange_face.h"
-#endif
+#endif*/
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
@@ -59,6 +61,7 @@ QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 
 Dirac* dirac;
+FaceBuffer *faceBuf;
 
 extern int Z[4];
 extern int V;
@@ -193,7 +196,11 @@ void init()
   
 
 #ifdef MULTI_GPU
-  exchange_init_dims(X);
+  int dummy = 1;
+  int dummyFace = 1;
+  faceBuf = new FaceBuffer(X, 4, dummy, dummyFace, prec);
+  
+  //exchange_init_dims(X);
   ghost_fatlink[0] = malloc(Vs_x*gaugeSiteSize*gSize);
   ghost_fatlink[1] = malloc(Vs_y*gaugeSiteSize*gSize);
   ghost_fatlink[2] = malloc(Vs_z*gaugeSiteSize*gSize);
@@ -209,7 +216,29 @@ void init()
     errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
   }
   //exchange_cpu_links(fatlink, ghost_fatlink[3], longlink, ghost_longlink[3], gaugeParam.cpu_prec);
-  exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+  //exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
+
+  void *fat_send[4], *long_send[4];
+  fat_send[0] = malloc(Vs_x*gaugeSiteSize*gSize);
+  fat_send[1] = malloc(Vs_y*gaugeSiteSize*gSize);
+  fat_send[2] = malloc(Vs_z*gaugeSiteSize*gSize);
+  fat_send[3] = malloc(Vs_t*gaugeSiteSize*gSize);
+  long_send[0] = malloc(3*Vs_x*gaugeSiteSize*gSize);
+  long_send[1] = malloc(3*Vs_y*gaugeSiteSize*gSize);
+  long_send[2] = malloc(3*Vs_z*gaugeSiteSize*gSize);
+  long_send[3] = malloc(3*Vs_t*gaugeSiteSize*gSize);
+
+  pack_ghost(fatlink, fat_send, 1, prec);
+  pack_ghost(longlink, long_send, 3, prec);
+
+  faceBuf->exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
+  faceBuf->exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
+
+  for (int i=0; i<4; i++) {
+    free(fat_send[i]);
+    free(long_send[i]);
+  }
+  
 #endif   
 
   
@@ -329,6 +358,10 @@ void end(void)
   delete spinorRef;
     
   endQuda();
+
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#endif
 }
 
 double dslashCUDA() {
@@ -660,9 +693,22 @@ int main(int argc, char **argv)
   display_test_info();
 
 #ifdef MULTI_GPU
+
+#ifdef QMP_COMMS
+  int ndim=4, dims[4];
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+  dims[0] = dims[1] = dims[2] = 1;
+  dims[3] = QMP_get_number_of_nodes();
+  QMP_declare_logical_topology(dims, ndim);
+#endif
+
+#ifdef MPI_COMMS
   MPI_Init (&argc, &argv);  
   comm_set_gridsize(xsize, ysize, zsize, tsize);  
   comm_init();
+#endif
+
 #endif
 
 
@@ -675,7 +721,13 @@ int main(int argc, char **argv)
     ret = 0;
   }
 #ifdef MULTI_GPU
+  delete faceBuf;
+
+
+#ifdef MPI_COMMS
   comm_cleanup();
+#endif 
+
 #endif
 
   return ret;

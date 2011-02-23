@@ -283,3 +283,22 @@ void FaceBuffer::exchangeCpuSpinor(void *spinorField, void **cpu_fwd_nbr_spinor,
     free(cpu_back_nbr_spinor_sendbuf[i]);
   }
 }
+
+
+void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace) {
+  int uptags[4] = {XUP, YUP, ZUP,TUP};
+  int fwd_nbrs[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
+  int back_nbrs[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
+
+  for(int dir =0; dir < 4; dir++)
+    {
+      int len = nFace*faceVolumeCB[dir]*gaugeSiteSize*precision;
+
+      unsigned long recv_request = comm_recv_with_tag(ghost_link[dir], 2*len, back_nbrs[dir], uptags[dir]);
+      unsigned long send_request = comm_send_with_tag(link_sendbuf[dir], 2*len, fwd_nbrs[dir], uptags[dir]);
+      comm_wait(recv_request);
+      comm_wait(send_request);
+    }
+}
+
+

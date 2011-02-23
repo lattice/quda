@@ -9,7 +9,9 @@
 #include <util_quda.h>
 #include <staggered_dslash_reference.h>
 #include "misc.h"
-#include "exchange_face.h"
+
+#include <face_quda.h>
+//#include "exchange_face.h"
 
 extern void *memset(void *s, int c, size_t n);
 
@@ -511,7 +513,6 @@ Float *spinorNeighbor_mg(int i, int dir, int oddBit, Float *spinorField,
 }
 
 
-
 template <typename sFloat, typename gFloat>
 void dslashReference_mg(sFloat *res, gFloat **fatlink, gFloat* ghost_fatlink, gFloat** longlink,  gFloat* ghost_longlink,
 			sFloat *spinorField, sFloat* fwd_nbr_spinor, sFloat* back_nbr_spinor, int oddBit, int daggerBit) 
@@ -524,9 +525,13 @@ void dslashReference_mg(sFloat *res, gFloat **fatlink, gFloat* ghost_fatlink, gF
   }else{
     prec = QUDA_DOUBLE_PRECISION;
   }
-  
+
+#if 0  
   exchange_cpu_spinor(Z, spinorField, fwd_nbr_spinor, back_nbr_spinor, prec);
-  
+#else
+  errorQuda("Not supported\n");
+#endif  
+
 
   for (int i=0; i<Vh*1*3*2; i++) res[i] = 0.0;
   
@@ -919,8 +924,12 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink
     printf("ERROR: full parity not supported in function %s\n", __FUNCTION__);
     exit(1);
   }
-  exchange_cpu_spinor4dir(Z, spinorField, (void**)fwd_nbr_spinor, (void**)back_nbr_spinor, prec, otherparity);
+  //exchange_cpu_spinor4dir(Z, spinorField, (void**)fwd_nbr_spinor, (void**)back_nbr_spinor, prec, otherparity);
 
+  // FIXME: FaceBuffer should expect full dimensions
+  int ZZ[4] = {Z[0]/2, Z[1], Z[2], Z[3]};
+  FaceBuffer faceBuf(ZZ, 4, 6, 3, prec);
+  faceBuf.exchangeCpuSpinor((char*)spinorField, (char**)fwd_nbr_spinor, (char**)back_nbr_spinor, otherparity);
 
   for (int i=0; i<Vh*1*3*2; i++) res[i] = 0.0;
 
