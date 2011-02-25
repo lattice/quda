@@ -441,13 +441,15 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
 				     const QudaParity parity, const int dagger,
 				     cudaStream_t *stream) {
 
-  int FloatN = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+  CUERR; // check error state
+
+  int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Vh = this->volume;
   int Vsh = x[0]*x[1]*x[2];
   int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
   if (nSpin == 4) Nint /= 2; // spin projection for Wilson
-  int Npad = Nint / FloatN; // number FloatN buffers we have
+  int Npad = Nint / Nvec; // number Nvec buffers we have
 
   if (dim != 3) errorQuda("Not supported");
 
@@ -469,12 +471,12 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
     
   // QUDA Memcpy NPad's worth. 
   //  -- Dest will point to the right beginning PAD. 
-  //  -- Each Pad has size FloatN*Vsh Floats. 
-  //  --  There is FloatN*Stride Floats from the start of one PAD to the start of the next
+  //  -- Each Pad has size Nvec*Vsh Floats. 
+  //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
   for(int i=0; i < Npad; i++) {
-    int len = num_faces*Vsh*FloatN*precision;     
+    int len = num_faces*Vsh*Nvec*precision;     
     void *dst = (char*)ghost_spinor + i*len;
-    void *src = (char*)v + (offset + i*stride)* FloatN*precision;
+    void *src = (char*)v + (offset + i*stride)* Nvec*precision;
     CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
 
@@ -495,12 +497,12 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
 				       const int dagger, cudaStream_t* stream) 
 {
   CUERR;
-  int FloatN = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+  int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Vsh = x[0]*x[1]*x[2];
   int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
   if (nSpin == 4) Nint /= 2; // spin projection for Wilson
-  int Npad = Nint / FloatN; // number FloatN buffers we have
+  int Npad = Nint / Nvec; // number Nvec buffers we have
 
   if (dim != 3) errorQuda("Not supported");
 
@@ -510,7 +512,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
   bool upper = dagger? false : true;
   if (dir == QUDA_FORWARDS) upper = !upper;
     
-  int len = num_faces*Vsh*FloatN*Npad;
+  int len = num_faces*Vsh*Nvec*Npad;
 
   int offset = length + ghostOffset[dim]*nColor*nSpin*2;
   if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len;

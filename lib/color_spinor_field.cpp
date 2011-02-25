@@ -97,6 +97,8 @@ void ColorSpinorField::createGhostZone() {
     total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
   }
 
+  if (precision != QUDA_HALF_PRECISION) total_norm_length = 0;
+
   if (verbose == QUDA_DEBUG_VERBOSE) {
     printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
     printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);

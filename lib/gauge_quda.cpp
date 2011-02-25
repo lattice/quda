@@ -763,13 +763,8 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
     
-#ifndef __DEVICE_EMULATION__
   cudaMallocHost((void**)&packedEven, bytes);
   cudaMallocHost((void**)&packedOdd, bytes);
-#else
-  packedEven = (FloatN*)malloc(bytes);
-  packedOdd = (FloatN*)malloc(bytes);
-#endif
     
   if( ! packedEven ) errorQuda( "packedEven is borked\n");
   if( ! packedOdd ) errorQuda( "packedOdd is borked\n");
@@ -818,10 +813,9 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
 
   packGhost((Float**)cpuGauge, sendLink, nFace); // pack the ghost zones into a contiguous buffer
 
-  int dummy = 1;
   int dummyFace = 1;
   int XX[] = {X[0]/2, X[1], X[2], X[3]}; // FIXME: FaceBuffer currently expects the CB dimensions
-  FaceBuffer face(XX, 4, dummy, dummyFace, QudaPrecision(sizeof(Float)));
+  FaceBuffer face(XX, 4, 18, dummyFace, QudaPrecision(sizeof(Float))); // this is the precision of the CPU field
   face.exchangeCpuLink((void**)ghostLink, (void**)sendLink, nFace);
 
   packQDPGaugeField(packedEven, ghostLink, 0, reconstruct, Vh,
@@ -835,16 +829,13 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   }
 #else
   // Old QMP T-split code
-  int veclength = sizeof(FloatN)/sizeof(Float);
-
-  // assume pad is Vs
+  QudaPrecision precision = (QudaPrecision) sizeof(even->x);
+  int Nvec = sizeof(FloatN)/precision;
 
   // one step approach
   // transfers into the pads directly
-  transferGaugeFaces((void *)packedEven, (void *)(packedEven + Vh), (QudaPrecision)sizeof(Float),
-		     veclength, reconstruct, Vh, pad);
-  transferGaugeFaces((void *)packedOdd, (void *)(packedOdd + Vh), (QudaPrecision)sizeof(Float),
-		     veclength, reconstruct, Vh, pad);
+  transferGaugeFaces((void *)packedEven, (void *)(packedEven + Vh), precision, Nvec, reconstruct, Vh, pad);
+  transferGaugeFaces((void *)packedOdd, (void *)(packedOdd + Vh), precision, Nvec, reconstruct, Vh, pad);
 #endif
 #endif
 
@@ -854,13 +845,8 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);
   checkCudaError();
   
-#ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedEven);
   cudaFreeHost(packedOdd);
-#else
-  free(packedEven);
-  free(packedOdd);
-#endif
 
 }
 
@@ -872,13 +858,8 @@ static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, Gauge
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
     
-#ifndef __DEVICE_EMULATION__
   cudaMallocHost((void**)&packedEven, bytes);
   cudaMallocHost((void**)&packedOdd, bytes);
-#else
-  packedEven = (FloatN*)malloc(bytes);
-  packedOdd = (FloatN*)malloc(bytes);
-#endif
     
   cudaMemcpy(packedEven, even, bytes, cudaMemcpyDeviceToHost);
   cudaMemcpy(packedOdd, odd, bytes, cudaMemcpyDeviceToHost);    
@@ -893,14 +874,8 @@ static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, Gauge
     errorQuda("Invalid gauge_order");
   }
     
-#ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedEven);
   cudaFreeHost(packedOdd);
-#else
-  free(packedEven);
-  free(packedOdd);
-#endif
-
 }
 
 void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
@@ -1099,12 +1074,12 @@ createStapleQuda(FullStaple* cudaStaple, QudaGaugeParam* param)
     QudaPrecision cuda_prec= param->cuda_prec;
     
     if (cpu_prec == QUDA_HALF_PRECISION) {
-	printf("ERROR: %s:  half precision not supported on cpu\n", __FUNCTION__);
+	printfQuda("ERROR: %s:  half precision not supported on cpu\n", __FUNCTION__);
 	exit(-1);
     }
     
     if (cuda_prec == QUDA_DOUBLE_PRECISION && param->cpu_prec != QUDA_DOUBLE_PRECISION) {
-	printf("Error: can only create a double GPU gauge field from a double CPU gauge field\n");
+	printfQuda("Error: can only create a double GPU gauge field from a double CPU gauge field\n");
 	exit(-1);
     }
     
@@ -1269,7 +1244,7 @@ allocateMomQuda(FullMom *cudaMom, QudaPrecision precision)
     else if (precision == QUDA_SINGLE_PRECISION) {
 	floatSize = sizeof(float);
     }else{
-	printf("ERROR: stape does not support half precision\n");
+	printfQuda("ERROR: stape does not support half precision\n");
 	exit(1);
     }
     
