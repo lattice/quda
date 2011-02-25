@@ -184,8 +184,7 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
   cudaStreamSynchronize(*mystream);
 }
 
-// This is just an initial hack for CPU comms
-void FaceBuffer::exchangeCpuSpinor(void *spinorField, void **cpu_fwd_nbr_spinor, void **cpu_back_nbr_spinor, int oddBit)
+void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)
 {
 
   //for all dimensions
@@ -196,66 +195,13 @@ void FaceBuffer::exchangeCpuSpinor(void *spinorField, void **cpu_fwd_nbr_spinor,
     nFace*faceVolumeCB[3]*Ninternal*precision
   };
 
-  void* cpu_fwd_nbr_spinor_sendbuf[4];
-  void* cpu_back_nbr_spinor_sendbuf[4];
-  for(int i=0;i < 4;i++){
-    cpu_fwd_nbr_spinor_sendbuf[i] = (void*)malloc(len[i]);
-    cpu_back_nbr_spinor_sendbuf[i] = (void*)malloc(len[i]);
+  // allocate the ghost buffer if not yet allocated
+  spinor.allocateGhostBuffer();
+
+  for(int i=0;i < 4; i++){
+    spinor.packGhost(spinor.backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, oddBit, dagger);
+    spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, oddBit, dagger);
   }
-
-  for( int i=0;i < Vh;i++){
-    //compute full index
-    int boundaryCrossings = i/(X[0]/2) + i/(X[0]*X[1]/2) + i/(X[0]*X[1]*X[2]/2);
-    int Y = 2*i + (boundaryCrossings + oddBit) % 2;
-    int x[4];
-    x[3] = Y/(X[2]*X[1]*X[0]);
-    x[2] = (Y/(X[1]*X[0])) % X[2];
-    x[1] = (Y/X[0]) % X[1];
-    x[0] = Y % X[0];
-
-    int ghost_face_idx ;
-
-    //X dimension
-    if (x[0] < nFace){
-      ghost_face_idx = (x[0]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] +x[1])>>1;
-      memcpy(&cpu_back_nbr_spinor_sendbuf[0][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-    if (x[0] >=X[0]-nFace){
-      ghost_face_idx = ((x[0]-X[0]+nFace)*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] +x[1])>>1;
-      memcpy(&cpu_fwd_nbr_spinor_sendbuf[0][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-
-    //Y dimension
-    if (x[1] < nFace){
-      ghost_face_idx = (x[1]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
-      memcpy(&cpu_back_nbr_spinor_sendbuf[1][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-    if (x[1] >= X[1]-nFace){
-      ghost_face_idx = ((x[1]-X[1]+nFace)*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
-      memcpy(&cpu_fwd_nbr_spinor_sendbuf[1][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-
-    //Z dimension
-    if (x[2] < nFace){
-      ghost_face_idx = (x[2]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-      memcpy(&cpu_back_nbr_spinor_sendbuf[2][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-    if (x[2] >= X[2] - nFace){
-      ghost_face_idx = ((x[2]-X[2]+nFace)*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
-      memcpy(&cpu_fwd_nbr_spinor_sendbuf[2][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-
-    //T dimension
-    if (x[3] < nFace){
-      ghost_face_idx = (x[3]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-      memcpy(&cpu_back_nbr_spinor_sendbuf[3][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-    if (x[3] >= X[3] - nFace){
-      ghost_face_idx = ((x[3]-X[3]+nFace)*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-      memcpy(&cpu_fwd_nbr_spinor_sendbuf[3][Ninternal*ghost_face_idx], &spinorField[Ninternal*i], Ninternal*precision);
-    }
-
-  }//i
 
   unsigned long recv_request1[4], recv_request2[4];
   unsigned long send_request1[4], send_request2[4];
@@ -265,10 +211,10 @@ void FaceBuffer::exchangeCpuSpinor(void *spinorField, void **cpu_fwd_nbr_spinor,
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
   for(int i=0;i < 4; i++){
-    recv_request1[i] = comm_recv_with_tag(cpu_back_nbr_spinor[i], len[i], back_nbr[i], uptags[i]);
-    recv_request2[i] = comm_recv_with_tag(cpu_fwd_nbr_spinor[i], len[i], fwd_nbr[i], downtags[i]);
-    send_request1[i]= comm_send_with_tag(cpu_fwd_nbr_spinor_sendbuf[i], len[i], fwd_nbr[i], uptags[i]);
-    send_request2[i] = comm_send_with_tag(cpu_back_nbr_spinor_sendbuf[i], len[i], back_nbr[i], downtags[i]);
+    recv_request1[i] = comm_recv_with_tag(spinor.backGhostFaceBuffer[i], len[i], back_nbr[i], uptags[i]);
+    recv_request2[i] = comm_recv_with_tag(spinor.fwdGhostFaceBuffer[i], len[i], fwd_nbr[i], downtags[i]);    
+    send_request1[i]= comm_send_with_tag(spinor.fwdGhostFaceSendBuffer[i], len[i], fwd_nbr[i], uptags[i]);
+    send_request2[i] = comm_send_with_tag(spinor.backGhostFaceSendBuffer[i], len[i], back_nbr[i], downtags[i]);
   }
 
   for(int i=0;i < 4;i++){
@@ -278,10 +224,6 @@ void FaceBuffer::exchangeCpuSpinor(void *spinorField, void **cpu_fwd_nbr_spinor,
     comm_wait(send_request2[i]);
   }
 
-  for(int i=0;i < 4;i++){
-    free(cpu_fwd_nbr_spinor_sendbuf[i]);
-    free(cpu_back_nbr_spinor_sendbuf[i]);
-  }
 }
 
 

@@ -20,10 +20,10 @@ class FaceBuffer {
   void *gather_fwd_face;
   void *gather_back_face;
 
-  void *my_fwd_face;
-  void *my_back_face;
-  void *from_back_face;
-  void *from_fwd_face;
+  void *my_fwd_face[4];
+  void *my_back_face[4];
+  void *from_back_face[4];
+  void *from_fwd_face[4];
 
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
@@ -36,17 +36,17 @@ class FaceBuffer {
   int nDim;
   int nFace;
 
-  size_t nbytes;
+  size_t nbytes[4];
 #ifdef QMP_COMMS
-  QMP_msgmem_t mm_send_fwd;
-  QMP_msgmem_t mm_from_fwd;
-  QMP_msgmem_t mm_send_back;
-  QMP_msgmem_t mm_from_back;
+  QMP_msgmem_t mm_send_fwd[4];
+  QMP_msgmem_t mm_from_fwd[4];
+  QMP_msgmem_t mm_send_back[4];
+  QMP_msgmem_t mm_from_back[4];
   
-  QMP_msghandle_t mh_send_fwd;
-  QMP_msghandle_t mh_from_fwd;
-  QMP_msghandle_t mh_send_back;
-  QMP_msghandle_t mh_from_back;
+  QMP_msghandle_t mh_send_fwd[4];
+  QMP_msghandle_t mh_from_fwd[4];
+  QMP_msghandle_t mh_send_back[4];
+  QMP_msghandle_t mh_from_back[4];
 #endif
 
   void setupDims(const int *X);
@@ -61,7 +61,7 @@ class FaceBuffer {
   void exchangeFacesComms();
   void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
 
-  void exchangeCpuSpinor(char *spinor, char **fwd, char **back, int parity);
+  void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
 
   void exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace);
 };
@@ -139,7 +139,7 @@ class FaceBuffer {
   void exchangeFacesComms();
   void exchangeFacesWait(cudaColorSpinorField &out, int dagger);
 
-  void exchangeCpuSpinor(char *spinor, char **fwd, char **back, int parity);
+  void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
 
   void exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace);
 };

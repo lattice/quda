@@ -28,11 +28,6 @@ void *longlink[4];
 void* ghost_fatlink[4], *ghost_longlink[4];
 #endif
 
-void *spinorIn;
-void *spinorOut;
-void *spinorCheck;
-void *tmp;
-
 FaceBuffer *faceBuf;
 
 int device = 0;

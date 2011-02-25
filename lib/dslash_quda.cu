@@ -650,6 +650,7 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 #ifdef MULTI_GPU
   // Gather from source spinor
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+#endif
 
   if (x==0) { // not doing xpay
     if (reconstruct == QUDA_RECONSTRUCT_12) {
@@ -783,6 +784,7 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 #ifdef MULTI_GPU
   // Gather from source spinor
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+#endif
 
   if (x==0) { // not doing xpay
     if (!dagger) {
