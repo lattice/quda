@@ -27,6 +27,13 @@ aligned_malloc(size_t n, void **m0)
 
   }*/
 
+
+int cpuColorSpinorField::initGhostFaceBuffer =0;
+void* cpuColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; 
+void* cpuColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM];
+void* cpuColorSpinorField::fwdGhostFaceSendBuffer[QUDA_MAX_DIM]; 
+void* cpuColorSpinorField::backGhostFaceSendBuffer[QUDA_MAX_DIM];
+
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
   ColorSpinorField(param), init(false), order_double(NULL), order_single(NULL) {
   create(param.create);
@@ -354,4 +361,168 @@ void cpuColorSpinorField::PrintVector(unsigned int x) {
 
 }
 
+void cpuColorSpinorField::allocateGhostBuffer(void)
+{
+  if(initGhostFaceBuffer){
+    return;
+  }
 
+  if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
+    errorQuda("Full spinor is not supported in alllocateGhostBuffer\n");
+  }
+  
+  int X1 = this->x[0]*2;
+  int X2 = this->x[1];
+  int X3 = this->x[2];
+  int X4 = this->x[3];
+  int Vsh[4]={ X2*X3*X4/2,
+	       X1*X3*X4/2,
+	       X1*X2*X4/2,
+	       X1*X2*X3/2};
+  
+  int num_faces = 1;
+  if(this->nSpin == 1){  //staggered
+    num_faces = 3; 
+  }
+  int spinor_size = 2*this->nSpin*this->nColor*this->precision;
+  for(int i=0;i < 4; i++){
+    fwdGhostFaceBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
+    backGhostFaceBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
+
+    fwdGhostFaceSendBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
+    backGhostFaceSendBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
+    
+    if(fwdGhostFaceBuffer[i]== NULL || backGhostFaceBuffer[i] == NULL||
+       fwdGhostFaceSendBuffer[i]== NULL || backGhostFaceSendBuffer[i]==NULL){
+      errorQuda("malloc for ghost buf in cpu spinor failed\n");
+    }
+  }
+  
+  initGhostFaceBuffer = 1;
+  return;
+}
+
+void cpuColorSpinorField::freeGhostBuffer(void)
+{
+  if(!initGhostFaceBuffer){
+    return;
+  }
+  for(int i=0;i < 4; i++){
+    free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
+    free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+    free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
+    free(backGhostFaceSendBuffer[i]);  backGhostFaceSendBuffer[i] = NULL;
+  } 
+
+  initGhostFaceBuffer = 0;
+  
+  return;
+}
+
+
+
+void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim, 
+				    const QudaDirection dir, const QudaParity oddBit, const int dagger)
+{
+  if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
+    errorQuda("Full spinor is not supported in packGhost for cpu\n");
+  }
+  
+  int num_faces=1;
+  if(this->nSpin == 1){ //staggered
+    num_faces=3;
+  }
+  int spinor_size = 2*this->nSpin*this->nColor*this->precision;
+
+  int X1 = this->x[0]*2;
+  int X2 = this->x[1];
+  int X3 = this->x[2];
+  int X4 = this->x[3];
+
+  for(int i=0;i < this->volume;i++){    
+    int boundaryCrossings = i/(X1/2) + i/(X1*X2/2) + i/(X1*X2*X3/2);
+    int Y = 2*i + (boundaryCrossings + oddBit) % 2;
+    int x4 = Y/(X3*X2*X1);
+    int x3 = (Y/(X2*X1)) % X3;
+    int x2 = (Y/X1) % X2;
+    int x1 = Y % X1;
+    
+    int ghost_face_idx ;
+    
+    switch(dim){            
+    case 0: //X dimension
+      if (dir == QUDA_BACKWARDS){
+	if (x1 < num_faces){
+	  ghost_face_idx =  (x1*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);
+	}
+      }else{  // QUDA_FORWARDS
+	if (x1 >=X1 - num_faces){
+	  ghost_face_idx = ((x1-X1+num_faces)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
+	}
+      }
+      break;
+      
+      
+      
+    case 1: //Y dimension
+      if (dir == QUDA_BACKWARDS){
+	if (x2 < num_faces){
+	  ghost_face_idx = (x2*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
+	}
+      }else{ // QUDA_FORWARDS      
+	if (x2 >= X2 - num_faces){
+	  ghost_face_idx = ((x2-X2+num_faces)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
+	}
+      }
+      break;
+
+    case 2: //Z dimension      
+      if (dir == QUDA_BACKWARDS){
+	if (x3 < num_faces){
+	  ghost_face_idx = (x3*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
+	}
+      }else{ // QUDA_FORWARDS     
+	if (x3 >= X3 - num_faces){
+	  ghost_face_idx = ((x3-X3+num_faces)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
+	}
+      }
+      break;
+      
+    case 3:  //T dimension      
+      if (dir == QUDA_BACKWARDS){
+	if (x4 < num_faces){
+	  ghost_face_idx = (x4*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
+	}
+      }else{ // QUDA_FORWARDS     
+	if (x4 >= X4 - num_faces){
+	  ghost_face_idx = ((x4-X4+num_faces)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
+	}
+      }
+      break;
+    default:
+      errorQuda("Invalid dim value\n");
+    }//switch
+  }//for i
+
+  return;
+}
+
+
+void cpuColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
+				      const QudaDirection dir, const int dagger)
+{
+  if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
+    errorQuda("Full spinor is not supported in unpackGhost for cpu\n");
+  }
+  
+  
+  
+}

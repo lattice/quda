@@ -45,7 +45,6 @@ void *hostGauge[4];
 void *fatlink[4], *longlink[4];
 
 #ifdef MULTI_GPU
-void *cpu_fwd_nbr_spinor[4], *cpu_back_nbr_spinor[4];
 void* ghost_fatlink[4], *ghost_longlink[4];
 #endif
 
@@ -170,18 +169,6 @@ void init()
   printfQuda("Randomizing fields ...\n");
     
   spinor->Source(QUDA_RANDOM_SOURCE);
-
-  //create ghost spinors
-#ifdef MULTI_GPU
-  for(int i=0;i < 4;i++){
-    cpu_fwd_nbr_spinor[i] = malloc(Vsh[i]* staggeredSpinorSiteSize *3*sizeof(double));
-    cpu_back_nbr_spinor[i] = malloc(Vsh[i]*staggeredSpinorSiteSize *3*sizeof(double));
-    if (cpu_fwd_nbr_spinor[i] == NULL || cpu_back_nbr_spinor[i] == NULL){
-      errorQuda("ERROR: malloc failed for cpu_fwd_nbr_spinor/cpu_back_nbr_spinor\n");
-    }
-  }
-#endif
-
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     
@@ -339,10 +326,6 @@ void end(void)
     free(ghost_fatlink[i]);
     free(ghost_longlink[i]);
   }
-  for(int i=0;i < 4;i++){
-    free(cpu_fwd_nbr_spinor[i]);
-    free(cpu_back_nbr_spinor[i]);
-  }
 
 #endif
 
@@ -421,8 +404,8 @@ void staggeredDslashRef()
   switch (test_type) {
   case 0:    
 #ifdef MULTI_GPU    
-    staggered_dslash_mg4dir(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-			    spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			    spinor, parity, dagger,
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
@@ -437,10 +420,10 @@ void staggeredDslashRef()
     break;
   case 1: 
 #ifdef MULTI_GPU
-    staggered_dslash_mg4dir(spinorRef->v, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-			    spinor->v, cpu_fwd_nbr_spinor, cpu_back_nbr_spinor, parity, dagger,
+    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
+			    spinor, parity, dagger,
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);    
-
+    
 #else
     cpu_parity=1; //ODD
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 

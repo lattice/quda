@@ -297,13 +297,13 @@ mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int dagg
 
 template <typename sFloat, typename gFloat>
 void
-Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat mass, int daggerBit, sFloat* tmp, MyQudaParity parity) 
+Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat mass, int daggerBit, sFloat* tmp, QudaParity parity) 
 {
     
     sFloat msq_x4 = mass*mass*4;
 
     switch(parity){
-    case QUDA_EVEN:
+    case QUDA_EVEN_PARITY:
 	{
 	    sFloat *inEven = in;
 	    sFloat *outEven = out;
@@ -314,7 +314,7 @@ Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat m
 	    axmy(inEven, msq_x4, outEven, Vh*mySpinorSiteSize);
 	    break;
 	}
-    case QUDA_ODD:
+    case QUDA_ODD_PARITY:
 	{
 	    sFloat *inOdd = in;
 	    sFloat *outOdd = out;
@@ -326,25 +326,6 @@ Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat m
 	    break;	
 	}
 	
-    case QUDA_EVENODD:
-	{
-	    sFloat *inEven = in;
-	    sFloat *inOdd = in + Vh*mySpinorSiteSize;
-	    sFloat *outEven = out;
-	    sFloat *outOdd = out + Vh*mySpinorSiteSize;
-	    sFloat *tmpEven = tmp;
-	    sFloat *tmpOdd = tmp + Vh*mySpinorSiteSize;
-	    
-	    dslashReference(tmpOdd, fatlink, longlink, inEven, 1, daggerBit);
-	    dslashReference(tmpEven, fatlink, longlink, inOdd, 0, daggerBit);
-	    
-	    dslashReference(outOdd, fatlink, longlink, tmpEven, 1, daggerBit);
-	    dslashReference(outEven, fatlink, longlink, tmpOdd, 0, daggerBit);
-	    
-	    // lastly apply the mass term
-	    axmy(in, msq_x4, out, V*mySpinorSiteSize);	    	    
-	    break;
-	}
     default:
 	fprintf(stderr, "ERROR: invalid parity in %s,line %d\n", __FUNCTION__, __LINE__);
 	break;
@@ -356,7 +337,7 @@ Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat m
 
 void 
 matdagmat(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
-	  QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
+	  QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, QudaParity parity) 
 {
   
   if (sPrecision == QUDA_DOUBLE_PRECISION){
@@ -438,6 +419,7 @@ x4_mg(int i, int oddBit)
   return x4;
 }
 
+<<<<<<< HEAD
 template <typename Float>
 Float *gaugeLink_mg(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, 
 		    Float* ghostGaugeEven, Float* ghostGaugeOdd, int n_ghost_faces, int nbr_distance) {
@@ -717,6 +699,9 @@ matdagmat_mg(void *out, void **fatlink, void* ghost_fatlink, void** longlink, vo
   }
 }
 
+=======
+ 
+>>>>>>> master
 template <typename Float>
 Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
 			Float** ghostGaugeEven, Float** ghostGaugeOdd, int n_ghost_faces, int nbr_distance) {
@@ -905,9 +890,10 @@ Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField,
 
 template <typename sFloat, typename gFloat>
 void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink, gFloat** longlink,  gFloat** ghostLonglink,
-                        sFloat *spinorField, sFloat** fwd_nbr_spinor, sFloat** back_nbr_spinor, int oddBit, int daggerBit)
+			    sFloat *spinorField, sFloat** fwd_nbr_spinor, sFloat** back_nbr_spinor, int oddBit, int daggerBit)
 {
 
+<<<<<<< HEAD
   QudaPrecision prec; 
   QudaParity otherparity;
 
@@ -930,6 +916,9 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink
   int ZZ[4] = {Z[0]/2, Z[1], Z[2], Z[3]};
   FaceBuffer faceBuf(ZZ, 4, 6, 3, prec);
   faceBuf.exchangeCpuSpinor((char*)spinorField, (char**)fwd_nbr_spinor, (char**)back_nbr_spinor, otherparity);
+=======
+  
+>>>>>>> master
 
   for (int i=0; i<Vh*1*3*2; i++) res[i] = 0.0;
 
@@ -998,126 +987,84 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink
 
 
 
-void staggered_dslash_mg4dir(void *res, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink,
-			     void *spinorField, void** fwd_nbr_spinor, void** back_nbr_spinor,
+void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink,
+			     cpuColorSpinorField* in, 
 			     int oddBit, int daggerBit,
 			     QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
 
+  QudaParity otherparity;
+
+  if (oddBit == QUDA_EVEN_PARITY){
+    otherparity = QUDA_ODD_PARITY;
+  }else if (oddBit == QUDA_ODD_PARITY){
+    otherparity = QUDA_EVEN_PARITY;
+  }else{
+    printf("ERROR: full parity not supported in function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  exchange_cpu_spinor4dir(in, Z, otherparity);
+  
+  void** fwd_nbr_spinor = in->fwdGhostFaceBuffer;
+  void** back_nbr_spinor = in->backGhostFaceBuffer;
+
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION){
-      dslashReference_mg4dir((double*)res, (double**)fatlink, (double**)ghost_fatlink,(double**)longlink,  (double**)ghost_longlink,
-                         (double*)spinorField, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+      dslashReference_mg4dir((double*)out->v, (double**)fatlink, (double**)ghost_fatlink,(double**)longlink,  (double**)ghost_longlink,
+			     (double*)in->v, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
     }else{
-      dslashReference_mg4dir((double*)res, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink,  (float**)ghost_longlink,
-                         (double*)spinorField, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+      dslashReference_mg4dir((double*)out->v, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink,  (float**)ghost_longlink,
+			     (double*)in->v, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
     }
   }
   else{
     if (gPrecision == QUDA_DOUBLE_PRECISION){
-      dslashReference_mg4dir((float*)res, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink,  (double**)ghost_longlink,
-                         (float*)spinorField, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+      dslashReference_mg4dir((float*)out->v, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink,  (double**)ghost_longlink,
+			     (float*)in->v, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
     }else{
-      dslashReference_mg4dir((float*)res, (float**)fatlink, (float**)ghost_fatlink,  (float**)longlink, (float**)ghost_longlink,
-                         (float*)spinorField, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+      dslashReference_mg4dir((float*)out->v, (float**)fatlink, (float**)ghost_fatlink,  (float**)longlink, (float**)ghost_longlink,
+			     (float*)in->v, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
     }
   }
-
-
+  
+  
 }
 
-template <typename sFloat, typename gFloat>
-void
-Matdagmat_mg4dir(sFloat *out, gFloat **fatlink, gFloat** ghost_fatlink, gFloat** longlink, gFloat** ghost_longlink,
-                  sFloat *in, sFloat** fwd_nbr_spinor, sFloat** back_nbr_spinor, sFloat mass, int daggerBit,
-                  sFloat* tmp, MyQudaParity parity)
-{
-
-  sFloat msq_x4 = mass*mass*4;
-
-  switch(parity){
-  case QUDA_EVEN:
-    {
-      sFloat *inEven = in;
-      sFloat *outEven = out;
-      dslashReference_mg4dir(tmp, fatlink,   ghost_fatlink,longlink, ghost_longlink, inEven,
-                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
-      dslashReference_mg4dir(outEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmp,
-                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
-
-      // lastly apply the mass term
-      axmy(inEven, msq_x4, outEven, Vh*mySpinorSiteSize);
-      break;
-    }
-  case QUDA_ODD:
-    {
-      sFloat *inOdd = in;
-      sFloat *outOdd = out;
-      dslashReference_mg4dir(tmp, fatlink, ghost_fatlink, longlink,  ghost_longlink, inOdd,
-                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
-      dslashReference_mg4dir(outOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmp,
-                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
-
-      // lastly apply the mass term
-      axmy(inOdd, msq_x4, outOdd, Vh*mySpinorSiteSize);
-      break;    
-    }
-     
-  case QUDA_EVENODD:
-    {
-      sFloat *inEven = in;
-      sFloat *inOdd = in + Vh*mySpinorSiteSize;
-      sFloat *outEven = out;
-      sFloat *outOdd = out + Vh*mySpinorSiteSize;
-      sFloat *tmpEven = tmp; 
-      sFloat *tmpOdd = tmp + Vh*mySpinorSiteSize;
-             
-      dslashReference_mg4dir(tmpOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, inEven,
-                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
-      dslashReference_mg4dir(tmpEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, inOdd,
-                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
-
-      dslashReference_mg4dir(outOdd, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmpEven,
-                         fwd_nbr_spinor, back_nbr_spinor, 1, daggerBit);
-      dslashReference_mg4dir(outEven, fatlink, ghost_fatlink, longlink,  ghost_longlink, tmpOdd,
-                         fwd_nbr_spinor, back_nbr_spinor, 0, daggerBit);
-
-      // lastly apply the mass term
-      axmy(in, msq_x4, out, V*mySpinorSiteSize);
-      break;
-    }
-  default:
-    fprintf(stderr, "ERROR: invalid parity in %s,line %d\n", __FUNCTION__, __LINE__);
-    break;
-  } 
-   
-}
 
 void 
-matdagmat_mg4dir(void *out, void **fatlink, void** ghost_fatlink, void** longlink, void** ghost_longlink, 
-		 void *in, void** fwd_nbr_spinor, void** back_nbr_spinor, double mass, int dagger_bit,
-		 QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, MyQudaParity parity) 
+matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** ghost_fatlink, void** longlink, void** ghost_longlink, 
+		 cpuColorSpinorField* in, double mass, int dagger_bit,
+		 QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity) 
 {
-  
-  if (sPrecision == QUDA_DOUBLE_PRECISION){
-    if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      Matdagmat_mg4dir((double*)out, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink, (double**)ghost_longlink,
-                        (double*)in, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, (double)mass, dagger_bit, (double*)tmp, parity);
-    }else {
-      Matdagmat_mg4dir((double*)out, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink, (float**)ghost_longlink, 
-                        (double*)in, (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, (double)mass, dagger_bit, (double*) tmp, parity);
-    }
-  }else{
-    if (gPrecision == QUDA_DOUBLE_PRECISION){ 
-      Matdagmat_mg4dir((float*)out, (double**)fatlink, (double**)ghost_fatlink, (double**)longlink, (double**)ghost_longlink,
-                        (float*)in, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
-    }else {
-      Matdagmat_mg4dir((float*)out, (float**)fatlink, (float**)ghost_fatlink, (float**)longlink, (float**)ghost_longlink, 
-                        (float*)in, (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, (float)mass, dagger_bit, (float*)tmp, parity);
-    }
+  //assert sPrecision and gPrecision must be the same
+  if (sPrecision != gPrecision){
+    errorQuda("Spinor precision and gPrecison is not the same");
   }
-}
+  
+  QudaParity otherparity;
+  if (parity == QUDA_EVEN_PARITY){
+    otherparity = QUDA_ODD_PARITY;
+  }else if (parity == QUDA_ODD_PARITY){
+    otherparity = QUDA_EVEN_PARITY;
+  }else{
+    printf("ERROR: full parity not supported in function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  
+  staggered_dslash_mg4dir(tmp, fatlink, longlink, ghost_fatlink, ghost_longlink,
+			  in, otherparity, dagger_bit, sPrecision, gPrecision);
+  
+  staggered_dslash_mg4dir(out, fatlink, longlink, ghost_fatlink, ghost_longlink,
+			  tmp, parity, dagger_bit, sPrecision, gPrecision);
+  
+  double msq_x4 = mass*mass*4;
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    axmy((double*)in->v, (double)msq_x4, (double*)out->v, Vh*mySpinorSiteSize);
+  }else{
+    axmy((float*)in->v, (float)msq_x4, (float*)out->v, Vh*mySpinorSiteSize);    
+  }
 
+}
 
 #endif
 
