@@ -15,7 +15,9 @@
 #include <face_quda.h>
 //#include "exchange_face.h"
 //#include "mpicomm.h"
+#ifdef MPI_COMMS
 #include <mpi.h>
+#endif
 #endif
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -27,8 +29,6 @@ void *longlink[4];
 #ifdef MULTI_GPU
 void* ghost_fatlink[4], *ghost_longlink[4];
 #endif
-
-FaceBuffer *faceBuf;
 
 int device = 0;
 
@@ -172,6 +172,8 @@ invert_test(void)
 	     link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
 	     0.8);
   
+  // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
+  initQuda(device);
 
   setDims(gaugeParam.X);
   setDimConstants(gaugeParam.X);
@@ -196,10 +198,6 @@ invert_test(void)
 
   
 #ifdef MULTI_GPU
-  int dummy = 1;
-  int dummyFace = 1;
-  int X[4] = {Z[0]/2, Z[1], Z[2], Z[3]};
-  faceBuf = new FaceBuffer(X, 4, dummy, dummyFace, prec);
 
   //exchange_init_dims(gaugeParam.X);
   int ghost_link_len[4] = {
@@ -226,11 +224,14 @@ invert_test(void)
     long_send[i] = malloc(3*ghost_link_len[i]);
   }
 
-  pack_ghost(fatlink, fat_send, 1, prec);
-  pack_ghost(longlink, long_send, 3, prec);
+  set_dim(Z);
+  pack_ghost(fatlink, fat_send, 1, gaugeParam.cpu_prec);
+  pack_ghost(longlink, long_send, 3, gaugeParam.cpu_prec);
 
-  faceBuf->exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
-  faceBuf->exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
+  int dummyFace = 1;
+  FaceBuffer faceBuf (Z, 4, 18, dummyFace, gaugeParam.cpu_prec);
+  faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
+  faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
 
   for (int i=0; i<4; i++) {
     free(fat_send[i]);
@@ -268,8 +269,6 @@ invert_test(void)
     constructSpinorField((double*)in->v);
   }
 
-
-  initQuda(device);
 
   
   
@@ -689,11 +688,12 @@ int main(int argc, char** argv)
   int ret = invert_test();
 
 #ifdef MULTI_GPU  
-  delete faceBuf;
 
-#ifdef MPI_COMMS
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#elif defined MPI_COMMS
   comm_cleanup();
-#endif
+#endif 
 
 #endif
 

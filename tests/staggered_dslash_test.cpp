@@ -18,6 +18,8 @@
 
 #include <face_quda.h>
 
+#include <assert.h>
+
 /*#ifdef MULTI_GPU
 #include <mpi.h>
 #include "mpicomm.h"
@@ -48,6 +50,7 @@ void *fatlink[4], *longlink[4];
 void* ghost_fatlink[4], *ghost_longlink[4];
 #endif
 
+const int loops = 100;
 
 QudaParity parity;
 QudaDagType dagger = QUDA_DAG_NO;
@@ -60,7 +63,6 @@ QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 
 Dirac* dirac;
-FaceBuffer *faceBuf;
 
 extern int Z[4];
 extern int V;
@@ -177,16 +179,13 @@ void init()
     longlink[dir] = malloc(V*gaugeSiteSize*gSize);
   }
   if (fatlink == NULL || longlink == NULL){
-    errorQuda("ERROR: malloc failed for fatlink/longlink\n");
+    errorQuda("ERROR: malloc failed for fatlink/longlink");
   }
   construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
   
 
 #ifdef MULTI_GPU
-  int dummy = 1;
-  int dummyFace = 1;
-  faceBuf = new FaceBuffer(X, 4, dummy, dummyFace, prec);
-  
+
   //exchange_init_dims(X);
   ghost_fatlink[0] = malloc(Vs_x*gaugeSiteSize*gSize);
   ghost_fatlink[1] = malloc(Vs_y*gaugeSiteSize*gSize);
@@ -200,7 +199,7 @@ void init()
       ghost_fatlink[1] == NULL || ghost_longlink[1] == NULL ||
       ghost_fatlink[2] == NULL || ghost_longlink[2] == NULL ||
       ghost_fatlink[3] == NULL || ghost_longlink[3] == NULL){
-    errorQuda("ERROR: malloc failed for ghost fatlink/longlink\n");
+    errorQuda("ERROR: malloc failed for ghost fatlink/longlink");
   }
   //exchange_cpu_links(fatlink, ghost_fatlink[3], longlink, ghost_longlink[3], gaugeParam.cpu_prec);
   //exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
@@ -215,11 +214,14 @@ void init()
   long_send[2] = malloc(3*Vs_z*gaugeSiteSize*gSize);
   long_send[3] = malloc(3*Vs_t*gaugeSiteSize*gSize);
 
-  pack_ghost(fatlink, fat_send, 1, prec);
-  pack_ghost(longlink, long_send, 3, prec);
+  set_dim(Z);
+  pack_ghost(fatlink, fat_send, 1, gaugeParam.cpu_prec);
+  pack_ghost(longlink, long_send, 3, gaugeParam.cpu_prec);
 
-  faceBuf->exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
-  faceBuf->exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
+  int dummyFace = 1;
+  FaceBuffer faceBuf(X, 4, 18, dummyFace, gaugeParam.cpu_prec);
+  faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
+  faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
 
   for (int i=0; i<4; i++) {
     free(fat_send[i]);
@@ -257,7 +259,7 @@ void init()
     
   if (!transfer) {
 
-    csParam.verbose = QUDA_DEBUG_VERBOSE;
+    //csParam.verbose = QUDA_DEBUG_VERBOSE;
 	
     csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -303,12 +305,12 @@ void init()
     diracParam.fatGauge = &cudaFatLinkPrecise;
     diracParam.longGauge = &cudaLongLinkPrecise;
 
-    diracParam.verbose = QUDA_DEBUG_VERBOSE;
+    //diracParam.verbose = QUDA_DEBUG_VERBOSE;
     diracParam.tmp1=tmp;
     dirac = Dirac::create(diracParam);
 	
   } else {
-    errorQuda("Error not suppported\n");
+    errorQuda("Error not suppported");
   }
     
   return;
@@ -350,18 +352,20 @@ void end(void)
 double dslashCUDA() {
     
   // execute kernel
-  const int LOOPS = 1;
-  printfQuda("Executing %d kernel loops...", LOOPS);
-  fflush(stdout);
-  stopwatchStart();
-  for (int i = 0; i < LOOPS; i++) {
+  printfQuda("Executing %d kernel loops...", loops);
+
+  cudaEvent_t start, end;
+  cudaEventCreate(&start);
+  cudaEventRecord(start, 0);
+  cudaEventSynchronize(start);
+
+  for (int i = 0; i < loops; i++) {
     switch (test_type) {
     case 0:
       parity = QUDA_EVEN_PARITY;
       if (transfer){
 	//dslashQuda(spinorOdd, spinorEven, &inv_param, parity);
-      }
-      else {
+      } else {
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }	   
       break;
@@ -369,28 +373,33 @@ double dslashCUDA() {
       parity = QUDA_ODD_PARITY;
       if (transfer){
 	//MatPCQuda(spinorOdd, spinorEven, &inv_param);
-      }else {
+      } else {
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;
     case 2:
       if (transfer){
 	//MatQuda(spinorGPU, spinor, &inv_param);
-      }
-      else {
+      } else {
 	dirac->M(*cudaSpinorOut, *cudaSpinor);
       }
     }
   }
     
+  cudaEventCreate(&end);
+  cudaEventRecord(end, 0);
+  cudaEventSynchronize(end);
+  float runTime;
+  cudaEventElapsedTime(&runTime, start, end);
+  cudaEventDestroy(start);
+  cudaEventDestroy(end);
+
+  double secs = runTime / 1000; //stopwatchReadSeconds();
+
   // check for errors
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
-    
-  cudaThreadSynchronize();
-  double secs = stopwatchReadSeconds() / LOOPS;
-  printfQuda("done.\n\n");
     
   return secs;
 }
@@ -435,7 +444,7 @@ void staggeredDslashRef()
     //inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   default:
-    errorQuda("Test type not defined\n");
+    errorQuda("Test type not defined");
   }
     
   printfQuda("done.\n");
@@ -461,7 +470,7 @@ static int dslashTest()
     printfQuda("\n%fms per loop\n", 1000*secs);
     staggeredDslashRef();
 	
-    int flops = dirac->Flops();
+    unsigned long long flops = dirac->Flops();
     int link_floats = 8*gaugeParam.reconstruct+8*18;
     int spinor_floats = 8*6*2 + 6;
     int link_float_size = prec;
@@ -475,7 +484,7 @@ static int dslashTest()
       bytes_for_one_site += (8*2 + 1)*4;	
     }
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GiB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/(secs*(1<<30)));
+    printfQuda("GiB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*(1<<30)));
 	
     if (!transfer) {
       double spinor_ref_norm2 = norm2(*spinorRef);
@@ -486,7 +495,7 @@ static int dslashTest()
     } else {
       double spinor_ref_norm2 = norm2(*spinorRef);
       double spinor_out_norm2 =  norm2(*spinorOut);
-      printf("Result: CPU=%f , CPU-CUDA=%f", spinor_ref_norm2, spinor_out_norm2);
+      printfQuda("Result: CPU=%f , CPU-CUDA=%f", spinor_ref_norm2, spinor_out_norm2);
     }
     
     accuracy_level = cpuColorSpinorField::Compare(*spinorRef, *spinorOut);	
@@ -544,8 +553,7 @@ int main(int argc, char **argv)
       }
       device =  atoi(argv[i+1]);
       if (device < 0){
-	errorQuda("Error: invalid device number(%d)\n", device);
-	exit(1);
+	errorQuda("Error: invalid device number(%d)", device);
       }
       i++;
       continue;
@@ -576,8 +584,7 @@ int main(int argc, char **argv)
       }	    
       test_type =  atoi(argv[i+1]);
       if (test_type < 0 || test_type > 2){
-	errorQuda("Error: invalid test type\n");
-	exit(1);
+	errorQuda("Error: invalid test type");
       }
       i++;
       continue;	    
@@ -589,8 +596,7 @@ int main(int argc, char **argv)
       }	    
       tdim =  atoi(argv[i+1]);
       if (tdim < 0 || tdim > 128){
-	errorQuda("Error: invalid t dimention\n");
-	exit(1);
+	errorQuda("Error: invalid t dimention");
       }
       i++;
       continue;	    
@@ -603,7 +609,6 @@ int main(int argc, char **argv)
       sdim =  atoi(argv[i+1]);
       if (sdim < 0 || sdim > 128){
 	printfQuda("Error: invalid S dimention\n");
-	exit(1);
       }
       i++;
       continue;	    
@@ -620,8 +625,7 @@ int main(int argc, char **argv)
       }     
       xsize =  atoi(argv[i+1]);
       if (xsize <= 0 ){
-        fprintf(stderr, "Error: invalid X grid size\n");
-        exit(1);
+        errorQuda("Error: invalid X grid size");
       }
       i++;
       continue;     
@@ -633,8 +637,7 @@ int main(int argc, char **argv)
       }     
       ysize =  atoi(argv[i+1]);
       if (ysize <= 0 ){
-        fprintf(stderr, "Error: invalid Y grid size\n");
-        exit(1); 
+        errorQuda("Error: invalid Y grid size");
       }
       i++;
       continue;     
@@ -646,8 +649,7 @@ int main(int argc, char **argv)
       }     
       zsize =  atoi(argv[i+1]);
       if (zsize <= 0 ){
-        fprintf(stderr, "Error: invalid Z grid size\n");
-        exit(1);
+        errorQuda("Error: invalid Z grid size");
       }
       i++;
       continue;
@@ -659,21 +661,16 @@ int main(int argc, char **argv)
       }     
       tsize =  atoi(argv[i+1]);
       if (tsize <= 0 ){
-        fprintf(stderr, "Error: invalid T grid size\n");
-        exit(1); 
+        errorQuda("Error: invalid T grid size");
       }
       i++;
       continue;
     }
 
 
-
-
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
-
-  display_test_info();
 
 #ifdef MULTI_GPU
 
@@ -684,9 +681,7 @@ int main(int argc, char **argv)
   dims[0] = dims[1] = dims[2] = 1;
   dims[3] = QMP_get_number_of_nodes();
   QMP_declare_logical_topology(dims, ndim);
-#endif
-
-#ifdef MPI_COMMS
+#elif defined(MPI_COMMS)
   MPI_Init (&argc, &argv);  
   comm_set_gridsize(xsize, ysize, zsize, tsize);  
   comm_init();
@@ -694,6 +689,7 @@ int main(int argc, char **argv)
 
 #endif
 
+  display_test_info();
 
   int ret =1;
   int accuracy_level = dslashTest();
@@ -704,10 +700,10 @@ int main(int argc, char **argv)
     ret = 0;
   }
 #ifdef MULTI_GPU
-  delete faceBuf;
 
-
-#ifdef MPI_COMMS
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#elif defined MPI_COMMS
   comm_cleanup();
 #endif 
 

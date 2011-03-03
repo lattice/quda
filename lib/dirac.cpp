@@ -92,15 +92,15 @@ void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSp
   }
 
   if (out.Ndim() != 5) {
-    if ((out.Volume() != 2*gauge.volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	(out.Volume() != gauge.volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
+    if ((out.Volume() != 2*gauge.volumeCB && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	(out.Volume() != gauge.volumeCB && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volumeCB);
     }
   } else {
     // Domain wall fermions, compare 4d volumes not 5d
-    if ((out.Volume()/out.X(4) != 2*gauge.volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	(out.Volume()/out.X(4) != gauge.volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volume);
+    if ((out.Volume()/out.X(4) != 2*gauge.volumeCB && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	(out.Volume()/out.X(4) != gauge.volumeCB && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.volumeCB);
     }
   }
 }

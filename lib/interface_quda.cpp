@@ -182,6 +182,7 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
+
   double anisotropy;
   FullGauge *precise, *sloppy;
 
@@ -318,6 +319,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   for (int i=0; i<4; i++) {
     X[i] = cudaGaugePrecise.X[i];
   }
+  X[0] /= 2; // X defines the full lattice now
+  // FIXME: clover should take the full lattice dims not the CB dims
 
   inv_param->cloverGiB = 0;
 
@@ -764,7 +767,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION ||
 		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  param->spinorGiB = cudaGaugePrecise.volume * spinorSiteSize;
+  param->spinorGiB = cudaGaugePrecise.volumeCB * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
   param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
   if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
@@ -903,7 +906,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION );
 
   // No of GiB in a checkerboard of a spinor
-  param->spinorGiB = cudaGaugePrecise.volume * spinorSiteSize;
+  param->spinorGiB = cudaGaugePrecise.volumeCB * spinorSiteSize;
   if( !pc_solve) param->spinorGiB *= 2; // Double volume for non PC solve
   
   // **** WARNING *** this may not match implementation... 
@@ -1212,10 +1215,10 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   if (param->solve_type == QUDA_NORMEQ_SOLVE) {
     csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    csParam.x[0] = 2*cudaFatLinkSloppy.X[0];
+    csParam.x[0] = cudaFatLinkSloppy.X[0];
   } else if (param->solve_type == QUDA_NORMEQ_PC_SOLVE) {
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    csParam.x[0] = cudaFatLinkSloppy.X[0];
+    csParam.x[0] = cudaFatLinkSloppy.X[0]/2; // gauge->X defines the full lattice volume 
   } else {
     errorQuda("Direct solve_type not supported for staggered");
   }

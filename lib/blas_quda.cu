@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
+#include <face_quda.h> // this is where the MPI / QMP depdendent code is
 
 #include <cuComplex.h>
 

@@ -15,9 +15,9 @@ cudaStream_t *stream;
   printf(a);	      \
   comm_exit(1);
 
-FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, const int nFaces, 
-		       const QudaPrecision precision) : nDim(nDim), Ninternal(Ninternal), 
-							nFace(nFace), precision(precision)
+FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
+		       const int nFaces, const QudaPrecision precision) : 
+  nDim(nDim), Ninternal(Ninternal), nFace(nFace), precision(precision)
 {
   setupDims(X);
 
@@ -86,7 +86,6 @@ void FaceBuffer::setupDims(const int* X)
   Volume = 1;
   for (int d=0; d< 4; d++) {
     this->X[d] = X[d];
-    if (d==0) this->X[d] *= 2;
     Volume *= this->X[d];    
   }
   VolumeCB = Volume/2;
@@ -244,3 +243,18 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFa
 }
 
 
+void reduceDouble(double &sum) {
+
+#ifdef MPI_COMMS
+  comm_allreduce(&sum);
+#endif
+
+}
+
+void reduceDoubleArray(double *sum, const int len) {
+
+#ifdef MPI_COMMS
+  comm_allreduce_array(sum, len);
+#endif
+
+}

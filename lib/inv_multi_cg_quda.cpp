@@ -8,6 +8,8 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
+#include <face_quda.h>
+
 #include <sys/time.h>
 
 
@@ -188,10 +190,8 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
     warningQuda("Exceeded maximum iterations %d\n", invert_param->maxiter);
   }
     
-  float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
-#ifdef QMP_COMMS
-  QMP_sum_float(&gflops);
-#endif
+  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+  reduceDouble(gflops);
 
   invert_param->gflops = gflops;
   invert_param->iter = k;

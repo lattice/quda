@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <quda.h>
 #include <string.h>
+#include <gauge_quda.h>
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -34,11 +35,13 @@ cudaStream_t *stream;
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
 #endif
 
-FaceBuffer::FaceBuffer(const int *XX, const int nDim, const int Ninternal, 
+FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision) :
   Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
 {
-  setupDims(XX);
+  if (nDim > QUDA_MAX_DIM) errorQuda("nDim = %d is greater than the maximum of %d\n", nDim, QUDA_MAX_DIM);
+
+  setupDims(X);
 
   // set these both = 0 `for no overlap of qmp and cudamemcpyasync
   // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
@@ -49,27 +52,33 @@ FaceBuffer::FaceBuffer(const int *XX, const int nDim, const int Ninternal,
   
   unsigned int flag = cudaHostAllocDefault;
 
+  //printf("nDim = %d\n", nDim);
+
   // Buffers hold half spinors
-  for (int i=0; i<4; i++) {
+  for (int i=0; i<nDim; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
-  
+
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
+    //printf("bytes = %d, nFace = %d, faceVolume = %d, Ndof = %d, prec =  %d\n", 
+    //	   nbytes[i], nFace, faceVolumeCB[i], Ninternal, precision);
 
     cudaHostAlloc(&(my_fwd_face[i]), nbytes[i], flag);
     if( !my_fwd_face[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[i]);
   
+    //printf("%d\n", nbytes[i]);
+
     cudaHostAlloc(&(my_back_face[i]), nbytes[i], flag);
     if( !my_back_face[i] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[i]);
   }
 
-  // this is not multi-dim aware yet
+  // this is not multi-dim aware yet - can we just use the ghost zones for these?
 #ifdef GATHER_COALESCE
   cudaMalloc(&(gather_fwd_face), nbytes[3]);
   cudaMalloc(&(gather_back_face), nbytes[3]);
 #endif
 
-  for (int i=0; i<4; i++) {
+  for (int i=0; i<nDim; i++) {
 #ifdef QMP_COMMS
     cudaHostAlloc(&(from_fwd_face[i]), nbytes[i], flag);
     if( !from_fwd_face[i] ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes[i]);
@@ -83,7 +92,7 @@ FaceBuffer::FaceBuffer(const int *XX, const int nDim, const int Ninternal,
   }
 
 #ifdef QMP_COMMS
-  for (int i=0; i<4; i++) {
+  for (int i=0; i<nDim; i++) {
     mm_send_fwd[i] = QMP_declare_msgmem(my_fwd_face[i], nbytes[i]);
     if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
     
@@ -116,13 +125,11 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
   errorQuda("FaceBuffer copy constructor not implemented");
 }
 
-// FIXME: The input X here is already checkboarded so need to undo this
 void FaceBuffer::setupDims(const int* X)
 {
   Volume = 1;
-  for (int d=0; d< 4; d++) {
+  for (int d=0; d< nDim; d++) {
     this->X[d] = X[d];
-    if (d==0) this->X[d] *= 2;
     Volume *= this->X[d];    
   }
   VolumeCB = Volume/2;
@@ -134,13 +141,16 @@ void FaceBuffer::setupDims(const int* X)
       faceVolume[i] *= this->X[j];
     }
     faceVolumeCB[i] = faceVolume[i]/2;
+
   }
+
 }
 
 FaceBuffer::~FaceBuffer()
 {
   
-  for (int i=0; i<4; i++) {
+  //printf("Ndim = %d\n", nDim);
+  for (int i=0; i<nDim; i++) {
 #ifdef QMP_COMMS
     QMP_free_msghandle(mh_send_fwd[i]);
     QMP_free_msghandle(mh_send_back[i]);
@@ -162,7 +172,7 @@ FaceBuffer::~FaceBuffer()
   cudaFree(gather_back_face);
 #endif
 
-  for (int i=0; i<4; i++) {
+  for (int i=0; i<nDim; i++) {
     my_fwd_face[i]=NULL;
     my_back_face[i]=NULL;
     from_fwd_face[i]=NULL;
@@ -267,15 +277,6 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
 void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)
 {
 
-  //for all dimensions
-  int len[4] = {
-    nFace*faceVolumeCB[0]*Ninternal*precision,
-    nFace*faceVolumeCB[1]*Ninternal*precision,
-    nFace*faceVolumeCB[2]*Ninternal*precision,
-    nFace*faceVolumeCB[3]*Ninternal*precision
-  };
-
-
   // allocate the ghost buffer if not yet allocated
   spinor.allocateGhostBuffer();
 
@@ -284,19 +285,36 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
     spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, (QudaParity)oddBit, dagger);
   }
 
+  /*
+  int len = nFace * ((X[0]*X[1]*X[2])/2) * 3 * 2;
+  for (int i=0; i<len; i++) {
+    printf("fwd = %e, back = %e\n", ((double**)spinor.backGhostFaceSendBuffer)[3][i], 
+	   ((double**)spinor.fwdGhostFaceSendBuffer)[3][i]);
+	   }*/
+
+
 #ifdef QMP_COMMS
 
+  QMP_msgmem_t mm_send_fwd[4];
+  QMP_msgmem_t mm_from_back[4];
+  QMP_msgmem_t mm_from_fwd[4];
+  QMP_msgmem_t mm_send_back[4];
+  QMP_msghandle_t mh_send_fwd[4];
+  QMP_msghandle_t mh_from_back[4];
+  QMP_msghandle_t mh_from_fwd[4];
+  QMP_msghandle_t mh_send_back[4];
+
   for (int i=0; i<4; i++) {
-    mm_send_fwd[i] = QMP_declare_msgmem(spinor.fwdGhostFaceSendBuffer[i], len[i]);
+    mm_send_fwd[i] = QMP_declare_msgmem(spinor.fwdGhostFaceSendBuffer[i], nbytes[i]);
     if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
     
-    mm_send_back[i] = QMP_declare_msgmem(spinor.backGhostFaceSendBuffer[i], len[i]);
+    mm_send_back[i] = QMP_declare_msgmem(spinor.backGhostFaceSendBuffer[i], nbytes[i]);
     if( mm_send_back == NULL ) errorQuda("Unable to allocate send back message mem");
     
-    mm_from_fwd[i] = QMP_declare_msgmem(spinor.fwdGhostFaceBuffer[i], len[i]);
+    mm_from_fwd[i] = QMP_declare_msgmem(spinor.fwdGhostFaceBuffer[i], nbytes[i]);
     if( mm_from_fwd[i] == NULL ) errorQuda("Unable to allocate recv from fwd message mem");
     
-    mm_from_back[i] = QMP_declare_msgmem(spinor.backGhostFaceBuffer[i], len[i]);
+    mm_from_back[i] = QMP_declare_msgmem(spinor.backGhostFaceBuffer[i], nbytes[i]);
     if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
     
     mh_send_fwd[i] = QMP_declare_send_relative(mm_send_fwd[i], i, +1, 0);
@@ -327,17 +345,22 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   }
 
   for (int i=0; i<4; i++) {
+    QMP_free_msghandle(mh_send_fwd[i]);
+    QMP_free_msghandle(mh_send_back[i]);
+    QMP_free_msghandle(mh_from_fwd[i]);
+    QMP_free_msghandle(mh_from_back[i]);
     QMP_free_msgmem(mm_send_fwd[i]);
+    QMP_free_msgmem(mm_send_back[i]);
     QMP_free_msgmem(mm_from_back[i]);
     QMP_free_msgmem(mm_from_fwd[i]);
-    QMP_free_msgmem(mm_send_back[i]);
   }
 
 #else
 
   for (int i=0; i<4; i++) {
-    memcpy(spinor.fwdGhostFaceBuffer[i], spinor.backGhostFaceSendBuffer[i], len[i]);
-    memcpy(spinor.backGhostFaceBuffer[i], spinor.fwdGhostFaceSendBuffer[i], len[i]);
+    //printf("%d COPY length = %d\n", i, nbytes[i]/precision);
+    memcpy(spinor.fwdGhostFaceBuffer[i], spinor.backGhostFaceSendBuffer[i], nbytes[i]);
+    memcpy(spinor.backGhostFaceBuffer[i], spinor.fwdGhostFaceSendBuffer[i], nbytes[i]);
   }
 
 #endif
@@ -387,8 +410,9 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFa
 #else
 
   for(int dir =0; dir < 4; dir++) {
-    int len = nFace*faceVolumeCB[dir]*gaugeSiteSize*precision;
-    memcpy(ghost_link[dir], link_sendbuf[i], 2*len);
+    int len = 2*nFace*faceVolumeCB[dir]*Ninternal; // factor 2 since we have both parities
+    //printf("%d COPY length = %d\n", dir, len);
+    memcpy(ghost_link[dir], link_sendbuf[dir], len*precision); 
   }
 
 #endif
@@ -459,4 +483,21 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
   }
 
 #endif // QMP_COMMS
+}
+
+
+void reduceDouble(double &sum) {
+
+#ifdef QMP_COMMS
+  QMP_sum_double(&sum);
+#endif
+
+}
+
+void reduceDoubleArray(double *sum, const int len) {
+
+#ifdef QMP_COMMS
+  QMP_sum_double_array(sum,len);
+#endif
+
 }

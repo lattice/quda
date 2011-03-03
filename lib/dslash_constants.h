@@ -86,16 +86,16 @@ bool qudaPtNm1 = true;
 float fat_link_max; //it is set somewhere else
 
 void initCommonConstants(const FullGauge gauge) {
-  int Vh = gauge.volume;
+  int Vh = gauge.volumeCB;
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
   
-  Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2];
+  Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2]/2; // FIXME - this shuold not be called Vs, rather Vsh
   cudaMemcpyToSymbol("Vs", &Vspatial, sizeof(int));
 
   int half_Vspatial = Vspatial;
   cudaMemcpyToSymbol("Vsh", &half_Vspatial, sizeof(int));
 
-  int X1 = 2*gauge.X[0];
+  int X1 = gauge.X[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
 
   int X2 = gauge.X[1];

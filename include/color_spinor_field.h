@@ -70,9 +70,9 @@ class ColorSpinorParam {
     for (int d=0; d<nDim; d++) ghostDim[d] = inv_param.ghostDim[d];
 
     if (!pc_solution) {
-      x[0] *= 2;
       siteSubset = QUDA_FULL_SITE_SUBSET;;
     } else {
+      x[0] /= 2; // X defined the full lattice dimensions
       siteSubset = QUDA_PARITY_SITE_SUBSET;
     }
 

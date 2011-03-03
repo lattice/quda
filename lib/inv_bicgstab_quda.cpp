@@ -10,6 +10,8 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 
+#include<face_quda.h>
+
 #include <color_spinor_field.h>
 
 void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
@@ -150,10 +152,8 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   
   invert_param->secs += stopwatchReadSeconds();
   
-  float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
-#ifdef QMP_COMMS
-  QMP_sum_float(&gflops);
-#endif
+  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+  reduceDouble(gflops);
 
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops += gflops;

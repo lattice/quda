@@ -10,6 +10,8 @@
 #include <util_quda.h>
 #include <sys/time.h>
 
+#include <face_quda.h>
+
 #include <iostream>
 
 void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
@@ -125,10 +127,8 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   if (invert_param->verbosity >= QUDA_SUMMARIZE)
     printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
-  float gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
-#ifdef QMP_COMMS
-  QMP_sum_float(&gflops);
-#endif
+  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+  reduceDouble(gflops);
 
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invert_param->gflops = gflops;

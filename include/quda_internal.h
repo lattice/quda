@@ -39,10 +39,10 @@ extern "C" {
     QudaPrecision precision;
     int length; // total length
     int real_length; // physical length (excluding padding)
-    int volume; // geometric volume (single parity)
+    int volumeCB; // geometric volume (single parity)
     int pad; // padding from end of array to start of next
     int stride; // geometric stride between volume lengthed arrays
-    int X[4]; // the geometric lengths (single parity)
+    int X[4]; // the geometric lengths
     int Nc; // number of colors
     ReconstructType reconstruct;
     GaugeFixed gauge_fixed;

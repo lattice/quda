@@ -20,10 +20,10 @@ class FaceBuffer {
   void *gather_fwd_face;
   void *gather_back_face;
 
-  void *my_fwd_face[4];
-  void *my_back_face[4];
-  void *from_back_face[4];
-  void *from_fwd_face[4];
+  void *my_fwd_face[QUDA_MAX_DIM];
+  void *my_back_face[QUDA_MAX_DIM];
+  void *from_back_face[QUDA_MAX_DIM];
+  void *from_fwd_face[QUDA_MAX_DIM];
 
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
@@ -36,17 +36,17 @@ class FaceBuffer {
   int nDim;
   int nFace;
 
-  size_t nbytes[4];
+  size_t nbytes[QUDA_MAX_DIM];
 #ifdef QMP_COMMS
-  QMP_msgmem_t mm_send_fwd[4];
-  QMP_msgmem_t mm_from_fwd[4];
-  QMP_msgmem_t mm_send_back[4];
-  QMP_msgmem_t mm_from_back[4];
+  QMP_msgmem_t mm_send_fwd[QUDA_MAX_DIM];
+  QMP_msgmem_t mm_from_fwd[QUDA_MAX_DIM];
+  QMP_msgmem_t mm_send_back[QUDA_MAX_DIM];
+  QMP_msgmem_t mm_from_back[QUDA_MAX_DIM];
   
-  QMP_msghandle_t mh_send_fwd[4];
-  QMP_msghandle_t mh_from_fwd[4];
-  QMP_msghandle_t mh_send_back[4];
-  QMP_msghandle_t mh_from_back[4];
+  QMP_msghandle_t mh_send_fwd[QUDA_MAX_DIM];
+  QMP_msghandle_t mh_from_fwd[QUDA_MAX_DIM];
+  QMP_msghandle_t mh_send_back[QUDA_MAX_DIM];
+  QMP_msghandle_t mh_from_back[QUDA_MAX_DIM];
 #endif
 
   void setupDims(const int *X);
@@ -68,6 +68,9 @@ class FaceBuffer {
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 			int veclength, ReconstructType reconstruct, int V, int Vs);
+
+void reduceDouble(double &);
+void reduceDoubleArray(double *, const int len);
 
 #else // MPI comms
 

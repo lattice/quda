@@ -14,11 +14,11 @@
 #include <wilson_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 1;
 
 // Dirac operator type
-//const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
-const QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
+//const QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 //const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
@@ -147,7 +147,7 @@ void init() {
   
   for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
   csParam.ghostDim[3] = true;
-  //csParam.verbose = QUDA_DEBUG_VERBOSE;
+  csParam.verbose = QUDA_DEBUG_VERBOSE;
 
   spinor = new cpuColorSpinorField(csParam);
   spinorOut = new cpuColorSpinorField(csParam);
@@ -268,13 +268,14 @@ void end() {
 // execute kernel
 double dslashCUDA() {
 
+  /*
   if (!transfer) {
     if (test_type < 2) {
       dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp1);
     } else {
       dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp1);
     }
-  }
+    }*/
 
   printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);

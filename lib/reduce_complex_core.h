@@ -158,13 +158,8 @@ cuDoubleComplex REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPre
     gpu_result.x += h_reduceComplex[i].x;
     gpu_result.y += h_reduceComplex[i].y;
   }
-  
-#ifdef QMP_COMMS
-  QMP_sum_double_array(&(gpu_result.x),2);
-#elif defined(MPI_COMMS)
-  comm_allreduce_array(&(gpu_result.x), 2);
-#else
-#endif
+
+  reduceDoubleArray(&(gpu_result.x), 2);
 
   return gpu_result;
 }

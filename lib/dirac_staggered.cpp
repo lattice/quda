@@ -74,9 +74,9 @@ void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cud
 	      in.SiteSubset(), out.SiteSubset());
   }
 
-  if ((out.Volume() != 2*fatGauge->volume && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-      (out.Volume() != fatGauge->volume && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge->volume);
+  if ((out.Volume() != 2*fatGauge->volumeCB && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+      (out.Volume() != fatGauge->volumeCB && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge->volumeCB);
   }
 }
 

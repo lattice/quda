@@ -462,9 +462,7 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
 	  memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	}
       }
-      break;
-      
-      
+      break;      
       
     case 1: //Y dimension
       if (dir == QUDA_BACKWARDS){

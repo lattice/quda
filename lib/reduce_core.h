@@ -136,12 +136,7 @@ double REDUCE_FUNC_NAME(Cuda) (REDUCE_TYPES, int n, int kernel, QudaPrecision pr
   double cpu_sum = 0;
   for (unsigned int i = 0; i < blasGrid.x; i++) cpu_sum += h_reduceFloat[i];
 
-#ifdef QMP_COMMS
-  QMP_sum_double(&cpu_sum);
-#elif defined(MPI_COMMS)
-  comm_allreduce(&cpu_sum);
-#else
-#endif
+  reduceDouble(cpu_sum);
 
   return cpu_sum;
 }
