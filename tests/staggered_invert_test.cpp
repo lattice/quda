@@ -13,11 +13,6 @@
 
 #ifdef MULTI_GPU
 #include <face_quda.h>
-//#include "exchange_face.h"
-//#include "mpicomm.h"
-#ifdef MPI_COMMS
-#include <mpi.h>
-#endif
 #endif
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -538,23 +533,11 @@ usage(char** argv )
 int main(int argc, char** argv)
 {
 
-#ifdef MULTI_GPU
-#ifdef QMP_COMMS
-  int ndim=4, dims[4];
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-  dims[0] = dims[1] = dims[2] = 1;
-  dims[3] = QMP_get_number_of_nodes();
-  QMP_declare_logical_topology(dims, ndim);
-#endif
+  int xsize=1;
+  int ysize=1;
+  int zsize=1;
+  int tsize=1;
 
-#ifdef MPI_COMMS
-  MPI_Init (&argc, &argv);  
-  comm_init();
-#endif
-
-#endif
-  
   int i;
   for (i =1;i < argc; i++){
 	
@@ -596,7 +579,7 @@ int main(int argc, char** argv)
       }
       sscanf(argv[i+1], "%f", &tmpf);
       if (tol <= 0){
-        printfQuda("ERROR: invalid tol(%f)\n", tmpf);
+        printf("ERROR: invalid tol(%f)\n", tmpf);
         usage(argv);
       }
       tol = tmpf;
@@ -639,7 +622,7 @@ int main(int argc, char** argv)
       }
       tdim= atoi(argv[i+1]);
       if (tdim < 0 || tdim > 128){
-	printfQuda("ERROR: invalid T dimention (%d)\n", tdim);
+	printf("ERROR: invalid T dimention (%d)\n", tdim);
 	usage(argv);
       }
       i++;
@@ -651,7 +634,7 @@ int main(int argc, char** argv)
       }
       sdim= atoi(argv[i+1]);
       if (sdim < 0 || sdim > 128){
-	printfQuda("ERROR: invalid S dimention (%d)\n", sdim);
+	printf("ERROR: invalid S dimention (%d)\n", sdim);
 	usage(argv);
       }
       i++;
@@ -663,15 +646,62 @@ int main(int argc, char** argv)
           }
           device =  atoi(argv[i+1]);
           if (device < 0){
-	    printfQuda("Error: invalid device number(%d)\n", device);
+	    printf("Error: invalid device number(%d)\n", device);
               exit(1);
           }
           i++;
           continue;
     }
 
+    if( strcmp(argv[i], "--xgridsize") == 0){
+      if (i+1 >= argc){ 
+        usage(argv);
+      }     
+      xsize =  atoi(argv[i+1]);
+      if (xsize <= 0 ){
+        errorQuda("Error: invalid X grid size");
+      }
+      i++;
+      continue;     
+    }
 
-    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
+    if( strcmp(argv[i], "--ygridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      ysize =  atoi(argv[i+1]);
+      if (ysize <= 0 ){
+        errorQuda("Error: invalid Y grid size");
+      }
+      i++;
+      continue;     
+    }
+
+    if( strcmp(argv[i], "--zgridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      zsize =  atoi(argv[i+1]);
+      if (zsize <= 0 ){
+        errorQuda("Error: invalid Z grid size");
+      }
+      i++;
+      continue;
+    }
+
+    if( strcmp(argv[i], "--tgridsize") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      tsize =  atoi(argv[i+1]);
+      if (tsize <= 0 ){
+        errorQuda("Error: invalid T grid size");
+      }
+      i++;
+      continue;
+    }
+
+    printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
 
@@ -685,17 +715,12 @@ int main(int argc, char** argv)
   
   display_test_info();
 
+  int X[] = {xsize, ysize, zsize, tsize};
+  initCommsQuda(argc, argv, X, 4);
+  
   int ret = invert_test();
 
-#ifdef MULTI_GPU  
-
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#elif defined MPI_COMMS
-  comm_cleanup();
-#endif 
-
-#endif
+  endCommsQuda();
 
   return ret;
 }

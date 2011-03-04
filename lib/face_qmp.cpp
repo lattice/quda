@@ -200,10 +200,10 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 #endif
 
   // gather for backwards send
-  in.packGhost(back_face, 0, 3, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[sendBackStrmIdx]);
+  in.packGhost(back_face, 3, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[sendBackStrmIdx]);
 
   // gather for forwards send
-  in.packGhost(fwd_face, 0, 3, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[sendFwdStrmIdx]);
+  in.packGhost(fwd_face, 3, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[sendFwdStrmIdx]);
  
 #ifdef GATHER_COALESCE  
   // Copy to host if we are coalescing into single face messages to reduce latency
@@ -266,11 +266,11 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
   // Scatter faces.
   QMP_finish_from_fwd(3);
   
-  out.unpackGhost(from_fwd_face[3], 0, 3, QUDA_FORWARDS, dagger, &stream[recFwdStrmIdx]);
+  out.unpackGhost(from_fwd_face[3], 3, QUDA_FORWARDS, dagger, &stream[recFwdStrmIdx]);
 
   QMP_finish_from_back(3);
   
-  out.unpackGhost(from_back_face[3], 0, 3, QUDA_BACKWARDS, dagger, &stream[recBackStrmIdx]);
+  out.unpackGhost(from_back_face[3], 3, QUDA_BACKWARDS, dagger, &stream[recBackStrmIdx]);
 }
 
 // This is just an initial hack for CPU comms - should be creating the message handlers at instantiation
@@ -376,11 +376,11 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFa
   QMP_msghandle_t mh_from_back[4];
 
   for (int i=0; i<4; i++) {
-    int len = nFace*faceVolumeCB[i]*Ninternal*precision;
-    mm_send_fwd[i] = QMP_declare_msgmem(link_sendbuf[i], 2*len);
+    int len = 2*nFace*faceVolumeCB[i]*Ninternal;
+    mm_send_fwd[i] = QMP_declare_msgmem(link_sendbuf[i], len*precision);
     if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
     
-    mm_from_back[i] = QMP_declare_msgmem(ghost_link[i], 2*len);
+    mm_from_back[i] = QMP_declare_msgmem(ghost_link[i], len*precision);
     if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
     
     mh_send_fwd[i] = QMP_declare_send_relative(mm_send_fwd[i], i, +1, 0);

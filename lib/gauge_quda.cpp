@@ -774,8 +774,9 @@ void freeGaugeField(FullGauge *cudaGauge) {
 }
 
 template <typename Float, typename FloatN>
-static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFieldOrder gauge_order,
-			   ReconstructType reconstruct, int bytes, int Vh, int pad, QudaLinkType type) {
+static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, 
+			   GaugeFieldOrder gauge_order, ReconstructType reconstruct, 
+			   int bytes, int Vh, int pad, QudaLinkType type) {
   
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
@@ -863,7 +864,6 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   
   cudaFreeHost(packedEven);
   cudaFreeHost(packedOdd);
-
 }
 
 
@@ -985,6 +985,7 @@ void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_p
     }
 
   }
+
 }
 
 

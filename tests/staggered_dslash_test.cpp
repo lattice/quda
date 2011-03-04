@@ -20,12 +20,6 @@
 
 #include <assert.h>
 
-/*#ifdef MULTI_GPU
-#include <mpi.h>
-#include "mpicomm.h"
-#include "exchange_face.h"
-#endif*/
-
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
@@ -218,10 +212,15 @@ void init()
   pack_ghost(fatlink, fat_send, 1, gaugeParam.cpu_prec);
   pack_ghost(longlink, long_send, 3, gaugeParam.cpu_prec);
 
+  printf("CPU Link Exchange started\n");
+
   int dummyFace = 1;
   FaceBuffer faceBuf(X, 4, 18, dummyFace, gaugeParam.cpu_prec);
+  printf("Constructor done\n");
   faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
+  printf("CPU Link Exchange 1 complete\n");
   faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
+  printf("CPU Link Exchange 2 complete\n");
 
   for (int i=0; i<4; i++) {
     free(fat_send[i]);
@@ -243,14 +242,18 @@ void init()
   gaugeParam.ga_pad = pad_size;    
 #endif
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  printfQuda("Fat links sending..."); 
   loadGaugeQuda(fatlink, &gaugeParam);
+  printfQuda("Fat links sent"); 
   
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
 #ifdef MULTI_GPU
   gaugeParam.ga_pad = 3*pad_size;
 #endif
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
+  printfQuda("Long links sending..."); 
   loadGaugeQuda(longlink, &gaugeParam);
+  printfQuda("Long links sent..."); 
 
   cudaFatLink = cudaFatLinkPrecise;
   cudaLongLink = cudaLongLinkPrecise;
@@ -343,10 +346,6 @@ void end(void)
   delete spinorRef;
     
   endQuda();
-
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#endif
 }
 
 double dslashCUDA() {
@@ -406,7 +405,6 @@ double dslashCUDA() {
 
 void staggeredDslashRef()
 {
-  int cpu_parity;
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
   fflush(stdout);
@@ -418,8 +416,7 @@ void staggeredDslashRef()
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
-    
-    cpu_parity = 0; //EVEN
+    int cpu_parity = 0; //EVEN
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
 		     inv_param.cpu_prec, gaugeParam.cpu_prec);
     
@@ -463,9 +460,7 @@ static int dslashTest()
 	
     double secs = dslashCUDA();
     
-    if (!transfer) {
-      *spinorOut = *cudaSpinorOut;
-    }
+    if (!transfer) *spinorOut = *cudaSpinorOut;
       
     printfQuda("\n%fms per loop\n", 1000*secs);
     staggeredDslashRef();
@@ -480,9 +475,8 @@ static int dslashTest()
     spinor_floats = test_type ? (2*spinor_floats) : spinor_floats;
 
     int bytes_for_one_site = link_floats * link_float_size + spinor_floats * spinor_float_size;
-    if (prec == QUDA_HALF_PRECISION) {
-      bytes_for_one_site += (8*2 + 1)*4;	
-    }
+    if (prec == QUDA_HALF_PRECISION) bytes_for_one_site += (8*2 + 1)*4;	
+
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printfQuda("GiB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*(1<<30)));
 	
@@ -520,14 +514,14 @@ void display_test_info()
 
 void usage(char** argv )
 {
-  printfQuda("Usage: %s <args>\n", argv[0]);
-  printfQuda("--prec <double/single/half> \t Precision in GPU\n"); 
-  printfQuda("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
-  printfQuda("--type <0/1/2> \t\t\t Test type\n"); 
-  printfQuda("--dagger \t\t\t Set the dagger to 1\n"); 
-  printfQuda("--tdim \t\t\t\t Set T dimention size(default 24)\n");     
-  printfQuda("--sdim \t\t\t\t Set space dimention size\n"); 
-  printfQuda("--help \t\t\t\t Print out this message\n"); 
+  printf("Usage: %s <args>\n", argv[0]);
+  printf("--prec <double/single/half> \t Precision in GPU\n"); 
+  printf("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
+  printf("--type <0/1/2> \t\t\t Test type\n"); 
+  printf("--dagger \t\t\t Set the dagger to 1\n"); 
+  printf("--tdim \t\t\t\t Set T dimention size(default 24)\n");     
+  printf("--sdim \t\t\t\t Set space dimention size\n"); 
+  printf("--help \t\t\t\t Print out this message\n"); 
   exit(1);
   return ;
 }
@@ -672,22 +666,8 @@ int main(int argc, char **argv)
     usage(argv);
   }
 
-#ifdef MULTI_GPU
-
-#ifdef QMP_COMMS
-  int ndim=4, dims[4];
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-  dims[0] = dims[1] = dims[2] = 1;
-  dims[3] = QMP_get_number_of_nodes();
-  QMP_declare_logical_topology(dims, ndim);
-#elif defined(MPI_COMMS)
-  MPI_Init (&argc, &argv);  
-  comm_set_gridsize(xsize, ysize, zsize, tsize);  
-  comm_init();
-#endif
-
-#endif
+  int X[] = {xsize, ysize, zsize, tsize};
+  initCommsQuda(argc, argv, X, 4);
 
   display_test_info();
 
@@ -695,19 +675,9 @@ int main(int argc, char **argv)
   int accuracy_level = dslashTest();
 
   printfQuda("accuracy_level =%d\n", accuracy_level);
-  if (accuracy_level >= 3){
-    //probably no error 
-    ret = 0;
-  }
-#ifdef MULTI_GPU
+  if (accuracy_level >= 3) ret = 0;    //probably no error 
 
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#elif defined MPI_COMMS
-  comm_cleanup();
-#endif 
-
-#endif
+  endCommsQuda();
 
   return ret;
 }

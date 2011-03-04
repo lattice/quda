@@ -5,19 +5,15 @@
 #include <quda.h>
 #include <string.h>
 
-#include <mpi_comms.h>
+#include <mpicomm.h>
 
 using namespace std;
 
 cudaStream_t *stream;
 
-#define COMM_ERROR(a) \
-  printf(a);	      \
-  comm_exit(1);
-
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
-		       const int nFaces, const QudaPrecision precision) : 
-  nDim(nDim), Ninternal(Ninternal), nFace(nFace), precision(precision)
+		       const int nFace, const QudaPrecision precision) : 
+  Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
 {
   setupDims(X);
 
@@ -29,50 +25,32 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   recBackStrmIdx = sendFwdStrmIdx;
 
   nbytes = nFace*faceVolumeCB[3]*Ninternal*precision;
-  nbytes_norm = nFace*faceVolumeCB[3]*sizeof(float);
+  if (precision == QUDA_HALF_PRECISION) nbytes += nFace*faceVolumeCB[3]*sizeof(float);
    
   cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf, nbytes); CUERR;
   cudaMallocHost((void**)&back_nbr_spinor_sendbuf, nbytes); CUERR;
+
   if (fwd_nbr_spinor_sendbuf == NULL || back_nbr_spinor_sendbuf == NULL)
-    COMM_ERROR("ERROR: malloc failed for fwd_nbr_spinor_sendbuf/back_nbr_spinor_sendbuf\n"); 
-  
+    errorQuda("malloc failed for fwd_nbr_spinor_sendbuf/back_nbr_spinor_sendbuf"); 
+
   cudaMallocHost((void**)&fwd_nbr_spinor, nbytes); CUERR;
   cudaMallocHost((void**)&back_nbr_spinor, nbytes); CUERR;
+
   if (fwd_nbr_spinor == NULL || back_nbr_spinor == NULL)
-    COMM_ERROR("ERROR: malloc failed for fwd_nbr_spinor/back_nbr_spinor\n"); 
-  
+    errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
+
   pagable_fwd_nbr_spinor_sendbuf = malloc(nbytes);
   pagable_back_nbr_spinor_sendbuf = malloc(nbytes);
+
   if (pagable_fwd_nbr_spinor_sendbuf == NULL || pagable_back_nbr_spinor_sendbuf == NULL)
-    COMM_ERROR("ERROR: malloc failed for pagable_fwd_nbr_spinor_sendbuf/pagable_back_nbr_spinor_sendbuf\n");
+    errorQuda("malloc failed for pagable_fwd_nbr_spinor_sendbuf/pagable_back_nbr_spinor_sendbuf");
   
   pagable_fwd_nbr_spinor=malloc(nbytes);
   pagable_back_nbr_spinor=malloc(nbytes);
-  if (pagable_fwd_nbr_spinor == NULL || pagable_back_nbr_spinor == NULL)
-    COMM_ERROR("ERROR: malloc failed for pagable_fwd_nbr_spinor/pagable_back_nbr_spinor\n"); 
-  
-  if (cudaSpinor.Precision() == QUDA_HALF_PRECISION){
-    cudaMallocHost(&f_norm_sendbuf, nbytes_norm);CUERR;
-    cudaMallocHost(&b_norm_sendbuf, nbytes_norm);CUERR;
-    if (f_norm_sendbuf == NULL || b_norm_sendbuf == NULL)
-      COMM_ERROR("ERROR: malloc failed for b_norm_sendbuf/f_norm_sendbuf\n");
-    
-    cudaMallocHost(&f_norm, nbytes_norm);CUERR;
-    cudaMallocHost(&b_norm, nbytes_norm);CUERR;
-    if (f_norm== NULL || b_norm== NULL)
-      COMM_ERROR("ERROR: malloc failed for b_norm/f_norm\n");
-    
-    pagable_f_norm_sendbuf=malloc(nbytes_norm);
-    pagable_b_norm_sendbuf=malloc(nbytes_norm);
-    if (pagable_f_norm_sendbuf == NULL || pagable_b_norm_sendbuf == NULL)
-      COMM_ERROR("ERROR: malloc failed for pagable_b_norm_sendbuf/pagable_f_norm_sendbuf\n");
 
-    pagable_f_norm=malloc(nbytes_norm);
-    pagable_b_norm=malloc(nbytes_norm);
-    if (pagable_f_norm== NULL || pagable_b_norm== NULL)
-      COMM_ERROR("ERROR: malloc failed for pagable_b_norm/pagable_f_norm\n");
-  }
-  
+  if (pagable_fwd_nbr_spinor == NULL || pagable_back_nbr_spinor == NULL)
+    errorQuda("malloc failed for pagable_fwd_nbr_spinor/pagable_back_nbr_spinor"); 
+
   return;
 }
 
@@ -84,7 +62,7 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
 void FaceBuffer::setupDims(const int* X)
 {
   Volume = 1;
-  for (int d=0; d< 4; d++) {
+  for (int d=0; d<nDim; d++) {
     this->X[d] = X[d];
     Volume *= this->X[d];    
   }
@@ -104,33 +82,25 @@ FaceBuffer::~FaceBuffer()
 {
   if(fwd_nbr_spinor_sendbuf) cudaFreeHost(fwd_nbr_spinor_sendbuf);
   if(back_nbr_spinor_sendbuf) cudaFreeHost(back_nbr_spinor_sendbuf);
-  if (f_norm_sendbuf) cudaFreeHost(f_norm_sendbuf);
-  if (b_norm_sendbuf) cudaFreeHost(b_norm_sendbuf);
   if(fwd_nbr_spinor) cudaFreeHost(fwd_nbr_spinor);
   if(back_nbr_spinor) cudaFreeHost(back_nbr_spinor);
-  if (f_norm) cudaFreeHost(f_norm);
-  if (b_norm) cudaFreeHost(b_norm);
 }
 
-void FaceBuffer::exchangeStart(cudaColorSpinorField &in, int parity, 
-			       int dagger, cudaStream_t* stream_p)
+void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
+				    int dagger, cudaStream_t *stream_p)
 {
   stream = stream_p;
   
   // Prepost all receives
   recv_request1 = comm_recv(pagable_back_nbr_spinor, nbytes, BACK_NBR);
   recv_request2 = comm_recv(pagable_fwd_nbr_spinor, nbytes, FWD_NBR);
-  if (precision == QUDA_HALF_PRECISION) {
-    recv_request3 = comm_recv(pagable_b_norm, nbytes_norm, BACK_NBR);
-    recv_request4 = comm_recv(pagable_f_norm, nbytes_norm, FWD_NBR);
-  }
 
   // gather for backwards send
-  in.packGhost(back_nbr_spinor_sendbuf, b_norm_sendbuf, 3, QUDA_BACKWARDS, 
+  in.packGhost(back_nbr_spinor_sendbuf, 3, QUDA_BACKWARDS, 
 	       (QudaParity)parity, dagger, &stream[sendBackStrmIdx]); CUERR;  
 
   // gather for forwards send
-  in.packGhost(fwd_nbr_spinor_sendbuf, f_norm_sendbuf, 3, QUDA_FORWARDS, 
+  in.packGhost(fwd_nbr_spinor_sendbuf, 3, QUDA_FORWARDS, 
 	       (QudaParity)parity, dagger, &stream[sendFwdStrmIdx]); CUERR;
 }
 
@@ -139,20 +109,11 @@ void FaceBuffer::exchangeFacesComms() {
 
   memcpy(pagable_back_nbr_spinor_sendbuf, back_nbr_spinor_sendbuf, nbytes);
   send_request2 = comm_send(pagable_back_nbr_spinor_sendbuf, nbytes, BACK_NBR);
-  if (precision == QUDA_HALF_PRECISION){
-    memcpy(pagable_b_norm_sendbuf, b_norm_sendbuf, nbytes_norm);
-    send_request4 = comm_send(pagable_b_norm_sendbuf, nbytes_norm, BACK_NBR);
-  }
 
   cudaStreamSynchronize(stream[sendFwdStrmIdx]); //required the data to be there before sending out
 
   memcpy(pagable_fwd_nbr_spinor_sendbuf, fwd_nbr_spinor_sendbuf, nbytes);
   send_request1= comm_send(pagable_fwd_nbr_spinor_sendbuf, nbytes, FWD_NBR);
-  if (precision == QUDA_HALF_PRECISION){
-    memcpy(pagable_f_norm_sendbuf, f_norm_sendbuf, nbytes_norm);
-    send_request3 = comm_send(pagable_f_norm_sendbuf, nbytes_norm, FWD_NBR);
-  }
-  
 } 
 
 
@@ -161,26 +122,14 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
   comm_wait(recv_request2);  
   comm_wait(send_request2);
   memcpy(fwd_nbr_spinor, pagable_fwd_nbr_spinor, nbytes);
-  if (precision == QUDA_HALF_PRECISION){
-    comm_wait(recv_request4);
-    comm_wait(send_request4);
-    memcpy(f_norm, pagable_f_norm, nbytes_norm);
-  }
 
-  out.unpackGhost(fwd_nbr_spinor, f_norm, 3, QUDA_FORWARDS,  dagger, &stream[recFwdStrmIdx]); CUERR;
+  out.unpackGhost(fwd_nbr_spinor, 3, QUDA_FORWARDS,  dagger, &stream[recFwdStrmIdx]); CUERR;
 
   comm_wait(recv_request1);
   comm_wait(send_request1);
   memcpy(back_nbr_spinor, pagable_back_nbr_spinor, nbytes);
 
-  if (precision == QUDA_HALF_PRECISION){
-    comm_wait(recv_request3);
-    comm_wait(send_request3);
-    memcpy(b_norm, pagable_b_norm, nbytes_norm);
-  }
-
-  out.unpackGhost(back_nbr_spinor, b_norm, 3, QUDA_BACKWARDS,  dagger, &stream[recBeckStrmIdx]); CUERR;
-  cudaStreamSynchronize(*mystream);
+  out.unpackGhost(back_nbr_spinor, 3, QUDA_BACKWARDS,  dagger, &stream[recBackStrmIdx]); CUERR;
 }
 
 void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)
@@ -198,8 +147,8 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   spinor.allocateGhostBuffer();
 
   for(int i=0;i < 4; i++){
-    spinor.packGhost(spinor.backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, oddBit, dagger);
-    spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, oddBit, dagger);
+    spinor.packGhost(spinor.backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, (QudaParity)oddBit, dagger);
+    spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, (QudaParity)oddBit, dagger);
   }
 
   unsigned long recv_request1[4], recv_request2[4];
@@ -233,10 +182,12 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFa
 
   for(int dir =0; dir < 4; dir++)
     {
-      int len = nFace*faceVolumeCB[dir]*gaugeSiteSize*precision;
+      int len = 2*nFace*faceVolumeCB[dir]*Ninternal;
 
-      unsigned long recv_request = comm_recv_with_tag(ghost_link[dir], 2*len, back_nbrs[dir], uptags[dir]);
-      unsigned long send_request = comm_send_with_tag(link_sendbuf[dir], 2*len, fwd_nbrs[dir], uptags[dir]);
+      unsigned long recv_request = 
+	comm_recv_with_tag(ghost_link[dir], len*precision, back_nbrs[dir], uptags[dir]);
+      unsigned long send_request = 
+	comm_send_with_tag(link_sendbuf[dir], len*precision, fwd_nbrs[dir], uptags[dir]);
       comm_wait(recv_request);
       comm_wait(send_request);
     }

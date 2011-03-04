@@ -349,11 +349,11 @@ class cudaColorSpinorField : public ColorSpinorField {
   void loadCPUSpinorField(const cpuColorSpinorField &src);
   void saveCPUSpinorField (cpuColorSpinorField &src) const;
 
-  // these routines replace Guochun's ones below
-  void packGhost(void* ghost_spinor, void* ghost_norm, const int dim, 
-		 const QudaDirection dir, const QudaParity parity, const int dagger, cudaStream_t* stream);
-  void unpackGhost(void* ghost_spinor, void* ghost_norm, const int dim, 
-		   const QudaDirection dir, const int dagger, cudaStream_t* stream);
+  void packGhost(void* ghost_spinor, const int dim, 
+		 const QudaDirection dir, const QudaParity parity, 
+		 const int dagger, cudaStream_t* stream);
+  void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
+		   const int dagger, cudaStream_t* stream);
   void* getV(){ return v;}
   void* getNorm(){return norm;}
 

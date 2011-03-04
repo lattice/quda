@@ -1314,12 +1314,57 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     diracTune = false;
   } 
   
-  for(i=0;i < num_offsets; i++){
-    delete h_x[i];
-  }
+  for(i=0;i < num_offsets; i++) delete h_x[i];
   delete x;
   delete b;
   
   return;
+}
+
+void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
+
+  if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
+
+#ifdef MULTI_GPU
+
+#ifdef QMP_COMMS
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+
+  if (X[0] != 1 && X[1] != 1 && X[2] != 1) 
+    errorQuda("QMP only supports T-dimension parallelization");
+  if (X[3] != QMP_get_number_of_nodes())
+    errorQuda("Number of processes %d must match requested T-dimension QMP grid size %d", 
+	      QMP_get_number_of_nodes(), X[3]);
+
+  QMP_declare_logical_topology(X, nDim);
+#elif defined(MPI_COMMS)
+  MPI_Init (&argc, &argv);  
+
+  int volume = 1;
+  for (int d=0; d<nDim; d++) volume *= X[d];
+  int size = -1;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (volume != size)
+    errorQuda("Number of processes %d must match requested MPI volume %d",
+	      size, volume);
+
+  comm_set_gridsize(X[0], X[1], X[2], X[3]);  
+  comm_init();
+#endif
+
+#endif
+}
+
+void endCommsQuda() {
+#ifdef MULTI_GPU
+
+#ifdef QMP_COMMS
+  QMP_finalize_msg_passing();
+#elif defined MPI_COMMS
+  comm_cleanup();
+#endif 
+
+#endif
 }
 

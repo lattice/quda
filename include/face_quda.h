@@ -4,6 +4,12 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
+#ifdef MULTI_GPU
+#ifdef MPI_COMMS
+#include <mpi.h>
+#endif
+#endif
+
 #ifndef MPI_COMMS
 
 class FaceBuffer {
@@ -96,7 +102,6 @@ class FaceBuffer {
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
   size_t nbytes;
-  size_t nbytes_norm;
 
   int Volume;
   int VolumeCB;
@@ -106,28 +111,20 @@ class FaceBuffer {
   int nDim;
   int nFace;
 
-  void* fwd_nbr_spinor_sendbuf = NULL;
-  void* back_nbr_spinor_sendbuf = NULL;
-  void* f_norm_sendbuf = NULL;
-  void* b_norm_sendbuf = NULL;
+  void* fwd_nbr_spinor_sendbuf;
+  void* back_nbr_spinor_sendbuf;
   
-  void* fwd_nbr_spinor = NULL;
-  void* back_nbr_spinor = NULL;
-  void* f_norm = NULL;
-  void* b_norm = NULL;
+  void* fwd_nbr_spinor;
+  void* back_nbr_spinor;
 
-  void* pagable_fwd_nbr_spinor_sendbuf = NULL;
-  void* pagable_back_nbr_spinor_sendbuf = NULL;
-  void* pagable_f_norm_sendbuf = NULL;
-  void* pagable_b_norm_sendbuf = NULL;
+  void* pagable_fwd_nbr_spinor_sendbuf;
+  void* pagable_back_nbr_spinor_sendbuf;
   
-  void* pagable_fwd_nbr_spinor = NULL;
-  void* pagable_back_nbr_spinor = NULL;
-  void* pagable_f_norm = NULL;
-  void* pagable_b_norm = NULL;
+  void* pagable_fwd_nbr_spinor;
+  void* pagable_back_nbr_spinor;
 
-  unsigned long recv_request1, recv_request2, recv_request3, recv_request4;
-  unsigned long send_request1, send_request2, send_request3, send_request4;
+  unsigned long recv_request1, recv_request2;
+  unsigned long send_request1, send_request2;
 
   void setupDims(const int *X);
   
@@ -146,6 +143,9 @@ class FaceBuffer {
 
   void exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace);
 };
+
+void reduceDouble(double &);
+void reduceDoubleArray(double *, const int len);
 
 #endif // MPI_COMMS
 

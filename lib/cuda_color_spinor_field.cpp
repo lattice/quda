@@ -436,8 +436,7 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
 }
 
 
-void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
-				     const int dim, const QudaDirection dir,
+void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
 				     const QudaParity parity, const int dagger,
 				     cudaStream_t *stream) {
 
@@ -480,11 +479,10 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
     CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
 
-  // FIXME: staggered uses separate buffers for spinor and its norm
   if (precision == QUDA_HALF_PRECISION) {
     int normlen = num_faces*Vsh*sizeof(float);
     int norm_offset = (dir == QUDA_BACKWARDS) ? t0_offset : Nt_minus1_offset*sizeof(float);
-    void *dst = (nSpin == 1) ? ghost_norm : (char*)ghost_spinor + num_faces*Nint*Vsh*precision;
+    void *dst = (char*)ghost_spinor + num_faces*Nint*Vsh*precision;
     void *src = (char*)norm + norm_offset;
     CUDAMEMCPY(dst, src, normlen, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
@@ -492,8 +490,8 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, void *ghost_norm,
 }
 
 
-void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm, 
-				       const int dim, const QudaDirection dir, 
+void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
+				       const QudaDirection dir, 
 				       const int dagger, cudaStream_t* stream) 
 {
   CUERR;
@@ -529,10 +527,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, void* ghost_norm,
     int normlen = num_faces*Vsh*sizeof(float);
     int norm_offset = (nSpin == 1) ? ((dir == QUDA_BACKWARDS) ? 0 : normlen ) : (upper ? 0 : normlen);
     void *dst = (char*)norm + stride*sizeof(float) + norm_offset;
-    // FIXME: Convention difference
-    // Staggered: separate spinor and norm buffers for communication
-    // Wilson: uses a single buffer for both spinor and norm 
-    void *src = (nSpin == 1) ? ghost_norm : (char*)ghost_spinor+num_faces*Nint*Vsh*precision;
+    void *src = (char*)ghost_spinor+num_faces*Nint*Vsh*precision;
     CUDAMEMCPY(dst, src, normlen, cudaMemcpyHostToDevice, *stream);  CUERR;
   }
 

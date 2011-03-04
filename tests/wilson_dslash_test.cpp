@@ -117,7 +117,7 @@ void init() {
 
   }
 
-  inv_param.verbosity = QUDA_DEBUG_VERBOSE;
+  //inv_param.verbosity = QUDA_DEBUG_VERBOSE;
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
@@ -147,7 +147,7 @@ void init() {
   
   for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
   csParam.ghostDim[3] = true;
-  csParam.verbose = QUDA_DEBUG_VERBOSE;
+  //csParam.verbose = QUDA_DEBUG_VERBOSE;
 
   spinor = new cpuColorSpinorField(csParam);
   spinorOut = new cpuColorSpinorField(csParam);
@@ -260,9 +260,6 @@ void end() {
   }
   endQuda();
 
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#endif
 }
 
 // execute kernel
@@ -384,14 +381,27 @@ void dslashRef() {
 
 int main(int argc, char **argv)
 {
-#ifdef QMP_COMMS
-  int ndim=4, dims[4];
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-  dims[0] = dims[1] = dims[2] = 1;
-  dims[3] = QMP_get_number_of_nodes();
-  QMP_declare_logical_topology(dims, ndim);
-#endif
+
+  int i;
+  int tsize = 1; // defaults to 1
+  for (i =1;i < argc; i++){
+    if( strcmp(argv[i], "--tgridsize") == 0){
+      if (i+1 >= argc){
+	printf("Usage: %s <args>\n", argv[0]);
+	printf("--tgridsize \t Set T comms grid size (default = 1)\n"); 
+	exit(1);
+      }     
+      tsize =  atoi(argv[i+1]);
+      if (tsize <= 0 ){
+	errorQuda("Error: invalid T grid size");
+      }
+      i++;
+      continue;
+    }
+  }
+
+  int ndim=4, dims[] = {1, 1, 1, tsize};
+  initCommsQuda(argc, argv, dims, ndim);
 
   init();
 
@@ -429,4 +439,6 @@ int main(int argc, char **argv)
     cpuColorSpinorField::Compare(*spinorRef, *spinorOut);
   }    
   end();
+
+  endCommsQuda();
 }

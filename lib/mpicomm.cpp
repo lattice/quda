@@ -285,8 +285,8 @@ comm_recv(void* buf, int len, int src)
     comm_exit(1);
   }
   
-  int srcproc;
-  int recvtag; //recvtag is opposite to the sendtag
+  int srcproc=-1;
+  int recvtag=-1; //recvtag is opposite to the sendtag
   if (src == BACK_NBR){
     srcproc = back_nbr;
     recvtag = FWD_NBR;

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 #include <test_util.h>
 #include <blas_reference.h>
@@ -16,16 +17,28 @@
 
 int main(int argc, char **argv)
 {
-  // Initialize QMP if multi-GPU is enabled.
 
-#ifdef QMP_COMMS
-  int ndim=4, dims[4];
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-  dims[0] = dims[1] = dims[2] = 1;
-  dims[3] = QMP_get_number_of_nodes();
-  QMP_declare_logical_topology(dims, ndim);
-#endif
+  int i;
+  int tsize = 1; // defaults to 1
+  for (i =1;i < argc; i++){
+    if( strcmp(argv[i], "--tgridsize") == 0){
+      if (i+1 >= argc){
+	printf("Usage: %s <args>\n", argv[0]);
+	printf("--tgridsize \t Set T comms grid size (default = 1)\n"); 
+	exit(1);
+      }     
+      tsize =  atoi(argv[i+1]);
+      if (tsize <= 0 ){
+	printf("Error: invalid T grid size");
+	exit(1);
+      }
+      i++;
+      continue;
+    }
+  }
+
+  int ndim=4, dims[] = {1, 1, 1, tsize};
+  initCommsQuda(argc, argv, dims, ndim);
 
   // *** QUDA parameters begin here.
 
@@ -275,8 +288,8 @@ int main(int argc, char **argv)
   // finalize the QUDA library
   endQuda();
 
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#endif
+  // end if the communications layer
+  endCommsQuda();
+
   return 0;
 }

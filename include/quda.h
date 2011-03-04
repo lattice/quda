@@ -165,6 +165,10 @@ extern int verbose;
 #define PRINTF printf
 #endif
 
+  // Initializes a communications world
+  void initCommsQuda(int argc, char **argv, const int *X, const int nDim);
+  // Ends a communications world
+  void endCommsQuda();
 
 #ifdef __cplusplus
 }
