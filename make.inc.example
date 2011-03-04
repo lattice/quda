@@ -84,6 +84,7 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
+  FACE_COMMS=face_qmp.o
 endif
  
 ifeq ($(strip $(BUILD_MPI)), yes)
@@ -93,10 +94,11 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_CFLAGS = 
   MPI_LDFLAGS =
   MPI_LIBS = 
-  INC += -DMPI_COMMS $(MPI_CFLAGS)
+  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
-  EXCHANGE_FACE=exchange_face.o
-  MPICOMM=mpicomm.o
+  FACE_COMMS=face_mpi.o mpicomm.o
+else
+  FACE_COMMS=face_qmp.o
 endif
 
 ifeq ($(strip $(OVERLAP_COMMS)), yes)
