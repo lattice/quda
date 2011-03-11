@@ -405,6 +405,10 @@ double dslashCUDA() {
 
 void staggeredDslashRef()
 {
+#ifndef MULTI_GPU
+  int cpu_parity = 0;
+#endif
+
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
   fflush(stdout);
@@ -416,7 +420,7 @@ void staggeredDslashRef()
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
-    int cpu_parity = 0; //EVEN
+    cpu_parity = 0; //EVEN
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
 		     inv_param.cpu_prec, gaugeParam.cpu_prec);
     

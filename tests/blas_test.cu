@@ -7,12 +7,12 @@
 
 #include <test_util.h>
 
-// volume per GPU
-const int LX = 12; // Has to be checkerboarded value... (so 24->12)
+// volume per GPU (full lattice dimensions)
+const int LX = 24;
 const int LY = 24;
 const int LZ = 24;
 const int LT = 24;
-const int Nspin = 1;
+const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
 const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
@@ -26,7 +26,7 @@ const int GridMax = 65536;
 cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
 
-// defines blas_threads[][] and blas_blocks[][]
+// defines blas_threads and blas_blocks
 #include "../lib/blas_param.h"
 
 
@@ -59,13 +59,15 @@ void initFields(int prec)
   param.nColor = 3;
   param.nSpin = Nspin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   param.nDim = 4; // number of spacetime dimensions
-  param.x[0] = LX;
+
+  param.pad = 0; // padding must be zero for cpu fields
+  param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) param.x[0] = LX/2;
+  else param.x[0] = LX;
   param.x[1] = LY;
   param.x[2] = LZ;
   param.x[3] = LT;
 
-  param.pad = 0; // padding must be zero for cpu fields
-  param.siteSubset = QUDA_PARITY_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   param.precision = QUDA_DOUBLE_PRECISION;
@@ -532,14 +534,8 @@ void write(char *names[], int threads[][3], int blocks[][3])
 int main(int argc, char** argv)
 {
 
-#ifdef QMP_COMMS
-  int ndim=4, dims[4];
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-  dims[0] = dims[1] = dims[2] = 1;
-  dims[3] = QMP_get_number_of_nodes();
-  QMP_declare_logical_topology(dims, ndim);
-#endif
+  int ndim=4, dims[] = {1, 1, 1, 1};
+  initCommsQuda(argc, argv, dims, ndim);
 
   int dev = 0;
   if (argc == 2) dev = atoi(argv[1]);
@@ -580,17 +576,6 @@ int main(int argc, char** argv)
   int Nprec = 2;
 #endif
 
-  // first check for correctness
-  for (int prec = 0; prec < Nprec; prec++) {
-    printf("\nTesting %s precision...\n\n", prec_str[prec]);
-    initFields(prec);
-    for (int kernel = 0; kernel < Nkernels; kernel++) {
-      double error = test(kernel);
-      printfQuda("%-35s error = %e, \n", names[kernel], error);
-    }
-    freeFields();
-  }
-
   int niter = Niter;
 
   for (int prec = 0; prec < Nprec; prec++) {
@@ -599,8 +584,6 @@ int main(int argc, char** argv)
     initFields(prec);
 
     for (int kernel = 0; kernel < Nkernels; kernel++) {
-
-      test(kernel);
 
       double gflops_max = 0.0;
       double gbytes_max = 0.0;
@@ -673,11 +656,22 @@ int main(int argc, char** argv)
     niter /= 2; 
     if (niter==0) niter = 1;
   }
+
+  // lastly check for correctness
+  for (int prec = 0; prec < Nprec; prec++) {
+    printf("\nTesting %s precision...\n\n", prec_str[prec]);
+    initFields(prec);
+    for (int kernel = 0; kernel < Nkernels; kernel++) {
+      // only benchmark "high precision" copyCuda() if double is supported
+      if ((Nprec < 3) && (kernel == 0)) continue;
+      double error = test(kernel);
+      printfQuda("%-35s error = %e, \n", names[kernel], error);
+    }
+    freeFields();
+  }
+
   write(names, blas_threads, blas_blocks);
   endQuda();
 
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#endif
-
+  endCommsQuda();
 }
