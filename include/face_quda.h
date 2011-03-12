@@ -4,12 +4,6 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
-#ifdef MULTI_GPU
-#ifdef MPI_COMMS
-#include <mpi.h>
-#endif
-#endif
-
 #ifndef MPI_COMMS
 
 class FaceBuffer {

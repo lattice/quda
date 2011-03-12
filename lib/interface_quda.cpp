@@ -14,8 +14,14 @@
 
 #include <color_spinor_field.h>
 
+#ifdef MULTI_GPU
+#ifdef MPI_COMMS
+#include <mpi.h>
+#endif
+
 #ifdef QMP_COMMS
 #include <qmp.h>
+#endif
 #endif
 
 #include "mpicomm.h"
