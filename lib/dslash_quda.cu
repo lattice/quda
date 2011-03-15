@@ -587,18 +587,18 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 #if (__CUDA_ARCH__ >= 130)
     domainWallDslashCuda<2>((double2*)out->v, (float*)out->norm, (double2*)gauge0, (double2*)gauge1, 
 			    gauge.reconstruct, (double2*)in->v, (float*)in->norm, dagger, 
-			    (double2*)xv, (float*)xnorm, m_f, k2, in->bytes, in->norm_bytes, block);
+			    (double2*)xv, (float*)xn, m_f, k2, in->bytes, in->norm_bytes, block);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->precision == QUDA_SINGLE_PRECISION) {
     domainWallDslashCuda<4>((float4*)out->v, (float*)out->norm, (float4*)gauge0, (float4*)gauge1, 
 			    gauge.reconstruct, (float4*)in->v, (float*)in->norm, dagger, 
-			    (float4*)xv, (float*)xnorm, m_f, k2, in->bytes, in->norm_bytes, block);
+			    (float4*)xv, (float*)xn, m_f, k2, in->bytes, in->norm_bytes, block);
   } else if (in->precision == QUDA_HALF_PRECISION) {
     domainWallDslashCuda<4>((short4*)out->v, (float*)out->norm, (short4*)gauge0, (short4*)gauge1, 
 			    gauge.reconstruct, (short4*)in->v, (float*)in->norm, dagger, 
-			    (short4*)xv, (float*)xnorm, m_f, k2, in->bytes, in->norm_bytes, block);
+			    (short4*)xv, (float*)xn, m_f, k2, in->bytes, in->norm_bytes, block);
   }
 
   unbindGaugeTex(gauge);
