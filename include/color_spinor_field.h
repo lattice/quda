@@ -326,9 +326,10 @@ class cudaColorSpinorField : public ColorSpinorField {
   static bool bufferInit;
   static size_t bufferBytes;
 
-  void* fwdGhostFaceBuffer[4]; //gpu memory
-  void* backGhostFaceBuffer[4]; //gpu memory
-  int initGhostFaceBuffer;
+  static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
+  static void* backGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
+  static int initGhostFaceBuffer;
+  static QudaPrecision facePrecision;
 
   void create(const QudaFieldCreate);
   void destroy();
