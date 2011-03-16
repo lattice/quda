@@ -8,14 +8,14 @@
 #include <test_util.h>
 
 // volume per GPU
-const int LX = 12; // Has to be checkerboarded value... (so 24->12)
-const int LY = 24;
-const int LZ = 24;
-const int LT = 24;
-const int Nspin = 1;
+const int LX = 8; // Has to be checkerboarded value... (so 24->12)
+const int LY = 16;
+const int LZ = 16;
+const int LT = 16;
+const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
-const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+const int Niter = 40 * (16*16*16*16*4) / (LX * LY * LZ * LT * Nspin);
 
 const int Nkernels = 23;
 const int ThreadMin = 32;
@@ -580,16 +580,6 @@ int main(int argc, char** argv)
   int Nprec = 2;
 #endif
 
-  // first check for correctness
-  for (int prec = 0; prec < Nprec; prec++) {
-    printf("\nTesting %s precision...\n\n", prec_str[prec]);
-    initFields(prec);
-    for (int kernel = 0; kernel < Nkernels; kernel++) {
-      double error = test(kernel);
-      printfQuda("%-35s error = %e, \n", names[kernel], error);
-    }
-    freeFields();
-  }
 
   int niter = Niter;
 
@@ -674,6 +664,18 @@ int main(int argc, char** argv)
     if (niter==0) niter = 1;
   }
   write(names, blas_threads, blas_blocks);
+
+  // first check for correctness
+  for (int prec = 0; prec < Nprec; prec++) {
+    printf("\nTesting %s precision...\n\n", prec_str[prec]);
+    initFields(prec);
+    for (int kernel = 0; kernel < Nkernels; kernel++) {
+      double error = test(kernel);
+      printfQuda("%-35s error = %e, \n", names[kernel], error);
+    }
+    freeFields();
+  }
+
   endQuda();
 
 #ifdef QMP_COMMS
