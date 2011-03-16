@@ -1177,9 +1177,9 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 
 }
 
-#ifdef GPU_STAGGERED_DIRAC
+
 #include "misc_helpers.cu"
-#endif
+
 
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 #include <force_common.h>

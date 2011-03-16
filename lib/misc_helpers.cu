@@ -363,6 +363,35 @@ collectGhostSpinor(void *in, const void *inNorm,
 	break;
       }
       break;
+
+    case 1:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+      
+    case 2:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+      
     case 3:
       switch(whichway){
       case QUDA_BACKWARDS:
@@ -396,6 +425,35 @@ collectGhostSpinor(void *in, const void *inNorm,
 	break;
       }
       break;
+
+    case 1:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+
+    case 2:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+
     case 3:
       switch(whichway){
       case QUDA_BACKWARDS:
@@ -411,7 +469,6 @@ collectGhostSpinor(void *in, const void *inNorm,
       break;
       
     }
-    
 
   }else{
     printf("ERROR: half precision not implemented yet for %s\n", __FUNCTION__);
