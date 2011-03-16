@@ -100,11 +100,16 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 				    int dagger, cudaStream_t *stream_p)
 {
   stream = stream_p;
-  
+
+  int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
+  int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
+  int uptags[4] = {XUP, YUP, ZUP, TUP};
+  int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+
   for(int dir = 0; dir  < 4; dir++){
     // Prepost all receives
-    recv_request1[dir] = comm_recv(pagable_back_nbr_spinor[dir], nbytes[dir], BACK_NBR);
-    recv_request2[dir] = comm_recv(pagable_fwd_nbr_spinor[dir], nbytes[dir], FWD_NBR);
+    recv_request1[dir] = comm_recv_with_tag(pagable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
+    recv_request2[dir] = comm_recv_with_tag(pagable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
     
     // gather for backwards send
     in.packGhost(back_nbr_spinor_sendbuf[dir], dir, QUDA_BACKWARDS, 
@@ -119,14 +124,19 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 void FaceBuffer::exchangeFacesComms() {
   cudaStreamSynchronize(stream[sendBackStrmIdx]); //required the data to be there before sending out
 
+  int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
+  int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
+  int uptags[4] = {XUP, YUP, ZUP, TUP};
+  int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+
   for(int dir = 0; dir < 4; dir++){
     memcpy(pagable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
-    send_request2[dir] = comm_send(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], BACK_NBR);
+    send_request2[dir] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
     
     cudaStreamSynchronize(stream[sendFwdStrmIdx]); //required the data to be there before sending out
     
     memcpy(pagable_fwd_nbr_spinor_sendbuf[dir], fwd_nbr_spinor_sendbuf[dir], nbytes[dir]);
-    send_request1[dir]= comm_send(pagable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], FWD_NBR);
+    send_request1[dir]= comm_send_with_tag(pagable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], fwd_nbr[dir], uptags[dir]);
   }
 } 
 

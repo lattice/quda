@@ -110,13 +110,12 @@ comm_partition(void)
   tid=(tgridid -1+tgridsize)%tgridsize;
   t_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
 
-  /*
-  printf("MPI rank: x_fwd_nbr=%d, x_back_nbr=%d\n", x_fwd_nbr, x_back_nbr);
-  printf("MPI rank: y_fwd_nbr=%d, y_back_nbr=%d\n", y_fwd_nbr, y_back_nbr);
-  printf("MPI rank: z_fwd_nbr=%d, z_back_nbr=%d\n", z_fwd_nbr, z_back_nbr);
-  printf("MPI rank: t_fwd_nbr=%d, t_back_nbr=%d\n", t_fwd_nbr, t_back_nbr);
-  */
+  printf("MPI rank: rank=%d, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, x_fwd_nbr, x_back_nbr);
+  printf("MPI rank: rank=%d, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, y_fwd_nbr, y_back_nbr);
+  printf("MPI rank: rank=%d, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, z_fwd_nbr, z_back_nbr);
+  printf("MPI rank: rank=%d, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, t_fwd_nbr, t_back_nbr);
 
+  
 }
 
 
@@ -176,8 +175,6 @@ comm_init()
     comm_exit(1);
   }
   
-  printf("rank=%d, back_neighbor=%d, fwd_nbr=%d, host=%s, use gpu=%d\n", 
-	 rank, back_nbr, fwd_nbr, hostname, which_gpu);
   srand(rank*999);
   
   free(hostname_recv_buf);

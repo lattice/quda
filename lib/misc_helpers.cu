@@ -408,9 +408,7 @@ collectGhostSpinor(void *in, const void *inNorm,
 
       
     }
-    //staggeredCollectGhostSpinorKernel<dir, whichway><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu);
   }else if(inSpinor->Precision() == QUDA_SINGLE_PRECISION){
-    //staggeredCollectGhostSpinorKernel<dir, whichway><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu);
     switch(dir){
     case 0:
       switch(whichway){
