@@ -1,2 +1,5 @@
 *.o
 *.a
+*~
+tests/*_test
+make.inc
