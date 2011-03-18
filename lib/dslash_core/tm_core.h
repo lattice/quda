@@ -262,7 +262,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    float4 I4 = tex1Dfetch(spinorTexHalf, sid + 4 * sp_stride);   
    float4 I5 = tex1Dfetch(spinorTexHalf, sid + 5 * sp_stride);
    
-   float C = tex1Dfetch(spinorTexNorm, sid);
+   float C = tex1Dfetch(spinorTexHalfNorm, sid);
    
    I0 = C * I0;
    I1 = C * I1;

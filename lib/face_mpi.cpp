@@ -175,7 +175,7 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
 }
 
 
-void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace) {
+void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
   int uptags[4] = {XUP, YUP, ZUP,TUP};
   int fwd_nbrs[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
   int back_nbrs[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};

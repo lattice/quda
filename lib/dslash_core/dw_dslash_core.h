@@ -270,7 +270,7 @@ o32_re = o32_im = 0;
     //J  ugly code repetition. ***
     if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
       // gauge field same parity.
-      READ_GAUGE_MATRIX(GAUGE0TEX, 0);
+      READ_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride);
         // read spinor from device memory
       READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -348,7 +348,7 @@ o32_re = o32_im = 0;
     
     } else {
       // gauge field opposite parity.
-      READ_GAUGE_MATRIX(GAUGE1TEX, 0);
+      READ_GAUGE_MATRIX(G, GAUGE1TEX, 0, ga_idx, ga_stride);
         // read spinor from device memory
       READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -448,7 +448,7 @@ o32_re = o32_im = 0;
     // I.e., parity is handled by having 2 bindings.
     if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
       // gauge field opposite parity.
-      READ_GAUGE_MATRIX(GAUGE1TEX, 1);
+      READ_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, ga_stride);
     // read spinor from device memory
     //J  The relevant code from io_spinor.h.
     //J  Which one to use is determined near Line 105
@@ -519,7 +519,7 @@ o32_re = o32_im = 0;
     o32_im -= A2_re;
     } else {
       // gauge field same parity.
-      READ_GAUGE_MATRIX(GAUGE0TEX, 1);
+      READ_GAUGE_MATRIX(G, GAUGE0TEX, 1, ga_idx, ga_stride);
     // read spinor from device memory
     //J  The relevant code from io_spinor.h.
     //J  Which one to use is determined near Line 105
@@ -606,7 +606,7 @@ o32_re = o32_im = 0;
     // read gauge matrix from device memory
     if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
       // gauge field same parity.
-      READ_GAUGE_MATRIX(GAUGE0TEX, 2);
+      READ_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -674,7 +674,7 @@ o32_re = o32_im = 0;
     o32_im -= A2_im;
     } else {
       // gauge field opposite parity.
-      READ_GAUGE_MATRIX(GAUGE1TEX, 2);
+      READ_GAUGE_MATRIX(G, GAUGE1TEX, 2, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -759,7 +759,7 @@ o32_re = o32_im = 0;
     // read gauge matrix from device memory
     if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
       // gauge field opposite parity.
-      READ_GAUGE_MATRIX(GAUGE1TEX, 3);
+      READ_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -828,7 +828,7 @@ o32_re = o32_im = 0;
     
     } else {
       // gauge field same parity.
-      READ_GAUGE_MATRIX(GAUGE0TEX, 3);
+      READ_GAUGE_MATRIX(G, GAUGE0TEX, 3, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -913,7 +913,7 @@ o32_re = o32_im = 0;
     // read gauge matrix from device memory
     if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
       // gauge field same parity.
-      READ_GAUGE_MATRIX(GAUGE0TEX, 4);
+      READ_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -981,7 +981,7 @@ o32_re = o32_im = 0;
     o32_im -= B2_re;
     } else {
       // gauge field opp parity.
-      READ_GAUGE_MATRIX(GAUGE1TEX, 4);
+      READ_GAUGE_MATRIX(G, GAUGE1TEX, 4, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -1066,7 +1066,7 @@ o32_re = o32_im = 0;
     // read gauge matrix from device memory
     if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
       // gauge field opposite parity.
-      READ_GAUGE_MATRIX(GAUGE1TEX, 5);
+      READ_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -1135,7 +1135,7 @@ o32_re = o32_im = 0;
     
     } else {
       // gauge field same parity.
-      READ_GAUGE_MATRIX(GAUGE0TEX, 5);
+      READ_GAUGE_MATRIX(G, GAUGE0TEX, 5, ga_idx, ga_stride);
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -1264,7 +1264,7 @@ o32_re = o32_im = 0;
         // read gauge matrix from device memory
         if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
           // gauge field same parity.
-          READ_GAUGE_MATRIX(GAUGE0TEX, 6);
+          READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
         // read spinor from device memory
         READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
         
@@ -1321,7 +1321,7 @@ o32_re = o32_im = 0;
         
         } else {
           // gauge field opp parity.
-          READ_GAUGE_MATRIX(GAUGE1TEX, 6);
+          READ_GAUGE_MATRIX(G, GAUGE1TEX, 6, ga_idx, ga_stride);
         // read spinor from device memory
         READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
         
@@ -1439,7 +1439,7 @@ o32_re = o32_im = 0;
         // read gauge matrix from device memory
         if ( !( (boundaryCrossings-boundaryCrossings4d) % 2) ) {
           // gauge field opposite parity.
-          READ_GAUGE_MATRIX(GAUGE1TEX, 7);
+          READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
         
@@ -1495,7 +1495,7 @@ o32_re = o32_im = 0;
         o12_im += B2_im;
         } else {
           // gauge field same parity.
-          READ_GAUGE_MATRIX(GAUGE0TEX, 7);
+          READ_GAUGE_MATRIX(G, GAUGE0TEX, 7, ga_idx, ga_stride);
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
         

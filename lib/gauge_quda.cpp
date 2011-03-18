@@ -831,9 +831,8 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge,
 
   packGhost((Float**)cpuGauge, sendLink, nFace); // pack the ghost zones into a contiguous buffer
 
-  int dummyFace = 1;
-  FaceBuffer face(X, 4, 18, dummyFace, QudaPrecision(sizeof(Float))); // this is the precision of the CPU field
-  face.exchangeCpuLink((void**)ghostLink, (void**)sendLink, nFace);
+  FaceBuffer face(X, 4, 18, nFace, QudaPrecision(sizeof(Float))); // this is the precision of the CPU field
+  face.exchangeCpuLink((void**)ghostLink, (void**)sendLink);
 
   packQDPGaugeField(packedEven, ghostLink, 0, reconstruct, Vh,
 		    faceVolumeCB, pad, Vh, nFace, type);

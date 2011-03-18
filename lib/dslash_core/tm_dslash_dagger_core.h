@@ -223,7 +223,7 @@ o32_re = o32_im = 0;
     int ga_idx = sid;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(GAUGE0TEX, 0);
+    READ_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride);
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
@@ -376,7 +376,7 @@ o32_re = o32_im = 0;
     int ga_idx = sp_idx;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(GAUGE1TEX, 1);
+    READ_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, ga_stride);
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
@@ -529,7 +529,7 @@ o32_re = o32_im = 0;
     int ga_idx = sid;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(GAUGE0TEX, 2);
+    READ_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride);
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
@@ -682,7 +682,7 @@ o32_re = o32_im = 0;
     int ga_idx = sp_idx;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(GAUGE1TEX, 3);
+    READ_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, ga_stride);
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
@@ -835,7 +835,7 @@ o32_re = o32_im = 0;
     int ga_idx = sid;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(GAUGE0TEX, 4);
+    READ_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride);
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
@@ -988,7 +988,7 @@ o32_re = o32_im = 0;
     int ga_idx = sp_idx;
     
     // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(GAUGE1TEX, 5);
+    READ_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, ga_stride);
     
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
@@ -1211,7 +1211,7 @@ o32_re = o32_im = 0;
     }
     else {
         // read gauge matrix from device memory
-        READ_GAUGE_MATRIX(GAUGE0TEX, 6);
+        READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
         
         // read spinor from device memory
         READ_SPINOR_UP(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);
@@ -1424,7 +1424,7 @@ o32_re = o32_im = 0;
     }
     else {
         // read gauge matrix from device memory
-        READ_GAUGE_MATRIX(GAUGE1TEX, 7);
+        READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
         
         // read spinor from device memory
         READ_SPINOR_DOWN(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);

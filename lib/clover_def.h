@@ -29,7 +29,7 @@
 #define DD_PREC_F D
 #define DD_PARAM1 double2* out, float *null1
 #define DD_PARAM3 const double2* in, const float *null3
-#define READ_SPINOR READ_SPINOR_DOUBLE
+#define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define SPINORTEX spinorTexDouble
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
@@ -41,7 +41,7 @@
 #define DD_PREC_F S
 #define DD_PARAM1 float4* out, float *null1
 #define DD_PARAM3 const float4* in, const float *null3
-#define READ_SPINOR READ_SPINOR_SINGLE
+#define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define SPINORTEX spinorTexSingle
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY==1)
@@ -50,7 +50,7 @@
 #endif
 #else            // half-precision spinor field
 #define DD_PREC_F H
-#define READ_SPINOR READ_SPINOR_HALF
+#define READ_SPINOR READ_SPINOR_HALF_TEX
 #define SPINORTEX spinorTexHalf
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm

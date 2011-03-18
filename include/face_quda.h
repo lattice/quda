@@ -63,7 +63,7 @@ class FaceBuffer {
 
   void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
 
-  void exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace);
+  void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
 };
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
@@ -135,7 +135,7 @@ class FaceBuffer {
 
   void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
 
-  void exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace);
+  void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
 };
 
 void reduceDouble(double &);

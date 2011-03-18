@@ -291,24 +291,6 @@ double2 __device__ make_Float2(double2 x) {
   float2 a##2 = tex1Dfetch(tex, i + 2*length);				\
   float a##c = a##N[i];
 
-#define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5)
-#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
-
-__device__ short float2short(float c, float a) {
-  //return (short)(a*MAX_SHORT);
-  short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
-  return rtn;
-}
-
-__device__ float short2float(short a) {
-  return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
-}
-
-__device__ short4 float42short4(float c, float4 a) {
-  return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));
-}
-
 #define FAST_ABS_MAX(a, b) fmaxf(fabsf(a), fabsf(b));
 #define FAST_MAX(a, b) fmaxf(a, b);
 
@@ -2206,7 +2188,7 @@ void caxpbypzYmbwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &
   if (!blasTuning) checkCudaError();
 }
 
-
+#if (__CUDA_ARCH__ < 130)
 // Computes c = a + b in "double single" precision.
 __device__ void dsadd(volatile QudaSumFloat &c0, volatile QudaSumFloat &c1, const volatile QudaSumFloat &a0, 
 		      const volatile QudaSumFloat &a1, const float b0, const float b1) {
@@ -2266,6 +2248,7 @@ __device__ void dsadd3(volatile QudaSumFloat3 &c0, volatile QudaSumFloat3 &c1, c
   c0.z = e = t1 + t2;
   c1.z = t2 - (e - t1);
 }
+#endif
 
 //
 // double normCuda(float *a, int n) {}

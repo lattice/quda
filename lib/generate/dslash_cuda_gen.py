@@ -443,7 +443,7 @@ def gen(dir):
 
     load_gauge = []
     load_gauge.append("// read gauge matrix from device memory\n")
-    load_gauge.append("READ_GAUGE_MATRIX(GAUGE"+`dir%2`+"TEX, "+`dir`+");\n\n")
+    load_gauge.append("READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n")
 
     reconstruct_gauge = []
     reconstruct_gauge.append("// reconstruct gauge matrix\n")

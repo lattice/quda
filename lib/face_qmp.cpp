@@ -366,7 +366,7 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
 #endif
 }
 
-void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf, int nFace) {
+void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
 
 #ifdef QMP_COMMS
 
