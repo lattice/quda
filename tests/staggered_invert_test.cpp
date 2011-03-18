@@ -223,10 +223,19 @@ invert_test(void)
   pack_ghost(fatlink, fat_send, 1, gaugeParam.cpu_prec);
   pack_ghost(longlink, long_send, 3, gaugeParam.cpu_prec);
 
-  int dummyFace = 1;
-  FaceBuffer faceBuf (Z, 4, 18, dummyFace, gaugeParam.cpu_prec);
-  faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
-  faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
+  printf("CPU Link Exchange started\n");
+
+  {
+    FaceBuffer faceBuf(Z, 4, 18, 1, gaugeParam.cpu_prec);
+    faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send);
+  }
+
+  {    
+    FaceBuffer faceBuf(Z, 4, 18, 3, gaugeParam.cpu_prec);
+    faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send);
+  }
+
+  printf("CPU Link Exchange finished\n");
 
   for (int i=0; i<4; i++) {
     free(fat_send[i]);

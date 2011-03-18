@@ -214,13 +214,17 @@ void init()
 
   printf("CPU Link Exchange started\n");
 
-  int dummyFace = 1;
-  FaceBuffer faceBuf(X, 4, 18, dummyFace, gaugeParam.cpu_prec);
-  printf("Constructor done\n");
-  faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send, 1);
-  printf("CPU Link Exchange 1 complete\n");
-  faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send, 3);
-  printf("CPU Link Exchange 2 complete\n");
+  {
+    FaceBuffer faceBuf(X, 4, 18, 1, gaugeParam.cpu_prec);
+    faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send);
+  }
+
+  {    
+    FaceBuffer faceBuf(X, 4, 18, 3, gaugeParam.cpu_prec);
+    faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send);
+  }
+
+  printf("CPU Link Exchange finished\n");
 
   for (int i=0; i<4; i++) {
     free(fat_send[i]);
