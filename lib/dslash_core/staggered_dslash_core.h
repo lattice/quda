@@ -430,7 +430,7 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 #endif
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x1 < X1 -3)|| (tLocate.y == EXTERIOR_KERNEL_X && x1 >= X1 -3))
+if ( (tLocate.y == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1 -3) )|| (tLocate.y == EXTERIOR_KERNEL_X && x1 >= X1 -3))
   //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
 {
@@ -455,7 +455,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x1 < X1 -3)|| (tLocate.y == EXTERIOR_KERNE
     int stride1 = sp_stride;
     int stride3 = sp_stride;    
 #ifdef MULTI_GPU
-    if (tLocate.y == EXTERIOR_KERNEL_X){
+    if ( (tLocate.y == EXTERIOR_KERNEL_X)){
       int space_con = (x4*X3*X2+x3*X2+x2)/2;
       
       if (x1 + 1 >= X1){
@@ -496,7 +496,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x1 < X1 -3)|| (tLocate.y == EXTERIOR_KERNE
 }
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x1 >= 3) || (tLocate.y == EXTERIOR_KERNEL_X && x1 < 3))
+if ( (tLocate.y == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 3)) || (tLocate.y == EXTERIOR_KERNEL_X && x1 < 3))
 //if ( (tLocate.y == INTERIOR_KERNEL))
 #endif
 {
@@ -578,7 +578,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x1 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x2 < X2 -3)|| (tLocate.y == EXTERIOR_KERNEL_Y && x2 >= X2 -3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2 -3))|| (tLocate.y == EXTERIOR_KERNEL_Y && x2 >= X2 -3))
   //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
 {
@@ -646,7 +646,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x2 < X2 -3)|| (tLocate.y == EXTERIOR_KERNE
 }
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x2 >= 3) || (tLocate.y == EXTERIOR_KERNEL_Y && x2 < 3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 3)) || (tLocate.y == EXTERIOR_KERNEL_Y && x2 < 3))
   //if ( (tLocate.y == INTERIOR_KERNEL))
 #endif
 {
@@ -729,7 +729,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x2 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x3 < X3 -3)|| (tLocate.y == EXTERIOR_KERNEL_Z && x3 >= X3 -3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| (tLocate.y == EXTERIOR_KERNEL_Z && x3 >= X3 -3))
 //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
 {
@@ -799,7 +799,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x3 < X3 -3)|| (tLocate.y == EXTERIOR_KERNE
 }
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x3 >= 3) || (tLocate.y == EXTERIOR_KERNEL_Z && x3 < 3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 3)) || (tLocate.y == EXTERIOR_KERNEL_Z && x3 < 3))
   //if ( (tLocate.y == INTERIOR_KERNEL))
 #endif
 {
@@ -889,7 +889,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x3 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 //    exterior kernel and x4 >= X4 -3
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < X4 -3))||
      (tLocate.y == EXTERIOR_KERNEL_T && x4 >= X4 -3))
 #endif
 
@@ -961,7 +961,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
 //or 
 //  exterior kernel and x4 < 3  
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 3)) ||
      (tLocate.y == EXTERIOR_KERNEL_T && x4 < 3))
 #endif
 {

@@ -273,12 +273,18 @@ void init()
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /=2;
     }
-	
-    for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
+#ifdef MULTI_GPU	
+    for (int d=0; d<4; d++) {
+      csParam.ghostDim[d] = comm_dim_partitioned(d);
+    }
+#else  
+    for (int d=0; d<4; d++) csParam.ghostDim[d] = false;
     csParam.ghostDim[0] = true;
     csParam.ghostDim[1] = true;
     csParam.ghostDim[2] = true;
     csParam.ghostDim[3] = true;
+
+#endif
 
     printfQuda("Creating cudaSpinor\n");
     cudaSpinor = new cudaColorSpinorField(csParam);
@@ -414,11 +420,11 @@ void staggeredDslashRef()
   fflush(stdout);
   switch (test_type) {
   case 0:    
-#ifdef MULTI_GPU    
+#ifdef MULTI_GPU
+
     staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
 			    spinor, parity, dagger,
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);
-
 #else
     cpu_parity = 0; //EVEN
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
@@ -512,6 +518,13 @@ void display_test_info()
   printfQuda("%s   %s       %d           %d       %d        %d \n", 
 	     get_prec_str(prec), get_recon_str(link_recon), 
 	     test_type, dagger, sdim, tdim);
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
+	     comm_dim_partitioned(0),
+	     comm_dim_partitioned(1),
+	     comm_dim_partitioned(2),
+	     comm_dim_partitioned(3));
+
   return ;
     
 }
@@ -664,7 +677,19 @@ int main(int argc, char **argv)
       i++;
       continue;
     }
-
+    if( strcmp(argv[i], "--manual_set_partition") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      int value  =  atoi(argv[i+1]);
+      for(int j=0; j < 4;j++){
+	if (value &  (1 << j)){
+	  comm_dim_partitioned_set(j);
+	}
+      }
+      i++;
+      continue;
+    }
 
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);

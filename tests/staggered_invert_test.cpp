@@ -146,10 +146,9 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-  inv_param->ghostDim[0] = true;
-  inv_param->ghostDim[1] = true;
-  inv_param->ghostDim[2] = true;
-  inv_param->ghostDim[3] = true;
+  for(int i =0;i < 4;i++){
+    inv_param->ghostDim[i] = comm_dim_partitioned(i);
+  }
 
 }
 
@@ -513,6 +512,14 @@ display_test_info()
 	 get_prec_str(prec),get_prec_str(prec_sloppy),
 	 get_recon_str(link_recon), 
 	 get_recon_str(link_recon_sloppy), get_test_type(testtype), sdim, tdim);     
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
+	     comm_dim_partitioned(0),
+	     comm_dim_partitioned(1),
+	     comm_dim_partitioned(2),
+	     comm_dim_partitioned(3)); 
+  
   return ;
   
 }
@@ -700,6 +707,20 @@ int main(int argc, char** argv)
       tsize =  atoi(argv[i+1]);
       if (tsize <= 0 ){
         errorQuda("Error: invalid T grid size");
+      }
+      i++;
+      continue;
+    }
+
+    if( strcmp(argv[i], "--manual_set_partition") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      int value  =  atoi(argv[i+1]);
+      for(int j=0; j < 4;j++){
+	if (value &  (1 << j)){
+	  comm_dim_partitioned_set(j);
+	}
       }
       i++;
       continue;

@@ -17,23 +17,26 @@ extern "C" {
 #define Z_FWD_NBR  7
 #define T_FWD_NBR  8
 
-void            comm_set_gridsize(int x, int y, int z, int t);
-void		comm_init(void);
-int		comm_rank(void);
-int		comm_size(void);
-unsigned long	comm_send(void*, int, int);
-unsigned long   comm_send_with_tag(void*, int, int, int);
-unsigned long	comm_recv(void*, int, int);
-unsigned long   comm_recv_with_tag(void*, int, int, int);
-void		comm_wait(unsigned long);
-void		comm_allreduce(double* data);
-void		comm_allreduce_array(double* data, size_t size);
-void		comm_allreduce_max(double* data);
-void		comm_barrier(void);
-void		comm_exit(int);
-void		comm_cleanup(void);
-int		comm_gpuid();
-
+  void            comm_set_gridsize(int x, int y, int z, int t);
+  int		comm_dim_partitioned(int dir);
+  /*testing/debugging use only */
+  void		comm_dim_partitioned_set(int dir);
+  void		comm_init(void);
+  int		comm_rank(void);
+  int		comm_size(void);
+  unsigned long	comm_send(void*, int, int);
+  unsigned long   comm_send_with_tag(void*, int, int, int);
+  unsigned long	comm_recv(void*, int, int);
+  unsigned long   comm_recv_with_tag(void*, int, int, int);
+  void		comm_wait(unsigned long);
+  void		comm_allreduce(double* data);
+  void		comm_allreduce_array(double* data, size_t size);
+  void		comm_allreduce_max(double* data);
+  void		comm_barrier(void);
+  void		comm_exit(int);
+  void		comm_cleanup(void);
+  int		comm_gpuid();
+  
 #ifdef __cplusplus
 }
 #endif

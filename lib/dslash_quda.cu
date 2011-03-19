@@ -706,6 +706,13 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
   };
   for(int i=0 ;i < 4;i++){
+#ifdef MPI_COMMS
+    if(!comm_dim_partitioned(i)){
+      continue;
+    }
+#else
+    //QMP case here
+#endif
     initTLocation(dims[i]-6, exterior_kernel_flag[i] , 6*Vsh[i]);  
     if (x==0) { // not doing xpay
       if (reconstruct == QUDA_RECONSTRUCT_12) {
@@ -813,6 +820,14 @@ template <int spinorN, typename spinorFloat, typename fatGaugeFloat, typename lo
 
   int exterior_kernel_flag[4]={EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T};
   for(int i=0; i< 4; i++){
+#ifdef MPI_COMMS
+    if(!comm_dim_partitioned(i)){
+      continue;
+    }
+#else
+    //QMP case here
+#endif
+
     initTLocation(dims[i] -6,exterior_kernel_flag[i] , 6*Vsh[i]);  
     if (x==0) { // not doing xpay
       if (!dagger) {

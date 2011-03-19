@@ -32,6 +32,8 @@ static int ygridid = -1;
 static int zgridid = -1;
 static int tgridid = -1;
 
+static int manual_set_partition[4] ={0, 0, 0, 0};
+
 void
 comm_set_gridsize(int x, int y, int z, int t)
 {
@@ -43,6 +45,48 @@ comm_set_gridsize(int x, int y, int z, int t)
   return;
 }
 
+/* This function is for and testing debugging purpose only
+ * The partitioning schedume should be generated automically 
+ * in production runs. Don't use this function if you don't know
+ * what you are doing
+ */
+void
+comm_dim_partitioned_set(int dir)
+{
+  manual_set_partition[dir] = 1;
+  return;
+}
+
+
+int 
+comm_dim_partitioned(int dir)
+{
+  int ret = 0;
+  
+  switch(dir){
+  case 0: 
+    ret = (xgridsize > 1);    
+    break;
+  case 1: 
+    ret = (ygridsize > 1);
+    break;
+  case 2: 
+    ret = (zgridsize > 1);
+    break;
+  case 3: 
+    ret = (tgridsize > 1);
+    break;    
+  defaut:
+    printf("ERROR: invalid direction\n");
+    comm_exit(1);
+  }
+  
+  if( manual_set_partition[dir]){
+    ret = manual_set_partition[dir];
+  }
+  
+  return ret;
+}
 
 static void
 comm_partition(void)
