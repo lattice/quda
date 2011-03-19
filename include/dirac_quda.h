@@ -56,7 +56,7 @@ class Dirac {
   friend class DiracMdagM;
   friend class DiracMdag;
 
- protected:
+  protected:
   FullGauge &gauge;
   double kappa;
   double mass;

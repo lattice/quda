@@ -190,7 +190,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
 
   double anisotropy;
-  FullGauge *precise, *sloppy;
+  FullGauge *precise = NULL, *sloppy = NULL;
 
   checkGaugeParam(param);
 
@@ -731,6 +731,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
 void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) {
   if (!diracCreation) {
+    printf("creating dirac object\n");
     setDiracParam(diracParam, &param, pc_solve);
     d = Dirac::create(diracParam); // create the Dirac operator    
     setDiracSloppyParam(diracParam, &param, pc_solve);
@@ -1064,38 +1065,50 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
 void endInvertQuda() {
   if (diracCreation) {
-    delete d;
-    delete dSloppy;
+    if (d){
+      delete d;
+      d = NULL;
+    }
+    
+    if (dSloppy){
+      delete dSloppy;
+      dSloppy = NULL;
+    }
+
     diracCreation = false;
     diracTune = false;
   }
 }
 
 
-/************************************** Mixed precision multishift CG solver ****************************/
+/************************************** Ugly Mixed precision multishift CG solver ****************************/
 
 static void* fatlink;
-static void* ghost_fatlink;
 static int fatlink_pad;
 static void* longlink;
-static void* ghost_longlink;
 static int longlink_pad;
 static QudaReconstructType longlink_recon;
 static QudaReconstructType longlink_recon_sloppy;
 static QudaGaugeParam* gauge_param;
 
 void 
-record_gauge(void *_fatlink, void* _ghost_fatlink, int _fatlink_pad, 
-	     void* _longlink, void* _ghost_longlink, int _longlink_pad, 
-	     QudaReconstructType _longlink_recon,QudaReconstructType _longlink_recon_sloppy,
+record_gauge(int* X, void *_fatlink, int _fatlink_pad, void* _longlink, int _longlink_pad, 
+	     QudaReconstructType _longlink_recon, QudaReconstructType _longlink_recon_sloppy,
 	     QudaGaugeParam *_param)
 {
+  
+  //the X and precsion in fatlink must be set because we use them in dirac creatation
+  //See dirac_staggered.cpp
+  for(int i =0;i < 4;i++){
+    cudaFatLinkPrecise.X[i]= cudaFatLinkSloppy.X[i] = X[i];
+  }
+  cudaFatLinkPrecise.precision = _param->cuda_prec;
+  cudaFatLinkSloppy.precision = _param->cuda_prec_sloppy;
+
   fatlink = _fatlink;
-  ghost_fatlink = _ghost_fatlink;
   fatlink_pad = _fatlink_pad;
   
   longlink = _longlink;
-  ghost_longlink = _ghost_longlink;
   longlink_pad = _longlink_pad;
   longlink_recon = _longlink_recon;
   longlink_recon_sloppy = _longlink_recon_sloppy;
@@ -1112,7 +1125,11 @@ do_create_precise_cuda_gauge(void)
 {
   QudaPrecision prec = gauge_param->cuda_prec;
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;
-  
+
+  //the sloppy gauge field will be filled, and needs to backup
+  FullGauge tmp_fat = cudaFatLinkSloppy;
+  FullGauge tmp_long= cudaLongLinkSloppy;
+
   //create precise links
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec;
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
@@ -1131,6 +1148,9 @@ do_create_precise_cuda_gauge(void)
   gauge_param->cuda_prec = prec;
   gauge_param->cuda_prec_sloppy =prec_sloppy;
   
+  //set the sloopy gauge filed back
+  cudaFatLinkSloppy = tmp_fat;
+  cudaLongLinkSloppy = tmp_long;
   return;
 }
 
@@ -1140,6 +1160,10 @@ do_create_sloppy_cuda_gauge(void)
   QudaPrecision prec = gauge_param->cuda_prec;
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;  
 
+  //the precise gauge field will be filled, and needs to backup
+  FullGauge tmp_fat = cudaFatLinkPrecise;
+  FullGauge tmp_long= cudaLongLinkPrecise;
+  
   //create sloppy links
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec_sloppy; 
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
@@ -1157,32 +1181,63 @@ do_create_sloppy_cuda_gauge(void)
   gauge_param->cuda_prec = prec;
   gauge_param->cuda_prec_sloppy =prec_sloppy;
   
+  //set the sloopy gauge filed back
+  cudaFatLinkPrecise = tmp_fat;
+  cudaLongLinkPrecise = tmp_long;  
   return;
 }
+
 
 void 
 invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
 
-  int i;
   QudaPrecision high_prec = param->cuda_prec;
-  QudaPrecision low_prec = param->cuda_prec_sloppy;
-  if (num_offsets <= 0){
-    return;
-  }
+  QudaPrecision low_prec=  param->cuda_prec_sloppy;
+  param->cuda_prec = param->cuda_prec_sloppy;
+  
+  do_create_sloppy_cuda_gauge();
 
-#ifdef MULTI_GPU   
-  do_create_sloppy_cuda_gauge();  
-#endif
+  checkInvertParam(param);
+  verbosity = param->verbosity;
+
+  // Are we doing a preconditioned solve */
+  /* What does NormEq solve mean in the shifted case? 
+   */
+  if (param->solve_type != QUDA_NORMEQ_PC_SOLVE &&
+      param->solve_type != QUDA_NORMEQ_SOLVE) { 
+    errorQuda("Direct solve_type is not supported in invertMultiShiftQuda()\n");
+  }
 
   bool pc_solve = (param->solve_type == QUDA_NORMEQ_PC_SOLVE);
 
-  //checkInvertParam(param);
+  // In principle one can do a MATPC Solution for a hermitian M_pc
+  // In practice most of the time I guess one will do a M^\dagger_pc M_pc solution.
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION ||
+		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION );
+
+  // No of GiB in a checkerboard of a spinor
+  param->spinorGiB = cudaGaugePrecise.volumeCB * spinorSiteSize;
+  if( !pc_solve) param->spinorGiB *= 2; // Double volume for non PC solve
+  
+  // **** WARNING *** this may not match implementation... 
+  if( param->inv_type == QUDA_CG_INVERTER ) { 
+    // CG-M needs 5 vectors for the smallest shift + 2 for each additional shift
+    param->spinorGiB *= (5 + 2*(num_offsets-1))/(double)(1<<30);
+  }
+  else {
+    // BiCGStab-M needs 7 for the original shift + 2 for each additional shift + 1 auxiliary
+    // (Jegerlehner hep-lat/9612014 eq (3.13)
+    param->spinorGiB *= (7 + 2*(num_offsets-1))/(double)(1<<30);
+  }
+
+  // Timing and FLOP counters
   param->secs = 0;
   param->gflops = 0;
   param->iter = 0;
   
+  // Find the smallest shift and its offset.
   double low_offset = offsets[0];
   int low_index = 0;
   for (int i=1;i < num_offsets;i++){
@@ -1192,12 +1247,17 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     }
   }
   
-  void* hp_x[num_offsets];
+  // Host pointers for x, take a copy of the input host pointers
+  void** hp_x;
+  hp_x = new void* [ num_offsets ];
+
   void* hp_b = _hp_b;
   for(int i=0;i < num_offsets;i++){
     hp_x[i] = _hp_x[i];
   }
   
+  // Now shift things so that the vector with the smallest shift 
+  // is in the first position of the array
   if (low_index != 0){
     void* tmp = hp_x[0];
     hp_x[0] = hp_x[low_index] ;
@@ -1207,125 +1267,143 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     offsets[0]= offsets[low_index];
     offsets[low_index] =tmp1;
   }
-  
-  
-  ColorSpinorParam csParam;
-  csParam.precision = param->cpu_prec;
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; 
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.nColor=3;
-  csParam.nSpin=1;
-  csParam.nDim=4;
-  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  
-  if (param->solve_type == QUDA_NORMEQ_SOLVE) {
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    csParam.x[0] = cudaFatLinkSloppy.X[0];
-  } else if (param->solve_type == QUDA_NORMEQ_PC_SOLVE) {
-    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-    csParam.x[0] = cudaFatLinkSloppy.X[0]/2; // gauge->X defines the full lattice volume 
-  } else {
-    errorQuda("Direct solve_type not supported for staggered");
+    
+  // Create the matrix.
+  // The way this works is that createDirac will create 'd' and 'dSloppy'
+  // which are global. We then grab these with references...
+  //
+  // Balint: Isn't there a  nice construction pattern we could use here? This is 
+  // expedient but yucky.
+  DiracParam diracParam; 
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH){
+    param->mass = sqrt(offsets[0]/4);  
   }
-
-  csParam.x[1] = cudaFatLinkSloppy.X[1];
-  csParam.x[2] = cudaFatLinkSloppy.X[2];
-  csParam.x[3] = cudaFatLinkSloppy.X[3];
-  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  csParam.v = hp_b;  
-  cpuColorSpinorField h_b(csParam);
-  
-  cpuColorSpinorField* h_x[num_offsets];
-  
-  for(i=0;i < num_offsets; i++){
-    csParam.v = hp_x[i];
-    h_x[i] = new cpuColorSpinorField(csParam);
-  }
-  
-  csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
-  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-
-  csParam.pad = param->sp_pad;
-  csParam.precision = low_prec;
-  param->cuda_prec = low_prec;
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  
-  cudaColorSpinorField *b = new cudaColorSpinorField(csParam);
-  
-  //set the mass in the invert_param
-  param->mass = sqrt(offsets[0]/4);
-
-  DiracParam diracParam;
   createDirac(diracParam, *param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
-  
-  *b= h_b; //send data from cpu to GPU
-  
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaColorSpinorField* x_sloppy[num_offsets]; // solution  
-  for(i=0;i < num_offsets;i++){
-    x_sloppy[i] = new cudaColorSpinorField(csParam);
+
+  cpuColorSpinorField *h_b = NULL; // Host RHS
+  cpuColorSpinorField **h_x = NULL;
+  cudaColorSpinorField *b = NULL;   // Cuda RHS
+  cudaColorSpinorField **x = NULL;  // Cuda Solutions
+
+  // Grab the dimension array of the input gauge field.
+  int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ? 
+    cudaFatLinkPrecise.X : cudaGaugePrecise.X;
+
+  // Wrap CPU host side pointers
+  // 
+  // Balint: This creates a ColorSpinorParam struct, from the host data pointer, 
+  // the definitions in param, the dimensions X, and whether the solution is on 
+  // a checkerboard instruction or not. These can then be used as 'instructions' 
+  // to create the actual colorSpinorField
+  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
+  h_b = new cpuColorSpinorField(cpuParam);
+
+  h_x = new cpuColorSpinorField* [ num_offsets ]; // DYNAMIC ALLOCATION
+  for(int i=0; i < num_offsets; i++) { 
+    cpuParam.v = hp_x[i];
+    h_x[i] = new cpuColorSpinorField(cpuParam);
   }
-  invertMultiShiftCgCuda(DiracMdagM(diracSloppy), DiracMdagM(diracSloppy), x_sloppy, *b, param, offsets, num_offsets, residue_sq);   
 
+  // Now I need a colorSpinorParam for the device
+  ColorSpinorParam cudaParam(cpuParam, *param);
+  // This setting will download a host vector
+  cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
+
+  // Create the solution fields filled with zero
+  x = new cudaColorSpinorField* [ num_offsets ];
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  for(int i=0; i < num_offsets; i++) { 
+    x[i] = new cudaColorSpinorField(cudaParam);
+  }
+
+  // Check source norms
+  if( param->verbosity >= QUDA_VERBOSE ) {
+    double nh_b = norm2(*h_b);
+    double nb = norm2(*b);
+    printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
+  }
+
+  // tune the Dirac Kernel
+  tuneDirac(*param, pc_solution ? *(x[0]) : (x[0])->Even());
+  
+  
+  massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
+  double *rescaled_shifts = new double [num_offsets];
+  for(int i=0; i < num_offsets; i++){ 
+    rescaled_shifts[i] = offsets[i];
+    massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
+  }
+  invertMultiShiftCgCuda(DiracMdagM(diracSloppy), DiracMdagM(diracSloppy), x, *b, param, rescaled_shifts, num_offsets, residue_sq);
+    
+  delete [] rescaled_shifts;
+  
   delete b;
-
+  
   int total_iters = 0;
   double total_secs = 0;
   double total_gflops = 0;
-
   total_iters += param->iter;
   total_secs  += param->secs;
   total_gflops += param->gflops;
-
+  
+  cudaParam.precision = high_prec;
   param->cuda_prec = high_prec;
-  csParam.precision = high_prec;
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  b = new cudaColorSpinorField(csParam);
-  *b = h_b;
-
-#ifdef MULTI_GPU   
   do_create_precise_cuda_gauge();
-#endif
-
-  cudaColorSpinorField* x;
-  x = new cudaColorSpinorField(csParam);
-  for(i=0;i < num_offsets; i++){
-    *x  = *x_sloppy[i];
-    delete x_sloppy[i];
-    double mass = sqrt(offsets[i]/4);
-    dirac.setMass(mass);
-    diracSloppy.setMass(mass);
-    invertCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), *x, *b, param);
-      
-    total_iters += param->iter;
-    total_secs  += param->secs;
-    total_gflops += param->gflops;
-
-    x->saveCPUSpinorField(*h_x[i]);
-    	
+  
+  b = new cudaColorSpinorField(cudaParam);
+  *b = *h_b;
+  
+  createDirac(diracParam, *param, pc_solve);
+  {
+    Dirac& dirac2 = *d;
+    Dirac& diracSloppy2 = *dSloppy;
+    
+    cudaColorSpinorField* high_x;
+    high_x = new cudaColorSpinorField(cudaParam);
+    for(int i=0;i < num_offsets; i++){
+      *high_x  = *x[i];
+      delete x[i];
+      double mass = sqrt(offsets[i]/4);
+      dirac2.setMass(mass);
+      diracSloppy2.setMass(mass);
+      invertCgCuda(DiracMdagM(dirac2), DiracMdagM(diracSloppy2), *high_x, *b, param);      
+      total_iters += param->iter;
+      total_secs  += param->secs;
+      total_gflops += param->gflops;      
+      high_x->saveCPUSpinorField(*h_x[i]);      
+    }
+    
+    delete high_x;
   }
   
-  param->iter = total_iters;
-  param->secs = total_secs;
-  param->gflops = total_gflops;
+  
+  for(int i=0; i < num_offsets; i++){ 
+    delete h_x[i];
+  }
+
+  delete h_b;
+  delete b;
+
+  delete [] h_x;
+  delete [] x;
+
+  delete [] hp_x;
 
   if (!param->preserve_dirac) {
     delete d;
     delete dSloppy;
     diracCreation = false;
     diracTune = false;
-  } 
-  
-  for(i=0;i < num_offsets; i++) delete h_x[i];
-  delete x;
-  delete b;
-  
+  }  
+
+
   return;
 }
+
+
 
 void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
 

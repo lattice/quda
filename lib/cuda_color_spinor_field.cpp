@@ -143,7 +143,7 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     if (cudaMalloc((void**)&v, bytes) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating spinor: bytes=%lu", (unsigned long)bytes);
     }
-    
+
     if (precision == QUDA_HALF_PRECISION) {
       if (cudaMalloc((void**)&norm, norm_bytes) == cudaErrorMemoryAllocation) {
 	errorQuda("Error allocating norm");
@@ -588,7 +588,6 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   }
 
 #else
-
   //x[0] is already half of X dimension length
   int Vsh_x = x[1]*x[2]*x[3]/2;
   int Vsh_y = x[0]*x[2]*x[3];

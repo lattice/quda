@@ -9,6 +9,12 @@
 
 using namespace std;
 
+#ifdef GPU_STAGGERED_DIRAC
+static int dir_start = 0;
+#else
+static int dir_start = 3;
+#endif
+
 cudaStream_t *stream;
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
@@ -37,7 +43,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     cudaMallocHost((void**)&back_nbr_spinor_sendbuf[dir], nbytes[dir]); CUERR;
     
     if (fwd_nbr_spinor_sendbuf[dir] == NULL || back_nbr_spinor_sendbuf[dir] == NULL)
-      errorQuda("malloc failed for fwd_nbr_spinor_sendbuf/back_nbr_spinor_sendbuf"); 
+      errorQuda("dir =%d, malloc failed for fwd_nbr_spinor_sendbuf/back_nbr_spinor_sendbuf", dir); 
     
     cudaMallocHost((void**)&fwd_nbr_spinor[dir], nbytes[dir]); CUERR;
     cudaMallocHost((void**)&back_nbr_spinor[dir], nbytes[dir]); CUERR;
@@ -106,7 +112,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
 
-  for(int dir = 0; dir  < 4; dir++){
+  for(int dir = dir_start; dir  < 4; dir++){
     // Prepost all receives
     recv_request1[dir] = comm_recv_with_tag(pagable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
     recv_request2[dir] = comm_recv_with_tag(pagable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
@@ -129,7 +135,7 @@ void FaceBuffer::exchangeFacesComms() {
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
 
-  for(int dir = 0; dir < 4; dir++){
+  for(int dir = dir_start; dir < 4; dir++){
     memcpy(pagable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
     send_request2[dir] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
     
@@ -143,7 +149,7 @@ void FaceBuffer::exchangeFacesComms() {
 
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
 {
-  for(int dir =0 ; dir < 4; dir++){
+  for(int dir = dir_start ; dir < 4; dir++){
     comm_wait(recv_request2[dir]);  
     comm_wait(send_request2[dir]);
     memcpy(fwd_nbr_spinor[dir], pagable_fwd_nbr_spinor[dir], nbytes[dir]);
@@ -172,7 +178,7 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   // allocate the ghost buffer if not yet allocated
   spinor.allocateGhostBuffer();
 
-  for(int i=0;i < 4; i++){
+  for(int i=dir_start;i < 4; i++){
     spinor.packGhost(spinor.backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, (QudaParity)oddBit, dagger);
     spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, (QudaParity)oddBit, dagger);
   }
@@ -184,14 +190,14 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
-  for(int i=0;i < 4; i++){
+  for(int i= dir_start;i < 4; i++){
     recv_request1[i] = comm_recv_with_tag(spinor.backGhostFaceBuffer[i], len[i], back_nbr[i], uptags[i]);
     recv_request2[i] = comm_recv_with_tag(spinor.fwdGhostFaceBuffer[i], len[i], fwd_nbr[i], downtags[i]);    
     send_request1[i]= comm_send_with_tag(spinor.fwdGhostFaceSendBuffer[i], len[i], fwd_nbr[i], uptags[i]);
     send_request2[i] = comm_send_with_tag(spinor.backGhostFaceSendBuffer[i], len[i], back_nbr[i], downtags[i]);
   }
 
-  for(int i=0;i < 4;i++){
+  for(int i=dir_start;i < 4;i++){
     comm_wait(recv_request1[i]);
     comm_wait(recv_request2[i]);
     comm_wait(send_request1[i]);

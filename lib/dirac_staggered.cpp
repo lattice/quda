@@ -7,7 +7,7 @@ DiracStaggered::DiracStaggered(const DiracParam &param) :
   blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
   fatGauge(param.fatGauge), longGauge(param.longGauge), 
   face(param.fatGauge->X, 4, 6, 3, param.fatGauge->precision) 
-  //FIXME: this may break mixed precision multishift solver since may not have fatGauge inited
+  //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
 {
 
 }
@@ -121,7 +121,7 @@ void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in
 
 void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-  
+
   if (!initDslash){
     initDslashConstants(*fatGauge, in.Stride());
     initStaggeredConstants(*fatGauge, *longGauge);

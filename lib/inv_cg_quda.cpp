@@ -106,7 +106,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
       r0Norm = rNorm;      
       rUpdate++;
 
-      beta = r2 / r2_old;
+      beta = r2 / r2_old; 
       xpayCuda(rSloppy, beta, p);
     }
 

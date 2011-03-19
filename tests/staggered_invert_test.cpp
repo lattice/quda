@@ -268,12 +268,13 @@ invert_test(void)
   
   
 #ifdef MULTI_GPU
-
-  if(testtype == 6){
-    record_gauge(fatlink, ghost_fatlink[3], Vsh_t,
-		 longlink, ghost_longlink[3], 3*Vsh_t,
+  int fat_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
+  int link_pad =  3*MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
+  if(testtype == 6){    
+    record_gauge(gaugeParam.X, fatlink, fat_pad,
+		 longlink, link_pad,
 		 link_recon, link_recon_sloppy,
-		 &gaugeParam);
+		 &gaugeParam);        
    }else{
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.ga_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
@@ -398,7 +399,7 @@ invert_test(void)
     
     double residue_sq;
     if (testtype == 6){
-      //invertMultiShiftQudaMixed(spinorOutArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);
+      invertMultiShiftQudaMixed(outArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);
     }else{      
       invertMultiShiftQuda(outArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);	
     }
@@ -443,10 +444,13 @@ invert_test(void)
       //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
       if (sqrt(nrm2/src2) > 100*inv_param.tol){
 	ret |=1;
-	errorQuda("Converge failed!\n");
       }
     }
-    
+
+    if (ret ==1){
+      errorQuda("Converge failed!\n");
+    }
+
     for(int i=1; i < num_offsets;i++){
       delete spinorOutArray[i];
     }
