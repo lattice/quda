@@ -130,7 +130,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->maxiter = 500;
   inv_param->reliable_delta = 1e-3;
 
-  inv_param->solution_type = QUDA_MATDAG_MAT_SOLUTION;
+  inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMEQ_PC_SOLVE;
   inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param->dagger = QUDA_DAG_NO;
@@ -310,7 +310,6 @@ invert_test(void)
   switch(testtype){
   case 0: //even
     volume = Vh;
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
     invertQuda(out->v, in->v, &inv_param);
@@ -333,7 +332,6 @@ invert_test(void)
   case 1: //odd
 	
     volume = Vh;    
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
     invertQuda(out->v, in->v, &inv_param);	
     time0 += clock(); // stop the timer
@@ -386,11 +384,10 @@ invert_test(void)
     
     len=Vh;
     volume = Vh;      
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
 
-    if (testtype == 3){
+    if (testtype == 3 || testtype == 6){
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
-    } else if (testtype == 4||testtype == 6){
+    } else if (testtype == 4){
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
     }else { //testtype ==5
       errorQuda("test 5 not supported\n");

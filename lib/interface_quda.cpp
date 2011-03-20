@@ -731,7 +731,6 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
 void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) {
   if (!diracCreation) {
-    printf("creating dirac object\n");
     setDiracParam(diracParam, &param, pc_solve);
     d = Dirac::create(diracParam); // create the Dirac operator    
     setDiracSloppyParam(diracParam, &param, pc_solve);
@@ -1375,6 +1374,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
       total_gflops += param->gflops;      
       high_x->saveCPUSpinorField(*h_x[i]);      
     }
+    
+    param->iter = total_iters;
     
     delete high_x;
   }
