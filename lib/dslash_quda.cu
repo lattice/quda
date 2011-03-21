@@ -50,7 +50,6 @@ cudaColorSpinorField *inSpinor;
 
 #include <dslash_textures.h>
 #include <dslash_constants.h>
-//#include <half_quda.h>
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5) // 32767.5
@@ -331,7 +330,8 @@ public:
 
 };
 
-void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int volume, const dim3 block, const dim3 blockFace) {
+void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
+		const int volume, const dim3 block, const dim3 blockFace) {
   int shared_bytes = block.x*SHARED_FLOATS_PER_THREAD*regSize;
 
   dslashParam.parity = parity;
@@ -471,7 +471,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
 							  (short4*)xv, (float*)xn, a, dagger, in->bytes, in->norm_bytes);
   }
 
-  dslashCuda(*dslash, regSize, parity, in->volume, block, blockFace);
+  dslashCuda(*dslash, regSize, parity, dagger, in->volume, block, blockFace);
 
   delete dslash;
   unbindGaugeTex(gauge);
@@ -526,7 +526,7 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
     
   }
 
-  dslashCuda(*dslash, regSize, parity, in->volume, block, blockFace);
+  dslashCuda(*dslash, regSize, parity, dagger, in->volume, block, blockFace);
 
   delete dslash;
   unbindGaugeTex(gauge);
@@ -584,7 +584,7 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 						     (float*)xn, m_f, k2, dagger, in->bytes, in->norm_bytes);
   }
 
-  dslashCuda(*dslash, regSize, parity, in->volume, block, blockFace);
+  dslashCuda(*dslash, regSize, parity, dagger, in->volume, block, blockFace);
 
   delete dslash;
   unbindGaugeTex(gauge);
