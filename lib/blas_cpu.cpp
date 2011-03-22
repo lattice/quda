@@ -151,7 +151,7 @@ void caxpbypzYmbwCpu(const Complex &a, const cpuColorSpinorField &x, const Compl
   else if (x.precision == QUDA_SINGLE_PRECISION)
     caxpbypcz((std::complex<float>)a, (std::complex<float>*)x.v, 
 	      (std::complex<float>)b, (std::complex<float>*)y.v, 
-	      (std::complex<float>)(1,0), (std::complex<float>*)z.v, x.length/2);
+	      (std::complex<float>)(1.0f), (std::complex<float>*)z.v, x.length/2);
   else 
     errorQuda("Precision type %d not implemented", x.precision);
 
