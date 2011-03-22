@@ -221,7 +221,7 @@ Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **g
         int new_x4 = (x4 - d + X4)% X4;
         if (x4 -d < 0){
           ghostGaugeField = (oddBit?ghostGaugeEven[3]: ghostGaugeOdd[3]);
-          int offset = (n_ghost_faces + x4 -d)*X1*X2*X3/2 + (x3*X2*X1 + x2*X2+x1)/2;
+          int offset = (n_ghost_faces + x4 -d)*X1*X2*X3/2 + (x3*X2*X1 + x2*X1+x1)/2;
           return &ghostGaugeField[offset*(3*3*2)];
         }
         j = (new_x4*(X3*X2*X1) + x3*(X2*X1) + x2*(X1) + x1) / 2;
