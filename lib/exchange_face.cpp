@@ -92,6 +92,9 @@ void exchange_init_dims(int* X)
 {
   setup_dims(X);
 }
+
+#if 0
+
 void exchange_init(cudaColorSpinorField* cudaSpinor)
 {
   
@@ -172,6 +175,109 @@ void exchange_init(cudaColorSpinorField* cudaSpinor)
   return;
 }
 
+#endif
+
+void exchange_init(cudaColorSpinorField* cudaSpinor)
+{
+ 
+  static int exchange_initialized = 0;
+  static int hp_initialized = 0;
+  if (exchange_initialized && hp_initialized){
+    return;
+  } 
+  
+  int i;
+  //the X dimension size in cudaSpinor is alread halved
+  int X[4];
+  X[0] = cudaSpinor->x[0]*2;
+  X[1] = cudaSpinor->x[1];
+  X[2] = cudaSpinor->x[2];
+  X[3] = cudaSpinor->x[3];
+  setup_dims(X);
+  
+  //int len = 3*Vsh*mySpinorSiteSize*cudaSpinor->Precision();
+  int len_x = 3*Vsh_x*mySpinorSiteSize*QUDA_DOUBLE_PRECISION; //use maximum precision size
+  int len_y = 3*Vsh_y*mySpinorSiteSize*QUDA_DOUBLE_PRECISION; //use maximum precision size
+  int len_z = 3*Vsh_z*mySpinorSiteSize*QUDA_DOUBLE_PRECISION; //use maximum precision size
+  int len_t = 3*Vsh_t*mySpinorSiteSize*QUDA_DOUBLE_PRECISION; //use maximum precision size
+  int len[4] = {len_x, len_y, len_z, len_t};
+  
+  int normlen[4] = {3*Vsh_x*sizeof(float),
+                    3*Vsh_y*sizeof(float),
+                    3*Vsh_z*sizeof(float),
+                    3*Vsh_t*sizeof(float)};
+
+  if (!exchange_initialized){
+    for(i=0;i < 4; i++){
+      cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf[i], len[i]); CUERR;
+      cudaMallocHost((void**)&back_nbr_spinor_sendbuf[i], len[i]); CUERR;
+      if (fwd_nbr_spinor_sendbuf[i] == NULL || back_nbr_spinor_sendbuf[i] == NULL){
+        printf("ERROR: malloc failed for fwd_nbr_spinor_sendbuf/back_nbr_spinor_sendbuf\n");
+        comm_exit(1);
+      }
+
+      cudaMallocHost((void**)&fwd_nbr_spinor[i], len[i]); CUERR;
+      cudaMallocHost((void**)&back_nbr_spinor[i], len[i]); CUERR;
+      if (fwd_nbr_spinor[i] == NULL || back_nbr_spinor[i] == NULL){
+        printf("ERROR: malloc failed for fwd_nbr_spinor[i]/back_nbr_spinor[i]\n");
+        comm_exit(1);
+      }  
+
+      pagable_fwd_nbr_spinor_sendbuf[i] = malloc(len[i]);
+      pagable_back_nbr_spinor_sendbuf[i] = malloc(len[i]);
+      if (pagable_fwd_nbr_spinor_sendbuf[i] == NULL || pagable_back_nbr_spinor_sendbuf[i] == NULL){
+        printf("ERROR: malloc failed for pagable_fwd_nbr_spinor_sendbuf]/pagable_back_nbr_spinor_sendbuf\n");
+        comm_exit(1);
+      }
+
+      pagable_fwd_nbr_spinor[i]=malloc(len[i]);
+      pagable_back_nbr_spinor[i]=malloc(len[i]);
+      if (pagable_fwd_nbr_spinor[i] == NULL || pagable_back_nbr_spinor[i] == NULL){
+        printf("ERROR: malloc failed for pagable_fwd_nbr_spinor/pagable_back_nbr_spinor\n");
+        comm_exit(1);
+      }
+    }
+
+    exchange_initialized = 1;
+  }
+  if (cudaSpinor->Precision() == QUDA_HALF_PRECISION && !hp_initialized){
+    for(i=0;i < 4; i++){
+      cudaMallocHost(&f_norm_sendbuf[i], normlen[i]);CUERR;
+      cudaMallocHost(&b_norm_sendbuf[i], normlen[i]);CUERR;
+      if (f_norm_sendbuf[i] == NULL || b_norm_sendbuf[i] == NULL){
+        printf("ERROR: malloc failed for b_norm_sendbuf/f_norm_sendbuf\n");
+        comm_exit(1);
+      }
+
+      cudaMallocHost(&f_norm[i], normlen[i]);CUERR;
+      cudaMallocHost(&b_norm[i], normlen[i]);CUERR;
+      if (f_norm[i]== NULL || b_norm[i]== NULL){
+        printf("ERROR: malloc failed for b_norm/f_norm\n");
+        comm_exit(1);
+      }
+
+      pagable_f_norm_sendbuf[i]=malloc(normlen[i]);
+      pagable_b_norm_sendbuf[i]=malloc(normlen[i]);
+      if (pagable_f_norm_sendbuf[i] == NULL || pagable_b_norm_sendbuf[i] == NULL){
+        printf("ERROR: malloc failed for pagable_b_norm_sendbuf/pagable_f_norm_sendbuf\n");
+        comm_exit(1);
+      }
+
+      pagable_f_norm[i]=malloc(normlen[i]);
+      pagable_b_norm[i]=malloc(normlen[i]);
+      if (pagable_f_norm[i]== NULL || pagable_b_norm[i]== NULL){
+        printf("ERROR: malloc failed for pagable_b_norm/pagable_f_norm\n");
+        comm_exit(1);
+      }
+    }
+    hp_initialized = 1;
+  }
+
+
+  return;
+}
+
+/*
 void exchange_dslash_cleanup(void)
 {
   
@@ -204,6 +310,36 @@ void exchange_dslash_cleanup(void)
   }
 
 }
+
+*/
+
+void exchange_dslash_cleanup(void)
+{
+  int i;
+  for(i=0;i < 4;i++){
+    cudaFreeHost(fwd_nbr_spinor_sendbuf[i]);
+    cudaFreeHost(back_nbr_spinor_sendbuf[i]);
+    cudaFreeHost(f_norm_sendbuf[i]);
+    cudaFreeHost(b_norm_sendbuf[i]);
+    cudaFreeHost(fwd_nbr_spinor[i]);
+    cudaFreeHost(back_nbr_spinor[i]);
+    cudaFreeHost(f_norm[i]);
+    cudaFreeHost(b_norm[i]);
+
+    free(pagable_fwd_nbr_spinor_sendbuf[i]);
+    free(pagable_back_nbr_spinor_sendbuf[i]);
+    free(pagable_f_norm_sendbuf[i]);
+    free(pagable_b_norm_sendbuf[i]);
+    free(pagable_fwd_nbr_spinor[i]);
+    free(pagable_back_nbr_spinor[i]);
+    free(pagable_f_norm[i]);
+    free(pagable_b_norm[i]);
+
+  }
+
+}
+
+
 
 
 template<typename Float>
@@ -282,11 +418,14 @@ exchange_gpu_spinor_start(void* _cudaSpinor, int parity, cudaStream_t* mystream)
   exchange_init(cudaSpinor);
   int dagger = -1; //dagger is not used in packGhost() for staggered
 
-  cudaSpinor->packGhost(fwd_nbr_spinor_sendbuf, f_norm_sendbuf, 3, QUDA_FORWARDS, (QudaParity)parity, dagger, mystream); CUERR;
-  cudaSpinor->packGhost(back_nbr_spinor_sendbuf, b_norm_sendbuf, 3, QUDA_BACKWARDS, (QudaParity)parity, dagger, mystream); CUERR;
+  for (int dir = 3; dir < 4;dir++){
+    cudaSpinor->packGhost(fwd_nbr_spinor_sendbuf[dir], f_norm_sendbuf[dir], dir, QUDA_FORWARDS, (QudaParity)parity, dagger, mystream); CUERR;
+    cudaSpinor->packGhost(back_nbr_spinor_sendbuf[dir], b_norm_sendbuf[]dir, dir, QUDA_BACKWARDS, (QudaParity)parity, dagger, mystream); CUERR;
+  }  
   
 }
 
+#if 0
 void
 exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
 {
@@ -349,6 +488,97 @@ exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
   cudaStreamSynchronize(*mystream);
   
 }
+
+#endif
+
+
+void
+exchange_gpu_spinor_wait(void* _cudaSpinor, cudaStream_t* mystream)
+{
+  cudaColorSpinorField* cudaSpinor = (cudaColorSpinorField*) _cudaSpinor;
+ 
+  int len_x = 3*Vsh_x*mySpinorSiteSize*cudaSpinor->Precision();
+  int len_y = 3*Vsh_y*mySpinorSiteSize*cudaSpinor->Precision();
+  int len_z = 3*Vsh_z*mySpinorSiteSize*cudaSpinor->Precision();
+  int len_t = 3*Vsh_t*mySpinorSiteSize*cudaSpinor->Precision();
+  int len[4]={len_x, len_y, len_z, len_t};
+  
+
+  cudaStreamSynchronize(*mystream); //required the data to be there before sending out
+
+  for(int i=3; i < 4;i++){
+    memcpy(pagable_back_nbr_spinor_sendbuf[i], back_nbr_spinor_sendbuf[i], len[i]);
+    memcpy(pagable_fwd_nbr_spinor_sendbuf[i], fwd_nbr_spinor_sendbuf[i], len[i]);
+  }
+
+  unsigned long recv_request1[4];
+  unsigned long recv_request2[4];
+  unsigned long send_request1[4];
+  unsigned long send_request2[4]; 
+    
+  int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
+  int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
+  int uptags[4] = {XUP, YUP, ZUP,TUP};
+  int downtags[4] = {XDOWN, YDOWN, ZDOWN,TDOWN};
+
+  for(int i=0;i < 4; i++){
+    recv_request1[i] = comm_recv_with_tag(pagable_back_nbr_spinor[i], len[i], back_nbr[i], uptags[i]);
+    recv_request2[i] = comm_recv_with_tag(pagable_fwd_nbr_spinor[i], len[i], fwd_nbr[i], downtags[i]);
+    send_request1[i]= comm_send_with_tag(pagable_fwd_nbr_spinor_sendbuf[i], len[i], fwd_nbr[i], uptags[i]);
+    send_request2[i] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[i], len[i], back_nbr[i], downtags[i]);
+  }
+
+  //FIXME: half precison not supported yet
+  /*
+  int normlen = 3*Vsh_t*sizeof(float);
+  unsigned long recv_request3 = 0;
+  unsigned long recv_request4 = 0;
+  unsigned long send_request3 = 0;
+  unsigned long send_request4 = 0;
+  
+  if (cudaSpinor->Precision() == QUDA_HALF_PRECISION){
+      memcpy(pagable_b_norm_sendbuf[3], b_norm_sendbuf[3], normlen);
+      memcpy(pagable_f_norm_sendbuf[3], f_norm_sendbuf[3], normlen);
+      
+      recv_request3 = comm_recv(pagable_b_norm[3], normlen, T_BACK_NBR);
+      recv_request4 = comm_recv(pagable_f_norm[3], normlen, T_FWD_NBR);
+      send_request3 = comm_send(pagable_f_norm_sendbuf[3], normlen, T_FWD_NBR);
+      send_request4 = comm_send(pagable_b_norm_sendbuf[3], normlen, T_BACK_NBR);
+  }
+  */
+
+  for(int i=0;i < 4;i++){
+    comm_wait(recv_request1[i]);
+    comm_wait(recv_request2[i]);
+    comm_wait(send_request1[i]);
+    comm_wait(send_request2[i]);
+  }
+
+  for(int i=0;i < 4; i++){
+    memcpy(fwd_nbr_spinor[i], pagable_fwd_nbr_spinor[i], len[i]);
+    memcpy(back_nbr_spinor[i], pagable_back_nbr_spinor[i], len[i]);
+  }
+
+  //FIXME: half precison not supported yet    
+  /*
+  if (cudaSpinor->Precision() == QUDA_HALF_PRECISION){
+    memcpy(f_norm[3], pagable_f_norm[3], normlen);
+    memcpy(b_norm[3], pagable_b_norm[3], normlen);
+
+    comm_wait(recv_request3);
+    comm_wait(recv_request4);
+    comm_wait(send_request3);
+    comm_wait(send_request4);
+    }
+  */
+
+  cudaSpinor->unpackGhostSpinor(fwd_nbr_spinor, back_nbr_spinor, f_norm, b_norm, mystream);
+  cudaStreamSynchronize(*mystream);
+
+}
+
+
+
 
 void exchange_fat_link(void** fatlink, void* ghost_fatlink,
 		       QudaPrecision gPrecision)

@@ -650,6 +650,13 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
   };
   for(int i=0 ;i < 4;i++){
+#ifdef MPI_COMMS
+    if(!comm_dim_partitioned(i)){
+      continue;
+    }
+#else
+    //QMP case here
+#endif
     initTLocation(dims[i]-6, exterior_kernel_flag[i] , 6*Vsh[i]);  
 
     DSLASH(staggeredDslash, Axpy, exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-2], out, outNorm, 
@@ -828,13 +835,16 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 #endif // GPU_TWISTED_MASS_DIRAC
 }
 
+
+#include "misc_helpers.cu"
+
+
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 #include <force_common.h>
 #include "force_kernel_common.cu"
 #endif
 
 #ifdef GPU_FATLINK
-#include "misc_helpers.cu"
 #include "llfat_quda.cu"
 #endif
 

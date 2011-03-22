@@ -1,6 +1,12 @@
 // *** CUDA DSLASH ***
 #undef SHARED_FLOATS_PER_THREAD 
 #define SHARED_FLOATS_PER_THREAD 6
+
+#define Vsh_x ghostFace[0]
+#define Vsh_y ghostFace[1]
+#define Vsh_z ghostFace[2]
+#define Vsh_t ghostFace[3]
+
 // input spinor
 #if (DD_PREC==0)
 #define spinorFloat double
@@ -424,7 +430,7 @@ if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
 #endif
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x1 < X1 -3)|| (tLocate.y == EXTERIOR_KERNEL_X && x1 >= X1 -3))
+if ( (tLocate.y == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1 -3) )|| (tLocate.y == EXTERIOR_KERNEL_X && x1 >= X1 -3))
   //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
 {
@@ -442,12 +448,32 @@ if ( (tLocate.y == INTERIOR_KERNEL && x1 < X1 -3)|| (tLocate.y == EXTERIOR_KERNE
     
     // read gauge matrix from device memory
     READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx);
-    READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx);
-    
+    READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx);    
+
+    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr;
+    int stride1 = sp_stride;
+    int stride3 = sp_stride;    
+#ifdef MULTI_GPU
+    if ( (tLocate.y == EXTERIOR_KERNEL_X)){
+      int space_con = (x4*X3*X2+x3*X2+x2)/2;
+      
+      if (x1 + 1 >= X1){
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[0] + 3*(3*Vsh_x) +(x1+1-X1)*(Vsh_x)+ space_con;
+	stride1 = 3*Vsh_x;
+
+      }
+      
+      if (x1 + 3 >= X1){
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[0] + 3*(3*Vsh_x) +(x1+3-X1)*(Vsh_x)+ space_con;
+	stride3 = 3*Vsh_x;
+      }
+    }
+#endif    
     // read spinor from device memory
-    READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
-    
+    READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);   
+
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(0, long, ga_idx, sign);
       
@@ -470,7 +496,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x1 < X1 -3)|| (tLocate.y == EXTERIOR_KERNE
 }
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x1 >= 3) || (tLocate.y == EXTERIOR_KERNEL_X && x1 < 3))
+if ( (tLocate.y == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 3)) || (tLocate.y == EXTERIOR_KERNEL_X && x1 < 3))
 //if ( (tLocate.y == INTERIOR_KERNEL))
 #endif
 {
@@ -502,9 +528,30 @@ if ( (tLocate.y == INTERIOR_KERNEL && x1 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
     
+
+    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr;
+    int stride1 = sp_stride;
+    int stride3 = sp_stride;
+    
+#ifdef MULTI_GPU
+    if (tLocate.y == EXTERIOR_KERNEL_X){
+      int space_con = (x4*X3*X2+x3*X2+x2)/2;
+      // read spinor from device memory
+      if (x1 - 1 < 0){
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[0] + (x1-1+3)*Vsh_x+ space_con;
+	stride1 = 3*Vsh_x;
+      }        
+      
+      if (x1 - 3 < 0){
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[0] + (x1 - 3 +3)*Vsh_x+ space_con;
+	stride3 = 3*Vsh_x;
+      }
+    }
+#endif
     // read spinor from device memory
-    READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
+    READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);  
 
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, sign);
@@ -531,7 +578,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x1 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x2 < X2 -3)|| (tLocate.y == EXTERIOR_KERNEL_Y && x2 >= X2 -3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2 -3))|| (tLocate.y == EXTERIOR_KERNEL_Y && x2 >= X2 -3))
   //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
 {
@@ -551,9 +598,29 @@ if ( (tLocate.y == INTERIOR_KERNEL && x2 < X2 -3)|| (tLocate.y == EXTERIOR_KERNE
     READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx);
     READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx);
 
+    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr;
+    int stride1 = sp_stride;
+    int stride3 = sp_stride;    
+#ifdef MULTI_GPU
+    if (tLocate.y == EXTERIOR_KERNEL_Y){
+      int space_con = (x4*X3*X1+x3*X1+x1)/2;
+      
+      if (x2 + 1 >= X2){
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[1] + 3*(3*Vsh_y) +(x2+1-X2)*(Vsh_y)+ space_con;
+	stride1 = 3*Vsh_y;
+
+      }
+      
+      if (x2 + 3 >= X2){
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[1] + 3*(3*Vsh_y) +(x2+3-X2)*(Vsh_y)+ space_con;
+	stride3 = 3*Vsh_y;
+      }
+    }
+#endif    
     // read spinor from device memory
-    READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);
+    READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
 
  
     // reconstruct gauge matrix
@@ -579,7 +646,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x2 < X2 -3)|| (tLocate.y == EXTERIOR_KERNE
 }
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x2 >= 3) || (tLocate.y == EXTERIOR_KERNEL_Y && x2 < 3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 3)) || (tLocate.y == EXTERIOR_KERNEL_Y && x2 < 3))
   //if ( (tLocate.y == INTERIOR_KERNEL))
 #endif
 {
@@ -612,9 +679,31 @@ if ( (tLocate.y == INTERIOR_KERNEL && x2 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
     
-    // read spinor from device memory
-    READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);   
+    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr;
+    int stride1 = sp_stride;
+    int stride3 = sp_stride;
+    
+#ifdef MULTI_GPU
+    if (tLocate.y == EXTERIOR_KERNEL_Y){
+      int space_con = (x4*X3*X1+x3*X1+x1)/2;
+      // read spinor from device memory
+      if (x2 - 1 < 0){
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[1] + (x2-1+3)*Vsh_y+ space_con;
+	stride1 = 3*Vsh_y;
+      }        
+      
+      if (x2 - 3 < 0){
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[1] + (x2 - 3 +3)*Vsh_y+ space_con;
+	stride3 = 3*Vsh_y;
+      }
+    }
+#endif
+
+
+// read spinor from device memory
+    READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
 
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,sign);
@@ -640,7 +729,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x2 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x3 < X3 -3)|| (tLocate.y == EXTERIOR_KERNEL_Z && x3 >= X3 -3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| (tLocate.y == EXTERIOR_KERNEL_Z && x3 >= X3 -3))
 //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
 {
@@ -661,22 +750,37 @@ if ( (tLocate.y == INTERIOR_KERNEL && x3 < X3 -3)|| (tLocate.y == EXTERIOR_KERNE
     READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx);
     READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx);
     
-    // read spinor from device memory
-    READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);   
+    
+    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr;
+    int stride1 = sp_stride;
+    int stride3 = sp_stride;
+    //if exterior kernel, we need to read from ghost slices
+#ifdef MULTI_GPU
+    if (tLocate.y == EXTERIOR_KERNEL_Z){
+      int space_con = (x4*X2X1+x2*X1+x1)/2;
+      
+      if (x3 + 1 >= X3){
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[2] + 3*(3*Vsh_z) +(x3+1-X3)*(Vsh_z)+ space_con;
+	stride1 = 3*Vsh_z;
 
+      }
+      
+      if (x3 + 3 >= X3){
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[2] + 3*(3*Vsh_z) +(x3+3-X3)*(Vsh_z)+ space_con;
+	stride3 = 3*Vsh_z;
+      }
+    }
+#endif
+    // read spinor from device memory
+    READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
 
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(4, long, ga_idx, sign);
 
     MAT_MUL_V(A, fat, i);
     MAT_MUL_V(B, long, t);    
-
-    if ( B0_re > 100.0 || B0_re < - 100.0 || B0_im > 100.0 || B0_im < - 100.0 ||
-	 B1_re > 100.0 || B1_re < - 100.0 || B1_im > 100.0 || B1_im < - 100.0 ||
-	 B2_re > 100.0 || B2_re < - 100.0 || B2_im > 100.0 || B2_im < - 100.0 ){
-      printf("***********************RROR: wrong vlaue\n");
-    }
 	 
     o00_re += A0_re;
     o00_im += A0_im;
@@ -695,7 +799,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x3 < X3 -3)|| (tLocate.y == EXTERIOR_KERNE
 }
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x3 >= 3) || (tLocate.y == EXTERIOR_KERNEL_Z && x3 < 3))
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 3)) || (tLocate.y == EXTERIOR_KERNEL_Z && x3 < 3))
   //if ( (tLocate.y == INTERIOR_KERNEL))
 #endif
 {
@@ -730,9 +834,32 @@ if ( (tLocate.y == INTERIOR_KERNEL && x3 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
     
-    // read spinor from device memory
-    READ_1ST_NBR_SPINOR(SPINORTEX, sp_idx_1st_nbr, sp_stride);
-    READ_3RD_NBR_SPINOR(SPINORTEX, sp_idx_3rd_nbr, sp_stride);      
+    
+    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr;
+    int stride1 = sp_stride;
+    int stride3 = sp_stride;
+    
+#ifdef MULTI_GPU
+    if (tLocate.y == EXTERIOR_KERNEL_Z){
+      int space_con = (x4*X2X1+x2*X1+x1)/2;
+      // read spinor from device memory
+      if (x3 - 1 < 0){
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[2] + (x3-1+3)*Vsh_z+ space_con;
+	stride1 = 3*Vsh_z;
+      }        
+      
+      if (x3 - 3 < 0){
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[2] + (x3 - 3 +3)*Vsh_z+ space_con;
+	stride3 = 3*Vsh_z;
+      }
+    }
+#endif
+
+
+// read spinor from device memory
+    READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,sign);
@@ -762,7 +889,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x3 >= 3) || (tLocate.y == EXTERIOR_KERNEL_
 //    exterior kernel and x4 >= X4 -3
 
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < X4 -3))||
      (tLocate.y == EXTERIOR_KERNEL_T && x4 >= X4 -3))
 #endif
 
@@ -794,13 +921,13 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
       int space_con = (x3*X2X1+x2*X1+x1)/2;
       
       if (x4 + 1 >= X4){
-	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh) +(x4+1-X4)*(Vsh)+ space_con;
-	stride1 = 3*Vsh;
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh_t) +(x4+1-X4)*(Vsh_t)+ space_con;
+	stride1 = 3*Vsh_t;
       }
       
       if (x4 + 3 >= X4){
-	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh) +(x4+3-X4)*(Vsh)+ space_con;
-	stride3 = 3*Vsh;
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh_t) +(x4+3-X4)*(Vsh_t)+ space_con;
+	stride3 = 3*Vsh_t;
       }
     }
 #endif
@@ -834,7 +961,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 < X4 -3)||
 //or 
 //  exterior kernel and x4 < 3  
 #ifdef MULTI_GPU
-if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
+if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 3)) ||
      (tLocate.y == EXTERIOR_KERNEL_T && x4 < 3))
 #endif
 {
@@ -866,18 +993,18 @@ if ( (tLocate.y == INTERIOR_KERNEL && x4 >= 3) ||
       }
       
       if ( (x4 - 3) < 0){
-	long_idx = Vh + x4*Vsh+ space_con;
+	long_idx = Vh + x4*Vsh_t+ space_con;
     }
       
       // read spinor from device memory
       if (x4 - 1 < 0){
-	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + (x4-1+3)*Vsh+ space_con;
-	stride1 = 3*Vsh;
+	nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + (x4-1+3)*Vsh_t+ space_con;
+	stride1 = 3*Vsh_t;
       }        
       
       if (x4 - 3 < 0){
-	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + (x4 - 3 +3)*Vsh+ space_con;
-	stride3 = 3*Vsh;
+	nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + (x4 - 3 +3)*Vsh_t+ space_con;
+	stride3 = 3*Vsh_t;
       }
     }
 #endif
@@ -1050,4 +1177,7 @@ WRITE_SPINOR();
 #undef t02_im
 
 #undef SHARED_FLOATS_PER_THREAD
-
+#undef Vsh_x
+#undef Vsh_y
+#undef Vsh_z
+#undef Vsh_t

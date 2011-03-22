@@ -92,7 +92,7 @@ class FaceBuffer {
 
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
-  size_t nbytes;
+  size_t nbytes[QUDA_MAX_DIM];
 
   int Volume;
   int VolumeCB;
@@ -102,20 +102,20 @@ class FaceBuffer {
   int nDim;
   int nFace;
 
-  void* fwd_nbr_spinor_sendbuf;
-  void* back_nbr_spinor_sendbuf;
+  void* fwd_nbr_spinor_sendbuf[QUDA_MAX_DIM];
+  void* back_nbr_spinor_sendbuf[QUDA_MAX_DIM];
   
-  void* fwd_nbr_spinor;
-  void* back_nbr_spinor;
+  void* fwd_nbr_spinor[QUDA_MAX_DIM];
+  void* back_nbr_spinor[QUDA_MAX_DIM];
 
-  void* pagable_fwd_nbr_spinor_sendbuf;
-  void* pagable_back_nbr_spinor_sendbuf;
+  void* pagable_fwd_nbr_spinor_sendbuf[QUDA_MAX_DIM];
+  void* pagable_back_nbr_spinor_sendbuf[QUDA_MAX_DIM];
   
-  void* pagable_fwd_nbr_spinor;
-  void* pagable_back_nbr_spinor;
-
-  unsigned long recv_request1, recv_request2;
-  unsigned long send_request1, send_request2;
+  void* pagable_fwd_nbr_spinor[QUDA_MAX_DIM];
+  void* pagable_back_nbr_spinor[QUDA_MAX_DIM];
+  
+  unsigned long recv_request1[QUDA_MAX_DIM], recv_request2[QUDA_MAX_DIM];
+  unsigned long send_request1[QUDA_MAX_DIM], send_request2[QUDA_MAX_DIM];
 
   void setupDims(const int *X);
   

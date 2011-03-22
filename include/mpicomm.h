@@ -18,6 +18,9 @@ extern "C" {
 #define T_FWD_NBR  8
 
 void            comm_set_gridsize(int x, int y, int z, int t);
+  int           comm_dim_partitioned(int dir);
+  /*testing/debugging use only */
+  void          comm_dim_partitioned_set(int dir);
 void		comm_init(void);
 int		comm_rank(void);
 int		comm_size(void);

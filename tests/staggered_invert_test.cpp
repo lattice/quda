@@ -130,7 +130,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->maxiter = 500;
   inv_param->reliable_delta = 1e-3;
 
-  inv_param->solution_type = QUDA_MATDAG_MAT_SOLUTION;
+  inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMEQ_PC_SOLVE;
   inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param->dagger = QUDA_DAG_NO;
@@ -146,10 +146,9 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-  inv_param->ghostDim[0] = true;
-  inv_param->ghostDim[1] = true;
-  inv_param->ghostDim[2] = true;
-  inv_param->ghostDim[3] = true;
+  for(int i =0;i < 4;i++){
+    inv_param->ghostDim[i] = comm_dim_partitioned(i);
+  }
 
 }
 
@@ -277,12 +276,13 @@ invert_test(void)
   
   
 #ifdef MULTI_GPU
-
-  if(testtype == 6){
-    record_gauge(fatlink, ghost_fatlink[3], Vsh_t,
-		 longlink, ghost_longlink[3], 3*Vsh_t,
+  int fat_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
+  int link_pad =  3*MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
+  if(testtype == 6){    
+    record_gauge(gaugeParam.X, fatlink, fat_pad,
+		 longlink, link_pad,
 		 link_recon, link_recon_sloppy,
-		 &gaugeParam);
+		 &gaugeParam);        
    }else{
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.ga_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
@@ -319,7 +319,6 @@ invert_test(void)
   switch(testtype){
   case 0: //even
     volume = Vh;
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
     invertQuda(out->v, in->v, &inv_param);
@@ -342,7 +341,6 @@ invert_test(void)
   case 1: //odd
 	
     volume = Vh;    
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
     invertQuda(out->v, in->v, &inv_param);	
     time0 += clock(); // stop the timer
@@ -395,11 +393,10 @@ invert_test(void)
     
     len=Vh;
     volume = Vh;      
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
 
-    if (testtype == 3){
+    if (testtype == 3 || testtype == 6){
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
-    } else if (testtype == 4||testtype == 6){
+    } else if (testtype == 4){
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
     }else { //testtype ==5
       errorQuda("test 5 not supported\n");
@@ -407,7 +404,7 @@ invert_test(void)
     
     double residue_sq;
     if (testtype == 6){
-      //invertMultiShiftQudaMixed(spinorOutArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);
+      invertMultiShiftQudaMixed(outArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);
     }else{      
       invertMultiShiftQuda(outArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);	
     }
@@ -452,10 +449,13 @@ invert_test(void)
       //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
       if (sqrt(nrm2/src2) > 100*inv_param.tol){
 	ret |=1;
-	errorQuda("Converge failed!\n");
       }
     }
-    
+
+    if (ret ==1){
+      errorQuda("Converge failed!\n");
+    }
+
     for(int i=1; i < num_offsets;i++){
       delete spinorOutArray[i];
     }
@@ -518,6 +518,14 @@ display_test_info()
 	 get_prec_str(prec),get_prec_str(prec_sloppy),
 	 get_recon_str(link_recon), 
 	 get_recon_str(link_recon_sloppy), get_test_type(testtype), sdim, tdim);     
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
+	     comm_dim_partitioned(0),
+	     comm_dim_partitioned(1),
+	     comm_dim_partitioned(2),
+	     comm_dim_partitioned(3)); 
+  
   return ;
   
 }
@@ -705,6 +713,20 @@ int main(int argc, char** argv)
       tsize =  atoi(argv[i+1]);
       if (tsize <= 0 ){
         errorQuda("Error: invalid T grid size");
+      }
+      i++;
+      continue;
+    }
+
+    if( strcmp(argv[i], "--manual_set_partition") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }     
+      int value  =  atoi(argv[i+1]);
+      for(int j=0; j < 4;j++){
+	if (value &  (1 << j)){
+	  comm_dim_partitioned_set(j);
+	}
       }
       i++;
       continue;

@@ -411,8 +411,6 @@ matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** ghost_fatlink,
   staggered_dslash_mg4dir(out, fatlink, longlink, ghost_fatlink, ghost_longlink,
 			  tmp, parity, dagger_bit, sPrecision, gPrecision);
   
-  printf("norm check %e %e %e\n", norm2(*in), norm2(*tmp), norm2(*out));
-  
 
   double msq_x4 = mass*mass*4;
   if (sPrecision == QUDA_DOUBLE_PRECISION){

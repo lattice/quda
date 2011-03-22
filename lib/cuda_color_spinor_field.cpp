@@ -18,6 +18,11 @@ void* cudaColorSpinorField::buffer = 0;
 bool cudaColorSpinorField::bufferInit = false;
 size_t cudaColorSpinorField::bufferBytes = 0;
 
+int cudaColorSpinorField::initGhostFaceBuffer = 0;
+void* cudaColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
+void* cudaColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
+QudaPrecision cudaColorSpinorField::facePrecision; 
+
 /*cudaColorSpinorField::cudaColorSpinorField() : 
   ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
 
@@ -138,7 +143,7 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     if (cudaMalloc((void**)&v, bytes) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating spinor: bytes=%lu", (unsigned long)bytes);
     }
-    
+
     if (precision == QUDA_HALF_PRECISION) {
       if (cudaMalloc((void**)&norm, norm_bytes) == cudaErrorMemoryAllocation) {
 	errorQuda("Error allocating norm");
@@ -438,8 +443,10 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
 
 void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
 				     const QudaParity parity, const int dagger,
-				     cudaStream_t *stream) {
+				     cudaStream_t *stream) 
+{
 
+#ifndef GPU_STAGGERED_DIRAC
   CUERR; // check error state
 
   int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
@@ -486,6 +493,49 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
     void *src = (char*)norm + norm_offset;
     CUDAMEMCPY(dst, src, normlen, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
+#else
+  
+  int Vsh_x = x[1]*x[2]*x[3]/2;
+  int Vsh_y = x[0]*x[2]*x[3];
+  int Vsh_z = x[0]*x[1]*x[3];
+  int Vsh_t = x[0]*x[1]*x[2];
+  int Vsh_xyzt[4]={Vsh_x, Vsh_y, Vsh_z, Vsh_t};
+  int num_faces = 3; //3 faces for asqtad
+  int FloatN = 2; // always use Float2 for staggered
+  int sizeOfFloatN = FloatN*precision; 
+  int len = num_faces*Vsh_xyzt[dim]*sizeOfFloatN;
+  
+  if(this->initGhostFaceBuffer == 0 || precision > facePrecision){
+    
+    cudaMalloc((void**)&this->fwdGhostFaceBuffer[0], 9*Vsh_x*sizeOfFloatN);
+    cudaMalloc((void**)&this->fwdGhostFaceBuffer[1], 9*Vsh_y*sizeOfFloatN);
+    cudaMalloc((void**)&this->fwdGhostFaceBuffer[2], 9*Vsh_z*sizeOfFloatN);
+    cudaMalloc((void**)&this->fwdGhostFaceBuffer[3], 9*Vsh_t*sizeOfFloatN);
+  
+    cudaMalloc((void**)&this->backGhostFaceBuffer[0], 9*Vsh_x*sizeOfFloatN);
+    cudaMalloc((void**)&this->backGhostFaceBuffer[1], 9*Vsh_y*sizeOfFloatN);
+    cudaMalloc((void**)&this->backGhostFaceBuffer[2], 9*Vsh_z*sizeOfFloatN);
+    cudaMalloc((void**)&this->backGhostFaceBuffer[3], 9*Vsh_t*sizeOfFloatN);
+    CUERR;
+    
+    this->facePrecision = precision;
+    this->initGhostFaceBuffer = 1;
+  }
+
+  void* gpu_buf;
+  if(dir== QUDA_BACKWARDS){
+    gpu_buf = this->backGhostFaceBuffer[dim];
+  }else{
+    gpu_buf = this->fwdGhostFaceBuffer[dim];
+  }
+  
+  CUERR;
+  collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this); CUERR;
+  cudaMemcpyAsync(ghost_spinor, gpu_buf, 3*len, cudaMemcpyDeviceToHost, *stream); CUERR;
+
+  
+#endif
+
 
 }
 
@@ -494,15 +544,21 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 				       const QudaDirection dir, 
 				       const int dagger, cudaStream_t* stream) 
 {
+#if 1
   CUERR;
   int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
-  int Vsh = x[0]*x[1]*x[2];
+  int Vsh_xyzt[4]= {
+    x[1]*x[2]*x[3]/2,
+    x[0]*x[2]*x[3],
+    x[0]*x[1]*x[3],
+    x[0]*x[1]*x[2]
+  };
+  int Vsh = Vsh_xyzt[dim];
   int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
   if (nSpin == 4) Nint /= 2; // spin projection for Wilson
   int Npad = Nint / Nvec; // number Nvec buffers we have
 
-  if (dim != 3) errorQuda("Not supported");
 
   // Wilson only
   // !dagger: receive lower components forwards, receive upper components backwards
@@ -530,5 +586,68 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
     void *src = (char*)ghost_spinor+num_faces*Nint*Vsh*precision;
     CUDAMEMCPY(dst, src, normlen, cudaMemcpyHostToDevice, *stream);  CUERR;
   }
+
+#else
+  //x[0] is already half of X dimension length
+  int Vsh_x = x[1]*x[2]*x[3]/2;
+  int Vsh_y = x[0]*x[2]*x[3];
+  int Vsh_z = x[0]*x[1]*x[3];
+  int Vsh_t = x[0]*x[1]*x[2];
+
+  int sizeOfFloatN = 2*precision;
+
+  void* src =ghost_spinor;
+  void* dst;
+  
+  //put X dimension ghost data in place
+  int len_x = 3*Vsh_x*sizeOfFloatN; //3 faces  
+  if (dim == 0 && dir == QUDA_BACKWARDS){
+    void* dst = ((char*)v) + 3*stride*sizeOfFloatN;
+    cudaMemcpyAsync(dst, src, 3*len_x, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  if (dim == 0 && dir == QUDA_FORWARDS){
+    dst = ((char*)v) + 3*stride*sizeOfFloatN + 3*len_x;
+    cudaMemcpyAsync(dst, src, 3*len_x, cudaMemcpyHostToDevice, *stream);CUERR;
+  }
+
+
+  //put Y dimension ghost data in place
+  int len_y = 3*Vsh_y*sizeOfFloatN; //3 faces  
+  if (dim == 1 && dir == QUDA_BACKWARDS){
+    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x)*(3*sizeOfFloatN);
+    cudaMemcpyAsync(dst, src, 3*len_y, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  if (dim == 1 && dir == QUDA_FORWARDS){
+    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x)*(3*sizeOfFloatN)+ 3*len_y;
+    cudaMemcpyAsync(dst, src, 3*len_y, cudaMemcpyHostToDevice, *stream);CUERR;
+  }
+
+  //put Z dimension ghost data in place
+  int len_z = 3*Vsh_z*sizeOfFloatN; //3 faces  
+  if (dim == 2 && dir == QUDA_BACKWARDS){
+    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y)*(3*sizeOfFloatN);
+    cudaMemcpyAsync(dst, src, 3*len_z, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  if (dim == 2 && dir == QUDA_FORWARDS){
+    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y)*(3*sizeOfFloatN)+ 3*len_z;
+    cudaMemcpyAsync(dst, src, 3*len_z, cudaMemcpyHostToDevice, *stream);CUERR;
+  }
+  
+  //put T dimension ghost data in place
+  int len_t = 3*Vsh_t*sizeOfFloatN; //3 faces  
+  if (dim == 3 && dir == QUDA_BACKWARDS){
+    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y+Vsh_z)*(3*sizeOfFloatN);
+    cudaMemcpyAsync(dst, src, 3*len_t, cudaMemcpyHostToDevice, *stream); CUERR;
+  }
+  if (dim == 3 && dir == QUDA_FORWARDS){
+    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y+Vsh_z)*(3*sizeOfFloatN)+ 3*len_t;
+    cudaMemcpyAsync(dst, src, 3*len_t, cudaMemcpyHostToDevice, *stream);CUERR;
+  }
+
+
+#endif
+
+  
+
 
 }

@@ -134,8 +134,8 @@ extern "C" {
   void printQudaInvertParam(QudaInvertParam *param);
 
 
-  void  record_gauge(void *_fatlink, void* _ghost_fatlink, int _fatlink_pad, 
-		     void* _longlink, void* _ghost_longlink, int _longlink_pad, 
+  void  record_gauge(int* X, void *_fatlink, int _fatlink_pad, 
+		     void* _longlink, int _longlink_pad, 
 		     QudaReconstructType _longlink_recon,QudaReconstructType _longlink_recon_sloppy,
 		     QudaGaugeParam *_param);
 

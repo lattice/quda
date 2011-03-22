@@ -32,6 +32,8 @@ static int ygridid = -1;
 static int zgridid = -1;
 static int tgridid = -1;
 
+static int manual_set_partition[4] ={0, 0, 0, 0};
+
 void
 comm_set_gridsize(int x, int y, int z, int t)
 {
@@ -43,6 +45,48 @@ comm_set_gridsize(int x, int y, int z, int t)
   return;
 }
 
+/* This function is for and testing debugging purpose only
+ * The partitioning schedume should be generated automically 
+ * in production runs. Don't use this function if you don't know
+ * what you are doing
+ */
+void
+comm_dim_partitioned_set(int dir)
+{
+  manual_set_partition[dir] = 1;
+  return;
+}
+
+
+int 
+comm_dim_partitioned(int dir)
+{
+  int ret = 0;
+  
+  switch(dir){
+  case 0: 
+    ret = (xgridsize > 1);    
+    break;
+  case 1: 
+    ret = (ygridsize > 1);
+    break;
+  case 2: 
+    ret = (zgridsize > 1);
+    break;
+  case 3: 
+    ret = (tgridsize > 1);
+    break;    
+  defaut:
+    printf("ERROR: invalid direction\n");
+    comm_exit(1);
+  }
+  
+  if( manual_set_partition[dir]){
+    ret = manual_set_partition[dir];
+  }
+  
+  return ret;
+}
 
 static void
 comm_partition(void)
@@ -110,13 +154,12 @@ comm_partition(void)
   tid=(tgridid -1+tgridsize)%tgridsize;
   t_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
 
-  /*
-  printf("MPI rank: x_fwd_nbr=%d, x_back_nbr=%d\n", x_fwd_nbr, x_back_nbr);
-  printf("MPI rank: y_fwd_nbr=%d, y_back_nbr=%d\n", y_fwd_nbr, y_back_nbr);
-  printf("MPI rank: z_fwd_nbr=%d, z_back_nbr=%d\n", z_fwd_nbr, z_back_nbr);
-  printf("MPI rank: t_fwd_nbr=%d, t_back_nbr=%d\n", t_fwd_nbr, t_back_nbr);
-  */
+  printf("MPI rank: rank=%d, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, x_fwd_nbr, x_back_nbr);
+  printf("MPI rank: rank=%d, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, y_fwd_nbr, y_back_nbr);
+  printf("MPI rank: rank=%d, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, z_fwd_nbr, z_back_nbr);
+  printf("MPI rank: rank=%d, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, t_fwd_nbr, t_back_nbr);
 
+  
 }
 
 
@@ -176,8 +219,6 @@ comm_init()
     comm_exit(1);
   }
   
-  printf("rank=%d, back_neighbor=%d, fwd_nbr=%d, host=%s, use gpu=%d\n", 
-	 rank, back_nbr, fwd_nbr, hostname, which_gpu);
   srand(rank*999);
   
   free(hostname_recv_buf);
