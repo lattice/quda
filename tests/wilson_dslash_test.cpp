@@ -15,7 +15,7 @@
 #include <wilson_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 1;
+const int test_type = 0;
 
 // Dirac operator type
 const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -29,7 +29,7 @@ const int transfer = 0; // include transfer time in the benchmark?
 const int loops = 100;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -59,7 +59,7 @@ void init() {
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
@@ -79,6 +79,9 @@ void init() {
   inv_param.dagger = dagger;
 
   inv_param.cpu_prec = cpu_prec;
+  if (inv_param.cpu_prec != gauge_param.cpu_prec) 
+    errorQuda("Gauge and spinor cpu precisions must match");
+
   inv_param.cuda_prec = cuda_prec;
 
 #ifndef MULTI_GPU // free parameter for single GPU
@@ -342,16 +345,14 @@ void dslashRef() {
       dslash_type == QUDA_WILSON_DSLASH) {
     switch (test_type) {
     case 0:
-      wil_dslash(spinorRef->v, hostGauge, spinor->v, parity, dagger, 
-		 inv_param.cpu_prec, gauge_param.cpu_prec);
+      wil_dslash(spinorRef->v, hostGauge, spinor->v, parity, dagger, inv_param.cpu_prec);
       break;
     case 1:    
       wil_matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.matpc_type, dagger, 
-		inv_param.cpu_prec, gauge_param.cpu_prec);
+		inv_param.cpu_prec);
       break;
     case 2:
-      wil_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, dagger, 
-	      inv_param.cpu_prec, gauge_param.cpu_prec);
+      wil_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, dagger, inv_param.cpu_prec);
       break;
     default:
       printf("Test type not defined\n");
@@ -361,15 +362,15 @@ void dslashRef() {
     switch (test_type) {
     case 0:
       tm_dslash(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-		parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec);
+		parity, dagger, inv_param.cpu_prec);
       break;
     case 1:    
       tm_matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-	       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param.cpu_prec);
+	       inv_param.matpc_type, dagger, inv_param.cpu_prec);
       break;
     case 2:
       tm_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-	     dagger, inv_param.cpu_prec, gauge_param.cpu_prec);
+	     dagger, inv_param.cpu_prec);
       break;
     default:
       printf("Test type not defined\n");
