@@ -422,14 +422,6 @@ o02_re = o02_im = 0.f;
 
 
 #ifdef MULTI_GPU
-if (tLocate.y == INTERIOR_KERNEL) {//if interior kernel
-#endif
-
-#ifdef MULTI_GPU
-}//if interior kernel
-#endif
-
-#ifdef MULTI_GPU
 if ( (tLocate.y == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1 -3) )|| (tLocate.y == EXTERIOR_KERNEL_X && x1 >= X1 -3))
   //if ( (tLocate.y == INTERIOR_KERNEL ))
 #endif
@@ -493,6 +485,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1 -3) )|| 
     o01_im += B1_im;
     o02_re += B2_re;
     o02_im += B2_im;  
+
 }
 
 #ifdef MULTI_GPU
@@ -575,7 +568,6 @@ if ( (tLocate.y == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 3)) || (tL
     o02_im -= B2_im;  
         
 }
-
 
 #ifdef MULTI_GPU
 if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2 -3))|| (tLocate.y == EXTERIOR_KERNEL_Y && x2 >= X2 -3))
@@ -727,7 +719,6 @@ if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 3)) || (tLo
     
 }
 
-
 #ifdef MULTI_GPU
 if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| (tLocate.y == EXTERIOR_KERNEL_Z && x3 >= X3 -3))
 //if ( (tLocate.y == INTERIOR_KERNEL ))
@@ -744,7 +735,7 @@ if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| (t
     int ga_idx = sid;
     
     int sp_idx_1st_nbr = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
-    int sp_idx_3rd_nbr = ((x3>= (X2 - 3))? X + (-X3 + 3)*X2*X1: X + 3*X2*X1)>> 1;
+    int sp_idx_3rd_nbr = ((x3>= (X3 - 3))? X + (-X3 + 3)*X2*X1: X + 3*X2*X1)>> 1;
     
     // read gauge matrix from device memory
     READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx);
@@ -795,7 +786,8 @@ if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| (t
     o01_im += B1_im;
     o02_re += B2_re;
     o02_im += B2_im;      
-    
+ 
+
 }
 
 #ifdef MULTI_GPU
@@ -882,7 +874,6 @@ if ( (tLocate.y == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 3)) || (tLo
     o02_im -= B2_im;    
     
 }
-
 
 // if interior kernel and x4 < X4 -3
 // or 
