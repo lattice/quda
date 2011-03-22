@@ -728,7 +728,7 @@ void freeGaugeField(FullGauge *cudaGauge) {
 template <typename Float, typename FloatN>
 static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFieldOrder gauge_order,
 			   ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh, QudaLinkType type) {
-  
+  checkCudaError();  
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
     
@@ -739,7 +739,7 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
   packedEven = (FloatN*)malloc(bytes);
   packedOdd = (FloatN*)malloc(bytes);
 #endif
-    
+
   if( ! packedEven ) errorQuda( "packedEven is borked\n");
   if( ! packedOdd ) errorQuda( "packedOdd is borked\n");
   if( ! even ) errorQuda( "even is borked\n");
@@ -793,7 +793,7 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, GaugeFiel
 		     veclength, reconstruct, Vh, pad);
 #endif
 #endif
-
+  checkCudaError();
   cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
   checkCudaError();
     
