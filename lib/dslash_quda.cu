@@ -412,7 +412,7 @@ void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColo
 						  gauge.reconstruct, (short4*)in->v, (float*)in->norm,
 						  (short4*)xv, (float*)xn, k, dagger, in->bytes, in->norm_bytes);
   }
-  dslashCuda(*dslash, regSize, parity, in->volume, block, blockFace);
+  dslashCuda(*dslash, regSize, parity, dagger, in->volume, block, blockFace);
 
   delete dslash;
   unbindGaugeTex(gauge);
