@@ -5,7 +5,7 @@ QUDA = ../lib/libquda.a
 INC += -I../include -I.
 
 HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h    \
-	domain_wall_dslash_reference.h test_util.h
+	domain_wall_dslash_reference.h test_util.h dslash_util.h
 
 TESTS = su3_test blas_test pack_test $(WILSON_DIRAC_TEST) 		\
 	$(STAGGERED_DIRAC_TEST) $(DOMAIN_WALL_DIRAC_TEST)		\

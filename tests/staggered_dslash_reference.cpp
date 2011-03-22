@@ -304,8 +304,8 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink
       gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
       gFloat* longlnk = gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3);
 
-      sFloat *first_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1);
-      sFloat *third_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3);
+      sFloat *first_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, 3);
+      sFloat *third_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, 3);
 
 #else
       gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
@@ -358,7 +358,7 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
   int Nc = 3;
   int nFace = 3;
   FaceBuffer faceBuf(Z, 4, 2*Nc, nFace, sPrecision);
-  faceBuf.exchangeCpuSpinor(*in, otherparity, 0); // staggered doesn't care about the parity
+  faceBuf.exchangeCpuSpinor(*in, otherparity, daggerBit); 
   
   void** fwd_nbr_spinor = in->fwdGhostFaceBuffer;
   void** back_nbr_spinor = in->backGhostFaceBuffer;

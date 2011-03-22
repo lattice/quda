@@ -202,6 +202,56 @@ comm_size(void)
   return size;
 }
 
+int
+comm_dim(int dir) {
+
+  int i;
+  switch(dir) {
+  case 0:
+    i = xgridsize;
+    break;
+  case 1:
+    i = ygridsize;
+    break;
+  case 2:
+    i = zgridsize;
+    break;
+  case 3:
+    i = tgridsize;
+    break;
+  default:
+    printf("Cannot get direction %d", dir);
+    comm_exit(1);
+  }
+
+  return i;
+}
+
+int
+comm_coords(int dir) {
+
+  int i;
+  switch(dir) {
+  case 0:
+    i = xgridid;
+    break;
+  case 1:
+    i = ygridid;
+    break;
+  case 2:
+    i = zgridid;
+    break;
+  case 3:
+    i = tgridid;
+    break;
+  default:
+    printf("Cannot get direction %d", dir);
+    comm_exit(1);
+  }
+
+  return i;
+}
+
 unsigned long
 comm_send(void* buf, int len, int dst)
 {

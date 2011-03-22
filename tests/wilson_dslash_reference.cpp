@@ -102,7 +102,7 @@ void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
 
 template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int oddBit, int daggerBit) {
-  for (int i=0; i<Vh*4*3*2; i++) res[i] = 0.0;
+  for (int i=0; i<Vh*mySpinorSiteSize; i++) res[i] = 0.0;
   
   gFloat *gaugeEven[4], *gaugeOdd[4];
   for (int dir = 0; dir < 4; dir++) {  
@@ -120,10 +120,8 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       
       for (int s = 0; s < 4; s++) {
-	if (dir % 2 == 0)
-	  su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
-	else
-	  su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
       }
       
       sum(&res[i*(4*3*2)], &res[i*(4*3*2)], gaugedSpinor, 4*3*2);
@@ -136,7 +134,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField, 
 		     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit) {
-  for (int i=0; i<Vh*4*3*2; i++) res[i] = 0.0;
+  for (int i=0; i<Vh*mySpinorSiteSize; i++) res[i] = 0.0;
   
   gFloat *gaugeEven[4], *gaugeOdd[4];
   gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
@@ -149,27 +147,101 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
   }
   
   for (int i = 0; i < Vh; i++) {
+
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink_mg4dir(i, dir, oddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1);
+      sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
       
       sFloat projectedSpinor[mySpinorSiteSize], gaugedSpinor[mySpinorSiteSize];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       
       for (int s = 0; s < 4; s++) {
-	if (dir % 2 == 0)
-	  su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
-	else
-	  su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
       }
       
       sum(&res[i*(4*3*2)], &res[i*(4*3*2)], gaugedSpinor, 4*3*2);
     }
+
   }
 }
 
 #endif
+
+// this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
+void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
+		QudaPrecision precision) {
+  
+#ifndef MULTI_GPU  
+  if (precision == QUDA_DOUBLE_PRECISION)
+    dslashReference((double*)out, (double**)gauge, (double*)in, oddBit, daggerBit);
+  else
+    dslashReference((float*)out, (float**)gauge, (float*)in, oddBit, daggerBit);
+#else
+
+  void *ghostGauge[4], *sendGauge[4];
+  for (int d=0; d<4; d++) {
+    ghostGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
+    sendGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
+  }
+
+  { // Exchange gauge matrices at boundary
+    set_dim(Z);
+    pack_ghost(gauge, sendGauge, 1, precision);
+    int nFace = 1;
+    FaceBuffer faceBuf(Z, 4, gaugeSiteSize, nFace, precision);
+    faceBuf.exchangeCpuLink(ghostGauge, sendGauge);
+  }
+  
+  // Get spinor ghost fields
+  // First wrap the input spinor into a ColorSpinorField
+  ColorSpinorParam csParam;
+  csParam.v = in;
+  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
+  csParam.nColor = 3;
+  csParam.nSpin = 4;
+  csParam.nDim = 4;
+  for (int d=0; d<4; d++) csParam.x[d] = Z[d];
+  csParam.precision = precision;
+  csParam.pad = 0;
+  csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  csParam.x[0] /= 2;
+  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  
+  cpuColorSpinorField inField(csParam);
+
+  {  // Now do the exchange
+    QudaParity otherParity;
+    if (oddBit == QUDA_EVEN_PARITY) otherParity = QUDA_ODD_PARITY;
+    else if (oddBit == QUDA_ODD_PARITY) otherParity = QUDA_EVEN_PARITY;
+    else errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
+
+    int nFace = 1;
+    FaceBuffer faceBuf(Z, 4, mySpinorSiteSize, nFace, precision);
+    faceBuf.exchangeCpuSpinor(inField, otherParity, daggerBit); 
+  }
+  void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
+  void** back_nbr_spinor = inField.backGhostFaceBuffer;
+
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    dslashReference((double*)out, (double**)gauge, (double**)ghostGauge, (double*)in, 
+		    (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+  } else{
+    dslashReference((float*)out, (float**)gauge, (float**)ghostGauge, (float*)in, 
+		    (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+  }
+
+  for (int d=0; d<4; d++) {
+    free(ghostGauge[d]);
+    free(sendGauge[d]);
+  }
+#endif
+
+}
 
 // applies b*(1 + i*a*gamma_5)
 template <typename sFloat>
@@ -214,81 +286,6 @@ void twist_gamma5(void *out, void *in,  int daggerBit, double kappa, double mu, 
   } 
 }
 
-
-// this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
-void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
-		QudaPrecision precision) {
-  
-#ifndef MULTI_GPU  
-
-  if (precision == QUDA_DOUBLE_PRECISION)
-    dslashReference((double*)out, (double**)gauge, (double*)in, oddBit, daggerBit);
-  else
-    dslashReference((float*)out, (float**)gauge, (float*)in, oddBit, daggerBit);
-
-#else
-
-  void *ghostGauge[4], *sendGauge[4];
-  for (int d=0; d<4; d++) {
-    ghostGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
-    sendGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
-  }
-
-  { // Exchange gauge matrices at boundary
-    set_dim(Z);
-    pack_ghost(gauge, sendGauge, 1, precision);
-    int nFace = 1;
-    FaceBuffer faceBuf(Z, 4, gaugeSiteSize, nFace, precision);
-    faceBuf.exchangeCpuLink(ghostGauge, sendGauge);
-  }
-  
-  // Get spinor ghost fields
-  // First wrap the input spinor into a ColorSpinorField
-  ColorSpinorParam csParam;
-  csParam.v = in;
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
-  csParam.nColor = 3;
-  csParam.nSpin = 4;
-  csParam.nDim = 4;
-  for (int d=0; d<4; d++) csParam.x[d] = Z[d];
-  csParam.precision = precision;
-  csParam.pad = 0;
-  csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  csParam.x[0] /= 2;
-  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  for (int d=0; d<3; d++) csParam.ghostDim[d] = false; // only parallelizes over T at the moment
-  csParam.ghostDim[3] = true;
-  
-  cpuColorSpinorField inField(csParam);
-
-  {  // Now do the exchange
-    QudaParity otherParity = (QudaParity)((oddBit + 1)%2);
-    int nFace = 1;
-    FaceBuffer faceBuf(Z, 4, mySpinorSiteSize, nFace, precision);
-    faceBuf.exchangeCpuSpinor(inField, otherParity, daggerBit); 
-  }
-  void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
-  void** back_nbr_spinor = inField.backGhostFaceBuffer;
-
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    dslashReference((double*)out, (double**)gauge, (double**)ghostGauge, (double*)in, 
-		    (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
-  } else{
-    dslashReference((float*)out, (float**)gauge, (float**)ghostGauge, (float*)in, 
-		    (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
-  }
-
-  for (int d=0; d<4; d++) {
-    free(ghostGauge[d]);
-    free(sendGauge[d]);
-  }
-
-#endif
-
-}
 
 void tm_dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double mu, 
 	       QudaTwistFlavorType flavor, int oddBit, int daggerBit, QudaPrecision precision) {

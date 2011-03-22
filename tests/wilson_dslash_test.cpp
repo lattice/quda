@@ -15,7 +15,7 @@
 #include <wilson_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 2;
 
 // Dirac operator type
 const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -29,7 +29,7 @@ const int transfer = 0; // include transfer time in the benchmark?
 const int loops = 100;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -49,17 +49,17 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 24;
+  gauge_param.X[0] = 8;
+  gauge_param.X[1] = 16;
+  gauge_param.X[2] = 8;
+  gauge_param.X[3] = 8;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;

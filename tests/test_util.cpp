@@ -7,6 +7,8 @@
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
 
+#include <face_quda.h>
+
 #define XUP 0
 #define YUP 1
 #define ZUP 2
@@ -447,8 +449,11 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
     }
   }
     
+  // only apply T-boundary at edge nodes
+  bool Ntm1 = (commCoords(3) == commDim(3)-1) ? true : false;
+
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && Ntm1) {
     for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
       for (int i = 0; i < gaugeSiteSize; i++) {
 	gauge[3][j*gaugeSiteSize+i] *= -1.0;

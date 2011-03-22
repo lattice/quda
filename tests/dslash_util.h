@@ -238,8 +238,8 @@ Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **g
 }
 
 template <typename Float>
-Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField,
-			     Float** fwd_nbr_spinor, Float** back_nbr_spinor, int neighbor_distance)
+Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField, Float** fwd_nbr_spinor, 
+			     Float** back_nbr_spinor, int neighbor_distance, int nFace)
 {
   int j;
   int nb = neighbor_distance;
@@ -269,7 +269,7 @@ Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField,
     {
       int new_x1 = (x1 - nb + X1)% X1;
       if(x1 - nb < 0){ 
-        int offset = ( x1+3- nb)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
+        int offset = ( x1+nFace- nb)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
         return back_nbr_spinor[0] + offset*mySpinorSiteSize;
       } 
       j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
@@ -289,7 +289,7 @@ Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField,
     {
       int new_x2 = (x2 - nb + X2)% X2;
       if(x2 - nb < 0){ 
-        int offset = ( x2 + 3 -nb)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
+        int offset = ( x2 + nFace -nb)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
         return back_nbr_spinor[1] + offset*mySpinorSiteSize;
       } 
       j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
@@ -309,7 +309,7 @@ Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField,
     {
       int new_x3 = (x3 - nb + X3)% X3;
       if(x3 - nb < 0){ 
-        int offset = ( x3 + 3 -nb)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
+        int offset = ( x3 + nFace -nb)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
         return back_nbr_spinor[2] + offset*mySpinorSiteSize;
       }
       j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
@@ -330,7 +330,7 @@ Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField,
       j = neighborIndex_mg(i, oddBit, -nb, 0, 0, 0);
       int x4 = x4_mg(i, oddBit);
       if ( (x4 - nb) < 0){
-        int offset = ( x4 - nb +3)*Vsh_t;
+        int offset = ( x4 - nb +nFace)*Vsh_t;
         return &back_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
       }
       break;

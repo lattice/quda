@@ -363,9 +363,7 @@ void cpuColorSpinorField::PrintVector(unsigned int x) {
 
 void cpuColorSpinorField::allocateGhostBuffer(void)
 {
-  if(initGhostFaceBuffer){
-    return;
-  }
+  if (initGhostFaceBuffer) return;
 
   if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
     errorQuda("Full spinor is not supported in alllocateGhostBuffer\n");
@@ -381,9 +379,8 @@ void cpuColorSpinorField::allocateGhostBuffer(void)
 	       X1*X2*X3/2};
   
   int num_faces = 1;
-  if(this->nSpin == 1){  //staggered
-    num_faces = 3; 
-  }
+  if(this->nSpin == 1) num_faces = 3; // staggered
+
   int spinor_size = 2*this->nSpin*this->nColor*this->precision;
   for(int i=0;i < 4; i++){
     fwdGhostFaceBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
@@ -404,9 +401,8 @@ void cpuColorSpinorField::allocateGhostBuffer(void)
 
 void cpuColorSpinorField::freeGhostBuffer(void)
 {
-  if(!initGhostFaceBuffer){
-    return;
-  }
+  if(!initGhostFaceBuffer) return;
+
   for(int i=0;i < 4; i++){
     free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
     free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
