@@ -209,3 +209,7 @@ void reduceDoubleArray(double *sum, const int len) {
 #endif
 
 }
+
+int commDim(int dir) { return comm_dim(dir); }
+
+int commCoords(int dir) { return comm_coords(dir); }

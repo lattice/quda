@@ -21,6 +21,8 @@ void            comm_set_gridsize(int x, int y, int z, int t);
 void		comm_init(void);
 int		comm_rank(void);
 int		comm_size(void);
+int             comm_dim(int);
+int             comm_coords(int);
 unsigned long	comm_send(void*, int, int);
 unsigned long   comm_send_with_tag(void*, int, int, int);
 unsigned long	comm_recv(void*, int, int);

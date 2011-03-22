@@ -110,7 +110,6 @@ void initQuda(int dev)
 #ifdef QMP_COMMS
   int ndim;
   const int *dim;
-  const int *coords;
 
   if ( QMP_is_initialized() != QMP_TRUE ) {
     errorQuda("QMP is not initialized");
@@ -127,12 +126,6 @@ void initQuda(int dev)
   if(  (dim[0] != 1) || (dim[1] != 1) || (dim[2] != 1) )  { 
     errorQuda("This code needs all spatial dimensions local for now");
   }
-  coords = QMP_get_logical_coordinates();
-  if( coords[3] == 0 ) qudaPt0=true;
-  else qudaPt0=false;
-
-  if( coords[3] == dim[3]-1 ) qudaPtNm1=true;
-  else qudaPtNm1=false;
 
 #elif defined(MPI_COMMS)
 
@@ -142,7 +135,13 @@ void initQuda(int dev)
 #else
   if (dev < 0) dev = deviceCount - 1;
 #endif
+  
+  // Used for applying the gauge field boundary condition
+  if( commCoords(3) == 0 ) qudaPt0=true;
+  else qudaPt0=false;
 
+  if( commCoords(3) == commDim(3)-1 ) qudaPtNm1=true;
+  else qudaPtNm1=false;
 
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);

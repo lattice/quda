@@ -69,9 +69,6 @@ class FaceBuffer {
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 			int veclength, ReconstructType reconstruct, int V, int Vs);
 
-void reduceDouble(double &);
-void reduceDoubleArray(double *, const int len);
-
 #else // MPI comms
 
 #define XUP 0
@@ -138,9 +135,12 @@ class FaceBuffer {
   void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
 };
 
+#endif // MPI_COMMS
+
 void reduceDouble(double &);
 void reduceDoubleArray(double *, const int len);
 
-#endif // MPI_COMMS
+int commDim(int);
+int commCoords(int);
 
 #endif // _FACE_QUDA_H

@@ -501,3 +501,11 @@ void reduceDoubleArray(double *sum, const int len) {
 #endif
 
 }
+
+#ifdef QMP_COMMS
+int commDim(int dir) { return QMP_get_logical_dimensions()[dir]; }
+int commCoords(int dir) { return QMP_get_logical_coordinates()[dir]; }
+#else
+int commDim(int dir) { return 1; }
+int commCoords(int dir) { return 0; }
+#endif
