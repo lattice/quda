@@ -274,9 +274,6 @@ invert_test(void)
   }
 
 
-  
-  
-#ifdef MULTI_GPU
   int fat_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
   int link_pad =  3*MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
   if(testtype == 6){    
@@ -284,7 +281,9 @@ invert_test(void)
 		 longlink, link_pad,
 		 link_recon, link_recon_sloppy,
 		 &gaugeParam);        
-   }else{
+   }else{ 
+    
+#ifdef MULTI_GPU
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.ga_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
@@ -295,18 +294,19 @@ invert_test(void)
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);
-  }
 
 #else
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(fatlink, &gaugeParam);
-  
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.reconstruct = link_recon;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda(longlink, &gaugeParam);
+    gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda(fatlink, &gaugeParam);
+    
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+    gaugeParam.reconstruct = link_recon;
+    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    loadGaugeQuda(longlink, &gaugeParam);
 #endif
+  }
+
   
   double time0 = -((double)clock()); // Start the timer
   
