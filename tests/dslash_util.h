@@ -14,7 +14,7 @@ void setDims(int *X) {
     faceVolume[d] = 1;
     for (int i=0; i<4; i++) {
       if (i==d) continue;
-      faceVolume[d] *= X[d];
+      faceVolume[d] *= X[i];
     }
   }
   Vh = V/2;

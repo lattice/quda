@@ -15,7 +15,7 @@
 #include <wilson_dslash_reference.h>
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 2;
+const int test_type = 0;
 
 // Dirac operator type
 const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -49,10 +49,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 8;
-  gauge_param.X[1] = 16;
-  gauge_param.X[2] = 8;
-  gauge_param.X[3] = 8;
+  gauge_param.X[0] = 24;
+  gauge_param.X[1] = 24;
+  gauge_param.X[2] = 24;
+  gauge_param.X[3] = 24;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
