@@ -39,7 +39,7 @@ DslashParam dslashParam;
 // these are set in initDslashConst
 int Vspatial;
 #ifdef MULTI_GPU
-static const int Nstream = 3;
+static const int Nstream = 5;
 #else
 static const int Nstream = 1;
 #endif
@@ -650,13 +650,9 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
   };
   for(int i=0 ;i < 4;i++){
-#ifdef MPI_COMMS
     if(!commDimPartitioned(i)){
       continue;
     }
-#else
-    //QMP case here
-#endif
     initTLocation(dims[i]-6, exterior_kernel_flag[i] , 6*Vsh[i]);  
 
     DSLASH(staggeredDslash, Axpy, exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-2], out, outNorm, 

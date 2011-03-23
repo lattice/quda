@@ -143,11 +143,15 @@ extern "C" {
   void set_dim(int *);
   void pack_ghost(void **cpuLink, void **cpuGhost, int nFace, QudaPrecision precision);
 
+#ifdef HOST_DEBUG
 #define CUERR  do{ cudaError_t cuda_err;                                \
     if ((cuda_err = cudaGetLastError()) != cudaSuccess) {               \
       fprintf(stderr, "ERROR: CUDA error: %s, line %d, function %s, file %s\n", \
               cudaGetErrorString(cuda_err),  __LINE__, __FUNCTION__, __FILE__); \
       exit(cuda_err);}}while(0)
+#else
+#define CUERR
+#endif
 
 extern int verbose;
   

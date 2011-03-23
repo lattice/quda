@@ -144,8 +144,8 @@ ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
 endif
 
 ifeq ($(strip $(HOST_DEBUG)), yes)
-  NVCCOPT += -g
-  COPT += -g -fno-inline
+  NVCCOPT += -g -DHOST_DEBUG
+  COPT += -g -fno-inline -DHOST_DEBUG
 endif
 ifeq ($(strip $(DEVICE_DEBUG)), yes)
   NVCCOPT += -G

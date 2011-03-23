@@ -11,5 +11,6 @@ void link_format_gpu_to_cpu(void* dst, void* src,
 void collectGhostSpinor(void *in, const void *inNorm,
 			void* ghost_spinor_gpu,		   
 			int dir, int whichway,
-			const int parity, cudaColorSpinorField* inSpinor);
+			const int parity, cudaColorSpinorField* inSpinor,
+			cudaStream_t* stream);
 #endif

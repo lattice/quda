@@ -342,7 +342,8 @@ void
 collectGhostSpinor(void *in, const void *inNorm,
                    void* ghost_spinor_gpu,		   
 		   int dir, int whichway,
-                   const int parity, cudaColorSpinorField* inSpinor)
+                   const int parity, cudaColorSpinorField* inSpinor, 
+		   cudaStream_t* stream)
 {
   
   dim3 gridDim(inSpinor->Volume()/BLOCKSIZE, 1, 1);
@@ -353,10 +354,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 0:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu);
+	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu);
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu);
+	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu);
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -367,10 +368,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 1:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -381,10 +382,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 2:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -395,10 +396,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 3:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -413,10 +414,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 0:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu);
+	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu);
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu);
+	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu);
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -427,10 +428,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 1:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -441,10 +442,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 2:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -455,10 +456,10 @@ collectGhostSpinor(void *in, const void *inNorm,
     case 3:
       switch(whichway){
       case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
 	break;
       case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
 	break;
       default:
 	errorQuda("Invalid whichway");
@@ -472,7 +473,6 @@ collectGhostSpinor(void *in, const void *inNorm,
     printf("ERROR: half precision not implemented yet for %s\n", __FUNCTION__);
     exit(1);
   }
-  cudaThreadSynchronize();
   CUERR;
 }
 

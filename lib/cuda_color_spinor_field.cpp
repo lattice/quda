@@ -529,7 +529,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
   }
   
   CUERR;
-  collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this); CUERR;
+  collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
   cudaMemcpyAsync(ghost_spinor, gpu_buf, 3*len, cudaMemcpyDeviceToHost, *stream); CUERR;
 
   

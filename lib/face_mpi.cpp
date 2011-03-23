@@ -113,11 +113,9 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
 
   for(int dir = dir_start; dir  < 4; dir++){
-#ifdef GPU_STAGGERED_DIRAC
-    if(!comm_dim_partitioned(dir)){
+    if(!commDimPartitioned(dir)){
       continue;
     }
-#endif
     // Prepost all receives
     recv_request1[dir] = comm_recv_with_tag(pagable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
     recv_request2[dir] = comm_recv_with_tag(pagable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
@@ -141,11 +139,9 @@ void FaceBuffer::exchangeFacesComms() {
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
 
   for(int dir = dir_start; dir < 4; dir++){
-#ifdef GPU_STAGGERED_DIRAC
-    if(!comm_dim_partitioned(dir)){
+    if(!commDimPartitioned(dir)){
       continue;
     }
-#endif
     memcpy(pagable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
     send_request2[dir] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
     
@@ -160,11 +156,9 @@ void FaceBuffer::exchangeFacesComms() {
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
 {
   for(int dir = dir_start ; dir < 4; dir++){
-#ifdef GPU_STAGGERED_DIRAC
-    if(!comm_dim_partitioned(dir)){
+    if(!commDimPartitioned(dir)){
       continue;
     }
-#endif
     comm_wait(recv_request2[dir]);  
     comm_wait(send_request2[dir]);
     memcpy(fwd_nbr_spinor[dir], pagable_fwd_nbr_spinor[dir], nbytes[dir]);
