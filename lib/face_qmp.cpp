@@ -511,6 +511,6 @@ void commDimPartitionedSet(int dir){ manual_set_partition[dir] = 1; }
 #else
 int commDim(int dir) { return 1; }
 int commCoords(int dir) { return 0; }
-int commDimPartitioned(int dir){errorQuda("%s is not implemented \n", __FUNCTION__); }
-void commDimPartitionedSet(int dir){ errorQuda("%s not implemented\n", __FUNCTION__); }
+int commDimPartitioned(int dir){ return 0; }
+void commDimPartitionedSet(int dir){ }
 #endif
