@@ -193,14 +193,7 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   // allocate the ghost buffer if not yet allocated
   spinor.allocateGhostBuffer();
 
-  for(int i=dir_start;i < 4; i++){
-    //FIXME: in staggered the cpu code is currently hard-coded to use the ghost zone in each direction
-    /*
-    if(!comm_dim_partitioned(i)){
-      continue;
-    }
-    */
-
+  for(int i=0;i < 4; i++){
     spinor.packGhost(spinor.backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, (QudaParity)oddBit, dagger);
     spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, (QudaParity)oddBit, dagger);
   }
@@ -212,29 +205,14 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
-  for(int i= dir_start;i < 4; i++){
-    //FIXME: in staggered the cpu code is currently hard-coded to use the ghost zone in each direction
-    /*
-    if(!comm_dim_partitioned(i)){
-      continue;
-    }
-    */
-
+  for(int i= 0;i < 4; i++){
     recv_request1[i] = comm_recv_with_tag(spinor.backGhostFaceBuffer[i], len[i], back_nbr[i], uptags[i]);
     recv_request2[i] = comm_recv_with_tag(spinor.fwdGhostFaceBuffer[i], len[i], fwd_nbr[i], downtags[i]);    
     send_request1[i]= comm_send_with_tag(spinor.fwdGhostFaceSendBuffer[i], len[i], fwd_nbr[i], uptags[i]);
     send_request2[i] = comm_send_with_tag(spinor.backGhostFaceSendBuffer[i], len[i], back_nbr[i], downtags[i]);
   }
 
-  for(int i=dir_start;i < 4;i++){
-    //FIXME: in staggered the cpu code is currently hard-coded to use the ghost zone in each direction
-    /*
-    if(!comm_dim_partitioned(i)){
-      continue;
-    }
-    */
-
-
+  for(int i=0;i < 4;i++){
     comm_wait(recv_request1[i]);
     comm_wait(recv_request2[i]);
     comm_wait(send_request1[i]);
