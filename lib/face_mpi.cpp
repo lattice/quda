@@ -252,7 +252,6 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
   for(int dir =0; dir < 4; dir++)
     {
       int len = 2*nFace*faceVolumeCB[dir]*Ninternal;
-
       unsigned long recv_request = 
 	comm_recv_with_tag(ghost_link[dir], len*precision, back_nbrs[dir], uptags[dir]);
       unsigned long send_request = 
@@ -282,3 +281,7 @@ void reduceDoubleArray(double *sum, const int len) {
 int commDim(int dir) { return comm_dim(dir); }
 
 int commCoords(int dir) { return comm_coords(dir); }
+
+int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
+
+void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}

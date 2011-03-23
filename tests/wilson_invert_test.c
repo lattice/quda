@@ -125,10 +125,8 @@ int main(int argc, char **argv)
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
 
-  inv_param.ghostDim[0] = 0;
-  inv_param.ghostDim[1] = 0;
-  inv_param.ghostDim[2] = 0;
-  inv_param.ghostDim[3] = 1;
+  //set the T dimension partitioning flag
+  commDimPartitionedSet(3);
 
   inv_param.verbosity = QUDA_VERBOSE;
 

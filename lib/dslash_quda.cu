@@ -651,7 +651,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   };
   for(int i=0 ;i < 4;i++){
 #ifdef MPI_COMMS
-    if(!comm_dim_partitioned(i)){
+    if(!commDimPartitioned(i)){
       continue;
     }
 #else
@@ -679,7 +679,7 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
   dslashParam.parity = parity;
   dslashParam.threads = in->volume;
   for(int i=0;i < 4;i++){
-    dslashParam.ghostDim[i] = in->ghostDim[i];
+    dslashParam.ghostDim[i] = commDimPartitioned(i);
     dslashParam.ghostOffset[i] = in->ghostOffset[i];
   }
   void *fatGauge0, *fatGauge1;

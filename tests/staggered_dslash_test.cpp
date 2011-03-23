@@ -127,9 +127,13 @@ void init()
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
-    
-  gaugeParam.ga_pad = sdim*sdim*sdim/2;
-  inv_param.sp_pad = sdim*sdim*sdim/2;
+
+  int tmpint = MAX(X[1]*X[2]*X[3], X[0]*X[2]*X[3]);
+  tmpint = MAX(tmpint, X[0]*X[1]*X[3]);
+  tmpint = MAX(tmpint, X[0]*X[1]*X[2]);
+  
+  
+  inv_param.sp_pad = tmpint;
 
   ColorSpinorParam csParam;
   csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
@@ -277,18 +281,6 @@ void init()
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /=2;
     }
-#ifdef MULTI_GPU	
-    for (int d=0; d<4; d++) {
-      csParam.ghostDim[d] = comm_dim_partitioned(d);
-    }
-#else  
-    for (int d=0; d<4; d++) csParam.ghostDim[d] = false;
-    csParam.ghostDim[0] = true;
-    csParam.ghostDim[1] = true;
-    csParam.ghostDim[2] = true;
-    csParam.ghostDim[3] = true;
-
-#endif
 
     printfQuda("Creating cudaSpinor\n");
     cudaSpinor = new cudaColorSpinorField(csParam);
@@ -426,9 +418,17 @@ void staggeredDslashRef()
   case 0:    
 #ifdef MULTI_GPU
 
+#if 1
     staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
 			    spinor, parity, dagger,
 			    inv_param.cpu_prec, gaugeParam.cpu_prec);
+#else
+
+    staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, 0, dagger, 
+		     inv_param.cpu_prec, gaugeParam.cpu_prec);
+#endif
+
+
 #else
     cpu_parity = 0; //EVEN
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 

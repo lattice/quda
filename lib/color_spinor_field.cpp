@@ -1,6 +1,7 @@
 #include <color_spinor_field.h>
 #include <string.h>
 #include <iostream>
+#include <face_quda.h>
 
 /*ColorSpinorField::ColorSpinorField() : init(false) {
 
@@ -15,7 +16,7 @@ ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(para
 {
   create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
 	 param.fieldLocation, param.siteSubset, param.siteOrder, param.fieldOrder, 
-	 param.gammaBasis, param.ghostDim);
+	 param.gammaBasis);
 
 }
 
@@ -24,7 +25,7 @@ ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(fiel
 {
   create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
 	 field.fieldLocation, field.siteSubset, field.siteOrder, field.fieldOrder, 
-	 field.gammaBasis, field.ghostDim);
+	 field.gammaBasis);
 
 }
 
@@ -48,7 +49,7 @@ void ColorSpinorField::createGhostZone() {
   int ghostVolume = 0;
   for (int i=0; i<nDim; i++) {
     ghostFace[i] = 0;
-    if (ghostDim[i]) {
+    if (commDimPartitioned(i)) {
       ghostFace[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
@@ -64,7 +65,7 @@ void ColorSpinorField::createGhostZone() {
       ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1];
     }
     if (verbose == QUDA_DEBUG_VERBOSE) 
-      printfQuda("face %d = %6d ghostDim = %6d ghostOffset = %6d\n", i, ghostFace[i], ghostDim[i], ghostOffset[i]);
+      printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d\n", i, ghostFace[i], commDimPartitioned(i), ghostOffset[i]);
   }
   int ghostNormVolume = num_norm_faces * ghostVolume;
   ghostVolume *= num_faces;
@@ -108,7 +109,7 @@ void ColorSpinorField::createGhostZone() {
 void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 			      QudaPrecision Prec, int Pad, QudaFieldLocation fieldLocation, 
 			      QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, 
-			      QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, const bool *ghostDim) {
+			      QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis) {
   this->fieldLocation = fieldLocation;
   this->siteSubset = siteSubset;
   this->siteOrder = siteOrder;
@@ -128,7 +129,6 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
   for (int d=0; d<nDim; d++) {
     x[d] = X[d];
     volume *= x[d];
-    this->ghostDim[d] = ghostDim[d];
   }
   pad = Pad;
   if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -157,7 +157,7 @@ ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
   if (&src != this) {
     create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
 	   src.precision, src.pad, src.fieldLocation, src.siteSubset, 
-	   src.siteOrder, src.fieldOrder, src.gammaBasis, src.ghostDim);    
+	   src.siteOrder, src.fieldOrder, src.gammaBasis);    
   }
   return *this;
 }
@@ -179,10 +179,6 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
     if (param.x[0] != 0) x[d] = param.x[d];
     volume *= x[d];
   }
-  for (int d=0; d<nDim; d++) {
-    ghostDim[d] = param.ghostDim[d];
-  }
-  
   
   if (param.pad != 0) pad = param.pad;
 
@@ -227,7 +223,6 @@ void ColorSpinorField::fill(ColorSpinorParam &param) const {
   param.fieldOrder = fieldOrder;
   param.gammaBasis = gammaBasis;
   param.create = QUDA_INVALID_FIELD_CREATE;
-  memcpy(param.ghostDim, ghostDim, QUDA_MAX_DIM*sizeof(bool));
   param.verbose = verbose;
 }
 

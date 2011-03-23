@@ -137,10 +137,20 @@ class FaceBuffer {
 
 #endif // MPI_COMMS
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void reduceDouble(double &);
 void reduceDoubleArray(double *, const int len);
 
 int commDim(int);
 int commCoords(int);
+int commDimPartitioned(int dir);
+void commDimPartitionedSet(int dir);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _FACE_QUDA_H

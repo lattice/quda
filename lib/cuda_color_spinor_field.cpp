@@ -174,7 +174,6 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     param.v = v;
     param.norm = norm;
-    memcpy(param.ghostDim, ghostDim, nDim*sizeof(bool));
     even = new cudaColorSpinorField(*this, param);
     odd = new cudaColorSpinorField(*this, param);
     // need this hackery for the moment (need to locate the odd pointer half way into the full field)

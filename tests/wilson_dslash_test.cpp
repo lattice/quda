@@ -148,9 +148,10 @@ void init() {
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
-  
-  for (int d=0; d<3; d++) csParam.ghostDim[d] = false;
-  csParam.ghostDim[3] = true;
+
+  //set the T dimension partitioning flag
+  commDimPartitionedSet(3);
+
   //csParam.verbose = QUDA_DEBUG_VERBOSE;
 
   spinor = new cpuColorSpinorField(csParam);

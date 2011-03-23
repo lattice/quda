@@ -288,7 +288,7 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink
     fatlinkOdd[dir] = fatlink[dir] + Vh*gaugeSiteSize;
     longlinkEven[dir] =longlink[dir];
     longlinkOdd[dir] = longlink[dir] + Vh*gaugeSiteSize;
-
+    
     ghostFatlinkEven[dir] = ghostFatlink[dir];
     ghostFatlinkOdd[dir] = ghostFatlink[dir] + Vsh[dir]*gaugeSiteSize;
     ghostLonglinkEven[dir] = ghostLonglink[dir];
@@ -330,8 +330,9 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** ghostFatlink
 
         su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
         sub(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
-
+	
       }
+
     }
     if (daggerBit){
       negx(&res[i*mySpinorSiteSize], mySpinorSiteSize);

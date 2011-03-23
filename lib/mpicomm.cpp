@@ -76,7 +76,7 @@ comm_dim_partitioned(int dir)
   case 3: 
     ret = (tgridsize > 1);
     break;    
-  defaut:
+  default:
     printf("ERROR: invalid direction\n");
     comm_exit(1);
   }

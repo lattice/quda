@@ -36,7 +36,6 @@ class ColorSpinorParam {
   void *v; // pointer to field
   void *norm;
 
-  bool ghostDim[QUDA_MAX_DIM]; // which of the dimensions are we parallelizing
 
   ColorSpinorParam(const ColorSpinorField &a);
 
@@ -51,7 +50,6 @@ class ColorSpinorParam {
     { 
       for(int d=0; d<QUDA_MAX_DIM; d++) {
 	x[d] = 0; 
-	ghostDim[d] = false;
       }
     }
   
@@ -67,7 +65,6 @@ class ColorSpinorParam {
 
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
-    for (int d=0; d<nDim; d++) ghostDim[d] = inv_param.ghostDim[d];
 
     if (!pc_solution) {
       siteSubset = QUDA_FULL_SITE_SUBSET;;
@@ -106,15 +103,6 @@ class ColorSpinorParam {
   {
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
-    /*
-    for (int d=0; d<nDim; d++) ghostDim[d] = false;
-#ifdef MULTI_GPU
-    ghostDim[nDim-1] = true; // currently only parallelizing over outer most dimension
-#endif
-    */
-    for(int d=0; d < nDim; d++) {
-      ghostDim[d] = inv_param.ghostDim[d];
-    }
 
     if (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) {
       fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -131,7 +119,6 @@ class ColorSpinorParam {
     printfQuda("twistFlavor = %d\n", twistFlavor);
     printfQuda("nDim = %d\n", nDim);
     for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
-    for (int d=0; d<nDim; d++) printfQuda("ghostDim[%d] = %d\n", d, ghostDim[d]);
     printfQuda("precision = %d\n", precision);
     printfQuda("pad = %d\n", pad);
     printfQuda("siteSubset = %d\n", siteSubset);
@@ -152,8 +139,7 @@ class ColorSpinorField {
  private:
   void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 	      QudaPrecision precision, int pad, QudaFieldLocation location, QudaSiteSubset subset, 
-	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-	      const bool *ghostDim);
+	      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
   void destroy();  
 
   QudaVerbosity verbose;
@@ -178,7 +164,6 @@ class ColorSpinorField {
   int length; // length including pads, but not ghost zone - used for BLAS
 
   // multi-GPU parameters
-  bool ghostDim[QUDA_MAX_DIM];// which dimensions we are parallelizing
   int ghostFace[QUDA_MAX_DIM];// the size of each face
   int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
 
