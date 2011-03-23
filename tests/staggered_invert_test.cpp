@@ -8,6 +8,7 @@
 #include <staggered_dslash_reference.h>
 #include <quda.h>
 #include <string.h>
+#include <face_quda.h>
 #include "misc.h"
 #include "gauge_quda.h"
 
@@ -147,7 +148,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
   for(int i =0;i < 4;i++){
-    inv_param->ghostDim[i] = comm_dim_partitioned(i);
+    inv_param->ghostDim[i] = commDimPartitioned(i);
   }
 
 }
@@ -521,10 +522,10 @@ display_test_info()
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     comm_dim_partitioned(0),
-	     comm_dim_partitioned(1),
-	     comm_dim_partitioned(2),
-	     comm_dim_partitioned(3)); 
+	     commDimPartitioned(0),
+	     commDimPartitioned(1),
+	     commDimPartitioned(2),
+	     commDimPartitioned(3)); 
   
   return ;
   
@@ -725,7 +726,7 @@ int main(int argc, char** argv)
       int value  =  atoi(argv[i+1]);
       for(int j=0; j < 4;j++){
 	if (value &  (1 << j)){
-	  comm_dim_partitioned_set(j);
+	  commDimPartitionedSet(j);
 	}
       }
       i++;

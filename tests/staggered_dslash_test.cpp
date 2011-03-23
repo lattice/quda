@@ -133,6 +133,7 @@ void init()
   tmpint = MAX(tmpint, X[0]*X[1]*X[2]);
   
   
+  gaugeParam.ga_pad = tmpint;
   inv_param.sp_pad = tmpint;
 
   ColorSpinorParam csParam;
@@ -524,10 +525,10 @@ void display_test_info()
 	     test_type, dagger, sdim, tdim);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     comm_dim_partitioned(0),
-	     comm_dim_partitioned(1),
-	     comm_dim_partitioned(2),
-	     comm_dim_partitioned(3));
+	     commDimPartitioned(0),
+	     commDimPartitioned(1),
+	     commDimPartitioned(2),
+	     commDimPartitioned(3));
 
   return ;
     
@@ -688,7 +689,7 @@ int main(int argc, char **argv)
       int value  =  atoi(argv[i+1]);
       for(int j=0; j < 4;j++){
 	if (value &  (1 << j)){
-	  comm_dim_partitioned_set(j);
+	  commDimPartitionedSet(j);
 	}
       }
       i++;
