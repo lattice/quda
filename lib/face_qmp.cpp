@@ -507,7 +507,7 @@ static int manual_set_partition[4] ={0, 0, 0, 0};
 int commDim(int dir) { return QMP_get_logical_dimensions()[dir]; }
 int commCoords(int dir) { return QMP_get_logical_coordinates()[dir]; }
 int commDimPartitioned(int dir){ return (manual_set_partition[dir] || ((commDim(dir) > 1)));}
-void commDimPartitionedSet(int dir){ manual_set_parition[dir] = 1; }
+void commDimPartitionedSet(int dir){ manual_set_partition[dir] = 1; }
 #else
 int commDim(int dir) { return 1; }
 int commCoords(int dir) { return 0; }
