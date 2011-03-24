@@ -5,7 +5,7 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 {
   // dimensions of the face (FIXME: optimize using constant cache)
 
-  int face_X = X1, face_Y = X2, face_Z = X3, face_T = X4;
+  int face_X = X1, face_Y = X2, face_Z = X3; // face_T = X4;
   switch (dir) {
   case 0:
     face_X = nLayers;
@@ -17,7 +17,7 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
     face_Z = nLayers;
     break;
   case 3:
-    face_T = nLayers;
+    // face_T = nLayers;
     break;
   }
   int face_XYZ = face_X * face_Y * face_Z;
@@ -43,19 +43,19 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 
   // reconstruct full face index from index into the checkerboard
 
-  int face_idx *= 2;
+  face_idx *= 2;
 
   if (face_XYZ & 1) {
     face_idx += face_parity;
   } else if (face_XY & 1) {
-    int t = face_idx / faceXYZ;
+    int t = face_idx / face_XYZ;
     face_idx += (face_parity + t) & 1;
   } else if (face_X & 1) {
-    int t = face_idx / faceXYZ;
+    int t = face_idx / face_XYZ;
     int z = (face_idx / face_XY) % face_Z;
     face_idx += (face_parity + t + z) & 1;
   } else { // FIXME: optimize to use only 3 divisions and no mods
-    int t = face_idx / faceXYZ;
+    int t = face_idx / face_XYZ;
     int z = (face_idx / face_XY) % face_Z;
     int y = (face_idx / face_X) % face_Y;
     face_idx += (face_parity + t + z + y) & 1;
@@ -64,25 +64,26 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
   // compute index into the full local volume
 
   int idx = face_idx;
+  int gap, aux;
 
   switch (dir) {
   case 0:
-    int gap = X1 - nLayers;
-    int aux = face_idx / face_X;
+    gap = X1 - nLayers;
+    aux = face_idx / face_X;
     idx += (aux + face_num) * gap;
     break;
   case 1:
-    int gap = X2 - nLayers;
-    int aux = face_idx / face_XY;
+    gap = X2 - nLayers;
+    aux = face_idx / face_XY;
     idx += (aux + face_num) * gap * face_X;
     break;
   case 2:
-    int gap = X3 - nLayers;
-    int aux = face_idx / face_XYZ;
+    gap = X3 - nLayers;
+    aux = face_idx / face_XYZ;
     idx += (aux + face_num) * gap * face_XY;
     break;
   case 3:
-    int gap = X4 - nLayers;
+    gap = X4 - nLayers;
     idx += face_num * gap * face_XYZ;
     break;
   }
@@ -115,52 +116,75 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
   }
 
   // compute an index into the local volume from the index into the face
-  int in_idx = indexFromFaceIndex<dir, 1>(face_idx, face_volume, face_num);
+  int idx = indexFromFaceIndex<dir, 1>(face_idx, face_volume, face_num);
 
-  switch (typeid(FloatN)) {
-  case typeid(double2):
-#define SPINOR_DOUBLE
+  if (typeid(FloatN) == typeid(double2)) {
+
+#if (__CUDA_ARCH__ >= 130)
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_DOUBLE2
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #define SPINORTEX spinorTexDouble
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_DOUBLE2
+#define SPINOR_DOUBLE
 #include "wilson_pack_face_core.h"
-#undef SPINOR_DOUBLE
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
-#undef WRITE_HALF_SPINOR
 #undef SPINORTEX
-    break;
+#undef WRITE_HALF_SPINOR
+#undef SPINOR_DOUBLE
+#endif // (__CUDA_ARCH__ >= 130)
 
-  case typeid(float4):
+  } else if (typeid(FloatN) == typeid(float4)) {
+
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_SINGLE_TEX
+#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #define SPINORTEX spinorTexSingle
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
 #include "wilson_pack_face_core.h"
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
-#undef WRITE_HALF_SPINOR
 #undef SPINORTEX
-    break;
+#undef WRITE_HALF_SPINOR
 
-  case typeid(short4):
+  } else if (typeid(FloatN) == typeid(short4)) {
+
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_SHORT4
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_HALF_TEX
+#define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #define SPINORTEX spinorTexHalf
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_SHORT4
 #include "wilson_pack_face_core.h"
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
-#undef WRITE_HALF_SPINOR
 #undef SPINORTEX
-    break;
+#undef WRITE_HALF_SPINOR
+
   }
 }
 #endif // GPU_WILSON_DIRAC
@@ -173,18 +197,19 @@ void packFaceWilson(FloatN *faces, float *facesNorm, const FloatN *in, const flo
 #ifdef GPU_WILSON_DIRAC
   if (dagger) {
     switch (dir) {
-    case 0: packFaceWilsonKernel<0,1><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 1: packFaceWilsonKernel<1,1><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 2: packFaceWilsonKernel<2,1><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 3: packFaceWilsonKernel<3,1><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 0: packFaceWilsonKernel<0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 1: packFaceWilsonKernel<1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 2: packFaceWilsonKernel<2,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 3: packFaceWilsonKernel<3,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
     }
   } else {
     switch (dir) {
-    case 0: packFaceWilsonKernel<0,0><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 1: packFaceWilsonKernel<1,0><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 2: packFaceWilsonKernel<2,0><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 3: packFaceWilsonKernel<3,0><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-  }  
+    case 0: packFaceWilsonKernel<0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 1: packFaceWilsonKernel<1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 2: packFaceWilsonKernel<2,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 3: packFaceWilsonKernel<3,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    }
+  }
 #else
   errorQuda("Wilson face packing kernel is not built");
 #endif  
@@ -228,10 +253,10 @@ void packFaceAsqtad(Float2 *faces, float *facesNorm, const Float2 *in, const flo
 {
 #ifdef GPU_STAGGERED_DIRAC
     switch (dir) {
-    case 0: packFaceAsqtadKernel<0><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 1: packFaceAsqtadKernel<1><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 2: packFaceAsqtadKernel<2><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 3: packFaceAsqtadKernel<3><<<gridDim, blockDim, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 0: packFaceAsqtadKernel<0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 1: packFaceAsqtadKernel<1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 2: packFaceAsqtadKernel<2><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+    case 3: packFaceAsqtadKernel<3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
     }
 #else
   errorQuda("Asqtad face packing kernel is not built");

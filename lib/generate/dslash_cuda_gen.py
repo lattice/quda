@@ -826,9 +826,8 @@ def pack_face(facenum):
         proj = []
         proj.append(gen(2*dir+facenum, pack_only=True))
         proj.append("// write spinor field back to device memory\n")
-        proj.append("WRITE_HALF_SPINOR(face_volume);\n")
-        proj.append("break;\n")
-        str.append(indent(''.join(proj)))
+        proj.append("WRITE_HALF_SPINOR(face_volume, face_idx);\n")
+        str.append(indent(block(''.join(proj))+"\n"+"break;\n"))
     str.append("}\n\n")
     return ''.join(str)
 # end def pack_face

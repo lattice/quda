@@ -325,7 +325,7 @@
 #define READ_HALF_SPINOR_SINGLE READ_SPINOR_SINGLE_UP
 #define READ_HALF_SPINOR_HALF   READ_SPINOR_HALF_UP
 
-#define WRITE_HALF_SPINOR_DOUBLE2(stride)            \
+#define WRITE_HALF_SPINOR_DOUBLE2(stride, sid)	     \
   out[0*(stride)+sid] = make_double2(a0_re, a0_im);  \
   out[1*(stride)+sid] = make_double2(a1_re, a1_im);  \
   out[2*(stride)+sid] = make_double2(a2_re, a2_im);  \
@@ -333,12 +333,12 @@
   out[4*(stride)+sid] = make_double2(b1_re, b1_im);  \
   out[5*(stride)+sid] = make_double2(b2_re, b2_im);
 
-#define WRITE_HALF_SPINOR_FLOAT4(stride)                          \
+#define WRITE_HALF_SPINOR_FLOAT4(stride, sid)			  \
   out[0*(stride)+sid] = make_float4(a0_re, a0_im, a1_re, a1_im);  \
   out[1*(stride)+sid] = make_float4(a2_re, a2_im, b0_re, b0_im);  \
   out[2*(stride)+sid] = make_float4(b1_re, b1_im, b2_re, b2_im);
 
-#define WRITE_HALF_SPINOR_SHORT4(stride)				\
+#define WRITE_HALF_SPINOR_SHORT4(stride, sid)				\
   float c0 = fmaxf(fabsf(a0_re), fabsf(a0_im));				\
   float c1 = fmaxf(fabsf(a1_re), fabsf(a1_im));				\
   float c2 = fmaxf(fabsf(a2_re), fabsf(a2_im));				\

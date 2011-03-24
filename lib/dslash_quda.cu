@@ -10,6 +10,7 @@
 //#define DIRECT_ACCESS_LINK
 //#define DIRECT_ACCESS_WILSON_SPINOR
 //#define DIRECT_ACCESS_WILSON_ACCUM
+//#define DIRECT_ACCESS_WILSON_PACK_SPINOR
 
 //these are access control for staggered action
 #if (__CUDA_ARCH__ >= 200)
@@ -87,7 +88,7 @@ __device__ float2 short22float2(short2 a) {
 #include <clover_def.h>           // kernels for applying the clover term alone
 
 #ifdef MULTI_GPU
-//#include <pack_face_def.h>        // kernels for packing the ghost zones
+#include <pack_face_def.h>        // kernels for packing the ghost zones
 #endif
 
 #ifndef SHARED_FLOATS_PER_THREAD
