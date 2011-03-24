@@ -318,6 +318,48 @@
   out[sid+4*(stride)] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
   out[sid+5*(stride)] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
 
+
+// macros used for exterior Wilson Dslash kernels and face packing
+
+#define READ_HALF_SPINOR_DOUBLE READ_SPINOR_DOUBLE_UP
+#define READ_HALF_SPINOR_SINGLE READ_SPINOR_SINGLE_UP
+#define READ_HALF_SPINOR_HALF   READ_SPINOR_HALF_UP
+
+#define WRITE_HALF_SPINOR_DOUBLE2(stride)            \
+  out[0*(stride)+sid] = make_double2(a0_re, a0_im);  \
+  out[1*(stride)+sid] = make_double2(a1_re, a1_im);  \
+  out[2*(stride)+sid] = make_double2(a2_re, a2_im);  \
+  out[3*(stride)+sid] = make_double2(b0_re, b0_im);  \
+  out[4*(stride)+sid] = make_double2(b1_re, b1_im);  \
+  out[5*(stride)+sid] = make_double2(b2_re, b2_im);
+
+#define WRITE_HALF_SPINOR_FLOAT4(stride)                          \
+  out[0*(stride)+sid] = make_float4(a0_re, a0_im, a1_re, a1_im);  \
+  out[1*(stride)+sid] = make_float4(a2_re, a2_im, b0_re, b0_im);  \
+  out[2*(stride)+sid] = make_float4(b1_re, b1_im, b2_re, b2_im);
+
+#define WRITE_HALF_SPINOR_SHORT4(stride)				\
+  float c0 = fmaxf(fabsf(a0_re), fabsf(a0_im));				\
+  float c1 = fmaxf(fabsf(a1_re), fabsf(a1_im));				\
+  float c2 = fmaxf(fabsf(a2_re), fabsf(a2_im));				\
+  float c3 = fmaxf(fabsf(b0_re), fabsf(b0_im));				\
+  float c4 = fmaxf(fabsf(b1_re), fabsf(b1_im));				\
+  float c5 = fmaxf(fabsf(b2_re), fabsf(b2_im));				\
+  c0 = fmaxf(c0, c1);							\
+  c1 = fmaxf(c2, c3);							\
+  c2 = fmaxf(c4, c5);							\
+  c0 = fmaxf(c0, c1);							\
+  c0 = fmaxf(c0, c2);							\
+  outNorm[sid] = c0;							\
+  float scale = __fdividef(MAX_SHORT, c0);				\
+  a0_re *= scale; a0_im *= scale; a1_re *= scale; a1_im *= scale;	\
+  a2_re *= scale; a2_im *= scale; b0_re *= scale; b0_im *= scale;	\
+  b1_re *= scale; b1_im *= scale; b2_re *= scale; b2_im *= scale;	\
+  out[sid+0*(stride)] = make_short4((short)a0_re, (short)a0_im, (short)a1_re, (short)a1_im); \
+  out[sid+1*(stride)] = make_short4((short)a2_re, (short)a2_im, (short)b0_re, (short)b0_im); \
+  out[sid+2*(stride)] = make_short4((short)b1_re, (short)b1_im, (short)b2_re, (short)b2_im);
+
+
 /************* the following is used by staggered *****************/
 #if 0
 

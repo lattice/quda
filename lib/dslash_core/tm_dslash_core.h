@@ -1208,8 +1208,7 @@ o32_re = o32_im = 0;
         o32_re += B2_re;
         o32_im += B2_im;
         
-    }
-    else {
+    } else {
         // read gauge matrix from device memory
         READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
         
@@ -1421,8 +1420,7 @@ o32_re = o32_im = 0;
         o12_re += B2_re;
         o12_im += B2_im;
         
-    }
-    else {
+    } else {
         // read gauge matrix from device memory
         READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
         
@@ -1640,7 +1638,6 @@ o32_re = o32_im = 0;
     #endif // DSLASH_XPAY
     
 }
-
 
 #ifdef DSLASH_XPAY
     READ_ACCUM(ACCUMTEX, sp_stride)

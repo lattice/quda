@@ -83,8 +83,12 @@ __device__ float2 short22float2(short2 a) {
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #include <dw_dslash_def.h>        // Domain Wall kernels
 #include <tm_dslash_def.h>        // Twisted Mass kernels
-#include <dslash_core/tm_core.h>  // solo twisted mass kernel
+#include <tm_core.h>              // solo twisted mass kernel
 #include <clover_def.h>           // kernels for applying the clover term alone
+
+#ifdef MULTI_GPU
+//#include <pack_face_def.h>        // kernels for packing the ghost zones
+#endif
 
 #ifndef SHARED_FLOATS_PER_THREAD
 #define SHARED_FLOATS_PER_THREAD 0
