@@ -707,11 +707,15 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
   void *xn = x ? x->norm : 0;
 
   if (in->precision == QUDA_DOUBLE_PRECISION) {
+#if (__CUDA_ARCH__ >= 130)
     staggeredDslashCuda((double2*)out->v, (float*)out->norm, (double2*)fatGauge0, (double2*)fatGauge1,
 			(double2*)longGauge0, (double2*)longGauge1, longGauge.reconstruct, 
 			(double2*)in->v, (float*)in->norm, parity, dagger, 
 			(double2*)xv, (float*)x, k, in->volume, Vsh, 
 			in->x, in->length, in->ghost_length, block);
+#else
+    errorQuda("Double precision not supported on this GPU");
+#endif
   } else if (in->precision == QUDA_SINGLE_PRECISION) {
     staggeredDslashCuda((float2*)out->v, (float*)out->norm, (float2*)fatGauge0, (float2*)fatGauge1,
 			(float4*)longGauge0, (float4*)longGauge1, longGauge.reconstruct, 
