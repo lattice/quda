@@ -248,6 +248,7 @@ void initDslashConstants(const FullGauge gauge, const int sp_stride)
 
   // create the streams
   for (int i=0; i<Nstream; i++) cudaStreamCreate(&streams[i]);
+  
 
 }
 
