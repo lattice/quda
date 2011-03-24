@@ -122,55 +122,54 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
     
     // gather for backwards send
     in.packGhost(back_nbr_spinor_sendbuf[dir], dir, QUDA_BACKWARDS, 
-		 (QudaParity)parity, dagger, &stream[sendBackStrmIdx]); CUERR;  
+		 (QudaParity)parity, dagger, &stream[2*dir + sendBackStrmIdx]); CUERR;  
     
     // gather for forwards send
     in.packGhost(fwd_nbr_spinor_sendbuf[dir], dir, QUDA_FORWARDS, 
-		 (QudaParity)parity, dagger, &stream[sendFwdStrmIdx]); CUERR;
+		 (QudaParity)parity, dagger, &stream[2*dir + sendFwdStrmIdx]); CUERR;
   }
 }
 
-void FaceBuffer::exchangeFacesComms() {
-  cudaStreamSynchronize(stream[sendBackStrmIdx]); //required the data to be there before sending out
+void FaceBuffer::exchangeFacesComms(int dir) {
+  cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]); //required the data to be there before sending out
 
   int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
   int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
 
-  for(int dir = dir_start; dir < 4; dir++){
-    if(!commDimPartitioned(dir)){
-      continue;
-    }
-    memcpy(pagable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
-    send_request2[dir] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
-    
-    cudaStreamSynchronize(stream[sendFwdStrmIdx]); //required the data to be there before sending out
-    
-    memcpy(pagable_fwd_nbr_spinor_sendbuf[dir], fwd_nbr_spinor_sendbuf[dir], nbytes[dir]);
-    send_request1[dir]= comm_send_with_tag(pagable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], fwd_nbr[dir], uptags[dir]);
+  if(!commDimPartitioned(dir)){
+    return;
   }
+  memcpy(pagable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
+  send_request2[dir] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
+    
+  cudaStreamSynchronize(stream[2*dir + sendFwdStrmIdx]); //required the data to be there before sending out
+  
+  memcpy(pagable_fwd_nbr_spinor_sendbuf[dir], fwd_nbr_spinor_sendbuf[dir], nbytes[dir]);
+  send_request1[dir]= comm_send_with_tag(pagable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], fwd_nbr[dir], uptags[dir]);
 } 
 
 
-void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
+void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
 {
-  for(int dir = dir_start ; dir < 4; dir++){
-    if(!commDimPartitioned(dir)){
-      continue;
-    }
-    comm_wait(recv_request2[dir]);  
-    comm_wait(send_request2[dir]);
-    memcpy(fwd_nbr_spinor[dir], pagable_fwd_nbr_spinor[dir], nbytes[dir]);
-    
-    out.unpackGhost(fwd_nbr_spinor[dir], dir, QUDA_FORWARDS,  dagger, &stream[recFwdStrmIdx]); CUERR;
-    
-    comm_wait(recv_request1[dir]);
-    comm_wait(send_request1[dir]);
-    memcpy(back_nbr_spinor[dir], pagable_back_nbr_spinor[dir], nbytes[dir]);
-    
-    out.unpackGhost(back_nbr_spinor[dir], dir, QUDA_BACKWARDS,  dagger, &stream[recBackStrmIdx]); CUERR;
+  if(!commDimPartitioned(dir)){
+    return;
   }
+  comm_wait(recv_request2[dir]);  
+  comm_wait(send_request2[dir]);
+  memcpy(fwd_nbr_spinor[dir], pagable_fwd_nbr_spinor[dir], nbytes[dir]);
+  
+  out.unpackGhost(fwd_nbr_spinor[dir], dir, QUDA_FORWARDS,  dagger, &stream[2*dir + recFwdStrmIdx]); CUERR;
+  
+  comm_wait(recv_request1[dir]);
+  comm_wait(send_request1[dir]);
+  memcpy(back_nbr_spinor[dir], pagable_back_nbr_spinor[dir], nbytes[dir]);
+  
+  out.unpackGhost(back_nbr_spinor[dir], dir, QUDA_BACKWARDS,  dagger, &stream[2*dir + recBackStrmIdx]); CUERR;
+
+  cudaStreamSynchronize(stream[2*dir + recFwdStrmIdx]);
+  cudaStreamSynchronize(stream[2*dir + recBackStrmIdx]);
 }
 
 void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)

@@ -39,7 +39,7 @@ DslashParam dslashParam;
 // these are set in initDslashConst
 int Vspatial;
 #ifdef MULTI_GPU
-static const int Nstream = 5;
+static const int Nstream = 9;
 #else
 static const int Nstream = 1;
 #endif
@@ -356,10 +356,10 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 #endif // OVERLAP_COMMS
 
   // Finish gather and start comms
-  face->exchangeFacesComms();
+  face->exchangeFacesComms(3);
 
   // Wait for comms to finish, and scatter into the end zone
-  face->exchangeFacesWait(*inSpinor, dagger);
+  face->exchangeFacesWait(*inSpinor, dagger,3);
 
   dslashParam.tOffset = 0;
 #ifdef OVERLAP_COMMS // do faces
@@ -641,10 +641,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 	 fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
 #ifdef MULTI_GPU
-  // Finish gather and start comms
-  face->exchangeFacesComms();
-  // Wait for comms to finish, and scatter into the end zone
-  face->exchangeFacesWait(*inSpinor, dagger);
+
 
   int exterior_kernel_flag[4]={
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
@@ -653,9 +650,16 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     if(!commDimPartitioned(i)){
       continue;
     }
+
+    // Finish gather and start comms
+    face->exchangeFacesComms(i);
+    // Wait for comms to finish, and scatter into the end zone
+    face->exchangeFacesWait(*inSpinor, dagger,i);    
+    
+
     initTLocation(dims[i]-6, exterior_kernel_flag[i] , 6*Vsh[i]);  
 
-    DSLASH(staggeredDslash, Axpy, exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-2], out, outNorm, 
+    DSLASH(staggeredDslash, Axpy, exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
 	   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
   }
 

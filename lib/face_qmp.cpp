@@ -212,7 +212,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 #endif
 }
 
-void FaceBuffer::exchangeFacesComms() {
+void FaceBuffer::exchangeFacesComms(int dir) {
 
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
@@ -254,7 +254,7 @@ void FaceBuffer::exchangeFacesComms() {
 
 #endif
 
-void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger)
+void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
 {
   // replaced this memcopy with aliasing pointers - useful benchmarking
 #ifndef QMP_COMMS
