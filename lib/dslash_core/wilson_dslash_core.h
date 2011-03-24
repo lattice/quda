@@ -1384,8 +1384,7 @@ o32_re = o32_im = 0;
         o32_re += B2_re;
         o32_im += B2_im;
         
-    }
-    else {
+    } else {
         // read gauge matrix from device memory
         READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
         
@@ -1597,8 +1596,7 @@ o32_re = o32_im = 0;
         o12_re += B2_re;
         o12_im += B2_im;
         
-    }
-    else {
+    } else {
         // read gauge matrix from device memory
         READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
         
@@ -1749,6 +1747,7 @@ o32_re = o32_im = 0;
     o20_re = a20_re;  o20_im = a20_im;
     o30_re = a30_re;  o30_im = a30_im;
 }
+
 {
     spinorFloat a01_re = -o11_re - o31_re;
     spinorFloat a01_im = -o11_im - o31_im;
@@ -1764,6 +1763,7 @@ o32_re = o32_im = 0;
     o21_re = a21_re;  o21_im = a21_im;
     o31_re = a31_re;  o31_im = a31_im;
 }
+
 {
     spinorFloat a02_re = -o12_re - o32_re;
     spinorFloat a02_im = -o12_im - o32_im;
@@ -1779,6 +1779,7 @@ o32_re = o32_im = 0;
     o22_re = a22_re;  o22_im = a22_im;
     o32_re = a32_re;  o32_im = a32_im;
 }
+
 
 // apply first chiral block
 {
@@ -2113,6 +2114,7 @@ o32_re = o32_im = 0;
     o20_re = a20_re;  o20_im = a20_im;
     o30_re = a30_re;  o30_im = a30_im;
 }
+
 {
     spinorFloat a01_re =  o11_re + o31_re;
     spinorFloat a01_im =  o11_im + o31_im;
@@ -2128,6 +2130,7 @@ o32_re = o32_im = 0;
     o21_re = a21_re;  o21_im = a21_im;
     o31_re = a31_re;  o31_im = a31_im;
 }
+
 {
     spinorFloat a02_re =  o12_re + o32_re;
     spinorFloat a02_im =  o12_im + o32_im;
@@ -2143,6 +2146,7 @@ o32_re = o32_im = 0;
     o22_re = a22_re;  o22_im = a22_im;
     o32_re = a32_re;  o32_im = a32_im;
 }
+
 #endif // DSLASH_CLOVER
 
 
