@@ -183,8 +183,11 @@ FaceBuffer::~FaceBuffer()
 void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 				    int dagger, cudaStream_t *stream_p)
 {
+  if(!commDimPartitioned(3)){
+     return;
+  }
   stream = stream_p;
-
+  
 #ifdef QMP_COMMS
   // Prepost all receives
   QMP_start(mh_from_fwd[3]);
@@ -213,7 +216,9 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 }
 
 void FaceBuffer::exchangeFacesComms(int dir) {
-
+  if(!commDimPartitioned(dir)){
+    return;
+  }
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
   cudaStreamSynchronize(stream[sendBackStrmIdx]);
@@ -256,6 +261,10 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
 {
+  if(!commDimPartitioned(dir)){
+   return;
+  }
+
   // replaced this memcopy with aliasing pointers - useful benchmarking
 #ifndef QMP_COMMS
   // NO QMP -- do copies
