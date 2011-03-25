@@ -62,8 +62,12 @@ void freeParityClover(ParityClover *clover)
 
 void freeCloverField(FullClover *clover)
 {
-  freeParityClover(&clover->even);
-  freeParityClover(&clover->odd);
+  if( &clover->even) { 
+    freeParityClover(&clover->even);
+  }
+  if( &clover->odd ) { 
+    freeParityClover(&clover->odd);
+  }
 }
 
 template <typename Float>
