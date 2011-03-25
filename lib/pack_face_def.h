@@ -134,7 +134,11 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
 #endif
 #define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
 #include "wilson_pack_face_core.h"
+    }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
@@ -157,7 +161,11 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
 #define SPINORTEX spinorTexSingle
 #endif
 #define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
 #include "wilson_pack_face_core.h"
+    }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
@@ -178,7 +186,11 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
 #define SPINORTEX spinorTexHalf
 #endif
 #define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_SHORT4
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
 #include "wilson_pack_face_core.h"
+    }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
@@ -252,12 +264,12 @@ void packFaceAsqtad(Float2 *faces, float *facesNorm, const Float2 *in, const flo
 		    const dim3 &gridDim, const dim3 &blockDim, const cudaStream_t &stream)
 {
 #ifdef GPU_STAGGERED_DIRAC
-    switch (dir) {
-    case 0: packFaceAsqtadKernel<0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 1: packFaceAsqtadKernel<1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 2: packFaceAsqtadKernel<2><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-    case 3: packFaceAsqtadKernel<3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-    }
+  switch (dir) {
+  case 0: packFaceAsqtadKernel<0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+  case 1: packFaceAsqtadKernel<1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+  case 2: packFaceAsqtadKernel<2><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+  case 3: packFaceAsqtadKernel<3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
+  }
 #else
   errorQuda("Asqtad face packing kernel is not built");
 #endif  
