@@ -101,9 +101,8 @@ FaceBuffer::~FaceBuffer()
     if(back_nbr_spinor[dir]) cudaFreeHost(back_nbr_spinor[dir]);
   }
 }
-
 #ifdef DSLASH_PROFILE
-cudaEvent_t pack_start[4][2], pack_stop[4][2];
+static cudaEvent_t pack_start[4][2], pack_stop[4][2];
 float first_memcpy_time[2];
 #endif
 
@@ -118,7 +117,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
-#ifdef DSLASH_PROFILE
+#ifdef DSLASH_PROFILE  
   for(int dir=0;dir < 4; dir++){
     for(int i =0;i < 2; i++){
       cudaEventCreate(&pack_start[dir][i]);
@@ -204,7 +203,6 @@ void FaceBuffer::exchangeFacesComms(int dir)
   
 } 
 
-
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
 {
   if(!commDimPartitioned(dir)){
@@ -212,7 +210,7 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   }
 
 #ifdef DSLASH_PROFILE
-  cudaEvent_t unpack_start[2], unpack_stop[2];  
+  static cudaEvent_t unpack_start[2], unpack_stop[2];  
   for(int i =0;i < 2; i++){
     cudaEventCreate(&unpack_start[i]);
     cudaEventCreate(&unpack_stop[i]);
@@ -260,11 +258,9 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   cudaEventRecord(unpack_stop[1], stream[2*dir+recBackStrmIdx]);
 #endif
 
-  cudaStreamSynchronize(stream[2*dir + recFwdStrmIdx]);
-  cudaStreamSynchronize(stream[2*dir + recBackStrmIdx]);
-
 #ifdef DSLASH_PROFILE
   float pack_time[2], unpack_time[2], second_memcpy_time[2], mpi_time[2];
+  float total_time;
   for(int i=0;i < 2;i++){
     cudaEventElapsedTime(&pack_time[i], pack_start[dir][i], pack_stop[dir][i]);
     cudaEventElapsedTime(&unpack_time[i], unpack_start[i], unpack_stop[i]);
@@ -273,17 +269,22 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
     mpi_time[i] = (mpi_stop[i].tv_sec - mpi_start[i].tv_sec)*1e+3
       + (mpi_stop[i].tv_usec - mpi_start[i].tv_usec)*1e-3;
   }
-  printfQuda("dir=%d, pack_time=%.2f, 1st_memcpy_time=%f, mpi_time=%.2f ms, 2nd memcpy_time=%.2f ms,  unpack_time=%.2f ms\n", dir,
+  total_time = pack_time[0] + pack_time[1] + first_memcpy_time[0] + first_memcpy_time[1]
+		+ mpi_time[0] + mpi_time[1] + second_memcpy_time[0] + second_memcpy_time[1]
+		+ unpack_time[0] + unpack_time[1];
+  printfQuda("dir=%d, pack_time=%.2f, 1st_memcpy_time=%f, mpi_time=%.2f ms, 2nd memcpy_time=%.2f ms,  unpack_time=%.2f ms, total=%.2f ms\n", dir,
 	     pack_time[0] + pack_time[1], 
 	     first_memcpy_time[0] + first_memcpy_time[1],	     
 	     mpi_time[0] + mpi_time[1],
 	     second_memcpy_time[0] + second_memcpy_time[1],
-	     unpack_time[0] + unpack_time[1]);
+	     unpack_time[0] + unpack_time[1], 
+	     total_time);
+
   for(int i=0;i < 2;i++){
-    cudaEventDestroy(unpack_start[i]);
-    cudaEventDestroy(unpack_stop[i]);
-    cudaEventDestroy(pack_start[dir][i]);
-    cudaEventDestroy(pack_stop[dir][i]);
+    //cudaEventDestroy(unpack_start[i]);
+    //cudaEventDestroy(unpack_stop[i]);
+    //cudaEventDestroy(pack_start[dir][i]);
+    //cudaEventDestroy(pack_stop[dir][i]);
   }
 
 #endif

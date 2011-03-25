@@ -648,14 +648,13 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     cudaEventCreate(&exterior_stop[i]);
   }
   cudaThreadSynchronize();
-  gettimeofday(&dslash_start, NULL);  
 #endif
   
   initTLocation(0, INTERIOR_KERNEL, volume);  CUERR;
   
 #ifdef MULTI_GPU
   // Gather from source spinor
-  face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+  face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams); 
 #endif
 
 #ifdef DSLASH_PROFILE  
@@ -689,6 +688,14 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 #ifdef DSLASH_PROFILE  
     gettimeofday(&comm_stop[i], NULL);
 #endif
+  }
+  for(int i=0 ;i < 4;i++){
+    if(!commDimPartitioned(i)){
+      continue;
+    }
+
+    cudaStreamSynchronize(streams[2*i]);
+    cudaStreamSynchronize(streams[2*i + 1]);
 
     initTLocation(dims[i]-6, exterior_kernel_flag[i] , 6*Vsh[i]);  
 
@@ -705,21 +712,22 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 #ifdef DSLASH_PROFILE  
   cudaThreadSynchronize();
   gettimeofday(&dslash_stop, NULL);
-  float interior_time, exterior_time[4], comm_time[4], dslash_time;
+  float interior_time, exterior_time[4], comm_time[4], dslash_time, accumu_time =0;
   cudaEventElapsedTime(&interior_time, interior_start, interior_stop);
   dslash_time = (dslash_stop.tv_sec - dslash_start.tv_sec)*1e+3
     + (dslash_stop.tv_usec - dslash_start.tv_usec)*1e-3;
-  printfQuda("Interior kernel: %.2f ms, overall dslash time=%.2f ms\n", interior_time, dslash_time); 
   for(int i=0;i < 4;i++){
     if(commDimPartitioned(i)){
       cudaEventElapsedTime(&exterior_time[i], exterior_start[i], exterior_stop[i]);
 #define TDIFF(a,b) ((a.tv_sec - b.tv_sec)*1e+3 + (a.tv_usec - b.tv_usec)*1e-3)
       comm_time[i] = TDIFF(comm_stop[i], comm_start[i]);
+      accumu_time += comm_time[i];
+      accumu_time += exterior_time[i];
       printfQuda("dir=%d, comm=%.2f ms, exterior kernel=%.2f ms\n", i, comm_time[i], exterior_time[i]); 
     }
   }
-
   
+  printfQuda("Interior kernel: %.2f ms, overall dslash time=%.2f ms, external accumu_time=%.2f ms\n", interior_time, dslash_time, accumu_time); 
   cudaEventDestroy(interior_start);
   cudaEventDestroy(interior_stop);
   for(int i=0;i < 4;i++){
