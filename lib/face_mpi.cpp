@@ -9,12 +9,6 @@
 
 using namespace std;
 
-#ifdef GPU_STAGGERED_DIRAC
-static int dir_start = 0;
-#else
-static int dir_start = 3;
-#endif
-
 cudaStream_t *stream;
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
@@ -112,7 +106,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
-  for(int dir = dir_start; dir  < 4; dir++){
+  for(int dir = 0; dir  < 4; dir++){
     if(!commDimPartitioned(dir)){
       continue;
     }
@@ -129,7 +123,6 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 		 (QudaParity)parity, dagger, &stream[2*dir + sendFwdStrmIdx]); CUERR;
   }
 }
-
 
 void FaceBuffer::exchangeFacesComms(int dir) 
 {
@@ -172,12 +165,6 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
 
   memcpy(back_nbr_spinor[dir], pagable_back_nbr_spinor[dir], nbytes[dir]);  
   out.unpackGhost(back_nbr_spinor[dir], dir, QUDA_BACKWARDS,  dagger, &stream[2*dir + recBackStrmIdx]); CUERR;
-
-  //for staggered case we don't assume ghost data is ready by the end of this call
-#ifndef GPU_STAGGERED_DIRAC
-  cudaStreamSynchronize(stream[2*dir + recFwdStrmIdx]);
-  cudaStreamSynchronize(stream[2*dir + recBackStrmIdx]);
-#endif
 }
 
 void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)

@@ -16,17 +16,12 @@
   - implement OpenMP version?
   - split face kernels
   - separate block sizes for body and face
-  - single coalesced D->H copy - first pass implemented, enable with GATHER_COALESCE 
-    (could be done better as a kernel - add to blas and autotune)
   - minimize pointer arithmetic in core code (need extra constant to replace SPINOR_HOP)
  */
 
 using namespace std;
 
 cudaStream_t *stream;
-
-// enabling this coalseces all per face transactions into a single buffer before the PCIe transfer
-//#define GATHER_COALESCE
 
 // Easy to switch between overlapping communication or not
 #ifdef OVERLAP_COMMS
@@ -71,12 +66,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     cudaHostAlloc(&(my_back_face[i]), nbytes[i], flag);
     if( !my_back_face[i] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[i]);
   }
-
-  // this is not multi-dim aware yet - can we just use the ghost zones for these?
-#ifdef GATHER_COALESCE
-  cudaMalloc(&(gather_fwd_face), nbytes[3]);
-  cudaMalloc(&(gather_back_face), nbytes[3]);
-#endif
 
   for (int i=0; i<nDim; i++) {
 #ifdef QMP_COMMS
@@ -167,11 +156,6 @@ FaceBuffer::~FaceBuffer()
     cudaFreeHost(my_back_face[i]);
   }
 
-#ifdef GATHER_COALESCE
-  cudaFree(gather_fwd_face);
-  cudaFree(gather_back_face);
-#endif
-
   for (int i=0; i<nDim; i++) {
     my_fwd_face[i]=NULL;
     my_back_face[i]=NULL;
@@ -183,60 +167,47 @@ FaceBuffer::~FaceBuffer()
 void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 				    int dagger, cudaStream_t *stream_p)
 {
-  if(!commDimPartitioned(3)){
-     return;
-  }
   stream = stream_p;
   
+  for (int dir = 0; dir < 4; dir++) {
+
+    if(!commDimPartitioned(dir)) continue;
+
 #ifdef QMP_COMMS
-  // Prepost all receives
-  QMP_start(mh_from_fwd[3]);
-  QMP_start(mh_from_back[3]);
+    // Prepost all receives
+    QMP_start(mh_from_fwd[dir]);
+    QMP_start(mh_from_back[dir]);
 #endif
 
-#ifdef GATHER_COALESCE
-  void *back_face = gather_back_face;
-  void *fwd_face = gather_fwd_face;
-#else
-  void *back_face = my_back_face[3];
-  void *fwd_face = my_fwd_face[3];
-#endif
+    // gather for backwards send
+    in.packGhost(my_back_face[dir], dir, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dir+sendBackStrmIdx]);
 
-  // gather for backwards send
-  in.packGhost(back_face, 3, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[sendBackStrmIdx]);
-
-  // gather for forwards send
-  in.packGhost(fwd_face, 3, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[sendFwdStrmIdx]);
- 
-#ifdef GATHER_COALESCE  
-  // Copy to host if we are coalescing into single face messages to reduce latency
-  CUDAMEMCPY((void *)my_back_face[3], (void *)gather_back_face,  nbytes[3], cudaMemcpyDeviceToHost, stream[sendBackStrmIdx]); 
-  CUDAMEMCPY((void *)my_fwd_face[3], (void *)gather_fwd_face,  nbytes[3], cudaMemcpyDeviceToHost, stream[sendFwdStrmIdx]); 
-#endif
+    // gather for forwards send
+    in.packGhost(my_fwd_face[dir], dir, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dir+sendFwdStrmIdx]);
+  } 
 }
 
 void FaceBuffer::exchangeFacesComms(int dir) {
-  if(!commDimPartitioned(dir)){
-    return;
-  }
+  if(!commDimPartitioned(dir)) return;
+
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
-  cudaStreamSynchronize(stream[sendBackStrmIdx]);
+  cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]);
 #endif
 
 #ifdef QMP_COMMS
   // Begin backward send
-  QMP_start(mh_send_back[3]);
+  QMP_start(mh_send_back[dir]);
 #endif
 
 #ifdef OVERLAP_COMMS
   // Need to wait for copy to finish before sending to neighbour
-  cudaStreamSynchronize(stream[sendFwdStrmIdx]);
+  cudaStreamSynchronize(stream[2*dir + sendFwdStrmIdx]);
 #endif
 
 #ifdef QMP_COMMS
   // Begin forward send
-  QMP_start(mh_send_fwd[3]);
+  QMP_start(mh_send_fwd[dir]);
 #endif
 
 } 
@@ -261,9 +232,7 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
 {
-  if(!commDimPartitioned(dir)){
-   return;
-  }
+  if(!commDimPartitioned(dir)) return;
 
   // replaced this memcopy with aliasing pointers - useful benchmarking
 #ifndef QMP_COMMS
@@ -273,13 +242,13 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
 #endif // QMP_COMMS
 
   // Scatter faces.
-  QMP_finish_from_fwd(3);
+  QMP_finish_from_fwd(dir);
   
-  out.unpackGhost(from_fwd_face[3], 3, QUDA_FORWARDS, dagger, &stream[recFwdStrmIdx]);
+  out.unpackGhost(from_fwd_face[dir], dir, QUDA_FORWARDS, dagger, &stream[2*dir+recFwdStrmIdx]); // 0, 2, 4, 6
 
-  QMP_finish_from_back(3);
+  QMP_finish_from_back(dir);
   
-  out.unpackGhost(from_back_face[3], 3, QUDA_BACKWARDS, dagger, &stream[recBackStrmIdx]);
+  out.unpackGhost(from_back_face[dir], dir, QUDA_BACKWARDS, dagger, &stream[2*dir+recBackStrmIdx]); // 1, 3, 5, 7
 }
 
 // This is just an initial hack for CPU comms - should be creating the message handlers at instantiation
@@ -293,14 +262,6 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
     spinor.packGhost(spinor.backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, (QudaParity)oddBit, dagger);
     spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, (QudaParity)oddBit, dagger);
   }
-
-  /*
-  int len = nFace * ((X[0]*X[1]*X[2])/2) * 3 * 2;
-  for (int i=0; i<len; i++) {
-    printf("fwd = %e, back = %e\n", ((double**)spinor.backGhostFaceSendBuffer)[3][i], 
-	   ((double**)spinor.fwdGhostFaceSendBuffer)[3][i]);
-	   }*/
-
 
 #ifdef QMP_COMMS
 

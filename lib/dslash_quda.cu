@@ -348,37 +348,41 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.tOffset = 0;
   dslashParam.tMul = 1;
   dslashParam.threads = volume;
-
-  dslash.apply(block, shared_bytes, streams[0]);
 #else
-
   // Gather from source spinor
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
   
-#ifdef OVERLAP_COMMS // do body
+  // do body
   dslashParam.tOffset = 1;
   dslashParam.tMul = 1;
   dslashParam.threads = volume - 2*Vspatial;
+#endif
 
-  dslash.apply(block, shared_bytes, streams[Nstream-1]);
-#endif // OVERLAP_COMMS
+  dslash.apply(block, shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
-  // Finish gather and start comms
-  face->exchangeFacesComms(3);
+#ifdef MULTI_GPU
 
-  // Wait for comms to finish, and scatter into the end zone
-  face->exchangeFacesWait(*inSpinor, dagger,3);
+  for (int i=0; i<4; i++) {
+    if (!commDimPartitioned(i)) continue;
 
-  dslashParam.tOffset = 0;
-#ifdef OVERLAP_COMMS // do faces
-  dslashParam.tMul = volume/Vspatial - 1; // hacky way to get Nt
-  dslashParam.threads = 2*Vspatial;
-#else // do all
-  dslashParam.tMul = 1;
-  dslashParam.threads = volume;
-#endif // OVERLAP_COMMS
-  shared_bytes = blockFace.x*SHARED_FLOATS_PER_THREAD*regSize;
-  dslash.apply(blockFace, shared_bytes, streams[Nstream-2]);
+    // Finish gather and start comms
+    face->exchangeFacesComms(i);
+    
+    // Wait for comms to finish, and scatter into the end zone
+    face->exchangeFacesWait(*inSpinor, dagger, i);
+  }
+
+  for (int i=0; i<4; i++) {
+    if (commDimPartitioned(i)) continue;
+
+    // the below is only for T-way parallelization -needs generalized as staggered
+    dslashParam.tOffset = 0;
+    dslashParam.tMul = volume/Vspatial - 1; // hacky way to get Nt
+    dslashParam.threads = 2*Vspatial;
+    shared_bytes = blockFace.x*SHARED_FLOATS_PER_THREAD*regSize;
+    cudaStreamSynchronize(streams[2*i]); // stream 6 (no need to synchronize 7)
+    dslash.apply(blockFace, shared_bytes, streams[Nstream-2]); // stream 7
+  }
 
 #endif // MULTI_GPU
 }
@@ -391,6 +395,11 @@ void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColo
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_WILSON_DIRAC
+  for(int i=0;i<4;i++){
+    dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+    dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+  }
+
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
