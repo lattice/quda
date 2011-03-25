@@ -259,6 +259,7 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
 #endif
 
 #ifdef DSLASH_PROFILE
+
   float pack_time[2], unpack_time[2], second_memcpy_time[2], mpi_time[2];
   float total_time;
   for(int i=0;i < 2;i++){

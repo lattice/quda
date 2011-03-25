@@ -548,7 +548,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
     cudaThreadSynchronize();
     cudaEventElapsedTime(&collect_time, collect_start, collect_stop);
     cudaEventElapsedTime(&d2h_time, d2h_start, d2h_stop);
-    printfQuda("dim=%d, collect_time=%.2f ms, d2h_time=%.2f ms\n", dim, collect_time, d2h_time);
+    printfQuda("dim=%d, gather_time=%.2f ms, d2h_time=%.2f ms\n", dim, collect_time, d2h_time);
     
     cudaEventDestroy(collect_start);
     cudaEventDestroy(collect_stop);

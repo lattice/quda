@@ -648,6 +648,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     cudaEventCreate(&exterior_stop[i]);
   }
   cudaThreadSynchronize();
+  gettimeofday(&dslash_start, NULL);
 #endif
   
   initTLocation(0, INTERIOR_KERNEL, volume);  CUERR;
