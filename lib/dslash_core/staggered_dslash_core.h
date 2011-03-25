@@ -6,7 +6,7 @@
 #define Vsh_y ghostFace[1]
 #define Vsh_z ghostFace[2]
 #define Vsh_t ghostFace[3]
-#define kernel_type tLocate.y
+#define kernel_type param.kernel_type
 
 // input spinor
 #if (DD_PREC==0)
@@ -309,7 +309,7 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define EXTERIOR_KERNEL_T 4
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if(sid >= threads) return;
+if(sid >= param.threads) return;
 
 int za,zb; 
 int x1h, x2h;
@@ -1167,3 +1167,4 @@ WRITE_SPINOR();
 #undef Vsh_y
 #undef Vsh_z
 #undef Vsh_t
+#undef kernel_type

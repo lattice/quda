@@ -73,9 +73,6 @@ __constant__ bool Pt0;
 // Are we processor Nt-1 in time?
 __constant__ bool PtNm1;
 
-__constant__ short2 tLocate;
-__constant__ int threads;
-
 int initDslash = 0;
 int initClover = 0;
 int initDomainWall = 0;

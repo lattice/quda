@@ -34,6 +34,8 @@ struct DslashParam {
   int parity;  // Even-Odd or Odd-Even
   int ghostDim[QUDA_MAX_DIM];
   int ghostOffset[QUDA_MAX_DIM];
+  int kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+  
 };
 
 DslashParam dslashParam;
@@ -608,16 +610,6 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 #define EXTERIOR_KERNEL_Z 3
 #define EXTERIOR_KERNEL_T 4
 
-
-void
-initTLocation(int toffset, int tmul, int threads) 
-{
-  short2 tLocate = make_short2((short)toffset, (short)tmul);
-  cudaMemcpyToSymbol("tLocate", &(tLocate), sizeof(short2));
-  cudaMemcpyToSymbol("threads", &(threads), sizeof(threads));
-
-}
-
 template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
 			   const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
@@ -636,8 +628,9 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     
   int shared_bytes = blockDim.x*6*bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
   
-  initTLocation(0, INTERIOR_KERNEL, volume);  CUERR;
-  
+  dslashParam.kernel_type = INTERIOR_KERNEL;
+  dslashParam.tOffset =  0;
+  dslashParam.threads = volume;
 #ifdef MULTI_GPU
   // Gather from source spinor
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
@@ -667,8 +660,9 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);
-    initTLocation(dims[i]-6, exterior_kernel_flag[i] , 6*Vsh[i]);  
-    
+    dslashParam.kernel_type = exterior_kernel_flag[i];
+    dslashParam.tOffset =  dims[i]-6;
+    dslashParam.threads = 6*Vsh[i];
     DSLASH(staggeredDslash, Axpy, exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
 	   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
