@@ -134,6 +134,9 @@ class ColorSpinorParam {
   }
 };
 
+class cpuColorSpinorField;
+class cudaColorSpinorField;
+
 class ColorSpinorField {
 
  private:
@@ -166,6 +169,7 @@ class ColorSpinorField {
   // multi-GPU parameters
   int ghostFace[QUDA_MAX_DIM];// the size of each face
   int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
+  int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
 
   int ghost_length; // length of ghost zone
   int ghost_norm_length; // length of ghost zone for norm
@@ -221,9 +225,10 @@ class ColorSpinorField {
 
   friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
   friend class ColorSpinorParam;
-};
 
-class cpuColorSpinorField;
+  friend void packFaceWilson(cudaColorSpinorField &in, const int dir, const int dagger, const int parity,
+			     const QudaPrecision precision, const cudaStream_t &stream);
+};
 
 // CUDA implementation
 class cudaColorSpinorField : public ColorSpinorField {
@@ -300,6 +305,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 			      const int dagger, const double &kappa, const double &mu,
 			      const QudaTwistGamma5Type twist, const dim3 &block);
+  friend void packFaceWilson(cudaColorSpinorField &in, const int dir, const int dagger, const int parity,
+			     const QudaPrecision precision, const cudaStream_t &stream);
 
  private:
   void *v; // the field elements

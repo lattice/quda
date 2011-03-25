@@ -66,4 +66,8 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const int dagger, const double &kappa, const double &mu,
 		     const QudaTwistGamma5Type, const dim3 &block);
 
+// face packing routines
+void packFaceWilson(cudaColorSpinorField &in, const int dir, const int dagger, const int parity,
+		    const QudaPrecision precision, const cudaStream_t &stream);
+
 #endif // _DSLASH_QUDA_H

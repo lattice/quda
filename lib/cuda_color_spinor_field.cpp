@@ -540,7 +540,6 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 				       const QudaDirection dir, 
 				       const int dagger, cudaStream_t* stream) 
 {
-#if 1
   CUERR;
   int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
@@ -554,7 +553,6 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
   if (nSpin == 4) Nint /= 2; // spin projection for Wilson
   int Npad = Nint / Nvec; // number Nvec buffers we have
-
 
   // Wilson only
   // !dagger: receive lower components forwards, receive upper components backwards
@@ -582,68 +580,5 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
     void *src = (char*)ghost_spinor+num_faces*Nint*Vsh*precision;
     CUDAMEMCPY(dst, src, normlen, cudaMemcpyHostToDevice, *stream);  CUERR;
   }
-
-#else
-  //x[0] is already half of X dimension length
-  int Vsh_x = x[1]*x[2]*x[3]/2;
-  int Vsh_y = x[0]*x[2]*x[3];
-  int Vsh_z = x[0]*x[1]*x[3];
-  int Vsh_t = x[0]*x[1]*x[2];
-
-  int sizeOfFloatN = 2*precision;
-
-  void* src =ghost_spinor;
-  void* dst;
-  
-  //put X dimension ghost data in place
-  int len_x = 3*Vsh_x*sizeOfFloatN; //3 faces  
-  if (dim == 0 && dir == QUDA_BACKWARDS){
-    void* dst = ((char*)v) + 3*stride*sizeOfFloatN;
-    cudaMemcpyAsync(dst, src, 3*len_x, cudaMemcpyHostToDevice, *stream); CUERR;
-  }
-  if (dim == 0 && dir == QUDA_FORWARDS){
-    dst = ((char*)v) + 3*stride*sizeOfFloatN + 3*len_x;
-    cudaMemcpyAsync(dst, src, 3*len_x, cudaMemcpyHostToDevice, *stream);CUERR;
-  }
-
-
-  //put Y dimension ghost data in place
-  int len_y = 3*Vsh_y*sizeOfFloatN; //3 faces  
-  if (dim == 1 && dir == QUDA_BACKWARDS){
-    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x)*(3*sizeOfFloatN);
-    cudaMemcpyAsync(dst, src, 3*len_y, cudaMemcpyHostToDevice, *stream); CUERR;
-  }
-  if (dim == 1 && dir == QUDA_FORWARDS){
-    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x)*(3*sizeOfFloatN)+ 3*len_y;
-    cudaMemcpyAsync(dst, src, 3*len_y, cudaMemcpyHostToDevice, *stream);CUERR;
-  }
-
-  //put Z dimension ghost data in place
-  int len_z = 3*Vsh_z*sizeOfFloatN; //3 faces  
-  if (dim == 2 && dir == QUDA_BACKWARDS){
-    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y)*(3*sizeOfFloatN);
-    cudaMemcpyAsync(dst, src, 3*len_z, cudaMemcpyHostToDevice, *stream); CUERR;
-  }
-  if (dim == 2 && dir == QUDA_FORWARDS){
-    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y)*(3*sizeOfFloatN)+ 3*len_z;
-    cudaMemcpyAsync(dst, src, 3*len_z, cudaMemcpyHostToDevice, *stream);CUERR;
-  }
-  
-  //put T dimension ghost data in place
-  int len_t = 3*Vsh_t*sizeOfFloatN; //3 faces  
-  if (dim == 3 && dir == QUDA_BACKWARDS){
-    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y+Vsh_z)*(3*sizeOfFloatN);
-    cudaMemcpyAsync(dst, src, 3*len_t, cudaMemcpyHostToDevice, *stream); CUERR;
-  }
-  if (dim == 3 && dir == QUDA_FORWARDS){
-    dst = ((char*)v) + 3*stride*sizeOfFloatN + 6*(Vsh_x+Vsh_y+Vsh_z)*(3*sizeOfFloatN)+ 3*len_t;
-    cudaMemcpyAsync(dst, src, 3*len_t, cudaMemcpyHostToDevice, *stream);CUERR;
-  }
-
-
-#endif
-
-  
-
 
 }
