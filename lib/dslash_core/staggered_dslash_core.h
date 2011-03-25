@@ -756,7 +756,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -1))|| 
     }
 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -1))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= X3 -1))
+if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= X3 -3))
 #endif
     {
 	int sp_idx_3rd_nbr = ((x3>= (X3 - 3))? X + (-X3 + 3)*X2*X1: X + 3*X2*X1)>> 1;    
