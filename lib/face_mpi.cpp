@@ -102,12 +102,6 @@ FaceBuffer::~FaceBuffer()
   }
 }
 
-#ifdef DSLASH_PROFILE
-cudaEvent_t pack_start[4][2], pack_stop[4][2];
-float first_memcpy_time[2];
-#endif
-
-
 void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 				    int dagger, cudaStream_t *stream_p)
 {
@@ -118,15 +112,6 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
-#ifdef DSLASH_PROFILE
-  for(int dir=0;dir < 4; dir++){
-    for(int i =0;i < 2; i++){
-      cudaEventCreate(&pack_start[dir][i]);
-      cudaEventCreate(&pack_stop[dir][i]);
-    }
-  }
-#endif  
-  
   for(int dir = dir_start; dir  < 4; dir++){
     if(!commDimPartitioned(dir)){
       continue;
@@ -134,23 +119,14 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
     // Prepost all receives
     recv_request1[dir] = comm_recv_with_tag(pagable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
     recv_request2[dir] = comm_recv_with_tag(pagable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
-#ifdef DSLASH_PROFILE    
-    cudaEventRecord(pack_start[dir][0], stream[2*dir + sendBackStrmIdx]);
-#endif
+
     // gather for backwards send
     in.packGhost(back_nbr_spinor_sendbuf[dir], dir, QUDA_BACKWARDS, 
 		 (QudaParity)parity, dagger, &stream[2*dir + sendBackStrmIdx]); CUERR;  
-#ifdef DSLASH_PROFILE
-    cudaEventRecord(pack_stop[dir][0], stream[2*dir + sendBackStrmIdx]);    
-    cudaEventRecord(pack_start[dir][1], stream[2*dir + sendFwdStrmIdx]);
-#endif
+
     // gather for forwards send
     in.packGhost(fwd_nbr_spinor_sendbuf[dir], dir, QUDA_FORWARDS, 
 		 (QudaParity)parity, dagger, &stream[2*dir + sendFwdStrmIdx]); CUERR;
-#ifdef DSLASH_PROFILE
-    cudaEventRecord(pack_stop[dir][1], stream[2*dir + sendFwdStrmIdx]);
-#endif
-
   }
 }
 
@@ -162,10 +138,6 @@ void FaceBuffer::exchangeFacesComms(int dir)
     return;
   }
 
-#ifdef DSLASH_PROFILE
-  struct timeval memcpy_start[2], memcpy_stop[2];
-#endif
-
   int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
   int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
   int uptags[4] = {XUP, YUP, ZUP, TUP};
@@ -173,34 +145,12 @@ void FaceBuffer::exchangeFacesComms(int dir)
 
 
   cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]); //required the data to be there before sending out
-#ifdef DSLASH_PROFILE
-  gettimeofday(&memcpy_start[0], NULL);
-#endif
   memcpy(pagable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
-#ifdef DSLASH_PROFILE
-  gettimeofday(&memcpy_stop[0], NULL);
-#endif
   send_request2[dir] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
     
   cudaStreamSynchronize(stream[2*dir + sendFwdStrmIdx]); //required the data to be there before sending out
-#ifdef DSLASH_PROFILE  
-  gettimeofday(&memcpy_start[1], NULL);
-#endif
   memcpy(pagable_fwd_nbr_spinor_sendbuf[dir], fwd_nbr_spinor_sendbuf[dir], nbytes[dir]);
-#ifdef DSLASH_PROFILE
-  gettimeofday(&memcpy_stop[1], NULL);
-#endif
   send_request1[dir]= comm_send_with_tag(pagable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], fwd_nbr[dir], uptags[dir]);
-
-#ifdef DSLASH_PROFILE
-  for(int i=0;i < 2;i++){
-    first_memcpy_time[i] = (memcpy_stop[i].tv_sec - memcpy_start[i].tv_sec)*1e+3
-      + (memcpy_stop[i].tv_usec - memcpy_start[i].tv_usec)*1e-3;
-  }
-
-#endif
-  
-
   
 } 
 
@@ -210,84 +160,24 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   if(!commDimPartitioned(dir)){
     return;
   }
-
-#ifdef DSLASH_PROFILE
-  cudaEvent_t unpack_start[2], unpack_stop[2];  
-  for(int i =0;i < 2; i++){
-    cudaEventCreate(&unpack_start[i]);
-    cudaEventCreate(&unpack_stop[i]);
-  }
-
-  struct timeval memcpy_start[2], memcpy_stop[2];
-  struct timeval mpi_start[2], mpi_stop[2];
-
-  gettimeofday(&mpi_start[0], NULL);
-#endif
-
-
   
   comm_wait(recv_request2[dir]);  
   comm_wait(send_request2[dir]);
 
-#ifdef DSLASH_PROFILE
-  gettimeofday(&mpi_stop[0], NULL);
-  gettimeofday(&memcpy_start[0], NULL);
-#endif
   memcpy(fwd_nbr_spinor[dir], pagable_fwd_nbr_spinor[dir], nbytes[dir]);
-#ifdef DSLASH_PROFILE  
-  gettimeofday(&memcpy_stop[0], NULL);
-  cudaEventRecord(unpack_start[0], stream[2*dir+recFwdStrmIdx]);
-#endif
   out.unpackGhost(fwd_nbr_spinor[dir], dir, QUDA_FORWARDS,  dagger, &stream[2*dir + recFwdStrmIdx]); CUERR;
-#ifdef DSLASH_PROFILE
-  cudaEventRecord(unpack_stop[0], stream[2*dir+recFwdStrmIdx]);
-  gettimeofday(&mpi_start[1], NULL);
-#endif
-  
+
   comm_wait(recv_request1[dir]);
   comm_wait(send_request1[dir]);
-#ifdef DSLASH_PROFILE
-  gettimeofday(&mpi_stop[1], NULL);
-  gettimeofday(&memcpy_start[1], NULL);
-#endif
-  memcpy(back_nbr_spinor[dir], pagable_back_nbr_spinor[dir], nbytes[dir]);  
-#ifdef DSLASH_PROFILE
-  gettimeofday(&memcpy_stop[1], NULL);
-  cudaEventRecord(unpack_start[1], stream[2*dir+recBackStrmIdx]);
-#endif
-  out.unpackGhost(back_nbr_spinor[dir], dir, QUDA_BACKWARDS,  dagger, &stream[2*dir + recBackStrmIdx]); CUERR;
-#ifdef DSLASH_PROFILE
-  cudaEventRecord(unpack_stop[1], stream[2*dir+recBackStrmIdx]);
-#endif
 
+  memcpy(back_nbr_spinor[dir], pagable_back_nbr_spinor[dir], nbytes[dir]);  
+  out.unpackGhost(back_nbr_spinor[dir], dir, QUDA_BACKWARDS,  dagger, &stream[2*dir + recBackStrmIdx]); CUERR;
+
+  //for staggered case we don't assume ghost data is ready by the end of this call
+#ifndef GPU_STAGGERED_DIRAC
   cudaStreamSynchronize(stream[2*dir + recFwdStrmIdx]);
   cudaStreamSynchronize(stream[2*dir + recBackStrmIdx]);
-
-#ifdef DSLASH_PROFILE
-  float pack_time[2], unpack_time[2], second_memcpy_time[2], mpi_time[2];
-  for(int i=0;i < 2;i++){
-    cudaEventElapsedTime(&pack_time[i], pack_start[dir][i], pack_stop[dir][i]);
-    cudaEventElapsedTime(&unpack_time[i], unpack_start[i], unpack_stop[i]);
-    second_memcpy_time[i] = (memcpy_stop[i].tv_sec - memcpy_start[i].tv_sec)*1e+3
-      + (memcpy_stop[i].tv_usec - memcpy_start[i].tv_usec)*1e-3;
-    mpi_time[i] = (mpi_stop[i].tv_sec - mpi_start[i].tv_sec)*1e+3
-      + (mpi_stop[i].tv_usec - mpi_start[i].tv_usec)*1e-3;
-  }
-  printfQuda("dir=%d, pack_time=%.2f, 1st_memcpy_time=%f, mpi_time=%.2f ms, 2nd memcpy_time=%.2f ms,  unpack_time=%.2f ms\n", dir,
-	     pack_time[0] + pack_time[1], 
-	     first_memcpy_time[0] + first_memcpy_time[1],	     
-	     mpi_time[0] + mpi_time[1],
-	     second_memcpy_time[0] + second_memcpy_time[1],
-	     unpack_time[0] + unpack_time[1]);
-  for(int i=0;i < 2;i++){
-    cudaEventDestroy(unpack_start[i]);
-    cudaEventDestroy(unpack_stop[i]);
-    cudaEventDestroy(pack_start[dir][i]);
-    cudaEventDestroy(pack_stop[dir][i]);
-  }
-
 #endif
-
 }
 
 void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)

@@ -635,21 +635,6 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   };
     
   int shared_bytes = blockDim.x*6*bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
-
-#ifdef DSLASH_PROFILE  
-  cudaEvent_t interior_start, interior_stop;
-  cudaEvent_t exterior_start[4], exterior_stop[4];
-  struct timeval comm_start[4], comm_stop[4];
-  struct timeval dslash_start, dslash_stop;
-  cudaEventCreate(&interior_start);
-  cudaEventCreate(&interior_stop);
-  for(int i=0;i < 4;i++){
-    cudaEventCreate(&exterior_start[i]);
-    cudaEventCreate(&exterior_stop[i]);
-  }
-  cudaThreadSynchronize();
-  gettimeofday(&dslash_start, NULL);  
-#endif
   
   initTLocation(0, INTERIOR_KERNEL, volume);  CUERR;
   
@@ -658,19 +643,10 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
 #endif
 
-#ifdef DSLASH_PROFILE  
-  cudaEventRecord(interior_start, streams[Nstream-1]);
-#endif
-
   DSLASH(staggeredDslash, Axpy, interiorGridDim, blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
 	 fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
-#ifdef DSLASH_PROFILE  
-  cudaEventRecord(interior_stop, streams[Nstream-1]);
-#endif
 
 #ifdef MULTI_GPU
-
-
   int exterior_kernel_flag[4]={
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
   };
@@ -678,56 +654,25 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     if(!commDimPartitioned(i)){
       continue;
     }
-#ifdef DSLASH_PROFILE  
-    gettimeofday(&comm_start[i], NULL);
-#endif
     // Finish gather and start comms
     face->exchangeFacesComms(i);
     // Wait for comms to finish, and scatter into the end zone
     face->exchangeFacesWait(*inSpinor, dagger,i);    
+  }
+
+  for(int i=0 ;i < 4;i++){
+    if(!commDimPartitioned(i)){
+      continue;
+    }
     
-#ifdef DSLASH_PROFILE  
-    gettimeofday(&comm_stop[i], NULL);
-#endif
-
+    cudaStreamSynchronize(streams[2*i]);
+    cudaStreamSynchronize(streams[2*i + 1]);
     initTLocation(dims[i]-6, exterior_kernel_flag[i] , 6*Vsh[i]);  
-
-#ifdef DSLASH_PROFILE  
-    cudaEventRecord(exterior_start[i], streams[Nstream-1]);
-#endif
+    
     DSLASH(staggeredDslash, Axpy, exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
 	   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
-#ifdef DSLASH_PROFILE  
-    cudaEventRecord(exterior_stop[i], streams[Nstream-1]);
-#endif
-  }
 
-#ifdef DSLASH_PROFILE  
-  cudaThreadSynchronize();
-  gettimeofday(&dslash_stop, NULL);
-  float interior_time, exterior_time[4], comm_time[4], dslash_time;
-  cudaEventElapsedTime(&interior_time, interior_start, interior_stop);
-  dslash_time = (dslash_stop.tv_sec - dslash_start.tv_sec)*1e+3
-    + (dslash_stop.tv_usec - dslash_start.tv_usec)*1e-3;
-  printfQuda("Interior kernel: %.2f ms, overall dslash time=%.2f ms\n", interior_time, dslash_time); 
-  for(int i=0;i < 4;i++){
-    if(commDimPartitioned(i)){
-      cudaEventElapsedTime(&exterior_time[i], exterior_start[i], exterior_stop[i]);
-#define TDIFF(a,b) ((a.tv_sec - b.tv_sec)*1e+3 + (a.tv_usec - b.tv_usec)*1e-3)
-      comm_time[i] = TDIFF(comm_stop[i], comm_start[i]);
-      printfQuda("dir=%d, comm=%.2f ms, exterior kernel=%.2f ms\n", i, comm_time[i], exterior_time[i]); 
-    }
   }
-
-  
-  cudaEventDestroy(interior_start);
-  cudaEventDestroy(interior_stop);
-  for(int i=0;i < 4;i++){
-    cudaEventDestroy(exterior_start[i]);
-    cudaEventDestroy(exterior_stop[i]);
-  }
-
-#endif
 
 #endif
 }

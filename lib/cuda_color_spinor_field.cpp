@@ -528,39 +528,8 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
     gpu_buf = this->fwdGhostFaceBuffer[dim];
   }
   
-#if 0
-  cudaEvent_t collect_start, collect_stop;
-  cudaEvent_t d2h_start, d2h_stop;
-  cudaEventCreate(&collect_start);
-  cudaEventCreate(&collect_stop);
-  cudaEventCreate(&d2h_start);  
-  cudaEventCreate(&d2h_stop);  
-
-  cudaEventRecord(collect_start, *stream);
-  collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
-  cudaEventRecord(collect_stop, *stream);
-
-  cudaEventRecord(d2h_start, *stream);
-  cudaMemcpyAsync(ghost_spinor, gpu_buf, 3*len, cudaMemcpyDeviceToHost, *stream); CUERR;
-  cudaEventRecord(d2h_stop, *stream);  
-  {
-    float collect_time, d2h_time;
-    cudaThreadSynchronize();
-    cudaEventElapsedTime(&collect_time, collect_start, collect_stop);
-    cudaEventElapsedTime(&d2h_time, d2h_start, d2h_stop);
-    printfQuda("dim=%d, collect_time=%.2f ms, d2h_time=%.2f ms\n", dim, collect_time, d2h_time);
-    
-    cudaEventDestroy(collect_start);
-    cudaEventDestroy(collect_stop);
-    cudaEventDestroy(d2h_start);  
-    cudaEventDestroy(d2h_stop);  
-  }
-#else
   collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
   cudaMemcpyAsync(ghost_spinor, gpu_buf, 3*len, cudaMemcpyDeviceToHost, *stream); CUERR;
-#endif
-
-
 
 #endif
 
