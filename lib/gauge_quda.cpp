@@ -634,11 +634,6 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
 
-  if(X[3] % 2 == 0){
-  }else{
-    //FIXME: switching odd and even ghost cpuLink      
-  }
-
   //loop variables: a, b, c with a the most signifcant and c the least significant
   //A, B, C the maximum value
   //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
@@ -670,8 +665,17 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
       Float* even_src = cpuLink[dir];
       Float* odd_src = cpuLink[dir] + volumeCB*gaugeSiteSize;
 
-      Float* even_dst = cpuGhost[dir];
-      Float* odd_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;
+      Float* even_dst;
+      Float* odd_dst;
+     
+     //switching odd and even ghost cpuLink when that dimension size is odd
+     if(X[dir] % 2 ==0){
+        even_dst = cpuGhost[dir];
+        odd_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;	
+     }else{
+	even_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;
+        odd_dst = cpuGhost[dir];
+     }
 
       int even_dst_index = 0;
       int odd_dst_index = 0;
