@@ -95,6 +95,101 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 
 
 #ifdef GPU_WILSON_DIRAC
+
+// double precision
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
+#define READ_SPINOR READ_SPINOR_DOUBLE
+#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
+#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
+#define SPINORTEX spinorTexDouble
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_DOUBLE2
+#define SPINOR_DOUBLE
+template <int dir, int dagger>
+static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, const double2 *in, const float *inNorm,
+						 const int &idx, const int &face_idx, const int &face_volume, const int &face_num)
+{
+#if (__CUDA_ARCH__ >= 130)
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
+#include "wilson_pack_face_core.h"
+    }
+#endif // (__CUDA_ARCH__ >= 130)
+}
+#undef READ_SPINOR
+#undef READ_SPINOR_UP
+#undef READ_SPINOR_DOWN
+#undef SPINORTEX
+#undef WRITE_HALF_SPINOR
+#undef SPINOR_DOUBLE
+
+
+// single precision
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
+#define READ_SPINOR READ_SPINOR_SINGLE
+#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
+#define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_SINGLE_TEX
+#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
+#define SPINORTEX spinorTexSingle
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
+template <int dir, int dagger>
+static inline __device__ void packFaceWilsonCore(float4 *out, float *outNorm, const float4 *in, const float *inNorm,
+						 const int &idx, const int &face_idx, const int &face_volume, const int &face_num)
+{
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
+#include "wilson_pack_face_core.h"
+    }
+}
+#undef READ_SPINOR
+#undef READ_SPINOR_UP
+#undef READ_SPINOR_DOWN
+#undef SPINORTEX
+#undef WRITE_HALF_SPINOR
+
+
+// half precision
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
+#define READ_SPINOR READ_SPINOR_HALF
+#define READ_SPINOR_UP READ_SPINOR_HALF_UP
+#define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_HALF_TEX
+#define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
+#define SPINORTEX spinorTexHalf
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_SHORT4
+template <int dir, int dagger>
+static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, const short4 *in, const float *inNorm,
+						 const int &idx, const int &face_idx, const int &face_volume, const int &face_num)
+{
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
+#include "wilson_pack_face_core.h"
+    }
+}
+#undef READ_SPINOR
+#undef READ_SPINOR_UP
+#undef READ_SPINOR_DOWN
+#undef SPINORTEX
+#undef WRITE_HALF_SPINOR
+
+
 template <int dir, int dagger, int parity, typename FloatN>
 __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *in, const float *inNorm)
 {
@@ -109,96 +204,15 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
   face_idx -= face_num*face_volume;
 
   // set out to point to the beginning of face 1 if necessary
-  if (typeid(FloatN) == typeid(double2)) {
-    out += face_num * 6 * face_volume;
-  } else {
-    out += face_num * 3 * face_volume;
-  }
+  out += face_num * (12*sizeof(out->x)/sizeof(out)) * face_volume;
 
   // compute an index into the local volume from the index into the face
   int idx = indexFromFaceIndex<dir, 1, parity>(face_idx, face_volume, face_num);
 
-  if (typeid(FloatN) == typeid(double2)) {
-
-#if (__CUDA_ARCH__ >= 130)
-#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
-#define READ_SPINOR READ_SPINOR_DOUBLE
-#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
-#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
-#define SPINORTEX in
-#else
-#define READ_SPINOR READ_SPINOR_DOUBLE_TEX
-#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
-#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
-#define SPINORTEX spinorTexDouble
-#endif
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_DOUBLE2
-#define SPINOR_DOUBLE
-    if (dagger) {
-#include "wilson_pack_face_dagger_core.h"
-    } else {
-#include "wilson_pack_face_core.h"
-    }
-#undef READ_SPINOR
-#undef READ_SPINOR_UP
-#undef READ_SPINOR_DOWN
-#undef SPINORTEX
-#undef WRITE_HALF_SPINOR
-#undef SPINOR_DOUBLE
-#endif // (__CUDA_ARCH__ >= 130)
-
-  } else if (typeid(FloatN) == typeid(float4)) {
-
-#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
-#define READ_SPINOR READ_SPINOR_SINGLE
-#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
-#define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
-#define SPINORTEX in
-#else
-#define READ_SPINOR READ_SPINOR_SINGLE_TEX
-#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
-#define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
-#define SPINORTEX spinorTexSingle
-#endif
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
-    if (dagger) {
-#include "wilson_pack_face_dagger_core.h"
-    } else {
-#include "wilson_pack_face_core.h"
-    }
-#undef READ_SPINOR
-#undef READ_SPINOR_UP
-#undef READ_SPINOR_DOWN
-#undef SPINORTEX
-#undef WRITE_HALF_SPINOR
-
-  } else if (typeid(FloatN) == typeid(short4)) {
-
-#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
-#define READ_SPINOR READ_SPINOR_HALF
-#define READ_SPINOR_UP READ_SPINOR_HALF_UP
-#define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
-#define SPINORTEX in
-#else
-#define READ_SPINOR READ_SPINOR_HALF_TEX
-#define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
-#define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
-#define SPINORTEX spinorTexHalf
-#endif
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_SHORT4
-    if (dagger) {
-#include "wilson_pack_face_dagger_core.h"
-    } else {
-#include "wilson_pack_face_core.h"
-    }
-#undef READ_SPINOR
-#undef READ_SPINOR_UP
-#undef READ_SPINOR_DOWN
-#undef SPINORTEX
-#undef WRITE_HALF_SPINOR
-
-  }
+  // read spinor, spin-project, and write half spinor to face
+  packFaceWilsonCore<dir, dagger>(out, outNorm, in, inNorm, idx, face_idx, face_volume, face_num);
 }
+
 #endif // GPU_WILSON_DIRAC
 
 
@@ -252,7 +266,7 @@ void packFaceWilson(cudaColorSpinorField &in, const int dir, const int dagger, c
   dim3 gridDim( (ghostFace[dir]+blockDim.x-1) / blockDim.x, 1, 1);
 
   char *ghost = (char*)in.v + (in.length + in.ghostOffset[dir]*in.nColor*in.nSpin*2)*precision;
-  float *ghostNorm = in.norm + in.stride + in.ghostNormOffset[dir];
+  float *ghostNorm = (float*)in.norm + in.stride + in.ghostNormOffset[dir];
 
   switch(precision) {
   case QUDA_DOUBLE_PRECISION:
