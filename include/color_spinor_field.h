@@ -343,7 +343,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   void saveCPUSpinorField (cpuColorSpinorField &src) const;
 
   void allocateGhostBuffer(void);
-  void freeGhostBuffer(void);
+  static void freeGhostBuffer(void);
 
   void packGhost(void* ghost_spinor, const int dim, 
 		 const QudaDirection dir, const QudaParity parity, 
@@ -455,7 +455,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   void PrintVector(unsigned int x);
 
   void allocateGhostBuffer(void);
-  void freeGhostBuffer(void);
+  static void freeGhostBuffer(void);
 	
   void packGhost(void* ghost_spinor, const int dim, 
 		 const QudaDirection dir, const QudaParity parity, const int dagger);

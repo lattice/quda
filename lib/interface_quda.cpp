@@ -1194,7 +1194,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 {
 
   QudaPrecision high_prec = param->cuda_prec;
-  QudaPrecision low_prec=  param->cuda_prec_sloppy;
   param->cuda_prec = param->cuda_prec_sloppy;
   
   do_create_sloppy_cuda_gauge();
@@ -1328,7 +1327,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   // tune the Dirac Kernel
   tuneDirac(*param, pc_solution ? *(x[0]) : (x[0])->Even());
-  
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [num_offsets];

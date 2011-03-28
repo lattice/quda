@@ -266,7 +266,7 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
   dim3 gridDim( (ghostFace[dir]+blockDim.x-1) / blockDim.x, 1, 1);
 
   int Ninternal = in.nColor * in.nSpin; // assume spin projection
-  float *ghostNorm = (char*)ghost_buf + Ninternal * ghostFace[dir] * precision; // offset into norm zone
+  float *ghostNorm = (float*)((char*)ghost_buf + Ninternal*ghostFace[dir]*in.precision); // norm zone
 
   errorQuda("FIXME: packing kernels need to be split for direction");
 
