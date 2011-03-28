@@ -58,7 +58,7 @@
 
 if (face_num) {
     
-    switch(dir) {
+    switch(dim) {
     case 0:
         {
             // read spinor from device memory
@@ -159,7 +159,7 @@ if (face_num) {
     
 } else {
     
-    switch(dir) {
+    switch(dim) {
     case 0:
         {
             // read spinor from device memory

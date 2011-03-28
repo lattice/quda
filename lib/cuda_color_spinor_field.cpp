@@ -535,7 +535,18 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
       CUDAMEMCPY(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); CUERR;
     }
   }  
-  
+
+  /*
+  cudaThreadSynchronize();
+  double mul = (kernelPackT ? 1.0 : 2.0);
+
+  double gSum = 0.0;
+  for (int i=0; i<ghostFace[dim]*Nint; i++) {
+    //printf("%d %e\n", i, mul*((float*)ghost_spinor)[i]);
+    gSum += mul*(double)(((float*)ghost_spinor)[i]);
+  }
+  printf("Pack check %d %d %e %d\n\n", dim, dir, gSum, ghostFace[dim]*Nint);
+  */
 }
     
 
