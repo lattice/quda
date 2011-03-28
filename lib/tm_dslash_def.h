@@ -154,6 +154,8 @@
 
 #if (DD_PREC==0) // double-precision fields
 
+#define TPROJSCALE tProjScale
+
 // double-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
 #define GAUGE0TEX gauge0
@@ -195,6 +197,8 @@
 #define SPINOR_HOP 12
 
 #elif (DD_PREC==1) // single-precision fields
+
+#define TPROJSCALE tProjScale_f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -239,6 +243,8 @@
 #define SPINOR_HOP 6
 
 #else             // half-precision fields
+
+#define TPROJSCALE tProjScale_f
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK

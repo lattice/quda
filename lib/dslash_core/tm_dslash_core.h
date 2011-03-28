@@ -1171,19 +1171,19 @@ o32_re = o32_im = 0;
         READ_SPINOR_DOWN(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);
         
         // project spinor into half spinors
-        spinorFloat a0_re = +2*i20_re;
-        spinorFloat a0_im = +2*i20_im;
-        spinorFloat a1_re = +2*i21_re;
-        spinorFloat a1_im = +2*i21_im;
-        spinorFloat a2_re = +2*i22_re;
-        spinorFloat a2_im = +2*i22_im;
+        spinorFloat a0_re = +(TPROJSCALE)*i20_re;
+        spinorFloat a0_im = +(TPROJSCALE)*i20_im;
+        spinorFloat a1_re = +(TPROJSCALE)*i21_re;
+        spinorFloat a1_im = +(TPROJSCALE)*i21_im;
+        spinorFloat a2_re = +(TPROJSCALE)*i22_re;
+        spinorFloat a2_im = +(TPROJSCALE)*i22_im;
         
-        spinorFloat b0_re = +2*i30_re;
-        spinorFloat b0_im = +2*i30_im;
-        spinorFloat b1_re = +2*i31_re;
-        spinorFloat b1_im = +2*i31_im;
-        spinorFloat b2_re = +2*i32_re;
-        spinorFloat b2_im = +2*i32_im;
+        spinorFloat b0_re = +(TPROJSCALE)*i30_re;
+        spinorFloat b0_im = +(TPROJSCALE)*i30_im;
+        spinorFloat b1_re = +(TPROJSCALE)*i31_re;
+        spinorFloat b1_im = +(TPROJSCALE)*i31_im;
+        spinorFloat b2_re = +(TPROJSCALE)*i32_re;
+        spinorFloat b2_im = +(TPROJSCALE)*i32_im;
         
         // identity gauge matrix
         spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
@@ -1219,19 +1219,19 @@ o32_re = o32_im = 0;
         RECONSTRUCT_GAUGE_MATRIX(6);
         
         // project spinor into half spinors
-        spinorFloat a0_re = +2*i20_re;
-        spinorFloat a0_im = +2*i20_im;
-        spinorFloat a1_re = +2*i21_re;
-        spinorFloat a1_im = +2*i21_im;
-        spinorFloat a2_re = +2*i22_re;
-        spinorFloat a2_im = +2*i22_im;
+        spinorFloat a0_re = +(TPROJSCALE)*i20_re;
+        spinorFloat a0_im = +(TPROJSCALE)*i20_im;
+        spinorFloat a1_re = +(TPROJSCALE)*i21_re;
+        spinorFloat a1_im = +(TPROJSCALE)*i21_im;
+        spinorFloat a2_re = +(TPROJSCALE)*i22_re;
+        spinorFloat a2_im = +(TPROJSCALE)*i22_im;
         
-        spinorFloat b0_re = +2*i30_re;
-        spinorFloat b0_im = +2*i30_im;
-        spinorFloat b1_re = +2*i31_re;
-        spinorFloat b1_im = +2*i31_im;
-        spinorFloat b2_re = +2*i32_re;
-        spinorFloat b2_im = +2*i32_im;
+        spinorFloat b0_re = +(TPROJSCALE)*i30_re;
+        spinorFloat b0_im = +(TPROJSCALE)*i30_im;
+        spinorFloat b1_re = +(TPROJSCALE)*i31_re;
+        spinorFloat b1_im = +(TPROJSCALE)*i31_im;
+        spinorFloat b2_re = +(TPROJSCALE)*i32_re;
+        spinorFloat b2_im = +(TPROJSCALE)*i32_im;
         
         // multiply row 0
         spinorFloat A0_re = 0;
@@ -1383,19 +1383,19 @@ o32_re = o32_im = 0;
         READ_SPINOR_UP(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);
         
         // project spinor into half spinors
-        spinorFloat a0_re = +2*i00_re;
-        spinorFloat a0_im = +2*i00_im;
-        spinorFloat a1_re = +2*i01_re;
-        spinorFloat a1_im = +2*i01_im;
-        spinorFloat a2_re = +2*i02_re;
-        spinorFloat a2_im = +2*i02_im;
+        spinorFloat a0_re = +(TPROJSCALE)*i00_re;
+        spinorFloat a0_im = +(TPROJSCALE)*i00_im;
+        spinorFloat a1_re = +(TPROJSCALE)*i01_re;
+        spinorFloat a1_im = +(TPROJSCALE)*i01_im;
+        spinorFloat a2_re = +(TPROJSCALE)*i02_re;
+        spinorFloat a2_im = +(TPROJSCALE)*i02_im;
         
-        spinorFloat b0_re = +2*i10_re;
-        spinorFloat b0_im = +2*i10_im;
-        spinorFloat b1_re = +2*i11_re;
-        spinorFloat b1_im = +2*i11_im;
-        spinorFloat b2_re = +2*i12_re;
-        spinorFloat b2_im = +2*i12_im;
+        spinorFloat b0_re = +(TPROJSCALE)*i10_re;
+        spinorFloat b0_im = +(TPROJSCALE)*i10_im;
+        spinorFloat b1_re = +(TPROJSCALE)*i11_re;
+        spinorFloat b1_im = +(TPROJSCALE)*i11_im;
+        spinorFloat b2_re = +(TPROJSCALE)*i12_re;
+        spinorFloat b2_im = +(TPROJSCALE)*i12_im;
         
         // identity gauge matrix
         spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
@@ -1431,19 +1431,19 @@ o32_re = o32_im = 0;
         RECONSTRUCT_GAUGE_MATRIX(7);
         
         // project spinor into half spinors
-        spinorFloat a0_re = +2*i00_re;
-        spinorFloat a0_im = +2*i00_im;
-        spinorFloat a1_re = +2*i01_re;
-        spinorFloat a1_im = +2*i01_im;
-        spinorFloat a2_re = +2*i02_re;
-        spinorFloat a2_im = +2*i02_im;
+        spinorFloat a0_re = +(TPROJSCALE)*i00_re;
+        spinorFloat a0_im = +(TPROJSCALE)*i00_im;
+        spinorFloat a1_re = +(TPROJSCALE)*i01_re;
+        spinorFloat a1_im = +(TPROJSCALE)*i01_im;
+        spinorFloat a2_re = +(TPROJSCALE)*i02_re;
+        spinorFloat a2_im = +(TPROJSCALE)*i02_im;
         
-        spinorFloat b0_re = +2*i10_re;
-        spinorFloat b0_im = +2*i10_im;
-        spinorFloat b1_re = +2*i11_re;
-        spinorFloat b1_im = +2*i11_im;
-        spinorFloat b2_re = +2*i12_re;
-        spinorFloat b2_im = +2*i12_im;
+        spinorFloat b0_re = +(TPROJSCALE)*i10_re;
+        spinorFloat b0_im = +(TPROJSCALE)*i10_im;
+        spinorFloat b1_re = +(TPROJSCALE)*i11_re;
+        spinorFloat b1_im = +(TPROJSCALE)*i11_im;
+        spinorFloat b2_re = +(TPROJSCALE)*i12_re;
+        spinorFloat b2_im = +(TPROJSCALE)*i12_im;
         
         // multiply row 0
         spinorFloat A0_re = 0;
