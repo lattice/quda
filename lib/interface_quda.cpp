@@ -457,6 +457,8 @@ void endQuda(void)
   endInvertQuda();
 
   cudaColorSpinorField::freeBuffer();
+  cudaColorSpinorField::freeGhostBuffer();
+  cpuColorSpinorField::freeGhostBuffer();
   freeGaugeQuda();
   freeCloverQuda();
 

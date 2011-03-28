@@ -99,6 +99,8 @@ FaceBuffer::~FaceBuffer()
 void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 				    int dagger, cudaStream_t *stream_p)
 {
+  in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated
+
   stream = stream_p;
 
   int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};

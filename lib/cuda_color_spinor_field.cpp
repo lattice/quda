@@ -439,102 +439,104 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   return;
 }
 
-
-void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
-				     const QudaParity parity, const int dagger,
-				     cudaStream_t *stream) 
-{
-
-#ifndef GPU_STAGGERED_DIRAC
-  CUERR; // check error state
-
-  int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-  int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
-  int Vh = this->volume;
-  int Vsh = x[0]*x[1]*x[2];
+void cudaColorSpinorField::allocateGhostBuffer(void) {
+  int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
   if (nSpin == 4) Nint /= 2; // spin projection for Wilson
-  int Npad = Nint / Nvec; // number Nvec buffers we have
 
-  if (dim != 3) errorQuda("Not supported");
+  if(this->initGhostFaceBuffer == 0 || precision > facePrecision){    
+    for (int i=0; i<4; i++) {
+      size_t faceBytes = nFace*ghostVolume[i]*Nint*precision;
+      // add extra space for the norms for half precision
+      if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostVolume[i]*sizeof(float);
 
-  int t0_offset=0; // T=0 is the first VS block
-  int Nt_minus1_offset = (Vh - num_faces*Vsh); // N_t -1 = Vh-Vsh
-
-  int offset = 0;
-  if (nSpin == 1) {
-    offset = (dir == QUDA_BACKWARDS) ? t0_offset : Nt_minus1_offset;
-  } else if (nSpin == 4) {    
-    // !dagger: send lower components backwards, send upper components forwards
-    // dagger: send upper components backwards, send lower components forwards
-    bool upper = dagger ? true : false; // Fwd is !Back  
-    if (dir == QUDA_FORWARDS) upper = !upper;
-    int lower_spin_offset=Npad*stride;	    
-    if (upper) offset = (dir == QUDA_BACKWARDS ? t0_offset : Nt_minus1_offset);
-    else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? t0_offset : Nt_minus1_offset);
-  }
-    
-  // QUDA Memcpy NPad's worth. 
-  //  -- Dest will point to the right beginning PAD. 
-  //  -- Each Pad has size Nvec*Vsh Floats. 
-  //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
-  for(int i=0; i < Npad; i++) {
-    int len = num_faces*Vsh*Nvec*precision;     
-    void *dst = (char*)ghost_spinor + i*len;
-    void *src = (char*)v + (offset + i*stride)* Nvec*precision;
-    CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
-  }
-
-  if (precision == QUDA_HALF_PRECISION) {
-    int normlen = num_faces*Vsh*sizeof(float);
-    int norm_offset = (dir == QUDA_BACKWARDS) ? t0_offset : Nt_minus1_offset*sizeof(float);
-    void *dst = (char*)ghost_spinor + num_faces*Nint*Vsh*precision;
-    void *src = (char*)norm + norm_offset;
-    CUDAMEMCPY(dst, src, normlen, cudaMemcpyDeviceToHost, *stream); CUERR;
-  }
-#else
-  
-  int Vsh_x = x[1]*x[2]*x[3]/2;
-  int Vsh_y = x[0]*x[2]*x[3];
-  int Vsh_z = x[0]*x[1]*x[3];
-  int Vsh_t = x[0]*x[1]*x[2];
-  int Vsh_xyzt[4]={Vsh_x, Vsh_y, Vsh_z, Vsh_t};
-  int num_faces = 3; //3 faces for asqtad
-  int FloatN = 2; // always use Float2 for staggered
-  int sizeOfFloatN = FloatN*precision; 
-  int len = num_faces*Vsh_xyzt[dim]*sizeOfFloatN;
-  
-  if(this->initGhostFaceBuffer == 0 || precision > facePrecision){
-    
-    cudaMalloc((void**)&this->fwdGhostFaceBuffer[0], 9*Vsh_x*sizeOfFloatN);
-    cudaMalloc((void**)&this->fwdGhostFaceBuffer[1], 9*Vsh_y*sizeOfFloatN);
-    cudaMalloc((void**)&this->fwdGhostFaceBuffer[2], 9*Vsh_z*sizeOfFloatN);
-    cudaMalloc((void**)&this->fwdGhostFaceBuffer[3], 9*Vsh_t*sizeOfFloatN);
-  
-    cudaMalloc((void**)&this->backGhostFaceBuffer[0], 9*Vsh_x*sizeOfFloatN);
-    cudaMalloc((void**)&this->backGhostFaceBuffer[1], 9*Vsh_y*sizeOfFloatN);
-    cudaMalloc((void**)&this->backGhostFaceBuffer[2], 9*Vsh_z*sizeOfFloatN);
-    cudaMalloc((void**)&this->backGhostFaceBuffer[3], 9*Vsh_t*sizeOfFloatN);
+      if (this->initGhostFaceBuffer) { // only free-ed if precision is higher than previous allocation
+	cudaFree(this->fwdGhostFaceBuffer[i]); this->fwdGhostFaceBuffer[i] = NULL;
+	cudaFree(this->backGhostFaceBuffer[i]); this->backGhostFaceBuffer[i] = NULL;
+      }
+      cudaMalloc((void**)&this->fwdGhostFaceBuffer[i], faceBytes);
+      cudaMalloc((void**)&this->backGhostFaceBuffer[i], faceBytes);
+    }   
     CUERR;
     
     this->facePrecision = precision;
     this->initGhostFaceBuffer = 1;
   }
-
-  void* gpu_buf;
-  if(dir== QUDA_BACKWARDS){
-    gpu_buf = this->backGhostFaceBuffer[dim];
-  }else{
-    gpu_buf = this->fwdGhostFaceBuffer[dim];
-  }
-  
-  collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
-  cudaMemcpyAsync(ghost_spinor, gpu_buf, 3*len, cudaMemcpyDeviceToHost, *stream); CUERR;
-
-#endif
-
 }
 
+void cudaColorSpinorField::freeGhostBuffer(void) {
+  if (!initGhostFaceBuffer == 0) return;
+
+  for(int i=0;i < 4; i++){
+    free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
+    free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+  } 
+
+  initGhostFaceBuffer = 0;  
+}
+
+#define KERNEL_PACK_T
+
+void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
+				     const QudaParity parity, const int dagger, cudaStream_t *stream) 
+{
+
+  int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+  int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+  int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
+
+  if (dim !=3 || KERNEL_PACK_T) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+
+    size_t bytes = nFace*Nint*ghostVolume[dim]*precision;
+    if (precision == QUDA_HALF_PRECISION) bytes += nFace*Nint*ghostVolume[dim]*sizeof(float);
+
+    void* gpu_buf = (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
+
+    if (nSpin == 1) { // use different packing kernels for staggered and Wilson
+      collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
+    } else { // FIXME: Wilson currently uses one kernel for both directions
+      packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, stream); CUERR;
+    }
+    CUDAMEMCPY(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); CUERR;
+  } else { // do multiple cudaMemcpys 
+
+    int Npad = Nint / Nvec; // number Nvec buffers we have
+    int Nt_minus1_offset = (volume - nFace*ghostVolume[3]); // N_t -1 = Vh-Vsh
+    
+    int offset = 0;
+    if (nSpin == 1) {
+      offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset;
+    } else if (nSpin == 4) {    
+      // !dagger: send lower components backwards, send upper components forwards
+      // dagger: send upper components backwards, send lower components forwards
+      bool upper = dagger ? true : false; // Fwd is !Back  
+      if (dir == QUDA_FORWARDS) upper = !upper;
+      int lower_spin_offset = Npad*stride;	    
+      if (upper) offset = (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
+      else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
+    }
+    
+    // QUDA Memcpy NPad's worth. 
+    //  -- Dest will point to the right beginning PAD. 
+    //  -- Each Pad has size Nvec*Vsh Floats. 
+    //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
+    for(int i=0; i < Npad; i++) {
+      int len = nFace*ghostVolume[3]*Nvec*precision;     
+      void *dst = (char*)ghost_spinor + i*len;
+      void *src = (char*)v + (offset + i*stride)* Nvec*precision;
+      CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+    }
+    
+    if (precision == QUDA_HALF_PRECISION) {
+      int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
+      void *dst = (char*)ghost_spinor + nFace*Nint*ghostVolume[3]*precision;
+      void *src = (char*)norm + norm_offset;
+      CUDAMEMCPY(dst, src, nFace*ghostVolume[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); CUERR;
+    }
+  }  
+  
+}
+    
 
 void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
 				       const QudaDirection dir, 
@@ -542,17 +544,8 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 {
   CUERR;
   int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-  int num_faces = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
-  int Vsh_xyzt[4]= {
-    x[1]*x[2]*x[3]/2,
-    x[0]*x[2]*x[3],
-    x[0]*x[1]*x[3],
-    x[0]*x[1]*x[2]
-  };
-  int Vsh = Vsh_xyzt[dim];
-  int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
-  if (nSpin == 4) Nint /= 2; // spin projection for Wilson
-  int Npad = Nint / Nvec; // number Nvec buffers we have
+  int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+  int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
   // Wilson only
   // !dagger: receive lower components forwards, receive upper components backwards
@@ -560,10 +553,9 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   bool upper = dagger? false : true;
   if (dir == QUDA_FORWARDS) upper = !upper;
     
-  int len = num_faces*Vsh*Nvec*Npad;
-
+  int len = nFace*ghostVolume[dim]*Nint;
   int offset = length + ghostOffset[dim]*nColor*nSpin*2;
-  if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len;
+  if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len; // convention difference
   else offset += (upper ? 0 : len);    
   void *dst = (char*)v + precision*offset;
   void *src = ghost_spinor;
@@ -574,10 +566,12 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
     // FIXME: Convention difference
     // Staggered: backwards goes in 1st norm zone, forwards in 2nd norm zone
     // Wilson: upper goes in the 1st norm zone, lower in the 2nd norm zone (changes depending on dagger)
-    int normlen = num_faces*Vsh*sizeof(float);
-    int norm_offset = (nSpin == 1) ? ((dir == QUDA_BACKWARDS) ? 0 : normlen ) : (upper ? 0 : normlen);
-    void *dst = (char*)norm + stride*sizeof(float) + norm_offset;
-    void *src = (char*)ghost_spinor+num_faces*Nint*Vsh*precision;
+    int normlen = nFace*ghostVolume[dim]*sizeof(float);
+    int norm_offset = stride + ghostNormOffset[dim];
+    norm_offset += (nSpin == 1) ? ((dir == QUDA_BACKWARDS) ? 0 : normlen ) : (upper ? 0 : normlen);
+
+    void *dst = (char*)norm + norm_offset*sizeof(float);
+    void *src = (char*)ghost_spinor+nFace*Nint*ghostVolume[dim]*precision; // norm region of host ghost zone
     CUDAMEMCPY(dst, src, normlen, cudaMemcpyHostToDevice, *stream);  CUERR;
   }
 

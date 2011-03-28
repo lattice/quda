@@ -226,8 +226,8 @@ class ColorSpinorField {
   friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
   friend class ColorSpinorParam;
 
-  friend void packFaceWilson(cudaColorSpinorField &in, const int dir, const int dagger, const int parity,
-			     const QudaPrecision precision, const cudaStream_t &stream);
+  friend void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
+			     const int parity, const cudaStream_t &stream);
 };
 
 // CUDA implementation
@@ -305,8 +305,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 			      const int dagger, const double &kappa, const double &mu,
 			      const QudaTwistGamma5Type twist, const dim3 &block);
-  friend void packFaceWilson(cudaColorSpinorField &in, const int dir, const int dagger, const int parity,
-			     const QudaPrecision precision, const cudaStream_t &stream);
+  friend void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
+			     const int parity, const cudaStream_t &stream);
 
  private:
   void *v; // the field elements
@@ -341,6 +341,9 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   void loadCPUSpinorField(const cpuColorSpinorField &src);
   void saveCPUSpinorField (cpuColorSpinorField &src) const;
+
+  void allocateGhostBuffer(void);
+  void freeGhostBuffer(void);
 
   void packGhost(void* ghost_spinor, const int dim, 
 		 const QudaDirection dir, const QudaParity parity, 
