@@ -64,6 +64,7 @@ extern int Vh;
 static int Vs_x, Vs_y, Vs_z, Vs_t;
 extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 static int Vsh[4];
+extern bool kernelPackT;
 
 void
 setDimConstants(int *X)
@@ -94,6 +95,7 @@ setDimConstants(int *X)
 
 void init()
 {    
+  kernelPackT = false;
 
   initQuda(device);
 

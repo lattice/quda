@@ -60,6 +60,8 @@ static int Vs_x, Vs_y, Vs_z, Vs_t;
 extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 static int Vsh[4];
 
+extern bool kernelPackT;
+
 template<typename Float>
 void constructSpinorField(Float *res) {
   for(int i = 0; i < Vh; i++) {
@@ -156,6 +158,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 int
 invert_test(void)
 {
+  kernelPackT = false;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
