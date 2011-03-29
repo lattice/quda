@@ -46,7 +46,11 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac;
 
+extern bool kernelPackT;
+
 void init() {
+
+  kernelPackT = false; // Set true for kernel T face packing
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();

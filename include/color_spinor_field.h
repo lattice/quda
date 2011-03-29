@@ -134,6 +134,9 @@ class ColorSpinorParam {
   }
 };
 
+class cpuColorSpinorField;
+class cudaColorSpinorField;
+
 class ColorSpinorField {
 
  private:
@@ -166,6 +169,7 @@ class ColorSpinorField {
   // multi-GPU parameters
   int ghostFace[QUDA_MAX_DIM];// the size of each face
   int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
+  int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
 
   int ghost_length; // length of ghost zone
   int ghost_norm_length; // length of ghost zone for norm
@@ -221,9 +225,10 @@ class ColorSpinorField {
 
   friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
   friend class ColorSpinorParam;
-};
 
-class cpuColorSpinorField;
+  friend void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
+			     const int parity, const cudaStream_t &stream);
+};
 
 // CUDA implementation
 class cudaColorSpinorField : public ColorSpinorField {
@@ -300,6 +305,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 			      const int dagger, const double &kappa, const double &mu,
 			      const QudaTwistGamma5Type twist, const dim3 &block);
+  friend void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
+			     const int parity, const cudaStream_t &stream);
 
  private:
   void *v; // the field elements
@@ -334,6 +341,9 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   void loadCPUSpinorField(const cpuColorSpinorField &src);
   void saveCPUSpinorField (cpuColorSpinorField &src) const;
+
+  void allocateGhostBuffer(void);
+  static void freeGhostBuffer(void);
 
   void packGhost(void* ghost_spinor, const int dim, 
 		 const QudaDirection dir, const QudaParity parity, 
@@ -445,7 +455,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   void PrintVector(unsigned int x);
 
   void allocateGhostBuffer(void);
-  void freeGhostBuffer(void);
+  static void freeGhostBuffer(void);
 	
   void packGhost(void* ghost_spinor, const int dim, 
 		 const QudaDirection dir, const QudaParity parity, const int dagger);

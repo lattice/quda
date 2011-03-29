@@ -73,6 +73,10 @@ __constant__ bool Pt0;
 // Are we processor Nt-1 in time?
 __constant__ bool PtNm1;
 
+// factor of 2 (or 1) for T-dimensional spin projection
+__constant__ double tProjScale;
+__constant__ float tProjScale_f;
+
 int initDslash = 0;
 int initClover = 0;
 int initDomainWall = 0;
@@ -86,7 +90,7 @@ void initCommonConstants(const FullGauge gauge) {
   int Vh = gauge.volumeCB;
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
   
-  Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2]/2; // FIXME - this shuold not be called Vs, rather Vsh
+  Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2]/2; // FIXME - this should not be called Vs, rather Vsh
   cudaMemcpyToSymbol("Vs", &Vspatial, sizeof(int));
 
   int half_Vspatial = Vspatial;
@@ -239,14 +243,19 @@ void initDslashConstants(const FullGauge gauge, const int sp_stride)
   float h_pi_f = M_PI;
   cudaMemcpyToSymbol("pi_f", &(h_pi_f), sizeof(float));
 
+  double TProjScale = (kernelPackT ? 1.0 : 2.0);
+  // temporary additions (?) for checking Ron's T-packing kernel with old multi-gpu kernel
+  cudaMemcpyToSymbol("tProjScale", &(TProjScale), sizeof(double));
+
+  float TProjScale_f = (float)TProjScale;
+  cudaMemcpyToSymbol("tProjScale_f", &(TProjScale_f), sizeof(float));
+
   checkCudaError();
 
   initDslash = 1;
 
   // create the streams
   for (int i=0; i<Nstream; i++) cudaStreamCreate(&streams[i]);
-  
-
 }
 
 void initCloverConstants (const int cl_stride) {

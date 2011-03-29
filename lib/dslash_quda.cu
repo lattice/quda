@@ -38,6 +38,9 @@ struct DslashParam {
   
 };
 
+// parameter used type of T-packing to use
+bool kernelPackT = false;
+
 DslashParam dslashParam;
 
 // these are set in initDslashConst

@@ -271,7 +271,7 @@ staggeredCollectGhostSpinorKernel(Float2* in, const int oddBit,
   int x3 = z2 - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   int x1 = 2*x1h + x1odd;
-  int X = 2*sid + x1odd;
+  //int X = 2*sid + x1odd;
 
   READ_ST_SPINOR(in, sid, sp_stride);
   int ghost_face_idx;
