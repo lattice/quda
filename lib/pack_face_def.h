@@ -310,7 +310,7 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
   dim3 gridDim( (in.ghostFace[dim]+blockDim.x-1) / blockDim.x, 1, 1);
 
   int Ninternal = in.nColor * in.nSpin; // assume spin projection
-  float *ghostNorm = (float*)((char*)ghost_buf + Ninternal*in.ghostFace[dir]*in.precision); // norm zone
+  float *ghostNorm = (float*)((char*)ghost_buf + Ninternal*in.ghostFace[dim]*in.precision); // norm zone
 
   //printfQuda("Starting face packing: dimension = %d, direction = %d, face size = %d\n", dim, dir, in.ghostFace[dim]);
 

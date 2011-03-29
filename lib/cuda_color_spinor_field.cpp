@@ -488,7 +488,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
   if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
     size_t bytes = nFace*Nint*ghostFace[dim]*precision;
-    if (precision == QUDA_HALF_PRECISION) bytes += nFace*Nint*ghostFace[dim]*sizeof(float);
+    if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
 
     void* gpu_buf = 
       (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
@@ -536,17 +536,6 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
     }
   }  
 
-  /*
-  cudaThreadSynchronize();
-  double mul = (kernelPackT ? 1.0 : 2.0);
-
-  double gSum = 0.0;
-  for (int i=0; i<ghostFace[dim]*Nint; i++) {
-    //printf("%d %e\n", i, mul*((float*)ghost_spinor)[i]);
-    gSum += mul*(double)(((float*)ghost_spinor)[i]);
-  }
-  printf("Pack check %d %d %e %d\n\n", dim, dir, gSum, ghostFace[dim]*Nint);
-  */
 }
     
 
