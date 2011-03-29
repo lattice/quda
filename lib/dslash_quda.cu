@@ -452,6 +452,11 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_WILSON_DIRAC
+  for(int i=0;i<4;i++){
+    dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+    dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+  }
+
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
 
@@ -513,6 +518,11 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_TWISTED_MASS_DIRAC
+  for(int i=0;i<4;i++){
+    dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+    dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+  }
+
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
