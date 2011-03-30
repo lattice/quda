@@ -67,6 +67,7 @@ extern "C" {
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
     QUDA_BICGSTAB_INVERTER,
+    QUDA_GCR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 

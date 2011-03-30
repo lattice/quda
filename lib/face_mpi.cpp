@@ -253,3 +253,5 @@ int commCoords(int dir) { return comm_coords(dir); }
 int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
 void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+void commBarrier() { comm_barrier(); }

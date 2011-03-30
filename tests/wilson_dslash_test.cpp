@@ -165,6 +165,8 @@ void init() {
   //set the T dimension partitioning flag
   commDimPartitionedSet(3);
 
+  inv_param.commDim[3] = 1; // override flag
+
   //csParam.verbose = QUDA_DEBUG_VERBOSE;
 
   spinor = new cpuColorSpinorField(csParam);

@@ -30,6 +30,8 @@ class DiracParam {
 
   QudaVerbosity verbose;
 
+  int commDim[QUDA_MAX_DIM]; // whether to do comms or not
+
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
     dagger(QUDA_DAG_INVALID), gauge(0), clover(0), cloverInv(0), mu(0.0), 
@@ -71,6 +73,8 @@ class Dirac {
 
   QudaTune tune;
   QudaVerbosity verbose;  
+
+  int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
  public:
   Dirac(const DiracParam &param);

@@ -572,6 +572,9 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
   diracParam.mu = inv_param->mu;
   diracParam.verbose = inv_param->verbosity;
 
+  for (int i=0; i<4; i++) {
+    diracParam.commDim[i] = inv_param->commDim[i];
+  }
 }
 
 
@@ -584,6 +587,11 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, con
   diracParam.longGauge = &cudaLongLinkSloppy;    
   diracParam.clover = &cudaCloverSloppy;
   diracParam.cloverInv = &cudaCloverInvSloppy;
+
+  for (int i=0; i<4; i++) {
+    diracParam.commDim[i] = inv_param->commDimSloppy[i];
+  }
+
 }
 
 
@@ -917,6 +925,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       copyCuda(*in, *out);
     }
     invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), *out, *in, param);
+    break;
+  case QUDA_GCR_INVERTER:
+    if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      invertGCRCuda(DiracMdag(dirac), DiracMdag(diracSloppy), *out, *in, param);
+      copyCuda(*in, *out);
+    }
+    invertGCRCuda(DiracM(dirac), DiracM(diracSloppy), *out, *in, param);
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);

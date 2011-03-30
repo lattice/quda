@@ -347,26 +347,28 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   dslashParam.parity = parity;
 
-#ifndef MULTI_GPU
-  dslashParam.tOffset = 0;
-  dslashParam.tMul = 1;
-  dslashParam.threads = volume;
-#else
-  // Gather from source spinor
-  face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
-  
-  // do body
-  dslashParam.tOffset = 1;
-  dslashParam.tMul = 1;
-  dslashParam.threads = volume - 2*Vspatial;
-#endif
+  if (!dslashParam.ghostDim[3]){ // hack for DD - will break with multi-dim
+    //#ifndef MULTI_GPU
+    dslashParam.tOffset = 0;
+    dslashParam.tMul = 1;
+    dslashParam.threads = volume;
+    //#else
+  } else {
+    // Gather from source spinor
+    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+    // do body
+    dslashParam.tOffset = 1;
+    dslashParam.tMul = 1;
+    dslashParam.threads = volume - 2*Vspatial;
+  }
+    //#endif
 
   dslash.apply(block, shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
 #ifdef MULTI_GPU
 
   for (int i=0; i<4; i++) {
-    if (!commDimPartitioned(i)) continue;
+    if (!dslashParam.ghostDim[i]) continue;
 
     // Finish gather and start comms
     face->exchangeFacesComms(i);
@@ -376,7 +378,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 
   for (int i=0; i<4; i++) {
-    if (commDimPartitioned(i)) continue;
+    if (!dslashParam.ghostDim[i]) continue;
 
     // the below is only for T-way parallelization -needs generalized as staggered
     dslashParam.tOffset = 0;
@@ -391,9 +393,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 }
 
 // Wilson wrappers
-void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
-		const int parity, const int dagger, const cudaColorSpinorField *x,
-		const double &k, const dim3 &block, const dim3 &blockFace) {
+void wilsonDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+		      const int parity, const int dagger, const cudaColorSpinorField *x,
+		      const double &k, const dim3 &block, const dim3 &blockFace, const int *commDim) {
 
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -401,6 +403,7 @@ void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColo
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
     dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    if (!commDim[i] && commDimPartitioned(i)) dslashParam.ghostDim[i] = 0; // override for DD algs
   }
 
   void *gauge0, *gauge1;
@@ -447,7 +450,7 @@ void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColo
 void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover cloverInv,
 		      const cudaColorSpinorField *in, const int parity, const int dagger, 
 		      const cudaColorSpinorField *x, const double &a,
-		      const dim3 &block, const dim3 &blockFace) {
+		      const dim3 &block, const dim3 &blockFace, const int *commDim) {
 
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -455,6 +458,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
     dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    if (!commDim[i] && commDimPartitioned(i)) dslashParam.ghostDim[i] = 0; // override for DD algs
   }
 
   void *cloverP, *cloverNormP;
@@ -513,7 +517,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
 void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
 			   const cudaColorSpinorField *in, const int parity, const int dagger, 
 			   const cudaColorSpinorField *x, const double &kappa, const double &mu, 
-			   const double &a, const dim3 &block, const dim3 &blockFace) {
+			   const double &a, const dim3 &block, const dim3 &blockFace, const int *commDim) {
 
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -521,6 +525,7 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
     dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    if (!commDim[i] && commDimPartitioned(i)) dslashParam.ghostDim[i] = 0; // override for DD algs
   }
 
   void *gauge0, *gauge1;
