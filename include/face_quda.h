@@ -20,10 +20,17 @@ class FaceBuffer {
   void *gather_fwd_face;
   void *gather_back_face;
 
+  // CUDA pinned memory
   void *my_fwd_face[QUDA_MAX_DIM];
   void *my_back_face[QUDA_MAX_DIM];
   void *from_back_face[QUDA_MAX_DIM];
   void *from_fwd_face[QUDA_MAX_DIM];
+
+  // IB pinned memory
+  void* ib_my_fwd_face[QUDA_MAX_DIM];
+  void* ib_my_back_face[QUDA_MAX_DIM];  
+  void* ib_from_back_face[QUDA_MAX_DIM];
+  void* ib_from_fwd_face[QUDA_MAX_DIM];
 
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
@@ -108,11 +115,11 @@ class FaceBuffer {
   void* fwd_nbr_spinor[QUDA_MAX_DIM];
   void* back_nbr_spinor[QUDA_MAX_DIM];
 
-  void* pagable_fwd_nbr_spinor_sendbuf[QUDA_MAX_DIM];
-  void* pagable_back_nbr_spinor_sendbuf[QUDA_MAX_DIM];
+  void* pageable_fwd_nbr_spinor_sendbuf[QUDA_MAX_DIM];
+  void* pageable_back_nbr_spinor_sendbuf[QUDA_MAX_DIM];
   
-  void* pagable_fwd_nbr_spinor[QUDA_MAX_DIM];
-  void* pagable_back_nbr_spinor[QUDA_MAX_DIM];
+  void* pageable_fwd_nbr_spinor[QUDA_MAX_DIM];
+  void* pageable_back_nbr_spinor[QUDA_MAX_DIM];
   
   unsigned long recv_request1[QUDA_MAX_DIM], recv_request2[QUDA_MAX_DIM];
   unsigned long send_request1[QUDA_MAX_DIM], send_request2[QUDA_MAX_DIM];
