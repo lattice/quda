@@ -45,17 +45,17 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     if (fwd_nbr_spinor[dir] == NULL || back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
 
-    pagable_fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-    pagable_back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
+    pageable_fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
+    pageable_back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
     
-    if (pagable_fwd_nbr_spinor_sendbuf[dir] == NULL || pagable_back_nbr_spinor_sendbuf[dir] == NULL)
-      errorQuda("malloc failed for pagable_fwd_nbr_spinor_sendbuf/pagable_back_nbr_spinor_sendbuf");
+    if (pageable_fwd_nbr_spinor_sendbuf[dir] == NULL || pageable_back_nbr_spinor_sendbuf[dir] == NULL)
+      errorQuda("malloc failed for pageable_fwd_nbr_spinor_sendbuf/pageable_back_nbr_spinor_sendbuf");
     
-    pagable_fwd_nbr_spinor[dir]=malloc(nbytes[dir]);
-    pagable_back_nbr_spinor[dir]=malloc(nbytes[dir]);
+    pageable_fwd_nbr_spinor[dir]=malloc(nbytes[dir]);
+    pageable_back_nbr_spinor[dir]=malloc(nbytes[dir]);
     
-    if (pagable_fwd_nbr_spinor[dir] == NULL || pagable_back_nbr_spinor[dir] == NULL)
-      errorQuda("malloc failed for pagable_fwd_nbr_spinor/pagable_back_nbr_spinor"); 
+    if (pageable_fwd_nbr_spinor[dir] == NULL || pageable_back_nbr_spinor[dir] == NULL)
+      errorQuda("malloc failed for pageable_fwd_nbr_spinor/pageable_back_nbr_spinor"); 
 
   }
   
@@ -113,8 +113,8 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
       continue;
     }
     // Prepost all receives
-    recv_request1[dir] = comm_recv_with_tag(pagable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
-    recv_request2[dir] = comm_recv_with_tag(pagable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
+    recv_request1[dir] = comm_recv_with_tag(pageable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
+    recv_request2[dir] = comm_recv_with_tag(pageable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
 
     // gather for backwards send
     in.packGhost(back_nbr_spinor_sendbuf[dir], dir, QUDA_BACKWARDS, 
@@ -140,12 +140,12 @@ void FaceBuffer::exchangeFacesComms(int dir)
 
 
   cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]); //required the data to be there before sending out
-  memcpy(pagable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
-  send_request2[dir] = comm_send_with_tag(pagable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
+  memcpy(pageable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
+  send_request2[dir] = comm_send_with_tag(pageable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
     
   cudaStreamSynchronize(stream[2*dir + sendFwdStrmIdx]); //required the data to be there before sending out
-  memcpy(pagable_fwd_nbr_spinor_sendbuf[dir], fwd_nbr_spinor_sendbuf[dir], nbytes[dir]);
-  send_request1[dir]= comm_send_with_tag(pagable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], fwd_nbr[dir], uptags[dir]);
+  memcpy(pageable_fwd_nbr_spinor_sendbuf[dir], fwd_nbr_spinor_sendbuf[dir], nbytes[dir]);
+  send_request1[dir]= comm_send_with_tag(pageable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], fwd_nbr[dir], uptags[dir]);
   
 } 
 
@@ -159,13 +159,13 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   comm_wait(recv_request2[dir]);  
   comm_wait(send_request2[dir]);
 
-  memcpy(fwd_nbr_spinor[dir], pagable_fwd_nbr_spinor[dir], nbytes[dir]);
+  memcpy(fwd_nbr_spinor[dir], pageable_fwd_nbr_spinor[dir], nbytes[dir]);
   out.unpackGhost(fwd_nbr_spinor[dir], dir, QUDA_FORWARDS,  dagger, &stream[2*dir + recFwdStrmIdx]); CUERR;
 
   comm_wait(recv_request1[dir]);
   comm_wait(send_request1[dir]);
 
-  memcpy(back_nbr_spinor[dir], pagable_back_nbr_spinor[dir], nbytes[dir]);  
+  memcpy(back_nbr_spinor[dir], pageable_back_nbr_spinor[dir], nbytes[dir]);  
   out.unpackGhost(back_nbr_spinor[dir], dir, QUDA_BACKWARDS,  dagger, &stream[2*dir + recBackStrmIdx]); CUERR;
 }
 

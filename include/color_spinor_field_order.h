@@ -12,7 +12,8 @@ class ColorSpinorFieldOrder {
   cpuColorSpinorField &field;
 
  public:
- ColorSpinorFieldOrder(cpuColorSpinorField &field) : field(field) { ; }
+  ColorSpinorFieldOrder(cpuColorSpinorField &field) : field(field) { ; }
+  virtual ~ColorSpinorFieldOrder() { ; }
 
   virtual const Float& operator()(const int &x, const int &s, const int &c, const int &z) const = 0;
   virtual Float& operator()(const int &x, const int &s, const int &c, const int &z) = 0;
@@ -32,6 +33,7 @@ class SpaceSpinColorOrder : public ColorSpinorFieldOrder<Float> {
  public:
   SpaceSpinColorOrder(cpuColorSpinorField &field): ColorSpinorFieldOrder<Float>(field), field(field) 
   { ; }
+  virtual ~SpaceSpinColorOrder() { ; }
 
   const Float& operator()(const int &x, const int &s, const int &c, const int &z) const {
     unsigned long index = ((x*field.nSpin+s)*field.nColor+c)*2+z;
@@ -53,6 +55,7 @@ class SpaceColorSpinOrder : public ColorSpinorFieldOrder<Float> {
  public:
   SpaceColorSpinOrder(cpuColorSpinorField &field) : ColorSpinorFieldOrder<Float>(field), field(field)
   { ; }
+  virtual ~SpaceColorSpinOrder() { ; }
 
   const Float& operator()(const int &x, const int &s, const int &c, const int &z) const {
     unsigned long index = ((x*field.nColor+c)*field.nSpin+s)*2+z;

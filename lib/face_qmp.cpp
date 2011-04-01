@@ -19,6 +19,8 @@
   - minimize pointer arithmetic in core code (need extra constant to replace SPINOR_HOP)
  */
 
+#define PINNED_COPY
+
 using namespace std;
 
 cudaStream_t *stream;
@@ -69,11 +71,27 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
   for (int i=0; i<nDim; i++) {
 #ifdef QMP_COMMS
+    unsigned int flag = cudaHostAllocWriteCombined;
     cudaHostAlloc(&(from_fwd_face[i]), nbytes[i], flag);
     if( !from_fwd_face[i] ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes[i]);
     
     cudaHostAlloc(&(from_back_face[i]), nbytes[i], flag);
     if( !from_back_face[i] ) errorQuda("Unable to allocate from_back_face with size %lu", nbytes[i]);
+
+#ifdef PINNED_COPY
+    ib_my_fwd_face[i] = malloc(nbytes[i]);
+    if (!ib_my_fwd_face[i]) errorQuda("Unable to allocate ib_my_fwd_face with size %lu", nbytes[i]);
+
+    ib_my_back_face[i] = malloc(nbytes[i]);
+    if (!ib_my_back_face[i]) errorQuda("Unable to allocate ib_my_back_face with size %lu", nbytes[i]);
+
+    ib_from_fwd_face[i] = malloc(nbytes[i]);
+    if (!ib_from_fwd_face[i]) errorQuda("Unable to allocate ib_from_fwd_face with size %lu", nbytes[i]);
+
+    ib_from_back_face[i] = malloc(nbytes[i]);
+    if (!ib_from_back_face[i]) errorQuda("Unable to allocate ib_from_back_face with size %lu", nbytes[i]);
+#endif
+
 #else
     from_fwd_face[i] = my_back_face[i];
     from_back_face[i] = my_fwd_face[i];
@@ -82,6 +100,20 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
 #ifdef QMP_COMMS
   for (int i=0; i<nDim; i++) {
+
+#ifdef PINNED_COPY
+    mm_send_fwd[i] = QMP_declare_msgmem(ib_my_fwd_face[i], nbytes[i]);
+    if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
+    
+    mm_send_back[i] = QMP_declare_msgmem(ib_my_back_face[i], nbytes[i]);
+    if( mm_send_back[i] == NULL ) errorQuda("Unable to allocate send back message mem");
+    
+    mm_from_fwd[i] = QMP_declare_msgmem(ib_from_fwd_face[i], nbytes[i]);
+    if( mm_from_fwd[i] == NULL ) errorQuda("Unable to allocate recv from fwd message mem");
+    
+    mm_from_back[i] = QMP_declare_msgmem(ib_from_back_face[i], nbytes[i]);
+    if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
+#else
     mm_send_fwd[i] = QMP_declare_msgmem(my_fwd_face[i], nbytes[i]);
     if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
     
@@ -93,7 +125,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     
     mm_from_back[i] = QMP_declare_msgmem(from_back_face[i], nbytes[i]);
     if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
-    
+#endif    
+
     mh_send_fwd[i] = QMP_declare_send_relative(mm_send_fwd[i], i, +1, 0);
     if( mh_send_fwd[i] == NULL ) errorQuda("Unable to allocate forward send");
     
@@ -141,6 +174,14 @@ FaceBuffer::~FaceBuffer()
   //printf("Ndim = %d\n", nDim);
   for (int i=0; i<nDim; i++) {
 #ifdef QMP_COMMS
+
+#ifdef PINNED_COPY
+    free(ib_my_fwd_face[i]);
+    free(ib_my_back_face[i]);
+    free(ib_from_fwd_face[i]);
+    free(ib_from_back_face[i]);
+#endif
+
     QMP_free_msghandle(mh_send_fwd[i]);
     QMP_free_msghandle(mh_send_back[i]);
     QMP_free_msghandle(mh_from_fwd[i]);
@@ -199,6 +240,9 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 #ifdef QMP_COMMS
   // Begin backward send
+#ifdef PINNED_COPY
+  memcpy(ib_my_back_face[dir], my_back_face[dir], nbytes[dir]);
+#endif
   QMP_start(mh_send_back[dir]);
 #endif
 
@@ -209,6 +253,9 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 #ifdef QMP_COMMS
   // Begin forward send
+#ifdef PINNED_COPY
+  memcpy(ib_my_fwd_face[dir], my_fwd_face[dir], nbytes[dir]);
+#endif
   QMP_start(mh_send_fwd[dir]);
 #endif
 
@@ -216,14 +263,31 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 // Finish backwards send and forwards receive
 #ifdef QMP_COMMS				
-#define QMP_finish_from_fwd(dir)				\
-  QMP_wait(mh_send_back[dir]);					\
-  QMP_wait(mh_from_fwd[dir]);					\
+
+#ifdef PINNED_COPY
+#define QMP_finish_from_fwd(dir)					\
+  QMP_wait(mh_send_back[dir]);						\
+  QMP_wait(mh_from_fwd[dir]);						\
+  memcpy(from_fwd_face[dir], ib_from_fwd_face[dir], nbytes[dir]);		
 
 // Finish forwards send and backwards receive
-#define QMP_finish_from_back(dir)				\
-  QMP_wait(mh_send_fwd[dir]);					\
-  QMP_wait(mh_from_back[dir]);					\
+#define QMP_finish_from_back(dir)					\
+  QMP_wait(mh_send_fwd[dir]);						\
+  QMP_wait(mh_from_back[dir]);						\
+  memcpy(from_back_face[dir], ib_from_back_face[dir], nbytes[dir]);		
+
+#else
+
+#define QMP_finish_from_fwd(dir)					\
+  QMP_wait(mh_send_back[dir]);						\
+  QMP_wait(mh_from_fwd[dir]);						
+
+// Finish forwards send and backwards receive
+#define QMP_finish_from_back(dir)					\
+  QMP_wait(mh_send_fwd[dir]);						\
+  QMP_wait(mh_from_back[dir]);						
+
+#endif
 
 #else
 #define QMP_finish_from_fwd					
