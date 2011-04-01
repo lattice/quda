@@ -814,11 +814,11 @@ def epilog():
 
 def pack_face(facenum):
     str = []
-    str.append("\nswitch(dir) {\n")
-    for dir in range(0,4):
-        str.append("case "+`dir`+":\n")
+    str.append("\nswitch(dim) {\n")
+    for dim in range(0,4):
+        str.append("case "+`dim`+":\n")
         proj = []
-        proj.append(gen(2*dir+facenum, pack_only=True))
+        proj.append(gen(2*dim+facenum, pack_only=True))
         proj.append("// write spinor field back to device memory\n")
         proj.append("WRITE_HALF_SPINOR(face_volume, face_idx);\n")
         str.append(indent(block(''.join(proj))+"\n"+"break;\n"))
