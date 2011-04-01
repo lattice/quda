@@ -3570,3 +3570,111 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorFiel
   exit(-1);
 }
 
+
+
+
+template <typename Float, typename Float2>
+__global__ void cabxpyAxKernel(Float a, Float2 b, Float2 *x, Float2 *y, int len) {
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    x[i].x *= a;
+    x[i].y *= a;
+    y[i].x += b.x*x[i].x - b.y*x[i].y;
+    y[i].y += b.y*x[i].x + b.x*x[i].y;
+    i += gridSize;
+  } 
+  
+}
+
+__global__ void cabxpyAxHKernel(float a, float2 b, short4 *xH, float *xN, short4 *yH, float *yN, 
+			     int stride, int length) {
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);
+    RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);
+    AX_FLOAT4(a, x0);
+    AX_FLOAT4(a, x1);
+    AX_FLOAT4(a, x2);
+    AX_FLOAT4(a, x3);
+    AX_FLOAT4(a, x4);
+    AX_FLOAT4(a, x5);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE(xH, xN, x, stride);
+    CAXPY_FLOAT4(b, x0, y0);
+    CAXPY_FLOAT4(b, x1, y1);
+    CAXPY_FLOAT4(b, x2, y2);
+    CAXPY_FLOAT4(b, x3, y3);
+    CAXPY_FLOAT4(b, x4, y4);
+    CAXPY_FLOAT4(b, x5, y5);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
+    i += gridSize;
+  } 
+  
+}
+
+__global__ void cabxpyAxHKernel(float a, float2 b, short2 *xH, float *xN, short2 *yH, float *yN, 
+			     int stride, int length) {
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);
+    RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);
+    AX_FLOAT2(a, x0);
+    AX_FLOAT2(a, x1);
+    AX_FLOAT2(a, x2);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(xH, xN, x, stride);
+    CAXPY_FLOAT2(b, x0, y0);
+    CAXPY_FLOAT2(b, x1, y1);
+    CAXPY_FLOAT2(b, x2, y2);
+    CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);
+    i += gridSize;
+  } 
+  
+}
+
+// performs the operation y[i] += a*b*x[i], x[i] *= a
+void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  checkSpinor(x,y);
+  int length = x.length/2;
+  setBlock(23, length, x.precision);
+  blas_quda_bytes += 4*x.real_length*x.precision;
+  blas_quda_flops += 5*x.real_length;
+  if (x.precision == QUDA_DOUBLE_PRECISION) {
+    double2 b2 = make_double2(real(b), imag(b));
+    cabxpyAxKernel<<<blasGrid, blasBlock>>>((double)a, b2, (double2*)x.v, (double2*)y.v, length);
+  } else if (x.precision == QUDA_SINGLE_PRECISION) {
+    float2 b2 = make_float2(real(b), imag(b));
+    cabxpyAxKernel<<<blasGrid, blasBlock>>>((float)a, b2, (float2*)x.v, (float2*)y.v, length);
+  } else {
+    if (x.siteSubset == QUDA_FULL_SITE_SUBSET) {
+      caxpyCuda(a, x.Even(), y.Even());
+      caxpyCuda(a, x.Odd(), y.Odd());
+      return;
+    }
+    int spinor_bytes = x.length*sizeof(short);
+    if (x.nSpin == 4){ //wilson
+      cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
+      cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
+      cudaBindTexture(0, texHalf2, y.v, spinor_bytes); 
+      cudaBindTexture(0, texNorm2, y.norm, spinor_bytes/12);    
+      float2 b2 = make_float2(real(b), imag(b));
+      cabxpyAxHKernel<<<blasGrid, blasBlock>>>((float)a, b2, (short4*)x.v, (float*)x.norm, (short4*)y.v, (float*)y.norm, y.stride, y.volume);
+    } else if (x.nSpin == 1){ //staggered
+      cudaBindTexture(0, texHalfSt1, x.v, spinor_bytes); 
+      cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/3);    
+      cudaBindTexture(0, texHalfSt2, y.v, spinor_bytes); 
+      cudaBindTexture(0, texNorm2, y.norm, spinor_bytes/3);    
+      float2 b2 = make_float2(real(b), imag(b));
+      cabxpyAxHKernel<<<blasGrid, blasBlock>>>((float)a, b2, (short2*)x.v, (float*)x.norm, (short2*)y.v, (float*)y.norm, y.stride, y.volume);
+    }else{
+      errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);     
+    }
+    blas_quda_bytes += 4*x.volume*sizeof(float);
+  }
+
+  if (!blasTuning) checkCudaError();
+}

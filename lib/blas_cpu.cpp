@@ -257,3 +257,8 @@ double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinor
   caxpbypzYmbwCpu(a, x, b, y, z, w);
   return cDotProductNormBCpu(u, y);
 }
+
+void cabxpyAxCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
+  axCpu(a, x);
+  caxpyCpu(b, x, y);
+}

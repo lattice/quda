@@ -9,16 +9,16 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 24;
-const int LY = 24;
-const int LZ = 24;
-const int LT = 24;
+const int LX = 32;
+const int LY = 32;
+const int LZ = 32;
+const int LT = 32;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
 const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
-const int Nkernels = 23;
+const int Nkernels = 24;
 const int ThreadMin = 32;
 const int ThreadMax = 1024;
 const int GridMin = 1;
@@ -283,6 +283,10 @@ double benchmark(int kernel, int niter) {
       caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
+    case 23:
+      cabxpyAxCuda(a, b2, *xD, *yD);
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -498,6 +502,14 @@ double test(int kernel) {
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
+  case 23:
+    *xD = *xH;
+    *yD = *yH;
+    cabxpyAxCuda(a, b2, *xD, *yD);
+    cabxpyAxCpu(a, b2, *xH, *yH);
+    error = ERROR(y);
+    break;
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
@@ -565,7 +577,8 @@ int main(int argc, char** argv)
     "xpaycDotzyCuda",
     "cDotProductNormACuda",
     "cDotProductNormBCuda",
-    "caxpbypzYmbwcDotProductWYNormYCuda"
+    "caxpbypzYmbwcDotProductWYNormYCuda",
+    "cabxpyAxCuda"
   };
 
   char *prec_str[] = {"half", "single", "double"};

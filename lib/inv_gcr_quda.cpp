@@ -106,16 +106,14 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
       caxpyCuda(-beta[i], *Ap[i], *Ap[k]);
     }
 
-    double scale = sqrt(norm2(*Ap[k]));
+    double3 Apr = cDotProductNormACuda(*Ap[k], r);
+    double scale = sqrt(Apr.z); // scale = |Ap|
+    alpha = Complex(Apr.x, Apr.y) / scale; // alpha = (1/|Ap|) * (Ap, r)
+
     if (scale == 0.0) errorQuda("GCR breakdown\n");
 
-    axCuda(1.0/scale, *p[k]); // kernel fusion here with proceeding caxpy calls
-    axCuda(1.0/scale, *Ap[k]);
-
-    alpha = cDotProductCuda(*Ap[k], r);
-
-    caxpyCuda(alpha, *p[k], x);
-    caxpyCuda(-alpha, *Ap[k], r);
+    cabxpyAxCuda(1.0/scale, alpha, *p[k], x); // x += (1/|Ap|^2) * (Ap, r) x, p *= 1/|Ap| 
+    cabxpyAxCuda(1.0/scale, -alpha, *Ap[k], r); // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
 
     r2 = norm2(r);
 
