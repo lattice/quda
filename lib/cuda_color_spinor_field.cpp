@@ -481,6 +481,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
 				     const QudaParity parity, const int dagger, cudaStream_t *stream) 
 {
 
+#ifdef MULTI_GPU
   int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
@@ -534,7 +535,10 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
       void *src = (char*)norm + norm_offset;
       CUDAMEMCPY(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); CUERR;
     }
-  }  
+  }
+#else
+  errorQuda("packGhost not built on single-GPU build");
+#endif
 
 }
     
