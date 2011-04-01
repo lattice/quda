@@ -1537,7 +1537,7 @@ if (param.ghostDim[3] || x4>0)
         int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
     #define sp_stride_t sp_stride
     #define sp_norm_idx sp_idx
-    #define t_proj_scale 2;
+    #define t_proj_scale 2
         int ga_idx = sp_idx;
     #else
         int sp_idx;
@@ -2470,4 +2470,3 @@ if (param.ghostDim[3] || x4>0)
 #undef o02_im
 #undef o10_re
 #undef o10_im
-
