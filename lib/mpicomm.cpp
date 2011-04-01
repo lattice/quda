@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include "mpicomm.h"
 
+static char hostname[128];
 static int fwd_nbr=-1;
 static int back_nbr=-1;
 static int rank = -1;
@@ -154,10 +155,10 @@ comm_partition(void)
   tid=(tgridid -1+tgridsize)%tgridsize;
   t_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
 
-  printf("MPI rank: rank=%d, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, x_fwd_nbr, x_back_nbr);
-  printf("MPI rank: rank=%d, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, y_fwd_nbr, y_back_nbr);
-  printf("MPI rank: rank=%d, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, z_fwd_nbr, z_back_nbr);
-  printf("MPI rank: rank=%d, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, t_fwd_nbr, t_back_nbr);
+  printf("MPI rank: rank=%d, hostname=%s, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, hostname, x_fwd_nbr, x_back_nbr);
+  printf("MPI rank: rank=%d, hostname=%s, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, hostname, y_fwd_nbr, y_back_nbr);
+  printf("MPI rank: rank=%d, hostname=%s, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, hostname, z_fwd_nbr, z_back_nbr);
+  printf("MPI rank: rank=%d, hostname=%s, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, hostname, t_fwd_nbr, t_back_nbr);
 
   
 }
@@ -180,6 +181,8 @@ comm_init()
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  gethostname(hostname, 128);
+
   comm_partition();
 
   back_nbr = (rank -1 + size)%size;
@@ -190,7 +193,6 @@ comm_init()
   }
 
   //determine which gpu this MPI process is going to use
-  char hostname[128];
   char* hostname_recv_buf = (char*)malloc(128*size);
   if(hostname_recv_buf == NULL){
     printf("ERROR: malloc failed for host_recv_buf\n");
