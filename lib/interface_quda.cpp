@@ -520,6 +520,7 @@ void freeCloverQuda(void)
 
 void endQuda(void)
 {
+  freeBiCGstab();
   endInvertQuda();
 
   cudaColorSpinorField::freeBuffer();
