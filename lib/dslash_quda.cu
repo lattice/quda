@@ -485,6 +485,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
 							     (double2*)gauge1, gauge.reconstruct, (double2*)cloverP, 
 							     (float*)cloverNormP, (double2*)in->v, (float*)in->norm,
 							     (double2*)xv, (float*)xn, a, dagger, in->bytes, in->norm_bytes);
+    regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
