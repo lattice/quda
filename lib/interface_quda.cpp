@@ -1393,7 +1393,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   // tune the Dirac Kernel
-  tuneDirac(*param, pc_solution ? *(x[0]) : (x[0])->Even());
+  // if set, tunning will happen in the first multishift call
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [num_offsets];
