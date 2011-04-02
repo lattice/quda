@@ -471,7 +471,7 @@ void cudaColorSpinorField::allocateGhostBuffer(void) {
 }
 
 void cudaColorSpinorField::freeGhostBuffer(void) {
-  if (!initGhostFaceBuffer == 0) return;
+  if (!initGhostFaceBuffer) return;
   
   for(int i=0;i < 4; i++){
     if(!commDimPartitioned(i)){
