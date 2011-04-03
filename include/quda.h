@@ -95,8 +95,6 @@ extern "C" {
 
     QudaTune dirac_tune; // tune the Dirac operator when it is first created?
     QudaPreserveDirac preserve_dirac; // free the Dirac operator or keep it resident?
-
-    int ghostDim[QUDA_MAX_DIM];
   } QudaInvertParam;
 
 
