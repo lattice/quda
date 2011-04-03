@@ -45,10 +45,15 @@ extern "C" {
 
   void freeBiCGstab();
 
-  // defined in inv_bicgstab_cuda.cpp
+  // defined in inv_gcr_cuda.cpp
 
   void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
 		     cudaColorSpinorField &b, QudaInvertParam *param);
+
+  // defined in inv_mr_cuda.cpp
+
+  void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, 
+		    cudaColorSpinorField &b, QudaInvertParam *param);
 
 #ifdef __cplusplus
 }

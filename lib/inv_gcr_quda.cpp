@@ -96,8 +96,12 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
       copyCuda(rSloppy, r);
       if (invert_param->inv_type_sloppy == QUDA_CG_INVERTER) // inner CG preconditioner
 	invertCgCuda(matSloppy, matSloppy, pSloppy, rSloppy, &invert_param_inner);
-      else // inner BiCGstab preconditioner
+      else if (invert_param->inv_type_sloppy == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
 	invertBiCGstabCuda(matSloppy, matSloppy, pSloppy, rSloppy, &invert_param_inner);
+      else if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) // inner MR preconditioner
+	invertBiCGstabCuda(matSloppy, pSloppy, rSloppy, &invert_param_inner);
+      else
+	errorQuda("Unknown inner solver %d", invert_param->inv_type_sloppy);
       copyCuda(*p[k], pSloppy);
     } else { // no preconditioner
       *p[k] = r;
