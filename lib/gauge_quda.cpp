@@ -669,7 +669,8 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
       Float* odd_dst;
      
      //switching odd and even ghost cpuLink when that dimension size is odd
-     if(X[dir] % 2 ==0){
+     //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
+      if((X[dir] % 2 ==0) || (commDim(dir) == 1)){
         even_dst = cpuGhost[dir];
         odd_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;	
      }else{
