@@ -520,7 +520,6 @@ void freeCloverQuda(void)
 
 void endQuda(void)
 {
-  freeBiCGstab();
   endInvertQuda();
 
   cudaColorSpinorField::freeBuffer();
@@ -1146,6 +1145,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 }
 
 void endInvertQuda() {
+  freeMR();
+  freeBiCGstab();
+
   if (diracCreation) {
     if (d){
       delete d;
