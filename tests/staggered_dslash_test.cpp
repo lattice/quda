@@ -49,8 +49,10 @@ const int loops = 100;
 QudaParity parity;
 QudaDagType dagger = QUDA_DAG_NO;
 int transfer = 0; // include transfer time in the benchmark?
+int xdim = 24;
+int ydim = 24;
+int zdim = 24;
 int tdim = 24;
-int sdim = 24;
 int X[4];
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
@@ -102,9 +104,9 @@ void init()
   gaugeParam = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
   
-  gaugeParam.X[0] = X[0] = sdim;
-  gaugeParam.X[1] = X[1] = sdim;
-  gaugeParam.X[2] = X[2] = sdim;
+  gaugeParam.X[0] = X[0] = xdim;
+  gaugeParam.X[1] = X[1] = ydim;
+  gaugeParam.X[2] = X[2] = zdim;
   gaugeParam.X[3] = X[3] = tdim;
 
   setDims(gaugeParam.X);
@@ -521,10 +523,10 @@ void display_test_info()
 {
   printfQuda("running the following test:\n");
  
-  printfQuda("prec recon   test_type     dagger   S_dim     T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d        %d \n", 
+  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
 	     get_prec_str(prec), get_recon_str(link_recon), 
-	     test_type, dagger, sdim, tdim);
+	     test_type, dagger, xdim, ydim, zdim, tdim);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     commDimPartitioned(0),
@@ -608,6 +610,47 @@ int main(int argc, char **argv)
       continue;	    
     }
 
+
+    if( strcmp(argv[i], "--xdim") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }
+      xdim= atoi(argv[i+1]);
+      if (xdim < 0 || xdim > 128){
+        printf("ERROR: invalid X dimention (%d)\n", xdim);
+        usage(argv);
+      }
+      i++;
+      continue;
+    }
+
+    if( strcmp(argv[i], "--ydim") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }
+      ydim= atoi(argv[i+1]);
+      if (ydim < 0 || ydim > 128){
+        printf("ERROR: invalid T dimention (%d)\n", ydim);
+        usage(argv);
+      }
+      i++;
+      continue;
+    }
+
+
+    if( strcmp(argv[i], "--zdim") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }
+      zdim= atoi(argv[i+1]);
+      if (zdim < 0 || zdim > 128){
+        printf("ERROR: invalid T dimention (%d)\n", zdim);
+        usage(argv);
+      }
+      i++;
+      continue;
+    }
+
     if( strcmp(argv[i], "--tdim") == 0){
       if (i+1 >= argc){
 	usage(argv);
@@ -624,10 +667,11 @@ int main(int argc, char **argv)
       if (i+1 >= argc){
 	usage(argv);
       }	    
-      sdim =  atoi(argv[i+1]);
+      int sdim =  atoi(argv[i+1]);
       if (sdim < 0 || sdim > 128){
 	printfQuda("Error: invalid S dimention\n");
       }
+      xdim=ydim=zdim=sdim;
       i++;
       continue;	    
     }
