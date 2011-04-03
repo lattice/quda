@@ -14,6 +14,8 @@
 
 #include <color_spinor_field.h>
 
+#include <sys/time.h>
+
 // set the required parameters for the inner solver
 void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) {
   inner.tol = outer.tol_sloppy;
@@ -83,6 +85,9 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
   if (invert_param->verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
 
+  struct timeval orth0, orth1;
+  double orthT = 0;
+
   while (r2 > stop && total_iter < invert_param->maxiter) {
     
     if (invert_param->inv_type_sloppy != QUDA_INVALID_INVERTER) {
@@ -99,12 +104,18 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
     } 
 
     mat(*Ap[k], *p[k], tmp);
-    
-    for (int i=0; i<k; i++) {
+
+    gettimeofday(&orth0, NULL);
+    for (int i=0; i<k; i++) { // 8 (k-1) memory transactions here
       beta[i] = cDotProductCuda(*Ap[i], *Ap[k]); // partial fusion here with previous iter
       caxpyCuda(-beta[i], *p[i], *p[k]);
       caxpyCuda(-beta[i], *Ap[i], *Ap[k]);
     }
+    gettimeofday(&orth1, NULL);
+    long ds = orth1.tv_sec - orth0.tv_sec;
+    long dus = orth1.tv_usec - orth0.tv_usec;
+    orthT += ds + 0.000001*dus;
+
 
     double3 Apr = cDotProductNormACuda(*Ap[k], r);
     double scale = sqrt(Apr.z); // scale = |Ap|
@@ -154,7 +165,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
   double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
   reduceDouble(gflops);
 
-  //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
+  printfQuda("%f gflops %e %e\n", gflops / stopwatchReadSeconds(), invert_param->secs, orthT);
   invert_param->gflops += gflops;
   invert_param->iter += total_iter;
   
