@@ -284,6 +284,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
 
   friend double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z);
+  friend double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
 
   friend void wilsonDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
 			       const int parity, const int dagger, const cudaColorSpinorField *x,

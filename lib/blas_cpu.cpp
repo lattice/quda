@@ -275,3 +275,10 @@ double caxpyXmazNormXCpu(const Complex &a, cpuColorSpinorField &x,
   caxpyCpu(-a, z, x);
   return norm2(x);
 }
+
+double cabxpyAxNormCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
+  axCpu(a, x);
+  caxpyCpu(b, x, y);
+  return norm2(y);
+}
+

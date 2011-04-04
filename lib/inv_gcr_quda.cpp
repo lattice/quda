@@ -16,6 +16,12 @@
 
 #include <sys/time.h>
 
+double timeInterval(struct timeval start, struct timeval end) {
+  long ds = end.tv_sec - start.tv_sec;
+  long dus = end.tv_usec - start.tv_usec;
+  return ds + 0.000001*dus;
+}
+
 // set the required parameters for the inner solver
 void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) {
   inner.tol = outer.tol_sloppy;
@@ -34,6 +40,17 @@ void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) 
   inner.inv_type_sloppy = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
 
   inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+
+}
+
+void backSubs(Complex *alpha, Complex **beta, double *gamma, Complex *delta, int n) {
+  for (int k=n-1; k>=0;k--) {
+    delta[k] = alpha[k];
+    for (int j=k+1;j<n; j++) {
+      delta[k] -= beta[k][j]*delta[j];
+    }
+    delta[k] /= gamma[k];
+  }
 }
 
 void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
@@ -63,8 +80,11 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
   QudaInvertParam invert_param_inner = newQudaInvertParam();
   fillInnerInvertParam(invert_param_inner, *invert_param);
 
-  Complex alpha = 0.0;
-  Complex *beta = new Complex[Nkrylov];
+  Complex *alpha = new Complex[Nkrylov];
+  Complex **beta = new Complex*[Nkrylov];
+  for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
+  double *gamma = new double[Nkrylov];
+  Complex *delta = new Complex[Nkrylov];
 
   double b2 = normCuda(b);
 
@@ -87,8 +107,8 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
   if (invert_param->verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
 
-  struct timeval orth0, orth1;
-  double orthT = 0;
+  struct timeval orth0, orth1, pre0, pre1, mat0, mat1;
+  double orthT = 0, matT = 0, preT = 0;
 
   while (r2 > stop && total_iter < invert_param->maxiter) {
     
@@ -102,6 +122,8 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
 	invertBiCGstabCuda(matSloppy, matSloppy, pSloppy, rSloppy, &invert_param_inner);
       else if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) // inner MR preconditioner
 	invertMRCuda(matSloppy, pSloppy, rSloppy, &invert_param_inner);
+      else if (invert_param->inv_type_sloppy == QUDA_GCR_INVERTER) // inner MR preconditioner
+	invertGCRCuda(matSloppy, matSloppy, pSloppy, rSloppy, &invert_param_inner);
       else
 	errorQuda("Unknown inner solver %d", invert_param->inv_type_sloppy);
       copyCuda(*p[k], pSloppy);
@@ -111,34 +133,20 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
 
     mat(*Ap[k], *p[k], tmp);
 
-    gettimeofday(&orth0, NULL);
-    for (int i=0; i<k; i++) { // 8 (k-1) memory transactions here
-      beta[i] = cDotProductCuda(*Ap[i], *Ap[k]);
-      caxpyCuda(-beta[i], *Ap[i], *Ap[k]);
-      /*if (i%2) caxpbypzCuda(-beta[i-1], *p[i-1], -beta[i], *p[i], *p[k]);
-      else if (i==k-1) */caxpyCuda(-beta[i], *p[i], *p[k]);
+    for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
+      beta[i][k] = cDotProductCuda(*Ap[i], *Ap[k]);
+      caxpyCuda(-beta[i][k], *Ap[i], *Ap[k]);
     }
-
-
-    gettimeofday(&orth1, NULL);
-    long ds = orth1.tv_sec - orth0.tv_sec;
-    long dus = orth1.tv_usec - orth0.tv_usec;
-    orthT += ds + 0.000001*dus;
-
-
+    
     double3 Apr = cDotProductNormACuda(*Ap[k], r);
-    double scale = sqrt(Apr.z); // scale = |Ap|
-    alpha = Complex(Apr.x, Apr.y) / scale; // alpha = (1/|Ap|) * (Ap, r)
+    gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
+    if (gamma[k] == 0.0) errorQuda("GCR breakdown\n");
+    alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
-    if (scale == 0.0) errorQuda("GCR breakdown\n");
-
-    cabxpyAxCuda(1.0/scale, alpha, *p[k], x); // x += (1/|Ap|^2) * (Ap, r) x, p *= 1/|Ap| 
-    cabxpyAxCuda(1.0/scale, -alpha, *Ap[k], r); // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-
-    r2 = norm2(r);
+    r2 = cabxpyAxNormCuda(1.0/gamma[k], -alpha[k], *Ap[k], r); // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
 
     if (invert_param->verbosity >= QUDA_DEBUG_VERBOSE) 
-      printfQuda("GCR: alpha = (%e,%e), x2 = %e\n", real(alpha), imag(alpha), norm2(x));
+      printfQuda("GCR: alpha = (%e,%e), x2 = %e\n", real(alpha[k]), imag(alpha[k]), norm2(x));
 
     k++;
     total_iter++;
@@ -146,7 +154,15 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
     if (invert_param->verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter, k, r2);
 
+    /*orthT += timeInterval(orth0, orth1);
+    matT += timeInterval(mat0, mat1);
+    preT += timeInterval(pre0, pre1);*/
+
     if (k==Nkrylov) { // restart the solver since max Nkrylov reached
+      // Update the solution vector
+      backSubs(alpha, beta, gamma, delta, k);
+      for (int i=0; i<k; i++) caxpyCuda(delta[i], *p[i], x);
+
       restart++;
 
       if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("\nGCR: restart %d, r2 = %e\n", restart, r2);
@@ -164,7 +180,13 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
       r2_old = r2;
     }
   }
-  
+
+  // Update the solution vector
+  if (k!=Nkrylov) {
+    backSubs(alpha, beta, gamma, delta, k);
+    for (int i=0; i<k; i++) caxpyCuda(delta[i], *p[i], x);
+  }  
+
   if (k>=invert_param->maxiter) warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
 
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
@@ -174,7 +196,8 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
   double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
   reduceDouble(gflops);
 
-  printfQuda("%f gflops %e %e\n", gflops / stopwatchReadSeconds(), invert_param->secs, orthT);
+  //printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e\n", 
+  //	     gflops / stopwatchReadSeconds(), invert_param->secs, preT, matT, orthT);
   invert_param->gflops += gflops;
   invert_param->iter += total_iter;
   
@@ -192,7 +215,11 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
     delete Ap[i];
   }
 
+  delete alpha;
+  for (int i=0; i<Nkrylov; i++) delete []beta[i];
   delete []beta;
+  delete gamma;
+  delete delta;
 
   return;
 }

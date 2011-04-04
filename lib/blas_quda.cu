@@ -3926,3 +3926,132 @@ double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x,
   }
 
 }
+
+
+//
+// double cabxpyAxNormCuda(float a, float *x, float *y, n){}
+//
+// First performs the operation y[i] = a*x[i] + y[i]
+// Second returns the norm of y
+//
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormF##suffix
+#define REDUCE_TYPES Float a, Float b, Float *x, Float *y
+#define REDUCE_PARAMS a, b, x, y
+#define REDUCE_AUXILIARY(i)						\
+  x[i].x *= a.x;							\
+  x[i].y *= a.x;							\
+  y[i].x += b.x*x[i].x - b.y*x[i].y;					\
+  y[i].y += b.y*x[i].x + b.x*x[i].y;
+#define REDUCE_OPERATION(i) (y[i].x*y[i].x + y[i].y*y[i].y)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormH##suffix
+#define REDUCE_TYPES Float a, Float b, short4 *xH, float *xN, short4 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, b, xH, xN, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  AX_FLOAT4(a.x, x0);							\
+  AX_FLOAT4(a.x, x1);							\
+  AX_FLOAT4(a.x, x2);							\
+  AX_FLOAT4(a.x, x3);							\
+  AX_FLOAT4(a.x, x4);							\
+  AX_FLOAT4(a.x, x5);							\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(xH, xN, x, stride);			\
+  CAXPY_FLOAT4(b, x0, y0);						\
+  REAL_DOT_FLOAT4(norm0, y0, y0);					\
+  CAXPY_FLOAT4(b, x1, y1);						\
+  REAL_DOT_FLOAT4(norm1, y1, y1);					\
+  CAXPY_FLOAT4(b, x2, y2);						\
+  REAL_DOT_FLOAT4(norm2, y2, y2);					\
+  CAXPY_FLOAT4(b, x3, y3);						\
+  REAL_DOT_FLOAT4(norm3, y3, y3);					\
+  CAXPY_FLOAT4(b, x4, y4);						\
+  REAL_DOT_FLOAT4(norm4, y4, y4);					\
+  CAXPY_FLOAT4(b, x5, y5);						\
+  REAL_DOT_FLOAT4(norm5, y5, y5);					\
+  norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2; norm0 += norm4; \
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormH##suffix
+#define REDUCE_TYPES Float a, Float b, short2 *xH, float *xN, short2 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, b, xH, xN, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
+  AX_FLOAT2(a.x, x0);							\
+  AX_FLOAT2(a.x, x1);							\
+  AX_FLOAT2(a.x, x2);							\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(xH, xN, x, stride);		\
+  CAXPY_FLOAT2(b, x0, y0);						\
+  REAL_DOT_FLOAT2(norm0, y0, y0);					\
+  CAXPY_FLOAT2(b, x1, y1);						\
+  REAL_DOT_FLOAT2(norm1, y1, y1);					\
+  CAXPY_FLOAT2(b, x2, y2);						\
+  REAL_DOT_FLOAT2(norm2, y2, y2);					\
+  norm0 += norm1; norm0 += norm2;					\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.siteSubset == QUDA_FULL_SITE_SUBSET) 
+    return cabxpyAxNormCuda(a, b, x.Even(), y.Even()) + cabxpyAxNormCuda(a, b, x.Odd(), y.Odd());
+
+  const int id = 26;
+  blas_quda_flops += 7*x.real_length;
+  checkSpinor(x,y);
+  blas_quda_bytes += 4*x.real_length*x.precision;
+  if (x.precision == QUDA_DOUBLE_PRECISION) {
+    double2 a2 = make_double2(a, 0);
+    double2 b2 = make_double2(real(b), imag(b));
+    return cabxpyAxNormFCuda(a2, b2, (double2*)x.v, (double2*)y.v, x.length/2, id, x.precision);
+  } else if (x.precision == QUDA_SINGLE_PRECISION) {
+    float2 a2 = make_float2(a, 0);
+    float2 b2 = make_float2(real(b), imag(b));
+    return cabxpyAxNormFCuda(a2, b2, (float2*)x.v, (float2*)y.v, x.length/2, id, x.precision);
+  } else {
+    cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
+    cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
+    blas_quda_bytes += 3*x.volume*sizeof(float);
+    
+    if (x.nSpin == 4){ //wilson
+      cudaBindTexture(0, texHalf1, x.v, x.bytes); 
+      cudaBindTexture(0, texHalf2, y.v, x.bytes); 
+      float2 a2 = make_float2(a, 0);
+      float2 b2 = make_float2(real(b), imag(b));
+      return cabxpyAxNormHCuda(a2, b2, (short4*)x.v, (float*)x.norm, (short4*)y.v, (float*)y.norm, x.stride, x.volume, id, x.precision);
+    }else if (x.nSpin == 1){ //staggered
+      cudaBindTexture(0, texHalfSt1, x.v, x.bytes); 
+      cudaBindTexture(0, texHalfSt2, y.v, x.bytes); 
+      float2 a2 = make_float2(a, 0);
+      float2 b2 = make_float2(real(b), imag(b));
+      return cabxpyAxNormHCuda(a2, b2, (short2*)x.v, (float*)x.norm, (short2*)y.v, (float*)y.norm, x.stride, x.volume, id, x.precision);
+    }else{
+      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.nSpin);            
+      return 0;
+    }
+  }
+
+}
