@@ -32,6 +32,8 @@ void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) 
   inner.secs = 0;
 
   inner.inv_type_sloppy = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
+
+  inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
 }
 
 void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
@@ -99,7 +101,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
       else if (invert_param->inv_type_sloppy == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
 	invertBiCGstabCuda(matSloppy, matSloppy, pSloppy, rSloppy, &invert_param_inner);
       else if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) // inner MR preconditioner
-	invertBiCGstabCuda(matSloppy, pSloppy, rSloppy, &invert_param_inner);
+	invertMRCuda(matSloppy, pSloppy, rSloppy, &invert_param_inner);
       else
 	errorQuda("Unknown inner solver %d", invert_param->inv_type_sloppy);
       copyCuda(*p[k], pSloppy);
@@ -111,10 +113,13 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaCol
 
     gettimeofday(&orth0, NULL);
     for (int i=0; i<k; i++) { // 8 (k-1) memory transactions here
-      beta[i] = cDotProductCuda(*Ap[i], *Ap[k]); // partial fusion here with previous iter
-      caxpyCuda(-beta[i], *p[i], *p[k]);
+      beta[i] = cDotProductCuda(*Ap[i], *Ap[k]);
       caxpyCuda(-beta[i], *Ap[i], *Ap[k]);
+      /*if (i%2) caxpbypzCuda(-beta[i-1], *p[i-1], -beta[i], *p[i], *p[k]);
+      else if (i==k-1) */caxpyCuda(-beta[i], *p[i], *p[k]);
     }
+
+
     gettimeofday(&orth1, NULL);
     long ds = orth1.tv_sec - orth0.tv_sec;
     long dus = orth1.tv_usec - orth0.tv_usec;

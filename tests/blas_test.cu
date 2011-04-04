@@ -12,13 +12,13 @@
 const int LX = 32;
 const int LY = 32;
 const int LZ = 32;
-const int LT = 32;
+const int LT = 8;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
 const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
-const int Nkernels = 24;
+const int Nkernels = 26;
 const int ThreadMin = 32;
 const int ThreadMax = 1024;
 const int GridMin = 1;
@@ -287,6 +287,14 @@ double benchmark(int kernel, int niter) {
       cabxpyAxCuda(a, b2, *xD, *yD);
       break;
 
+    case 24:
+      caxpyNormCuda(a2, *xD, *yD);
+      break;
+
+    case 25:
+      caxpyXmazNormXCuda(a2, *xD, *yD, *zD);
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -507,8 +515,26 @@ double test(int kernel) {
     *yD = *yH;
     cabxpyAxCuda(a, b2, *xD, *yD);
     cabxpyAxCpu(a, b2, *xH, *yH);
-    error = ERROR(y);
+    error = ERROR(y) + ERROR(x);
     break;
+
+  case 24:
+    *xD = *xH;
+    *yD = *yH;
+    {double d = caxpyNormCuda(a, *xD, *yD);
+    double h = caxpyNormCpu(a, *xH, *yH);
+    error = ERROR(y) + fabs(d-h)/fabs(h);}
+    break;
+
+  case 25:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {double d = caxpyXmazNormXCuda(a, *xD, *yD, *zD);
+      double h = caxpyXmazNormXCpu(a, *xH, *yH, *zH);
+      error = ERROR(y) + ERROR(x) + fabs(d-h)/fabs(h);}
+    break;
+
 
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
@@ -578,7 +604,9 @@ int main(int argc, char** argv)
     "cDotProductNormACuda",
     "cDotProductNormBCuda",
     "caxpbypzYmbwcDotProductWYNormYCuda",
-    "cabxpyAxCuda"
+    "cabxpyAxCuda",
+    "caxpyNormCuda",
+    "caxpyXmazNormXCuda"
   };
 
   char *prec_str[] = {"half", "single", "double"};

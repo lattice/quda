@@ -67,6 +67,9 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorFiel
 					   cudaColorSpinorField &z, cudaColorSpinorField &w, cudaColorSpinorField &u);
 
 void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
+double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, 
+			  cudaColorSpinorField &y, cudaColorSpinorField &z);
 
 // CPU variants
 
@@ -104,4 +107,9 @@ double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinor
 					  const cpuColorSpinorField &u);
 
 void cabxpyAxCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
+
+double caxpyNormCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y);
+
+double caxpyXmazNormXCpu(const Complex &a, cpuColorSpinorField &x, 
+			 cpuColorSpinorField &y, cpuColorSpinorField &z);
 #endif // _QUDA_BLAS_H

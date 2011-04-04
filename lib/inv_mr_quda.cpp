@@ -14,17 +14,17 @@
 
 #include <color_spinor_field.h>
 
-cudaColorSpinorField *rp = 0;
-cudaColorSpinorField *Arp = 0;
-cudaColorSpinorField *tmpp = 0;
+cudaColorSpinorField *rp_mr = 0;
+cudaColorSpinorField *Arp_mr = 0;
+cudaColorSpinorField *tmpp_mr = 0;
 
 bool initMR = false;
 
 void freeMR() {
   if (initMR) {
-    if (rp) delete rp;
-    delete Arp;
-    delete tmpp;
+    if (rp_mr) delete rp_mr;
+    delete Arp_mr;
+    delete tmpp_mr;
 
     initMR = false;
   }
@@ -38,30 +38,39 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
   if (!initMR) {
     ColorSpinorParam param(x);
     param.create = QUDA_ZERO_FIELD_CREATE;
-    if (invert_param->preserve_source) rp = new cudaColorSpinorField(x, param); 
-    Arp = new cudaColorSpinorField(x);
-    tmpp = new cudaColorSpinorField(x, param); //temporary for mat-vec
+    if (invert_param->preserve_source == QUDA_PRESERVE_SOURCE_YES)
+      rp_mr = new cudaColorSpinorField(x, param); 
+    Arp_mr = new cudaColorSpinorField(x);
+    tmpp_mr = new cudaColorSpinorField(x, param); //temporary for mat-vec
 
     initMR = true;
   }
-  cudaColorSpinorField &r = (invert_param->preserve_source ? *Arp : b);
-  cudaColorSpinorField &Ar = *Arp;
-  cudaColorSpinorField &tmp = *tmpp;
+  cudaColorSpinorField &r = 
+    (invert_param->preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp_mr : b;
+  cudaColorSpinorField &Ar = *Arp_mr;
+  cudaColorSpinorField &tmp = *tmpp_mr;
 
   double b2 = normCuda(b);
   double stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
 
   // calculate initial residual
-  mat(r, x, tmp);
-  double r2 = xmyNormCuda(b, r);  
+  //mat(Ar, x, tmp);
+  //double r2 = xmyNormCuda(b, Ar);  
+  //r = Ar;
 
-  if (invert_param->inv_type_sloppy == QUDA_GCR_INVERTER) {
+  zeroCuda(x);
+  double r2 = b2;
+
+  if (invert_param->inv_type_sloppy != QUDA_GCR_INVERTER) {
     blas_quda_flops = 0;
     stopwatchStart();
   }
 
+  double omega = 1.0;
+
   int k = 0;
-  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
+  if (invert_param->verbosity >= QUDA_VERBOSE) 
+    printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
 
   while (r2 > stop && k < invert_param->maxiter) {
     
@@ -70,10 +79,10 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
     double3 Ar3 = cDotProductNormACuda(Ar, r);
     Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
 
-    // fuse the following 3 kernels (7 -> 5 i/o transactions)
-    caxpyCuda(omega*alpha, r, x);
-    caxpyCuda(-omega*alpha, Ar, r);
-    r2 = norm2(r);
+    //printfQuda("%d MR %e %e %e\n", k, Ar3.x, Ar3.y, Ar3.z);
+
+    // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = norm2(r)
+    r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
 
     k++;
 
@@ -82,15 +91,15 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
   
   if (k>=invert_param->maxiter) warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
   
-  if (invert_param->inv_type_sloppy == QUDA_GCR_INVERTER) {
+  if (invert_param->inv_type_sloppy != QUDA_GCR_INVERTER) {
     invert_param->secs += stopwatchReadSeconds();
   
-    double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas_quda_flops + mat.flops())*1e-9;
     reduceDouble(gflops);
 
     //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
     invert_param->gflops += gflops;
-    invert_param->iter += total_iter;
+    invert_param->iter += k;
     
     if (invert_param->verbosity >= QUDA_SUMMARIZE) {
       // Calculate the true residual
@@ -98,7 +107,7 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
       double true_res = xmyNormCuda(b, r);
       
       printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		 total_iter, sqrt(r2/b2), sqrt(true_res / b2));    
+		 k, sqrt(r2/b2), sqrt(true_res / b2));    
     }
   }
 

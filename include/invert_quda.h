@@ -55,6 +55,8 @@ extern "C" {
   void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, 
 		    cudaColorSpinorField &b, QudaInvertParam *param);
 
+  void freeMR();
+
 #ifdef __cplusplus
 }
 #endif
