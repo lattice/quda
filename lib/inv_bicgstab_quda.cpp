@@ -15,8 +15,20 @@
 #include <color_spinor_field.h>
 
 // pointers to fields to avoid multiplie creation overhead
-cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
 bool initBiCGstab = false;
+
+// set the required parameters for the inner solver
+void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer);
+
+
+double resNorm(const DiracMatrix &mat, cudaColorSpinorField &b, cudaColorSpinorField &x) {  
+  cudaColorSpinorField r(b);
+  mat(r, x);
+  return xmyNormCuda(b, r);
+}
+
+
 
 void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
 			cudaColorSpinorField &b, QudaInvertParam *invert_param)
@@ -33,6 +45,16 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     vp = new cudaColorSpinorField(x, param);
     tmpp = new cudaColorSpinorField(x, param);
     tp = new cudaColorSpinorField(x, param);
+
+    // MR preconditioner - we need extra vectors
+    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+      wp = new cudaColorSpinorField(x, param);
+      zp = new cudaColorSpinorField(x, param);
+    } else { // dummy assignments
+      wp = pp;
+      zp = pp;
+    }
+
     initBiCGstab = true;
   }
 
@@ -42,6 +64,9 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   cudaColorSpinorField &v = *vp;
   cudaColorSpinorField &tmp = *tmpp;
   cudaColorSpinorField &t = *tp;
+
+  cudaColorSpinorField &w = *wp;
+  cudaColorSpinorField &z = *zp;
 
   cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
@@ -65,6 +90,9 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   cudaColorSpinorField &rSloppy = *r_sloppy;
   cudaColorSpinorField &xSloppy = *x_sloppy;
   cudaColorSpinorField &r0 = *r_0;
+
+  QudaInvertParam invert_param_inner = newQudaInvertParam();
+  fillInnerInvertParam(invert_param_inner, *invert_param);
 
   double b2 = normCuda(b);
 
@@ -108,7 +136,12 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
       cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
     }
     
-    matSloppy(v, p, tmp);
+    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+      invertMRCuda(matSloppy, w, p, &invert_param_inner);
+      matSloppy(v, w, tmp);
+    } else {
+      matSloppy(v, p, tmp);
+    }
 
     if (abs(rho) == 0.0) alpha = 0.0;
     else alpha = rho / cDotProductCuda(r0, v);
@@ -116,14 +149,27 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     // r -= alpha*v
     caxpyCuda(-alpha, v, rSloppy);
 
-    matSloppy(t, rSloppy, tmp);
+    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+      invertMRCuda(matSloppy, z, rSloppy, &invert_param_inner);
+      matSloppy(t, z, tmp);
+    } else {
+      matSloppy(t, rSloppy, tmp);
+    }
     
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, rSloppy);
     omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
-    //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-    rho_r2 = caxpbypzYmbwcDotProductUYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
+    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+      //x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
+      caxpyCuda(alpha, w, xSloppy); // moved above for debugging
+      caxpyCuda(omega, z, xSloppy);
+      caxpyCuda(-omega, t, rSloppy);
+      rho_r2 = cDotProductNormBCuda(r0, rSloppy);
+    } else {
+      //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
+      rho_r2 = caxpbypzYmbwcDotProductUYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
+    }
 
     rho0 = rho;
     rho = Complex(rho_r2.x, rho_r2.y);
@@ -198,6 +244,8 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
 
 void freeBiCGstab() {
   if(initBiCGstab) {
+    if (wp && wp != pp) delete wp;
+    if (zp && zp != pp) delete zp;
     delete yp;
     delete rp;
     delete pp;

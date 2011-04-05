@@ -572,9 +572,9 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
   diracParam.mu = inv_param->mu;
   diracParam.verbose = inv_param->verbosity;
 
-  for (int i=0; i<4; i++) {
+  /*for (int i=0; i<4; i++) {
     diracParam.commDim[i] = inv_param->commDim[i];
-  }
+    }*/
 }
 
 
@@ -588,9 +588,9 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, con
   diracParam.clover = &cudaCloverSloppy;
   diracParam.cloverInv = &cudaCloverInvSloppy;
 
-  for (int i=0; i<4; i++) {
+  /*for (int i=0; i<4; i++) {
     diracParam.commDim[i] = inv_param->commDimSloppy[i];
-  }
+    }*/
 
 }
 

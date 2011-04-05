@@ -30,7 +30,7 @@ class DiracParam {
 
   QudaVerbosity verbose;
 
-  int commDim[QUDA_MAX_DIM]; // whether to do comms or not
+  //int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
@@ -54,6 +54,7 @@ class DiracMdag;
 // Abstract base class
 class Dirac {
 
+  friend class DiracMatrix;
   friend class DiracM;
   friend class DiracMdagM;
   friend class DiracMdag;
@@ -74,7 +75,7 @@ class Dirac {
   QudaTune tune;
   QudaVerbosity verbose;  
 
-  int commDim[QUDA_MAX_DIM]; // whether do comms or not
+  mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
  public:
   Dirac(const DiracParam &param);
@@ -434,6 +435,7 @@ class DiracMatrix {
 
   unsigned long long flops() const { return dirac->Flops(); }
 
+  void setCommDim(int dim, int value) const {dirac->commDim[dim] = value;} // extreme hack for DD
 };
 
 inline DiracMatrix::~DiracMatrix()

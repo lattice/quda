@@ -39,7 +39,8 @@ void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) 
 
   inner.inv_type_sloppy = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
 
-  inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  if (outer.inv_type == QUDA_GCR_INVERTER) inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
 }
 

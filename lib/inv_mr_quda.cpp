@@ -33,6 +33,8 @@ void freeMR() {
 void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpinorField &b, 
 		  QudaInvertParam *invert_param)
 {
+  mat.setCommDim(3, 0); // hack to switch off the comms
+
   typedef std::complex<double> Complex;
 
   if (!initMR) {
@@ -49,6 +51,8 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
     (invert_param->preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp_mr : b;
   cudaColorSpinorField &Ar = *Arp_mr;
   cudaColorSpinorField &tmp = *tmpp_mr;
+
+  if (&r != &b) copyCuda(r, b);
 
   double b2 = normCuda(b);
   double stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
@@ -110,6 +114,8 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
 		 k, sqrt(r2/b2), sqrt(true_res / b2));    
     }
   }
+
+  mat.setCommDim(3, 1); // restore comms
 
   return;
 }

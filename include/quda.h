@@ -103,8 +103,8 @@ extern "C" {
     int maxiter_sloppy; // max number of iterations used by inner solver
     int gcrNkrylov;  // maximum size of Krylov space used by solver
 
-    int commDim[QUDA_MAX_DIM];
-    int commDimSloppy[QUDA_MAX_DIM];
+    //int commDim[QUDA_MAX_DIM];
+    //int commDimSloppy[QUDA_MAX_DIM];
     //int ghostDim[QUDA_MAX_DIM];
   } QudaInvertParam;
 
