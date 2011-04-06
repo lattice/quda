@@ -25,6 +25,8 @@ using namespace std;
 
 cudaStream_t *stream;
 
+bool globalReduce = true;
+
 // Easy to switch between overlapping communication or not
 #ifdef OVERLAP_COMMS
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpyAsync(dst, src, size, type, stream)
@@ -525,7 +527,7 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 void reduceDouble(double &sum) {
 
 #ifdef QMP_COMMS
-  QMP_sum_double(&sum);
+  if (globalReduce) QMP_sum_double(&sum);
 #endif
 
 }
@@ -533,7 +535,7 @@ void reduceDouble(double &sum) {
 void reduceDoubleArray(double *sum, const int len) {
 
 #ifdef QMP_COMMS
-  QMP_sum_double_array(sum,len);
+  if (globalReduce) QMP_sum_double_array(sum,len);
 #endif
 
 }

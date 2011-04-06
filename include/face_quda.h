@@ -147,7 +147,8 @@ class FaceBuffer {
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+  
+  extern bool globalReduce;
   void reduceDouble(double &);
   void reduceDoubleArray(double *, const int len);
   

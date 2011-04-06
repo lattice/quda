@@ -11,6 +11,8 @@ using namespace std;
 
 cudaStream_t *stream;
 
+bool globalReduce = true;
+
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision) : 
   Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
@@ -233,7 +235,7 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
 void reduceDouble(double &sum) {
 
 #ifdef MPI_COMMS
-  comm_allreduce(&sum);
+  if (globalReduce) comm_allreduce(&sum);
 #endif
 
 }
@@ -241,7 +243,7 @@ void reduceDouble(double &sum) {
 void reduceDoubleArray(double *sum, const int len) {
 
 #ifdef MPI_COMMS
-  comm_allreduce_array(sum, len);
+  if (globalReduce) comm_allreduce_array(sum, len);
 #endif
 
 }

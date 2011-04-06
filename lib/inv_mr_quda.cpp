@@ -34,6 +34,8 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
 		  QudaInvertParam *invert_param)
 {
 
+  globalReduce = false;
+
   typedef std::complex<double> Complex;
 
   if (!initMR) {
@@ -113,6 +115,8 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
 		 k, sqrt(r2/b2), sqrt(true_res / b2));    
     }
   }
+
+  globalReduce = true;
 
   return;
 }
