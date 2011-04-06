@@ -54,7 +54,7 @@ int main(int argc, char **argv)
   //QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+  QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
   QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
 
   // offsets used only by multi-shift solver
@@ -99,15 +99,16 @@ int main(int argc, char **argv)
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.tol = 5e-7;
-  inv_param.maxiter = 10000;
-  inv_param.reliable_delta = 1e-1; // ignored by multi-shift solver
+  inv_param.maxiter = 1000;
+  inv_param.reliable_delta = 1e-2; // ignored by multi-shift solver
 
   // domain decomposition parameters
   inv_param.tol_sloppy = 1e-1;
   inv_param.maxiter_sloppy = 1000;
-  inv_param.gcrNkrylov = 10;
+  inv_param.gcrNkrylov = 20;
   inv_param.verbosity_sloppy = QUDA_SILENT;
   inv_param.inv_type_sloppy = QUDA_MR_INVERTER;
+  inv_param.prec_precondition = cuda_prec_sloppy;
 
   //inv_param.commDim[3] = 1;
   //inv_param.commDimSloppy[3] = 1;

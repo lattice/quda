@@ -30,9 +30,13 @@ double resNorm(const DiracMatrix &mat, cudaColorSpinorField &b, cudaColorSpinorF
 
 
 
-void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
-			cudaColorSpinorField &b, QudaInvertParam *invert_param)
+void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &pre,
+			cudaColorSpinorField &x, cudaColorSpinorField &b, QudaInvertParam *invert_param)
 {
+  
+  if (invert_param->cuda_prec_sloppy != invert_param->prec_precondition)
+    errorQuda("BiCGstab does not yet support different sloppy and preconditioner precisions");
+
   typedef std::complex<double> Complex;
 
   if (!initBiCGstab) {
@@ -137,7 +141,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     }
     
     if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
-      invertMRCuda(matSloppy, w, p, &invert_param_inner);
+      invertMRCuda(pre, w, p, &invert_param_inner);
       matSloppy(v, w, tmp);
     } else {
       matSloppy(v, p, tmp);
@@ -150,7 +154,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     caxpyCuda(-alpha, v, rSloppy);
 
     if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
-      invertMRCuda(matSloppy, z, rSloppy, &invert_param_inner);
+      invertMRCuda(pre, z, rSloppy, &invert_param_inner);
       matSloppy(t, z, tmp);
     } else {
       matSloppy(t, rSloppy, tmp);
@@ -162,7 +166,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
 
     if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
       //x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
-      caxpyCuda(alpha, w, xSloppy); // moved above for debugging
+      caxpyCuda(alpha, w, xSloppy);
       caxpyCuda(omega, z, xSloppy);
       caxpyCuda(-omega, t, rSloppy);
       rho_r2 = cDotProductNormBCuda(r0, rSloppy);
@@ -174,6 +178,10 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     rho0 = rho;
     rho = Complex(rho_r2.x, rho_r2.y);
     r2 = rho_r2.z;
+
+    if (invert_param->verbosity == QUDA_DEBUG_VERBOSE)
+      printfQuda("DEBUG: %d iterated residual norm = %e, true residual norm = %e\n",
+		 k, norm2(rSloppy), resNorm(matSloppy, b, xSloppy));
 
     // reliable updates
     rNorm = sqrt(r2);
@@ -216,7 +224,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   if (invert_param->inv_type_sloppy != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
     invert_param->secs += stopwatchReadSeconds();
 
-    double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + pre.flops())*1e-9;
     reduceDouble(gflops);
 
     //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());

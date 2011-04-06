@@ -813,6 +813,8 @@ __global__ void convertDHKernelSt(double2 *res, int length, int real_length) {
 
 void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 
+  if (&src == &dst) return; // aliasing fields
+
   if (src.nSpin != 1 && src.nSpin != 4){
     errorQuda("nSpin(%d) not supported in function %s, line %d\n", src.nSpin, __FUNCTION__, __LINE__);	
   }

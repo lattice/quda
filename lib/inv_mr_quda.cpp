@@ -33,7 +33,6 @@ void freeMR() {
 void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpinorField &b, 
 		  QudaInvertParam *invert_param)
 {
-  mat.setCommDim(3, 0); // hack to switch off the comms
 
   typedef std::complex<double> Complex;
 
@@ -114,8 +113,6 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
 		 k, sqrt(r2/b2), sqrt(true_res / b2));    
     }
   }
-
-  mat.setCommDim(3, 1); // restore comms
 
   return;
 }

@@ -102,6 +102,8 @@ extern "C" {
     double tol_sloppy; // tolerance used by inner solver
     int maxiter_sloppy; // max number of iterations used by inner solver
     int gcrNkrylov;  // maximum size of Krylov space used by solver
+    
+    QudaPrecision prec_precondition; // the precision for the preconditioned solver
 
     //int commDim[QUDA_MAX_DIM];
     //int commDimSloppy[QUDA_MAX_DIM];

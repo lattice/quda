@@ -145,7 +145,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tol_sloppy, INVALID_DOUBLE);
   P(maxiter_sloppy, INVALID_INT);
   P(gcrNkrylov, INVALID_INT);
-  P(verbosity, QUDA_INVALID_VERBOSITY);
+  P(verbosity_sloppy, QUDA_INVALID_VERBOSITY);
+  P(prec_precondition, QUDA_INVALID_PRECISION);
 
   //set the default to no
 #ifdef INIT_PARAM
