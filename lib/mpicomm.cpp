@@ -108,14 +108,25 @@ comm_partition(void)
 
   int leftover;
 
+#if 0
   tgridid  = rank/(zgridsize*ygridsize*xgridsize);
   leftover = rank%(zgridsize*ygridsize*xgridsize);
   zgridid  = leftover/(ygridsize*xgridsize);
   leftover = leftover%(ygridsize*xgridsize);
   ygridid  = leftover/xgridsize;
   xgridid  = leftover%xgridsize;
+  #define GRID_ID(xid,yid,zid,tid) (tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid)
+#else
 
-  //printf("My rank: %d, gridid(t,z,y,x): %d %d %d %d\n", rank, tgridid, zgridid, ygridid, xgridid);
+  xgridid  = rank/(ygridsize*zgridsize*tgridsize);
+  leftover = rank%(ygridsize*zgridsize*tgridsize);
+  ygridid  = leftover/(zgridsize*tgridsize);
+  leftover = leftover%(zgridsize*tgridsize);
+  zgridid  = leftover/tgridsize;
+  tgridid  = leftover%tgridsize;  
+#define GRID_ID(xid,yid,zid,tid) (xid*ygridsize*zgridsize*tgridsize+yid*zgridsize*tgridsize+zid*tgridsize+tid)
+#endif
+  printf("My rank: %d, gridid(t,z,y,x): %d %d %d %d\n", rank, tgridid, zgridid, ygridid, xgridid);
 
 
   int xid, yid, zid, tid;
@@ -124,36 +135,36 @@ comm_partition(void)
   zid =zgridid;
   tid =tgridid;
   xid=(xgridid +1)%xgridsize;
-  x_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  x_fwd_nbr = GRID_ID(xid,yid,zid,tid);
   xid=(xgridid -1+xgridsize)%xgridsize;
-  x_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  x_back_nbr = GRID_ID(xid,yid,zid,tid);
 
   //Y direction neighbors
   xid =xgridid;
   zid =zgridid;
   tid =tgridid;
   yid =(ygridid+1)%ygridsize;
-  y_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  y_fwd_nbr = GRID_ID(xid,yid,zid,tid);
   yid=(ygridid -1+ygridsize)%ygridsize;
-  y_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  y_back_nbr = GRID_ID(xid,yid,zid,tid);
 
   //Z direction neighbors
   xid =xgridid;
   yid =ygridid;
   tid =tgridid;
   zid =(zgridid+1)%zgridsize;
-  z_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  z_fwd_nbr = GRID_ID(xid,yid,zid,tid);
   zid=(zgridid -1+zgridsize)%zgridsize;
-  z_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  z_back_nbr = GRID_ID(xid,yid,zid,tid);
 
-  //Z direction neighbors
+  //T direction neighbors
   xid =xgridid;
   yid =ygridid;
   zid =zgridid;
   tid =(tgridid+1)%tgridsize;
-  t_fwd_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  t_fwd_nbr = GRID_ID(xid,yid,zid,tid);
   tid=(tgridid -1+tgridsize)%tgridsize;
-  t_back_nbr = tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid;
+  t_back_nbr = GRID_ID(xid,yid,zid,tid);
 
   printf("MPI rank: rank=%d, hostname=%s, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, hostname, x_fwd_nbr, x_back_nbr);
   printf("MPI rank: rank=%d, hostname=%s, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, hostname, y_fwd_nbr, y_back_nbr);
