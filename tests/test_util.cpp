@@ -689,9 +689,9 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
 	for (int m = 0; m < 3; m++) { // last 2 rows
 	  for (int n = 0; n < 3; n++) { // 3 columns
 	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] =1.0* rand() / (Float)RAND_MAX;
-	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] =2.0* rand() / (Float)RAND_MAX;
-	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 3.0*rand() / (Float)RAND_MAX;
-	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 4.0*rand() / (Float)RAND_MAX;
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] =1.0* rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 1.0*rand() / (Float)RAND_MAX;
+	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 1.0*rand() / (Float)RAND_MAX;
 	  }
 	}
       }

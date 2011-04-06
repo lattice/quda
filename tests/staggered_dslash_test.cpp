@@ -97,7 +97,6 @@ setDimConstants(int *X)
 
 void init()
 {    
-  kernelPackT = false;
 
   initQuda(device);
 
@@ -728,7 +727,7 @@ int main(int argc, char **argv)
       i++;
       continue;
     }
-    if( strcmp(argv[i], "--manual_set_partition") == 0){
+    if( strcmp(argv[i], "--partition") == 0){
       if (i+1 >= argc){
         usage(argv);
       }     
@@ -739,6 +738,11 @@ int main(int argc, char **argv)
 	}
       }
       i++;
+      continue;
+    }
+
+    if( strcmp(argv[i], "--kernel_pack_t") == 0){
+      kernelPackT = true;
       continue;
     }
 

@@ -156,7 +156,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 int
 invert_test(void)
 {
-  kernelPackT = false;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
@@ -772,7 +771,7 @@ int main(int argc, char** argv)
       continue;
     }
 
-    if( strcmp(argv[i], "--manual_set_partition") == 0){
+    if( strcmp(argv[i], "--partition") == 0){
       if (i+1 >= argc){
         usage(argv);
       }     
@@ -785,6 +784,12 @@ int main(int argc, char** argv)
       i++;
       continue;
     }
+
+    if( strcmp(argv[i], "--kernel_pack_t") == 0){
+      kernelPackT = true;
+      continue;
+    }
+
 
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);

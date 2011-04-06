@@ -228,6 +228,8 @@ class ColorSpinorField {
 
   friend void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
 			     const int parity, const cudaStream_t &stream);
+  friend void collectGhostSpinor(void *in, const void *inNorm, void* ghost_spinor_gpu, int dir, int whichway,
+				 const int parity, cudaColorSpinorField* inSpinor, cudaStream_t* stream);
 };
 
 // CUDA implementation
