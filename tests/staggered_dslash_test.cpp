@@ -319,6 +319,8 @@ void init()
     diracParam.tmp1=tmp;
     dirac = Dirac::create(diracParam);
 	
+    //dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp);
+
   } else {
     errorQuda("Error not suppported");
   }
@@ -547,6 +549,7 @@ void usage(char** argv )
   printf("--dagger \t\t\t Set the dagger to 1\n"); 
   printf("--tdim \t\t\t\t Set T dimention size(default 24)\n");     
   printf("--sdim \t\t\t\t Set space dimention size\n"); 
+  printf("--manual_set_partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("--help \t\t\t\t Print out this message\n"); 
   exit(1);
   return ;

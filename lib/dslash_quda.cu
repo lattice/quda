@@ -624,17 +624,18 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
 			   const double &a, const int volume, const int* Vsh, const int* dims,
-			   const int length, const int ghost_length, dim3 blockDim) {
+			   const int length, const int ghost_length, const dim3 *blockDim) {
     
-  dim3 interiorGridDim( (dslashParam.threads + blockDim.x -1)/blockDim.x, 1, 1);
+  dim3 interiorGridDim( (dslashParam.threads + blockDim[0].x -1)/blockDim[0].x, 1, 1);
   dim3 exteriorGridDim[4]  = {
-    dim3((6*Vsh[0] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[1] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[2] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[3] + blockDim.x -1)/blockDim.x, 1, 1)
+    dim3((6*Vsh[0] + blockDim[1].x -1)/blockDim[1].x, 1, 1),
+    dim3((6*Vsh[1] + blockDim[2].x -1)/blockDim[2].x, 1, 1),
+    dim3((6*Vsh[2] + blockDim[3].x -1)/blockDim[3].x, 1, 1),
+    dim3((6*Vsh[3] + blockDim[4].x -1)/blockDim[4].x, 1, 1)
   };
     
-  int shared_bytes = blockDim.x*6*bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
+  size_t regSize = bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
+  int shared_bytes = blockDim[0].x*6*regSize;
   
   dslashParam.kernel_type = INTERIOR_KERNEL;
   dslashParam.tOffset =  0;
@@ -644,7 +645,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
 #endif
 
-  STAGGERED_DSLASH(interiorGridDim, blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
+  STAGGERED_DSLASH(interiorGridDim, blockDim[0], shared_bytes, streams[Nstream-1], out, outNorm, 
 		   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
 #ifdef MULTI_GPU
@@ -662,16 +663,16 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   }
 
   for(int i=0 ;i < 4;i++){
-    if(!commDimPartitioned(i)){
-      continue;
-    }
+    if(!commDimPartitioned(i)) continue;
+
+    shared_bytes = blockDim[i+1].x*6*regSize;
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);
     dslashParam.kernel_type = exterior_kernel_flag[i];
     dslashParam.tOffset =  dims[i]-6;
     dslashParam.threads = 6*Vsh[i];
-    STAGGERED_DSLASH(exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
+    STAGGERED_DSLASH(exteriorGridDim[i], blockDim[i+1], shared_bytes, streams[Nstream-1], out, outNorm, 
 		     fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
   }
@@ -682,7 +683,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, 
 			 const FullGauge longGauge, const cudaColorSpinorField *in,
 			 const int parity, const int dagger, const cudaColorSpinorField *x,
-			 const double &k, const dim3 &block, const dim3 &blockFace)
+			 const double &k, const dim3 *block)
 {
   
   inSpinor = (cudaColorSpinorField*)in; // EVIL

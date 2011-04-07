@@ -356,10 +356,8 @@ class DiracTwistedMassPC : public DiracTwistedMass {
 class DiracStaggered : public Dirac {
 
  private:
-  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
-  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
-  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslash[5]; // thread block size for Dslash (body + face kernels)
+  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (body + face kernels)
 
  protected:
   FullGauge *fatGauge;
