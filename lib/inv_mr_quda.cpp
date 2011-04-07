@@ -34,7 +34,7 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
 		  QudaInvertParam *invert_param)
 {
 
-  globalReduce = false;
+  globalReduce = false; // use local reductions for DD solver
 
   typedef std::complex<double> Complex;
 
@@ -116,7 +116,7 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
     }
   }
 
-  globalReduce = true;
+  globalReduce = true; // renable global reductions for outer solver
 
   return;
 }

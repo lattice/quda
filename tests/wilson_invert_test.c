@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.48725;
+  double mass = -0.57;//-0.48725;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
   // domain decomposition parameters
   inv_param.tol_sloppy = 1e-1;
   inv_param.maxiter_sloppy = 1000;
-  inv_param.gcrNkrylov = 20;
+  inv_param.gcrNkrylov = 30;
   inv_param.verbosity_sloppy = QUDA_SILENT;
   inv_param.inv_type_sloppy = QUDA_MR_INVERTER;
   inv_param.prec_precondition = cuda_prec_sloppy;
