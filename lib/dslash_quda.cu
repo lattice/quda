@@ -37,7 +37,8 @@ struct DslashParam {
   
 };
 
-// parameter used type of T-packing to use
+// determines whether the temporal ghost zones are packed with a gather kernel,
+// as opposed to multiple calls to cudaMemcpy()
 bool kernelPackT = false;
 
 DslashParam dslashParam;
@@ -83,17 +84,13 @@ static inline __device__ float2 short22float2(short2 a) {
   return make_float2(short2float(a.x), short2float(a.y));
 }
 
-
+#include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #include <dw_dslash_def.h>        // Domain Wall kernels
 #include <tm_dslash_def.h>        // Twisted Mass kernels
 #include <tm_core.h>              // solo twisted mass kernel
 #include <clover_def.h>           // kernels for applying the clover term alone
-
-#ifdef MULTI_GPU
-#include <pack_face_def.h>        // kernels for packing the ghost zones
-#endif
 
 #ifndef SHARED_FLOATS_PER_THREAD
 #define SHARED_FLOATS_PER_THREAD 0
