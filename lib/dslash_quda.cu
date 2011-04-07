@@ -37,7 +37,8 @@ struct DslashParam {
   
 };
 
-// parameter used type of T-packing to use
+// determines whether the temporal ghost zones are packed with a gather kernel,
+// as opposed to multiple calls to cudaMemcpy()
 bool kernelPackT = false;
 
 DslashParam dslashParam;
@@ -83,17 +84,13 @@ static inline __device__ float2 short22float2(short2 a) {
   return make_float2(short2float(a.x), short2float(a.y));
 }
 
-
+#include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #include <dw_dslash_def.h>        // Domain Wall kernels
 #include <tm_dslash_def.h>        // Twisted Mass kernels
 #include <tm_core.h>              // solo twisted mass kernel
 #include <clover_def.h>           // kernels for applying the clover term alone
-
-#ifdef MULTI_GPU
-#include <pack_face_def.h>        // kernels for packing the ghost zones
-#endif
 
 #ifndef SHARED_FLOATS_PER_THREAD
 #define SHARED_FLOATS_PER_THREAD 0
@@ -627,17 +624,18 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
 			   const double &a, const int volume, const int* Vsh, const int* dims,
-			   const int length, const int ghost_length, dim3 blockDim) {
+			   const int length, const int ghost_length, const dim3 *blockDim) {
     
-  dim3 interiorGridDim( (dslashParam.threads + blockDim.x -1)/blockDim.x, 1, 1);
+  dim3 interiorGridDim( (dslashParam.threads + blockDim[0].x -1)/blockDim[0].x, 1, 1);
   dim3 exteriorGridDim[4]  = {
-    dim3((6*Vsh[0] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[1] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[2] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[3] + blockDim.x -1)/blockDim.x, 1, 1)
+    dim3((6*Vsh[0] + blockDim[1].x -1)/blockDim[1].x, 1, 1),
+    dim3((6*Vsh[1] + blockDim[2].x -1)/blockDim[2].x, 1, 1),
+    dim3((6*Vsh[2] + blockDim[3].x -1)/blockDim[3].x, 1, 1),
+    dim3((6*Vsh[3] + blockDim[4].x -1)/blockDim[4].x, 1, 1)
   };
     
-  int shared_bytes = blockDim.x*6*bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
+  size_t regSize = bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
+  int shared_bytes = blockDim[0].x*6*regSize;
   
   dslashParam.kernel_type = INTERIOR_KERNEL;
   dslashParam.tOffset =  0;
@@ -647,7 +645,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
 #endif
 
-  STAGGERED_DSLASH(interiorGridDim, blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
+  STAGGERED_DSLASH(interiorGridDim, blockDim[0], shared_bytes, streams[Nstream-1], out, outNorm, 
 		   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
 #ifdef MULTI_GPU
@@ -665,16 +663,16 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   }
 
   for(int i=0 ;i < 4;i++){
-    if(!commDimPartitioned(i)){
-      continue;
-    }
+    if(!commDimPartitioned(i)) continue;
+
+    shared_bytes = blockDim[i+1].x*6*regSize;
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);
     dslashParam.kernel_type = exterior_kernel_flag[i];
     dslashParam.tOffset =  dims[i]-6;
     dslashParam.threads = 6*Vsh[i];
-    STAGGERED_DSLASH(exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
+    STAGGERED_DSLASH(exteriorGridDim[i], blockDim[i+1], shared_bytes, streams[Nstream-1], out, outNorm, 
 		     fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
   }
@@ -685,7 +683,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, 
 			 const FullGauge longGauge, const cudaColorSpinorField *in,
 			 const int parity, const int dagger, const cudaColorSpinorField *x,
-			 const double &k, const dim3 &block, const dim3 &blockFace)
+			 const double &k, const dim3 *block)
 {
   
   inSpinor = (cudaColorSpinorField*)in; // EVIL

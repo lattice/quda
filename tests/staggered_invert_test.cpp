@@ -545,6 +545,7 @@ usage(char** argv )
 	 "                                                     4=multimass odd, 5=multimass full)\n"); 
   printfQuda("--tdim                                  T dimension\n");
   printfQuda("--sdim                                  S dimension\n");
+  printf("--manual_set_partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printfQuda("--help                                  Print out this message\n"); 
   exit(1);
   return ;
