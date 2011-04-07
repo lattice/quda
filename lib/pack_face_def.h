@@ -1,7 +1,7 @@
 // compute an index into the local volume from an index into the face
-template <int dim, int nLayers, int parity>
+template <int dim, int nLayers>
 static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_volume,
-						const int &face_num)
+						const int &face_num, const int &parity)
 {
   // dimensions of the face (FIXME: optimize using constant cache)
 
@@ -190,19 +190,16 @@ static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, co
 #undef WRITE_HALF_SPINOR
 
 
-template <int dim, int dir, int dagger, int parity, typename FloatN>
-__global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *in, const float *inNorm)
+template <int dim, int dagger, typename FloatN>
+__global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *in, const float *inNorm, const int face_num, const int parity)
 {
   int face_volume = ghostFace[dim];
 
   int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
   if (face_idx >= face_volume) return;
 
-  // are we on face 0 or face 1?
-  const int face_num = dir;
-
   // compute an index into the local volume from the index into the face
-  int idx = indexFromFaceIndex<dim, 1, parity>(face_idx, face_volume, face_num);
+  int idx = indexFromFaceIndex<dim, 1>(face_idx, face_volume, face_num, parity);
 
   // read spinor, spin-project, and write half spinor to face
   packFaceWilsonCore<dim, dagger>(out, outNorm, in, inNorm, idx, face_idx, face_volume, face_num);
@@ -217,85 +214,22 @@ void packFaceWilson(FloatN *faces, float *facesNorm, const FloatN *in, const flo
 		    const dim3 &gridDim, const dim3 &blockDim, const cudaStream_t &stream)
 {
 #ifdef GPU_WILSON_DIRAC
-  if (parity) {
-    if (dagger) {
-      switch (dir) {
-      case QUDA_BACKWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,0,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,0,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,0,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,0,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      case QUDA_FORWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,1,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,1,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,1,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,1,1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      }
-    } else {
-      switch (dir) {
-      case QUDA_BACKWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,0,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,0,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,0,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,0,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      case QUDA_FORWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,1,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,1,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,1,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,1,0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      }
+
+  const int face_num = (dir == QUDA_FORWARDS);
+
+  if (dagger) {
+    switch (dim) {
+    case 0: packFaceWilsonKernel<0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
+    case 1: packFaceWilsonKernel<1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
+    case 2: packFaceWilsonKernel<2,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
+    case 3: packFaceWilsonKernel<3,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
     }
   } else {
-    if (dagger) {
-      switch (dir) {
-      case QUDA_BACKWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,0,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,0,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,0,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,0,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      case QUDA_FORWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,1,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,1,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,1,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,1,1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      }
-    } else {
-      switch (dir) {
-      case QUDA_BACKWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,0,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,0,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,0,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,0,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      case QUDA_FORWARDS:
-	switch (dim) {
-	case 0: packFaceWilsonKernel<0,1,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 1: packFaceWilsonKernel<1,1,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 2: packFaceWilsonKernel<2,1,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	case 3: packFaceWilsonKernel<3,1,0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm); break;
-	}
-	break;
-      }
+    switch (dim) {
+    case 0: packFaceWilsonKernel<0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
+    case 1: packFaceWilsonKernel<1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
+    case 2: packFaceWilsonKernel<2,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
+    case 3: packFaceWilsonKernel<3,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, face_num, parity); break;
     }
   }
 #else
@@ -306,7 +240,7 @@ void packFaceWilson(FloatN *faces, float *facesNorm, const FloatN *in, const flo
 void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
 		    const int parity, const cudaStream_t &stream) {
 
-  dim3 blockDim(64, 1, 1); // make this a parameter for auto-tuning
+  dim3 blockDim(64, 1, 1); // TODO: make this a parameter for auto-tuning
   dim3 gridDim( (in.ghostFace[dim]+blockDim.x-1) / blockDim.x, 1, 1);
 
   int Ninternal = in.nColor * in.nSpin; // assume spin projection
@@ -334,11 +268,12 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 }
 
 
-// TODO: add support for texture reads
+// TODO: add support for textured reads
+// TODO: pack only one face at a time
 
 #ifdef GPU_STAGGERED_DIRAC
 template <int dir, typename Float2>
-__global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *in, const float *inNorm)
+__global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *in, const float *inNorm, const int parity)
 {
   int face_volume = ghostFace[dir];
 
@@ -354,7 +289,7 @@ __global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *
   out += face_num * 3 * face_volume;
 
   // compute an index into the local volume from the index into the face
-  int idx = indexFromFaceIndex<dir, 3>(face_idx, face_volume, face_num);
+  int idx = indexFromFaceIndex<dir, 3>(face_idx, face_volume, face_num, parity);
 
   out[face_idx + 0*face_volume] = in[idx + 0*sp_stride];
   out[face_idx + 1*face_volume] = in[idx + 1*sp_stride];
