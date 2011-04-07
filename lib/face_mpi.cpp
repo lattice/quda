@@ -229,7 +229,13 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
     }
 }
 
+void reduceMaxDouble(double &max) {
 
+#ifdef MPI_COMMS
+  comm_allreduce_max(&max);
+#endif
+
+}
 void reduceDouble(double &sum) {
 
 #ifdef MPI_COMMS
