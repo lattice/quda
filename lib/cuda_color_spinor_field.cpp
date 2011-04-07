@@ -497,7 +497,6 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
 
     size_t bytes = nFace*Nint*ghostFace[dim]*precision;
     if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
-
     void* gpu_buf = 
       (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
 
@@ -581,6 +580,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
     void *dst = (char*)norm + norm_offset*sizeof(float);
     void *src = (char*)ghost_spinor+nFace*Nint*ghostFace[dim]*precision; // norm region of host ghost zone
     CUDAMEMCPY(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);  CUERR;
+    
   }
   
 }

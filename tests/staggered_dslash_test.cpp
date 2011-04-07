@@ -746,6 +746,8 @@ int main(int argc, char **argv)
       continue;
     }
 
+
+
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -759,7 +761,7 @@ int main(int argc, char **argv)
   int accuracy_level = dslashTest();
 
   printfQuda("accuracy_level =%d\n", accuracy_level);
-  if (accuracy_level >= 3) ret = 0;    //probably no error 
+  if (accuracy_level >= 1) ret = 0;    //probably no error 
 
   endCommsQuda();
 

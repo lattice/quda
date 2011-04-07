@@ -599,7 +599,7 @@ int main(int argc, char** argv)
         usage(argv);
       }
       sscanf(argv[i+1], "%f", &tmpf);
-      if (tol <= 0){
+      if (tmpf <= 0){
         printf("ERROR: invalid tol(%f)\n", tmpf);
         usage(argv);
       }

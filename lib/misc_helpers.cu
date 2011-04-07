@@ -407,7 +407,6 @@ staggeredCollectGhostSpinorNormKernel(float* in_norm, const int oddBit,
       nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
     }
   }
-
 }
 
 //@dir can be 0, 1, 2, 3 (X,Y,Z,T directions)
