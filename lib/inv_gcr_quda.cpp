@@ -136,11 +136,13 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   if (invert_param->verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
 
-  //struct timeval orth0, orth1, pre0, pre1, mat0, mat1;
-  //double orthT = 0, matT = 0, preT = 0;
+  struct timeval orth0, orth1, pre0, pre1, mat0, mat1, rst0, rst1;
+  double orthT = 0, matT = 0, preT = 0, resT = 0;
 
   while (r2 > stop && total_iter < invert_param->maxiter) {
     
+    gettimeofday(&pre0, NULL);
+
     if (invert_param->inv_type_sloppy != QUDA_INVALID_INVERTER) {
       if (invert_param->tol/(sqrt(r2/b2)) > invert_param->tol_sloppy) // relax stoppng condition
 	invert_param_inner.tol = invert_param->tol/sqrt(r2/b2);
@@ -162,12 +164,19 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
       *p[k] = rSloppy;
     } 
 
-    matSloppy(*Ap[k], *p[k], tmp);
+    gettimeofday(&pre1, NULL);
 
+
+    gettimeofday(&mat0, NULL);
+    matSloppy(*Ap[k], *p[k], tmp);
+    gettimeofday(&mat1, NULL);
+
+    gettimeofday(&orth0, NULL);
     for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
       beta[i][k] = cDotProductCuda(*Ap[i], *Ap[k]);
       caxpyCuda(-beta[i][k], *Ap[i], *Ap[k]);
     }
+    gettimeofday(&orth1, NULL);
     
     double3 Apr = cDotProductNormACuda(*Ap[k], rSloppy);
     gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
@@ -186,10 +195,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     if (invert_param->verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter, k, r2);
 
-    /*orthT += timeInterval(orth0, orth1);
-    matT += timeInterval(mat0, mat1);
-    preT += timeInterval(pre0, pre1);*/
-
+    gettimeofday(&rst0, NULL);
     // update solution and residual since max Nkrylov reached, converged or reliable update required
     if (k==Nkrylov || r2 < stop || r2/r2_old < invert_param->reliable_delta) { 
       // Update the solution vector
@@ -224,6 +230,13 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
 
       r2_old = r2;
     }
+    gettimeofday(&rst1, NULL);
+
+    orthT += timeInterval(orth0, orth1);
+    matT += timeInterval(mat0, mat1);
+    preT += timeInterval(pre0, pre1);
+    resT += timeInterval(rst0, rst1);
+
   }
 
   copyCuda(x, y);
@@ -237,8 +250,8 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + pre.flops())*1e-9;
   reduceDouble(gflops);
 
-  //printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e\n", 
-  //	     gflops / stopwatchReadSeconds(), invert_param->secs, preT, matT, orthT);
+  printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
+  	     gflops / stopwatchReadSeconds(), invert_param->secs, preT, matT, orthT, resT);
   invert_param->gflops += gflops;
   invert_param->iter += total_iter;
   
