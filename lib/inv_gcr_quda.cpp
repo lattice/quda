@@ -16,6 +16,8 @@
 
 #include <sys/time.h>
 
+struct timeval orth0, orth1, pre0, pre1, mat0, mat1, rst0, rst1;
+
 double timeInterval(struct timeval start, struct timeval end) {
   long ds = end.tv_sec - start.tv_sec;
   long dus = end.tv_usec - start.tv_usec;
@@ -44,6 +46,62 @@ void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) 
   else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
 }
+
+void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
+  gettimeofday(&orth0, NULL);
+
+  int type = 1;
+
+  switch (type) {
+  case 0: // no kernel fusion
+    for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
+      beta[i][k] = cDotProductCuda(*Ap[i], *Ap[k]);
+      caxpyCuda(-beta[i][k], *Ap[i], *Ap[k]);
+    }
+    break;
+  case 1: // basic kernel fusion
+    if (k==0) break;
+    beta[0][k] = cDotProductCuda(*Ap[0], *Ap[k]);
+    for (int i=0; i<k-1; i++) { // 4 (k-1) memory transactions here
+      beta[i+1][k] = caxpyDotzyCuda(-beta[i][k], *Ap[i], *Ap[k], *Ap[i+1]);
+    }
+    caxpyCuda(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+    break;
+  case 2: // 
+    for (int i=0; i<k-2; i+=3) { // 5 (k-1) memory transactions here
+      for (int j=i; j<i+3; j++) beta[j][k] = cDotProductCuda(*Ap[j], *Ap[k]);
+      caxpbypczpwCuda(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
+    }
+    
+    if (k%3 != 0) { // need to update the remainder
+      if ((k - 3*(k/3)) % 2 == 0) {
+	beta[k-2][k] = cDotProductCuda(*Ap[k-2], *Ap[k]);
+	beta[k-1][k] = cDotProductCuda(*Ap[k-1], *Ap[k]);
+	caxpbypzCuda(beta[k-2][k], *Ap[k-2], beta[k-1][k], *Ap[k-1], *Ap[k]);
+      } else {
+	beta[k-1][k] = cDotProductCuda(*Ap[k-1], *Ap[k]);
+	caxpyCuda(beta[k-1][k], *Ap[k-1], *Ap[k]);
+      }
+    }
+
+    break;
+  case 3:
+    for (int i=0; i<k-1; i+=2) {
+      for (int j=i; j<i+2; j++) beta[j][k] = cDotProductCuda(*Ap[j], *Ap[k]);
+      caxpbypzCuda(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
+    }
+    
+    if (k%2 != 0) { // need to update the remainder
+      beta[k-1][k] = cDotProductCuda(*Ap[k-1], *Ap[k]);
+      caxpyCuda(beta[k-1][k], *Ap[k-1], *Ap[k]);
+    }
+    break;
+  default:
+    errorQuda("Orthogonalization type not defined");
+  }
+
+  gettimeofday(&orth1, NULL);
+}   
 
 void backSubs(Complex *alpha, Complex **beta, double *gamma, Complex *delta, int n) {
   for (int k=n-1; k>=0;k--) {
@@ -136,7 +194,6 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   if (invert_param->verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
 
-  struct timeval orth0, orth1, pre0, pre1, mat0, mat1, rst0, rst1;
   double orthT = 0, matT = 0, preT = 0, resT = 0;
 
   while (r2 > stop && total_iter < invert_param->maxiter) {
@@ -166,18 +223,12 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
 
     gettimeofday(&pre1, NULL);
 
-
     gettimeofday(&mat0, NULL);
     matSloppy(*Ap[k], *p[k], tmp);
     gettimeofday(&mat1, NULL);
 
-    gettimeofday(&orth0, NULL);
-    for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
-      beta[i][k] = cDotProductCuda(*Ap[i], *Ap[k]);
-      caxpyCuda(-beta[i][k], *Ap[i], *Ap[k]);
-    }
-    gettimeofday(&orth1, NULL);
-    
+    orthoDir(beta, Ap, k);
+
     double3 Apr = cDotProductNormACuda(*Ap[k], rSloppy);
     gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
     if (gamma[k] == 0.0) errorQuda("GCR breakdown\n");
@@ -200,7 +251,16 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     if (k==Nkrylov || r2 < stop || r2/r2_old < invert_param->reliable_delta) { 
       // Update the solution vector
       backSubs(alpha, beta, gamma, delta, k);
-      for (int i=0; i<k; i++) caxpyCuda(delta[i], *p[i], xSloppy);
+
+      //for (int i=0; i<k; i++) caxpyCuda(delta[i], *p[i], xSloppy);
+
+      for (int i=0; i<k-2; i+=3) 
+	caxpbypczpwCuda(delta[i], *p[i], delta[i+1], *p[i+1], delta[i+2], *p[i+2], xSloppy); 
+
+      if (k%3 != 0) { // need to update the remainder
+	if ((k - 3*(k/3)) % 2 == 0) caxpbypzCuda(delta[k-2], *p[k-2], delta[k-1], *p[k-1], xSloppy);
+	else caxpyCuda(delta[k-1], *p[k-1], xSloppy);
+      }
 
       // recalculate residual in high precision
       copyCuda(x, xSloppy);

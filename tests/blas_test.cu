@@ -16,9 +16,9 @@ const int LT = 8;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
-const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
-const int Nkernels = 27;
+const int Nkernels = 30;
 const int ThreadMin = 32;
 const int ThreadMax = 1024;
 const int GridMin = 1;
@@ -177,7 +177,7 @@ void freeFields()
 double benchmark(int kernel, int niter) {
 
   double a, b, c;
-  Complex a2, b2;
+  Complex a2, b2, c2;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -299,6 +299,18 @@ double benchmark(int kernel, int niter) {
       cabxpyAxNormCuda(a, b2, *xD, *yD);
       break;
 
+    case 27:
+      caxpbypzCuda(a2, *xD, b2, *yD, *zD);
+      break;
+
+    case 28:
+      caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
+      break;
+
+    case 29:
+      caxpyDotzyCuda(a2, *xD, *yD, *zD);
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -321,7 +333,7 @@ double benchmark(int kernel, int niter) {
 double test(int kernel) {
 
   double a = 1.5, b = 2.5, c = 3.5;
-  Complex a2(a, b), b2(b, -c);
+  Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
 
   switch (kernel) {
@@ -547,6 +559,33 @@ double test(int kernel) {
       error = ERROR(x) + ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
+  case 27:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {caxpbypzCuda(a2, *xD, b2, *yD, *zD);
+      caxpbypzCpu(a2, *xH, b2, *yH, *zH);
+      error = ERROR(z); }
+    break;
+    
+  case 28:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *wD = *wH;
+    {caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
+      caxpbypczpwCpu(a2, *xH, b2, *yH, c2, *zH, *wH);
+      error = ERROR(w); }
+    break;
+
+  case 29:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
+      Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
+    error = ERROR(y) + abs(d-h)/abs(h);}
+    break;
 
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
@@ -620,6 +659,9 @@ int main(int argc, char** argv)
     "caxpyNormCuda",
     "caxpyXmazNormXCuda",
     "cabxpyAxNormCuda",
+    "caxpbypzCuda",
+    "caxpbypczpwCuda",
+    "caxpyDotzyCuda"
   };
 
   char *prec_str[] = {"half", "single", "double"};

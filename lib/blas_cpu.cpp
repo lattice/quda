@@ -282,3 +282,22 @@ double cabxpyAxNormCpu(const double &a, const Complex &b, cpuColorSpinorField &x
   return norm2(y);
 }
 
+void caxpbypzCpu(const Complex &a, cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y, 
+		 cpuColorSpinorField &z) {
+  caxpyCpu(a, x, z);
+  caxpyCpu(b, y, z);
+}
+
+void caxpbypczpwCpu(const Complex &a, cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y, 
+		    const Complex &c, cpuColorSpinorField &z, cpuColorSpinorField &w) {
+  caxpyCpu(a, x, w);
+  caxpyCpu(b, y, w);
+  caxpyCpu(c, z, w);
+
+}
+
+Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
+		      cpuColorSpinorField &z) {
+  caxpyCpu(a, x, y);
+  return cDotProductCpu(z, y);
+}
