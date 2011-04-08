@@ -96,13 +96,13 @@ extern "C" {
     QudaTune dirac_tune; // tune the Dirac operator when it is first created?
     QudaPreserveDirac preserve_dirac; // free the Dirac operator or keep it resident?
 
-    // these parameters are used for domain decomposition and the GCR solver
-    QudaVerbosity verbosity_sloppy; // verbosity of inner Krylov solver
-    QudaInverterType inv_type_sloppy; // the inner Krylov solver used by GCR
-    double tol_sloppy; // tolerance used by inner solver
-    int maxiter_sloppy; // max number of iterations used by inner solver
     int gcrNkrylov;  // maximum size of Krylov space used by solver
-    
+
+    // these parameters are used for domain decomposition
+    QudaVerbosity verbosity_precondition; // verbosity of inner Krylov solver
+    QudaInverterType inv_type_precondition; // the inner Krylov solver used by preconditioner
+    double tol_precondition; // tolerance used by inner solver
+    int maxiter_precondition; // max number of iterations used by inner solver    
     QudaPrecision prec_precondition; // the precision for the preconditioned solver
 
     //int commDim[QUDA_MAX_DIM];

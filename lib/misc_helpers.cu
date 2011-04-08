@@ -261,7 +261,7 @@ __global__ void
 staggeredCollectGhostSpinorKernel(Float2* in, const int oddBit,
                                   Float2* nbr_spinor_gpu)
 {
-#if 1
+
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
   int z1 = FAST_INT_DIVIDE(sid, X1h);
   int x1h = sid - z1*X1h;
@@ -331,10 +331,83 @@ staggeredCollectGhostSpinorKernel(Float2* in, const int oddBit,
       WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X3*X2*X1/2);
     }
   }
-#endif
 
 }
 
+template<int dir, int whichway>
+__global__ void
+staggeredCollectGhostSpinorNormKernel(float* in_norm, const int oddBit,
+				      float* nbr_spinor_norm_gpu)
+{
+
+  int sid = blockIdx.x*blockDim.x + threadIdx.x;
+  int z1 = FAST_INT_DIVIDE(sid, X1h);
+  int x1h = sid - z1*X1h;
+  int z2 = FAST_INT_DIVIDE(z1, X2);
+  int x2 = z1 - z2*X2;
+  int x4 = FAST_INT_DIVIDE(z2, X3);
+  int x3 = z2 - x4*X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+
+  int ghost_face_idx;
+
+  if ( dir == 0 && whichway == QUDA_BACKWARDS){
+    if (x1 < 3){
+      ghost_face_idx = (x1*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+
+  if ( dir == 0 && whichway == QUDA_FORWARDS){
+    if (x1 >= X1 - 3){
+      ghost_face_idx = ((x1-X1+3)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+
+  if ( dir == 1 && whichway == QUDA_BACKWARDS){
+    if (x2 < 3){
+      ghost_face_idx = (x2*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+
+  if ( dir == 1 && whichway == QUDA_FORWARDS){
+    if (x2 >= X2 - 3){
+      ghost_face_idx = ((x2-X2+3)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+
+  if ( dir == 2 && whichway == QUDA_BACKWARDS){
+    if (x3 < 3){
+      ghost_face_idx = (x3*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+
+  if ( dir == 2 && whichway == QUDA_FORWARDS){
+    if (x3 >= X3 - 3){
+      ghost_face_idx = ((x3-X3+3)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+
+  if ( dir == 3 && whichway == QUDA_BACKWARDS){
+    if (x4 < 3){
+      ghost_face_idx = (x4*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+
+  if ( dir == 3 && whichway == QUDA_FORWARDS){
+    if (x4 >= X4 - 3){
+      ghost_face_idx = ((x4-X4+3)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
+    }
+  }
+}
 
 //@dir can be 0, 1, 2, 3 (X,Y,Z,T directions)
 //@whichway can be QUDA_FORWARDS, QUDA_BACKWORDS
@@ -465,12 +538,78 @@ collectGhostSpinor(void *in, const void *inNorm,
 	errorQuda("Invalid whichway");
 	break;
       }
-      break;
-      
+      break;      
     }
+  }else if(inSpinor->Precision() == QUDA_HALF_PRECISION){
+    int nFace =3 ;
+    float* ghost_norm_gpu = (float*)(((char*)ghost_spinor_gpu) + nFace*6*inSpinor->Precision()*inSpinor->ghostFace[dir]);
+    switch(dir){
+    case 0:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu);
+	staggeredCollectGhostSpinorNormKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu);
+	staggeredCollectGhostSpinorNormKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
 
+    case 1:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorNormKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorNormKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+
+    case 2:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorNormKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorNormKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+
+    case 3:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorNormKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      case QUDA_FORWARDS:
+	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
+	staggeredCollectGhostSpinorNormKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;      
+    }
   }else{
-    printf("ERROR: half precision not implemented yet for %s\n", __FUNCTION__);
+    printf("ERROR: invalid  precision for %s\n", __FUNCTION__);
     exit(1);
   }
   CUERR;

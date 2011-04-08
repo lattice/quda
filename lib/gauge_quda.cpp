@@ -669,7 +669,8 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
       Float* odd_dst;
      
      //switching odd and even ghost cpuLink when that dimension size is odd
-     if(X[dir] % 2 ==0){
+     //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
+      if((X[dir] % 2 ==0) || (commDim(dir) == 1)){
         even_dst = cpuGhost[dir];
         odd_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;	
      }else{
@@ -802,6 +803,25 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge,
     errorQuda("Only QUDA_QDP_GAUGE_ORDER is supported for multi-gpu\n");
 #endif
 
+  //for QUDA_ASQTAD_FAT_LINKS, need to find out the max value
+  //fat_link_max will be used in encoding half precision fat link
+  if(type == QUDA_ASQTAD_FAT_LINKS){
+    for(int dir=0; dir < 4; dir++){
+      for(int i=0;i < 2*Vh*gaugeSiteSize; i++){
+	Float** tmp = (Float**)cpuGauge;
+	if( tmp[dir][i] > fat_link_max ){
+	  fat_link_max = tmp[dir][i];
+	}
+      }
+    }
+  }
+  
+  double fat_link_max_double = fat_link_max;
+#ifdef MULTI_GPU
+  reduceMaxDouble(fat_link_max_double);
+#endif
+  fat_link_max = fat_link_max_double;
+
   int voxels[] = {Vh, Vh, Vh, Vh};
   int nFace = 1;
 
@@ -816,6 +836,8 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge,
   } else {
     errorQuda("Invalid gauge_order");
   }
+
+
 
 #ifdef MULTI_GPU
 #if 1

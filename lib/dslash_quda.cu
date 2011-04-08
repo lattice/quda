@@ -1,4 +1,3 @@
-
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -38,7 +37,8 @@ struct DslashParam {
   
 };
 
-// parameter used type of T-packing to use
+// determines whether the temporal ghost zones are packed with a gather kernel,
+// as opposed to multiple calls to cudaMemcpy()
 bool kernelPackT = false;
 
 DslashParam dslashParam;
@@ -62,39 +62,35 @@ cudaColorSpinorField *inSpinor;
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5) // 32767.5
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1)) // 1.5259021897e-5
 
-__device__ short float2short(float c, float a) {
+static inline __device__ short float2short(float c, float a) {
   //return (short)(a*MAX_SHORT);
   short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
   return rtn;
 }
 
-__device__ float short2float(short a) {
+static inline __device__ float short2float(short a) {
   return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
 }
 
-__device__ short4 float42short4(float c, float4 a) {
+static inline __device__ short4 float42short4(float c, float4 a) {
   return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));
 }
 
-__device__ float4 short42float4(short4 a) {
+static inline __device__ float4 short42float4(short4 a) {
   return make_float4(short2float(a.x), short2float(a.y), short2float(a.z), short2float(a.w));
 }
 
-__device__ float2 short22float2(short2 a) {
+static inline __device__ float2 short22float2(short2 a) {
   return make_float2(short2float(a.x), short2float(a.y));
 }
 
-
+#include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #include <dw_dslash_def.h>        // Domain Wall kernels
 #include <tm_dslash_def.h>        // Twisted Mass kernels
 #include <tm_core.h>              // solo twisted mass kernel
 #include <clover_def.h>           // kernels for applying the clover term alone
-
-#ifdef MULTI_GPU
-#include <pack_face_def.h>        // kernels for packing the ghost zones
-#endif
 
 #ifndef SHARED_FLOATS_PER_THREAD
 #define SHARED_FLOATS_PER_THREAD 0
@@ -135,6 +131,39 @@ void setFace(const FaceBuffer &Face) {
   face = (FaceBuffer*)&Face; // nasty
 }
 
+
+#define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, ...)                  \
+if (x==0) {                                                                                   \
+  if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                   \
+    FUNC ## 18 ## DAG ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ );      \
+  } else if (reconstruct == QUDA_RECONSTRUCT_12) {                                            \
+    FUNC ## 12 ## DAG ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ );      \
+  } else {                                                                                    \
+    FUNC ## 8 ## DAG ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ );       \
+  }					                                                      \
+} else {                                                                                      \
+  if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                   \
+    FUNC ## 18 ## DAG ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
+  } else if (reconstruct == QUDA_RECONSTRUCT_12) {                                            \
+    FUNC ## 12 ## DAG ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
+  } else if (reconstruct == QUDA_RECONSTRUCT_8) {                                             \
+    FUNC ## 8 ## DAG ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ );  \
+  }                                                                                           \
+ }									
+
+// macro used for dslash types with dagger kernel defined (Wilson, domain wall, etc.)
+#define DSLASH(FUNC, gridDim, blockDim, shared, stream, ...)                          \
+if (!dagger) {                                                                        \
+  GENERIC_DSLASH(FUNC, , Xpay, gridDim, blockDim, shared, stream, __VA_ARGS__ )       \
+} else {                                                                              \
+  GENERIC_DSLASH(FUNC, Dagger, Xpay, gridDim, blockDim, shared, stream, __VA_ARGS__ ) \
+}
+
+// macro used for staggered dslash
+#define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, ...) \
+  GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, __VA_ARGS__ )
+
+
 // Use an abstract class interface to drive the different CUDA dslash
 // kernels.  All parameters are curried into the derived classes to
 // allow a simple interface.
@@ -145,50 +174,6 @@ public:
   virtual void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) = 0;
 };
 
-// Use this macro for all dslash types
-#define DSLASH(FUNC, X, gridDim, blockDim, shared, stream, ...)		\
-if (x==0) {								\
-  if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-    if (!dagger) {							\
-      FUNC ## 18Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    } else {								\
-      FUNC ## 18DaggerKernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    }									\
-  } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-    if (!dagger) {							\
-      FUNC ## 12Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    } else {								\
-      FUNC ## 12DaggerKernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    }									\
-  } else {								\
-    if (!dagger) {							\
-      FUNC ## 8Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    } else {								\
-      FUNC ## 8DaggerKernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    }									\
-  }									\
- } else {								\
-  if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-    if (!dagger) {							\
-      FUNC ## 18 ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    } else {								\
-      FUNC ## 18Dagger ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    }									\
-  } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-    if (!dagger) {							\
-      FUNC ## 12 ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    } else {								\
-      FUNC ## 12Dagger ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    }									\
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-    if (!dagger) {							\
-      FUNC ## 8 ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    } else {								\
-      FUNC ## 8Dagger ## X ## Kernel <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ ); \
-    }									\
-  }									\
- }									
-  
 
 template <typename sFloat, typename gFloat>
 class WilsonDslashCuda : public DslashCuda {
@@ -208,7 +193,7 @@ public:
 		   const QudaReconstructType reconstruct, const sFloat *in, const float *inNorm,
 		   const sFloat *x, const float *xNorm, const double a,
 		   const int dagger, const size_t bytes, const size_t norm_bytes) :
-    DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
+  DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
     inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, x, xNorm); 
   }
@@ -216,7 +201,7 @@ public:
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(dslash, Xpay, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
+    DSLASH(dslash, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
 	   gauge0, gauge1, in, inNorm, x, xNorm, a, dslashParam);
   }
 
@@ -252,7 +237,7 @@ public:
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(cloverDslash, Xpay, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
+    DSLASH(cloverDslash, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
 	   gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a, dslashParam);
   }
 
@@ -302,7 +287,7 @@ public:
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(twistedMassDslash, Xpay, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
+    DSLASH(twistedMassDslash, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
 	   gauge0, gauge1, in, inNorm, a, b, x, xNorm, dslashParam);
   }
 
@@ -335,7 +320,7 @@ public:
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(domainWallDslash, Xpay, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
+    DSLASH(domainWallDslash, gridDim, blockDim, shared_bytes, stream, out, outNorm, 
 	   gauge0, gauge1, in, inNorm, mferm, x, xNorm, a, dslashParam);
   }
 
@@ -644,17 +629,18 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
 			   const double &a, const int volume, const int* Vsh, const int* dims,
-			   const int length, const int ghost_length, dim3 blockDim) {
+			   const int length, const int ghost_length, const dim3 *blockDim) {
     
-  dim3 interiorGridDim( (dslashParam.threads + blockDim.x -1)/blockDim.x, 1, 1);
+  dim3 interiorGridDim( (dslashParam.threads + blockDim[0].x -1)/blockDim[0].x, 1, 1);
   dim3 exteriorGridDim[4]  = {
-    dim3((6*Vsh[0] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[1] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[2] + blockDim.x -1)/blockDim.x, 1, 1),
-    dim3((6*Vsh[3] + blockDim.x -1)/blockDim.x, 1, 1)
+    dim3((6*Vsh[0] + blockDim[1].x -1)/blockDim[1].x, 1, 1),
+    dim3((6*Vsh[1] + blockDim[2].x -1)/blockDim[2].x, 1, 1),
+    dim3((6*Vsh[2] + blockDim[3].x -1)/blockDim[3].x, 1, 1),
+    dim3((6*Vsh[3] + blockDim[4].x -1)/blockDim[4].x, 1, 1)
   };
     
-  int shared_bytes = blockDim.x*6*bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
+  size_t regSize = bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm); CUERR;
+  int shared_bytes = blockDim[0].x*6*regSize;
   
   dslashParam.kernel_type = INTERIOR_KERNEL;
   dslashParam.tOffset =  0;
@@ -664,8 +650,8 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
 #endif
 
-  DSLASH(staggeredDslash, Axpy, interiorGridDim, blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
-	 fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
+  STAGGERED_DSLASH(interiorGridDim, blockDim[0], shared_bytes, streams[Nstream-1], out, outNorm, 
+		   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
 #ifdef MULTI_GPU
   int exterior_kernel_flag[4]={
@@ -682,17 +668,17 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   }
 
   for(int i=0 ;i < 4;i++){
-    if(!commDimPartitioned(i)){
-      continue;
-    }
+    if(!commDimPartitioned(i)) continue;
+
+    shared_bytes = blockDim[i+1].x*6*regSize;
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);
     dslashParam.kernel_type = exterior_kernel_flag[i];
     dslashParam.tOffset =  dims[i]-6;
     dslashParam.threads = 6*Vsh[i];
-    DSLASH(staggeredDslash, Axpy, exteriorGridDim[i], blockDim, shared_bytes, streams[Nstream-1], out, outNorm, 
-	   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
+    STAGGERED_DSLASH(exteriorGridDim[i], blockDim[i+1], shared_bytes, streams[Nstream-1], out, outNorm, 
+		     fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
   }
 
@@ -702,7 +688,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, 
 			 const FullGauge longGauge, const cudaColorSpinorField *in,
 			 const int parity, const int dagger, const cudaColorSpinorField *x,
-			 const double &k, const dim3 &block, const dim3 &blockFace)
+			 const double &k, const dim3 *block)
 {
   
   inSpinor = (cudaColorSpinorField*)in; // EVIL

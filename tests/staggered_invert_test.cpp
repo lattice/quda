@@ -47,7 +47,9 @@ cpuColorSpinorField* tmp;
 static double tol = 1e-8;
 
 static int testtype = 0;
-static int sdim = 24;
+static int xdim = 24;
+static int ydim = 24;
+static int zdim = 24;
 static int tdim = 24;
 
 
@@ -145,27 +147,22 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
-  inv_param->dirac_tune = QUDA_TUNE_NO;
+  inv_param->dirac_tune = QUDA_TUNE_YES;
   inv_param->preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-  for(int i =0;i < 4;i++){
-    inv_param->ghostDim[i] = commDimPartitioned(i);
-  }
-
 }
 
 int
 invert_test(void)
 {
-  kernelPackT = false;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
   double mass = 0.95;
 
   set_params(&gaugeParam, &inv_param,
-	     sdim, sdim, sdim, tdim,
+	     xdim, ydim, zdim, tdim,
 	     cpu_prec, prec, prec_sloppy,
 	     link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
 	     0.8);
@@ -276,9 +273,12 @@ invert_test(void)
     constructSpinorField((double*)in->v);
   }
 
+  int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
+   tmp_value = MAX(tmp_value, xdim*ydim*tdim/2);
+   tmp_value = MAX(tmp_value, xdim*ydim*zdim/2);
 
-  int fat_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
-  int link_pad =  3*MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
+  int fat_pad = tmp_value;
+  int link_pad =  3*tmp_value;
   if(testtype == 6){    
     record_gauge(gaugeParam.X, fatlink, fat_pad,
 		 longlink, link_pad,
@@ -288,12 +288,12 @@ invert_test(void)
     
 #ifdef MULTI_GPU
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-    gaugeParam.ga_pad = MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
+    gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(fatlink, &gaugeParam);
     
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-    gaugeParam.ga_pad = 3*MAX(sdim*sdim*sdim/2, sdim*sdim*tdim/2);
+    gaugeParam.ga_pad = link_pad;
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);
@@ -372,10 +372,10 @@ invert_test(void)
   case 5:
   case 6:
 
-#define NUM_OFFSETS 4
+#define NUM_OFFSETS 7
         
     nflops = 2*(1205 + 15* NUM_OFFSETS); //from MILC's multimass CG routine
-    double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33};
+    double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81};
     double offsets[NUM_OFFSETS];	
     int num_offsets =NUM_OFFSETS;
     void* outArray[NUM_OFFSETS];
@@ -518,10 +518,10 @@ display_test_info()
   printfQuda("running the following test:\n");
     
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
-  printfQuda("%s   %s             %s            %s            %s         %d          %d \n",
+  printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n",
 	 get_prec_str(prec),get_prec_str(prec_sloppy),
 	 get_recon_str(link_recon), 
-	 get_recon_str(link_recon_sloppy), get_test_type(testtype), sdim, tdim);     
+	     get_recon_str(link_recon_sloppy), get_test_type(testtype), xdim, ydim, zdim, tdim);     
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -545,6 +545,7 @@ usage(char** argv )
 	 "                                                     4=multimass odd, 5=multimass full)\n"); 
   printfQuda("--tdim                                  T dimension\n");
   printfQuda("--sdim                                  S dimension\n");
+  printf("--manual_set_partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printfQuda("--help                                  Print out this message\n"); 
   exit(1);
   return ;
@@ -599,7 +600,7 @@ int main(int argc, char** argv)
         usage(argv);
       }
       sscanf(argv[i+1], "%f", &tmpf);
-      if (tol <= 0){
+      if (tmpf <= 0){
         printf("ERROR: invalid tol(%f)\n", tmpf);
         usage(argv);
       }
@@ -637,6 +638,51 @@ int main(int argc, char** argv)
       continue;
     }
 
+    if( strcmp(argv[i], "--xdim") == 0){
+      if (i+1 >= argc){
+	usage(argv);
+      }
+      xdim= atoi(argv[i+1]);
+      if (xdim < 0 || xdim > 128){
+	printf("ERROR: invalid X dimention (%d)\n", xdim);
+	usage(argv);
+      }
+      i++;
+      continue;
+    }		
+
+
+
+    if( strcmp(argv[i], "--ydim") == 0){
+      if (i+1 >= argc){
+	usage(argv);
+      }
+      ydim= atoi(argv[i+1]);
+      if (ydim < 0 || ydim > 128){
+	printf("ERROR: invalid T dimention (%d)\n", ydim);
+	usage(argv);
+      }
+      i++;
+      continue;
+    }		
+
+
+
+    if( strcmp(argv[i], "--zdim") == 0){
+      if (i+1 >= argc){
+	usage(argv);
+      }
+      zdim= atoi(argv[i+1]);
+      if (zdim < 0 || zdim > 128){
+	printf("ERROR: invalid T dimention (%d)\n", zdim);
+	usage(argv);
+      }
+      i++;
+      continue;
+    }		
+
+
+
     if( strcmp(argv[i], "--tdim") == 0){
       if (i+1 >= argc){
 	usage(argv);
@@ -649,15 +695,19 @@ int main(int argc, char** argv)
       i++;
       continue;
     }		
+
+
+
     if( strcmp(argv[i], "--sdim") == 0){
       if (i+1 >= argc){
 	usage(argv);
       }
-      sdim= atoi(argv[i+1]);
+      int sdim= atoi(argv[i+1]);
       if (sdim < 0 || sdim > 128){
 	printf("ERROR: invalid S dimention (%d)\n", sdim);
 	usage(argv);
       }
+      xdim=ydim=zdim=sdim;
       i++;
       continue;
     }
@@ -722,7 +772,7 @@ int main(int argc, char** argv)
       continue;
     }
 
-    if( strcmp(argv[i], "--manual_set_partition") == 0){
+    if( strcmp(argv[i], "--partition") == 0){
       if (i+1 >= argc){
         usage(argv);
       }     
@@ -736,6 +786,12 @@ int main(int argc, char** argv)
       continue;
     }
 
+    if( strcmp(argv[i], "--kernel_pack_t") == 0){
+      kernelPackT = true;
+      continue;
+    }
+
+
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -748,10 +804,10 @@ int main(int argc, char** argv)
     link_recon_sloppy = link_recon;
   }
   
-  display_test_info();
 
   int X[] = {xsize, ysize, zsize, tsize};
   initCommsQuda(argc, argv, X, 4);
+  display_test_info();
   
   int ret = invert_test();
 

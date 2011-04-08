@@ -3,21 +3,24 @@
 #include <tune_quda.h>
 
 DiracStaggered::DiracStaggered(const DiracParam &param) : 
-  Dirac(param), blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), 
-  blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
-  fatGauge(param.fatGauge), longGauge(param.longGauge), 
+  Dirac(param), fatGauge(param.fatGauge), longGauge(param.longGauge), 
   face(param.fatGauge->X, 4, 6, 3, param.fatGauge->precision) 
   //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
 {
-
+  for (int i=0; i<5; i++) {
+    blockDslash[i] = dim3(64, 1, 1);
+    blockDslashXpay[i] = dim3(64, 1, 1);
+  }
 }
 
 DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
-  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
   fatGauge(dirac.fatGauge), longGauge(dirac.longGauge),
   face(dirac.face)
 {
-
+  for (int i=0; i<5; i++) {
+    blockDslash[i] = dim3(64, 1, 1);
+    blockDslashXpay[i] = dim3(64, 1, 1);
+  }
 }
 
 DiracStaggered::~DiracStaggered()
@@ -29,10 +32,10 @@ DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac)
 {
   if (&dirac != this) {
     Dirac::operator=(dirac);
-    blockDslash = dirac.blockDslash;
-    blockDslashXpay = dirac.blockDslashXpay;
-    blockDslashFace = dirac.blockDslashFace;
-    blockDslashXpayFace = dirac.blockDslashXpayFace;
+    for (int i=0; i<5; i++) {
+      blockDslash[i] = dirac.blockDslash[i];
+      blockDslashXpay[i] = dirac.blockDslashXpay[i];
+    }
     fatGauge = dirac.fatGauge;
     longGauge = dirac.longGauge;
     face = dirac.face;
@@ -48,12 +51,16 @@ void DiracStaggered::Tune(cudaColorSpinorField &out, const cudaColorSpinorField 
 
   { // Tune Dslash
     TuneDiracStaggeredDslash dslashTune(*this, out, in);
-    dslashTune.Benchmark(blockDslash);
+    dslashTune.Benchmark(blockDslash[0]);
+    for (int i=0; i<4; i++) 
+      if (commDimPartitioned(i)) dslashTune.Benchmark(blockDslash[i+1]);
   }
 
   { // Tune DslashXpay
     TuneDiracStaggeredDslashXpay dslashXpayTune(*this, out, in, x);
-    dslashXpayTune.Benchmark(blockDslashXpay);
+    dslashXpayTune.Benchmark(blockDslashXpay[0]);
+    for (int i=0; i<4; i++) 
+      if (commDimPartitioned(i)) dslashXpayTune.Benchmark(blockDslashXpay[i+1]);
   }
 
   setDslashTuning(QUDA_TUNE_NO);
@@ -91,8 +98,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
   checkParitySpinor(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, 
-		     0, 0, blockDslash, blockDslashFace);
+  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, 0, 0, blockDslash);
   
   flops += 1146*in.volume;
 }
@@ -108,8 +114,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
   checkParitySpinor(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, &x, k, 
-		      blockDslashXpay, blockDslashXpayFace);
+  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, &x, k, blockDslashXpay);
   
   flops += (1146+12)*in.volume;
 }

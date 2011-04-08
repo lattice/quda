@@ -523,6 +523,13 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 #endif // QMP_COMMS
 }
 
+void reduceMaxDouble(double &max) {
+
+#ifdef QMP_COMMS
+  QMP_max_double(&max);
+#endif
+
+}
 
 void reduceDouble(double &sum) {
 

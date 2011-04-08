@@ -6,6 +6,7 @@
 #include <string.h>
 #include <iostream>
 #include "misc_helpers.h"
+#include <face_quda.h>
 
 // Easy to switch between overlapping communication or not
 #ifdef OVERLAP_COMMS
@@ -448,10 +449,13 @@ void cudaColorSpinorField::allocateGhostBuffer(void) {
 
   if(this->initGhostFaceBuffer == 0 || precision > facePrecision){    
     for (int i=0; i<4; i++) {
+      if(!commDimPartitioned(i)){
+	continue;
+      }
       size_t faceBytes = nFace*ghostFace[i]*Nint*precision;
       // add extra space for the norms for half precision
       if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostFace[i]*sizeof(float);
-
+      
       if (this->initGhostFaceBuffer) { // only free-ed if precision is higher than previous allocation
 	cudaFree(this->fwdGhostFaceBuffer[i]); this->fwdGhostFaceBuffer[i] = NULL;
 	cudaFree(this->backGhostFaceBuffer[i]); this->backGhostFaceBuffer[i] = NULL;
@@ -467,11 +471,14 @@ void cudaColorSpinorField::allocateGhostBuffer(void) {
 }
 
 void cudaColorSpinorField::freeGhostBuffer(void) {
-  if (!initGhostFaceBuffer == 0) return;
-
+  if (!initGhostFaceBuffer) return;
+  
   for(int i=0;i < 4; i++){
-    free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
-    free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+    if(!commDimPartitioned(i)){
+      continue;
+    }
+    cudaFree(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
+    cudaFree(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
   } 
 
   initGhostFaceBuffer = 0;  
@@ -490,7 +497,6 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
 
     size_t bytes = nFace*Nint*ghostFace[dim]*precision;
     if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
-
     void* gpu_buf = 
       (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
 
@@ -574,6 +580,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
     void *dst = (char*)norm + norm_offset*sizeof(float);
     void *src = (char*)ghost_spinor+nFace*Nint*ghostFace[dim]*precision; // norm region of host ghost zone
     CUDAMEMCPY(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);  CUERR;
+    
   }
   
 }

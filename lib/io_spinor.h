@@ -596,28 +596,19 @@
   float2 I0 = tex1Dfetch((spinor), idx + 0*mystride);			\
   float2 I1 = tex1Dfetch((spinor), idx + 1*mystride);			\
   float2 I2 = tex1Dfetch((spinor), idx + 2*mystride);			\
-  {  int moffset = 0;							\
-    if (idx >=(3*sp_stride +3*(3*Vsh))){				\
-      moffset = 2*sp_stride + 6*Vsh;					\
-    }else if (idx >= (3*sp_stride)){					\
-      moffset = 2*sp_stride ;						\
-    }									\
-    float C = tex1Dfetch((spinorTexHalfNorm), idx - moffset);		\
+  {									\
+    float C = tex1Dfetch((spinorTexHalfNorm), norm_idx1);		\
     I0.x *= C; I0.y *= C;						\
     I1.x *= C; I1.y *= C;						\
     I2.x *= C; I2.y *= C;}
+
 
 #define READ_3RD_NBR_SPINOR_HALF(spinor, idx, mystride)			\
   float2 T0 = tex1Dfetch((spinor), idx + 0*mystride);			\
   float2 T1 = tex1Dfetch((spinor), idx + 1*mystride);			\
   float2 T2 = tex1Dfetch((spinor), idx + 2*mystride);			\
-  { int moffset = 0;							\
-    if (idx >=(3*sp_stride +3*(3*Vsh) )){				\
-      moffset = 2*sp_stride + 6*Vsh;					\
-    }else if (idx >= (3*sp_stride)){					\
-      moffset = 2*sp_stride ;						\
-    }									\
-    float C = tex1Dfetch((spinorTexHalfNorm), idx-moffset);			\
+  {									\
+    float C = tex1Dfetch((spinorTexHalfNorm), norm_idx3);		\
     T0.x *= C; T0.y *= C;						\
     T1.x *= C; T1.y *= C;						\
     T2.x *= C; T2.y *= C;}

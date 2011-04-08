@@ -84,7 +84,7 @@ int initStaggered = 0;
 
 bool qudaPt0 = true;   // Single core versions always to Boundary
 bool qudaPtNm1 = true;
-float fat_link_max; //it is set somewhere else
+float fat_link_max = 1.0; //it is set somewhere else
 
 void initCommonConstants(const FullGauge gauge) {
   int Vh = gauge.volumeCB;

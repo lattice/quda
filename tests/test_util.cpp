@@ -697,7 +697,6 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
       }
     }
     
-    fat_link_max = 4.0;
       
   }
   
