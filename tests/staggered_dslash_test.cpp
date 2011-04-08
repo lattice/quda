@@ -220,7 +220,6 @@ void init()
   pack_ghost(fatlink, fat_send, 1, gaugeParam.cpu_prec);
   pack_ghost(longlink, long_send, 3, gaugeParam.cpu_prec);
 
-  printf("CPU Link Exchange started\n");
 
   {
     FaceBuffer faceBuf(X, 4, 18, 1, gaugeParam.cpu_prec);
@@ -231,8 +230,6 @@ void init()
     FaceBuffer faceBuf(X, 4, 18, 3, gaugeParam.cpu_prec);
     faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send);
   }
-
-  printf("CPU Link Exchange finished\n");
 
   for (int i=0; i<4; i++) {
     free(fat_send[i]);
@@ -764,10 +761,8 @@ int main(int argc, char **argv)
   int accuracy_level = dslashTest();
 
   printfQuda("accuracy_level =%d\n", accuracy_level);
-  if (accuracy_level >= 1) ret = 0;    //probably no error 
-
+  if (accuracy_level >= 1) ret = 0;    //probably no error, -1 means no matching  
   endCommsQuda();
-
   return ret;
 }
 
