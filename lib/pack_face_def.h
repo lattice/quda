@@ -47,7 +47,7 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 
   face_idx *= 2;
 
-  if (face_X & 1 == 0) {
+  if (!(face_X & 1)) { // face_X even
     //   int t = face_idx / face_XYZ;
     //   int z = (face_idx / face_XY) % face_Z;
     //   int y = (face_idx / face_X) % face_Y;
@@ -59,11 +59,11 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
     int t = aux2 / face_Z;
     int z = aux2 - t * face_Z;
     face_idx += (face_parity + t + z + y) & 1;
-  } else if (face_Y & 1 == 0) {
+  } else if (!(face_Y & 1)) { // face_Y even
     int t = face_idx / face_XYZ;
     int z = (face_idx / face_XY) % face_Z;
     face_idx += (face_parity + t + z) & 1;
-  } else if (face_Z & 1 == 0) {
+  } else if (!(face_Z & 1)) { // face_Z even
     int t = face_idx / face_XYZ;
     face_idx += (face_parity + t) & 1;
   } else {
@@ -105,14 +105,9 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 
 // compute full coordinates from an index into the face (used by the exterior Dslash kernels)
 template <int nLayers>
-static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int4 &coords, int face_idx, const int &face_volume,
-						  const int &dim, const int &face_num, const int &parity)
+static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int &x, int &y, int &z, int &t, int face_idx,
+						  const int &face_volume, const int &dim, const int &face_num, const int &parity)
 {
-  int &x = coords.x;
-  int &y = coords.y;
-  int &z = coords.z;
-  int &t = coords.w;
-
   // dimensions of the face (FIXME: optimize using constant cache)
 
   int face_X = X1, face_Y = X2, face_Z = X3;
@@ -141,7 +136,7 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int4 &c
 
   face_idx *= 2;
 
-  if (face_X & 1 == 0) {
+  if (!(face_X & 1)) { // face_X even
     //   t = face_idx / face_XYZ;
     //   z = (face_idx / face_XY) % face_Z;
     //   y = (face_idx / face_X) % face_Y;
@@ -156,13 +151,13 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int4 &c
     z = aux2 - t * face_Z;
     x += (face_parity + t + z + y) & 1;
     // face_idx += (face_parity + t + z + y) & 1;
-  } else if (face_Y & 1 == 0) {
+  } else if (!(face_Y & 1)) { // face_Y even
     t = face_idx / face_XYZ;
     z = (face_idx / face_XY) % face_Z;
     face_idx += (face_parity + t + z) & 1;
     y = (face_idx / face_X) % face_Y;
     x = face_idx % face_X;
-  } else if (face_Z & 1 == 0) {
+  } else if (!(face_Z & 1)) { // face_Z even
     t = face_idx / face_XYZ;
     face_idx += (face_parity + t) & 1;
     z = (face_idx / face_XY) % face_Z;
@@ -187,13 +182,8 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int4 &c
 
 
 // compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
-static inline __device__ void coordsFromIndex(int &idx, int4 &coords, const int &cb_idx, const int &face_num, const int &parity)
+static inline __device__ void coordsFromIndex(int &idx, int &x, int &y, int &z, int &t, const int &cb_idx, const int &parity)
 {
-  int &x = coords.x;
-  int &y = coords.y;
-  int &z = coords.z;
-  int &t = coords.w;
-
   int &X = X1;
   int &Y = X2;
   int &Z = X3;
@@ -202,7 +192,7 @@ static inline __device__ void coordsFromIndex(int &idx, int4 &coords, const int 
 
   idx = 2*cb_idx;
 
-  if (X & 1 == 0) {
+  if (!(X & 1)) { // X even
     //   t = idx / XYZ;
     //   z = (idx / XY) % Z;
     //   y = (idx / X) % Y;
@@ -218,13 +208,13 @@ static inline __device__ void coordsFromIndex(int &idx, int4 &coords, const int 
     aux1 = (parity + t + z + y) & 1;
     x += aux1;
     idx += aux1;
-  } else if (Y & 1 == 0) {
+  } else if (!(Y & 1)) { // Y even
     t = idx / XYZ;
     z = (idx / XY) % Z;
     idx += (parity + t + z) & 1;
     y = (idx / X) % Y;
     x = idx % X;
-  } else if (Z & 1 == 0) {
+  } else if (!(Z & 1)) { // Z even
     t = idx / XYZ;
     idx += (parity + t) & 1;
     z = (idx / XY) % Z;
