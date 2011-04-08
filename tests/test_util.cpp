@@ -266,8 +266,29 @@ int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision prec
 // given a "half index" i into either an even or odd half lattice (corresponding
 // to oddBit = {0, 1}), returns the corresponding full lattice index.
 int fullLatticeIndex(int i, int oddBit) {
+  /*
   int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2);
   return 2*i + (boundaryCrossings + oddBit) % 2;
+  */
+
+  int X1 = Z[0];  
+  int X2 = Z[1];
+  int X3 = Z[2];
+  int X4 = Z[3];
+  int X1h =X1/2;
+
+  int sid =i;
+  int za = sid/X1h;
+  int x1h = sid - za*X1h;
+  int zb = za/X2;
+  int x2 = za - zb*X2;
+  int x4 = zb/X3;
+  int x3 = zb - x4*X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+  int X = 2*sid + x1odd; 
+
+  return X;
 }
 
 
@@ -408,8 +429,29 @@ neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
 // There, i is the thread index.
 int fullLatticeIndex_4d(int i, int oddBit) {
   if (i >= Vh || i < 0) {printf("i out of range in fullLatticeIndex_4d"); exit(-1);}
+  /*
   int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2);
   return 2*i + (boundaryCrossings + oddBit) % 2;
+  */
+
+  int X1 = Z[0];  
+  int X2 = Z[1];
+  int X3 = Z[2];
+  int X4 = Z[3];
+  int X1h =X1/2;
+
+  int sid =i;
+  int za = sid/X1h;
+  int x1h = sid - za*X1h;
+  int zb = za/X2;
+  int x2 = za - zb*X2;
+  int x4 = zb/X3;
+  int x3 = zb - x4*X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+  int X = 2*sid + x1odd; 
+
+  return X;
 }
 
 // 5d checkerboard.

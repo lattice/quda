@@ -436,13 +436,24 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
   int X4 = this->x[3];
 
   for(int i=0;i < this->volume;i++){    
+    /*
     int boundaryCrossings = i/(X1/2) + i/(X1*X2/2) + i/(X1*X2*X3/2);
     int Y = 2*i + (boundaryCrossings + oddBit) % 2;
-    int x4 = Y/(X3*X2*X1);
-    int x3 = (Y/(X2*X1)) % X3;
-    int x2 = (Y/X1) % X2;
-    int x1 = Y % X1;
+    */
+    int X1h = X1/2;
     
+    int sid =i;
+    int za = sid/X1h;
+    int x1h = sid - za*X1h;
+    int zb = za/X2;
+  int x2 = za - zb*X2;
+  int x4 = zb/X3;
+  int x3 = zb - x4*X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+  int X = 2*sid + x1odd; 
+
+
     int ghost_face_idx ;
     
     switch(dim){            
