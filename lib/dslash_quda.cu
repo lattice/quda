@@ -332,21 +332,20 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   dslashParam.parity = parity;
 
-  if (!dslashParam.ghostDim[3]){ // hack for DD - will break with multi-dim
-    //#ifndef MULTI_GPU
+  if (!dslashParam.ghostDim[3]){ // single GPU or DD - logic must be updated for multi-dim
     dslashParam.tOffset = 0;
     dslashParam.tMul = 1;
     dslashParam.threads = volume;
-    //#else
   } else {
     // Gather from source spinor
-    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+    for(int dir =0; dir < 4; dir++){
+      face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
+    }
     // do body
     dslashParam.tOffset = 1;
     dslashParam.tMul = 1;
     dslashParam.threads = volume - 2*Vspatial;
   }
-    //#endif
 
   dslash.apply(block, shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
@@ -647,7 +646,9 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   dslashParam.threads = volume;
 #ifdef MULTI_GPU
   // Gather from source spinor
-  face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+  for(int dir = 0; dir <4; dir++){
+    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
+  }
 #endif
 
   STAGGERED_DSLASH(interiorGridDim, blockDim[0], shared_bytes, streams[Nstream-1], out, outNorm, 

@@ -208,16 +208,14 @@ FaceBuffer::~FaceBuffer()
 }
 
 void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
-				    int dagger, cudaStream_t *stream_p)
+				    int dagger, int dir, cudaStream_t *stream_p)
 {
+  if(!commDimPartitioned(dir)) return;
+
   in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated
 
   stream = stream_p;
   
-  for (int dir = 0; dir < 4; dir++) {
-
-    if(!commDimPartitioned(dir)) continue;
-
 #ifdef QMP_COMMS
     // Prepost all receives
     QMP_start(mh_from_fwd[dir]);
@@ -229,7 +227,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
 
     // gather for forwards send
     in.packGhost(my_fwd_face[dir], dir, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dir+sendFwdStrmIdx]);
-  } 
+
 }
 
 void FaceBuffer::exchangeFacesComms(int dir) {

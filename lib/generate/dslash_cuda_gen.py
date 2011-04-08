@@ -294,23 +294,20 @@ def prolog():
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
-int z1 = FAST_INT_DIVIDE(sid, X1h);
-int x1h = sid - z1*X1h;
-int z2 = FAST_INT_DIVIDE(z1, X2);
-int x2 = z1 - z2*X2;
-int x4 = FAST_INT_DIVIDE(z2, X3);
-int x3 = z2 - x4*X3;
+
+int X, x1, x2, x3, x4;
+coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
 
 #ifdef MULTI_GPU
 // now calculate the new x4 given the T offset and space between T slices
 int x4_new = (x4 + param.tOffset) * param.tMul;
 sid += Vs*(x4_new - x4); // new spatial index
+X += X3X2X1*(x4_new - x4);
+int x1diff = ((x2 + x3 + x4_new + param.parity) & 1) - ((x2 + x3 + x4 + param.parity) & 1);
+x1 += x1diff;
+X += x1diff;
 x4 = x4_new;
 #endif
-
-int x1odd = (x2 + x3 + x4 + param.parity) & 1;
-int x1 = 2*x1h + x1odd;
-int X = 2*sid + x1odd;
 
 """)
     
