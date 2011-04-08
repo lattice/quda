@@ -9,16 +9,16 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 24;
-const int LY = 24;
-const int LZ = 24;
-const int LT = 24;
+const int LX = 32;
+const int LY = 32;
+const int LZ = 32;
+const int LT = 8;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
-const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
-const int Nkernels = 23;
+const int Nkernels = 30;
 const int ThreadMin = 32;
 const int ThreadMax = 1024;
 const int GridMin = 1;
@@ -177,7 +177,7 @@ void freeFields()
 double benchmark(int kernel, int niter) {
 
   double a, b, c;
-  Complex a2, b2;
+  Complex a2, b2, c2;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -283,6 +283,34 @@ double benchmark(int kernel, int niter) {
       caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
+    case 23:
+      cabxpyAxCuda(a, b2, *xD, *yD);
+      break;
+
+    case 24:
+      caxpyNormCuda(a2, *xD, *yD);
+      break;
+
+    case 25:
+      caxpyXmazNormXCuda(a2, *xD, *yD, *zD);
+      break;
+
+    case 26:
+      cabxpyAxNormCuda(a, b2, *xD, *yD);
+      break;
+
+    case 27:
+      caxpbypzCuda(a2, *xD, b2, *yD, *zD);
+      break;
+
+    case 28:
+      caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
+      break;
+
+    case 29:
+      caxpyDotzyCuda(a2, *xD, *yD, *zD);
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -305,7 +333,7 @@ double benchmark(int kernel, int niter) {
 double test(int kernel) {
 
   double a = 1.5, b = 2.5, c = 3.5;
-  Complex a2(a, b), b2(b, -c);
+  Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
 
   switch (kernel) {
@@ -498,6 +526,67 @@ double test(int kernel) {
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
+  case 23:
+    *xD = *xH;
+    *yD = *yH;
+    cabxpyAxCuda(a, b2, *xD, *yD);
+    cabxpyAxCpu(a, b2, *xH, *yH);
+    error = ERROR(y) + ERROR(x);
+    break;
+
+  case 24:
+    *xD = *xH;
+    *yD = *yH;
+    {double d = caxpyNormCuda(a, *xD, *yD);
+    double h = caxpyNormCpu(a, *xH, *yH);
+    error = ERROR(y) + fabs(d-h)/fabs(h);}
+    break;
+
+  case 25:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {double d = caxpyXmazNormXCuda(a, *xD, *yD, *zD);
+      double h = caxpyXmazNormXCpu(a, *xH, *yH, *zH);
+      error = ERROR(y) + ERROR(x) + fabs(d-h)/fabs(h);}
+    break;
+
+  case 26:
+    *xD = *xH;
+    *yD = *yH;
+    {double d = cabxpyAxNormCuda(a, b2, *xD, *yD);
+      double h = cabxpyAxNormCpu(a, b2, *xH, *yH);
+      error = ERROR(x) + ERROR(y) + fabs(d-h)/fabs(h);}
+    break;
+
+  case 27:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {caxpbypzCuda(a2, *xD, b2, *yD, *zD);
+      caxpbypzCpu(a2, *xH, b2, *yH, *zH);
+      error = ERROR(z); }
+    break;
+    
+  case 28:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *wD = *wH;
+    {caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
+      caxpbypczpwCpu(a2, *xH, b2, *yH, c2, *zH, *wH);
+      error = ERROR(w); }
+    break;
+
+  case 29:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
+      Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
+    error = ERROR(y) + abs(d-h)/abs(h);}
+    break;
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
@@ -565,7 +654,14 @@ int main(int argc, char** argv)
     "xpaycDotzyCuda",
     "cDotProductNormACuda",
     "cDotProductNormBCuda",
-    "caxpbypzYmbwcDotProductWYNormYCuda"
+    "caxpbypzYmbwcDotProductWYNormYCuda",
+    "cabxpyAxCuda",
+    "caxpyNormCuda",
+    "caxpyXmazNormXCuda",
+    "cabxpyAxNormCuda",
+    "caxpbypzCuda",
+    "caxpbypczpwCuda",
+    "caxpyDotzyCuda"
   };
 
   char *prec_str[] = {"half", "single", "double"};

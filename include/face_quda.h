@@ -147,14 +147,17 @@ class FaceBuffer {
 #ifdef __cplusplus
 extern "C" {
 #endif
-void reduceMaxDouble(double &);
-void reduceDouble(double &);
-void reduceDoubleArray(double *, const int len);
+  extern bool globalReduce;
 
-int commDim(int);
-int commCoords(int);
-int commDimPartitioned(int dir);
-void commDimPartitionedSet(int dir);
+  void reduceMaxDouble(double &);
+  void reduceDouble(double &);
+  void reduceDoubleArray(double *, const int len);
+
+  int commDim(int);
+  int commCoords(int);
+  int commDimPartitioned(int dir);
+  void commDimPartitionedSet(int dir);
+  void commBarrier();
 
 #ifdef __cplusplus
 }

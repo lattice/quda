@@ -73,6 +73,7 @@ int verbose = 0;
 
 Dirac *d = NULL;
 Dirac *dSloppy = NULL;
+Dirac *dPre = NULL; // the DD preconditioning operator
 bool diracCreation = false;
 bool diracTune = false;
 
@@ -565,6 +566,9 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
   diracParam.mu = inv_param->mu;
   diracParam.verbose = inv_param->verbosity;
 
+  for (int i=0; i<4; i++) {
+    diracParam.commDim[i] = 1;   // comms are always on
+  }
 }
 
 
@@ -577,6 +581,28 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, con
   diracParam.longGauge = &cudaLongLinkSloppy;    
   diracParam.clover = &cudaCloverSloppy;
   diracParam.cloverInv = &cudaCloverInvSloppy;
+
+  for (int i=0; i<4; i++) {
+    diracParam.commDim[i] = 1;   // comms are always on
+  }
+
+}
+
+// The preconditioner currently mimicks the sloppy operator with no comms
+void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+{
+  setDiracParam(diracParam, inv_param, pc);
+
+  diracParam.gauge = &cudaGaugeSloppy;
+  diracParam.fatGauge = &cudaFatLinkSloppy;
+  diracParam.longGauge = &cudaLongLinkSloppy;    
+  diracParam.clover = &cudaCloverSloppy;
+  diracParam.cloverInv = &cudaCloverInvSloppy;
+
+  for (int i=0; i<4; i++) {
+    diracParam.commDim[i] = 0; // comms are always off
+  }
+
 }
 
 
@@ -795,6 +821,8 @@ void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) 
     d = Dirac::create(diracParam); // create the Dirac operator    
     setDiracSloppyParam(diracParam, &param, pc_solve);
     dSloppy = Dirac::create(diracParam);
+    setDiracPreParam(diracParam, &param, pc_solve);
+    dPre = Dirac::create(diracParam);
     diracCreation = true;
   }
 }
@@ -818,6 +846,16 @@ void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
       cudaColorSpinorField c(x, CSparam);
       dSloppy->Tune(a, b, c);
     }
+
+    { // tune preconditioner Dirac operator
+      ColorSpinorParam CSparam(x);
+      CSparam.precision = param.prec_precondition;
+      CSparam.create = QUDA_NULL_FIELD_CREATE;
+      cudaColorSpinorField a(x, CSparam);
+      cudaColorSpinorField b(x, CSparam);
+      cudaColorSpinorField c(x, CSparam);
+      dPre->Tune(a, b, c);
+    }
     diracTune = true;
   }
 }
@@ -825,6 +863,9 @@ void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   checkInvertParam(param);
+  if (param->cuda_prec_sloppy != param->prec_precondition)
+    errorQuda("Sorry, cannot yet use different sloppy and preconditioner precisions");
+
   verbosity = param->verbosity;
 
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE ||
@@ -851,6 +892,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   createDirac(diracParam, *param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
 
   cpuColorSpinorField *h_b = NULL;
   cpuColorSpinorField *h_x = NULL;
@@ -906,10 +948,17 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(DiracMdag(dirac), DiracMdag(diracSloppy), *out, *in, param);
+      invertBiCGstabCuda(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *out, *in, param);
       copyCuda(*in, *out);
     }
-    invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), *out, *in, param);
+    invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *out, *in, param);
+    break;
+  case QUDA_GCR_INVERTER:
+    if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      invertGCRCuda(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *out, *in, param);
+      copyCuda(*in, *out);
+    }
+    invertGCRCuda(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *out, *in, param);
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);
@@ -932,6 +981,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (!param->preserve_dirac) {
     delete d;
     delete dSloppy;
+    delete dPre;
     diracCreation = false;
     diracTune = false;
   }  
@@ -1123,6 +1173,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 }
 
 void endInvertQuda() {
+  freeMR();
+  freeBiCGstab();
+
   if (diracCreation) {
     if (d){
       delete d;
@@ -1132,6 +1185,11 @@ void endInvertQuda() {
     if (dSloppy){
       delete dSloppy;
       dSloppy = NULL;
+    }
+
+    if (dPre){
+      delete dPre;
+      dPre = NULL;
     }
 
     diracCreation = false;

@@ -213,7 +213,7 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, 0, 0.0, 
-		   blockDslash, blockDslashFace);
+		   blockDslash, blockDslashFace, commDim);
 
   flops += (1320+504)*in.volume;
 }
@@ -231,7 +231,7 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, &x, k, 
-		   blockDslashXpay, blockDslashXpayFace);
+		   blockDslashXpay, blockDslashXpayFace, commDim);
 
   flops += (1320+504+48)*in.volume;
 }

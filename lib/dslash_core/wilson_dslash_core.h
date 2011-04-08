@@ -1303,6 +1303,9 @@ o32_re = o32_im = 0;
     
 }
 
+#ifdef MULTI_GPU
+if (param.commDim[3] || x4<X4m1)
+#endif
 {
     // Projector P3-
     // 0 0 0 0 
@@ -1517,6 +1520,9 @@ o32_re = o32_im = 0;
     }
 }
 
+#ifdef MULTI_GPU
+if (param.commDim[3] || x4>0)
+#endif
 {
     // Projector P3+
     // 2 0 0 0 
@@ -2461,4 +2467,3 @@ o32_re = o32_im = 0;
 #undef o02_im
 #undef o10_re
 #undef o10_im
-

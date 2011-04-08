@@ -14,31 +14,76 @@
 
 #include <color_spinor_field.h>
 
-void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x, 
-			cudaColorSpinorField &b, QudaInvertParam *invert_param)
+// pointers to fields to avoid multiplie creation overhead
+cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
+bool initBiCGstab = false;
+
+// set the required parameters for the inner solver
+void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer);
+
+
+double resNorm(const DiracMatrix &mat, cudaColorSpinorField &b, cudaColorSpinorField &x) {  
+  cudaColorSpinorField r(b);
+  mat(r, x);
+  return xmyNormCuda(b, r);
+}
+
+
+
+void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &pre,
+			cudaColorSpinorField &x, cudaColorSpinorField &b, QudaInvertParam *invert_param)
 {
+  
+  if (invert_param->cuda_prec_sloppy != invert_param->prec_precondition)
+    errorQuda("BiCGstab does not yet support different sloppy and preconditioner precisions");
+
   typedef std::complex<double> Complex;
 
-  ColorSpinorParam param(x);
-  param.create = QUDA_ZERO_FIELD_CREATE;
-  cudaColorSpinorField y(x, param);
-  cudaColorSpinorField r(x, param); 
-  param.precision = invert_param->cuda_prec_sloppy;
-  cudaColorSpinorField p(x, param);
-  cudaColorSpinorField v(x, param);
-  cudaColorSpinorField tmp(x, param);
-  cudaColorSpinorField t(x, param);
+  if (!initBiCGstab) {
+    ColorSpinorParam param(x);
+    param.create = QUDA_ZERO_FIELD_CREATE;
+    yp = new cudaColorSpinorField(x, param);
+    rp = new cudaColorSpinorField(x, param); 
+    param.precision = invert_param->cuda_prec_sloppy;
+    pp = new cudaColorSpinorField(x, param);
+    vp = new cudaColorSpinorField(x, param);
+    tmpp = new cudaColorSpinorField(x, param);
+    tp = new cudaColorSpinorField(x, param);
+
+    // MR preconditioner - we need extra vectors
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
+      wp = new cudaColorSpinorField(x, param);
+      zp = new cudaColorSpinorField(x, param);
+    } else { // dummy assignments
+      wp = pp;
+      zp = pp;
+    }
+
+    initBiCGstab = true;
+  }
+
+  cudaColorSpinorField &y = *yp;
+  cudaColorSpinorField &r = *rp; 
+  cudaColorSpinorField &p = *pp;
+  cudaColorSpinorField &v = *vp;
+  cudaColorSpinorField &tmp = *tmpp;
+  cudaColorSpinorField &t = *tp;
+
+  cudaColorSpinorField &w = *wp;
+  cudaColorSpinorField &z = *zp;
 
   cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
   if (invert_param->cuda_prec_sloppy == x.Precision()) {
-    param.create = QUDA_REFERENCE_FIELD_CREATE;
     x_sloppy = &x;
     r_sloppy = &r;
     r_0 = &b;
     zeroCuda(*x_sloppy);
     copyCuda(*r_sloppy, b);
   } else {
+    ColorSpinorParam param(x);
+    param.create = QUDA_ZERO_FIELD_CREATE;
+    param.precision = invert_param->cuda_prec_sloppy;
     x_sloppy = new cudaColorSpinorField(x, param);
     param.create = QUDA_COPY_FIELD_CREATE;
     r_sloppy = new cudaColorSpinorField(b, param);
@@ -49,6 +94,9 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   cudaColorSpinorField &rSloppy = *r_sloppy;
   cudaColorSpinorField &xSloppy = *x_sloppy;
   cudaColorSpinorField &r0 = *r_0;
+
+  QudaInvertParam invert_param_inner = newQudaInvertParam();
+  fillInnerInvertParam(invert_param_inner, *invert_param);
 
   double b2 = normCuda(b);
 
@@ -75,9 +123,10 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
 
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: %d iterations, r2 = %e\n", k, r2);
 
-  blas_quda_flops = 0;
-
-  stopwatchStart();
+  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+    blas_quda_flops = 0;    
+    stopwatchStart();
+  }
 
   while (r2 > stop && k<invert_param->maxiter) {
     
@@ -91,7 +140,12 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
       cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
     }
     
-    matSloppy(v, p, tmp);
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
+      invertMRCuda(pre, w, p, &invert_param_inner);
+      matSloppy(v, w, tmp);
+    } else {
+      matSloppy(v, p, tmp);
+    }
 
     if (abs(rho) == 0.0) alpha = 0.0;
     else alpha = rho / cDotProductCuda(r0, v);
@@ -99,18 +153,35 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
     // r -= alpha*v
     caxpyCuda(-alpha, v, rSloppy);
 
-    matSloppy(t, rSloppy, tmp);
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
+      invertMRCuda(pre, z, rSloppy, &invert_param_inner);
+      matSloppy(t, z, tmp);
+    } else {
+      matSloppy(t, rSloppy, tmp);
+    }
     
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, rSloppy);
     omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
-    //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-    rho_r2 = caxpbypzYmbwcDotProductUYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
+      //x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
+      caxpyCuda(alpha, w, xSloppy);
+      caxpyCuda(omega, z, xSloppy);
+      caxpyCuda(-omega, t, rSloppy);
+      rho_r2 = cDotProductNormBCuda(r0, rSloppy);
+    } else {
+      //x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
+      rho_r2 = caxpbypzYmbwcDotProductUYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
+    }
 
     rho0 = rho;
     rho = Complex(rho_r2.x, rho_r2.y);
     r2 = rho_r2.z;
+
+    if (invert_param->verbosity == QUDA_DEBUG_VERBOSE)
+      printfQuda("DEBUG: %d iterated residual norm = %e, true residual norm = %e\n",
+		 k, norm2(rSloppy), resNorm(matSloppy, b, xSloppy));
 
     // reliable updates
     rNorm = sqrt(r2);
@@ -150,22 +221,24 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
 
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
-  invert_param->secs += stopwatchReadSeconds();
-  
-  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
-  reduceDouble(gflops);
+  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+    invert_param->secs += stopwatchReadSeconds();
 
-  //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
-  invert_param->gflops += gflops;
-  invert_param->iter += k;
-  
-  if (invert_param->verbosity >= QUDA_SUMMARIZE) {
-    // Calculate the true residual
-    mat(r, x);
-    double true_res = xmyNormCuda(b, r);
+    double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + pre.flops())*1e-9;
+    reduceDouble(gflops);
+
+    //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
+    invert_param->gflops += gflops;
+    invert_param->iter += k;
     
-    printfQuda("BiCGstab: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-	       k, sqrt(r2/b2), sqrt(true_res / b2));    
+    if (invert_param->verbosity >= QUDA_SUMMARIZE) {
+      // Calculate the true residual
+      mat(r, x);
+      double true_res = xmyNormCuda(b, r);
+      
+      printfQuda("BiCGstab: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+		 k, sqrt(r2/b2), sqrt(true_res / b2));    
+    }
   }
 
   if (invert_param->cuda_prec_sloppy != x.Precision()) {
@@ -175,4 +248,18 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cu
   }
 
   return;
+}
+
+void freeBiCGstab() {
+  if(initBiCGstab) {
+    if (wp && wp != pp) delete wp;
+    if (zp && zp != pp) delete zp;
+    delete yp;
+    delete rp;
+    delete pp;
+    delete vp;
+    delete tmpp;
+    delete tp;
+    initBiCGstab = false;
+  }
 }

@@ -66,6 +66,19 @@ double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y, 
 					   cudaColorSpinorField &z, cudaColorSpinorField &w, cudaColorSpinorField &u);
 
+void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
+double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, 
+			  cudaColorSpinorField &y, cudaColorSpinorField &z);
+double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
+
+void caxpbypzCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
+		  cudaColorSpinorField &);
+void caxpbypczpwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
+		     const Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
+Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
+		       cudaColorSpinorField &z);
+
 // CPU variants
 
 void copyCpu(cpuColorSpinorField &dst, const cpuColorSpinorField &src);
@@ -100,5 +113,21 @@ double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinor
 					  const Complex &b, cpuColorSpinorField &y, 
 					  cpuColorSpinorField &z, const cpuColorSpinorField &w, 
 					  const cpuColorSpinorField &u);
+
+void cabxpyAxCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
+
+double caxpyNormCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y);
+
+double caxpyXmazNormXCpu(const Complex &a, cpuColorSpinorField &x, 
+			 cpuColorSpinorField &y, cpuColorSpinorField &z);
+double cabxpyAxNormCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
+
+void caxpbypzCpu(const Complex &, cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
+		 cpuColorSpinorField &);
+
+void caxpbypczpwCpu(const Complex &, cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
+		    const Complex &, cpuColorSpinorField &, cpuColorSpinorField &);
+Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
+		      cpuColorSpinorField &z);
 
 #endif // _QUDA_BLAS_H

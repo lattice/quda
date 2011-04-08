@@ -257,3 +257,47 @@ double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinor
   caxpbypzYmbwCpu(a, x, b, y, z, w);
   return cDotProductNormBCpu(u, y);
 }
+
+void cabxpyAxCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
+  axCpu(a, x);
+  caxpyCpu(b, x, y);
+}
+
+double caxpyNormCpu(const Complex &a, cpuColorSpinorField &x, 
+		    cpuColorSpinorField &y) {
+  caxpyCpu(a, x, y);
+  return norm2(y);
+}
+
+double caxpyXmazNormXCpu(const Complex &a, cpuColorSpinorField &x, 
+			 cpuColorSpinorField &y, cpuColorSpinorField &z) {
+  caxpyCpu(a, x, y);
+  caxpyCpu(-a, z, x);
+  return norm2(x);
+}
+
+double cabxpyAxNormCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
+  axCpu(a, x);
+  caxpyCpu(b, x, y);
+  return norm2(y);
+}
+
+void caxpbypzCpu(const Complex &a, cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y, 
+		 cpuColorSpinorField &z) {
+  caxpyCpu(a, x, z);
+  caxpyCpu(b, y, z);
+}
+
+void caxpbypczpwCpu(const Complex &a, cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y, 
+		    const Complex &c, cpuColorSpinorField &z, cpuColorSpinorField &w) {
+  caxpyCpu(a, x, w);
+  caxpyCpu(b, y, w);
+  caxpyCpu(c, z, w);
+
+}
+
+Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
+		      cpuColorSpinorField &z) {
+  caxpyCpu(a, x, y);
+  return cDotProductCpu(z, y);
+}

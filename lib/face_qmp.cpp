@@ -25,6 +25,8 @@ using namespace std;
 
 cudaStream_t *stream;
 
+bool globalReduce = true;
+
 // Easy to switch between overlapping communication or not
 #ifdef OVERLAP_COMMS
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpyAsync(dst, src, size, type, stream)
@@ -530,7 +532,7 @@ void reduceMaxDouble(double &max) {
 void reduceDouble(double &sum) {
 
 #ifdef QMP_COMMS
-  QMP_sum_double(&sum);
+  if (globalReduce) QMP_sum_double(&sum);
 #endif
 
 }
@@ -538,7 +540,7 @@ void reduceDouble(double &sum) {
 void reduceDoubleArray(double *sum, const int len) {
 
 #ifdef QMP_COMMS
-  QMP_sum_double_array(sum,len);
+  if (globalReduce) QMP_sum_double_array(sum,len);
 #endif
 
 }
@@ -549,9 +551,11 @@ int commDim(int dir) { return QMP_get_logical_dimensions()[dir]; }
 int commCoords(int dir) { return QMP_get_logical_coordinates()[dir]; }
 int commDimPartitioned(int dir){ return (manual_set_partition[dir] || ((commDim(dir) > 1)));}
 void commDimPartitionedSet(int dir){ manual_set_partition[dir] = 1; }
+void commBarrier() { QMP_barrier(); }
 #else
 int commDim(int dir) { return 1; }
 int commCoords(int dir) { return 0; }
 int commDimPartitioned(int dir){ return 0; }
-void commDimPartitionedSet(int dir){ }
+void commDimPartitionedSet(int dir){ ; }
+void commBarrier() { ; }
 #endif

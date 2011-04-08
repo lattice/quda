@@ -11,6 +11,8 @@ using namespace std;
 
 cudaStream_t *stream;
 
+bool globalReduce = true;
+
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision) : 
   Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
@@ -238,7 +240,7 @@ void reduceMaxDouble(double &max) {
 void reduceDouble(double &sum) {
 
 #ifdef MPI_COMMS
-  comm_allreduce(&sum);
+  if (globalReduce) comm_allreduce(&sum);
 #endif
 
 }
@@ -246,7 +248,7 @@ void reduceDouble(double &sum) {
 void reduceDoubleArray(double *sum, const int len) {
 
 #ifdef MPI_COMMS
-  comm_allreduce_array(sum, len);
+  if (globalReduce) comm_allreduce_array(sum, len);
 #endif
 
 }
@@ -258,3 +260,5 @@ int commCoords(int dir) { return comm_coords(dir); }
 int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
 void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+void commBarrier() { comm_barrier(); }

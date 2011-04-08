@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy = QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
 
   // offsets used only by multi-shift solver
   int num_offsets = 4;
@@ -64,12 +64,12 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 24;
+  gauge_param.X[0] = 32;
+  gauge_param.X[1] = 32;
+  gauge_param.X[2] = 32;
+  gauge_param.X[3] = 8;
 
-  gauge_param.anisotropy = 1.0;
+  gauge_param.anisotropy = 3.5;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -82,9 +82,8 @@ int main(int argc, char **argv)
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = dslash_type;
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
 
-  double mass = -0.9;
+  double mass = -0.57;//-0.48725;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -92,15 +91,27 @@ int main(int argc, char **argv)
     inv_param.twist_flavor = QUDA_TWIST_MINUS;
   }
 
-  inv_param.tol = 5e-8;
-  inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 0.001; // ignored by multi-shift solver
-
   inv_param.solution_type = QUDA_MATPC_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.gcrNkrylov = 30;
+  inv_param.tol = 5e-7;
+  inv_param.maxiter = 1000;
+  inv_param.reliable_delta = 1e-2; // ignored by multi-shift solver
+
+  // domain decomposition preconditioner parameters
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 1000;
+  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.prec_precondition = cuda_prec_sloppy;
+
+  //inv_param.commDim[3] = 1;
+  //inv_param.commDimSloppy[3] = 1;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -134,10 +145,10 @@ int main(int argc, char **argv)
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
 
+  inv_param.verbosity = QUDA_VERBOSE;
+
   //set the T dimension partitioning flag
   commDimPartitionedSet(3);
-
-  inv_param.verbosity = QUDA_VERBOSE;
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.

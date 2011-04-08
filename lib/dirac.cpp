@@ -9,7 +9,7 @@ Dirac::Dirac(const DiracParam &param)
     dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
     verbose(param.verbose)
 {
-
+  for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
 }
 
 Dirac::Dirac(const Dirac &dirac) 
@@ -17,7 +17,7 @@ Dirac::Dirac(const Dirac &dirac)
     dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
     verbose(dirac.verbose)
 {
-
+  for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 }
 
 Dirac::~Dirac() {
@@ -37,6 +37,8 @@ Dirac& Dirac::operator=(const Dirac &dirac)
     verbose = dirac.verbose;
 
     tune = dirac.tune;
+
+    for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
 
   return *this;

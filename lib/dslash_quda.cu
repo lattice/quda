@@ -31,10 +31,10 @@ struct DslashParam {
   int tMul;    // spatial volume distance between the T faces being updated (multi gpu only)
   int threads; // the desired number of active threads
   int parity;  // Even-Odd or Odd-Even
-  int ghostDim[QUDA_MAX_DIM];
+  int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
   int ghostOffset[QUDA_MAX_DIM];
+  int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
   int kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
-  
 };
 
 // determines whether the temporal ghost zones are packed with a gather kernel,
@@ -62,6 +62,8 @@ cudaColorSpinorField *inSpinor;
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5) // 32767.5
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1)) // 1.5259021897e-5
 
+#if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
+  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
 static inline __device__ short float2short(float c, float a) {
   //return (short)(a*MAX_SHORT);
   short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
@@ -83,6 +85,7 @@ static inline __device__ float4 short42float4(short4 a) {
 static inline __device__ float2 short22float2(short2 a) {
   return make_float2(short2float(a.x), short2float(a.y));
 }
+#endif // DIRECT_ACCESS inclusions
 
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
@@ -332,28 +335,27 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   dslashParam.parity = parity;
 
-#ifndef MULTI_GPU
-  dslashParam.tOffset = 0;
-  dslashParam.tMul = 1;
-  dslashParam.threads = volume;
-#else
-  // Gather from source spinor
-  for(int dir =0; dir < 4; dir++){
-    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
+  if (!dslashParam.commDim[3]){ // single GPU or DD - logic must be updated for multi-dim 
+    dslashParam.tOffset = 0;
+    dslashParam.tMul = 1;
+    dslashParam.threads = volume;
+  } else {
+    // Gather from source spinor
+    for(int dir =0; dir < 4; dir++){
+      face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
+    }
+    // do body
+    dslashParam.tOffset = 1;
+    dslashParam.tMul = 1;
+    dslashParam.threads = volume - 2*Vspatial;
   }
-  
-  // do body
-  dslashParam.tOffset = 1;
-  dslashParam.tMul = 1;
-  dslashParam.threads = volume - 2*Vspatial;
-#endif
 
   dslash.apply(block, shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
 #ifdef MULTI_GPU
 
   for (int i=0; i<4; i++) {
-    if (!commDimPartitioned(i)) continue;
+    if (!dslashParam.commDim[i]) continue;
 
     // Finish gather and start comms
     face->exchangeFacesComms(i);
@@ -363,7 +365,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 
   for (int i=0; i<4; i++) {
-    if (commDimPartitioned(i)) continue;
+    if (!dslashParam.commDim[i]) continue;
 
     // the below is only for T-way parallelization -needs generalized as staggered
     dslashParam.tOffset = 0;
@@ -378,9 +380,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 }
 
 // Wilson wrappers
-void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
-		const int parity, const int dagger, const cudaColorSpinorField *x,
-		const double &k, const dim3 &block, const dim3 &blockFace) {
+void wilsonDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+		      const int parity, const int dagger, const cudaColorSpinorField *x,
+		      const double &k, const dim3 &block, const dim3 &blockFace, const int *commOverride) {
 
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -388,6 +390,7 @@ void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColo
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
     dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
   void *gauge0, *gauge1;
@@ -434,7 +437,7 @@ void dslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColo
 void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover cloverInv,
 		      const cudaColorSpinorField *in, const int parity, const int dagger, 
 		      const cudaColorSpinorField *x, const double &a,
-		      const dim3 &block, const dim3 &blockFace) {
+		      const dim3 &block, const dim3 &blockFace, const int *commOverride) {
 
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -442,6 +445,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
     dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
   void *cloverP, *cloverNormP;
@@ -501,7 +505,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
 void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
 			   const cudaColorSpinorField *in, const int parity, const int dagger, 
 			   const cudaColorSpinorField *x, const double &kappa, const double &mu, 
-			   const double &a, const dim3 &block, const dim3 &blockFace) {
+			   const double &a, const dim3 &block, const dim3 &blockFace, const int *commOverride) {
 
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -509,6 +513,7 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
     dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
   void *gauge0, *gauge1;
@@ -645,6 +650,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 #ifdef MULTI_GPU
   // Gather from source spinor
   for(int dir = 0; dir <4; dir++){
+    if (!dslashParam.commDim[dir]) continue;
     face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
   }
 #endif
@@ -657,9 +663,8 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
   };
   for(int i=0 ;i < 4;i++){
-    if(!commDimPartitioned(i)){
-      continue;
-    }
+    if (!dslashParam.commDim[i]) continue;
+
     // Finish gather and start comms
     face->exchangeFacesComms(i);
     // Wait for comms to finish, and scatter into the end zone
@@ -667,7 +672,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   }
 
   for(int i=0 ;i < 4;i++){
-    if(!commDimPartitioned(i)) continue;
+    if(!dslashParam.commDim[i]) continue;
 
     shared_bytes = blockDim[i+1].x*6*regSize;
     
@@ -687,7 +692,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, 
 			 const FullGauge longGauge, const cudaColorSpinorField *in,
 			 const int parity, const int dagger, const cudaColorSpinorField *x,
-			 const double &k, const dim3 *block)
+			 const double &k, const dim3 *block, const int *commOverride)
 {
   
   inSpinor = (cudaColorSpinorField*)in; // EVIL
@@ -699,6 +704,7 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
   for(int i=0;i < 4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i);
     dslashParam.ghostOffset[i] = in->ghostOffset[i];
+    dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
   void *fatGauge0, *fatGauge1;
   void* longGauge0, *longGauge1;
