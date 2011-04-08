@@ -66,7 +66,7 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
   zeroCuda(x);
   double r2 = b2;
 
-  if (invert_param->inv_type_sloppy != QUDA_GCR_INVERTER) {
+  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) {
     blas_quda_flops = 0;
     stopwatchStart();
   }
@@ -96,7 +96,7 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
   
   if (k>=invert_param->maxiter) warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
   
-  if (invert_param->inv_type_sloppy != QUDA_GCR_INVERTER) {
+  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) {
     invert_param->secs += stopwatchReadSeconds();
   
     double gflops = (blas_quda_flops + mat.flops())*1e-9;

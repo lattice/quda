@@ -98,16 +98,16 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.gcrNkrylov = 30;
   inv_param.tol = 5e-7;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-2; // ignored by multi-shift solver
 
-  // domain decomposition parameters
-  inv_param.tol_sloppy = 1e-1;
-  inv_param.maxiter_sloppy = 1000;
-  inv_param.gcrNkrylov = 30;
-  inv_param.verbosity_sloppy = QUDA_SILENT;
-  inv_param.inv_type_sloppy = QUDA_MR_INVERTER;
+  // domain decomposition preconditioner parameters
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 1000;
+  inv_param.verbosity_precondition = QUDA_SILENT;
   inv_param.prec_precondition = cuda_prec_sloppy;
 
   //inv_param.commDim[3] = 1;

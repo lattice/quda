@@ -51,7 +51,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, co
     tp = new cudaColorSpinorField(x, param);
 
     // MR preconditioner - we need extra vectors
-    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
       wp = new cudaColorSpinorField(x, param);
       zp = new cudaColorSpinorField(x, param);
     } else { // dummy assignments
@@ -123,7 +123,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, co
 
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: %d iterations, r2 = %e\n", k, r2);
 
-  if (invert_param->inv_type_sloppy != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
     blas_quda_flops = 0;    
     stopwatchStart();
   }
@@ -140,7 +140,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, co
       cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
     }
     
-    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
       invertMRCuda(pre, w, p, &invert_param_inner);
       matSloppy(v, w, tmp);
     } else {
@@ -153,7 +153,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, co
     // r -= alpha*v
     caxpyCuda(-alpha, v, rSloppy);
 
-    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
       invertMRCuda(pre, z, rSloppy, &invert_param_inner);
       matSloppy(t, z, tmp);
     } else {
@@ -164,7 +164,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, co
     omega_t2 = cDotProductNormACuda(t, rSloppy);
     omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
-    if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) {
+    if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) {
       //x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
       caxpyCuda(alpha, w, xSloppy);
       caxpyCuda(omega, z, xSloppy);
@@ -221,7 +221,7 @@ void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, co
 
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
-  if (invert_param->inv_type_sloppy != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
     invert_param->secs += stopwatchReadSeconds();
 
     double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + pre.flops())*1e-9;

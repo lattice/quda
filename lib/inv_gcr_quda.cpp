@@ -26,20 +26,20 @@ double timeInterval(struct timeval start, struct timeval end) {
 
 // set the required parameters for the inner solver
 void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) {
-  inner.tol = outer.tol_sloppy;
-  inner.maxiter = outer.maxiter_sloppy;
+  inner.tol = outer.tol_precondition;
+  inner.maxiter = outer.maxiter_precondition;
   inner.reliable_delta = 1e-20; // no reliable updates within the inner solver
   
-  inner.cuda_prec = outer.cuda_prec_sloppy; // only use sloppy precision on inner solver
-  inner.cuda_prec_sloppy = outer.cuda_prec_sloppy;
+  inner.cuda_prec = outer.prec_precondition; // preconditioners are uni-precision solvers
+  inner.cuda_prec_sloppy = outer.prec_precondition;
   
-  inner.verbosity = outer.verbosity_sloppy;
+  inner.verbosity = outer.verbosity_precondition;
   
   inner.iter = 0;
   inner.gflops = 0;
   inner.secs = 0;
 
-  inner.inv_type_sloppy = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
+  inner.inv_type_precondition = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
 
   if (outer.inv_type == QUDA_GCR_INVERTER && outer.cuda_prec_sloppy != outer.prec_precondition) 
     inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
@@ -200,21 +200,21 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     
     gettimeofday(&pre0, NULL);
 
-    if (invert_param->inv_type_sloppy != QUDA_INVALID_INVERTER) {
-      if (invert_param->tol/(sqrt(r2/b2)) > invert_param->tol_sloppy) // relax stoppng condition
-	invert_param_inner.tol = invert_param->tol/sqrt(r2/b2);
+    if (invert_param->inv_type_precondition != QUDA_INVALID_INVERTER) {
+      //if (invert_param->tol/(sqrt(r2/b2)) > invert_param->tol_precondition) // don'trelax stoppng condition
+	//invert_param_inner.tol = invert_param->tol/sqrt(r2/b2);
 
       cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
 
       copyCuda(rPre, rSloppy);
-      if (invert_param->inv_type_sloppy == QUDA_CG_INVERTER) // inner CG preconditioner
+      if (invert_param->inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
 	invertCgCuda(pre, pre, pPre, rPre, &invert_param_inner);
-      else if (invert_param->inv_type_sloppy == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
+      else if (invert_param->inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
 	invertBiCGstabCuda(pre, pre, pre, pPre, rPre, &invert_param_inner);
-      else if (invert_param->inv_type_sloppy == QUDA_MR_INVERTER) // inner MR preconditioner
+      else if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
 	invertMRCuda(pre, pPre, rPre, &invert_param_inner);
       else
-	errorQuda("Unknown inner solver %d", invert_param->inv_type_sloppy);
+	errorQuda("Unknown inner solver %d", invert_param->inv_type_precondition);
 
       copyCuda(*p[k], pPre);
     } else { // no preconditioner
