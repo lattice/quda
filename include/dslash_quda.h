@@ -52,7 +52,7 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, cons
 // staggered Dslash    
 void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, FullGauge longGauge,
 			 const cudaColorSpinorField *in, const int parity, const int dagger, 
-			 const cudaColorSpinorField *x, const double &k, const dim3 *block);
+			 const cudaColorSpinorField *x, const double &k, const dim3 *block, const int *commDim);
 
 // twisted mass Dslash  
 void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,

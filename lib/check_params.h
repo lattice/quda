@@ -140,8 +140,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(dirac_tune, QUDA_TUNE_INVALID);
   P(preserve_dirac, QUDA_PRESERVE_DIRAC_INVALID);
 
-
+#if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);
+#else
+  if (param->inv_type == QUDA_GCR_INVERTER) {
+    P(gcrNkrylov, INVALID_INT);
+  }
+#endif
 
   // domain decomposition parameters
   //P(inv_type_sloppy, QUDA_INVALID_INVERTER); // disable since invalid means no preconditioner
