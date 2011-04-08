@@ -338,7 +338,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.threads = volume;
 #else
   // Gather from source spinor
-  face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+  for(int dir =0; dir < 4; dir++){
+    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
+  }
   
   // do body
   dslashParam.tOffset = 1;
@@ -642,7 +644,9 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   dslashParam.threads = volume;
 #ifdef MULTI_GPU
   // Gather from source spinor
-  face->exchangeFacesStart(*inSpinor, 1-parity, dagger, streams);
+  for(int dir = 0; dir <4; dir++){
+    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
+  }
 #endif
 
   STAGGERED_DSLASH(interiorGridDim, blockDim[0], shared_bytes, streams[Nstream-1], out, outNorm, 

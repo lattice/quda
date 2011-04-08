@@ -97,33 +97,32 @@ FaceBuffer::~FaceBuffer()
 }
 
 void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
-				    int dagger, cudaStream_t *stream_p)
+				    int dagger, int dir, cudaStream_t *stream_p)
 {
+  if(!commDimPartitioned(dir)){
+    return ;
+  }
+
   in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated
-
+  
   stream = stream_p;
-
+  
   int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
   int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
-  for(int dir = 0; dir  < 4; dir++){
-    if(!commDimPartitioned(dir)){
-      continue;
-    }
-    // Prepost all receives
-    recv_request1[dir] = comm_recv_with_tag(pageable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
-    recv_request2[dir] = comm_recv_with_tag(pageable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
-
-    // gather for backwards send
-    in.packGhost(back_nbr_spinor_sendbuf[dir], dir, QUDA_BACKWARDS, 
-		 (QudaParity)parity, dagger, &stream[2*dir + sendBackStrmIdx]); CUERR;  
-
-    // gather for forwards send
-    in.packGhost(fwd_nbr_spinor_sendbuf[dir], dir, QUDA_FORWARDS, 
-		 (QudaParity)parity, dagger, &stream[2*dir + sendFwdStrmIdx]); CUERR;
-  }
+  // Prepost all receives
+  recv_request1[dir] = comm_recv_with_tag(pageable_back_nbr_spinor[dir], nbytes[dir], back_nbr[dir], uptags[dir]);
+  recv_request2[dir] = comm_recv_with_tag(pageable_fwd_nbr_spinor[dir], nbytes[dir], fwd_nbr[dir], downtags[dir]);
+  
+  // gather for backwards send
+  in.packGhost(back_nbr_spinor_sendbuf[dir], dir, QUDA_BACKWARDS, 
+	       (QudaParity)parity, dagger, &stream[2*dir + sendBackStrmIdx]); CUERR;  
+  
+  // gather for forwards send
+  in.packGhost(fwd_nbr_spinor_sendbuf[dir], dir, QUDA_FORWARDS, 
+	       (QudaParity)parity, dagger, &stream[2*dir + sendFwdStrmIdx]); CUERR;
 }
 
 void FaceBuffer::exchangeFacesComms(int dir) 
