@@ -863,7 +863,8 @@ void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   checkInvertParam(param);
-  if (param->cuda_prec_sloppy != param->prec_precondition)
+  if (param->cuda_prec_sloppy != param->prec_precondition && 
+      param->inv_type_precondition != QUDA_INVALID_INVERTER)
     errorQuda("Sorry, cannot yet use different sloppy and preconditioner precisions");
 
   verbosity = param->verbosity;
