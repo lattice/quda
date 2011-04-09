@@ -202,11 +202,11 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
 
   double true_res = xmyNormCuda(b, *r);
   if (invert_param->verbosity >= QUDA_SUMMARIZE){
-    printfQuda("Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
+    printfQuda("MultiShift CG: Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
 	       k,r2, (true_res / b2));
   }    
   if (invert_param->verbosity >= QUDA_VERBOSE){
-    printfQuda("Converged after %d iterations\n", k);
+    printfQuda("MultiShift CG: Converged after %d iterations\n", k);
     printfQuda(" shift=0 resid_rel=%e\n", sqrt(true_res/b2));
     for(int i=1; i < num_offsets; i++) { 
       mat(*r, *x[i]); 
@@ -214,11 +214,7 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
       true_res = xmyNormCuda(b, *r);
       printfQuda(" shift=%d resid_rel=%e\n",i, sqrt(true_res/b2));
     }
-  }
-  
-
-  //#endif
-    
+  }      
   
   delete r;
   for(i=0;i < num_offsets; i++){
