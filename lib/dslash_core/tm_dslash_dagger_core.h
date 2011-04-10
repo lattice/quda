@@ -176,6 +176,7 @@ X += x1diff;
 x4 = x4_new;
 #endif
 
+
 #ifdef SPINOR_DOUBLE
 #if (__CUDA_ARCH__ >= 200)
 #define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
@@ -1647,9 +1648,9 @@ if (param.commDim[3] || x4>0)
     #endif // DSLASH_XPAY
     
 }
-
 #ifdef DSLASH_XPAY
     READ_ACCUM(ACCUMTEX, sp_stride)
+
 #ifdef SPINOR_DOUBLE
     o00_re = b*o00_re + accum0.x;
     o00_im = b*o00_im + accum0.y;
@@ -1703,9 +1704,8 @@ if (param.commDim[3] || x4>0)
 #endif // SPINOR_DOUBLE
 #endif // DSLASH_XPAY
 
-
-    // write spinor field back to device memory
-    WRITE_SPINOR(sp_stride);
+// write spinor field back to device memory
+WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
