@@ -1150,14 +1150,14 @@ if (param.commDim[3] || x4<X4m1)
     #else
     #define sp_norm_idx sp_idx
     #endif
-	spinorFloat t_proj_scale = TWO;
+        spinorFloat t_proj_scale = TWO;
         if (x4 == X4m1) { // front face (lower spin components)
           sp_stride_t = Vs;
           sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)
     #if (DD_PREC==2)
           sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the 2nd norm buffer
     #endif
-	  t_proj_scale = TPROJSCALE;
+          t_proj_scale = TPROJSCALE;
         } else {
           sp_stride_t = sp_stride;
           sp_idx = (X+X3X2X1) >> 1;
@@ -1345,7 +1345,7 @@ if (param.commDim[3] || x4<X4m1)
 }
 
 #ifdef MULTI_GPU
-if (param.commDim[3] || x4==0)
+if (param.commDim[3] || x4>0)
 #endif
 {
     // Projector P3-
@@ -1368,14 +1368,14 @@ if (param.commDim[3] || x4==0)
     #else
     #define sp_norm_idx sp_idx
     #endif
-	spinorFloat t_proj_scale = TWO;
+        spinorFloat t_proj_scale = TWO;
         if (x4 == 0) { // back face
           sp_stride_t = Vs;
           sp_idx = sid + SPINOR_HOP*sp_stride;
     #if (DD_PREC==2)
           sp_norm_idx = sid + sp_stride;
     #endif
-	  t_proj_scale = TPROJSCALE;
+          t_proj_scale = TPROJSCALE;
         } else {
           sp_stride_t = sp_stride;
           sp_idx = (X - X3X2X1) >> 1;

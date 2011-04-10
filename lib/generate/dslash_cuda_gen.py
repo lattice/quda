@@ -355,7 +355,18 @@ def gen(dir, pack_only=False):
             return (1, proj(i,1))
         if proj(i,1) == 0j:
             return (0, proj(i,0))
-    
+
+
+    cond = ""
+    if dir == 6:
+        cond += "#ifdef MULTI_GPU\n"
+        cond += "if (param.commDim[3] || x4<X4m1)\n"
+        cond += "#endif\n"
+    elif dir == 7:
+        cond += "#ifdef MULTI_GPU\n"
+        cond += "if (param.commDim[3] || x4>0)\n"
+        cond += "#endif\n"
+
     str = []
     
     projName = "P"+`dir/2`+["-","+"][projIdx%2]
@@ -375,6 +386,7 @@ def gen(dir, pack_only=False):
         str.append("    int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;\n")
         str.append("#define sp_stride_t sp_stride\n")
         str.append("#define sp_norm_idx sp_idx\n")
+        str.append("#define t_proj_scale 2\n")
         str.append("#else\n")
         str.append("    int sp_idx;\n")
         str.append("    int sp_stride_t;\n")
@@ -383,12 +395,14 @@ def gen(dir, pack_only=False):
         str.append("#else\n")
         str.append("#define sp_norm_idx sp_idx\n")
         str.append("#endif\n")
+        str.append("    spinorFloat t_proj_scale = TWO;\n")
         str.append("    if (x4 == X4m1) { // front face (lower spin components)\n")
         str.append("      sp_stride_t = Vs;\n")
         str.append("      sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)\n")
         str.append("#if (DD_PREC==2)\n")
         str.append("      sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the 2nd norm buffer\n")
         str.append("#endif\n")
+        str.append("      t_proj_scale = TPROJSCALE;\n")
         str.append("    } else {\n")
         str.append("      sp_stride_t = sp_stride;\n")
         str.append("      sp_idx = (X+X3X2X1) >> 1;\n")
@@ -402,6 +416,7 @@ def gen(dir, pack_only=False):
         str.append("    int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;\n")
         str.append("#define sp_stride_t sp_stride\n")
         str.append("#define sp_norm_idx sp_idx\n")
+        str.append("#define t_proj_scale 2\n")
         str.append("    int ga_idx = sp_idx;\n")
         str.append("#else\n")
         str.append("    int sp_idx;\n")
@@ -411,12 +426,14 @@ def gen(dir, pack_only=False):
         str.append("#else\n")
         str.append("#define sp_norm_idx sp_idx\n")
         str.append("#endif\n")
+        str.append("    spinorFloat t_proj_scale = TWO;\n")
         str.append("    if (x4 == 0) { // back face\n")
         str.append("      sp_stride_t = Vs;\n")
         str.append("      sp_idx = sid + SPINOR_HOP*sp_stride;\n")
         str.append("#if (DD_PREC==2)\n")
         str.append("      sp_norm_idx = sid + sp_stride;\n")
         str.append("#endif\n")
+        str.append("      t_proj_scale = TPROJSCALE;\n")
         str.append("    } else {\n")
         str.append("      sp_stride_t = sp_stride;\n")
         str.append("      sp_idx = (X - X3X2X1) >> 1;\n")
@@ -557,7 +574,9 @@ def gen(dir, pack_only=False):
         out = out.replace("sp_norm_idx", "idx")
         return out
     else:
-        return block(''.join(str))+"\n\n"
+        out = ''.join(str)
+        out = out.replace("2*", "t_proj_scale*")
+        return cond+block(out)+"\n\n"
 # end def gen
 
 
@@ -825,6 +844,7 @@ def pack_face(facenum):
 
 
 def generate_pack():
+    assert (sharedFloats == 0)
     str = []
     str.append(def_input_spinor())
     str.append("#include \"io_spinor.h\"\n\n")
