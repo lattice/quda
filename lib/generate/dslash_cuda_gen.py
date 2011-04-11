@@ -312,21 +312,15 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 
 int X, x1, x2, x3, x4, sp_idx;
 
-#ifndef MULTI_GPU
-#define t_proj_scale 2 // coefficient for temporal spin projection is always 2 in single-GPU mode
-#else // MULTI_GPU
-#if (DD_PREC==2) // half precision
+#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
 int sp_norm_idx;
-#else
-const int &sp_norm_idx = sp_idx;
-#endif
-#endif // MULTI_GPU
+#endif // MULTI_GPU half precision
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
 #ifdef MULTI_GPU
-if (param.kernel_type = INTERIOR_KERNEL) {
+if (param.kernel_type == INTERIOR_KERNEL) {
 #endif
 
   coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -346,7 +340,7 @@ if (param.kernel_type = INTERIOR_KERNEL) {
 
   const int dim = static_cast<int>(param.kernel_type);
   const int face_volume = (param.threads >> 1);
-  const int face_num = (face_idx >= face_volume);
+  const int face_num = (sid >= face_volume);
   const int face_idx = sid - face_num*face_volume;
 
   sp_idx = sid + param.ghostOffset[dim];
@@ -357,7 +351,7 @@ if (param.kernel_type = INTERIOR_KERNEL) {
     
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
 
-  READ_SPINOR(INTERTEX, sp_stride, sid, sid);
+  READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
 
 """)
 
@@ -414,7 +408,7 @@ def gen(dir, pack_only=False):
     str += "\n"
 
     str += "#ifdef MULTI_GPU\n"
-    str += "if (param.kernel_type = INTERIOR_KERNEL) {\n"
+    str += "if (param.kernel_type == INTERIOR_KERNEL) {\n"
     str += "#endif\n"
     str += "  sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#ifdef MULTI_GPU\n"
@@ -449,9 +443,7 @@ def gen(dir, pack_only=False):
             decl_half += "spinorFloat "+h1_re(h,c)+", "+h1_im(h,c)+";\n";
     decl_half += "\n"
 
-    load_spinor = ""
-    if dir >= 6: load_spinor += "spinorFloat t_proj_scale = spinorFloat(2.0);\n\n"
-    load_spinor += "// read spinor from device memory\n"
+    load_spinor = "// read spinor from device memory\n"
     if row_cnt[0] == 0:
         load_spinor += "READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
     elif row_cnt[2] == 0:
@@ -584,12 +576,9 @@ def gen(dir, pack_only=False):
     
     if pack_only:
         out = load_spinor + decl_half + project
-        out = out.replace("sp_stride_t", "sp_stride")
         out = out.replace("sp_idx", "idx")
-        out = out.replace("sp_norm_idx", "idx")
         return out
     else:
-        str = str.replace("2*", "t_proj_scale*")
         return cond + block(str)+"\n\n"
 # end def gen
 
@@ -786,17 +775,17 @@ def epilog():
         str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
     str += (
 """
-bool incomplete = false; // Have all 8 contributions been computed for this site?
+int incomplete = 0; // Have all 8 contributions been computed for this site?
 
 switch(param.kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
-  incomplete ||= commDim[0] && (x1==0 || x1==X1m1);
+  incomplete = incomplete || param.commDim[0] && (x1==0 || x1==X1m1);
 case EXTERIOR_KERNEL_X:
-  incomplete ||= commDim[1] && (x2==0 || x2==X2m1);
+  incomplete = incomplete || param.commDim[1] && (x2==0 || x2==X2m1);
 case EXTERIOR_KERNEL_Y:
-  incomplete ||= commDim[2] && (x3==0 || x3==X3m1);
+  incomplete = incomplete || param.commDim[2] && (x3==0 || x3==X3m1);
 case EXTERIOR_KERNEL_Z:
-  incomplete ||= commDim[3] && (x4==0 || x4==X4m1);
+  incomplete = incomplete || param.commDim[3] && (x4==0 || x4==X4m1);
 }
 
 """)    
@@ -815,10 +804,6 @@ case EXTERIOR_KERNEL_Z:
 
     str += "#undef A_re\n"
     str += "#undef A_im\n\n"
-
-    str += "#ifdef sp_norm_idx\n"
-    str += "#undef sp_norm_idx\n"
-    str += "#endif\n"
 
     for m in range(0,3):
         for n in range(0,3):

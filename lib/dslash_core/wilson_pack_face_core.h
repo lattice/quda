@@ -151,8 +151,6 @@ if (face_num) {
     break;
   case 3:
     {
-      spinorFloat t_proj_scale = spinorFloat(2.0);
-      
       // read spinor from device memory
       READ_SPINOR_UP(SPINORTEX, sp_stride, idx, idx);
       
@@ -278,8 +276,6 @@ if (face_num) {
     break;
   case 3:
     {
-      spinorFloat t_proj_scale = spinorFloat(2.0);
-      
       // read spinor from device memory
       READ_SPINOR_DOWN(SPINORTEX, sp_stride, idx, idx);
       
