@@ -502,7 +502,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
 
     if (nSpin == 1) { // use different packing kernels for staggered and Wilson
       collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
-    } else { // FIXME: Wilson currently uses one kernel for both directions
+    } else {
       packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, *stream); CUERR;
     }
     CUDAMEMCPY(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); CUERR;

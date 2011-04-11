@@ -40,9 +40,10 @@ struct DslashParam {
   int tMul;    // spatial volume distance between the T faces being updated (multi gpu only)
   int threads; // the desired number of active threads
   int parity;  // Even-Odd or Odd-Even
+  int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
   int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
   int ghostOffset[QUDA_MAX_DIM];
-  int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+  int ghostNormOffset[QUDA_MAX_DIM];
   KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
 };
 
@@ -399,7 +400,8 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cu
 #ifdef GPU_WILSON_DIRAC
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-    dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    dslashParam.ghostOffset[i] = in->ghostOffset[i];
+    dslashParam.ghostNormOffset[i] = in->ghostNormOffset[i];
     dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
@@ -454,7 +456,8 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
 #ifdef GPU_WILSON_DIRAC
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-    dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    dslashParam.ghostOffset[i] = in->ghostOffset[i];
+    dslashParam.ghostNormOffset[i] = in->ghostNormOffset[i];
     dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
@@ -522,7 +525,8 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 #ifdef GPU_TWISTED_MASS_DIRAC
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-    dslashParam.ghostOffset[i] = in->ghostOffset[i]; // wilson kernel currently ignores this
+    dslashParam.ghostOffset[i] = in->ghostOffset[i];
+    dslashParam.ghostNormOffset[i] = in->ghostNormOffset[i];
     dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
