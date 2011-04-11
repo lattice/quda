@@ -9,6 +9,7 @@
 //#define DIRECT_ACCESS_LINK
 //#define DIRECT_ACCESS_WILSON_SPINOR
 //#define DIRECT_ACCESS_WILSON_ACCUM
+//#define DIRECT_ACCESS_WILSON_INTER
 //#define DIRECT_ACCESS_WILSON_PACK_SPINOR
 
 //these are access control for staggered action
@@ -26,6 +27,14 @@
 #include <dslash_quda.h>
 #include <sys/time.h>
 
+enum KernelType {
+  INTERIOR_KERNEL = -1,
+  EXTERIOR_KERNEL_X = 0,
+  EXTERIOR_KERNEL_Y = 1,
+  EXTERIOR_KERNEL_Z = 2,
+  EXTERIOR_KERNEL_T = 3
+};
+
 struct DslashParam {
   int tOffset; // offset into the T dimension (multi gpu only)
   int tMul;    // spatial volume distance between the T faces being updated (multi gpu only)
@@ -34,7 +43,7 @@ struct DslashParam {
   int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
   int ghostOffset[QUDA_MAX_DIM];
   int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
-  int kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+  KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
 };
 
 // determines whether the temporal ghost zones are packed with a gather kernel,
@@ -196,11 +205,12 @@ public:
 		   const QudaReconstructType reconstruct, const sFloat *in, const float *inNorm,
 		   const sFloat *x, const float *xNorm, const double a,
 		   const int dagger, const size_t bytes, const size_t norm_bytes) :
-  DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
+    DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
     inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
-    bindSpinorTex(bytes, norm_bytes, in, inNorm, x, xNorm); 
+    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
   }
-  virtual ~WilsonDslashCuda() { unbindSpinorTex(in, inNorm, x, xNorm); }
+
+  virtual ~WilsonDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
@@ -234,9 +244,9 @@ public:
     DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), 
     clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm), 
     reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
-    bindSpinorTex(bytes, norm_bytes, in, inNorm, x, xNorm); 
+    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
   }
-  virtual ~CloverDslashCuda() { unbindSpinorTex(in, inNorm, x, xNorm); }
+  virtual ~CloverDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
@@ -282,11 +292,11 @@ public:
 		    const double k, const int dagger, const size_t bytes, const size_t norm_bytes) :
     DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), 
     in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm) { 
-    bindSpinorTex(bytes, norm_bytes, in, inNorm, x, xNorm); 
+    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
     setTwistParam(a, b, kappa, mu, dagger, QUDA_TWIST_GAMMA5_INVERSE);
     if (x) b *= k;
   }
-  virtual ~TwistedDslashCuda() { unbindSpinorTex(in, inNorm, x, xNorm); }
+  virtual ~TwistedDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
@@ -317,9 +327,9 @@ public:
 		       const double a, const int dagger, const size_t bytes, const size_t norm_bytes) :
     DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), 
     in(in), inNorm(inNorm), mferm(mferm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
-    bindSpinorTex(bytes, norm_bytes, in, inNorm, x, xNorm); 
+    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
   }
-  virtual ~DomainWallDslashCuda() { unbindSpinorTex(in, inNorm, x, xNorm); }
+  virtual ~DomainWallDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
@@ -619,11 +629,6 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 
 }
 
-#define INTERIOR_KERNEL 0
-#define EXTERIOR_KERNEL_X 1
-#define EXTERIOR_KERNEL_Y 2
-#define EXTERIOR_KERNEL_Z 3
-#define EXTERIOR_KERNEL_T 4
 
 template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
@@ -659,9 +664,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
 		   fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a, dslashParam); CUERR;
 
 #ifdef MULTI_GPU
-  int exterior_kernel_flag[4]={
-    EXTERIOR_KERNEL_X, EXTERIOR_KERNEL_Y, EXTERIOR_KERNEL_Z, EXTERIOR_KERNEL_T
-  };
+
   for(int i=0 ;i < 4;i++){
     if (!dslashParam.commDim[i]) continue;
 
@@ -678,7 +681,7 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);
-    dslashParam.kernel_type = exterior_kernel_flag[i];
+    dslashParam.kernel_type = static_cast<KernelType>(i);
     dslashParam.tOffset =  dims[i]-6;
     dslashParam.threads = 6*Vsh[i];
     STAGGERED_DSLASH(exteriorGridDim[i], blockDim[i+1], shared_bytes, streams[Nstream-1], out, outNorm, 
