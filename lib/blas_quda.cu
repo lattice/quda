@@ -4437,8 +4437,8 @@ template <unsigned int reduce_threads, typename Float, typename Float2>
   IMAG_DOT_FLOAT4(idot5, z5, y5);					\
   rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4; \
   idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;
-#define REDUCE_REAL_OPERATION(i) (rdot0);
-#define REDUCE_IMAG_OPERATION(i) (idot0);
+#define REDUCE_REAL_OPERATION(i) (rdot0)
+#define REDUCE_IMAG_OPERATION(i) (idot0)
 #include "reduce_complex_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
@@ -4469,8 +4469,8 @@ template <unsigned int reduce_threads, typename Float, typename Float2>
   IMAG_DOT_FLOAT2(idot2, z2, y2);					\
   rdot0 += rdot1; rdot0 += rdot2;					\
   idot0 += idot1; idot0 += idot2; 
-#define REDUCE_REAL_OPERATION(i) (rdot0);
-#define REDUCE_IMAG_OPERATION(i) (idot0);	
+#define REDUCE_REAL_OPERATION(i) (rdot0)
+#define REDUCE_IMAG_OPERATION(i) (idot0)	
 #include "reduce_complex_core.h"
 #undef REDUCE_FUNC_NAME
 #undef REDUCE_TYPES
