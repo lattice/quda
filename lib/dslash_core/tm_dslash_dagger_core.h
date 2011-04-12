@@ -301,7 +301,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) |
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
     
     a0_re = i00_re;  a0_im = i00_im;
     a1_re = i01_re;  a1_im = i01_im;
@@ -498,7 +498,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
     a0_re = i00_re;  a0_im = i00_im;
     a1_re = i01_re;  a1_im = i01_im;
@@ -691,7 +691,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) |
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
     
     a0_re = i00_re;  a0_im = i00_im;
     a1_re = i01_re;  a1_im = i01_im;
@@ -888,7 +888,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
     a0_re = i00_re;  a0_im = i00_im;
     a1_re = i01_re;  a1_im = i01_im;
@@ -1081,7 +1081,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) |
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
     
     a0_re = i00_re;  a0_im = i00_im;
     a1_re = i01_re;  a1_im = i01_im;
@@ -1278,7 +1278,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
     a0_re = i00_re;  a0_im = i00_im;
     a1_re = i01_re;  a1_im = i01_im;
@@ -1471,7 +1471,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
-      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
       
       a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
       a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
@@ -1546,7 +1546,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
-      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
       
       a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
       a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
@@ -1732,7 +1732,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
-      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
       
       a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
       a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
@@ -1807,7 +1807,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
-      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
       
       a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
       a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
