@@ -133,8 +133,8 @@
   float4 G##2 = make_float4(0,0,0,0);					\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);					\
-  (G##3).z = pi_f*(G##0).x;						\
-  (G##3).w = pi_f*(G##0).w;
+  (G##3).z = (G##0).x = pi_f*(G##0).x;						\
+  (G##3).w = (G##0).y = pi_f*(G##0).y;
 
 #define READ_GAUGE_MATRIX_18_DOUBLE2(G, gauge, dir, idx, stride)    \
   double2 G##0 = gauge[idx + ((dir/2)*9+0)*stride];		    \
@@ -225,8 +225,8 @@
   float4 G##2 = make_float4(0,0,0,0);					\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);					\
-  (G##3).z = pi_f*(G##0).x;						\
-  (G##3).w = pi_f*(G##0).w;
+  (G##3).z = (G##0).x = pi_f*(G##0).x;						\
+  (G##3).w = (G##0).y = pi_f*(G##0).y;
 
 
 #define RESCALE2(G, max)						\
