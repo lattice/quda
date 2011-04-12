@@ -302,11 +302,6 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
   VOUT##2_im += M##22_re * V##02_im;            \
   VOUT##2_im -= M##22_im * V##02_re;
 
-#define INTERIOR_KERNEL 0
-#define EXTERIOR_KERNEL_X 1
-#define EXTERIOR_KERNEL_Y 2
-#define EXTERIOR_KERNEL_Z 3
-#define EXTERIOR_KERNEL_T 4
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if(sid >= param.threads) return;

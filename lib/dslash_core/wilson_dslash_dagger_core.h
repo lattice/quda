@@ -352,6 +352,7 @@ X += x1diff;
 x4 = x4_new;
 #endif
 
+
 #ifdef SPINOR_DOUBLE
 #if (__CUDA_ARCH__ >= 200)
 #define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
@@ -1326,14 +1327,14 @@ if (param.commDim[3] || x4<X4m1)
     #else
     #define sp_norm_idx sp_idx
     #endif
-	spinorFloat t_proj_scale = TWO;
+        spinorFloat t_proj_scale = TWO;
         if (x4 == X4m1) { // front face (lower spin components)
           sp_stride_t = Vs;
           sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)
     #if (DD_PREC==2)
           sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the 2nd norm buffer
     #endif
-	  t_proj_scale = TPROJSCALE;
+          t_proj_scale = TPROJSCALE;
         } else {
           sp_stride_t = sp_stride;
           sp_idx = (X+X3X2X1) >> 1;
@@ -1544,14 +1545,14 @@ if (param.commDim[3] || x4>0)
     #else
     #define sp_norm_idx sp_idx
     #endif
-	spinorFloat t_proj_scale = TWO;
+        spinorFloat t_proj_scale = TWO;
         if (x4 == 0) { // back face
           sp_stride_t = Vs;
           sp_idx = sid + SPINOR_HOP*sp_stride;
     #if (DD_PREC==2)
           sp_norm_idx = sid + sp_stride;
     #endif
-	  t_proj_scale = TPROJSCALE;
+          t_proj_scale = TPROJSCALE;
         } else {
           sp_stride_t = sp_stride;
           sp_idx = (X - X3X2X1) >> 1;
@@ -2158,9 +2159,9 @@ if (param.commDim[3] || x4>0)
 
 #endif // DSLASH_CLOVER
 
-
 #ifdef DSLASH_XPAY
     READ_ACCUM(ACCUMTEX, sp_stride)
+
 #ifdef SPINOR_DOUBLE
     o00_re = a*o00_re + accum0.x;
     o00_im = a*o00_im + accum0.y;
@@ -2214,9 +2215,8 @@ if (param.commDim[3] || x4>0)
 #endif // SPINOR_DOUBLE
 #endif // DSLASH_XPAY
 
-
-    // write spinor field back to device memory
-    WRITE_SPINOR(sp_stride);
+// write spinor field back to device memory
+WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

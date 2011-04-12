@@ -133,76 +133,76 @@ def tmp_im(s, c): return "tmp"+`s`+`c`+"_im"
 
 
 def def_input_spinor():
-    str = []
-    str.append("// input spinor\n")
-    str.append("#ifdef SPINOR_DOUBLE\n")
-    str.append("#define spinorFloat double\n")
+    str = ""
+    str += "// input spinor\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "#define spinorFloat double\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str.append("#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n")
-            str.append("#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n")
-    str.append("\n")
-    str.append("#else\n")
-    str.append("#define spinorFloat float\n")
+            str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
+            str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
+    str += "\n"
+    str += "#else\n"
+    str += "#define spinorFloat float\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str.append("#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n")
-            str.append("#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n")
-    str.append("#endif // SPINOR_DOUBLE\n\n")
-    return ''.join(str)
+            str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
+            str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
+    str += "#endif // SPINOR_DOUBLE\n\n"
+    return str
 # end def def_input_spinor
 
 
 def def_gauge():
-    str = []
-    str.append("// gauge link\n")
-    str.append("#ifdef GAUGE_FLOAT2\n")
+    str = ""
+    str += "// gauge link\n"
+    str += "#ifdef GAUGE_FLOAT2\n"
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
-            str.append("#define "+g_re(0,m,n)+" G"+nthFloat2(2*i+0)+"\n")
-            str.append("#define "+g_im(0,m,n)+" G"+nthFloat2(2*i+1)+"\n")
+            str += "#define "+g_re(0,m,n)+" G"+nthFloat2(2*i+0)+"\n"
+            str += "#define "+g_im(0,m,n)+" G"+nthFloat2(2*i+1)+"\n"
 
-    str.append("// temporaries\n")
-    str.append("#define A_re G"+nthFloat2(18)+"\n")
-    str.append("#define A_im G"+nthFloat2(19)+"\n")    
-    str.append("\n")
-    str.append("#else\n")
+    str += "// temporaries\n"
+    str += "#define A_re G"+nthFloat2(18)+"\n"
+    str += "#define A_im G"+nthFloat2(19)+"\n"
+    str += "\n"
+    str += "#else\n"
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
-            str.append("#define "+g_re(0,m,n)+" G"+nthFloat4(2*i+0)+"\n")
-            str.append("#define "+g_im(0,m,n)+" G"+nthFloat4(2*i+1)+"\n")
+            str += "#define "+g_re(0,m,n)+" G"+nthFloat4(2*i+0)+"\n"
+            str += "#define "+g_im(0,m,n)+" G"+nthFloat4(2*i+1)+"\n"
 
-    str.append("// temporaries\n")
-    str.append("#define A_re G"+nthFloat4(18)+"\n")
-    str.append("#define A_im G"+nthFloat4(19)+"\n")    
-    str.append("\n")
-    str.append("#endif // GAUGE_DOUBLE\n\n")    
+    str += "// temporaries\n"
+    str += "#define A_re G"+nthFloat4(18)+"\n"
+    str += "#define A_im G"+nthFloat4(19)+"\n"
+    str += "\n"
+    str += "#endif // GAUGE_DOUBLE\n\n"
             
-    str.append("// conjugated gauge link\n")
+    str += "// conjugated gauge link\n"
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
-            str.append("#define "+g_re(1,m,n)+" (+"+g_re(0,n,m)+")\n")
-            str.append("#define "+g_im(1,m,n)+" (-"+g_im(0,n,m)+")\n")
-    str.append("\n")
+            str += "#define "+g_re(1,m,n)+" (+"+g_re(0,n,m)+")\n"
+            str += "#define "+g_im(1,m,n)+" (-"+g_im(0,n,m)+")\n"
+    str += "\n"
 
-    return ''.join(str)
+    return str
 # end def def_gauge
 
 
 def def_clover():
-    str = []
-    str.append("// first chiral block of inverted clover term\n")
-    str.append("#ifdef CLOVER_DOUBLE\n")
+    str = ""
+    str += "// first chiral block of inverted clover term\n"
+    str += "#ifdef CLOVER_DOUBLE\n"
     i = 0
     for m in range(0,6):
         s = m/3
         c = m%3
-        str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat2(i)+"\n")
+        str += "#define "+c_re(0,s,c,s,c)+" C"+nthFloat2(i)+"\n"
         i += 1
     for n in range(0,6):
         sn = n/3
@@ -210,15 +210,15 @@ def def_clover():
         for m in range(n+1,6):
             sm = m/3
             cm = m%3
-            str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat2(i)+"\n")
-            str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat2(i+1)+"\n")
+            str += "#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat2(i)+"\n"
+            str += "#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat2(i+1)+"\n"
             i += 2
-    str.append("#else\n")
+    str += "#else\n"
     i = 0
     for m in range(0,6):
         s = m/3
         c = m%3
-        str.append("#define "+c_re(0,s,c,s,c)+" C"+nthFloat4(i)+"\n")
+        str += "#define "+c_re(0,s,c,s,c)+" C"+nthFloat4(i)+"\n"
         i += 1
     for n in range(0,6):
         sn = n/3
@@ -226,10 +226,10 @@ def def_clover():
         for m in range(n+1,6):
             sm = m/3
             cm = m%3
-            str.append("#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat4(i)+"\n")
-            str.append("#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat4(i+1)+"\n")
+            str += "#define "+c_re(0,sm,cm,sn,cn)+" C"+nthFloat4(i)+"\n"
+            str += "#define "+c_im(0,sm,cm,sn,cn)+" C"+nthFloat4(i+1)+"\n"
             i += 2
-    str.append("#endif // CLOVER_DOUBLE\n\n")    
+    str += "#endif // CLOVER_DOUBLE\n\n"
 
     for n in range(0,6):
         sn = n/3
@@ -237,55 +237,54 @@ def def_clover():
         for m in range(0,n):
             sm = m/3
             cm = m%3
-            str.append("#define "+c_re(0,sm,cm,sn,cn)+" (+"+c_re(0,sn,cn,sm,cm)+")\n")
-            str.append("#define "+c_im(0,sm,cm,sn,cn)+" (-"+c_im(0,sn,cn,sm,cm)+")\n")
-    str.append("\n")
+            str += "#define "+c_re(0,sm,cm,sn,cn)+" (+"+c_re(0,sn,cn,sm,cm)+")\n"
+            str += "#define "+c_im(0,sm,cm,sn,cn)+" (-"+c_im(0,sn,cn,sm,cm)+")\n"
+    str += "\n"
 
-    str.append("// second chiral block of inverted clover term (reuses C0,...,C9)\n")
+    str += "// second chiral block of inverted clover term (reuses C0,...,C9)\n"
     for n in range(0,6):
         sn = n/3
         cn = n%3
         for m in range(0,6):
             sm = m/3
             cm = m%3
-            str.append("#define "+c_re(1,sm,cm,sn,cn)+" "+c_re(0,sm,cm,sn,cn)+"\n")
-            if m != n: str.append("#define "+c_im(1,sm,cm,sn,cn)+" "+c_im(0,sm,cm,sn,cn)+"\n")
-    str.append("\n")
+            str += "#define "+c_re(1,sm,cm,sn,cn)+" "+c_re(0,sm,cm,sn,cn)+"\n"
+            if m != n: str += "#define "+c_im(1,sm,cm,sn,cn)+" "+c_im(0,sm,cm,sn,cn)+"\n"
+    str += "\n"
 
-    return ''.join(str)
+    return str
 # end def def_clover
 
 
 def def_output_spinor():
-    str = []
-    str.append("// output spinor\n")
+    str = ""
+    str += "// output spinor\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             if 2*i < sharedFloats:
-                str.append("#define "+out_re(s,c)+" s["+`(2*i+0)`+"*SHARED_STRIDE]\n")
+                str += "#define "+out_re(s,c)+" s["+`(2*i+0)`+"*SHARED_STRIDE]\n"
             else:
-                str.append("volatile spinorFloat "+out_re(s,c)+";\n")
+                str += "volatile spinorFloat "+out_re(s,c)+";\n"
             if 2*i+1 < sharedFloats:
-                str.append("#define "+out_im(s,c)+" s["+`(2*i+1)`+"*SHARED_STRIDE]\n")
+                str += "#define "+out_im(s,c)+" s["+`(2*i+1)`+"*SHARED_STRIDE]\n"
             else:
-                str.append("volatile spinorFloat "+out_im(s,c)+";\n")
-    str.append("\n")
-    return ''.join(str)
+                str += "volatile spinorFloat "+out_im(s,c)+";\n"
+    str += "\n"
+    return str
 # end def def_output_spinor
 
 
 def prolog():
-    str = []
-    str.append("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
-    str.append("#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n\n")
+    str = ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
+    str += "#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n\n"
 
-    str.append(def_input_spinor())
-    str.append(def_gauge())    
-    if clover == True: str.append(def_clover())
-    str.append(def_output_spinor())
+    str += def_input_spinor()
+    str += def_gauge()
+    if clover == True: str += def_clover()
+    str += def_output_spinor()
 
-    str.append(
+    str += (
 """
 
 #include "read_gauge.h"
@@ -311,33 +310,36 @@ x4 = x4_new;
 
 """)
     
-    if sharedFloats > 0:
-        str.append("#ifdef SPINOR_DOUBLE\n")
-        str.append("#if (__CUDA_ARCH__ >= 200)\n")
-        str.append("#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi\n")
-        str.append("#else\n")
-        str.append("#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200\n")
-        str.append("#endif\n")
-        str.append("extern __shared__ spinorFloat sd_data[];\n")
-        str.append("volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)\n")
-        str.append("                                  + (threadIdx.x % SHARED_STRIDE);\n")
-        str.append("#else\n")
-        str.append("#if (__CUDA_ARCH__ >= 200)\n")
-        str.append("#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi\n")
-        str.append("#else\n")
-        str.append("#define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200\n")
-        str.append("#endif\n")
-        str.append("extern __shared__ spinorFloat ss_data[];\n")
-        str.append("volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)\n")
-        str.append("                                  + (threadIdx.x % SHARED_STRIDE);\n")
-        str.append("#endif\n\n")
+    if sharedFloats > 0: str += (
+"""
+#ifdef SPINOR_DOUBLE
+#if (__CUDA_ARCH__ >= 200)
+#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
+#else
+#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
+#endif
+extern __shared__ spinorFloat sd_data[];
+volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
+#else
+#if (__CUDA_ARCH__ >= 200)
+#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
+#else
+#define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
+#endif
+extern __shared__ spinorFloat ss_data[];
+volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
+#endif
+
+""")
     
     for s in range(0,4):
         for c in range(0,3):
-            str.append(out_re(s,c) + " = " + out_im(s,c)+" = 0;\n")
-    str.append("\n")
+            str += out_re(s,c) + " = " + out_im(s,c)+" = 0;\n"
+    str += "\n"
     
-    return ''.join(str)
+    return str
 # end def prolog
 
 
@@ -355,82 +357,103 @@ def gen(dir, pack_only=False):
             return (1, proj(i,1))
         if proj(i,1) == 0j:
             return (0, proj(i,0))
-    
-    str = []
+
+
+    cond = ""
+    if dir == 6:
+        cond += "#ifdef MULTI_GPU\n"
+        cond += "if (param.commDim[3] || x4<X4m1)\n"
+        cond += "#endif\n"
+    elif dir == 7:
+        cond += "#ifdef MULTI_GPU\n"
+        cond += "if (param.commDim[3] || x4>0)\n"
+        cond += "#endif\n"
+
+    str = ""
     
     projName = "P"+`dir/2`+["-","+"][projIdx%2]
-    str.append("// Projector "+projName+"\n")
+    str += "// Projector "+projName+"\n"
     for l in projStr.splitlines():
-        str.append("// "+l+"\n")
-    str.append("\n")
+        str += "// "+l+"\n"
+    str += "\n"
     
-    if dir == 0: str.append("int sp_idx = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;\n")
-    if dir == 1: str.append("int sp_idx = ((x1==0)    ? X+X1m1 : X-1) >> 1;\n")
-    if dir == 2: str.append("int sp_idx = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;\n")
-    if dir == 3: str.append("int sp_idx = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;\n")
-    if dir == 4: str.append("int sp_idx = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;\n")
-    if dir == 5: str.append("int sp_idx = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;\n")
-    if dir == 6: 
-        str.append("#ifndef MULTI_GPU\n")
-        str.append("    int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;\n")
-        str.append("#define sp_stride_t sp_stride\n")
-        str.append("#define sp_norm_idx sp_idx\n")
-        str.append("#else\n")
-        str.append("    int sp_idx;\n")
-        str.append("    int sp_stride_t;\n")
-        str.append("#if (DD_PREC==2)\n")
-        str.append("    int sp_norm_idx;\n")
-        str.append("#else\n")
-        str.append("#define sp_norm_idx sp_idx\n")
-        str.append("#endif\n")
-        str.append("    if (x4 == X4m1) { // front face (lower spin components)\n")
-        str.append("      sp_stride_t = Vs;\n")
-        str.append("      sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)\n")
-        str.append("#if (DD_PREC==2)\n")
-        str.append("      sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the 2nd norm buffer\n")
-        str.append("#endif\n")
-        str.append("    } else {\n")
-        str.append("      sp_stride_t = sp_stride;\n")
-        str.append("      sp_idx = (X+X3X2X1) >> 1;\n")
-        str.append("#if (DD_PREC==2)\n")
-        str.append("      sp_norm_idx = sp_idx;\n")
-        str.append("#endif\n")
-        str.append("    }\n")
-        str.append("#endif // MULTI_GPU\n\n")
-    if dir == 7: 
-        str.append("#ifndef MULTI_GPU\n")
-        str.append("    int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;\n")
-        str.append("#define sp_stride_t sp_stride\n")
-        str.append("#define sp_norm_idx sp_idx\n")
-        str.append("    int ga_idx = sp_idx;\n")
-        str.append("#else\n")
-        str.append("    int sp_idx;\n")
-        str.append("    int sp_stride_t;\n")
-        str.append("#if (DD_PREC==2)\n")
-        str.append("    int sp_norm_idx;\n")
-        str.append("#else\n")
-        str.append("#define sp_norm_idx sp_idx\n")
-        str.append("#endif\n")
-        str.append("    if (x4 == 0) { // back face\n")
-        str.append("      sp_stride_t = Vs;\n")
-        str.append("      sp_idx = sid + SPINOR_HOP*sp_stride;\n")
-        str.append("#if (DD_PREC==2)\n")
-        str.append("      sp_norm_idx = sid + sp_stride;\n")
-        str.append("#endif\n")
-        str.append("    } else {\n")
-        str.append("      sp_stride_t = sp_stride;\n")
-        str.append("      sp_idx = (X - X3X2X1) >> 1;\n")
-        str.append("#if (DD_PREC==2)\n")
-        str.append("      sp_norm_idx = sp_idx;\n")
-        str.append("#endif\n")
-        str.append("    }\n")
-        str.append("    // back links in pad, which is offset by Vh+sid from buffer start\n")
-        str.append("    int ga_idx = (x4==0) ? sid+Vh : sp_idx;\n")
-        str.append("#endif // MULTI_GPU\n\n")
+    if dir == 0: str += "int sp_idx = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;\n"
+    if dir == 1: str += "int sp_idx = ((x1==0)    ? X+X1m1 : X-1) >> 1;\n"
+    if dir == 2: str += "int sp_idx = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;\n"
+    if dir == 3: str += "int sp_idx = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;\n"
+    if dir == 4: str += "int sp_idx = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;\n"
+    if dir == 5: str += "int sp_idx = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;\n"
+    if dir == 6: str += (
+"""#ifndef MULTI_GPU
+    int sp_idx = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+#define sp_stride_t sp_stride
+#define sp_norm_idx sp_idx
+#define t_proj_scale 2
+#else
+    int sp_idx;
+    int sp_stride_t;
+#if (DD_PREC==2)
+    int sp_norm_idx;
+#else
+#define sp_norm_idx sp_idx
+#endif
+    spinorFloat t_proj_scale = TWO;
+    if (x4 == X4m1) { // front face (lower spin components)
+      sp_stride_t = Vs;
+      sp_idx = sid - (Vh - Vs) + SPINOR_HOP*sp_stride; // starts at Npad*Vs (precalculate more)
+#if (DD_PREC==2)
+      sp_norm_idx = sid - (Vh - Vs) + sp_stride + Vs; // need extra Vs addition since we require the 2nd norm buffer
+#endif
+      t_proj_scale = TPROJSCALE;
+    } else {
+      sp_stride_t = sp_stride;
+      sp_idx = (X+X3X2X1) >> 1;
+#if (DD_PREC==2)
+      sp_norm_idx = sp_idx;
+#endif
+    }
+#endif // MULTI_GPU
+
+""")
+
+    if dir == 7: str += (
+"""#ifndef MULTI_GPU
+    int sp_idx = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
+#define sp_stride_t sp_stride
+#define sp_norm_idx sp_idx
+#define t_proj_scale 2
+    int ga_idx = sp_idx;
+#else
+    int sp_idx;
+    int sp_stride_t;
+#if (DD_PREC==2)
+    int sp_norm_idx;
+#else
+#define sp_norm_idx sp_idx
+#endif
+    spinorFloat t_proj_scale = TWO;
+    if (x4 == 0) { // back face
+      sp_stride_t = Vs;
+      sp_idx = sid + SPINOR_HOP*sp_stride;
+#if (DD_PREC==2)
+      sp_norm_idx = sid + sp_stride;
+#endif
+      t_proj_scale = TPROJSCALE;
+    } else {
+      sp_stride_t = sp_stride;
+      sp_idx = (X - X3X2X1) >> 1;
+#if (DD_PREC==2)
+      sp_norm_idx = sp_idx;
+#endif
+    }
+    // back links in pad, which is offset by Vh+sid from buffer start
+    int ga_idx = (x4==0) ? sid+Vh : sp_idx;
+#endif // MULTI_GPU\n
+""")
     
     if dir != 7:
         ga_idx = "sid" if dir % 2 == 0 else "sp_idx"
-        str.append("int ga_idx = "+ga_idx+";\n\n")
+        str += "int ga_idx = "+ga_idx+";\n\n"
     
     # scan the projector to determine which loads are required
     row_cnt = ([0,0,0,0])
@@ -443,87 +466,82 @@ def gen(dir, pack_only=False):
     row_cnt[0] += row_cnt[1]
     row_cnt[2] += row_cnt[3]
 
-    load_spinor = []
-    load_spinor.append("// read spinor from device memory\n")
+    load_spinor = "// read spinor from device memory\n"
     if row_cnt[0] == 0:
-        load_spinor.append("READ_SPINOR_DOWN(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);\n\n")
+        load_spinor += "READ_SPINOR_DOWN(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);\n\n"
     elif row_cnt[2] == 0:
-        load_spinor.append("READ_SPINOR_UP(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);\n\n")
+        load_spinor += "READ_SPINOR_UP(SPINORTEX, sp_stride_t, sp_idx, sp_norm_idx);\n\n"
     else:
-        load_spinor.append("READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n\n")
+        load_spinor += "READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n\n"
 
-    load_gauge = []
-    load_gauge.append("// read gauge matrix from device memory\n")
-    load_gauge.append("READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n")
+    load_gauge = "// read gauge matrix from device memory\n"
+    load_gauge += "READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
 
-    reconstruct_gauge = []
-    reconstruct_gauge.append("// reconstruct gauge matrix\n")
-    reconstruct_gauge.append("RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n")
+    reconstruct_gauge = "// reconstruct gauge matrix\n"
+    reconstruct_gauge += "RECONSTRUCT_GAUGE_MATRIX("+`dir`+");\n\n"
 
-    project = []
-    project.append("// project spinor into half spinors\n")
+    project = "// project spinor into half spinors\n"
     for h in range(0, 2):
         for c in range(0, 3):
-            strRe = []
-            strIm = []
+            strRe = ""
+            strIm = ""
             for s in range(0, 4):
                 re = proj(h,s).real
                 im = proj(h,s).imag
                 if re==0 and im==0: ()
                 elif im==0:
-                    strRe.append(sign(re)+in_re(s,c))
-                    strIm.append(sign(re)+in_im(s,c))
+                    strRe += sign(re)+in_re(s,c)
+                    strIm += sign(re)+in_im(s,c)
                 elif re==0:
-                    strRe.append(sign(-im)+in_im(s,c))
-                    strIm.append(sign(im)+in_re(s,c))
+                    strRe += sign(-im)+in_im(s,c)
+                    strIm += sign(im)+in_re(s,c)
             if row_cnt[0] == 0: #projector defined on lower half only
                 for s in range(0, 4):
                     re = proj(h+2,s).real
                     im = proj(h+2,s).imag
                     if re==0 and im==0: ()
                     elif im==0:
-                        strRe.append(sign(re)+in_re(s,c))
-                        strIm.append(sign(re)+in_im(s,c))
+                        strRe += sign(re)+in_re(s,c)
+                        strIm += sign(re)+in_im(s,c)
                     elif re==0:
-                        strRe.append(sign(-im)+in_im(s,c))
-                        strIm.append(sign(im)+in_re(s,c))
+                        strRe += sign(-im)+in_im(s,c)
+                        strIm += sign(im)+in_re(s,c)
                 
-            project.append("spinorFloat "+h1_re(h,c)+ " = "+''.join(strRe)+";\n")
-            project.append("spinorFloat "+h1_im(h,c)+ " = "+''.join(strIm)+";\n")
-        project.append("\n")
+            project += "spinorFloat "+h1_re(h,c)+ " = "+''.join(strRe)+";\n"
+            project += "spinorFloat "+h1_im(h,c)+ " = "+''.join(strIm)+";\n"
+        project += "\n"
     
-    ident = []
-    ident.append("// identity gauge matrix\n")
+    ident = "// identity gauge matrix\n"
     for m in range(0,3):
         for h in range(0,2):
-            ident.append("spinorFloat "+h2_re(h,m)+" = " + h1_re(h,m) + "; ")
-            ident.append("spinorFloat "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n")
-    ident.append("\n")
+            ident += "spinorFloat "+h2_re(h,m)+" = " + h1_re(h,m) + "; "
+            ident += "spinorFloat "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n"
+    ident += "\n"
     
-    mult = []
+    mult = ""
     for m in range(0,3):
-        mult.append("// multiply row "+`m`+"\n")
+        mult += "// multiply row "+`m`+"\n"
         for h in range(0,2):
-            re = ["spinorFloat "+h2_re(h,m)+" = 0;\n"]
-            im = ["spinorFloat "+h2_im(h,m)+" = 0;\n"]
+            re = "spinorFloat "+h2_re(h,m)+" = 0;\n"
+            im = "spinorFloat "+h2_im(h,m)+" = 0;\n"
             for c in range(0,3):
-                re.append(h2_re(h,m) + " += " + g_re(dir,m,c) + " * "+h1_re(h,c)+";\n")
-                re.append(h2_re(h,m) + " -= " + g_im(dir,m,c) + " * "+h1_im(h,c)+";\n")
-                im.append(h2_im(h,m) + " += " + g_re(dir,m,c) + " * "+h1_im(h,c)+";\n")
-                im.append(h2_im(h,m) + " += " + g_im(dir,m,c) + " * "+h1_re(h,c)+";\n")
-            mult.append(''.join(re))
-            mult.append(''.join(im))
-        mult.append("\n")
+                re += h2_re(h,m) + " += " + g_re(dir,m,c) + " * "+h1_re(h,c)+";\n"
+                re += h2_re(h,m) + " -= " + g_im(dir,m,c) + " * "+h1_im(h,c)+";\n"
+                im += h2_im(h,m) + " += " + g_re(dir,m,c) + " * "+h1_im(h,c)+";\n"
+                im += h2_im(h,m) + " += " + g_im(dir,m,c) + " * "+h1_re(h,c)+";\n"
+            mult += ''.join(re)
+            mult += ''.join(im)
+        mult += "\n"
     
-    reconstruct = []
+    reconstruct = ""
     for m in range(0,3):
 
         for h in range(0,2):
             h_out = h
             if row_cnt[0] == 0: # projector defined on lower half only
                 h_out = h+2
-            reconstruct.append(out_re(h_out, m) + " += " + h2_re(h,m) + ";\n")
-            reconstruct.append(out_im(h_out, m) + " += " + h2_im(h,m) + ";\n")
+            reconstruct += out_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
+            reconstruct += out_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
     
         for s in range(2,4):
             (h,c) = row(s)
@@ -532,325 +550,313 @@ def gen(dir, pack_only=False):
             if im == 0 and re == 0:
                 ()
             elif im == 0:
-                reconstruct.append(out_re(s, m) + " " + sign(re) + "= " + h2_re(h,m) + ";\n")
-                reconstruct.append(out_im(s, m) + " " + sign(re) + "= " + h2_im(h,m) + ";\n")
+                reconstruct += out_re(s, m) + " " + sign(re) + "= " + h2_re(h,m) + ";\n"
+                reconstruct += out_im(s, m) + " " + sign(re) + "= " + h2_im(h,m) + ";\n"
             elif re == 0:
-                reconstruct.append(out_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n")
-                reconstruct.append(out_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n")
+                reconstruct += out_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
+                reconstruct += out_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
         
-        reconstruct.append("\n")
+        reconstruct += "\n"
         
     if dir >= 6:
-        str.append("if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) ")
-        str.append(block(''.join(load_spinor) + ''.join(project) + ''.join(ident) + ''.join(reconstruct)))
-        str.append(" else ")
-        str.append(block(''.join(load_gauge) + ''.join(load_spinor) + ''.join(reconstruct_gauge) + 
-                         ''.join(project) + ''.join(mult) + ''.join(reconstruct)))
+        str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h) "
+        str += block(load_spinor + project + ident + reconstruct)
+        str += " else "
+        str += block(load_gauge + load_spinor + reconstruct_gauge + project + mult + reconstruct)
     else:
-        str.append(''.join(load_gauge) + ''.join(load_spinor) + ''.join(reconstruct_gauge) + 
-                   ''.join(project) + ''.join(mult) + ''.join(reconstruct))
+        str += load_gauge + load_spinor + reconstruct_gauge + project + mult + reconstruct
     
     if pack_only:
-        out = ''.join(load_spinor) + ''.join(project)
+        out = load_spinor + project
         out = out.replace("sp_stride_t", "sp_stride")
         out = out.replace("sp_idx", "idx")
         out = out.replace("sp_norm_idx", "idx")
         return out
     else:
-        return block(''.join(str))+"\n\n"
+        str = str.replace("2*", "t_proj_scale*")
+        return cond + block(str)+"\n\n"
 # end def gen
 
 
 def to_chiral_basis(c):
-    str = []
-
-    str.append("spinorFloat "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n")
-    str.append("spinorFloat "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n")
-    str.append("spinorFloat "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n")
-    str.append("spinorFloat "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n")
-    str.append("spinorFloat "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n")
-    str.append("spinorFloat "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n")
-    str.append("spinorFloat "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n")
-    str.append("spinorFloat "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n")
-    str.append("\n")
+    str = ""
+    str += "spinorFloat "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n"
+    str += "spinorFloat "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n"
+    str += "spinorFloat "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n"
+    str += "spinorFloat "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n"
+    str += "spinorFloat "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n"
+    str += "spinorFloat "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n"
+    str += "spinorFloat "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n"
+    str += "spinorFloat "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n"
+    str += "\n"
 
     for s in range (0,4):
-        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";  ")
-        str.append(out_im(s,c)+" = "+a_im(0,s,c)+";\n")
+        str += out_re(s,c)+" = "+a_re(0,s,c)+";  "
+        str += out_im(s,c)+" = "+a_im(0,s,c)+";\n"
 
-    return block(''.join(str))+"\n\n"
+    return block(str)+"\n\n"
 # end def to_chiral_basis
 
 
 def from_chiral_basis(c): # note: factor of 1/2 is included in clover term normalization
-    str = []
-    str.append("spinorFloat "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n")
-    str.append("spinorFloat "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n")
-    str.append("spinorFloat "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n")
-    str.append("spinorFloat "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n")
-    str.append("spinorFloat "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n")
-    str.append("spinorFloat "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n")
-    str.append("spinorFloat "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n")
-    str.append("spinorFloat "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n")
-    str.append("\n")
+    str = ""
+    str += "spinorFloat "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n"
+    str += "spinorFloat "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n"
+    str += "spinorFloat "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n"
+    str += "spinorFloat "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n"
+    str += "spinorFloat "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n"
+    str += "spinorFloat "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n"
+    str += "spinorFloat "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n"
+    str += "spinorFloat "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n"
+    str += "\n"
 
     for s in range (0,4):
-        str.append(out_re(s,c)+" = "+a_re(0,s,c)+";  ")
-        str.append(out_im(s,c)+" = "+a_im(0,s,c)+";\n")
+        str += out_re(s,c)+" = "+a_re(0,s,c)+";  "
+        str += out_im(s,c)+" = "+a_im(0,s,c)+";\n"
 
-    return block(''.join(str))+"\n\n"
+    return block(str)+"\n\n"
 # end def from_chiral_basis
 
 
 def clover_mult(chi):
-    str = []
-    str.append("READ_CLOVER(CLOVERTEX, "+`chi`+")\n")
-    str.append("\n")
+    str = "READ_CLOVER(CLOVERTEX, "+`chi`+")\n\n"
 
     for s in range (0,2):
         for c in range (0,3):
-            str.append("spinorFloat "+a_re(chi,s,c)+" = 0; spinorFloat "+a_im(chi,s,c)+" = 0;\n")
-    str.append("\n")
+            str += "spinorFloat "+a_re(chi,s,c)+" = 0; spinorFloat "+a_im(chi,s,c)+" = 0;\n"
+    str += "\n"
 
     for sm in range (0,2):
         for cm in range (0,3):
             for sn in range (0,2):
                 for cn in range (0,3):
-                    str.append(a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n")
+                    str += a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n"
                     if (sn != sm) or (cn != cm): 
-                        str.append(a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n")
-                    #else: str.append(";\n")
-                    str.append(a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n")
+                        str += a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n"
+                    #else: str += ";\n"
+                    str += a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n"
                     if (sn != sm) or (cn != cm): 
-                        str.append(a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n")
-                    #else: str.append(";\n")
-            str.append("\n")
+                        str += a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n"
+                    #else: str += ";\n"
+            str += "\n"
 
     for s in range (0,2):
         for c in range (0,3):
-            str.append(out_re(2*chi+s,c)+" = "+a_re(chi,s,c)+";  ")
-            str.append(out_im(2*chi+s,c)+" = "+a_im(chi,s,c)+";\n")
-    str.append("\n")
+            str += out_re(2*chi+s,c)+" = "+a_re(chi,s,c)+";  "
+            str += out_im(2*chi+s,c)+" = "+a_im(chi,s,c)+";\n"
+    str += "\n"
 
-    return block(''.join(str))+"\n\n"
+    return block(str)+"\n\n"
 # end def clover_mult
 
 
 def apply_clover():
-    str = []
-    str.append("#ifdef DSLASH_CLOVER\n\n")
-    str.append("// change to chiral basis\n")
-    str.append(to_chiral_basis(0) + to_chiral_basis(1) + to_chiral_basis(2) + "\n")
-    str.append("// apply first chiral block\n")
-    str.append(clover_mult(0))
-    str.append("// apply second chiral block\n")
-    str.append(clover_mult(1))
-    str.append("// change back from chiral basis\n")
-    str.append("// (note: required factor of 1/2 is included in clover term normalization)\n")
-    str.append(from_chiral_basis(0) + from_chiral_basis(1) + from_chiral_basis(2))
-    str.append("#endif // DSLASH_CLOVER\n")
+    str = ""
+    str += "#ifdef DSLASH_CLOVER\n\n"
+    str += "// change to chiral basis\n"
+    str += to_chiral_basis(0) + to_chiral_basis(1) + to_chiral_basis(2) + "\n"
+    str += "// apply first chiral block\n"
+    str += clover_mult(0)
+    str += "// apply second chiral block\n"
+    str += clover_mult(1)
+    str += "// change back from chiral basis\n"
+    str += "// (note: required factor of 1/2 is included in clover term normalization)\n"
+    str += from_chiral_basis(0) + from_chiral_basis(1) + from_chiral_basis(2)
+    str += "#endif // DSLASH_CLOVER\n"
 
     return ''.join(str)+"\n"
 # end def clover
 
 
 def twisted_rotate(x):
-    str = []
-    str.append("// apply twisted mass rotation\n")
+    str = "// apply twisted mass rotation\n"
 
     for h in range(0, 4):
         for c in range(0, 3):
-            strRe = []
-            strIm = []
+            strRe = ""
+            strIm = ""
             for s in range(0, 4):
                 # identity
                 re = id[4*h+s].real
                 im = id[4*h+s].imag
                 if re==0 and im==0: ()
                 elif im==0:
-                    strRe.append(sign(re)+out_re(s,c))
-                    strIm.append(sign(re)+out_im(s,c))
+                    strRe += sign(re)+out_re(s,c)
+                    strIm += sign(re)+out_im(s,c)
                 elif re==0:
-                    strRe.append(sign(-im)+out_im(s,c))
-                    strIm.append(sign(im)+out_re(s,c))
+                    strRe += sign(-im)+out_im(s,c)
+                    strIm += sign(im)+out_re(s,c)
                 
                 # sign(x)*i*mu*gamma_5
                 re = igamma5[4*h+s].real
                 im = igamma5[4*h+s].imag
                 if re==0 and im==0: ()
                 elif im==0:
-                    strRe.append(sign(re*x)+out_re(s,c) + "*a")
-                    strIm.append(sign(re*x)+out_im(s,c) + "*a")
+                    strRe += sign(re*x)+out_re(s,c) + "*a"
+                    strIm += sign(re*x)+out_im(s,c) + "*a"
                 elif re==0:
-                    strRe.append(sign(-im*x)+out_im(s,c) + "*a")
-                    strIm.append(sign(im*x)+out_re(s,c) + "*a")
+                    strRe += sign(-im*x)+out_im(s,c) + "*a"
+                    strIm += sign(im*x)+out_re(s,c) + "*a"
 
-            str.append("volatile spinorFloat "+tmp_re(h,c)+ " = "+''.join(strRe)+";\n")
-            str.append("volatile spinorFloat "+tmp_im(h,c)+ " = "+''.join(strIm)+";\n")
-        str.append("\n")
+            str += "volatile spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
+            str += "volatile spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
+        str += "\n"
     
-    return ''.join(str)+"\n"
+    return str+"\n"
 
 
 def twisted():
-    str = []
-    str.append(twisted_rotate(+1))
+    str = ""
+    str += twisted_rotate(+1)
 
-    str.append("#ifndef DSLASH_XPAY\n")
-    str.append("//scale by b = 1/(1 + a*a) \n")
+    str += "#ifndef DSLASH_XPAY\n"
+    str += "//scale by b = 1/(1 + a*a) \n"
     for s in range(0,4):
         for c in range(0,3):
-            str.append(out_re(s,c) + " = b*" + tmp_re(s,c) + ";\n")
-            str.append(out_im(s,c) + " = b*" + tmp_im(s,c) + ";\n")
-    str.append("#else\n")
+            str += out_re(s,c) + " = b*" + tmp_re(s,c) + ";\n"
+            str += out_im(s,c) + " = b*" + tmp_im(s,c) + ";\n"
+    str += "#else\n"
     for s in range(0,4):
         for c in range(0,3):
-            str.append(out_re(s,c) + " = " + tmp_re(s,c) + ";\n")
-            str.append(out_im(s,c) + " = " + tmp_im(s,c) + ";\n")
-    str.append("#endif // DSLASH_XPAY\n")
-    str.append("\n")
+            str += out_re(s,c) + " = " + tmp_re(s,c) + ";\n"
+            str += out_im(s,c) + " = " + tmp_im(s,c) + ";\n"
+    str += "#endif // DSLASH_XPAY\n"
+    str += "\n"
 
     return block(''.join(str))+"\n"
 # end def twisted
 
 
 def epilog():
-    str = []
-    str.append(
-"""
-#ifdef DSLASH_XPAY
-    READ_ACCUM(ACCUMTEX, sp_stride)
-""")
+    str = ""
+    str += "#ifdef DSLASH_XPAY\n"
+    str += "    READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
 
-    str.append("#ifdef SPINOR_DOUBLE\n")
+    str += "#ifdef SPINOR_DOUBLE\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             if twist == False:
-                str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n")
-                str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n")
+                str += "    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
+                str += "    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
             else:
-                str.append("    "+out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n")
-                str.append("    "+out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n")
+                str += "    "+out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
+                str += "    "+out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
 
-    str.append("#else\n")
+    str += "#else\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             if twist == False:
-                str.append("    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
-                str.append("    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
+                str += "    "+out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
+                str += "    "+out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
             else:
-                str.append("    "+out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n")
-                str.append("    "+out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n")
-    str.append("#endif // SPINOR_DOUBLE\n")
+                str += "    "+out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
+                str += "    "+out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
 
-    str.append("#endif // DSLASH_XPAY\n\n")
+    str += "#endif // SPINOR_DOUBLE\n"
+    str += "#endif // DSLASH_XPAY\n\n"
     
-    str.append(
-"""
-    // write spinor field back to device memory
-    WRITE_SPINOR(sp_stride);
+    str += "// write spinor field back to device memory\n"
+    str += "WRITE_SPINOR(sp_stride);\n\n"
 
-""")
+    str += "// undefine to prevent warning when precision is changed\n"
+    str += "#undef spinorFloat\n"
+    str += "#undef SHARED_STRIDE\n\n"
 
-    str.append("// undefine to prevent warning when precision is changed\n")
-    str.append("#undef spinorFloat\n")
-    str.append("#undef SHARED_STRIDE\n\n")
+    str += "#undef A_re\n"
+    str += "#undef A_im\n\n"
 
-    str.append("#undef A_re\n")
-    str.append("#undef A_im\n\n")
-
-    str.append("#ifdef sp_norm_idx\n")
-    str.append("#undef sp_norm_idx\n")
-    str.append("#endif\n")
+    str += "#ifdef sp_norm_idx\n"
+    str += "#undef sp_norm_idx\n"
+    str += "#endif\n"
 
     for m in range(0,3):
         for n in range(0,3):
             i = 3*m+n
-            str.append("#undef "+g_re(0,m,n)+"\n")
-            str.append("#undef "+g_im(0,m,n)+"\n")
-    str.append("\n")
+            str += "#undef "+g_re(0,m,n)+"\n"
+            str += "#undef "+g_im(0,m,n)+"\n"
+    str += "\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str.append("#undef "+in_re(s,c)+"\n")
-            str.append("#undef "+in_im(s,c)+"\n")
-    str.append("\n")
+            str += "#undef "+in_re(s,c)+"\n"
+            str += "#undef "+in_im(s,c)+"\n"
+    str += "\n"
 
     if clover == True:
         for m in range(0,6):
             s = m/3
             c = m%3
-            str.append("#undef "+c_re(0,s,c,s,c)+"\n")
+            str += "#undef "+c_re(0,s,c,s,c)+"\n"
             for n in range(0,6):
                 sn = n/3
                 cn = n%3
                 for m in range(n+1,6):
                     sm = m/3
                     cm = m%3
-                    str.append("#undef "+c_re(0,sm,cm,sn,cn)+"\n")
-                    str.append("#undef "+c_im(0,sm,cm,sn,cn)+"\n")
-        str.append("\n")
+                    str += "#undef "+c_re(0,sm,cm,sn,cn)+"\n"
+                    str += "#undef "+c_im(0,sm,cm,sn,cn)+"\n"
+        str += "\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             if 2*i < sharedFloats:
-                str.append("#undef "+out_re(s,c)+"\n")
+                str += "#undef "+out_re(s,c)+"\n"
                 if 2*i+1 < sharedFloats:
-                    str.append("#undef "+out_im(s,c)+"\n")
-    str.append("\n")
+                    str += "#undef "+out_im(s,c)+"\n"
+    str += "\n"
 
     return ''.join(str)
 # end def epilog
 
 
 def pack_face(facenum):
-    str = []
-    str.append("\nswitch(dim) {\n")
+    str = "\n"
+    str += "switch(dim) {\n"
     for dim in range(0,4):
-        str.append("case "+`dim`+":\n")
-        proj = []
-        proj.append(gen(2*dim+facenum, pack_only=True))
-        proj.append("// write spinor field back to device memory\n")
-        proj.append("WRITE_HALF_SPINOR(face_volume, face_idx);\n")
-        str.append(indent(block(''.join(proj))+"\n"+"break;\n"))
-    str.append("}\n\n")
-    return ''.join(str)
+        str += "case "+`dim`+":\n"
+        proj = gen(2*dim+facenum, pack_only=True)
+        proj += "// write half spinor back to device memory\n"
+        proj += "WRITE_HALF_SPINOR(face_volume, face_idx);\n"
+        str += indent(block(proj)+"\n"+"break;\n")
+    str += "}\n\n"
+    return str
 # end def pack_face
 
 
 def generate_pack():
-    str = []
-    str.append(def_input_spinor())
-    str.append("#include \"io_spinor.h\"\n\n")
+    assert (sharedFloats == 0)
+    str = ""
+    str += def_input_spinor()
+    str += "#include \"io_spinor.h\"\n\n"
 
-    str.append("if (face_num) ")
-    str.append(block(pack_face(1)))
-    str.append(" else ")
-    str.append(block(pack_face(0)))
+    str += "if (face_num) "
+    str += block(pack_face(1))
+    str += " else "
+    str += block(pack_face(0))
 
-    str.append("\n\n")
-    str.append("// undefine to prevent warning when precision is changed\n")
-    str.append("#undef spinorFloat\n")
-    str.append("#undef SHARED_STRIDE\n\n")
+    str += "\n\n"
+    str += "// undefine to prevent warning when precision is changed\n"
+    str += "#undef spinorFloat\n"
+    str += "#undef SHARED_STRIDE\n\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str.append("#undef "+in_re(s,c)+"\n")
-            str.append("#undef "+in_im(s,c)+"\n")
-    str.append("\n")
+            str += "#undef "+in_re(s,c)+"\n"
+            str += "#undef "+in_im(s,c)+"\n"
+    str += "\n"
 
-    return ''.join(str)
+    return str
 # end def generate_pack
 
 
-def generate():
+def generate_wilson():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + apply_clover() + epilog()
 
 def generate_twisted():
@@ -865,13 +871,13 @@ clover = True
 dagger = False
 print sys.argv[0] + ": generating wilson_dslash_core.h";
 f = open('dslash_core/wilson_dslash_core.h', 'w')
-f.write(generate())
+f.write(generate_wilson())
 f.close()
 
 dagger = True
 print sys.argv[0] + ": generating wilson_dslash_dagger_core.h";
 f = open('dslash_core/wilson_dslash_dagger_core.h', 'w')
-f.write(generate())
+f.write(generate_wilson())
 f.close()
 
 twist = True

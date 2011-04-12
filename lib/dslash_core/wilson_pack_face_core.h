@@ -79,7 +79,7 @@ if (face_num) {
             spinorFloat b2_re = +i12_re-i22_im;
             spinorFloat b2_im = +i12_im+i22_re;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
@@ -103,7 +103,7 @@ if (face_num) {
             spinorFloat b2_re = +i12_re-i22_re;
             spinorFloat b2_im = +i12_im-i22_im;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
@@ -127,7 +127,7 @@ if (face_num) {
             spinorFloat b2_re = +i12_re+i32_im;
             spinorFloat b2_im = +i12_im-i32_re;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
@@ -151,7 +151,7 @@ if (face_num) {
             spinorFloat b2_re = +2*i12_re;
             spinorFloat b2_im = +2*i12_im;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
@@ -180,7 +180,7 @@ if (face_num) {
             spinorFloat b2_re = +i12_re+i22_im;
             spinorFloat b2_im = +i12_im-i22_re;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
@@ -204,7 +204,7 @@ if (face_num) {
             spinorFloat b2_re = +i12_re+i22_re;
             spinorFloat b2_im = +i12_im+i22_im;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
@@ -228,7 +228,7 @@ if (face_num) {
             spinorFloat b2_re = +i12_re-i32_im;
             spinorFloat b2_im = +i12_im+i32_re;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
@@ -252,7 +252,7 @@ if (face_num) {
             spinorFloat b2_re = +2*i32_re;
             spinorFloat b2_im = +2*i32_im;
             
-            // write spinor field back to device memory
+            // write half spinor back to device memory
             WRITE_HALF_SPINOR(face_volume, face_idx);
         }
         break;
