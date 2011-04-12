@@ -719,7 +719,7 @@ int main(int argc, char** argv)
       continue;
     }
 
-    if( strcmp(argv[i], "--manual_set_partition") == 0){
+    if( strcmp(argv[i], "--partition") == 0){
       if (i+1 >= argc){
         usage(argv);
       }     
