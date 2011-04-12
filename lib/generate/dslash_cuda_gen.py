@@ -339,14 +339,17 @@ if (param.kernel_type == INTERIOR_KERNEL) {
 } else { // exterior kernel
 
   const int dim = static_cast<int>(param.kernel_type);
-  const int face_volume = (param.threads >> 1);
-  const int face_num = (sid >= face_volume);
-  const int face_idx = sid - face_num*face_volume;
+  const int face_volume = (param.threads >> 1);           // volume of one face
+  const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
+  const int face_idx = sid - face_num*face_volume;        // index into the respective face
 
-  sp_idx = sid + param.ghostOffset[dim];
+  // need extra SPINOR_HOP*sp_stride since ghostoffset is just the offset from the start of the end zone
+  // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
+  sp_idx = face_idx + SPINOR_HOP*sp_stride + param.ghostOffset[dim];
+  //sp_idx = sid + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[dim];
+  sp_norm_idx = sid + sp_stride + param.ghostNormOffset[dim];
 #endif
     
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
@@ -458,8 +461,11 @@ def gen(dir, pack_only=False):
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
     load_half += "// read half spinor from device memory\n"
-    load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
 
+# we have to use the same volume index for backwards and forwards gathers
+# instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
+    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
     load_gauge += "READ_GAUGE_MATRIX(G, GAUGE"+`dir%2`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
 

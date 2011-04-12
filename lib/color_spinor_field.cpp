@@ -66,6 +66,7 @@ void ColorSpinorField::createGhostZone() {
       ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1];
       ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
     }
+
     if (verbose == QUDA_DEBUG_VERBOSE) 
       printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
 		 i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);

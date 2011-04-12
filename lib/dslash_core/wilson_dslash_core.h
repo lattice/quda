@@ -385,32 +385,35 @@ if (param.kernel_type == INTERIOR_KERNEL) {
 } else { // exterior kernel
 
   const int dim = static_cast<int>(param.kernel_type);
-  const int face_volume = (param.threads >> 1);
-  const int face_num = (sid >= face_volume);
-  const int face_idx = sid - face_num*face_volume;
+  const int face_volume = (param.threads >> 1);           // volume of one face
+  const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
+  const int face_idx = sid - face_num*face_volume;        // index into the respective face
 
-  sp_idx = sid + param.ghostOffset[dim];
+  // need extra SPINOR_HOP*sp_stride since ghostoffset is just the offset from the start of the end zone
+  // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
+  sp_idx = face_idx + SPINOR_HOP*sp_stride + param.ghostOffset[dim];
+  //sp_idx = sid + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[dim];
+  sp_norm_idx = sid + sp_stride + param.ghostNormOffset[dim];
 #endif
     
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
 
   READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
 
-  o00_re = i00_re;  o00_im = i00_re;
-  o01_re = i01_re;  o01_im = i01_re;
-  o02_re = i02_re;  o02_im = i02_re;
-  o10_re = i10_re;  o10_im = i10_re;
-  o11_re = i11_re;  o11_im = i11_re;
-  o12_re = i12_re;  o12_im = i12_re;
-  o20_re = i20_re;  o20_im = i20_re;
-  o21_re = i21_re;  o21_im = i21_re;
-  o22_re = i22_re;  o22_im = i22_re;
-  o30_re = i30_re;  o30_im = i30_re;
-  o31_re = i31_re;  o31_im = i31_re;
-  o32_re = i32_re;  o32_im = i32_re;
+  o00_re = i00_re;  o00_im = i00_im;
+  o01_re = i01_re;  o01_im = i01_im;
+  o02_re = i02_re;  o02_im = i02_im;
+  o10_re = i10_re;  o10_im = i10_im;
+  o11_re = i11_re;  o11_im = i11_im;
+  o12_re = i12_re;  o12_im = i12_im;
+  o20_re = i20_re;  o20_im = i20_im;
+  o21_re = i21_re;  o21_im = i21_im;
+  o22_re = i22_re;  o22_im = i22_im;
+  o30_re = i30_re;  o30_im = i30_im;
+  o31_re = i31_re;  o31_im = i31_im;
+  o32_re = i32_re;  o32_im = i32_im;
 }
 #endif // MULTI_GPU
 
@@ -474,14 +477,14 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) |
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
     
-    a0_re = o00_re;  a0_im = o00_im;
-    a1_re = o01_re;  a1_im = o01_im;
-    a2_re = o02_re;  a2_im = o02_im;
-    b0_re = o10_re;  b0_im = o10_im;
-    b1_re = o11_re;  b1_im = o11_im;
-    b2_re = o12_re;  b2_im = o12_im;
+    a0_re = i00_re;  a0_im = i00_im;
+    a1_re = i01_re;  a1_im = i01_im;
+    a2_re = i02_re;  a2_im = i02_im;
+    b0_re = i10_re;  b0_im = i10_im;
+    b1_re = i11_re;  b1_im = i11_im;
+    b2_re = i12_re;  b2_im = i12_im;
     
   }
 #endif // MULTI_GPU
@@ -673,12 +676,12 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
-    a0_re = o00_re;  a0_im = o00_im;
-    a1_re = o01_re;  a1_im = o01_im;
-    a2_re = o02_re;  a2_im = o02_im;
-    b0_re = o10_re;  b0_im = o10_im;
-    b1_re = o11_re;  b1_im = o11_im;
-    b2_re = o12_re;  b2_im = o12_im;
+    a0_re = i00_re;  a0_im = i00_im;
+    a1_re = i01_re;  a1_im = i01_im;
+    a2_re = i02_re;  a2_im = i02_im;
+    b0_re = i10_re;  b0_im = i10_im;
+    b1_re = i11_re;  b1_im = i11_im;
+    b2_re = i12_re;  b2_im = i12_im;
     
   }
 #endif // MULTI_GPU
@@ -864,14 +867,14 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) |
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
     
-    a0_re = o00_re;  a0_im = o00_im;
-    a1_re = o01_re;  a1_im = o01_im;
-    a2_re = o02_re;  a2_im = o02_im;
-    b0_re = o10_re;  b0_im = o10_im;
-    b1_re = o11_re;  b1_im = o11_im;
-    b2_re = o12_re;  b2_im = o12_im;
+    a0_re = i00_re;  a0_im = i00_im;
+    a1_re = i01_re;  a1_im = i01_im;
+    a2_re = i02_re;  a2_im = i02_im;
+    b0_re = i10_re;  b0_im = i10_im;
+    b1_re = i11_re;  b1_im = i11_im;
+    b2_re = i12_re;  b2_im = i12_im;
     
   }
 #endif // MULTI_GPU
@@ -1063,12 +1066,12 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
-    a0_re = o00_re;  a0_im = o00_im;
-    a1_re = o01_re;  a1_im = o01_im;
-    a2_re = o02_re;  a2_im = o02_im;
-    b0_re = o10_re;  b0_im = o10_im;
-    b1_re = o11_re;  b1_im = o11_im;
-    b2_re = o12_re;  b2_im = o12_im;
+    a0_re = i00_re;  a0_im = i00_im;
+    a1_re = i01_re;  a1_im = i01_im;
+    a2_re = i02_re;  a2_im = i02_im;
+    b0_re = i10_re;  b0_im = i10_im;
+    b1_re = i11_re;  b1_im = i11_im;
+    b2_re = i12_re;  b2_im = i12_im;
     
   }
 #endif // MULTI_GPU
@@ -1254,14 +1257,14 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) |
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+    READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
     
-    a0_re = o00_re;  a0_im = o00_im;
-    a1_re = o01_re;  a1_im = o01_im;
-    a2_re = o02_re;  a2_im = o02_im;
-    b0_re = o10_re;  b0_im = o10_im;
-    b1_re = o11_re;  b1_im = o11_im;
-    b2_re = o12_re;  b2_im = o12_im;
+    a0_re = i00_re;  a0_im = i00_im;
+    a1_re = i01_re;  a1_im = i01_im;
+    a2_re = i02_re;  a2_im = i02_im;
+    b0_re = i10_re;  b0_im = i10_im;
+    b1_re = i11_re;  b1_im = i11_im;
+    b2_re = i12_re;  b2_im = i12_im;
     
   }
 #endif // MULTI_GPU
@@ -1453,12 +1456,12 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
-    a0_re = o00_re;  a0_im = o00_im;
-    a1_re = o01_re;  a1_im = o01_im;
-    a2_re = o02_re;  a2_im = o02_im;
-    b0_re = o10_re;  b0_im = o10_im;
-    b1_re = o11_re;  b1_im = o11_im;
-    b2_re = o12_re;  b2_im = o12_im;
+    a0_re = i00_re;  a0_im = i00_im;
+    a1_re = i01_re;  a1_im = i01_im;
+    a2_re = i02_re;  a2_im = i02_im;
+    b0_re = i10_re;  b0_im = i10_im;
+    b1_re = i11_re;  b1_im = i11_im;
+    b2_re = i12_re;  b2_im = i12_im;
     
   }
 #endif // MULTI_GPU
@@ -1644,14 +1647,14 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
-      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
       
-      a0_re = t_proj_scale*o00_re;  a0_im = t_proj_scale*o00_im;
-      a1_re = t_proj_scale*o01_re;  a1_im = t_proj_scale*o01_im;
-      a2_re = t_proj_scale*o02_re;  a2_im = t_proj_scale*o02_im;
-      b0_re = t_proj_scale*o10_re;  b0_im = t_proj_scale*o10_im;
-      b1_re = t_proj_scale*o11_re;  b1_im = t_proj_scale*o11_im;
-      b2_re = t_proj_scale*o12_re;  b2_im = t_proj_scale*o12_im;
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
@@ -1719,14 +1722,14 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
-      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+      READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
       
-      a0_re = t_proj_scale*o00_re;  a0_im = t_proj_scale*o00_im;
-      a1_re = t_proj_scale*o01_re;  a1_im = t_proj_scale*o01_im;
-      a2_re = t_proj_scale*o02_re;  a2_im = t_proj_scale*o02_im;
-      b0_re = t_proj_scale*o10_re;  b0_im = t_proj_scale*o10_im;
-      b1_re = t_proj_scale*o11_re;  b1_im = t_proj_scale*o11_im;
-      b2_re = t_proj_scale*o12_re;  b2_im = t_proj_scale*o12_im;
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
@@ -1907,12 +1910,12 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
       // read half spinor from device memory
       READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
       
-      a0_re = t_proj_scale*o00_re;  a0_im = t_proj_scale*o00_im;
-      a1_re = t_proj_scale*o01_re;  a1_im = t_proj_scale*o01_im;
-      a2_re = t_proj_scale*o02_re;  a2_im = t_proj_scale*o02_im;
-      b0_re = t_proj_scale*o10_re;  b0_im = t_proj_scale*o10_im;
-      b1_re = t_proj_scale*o11_re;  b1_im = t_proj_scale*o11_im;
-      b2_re = t_proj_scale*o12_re;  b2_im = t_proj_scale*o12_im;
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
@@ -1982,12 +1985,12 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
       // read half spinor from device memory
       READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
       
-      a0_re = t_proj_scale*o00_re;  a0_im = t_proj_scale*o00_im;
-      a1_re = t_proj_scale*o01_re;  a1_im = t_proj_scale*o01_im;
-      a2_re = t_proj_scale*o02_re;  a2_im = t_proj_scale*o02_im;
-      b0_re = t_proj_scale*o10_re;  b0_im = t_proj_scale*o10_im;
-      b1_re = t_proj_scale*o11_re;  b1_im = t_proj_scale*o11_im;
-      b2_re = t_proj_scale*o12_re;  b2_im = t_proj_scale*o12_im;
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
