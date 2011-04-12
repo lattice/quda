@@ -187,10 +187,11 @@ comm_init()
   }
   firsttime = 0;
   
-  int gpus_per_node = getGpuCount();
-  
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  int gpus_per_node = getGpuCount();
+  
 
   gethostname(hostname, 128);
 
