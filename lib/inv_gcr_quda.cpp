@@ -103,7 +103,7 @@ void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
   gettimeofday(&orth1, NULL);
 }   
 
-void backSubs(Complex *alpha, Complex **beta, double *gamma, Complex *delta, int n) {
+void backSubs(const Complex *alpha, Complex** const beta, const double *gamma, Complex *delta, int n) {
   for (int k=n-1; k>=0;k--) {
     delta[k] = alpha[k];
     for (int j=k+1;j<n; j++) {
@@ -111,6 +111,27 @@ void backSubs(Complex *alpha, Complex **beta, double *gamma, Complex *delta, int
     }
     delta[k] /= gamma[k];
   }
+}
+
+void updateSolution(cudaColorSpinorField &x, const Complex *alpha, Complex** const beta, 
+		    double *gamma, int k, cudaColorSpinorField *p[]) {
+
+  Complex *delta = new Complex[k];
+
+  // Update the solution vector
+  backSubs(alpha, beta, gamma, delta, k);
+  
+  //for (int i=0; i<k; i++) caxpyCuda(delta[i], *p[i], x);
+  
+  for (int i=0; i<k-2; i+=3) 
+    caxpbypczpwCuda(delta[i], *p[i], delta[i+1], *p[i+1], delta[i+2], *p[i+2], x); 
+  
+  if (k%3 != 0) { // need to update the remainder
+    if ((k - 3*(k/3)) % 2 == 0) caxpbypzCuda(delta[k-2], *p[k-2], delta[k-1], *p[k-1], x);
+    else caxpyCuda(delta[k-1], *p[k-1], x);
+  }
+
+  delete []delta;
 }
 
 void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &pre, 
@@ -170,7 +191,6 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   Complex **beta = new Complex*[Nkrylov];
   for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
   double *gamma = new double[Nkrylov];
-  Complex *delta = new Complex[Nkrylov];
 
   double b2 = normCuda(b);
 
@@ -249,18 +269,9 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     gettimeofday(&rst0, NULL);
     // update solution and residual since max Nkrylov reached, converged or reliable update required
     if (k==Nkrylov || r2 < stop || r2/r2_old < invert_param->reliable_delta) { 
-      // Update the solution vector
-      backSubs(alpha, beta, gamma, delta, k);
 
-      //for (int i=0; i<k; i++) caxpyCuda(delta[i], *p[i], xSloppy);
-
-      for (int i=0; i<k-2; i+=3) 
-	caxpbypczpwCuda(delta[i], *p[i], delta[i+1], *p[i+1], delta[i+2], *p[i+2], xSloppy); 
-
-      if (k%3 != 0) { // need to update the remainder
-	if ((k - 3*(k/3)) % 2 == 0) caxpbypzCuda(delta[k-2], *p[k-2], delta[k-1], *p[k-1], xSloppy);
-	else caxpyCuda(delta[k-1], *p[k-1], xSloppy);
-      }
+      // update the solution vector
+      updateSolution(xSloppy, alpha, beta, gamma, k, p);
 
       // recalculate residual in high precision
       copyCuda(x, xSloppy);
@@ -343,7 +354,6 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   for (int i=0; i<Nkrylov; i++) delete []beta[i];
   delete []beta;
   delete gamma;
-  delete delta;
 
   return;
 }
