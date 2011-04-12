@@ -31,11 +31,12 @@
     }						\
   } while (0)
 
+extern char hostname[];
 #define errorQuda(...) do {		    \
   printf("QUDA error: " __VA_ARGS__);       \
-  printf(" (node %d, " __FILE__ ":%d)\n",   \
-         comm_rank(), __LINE__);  \
-  comm_exit(1);				    \
+  printf(" (node %d, " __FILE__ ":%d, hostname=%s)\n",   \
+         comm_rank(), __LINE__, hostname);			 \
+  comm_exit(1);						 \
 } while (0)
 
 #else

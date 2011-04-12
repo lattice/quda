@@ -5,7 +5,7 @@
 #include <mpi.h>
 #include "mpicomm.h"
 
-static char hostname[128];
+char hostname[128];
 static int fwd_nbr=-1;
 static int back_nbr=-1;
 static int rank = -1;
@@ -186,14 +186,12 @@ comm_init()
     return;
   }
   firsttime = 0;
-  
+
+  gethostname(hostname, 128);  
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  int gpus_per_node = getGpuCount();
-  
-
-  gethostname(hostname, 128);
+  int gpus_per_node = getGpuCount();  
 
   comm_partition();
 
