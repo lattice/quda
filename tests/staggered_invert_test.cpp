@@ -44,7 +44,7 @@ cpuColorSpinorField* out;
 cpuColorSpinorField* ref;
 cpuColorSpinorField* tmp;
 
-static double tol = 1e-8;
+static double tol = 1e-6;
 
 static int testtype = 0;
 static int xdim = 24;
@@ -129,11 +129,23 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->ga_pad = X1*X2*X3/2;
 
   inv_param->verbosity = QUDA_VERBOSE;
-  inv_param->inv_type = QUDA_CG_INVERTER;    
   inv_param->mass = mass;
+
+  // outer solver parameters
+  inv_param->inv_type = QUDA_CG_INVERTER;
   inv_param->tol = tol;
-  inv_param->maxiter = 500;
-  inv_param->reliable_delta = 1e-3;
+  inv_param->maxiter = 10000;
+  inv_param->reliable_delta = 1e-1; // ignored by multi-shift solver
+
+  //inv_param->inv_type = QUDA_GCR_INVERTER;
+  //inv_param->gcrNkrylov = 10;
+
+  // domain decomposition preconditioner parameters
+  //inv_param->inv_type_precondition = QUDA_MR_INVERTER;
+  //inv_param->tol_precondition = 1e-1;
+  //inv_param->maxiter_precondition = 100;
+  //inv_param->verbosity_precondition = QUDA_SILENT;
+  //inv_param->prec_precondition = prec_sloppy;
 
   inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMEQ_PC_SOLVE;
@@ -152,9 +164,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
-  inv_param->prec_precondition = inv_param->cuda_prec_sloppy;
-
-
 }
 
 int
@@ -163,7 +172,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.95;
+  double mass = 0.1;
 
   set_params(&gaugeParam, &inv_param,
 	     xdim, ydim, zdim, tdim,
@@ -549,7 +558,7 @@ usage(char** argv )
 	 "                                                     4=multimass odd, 5=multimass full)\n"); 
   printfQuda("--tdim                                  T dimension\n");
   printfQuda("--sdim                                  S dimension\n");
-  printf("--manual_set_partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
+  printfQuda("--partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printfQuda("--help                                  Print out this message\n"); 
   exit(1);
   return ;
