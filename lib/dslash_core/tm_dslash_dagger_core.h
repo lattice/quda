@@ -177,7 +177,7 @@ volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #include "read_clover.h"
 #include "io_spinor.h"
 
-int X, x1, x2, x3, x4, sp_idx;
+int X, x1, x2, x3, x4, sp_idx, face_idx;
 
 #if (defined MULTI_GPU) && (DD_PREC==2) // half precision
 int sp_norm_idx;
@@ -211,11 +211,11 @@ if (param.kernel_type == INTERIOR_KERNEL) {
   const int dim = static_cast<int>(param.kernel_type);
   const int face_volume = (param.threads >> 1);           // volume of one face
   const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
-  const int face_idx = sid - face_num*face_volume;        // index into the respective face
+  face_idx = sid - face_num*face_volume;        // index into the respective face
 
   // need extra SPINOR_HOP*sp_stride since ghostoffset is just the offset from the start of the end zone
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-  sp_idx = face_idx + SPINOR_HOP*sp_stride + param.ghostOffset[dim];
+  sp_idx = face_idx + SPINOR_HOP*(sp_stride + param.ghostOffset[dim]);
   //sp_idx = sid + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
@@ -455,7 +455,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+sid);
+  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
@@ -845,7 +845,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+sid);
+  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
@@ -1235,7 +1235,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+sid);
+  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
@@ -1689,7 +1689,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+sid);
+  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
