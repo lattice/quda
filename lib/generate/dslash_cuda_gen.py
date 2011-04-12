@@ -499,8 +499,8 @@ def gen(dir, pack_only=False):
     copy_half = ""
     for h in range(0, 2):
         for c in range(0, 3):
-            copy_half += h1_re(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+out_re(h,c)+";  "
-            copy_half += h1_im(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+out_im(h,c)+";\n"
+            copy_half += h1_re(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_re(h,c)+";  "
+            copy_half += h1_im(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_im(h,c)+";\n"
     copy_half += "\n"
 
     prep_half = ""
