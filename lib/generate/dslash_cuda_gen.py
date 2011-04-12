@@ -358,7 +358,7 @@ if (param.kernel_type == INTERIOR_KERNEL) {
     out = ""
     for s in range(0,4):
         for c in range(0,3):
-            out += out_re(s,c)+" = "+in_re(s,c)+";  "+out_im(s,c)+" = "+in_re(s,c)+";\n"
+            out += out_re(s,c)+" = "+in_re(s,c)+";  "+out_im(s,c)+" = "+in_im(s,c)+";\n"
     str += indent(out)
     str += "}\n"
     str += "#endif // MULTI_GPU\n\n\n"
