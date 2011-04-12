@@ -119,9 +119,20 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
   flops += (1146+12)*in.volume;
 }
 
+// Full staggered operator
 void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-  errorQuda("DiracStaggered::M() is not implemented");  
+  if (!initDslash){
+    initDslashConstants(*fatGauge, in.Stride());
+    initStaggeredConstants(*fatGauge, *longGauge);
+  }
+
+  bool reset = newTmp(&tmp1, in.Even());
+
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp1, 2*mass);  
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp1, 2*mass);
+  
+  deleteTmp(&tmp1, reset);
 }
 
 void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
