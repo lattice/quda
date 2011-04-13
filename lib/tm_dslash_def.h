@@ -155,7 +155,6 @@
 #if (DD_PREC==0) // double-precision fields
 
 #define TPROJSCALE tProjScale
-#define TWO 2.0
 
 // double-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -207,7 +206,6 @@
 #elif (DD_PREC==1) // single-precision fields
 
 #define TPROJSCALE tProjScale_f
-#define TWO 2.0f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -261,7 +259,6 @@
 #else             // half-precision fields
 
 #define TPROJSCALE tProjScale_f
-#define TWO 2.0
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -371,7 +368,6 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef SPINOR_HOP
 
 #undef TPROJSCALE
-#undef TWO
 
 // prepare next set of options, or clean up after final iteration
 

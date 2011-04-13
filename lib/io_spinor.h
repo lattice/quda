@@ -321,9 +321,7 @@
 
 // macros used for exterior Wilson Dslash kernels and face packing
 
-#define READ_HALF_SPINOR_DOUBLE READ_SPINOR_DOUBLE_UP
-#define READ_HALF_SPINOR_SINGLE READ_SPINOR_SINGLE_UP
-#define READ_HALF_SPINOR_HALF   READ_SPINOR_HALF_UP
+#define READ_HALF_SPINOR READ_SPINOR_UP
 
 #define WRITE_HALF_SPINOR_DOUBLE2(stride, sid)	     \
   out[0*(stride)+sid] = make_double2(a0_re, a0_im);  \

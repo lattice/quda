@@ -133,18 +133,22 @@ void DiracClover::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFiel
   // do nothing
 }
 
-DiracCloverPC::DiracCloverPC(const DiracParam &param) : DiracClover(param), 
-  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
-  cloverInv(*(param.cloverInv))
+DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
+  DiracClover(param), cloverInv(*(param.cloverInv))
 {
-
+  for (int i=0; i<5; i++) {
+    blockDslash[i] = dim3(64, 1, 1);
+    blockDslashXpay[i] = dim3(64, 1, 1);
+  }
 }
 
-DiracCloverPC::DiracCloverPC(const DiracCloverPC &dirac) : DiracClover(dirac), 
-  blockDslash(64, 1, 1), blockDslashXpay(64, 1, 1), blockDslashFace(64, 1, 1), blockDslashXpayFace(64, 1, 1),
- cloverInv(dirac.clover)
+DiracCloverPC::DiracCloverPC(const DiracCloverPC &dirac) : 
+  DiracClover(dirac), cloverInv(dirac.clover)
 {
-
+  for (int i=0; i<5; i++) {
+    blockDslash[i] = dirac.blockDslash[i];
+    blockDslashXpay[i] = dirac.blockDslashXpay[i];
+  }
 }
 
 DiracCloverPC::~DiracCloverPC()
@@ -156,10 +160,10 @@ DiracCloverPC& DiracCloverPC::operator=(const DiracCloverPC &dirac)
 {
   if (&dirac != this) {
     DiracClover::operator=(dirac);
-    blockDslash = dirac.blockDslash;
-    blockDslashXpay = dirac.blockDslashXpay;
-    blockDslashFace = dirac.blockDslashFace;
-    blockDslashXpayFace = dirac.blockDslashXpayFace;
+    for (int i=0; i<5; i++) {
+      blockDslash[i] = dirac.blockDslash[i];
+      blockDslashXpay[i] = dirac.blockDslashXpay[i];
+    }
     cloverInv = dirac.cloverInv;
   }
 
@@ -175,18 +179,16 @@ void DiracCloverPC::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &
 
   { // Tune Dslash
     TuneDiracCloverDslash dslashTune(*this, out, in);
-    dslashTune.Benchmark(blockDslash);
-#ifdef OVERLAP_COMMS
-    dslashTune.Benchmark(blockDslashFace);
-#endif
+    dslashTune.Benchmark(blockDslash[0]);
+    for (int i=0; i<4; i++) 
+      if (commDimPartitioned(i)) dslashTune.Benchmark(blockDslash[i+1]);
   }
 
   { // Tune DslashXpay
     TuneDiracCloverDslashXpay dslashXpayTune(*this, out, in, x);
-    dslashXpayTune.Benchmark(blockDslashXpay);
-#ifdef OVERLAP_COMMS
-    dslashXpayTune.Benchmark(blockDslashXpayFace);
-#endif
+    dslashXpayTune.Benchmark(blockDslashXpay[0]);
+    for (int i=0; i<4; i++) 
+      if (commDimPartitioned(i)) dslashXpayTune.Benchmark(blockDslashXpay[i+1]);
   }
 
   setDslashTuning(QUDA_TUNE_NO);
@@ -213,7 +215,7 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, 0, 0.0, 
-		   blockDslash, blockDslashFace, commDim);
+		   blockDslash, commDim);
 
   flops += (1320+504)*in.volume;
 }
@@ -231,7 +233,7 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
   cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, &x, k, 
-		   blockDslashXpay, blockDslashXpayFace, commDim);
+		   blockDslashXpay, commDim);
 
   flops += (1320+504+48)*in.volume;
 }

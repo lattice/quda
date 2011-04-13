@@ -165,10 +165,28 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int &x,
     x = face_idx % face_X;
   } else {
     face_idx += face_parity;
-    t = face_idx / face_XYZ;
+    t = face_idx / face_XYZ; 
     z = (face_idx / face_XY) % face_Z;
     y = (face_idx / face_X) % face_Y;
     x = face_idx % face_X;
+  }
+
+  //printf("Local sid %d (%d, %d, %d, %d)\n", cb_int, x, y, z, t);
+
+  // need to convert to global coords, not face coords
+  switch(dim) {
+  case 0:
+    x += face_num * (X1-nLayers);
+    break;
+  case 1:
+    y += face_num * (X2-nLayers);
+    break;
+  case 2:
+    z += face_num * (X3-nLayers);
+    break;
+  case 3:
+    t += face_num * (X4-nLayers);
+    break;
   }
 
   // compute index into the full local volume
@@ -178,6 +196,8 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int &x,
   // compute index into the checkerboard
 
   cb_idx = idx >> 1;
+
+  //printf("Global sid %d (%d, %d, %d, %d)\n", cb_int, x, y, z, t);
 }
 
 

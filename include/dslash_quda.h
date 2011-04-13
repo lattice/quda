@@ -32,13 +32,13 @@ extern "C" {
 // plain Wilson Dslash  
 void wilsonDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
 		      const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-		      const double &k, const dim3 &block, const dim3 &blockFace, const int *commDim);
+		      const double &k, const dim3 *block, const int *commDim);
 
 // clover Dslash
 void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
 		      const FullClover cloverInv, const cudaColorSpinorField *in, 
 		      const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-		      const double &k, const dim3 &block, const dim3 &blockFace, const int *commDim);
+		      const double &k, const dim3 *block, const int *commDim);
 
 // solo clover term
 void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover clover, 
@@ -47,7 +47,7 @@ void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClov
 // domain wall Dslash  
 void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in, 
 			  const int parity, const int dagger, const cudaColorSpinorField *x, 
-			  const double &m_f, const double &k, const dim3 &block, const dim3 &blockFace);
+			  const double &m_f, const double &k, const dim3 *blockDim);
 
 // staggered Dslash    
 void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, FullGauge longGauge,
@@ -58,7 +58,7 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, Fu
 void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
 			   const int parity, const int dagger, const cudaColorSpinorField *x, 
 			   const double &kappa, const double &mu, const double &a, 
-			   const dim3 &block, const dim3 &blockFace, const int *commDim);
+			   const dim3 *block, const int *commDim);
 
 // solo twist term
 void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
