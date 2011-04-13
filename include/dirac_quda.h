@@ -117,10 +117,8 @@ class Dirac {
 class DiracWilson : public Dirac {
 
  private:
-  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
-  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
-  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
 
  protected:
   FaceBuffer face; // multi-gpu communication buffers
@@ -204,10 +202,8 @@ class DiracClover : public DiracWilson {
 class DiracCloverPC : public DiracClover {
 
  private:
-  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
-  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
-  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
   FullClover &cloverInv;
 
  public:
@@ -240,10 +236,8 @@ class DiracCloverPC : public DiracClover {
 class DiracDomainWall : public DiracWilson {
 
  private:
-  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
-  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
-  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
 
  protected:
   double m5;
@@ -328,10 +322,8 @@ class DiracTwistedMass : public DiracWilson {
 class DiracTwistedMassPC : public DiracTwistedMass {
 
  private:
-  dim3 blockDslash; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay; // thread block size for DslashXpay (full volume or just body for overlapping comms)
-  dim3 blockDslashFace; // thread block size for Dslash (face for overlapping comms)
-  dim3 blockDslashXpayFace; // thread block size for Dslash (face for overlapping comms)
+  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
+  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
 
  public:
   DiracTwistedMassPC(const DiracParam &param);

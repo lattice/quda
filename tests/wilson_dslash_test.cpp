@@ -399,26 +399,29 @@ void dslashRef() {
 
 int main(int argc, char **argv)
 {
+  int ndim=4, dims[4] = {1, 1, 1, 1};
+  char dimchar[] = {'X', 'Y', 'Z', 'T'};
+  char *gridsizeopt[] = {"--xgridsize", "--ygridsize", "--zgridsize", "--tgridsize"};
 
-  int i;
-  int tsize = 1; // defaults to 1
-  for (i =1;i < argc; i++){
-    if( strcmp(argv[i], "--tgridsize") == 0){
-      if (i+1 >= argc){
-	printf("Usage: %s <args>\n", argv[0]);
-	printf("--tgridsize \t Set T comms grid size (default = 1)\n"); 
-	exit(1);
-      }     
-      tsize =  atoi(argv[i+1]);
-      if (tsize <= 0 ){
-	errorQuda("Error: invalid T grid size");
+  for (int i=1; i<argc; i++) {
+    for (int d=0; d<ndim; d++) {
+      if (!strcmp(argv[i], gridsizeopt[d])) {
+	if (i+1 >= argc) {
+	  printf("Usage: %s <args>\n", argv[0]);
+	  printf("%s\t Set %c comms grid size (default = 1)\n", gridsizeopt[d], dimchar[d]); 
+	  exit(1);
+	}     
+	dims[d] = atoi(argv[i+1]);
+	if (dims[d] <= 0 ) {
+	  printf("Error: Invalid %c grid size\n", dimchar[d]);
+	  exit(1);
+	}
+	i++;
+	break;
       }
-      i++;
-      continue;
     }
   }
 
-  int ndim=4, dims[] = {1, 1, 1, tsize};
   initCommsQuda(argc, argv, dims, ndim);
 
   init();

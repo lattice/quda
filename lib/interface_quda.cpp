@@ -121,12 +121,6 @@ void initQuda(int dev)
   dev += rank_QMP % deviceCount;
   ndim = QMP_get_logical_number_of_dimensions();
   dim = QMP_get_logical_dimensions();
-  if (ndim != 4) { 
-    errorQuda("This code needs 4 logical dimensions");
-  }
-  if(  (dim[0] != 1) || (dim[1] != 1) || (dim[2] != 1) )  { 
-    errorQuda("This code needs all spatial dimensions local for now");
-  }
 
 #elif defined(MPI_COMMS)
 
@@ -1533,12 +1527,6 @@ void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
 #ifdef QMP_COMMS
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-
-  if (X[0] != 1 && X[1] != 1 && X[2] != 1) 
-    errorQuda("QMP only supports T-dimension parallelization");
-  if (X[3] != QMP_get_number_of_nodes())
-    errorQuda("Number of processes %d must match requested T-dimension QMP grid size %d", 
-	      QMP_get_number_of_nodes(), X[3]);
 
   QMP_declare_logical_topology(X, nDim);
 #elif defined(MPI_COMMS)

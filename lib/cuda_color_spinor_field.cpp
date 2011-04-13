@@ -502,7 +502,7 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
 
     if (nSpin == 1) { // use different packing kernels for staggered and Wilson
       collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
-    } else { // FIXME: Wilson currently uses one kernel for both directions
+    } else {
       packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, *stream); CUERR;
     }
     CUDAMEMCPY(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); CUERR;
@@ -560,13 +560,15 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   // Wilson only
   // !dagger: receive lower components forwards, receive upper components backwards
   // dagger: receive upper components forwards, receive lower components backwards
-  bool upper = dagger? false : true;
-  if (dir == QUDA_FORWARDS) upper = !upper;
+  //bool upper = dagger? false : true;
+  //if (dir == QUDA_FORWARDS) upper = !upper;
     
   int len = nFace*ghostFace[dim]*Nint;
   int offset = length + ghostOffset[dim]*nColor*nSpin*2;
-  if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len; // convention difference
-  else offset += (upper ? 0 : len);    
+  //if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len; // convention difference
+  //else offset += (upper ? 0 : len);    
+  offset += (dir == QUDA_BACKWARDS) ? 0 : len;
+
   void *dst = (char*)v + precision*offset;
   void *src = ghost_spinor;
 
