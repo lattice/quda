@@ -4,9 +4,13 @@
 #include <math.h>
 #include <string.h>
 
+#include <util_quda.h>
 #include <test_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
+#include "misc.h"
+
+#include "face_quda.h"
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -17,8 +21,42 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+extern int xdim;
+extern int ydim;
+extern int zdim;
+extern int tdim;
+extern int gridsize_from_cmdline[];
+extern QudaReconstructType link_recon;
+extern QudaPrecision prec;
+extern QudaReconstructType link_recon_sloppy;
+extern QudaPrecision  prec_sloppy;
+
+void
+display_test_info()
+{
+  printfQuda("running the following test:\n");
+    
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d \n",
+	     get_prec_str(prec),get_prec_str(prec_sloppy),
+	     get_recon_str(link_recon), 
+	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim);     
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
+	     commDimPartitioned(0),
+	     commDimPartitioned(1),
+	     commDimPartitioned(2),
+	     commDimPartitioned(3)); 
+  
+  return ;
+  
+}
+
+extern void usage(char** );
 int main(int argc, char **argv)
 {
+  /*
   int ndim=4, dims[4] = {1, 1, 1, 1};
   char dimchar[] = {'X', 'Y', 'Z', 'T'};
   char *gridsizeopt[] = {"--xgridsize", "--ygridsize", "--zgridsize", "--tgridsize"};
@@ -41,8 +79,23 @@ int main(int argc, char **argv)
       }
     }
   }
+  */
 
-  initCommsQuda(argc, argv, dims, ndim);
+
+
+  int i;
+  for (i =1;i < argc; i++){
+
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    } 
+    
+    printf("ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+    
+
+  }
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
   // *** QUDA parameters begin here.
 
@@ -56,8 +109,8 @@ int main(int argc, char **argv)
   //QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
-  QudaPrecision cuda_prec_sloppy = QUDA_HALF_PRECISION;
+  QudaPrecision cuda_prec = prec;
+  QudaPrecision cuda_prec_sloppy = prec_sloppy;
 
   // offsets used only by multi-shift solver
   int num_offsets = 4;
@@ -66,10 +119,10 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  gauge_param.X[0] = 32;
-  gauge_param.X[1] = 32;
-  gauge_param.X[2] = 32;
-  gauge_param.X[3] = 8;
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
 
   gauge_param.anisotropy = 3.5;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -78,9 +131,9 @@ int main(int argc, char **argv)
   
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_12;
+  gauge_param.reconstruct = link_recon;
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = dslash_type;
@@ -198,7 +251,7 @@ int main(int argc, char **argv)
 
   void *spinorOut = NULL, **spinorOutMulti = NULL;
   if (multi_shift) {
-    spinorOutMulti = malloc(num_offsets*sizeof(void *));
+    spinorOutMulti = (void**)malloc(num_offsets*sizeof(void *));
     for (int i=0; i<num_offsets; i++) {
       spinorOutMulti[i] = malloc(V*spinorSiteSize*sSize);
     }

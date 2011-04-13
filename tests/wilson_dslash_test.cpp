@@ -13,6 +13,7 @@
 
 #include <test_util.h>
 #include <wilson_dslash_reference.h>
+#include "misc.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -25,13 +26,12 @@ const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 //const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
-const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
 
 const int loops = 100;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -46,19 +46,29 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac;
 
+
+extern int xdim;
+extern int ydim;
+extern int zdim;
+extern int tdim;
+extern int gridsize_from_cmdline[];
+extern QudaReconstructType link_recon;
+extern QudaPrecision prec;
 extern bool kernelPackT;
+extern QudaDagType dagger;
 
 void init() {
 
   kernelPackT = false; // Set true for kernel T face packing
+  cuda_prec= prec;
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 24;
-  gauge_param.X[1] = 24;
-  gauge_param.X[2] = 24;
-  gauge_param.X[3] = 24;
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
   setDims(gauge_param.X);
 
   gauge_param.anisotropy = 2.3;
@@ -69,9 +79,9 @@ void init() {
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
-  gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
+  gauge_param.reconstruct = link_recon;
+  gauge_param.reconstruct_sloppy = link_recon;
+  gauge_param.cuda_prec_sloppy = cuda_prec;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.kappa = 0.1;
@@ -397,32 +407,45 @@ void dslashRef() {
   printf("done.\n");
 }
 
+
+void display_test_info()
+{
+  printfQuda("running the following test:\n");
+ 
+  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
+	     get_prec_str(prec), get_recon_str(link_recon), 
+	     test_type, dagger, xdim, ydim, zdim, tdim);
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
+	     commDimPartitioned(0),
+	     commDimPartitioned(1),
+	     commDimPartitioned(2),
+	     commDimPartitioned(3));
+
+  return ;
+    
+}
+
+extern void usage(char**);
+
+
 int main(int argc, char **argv)
 {
-  int ndim=4, dims[4] = {1, 1, 1, 1};
-  char dimchar[] = {'X', 'Y', 'Z', 'T'};
-  char *gridsizeopt[] = {"--xgridsize", "--ygridsize", "--zgridsize", "--tgridsize"};
 
-  for (int i=1; i<argc; i++) {
-    for (int d=0; d<ndim; d++) {
-      if (!strcmp(argv[i], gridsizeopt[d])) {
-	if (i+1 >= argc) {
-	  printf("Usage: %s <args>\n", argv[0]);
-	  printf("%s\t Set %c comms grid size (default = 1)\n", gridsizeopt[d], dimchar[d]); 
-	  exit(1);
-	}     
-	dims[d] = atoi(argv[i+1]);
-	if (dims[d] <= 0 ) {
-	  printf("Error: Invalid %c grid size\n", dimchar[d]);
-	  exit(1);
-	}
-	i++;
-	break;
-      }
-    }
+  for (int i =1;i < argc; i++){    
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }  
+    
+    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
   }
 
-  initCommsQuda(argc, argv, dims, ndim);
+
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+
+  display_test_info();
 
   init();
 

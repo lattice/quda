@@ -9,11 +9,9 @@
 #include <test_util.h>
 
 
-
 extern int verbose;
 
 #define stSpinorSiteSize 6
-
 template<typename Float>
 void display_spinor_internal(Float* spinor)
 {
