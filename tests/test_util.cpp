@@ -1291,15 +1291,26 @@ int gridsize_from_cmdline[4]={1,1,1,1};
 
 void usage(char** argv )
 {
-  printf("Usage: %s <args>\n", argv[0]);
-  printf("--prec <double/single/half> \t Precision in GPU\n"); 
-  printf("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
-  printf("--type <0/1/2> \t\t\t Test type\n"); 
-  printf("--dagger \t\t\t Set the dagger to 1\n"); 
-  printf("--tdim \t\t\t\t Set T dimention size(default 24)\n");     
-  printf("--sdim \t\t\t\t Set space dimention size\n"); 
-  printf("--partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
-  printf("--help \t\t\t\t Print out this message\n"); 
+  printf("Usage: %s [options]\n", argv[0]);
+  printf("Available options: \n");
+  printf("    --prec <double/single/half>               # Precision in GPU\n"); 
+  printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
+  printf("    --recon <8/12/18>                         # Link reconstruction type\n"); 
+  printf("    --recon_sloppy <8/12/18>                  # Sloppy link reconstruction type\n"); 
+  printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
+  printf("    --sdim <n>                                # Set space dimention(X/Y/Z) size\n"); 
+  printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     
+  printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
+  printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
+  printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
+  printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
+  printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
+  printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
+  printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
+  printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
+  printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
+  printf("    --help                                    # Print out this message\n"); 
+  
   exit(1);
   return ;
 }
