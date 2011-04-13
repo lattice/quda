@@ -53,21 +53,20 @@ extern int xdim;
 extern int ydim;
 extern int zdim;
 extern int tdim;
-
-int X[4];
-
+extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 
-Dirac* dirac;
+int X[4];
 
+
+Dirac* dirac;
 extern int Z[4];
 extern int V;
 extern int Vh;
 static int Vs_x, Vs_y, Vs_z, Vs_t;
 extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 static int Vsh[4];
-extern bool kernelPackT;
 
 void
 setDimConstants(int *X)
@@ -543,19 +542,12 @@ extern void usage(char** argv );
 int main(int argc, char **argv) 
 {
 
-  int xsize=1;
-  int ysize=1;
-  int zsize=1;
-  int tsize=1;
-
   int i;
   for (i =1;i < argc; i++){
-	
+    
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
-    }
-    
-
+    }    
 
     if( strcmp(argv[i], "--device") == 0){
       if (i+1 >= argc){
@@ -568,8 +560,7 @@ int main(int argc, char **argv)
       i++;
       continue;
     }
-	
-
+    
 	
     if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
@@ -582,87 +573,13 @@ int main(int argc, char **argv)
       i++;
       continue;	    
     }
-
-
-
-	
-
-
-    if( strcmp(argv[i], "--xgridsize") == 0){
-      if (i+1 >= argc){ 
-        usage(argv);
-      }     
-      xsize =  atoi(argv[i+1]);
-      if (xsize <= 0 ){
-        errorQuda("Error: invalid X grid size");
-      }
-      i++;
-      continue;     
-    }
-
-    if( strcmp(argv[i], "--ygridsize") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }     
-      ysize =  atoi(argv[i+1]);
-      if (ysize <= 0 ){
-        errorQuda("Error: invalid Y grid size");
-      }
-      i++;
-      continue;     
-    }
-
-    if( strcmp(argv[i], "--zgridsize") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }     
-      zsize =  atoi(argv[i+1]);
-      if (zsize <= 0 ){
-        errorQuda("Error: invalid Z grid size");
-      }
-      i++;
-      continue;
-    }
-
-    if( strcmp(argv[i], "--tgridsize") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }     
-      tsize =  atoi(argv[i+1]);
-      if (tsize <= 0 ){
-        errorQuda("Error: invalid T grid size");
-      }
-      i++;
-      continue;
-    }
-    if( strcmp(argv[i], "--partition") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }     
-      int value  =  atoi(argv[i+1]);
-      for(int j=0; j < 4;j++){
-	if (value &  (1 << j)){
-	  commDimPartitionedSet(j);
-	}
-      }
-      i++;
-      continue;
-    }
-
-    if( strcmp(argv[i], "--kernel_pack_t") == 0){
-      kernelPackT = true;
-      continue;
-    }
-
-
-
+    
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
-
-  int X[] = {xsize, ysize, zsize, tsize};
-  initCommsQuda(argc, argv, X, 4);
-
+  
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  
   display_test_info();
 
   int ret =1;

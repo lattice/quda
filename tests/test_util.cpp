@@ -1278,12 +1278,16 @@ void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
 
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
+QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
+QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
 int tdim = 24;
 QudaDagType dagger = QUDA_DAG_NO;
+extern bool kernelPackT;
+int gridsize_from_cmdline[4]={1,1,1,1};
 
 void usage(char** argv )
 {
@@ -1319,13 +1323,32 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
+  if( strcmp(argv[i], "--prec_sloppy") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    prec_sloppy =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
   
-	
   if( strcmp(argv[i], "--recon") == 0){
     if (i+1 >= argc){
       usage(argv);
     }	    
     link_recon =  get_recon(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--recon_sloppy") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    link_recon_sloppy =  get_recon(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -1407,10 +1430,87 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }	
   
+  if( strcmp(argv[i], "--partition") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    int value  =  atoi(argv[i+1]);
+    for(int j=0; j < 4;j++){
+      if (value &  (1 << j)){
+	commDimPartitionedSet(j);
+      }
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--kernel_pack_t") == 0){
+    kernelPackT = true;
+    ret= 0;
+    goto out;
+  }
 
 
+  if( strcmp(argv[i], "--xgridsize") == 0){
+    if (i+1 >= argc){ 
+      usage(argv);
+    }     
+    int xsize =  atoi(argv[i+1]);
+    if (xsize <= 0 ){
+      errorQuda("Error: invalid X grid size");
+    }
+    gridsize_from_cmdline[0] = xsize;
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--ygridsize") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    int ysize =  atoi(argv[i+1]);
+    if (ysize <= 0 ){
+      errorQuda("Error: invalid Y grid size");
+    }
+    gridsize_from_cmdline[1] = ysize;
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--zgridsize") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    int zsize =  atoi(argv[i+1]);
+    if (zsize <= 0 ){
+      errorQuda("Error: invalid Z grid size");
+    }
+    gridsize_from_cmdline[2] = zsize;
+    i++;
+    ret = 0;
+    goto out;
+    }
+  
+  if( strcmp(argv[i], "--tgridsize") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    int tsize =  atoi(argv[i+1]);
+    if (tsize <= 0 ){
+      errorQuda("Error: invalid T grid size");
+    }
+    gridsize_from_cmdline[3] = tsize;
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  
  out:
   *idx = i;
   return ret ;
-
+  
 }

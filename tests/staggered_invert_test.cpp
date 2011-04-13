@@ -37,8 +37,8 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 
-QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
-QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
+extern QudaReconstructType link_recon_sloppy;
+extern QudaPrecision  prec_sloppy;
 cpuColorSpinorField* in;
 cpuColorSpinorField* out;
 cpuColorSpinorField* ref;
@@ -47,10 +47,12 @@ cpuColorSpinorField* tmp;
 static double tol = 1e-6;
 
 static int testtype = 0;
-static int xdim = 24;
-static int ydim = 24;
-static int zdim = 24;
-static int tdim = 24;
+extern int xdim;
+extern int ydim;
+extern int zdim;
+extern int tdim;
+extern bool kernelPackT;
+extern int gridsize_from_cmdline[];
 
 
 static void end();
@@ -62,7 +64,6 @@ static int Vs_x, Vs_y, Vs_z, Vs_t;
 extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 static int Vsh[4];
 
-extern bool kernelPackT;
 
 template<typename Float>
 void constructSpinorField(Float *res) {
@@ -576,38 +577,12 @@ int main(int argc, char** argv)
 
   int i;
   for (i =1;i < argc; i++){
-	
-    if( strcmp(argv[i], "--help")== 0){
-      usage(argv);
-    }
-	
-    if( strcmp(argv[i], "--prec") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      prec = get_prec(argv[i+1]);
-      i++;
-      continue;	    
-    }
+
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }   
     
-    if( strcmp(argv[i], "--prec_sloppy") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      prec_sloppy =  get_prec(argv[i+1]);
-      i++;
-      continue;	    
-    }
-    
-    
-    if( strcmp(argv[i], "--recon") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_recon =  get_recon(argv[i+1]);
-      i++;
-      continue;	    
-    }
+
     if( strcmp(argv[i], "--tol") == 0){
       float tmpf;
       if (i+1 >= argc){
@@ -622,18 +597,8 @@ int main(int argc, char** argv)
       i++;
       continue;
     }
-
-
-	
-    if( strcmp(argv[i], "--recon_sloppy") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_recon_sloppy =  get_recon(argv[i+1]);
-      i++;
-      continue;	    
-    }
-	
+    
+    
     if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
 	usage(argv);
@@ -642,7 +607,7 @@ int main(int argc, char** argv)
       i++;
       continue;	    
     }
-
+    
     if( strcmp(argv[i], "--cprec") == 0){
       if (i+1 >= argc){
 	usage(argv);
@@ -651,161 +616,21 @@ int main(int argc, char** argv)
       i++;
       continue;
     }
-
-    if( strcmp(argv[i], "--xdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      xdim= atoi(argv[i+1]);
-      if (xdim < 0 || xdim > 128){
-	printf("ERROR: invalid X dimention (%d)\n", xdim);
-	usage(argv);
-      }
-      i++;
-      continue;
-    }		
-
-
-
-    if( strcmp(argv[i], "--ydim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      ydim= atoi(argv[i+1]);
-      if (ydim < 0 || ydim > 128){
-	printf("ERROR: invalid T dimention (%d)\n", ydim);
-	usage(argv);
-      }
-      i++;
-      continue;
-    }		
-
-
-
-    if( strcmp(argv[i], "--zdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      zdim= atoi(argv[i+1]);
-      if (zdim < 0 || zdim > 128){
-	printf("ERROR: invalid T dimention (%d)\n", zdim);
-	usage(argv);
-      }
-      i++;
-      continue;
-    }		
-
-
-
-    if( strcmp(argv[i], "--tdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      tdim= atoi(argv[i+1]);
-      if (tdim < 0 || tdim > 128){
-	printf("ERROR: invalid T dimention (%d)\n", tdim);
-	usage(argv);
-      }
-      i++;
-      continue;
-    }		
-
-
-
-    if( strcmp(argv[i], "--sdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      int sdim= atoi(argv[i+1]);
-      if (sdim < 0 || sdim > 128){
-	printf("ERROR: invalid S dimention (%d)\n", sdim);
-	usage(argv);
-      }
-      xdim=ydim=zdim=sdim;
-      i++;
-      continue;
-    }
+    
+    
     if( strcmp(argv[i], "--device") == 0){
-          if (i+1 >= argc){
-              usage(argv);
-          }
-          device =  atoi(argv[i+1]);
-          if (device < 0){
-	    printf("Error: invalid device number(%d)\n", device);
-              exit(1);
-          }
-          i++;
-          continue;
-    }
-
-    if( strcmp(argv[i], "--xgridsize") == 0){
-      if (i+1 >= argc){ 
-        usage(argv);
-      }     
-      xsize =  atoi(argv[i+1]);
-      if (xsize <= 0 ){
-        errorQuda("Error: invalid X grid size");
-      }
-      i++;
-      continue;     
-    }
-
-    if( strcmp(argv[i], "--ygridsize") == 0){
       if (i+1 >= argc){
-        usage(argv);
-      }     
-      ysize =  atoi(argv[i+1]);
-      if (ysize <= 0 ){
-        errorQuda("Error: invalid Y grid size");
+	usage(argv);
       }
-      i++;
-      continue;     
-    }
-
-    if( strcmp(argv[i], "--zgridsize") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }     
-      zsize =  atoi(argv[i+1]);
-      if (zsize <= 0 ){
-        errorQuda("Error: invalid Z grid size");
+      device =  atoi(argv[i+1]);
+      if (device < 0){
+	printf("Error: invalid device number(%d)\n", device);
+	exit(1);
       }
       i++;
       continue;
     }
-
-    if( strcmp(argv[i], "--tgridsize") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }     
-      tsize =  atoi(argv[i+1]);
-      if (tsize <= 0 ){
-        errorQuda("Error: invalid T grid size");
-      }
-      i++;
-      continue;
-    }
-
-    if( strcmp(argv[i], "--partition") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }     
-      int value  =  atoi(argv[i+1]);
-      for(int j=0; j < 4;j++){
-	if (value &  (1 << j)){
-	  commDimPartitionedSet(j);
-	}
-      }
-      i++;
-      continue;
-    }
-
-    if( strcmp(argv[i], "--kernel_pack_t") == 0){
-      kernelPackT = true;
-      continue;
-    }
-
-
+        
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -819,8 +644,7 @@ int main(int argc, char** argv)
   }
   
 
-  int X[] = {xsize, ysize, zsize, tsize};
-  initCommsQuda(argc, argv, X, 4);
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
   display_test_info();
   
   int ret = invert_test();
