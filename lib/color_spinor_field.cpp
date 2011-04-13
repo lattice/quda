@@ -169,8 +169,6 @@ ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
 // Resets the attributes of this field if param disagrees (and is defined)
 void ColorSpinorField::reset(const ColorSpinorParam &param) {
 
-  printf("Resetting\n");
-
   if (param.fieldLocation != QUDA_INVALID_FIELD_LOCATION) fieldLocation = param.fieldLocation;
 
   if (param.nColor != 0) nColor = param.nColor;
