@@ -35,8 +35,8 @@ ColorSpinorField::~ColorSpinorField() {
 
 void ColorSpinorField::createGhostZone() {
 
-  if (verbose == QUDA_DEBUG_VERBOSE) 
-    printfQuda("Location = %d, Precision = %d\n", fieldLocation, precision);
+  if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) 
+    printfQuda("Location = %d, Precision = %d, Subset = %d\n", fieldLocation, precision, siteSubset);
 
   int num_faces = 1;
   int num_norm_faces=2;
@@ -67,14 +67,14 @@ void ColorSpinorField::createGhostZone() {
       ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
     }
 
-    if (verbose == QUDA_DEBUG_VERBOSE) 
+    if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) 
       printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
 		 i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
   }
   int ghostNormVolume = num_norm_faces * ghostVolume;
   ghostVolume *= num_faces;
 
-  if (verbose == QUDA_DEBUG_VERBOSE) 
+  if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) 
     printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
 
 // ghost zones are calculated on c/b volumes
@@ -104,7 +104,7 @@ void ColorSpinorField::createGhostZone() {
 
   if (precision != QUDA_HALF_PRECISION) total_norm_length = 0;
 
-  if (verbose == QUDA_DEBUG_VERBOSE) {
+  if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) {
     printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
     printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
   }
@@ -169,6 +169,8 @@ ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
 // Resets the attributes of this field if param disagrees (and is defined)
 void ColorSpinorField::reset(const ColorSpinorParam &param) {
 
+  printf("Resetting\n");
+
   if (param.fieldLocation != QUDA_INVALID_FIELD_LOCATION) fieldLocation = param.fieldLocation;
 
   if (param.nColor != 0) nColor = param.nColor;
@@ -197,17 +199,17 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
     //do nothing, not an error (can't remember why - need to document this sometime! )
   }
 
+  if (param.siteSubset != QUDA_INVALID_SITE_SUBSET) siteSubset = param.siteSubset;
+  if (param.siteOrder != QUDA_INVALID_SITE_ORDER) siteOrder = param.siteOrder;
+  if (param.fieldOrder != QUDA_INVALID_FIELD_ORDER) fieldOrder = param.fieldOrder;
+  if (param.gammaBasis != QUDA_INVALID_GAMMA_BASIS) gammaBasis = param.gammaBasis;
+
   createGhostZone();
 
   real_length = volume*nColor*nSpin*2;
 
   bytes = total_length * precision;
   norm_bytes = total_norm_length * sizeof(float);
-
-  if (param.siteSubset != QUDA_INVALID_SITE_SUBSET) siteSubset = param.siteSubset;
-  if (param.siteOrder != QUDA_INVALID_SITE_ORDER) siteOrder = param.siteOrder;
-  if (param.fieldOrder != QUDA_INVALID_FIELD_ORDER) fieldOrder = param.fieldOrder;
-  if (param.gammaBasis != QUDA_INVALID_GAMMA_BASIS) gammaBasis = param.gammaBasis;
 
   if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 }
