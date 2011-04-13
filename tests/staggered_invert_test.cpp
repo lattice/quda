@@ -33,8 +33,8 @@ extern FullGauge cudaFatLinkSloppy;
 extern FullGauge cudaLongLinkPrecise;
 extern FullGauge cudaLongLinkSloppy;
 
-QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
-QudaPrecision prec = QUDA_SINGLE_PRECISION;
+extern QudaReconstructType link_recon;
+extern QudaPrecision prec;
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
@@ -546,7 +546,8 @@ display_test_info()
   return ;
   
 }
-
+extern void usage(char** argv );
+/*
 void
 usage(char** argv )
 {
@@ -563,7 +564,7 @@ usage(char** argv )
   exit(1);
   return ;
 }
-
+*/
 
 int main(int argc, char** argv)
 {

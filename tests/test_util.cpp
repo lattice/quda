@@ -8,6 +8,7 @@
 #include <test_util.h>
 
 #include <face_quda.h>
+#include "misc.h"
 
 #define XUP 0
 #define YUP 1
@@ -1264,4 +1265,152 @@ void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
     }else{
 	compare_mom((float*)momA, (float*)momB, len);
     }
+}
+
+
+/************
+ * return value
+ *
+ * 0: command line option matched and processed sucessfully
+ * non-zero: command line option does not match
+ *
+ */
+
+
+QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
+QudaPrecision prec = QUDA_SINGLE_PRECISION;
+int xdim = 24;
+int ydim = 24;
+int zdim = 24;
+int tdim = 24;
+QudaDagType dagger = QUDA_DAG_NO;
+
+void usage(char** argv )
+{
+  printf("Usage: %s <args>\n", argv[0]);
+  printf("--prec <double/single/half> \t Precision in GPU\n"); 
+  printf("--recon <8/12> \t\t\t Long link reconstruction type\n"); 
+  printf("--type <0/1/2> \t\t\t Test type\n"); 
+  printf("--dagger \t\t\t Set the dagger to 1\n"); 
+  printf("--tdim \t\t\t\t Set T dimention size(default 24)\n");     
+  printf("--sdim \t\t\t\t Set space dimention size\n"); 
+  printf("--partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
+  printf("--help \t\t\t\t Print out this message\n"); 
+  exit(1);
+  return ;
+}
+
+int process_command_line_option(int argc, char** argv, int* idx)
+{
+  int ret = -1;
+  
+  int i = *idx;
+
+  if( strcmp(argv[i], "--help")== 0){
+    usage(argv);
+  }
+  
+  if( strcmp(argv[i], "--prec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    prec =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+	
+  if( strcmp(argv[i], "--recon") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    link_recon =  get_recon(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--xdim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    xdim= atoi(argv[i+1]);
+    if (xdim < 0 || xdim > 128){
+      printf("ERROR: invalid X dimention (%d)\n", xdim);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--ydim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    ydim= atoi(argv[i+1]);
+    if (ydim < 0 || ydim > 128){
+      printf("ERROR: invalid T dimention (%d)\n", ydim);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+  if( strcmp(argv[i], "--zdim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    zdim= atoi(argv[i+1]);
+    if (zdim < 0 || zdim > 128){
+      printf("ERROR: invalid T dimention (%d)\n", zdim);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--tdim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    tdim =  atoi(argv[i+1]);
+    if (tdim < 0 || tdim > 128){
+      errorQuda("Error: invalid t dimention");
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--sdim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    int sdim =  atoi(argv[i+1]);
+    if (sdim < 0 || sdim > 128){
+      printfQuda("Error: invalid S dimention\n");
+    }
+    xdim=ydim=zdim=sdim;
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--dagger") == 0){
+    dagger = QUDA_DAG_YES;
+    ret = 0;
+    goto out;
+  }	
+  
+
+
+ out:
+  *idx = i;
+  return ret ;
+
 }
