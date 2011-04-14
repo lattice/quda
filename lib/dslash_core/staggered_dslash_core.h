@@ -6,7 +6,8 @@
 #define Vsh_y ghostFace[1]
 #define Vsh_z ghostFace[2]
 #define Vsh_t ghostFace[3]
-#define kernel_type param.kernel_type
+
+//#define kernel_type param.kernel_type
 
 // input spinor
 #if (DD_PREC==0)
