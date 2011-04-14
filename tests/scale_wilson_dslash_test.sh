@@ -10,10 +10,10 @@ function run_dslash_test {
     gs_z=$4
     gs_t=$5
 
-    xdim=$((nx/$gs_x))
-    ydim=$((ny/$gs_y))
-    zdim=$((nz/$gs_z))
-    tdim=$((nt/$gs_t))
+    xdim=$(($nx/$gs_x))
+    ydim=$(($ny/$gs_y))
+    zdim=$(($nz/$gs_z))
+    tdim=$(($nt/$gs_t))
     
     precs="double single half"
     recons="18 12"
