@@ -288,6 +288,7 @@
 
 // define the kernel
 
+template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 

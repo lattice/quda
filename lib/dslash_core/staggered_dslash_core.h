@@ -6,7 +6,8 @@
 #define Vsh_y ghostFace[1]
 #define Vsh_z ghostFace[2]
 #define Vsh_t ghostFace[3]
-#define kernel_type param.kernel_type
+
+//#define kernel_type param.kernel_type
 
 // input spinor
 #if (DD_PREC==0)
@@ -444,10 +445,10 @@ o02_re = o02_im = 0.f;
 	    if ( (kernel_type == EXTERIOR_KERNEL_X)){
 		int space_con = (x4*X3*X2+x3*X2+x2)/2;	
 		if (x1 + 1 >= X1){
-		    nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[0] + 3*(3*Vsh_x) +(x1+1-X1)*(Vsh_x)+ space_con;
+		    nbr_idx1 = param.ghostOffset[0] + 3*(3*Vsh_x) +(x1+1-X1)*(Vsh_x)+ space_con;
 		    stride1 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx1 = sp_stride + param.ghostOffset[0] + 3*Vsh_x + (x1+1-X1)*(Vsh_x)+ space_con;
+		    norm_idx1 = param.ghostNormOffset[0] + 3*Vsh_x + (x1+1-X1)*(Vsh_x)+ space_con;
 #endif		    
 		}
 		
@@ -477,10 +478,10 @@ o02_re = o02_im = 0.f;
 	    if ( (kernel_type == EXTERIOR_KERNEL_X)){
 		int space_con = (x4*X3*X2+x3*X2+x2)/2;		
 		if (x1 + 3 >= X1){
-		    nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[0] + 3*(3*Vsh_x) +(x1+3-X1)*(Vsh_x)+ space_con;
+		    nbr_idx3 = param.ghostOffset[0] + 3*(3*Vsh_x) +(x1+3-X1)*(Vsh_x)+ space_con;
 		    stride3 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx3 = sp_stride + param.ghostOffset[0] + 3*Vsh_x + (x1+3-X1)*(Vsh_x)+ space_con;
+		    norm_idx3 = param.ghostNormOffset[0] + 3*Vsh_x + (x1+3-X1)*(Vsh_x)+ space_con;
 #endif	
 		}
 	    }
@@ -529,10 +530,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_X){
 		if (x1 - 1 < 0){
-		    nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[0] + (x1-1+3)*Vsh_x+ space_con;
+		    nbr_idx1 = param.ghostOffset[0] + (x1-1+3)*Vsh_x+ space_con;
 		    stride1 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx1 = sp_stride + param.ghostOffset[0]  + (x1-1+3)*Vsh_x+ space_con;
+		    norm_idx1 = param.ghostNormOffset[0]  + (x1-1+3)*Vsh_x+ space_con;
 #endif	
 		}        
 	    }
@@ -567,10 +568,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_X){
 		if (x1 - 3 < 0){
-		    nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[0] + (x1 - 3 +3)*Vsh_x+ space_con;
+		    nbr_idx3 = param.ghostOffset[0] + (x1 - 3 +3)*Vsh_x+ space_con;
 		    stride3 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx3 = sp_stride + param.ghostOffset[0]  + (x1-3+3)*Vsh_x+ space_con;
+		    norm_idx3 = param.ghostNormOffset[0]  + (x1-3+3)*Vsh_x+ space_con;
 #endif
 		}
 	    }
@@ -615,10 +616,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){	    
 		if (x2 + 1 >= X2){
-		    nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[1] + 3*(3*Vsh_y) +(x2+1-X2)*(Vsh_y)+ space_con;
+		    nbr_idx1 = param.ghostOffset[1] + 3*(3*Vsh_y) +(x2+1-X2)*(Vsh_y)+ space_con;
 		    stride1 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx1 = sp_stride + param.ghostOffset[1] + 3*Vsh_y + (x2+1-X2)*(Vsh_y)+ space_con;
+		    norm_idx1 = param.ghostNormOffset[1] + 3*Vsh_y + (x2+1-X2)*(Vsh_y)+ space_con;
 #endif		    
 		}      
 	    }
@@ -647,10 +648,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		if (x2 + 3 >= X2){
-		    nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[1] + 3*(3*Vsh_y) +(x2+3-X2)*(Vsh_y)+ space_con;
+		    nbr_idx3 = param.ghostOffset[1] + 3*(3*Vsh_y) +(x2+3-X2)*(Vsh_y)+ space_con;
 		    stride3 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx3 = sp_stride + param.ghostOffset[1] + 3*Vsh_y + (x2+3-X2)*(Vsh_y)+ space_con;
+		    norm_idx3 = param.ghostNormOffset[1] + 3*Vsh_y + (x2+3-X2)*(Vsh_y)+ space_con;
 #endif		    
 		}
 	    }
@@ -698,10 +699,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		if (x2 - 1 < 0){
-		    nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[1] + (x2-1+3)*Vsh_y+ space_con;
+		    nbr_idx1 = param.ghostOffset[1] + (x2-1+3)*Vsh_y+ space_con;
 		    stride1 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx1 = sp_stride + param.ghostOffset[1]  + (x2-1+3)*Vsh_y+ space_con;
+		    norm_idx1 = param.ghostNormOffset[1]  + (x2-1+3)*Vsh_y+ space_con;
 #endif	
 		}              
     }
@@ -736,10 +737,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		if (x2 - 3 < 0){
-		    nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[1] + (x2 - 3 +3)*Vsh_y+ space_con;
+		    nbr_idx3 = param.ghostOffset[1] + (x2 - 3 +3)*Vsh_y+ space_con;
 		    stride3 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx3 = sp_stride + param.ghostOffset[1]  + (x2-3+3)*Vsh_y+ space_con;
+		    norm_idx3 = param.ghostNormOffset[1]  + (x2-3+3)*Vsh_y+ space_con;
 #endif
 		}
 	    }
@@ -783,10 +784,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -1))|| 
 #ifdef MULTI_GPU
 	if (kernel_type == EXTERIOR_KERNEL_Z){	
 	    if (x3 + 1 >= X3){
-		nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[2] + 3*(3*Vsh_z) +(x3+1-X3)*(Vsh_z)+ space_con;
+		nbr_idx1 = param.ghostOffset[2] + 3*(3*Vsh_z) +(x3+1-X3)*(Vsh_z)+ space_con;
 		stride1 = 3*Vsh_z;	    
 #if (DD_PREC == 2) //half precision
-		norm_idx1 = sp_stride + param.ghostOffset[2] + 3*Vsh_z + (x3+1-X3)*(Vsh_z)+ space_con;
+		norm_idx1 = param.ghostNormOffset[2] + 3*Vsh_z + (x3+1-X3)*(Vsh_z)+ space_con;
 #endif		
 	    }      
 	}
@@ -815,10 +816,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| 
 #ifdef MULTI_GPU
 	if (kernel_type == EXTERIOR_KERNEL_Z){
 	    if (x3 + 3 >= X3){
-		nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[2] + 3*(3*Vsh_z) +(x3+3-X3)*(Vsh_z)+ space_con;
+		nbr_idx3 = param.ghostOffset[2] + 3*(3*Vsh_z) +(x3+3-X3)*(Vsh_z)+ space_con;
 		stride3 = 3*Vsh_z;
 #if (DD_PREC == 2) //half precision
-		norm_idx3 = sp_stride + param.ghostOffset[2] + 3*Vsh_z + (x3+3-X3)*(Vsh_z)+ space_con;
+		norm_idx3 = param.ghostNormOffset[2] + 3*Vsh_z + (x3+3-X3)*(Vsh_z)+ space_con;
 #endif
 	    }
 	}
@@ -868,10 +869,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 		if (x3 - 1 < 0){
-		    nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[2] + (x3-1+3)*Vsh_z+ space_con;
+		    nbr_idx1 = param.ghostOffset[2] + (x3-1+3)*Vsh_z+ space_con;
 		    stride1 = 3*Vsh_z;
 #if (DD_PREC == 2) //half precision
-		    norm_idx1 = sp_stride + param.ghostOffset[2]  + (x3-1+3)*Vsh_z+ space_con;
+		    norm_idx1 = param.ghostNormOffset[2]  + (x3-1+3)*Vsh_z+ space_con;
 #endif			    
 		}        
 	    }
@@ -906,10 +907,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 		if (x3 - 3 < 0){
-		    nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[2] + (x3 - 3 +3)*Vsh_z+ space_con;
+		    nbr_idx3 = param.ghostOffset[2] + (x3 - 3 +3)*Vsh_z+ space_con;
 		    stride3 = 3*Vsh_z;
 #if (DD_PREC == 2) //half precision
-		    norm_idx3 = sp_stride + param.ghostOffset[2]  + (x3-3+3)*Vsh_z+ space_con;
+		    norm_idx3 = param.ghostNormOffset[2]  + (x3-3+3)*Vsh_z+ space_con;
 #endif			    
 		}
 	    }
@@ -952,10 +953,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){      
 		if (x4 + 1 >= X4){
-		    nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh_t) +(x4+1-X4)*(Vsh_t)+ space_con;
+		    nbr_idx1 = param.ghostOffset[3] + 3*(3*Vsh_t) +(x4+1-X4)*(Vsh_t)+ space_con;
 		    stride1 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx1 = sp_stride + param.ghostOffset[3] + 3*Vsh_t + (x4+1-X4)*(Vsh_t)+ space_con;
+		    norm_idx1 = param.ghostNormOffset[3] + 3*Vsh_t + (x4+1-X4)*(Vsh_t)+ space_con;
 #endif
 		}
 	    }
@@ -985,10 +986,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){
 		if (x4 + 3 >= X4){
-		    nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + 3*(3*Vsh_t) +(x4+3-X4)*(Vsh_t)+ space_con;
+		    nbr_idx3 = param.ghostOffset[3] + 3*(3*Vsh_t) +(x4+3-X4)*(Vsh_t)+ space_con;
 		    stride3 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx3 = sp_stride + param.ghostOffset[3] + 3*Vsh_t + (x4+3-X4)*(Vsh_t)+ space_con;
+		    norm_idx3 = param.ghostNormOffset[3] + 3*Vsh_t + (x4+3-X4)*(Vsh_t)+ space_con;
 #endif
 		}
 	    }
@@ -1035,10 +1036,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| 
 		}
 		
 		if (x4 - 1 < 0){
-		    nbr_idx1 = 3*sp_stride + 3*param.ghostOffset[3] + (x4-1+3)*Vsh_t+ space_con;
+		    nbr_idx1 = param.ghostOffset[3] + (x4-1+3)*Vsh_t+ space_con;
 		    stride1 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx1 = sp_stride + param.ghostOffset[3]  + (x4-1+3)*Vsh_t+ space_con;
+		    norm_idx1 = param.ghostNormOffset[3]  + (x4-1+3)*Vsh_t+ space_con;
 #endif		    
 		}        	
 	    }
@@ -1071,10 +1072,10 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3 -3))|| 
 		    long_idx = Vh + x4*Vsh_t+ space_con;
 		}	
 		if (x4 - 3 < 0){
-		    nbr_idx3 = 3*sp_stride + 3*param.ghostOffset[3] + (x4 - 3 +3)*Vsh_t+ space_con;
+		    nbr_idx3 = param.ghostOffset[3] + (x4 - 3 +3)*Vsh_t+ space_con;
 		    stride3 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx3 = sp_stride + param.ghostOffset[3]  + (x4-3+3)*Vsh_t+ space_con;
+		    norm_idx3 = param.ghostNormOffset[3]  + (x4-3+3)*Vsh_t+ space_con;
 #endif		    
 		}
 	    }

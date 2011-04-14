@@ -363,7 +363,7 @@ int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
 #ifdef MULTI_GPU
-if (param.kernel_type == INTERIOR_KERNEL) {
+if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
   coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -384,18 +384,18 @@ if (param.kernel_type == INTERIOR_KERNEL) {
 #ifdef MULTI_GPU
 } else { // exterior kernel
 
-  const int dim = static_cast<int>(param.kernel_type);
+  const int dim = static_cast<int>(kernel_type);
   const int face_volume = (param.threads >> 1);           // volume of one face
   const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
   face_idx = sid - face_num*face_volume;        // index into the respective face
 
-  // need extra SPINOR_HOP*sp_stride since ghostoffset is just the offset from the start of the end zone
+  // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-  sp_idx = face_idx + SPINOR_HOP*(sp_stride + param.ghostOffset[dim]);
+  sp_idx = face_idx + param.ghostOffset[dim];
   //sp_idx = sid + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + sp_stride + param.ghostNormOffset[dim];
+  sp_norm_idx = sid + param.ghostNormOffset[dim];
 #endif
     
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
@@ -419,8 +419,8 @@ if (param.kernel_type == INTERIOR_KERNEL) {
 
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_X && x1==X1m1) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
+     (kernel_type == EXTERIOR_KERNEL_X && x1==X1m1) )
 #endif
 {
   // Projector P0-
@@ -430,7 +430,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) |
   // i 0 0 1 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x1==X1m1 ? X-X1m1 : X+1) >> 1;
 #ifdef MULTI_GPU
@@ -450,7 +450,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) |
   spinorFloat b2_re, b2_im;
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
     // read spinor from device memory
@@ -473,7 +473,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) |
 #ifdef MULTI_GPU
   } else {
   
-    const int dim = static_cast<int>(param.kernel_type);
+    const int dim = static_cast<int>(kernel_type);
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
@@ -612,8 +612,8 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) |
 }
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_X && x1==0) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
+     (kernel_type == EXTERIOR_KERNEL_X && x1==0) )
 #endif
 {
   // Projector P0+
@@ -623,7 +623,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   // -i 0 0 1 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x1==0 ? X+X1m1 : X-1) >> 1;
 #ifdef MULTI_GPU
@@ -631,7 +631,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
+  int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
@@ -647,7 +647,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   spinorFloat b2_re, b2_im;
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
     // read spinor from device memory
@@ -670,7 +670,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 #ifdef MULTI_GPU
   } else {
   
-    const int dim = static_cast<int>(param.kernel_type);
+    const int dim = static_cast<int>(kernel_type);
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
@@ -809,8 +809,8 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 }
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_Y && x2==X2m1) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
+     (kernel_type == EXTERIOR_KERNEL_Y && x2==X2m1) )
 #endif
 {
   // Projector P1-
@@ -820,7 +820,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) |
   // -1 0 0 1 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1;
 #ifdef MULTI_GPU
@@ -840,7 +840,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) |
   spinorFloat b2_re, b2_im;
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
     // read spinor from device memory
@@ -863,7 +863,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) |
 #ifdef MULTI_GPU
   } else {
   
-    const int dim = static_cast<int>(param.kernel_type);
+    const int dim = static_cast<int>(kernel_type);
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
@@ -1002,8 +1002,8 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) |
 }
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_Y && x2==0) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
+     (kernel_type == EXTERIOR_KERNEL_Y && x2==0) )
 #endif
 {
   // Projector P1+
@@ -1013,7 +1013,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   // 1 0 0 1 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x2==0 ? X+X2X1mX1 : X-X1) >> 1;
 #ifdef MULTI_GPU
@@ -1021,7 +1021,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
+  int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
@@ -1037,7 +1037,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   spinorFloat b2_re, b2_im;
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
     // read spinor from device memory
@@ -1060,7 +1060,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 #ifdef MULTI_GPU
   } else {
   
-    const int dim = static_cast<int>(param.kernel_type);
+    const int dim = static_cast<int>(kernel_type);
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
@@ -1199,8 +1199,8 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 }
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_Z && x3==X3m1) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
+     (kernel_type == EXTERIOR_KERNEL_Z && x3==X3m1) )
 #endif
 {
   // Projector P2-
@@ -1210,7 +1210,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) |
   // 0 -i 0 1 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
 #ifdef MULTI_GPU
@@ -1230,7 +1230,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) |
   spinorFloat b2_re, b2_im;
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
     // read spinor from device memory
@@ -1253,7 +1253,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) |
 #ifdef MULTI_GPU
   } else {
   
-    const int dim = static_cast<int>(param.kernel_type);
+    const int dim = static_cast<int>(kernel_type);
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
@@ -1392,8 +1392,8 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) |
 }
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_Z && x3==0) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
+     (kernel_type == EXTERIOR_KERNEL_Z && x3==0) )
 #endif
 {
   // Projector P2+
@@ -1403,7 +1403,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   // 0 i 0 1 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
 #ifdef MULTI_GPU
@@ -1411,7 +1411,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
+  int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
@@ -1427,7 +1427,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   spinorFloat b2_re, b2_im;
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
     // read spinor from device memory
@@ -1450,7 +1450,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 #ifdef MULTI_GPU
   } else {
   
-    const int dim = static_cast<int>(param.kernel_type);
+    const int dim = static_cast<int>(kernel_type);
     const int sp_stride_pad = ghostFace[dim];
     
     // read half spinor from device memory
@@ -1589,8 +1589,8 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 }
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_T && x4==X4m1) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
+     (kernel_type == EXTERIOR_KERNEL_T && x4==X4m1) )
 #endif
 {
   // Projector P3-
@@ -1600,7 +1600,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
   // 0 0 0 2 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
 #ifdef MULTI_GPU
@@ -1619,7 +1619,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
     spinorFloat b2_re, b2_im;
     
 #ifdef MULTI_GPU
-    if (param.kernel_type == INTERIOR_KERNEL) {
+    if (kernel_type == INTERIOR_KERNEL) {
 #endif
     
       // read spinor from device memory
@@ -1642,7 +1642,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
 #ifdef MULTI_GPU
     } else {
     
-      const int dim = static_cast<int>(param.kernel_type);
+      const int dim = static_cast<int>(kernel_type);
       const int sp_stride_pad = ghostFace[dim];
       const int t_proj_scale = TPROJSCALE;
       
@@ -1694,7 +1694,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
     spinorFloat b2_re, b2_im;
     
 #ifdef MULTI_GPU
-    if (param.kernel_type == INTERIOR_KERNEL) {
+    if (kernel_type == INTERIOR_KERNEL) {
 #endif
     
       // read spinor from device memory
@@ -1717,7 +1717,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
 #ifdef MULTI_GPU
     } else {
     
-      const int dim = static_cast<int>(param.kernel_type);
+      const int dim = static_cast<int>(kernel_type);
       const int sp_stride_pad = ghostFace[dim];
       const int t_proj_scale = TPROJSCALE;
       
@@ -1846,8 +1846,8 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) |
 }
 
 #ifdef MULTI_GPU
-if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
-     (param.kernel_type == EXTERIOR_KERNEL_T && x4==0) )
+if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
+     (kernel_type == EXTERIOR_KERNEL_T && x4==0) )
 #endif
 {
   // Projector P3+
@@ -1857,7 +1857,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
   // 0 0 0 0 
   
 #ifdef MULTI_GPU
-  if (param.kernel_type == INTERIOR_KERNEL) {
+  if (kernel_type == INTERIOR_KERNEL) {
 #endif
     sp_idx = (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
 #ifdef MULTI_GPU
@@ -1865,7 +1865,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif // MULTI_GPU
   
 #ifdef MULTI_GPU
-  int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
+  int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);
 #else
   int ga_idx = sp_idx;
 #endif
@@ -1880,7 +1880,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     spinorFloat b2_re, b2_im;
     
 #ifdef MULTI_GPU
-    if (param.kernel_type == INTERIOR_KERNEL) {
+    if (kernel_type == INTERIOR_KERNEL) {
 #endif
     
       // read spinor from device memory
@@ -1903,7 +1903,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #ifdef MULTI_GPU
     } else {
     
-      const int dim = static_cast<int>(param.kernel_type);
+      const int dim = static_cast<int>(kernel_type);
       const int sp_stride_pad = ghostFace[dim];
       const int t_proj_scale = TPROJSCALE;
       
@@ -1955,7 +1955,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     spinorFloat b2_re, b2_im;
     
 #ifdef MULTI_GPU
-    if (param.kernel_type == INTERIOR_KERNEL) {
+    if (kernel_type == INTERIOR_KERNEL) {
 #endif
     
       // read spinor from device memory
@@ -1978,7 +1978,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #ifdef MULTI_GPU
     } else {
     
-      const int dim = static_cast<int>(param.kernel_type);
+      const int dim = static_cast<int>(kernel_type);
       const int sp_stride_pad = ghostFace[dim];
       const int t_proj_scale = TPROJSCALE;
       
@@ -2110,7 +2110,7 @@ if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 
 int incomplete = 0; // Have all 8 contributions been computed for this site?
 
-switch(param.kernel_type) { // intentional fall-through
+switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
   incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
 case EXTERIOR_KERNEL_T:

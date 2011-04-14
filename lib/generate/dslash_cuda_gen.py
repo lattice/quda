@@ -320,7 +320,7 @@ int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
 #ifdef MULTI_GPU
-if (param.kernel_type == INTERIOR_KERNEL) {
+if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
   coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -338,18 +338,18 @@ if (param.kernel_type == INTERIOR_KERNEL) {
 #ifdef MULTI_GPU
 } else { // exterior kernel
 
-  const int dim = static_cast<int>(param.kernel_type);
+  const int dim = static_cast<int>(kernel_type);
   const int face_volume = (param.threads >> 1);           // volume of one face
   const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
   face_idx = sid - face_num*face_volume;        // index into the respective face
 
-  // need extra SPINOR_HOP*sp_stride since ghostoffset is just the offset from the start of the end zone
+  // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-  sp_idx = face_idx + SPINOR_HOP*(sp_stride + param.ghostOffset[dim]);
+  sp_idx = face_idx + param.ghostOffset[dim];
   //sp_idx = sid + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + sp_stride + param.ghostNormOffset[dim];
+  sp_norm_idx = sid + param.ghostNormOffset[dim];
 #endif
     
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
@@ -398,8 +398,8 @@ def gen(dir, pack_only=False):
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
-    cond += "if ( (param.kernel_type == INTERIOR_KERNEL && (!param.ghostDim["+`dir/2`+"] || "+interior[dir]+")) ||\n"
-    cond += "     (param.kernel_type == EXTERIOR_KERNEL_"+dim[dir/2]+" && "+boundary[dir]+") )\n"
+    cond += "if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim["+`dir/2`+"] || "+interior[dir]+")) ||\n"
+    cond += "     (kernel_type == EXTERIOR_KERNEL_"+dim[dir/2]+" && "+boundary[dir]+") )\n"
     cond += "#endif\n"
 
     str = ""
@@ -411,7 +411,7 @@ def gen(dir, pack_only=False):
     str += "\n"
 
     str += "#ifdef MULTI_GPU\n"
-    str += "if (param.kernel_type == INTERIOR_KERNEL) {\n"
+    str += "if (kernel_type == INTERIOR_KERNEL) {\n"
     str += "#endif\n"
     str += "  sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#ifdef MULTI_GPU\n"
@@ -423,7 +423,7 @@ def gen(dir, pack_only=False):
         str += "int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        str += "int ga_idx = ((param.kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+        str += "int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
         str += "#else\n"
         str += "int ga_idx = sp_idx;\n"
         str += "#endif\n"
@@ -456,7 +456,7 @@ def gen(dir, pack_only=False):
     load_spinor += "\n"
 
     load_half = ""
-    load_half += "const int dim = static_cast<int>(param.kernel_type);\n"
+    load_half += "const int dim = static_cast<int>(kernel_type);\n"
     load_half += "const int sp_stride_pad = ghostFace[dim];\n"
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
@@ -511,7 +511,7 @@ def gen(dir, pack_only=False):
 
     prep_half = ""
     prep_half += "#ifdef MULTI_GPU\n"
-    prep_half += "if (param.kernel_type == INTERIOR_KERNEL) {\n"
+    prep_half += "if (kernel_type == INTERIOR_KERNEL) {\n"
     prep_half += "#endif\n"
     prep_half += "\n"
     prep_half += indent(load_spinor)
@@ -783,7 +783,7 @@ def epilog():
 """
 int incomplete = 0; // Have all 8 contributions been computed for this site?
 
-switch(param.kernel_type) { // intentional fall-through
+switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
   incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
 case EXTERIOR_KERNEL_T:

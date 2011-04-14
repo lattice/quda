@@ -304,6 +304,8 @@
 #define DD_FUNC(n,r,x) DD_CONCAT(n,r,x)
 
 // define the kernel
+
+template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
   (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
 #ifdef GPU_STAGGERED_DIRAC
