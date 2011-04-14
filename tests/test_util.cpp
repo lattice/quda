@@ -1,6 +1,7 @@
 #include <complex>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <short.h>
 
