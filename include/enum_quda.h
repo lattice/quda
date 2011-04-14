@@ -210,9 +210,9 @@ extern "C" {
   
   // Degree of freedom ordering
   typedef enum QudaFieldOrder_s {
-    QUDA_FLOAT_FIELD_ORDER, // spin-color-complex-space
-    QUDA_FLOAT2_FIELD_ORDER, // (spin-color-complex)/2-space-(spin-color-complex)%2
-    QUDA_FLOAT4_FIELD_ORDER, // (spin-color-complex)/4-space-(spin-color-complex)%4
+    QUDA_FLOAT_FIELD_ORDER = 1, // spin-color-complex-space
+    QUDA_FLOAT2_FIELD_ORDER = 2, // (spin-color-complex)/2-space-(spin-color-complex)%2
+    QUDA_FLOAT4_FIELD_ORDER = 4, // (spin-color-complex)/4-space-(spin-color-complex)%4
     QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, // CPS/QDP++ ordering
     QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM

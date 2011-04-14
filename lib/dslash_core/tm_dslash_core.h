@@ -213,13 +213,13 @@ if (kernel_type == INTERIOR_KERNEL) {
   const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
   face_idx = sid - face_num*face_volume;        // index into the respective face
 
-  // need extra SPINOR_HOP*sp_stride since ghostoffset is just the offset from the start of the end zone
+  // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-  sp_idx = face_idx + SPINOR_HOP*(sp_stride + param.ghostOffset[dim]);
+  sp_idx = face_idx + param.ghostOffset[dim];
   //sp_idx = sid + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + sp_stride + param.ghostNormOffset[dim];
+  sp_norm_idx = sid + param.ghostNormOffset[dim];
 #endif
     
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
