@@ -26,10 +26,10 @@ function run_dslash_test {
     for prec in $precs ; do
 	for recon in $recons ; do
 	    cmd="mpirun -n $ngpus ./$prog --dslash_type clover --xdim $xdim --ydim $ydim --zdim $zdim --tdim $tdim --recon $recon --prec $prec --xgridsize $gs_x --ygridsize $gs_y --zgridsize $gs_z --tgridsize $gs_t"
-	    #echo running $cmd
-	    #echo "----------------------------------------------------------" 
+	    echo running $cmd
+	    echo "----------------------------------------------------------" 
 	    echo $cmd 
-	    #$cmd 
+	    $cmd 
 	done
     done
 }
