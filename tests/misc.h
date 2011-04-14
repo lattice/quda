@@ -18,6 +18,9 @@ extern "C" {
     const char* get_recon_str(QudaReconstructType recon);
     const char* get_test_type(int t);
     void quda_set_verbose(int );
+    QudaDslashType get_dslash_type(char* s);
+    const char* get_dslash_type_str(QudaDslashType type);
+
 #ifdef __cplusplus
 }
 #endif

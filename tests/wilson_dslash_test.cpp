@@ -21,7 +21,7 @@
 const int test_type = 0;
 
 // Dirac operator type
-const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
+extern QudaDslashType dslash_type;
 //const QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 //const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
@@ -412,10 +412,11 @@ void display_test_info()
 {
   printfQuda("running the following test:\n");
  
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
+  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension   dslash_type\n");
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d            %s\n", 
 	     get_prec_str(prec), get_recon_str(link_recon), 
-	     test_type, dagger, xdim, ydim, zdim, tdim);
+	     test_type, dagger, xdim, ydim, zdim, tdim, 
+	     get_dslash_type_str(dslash_type));
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     commDimPartitioned(0),
