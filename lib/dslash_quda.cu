@@ -414,8 +414,8 @@ public:
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(domainWallDslash, gridDim, blockDim, shared_bytes, stream, out, dslashParam,
-	   outNorm, gauge0, gauge1, in, inNorm, mferm, x, xNorm, a);
+    //DSLASH(domainWallDslash, gridDim, blockDim, shared_bytes, stream, out, dslashParam,
+    //	   outNorm, gauge0, gauge1, in, inNorm, mferm, x, xNorm, a);
   }
 
 };
