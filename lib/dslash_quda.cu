@@ -149,95 +149,95 @@ void setFace(const FaceBuffer &Face) {
  case INTERIOR_KERNEL:							\
     if (x==0) {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel <INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+	FUNC ## 18 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel <INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+	FUNC ## 12 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
       } else {								\
-	FUNC ## 8 ## DAG ## Kernel <INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     } else {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel <INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel <INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
 	FUNC ## 8 ## DAG ## X ## Kernel<INTERIOR_KERNEL> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     }									\
     break;\
- case EXTERIOR_KERNEL_X::						\
+ case EXTERIOR_KERNEL_X:						\
     if (x==0) {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel <EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel <EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else {								\
-	FUNC ## 8 ## DAG ## Kernel <EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     } else {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     }									\
  break;									\
  case EXTERIOR_KERNEL_Y:						\
     if (x==0) {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel <EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel <EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else {								\
-	FUNC ## 8 ## DAG ## Kernel <EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     } else {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     }									\
     break;								\
  case EXTERIOR_KERNEL_Z:						\
     if (x==0) {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel <EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel <EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else {								\
 	FUNC ## 8 ## DAG ## Kernel <EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     } else {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     }									\
     break;								\
  case EXTERIOR_KERNEL_T:						\
     if (x==0) {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel <EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel <EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else {								\
-	FUNC ## 8 ## DAG ## Kernel <EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     } else {								\
       if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel <EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
       }									\
     }									\
     break;								\
