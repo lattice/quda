@@ -63,6 +63,18 @@ function run_dslash_test {
     done
 }
 
+#gridsize for 8 GPUs
+partitions[8]="
+1 1 2 4 
+1 1 1 8 
+"
+
+#gridsize for 16 GPUs
+partitions[16]="
+1 1 2 8 
+1 1 1 16
+"
+
 #gridsize for 32 GPUs
 partitions[32]="
 1 1 2 16 
