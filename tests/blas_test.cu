@@ -16,7 +16,7 @@ const int LT = 8;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
-const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
 const int Nkernels = 30;
 const int ThreadMin = 32;
@@ -134,9 +134,6 @@ void initFields(int prec)
   // check for successful allocation
   checkCudaError();
 
-  //std::cout << *vD << *vH;
-  //exit(0);
-
   *vD = *vH;
   *wD = *wH;
   *xD = *xH;
@@ -144,10 +141,6 @@ void initFields(int prec)
   *zD = *zH;
   *hD = *hH;
   *lD = *lH;
-  
-
-  // turn off error checking in blas kernels
-  setBlasTuning(QUDA_TUNE_YES);
 }
 
 
@@ -675,6 +668,9 @@ int main(int argc, char** argv)
 
   int niter = Niter;
 
+  // turn off error checking in blas kernels for tuning
+  setBlasTuning(QUDA_TUNE_YES);
+
   for (int prec = 0; prec < Nprec; prec++) {
 
     printf("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
@@ -754,10 +750,17 @@ int main(int argc, char** argv)
     if (niter==0) niter = 1;
   }
 
+  // clear the error state
+  cudaGetLastError();
+
+  // turn on error checking in blas kernels
+  setBlasTuning(QUDA_TUNE_NO);
+
   // lastly check for correctness
   for (int prec = 0; prec < Nprec; prec++) {
     printf("\nTesting %s precision...\n\n", prec_str[prec]);
     initFields(prec);
+    
     for (int kernel = 0; kernel < Nkernels; kernel++) {
       // only benchmark "high precision" copyCuda() if double is supported
       if ((Nprec < 3) && (kernel == 0)) continue;
