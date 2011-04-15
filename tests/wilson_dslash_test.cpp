@@ -18,10 +18,11 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 1;
 
 // Dirac operator type
 extern QudaDslashType dslash_type;
+//const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 //const QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 //const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
@@ -295,14 +296,13 @@ void end() {
 // execute kernel
 double dslashCUDA() {
 
-  /*
   if (!transfer) {
     if (test_type < 2) {
       dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp1);
     } else {
       dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp1);
     }
-    }*/
+  }
 
   printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);
