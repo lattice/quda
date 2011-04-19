@@ -273,15 +273,15 @@ def def_output_spinor():
 
 
 def prolog():
-    str = ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
-    str += "#define SHARED_FLOATS_PER_THREAD "+`sharedFloats`+"\n\n"
+    prolog_str= ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
+    prolog_str+= "#define DSLASH_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
 
-    str += def_input_spinor()
-    str += def_gauge()
-    if clover == True: str += def_clover()
-    str += def_output_spinor()
+    prolog_str+= def_input_spinor()
+    prolog_str+= def_gauge()
+    if clover == True: prolog_str+= def_clover()
+    prolog_str+= def_output_spinor()
 
-    if sharedFloats > 0: str += (
+    if sharedFloats > 0: prolog_str+= (
 """
 #ifdef SPINOR_DOUBLE
 #if (__CUDA_ARCH__ >= 200)
@@ -290,7 +290,7 @@ def prolog():
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat sd_data[];
-volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+volatile spinorFloat *s = sd_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #else
 #if (__CUDA_ARCH__ >= 200)
@@ -299,18 +299,18 @@ volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat ss_data[];
-volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+volatile spinorFloat *s = ss_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #endif
 """)
 
-    str += (
+    prolog_str+= (
 """
 #include "read_gauge.h"
 #include "read_clover.h"
 #include "io_spinor.h"
 
-int X, x1, x2, x3, x4, sp_idx, face_idx;
+int X, x1, x2, x3, x4, sp_idx;
 
 #if (defined MULTI_GPU) && (DD_PREC==2) // half precision
 int sp_norm_idx;
@@ -320,6 +320,7 @@ int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
 #ifdef MULTI_GPU
+int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
@@ -331,9 +332,9 @@ if (kernel_type == INTERIOR_KERNEL) {
     for s in range(0,4):
         for c in range(0,3):
             out += out_re(s,c)+" = 0;  "+out_im(s,c)+" = 0;\n"
-    str += indent(out)
+    prolog_str+= indent(out)
 
-    str += (
+    prolog_str+= (
 """
 #ifdef MULTI_GPU
 } else { // exterior kernel
@@ -362,11 +363,11 @@ if (kernel_type == INTERIOR_KERNEL) {
     for s in range(0,4):
         for c in range(0,3):
             out += out_re(s,c)+" = "+in_re(s,c)+";  "+out_im(s,c)+" = "+in_im(s,c)+";\n"
-    str += indent(out)
-    str += "}\n"
-    str += "#endif // MULTI_GPU\n\n\n"
+    prolog_str+= indent(out)
+    prolog_str+= "}\n"
+    prolog_str+= "#endif // MULTI_GPU\n\n\n"
             
-    return str
+    return prolog_str
 # end def prolog
 
 
@@ -900,7 +901,12 @@ def generate_dslash():
 
 
 # To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
+
 sharedFloats = 8
+if(len(sys.argv) > 1):
+    if (sys.argv[1] == '--shared'):
+        sharedFloats = int(sys.argv[2])
+print "Shared floats set to " + str(sharedFloats);
 
 twist = False
 clover = True
