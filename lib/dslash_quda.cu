@@ -28,7 +28,7 @@
 #include <sys/time.h>
 
 enum KernelType {
-  INTERIOR_KERNEL = -1,
+  INTERIOR_KERNEL = 5,
   EXTERIOR_KERNEL_X = 0,
   EXTERIOR_KERNEL_Y = 1,
   EXTERIOR_KERNEL_Z = 2,
@@ -474,7 +474,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  int shared_bytes = blockDim[0].x*DSLASH_SHARED_FLOATS_PER_THREAD*regSize;
+  int shared_bytes = blockDim[0].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_PARAM);
   dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
 #ifdef MULTI_GPU
@@ -492,7 +492,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for (int i=3; i>=0; i--) { // count down for Wilson
     if (!dslashParam.commDim[i]) continue;
 
-    shared_bytes = blockDim[i+1].x*DSLASH_SHARED_FLOATS_PER_THREAD*regSize;
+    shared_bytes = blockDim[i+1].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_PARAM);
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);
@@ -571,7 +571,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const Fu
 
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
-#ifdef GPU_WILSON_DIRAC
+#ifdef GPU_CLOVER_DIRAC
   int Npad = (in->nColor*in->nSpin*2)/in->fieldOrder; // SPINOR_HOP in old code
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
@@ -902,7 +902,7 @@ void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClov
   dslashParam.tMul = 1;
   dslashParam.threads = in->volume;
 
-#ifdef GPU_WILSON_DIRAC
+#ifdef GPU_CLOVER_DIRAC
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
 

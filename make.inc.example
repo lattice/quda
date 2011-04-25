@@ -15,7 +15,8 @@ HOST_DEBUG = no                # compile host debug code
 DEVICE_DEBUG = no              # compile device debug code for cuda-gdb 
 VERBOSE = no                   # display kernel register useage
 
-BUILD_WILSON_DIRAC = yes       # build Wilson and clover Dirac operators?
+BUILD_WILSON_DIRAC = yes       # build Wilson Dirac operators?
+BUILD_CLOVER_DIRAC = no       # build clover Dirac operators?
 BUILD_DOMAIN_WALL_DIRAC = no  # build domain wall Dirac operators?
 BUILD_STAGGERED_DIRAC = no    # build staggered Dirac operators?
 BUILD_TWISTED_MASS_DIRAC = no  # build twisted mass Dirac operators?
@@ -121,10 +122,13 @@ ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   COPT += -DGPU_STAGGERED_DIRAC
   STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
 endif
+ifeq ($(strip $(BUILD_CLOVER_DIRAC)), yes)
+  NVCCOPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+  COPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+endif
 ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
   NVCCOPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
   COPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-  TWISTED_MASS_DIRAC_TEST=twisted_mass_dslash_test twisted_mass_invert_test
 endif
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK
