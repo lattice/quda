@@ -731,3 +731,59 @@ quda_set_verbose(int v)
 {
     verbose = v;
 }
+
+
+
+QudaDslashType
+get_dslash_type(char* s)
+{
+  QudaDslashType ret =  QUDA_INVALID_DSLASH;
+  
+  if (strcmp(s, "wilson") == 0){
+    ret = QUDA_WILSON_DSLASH;
+  }else if (strcmp(s, "clover") == 0){
+    ret = QUDA_CLOVER_WILSON_DSLASH;
+  }else if (strcmp(s, "twisted_mass") == 0){
+    ret = QUDA_TWISTED_MASS_DSLASH;
+  }else if (strcmp(s, "asqtad") == 0){
+    ret =  QUDA_ASQTAD_DSLASH;
+  }else if (strcmp(s, "domain_wall") == 0){
+    ret =  QUDA_DOMAIN_WALL_DSLASH;
+  }else{
+    fprintf(stderr, "Error: invalid dslash type\n");	
+    exit(1);
+  }
+  
+  return ret;
+}
+
+const char* 
+get_dslash_type_str(QudaDslashType type)
+{
+  const char* ret;
+  
+  switch( type){	
+  case QUDA_WILSON_DSLASH:
+    ret=  "wilson";
+    break;
+  case QUDA_CLOVER_WILSON_DSLASH:
+    ret= "clover";
+    break;
+  case QUDA_TWISTED_MASS_DSLASH:
+    ret= "twisted_mass";
+    break;
+  case QUDA_ASQTAD_DSLASH:
+    ret = "asqtad";
+    break;
+  case QUDA_DOMAIN_WALL_DSLASH:
+    ret = "domain_wall";
+      break;
+  default:
+    ret = "unknown";	
+    break;
+  }
+  
+  
+  return ret;
+    
+}

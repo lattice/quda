@@ -496,6 +496,10 @@ __device__ float fast_abs_max(float4 a) {
   Y.y = fmaf(a.y, X.x, Y.y); Y.y = fmaf( a.x, X.y, Y.y);
 #endif // (__CUDA_ARCH__ < 200)
 
+#define CAXPY_DOUBLE2(a, X, Y)		\
+  Y.x += a.x*X.x; Y.x -= a.y*X.y;	\
+  Y.y += a.y*X.x; Y.y += a.x*X.y;	\
+
 #define CMAXPY_FLOAT4(a, X, Y)			\
   Y.x -= a.x*X.x; Y.x += a.y*X.y;		\
   Y.y -= a.y*X.x; Y.y -= a.x*X.y;		\
@@ -4208,13 +4212,13 @@ __global__ void caxpbypczpwDKernel(Float2 a, Float2 *x, Float2 b, Float2 *y,
     Float2 W = read_Float2(w, i);
 
     Float2 X = READ_DOUBLE2_TEXTURE(x, i);
-    CAXPY_FLOAT2(a, X, W);
+    CAXPY_DOUBLE2(a, X, W);
 
     Float2 Y = READ_DOUBLE2_TEXTURE(y, i);
-    CAXPY_FLOAT2(b, Y, W);
+    CAXPY_DOUBLE2(b, Y, W);
 
     Float2 Z = READ_DOUBLE2_TEXTURE(z, i);
-    CAXPY_FLOAT2(c, Z, W);
+    CAXPY_DOUBLE2(c, Z, W);
 
     w[i] = make_Float2(W);
 

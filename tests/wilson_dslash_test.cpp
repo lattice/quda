@@ -18,10 +18,11 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 0;
+const int test_type = 1;
 
 // Dirac operator type
-const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
+extern QudaDslashType dslash_type;
+//const QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 //const QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 //const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
@@ -295,14 +296,13 @@ void end() {
 // execute kernel
 double dslashCUDA() {
 
-  /*
   if (!transfer) {
     if (test_type < 2) {
       dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp1);
     } else {
       dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp1);
     }
-    }*/
+  }
 
   printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);
@@ -345,9 +345,9 @@ double dslashCUDA() {
   // check for errors
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
-    printf("with ERROR: %s\n", cudaGetErrorString(stat));
+    printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
-  printf("done.\n\n");
+  printfQuda("done.\n\n");
 
   return secs;
 }
@@ -364,7 +364,7 @@ void dslashRef() {
   }
 
   // compare to dslash reference implementation
-  printf("Calculating reference implementation...");
+  printfQuda("Calculating reference implementation...");
   fflush(stdout);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
@@ -404,7 +404,7 @@ void dslashRef() {
     }
   }
 
-  printf("done.\n");
+  printfQuda("done.\n");
 }
 
 
@@ -412,10 +412,11 @@ void display_test_info()
 {
   printfQuda("running the following test:\n");
  
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
+  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension   dslash_type\n");
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d            %s\n", 
 	     get_prec_str(prec), get_recon_str(link_recon), 
-	     test_type, dagger, xdim, ydim, zdim, tdim);
+	     test_type, dagger, xdim, ydim, zdim, tdim, 
+	     get_dslash_type_str(dslash_type));
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     commDimPartitioned(0),
@@ -450,8 +451,8 @@ int main(int argc, char **argv)
   init();
 
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
-  printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
-  printf("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
+  printfQuda("\nSpinor mem: %.3f GiB\n", spinorGiB);
+  printfQuda("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
   
   int attempts = 1;
   dslashRef();
@@ -462,7 +463,7 @@ int main(int argc, char **argv)
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
     // print timing information
-    printf("%fms per loop\n", 1000*secs);
+    printfQuda("%fms per loop\n", 1000*secs);
     
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
@@ -470,14 +471,18 @@ int main(int argc, char **argv)
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       floats += test_type ? 72*2 : 72;
     }
-    printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/loops)*(1<<30)));
+    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printfQuda("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/loops)*(1<<30)));
     
     if (!transfer) {
-      std::cout << "Results: CPU = " << norm2(*spinorRef) << ", CUDA = " << norm2(*cudaSpinorOut) << 
-	", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
+      double norm2_cpu = norm2(*spinorRef);
+      double norm2_cuda= norm2(*cudaSpinorOut);
+      double norm2_cpu_cuda= norm2(*spinorOut);
+      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
-      std::cout << "Result: CPU = " << norm2(*spinorRef) << ", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
+      double norm2_cpu = norm2(*spinorRef);
+      double norm2_cuda= norm2(*cudaSpinorOut);
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cuda);
     }
     
     cpuColorSpinorField::Compare(*spinorRef, *spinorOut);

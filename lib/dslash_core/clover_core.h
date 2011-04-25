@@ -1,6 +1,6 @@
 // *** CUDA CLOVER ***
 
-#define SHARED_FLOATS_PER_THREAD 8
+#define CLOVER_SHARED_FLOATS_PER_THREAD 8
 
 // input spinor
 #ifdef SPINOR_DOUBLE
@@ -272,7 +272,7 @@ if (sid >= param.threads) return;
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat sd_data[];
-volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+volatile spinorFloat *s = sd_data + CLOVER_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #else
 #if (__CUDA_ARCH__ >= 200)
@@ -281,7 +281,7 @@ volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat ss_data[];
-volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+volatile spinorFloat *s = ss_data + CLOVER_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #endif
 

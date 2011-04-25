@@ -105,8 +105,12 @@ static inline __device__ float2 short22float2(short2 a) {
 #include <tm_core.h>              // solo twisted mass kernel
 #include <clover_def.h>           // kernels for applying the clover term alone
 
-#ifndef SHARED_FLOATS_PER_THREAD
-#define SHARED_FLOATS_PER_THREAD 0
+#ifndef DSLASH_SHARED_FLOATS_PER_THREAD
+#define DSLASH_SHARED_FLOATS_PER_THREAD 0
+#endif
+
+#ifndef CLOVER_SHARED_FLOATS_PER_THREAD
+#define CLOVER_SHARED_FLOATS_PER_THREAD 0
 #endif
 
 #include <blas_quda.h>
@@ -143,6 +147,35 @@ void initCache() {
 void setFace(const FaceBuffer &Face) {
   face = (FaceBuffer*)&Face; // nasty
 }
+
+#ifndef MULTI_GPU
+
+#define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
+  switch(param.kernel_type) {						\
+ case INTERIOR_KERNEL:							\
+    if (x==0) {								\
+      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
+	FUNC ## 18 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
+	FUNC ## 12 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+      } else {								\
+	FUNC ## 8 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      }									\
+    } else {								\
+      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
+	FUNC ## 18 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
+	FUNC ## 12 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
+	FUNC ## 8 ## DAG ## X ## Kernel<INTERIOR_KERNEL> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      }									\
+    }									\
+    break;								\
+  default:								\
+   errorQuda("KernelType %d not defined for single GPU", param.kernel_type); \
+ }
+
+#else
 
 #define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
   switch(param.kernel_type) {						\
@@ -241,7 +274,9 @@ void setFace(const FaceBuffer &Face) {
       }									\
     }									\
     break;								\
-    }
+  }
+
+#endif
 
 // macro used for dslash types with dagger kernel defined (Wilson, domain wall, etc.)
 #define DSLASH(FUNC, gridDim, blockDim, shared, stream, param, ...)	\
@@ -439,7 +474,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  int shared_bytes = blockDim[0].x*SHARED_FLOATS_PER_THREAD*regSize;
+  int shared_bytes = blockDim[0].x*DSLASH_SHARED_FLOATS_PER_THREAD*regSize;
   dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
 #ifdef MULTI_GPU
@@ -457,7 +492,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for (int i=3; i>=0; i--) { // count down for Wilson
     if (!dslashParam.commDim[i]) continue;
 
-    shared_bytes = blockDim[i+1].x*SHARED_FLOATS_PER_THREAD*regSize;
+    shared_bytes = blockDim[i+1].x*DSLASH_SHARED_FLOATS_PER_THREAD*regSize;
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);
@@ -466,13 +501,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     dslashParam.threads = 2*faceVolumeCB[i]; // updating 2 faces
 
     dslash.apply(blockDim[i+1], shared_bytes, streams[Nstream-1]); // all faces use this stream
-
-    // the below is only for T-way parallelization -needs generalized as staggered
-    //dslashParam.tOffset = 0;
-    //dslashParam.tMul = volume/Vspatial - 1; // hacky way to get Nt
-    //dslashParam.threads = 2*Vspatial;
-    //shared_bytes = blockFace.x*SHARED_FLOATS_PER_THREAD*regSize;
-    //cudaStreamSynchronize(streams[2*i]); // stream 6 (no need to synchronize 7)
   }
 
 #endif // MULTI_GPU
@@ -860,7 +888,7 @@ void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
 {
   dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
 
-  int shared_bytes = blockDim.x*SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm);
+  int shared_bytes = blockDim.x*CLOVER_SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm);
   cloverKernel<<<gridDim, blockDim, shared_bytes>>> 
     (out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
   unbindSpinorTex(in, inNorm);
