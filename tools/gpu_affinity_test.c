@@ -179,37 +179,6 @@ display_bandwidth_table(double* table, int nodes, int device_count)
    PRINT("\n");   
 }
 
-void
-output_to_file(char node_affinity_string[MAX_NODES][MAX_STRING_LEN], int* gpu_affinity_table, int device_count, char* output_file)
-{
-    char filebuf[1024*16];       
-    char* s =  filebuf;
-    char buf[1024];
-    int buflen=1024;
-    int i;
-    FILE* file = fopen(output_file, "r");
-    if (file){
-	while(fgets(buf, buflen, file) != NULL){
-	    char keyword[] = "affinity";
-	    if (strncmp(buf, keyword, strlen(keyword)) !=0){
-		s+= sprintf(s,"%s", buf);
-	    }
-	}
-	fclose(file);
-    }
-    
-    for(i = 0;i < device_count; i++){
-	s+= sprintf(s, "affinity     %d    %s\n", i, node_affinity_string[gpu_affinity_table[i]]);
-    }
-    
-    file = fopen(output_file, "w");
-    if (file == NULL){
-	printf("ERROR: opening file %s for write failed\n");
-	exit(1);
-    }
-    fprintf(file, "%s", filebuf);
-    fclose(file);    
-}
 
 void 
 usage(char** argv)
@@ -219,7 +188,6 @@ usage(char** argv)
     printf("options\n");
     printf("-v                 Verbose, print out the bandwidth table\n");
     printf("-vv                More verbose message, print out all measurements and related information\n");
-    printf("-o <output_file>   Output file for GPU/CPU affinity. The file is created if it does not exists.\n");
     printf("                   If the file exists, the old affinity entries is removed. Other content in the file remains the same\n");	   
     printf("--help             This message\n");
 
@@ -237,14 +205,6 @@ main(int argc, char** argv)
 	    usage(argv);
 	}
 	
-	if( strcmp(argv[i], "-o") == 0){
-	    if (i+1 >= argc){
-		usage(argv);
-	    }
-	    output_file =  argv[i+1];
-	    i++;
-	    continue;
-	}
 
 	if( strcmp(argv[i], "-v") == 0){
 	    verbose = 1;
@@ -356,14 +316,12 @@ main(int argc, char** argv)
     
     process_bandwidth_table(bandwidth_table, nodes, device_count, gpu_affinity_table);
     
-    if (!output_file){
-	printf("#affinity  <GPU>  nodeid   cpu1,cpu2,...\n");
-	for(i = 0;i < device_count; i++){
-	    printf("affinity     %d      %d       %s\n", i, gpu_affinity_table[i], node_affinity_string[gpu_affinity_table[i]]);
-	}
-    }else{
-	output_to_file(node_affinity_string, gpu_affinity_table, device_count, output_file);
+    printf("#affinity  <GPU>  nodeid   cpu1,cpu2,...\n");
+    for(i = 0;i < device_count; i++){
+	printf("affinity     %d      %d       %s\n", i, gpu_affinity_table[i], node_affinity_string[gpu_affinity_table[i]]);
     }
+
+
     free(bandwidth_table);
     free(gpu_affinity_table);
     

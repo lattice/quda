@@ -8,7 +8,7 @@
 char hostname[128];
 static int fwd_nbr=-1;
 static int back_nbr=-1;
-static int rank = -1;
+static int rank = 0;
 static int size = -1;
 extern int verbose;
 static int num_nodes;

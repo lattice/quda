@@ -14,7 +14,11 @@ tune:
 	$(MAKE) -C tests/ tune
 	@echo "Autotuning completed successfully. " \
 	      "Please type 'make' to rebuild library."
-
+numa:
+	$(MAKE) -C tools/
+	tools/gpu_affinity_test > gpu_numa_config.txt
+	echo The generated numa file is 
+	cat tools/gpu_numa_config.txt
 gen:
 	$(MAKE) -C lib/ gen
 
@@ -22,4 +26,4 @@ clean:
 	$(MAKE) -C lib/ clean
 	$(MAKE) -C tests/ clean
 	rm -rf ./config.log ./config.status ./autom4te.cache
-.PHONY: all lib tests tune gen clean
+.PHONY: all lib tests tune numa gen clean

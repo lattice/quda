@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
+
+#ifdef HAVE_NUMA
+#include <numa.h>
+#endif
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -11,7 +16,6 @@
 #include <dslash_quda.h>
 #include <clover_quda.h>
 #include <invert_quda.h>
-
 #include <color_spinor_field.h>
 
 #ifdef MULTI_GPU
@@ -43,6 +47,9 @@ FullClover cudaCloverSloppy;
 
 FullClover cudaCloverInvPrecise; // inverted clover term
 FullClover cudaCloverInvSloppy;
+
+
+#define MAX_GPU_NUM_PER_NODE 16
 
 // define newQudaGaugeParam() and newQudaInvertParam()
 #define INIT_PARAM
@@ -77,12 +84,76 @@ Dirac *dPre = NULL; // the DD preconditioning operator
 bool diracCreation = false;
 bool diracTune = false;
 
+static int gpu_affinity[MAX_GPU_NUM_PER_NODE]; 
+static int numa_config_set = 0;
+void qudaSetNumaConfig(char* filename)
+{
+  if(filename ==NULL){
+    errorQuda("numa config filename is NULL\n");
+  }
+  if(strlen(filename) >= 128){
+    errorQuda("numa config filename too long\n");
+  }
+  
+  FILE* fd = fopen(filename, "r");
+  if (fd == NULL){
+    warningQuda("opening numa config file(%s) failed",filename );
+    return;
+  }
+  
+  for(int i=0;i < MAX_GPU_NUM_PER_NODE; i++){
+    gpu_affinity[i] = -1;
+  }
+
+
+  char buf[1024];
+  while ( fgets(buf, 1024, fd) != NULL){
+    if (buf[0]== '\n' || buf[0] == '#'){
+      continue;
+    }
+    
+    char* token[4];
+    token[0] = (char*)strtok(buf, " \t\n");
+    token[1] = (char*)strtok(NULL, " \t\n");
+    token[2] = (char*)strtok(NULL, " \t\n");
+    token[3] = (char*)strtok(NULL, " \t\n");
+    
+    if(strcmp(token[0], "affinity") != 0){
+      warningQuda("Invalid format for the numa config file\n");
+      fclose(fd);
+      return ;
+    }
+
+    if (token[1] == NULL || token[2] == NULL){
+      warningQuda("invalid entry for affinity\n");
+      fclose(fd);
+      return;
+    }
+    int gpunum = atoi(token[1]);
+    int nodenum = atoi(token[2]);
+    if(gpunum < 0 ||nodenum < 0){
+      warningQuda("Invalid gpunum(%d) or nodenum(%d)\n", gpunum, nodenum);
+      fclose(fd);
+      return;
+    }
+    gpu_affinity[gpunum] = nodenum;
+  }
+  
+  fclose(fd);
+  
+  numa_config_set = 1;
+  
+  return;
+}
 int getGpuCount()
 {
   int count;
   cudaGetDeviceCount(&count);
   if (count <= 0){
     errorQuda("No devices supporting CUDA");
+  }
+  if(count > MAX_GPU_NUM_PER_NODE){
+    errorQuda("gpu count(%d) is larger than limit\n", count);
   }
   return count;
 }
@@ -148,6 +219,15 @@ void initQuda(int dev)
   printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
 
   cudaSetDevice(dev);
+#ifdef HAVE_NUMA
+  if(numa_config_set){
+    if(gpu_affinity[dev] >=0){
+      printfQuda("Numa setting to cpu node %d\n", gpu_affinity[dev]);
+      numa_run_on_node(gpu_affinity[dev]);
+    }
+
+  }
+#endif
 
   cudaGaugePrecise.even = NULL;
   cudaGaugePrecise.odd = NULL;
