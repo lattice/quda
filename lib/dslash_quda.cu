@@ -474,7 +474,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  int shared_bytes = blockDim[0].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_PARAM);
+  int shared_bytes = blockDim[0].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_COORDS);
   dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
 #ifdef MULTI_GPU
@@ -492,7 +492,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for (int i=3; i>=0; i--) { // count down for Wilson
     if (!dslashParam.commDim[i]) continue;
 
-    shared_bytes = blockDim[i+1].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_PARAM);
+    shared_bytes = blockDim[i+1].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_COORDS);
     
     cudaStreamSynchronize(streams[2*i]);
     cudaStreamSynchronize(streams[2*i + 1]);

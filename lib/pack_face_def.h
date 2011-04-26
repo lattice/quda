@@ -104,8 +104,8 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 
 
 // compute full coordinates from an index into the face (used by the exterior Dslash kernels)
-template <int nLayers>
-static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int &x, int &y, int &z, int &t, int face_idx,
+template <int nLayers, typename Int>
+static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int &X, Int &Y, Int &Z, Int &T, int face_idx,
 						  const int &face_volume, const int &dim, const int &face_num, const int &parity)
 {
   // dimensions of the face (FIXME: optimize using constant cache)
@@ -135,6 +135,8 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int &x,
   // compute coordinates from (checkerboard) face index
 
   face_idx *= 2;
+
+  int x, y, z, t;
 
   if (!(face_X & 1)) { // face_X even
     //   t = face_idx / face_XYZ;
@@ -197,56 +199,70 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, int &x,
 
   cb_idx = idx >> 1;
 
+  X = x;
+  Y = y;
+  Z = z;
+  T = t;  
+
   //printf("Global sid %d (%d, %d, %d, %d)\n", cb_int, x, y, z, t);
 }
 
 
 // compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
-static inline __device__ void coordsFromIndex(int &idx, int &x, int &y, int &z, int &t, const int &cb_idx, const int &parity)
+template <typename Int>
+static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y, Int &Z, Int &T, const int &cb_idx, const int &parity)
 {
-  int &X = X1;
-  int &Y = X2;
-  int &Z = X3;
+
+  int &LX = X1;
+  int &LY = X2;
+  int &LZ = X3;
   int &XYZ = X3X2X1;
   int &XY = X2X1;
 
   idx = 2*cb_idx;
 
-  if (!(X & 1)) { // X even
+  int x, y, z, t;
+
+  if (!(LX & 1)) { // X even
     //   t = idx / XYZ;
     //   z = (idx / XY) % Z;
     //   y = (idx / X) % Y;
     //   idx += (parity + t + z + y) & 1;
     //   x = idx % X;
     // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = idx / X;
-    x = idx - aux1 * X;
-    int aux2 = aux1 / Y;
-    y = aux1 - aux2 * Y;
-    t = aux2 / Z;
-    z = aux2 - t * Z;
+    int aux1 = idx / LX;
+    x = idx - aux1 * LX;
+    int aux2 = aux1 / LY;
+    y = aux1 - aux2 * LY;
+    t = aux2 / LZ;
+    z = aux2 - t * LZ;
     aux1 = (parity + t + z + y) & 1;
     x += aux1;
     idx += aux1;
-  } else if (!(Y & 1)) { // Y even
+  } else if (!(LY & 1)) { // Y even
     t = idx / XYZ;
-    z = (idx / XY) % Z;
+    z = (idx / XY) % LZ;
     idx += (parity + t + z) & 1;
-    y = (idx / X) % Y;
-    x = idx % X;
-  } else if (!(Z & 1)) { // Z even
+    y = (idx / LX) % LY;
+    x = idx % LX;
+  } else if (!(LZ & 1)) { // Z even
     t = idx / XYZ;
     idx += (parity + t) & 1;
-    z = (idx / XY) % Z;
-    y = (idx / X) % Y;
-    x = idx % X;
+    z = (idx / XY) % LZ;
+    y = (idx / LX) % LY;
+    x = idx % LX;
   } else {
     idx += parity;
     t = idx / XYZ;
-    z = (idx / XY) % Z;
-    y = (idx / X) % Y;
-    x = idx % X;
+    z = (idx / XY) % LZ;
+    y = (idx / LX) % LY;
+    x = idx % LX;
   }
+
+  X = x;
+  Y = y;
+  Z = z;
+  T = t;
 }
 
 
