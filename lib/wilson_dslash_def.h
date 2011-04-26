@@ -351,13 +351,26 @@
 #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
+#ifdef GPU_WILSON_DIRAC
+#define BUILD_WILSON 1
+#else
+#define BUILD_WILSON 0
+#endif
+
+#ifdef GPU_CLOVER_DIRAC
+#define BUILD_CLOVER 1
+#else
+#define BUILD_CLOVER 0
+#endif
+
 // define the kernel
 
 template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM_OUT DD_PARAM_GAUGE DD_PARAM_CLOVER DD_PARAM_IN DD_PARAM_XPAY const DslashParam param) {
 
-#ifdef GPU_WILSON_DIRAC
+  // build Wilson or clover as appropriate
+#if ((DD_CLOVER==0 && BUILD_WILSON) || (DD_CLOVER==1 && BUILD_CLOVER))
 #if DD_DAG
 #include "wilson_dslash_dagger_core.h"
 #else

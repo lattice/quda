@@ -557,16 +557,8 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
-  // Wilson only
-  // !dagger: receive lower components forwards, receive upper components backwards
-  // dagger: receive upper components forwards, receive lower components backwards
-  //bool upper = dagger? false : true;
-  //if (dir == QUDA_FORWARDS) upper = !upper;
-    
   int len = nFace*ghostFace[dim]*Nint;
   int offset = length + ghostOffset[dim]*nColor*nSpin*2;
-  //if (nSpin == 1) offset += (dir == QUDA_BACKWARDS) ? 0 : len; // convention difference
-  //else offset += (upper ? 0 : len);    
   offset += (dir == QUDA_BACKWARDS) ? 0 : len;
 
   void *dst = (char*)v + precision*offset;
@@ -582,7 +574,6 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
     void *dst = (char*)norm + norm_offset*sizeof(float);
     void *src = (char*)ghost_spinor+nFace*Nint*ghostFace[dim]*precision; // norm region of host ghost zone
     CUDAMEMCPY(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);  CUERR;
-    
   }
   
 }

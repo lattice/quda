@@ -281,7 +281,7 @@ def prolog():
     if clover == True: prolog_str+= def_clover()
     prolog_str+= def_output_spinor()
 
-    if sharedFloats > 0: prolog_str+= (
+    prolog_str+= (
 """
 #ifdef SPINOR_DOUBLE
 #if (__CUDA_ARCH__ >= 200)
@@ -289,19 +289,43 @@ def prolog():
 #else
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #endif
-extern __shared__ spinorFloat sd_data[];
-volatile spinorFloat *s = sd_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
-                                  + (threadIdx.x % SHARED_STRIDE);
 #else
 #if (__CUDA_ARCH__ >= 200)
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
 #endif
-extern __shared__ spinorFloat ss_data[];
-volatile spinorFloat *s = ss_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
-                                  + (threadIdx.x % SHARED_STRIDE);
 #endif
+""")
+
+    if sharedCoords or sharedFloats > 0:
+        prolog_str += (
+"""
+extern __shared__ char s_data[];
+""")
+
+    if sharedFloats > 0:
+        prolog_str += (
+"""
+volatile spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
+""")
+
+    if sharedCoords:
+        prolog_str += (
+"""
+short *coords = (short*)((spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*blockDim.x) + 4*threadIdx.x;
+#define SHARED_COORDS (4*sizeof(short)) 
+#define x1 coords[0]
+#define x2 coords[1]
+#define x3 coords[2]
+#define x4 coords[3]
+""")
+    else:
+        prolog_str += (
+"""
+int x1, x2, x3, x4;
+#define SHARED_COORDS 0 
 """)
 
     prolog_str+= (
@@ -310,7 +334,7 @@ volatile spinorFloat *s = ss_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRID
 #include "read_clover.h"
 #include "io_spinor.h"
 
-int X, x1, x2, x3, x4, sp_idx;
+int X;
 
 #if (defined MULTI_GPU) && (DD_PREC==2) // half precision
 int sp_norm_idx;
@@ -324,7 +348,19 @@ int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
-  coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+  // Inline by hand for the moment and assume even dimensions
+  //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
+  X = 2*sid;
+  int aux1 = X / X1;
+  x1 = X - aux1 * X1;
+  int aux2 = aux1 / X2;
+  x2 = aux1 - aux2 * X3;
+  x4 = aux2 / X3;
+  x3 = aux2 - x4 * X3;
+  aux1 = (param.parity + x4 + x3 + x2) & 1;
+  x1 += aux1;
+  X += aux1;
 
 """)
 
@@ -346,13 +382,12 @@ if (kernel_type == INTERIOR_KERNEL) {
 
   // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-  sp_idx = face_idx + param.ghostOffset[dim];
-  //sp_idx = sid + param.ghostOffset[dim];
+  //sp_idx = face_idx + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[dim];
+  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
 #endif
-    
+
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
 
   READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
@@ -386,6 +421,8 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
+#    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
+#    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
     boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
     interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
     dim = ["X", "Y", "Z", "T"]
@@ -412,21 +449,20 @@ def gen(dir, pack_only=False):
     str += "\n"
 
     str += "#ifdef MULTI_GPU\n"
-    str += "if (kernel_type == INTERIOR_KERNEL) {\n"
+    str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
+    str += "  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];\n"
+    str += "#else\n"
+    str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
-    str += "  sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
-    str += "#ifdef MULTI_GPU\n"
-    str += "}\n"
-    str += "#endif // MULTI_GPU\n"
 
     str += "\n"
     if dir % 2 == 0:
-        str += "int ga_idx = sid;\n"
+        str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        str += "int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
         str += "#else\n"
-        str += "int ga_idx = sp_idx;\n"
+        str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
     str += "\n"
 
@@ -457,8 +493,11 @@ def gen(dir, pack_only=False):
     load_spinor += "\n"
 
     load_half = ""
-    load_half += "const int dim = static_cast<int>(kernel_type);\n"
-    load_half += "const int sp_stride_pad = ghostFace[dim];\n"
+    load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n"
+    #load_half += "#if (DD_PREC==2) // half precision\n"
+    #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
+    #load_half += "#endif\n"
+
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
     load_half += "// read half spinor from device memory\n"
@@ -850,6 +889,15 @@ case EXTERIOR_KERNEL_Y:
                     str += "#undef "+out_im(s,c)+"\n"
     str += "\n"
 
+    if sharedCoords:
+        str += (
+"""
+#undef x1
+#undef x2
+#undef x3
+#undef x4
+""")
+
     return str
 # end def epilog
 
@@ -902,7 +950,8 @@ def generate_dslash():
 
 # To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
 
-sharedFloats = 8
+sharedFloats = 0
+sharedCoords = False
 if(len(sys.argv) > 1):
     if (sys.argv[1] == '--shared'):
         sharedFloats = int(sys.argv[2])
