@@ -352,6 +352,10 @@ int x1, x2, x3, x4;
 
 int X;
 
+#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
+int sp_norm_idx;
+#endif // MULTI_GPU half precision
+
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
@@ -398,6 +402,10 @@ if (kernel_type == INTERIOR_KERNEL) {
   // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
   //sp_idx = face_idx + param.ghostOffset[dim];
+
+#if (DD_PREC==2) // half precision
+  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
+#endif
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
 
@@ -474,9 +482,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   } else {
   
     const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-    const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
     
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
@@ -672,9 +677,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   } else {
   
     const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-    const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
     
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
@@ -866,9 +868,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   } else {
   
     const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-    const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
     
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
@@ -1064,9 +1063,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   } else {
   
     const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-    const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
     
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
@@ -1258,9 +1254,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   } else {
   
     const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-    const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
     
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
@@ -1456,9 +1449,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   } else {
   
     const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-    const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
     
     // read half spinor from device memory
     READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
@@ -1649,9 +1639,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-      const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
@@ -1726,9 +1713,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-      const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
@@ -1913,9 +1897,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-      const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
@@ -1990,9 +1971,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-#if (DD_PREC==2) // half precision
-      const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
       const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory

@@ -173,11 +173,6 @@ void init() {
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-  //set the T dimension partitioning flag
-  commDimPartitionedSet(3);
-
-  //inv_param.commDim[3] = 1; // override flag
-
   //csParam.verbose = QUDA_DEBUG_VERBOSE;
 
   spinor = new cpuColorSpinorField(csParam);

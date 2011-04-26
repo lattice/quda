@@ -336,6 +336,10 @@ int x1, x2, x3, x4;
 
 int X;
 
+#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
+int sp_norm_idx;
+#endif // MULTI_GPU half precision
+
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
@@ -379,6 +383,10 @@ if (kernel_type == INTERIOR_KERNEL) {
   // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
   //sp_idx = face_idx + param.ghostOffset[dim];
+
+#if (DD_PREC==2) // half precision
+  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
+#endif
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
 
@@ -486,9 +494,9 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n"
-    load_half += "#if (DD_PREC==2) // half precision\n"
-    load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
-    load_half += "#endif\n"
+    #load_half += "#if (DD_PREC==2) // half precision\n"
+    #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
+    #load_half += "#endif\n"
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
