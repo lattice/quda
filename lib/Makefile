@@ -48,11 +48,16 @@ else
   MAXREG = --maxrregcount=80
 endif
 
+ifeq ($(strip $(HAVE_NUMA)), yes)
+	MERGE_NUMA_LIB=mergelib libquda.a /usr/lib64/libnuma.a
+endif
+
+
 all: $(QUDA)
 
 $(QUDA): $(QUDA_OBJS) ../make.inc
 	ar cru $@ $(QUDA_OBJS)
-
+	${MERGE_NUMA_LIB}
 gen:
 	$(PYTHON) generate/dslash_cuda_gen.py
 
