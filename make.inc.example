@@ -39,6 +39,8 @@ MPICXX = $(MPI_HOME)/bin/mpicxx
 
 QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
 
+DSLASH_SHARED_FLOATS=0
+
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include

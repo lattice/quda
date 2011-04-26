@@ -39,6 +39,8 @@ MPICXX = $(MPI_HOME)/bin/mpicxx
 
 QMP_HOME=@QMP_HOME@
 
+DSLASH_SHARED_FLOATS=0
+
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include
