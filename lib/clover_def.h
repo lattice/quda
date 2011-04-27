@@ -88,7 +88,7 @@
 
 __global__ void DD_FUNC(DD_XPAY_F)(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 
-#ifdef GPU_WILSON_DIRAC
+#ifdef GPU_CLOVER_DIRAC
 #include "clover_core.h"
 #endif
 

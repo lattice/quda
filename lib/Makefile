@@ -59,7 +59,7 @@ $(QUDA): $(QUDA_OBJS) ../make.inc
 	ar cru $@ $(QUDA_OBJS)
 	${MERGE_NUMA_LIB}
 gen:
-	$(PYTHON) generate/dslash_cuda_gen.py
+	$(PYTHON) generate/dslash_cuda_gen.py --shared $(DSLASH_SHARED_FLOATS)
 
 clean:
 	-rm -f *.o $(QUDA)

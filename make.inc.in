@@ -15,7 +15,8 @@ HOST_DEBUG = @HOST_DEBUG@      # compile host debug code
 DEVICE_DEBUG = @DEVICE_DEBUG@  # compile deivce debug code for cuda-gdb 
 VERBOSE = @VERBOSE@            # display kernel register useage
 
-BUILD_WILSON_DIRAC = @BUILD_WILSON_DIRAC@       	# build Wilson and clover Dirac operators?
+BUILD_WILSON_DIRAC = @BUILD_WILSON_DIRAC@       	# build Wilson Dirac operators?
+BUILD_CLOVER_DIRAC = @BUILD_CLOVER_DIRAC@       	# build clover Dirac operators?
 BUILD_DOMAIN_WALL_DIRAC = @BUILD_DOMAIN_WALL_DIRAC@   	# build domain wall Dirac operators?
 BUILD_STAGGERED_DIRAC = @BUILD_STAGGERED_DIRAC@		# build staggered Dirac operators?
 BUILD_TWISTED_MASS_DIRAC = @BUILD_TWISTED_MASS_DIRAC@	# build twisted mass Dirac operators?
@@ -40,6 +41,8 @@ MPICC = $(MPI_HOME)/bin/mpicc
 MPICXX = $(MPI_HOME)/bin/mpicxx
 
 QMP_HOME=@QMP_HOME@
+
+DSLASH_SHARED_FLOATS=0
 
 ######
 
@@ -99,7 +102,6 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_LIBS =
   INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
-  EXCHANGE_FACE=exchange_face.o
   FACE_COMMS=face_mpi.o mpicomm.o
 else
   FACE_COMMS=face_qmp.o
@@ -124,6 +126,10 @@ ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   NVCCOPT += -DGPU_STAGGERED_DIRAC
   COPT += -DGPU_STAGGERED_DIRAC
   STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
+endif
+ifeq ($(strip $(BUILD_CLOVER_DIRAC)), yes)
+  NVCCOPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+  COPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
 endif
 ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
   NVCCOPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
