@@ -88,6 +88,12 @@ static int gpu_affinity[MAX_GPU_NUM_PER_NODE];
 static int numa_config_set = 0;
 void qudaSetNumaConfig(char* filename)
 {
+  static int already_set = 0;
+  if(already_set){
+	return;
+  }
+  already_set =1;
+
   if(filename ==NULL){
     errorQuda("numa config filename is NULL\n");
   }
