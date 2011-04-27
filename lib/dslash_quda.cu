@@ -113,6 +113,10 @@ static inline __device__ float2 short22float2(short2 a) {
 #define CLOVER_SHARED_FLOATS_PER_THREAD 0
 #endif
 
+#ifndef SHARED_COORDS
+#define SHARED_COORDS 0
+#endif
+
 #include <blas_quda.h>
 #include <face_quda.h>
 
