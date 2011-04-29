@@ -1473,10 +1473,10 @@ createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param)
     cudaGauge->anisotropy = param->anisotropy;
     cudaGauge->volumeCB = 1;
     for (int d=0; d<4; d++) {
-	cudaGauge->X[d] = param->X[d];
+      cudaGauge->X[d] = param->X[d];
 	cudaGauge->volumeCB *= param->X[d];
     }
-    cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
+    //cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
     cudaGauge->volumeCB /= 2;    
     cudaGauge->pad = param->ga_pad;
     cudaGauge->stride = cudaGauge->volumeCB + cudaGauge->pad;

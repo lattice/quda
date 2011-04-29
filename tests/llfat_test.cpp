@@ -40,13 +40,12 @@ extern void initDslashCuda(FullGauge gauge);
 
 int device = 0;
 int ODD_BIT = 1;
-extern int tdim;
-int sdim = 8;
 int Z[4];
 int V;
 int Vh;
 int Vs;
 int Vsh;
+extern int xdim, ydim, zdim, tdim;
 
 extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_DOUBLE_PRECISION;
@@ -80,9 +79,9 @@ llfat_init(void)
   initQuda(device);
   //cudaSetDevice(dev); CUERR;
     
-  gaugeParam.X[0] = sdim;
-  gaugeParam.X[1] = sdim;
-  gaugeParam.X[2] = sdim;
+  gaugeParam.X[0] = xdim;
+  gaugeParam.X[1] = ydim;
+  gaugeParam.X[2] = zdim;
   gaugeParam.X[3] = tdim;
 
   setDims(gaugeParam.X);
@@ -294,10 +293,10 @@ display_test_info()
   printf("running the following test:\n");
     
   printf("link_precision           link_reconstruct           space_dimension        T_dimension\n");
-  printf("%s                       %s                         %d                     %d\n", 
+  printf("%s                       %s                         %d/%d/%d/                  %d\n", 
 	 get_prec_str(link_prec),
 	 get_recon_str(link_recon), 
-	 sdim, 
+	 xdim, ydim, zdim,
 	 tdim);
   return ;
     
@@ -328,18 +327,9 @@ main(int argc, char **argv)
 
   int i;
   for (i =1;i < argc; i++){
-	
-    if( strcmp(argv[i], "--help")== 0){
-      usage(argv);
-    }
-	
-    if( strcmp(argv[i], "--prec") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_prec =  get_prec(argv[i+1]);
-      i++;
-      continue;	    
+
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
     }
 
     if( strcmp(argv[i], "--cpu_prec") == 0){
@@ -349,42 +339,7 @@ main(int argc, char **argv)
       cpu_link_prec =  get_prec(argv[i+1]);
       i++;
       continue;	    
-    }	
-
-    if( strcmp(argv[i], "--recon") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_recon =  get_recon(argv[i+1]);
-      i++;
-      continue;	    
-    }
-	
-    if( strcmp(argv[i], "--tdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      tdim =  atoi(argv[i+1]);
-      if (tdim < 0 || tdim > 128){
-	fprintf(stderr, "Error: invalid t dimention\n");
-	exit(1);
-      }
-      i++;
-      continue;	    
-    }
-	
-    if( strcmp(argv[i], "--sdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      sdim =  atoi(argv[i+1]);
-      if (sdim < 0 || sdim > 128){
-	fprintf(stderr, "Error: invalid space dimention\n");
-	exit(1);
-      }
-      i++;
-      continue;	    
-    }
+    }	 
 
     if( strcmp(argv[i], "--verify") == 0){
       verify_results=1;
@@ -409,6 +364,7 @@ main(int argc, char **argv)
   }
     
   display_test_info();
+
     
   int accuracy_level = llfat_test();
     
