@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include <quda_internal.h>
-#include "exchange_face.h"
+#include "face_quda.h"
 
 #define XUP 0
 #define YUP 1
@@ -288,10 +288,15 @@ void llfat_cpu(void** fatlink, su3_matrix** sitelink, Float* act_path_coeff)
     }
   }
 
+
+
+
   for (int dir=XUP; dir<=TUP; dir++){
     for(int nu=XUP; nu<=TUP; nu++){
       if(nu!=dir){
 	llfat_compute_gen_staple_field(staple,dir,nu,sitelink[dir], sitelink,fatlink, act_path_coeff[2], 0);
+
+#if 0
 
 	/* The Lepage term */
 	/* Note this also involves modifying c_1 (above) */
@@ -313,12 +318,14 @@ void llfat_cpu(void** fatlink, su3_matrix** sitelink, Float* act_path_coeff)
 
 	}/* rho */
 
+#endif
 
       } 
 
     }/* nu */
 	
   }/* dir */      
+
 
   free(staple);
   free(tempmat1);
@@ -618,6 +625,7 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitel
 void
 llfat_reference_mg(void** fatlink, void** sitelink, void* ghost_sitelink, QudaPrecision prec, void* act_path_coeff)
 {
+
   switch(prec){
   case QUDA_DOUBLE_PRECISION:{
     llfat_cpu_mg((void**)fatlink, (dsu3_matrix**)sitelink, (dsu3_matrix*)ghost_sitelink, (double*) act_path_coeff);

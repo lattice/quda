@@ -7,7 +7,7 @@
 #include <gauge_quda.h>
 #include <force_common.h>
 #include "llfat_quda.h"
-#include "exchange_face.h"
+#include <face_quda.h>
 
 
 #define BLOCK_DIM 64
@@ -46,9 +46,10 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   for(int i = 0;i < 2; i++){
     cudaStreamCreate(&stream[i]);
   }
-
+  
   llfatOneLinkKernel(cudaFatLink, cudaSiteLink,cudaStaple, cudaStaple1,
 		     param, act_path_coeff); CUERR;
+
   
   int2 tloc, tloc_interior, tloc_exterior;
   tloc.x = 0;
@@ -66,6 +67,7 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   for(int dir = 0;dir < 4; dir++){
     for(int nu = 0; nu < 4; nu++){
       if (nu != dir){
+
 
 #ifdef MULTI_GPU
 	//even exterior kernel
@@ -99,6 +101,9 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					 dir, nu,1,
 					 act_path_coeff[2],
 					 recon, prec, tloc_interior, halfInteriorGridDim, &stream[1]); CUERR;
+
+#if 0
+
 #ifdef MULTI_GPU	
 	exchange_gpu_staple_wait(param->X, &cudaStaple, &stream[0]); CUERR;
 #endif	
@@ -186,11 +191,13 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 	    }//sig
 	  }
 	}//rho
+#endif
 	
       }
     }//nu
   }//dir
   
+
   cudaThreadSynchronize(); 
   checkCudaError();
   

@@ -11,7 +11,7 @@
 #include <assert.h>
 
 #ifdef MPI_COMMS
-#include "exchange_face.h"
+#include "face_quda.h"
 #endif
 
 
@@ -1471,15 +1471,15 @@ createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param)
     }
         
     cudaGauge->anisotropy = param->anisotropy;
-    cudaGauge->volume = 1;
+    cudaGauge->volumeCB = 1;
     for (int d=0; d<4; d++) {
 	cudaGauge->X[d] = param->X[d];
-	cudaGauge->volume *= param->X[d];
+	cudaGauge->volumeCB *= param->X[d];
     }
     cudaGauge->X[0] /= 2; // actually store the even-odd sublattice dimensions
-    cudaGauge->volume /= 2;    
+    cudaGauge->volumeCB /= 2;    
     cudaGauge->pad = param->ga_pad;
-    cudaGauge->stride = cudaGauge->volume + cudaGauge->pad;
+    cudaGauge->stride = cudaGauge->volumeCB + cudaGauge->pad;
     cudaGauge->reconstruct = param->reconstruct;
 
     allocateGaugeField(cudaGauge, param->reconstruct, param->cuda_prec);
@@ -1549,11 +1549,11 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void* ghost_cpuGauge, QudaGa
 
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
     do_loadLinkToGPU((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
-		     (double*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume, pad, Vsh, 
+		     (double*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, Vsh, 
 		     cuda_prec);
   } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
     do_loadLinkToGPU((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
-		     (float*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volume, pad, Vsh, 
+		     (float*)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, Vsh, 
 		     cuda_prec);
   }else{
     printf("ERROR: half precision not supported in this funciton %s\n", __FUNCTION__);
@@ -1603,14 +1603,14 @@ storeLinkToCPU(void* cpuGauge, FullGauge *cudaGauge, QudaGaugeParam* param)
     exit(1);
   }
   
-  int stride = cudaGauge->volume + param->ga_pad;
+  int stride = cudaGauge->volumeCB + param->ga_pad;
   
   if (cuda_prec == QUDA_DOUBLE_PRECISION){
     do_storeLinkToCPU( (double*)cpuGauge, (double2*) cudaGauge->even, (double2*)cudaGauge->odd, 
-		       cudaGauge->bytes, cudaGauge->volume, stride, cuda_prec);
+		       cudaGauge->bytes, cudaGauge->volumeCB, stride, cuda_prec);
   }else if (cuda_prec == QUDA_SINGLE_PRECISION){
     do_storeLinkToCPU( (float*)cpuGauge, (float2*) cudaGauge->even, (float2*)cudaGauge->odd, 
-		       cudaGauge->bytes, cudaGauge->volume, stride, cuda_prec);
+		       cudaGauge->bytes, cudaGauge->volumeCB, stride, cuda_prec);
   }else{
     printf("ERROR: half precision not supported in this function %s\n", __FUNCTION__);
     exit(1);

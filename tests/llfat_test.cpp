@@ -15,7 +15,7 @@
 #include "misc.h"
 
 #ifdef MULTI_GPU
-#include "exchange_face.h"
+#include "face_quda.h"
 #include "mpicomm.h"
 #include <mpi.h>
 #endif
@@ -40,7 +40,7 @@ extern void initDslashCuda(FullGauge gauge);
 
 int device = 0;
 int ODD_BIT = 1;
-int tdim = 16;
+extern int tdim;
 int sdim = 8;
 int Z[4];
 int V;
@@ -48,7 +48,7 @@ int Vh;
 int Vs;
 int Vsh;
 
-QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
+extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision  cpu_link_prec = QUDA_DOUBLE_PRECISION;
 size_t gSize;
@@ -183,7 +183,7 @@ llfat_end()
   freeStapleQuda(&cudaStaple1);
 
 #ifdef MULTI_GPU
-  exchange_cleanup();
+  //exchange_cleanup();
 #endif
 
 }
@@ -215,7 +215,8 @@ llfat_test(void)
   }
   if (verify_results){
 #ifdef MULTI_GPU
-    llfat_reference_mg(reflink, sitelink, ghost_sitelink, gaugeParam.cpu_prec, act_path_coeff);
+    //llfat_reference_mg(reflink, sitelink, ghost_sitelink, gaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference(reflink, sitelink, gaugeParam.cpu_prec, act_path_coeff);
 #else
     llfat_reference(reflink, sitelink, gaugeParam.cpu_prec, act_path_coeff);
 #endif
@@ -231,7 +232,7 @@ llfat_test(void)
   cudaThreadSynchronize();
   gettimeofday(&t1, NULL);
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
-    
+  
   gaugeParam.ga_pad = gaugeParam.llfat_ga_pad;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   storeLinkToCPU(fatlink, &cudaFatLink, &gaugeParam);    
