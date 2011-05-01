@@ -46,6 +46,7 @@ int Vh;
 int Vs;
 int Vsh;
 extern int xdim, ydim, zdim, tdim;
+extern int gridsize_from_cmdline[];
 
 extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_DOUBLE_PRECISION;
@@ -263,10 +264,10 @@ llfat_test(void)
   
   accuracy_level = strong_check_link(reflink, myfatlink, V, gaugeParam.cpu_prec);  
     
-  printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
+  printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
   int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
   double perf = 1.0* flops*volume/(secs*1024*1024*1024);
-  printf("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
+  printfQuda("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
 
 
   for(i=0;i < 4;i++){
@@ -275,10 +276,10 @@ llfat_test(void)
   llfat_end();
     
   if (res == 0){//failed
-    printf("\n");
-    printf("Warning: your test failed. \n");
-    printf("	Did you use --verify?\n");
-    printf("	Did you check the GPU health by running cuda memtest?\n");
+    printfQuda("\n");
+    printfQuda("Warning: your test failed. \n");
+    printfQuda("	Did you use --verify?\n");
+    printfQuda("	Did you check the GPU health by running cuda memtest?\n");
   }
 
 
@@ -289,29 +290,29 @@ llfat_test(void)
 static void
 display_test_info()
 {
-  printf("running the following test:\n");
+  printfQuda("running the following test:\n");
     
-  printf("link_precision           link_reconstruct           space_dimension        T_dimension\n");
-  printf("%s                       %s                         %d/%d/%d/                  %d\n", 
-	 get_prec_str(link_prec),
-	 get_recon_str(link_recon), 
-	 xdim, ydim, zdim,
-	 tdim);
+  printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension\n");
+  printfQuda("%s                       %s                         %d/%d/%d/                  %d\n", 
+	     get_prec_str(link_prec),
+	     get_recon_str(link_recon), 
+	     xdim, ydim, zdim,
+	     tdim);
   return ;
-    
+  
 }
 
 static void
 usage(char** argv )
 {
-  printf("Usage: %s <args>\n", argv[0]);
-  printf("  --device <dev_id>               Set which device to run on\n");
-  printf("  --gprec <double/single/half>    Link precision\n"); 
-  printf("  --recon <8/12>                  Link reconstruction type\n"); 
-  printf("  --sdim <n>                      Set spacial dimention\n");
-  printf("  --tdim <n>                      Set T dimention size(default 24)\n"); 
-  printf("  --verify                        Verify the GPU results using CPU results\n");
-  printf("  --help                          Print out this message\n"); 
+  printfQuda("Usage: %s <args>\n", argv[0]);
+  printfQuda("  --device <dev_id>               Set which device to run on\n");
+  printfQuda("  --gprec <double/single/half>    Link precision\n"); 
+  printfQuda("  --recon <8/12>                  Link reconstruction type\n"); 
+  printfQuda("  --sdim <n>                      Set spacial dimention\n");
+  printfQuda("  --tdim <n>                      Set T dimention size(default 24)\n"); 
+  printfQuda("  --verify                        Verify the GPU results using CPU results\n");
+  printfQuda("  --help                          Print out this message\n"); 
   exit(1);
   return ;
 }
@@ -319,10 +320,7 @@ usage(char** argv )
 int 
 main(int argc, char **argv) 
 {
-#ifdef MULTI_GPU
-  MPI_Init(&argc, &argv);
-  comm_init();
-#endif
+
 
   
   //default to 18 reconstruct, 8^3 x 8 
@@ -366,17 +364,31 @@ main(int argc, char **argv)
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
-    
+
+  /*    
+#ifdef MULTI_GPU
+  MPI_Init(&argc, &argv);
+  comm_init();
+#endif
+  */
+
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+
+
   display_test_info();
 
     
   int accuracy_level = llfat_test();
     
-  printf("accuracy_level=%d\n", accuracy_level);
+  printfQuda("accuracy_level=%d\n", accuracy_level);
 
+  /*
 #ifdef MULTI_GPU
   comm_cleanup();
 #endif
+  */
+
+  endCommsQuda();
 
   int ret;
   if(accuracy_level >=3 ){
