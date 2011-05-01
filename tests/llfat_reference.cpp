@@ -397,7 +397,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
 	
     memset(dx, 0, sizeof(dx));
     dx[nu] =1;
-    int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
+    int nbr_idx;
     
     su3_matrix* B;  
     if (use_staple){
@@ -476,7 +476,6 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     }
     
     su3_matrix* B;
-    nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
     if (use_staple){
       nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);     
       if (x4 + dx[3]  < 0){

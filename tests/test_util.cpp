@@ -21,7 +21,7 @@ using namespace std;
 
 template <typename Float>
 static void printVector(Float *v) {
-  printf("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
+  printfQuda("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
 }
 
 // X indexes the lattice site
@@ -251,7 +251,7 @@ static int compareFloats(Float *a, Float *b, int len, double epsilon) {
   for (int i = 0; i < len; i++) {
     double diff = fabs(a[i] - b[i]);
     if (diff > epsilon) {
-      printf("error: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
+      printfQuda("error: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
       return 0;
     }
   }
@@ -1065,7 +1065,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
     }
   }
   
-  for (int i=0; i<18; i++) printf("%d fails = %d\n", i, iter[i]);
+  for (int i=0; i<18; i++) printfQuda("%d fails = %d\n", i, iter[i]);
   
   int accuracy_level = 0;
   for(int f =0; f < fail_check; f++){
@@ -1075,7 +1075,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   }
 
   for (int f=0; f<fail_check; f++) {
-      printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*gaugeSiteSize, fail[f] / (double)(len*6));
+      printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*gaugeSiteSize, fail[f] / (double)(len*6));
   }
   
   return accuracy_level;
@@ -1115,21 +1115,21 @@ printLinkElement(void *link, int X, QudaPrecision precision)
 
 int strong_check_link(void** linkA, void **linkB, int len, QudaPrecision prec) 
 {
-    printf("LinkA:\n");
+    printfQuda("LinkA:\n");
     printLinkElement(linkA[0], 0, prec); 
-    printf("\n");
+    printfQuda("\n");
     printLinkElement(linkA[0], 1, prec); 
-    printf("...\n");
+    printfQuda("...\n");
     printLinkElement(linkA[3], len-1, prec); 
-    printf("\n");    
+    printfQuda("\n");    
     
-    printf("\nlinkB:\n");
+    printfQuda("\nlinkB:\n");
     printLinkElement(linkB[0], 0, prec); 
-    printf("\n");
+    printfQuda("\n");
     printLinkElement(linkB[0], 1, prec); 
-    printf("...\n");
+    printfQuda("...\n");
     printLinkElement(linkB[3], len-1, prec); 
-    printf("\n");
+    printfQuda("\n");
     
     int ret = compare_link(linkA, linkB, len, prec);
     return ret;

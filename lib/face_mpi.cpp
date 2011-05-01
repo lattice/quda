@@ -454,7 +454,7 @@ void exchange_cpu_sitelink(int* X,
 
 template<typename Float>
 void
-exchange_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sendbuf, Float* staple_back_sendbuf)
+do_exchange_cpu_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sendbuf, Float* staple_back_sendbuf)
 {
   
   int len = Vsh_t*gaugeSiteSize*sizeof(Float);
@@ -489,10 +489,11 @@ exchange_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sendbuf, F
   Float* ghost_staple_back = ghost_staple;
   Float* ghost_staple_fwd = ghost_staple + 2*Vsh_t*gaugeSiteSize;
 
-  unsigned long recv_request1 = comm_recv(ghost_staple_back, 2*len, BACK_NBR);
-  unsigned long recv_request2 = comm_recv(ghost_staple_fwd, 2*len, FWD_NBR);
-  unsigned long send_request1 = comm_send(staple_fwd_sendbuf, 2*len, FWD_NBR);
-  unsigned long send_request2 = comm_send(staple_back_sendbuf, 2*len, BACK_NBR);
+  unsigned long recv_request1 = comm_recv_with_tag(ghost_staple_back, 2*len, T_BACK_NBR, TUP);
+  unsigned long recv_request2 = comm_recv_with_tag(ghost_staple_fwd, 2*len, T_FWD_NBR, TDOWN);
+  unsigned long send_request1 = comm_send_with_tag(staple_fwd_sendbuf, 2*len, T_FWD_NBR, TUP);
+  unsigned long send_request2 = comm_send_with_tag(staple_back_sendbuf, 2*len, T_BACK_NBR, TDOWN);
+
   comm_wait(recv_request1);
   comm_wait(recv_request2);
   comm_wait(send_request1);
@@ -504,17 +505,8 @@ void exchange_cpu_staple(int* X,
 			 QudaPrecision gPrecision)
 {
   
-  
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    dims[d] = X[d];
-  }
-  Vh = V/2;
-  
-  Vs = X[0]*X[1]*X[2];
-  Vsh_t = Vs/2;
-  
+  setup_dims(X);
+
   void*  staple_fwd_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
   void*  staple_back_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
   if (staple_fwd_sendbuf == NULL|| staple_back_sendbuf == NULL){
@@ -523,10 +515,10 @@ void exchange_cpu_staple(int* X,
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_staple((double*)staple, (double*)ghost_staple, 
+    do_exchange_cpu_staple((double*)staple, (double*)ghost_staple, 
 		    (double*)staple_fwd_sendbuf, (double*)staple_back_sendbuf);
   }else{ //single
-    exchange_staple((float*)staple, (float*)ghost_staple, 
+    do_exchange_cpu_staple((float*)staple, (float*)ghost_staple, 
 		    (float*)staple_fwd_sendbuf, (float*)staple_back_sendbuf);
   }
   
@@ -544,21 +536,21 @@ exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream)
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;
   exchange_llfat_init(cudaStaple);
   
-  int len = Vs*gaugeSiteSize*cudaStaple->precision;
-  int normlen = Vs*sizeof(float);
+  int len = Vs_t*gaugeSiteSize*cudaStaple->precision;
+  int normlen = Vs_t*sizeof(float);
   
   packGhostStaple(cudaStaple, fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, NULL, NULL, stream);
   cudaStreamSynchronize(*stream);
   
 
-  unsigned long recv_request1 = comm_recv(back_nbr_staple_cpu, len, BACK_NBR);
-  unsigned long recv_request2 = comm_recv(fwd_nbr_staple_cpu, len, FWD_NBR);
+  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu, len, T_BACK_NBR, TUP);
+  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu, len, T_FWD_NBR, TDOWN);
   
   memcpy(fwd_nbr_staple_sendbuf_cpu, fwd_nbr_staple_sendbuf, len);
   memcpy(back_nbr_staple_sendbuf_cpu, back_nbr_staple_sendbuf, len);
 
-  unsigned long send_request1= comm_send(fwd_nbr_staple_sendbuf_cpu, len, FWD_NBR);
-  unsigned long send_request2 = comm_send(back_nbr_staple_sendbuf_cpu, len, BACK_NBR);
+  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu, len, T_FWD_NBR,  TUP);
+  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu, len, T_BACK_NBR ,TDOWN);
 
   unsigned long recv_request3 = 0;
   unsigned long recv_request4 = 0;
@@ -610,19 +602,19 @@ void
 exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream)
 {
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;  
-  int len = Vs*gaugeSiteSize*cudaStaple->precision;
-  int normlen = Vs*sizeof(float);
+  int len = Vs_t*gaugeSiteSize*cudaStaple->precision;
+  int normlen = Vs_t*sizeof(float);
   
   cudaStreamSynchronize(*stream);  
 
-  unsigned long recv_request1 = comm_recv(back_nbr_staple_cpu, len, BACK_NBR);
-  unsigned long recv_request2 = comm_recv(fwd_nbr_staple_cpu, len, FWD_NBR);
-  
+  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu, len, T_BACK_NBR, TUP);
+  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu, len, T_FWD_NBR, TDOWN);
+
   memcpy(fwd_nbr_staple_sendbuf_cpu, fwd_nbr_staple_sendbuf, len);
   memcpy(back_nbr_staple_sendbuf_cpu, back_nbr_staple_sendbuf, len);
 
-  unsigned long send_request1= comm_send(fwd_nbr_staple_sendbuf_cpu, len, FWD_NBR);
-  unsigned long send_request2 = comm_send(back_nbr_staple_sendbuf_cpu, len, BACK_NBR);
+  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu, len, T_FWD_NBR,  TUP);
+  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu, len, T_BACK_NBR ,TDOWN);
 
   unsigned long recv_request3 = 0;
   unsigned long recv_request4 = 0;
