@@ -296,11 +296,8 @@ void llfat_cpu(void** fatlink, su3_matrix** sitelink, Float* act_path_coeff)
       if(nu!=dir){
 	llfat_compute_gen_staple_field(staple,dir,nu,sitelink[dir], sitelink,fatlink, act_path_coeff[2], 0);
 
-#if 0
-
 	/* The Lepage term */
 	/* Note this also involves modifying c_1 (above) */
-
 		
 	llfat_compute_gen_staple_field((su3_matrix*)NULL,dir,nu,staple,sitelink, fatlink, act_path_coeff[5],1);
 		
@@ -317,9 +314,6 @@ void llfat_cpu(void** fatlink, su3_matrix** sitelink, Float* act_path_coeff)
 	  } 
 
 	}/* rho */
-
-#endif
-
       } 
 
     }/* nu */

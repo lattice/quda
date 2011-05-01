@@ -214,8 +214,7 @@ llfat_test(void)
   }
   if (verify_results){
 #ifdef MULTI_GPU
-    //llfat_reference_mg(reflink, sitelink, ghost_sitelink, gaugeParam.cpu_prec, act_path_coeff);
-    llfat_reference(reflink, sitelink, gaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference_mg(reflink, sitelink, ghost_sitelink, gaugeParam.cpu_prec, act_path_coeff);
 #else
     llfat_reference(reflink, sitelink, gaugeParam.cpu_prec, act_path_coeff);
 #endif

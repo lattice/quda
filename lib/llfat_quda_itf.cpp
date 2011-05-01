@@ -102,8 +102,6 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					 act_path_coeff[2],
 					 recon, prec, tloc_interior, halfInteriorGridDim, &stream[1]); CUERR;
 
-#if 0
-
 #ifdef MULTI_GPU	
 	exchange_gpu_staple_wait(param->X, &cudaStaple, &stream[0]); CUERR;
 #endif	
@@ -190,9 +188,7 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 	      }			    
 	    }//sig
 	  }
-	}//rho
-#endif
-	
+	}//rho	
       }
     }//nu
   }//dir
