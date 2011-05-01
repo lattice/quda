@@ -324,6 +324,11 @@ main(int argc, char **argv)
   comm_init();
 #endif
 
+  
+  //default to 18 reconstruct, 8^3 x 8 
+  link_recon = QUDA_RECONSTRUCT_NO;
+  xdim=ydim=zdim=tdim=8;
+
   int i;
   for (i =1;i < argc; i++){
 
