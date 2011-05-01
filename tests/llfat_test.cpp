@@ -365,13 +365,6 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-  /*    
-#ifdef MULTI_GPU
-  MPI_Init(&argc, &argv);
-  comm_init();
-#endif
-  */
-
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
 
@@ -381,12 +374,6 @@ main(int argc, char **argv)
   int accuracy_level = llfat_test();
     
   printfQuda("accuracy_level=%d\n", accuracy_level);
-
-  /*
-#ifdef MULTI_GPU
-  comm_cleanup();
-#endif
-  */
 
   endCommsQuda();
 
