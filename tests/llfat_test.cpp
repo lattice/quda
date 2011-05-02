@@ -151,7 +151,7 @@ llfat_init(void)
   gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*Vsh_t;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink[3], &gaugeParam);
+  loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink, &gaugeParam);
 
   gaugeParam.staple_pad = 3*Vsh_t;
   createStapleQuda(&cudaStaple, &gaugeParam);

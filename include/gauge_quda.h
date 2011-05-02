@@ -20,7 +20,7 @@ extern "C" {
 
   void freeGaugeField(FullGauge *cudaGauge);
   
-  void loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void* ghost_cpuGauge, QudaGaugeParam* param);
+  void loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void** ghost_cpuGauge, QudaGaugeParam* param);
   void storeLinkToCPU(void* cpuGauge, FullGauge *cudaGauge, QudaGaugeParam* param);
   void createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param);
   void createStapleQuda(FullStaple* cudaStaple, QudaGaugeParam* param);
