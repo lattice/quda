@@ -69,40 +69,23 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
       if (nu != dir){
 
 
-#ifdef MULTI_GPU
-	//even exterior kernel
+	//even kernel
 	siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
 					 (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
 					 (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
 					 dir, nu,0,
 					 act_path_coeff[2],
-					 recon, prec, tloc_exterior,  halfExteriorGridDim, &stream[0]); CUERR;
-	//odd exterior kernel
+					 recon, prec, tloc,  halfGridDim, &stream[0]); CUERR;
+	//odd kernel
 	siteComputeGenStapleParityKernel((void*)cudaStaple.odd, (void*)cudaStaple.even,
 					 (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
 					 (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
 					 dir, nu,1,
 					 act_path_coeff[2],
-					 recon, prec, tloc_exterior, halfExteriorGridDim, &stream[0]); CUERR;
-
-	exchange_gpu_staple_start(param->X, &cudaStaple, &stream[0]);  CUERR;
-#endif
-	//even interior kernel
-	siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
-					 (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
-					 (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
-					 dir, nu,0,
-					 act_path_coeff[2],
-					 recon, prec, tloc_interior,  halfInteriorGridDim, &stream[1]); CUERR;
-	//odd interior kernel
-	siteComputeGenStapleParityKernel((void*)cudaStaple.odd, (void*)cudaStaple.even,
-					 (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
-					 (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
-					 dir, nu,1,
-					 act_path_coeff[2],
-					 recon, prec, tloc_interior, halfInteriorGridDim, &stream[1]); CUERR;
-
+					 recon, prec, tloc, halfGridDim, &stream[0]); CUERR;
+	
 #ifdef MULTI_GPU	
+	exchange_gpu_staple_start(param->X, &cudaStaple, &stream[0]);  CUERR;
 	exchange_gpu_staple_wait(param->X, &cudaStaple, &stream[0]); CUERR;
 #endif	
 	//even
@@ -125,45 +108,24 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 	for(int rho = 0; rho < 4; rho++){
 	  if (rho != dir && rho != nu){
 	    
-#ifdef MULTI_GPU
-	    //even exterior
-
+	    //even 
 	    computeGenStapleFieldParityKernel((void*)cudaStaple1.even, (void*)cudaStaple1.odd,
 					      (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
 					      (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
 					      (void*)cudaStaple.even, (void*)cudaStaple.odd,
 					      dir, rho,even,1,
 					      act_path_coeff[3],
-					      recon, prec, tloc_exterior, halfExteriorGridDim, &stream[0]); CUERR;
-	    //odd exterior
+					      recon, prec, tloc,  halfGridDim,&stream[0]); CUERR;
+	    //odd 
 	    computeGenStapleFieldParityKernel((void*)cudaStaple1.odd, (void*)cudaStaple1.even,
 					      (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
 					      (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
 					      (void*)cudaStaple.odd, (void*)cudaStaple.even,
 					      dir, rho,odd,1,
 					      act_path_coeff[3],
-					      recon, prec, tloc_exterior, halfExteriorGridDim, &stream[0]); CUERR;
-
+					      recon, prec, tloc,  halfGridDim,&stream[0]); CUERR;
+#ifdef MULTI_GPU
 	    exchange_gpu_staple_start(param->X, &cudaStaple1, &stream[0]); CUERR;
-#endif	    
-	    //even interior
-
-	    computeGenStapleFieldParityKernel((void*)cudaStaple1.even, (void*)cudaStaple1.odd,
-					      (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
-					      (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
-					      (void*)cudaStaple.even, (void*)cudaStaple.odd,
-					      dir, rho,even,1,
-					      act_path_coeff[3],
-					      recon, prec, tloc_interior,  halfInteriorGridDim,&stream[1]); CUERR;
-	    //odd interior
-	    computeGenStapleFieldParityKernel((void*)cudaStaple1.odd, (void*)cudaStaple1.even,
-					      (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
-					      (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
-					      (void*)cudaStaple.odd, (void*)cudaStaple.even,
-					      dir, rho,odd,1,
-					      act_path_coeff[3],
-					      recon, prec, tloc_interior,  halfInteriorGridDim,&stream[1]); CUERR;
-#ifdef MULTI_GPU
 	    exchange_gpu_staple_wait(param->X, &cudaStaple1, &stream[0]); CUERR;
 #endif	    
 	    for(int sig = 0; sig < 4; sig++){
