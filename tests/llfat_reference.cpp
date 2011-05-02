@@ -367,7 +367,18 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
   su3_matrix tmat1,tmat2;
   int i ;
   su3_matrix *fat1;
-    
+  
+
+  int X1 = Z[0];  
+  int X2 = Z[1];
+  int X3 = Z[2];
+  int X4 = Z[3];
+  int X1h =X1/2;
+  
+  int X2X1 = X1*X2;
+  int X3X2 = X3*X2;
+  int X3X1 = X3*X1;  
+
   /* Upper staple */
   /* Computes the staple :
    *                mu (B)
@@ -393,7 +404,26 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
       oddBit = 1;
       half_index = i -Vh;
     }
-    int x4 = x4_from_full_index(i);
+    //int x4 = x4_from_full_index(i);
+
+
+    
+    int sid =half_index;
+    int za = sid/X1h;
+    int x1h = sid - za*X1h;
+    int zb = za/X2;
+    int x2 = za - zb*X2;
+    int x4 = zb/X3;
+    int x3 = zb - x4*X3;
+    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+    int x1 = 2*x1h + x1odd;
+    int x[4] = {x1,x2,x3,x4};
+    int space_con[4]={
+      (x4*X3X2+x3*X2+x2)/2,
+      (x4*X3X1+x3*X1+x1)/2,
+      (x4*X2X1+x2*X1+x1)/2,
+      (x3*X2X1+x2*X1+x1)/2
+    };
 
     fat1 = ((su3_matrix*)fatlink[mu]) + i;
     su3_matrix* A = sitelink[nu] + i;
@@ -404,19 +434,18 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     
     su3_matrix* B;  
     if (use_staple){
-      nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);     
       if (x4 + dx[3]  >= Z[3]){
-	B =  ghost_mulink + Vs_t + (1-oddBit)*Vsh_t + nbr_idx;
+	B =  ghost_mulink + Vs_t + (1-oddBit)*Vsh_t + (x3*X2X1+x2*X1+x1)/2;
       }else{
+	nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);     
 	B = mulink + nbr_idx;
       }
-    }else{
-      
-      nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);
-      if (x4 + dx[3] >= Z[3]){
-	B = ghost_sitelink[3] + 4*Vs_t + mu*Vs_t + (1-oddBit)*Vsh_t+nbr_idx;
+    }else{      
+      if(x[nu]+dx[nu] >= Z[nu]){ //out of boundary, use ghost data
+	B = ghost_sitelink[nu] + 4*Vs[nu] + mu*Vs[nu] + (1-oddBit)*Vsh[nu] + space_con[nu];
       }else{
-	B = mulink + nbr_idx;
+	nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);	
+	B = sitelink[mu] + nbr_idx;
       }
     }
 	
@@ -424,11 +453,11 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     //we could be in the ghost link area if mu is T and we are at high T boundary
     su3_matrix* C;
     memset(dx, 0, sizeof(dx));
-    dx[mu] =1;
-    nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2],dx[1],dx[0]);    
-    if (x4 + dx[3] >= Z[3]){
-      C = ghost_sitelink[3] + 4*Vs_t + nu*Vs_t + (1 - oddBit)*Vsh_t + nbr_idx;
+    dx[mu] =1;    
+    if(x[mu] + dx[mu] >= Z[mu]){ //out of boundary, use ghost data
+      C = ghost_sitelink[mu] + 4*Vs[mu] + nu*Vs[mu] + (1-oddBit)*Vsh[mu] + space_con[mu];
     }else{
+      nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2],dx[1],dx[0]);    
       C = sitelink[nu] + nbr_idx;
     }
 
@@ -459,7 +488,25 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
       oddBit = 1;
       half_index = i -Vh;
     }
-    int x4 = x4_from_full_index(i);
+
+    int sid =half_index;
+    int za = sid/X1h;
+    int x1h = sid - za*X1h;
+    int zb = za/X2;
+    int x2 = za - zb*X2;
+    int x4 = zb/X3;
+    int x3 = zb - x4*X3;
+    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+    int x1 = 2*x1h + x1odd;
+    int x[4] = {x1,x2,x3,x4};
+    int space_con[4]={
+      (x4*X3X2+x3*X2+x2)/2,
+      (x4*X3X1+x3*X1+x1)/2,
+      (x4*X2X1+x2*X1+x1)/2,
+      (x3*X2X1+x2*X1+x1)/2
+    };
+
+    //int x4 = x4_from_full_index(i);
 
     fat1 = ((su3_matrix*)fatlink[mu]) + i;
 
@@ -467,14 +514,12 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     su3_matrix* A;
     memset(dx, 0, sizeof(dx));
     dx[nu] = -1;
-    int nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);	
-    if (nbr_idx >= V || nbr_idx <0){
-      fprintf(stderr, "ERROR: invliad nbr_idx(%d), line=%d\n", nbr_idx, __LINE__);
-      exit(1);
-    }
-    if (x4 + dx[3] < 0){
-      A = ghost_sitelink[3] + nu*Vs_t + ( 1 -oddBit)*Vsh_t + nbr_idx;
+
+    int nbr_idx;
+    if(x[nu] + dx[nu] < 0){ //out of boundary, use ghost data
+      A = ghost_sitelink[nu] + nu*Vs[nu] + (1-oddBit)*Vsh[nu] + space_con[nu];
     }else{
+      nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);	
       A = sitelink[nu] + nbr_idx;
     }
     
@@ -486,12 +531,12 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
       }else{
 	B = mulink + nbr_idx;
       }
-    }else{
-      nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);
-      if (x4 + dx[3] < 0){
-	B = ghost_sitelink[3] + mu*Vs_t + (1-oddBit)*Vsh_t+nbr_idx;
+    }else{      
+      if(x[nu] + dx[nu] < 0){ //out of boundary, use ghost data
+	B = ghost_sitelink[nu] + mu*Vs[nu] + (1-oddBit)*Vsh[nu] + space_con[nu];	
       }else{
-	B = mulink + nbr_idx;
+	nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);
+	B = sitelink[mu] + nbr_idx;
       }
     }
 
@@ -502,14 +547,22 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     dx[nu] = -1;
     dx[mu] = 1;
     nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2],dx[1],dx[0]);
-    if (x4 + dx[3] < 0){
-      //nu is T, we are at low T boundary and we are at the same oddBit 
-      // with the starting site
-      C = ghost_sitelink[3] + nu*Vs_t + oddBit*Vsh_t+nbr_idx;
-    }else if (x4 + dx[3] >= Z[3]){
-      //mu is T, we are at high T boundaryand we are at the same oddBit 
-      // with the starting site
-      C = ghost_sitelink[3] + 4*Vs_t + nu*Vs_t + oddBit*Vsh_t+nbr_idx;
+    
+    //space con must be recomputed because we have coodinates change in 2 directions
+    int new_x1, new_x2, new_x3, new_x4;
+    new_x1 = (x[0] + dx[0] + Z[0])%Z[0];
+    new_x2 = (x[1] + dx[1] + Z[1])%Z[1];
+    new_x3 = (x[2] + dx[2] + Z[2])%Z[2];
+    new_x4 = (x[3] + dx[3] + Z[3])%Z[3];
+    space_con[0] = (new_x4*X3X2 + new_x3*X2 + new_x2)/2;
+    space_con[1] = (new_x4*X3X1 + new_x3*X1 + new_x1)/2;
+    space_con[2] = (new_x4*X2X1 + new_x2*X1 + new_x1)/2;
+    space_con[3] = (new_x3*X2X1 + new_x2*X1 + new_x1)/2;
+
+    if (x[nu] + dx[nu] < 0){
+      C = ghost_sitelink[nu] + nu*Vs[nu] + oddBit*Vsh[nu]+ space_con[nu];
+    }else if (x[mu] + dx[mu] >= Z[mu]){
+      C = ghost_sitelink[mu] + 4*Vs[mu] + nu*Vs[mu] + oddBit*Vsh[mu]+space_con[mu];
     }else{
       C = sitelink[nu] + nbr_idx;
     }

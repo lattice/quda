@@ -412,10 +412,10 @@ void
 exchange_sitelink(Float** sitelink, Float** ghost_sitelink, Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf)
 {
 
-  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
 
 #if 0
   int i;
+  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
   for(i=0;i < 4;i++){
     Float* even_sitelink_back_src = sitelink[i];
     Float* odd_sitelink_back_src = sitelink[i] + Vh*gaugeSiteSize;
@@ -449,17 +449,20 @@ exchange_sitelink(Float** sitelink, Float** ghost_sitelink, Float** sitelink_fwd
   pack_ghost_all_links((void**)sitelink, (void**)sitelink_back_sendbuf, (void**)sitelink_fwd_sendbuf, 1, (QudaPrecision)(sizeof(Float)));
 #endif
 
-  Float* ghost_sitelink_back = ghost_sitelink[3];
-  Float* ghost_sitelink_fwd = ghost_sitelink[3] + 8*Vsh_t*gaugeSiteSize;
-
-  unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, T_BACK_NBR, TUP);
-  unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, T_FWD_NBR, TDOWN);
-  unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf[3], 8*len, T_FWD_NBR, TUP);
-  unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf[3], 8*len, T_BACK_NBR, TDOWN);
-  comm_wait(recv_request1);
-  comm_wait(recv_request2);
-  comm_wait(send_request1);
-  comm_wait(send_request2);
+  for(int dir  =0; dir < 4; dir++){
+    int len = Vsh[dir]*gaugeSiteSize*sizeof(Float);
+    Float* ghost_sitelink_back = ghost_sitelink[dir];
+    Float* ghost_sitelink_fwd = ghost_sitelink[dir] + 8*Vsh[dir]*gaugeSiteSize;
+    
+    unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, T_BACK_NBR, TUP);
+    unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, T_FWD_NBR, TDOWN);
+    unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf[dir], 8*len, T_FWD_NBR, TUP);
+    unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf[dir], 8*len, T_BACK_NBR, TDOWN);
+    comm_wait(recv_request1);
+    comm_wait(recv_request2);
+    comm_wait(send_request1);
+    comm_wait(send_request2);
+  }
 }
 
 //this function is used for link fattening computation
