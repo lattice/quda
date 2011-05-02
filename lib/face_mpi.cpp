@@ -287,11 +287,12 @@ static int dims[4];
 static int X1,X2,X3,X4;
 static int V;
 static int Vh;
-static int Vs;
+static int Vs[4], Vsh[4];
 static int Vs_x, Vs_y, Vs_z, Vs_t;
 static int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 
 #include <gauge_quda.h>
+extern void setup_dims_in_gauge(int *XX);
 
 static void
 setup_dims(int* X)
@@ -303,25 +304,21 @@ setup_dims(int* X)
   }
   Vh = V/2;
   
-  Vs = X[0]*X[1]*X[2];
-  Vsh_t = Vs/2;
-
   X1=X[0];
   X2=X[1];
   X3=X[2];
   X4=X[3];
 
 
-  Vs_x = X[1]*X[2]*X[3];
-  Vs_y = X[0]*X[2]*X[3];
-  Vs_z = X[0]*X[1]*X[3];
-  Vs_t = X[0]*X[1]*X[2];
+  Vs[0] = Vs_x = X[1]*X[2]*X[3];
+  Vs[1] = Vs_y = X[0]*X[2]*X[3];
+  Vs[2] = Vs_z = X[0]*X[1]*X[3];
+  Vs[3] = Vs_t = X[0]*X[1]*X[2];
 
-  Vsh_x = Vs_x/2;
-  Vsh_y = Vs_y/2;
-  Vsh_z = Vs_z/2;
-  Vsh_t = Vs_t/2;
-
+  Vsh[0] = Vsh_x = Vs_x/2;
+  Vsh[1] = Vsh_y = Vs_y/2;
+  Vsh[2] = Vsh_z = Vs_z/2;
+  Vsh[3] = Vsh_t = Vs_t/2;
 
 }
 
@@ -336,22 +333,22 @@ exchange_llfat_init(FullStaple* cudaStaple)
   
   QudaPrecision prec = cudaStaple->precision;
 
-  cudaMallocHost((void**)&fwd_nbr_staple, Vs*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&back_nbr_staple, Vs*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&fwd_nbr_staple_sendbuf, Vs*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&back_nbr_staple_sendbuf, Vs*gaugeSiteSize*prec);
+  cudaMallocHost((void**)&fwd_nbr_staple, Vs_t*gaugeSiteSize*prec);
+  cudaMallocHost((void**)&back_nbr_staple, Vs_t*gaugeSiteSize*prec);
+  cudaMallocHost((void**)&fwd_nbr_staple_sendbuf, Vs_t*gaugeSiteSize*prec);
+  cudaMallocHost((void**)&back_nbr_staple_sendbuf, Vs_t*gaugeSiteSize*prec);
 
   CUERR;
 
-  fwd_nbr_staple_cpu = malloc(Vs*gaugeSiteSize*prec);
-  back_nbr_staple_cpu = malloc(Vs*gaugeSiteSize*prec);
+  fwd_nbr_staple_cpu = malloc(Vs_t*gaugeSiteSize*prec);
+  back_nbr_staple_cpu = malloc(Vs_t*gaugeSiteSize*prec);
   if (fwd_nbr_staple_cpu == NULL||back_nbr_staple_cpu == NULL){
     printf("ERROR: malloc failed for fwd_nbr_staple/back_nbr_staple\n");
     comm_exit(1);
   }
   
-  fwd_nbr_staple_sendbuf_cpu = malloc(Vs*gaugeSiteSize*prec);
-  back_nbr_staple_sendbuf_cpu = malloc(Vs*gaugeSiteSize*prec);
+  fwd_nbr_staple_sendbuf_cpu = malloc(Vs_t*gaugeSiteSize*prec);
+  back_nbr_staple_sendbuf_cpu = malloc(Vs_t*gaugeSiteSize*prec);
   if (fwd_nbr_staple_sendbuf_cpu == NULL || back_nbr_staple_sendbuf_cpu == NULL){
     printf("ERROR: malloc failed for fwd_nbr_staple_sendbuf/back_nbr_staple_sendbuf\n");
     comm_exit(1);
@@ -360,11 +357,9 @@ exchange_llfat_init(FullStaple* cudaStaple)
   return;
 }
 
-
-
 template<typename Float>
 void
-exchange_sitelink(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_sendbuf, Float* sitelink_back_sendbuf)
+exchange_sitelink2(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_sendbuf, Float* sitelink_back_sendbuf)
 {
 
   int i;
@@ -412,31 +407,93 @@ exchange_sitelink(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_s
   comm_wait(send_request2);
 }
 
+template<typename Float>
+void
+exchange_sitelink(Float** sitelink, Float** ghost_sitelink, Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf)
+{
+
+  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
+
+#if 0
+  int i;
+  for(i=0;i < 4;i++){
+    Float* even_sitelink_back_src = sitelink[i];
+    Float* odd_sitelink_back_src = sitelink[i] + Vh*gaugeSiteSize;
+    Float* sitelink_back_dst = sitelink_back_sendbuf[3] + 2*i*Vsh_t*gaugeSiteSize;
+
+    if(dims[3] % 2 == 0){    
+      memcpy(sitelink_back_dst, even_sitelink_back_src, len);
+      memcpy(sitelink_back_dst + Vsh_t*gaugeSiteSize, odd_sitelink_back_src, len);
+    }else{
+      //switching odd and even ghost sitelink
+      memcpy(sitelink_back_dst, odd_sitelink_back_src, len);
+      memcpy(sitelink_back_dst + Vsh_t*gaugeSiteSize, even_sitelink_back_src, len);
+    }
+  }
+
+  for(i=0;i < 4;i++){
+    Float* even_sitelink_fwd_src = sitelink[i] + (Vh - Vsh_t)*gaugeSiteSize;
+    Float* odd_sitelink_fwd_src = sitelink[i] + Vh*gaugeSiteSize + (Vh - Vsh_t)*gaugeSiteSize;
+    Float* sitelink_fwd_dst = sitelink_fwd_sendbuf[3] + 2*i*Vsh_t*gaugeSiteSize;
+    if(dims[3] % 2 == 0){    
+      memcpy(sitelink_fwd_dst, even_sitelink_fwd_src, len);
+      memcpy(sitelink_fwd_dst + Vsh_t*gaugeSiteSize, odd_sitelink_fwd_src, len);
+    }else{
+      //switching odd and even ghost sitelink
+      memcpy(sitelink_fwd_dst, odd_sitelink_fwd_src, len);
+      memcpy(sitelink_fwd_dst + Vsh_t*gaugeSiteSize, even_sitelink_fwd_src, len);
+    }
+    
+  }
+#else
+  pack_ghost_all_links((void**)sitelink, (void**)sitelink_back_sendbuf, (void**)sitelink_fwd_sendbuf, 1, (QudaPrecision)(sizeof(Float)));
+#endif
+
+  Float* ghost_sitelink_back = ghost_sitelink[3];
+  Float* ghost_sitelink_fwd = ghost_sitelink[3] + 8*Vsh_t*gaugeSiteSize;
+
+  unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, T_BACK_NBR, TUP);
+  unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, T_FWD_NBR, TDOWN);
+  unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf[3], 8*len, T_FWD_NBR, TUP);
+  unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf[3], 8*len, T_BACK_NBR, TDOWN);
+  comm_wait(recv_request1);
+  comm_wait(recv_request2);
+  comm_wait(send_request1);
+  comm_wait(send_request2);
+}
+
 //this function is used for link fattening computation
 void exchange_cpu_sitelink(int* X,
 			   void** sitelink, void** ghost_sitelink,
 			   QudaPrecision gPrecision)
 {  
   setup_dims(X);
-  
-  void*  sitelink_fwd_sendbuf = malloc(4*Vs*gaugeSiteSize*gPrecision);
-  void*  sitelink_back_sendbuf = malloc(4*Vs*gaugeSiteSize*gPrecision);
-  if (sitelink_fwd_sendbuf == NULL|| sitelink_back_sendbuf == NULL){
-    printf("ERROR: malloc failed for sitelink_sendbuf/site_link_back_sendbuf\n");
-    exit(1);
+  set_dim(X);
+  void*  sitelink_fwd_sendbuf[4];
+  void*  sitelink_back_sendbuf[4];
+
+  for(int i=0;i < 4;i++){
+    sitelink_fwd_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
+    sitelink_back_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
+    if (sitelink_fwd_sendbuf[i] == NULL|| sitelink_back_sendbuf[i] == NULL){
+      errorQuda("ERROR: malloc failed for sitelink_sendbuf/site_link_back_sendbuf\n");
+    }  
+    memset(sitelink_fwd_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+    memset(sitelink_back_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_sitelink((double**)sitelink, (double*)(ghost_sitelink[3]), 
-		      (double*)sitelink_fwd_sendbuf, (double*)sitelink_back_sendbuf);
+    exchange_sitelink((double**)sitelink, (double**)(ghost_sitelink), 
+		      (double**)sitelink_fwd_sendbuf, (double**)sitelink_back_sendbuf);
   }else{ //single
-    exchange_sitelink((float**)sitelink, (float*)(ghost_sitelink[3]), 
-		      (float*)sitelink_fwd_sendbuf, (float*)sitelink_back_sendbuf);
+    exchange_sitelink((float**)sitelink, (float**)(ghost_sitelink), 
+		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf);
   }
-
-  free(sitelink_fwd_sendbuf);
-  free(sitelink_back_sendbuf);
-
+  
+  for(int i=0;i < 4;i++){
+    free(sitelink_fwd_sendbuf[i]);
+    free(sitelink_back_sendbuf[i]);
+  }
 }
 
 
@@ -497,8 +554,8 @@ void exchange_cpu_staple(int* X,
   
   setup_dims(X);
 
-  void*  staple_fwd_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
-  void*  staple_back_sendbuf = malloc(Vs*gaugeSiteSize*gPrecision);
+  void*  staple_fwd_sendbuf = malloc(Vs_t*gaugeSiteSize*gPrecision);
+  void*  staple_back_sendbuf = malloc(Vs_t*gaugeSiteSize*gPrecision);
   if (staple_fwd_sendbuf == NULL|| staple_back_sendbuf == NULL){
     printf("ERROR: malloc failed for staple_sendbuf/site_link_back_sendbuf\n");
     exit(1);
