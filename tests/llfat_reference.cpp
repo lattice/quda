@@ -50,8 +50,11 @@ typedef struct { dcomplex c[3]; } dsu3_vector;
 extern int Z[4];
 extern int V;
 extern int Vh;
-extern int Vs;
-extern int Vsh;
+extern int Vs[];
+extern int Vsh[];
+extern int Vs_x, Vs_y, Vs_z, Vs_t;
+extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+
 
 template<typename su3_matrix, typename Real>
 void 
@@ -357,7 +360,7 @@ template<typename su3_matrix, typename Real>
 void 
 llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, 
 				  su3_matrix* mulink, su3_matrix* ghost_mulink, 
-				  su3_matrix** sitelink, su3_matrix* ghost_sitelink,
+				  su3_matrix** sitelink, su3_matrix** ghost_sitelink,
 				  void** fatlink, Real coef,
 				  int use_staple) 
 {
@@ -403,7 +406,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     if (use_staple){
       nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);     
       if (x4 + dx[3]  >= Z[3]){
-	B =  ghost_mulink + Vs + (1-oddBit)*Vsh + nbr_idx;
+	B =  ghost_mulink + Vs_t + (1-oddBit)*Vsh_t + nbr_idx;
       }else{
 	B = mulink + nbr_idx;
       }
@@ -411,7 +414,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
       
       nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);
       if (x4 + dx[3] >= Z[3]){
-	B = ghost_sitelink + 4*Vs + mu*Vs + (1-oddBit)*Vsh+nbr_idx;
+	B = ghost_sitelink[3] + 4*Vs_t + mu*Vs_t + (1-oddBit)*Vsh_t+nbr_idx;
       }else{
 	B = mulink + nbr_idx;
       }
@@ -424,7 +427,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     dx[mu] =1;
     nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2],dx[1],dx[0]);    
     if (x4 + dx[3] >= Z[3]){
-      C = ghost_sitelink + 4*Vs + nu*Vs + (1 - oddBit)*Vsh + nbr_idx;
+      C = ghost_sitelink[3] + 4*Vs_t + nu*Vs_t + (1 - oddBit)*Vsh_t + nbr_idx;
     }else{
       C = sitelink[nu] + nbr_idx;
     }
@@ -470,7 +473,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
       exit(1);
     }
     if (x4 + dx[3] < 0){
-      A = ghost_sitelink + nu*Vs + ( 1 -oddBit)*Vsh + nbr_idx;
+      A = ghost_sitelink[3] + nu*Vs_t + ( 1 -oddBit)*Vsh_t + nbr_idx;
     }else{
       A = sitelink[nu] + nbr_idx;
     }
@@ -479,14 +482,14 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     if (use_staple){
       nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);     
       if (x4 + dx[3]  < 0){
-	B =  ghost_mulink + (1-oddBit)*Vsh + nbr_idx;
+	B =  ghost_mulink + (1-oddBit)*Vsh_t + nbr_idx;
       }else{
 	B = mulink + nbr_idx;
       }
     }else{
       nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);
       if (x4 + dx[3] < 0){
-	B = ghost_sitelink + mu*Vs + (1-oddBit)*Vsh+nbr_idx;
+	B = ghost_sitelink[3] + mu*Vs_t + (1-oddBit)*Vsh_t+nbr_idx;
       }else{
 	B = mulink + nbr_idx;
       }
@@ -502,11 +505,11 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     if (x4 + dx[3] < 0){
       //nu is T, we are at low T boundary and we are at the same oddBit 
       // with the starting site
-      C = ghost_sitelink + nu*Vs + oddBit*Vsh+nbr_idx;
+      C = ghost_sitelink[3] + nu*Vs_t + oddBit*Vsh_t+nbr_idx;
     }else if (x4 + dx[3] >= Z[3]){
       //mu is T, we are at high T boundaryand we are at the same oddBit 
       // with the starting site
-      C = ghost_sitelink + 4*Vs + nu*Vs + oddBit*Vsh+nbr_idx;
+      C = ghost_sitelink[3] + 4*Vs_t + nu*Vs_t + oddBit*Vsh_t+nbr_idx;
     }else{
       C = sitelink[nu] + nbr_idx;
     }
@@ -526,7 +529,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
 
 
 template <typename su3_matrix, typename Float>
-void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitelink, Float* act_path_coeff)
+void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_sitelink, Float* act_path_coeff)
 {
   QudaPrecision prec;
   if (sizeof(Float) == 4){
@@ -541,13 +544,13 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitel
     exit(1);
   }
   
-  su3_matrix* ghost_staple = (su3_matrix*)malloc(2*Vs*sizeof(su3_matrix));
+  su3_matrix* ghost_staple = (su3_matrix*)malloc(2*Vs_t*sizeof(su3_matrix));
   if (ghost_staple == NULL){
     fprintf(stderr, "Error: malloc failed for ghost staple in function %s\n", __FUNCTION__);
     exit(1);
   }
     
-  su3_matrix* ghost_staple1 = (su3_matrix*)malloc(2*Vs*sizeof(su3_matrix));
+  su3_matrix* ghost_staple1 = (su3_matrix*)malloc(2*Vs_t*sizeof(su3_matrix));
   if (ghost_staple1 == NULL){ 
     fprintf(stderr, "Error: malloc failed for ghost staple in function %s\n", __FUNCTION__);
     exit(1);
@@ -616,16 +619,16 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix* ghost_sitel
 
 
 void
-llfat_reference_mg(void** fatlink, void** sitelink, void* ghost_sitelink, QudaPrecision prec, void* act_path_coeff)
+llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink, QudaPrecision prec, void* act_path_coeff)
 {
 
   switch(prec){
   case QUDA_DOUBLE_PRECISION:{
-    llfat_cpu_mg((void**)fatlink, (dsu3_matrix**)sitelink, (dsu3_matrix*)ghost_sitelink, (double*) act_path_coeff);
+    llfat_cpu_mg((void**)fatlink, (dsu3_matrix**)sitelink, (dsu3_matrix**)ghost_sitelink, (double*) act_path_coeff);
     break;
   }
   case QUDA_SINGLE_PRECISION:{
-    llfat_cpu_mg((void**)fatlink, (fsu3_matrix**)sitelink, (fsu3_matrix*)ghost_sitelink, (float*) act_path_coeff);
+    llfat_cpu_mg((void**)fatlink, (fsu3_matrix**)sitelink, (fsu3_matrix**)ghost_sitelink, (float*) act_path_coeff);
     break;
   }
   default:

@@ -29,7 +29,7 @@ QudaGaugeParam gaugeParam;
 void *fatlink, *sitelink[4], *reflink[4];
 
 #ifdef MULTI_GPU
-void* ghost_sitelink;
+void* ghost_sitelink[4];
 #endif
 
 int verify_results = 0;
@@ -43,8 +43,12 @@ int ODD_BIT = 1;
 int Z[4];
 int V;
 int Vh;
-int Vs;
-int Vsh;
+int Vs[4];
+int Vsh[4];
+int Vs_x, Vs_y, Vs_z, Vs_t;
+int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+
+
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
@@ -70,8 +74,19 @@ setDims(int *X) {
     Z[d] = X[d];
   }
   Vh = V/2;
-  Vs = X[0]*X[1]*X[2];
-  Vsh= Vs/2;
+
+  Vs[0] = Vs_x = X[1]*X[2]*X[3];
+  Vs[1] = Vs_y = X[0]*X[2]*X[3];
+  Vs[2] = Vs_z = X[0]*X[1]*X[3];
+  Vs[3] = Vs_t = X[0]*X[1]*X[2];
+
+  Vsh[0] = Vsh_x = Vs_x/2;
+  Vsh[1] = Vsh_y = Vs_y/2;
+  Vsh[2] = Vsh_z = Vs_z/2;
+  Vsh[3] = Vsh_t = Vs_t/2;
+
+ 
+
 }
 
 static void
@@ -109,11 +124,13 @@ llfat_init(void)
 
 #ifdef MULTI_GPU
   //we need x,y,z site links in the back and forward T slice
-  // so it is 3*2*Vs
-  ghost_sitelink = malloc(8*Vs*gaugeSiteSize*gSize);
-  if (ghost_sitelink == NULL){
-    printf("ERROR: malloc failed for ghost_sitelink \n");
-    exit(1);
+  // so it is 3*2*Vs_t
+  for(i=0;i < 4; i++){
+    ghost_sitelink[i] = malloc(8*Vs[i]*gaugeSiteSize*gSize);
+    if (ghost_sitelink[i] == NULL){
+      printf("ERROR: malloc failed for ghost_sitelink[%d] \n",i);
+      exit(1);
+    }
   }
 #endif
 
@@ -131,27 +148,27 @@ llfat_init(void)
 #ifdef MULTI_GPU
   exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, gaugeParam.cpu_prec);
   
-  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*Vsh;
+  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*Vsh_t;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink, &gaugeParam);
+  loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink[3], &gaugeParam);
 
-  gaugeParam.staple_pad = 3*Vsh;
+  gaugeParam.staple_pad = 3*Vsh_t;
   createStapleQuda(&cudaStaple, &gaugeParam);
   createStapleQuda(&cudaStaple1, &gaugeParam);
 #else
-  gaugeParam.site_ga_pad = gaugeParam.ga_pad = Vsh;
+  gaugeParam.site_ga_pad = gaugeParam.ga_pad = Vsh_t;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
   loadLinkToGPU(cudaSiteLink, sitelink, NULL, &gaugeParam);
 
-  gaugeParam.staple_pad = Vsh;
+  gaugeParam.staple_pad = Vsh_t;
   createStapleQuda(&cudaStaple, &gaugeParam);
   createStapleQuda(&cudaStaple1, &gaugeParam);
 #endif
     
 
-  gaugeParam.llfat_ga_pad = gaugeParam.ga_pad = Vsh;
+  gaugeParam.llfat_ga_pad = gaugeParam.ga_pad = Vsh_t;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   createLinkQuda(&cudaFatLink, &gaugeParam);
   
@@ -170,7 +187,9 @@ llfat_end()
   }
 
 #ifdef MULTI_GPU  
-  free(ghost_sitelink);
+  for(i=0;i < 4;i++){
+    free(ghost_sitelink[i]);
+  }
 #endif
 
   for(i=0;i < 4;i++){

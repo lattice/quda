@@ -402,10 +402,10 @@ exchange_sitelink(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_s
   Float* ghost_sitelink_back = ghost_sitelink;
   Float* ghost_sitelink_fwd = ghost_sitelink + 8*Vsh_t*gaugeSiteSize;
 
-  unsigned long recv_request1 = comm_recv(ghost_sitelink_back, 8*len, BACK_NBR);
-  unsigned long recv_request2 = comm_recv(ghost_sitelink_fwd, 8*len, FWD_NBR);
-  unsigned long send_request1 = comm_send(sitelink_fwd_sendbuf, 8*len, FWD_NBR);
-  unsigned long send_request2 = comm_send(sitelink_back_sendbuf, 8*len, BACK_NBR);
+  unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, T_BACK_NBR, TUP);
+  unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, T_FWD_NBR, TDOWN);
+  unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf, 8*len, T_FWD_NBR, TUP);
+  unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf, 8*len, T_BACK_NBR, TDOWN);
   comm_wait(recv_request1);
   comm_wait(recv_request2);
   comm_wait(send_request1);
@@ -414,21 +414,11 @@ exchange_sitelink(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_s
 
 //this function is used for link fattening computation
 void exchange_cpu_sitelink(int* X,
-			   void** sitelink, void* ghost_sitelink,
+			   void** sitelink, void** ghost_sitelink,
 			   QudaPrecision gPrecision)
-{
+{  
+  setup_dims(X);
   
-
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    dims[d] = X[d];
-  }
-  Vh = V/2;
-
-  Vs = X[0]*X[1]*X[2];
-  Vsh_t = Vs/2;
-
   void*  sitelink_fwd_sendbuf = malloc(4*Vs*gaugeSiteSize*gPrecision);
   void*  sitelink_back_sendbuf = malloc(4*Vs*gaugeSiteSize*gPrecision);
   if (sitelink_fwd_sendbuf == NULL|| sitelink_back_sendbuf == NULL){
@@ -437,10 +427,10 @@ void exchange_cpu_sitelink(int* X,
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_sitelink((double**)sitelink, (double*)ghost_sitelink, 
+    exchange_sitelink((double**)sitelink, (double*)(ghost_sitelink[3]), 
 		      (double*)sitelink_fwd_sendbuf, (double*)sitelink_back_sendbuf);
   }else{ //single
-    exchange_sitelink((float**)sitelink, (float*)ghost_sitelink, 
+    exchange_sitelink((float**)sitelink, (float*)(ghost_sitelink[3]), 
 		      (float*)sitelink_fwd_sendbuf, (float*)sitelink_back_sendbuf);
   }
 
