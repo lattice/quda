@@ -2,9 +2,6 @@
 #define __MISC_HELPERS_H__
 
 
-void link_format_cpu_to_gpu2(void* dst, void* src,
-			    int reconstruct, int bytes, int Vh, int pad, int Vsh, 
-			    QudaPrecision prec);
 void link_format_cpu_to_gpu(void* dst, void* src,
 			    int reconstruct, int bytes, int Vh, int pad,
 			    int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t, 

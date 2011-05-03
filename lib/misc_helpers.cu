@@ -55,62 +55,6 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
 
 
 
-// we require the cpu precisision and gpu precision are the same
-void 
-link_format_cpu_to_gpu2(void* dst, void* src, 
-		       int reconstruct, int bytes, int Vh, int pad, int Vsh, 
-		       QudaPrecision prec)
-{
-  dim3 blockDim(BLOCKSIZE);
-#ifdef MULTI_GPU  
-  dim3 gridDim((Vh+2*Vsh)/blockDim.x);
-#else
-  dim3 gridDim(Vh/blockDim.x);
-#endif
-  //(Vh+2*Vsh) must be multipl of BLOCKSIZE or the kernel does not work
-    //because the intermediae GPU data has stride=Vh+2*Vsh and the extra two
-    //Vsh is occupied by the back and forward neighbor
-    if ((Vh+2*Vsh) % blockDim.x != 0){
-	printf("ERROR: Vh(%d) is not multiple of blocksize(%d), exitting\n", Vh, blockDim.x);
-	exit(1);
-    }
-    
-    
-    switch (prec){
-    case QUDA_DOUBLE_PRECISION:
-      do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, Vsh);
-      break;
-      
-    case QUDA_SINGLE_PRECISION:
-      if(reconstruct == QUDA_RECONSTRUCT_NO){
-	do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, Vsh);   
-      }else if (reconstruct == QUDA_RECONSTRUCT_12){
-	//not working yet
-	//do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float4*)dst, (float*)src, reconstruct, bytes, Vh, pad, Vsh);   
-	
-      }
-      break;
-      
-    default:
-      printf("ERROR: half precision not support in %s\n", __FUNCTION__);
-      exit(1);
-    }
-    
-    /*
-    if (cuda_prec == QUDA_DOUBLE_PRECISION){
-      do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, Vsh);
-    }else if( cuda_prec == QUDA_SINGLE_PRECISION){
-      do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, Vsh);      
-    }else{
-      printf("ERROR: half precision is not supported in %s\n", __FUNCTION__);
-      exit(1);
-    }
-    */
-
-    return;
-    
-}
-
 void 
 link_format_cpu_to_gpu(void* dst, void* src, 
 		       int reconstruct, int bytes, int Vh, int pad, 

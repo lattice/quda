@@ -148,7 +148,7 @@ llfat_init(void)
 #ifdef MULTI_GPU
   exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, gaugeParam.cpu_prec);
   
-  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*Vsh_t;
+  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t);
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
   loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink, &gaugeParam);

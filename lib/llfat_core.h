@@ -1,15 +1,7 @@
-#if 0
 #define Vsh_x ghostFace[0]
 #define Vsh_y ghostFace[1]
 #define Vsh_z ghostFace[2]
 #define Vsh_t ghostFace[3]
-#else
-#define Vsh_x 0
-#define Vsh_y 0
-#define Vsh_z 0
-#define Vsh_t ghostFace[3]
-
-#endif
 
 #if ((PRECISION == 1) && (RECONSTRUCT == 12 || RECONSTRUCT == 8))
 #define a00_re A0.x

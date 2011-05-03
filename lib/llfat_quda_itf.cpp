@@ -83,6 +83,8 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					 dir, nu,1,
 					 act_path_coeff[2],
 					 recon, prec, tloc, halfGridDim, &stream[0]); CUERR;
+	//FIXME
+	return;
 	
 #ifdef MULTI_GPU	
 	exchange_gpu_staple_start(param->X, &cudaStaple, &stream[0]);  CUERR;

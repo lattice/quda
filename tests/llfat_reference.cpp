@@ -632,7 +632,10 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
     for(int nu=XUP; nu<=TUP; nu++){
       if(nu!=dir){
 	llfat_compute_gen_staple_field_mg(staple,dir,nu,sitelink[dir], (su3_matrix*)NULL, sitelink, ghost_sitelink, fatlink, act_path_coeff[2], 0);
-	
+
+	//FIXME
+	return;
+
 	/* The Lepage term */
 	/* Note this also involves modifying c_1 (above) */
 
