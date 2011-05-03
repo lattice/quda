@@ -1606,7 +1606,7 @@ createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param)
 
 template<typename FloatN, typename Float>
 static void 
-do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuGauge,
+do_loadLinkToGPU2(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuGauge,
 		 ReconstructType reconstruct, int bytes, int Vh, int pad, int Vsh_t,
 		 QudaPrecision prec) 
 {
@@ -1631,7 +1631,7 @@ do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuG
 #endif
   }    
   
-  link_format_cpu_to_gpu((void*)even, (void*)tmp,  reconstruct, bytes, Vh, pad, Vsh_t, prec); CUERR;
+  link_format_cpu_to_gpu2((void*)even, (void*)tmp,  reconstruct, bytes, Vh, pad, Vsh_t, prec); CUERR;
   
   //odd links
   for(i=0;i < 4; i++){
@@ -1641,12 +1641,85 @@ do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuG
       cudaMemcpy(tmp + i*(len+2*glen)+len + glen, ((char*)ghost_cpuGauge[3])+8*glen+glen +i*2*glen, glen, cudaMemcpyHostToDevice); CUERR;
 #endif
   }
-  link_format_cpu_to_gpu((void*)odd, (void*)tmp, reconstruct, bytes, Vh, pad, Vsh_t, prec); CUERR;
+  link_format_cpu_to_gpu2((void*)odd, (void*)tmp, reconstruct, bytes, Vh, pad, Vsh_t, prec); CUERR;
   
   cudaFree(tmp);
   CUERR;
 }
 
+
+template<typename FloatN, typename Float>
+static void 
+do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuGauge,
+                ReconstructType reconstruct, int bytes, int Vh, int pad, 
+                int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t,
+                QudaPrecision prec) 
+{
+  // Use pinned memory
+  int i;
+  char* tmp;
+  int len = Vh*gaugeSiteSize*sizeof(Float);
+
+#ifdef MULTI_GPU  
+  int glen[4] = {
+      Vsh_x*gaugeSiteSize*sizeof(Float),
+      Vsh_y*gaugeSiteSize*sizeof(Float),
+      Vsh_z*gaugeSiteSize*sizeof(Float),
+      Vsh_t*gaugeSiteSize*sizeof(Float)
+  };
+#else
+  int glen[4] = {0,0,0,0};
+#endif  
+
+  int glen_sum = glen[0]+glen[1]+glen[2]+glen[3];
+  cudaMalloc(&tmp, 4*(len+2*glen_sum)); CUERR;
+  
+  //even links
+  for(i=0;i < 4; i++){
+      cudaMemcpy(tmp + i*(len+2*glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice); 
+#ifdef MULTI_GPU  
+      //cudaMemcpy(tmp + i*(len+2*glen_sum)+len, ((char*)ghost_cpuGauge[3])+i*2*glen, glen, cudaMemcpyHostToDevice); 
+      //cudaMemcpy(tmp + i*(len+2*glen_sum)+len + glen, ((char*)ghost_cpuGauge[3])+8*glen+i*2*glen, glen, cudaMemcpyHostToDevice); 
+      cudaMemcpy(tmp + i*(len+2*glen_sum)+len+ 2*(glen[0]+glen[1]+glen[2]), ((char*)ghost_cpuGauge[3])+i*2*glen[3], glen[3], cudaMemcpyHostToDevice); 
+      cudaMemcpy(tmp + i*(len+2*glen_sum)+len + 2*(glen[0]+glen[1]+glen[2])+ glen[3], ((char*)ghost_cpuGauge[3])+8*glen[3]+i*2*glen[3], glen[3], cudaMemcpyHostToDevice); 
+
+#if 0
+      //dir: the source direction
+      char* dest = tmp + i*(len+2*glen_sum)+len;
+      for(int dir = 0; dir < 4; dir++){
+         cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+         cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+         dest += 2*glen[dir];
+      }
+#endif
+
+#endif
+  }    
+  
+  link_format_cpu_to_gpu((void*)even, (void*)tmp,  reconstruct, bytes, Vh, pad, Vsh_x, Vsh_y, Vsh_z, Vsh_t, prec); CUERR;
+  
+  //odd links
+  for(i=0;i < 4; i++){
+      cudaMemcpy(tmp + i*(len+2*glen_sum), cpuGauge[i] + Vh*gaugeSiteSize, len, cudaMemcpyHostToDevice);CUERR;
+#ifdef MULTI_GPU  
+      //cudaMemcpy(tmp + i*(len+2*glen_sum)+len, ((char*)ghost_cpuGauge[3])+glen +i*2*glen, glen, cudaMemcpyHostToDevice); CUERR;
+      //cudaMemcpy(tmp + i*(len+2*glen_sum)+len + glen, ((char*)ghost_cpuGauge[3])+8*glen+glen +i*2*glen, glen, cudaMemcpyHostToDevice); CUERR;
+      cudaMemcpy(tmp + i*(len+2*glen_sum)+len+2*(glen[0]+glen[1]+glen[2]), ((char*)ghost_cpuGauge[3])+glen[3] +i*2*glen[3], glen[3], cudaMemcpyHostToDevice); CUERR;
+      cudaMemcpy(tmp + i*(len+2*glen_sum)+len+2*(glen[0]+glen[1]+glen[2])+glen[3], ((char*)ghost_cpuGauge[3])+8*glen[3]+glen[3] +i*2*glen[3], glen[3], cudaMemcpyHostToDevice); CUERR;
+#if 0       
+      char* dest = tmp + i*(len+2*glen_sum)+len;
+      for(int dir = 0; dir < 4; dir++){
+         cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
+         cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
+      }
+#endif
+#endif
+  }
+  link_format_cpu_to_gpu((void*)odd, (void*)tmp, reconstruct, bytes, Vh, pad, Vsh_x, Vsh_y, Vsh_z, Vsh_t, prec); CUERR;
+  
+  cudaFree(tmp);
+  CUERR;
+}
 
 
 void 
@@ -1655,6 +1728,9 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void** ghost_cpuGauge, QudaG
   QudaPrecision cpu_prec = param->cpu_prec;
   QudaPrecision cuda_prec= param->cuda_prec;
   int pad = param->ga_pad;
+  int Vsh_x = param->X[1]*param->X[2]*param->X[3]/2;
+  int Vsh_y = param->X[0]*param->X[2]*param->X[3]/2;
+  int Vsh_z = param->X[0]*param->X[1]*param->X[3]/2;
   int Vsh_t = param->X[0]*param->X[1]*param->X[2]/2;
   
   
@@ -1662,15 +1738,29 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void** ghost_cpuGauge, QudaG
     printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
     exit(1);
   }
-
+  
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+#if 0
     do_loadLinkToGPU((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
+		     (double**)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
+		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
+		     cuda_prec);
+#else
+    do_loadLinkToGPU2((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
 		     (double**)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, Vsh_t, 
 		     cuda_prec);
+#endif
   } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
+#if 0
     do_loadLinkToGPU((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
+		     (float**)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
+		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
+		     cuda_prec);    
+#else
+    do_loadLinkToGPU2((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
 		     (float**)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, Vsh_t, 
 		     cuda_prec);
+#endif
   }else{
     printf("ERROR: half precision not supported in this funciton %s\n", __FUNCTION__);
     exit(1);
