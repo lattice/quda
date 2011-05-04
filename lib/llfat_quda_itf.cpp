@@ -82,10 +82,7 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					 (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
 					 dir, nu,1,
 					 act_path_coeff[2],
-					 recon, prec, tloc, halfGridDim, &stream[0]); CUERR;
-	//FIXME
-	return;
-	
+					 recon, prec, tloc, halfGridDim, &stream[0]); CUERR;	
 #ifdef MULTI_GPU	
 	exchange_gpu_staple_start(param->X, &cudaStaple, &stream[0]);  CUERR;
 	exchange_gpu_staple_wait(param->X, &cudaStaple, &stream[0]); CUERR;
@@ -107,6 +104,8 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					  dir, nu,odd,0,
 					  act_path_coeff[5],
 					  recon, prec, tloc,  halfGridDim, &stream[0]);	 CUERR;
+
+
 	for(int rho = 0; rho < 4; rho++){
 	  if (rho != dir && rho != nu){
 	    
@@ -126,12 +125,14 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					      dir, rho,odd,1,
 					      act_path_coeff[3],
 					      recon, prec, tloc,  halfGridDim,&stream[0]); CUERR;
+
 #ifdef MULTI_GPU
 	    exchange_gpu_staple_start(param->X, &cudaStaple1, &stream[0]); CUERR;
 	    exchange_gpu_staple_wait(param->X, &cudaStaple1, &stream[0]); CUERR;
 #endif	    
 	    for(int sig = 0; sig < 4; sig++){
 	      if (sig != dir && sig != nu && sig != rho){				
+
 		
 		//even				
 		computeGenStapleFieldParityKernel((void*)NULL, (void*)NULL, 
@@ -149,6 +150,8 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 						  dir, sig, odd, 0,
 						  act_path_coeff[4],
 						  recon, prec, tloc,  halfGridDim,&stream[0]);	 CUERR;
+		
+		
 	      }			    
 	    }//sig
 	  }

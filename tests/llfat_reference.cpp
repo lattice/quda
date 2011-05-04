@@ -633,32 +633,31 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
       if(nu!=dir){
 	llfat_compute_gen_staple_field_mg(staple,dir,nu,sitelink[dir], (su3_matrix*)NULL, sitelink, ghost_sitelink, fatlink, act_path_coeff[2], 0);
 
-	//FIXME
-	return;
-
 	/* The Lepage term */
 	/* Note this also involves modifying c_1 (above) */
 
 	exchange_cpu_staple(Z, staple, ghost_staple, prec);
 	
 	llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,nu,staple,ghost_staple, sitelink, ghost_sitelink, fatlink, act_path_coeff[5],1);
-		
+
 	for(int rho=XUP; rho<=TUP; rho++) {
 	  if((rho!=dir)&&(rho!=nu)){
 	    llfat_compute_gen_staple_field_mg( tempmat1, dir, rho, staple,ghost_staple, sitelink, ghost_sitelink, fatlink, act_path_coeff[3], 1);
-	    exchange_cpu_staple(Z, tempmat1, ghost_staple1, prec);
 
+
+	    exchange_cpu_staple(Z, tempmat1, ghost_staple1, prec);
+	    
 	    for(int sig=XUP; sig<=TUP; sig++){
 	      if((sig!=dir)&&(sig!=nu)&&(sig!=rho)){
+
 		llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,sig,tempmat1, ghost_staple1, sitelink, ghost_sitelink, fatlink, act_path_coeff[4], 1);
+		//FIXME
+		//return;
+
 	      } 
-	    }/* sig */
-
+	    }/* sig */		
 	  } 
-
 	}/* rho */
-
-
       } 
 
     }/* nu */

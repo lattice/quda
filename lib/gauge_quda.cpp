@@ -1639,11 +1639,10 @@ do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuG
       //dir: the source direction
       char* dest = tmp + i*(len+2*glen_sum)+len;
       for(int dir = 0; dir < 4; dir++){
-         cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
-         cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
-         dest += 2*glen[dir];
+	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+	dest += 2*glen[dir];
       }
-
 #endif
   }    
   
@@ -1658,7 +1657,9 @@ do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuG
       for(int dir = 0; dir < 4; dir++){
 	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
 	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
+	dest += 2*glen[dir];
       }
+
 #endif
   }
   link_format_cpu_to_gpu((void*)odd, (void*)tmp, reconstruct, bytes, Vh, pad, Vsh_x, Vsh_y, Vsh_z, Vsh_t, prec); CUERR;
