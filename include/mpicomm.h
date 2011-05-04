@@ -27,8 +27,10 @@ int		comm_size(void);
 int             comm_dim(int);
 int             comm_coords(int);
 unsigned long	comm_send(void*, int, int);
+unsigned long	comm_send_to_rank(void*, int, int);
 unsigned long   comm_send_with_tag(void*, int, int, int);
 unsigned long	comm_recv(void*, int, int);
+unsigned long	comm_recv_from_rank(void*, int, int);
 unsigned long   comm_recv_with_tag(void*, int, int, int);
 void		comm_wait(unsigned long);
 void		comm_allreduce(double* data);
@@ -38,7 +40,8 @@ void		comm_barrier(void);
 void		comm_exit(int);
 void		comm_cleanup(void);
 int		comm_gpuid();
-
+int		comm_get_neighbor_rank(int dx, int dy, int dz, int dt);
+  
 #ifdef __cplusplus
 }
 #endif

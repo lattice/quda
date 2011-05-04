@@ -855,6 +855,71 @@ void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFw
   
 }
 
+void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir1, int dir2, QudaPrecision prec)
+{
+    /*
+      nu |          |
+         |__________|
+            mu 
+    *	    
+    * nu, mu are the directions we are working on
+    * Since we are packing our own data, we need to go to the north-west corner in the diagram
+    * i.e. x[nu] = X[nu]-1, x[mu]=0, and looop throught x[dir1],x[dir2]
+    * in the remaining two directions (dir1/dir2), dir2 is the slowest changing dim when computing
+    * index
+    */
+
+
+  int mul_factor[4]={
+    1, X[0], X[1]*X[0], X[2]*X[1]*X[0],
+  };
+
+  int even_dst_idx = 0;
+  int odd_dst_idx = 0;
+  char* dst_even =(char*)buf;
+  char* dst_odd = dst_even + (X[dir1]*X[dir2]/2)*gaugeSiteSize*prec;
+  char* src_even = (char*)sitelink[nu];
+  char* src_odd = src_even + (X[0]*X[1]*X[2]*X[3]/2)*gaugeSiteSize*prec;
+
+  if( (X[nu]+X[mu]) % 2 == 1){
+    //oddness will change between me and the diagonal neighbor
+    //switch it now
+    char* tmp = dst_odd;
+    dst_odd = dst_even;
+    dst_even = tmp;
+  }
+
+  for(int i=0;i < X[dir2]; i++){
+    for(int j=0; j < X[dir1]; j++){
+      int src_idx = ((X[nu]-1)*mul_factor[nu]+ 0*mul_factor[mu]+i*mul_factor[dir2]+j*mul_factor[dir1])>>1;
+      int dst_idx = (i*X[dir1]+j) >> 1; 
+      int oddness = ( (X[nu]-1) + 0 + i + j) %2;
+
+      if(oddness==0){
+	for(int tmpidx = 0; tmpidx < gaugeSiteSize; tmpidx++){
+	  memcpy(&dst_even[(18*even_dst_idx+tmpidx)*prec], &src_even[(18*src_idx + tmpidx)*prec], prec);
+	}
+	even_dst_idx++;
+      }else{
+	for(int tmpidx = 0; tmpidx < gaugeSiteSize; tmpidx++){	
+	  memcpy(&dst_odd[(18*odd_dst_idx+tmpidx)*prec], &src_odd[(18*src_idx + tmpidx)*prec], prec);
+	}
+	odd_dst_idx++;
+      }//if
+
+    }//for j
+  }//for i
+      
+  if( (even_dst_idx != X[dir1]*X[dir2]/2)|| (odd_dst_idx != X[dir1]*X[dir2]/2)){
+    errorQuda("even_dst_idx/odd_dst_idx(%d/%d) does not match the value of X[dir1]*X[dir2]/2 (%d)\n",
+	      even_dst_idx, odd_dst_idx, X[dir1]*X[dir2]/2);
+  }
+  return ;
+  
+
+}
+
+
 static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct, QudaPrecision precision) {
 
   cudaGauge->reconstruct = reconstruct;

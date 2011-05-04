@@ -144,6 +144,7 @@ class FaceBuffer {
 };
 
 void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
+			   void** ghost_sitelink_diag, 
 			   QudaPrecision gPrecision); 
 void exchange_gpu_staple_start(int* X, void* _cudaStaple, cudaStream_t * stream);
 void exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream);

@@ -360,7 +360,7 @@ template<typename su3_matrix, typename Real>
 void 
 llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, 
 				  su3_matrix* mulink, su3_matrix* ghost_mulink, 
-				  su3_matrix** sitelink, su3_matrix** ghost_sitelink,
+				  su3_matrix** sitelink, su3_matrix** ghost_sitelink, su3_matrix** ghost_sitelink_diag, 
 				  void** fatlink, Real coef,
 				  int use_staple) 
 {
@@ -554,12 +554,28 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     new_x2 = (x[1] + dx[1] + Z[1])%Z[1];
     new_x3 = (x[2] + dx[2] + Z[2])%Z[2];
     new_x4 = (x[3] + dx[3] + Z[3])%Z[3];
+    int new_x[4] = {new_x1, new_x2, new_x3, new_x4};
     space_con[0] = (new_x4*X3X2 + new_x3*X2 + new_x2)/2;
     space_con[1] = (new_x4*X3X1 + new_x3*X1 + new_x1)/2;
     space_con[2] = (new_x4*X2X1 + new_x2*X1 + new_x1)/2;
     space_con[3] = (new_x3*X2X1 + new_x2*X1 + new_x1)/2;
 
-    if (x[nu] + dx[nu] < 0){
+    if( (x[nu] + dx[nu]) < 0  && (x[mu] + dx[mu] >= Z[mu])){
+      //find the other 2 directions, dir1, dir2
+      //with dir2 the slowest changing direction
+      int dir1, dir2; //other two dimensions
+      for(dir1=0; dir1 < 4; dir1 ++){
+	if(dir1 != nu && dir1 != mu){
+	  break;
+	}
+      }
+      for(dir2=0; dir2 < 4; dir2 ++){
+	if(dir2 != nu && dir2 != mu && dir2 != dir1){
+	  break;
+	}
+      }  
+      C = ghost_sitelink_diag[nu*4+mu] +  oddBit*Z[dir1]*Z[dir2]/2 + (new_x[dir2]*Z[dir1]+new_x[dir1])/2;	
+    }else if (x[nu] + dx[nu] < 0){
       C = ghost_sitelink[nu] + nu*Vs[nu] + oddBit*Vsh[nu]+ space_con[nu];
     }else if (x[mu] + dx[mu] >= Z[mu]){
       C = ghost_sitelink[mu] + 4*Vs[mu] + nu*Vs[mu] + oddBit*Vsh[mu]+space_con[mu];
@@ -582,7 +598,8 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
 
 
 template <typename su3_matrix, typename Float>
-void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_sitelink, Float* act_path_coeff)
+void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_sitelink,
+		  su3_matrix** ghost_sitelink_diag, Float* act_path_coeff)
 {
   QudaPrecision prec;
   if (sizeof(Float) == 4){
@@ -631,18 +648,27 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
   for (int dir=XUP; dir<=TUP; dir++){
     for(int nu=XUP; nu<=TUP; nu++){
       if(nu!=dir){
-	llfat_compute_gen_staple_field_mg(staple,dir,nu,sitelink[dir], (su3_matrix*)NULL, sitelink, ghost_sitelink, fatlink, act_path_coeff[2], 0);
-
+	llfat_compute_gen_staple_field_mg(staple,dir,nu,
+					  sitelink[dir], (su3_matrix*)NULL, 
+					  sitelink, ghost_sitelink, ghost_sitelink_diag, 
+					  fatlink, act_path_coeff[2], 0);
+	
 	/* The Lepage term */
 	/* Note this also involves modifying c_1 (above) */
 
 	exchange_cpu_staple(Z, staple, ghost_staple, prec);
 	
-	llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,nu,staple,ghost_staple, sitelink, ghost_sitelink, fatlink, act_path_coeff[5],1);
+	llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,nu,
+					  staple,ghost_staple, 
+					  sitelink, ghost_sitelink, ghost_sitelink_diag, 
+					  fatlink, act_path_coeff[5],1);
 
 	for(int rho=XUP; rho<=TUP; rho++) {
 	  if((rho!=dir)&&(rho!=nu)){
-	    llfat_compute_gen_staple_field_mg( tempmat1, dir, rho, staple,ghost_staple, sitelink, ghost_sitelink, fatlink, act_path_coeff[3], 1);
+	    llfat_compute_gen_staple_field_mg( tempmat1, dir, rho, 
+					       staple,ghost_staple, 
+					       sitelink, ghost_sitelink, ghost_sitelink_diag, 
+					       fatlink, act_path_coeff[3], 1);
 
 
 	    exchange_cpu_staple(Z, tempmat1, ghost_staple1, prec);
@@ -650,7 +676,10 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
 	    for(int sig=XUP; sig<=TUP; sig++){
 	      if((sig!=dir)&&(sig!=nu)&&(sig!=rho)){
 
-		llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,sig,tempmat1, ghost_staple1, sitelink, ghost_sitelink, fatlink, act_path_coeff[4], 1);
+		llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,sig,
+						  tempmat1, ghost_staple1,
+						  sitelink, ghost_sitelink, ghost_sitelink_diag, 
+						  fatlink, act_path_coeff[4], 1);
 		//FIXME
 		//return;
 
@@ -674,16 +703,19 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
 
 
 void
-llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink, QudaPrecision prec, void* act_path_coeff)
+llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink,
+		   void** ghost_sitelink_diag, QudaPrecision prec, void* act_path_coeff)
 {
 
   switch(prec){
   case QUDA_DOUBLE_PRECISION:{
-    llfat_cpu_mg((void**)fatlink, (dsu3_matrix**)sitelink, (dsu3_matrix**)ghost_sitelink, (double*) act_path_coeff);
+    llfat_cpu_mg((void**)fatlink, (dsu3_matrix**)sitelink, (dsu3_matrix**)ghost_sitelink, 
+		 (dsu3_matrix**)ghost_sitelink_diag, (double*) act_path_coeff);
     break;
   }
   case QUDA_SINGLE_PRECISION:{
-    llfat_cpu_mg((void**)fatlink, (fsu3_matrix**)sitelink, (fsu3_matrix**)ghost_sitelink, (float*) act_path_coeff);
+    llfat_cpu_mg((void**)fatlink, (fsu3_matrix**)sitelink, (fsu3_matrix**)ghost_sitelink, 
+		 (fsu3_matrix**)ghost_sitelink_diag, (float*) act_path_coeff);
     break;
   }
   default:

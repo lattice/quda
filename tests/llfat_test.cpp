@@ -30,6 +30,7 @@ void *fatlink, *sitelink[4], *reflink[4];
 
 #ifdef MULTI_GPU
 void* ghost_sitelink[4];
+void* ghost_sitelink_diag[16];
 #endif
 
 int verify_results = 0;
@@ -85,8 +86,6 @@ setDims(int *X) {
   Vsh[2] = Vsh_z = Vs_z/2;
   Vsh[3] = Vsh_t = Vs_t/2;
 
- 
-
 }
 
 static void
@@ -132,6 +131,41 @@ llfat_init(void)
       exit(1);
     }
   }
+
+  /*
+    nu |     |
+       |_____|
+          mu     
+  */
+  
+  for(int nu=0;nu < 4;nu++){
+    for(int mu=0; mu < 4;mu++){
+      if(nu == mu){
+	ghost_sitelink_diag[nu*4+mu] = NULL;
+      }else{
+	//the other directions
+	int dir1, dir2;
+	for(dir1= 0; dir1 < 4; dir1++){
+	  if(dir1 !=nu && dir1 != mu){
+	    break;
+	  }
+	}
+	for(dir2=0; dir2 < 4; dir2++){
+	  if(dir2 != nu && dir2 != mu && dir2 != dir1){
+	    break;
+	  }
+	}
+	ghost_sitelink_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+	if(ghost_sitelink_diag[nu*4+mu] == NULL){
+	  errorQuda("malloc failed for ghost_sitelink_diag\n");
+	}
+	
+	memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+      }
+
+    }
+  }
+
 #endif
 
   for(i=0;i < 4;i++){
@@ -146,7 +180,7 @@ llfat_init(void)
   createSiteLinkCPU(sitelink, gaugeParam.cpu_prec, 1);
   
 #ifdef MULTI_GPU
-  exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, gaugeParam.cpu_prec);
+  exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, gaugeParam.cpu_prec);
   
   gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t);
   gaugeParam.reconstruct = link_recon;
@@ -234,7 +268,7 @@ llfat_test(void)
   }
   if (verify_results){
 #ifdef MULTI_GPU
-    llfat_reference_mg(reflink, sitelink, ghost_sitelink, gaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference_mg(reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, gaugeParam.cpu_prec, act_path_coeff);
     //llfat_reference(reflink, sitelink, gaugeParam.cpu_prec, act_path_coeff);
 #else
     llfat_reference(reflink, sitelink, gaugeParam.cpu_prec, act_path_coeff);

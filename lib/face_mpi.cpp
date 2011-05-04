@@ -409,7 +409,74 @@ exchange_sitelink2(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_
 
 template<typename Float>
 void
-exchange_sitelink(Float** sitelink, Float** ghost_sitelink, Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf)
+exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag)
+{
+  /*
+    nu |          |
+       |__________|
+           mu 
+
+  * There are total 12 different combinations for (nu,mu)
+  * since nu/mu = X,Y,Z,T and nu != mu
+  * For each combination, we need to communicate with the corresponding
+  * neighbor and get the diag ghost data
+  * The neighbor we need to get data from is dx[nu]=-1, dx[mu]= +1
+  * and we need to send our data to neighbor with dx[nu]=+1, dx[mu]=-1
+  */
+  
+  for(int nu = XUP; nu <=TUP; nu++){
+    for(int mu = XUP; mu <= TUP; mu++){
+      if(nu == mu){
+	continue;
+      }
+      int dir1, dir2; //other two dimensions
+      for(dir1=0; dir1 < 4; dir1 ++){
+	if(dir1 != nu && dir1 != mu){
+	  break;
+	}
+      }
+      for(dir2=0; dir2 < 4; dir2 ++){
+	if(dir2 != nu && dir2 != mu && dir2 != dir1){
+	  break;
+	}
+      }  
+      
+      if(dir1 == 4 || dir2 == 4){
+	errorQuda("Invalid dir1/dir2");
+      }
+      int len = X[dir1]*X[dir2]*gaugeSiteSize*sizeof(Float);
+      void* sendbuf = malloc(len);
+      if(sendbuf == NULL){
+	errorQuda("Malloc failed for diag sendbuf\n");
+      }
+      
+      pack_gauge_diag(sendbuf, X, (void**)sitelink, nu, mu, dir1, dir2, (QudaPrecision)sizeof(Float));
+  
+      //post recv
+      int dx[4]={0,0,0,0};
+      dx[nu]=-1;
+      dx[mu]=+1;
+      int src_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
+      unsigned long recv_request = comm_recv_from_rank(ghost_sitelink_diag[nu*4+mu], len, src_rank);
+      //do send
+      dx[nu]=+1;
+      dx[mu]=-1;
+      int dst_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
+      unsigned long send_request = comm_send_to_rank(sendbuf, len, dst_rank);
+      
+      comm_wait(recv_request);
+      comm_wait(send_request);
+            
+      free(sendbuf);
+    }//mu
+  }//nu
+}
+
+
+template<typename Float>
+void
+exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost_sitelink_diag, 
+		  Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf)
 {
 
 
@@ -463,18 +530,21 @@ exchange_sitelink(Float** sitelink, Float** ghost_sitelink, Float** sitelink_fwd
     comm_wait(send_request1);
     comm_wait(send_request2);
   }
+
+  exchange_sitelink_diag(X, sitelink, ghost_sitelink_diag);
 }
 
 //this function is used for link fattening computation
 void exchange_cpu_sitelink(int* X,
 			   void** sitelink, void** ghost_sitelink,
+			   void** ghost_sitelink_diag,
 			   QudaPrecision gPrecision)
 {  
   setup_dims(X);
   set_dim(X);
   void*  sitelink_fwd_sendbuf[4];
   void*  sitelink_back_sendbuf[4];
-
+  
   for(int i=0;i < 4;i++){
     sitelink_fwd_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
     sitelink_back_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
@@ -486,10 +556,10 @@ void exchange_cpu_sitelink(int* X,
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
-    exchange_sitelink((double**)sitelink, (double**)(ghost_sitelink), 
+    exchange_sitelink(X, (double**)sitelink, (double**)(ghost_sitelink), (double**)ghost_sitelink_diag, 
 		      (double**)sitelink_fwd_sendbuf, (double**)sitelink_back_sendbuf);
   }else{ //single
-    exchange_sitelink((float**)sitelink, (float**)(ghost_sitelink), 
+    exchange_sitelink(X, (float**)sitelink, (float**)(ghost_sitelink), (float**)ghost_sitelink_diag, 
 		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf);
   }
   

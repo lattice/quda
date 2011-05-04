@@ -174,6 +174,27 @@ comm_partition(void)
   
 }
 
+int 
+comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
+{
+  int ret;
+#if 0
+#define GRID_ID(xid,yid,zid,tid) (tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid)
+#else
+#define GRID_ID(xid,yid,zid,tid) (xid*ygridsize*zgridsize*tgridsize+yid*zgridsize*tgridsize+zid*tgridsize+tid)
+#endif
+
+  
+  int xid, yid, zid, tid;
+  xid=(xgridid + dx + xgridsize)%xgridsize;
+  yid=(ygridid + dy + ygridsize)%ygridsize;
+  zid=(zgridid + dz + zgridsize)%zgridsize;
+  tid=(tgridid + dt + tgridsize)%tgridsize;
+
+  ret = GRID_ID(xid,yid,zid,tid);
+
+  return ret;
+}
 
 
 void 
@@ -333,6 +354,25 @@ comm_send(void* buf, int len, int dst)
 }
 
 unsigned long
+comm_send_to_rank(void* buf, int len, int dst_rank)
+{
+  
+  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  if (request == NULL){
+    printf("ERROR: malloc failed for mpi request\n");
+    comm_exit(1);
+  }
+  
+  if(dst_rank < 0 || dst_rank >= comm_size()){
+    printf("ERROR: Invalid dst rank(%d)\n", dst_rank);
+    comm_exit(1);
+  }
+  int sendtag = -1;
+  MPI_Isend(buf, len, MPI_BYTE, dst_rank, sendtag, MPI_COMM_WORLD, request);  
+  return (unsigned long)request;  
+}
+
+unsigned long
 comm_send_with_tag(void* buf, int len, int dst, int tag)
 {
 
@@ -402,6 +442,26 @@ comm_recv(void* buf, int len, int src)
   }
   
   MPI_Irecv(buf, len, MPI_BYTE, srcproc, recvtag, MPI_COMM_WORLD, request);
+  
+  return (unsigned long)request;
+}
+
+unsigned long
+comm_recv_from_rank(void* buf, int len, int src_rank)
+{
+  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  if (request == NULL){
+    printf("ERROR: malloc failed for mpi request\n");
+    comm_exit(1);
+  }
+  
+  if(src_rank < 0 || src_rank >= comm_size()){
+    printf("ERROR: Invalid src rank(%d)\n", src_rank);
+    comm_exit(1);
+  }
+  
+  int recvtag = -1;
+  MPI_Irecv(buf, len, MPI_BYTE, src_rank, recvtag, MPI_COMM_WORLD, request);
   
   return (unsigned long)request;
 }
