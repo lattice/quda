@@ -264,16 +264,18 @@
     
 #ifdef MULTI_GPU
 
+#if 1
+
 #define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {                     \
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_mem_idx = ( (x1==X1m1)?idx-X1m1:idx+1)>>1;                    \
+      new_mem_idx = (x1==X1m1)? (Vh+Vsh_x+ spacecon_x):((idx+1)>>1);	\
       break;                                                            \
     case 1:                                                             \
       new_mem_idx = ( (x2==X2m1)?idx-X2X1mX1:idx+X1)>>1;                \
       break;                                                            \
     case 2:                                                             \
-      new_mem_idx = ( (x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1)>>1;          \
+      new_mem_idx = ( (x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1)>>1;	\
       break;                                                            \
     case 3:                                                             \
       new_mem_idx = ( (x4==X4m1)? Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+(offset>>1): (idx+X3X2X1)>>1);	\
@@ -281,6 +283,27 @@
     }                                                                   \
   }while(0)
 
+#else
+
+#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {                     \
+    switch(mydir){                                                      \
+    case 0:                                                             \
+      new_mem_idx = ( (x1==X1m1)?idx-X1m1:idx+1)>>1;			\
+      break;                                                            \
+    case 1:                                                             \
+      new_mem_idx = ( (x2==X2m1)?idx-X2X1mX1:idx+X1)>>1;                \
+      break;                                                            \
+    case 2:                                                             \
+      new_mem_idx = ( (x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1)>>1;	\
+      break;                                                            \
+    case 3:                                                             \
+      new_mem_idx = ( (x4==X4m1)? Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+(offset>>1): (idx+X3X2X1)>>1);	\
+      break;                                                            \
+    }                                                                   \
+  }while(0)
+
+
+#endif
 
 #define LLFAT_COMPUTE_NEW_IDX_MINUS(mydir, idx) do {		\
     switch(mydir){                                                      \
@@ -542,6 +565,10 @@ template<int mu, int nu, int odd_bit>
   int new_x4 = x4;
   int offset = x3*X2X1+x2*X1+x1;    
     
+  int spacecon_x = (x4*X3*X2+x3*X2+x2)>>1;
+  int spacecon_y = (x4*X3*X1+x3*X1+x1)>>1;
+  int spacecon_z = (x4*X2*X1+x2*X1+x1)>>1;
+  int spacecon_t = (x3*X2*X1+x2*X1+x1)>>1;
   /* Upper staple */
   /* Computes the staple :
    *                 mu (B)
@@ -565,6 +592,7 @@ template<int mu, int nu, int odd_bit>
     COMPUTE_RECONSTRUCT_SIGN(sign, mu, new_x1, new_x2, new_x3, new_x4);    
     RECONSTRUCT_SITE_LINK(mu, new_mem_idx, sign, b);
     
+
     MULT_SU3_NN(a, b, tempa);    
     
     /* load matrix C*/
@@ -573,7 +601,7 @@ template<int mu, int nu, int odd_bit>
     LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, new_x3, new_x4);    
     RECONSTRUCT_SITE_LINK(nu, new_mem_idx, sign, c);
-    
+
     MULT_SU3_NA(tempa, c, staple);		
   }
 
@@ -659,7 +687,11 @@ template<int mu, int nu, int odd_bit, int save_staple>
   int new_x4 = x4;
   int offset = x3*X2X1+x2*X1+x1;
 
-    
+  int spacecon_x = (x4*X3*X2+x3*X2+x2)>>1;
+  int spacecon_y = (x4*X3*X1+x3*X1+x1)>>1;
+  int spacecon_z = (x4*X2*X1+x2*X1+x1)>>1;
+  int spacecon_t = (x3*X2*X1+x2*X1+x1)>>1;
+
   /* Upper staple */
   /* Computes the staple :
    *                mu (BB)

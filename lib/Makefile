@@ -21,7 +21,7 @@ BLAS_INLN = blas_param.h reduce_complex_core.h reduce_core.h reduce_triple_core.
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/
 QUDA_INLN = check_params.h clover_def.h dslash_constants.h dslash_textures.h \
-	force_common.h io_spinor.h llfat_core.h pack_spinor.h read_clover.h  \
+	force_common.h io_spinor.h pack_spinor.h read_clover.h  \
 	read_gauge.h staggered_dslash_def.h wilson_dslash_def.h              \
 	dw_dslash_def.h tm_dslash_def.h pack_face_def.h
 

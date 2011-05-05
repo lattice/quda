@@ -1672,9 +1672,10 @@ createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param)
 template<typename FloatN, typename Float>
 static void 
 do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuGauge,
-                ReconstructType reconstruct, int bytes, int Vh, int pad, 
-                int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t,
-                QudaPrecision prec) 
+		 Float** ghost_cpuGauge_diag, 
+		 ReconstructType reconstruct, int bytes, int Vh, int pad, 
+		 int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t,
+		 QudaPrecision prec) 
 {
   // Use pinned memory
   int i;
@@ -1735,7 +1736,8 @@ do_loadLinkToGPU(FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuG
 
 
 void 
-loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void** ghost_cpuGauge, QudaGaugeParam* param)
+loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void** ghost_cpuGauge,
+	      void** ghost_cpuGauge_diag, QudaGaugeParam* param)
 {
   QudaPrecision cpu_prec = param->cpu_prec;
   QudaPrecision cuda_prec= param->cuda_prec;
@@ -1753,12 +1755,14 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void** ghost_cpuGauge, QudaG
   
   if (cuda_prec == QUDA_DOUBLE_PRECISION) {
     do_loadLinkToGPU((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
-		     (double**)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
+		     (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 
+		     cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
 		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
 		     cuda_prec);
   } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
     do_loadLinkToGPU((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
-		     (float**)ghost_cpuGauge, cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
+		     (float**)ghost_cpuGauge, (float**)ghost_cpuGauge_diag, 
+		     cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
 		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
 		     cuda_prec);    
   }else{

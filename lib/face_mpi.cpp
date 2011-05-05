@@ -359,56 +359,6 @@ exchange_llfat_init(FullStaple* cudaStaple)
 
 template<typename Float>
 void
-exchange_sitelink2(Float** sitelink, Float* ghost_sitelink, Float* sitelink_fwd_sendbuf, Float* sitelink_back_sendbuf)
-{
-
-  int i;
-  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
-  for(i=0;i < 4;i++){
-    Float* even_sitelink_back_src = sitelink[i];
-    Float* odd_sitelink_back_src = sitelink[i] + Vh*gaugeSiteSize;
-    Float* sitelink_back_dst = sitelink_back_sendbuf + 2*i*Vsh_t*gaugeSiteSize;
-
-    if(dims[3] % 2 == 0){    
-      memcpy(sitelink_back_dst, even_sitelink_back_src, len);
-      memcpy(sitelink_back_dst + Vsh_t*gaugeSiteSize, odd_sitelink_back_src, len);
-    }else{
-      //switching odd and even ghost sitelink
-      memcpy(sitelink_back_dst, odd_sitelink_back_src, len);
-      memcpy(sitelink_back_dst + Vsh_t*gaugeSiteSize, even_sitelink_back_src, len);
-    }
-  }
-
-  for(i=0;i < 4;i++){
-    Float* even_sitelink_fwd_src = sitelink[i] + (Vh - Vsh_t)*gaugeSiteSize;
-    Float* odd_sitelink_fwd_src = sitelink[i] + Vh*gaugeSiteSize + (Vh - Vsh_t)*gaugeSiteSize;
-    Float* sitelink_fwd_dst = sitelink_fwd_sendbuf + 2*i*Vsh_t*gaugeSiteSize;
-    if(dims[3] % 2 == 0){    
-      memcpy(sitelink_fwd_dst, even_sitelink_fwd_src, len);
-      memcpy(sitelink_fwd_dst + Vsh_t*gaugeSiteSize, odd_sitelink_fwd_src, len);
-    }else{
-      //switching odd and even ghost sitelink
-      memcpy(sitelink_fwd_dst, odd_sitelink_fwd_src, len);
-      memcpy(sitelink_fwd_dst + Vsh_t*gaugeSiteSize, even_sitelink_fwd_src, len);
-    }
-    
-  }
-  
-  Float* ghost_sitelink_back = ghost_sitelink;
-  Float* ghost_sitelink_fwd = ghost_sitelink + 8*Vsh_t*gaugeSiteSize;
-
-  unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, T_BACK_NBR, TUP);
-  unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, T_FWD_NBR, TDOWN);
-  unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf, 8*len, T_FWD_NBR, TUP);
-  unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf, 8*len, T_BACK_NBR, TDOWN);
-  comm_wait(recv_request1);
-  comm_wait(recv_request2);
-  comm_wait(send_request1);
-  comm_wait(send_request2);
-}
-
-template<typename Float>
-void
 exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag)
 {
   /*
@@ -516,15 +466,21 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
   pack_ghost_all_links((void**)sitelink, (void**)sitelink_back_sendbuf, (void**)sitelink_fwd_sendbuf, 1, (QudaPrecision)(sizeof(Float)));
 #endif
 
+
+  int fwd_neighbors[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
+  int back_neighbors[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
+  int up_tags[4] = {XUP, YUP, ZUP, TUP};
+  int down_tags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+
   for(int dir  =0; dir < 4; dir++){
     int len = Vsh[dir]*gaugeSiteSize*sizeof(Float);
     Float* ghost_sitelink_back = ghost_sitelink[dir];
     Float* ghost_sitelink_fwd = ghost_sitelink[dir] + 8*Vsh[dir]*gaugeSiteSize;
     
-    unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, T_BACK_NBR, TUP);
-    unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, T_FWD_NBR, TDOWN);
-    unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf[dir], 8*len, T_FWD_NBR, TUP);
-    unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf[dir], 8*len, T_BACK_NBR, TDOWN);
+    unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, back_neighbors[dir], up_tags[dir]);
+    unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, fwd_neighbors[dir], down_tags[dir]);
+    unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf[dir], 8*len, fwd_neighbors[dir], up_tags[dir]);
+    unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf[dir], 8*len, back_neighbors[dir], down_tags[dir]);
     comm_wait(recv_request1);
     comm_wait(recv_request2);
     comm_wait(send_request1);

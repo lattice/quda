@@ -651,8 +651,7 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
 	llfat_compute_gen_staple_field_mg(staple,dir,nu,
 					  sitelink[dir], (su3_matrix*)NULL, 
 					  sitelink, ghost_sitelink, ghost_sitelink_diag, 
-					  fatlink, act_path_coeff[2], 0);
-	
+					  fatlink, act_path_coeff[2], 0);	
 	/* The Lepage term */
 	/* Note this also involves modifying c_1 (above) */
 

@@ -20,6 +20,7 @@
 #include <mpi.h>
 #endif
 
+#define MAX(a,b) ((a)>(b)? (a):(b))
 
 FullGauge cudaSiteLink;
 FullGauge cudaFatLink;
@@ -181,11 +182,19 @@ llfat_init(void)
   
 #ifdef MULTI_GPU
   exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, gaugeParam.cpu_prec);
+    
+  int max_2d_face_size = MAX(xdim*ydim, xdim*zdim);
+  max_2d_face_size = MAX(max_2d_face_size, xdim*tdim);
+  max_2d_face_size = MAX(max_2d_face_size, ydim*zdim);  
+  max_2d_face_size = MAX(max_2d_face_size, ydim*tdim);  
+  max_2d_face_size = MAX(max_2d_face_size, zdim*tdim);  
+
+  int diag_ghost_size = 3*max_2d_face_size;
   
-  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t);
+  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + diag_ghost_size;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink, &gaugeParam);
+  loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink, ghost_sitelink_diag, &gaugeParam);
 
   gaugeParam.staple_pad = 3*Vsh_t;
   createStapleQuda(&cudaStaple, &gaugeParam);
@@ -194,7 +203,7 @@ llfat_init(void)
   gaugeParam.site_ga_pad = gaugeParam.ga_pad = Vsh_t;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, sitelink, NULL, &gaugeParam);
+  loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &gaugeParam);
 
   gaugeParam.staple_pad = Vsh_t;
   createStapleQuda(&cudaStaple, &gaugeParam);
@@ -223,6 +232,14 @@ llfat_end()
 #ifdef MULTI_GPU  
   for(i=0;i < 4;i++){
     free(ghost_sitelink[i]);
+  }
+  for(i=0;i <4; i++){
+    for(int j=0;j <4; j++){
+      if (i==j){
+	continue;
+      }
+      free(ghost_sitelink_diag[i*4+j]);
+    }    
   }
 #endif
 
