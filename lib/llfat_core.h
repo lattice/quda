@@ -305,6 +305,90 @@
     new_x2 = x2;                                                        \
     new_x3 = x3;                                                        \
     new_x4 = x4;                                                        \
+    new_mem_idx=X;							\
+    if(x[mydir1] > 0){/*mydir1 is not out of boundary*/			\
+      switch(mydir1){							\
+      case 0:								\
+	new_mem_idx = new_mem_idx-1;					\
+	new_x1 = x1 - 1;						\
+	break;								\
+      case 1:								\
+	new_mem_idx = new_mem_idx-X1;					\
+	new_x2 = x2 - 1;						\
+	break;								\
+      case 2:								\
+	new_mem_idx = new_mem_idx-X2X1;					\
+	new_x3 = x3 - 1;						\
+	break;								\
+      case 3:								\
+	new_mem_idx = new_mem_idx-X3X2X1;				\
+	new_x4 = x4 - 1;						\
+	break;								\
+      }									\
+      switch(mydir2){							\
+      case 0:								\
+	new_mem_idx = (x1==X1m1)?2*(Vh+Vsh_x)+((new_x4*X3X2+new_x3*X2+new_x2)):(new_mem_idx+1); \
+	new_x1 = (x1==X1m1)?0:x1+1;					\
+	break;								\
+      case 1:								\
+	new_mem_idx = (x2==X2m1)?2*(Vh+2*(Vsh_x)+Vsh_y)+((new_x4*X3X1+new_x3*X1+new_x1)):(new_mem_idx+X1); \
+	new_x2 = (x2==X2m1)?0:x2+1;					\
+	break;								\
+      case 2:								\
+	new_mem_idx = (x3==X3m1)?2*(Vh+2*(Vsh_x+Vsh_y)+Vsh_z)+((new_x4*X2X1+new_x2*X1+new_x1)):(new_mem_idx+X2X1); \
+	break;								\
+      case 3:								\
+	new_mem_idx = (x4==X4m1)?2*(Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t)+((new_x3*X2X1+new_x2*X1+new_x1)):(new_mem_idx+X3X2X1); \
+	new_x4 = (x4==X4m1)?0:x4+1;					\
+	break;								\
+      }									\
+    }else{/*mydir1 is out of boundary, means mydir2 must be within boundary*/ \
+      /*the case where both dir1/dir2 are out of boundary are dealed with a different macro (_DIAG)*/ \
+      switch(mydir2){							\
+      case 0:								\
+	new_mem_idx = new_mem_idx+1;					\
+	new_x1 = x1+1;							\
+	break;								\
+      case 1:								\
+	new_mem_idx = new_mem_idx+X1;					\
+	new_x2 = x2+1;							\
+	break;								\
+      case 2:								\
+	new_mem_idx = new_mem_idx+X2X1;					\
+	new_x3 = x3+1;							\
+	break;								\
+      case 3:								\
+	new_mem_idx = new_mem_idx+X3X2X1;				\
+	new_x4 = x4+1;							\
+	break;								\
+      }									\
+      switch(mydir1){							\
+      case 0:								\
+	new_mem_idx = (x1==0)?(2*(Vh)+(new_x4*X3X2+new_x3*X2+new_x2)):(new_mem_idx-1); \
+	new_x1 = (x1==0)?X1m1:x1 - 1;					\
+	break;								\
+      case 1:								\
+	new_mem_idx = (x2==0)?(2*(Vh+2*Vsh_x)+(new_x4*X3X1+new_x3*X1+new_x1)):(new_mem_idx-X1); \
+	new_x2 = (x2==0)?X2m1:x2 - 1;					\
+	break;								\
+      case 2:								\
+	new_mem_idx = (x3==0)?(2*(Vh+2*(Vsh_x+Vsh_y))+(new_x4*X2X1+new_x2*X1+new_x1)):(new_mem_idx-X2X1); \
+	break;								\
+      case 3:								\
+	new_mem_idx = (x4==0)?(2*(Vh+2*(Vsh_x+Vsh_y+Vsh_z))+(new_x3*X2X1+new_x2*X1+new_x1)):(new_mem_idx-X3X2X1); \
+	new_x4 = (x4==0)?X4m1:x4 - 1;					\
+	break;								\
+      }									\
+    }									\
+    new_mem_idx = new_mem_idx >> 1;					\
+  }while(0)
+
+
+#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(mydir1, mydir2) do {	\
+    new_x1 = x1;                                                        \
+    new_x2 = x2;                                                        \
+    new_x3 = x3;                                                        \
+    new_x4 = x4;                                                        \
     switch(mydir1){                                                     \
     case 0:                                                             \
       new_mem_idx = ( (x1==0)?X+X1m1:X-1);                              \
@@ -336,7 +420,7 @@
       new_mem_idx = ( (x3==X3m1)?new_mem_idx-X3X2X1mX2X1:new_mem_idx+X2X1) >> 1; \
       break;                                                            \
     case 3:                                                             \
-      new_mem_idx = (x4==X4m1)?Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+((new_x1+new_x2*X1+new_x3*X2X1)>>1):(new_mem_idx+X3X2X1) >> 1; \
+      new_mem_idx = (x4==X4m1)?Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+((new_x3*X2X1+new_x2*X1+new_x1)>>1):(new_mem_idx+X3X2X1) >> 1; \
       new_x4 = (x4==X4m1)?0:x4+1; /*fixme*/				\
       break;                                                            \
     }                                                                   \
@@ -415,7 +499,7 @@
       new_mem_idx = ( (x3==X3m1)?new_mem_idx-X3X2X1mX2X1:new_mem_idx+X2X1) >> 1; \
       break;                                                            \
     case 3:                                                             \
-      new_mem_idx = (x4==X4m1)?Vh+Vsh+((new_x1+new_x2*X1+new_x3*X2X1)>>1):(new_mem_idx+X3X2X1) >> 1; \
+      new_mem_idx = (x4==X4m1)?Vh+Vsh+((new_x3*X2X1+new_x2*X1+new_x1)>>1):(new_mem_idx+X3X2X1) >> 1; \
       new_x4 = (x4==X4m1)?0:x4+1; /*fixme*/				\
       break;                                                            \
     }                                                                   \
@@ -541,7 +625,9 @@ template<int mu, int nu, int odd_bit>
   int new_x3 = x3;
   int new_x4 = x4;
   int offset = x3*X2X1+x2*X1+x1;    
-    
+  int x[4] = {x1,x2,x3, x4};
+  int Z[4] ={X1,X2,X3,X4};
+
   int spacecon_x = (x4*X3*X2+x3*X2+x2)>>1;
   int spacecon_y = (x4*X3*X1+x3*X1+x1)>>1;
   int spacecon_z = (x4*X2*X1+x2*X1+x1)>>1;
@@ -608,7 +694,11 @@ template<int mu, int nu, int odd_bit>
     MULT_SU3_AN(a, b, tempa);
     
     /* load matrix C*/
-    LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
+    if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu);
+    }else{
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
+    }
     LOAD_EVEN_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, new_x3, new_x4);        
     RECONSTRUCT_SITE_LINK(nu, new_mem_idx, sign, c);
@@ -656,7 +746,9 @@ template<int mu, int nu, int odd_bit, int save_staple>
   int x1 = 2*x1h + x1odd;
   int X = 2*mem_idx + x1odd;
   int sign =1;
-    
+  int x[4] = {x1,x2,x3, x4};
+  int Z[4] ={X1,X2,X3,X4};
+  
   int new_mem_idx;
   int new_x1 = x1;
   int new_x2 = x2;
@@ -728,8 +820,11 @@ template<int mu, int nu, int odd_bit, int save_staple>
     MULT_SU3_AN(a, bb, tempa);
     
     /* load matrix C*/
-    LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
-    
+    if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu);
+    }else{
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
+    }
     LOAD_EVEN_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, new_x3, new_x4);
     RECONSTRUCT_SITE_LINK(nu, new_mem_idx, sign, c);				
