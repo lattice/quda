@@ -383,13 +383,20 @@
     new_mem_idx = new_mem_idx >> 1;					\
   }while(0)
 
+#if 0
 
-#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(mydir1, mydir2) do {	\
+#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do {	\
+    new_mem_idx = Vh+2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + mu*Vh_2d_max + (x[dir2]*Z[dir1] + x[dir1])>>1; \
+  }while(0)
+
+#else
+
+#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do { \
     new_x1 = x1;                                                        \
     new_x2 = x2;                                                        \
     new_x3 = x3;                                                        \
     new_x4 = x4;                                                        \
-    switch(mydir1){                                                     \
+    switch(nu){								\
     case 0:                                                             \
       new_mem_idx = ( (x1==0)?X+X1m1:X-1);                              \
       new_x1 = (x1==0)?X1m1:x1 - 1;                                     \
@@ -407,7 +414,7 @@
       new_x4 = (x4==0)?X4m1:x4 - 1;                                     \
       break;                                                            \
     }                                                                   \
-    switch(mydir2){                                                     \
+    switch(mu){								\
     case 0:                                                             \
       new_mem_idx = ( (x1==X1m1)?new_mem_idx-X1m1:new_mem_idx+1)>> 1;   \
       new_x1 = (x1==X1m1)?0:x1+1;                                       \
@@ -425,6 +432,7 @@
       break;                                                            \
     }                                                                   \
   }while(0)
+#endif
 
 
 #define LLFAT_COMPUTE_NEW_IDX_PLUS_TEST(mydir, idx) do {                     \
@@ -695,7 +703,18 @@ template<int mu, int nu, int odd_bit>
     
     /* load matrix C*/
     if(x[nu] == 0 && x[mu] == Z[mu] - 1){
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu);
+      int dir1, dir2;
+      for(dir1=0; dir1 < 4; dir1 ++){
+	if(dir1 != nu && dir1 != mu){
+	  break;
+	}
+      }
+      for(dir2=0; dir2 < 4; dir2 ++){
+	if(dir2 != nu && dir2 != mu && dir2 != dir1){
+	  break;
+	}
+      }      
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2);
     }else{
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
     }
@@ -821,7 +840,18 @@ template<int mu, int nu, int odd_bit, int save_staple>
     
     /* load matrix C*/
     if(x[nu] == 0 && x[mu] == Z[mu] - 1){
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu);
+      int dir1, dir2;
+      for(dir1=0; dir1 < 4; dir1 ++){
+	if(dir1 != nu && dir1 != mu){
+	  break;
+	}
+      }
+      for(dir2=0; dir2 < 4; dir2 ++){
+	if(dir2 != nu && dir2 != mu && dir2 != dir1){
+	  break;
+	}
+      }      
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2);
     }else{
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
     }

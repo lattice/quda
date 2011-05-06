@@ -183,15 +183,13 @@ llfat_init(void)
 #ifdef MULTI_GPU
   exchange_cpu_sitelink(gaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, gaugeParam.cpu_prec);
     
-  int max_2d_face_size = MAX(xdim*ydim, xdim*zdim);
-  max_2d_face_size = MAX(max_2d_face_size, xdim*tdim);
-  max_2d_face_size = MAX(max_2d_face_size, ydim*zdim);  
-  max_2d_face_size = MAX(max_2d_face_size, ydim*tdim);  
-  max_2d_face_size = MAX(max_2d_face_size, zdim*tdim);  
-
-  int diag_ghost_size = 3*max_2d_face_size;
+  int Vh_2d_max = MAX(xdim*ydim/2, xdim*zdim/2);
+  Vh_2d_max = MAX(Vh_2d_max, xdim*tdim/2);
+  Vh_2d_max = MAX(Vh_2d_max, ydim*zdim/2);  
+  Vh_2d_max = MAX(Vh_2d_max, ydim*tdim/2);  
+  Vh_2d_max = MAX(Vh_2d_max, zdim*tdim/2);  
   
-  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + diag_ghost_size;
+  gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + 4*Vh_2d_max;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
   loadLinkToGPU(cudaSiteLink, sitelink, ghost_sitelink, ghost_sitelink_diag, &gaugeParam);

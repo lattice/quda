@@ -1,3 +1,4 @@
+#define MAX(a,b) ((a) > (b)?(a): (b))
 __constant__ int X1h;
 __constant__ int X2h;
 __constant__ int X1;
@@ -40,6 +41,8 @@ __constant__ int X4X3X1;
 __constant__ int X4X3X1h;
 __constant__ int X4X3X2;
 __constant__ int X4X3X2h;
+
+__constant__ int Vh_2d_max;
 
 __constant__ int X2X1_3;
 __constant__ int X3X2X1_3;
@@ -230,6 +233,13 @@ void initCommonConstants(const FullGauge gauge) {
 
   int X4X3X2X1hm3X3X2X1h = (X4-3)*X3*X2*X1h;
   cudaMemcpyToSymbol("X4X3X2X1hm3X3X2X1h", &X4X3X2X1hm3X3X2X1h, sizeof(int)); 
+  
+  int Vh_2d_max = MAX(X1*X2/2, X1*X3/2);
+  Vh_2d_max = MAX(Vh_2d_max, X1*X4/2);
+  Vh_2d_max = MAX(Vh_2d_max, X2*X3/2);
+  Vh_2d_max = MAX(Vh_2d_max, X2*X4/2);
+  Vh_2d_max = MAX(Vh_2d_max, X3*X4/2);
+  cudaMemcpyToSymbol("Vh_2d_max", &Vh_2d_max, sizeof(int));
 
   cudaMemcpyToSymbol("Pt0", &(qudaPt0), sizeof(bool)); 
   cudaMemcpyToSymbol("PtNm1", &(qudaPtNm1), sizeof(bool)); 

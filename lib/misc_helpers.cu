@@ -35,11 +35,11 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
   
   for(dir = 0; dir < 4; dir++){
 #ifdef MULTI_GPU
-      FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh+2*ghostV) + thread0_tid*gaugeSiteSize);   
+    FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh+ghostV) + thread0_tid*gaugeSiteSize);   
 #else
-      FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh) + thread0_tid*gaugeSiteSize);   
+    FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh) + thread0_tid*gaugeSiteSize);   
 #endif
-      for(j=0; j < gaugeSiteSize/2; j++){
+    for(j=0; j < gaugeSiteSize/2; j++){
 	  buf[j*blockDim.x + threadIdx.x] =  src_start[j*blockDim.x + threadIdx.x];
       }
       __syncthreads();
@@ -58,19 +58,19 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
 void 
 link_format_cpu_to_gpu(void* dst, void* src, 
 		       int reconstruct, int bytes, int Vh, int pad, 
-		       int Vsh_x, int Vsh_y, int Vsh_z,int Vsh_t, 
+		       int ghostV,
 		       QudaPrecision prec)
 {
   dim3 blockDim(BLOCKSIZE);
 #ifdef MULTI_GPU  
-  dim3 gridDim((Vh+2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t))/blockDim.x);
+  dim3 gridDim((Vh+ghostV)/blockDim.x);
 #else
   dim3 gridDim(Vh/blockDim.x);
 #endif
   //(Vh+2*Vsh) must be multipl of BLOCKSIZE or the kernel does not work
   //because the intermediae GPU data has stride=Vh+2*Vsh and the extra two
   //Vsh is occupied by the back and forward neighbor
-  if ((Vh+2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t)) % blockDim.x != 0){
+  if ((Vh+ghostV) % blockDim.x != 0){
     printf("ERROR: Vh(%d) is not multiple of blocksize(%d), exitting\n", Vh, blockDim.x);
     exit(1);
   }
@@ -79,13 +79,13 @@ link_format_cpu_to_gpu(void* dst, void* src,
   switch (prec){
   case QUDA_DOUBLE_PRECISION:
     do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, 
-						     Vsh_x+Vsh_y+Vsh_z+Vsh_t);
+						     ghostV);
     break;
     
   case QUDA_SINGLE_PRECISION:
     if(reconstruct == QUDA_RECONSTRUCT_NO){
       do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad,
-						       Vsh_x+Vsh_y+Vsh_z+Vsh_t);   
+						       ghostV);   
     }else if (reconstruct == QUDA_RECONSTRUCT_12){
       //not working yet
       //do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float4*)dst, (float*)src, reconstruct, bytes, Vh, pad, Vsh);   
