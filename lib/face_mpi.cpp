@@ -530,14 +530,14 @@ void exchange_cpu_sitelink(int* X,
 
 template<typename Float>
 void
-do_exchange_cpu_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sendbuf, Float* staple_back_sendbuf)
+do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_sendbuf, Float** staple_back_sendbuf)
 {
   
   int len = Vsh_t*gaugeSiteSize*sizeof(Float);
 
   Float* even_staple_back_src = staple;
   Float* odd_staple_back_src = staple + Vh*gaugeSiteSize;
-  Float* staple_back_dst = staple_back_sendbuf;
+  Float* staple_back_dst = staple_back_sendbuf[3];
   
   if(dims[3] % 2 == 0){    
     memcpy(staple_back_dst, even_staple_back_src, len);
@@ -551,7 +551,7 @@ do_exchange_cpu_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sen
   
   Float* even_staple_fwd_src = staple + (Vh - Vsh_t)*gaugeSiteSize;
   Float* odd_staple_fwd_src = staple + Vh*gaugeSiteSize + (Vh - Vsh_t)*gaugeSiteSize;
-  Float* staple_fwd_dst = staple_fwd_sendbuf;
+  Float* staple_fwd_dst = staple_fwd_sendbuf[3];
   if(dims[3] % 2 == 0){    
     memcpy(staple_fwd_dst, even_staple_fwd_src, len);
     memcpy(staple_fwd_dst + Vsh_t*gaugeSiteSize, odd_staple_fwd_src, len);
@@ -562,13 +562,13 @@ do_exchange_cpu_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sen
   }
   
   
-  Float* ghost_staple_back = ghost_staple;
-  Float* ghost_staple_fwd = ghost_staple + 2*Vsh_t*gaugeSiteSize;
+  Float* ghost_staple_back = ghost_staple[3];
+  Float* ghost_staple_fwd = ghost_staple[3] + 2*Vsh_t*gaugeSiteSize;
 
   unsigned long recv_request1 = comm_recv_with_tag(ghost_staple_back, 2*len, T_BACK_NBR, TUP);
   unsigned long recv_request2 = comm_recv_with_tag(ghost_staple_fwd, 2*len, T_FWD_NBR, TDOWN);
-  unsigned long send_request1 = comm_send_with_tag(staple_fwd_sendbuf, 2*len, T_FWD_NBR, TUP);
-  unsigned long send_request2 = comm_send_with_tag(staple_back_sendbuf, 2*len, T_BACK_NBR, TDOWN);
+  unsigned long send_request1 = comm_send_with_tag(staple_fwd_sendbuf[3], 2*len, T_FWD_NBR, TUP);
+  unsigned long send_request2 = comm_send_with_tag(staple_back_sendbuf[3], 2*len, T_BACK_NBR, TDOWN);
 
   comm_wait(recv_request1);
   comm_wait(recv_request2);
@@ -577,29 +577,37 @@ do_exchange_cpu_staple(Float* staple, Float* ghost_staple, Float* staple_fwd_sen
 }
 //this function is used for link fattening computation
 void exchange_cpu_staple(int* X,
-			 void* staple, void* ghost_staple,
+			 void* staple, void** ghost_staple,
 			 QudaPrecision gPrecision)
 {
   
   setup_dims(X);
 
-  void*  staple_fwd_sendbuf = malloc(Vs_t*gaugeSiteSize*gPrecision);
-  void*  staple_back_sendbuf = malloc(Vs_t*gaugeSiteSize*gPrecision);
-  if (staple_fwd_sendbuf == NULL|| staple_back_sendbuf == NULL){
-    printf("ERROR: malloc failed for staple_sendbuf/site_link_back_sendbuf\n");
-    exit(1);
+  int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
+  void*  staple_fwd_sendbuf[4];
+  void*  staple_back_sendbuf[4];
+
+  for(int i=0;i < 4; i++){
+    staple_fwd_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*gPrecision);
+    staple_back_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*gPrecision);
+    if (staple_fwd_sendbuf[i] == NULL|| staple_back_sendbuf[i] == NULL){
+      printf("ERROR: malloc failed for staple_sendbuf/site_link_back_sendbuf\n");
+      exit(1);
+    }
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
-    do_exchange_cpu_staple((double*)staple, (double*)ghost_staple, 
-		    (double*)staple_fwd_sendbuf, (double*)staple_back_sendbuf);
+    do_exchange_cpu_staple((double*)staple, (double**)ghost_staple, 
+			   (double**)staple_fwd_sendbuf, (double**)staple_back_sendbuf);
   }else{ //single
-    do_exchange_cpu_staple((float*)staple, (float*)ghost_staple, 
-		    (float*)staple_fwd_sendbuf, (float*)staple_back_sendbuf);
+    do_exchange_cpu_staple((float*)staple, (float**)ghost_staple, 
+			   (float**)staple_fwd_sendbuf, (float**)staple_back_sendbuf);
   }
   
-  free(staple_fwd_sendbuf);
-  free(staple_back_sendbuf);
+  for(int i=0;i < 4;i++){
+    free(staple_fwd_sendbuf[i]);
+    free(staple_back_sendbuf[i]);
+  }
 }
 
 

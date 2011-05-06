@@ -359,7 +359,7 @@ llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_p
 template<typename su3_matrix, typename Real>
 void 
 llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, 
-				  su3_matrix* mulink, su3_matrix* ghost_mulink, 
+				  su3_matrix* mulink, su3_matrix** ghost_mulink, 
 				  su3_matrix** sitelink, su3_matrix** ghost_sitelink, su3_matrix** ghost_sitelink_diag, 
 				  void** fatlink, Real coef,
 				  int use_staple) 
@@ -435,7 +435,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     su3_matrix* B;  
     if (use_staple){
       if (x4 + dx[3]  >= Z[3]){
-	B =  ghost_mulink + Vs_t + (1-oddBit)*Vsh_t + (x3*X2X1+x2*X1+x1)/2;
+	B =  ghost_mulink[3] + Vs_t + (1-oddBit)*Vsh_t + (x3*X2X1+x2*X1+x1)/2;
       }else{
 	nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);     
 	B = mulink + nbr_idx;
@@ -527,7 +527,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
     if (use_staple){
       nbr_idx = neighborIndexFullLattice_mg(i, dx[3], dx[2], dx[1], dx[0]);     
       if (x4 + dx[3]  < 0){
-	B =  ghost_mulink + (1-oddBit)*Vsh_t + nbr_idx;
+	B =  ghost_mulink[3] + (1-oddBit)*Vsh_t + nbr_idx;
       }else{
 	B = mulink + nbr_idx;
       }
@@ -614,17 +614,23 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
     exit(1);
   }
   
-  su3_matrix* ghost_staple = (su3_matrix*)malloc(2*Vs_t*sizeof(su3_matrix));
-  if (ghost_staple == NULL){
-    fprintf(stderr, "Error: malloc failed for ghost staple in function %s\n", __FUNCTION__);
-    exit(1);
-  }
+
+  su3_matrix* ghost_staple[4];
+  su3_matrix* ghost_staple1[4];
+
+  for(int i=0;i < 4;i++){
+    ghost_staple[i] = (su3_matrix*)malloc(2*Vs[i]*sizeof(su3_matrix));
+    if (ghost_staple[i] == NULL){
+      fprintf(stderr, "Error: malloc failed for ghost staple in function %s\n", __FUNCTION__);
+      exit(1);
+    }
     
-  su3_matrix* ghost_staple1 = (su3_matrix*)malloc(2*Vs_t*sizeof(su3_matrix));
-  if (ghost_staple1 == NULL){ 
-    fprintf(stderr, "Error: malloc failed for ghost staple in function %s\n", __FUNCTION__);
-    exit(1);
-  } 
+    ghost_staple1[i] = (su3_matrix*)malloc(2*Vs[i]*sizeof(su3_matrix));
+    if (ghost_staple1[i] == NULL){ 
+      fprintf(stderr, "Error: malloc failed for ghost staple1 in function %s\n", __FUNCTION__);
+      exit(1);
+    }     
+  }
 
   su3_matrix* tempmat1 = (su3_matrix *)malloc(V*sizeof(su3_matrix));
   if(tempmat1 == NULL){
@@ -649,13 +655,13 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
     for(int nu=XUP; nu<=TUP; nu++){
       if(nu!=dir){
 	llfat_compute_gen_staple_field_mg(staple,dir,nu,
-					  sitelink[dir], (su3_matrix*)NULL, 
+					  sitelink[dir], (su3_matrix**)NULL, 
 					  sitelink, ghost_sitelink, ghost_sitelink_diag, 
 					  fatlink, act_path_coeff[2], 0);	
 	/* The Lepage term */
 	/* Note this also involves modifying c_1 (above) */
 
-	exchange_cpu_staple(Z, staple, ghost_staple, prec);
+	exchange_cpu_staple(Z, staple, (void**)ghost_staple, prec);
 	
 	llfat_compute_gen_staple_field_mg((su3_matrix*)NULL,dir,nu,
 					  staple,ghost_staple, 
@@ -670,7 +676,7 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
 					       fatlink, act_path_coeff[3], 1);
 
 
-	    exchange_cpu_staple(Z, tempmat1, ghost_staple1, prec);
+	    exchange_cpu_staple(Z, tempmat1, (void**)ghost_staple1, prec);
 	    
 	    for(int sig=XUP; sig<=TUP; sig++){
 	      if((sig!=dir)&&(sig!=nu)&&(sig!=rho)){
@@ -691,10 +697,12 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
     }/* nu */
 	
   }/* dir */      
-
+  
   free(staple);
-  free(ghost_staple);
-  free(ghost_staple1);
+  for(int i=0;i < 4;i++){
+    free(ghost_staple[i]);
+    free(ghost_staple1[i]);
+  }
   free(tempmat1);
 
 }

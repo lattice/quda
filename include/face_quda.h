@@ -149,7 +149,7 @@ void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
 void exchange_gpu_staple_start(int* X, void* _cudaStaple, cudaStream_t * stream);
 void exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream);
 void exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream);
-void exchange_cpu_staple(int* X, void* staple, void* ghost_staple,
+void exchange_cpu_staple(int* X, void* staple, void** ghost_staple,
 			 QudaPrecision gPrecision);
 void 
 exchange_llfat_init(FullStaple* cudaStaple);
