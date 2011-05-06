@@ -34,6 +34,7 @@ extern "C" {
 		       void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream);
   void  unpackGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf, 
 			  void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream);
+  void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void** cpuGhostStapleFwd, int nFace, QudaPrecision precision);
   void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFwd, int nFace, QudaPrecision precision);
   void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir1, int dir2, QudaPrecision prec);
 #define freeLinkQuda freeGaugeField

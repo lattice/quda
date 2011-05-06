@@ -532,9 +532,10 @@ template<typename Float>
 void
 do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_sendbuf, Float** staple_back_sendbuf)
 {
-  
-  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
 
+
+#if 0  
+  int len = Vsh_t*gaugeSiteSize*sizeof(Float);
   Float* even_staple_back_src = staple;
   Float* odd_staple_back_src = staple + Vh*gaugeSiteSize;
   Float* staple_back_dst = staple_back_sendbuf[3];
@@ -560,20 +561,40 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
     memcpy(staple_fwd_dst, odd_staple_fwd_src, len);
     memcpy(staple_fwd_dst + Vsh_t*gaugeSiteSize, even_staple_fwd_src, len);
   }
-  
-  
-  Float* ghost_staple_back = ghost_staple[3];
-  Float* ghost_staple_fwd = ghost_staple[3] + 2*Vsh_t*gaugeSiteSize;
+#else
+  int nFace =1;
+  pack_ghost_all_staples_cpu(staple, (void**)staple_back_sendbuf, 
+			     (void**)staple_fwd_sendbuf,  nFace, (QudaPrecision)(sizeof(Float)));
 
-  unsigned long recv_request1 = comm_recv_with_tag(ghost_staple_back, 2*len, T_BACK_NBR, TUP);
-  unsigned long recv_request2 = comm_recv_with_tag(ghost_staple_fwd, 2*len, T_FWD_NBR, TDOWN);
-  unsigned long send_request1 = comm_send_with_tag(staple_fwd_sendbuf[3], 2*len, T_FWD_NBR, TUP);
-  unsigned long send_request2 = comm_send_with_tag(staple_back_sendbuf[3], 2*len, T_BACK_NBR, TDOWN);
-
-  comm_wait(recv_request1);
-  comm_wait(recv_request2);
-  comm_wait(send_request1);
-  comm_wait(send_request2);
+#endif  
+  
+  int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
+  int len[4] = {
+    Vsh_x*gaugeSiteSize*sizeof(Float),
+    Vsh_y*gaugeSiteSize*sizeof(Float),
+    Vsh_z*gaugeSiteSize*sizeof(Float),
+    Vsh_t*gaugeSiteSize*sizeof(Float)
+  };
+  
+  int fwd_neighbors[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
+  int back_neighbors[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
+  int up_tags[4] = {XUP, YUP, ZUP, TUP};
+  int down_tags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+  
+  for(int dir=0;dir < 4; dir++){
+    Float* ghost_staple_back = ghost_staple[dir];
+    Float* ghost_staple_fwd = ghost_staple[dir] + 2*Vsh[dir]*gaugeSiteSize;
+    
+    unsigned long recv_request1 = comm_recv_with_tag(ghost_staple_back, 2*len[dir], back_neighbors[dir], up_tags[dir]);
+    unsigned long recv_request2 = comm_recv_with_tag(ghost_staple_fwd, 2*len[dir], fwd_neighbors[dir], down_tags[dir]);
+    unsigned long send_request1 = comm_send_with_tag(staple_fwd_sendbuf[dir], 2*len[dir], fwd_neighbors[dir], up_tags[dir]);
+    unsigned long send_request2 = comm_send_with_tag(staple_back_sendbuf[dir], 2*len[dir], back_neighbors[dir], down_tags[dir]);
+    
+    comm_wait(recv_request1);
+    comm_wait(recv_request2);
+    comm_wait(send_request1);
+    comm_wait(send_request2);
+  }
 }
 //this function is used for link fattening computation
 void exchange_cpu_staple(int* X,

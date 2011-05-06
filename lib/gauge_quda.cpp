@@ -857,6 +857,125 @@ void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFw
   
 }
 
+
+
+
+template <typename Float>
+void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace) {
+  int XY=X[0]*X[1];
+  int XYZ=X[0]*X[1]*X[2];
+  //loop variables: a, b, c with a the most signifcant and c the least significant
+  //A, B, C the maximum value
+  //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
+  int A[4], B[4], C[4];
+  
+  //X dimension
+  A[0] = X[3]; B[0] = X[2]; C[0] = X[1];
+  
+  //Y dimension
+  A[1] = X[3]; B[1] = X[2]; C[1] = X[0];
+
+  //Z dimension
+  A[2] = X[3]; B[2] = X[1]; C[2] = X[0];
+
+  //T dimension
+  A[3] = X[2]; B[3] = X[1]; C[3] = X[0];
+
+
+  //multiplication factor to compute index in original cpu memory
+  int f[4][4]={
+    {XYZ,    XY, X[0],     1},
+    {XYZ,    XY,    1,  X[0]},
+    {XYZ,  X[0],    1,    XY},
+    { XY,  X[0],    1,   XYZ}
+  };
+  
+  
+  for(int ite = 0; ite < 2; ite++){
+    //ite == 0: back
+    //ite == 1: fwd
+    Float** dst;
+    if (ite == 0){
+      dst = cpuGhostBack;
+    }else{
+      dst = cpuGhostFwd;
+    }
+    
+    //collect back ghost staple
+    for(int dir =0; dir < 4; dir++){
+      int d;
+      int a,b,c;
+      
+      //ther is only one staple in the same location
+      for(int linkdir=0; linkdir < 1; linkdir ++){
+	Float* even_src = cpuStaple;
+	Float* odd_src = cpuStaple + volumeCB*gaugeSiteSize;
+
+	Float* even_dst;
+	Float* odd_dst;
+	
+	//switching odd and even ghost cpuLink when that dimension size is odd
+	//only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
+	if((X[dir] % 2 ==0) || (commDim(dir) == 1)){
+	  even_dst = dst[dir];
+	  odd_dst = even_dst + nFace*faceVolumeCB[dir]*gaugeSiteSize;	
+	}else{
+	  odd_dst = dst[dir];
+	  even_dst = dst[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;
+	}
+
+	int even_dst_index = 0;
+	int odd_dst_index = 0;
+	
+	int startd;
+	int endd; 
+	if(ite == 0){ //back
+	  startd = 0; 
+	  endd= nFace;
+	}else{//fwd
+	  startd = X[dir] - nFace;
+	  endd =X[dir];
+	}
+	for(d = startd; d < endd; d++){
+	  for(a = 0; a < A[dir]; a++){
+	    for(b = 0; b < B[dir]; b++){
+	      for(c = 0; c < C[dir]; c++){
+		int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
+		int oddness = (a+b+c+d)%2;
+		if (oddness == 0){ //even
+		  for(int i=0;i < 18;i++){
+		    even_dst[18*even_dst_index+i] = even_src[18*index + i];
+		  }
+		  even_dst_index++;
+		}else{ //odd
+		  for(int i=0;i < 18;i++){
+		    odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
+		  }
+		  odd_dst_index++;
+		}
+	      }//c
+	    }//b
+	  }//a
+	}//d
+	assert( even_dst_index == nFace*faceVolumeCB[dir]);
+	assert( odd_dst_index == nFace*faceVolumeCB[dir]);	
+      }//linkdir
+      
+    }//dir
+  }//ite
+}
+
+
+void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void** cpuGhostStapleFwd, int nFace, QudaPrecision precision) {
+  
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    packGhostAllStaples((double*)staple, (double**)cpuGhostStapleBack, (double**) cpuGhostStapleFwd, nFace);
+  } else {
+    packGhostAllStaples((float*)staple, (float**)cpuGhostStapleBack, (float**)cpuGhostStapleFwd, nFace);
+  }
+  
+}
+
 void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir1, int dir2, QudaPrecision prec)
 {
     /*
