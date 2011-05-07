@@ -616,7 +616,282 @@ collectGhostSpinor(void *in, const void *inNorm,
 }
 
 
+#define READ_ST_STAPLE(staple, idx, mystride)           \
+  Float2 P0 = staple[idx + 0*mystride];                 \
+  Float2 P1 = staple[idx + 1*mystride];                 \
+  Float2 P2 = staple[idx + 2*mystride];			\
+  Float2 P3 = staple[idx + 3*mystride];			\
+  Float2 P4 = staple[idx + 4*mystride];			\
+  Float2 P5 = staple[idx + 5*mystride];			\
+  Float2 P6 = staple[idx + 6*mystride];			\
+  Float2 P7 = staple[idx + 7*mystride];			\
+  Float2 P8 = staple[idx + 8*mystride];			
 
+#define WRITE_ST_STAPLE(staple, idx, mystride)		\
+  staple[idx + 0*mystride] = P0;                        \
+  staple[idx + 1*mystride] = P1;                        \
+  staple[idx + 2*mystride] = P2;			\
+  staple[idx + 3*mystride] = P3;			\
+  staple[idx + 4*mystride] = P4;			\
+  staple[idx + 5*mystride] = P5;			\
+  staple[idx + 6*mystride] = P6;			\
+  staple[idx + 7*mystride] = P7;			\
+  staple[idx + 8*mystride] = P8;			
+
+
+
+template<int dir, int whichway, typename Float2>
+  __global__ void
+  collectGhostStapleKernel(Float2* in, const int oddBit,
+			   Float2* nbr_staple_gpu)
+{
+
+  int sid = blockIdx.x*blockDim.x + threadIdx.x;
+  int z1 = FAST_INT_DIVIDE(sid, X1h);
+  int x1h = sid - z1*X1h;
+  int z2 = FAST_INT_DIVIDE(z1, X2);
+  int x2 = z1 - z2*X2;
+  int x4 = FAST_INT_DIVIDE(z2, X3);
+  int x3 = z2 - x4*X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+  //int X = 2*sid + x1odd;
+
+  READ_ST_STAPLE(in, sid, staple_stride);
+  int ghost_face_idx;
+  
+  if ( dir == 0 && whichway == QUDA_BACKWARDS){
+    if (x1 < 1){
+      ghost_face_idx = (x4*(X3*X2)+x3*X2 +x2)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X2/2);
+    }
+  }
+
+  if ( dir == 0 && whichway == QUDA_FORWARDS){
+    if (x1 >= X1 - 1){
+      ghost_face_idx = (x4*(X3*X2)+x3*X2 +x2)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X2/2);
+    }
+  }
+  
+  if ( dir == 1 && whichway == QUDA_BACKWARDS){
+    if (x2 < 1){
+      ghost_face_idx = (x4*X3*X1+x3*X1+x1)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X1/2);
+    }
+  }
+
+  if ( dir == 1 && whichway == QUDA_FORWARDS){
+    if (x2 >= X2 - 1){
+      ghost_face_idx = (x4*X3*X1+x3*X1+x1)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X1/2);
+    }
+  }
+
+  if ( dir == 2 && whichway == QUDA_BACKWARDS){
+    if (x3 < 1){
+      ghost_face_idx = (x4*X2*X1+x2*X1+x1)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X2*X1/2);
+    }
+  }
+
+  if ( dir == 2 && whichway == QUDA_FORWARDS){
+    if (x3 >= X3 - 1){
+      ghost_face_idx = (x4*X2*X1 + x2*X1 + x1)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X2*X1/2);
+    }
+  }
+
+  if ( dir == 3 && whichway == QUDA_BACKWARDS){
+    if (x4 < 1){
+      ghost_face_idx = (x3*X2*X1+x2*X1+x1)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X3*X2*X1/2);
+    }
+  }
+  
+  if ( dir == 3 && whichway == QUDA_FORWARDS){
+    if (x4 >= X4 - 1){
+      ghost_face_idx = (x3*X2*X1+x2*X1+x1)>>1;
+      WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X3*X2*X1/2);
+    }
+  }
+
+}
+
+
+//@dir can be 0, 1, 2, 3 (X,Y,Z,T directions)
+//@whichway can be QUDA_FORWARDS, QUDA_BACKWORDS
+void
+collectGhostStaple(FullStaple* cudaStaple, void* ghost_staple_gpu,		   
+		   int dir, int whichway, cudaStream_t* stream)
+{
+  int* X = cudaStaple->X;
+  int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+  
+  Vsh_x = X[1]*X[2]*X[3]/2;
+  Vsh_y = X[0]*X[2]*X[3]/2;
+  Vsh_z = X[0]*X[1]*X[3]/2;
+  Vsh_t = X[0]*X[1]*X[2]/2;  
+  
+  void* even = cudaStaple->even;
+  void* odd = cudaStaple->odd;
+  
+  dim3 gridDim(cudaStaple->volume/BLOCKSIZE, 1, 1);
+  dim3 blockDim(BLOCKSIZE, 1, 1);
+  int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
+  
+  printf("cudaStaple->volume =%d\n", cudaStaple->volume);
+  
+  
+  void* gpu_buf_even = ghost_staple_gpu;
+  void* gpu_buf_odd = ((char*)ghost_staple_gpu) + Vsh[dir]*gaugeSiteSize*cudaStaple->precision ;
+  if (X[dir] % 2 ==1){ //need switch even/odd
+    gpu_buf_odd = ghost_staple_gpu;
+    gpu_buf_even = ((char*)ghost_staple_gpu) + Vsh[dir]*gaugeSiteSize*cudaStaple->precision ;    
+  }
+
+  int even_parity = 0;
+  int odd_parity = 1;
+  
+  if (cudaStaple->precision == QUDA_DOUBLE_PRECISION){
+    switch(dir){
+    case 0:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+
+    case 1:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+      
+    case 2:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+      
+    case 3:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
+	collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;      
+    }
+  }else if(cudaStaple->precision == QUDA_SINGLE_PRECISION){
+   switch(dir){
+    case 0:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+
+    case 1:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+      
+    case 2:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+      
+    case 3:
+      switch(whichway){
+      case QUDA_BACKWARDS:
+	collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      case QUDA_FORWARDS:
+	collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
+	collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	break;
+      default:
+	errorQuda("Invalid whichway");
+	break;
+      }
+      break;
+   }
+  }else{
+    printf("ERROR: invalid  precision for %s\n", __FUNCTION__);
+    exit(1);
+  }
+
+  CUERR;
+}
 
 
 #undef gaugeSiteSize 

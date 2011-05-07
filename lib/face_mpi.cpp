@@ -278,6 +278,9 @@ static void* back_nbr_staple_cpu[4];
 static void* fwd_nbr_staple_sendbuf_cpu[4];
 static void* back_nbr_staple_sendbuf_cpu[4];
 
+static void* fwd_nbr_staple_gpu[4];
+static void* back_nbr_staple_gpu[4];
+
 static void* fwd_nbr_staple[4];
 static void* back_nbr_staple[4];
 static void* fwd_nbr_staple_sendbuf[4];
@@ -334,14 +337,17 @@ exchange_llfat_init(FullStaple* cudaStaple)
   QudaPrecision prec = cudaStaple->precision;
 
   for(int i=0;i < 4; i++){
+    cudaMalloc((void**)&fwd_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec);
+    cudaMalloc((void**)&back_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec);
+
     cudaMallocHost((void**)&fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);
     cudaMallocHost((void**)&back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);
 
-    cudaMallocHost((void**)&fwd_nbr_staple_sendbuf[i], Vs_t*gaugeSiteSize*prec);
-    cudaMallocHost((void**)&back_nbr_staple_sendbuf[i], Vs_t*gaugeSiteSize*prec);
+    cudaMallocHost((void**)&fwd_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec);
+    cudaMallocHost((void**)&back_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec);
   }
 
-
+  
   CUERR;
 
   for(int i=0;i < 4; i++){
@@ -646,58 +652,62 @@ void
 exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream)
 {
   setup_dims(X);
-  
+
+  int fwd_neighbors[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
+  int back_neighbors[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
+  int up_tags[4] = {XUP, YUP, ZUP, TUP};
+  int down_tags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;
   exchange_llfat_init(cudaStaple);
   
-  int len = Vs_t*gaugeSiteSize*cudaStaple->precision;
-  int normlen = Vs_t*sizeof(float);
-  
-  packGhostStaple(cudaStaple, fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, NULL, NULL, stream);
+  packGhostStaple(cudaStaple, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
+		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, NULL, NULL, stream);
   cudaStreamSynchronize(*stream);
   
-
-  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu[3], len, T_BACK_NBR, TUP);
-  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu[3], len, T_FWD_NBR, TDOWN);
-  
-  memcpy(fwd_nbr_staple_sendbuf_cpu[3], fwd_nbr_staple_sendbuf[3], len);
-  memcpy(back_nbr_staple_sendbuf_cpu[3], back_nbr_staple_sendbuf[3], len);
-
-  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[3], len, T_FWD_NBR,  TUP);
-  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[3], len, T_BACK_NBR ,TDOWN);
-
-  unsigned long recv_request3 = 0;
-  unsigned long recv_request4 = 0;
-  unsigned long send_request3 = 0;
-  unsigned long send_request4 = 0;
-  
-  if (cudaStaple->precision == QUDA_HALF_PRECISION){
-    //FIXME: half precision not suppported yet
-    /*
-      recv_request3 = comm_recv(b_norm, normlen, BACK_NBR);
-      recv_request4 = comm_recv(f_norm, normlen, FWD_NBR);
-      send_request3 = comm_send(f_norm_sendbuf, normlen, FWD_NBR);
-      send_request4 = comm_send(b_norm_sendbuf, normlen, BACK_NBR);
-    */
+  for(int i=0; i < 4; i++){
+    int len = Vs[i]*gaugeSiteSize*cudaStaple->precision;
+    int normlen = Vs[i]*sizeof(float);
+    
+    unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu[i], len, back_neighbors[i], up_tags[i]);
+    unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu[i], len, fwd_neighbors[i], down_tags[i]);
+    
+    memcpy(fwd_nbr_staple_sendbuf_cpu[i], fwd_nbr_staple_sendbuf[i], len);
+    memcpy(back_nbr_staple_sendbuf_cpu[i], back_nbr_staple_sendbuf[i], len);
+    
+    unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i]);
+    unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[i], len, back_neighbors[i] ,down_tags[i]);
+    
+    unsigned long recv_request3 = 0;
+    unsigned long recv_request4 = 0;
+    unsigned long send_request3 = 0;
+    unsigned long send_request4 = 0;
+    
+    if (cudaStaple->precision == QUDA_HALF_PRECISION){
+      //FIXME: half precision not suppported yet
+      /*
+	recv_request3 = comm_recv(b_norm, normlen, BACK_NBR);
+	recv_request4 = comm_recv(f_norm, normlen, FWD_NBR);
+	send_request3 = comm_send(f_norm_sendbuf, normlen, FWD_NBR);
+	send_request4 = comm_send(b_norm_sendbuf, normlen, BACK_NBR);
+      */
+    }
+           
+    comm_wait(recv_request1);
+    comm_wait(recv_request2);  
+    comm_wait(send_request1);
+    comm_wait(send_request2);
+    
+    if (cudaStaple->precision == QUDA_HALF_PRECISION){
+      comm_wait(recv_request3);
+      comm_wait(recv_request4);
+      comm_wait(send_request3);
+      comm_wait(send_request4);
+    }
+    
+    memcpy(fwd_nbr_staple[i], fwd_nbr_staple_cpu[i], len);
+    memcpy(back_nbr_staple[i], back_nbr_staple_cpu[i], len);
   }
-  
-  
-  
-  comm_wait(recv_request1);
-  comm_wait(recv_request2);  
-  comm_wait(send_request1);
-  comm_wait(send_request2);
-  
-  if (cudaStaple->precision == QUDA_HALF_PRECISION){
-    comm_wait(recv_request3);
-    comm_wait(recv_request4);
-    comm_wait(send_request3);
-    comm_wait(send_request4);
-  }
-  
-  memcpy(fwd_nbr_staple[3], fwd_nbr_staple_cpu[3], len);
-  memcpy(back_nbr_staple[3], back_nbr_staple_cpu[3], len);
-
   unpackGhostStaple(cudaStaple, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
   cudaStreamSynchronize(*stream);
 }
@@ -709,59 +719,66 @@ exchange_gpu_staple_start(int* X, void* _cudaStaple, cudaStream_t * stream)
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;
   exchange_llfat_init(cudaStaple);
   
-  packGhostStaple(cudaStaple, fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, NULL, NULL, stream);
+  packGhostStaple(cudaStaple, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
+		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, NULL, NULL, stream);
 }
 
 void
 exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream)
 {
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;  
-  int len = Vs_t*gaugeSiteSize*cudaStaple->precision;
-  int normlen = Vs_t*sizeof(float);
-  
+
+  int fwd_neighbors[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
+  int back_neighbors[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
+  int up_tags[4] = {XUP, YUP, ZUP, TUP};
+  int down_tags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+
   cudaStreamSynchronize(*stream);  
-
-  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu[3], len, T_BACK_NBR, TUP);
-  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu[3], len, T_FWD_NBR, TDOWN);
-
-  memcpy(fwd_nbr_staple_sendbuf_cpu[3], fwd_nbr_staple_sendbuf[3], len);
-  memcpy(back_nbr_staple_sendbuf_cpu[3], back_nbr_staple_sendbuf[3], len);
-
-  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[3], len, T_FWD_NBR,  TUP);
-  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[3], len, T_BACK_NBR ,TDOWN);
-
-  unsigned long recv_request3 = 0;
-  unsigned long recv_request4 = 0;
-  unsigned long send_request3 = 0;
-  unsigned long send_request4 = 0;
   
-  if (cudaStaple->precision == QUDA_HALF_PRECISION){
-    //FIXME: half precisiono not supported yet
-    /*
-    recv_request3 = comm_recv(b_norm, normlen, BACK_NBR);
-    recv_request4 = comm_recv(f_norm, normlen, FWD_NBR);
-    send_request3 = comm_send(f_norm_sendbuf, normlen, FWD_NBR);
-    send_request4 = comm_send(b_norm_sendbuf, normlen, BACK_NBR);
-    */
+  for(int i=0; i < 4; i++){
+    int len = Vs[i]*gaugeSiteSize*cudaStaple->precision;
+    int normlen = Vs[i]*sizeof(float);
+       
+    unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu[i], len, back_neighbors[i], up_tags[i]);
+    unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu[i], len, fwd_neighbors[i], down_tags[i]);
+    
+    memcpy(fwd_nbr_staple_sendbuf_cpu[i], fwd_nbr_staple_sendbuf[i], len);
+    memcpy(back_nbr_staple_sendbuf_cpu[i], back_nbr_staple_sendbuf[i], len);
+    
+    unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i]);
+    unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[i], len, back_neighbors[i] ,down_tags[i]);
+    
+    unsigned long recv_request3 = 0;
+    unsigned long recv_request4 = 0;
+    unsigned long send_request3 = 0;
+    unsigned long send_request4 = 0;
+    
+    if (cudaStaple->precision == QUDA_HALF_PRECISION){
+      //FIXME: half precisiono not supported yet
+      /*
+	recv_request3 = comm_recv(b_norm, normlen, BACK_NBR);
+	recv_request4 = comm_recv(f_norm, normlen, FWD_NBR);
+	send_request3 = comm_send(f_norm_sendbuf, normlen, FWD_NBR);
+	send_request4 = comm_send(b_norm_sendbuf, normlen, BACK_NBR);
+      */
+    }        
+    
+    comm_wait(recv_request1);
+    comm_wait(recv_request2);  
+    comm_wait(send_request1);
+    comm_wait(send_request2);
+    
+    if (cudaStaple->precision == QUDA_HALF_PRECISION){
+      comm_wait(recv_request3);
+      comm_wait(recv_request4);
+      comm_wait(send_request3);
+      comm_wait(send_request4);
+    }
+    
+    memcpy(fwd_nbr_staple[i], fwd_nbr_staple_cpu[i], len);
+    memcpy(back_nbr_staple[i], back_nbr_staple_cpu[i], len);
+    
   }
-  
-  
-  
-  comm_wait(recv_request1);
-  comm_wait(recv_request2);  
-  comm_wait(send_request1);
-  comm_wait(send_request2);
-  
-  if (cudaStaple->precision == QUDA_HALF_PRECISION){
-    comm_wait(recv_request3);
-    comm_wait(recv_request4);
-    comm_wait(send_request3);
-    comm_wait(send_request4);
-  }
-  
-  memcpy(fwd_nbr_staple[3], fwd_nbr_staple_cpu[3], len);
-  memcpy(back_nbr_staple[3], back_nbr_staple_cpu[3], len);
-
   unpackGhostStaple(cudaStaple, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
   cudaStreamSynchronize(*stream);
 }
@@ -770,6 +787,17 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream)
 static void
 exchange_llfat_cleanup(void)
 {
+  
+  for(int i=0;i < 4; i++){
+    if(fwd_nbr_staple_gpu[i]){
+      cudaFree(fwd_nbr_staple_gpu[i]); fwd_nbr_staple_gpu[i] =NULL;
+    }      
+    if(back_nbr_staple_gpu[i]){
+      cudaFree(back_nbr_staple_gpu[i]);back_nbr_staple_gpu[i] = NULL;
+    }
+
+  }
+
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_cpu[i]){
       free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] =NULL;

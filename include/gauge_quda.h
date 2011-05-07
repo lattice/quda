@@ -30,7 +30,8 @@ extern "C" {
   void freeMomQuda(FullMom *cudaMom);
   void storeMomToCPU(void* mom, FullMom cudaMom, QudaGaugeParam* param);
   void loadMomToGPU(FullMom cudaMom, void* mom, QudaGaugeParam* param);
-  void packGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_buf, 
+  void packGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf_gpu, void** back_nbr_buf_gpu, 
+		       void** fwd_nbr_buf, void** back_nbr_buf, 
 		       void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream);
   void  unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_buf, 
 			  void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream);

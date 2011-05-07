@@ -205,9 +205,6 @@
   mc##22_im = ma##22_im + mb##22_im;		
 
 
-__constant__ int site_ga_stride;
-__constant__ int staple_stride;
-__constant__ int llfat_ga_stride;
 
 void
 llfat_init_cuda(QudaGaugeParam* param)

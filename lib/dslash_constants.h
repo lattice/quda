@@ -89,6 +89,12 @@ __constant__ bool PtNm1;
 __constant__ double tProjScale;
 __constant__ float tProjScale_f;
 
+//for link fattening code
+__constant__ int site_ga_stride;
+__constant__ int staple_stride;
+__constant__ int llfat_ga_stride;
+
+
 int initDslash = 0;
 int initClover = 0;
 int initDomainWall = 0;
