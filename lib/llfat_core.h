@@ -390,16 +390,16 @@
 #define LLFAT_COMPUTE_NEW_IDX_PLUS_TEST(mydir, idx) do {                     \
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_mem_idx = ( (x1==X1m1)?idx-X1m1:idx+1)>>1;                    \
+      new_mem_idx = (x1==X1m1)?Vh+Vsh_x+spacecon_x:(idx+1)>>1;		\
       break;                                                            \
     case 1:                                                             \
-      new_mem_idx = ( (x2==X2m1)?idx-X2X1mX1:idx+X1)>>1;                \
+      new_mem_idx = (x2==X2m1)?Vh+2*Vsh_x+Vsh_y+spacecon_y:(idx+X1)>>1; \
       break;                                                            \
     case 2:                                                             \
-      new_mem_idx = ( (x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1)>>1;          \
+      new_mem_idx = (x3==X3m1)?Vh+2*(Vsh_x+Vsh_y)+Vsh_z+spacecon_z:(idx+X2X1)>>1; \
       break;                                                            \
     case 3:                                                             \
-      new_mem_idx = ( (x4==X4m1)? Vh+Vsh+(offset>>1): (idx+X3X2X1)>>1);	\
+      new_mem_idx = (x4==X4m1)? Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+spacecon_t: (idx+X3X2X1)>>1; \
       break;                                                            \
     }                                                                   \
   }while(0)
@@ -408,16 +408,16 @@
 #define LLFAT_COMPUTE_NEW_IDX_MINUS_TEST(mydir, idx) do {		\
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_mem_idx = ( (x1==0)?idx+X1m1:idx-1) >> 1;                     \
+      new_mem_idx = (x1==0)?Vh+spacecon_x:((idx-1)>> 1);		\
       break;                                                            \
     case 1:                                                             \
-      new_mem_idx = ( (x2==0)?idx+X2X1mX1:idx-X1) >> 1;                 \
+      new_mem_idx = (x2==0)?Vh+2*Vsh_x+spacecon_y:((idx-X1)>> 1);	\
       break;                                                            \
     case 2:                                                             \
-      new_mem_idx = ( (x3==0)?idx+X3X2X1mX2X1:idx-X2X1) >> 1;           \
+      new_mem_idx = (x3==0)?Vh+2*(Vsh_x+Vsh_y)+spacecon_z:((idx-X2X1) >> 1); \
       break;                                                            \
     case 3:                                                             \
-      new_mem_idx = (x4==0)?Vh+ (offset>>1):((idx-X3X2X1) >> 1);	\
+      new_mem_idx = (x4==0)?Vh+ 2*(Vsh_x+Vsh_y+Vsh_z)+spacecon_t:((idx-X3X2X1) >> 1); \
       break;                                                            \
     }                                                                   \
   }while(0)

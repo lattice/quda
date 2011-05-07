@@ -739,10 +739,7 @@ collectGhostStaple(FullStaple* cudaStaple, void* ghost_staple_gpu,
   dim3 gridDim(cudaStaple->volume/BLOCKSIZE, 1, 1);
   dim3 blockDim(BLOCKSIZE, 1, 1);
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
-  
-  printf("cudaStaple->volume =%d\n", cudaStaple->volume);
-  
-  
+    
   void* gpu_buf_even = ghost_staple_gpu;
   void* gpu_buf_odd = ((char*)ghost_staple_gpu) + Vsh[dir]*gaugeSiteSize*cudaStaple->precision ;
   if (X[dir] % 2 ==1){ //need switch even/odd

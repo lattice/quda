@@ -1566,8 +1566,8 @@ unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_bu
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
 
   //FIXME: ignore half precision for now  
-  void* even = cudaStaple->even;
-  void* odd = cudaStaple->odd;
+  char* even = (char*)cudaStaple->even;
+  char* odd = (char*)cudaStaple->odd;
   int Vh = cudaStaple->volume;
   //int Vsh = cudaStaple->X[0]*cudaStaple->X[1]*cudaStaple->X[2]/2;
   int prec= cudaStaple->precision;
@@ -1579,29 +1579,39 @@ unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_bu
     Vsh_t*sizeOfFloatN 
   };
   
-  for(int dir=3; dir < 4; dir++){
+  int tmpint[4] = {
+    0,
+    Vsh_x, 
+    Vsh_x + Vsh_y, 
+    Vsh_x + Vsh_y + Vsh_z, 
+  };
+  
+  for(int dir=0; dir < 4; dir++){
+    even = ((char*)cudaStaple->even) + Vh*sizeOfFloatN + 2*tmpint[dir]*sizeOfFloatN;
+    odd = ((char*)cudaStaple->odd) + Vh*sizeOfFloatN +2*tmpint[dir]*sizeOfFloatN;
+    
     //back,even
     for(int i=0;i < 9; i++){
-      void* dst = ((char*)even) + Vh*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+      void* dst = even + i*cudaStaple->stride*sizeOfFloatN;
       void* src = ((char*)back_nbr_buf[dir]) + i*len[dir] ; 
       cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
     }
     //back, odd
     for(int i=0;i < 9; i++){
-      void* dst = ((char*)odd) + Vh*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+      void* dst = odd + i*cudaStaple->stride*sizeOfFloatN;
       void* src = ((char*)back_nbr_buf[dir]) + 9*len[dir] + i*len[dir] ; 
       cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
     }
     
     //fwd,even
     for(int i=0;i < 9; i++){
-      void* dst = ((char*)even) + (Vh+Vsh[dir])*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+      void* dst = even + Vsh[dir]*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
       void* src = ((char*)fwd_nbr_buf[dir]) + i*len[dir] ; 
       cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
     }
     //fwd, odd
     for(int i=0;i < 9; i++){
-      void* dst = ((char*)odd) + (Vh+Vsh[dir])*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
+      void* dst = odd + Vsh[dir]*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
       void* src = ((char*)fwd_nbr_buf[dir]) + 9*len[dir] + i*len[dir] ; 
       cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
     }
