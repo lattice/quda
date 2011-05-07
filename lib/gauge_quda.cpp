@@ -1446,7 +1446,7 @@ freeStapleQuda(FullStaple *cudaStaple)
     cudaStaple->odd = NULL;
 }
 void
-packGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
+packGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_buf,
 		void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream)
 {
   //FIXME: ignore half precision for now
@@ -1463,26 +1463,26 @@ packGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
   if(cudaStaple->X[3] %2 == 0){
   //back,even
   for(i=0;i < 9; i++){
-    void* dst = ((char*)back_nbr_buf) + i*len ; 
+    void* dst = ((char*)back_nbr_buf[3]) + i*len ; 
     void* src = ((char*)even) + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
   //back, odd
   for(i=0;i < 9; i++){
-    void* dst = ((char*)back_nbr_buf) + 9*len + i*len ; 
+    void* dst = ((char*)back_nbr_buf[3]) + 9*len + i*len ; 
     void* src = ((char*)odd) + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
 
   //fwd,even
   for(i=0;i < 9; i++){
-    void* dst = ((char*)fwd_nbr_buf) + i*len ; 
+    void* dst = ((char*)fwd_nbr_buf[3]) + i*len ; 
     void* src = ((char*)even) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
   //fwd, odd
   for(i=0;i < 9; i++){
-    void* dst = ((char*)fwd_nbr_buf) + 9*len + i*len ; 
+    void* dst = ((char*)fwd_nbr_buf[3]) + 9*len + i*len ; 
     void* src = ((char*)odd) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
@@ -1490,26 +1490,26 @@ packGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
    //reverse even and odd position
   //back,odd
   for(i=0;i < 9; i++){
-    void* dst = ((char*)back_nbr_buf) + i*len ; 
+    void* dst = ((char*)back_nbr_buf[3]) + i*len ; 
     void* src = ((char*)odd) + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
   //back, even
   for(i=0;i < 9; i++){
-    void* dst = ((char*)back_nbr_buf) + 9*len + i*len ; 
+    void* dst = ((char*)back_nbr_buf[3]) + 9*len + i*len ; 
     void* src = ((char*)even) + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
 
   //fwd,odd
   for(i=0;i < 9; i++){
-    void* dst = ((char*)fwd_nbr_buf) + i*len ; 
+    void* dst = ((char*)fwd_nbr_buf[3]) + i*len ; 
     void* src = ((char*)odd) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
   //fwd, even
   for(i=0;i < 9; i++){
-    void* dst = ((char*)fwd_nbr_buf) + 9*len + i*len ; 
+    void* dst = ((char*)fwd_nbr_buf[3]) + 9*len + i*len ; 
     void* src = ((char*)even) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
     cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
   }
@@ -1521,7 +1521,7 @@ packGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
 
 
 void 
-unpackGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
+unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_buf,
 		  void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream)
 {
   //FIXME: ignore half precision for now  
@@ -1537,26 +1537,26 @@ unpackGhostStaple(FullStaple* cudaStaple, void* fwd_nbr_buf, void* back_nbr_buf,
   //back,even
   for(i=0;i < 9; i++){
     void* dst = ((char*)even) + Vh*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
-    void* src = ((char*)back_nbr_buf) + i*len ; 
+    void* src = ((char*)back_nbr_buf[3]) + i*len ; 
     cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
   }
   //back, odd
   for(i=0;i < 9; i++){
     void* dst = ((char*)odd) + Vh*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
-    void* src = ((char*)back_nbr_buf) + 9*len + i*len ; 
+    void* src = ((char*)back_nbr_buf[3]) + 9*len + i*len ; 
     cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
   }
   
   //fwd,even
   for(i=0;i < 9; i++){
     void* dst = ((char*)even) + (Vh+Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
-    void* src = ((char*)fwd_nbr_buf) + i*len ; 
+    void* src = ((char*)fwd_nbr_buf[3]) + i*len ; 
     cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
   }
   //fwd, odd
   for(i=0;i < 9; i++){
     void* dst = ((char*)odd) + (Vh+Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
-    void* src = ((char*)fwd_nbr_buf) + 9*len + i*len ; 
+    void* src = ((char*)fwd_nbr_buf[3]) + 9*len + i*len ; 
     cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, *stream); CUERR;
   }
   

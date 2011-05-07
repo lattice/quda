@@ -273,15 +273,15 @@ void commBarrier() { comm_barrier(); }
 
 #define gaugeSiteSize 18
 
-static void* fwd_nbr_staple_cpu = NULL;
-static void* back_nbr_staple_cpu = NULL;
-static void* fwd_nbr_staple_sendbuf_cpu = NULL;
-static void* back_nbr_staple_sendbuf_cpu = NULL;
+static void* fwd_nbr_staple_cpu[4];
+static void* back_nbr_staple_cpu[4];
+static void* fwd_nbr_staple_sendbuf_cpu[4];
+static void* back_nbr_staple_sendbuf_cpu[4];
 
-static void* fwd_nbr_staple = NULL;
-static void* back_nbr_staple = NULL;
-static void* fwd_nbr_staple_sendbuf = NULL;
-static void* back_nbr_staple_sendbuf = NULL;
+static void* fwd_nbr_staple[4];
+static void* back_nbr_staple[4];
+static void* fwd_nbr_staple_sendbuf[4];
+static void* back_nbr_staple_sendbuf[4];
 
 static int dims[4];
 static int X1,X2,X3,X4;
@@ -333,25 +333,34 @@ exchange_llfat_init(FullStaple* cudaStaple)
   
   QudaPrecision prec = cudaStaple->precision;
 
-  cudaMallocHost((void**)&fwd_nbr_staple, Vs_t*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&back_nbr_staple, Vs_t*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&fwd_nbr_staple_sendbuf, Vs_t*gaugeSiteSize*prec);
-  cudaMallocHost((void**)&back_nbr_staple_sendbuf, Vs_t*gaugeSiteSize*prec);
+  for(int i=0;i < 4; i++){
+    cudaMallocHost((void**)&fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);
+    cudaMallocHost((void**)&back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);
+
+    cudaMallocHost((void**)&fwd_nbr_staple_sendbuf[i], Vs_t*gaugeSiteSize*prec);
+    cudaMallocHost((void**)&back_nbr_staple_sendbuf[i], Vs_t*gaugeSiteSize*prec);
+  }
+
 
   CUERR;
 
-  fwd_nbr_staple_cpu = malloc(Vs_t*gaugeSiteSize*prec);
-  back_nbr_staple_cpu = malloc(Vs_t*gaugeSiteSize*prec);
-  if (fwd_nbr_staple_cpu == NULL||back_nbr_staple_cpu == NULL){
-    printf("ERROR: malloc failed for fwd_nbr_staple/back_nbr_staple\n");
-    comm_exit(1);
+  for(int i=0;i < 4; i++){
+    fwd_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    back_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    if (fwd_nbr_staple_cpu[i] == NULL||back_nbr_staple_cpu[i] == NULL){
+      printf("ERROR: malloc failed for fwd_nbr_staple_cpu/back_nbr_staple_cpu\n");
+      comm_exit(1);
+    }
+
   }
-  
-  fwd_nbr_staple_sendbuf_cpu = malloc(Vs_t*gaugeSiteSize*prec);
-  back_nbr_staple_sendbuf_cpu = malloc(Vs_t*gaugeSiteSize*prec);
-  if (fwd_nbr_staple_sendbuf_cpu == NULL || back_nbr_staple_sendbuf_cpu == NULL){
-    printf("ERROR: malloc failed for fwd_nbr_staple_sendbuf/back_nbr_staple_sendbuf\n");
-    comm_exit(1);
+
+  for(int i=0;i < 4; i++){
+    fwd_nbr_staple_sendbuf_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    back_nbr_staple_sendbuf_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    if (fwd_nbr_staple_sendbuf_cpu[i] == NULL || back_nbr_staple_sendbuf_cpu[i] == NULL){
+      printf("ERROR: malloc failed for fwd_nbr_staple_sendbuf/back_nbr_staple_sendbuf\n");
+      comm_exit(1);
+    }
   }
   
   return;
@@ -648,14 +657,14 @@ exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream)
   cudaStreamSynchronize(*stream);
   
 
-  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu, len, T_BACK_NBR, TUP);
-  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu, len, T_FWD_NBR, TDOWN);
+  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu[3], len, T_BACK_NBR, TUP);
+  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu[3], len, T_FWD_NBR, TDOWN);
   
-  memcpy(fwd_nbr_staple_sendbuf_cpu, fwd_nbr_staple_sendbuf, len);
-  memcpy(back_nbr_staple_sendbuf_cpu, back_nbr_staple_sendbuf, len);
+  memcpy(fwd_nbr_staple_sendbuf_cpu[3], fwd_nbr_staple_sendbuf[3], len);
+  memcpy(back_nbr_staple_sendbuf_cpu[3], back_nbr_staple_sendbuf[3], len);
 
-  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu, len, T_FWD_NBR,  TUP);
-  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu, len, T_BACK_NBR ,TDOWN);
+  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[3], len, T_FWD_NBR,  TUP);
+  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[3], len, T_BACK_NBR ,TDOWN);
 
   unsigned long recv_request3 = 0;
   unsigned long recv_request4 = 0;
@@ -686,8 +695,8 @@ exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream)
     comm_wait(send_request4);
   }
   
-  memcpy(fwd_nbr_staple, fwd_nbr_staple_cpu, len);
-  memcpy(back_nbr_staple, back_nbr_staple_cpu, len);
+  memcpy(fwd_nbr_staple[3], fwd_nbr_staple_cpu[3], len);
+  memcpy(back_nbr_staple[3], back_nbr_staple_cpu[3], len);
 
   unpackGhostStaple(cudaStaple, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
   cudaStreamSynchronize(*stream);
@@ -712,14 +721,14 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream)
   
   cudaStreamSynchronize(*stream);  
 
-  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu, len, T_BACK_NBR, TUP);
-  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu, len, T_FWD_NBR, TDOWN);
+  unsigned long recv_request1 = comm_recv_with_tag(back_nbr_staple_cpu[3], len, T_BACK_NBR, TUP);
+  unsigned long recv_request2 = comm_recv_with_tag(fwd_nbr_staple_cpu[3], len, T_FWD_NBR, TDOWN);
 
-  memcpy(fwd_nbr_staple_sendbuf_cpu, fwd_nbr_staple_sendbuf, len);
-  memcpy(back_nbr_staple_sendbuf_cpu, back_nbr_staple_sendbuf, len);
+  memcpy(fwd_nbr_staple_sendbuf_cpu[3], fwd_nbr_staple_sendbuf[3], len);
+  memcpy(back_nbr_staple_sendbuf_cpu[3], back_nbr_staple_sendbuf[3], len);
 
-  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu, len, T_FWD_NBR,  TUP);
-  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu, len, T_BACK_NBR ,TDOWN);
+  unsigned long send_request1= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[3], len, T_FWD_NBR,  TUP);
+  unsigned long send_request2 = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[3], len, T_BACK_NBR ,TDOWN);
 
   unsigned long recv_request3 = 0;
   unsigned long recv_request4 = 0;
@@ -750,8 +759,8 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream)
     comm_wait(send_request4);
   }
   
-  memcpy(fwd_nbr_staple, fwd_nbr_staple_cpu, len);
-  memcpy(back_nbr_staple, back_nbr_staple_cpu, len);
+  memcpy(fwd_nbr_staple[3], fwd_nbr_staple_cpu[3], len);
+  memcpy(back_nbr_staple[3], back_nbr_staple_cpu[3], len);
 
   unpackGhostStaple(cudaStaple, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
   cudaStreamSynchronize(*stream);
@@ -761,29 +770,38 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream)
 static void
 exchange_llfat_cleanup(void)
 {
-  if(fwd_nbr_staple_cpu){
-    free(fwd_nbr_staple_cpu); fwd_nbr_staple_cpu =NULL;
-  }      
-  if(back_nbr_staple_cpu){
-    free(back_nbr_staple_cpu);back_nbr_staple_cpu = NULL;
+  for(int i=0;i < 4; i++){
+    if(fwd_nbr_staple_cpu[i]){
+      free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] =NULL;
+    }      
+    if(back_nbr_staple_cpu[i]){
+      free(back_nbr_staple_cpu[i]);back_nbr_staple_cpu[i] = NULL;
+    }
   }
-  if(fwd_nbr_staple_sendbuf_cpu){
-    free(fwd_nbr_staple_sendbuf_cpu); fwd_nbr_staple_sendbuf_cpu = NULL;
+  for(int i=0;i < 4; i++){
+    if(fwd_nbr_staple_sendbuf_cpu[i]){
+      free(fwd_nbr_staple_sendbuf_cpu[i]); fwd_nbr_staple_sendbuf_cpu[i] = NULL;
+    }
+    if(back_nbr_staple_sendbuf_cpu[i]){
+      free(back_nbr_staple_sendbuf_cpu[i]); back_nbr_staple_sendbuf_cpu[i] = NULL;
+    }    
   }
-  if(back_nbr_staple_sendbuf_cpu){
-    free(back_nbr_staple_sendbuf_cpu); back_nbr_staple_sendbuf_cpu = NULL;
-  }    
-  if(fwd_nbr_staple){
-    cudaFreeHost(fwd_nbr_staple); fwd_nbr_staple = NULL;
+  for(int i=0;i < 4; i++){
+    if(fwd_nbr_staple[i]){
+      cudaFreeHost(fwd_nbr_staple[i]); fwd_nbr_staple[i] = NULL;
+    }
+    if(back_nbr_staple[i]){
+      cudaFreeHost(back_nbr_staple[i]); back_nbr_staple[i] = NULL;
+    }
   }
-  if(back_nbr_staple){
-    cudaFreeHost(back_nbr_staple); back_nbr_staple = NULL;
-  }
-  if(fwd_nbr_staple_sendbuf){
-    cudaFreeHost(fwd_nbr_staple_sendbuf); fwd_nbr_staple_sendbuf = NULL;
-  }
-  if(back_nbr_staple_sendbuf){
-    cudaFreeHost(back_nbr_staple_sendbuf); back_nbr_staple_sendbuf = NULL;
+  
+  for(int i=0;i < 4; i++){
+    if(fwd_nbr_staple_sendbuf[i]){
+      cudaFreeHost(fwd_nbr_staple_sendbuf[i]); fwd_nbr_staple_sendbuf[i] = NULL;
+    }
+    if(back_nbr_staple_sendbuf[i]){
+      cudaFreeHost(back_nbr_staple_sendbuf[i]); back_nbr_staple_sendbuf[i] = NULL;
+    }
   }
 
 }
