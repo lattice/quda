@@ -718,7 +718,6 @@ template <typename Float>
 void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace) {
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
-  printf("XY=%d, XYZ=%d\n", XY,XYZ); 
   //loop variables: a, b, c with a the most signifcant and c the least significant
   //A, B, C the maximum value
   //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
