@@ -143,16 +143,22 @@ class FaceBuffer {
 
 };
 
-void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
-			   void** ghost_sitelink_diag, 
-			   QudaPrecision gPrecision); 
-void exchange_gpu_staple_start(int* X, void* _cudaStaple, cudaStream_t * stream);
-void exchange_gpu_staple_wait(int* X, void* _cudaStaple, cudaStream_t * stream);
-void exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream);
-void exchange_cpu_staple(int* X, void* staple, void** ghost_staple,
-			 QudaPrecision gPrecision);
-void 
-exchange_llfat_init(FullStaple* cudaStaple);
+#ifdef __cplusplus
+extern "C" {
+#endif
+  void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
+			     void** ghost_sitelink_diag, 
+			     QudaPrecision gPrecision); 
+  void exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway,  cudaStream_t * stream);
+  void exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream);
+  void exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream);
+  void exchange_gpu_staple(int* X, void* _cudaStaple, cudaStream_t * stream);
+  void exchange_cpu_staple(int* X, void* staple, void** ghost_staple,
+			   QudaPrecision gPrecision);
+  void exchange_llfat_init(FullStaple* cudaStaple);
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

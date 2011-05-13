@@ -556,7 +556,8 @@ template<int mu, int nu, int odd_bit>
   LLFAT_KERNEL(do_siteComputeGenStapleParity, RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
 							   FloatN* sitelink_even, FloatN* sitelink_odd, 
 							   FloatM* fatlink_even, FloatM* fatlink_odd,	
-							   Float mycoeff, int2 tloc)
+							   Float mycoeff, llfat_kernel_param_t kparam,
+							   int2 tloc)
 {
   FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
   FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
@@ -578,6 +579,16 @@ template<int mu, int nu, int odd_bit>
   short x1odd = (x2 + x3 + x4 + odd_bit) & 1;
   short x1 = 2*x1h + x1odd;
   int X = 2*mem_idx + x1odd;    
+
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_X && x1 != X1m1) return;
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_X && x1 != 0) return;
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_Y && x2 != X2m1) return;
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_Y && x2 != 0) return;
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_Z && x3 != X3m1) return;
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_Z && x3 != 0) return;
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_T && x4 != X4m1) return;
+  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_T && x4 != 0) return;
+
   float sign =1;    
   int new_mem_idx;
   int new_x1 = x1;
@@ -680,10 +691,11 @@ template<int mu, int nu, int odd_bit>
     LLFAT_ADD_SU3_MATRIX(b, staple, staple);
   }
   
-  LOAD_EVEN_FAT_MATRIX(mu, mem_idx);
-  SCALAR_MULT_ADD_SU3_MATRIX(fat, staple, mycoeff, fat);
-  WRITE_FAT_MATRIX(fatlink_even,mu,  mem_idx);	
-    
+  if(kparam.kernel_type == LLFAT_INTERIOR_KERNEL){
+    LOAD_EVEN_FAT_MATRIX(mu, mem_idx);
+    SCALAR_MULT_ADD_SU3_MATRIX(fat, staple, mycoeff, fat);
+    WRITE_FAT_MATRIX(fatlink_even,mu,  mem_idx);	
+  }
   WRITE_STAPLE_MATRIX(staple_even, mem_idx);	
     
   return;

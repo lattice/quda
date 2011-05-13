@@ -756,7 +756,7 @@ void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd,
 				      int mu, int nu,int odd_bit,
 				      double mycoeff,
 				      QudaReconstructType recon, QudaPrecision prec,
-				      int2 tloc, dim3 halfGridDim, 
+				      int2 tloc, dim3 halfGridDim,  llfat_kernel_param_t kparam,
 				      cudaStream_t* stream)
 {
 
@@ -768,13 +768,13 @@ void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd,
 	<<<halfGridDim, blockDim, 0, *stream>>>((double2*)staple_even, (double2*)staple_odd, \
 						(double2*)sitelink_even, (double2*)sitelink_odd, \
 						(double2*)fatlink_even, (double2*)fatlink_odd, \
-						(double)mycoeff, tloc);	\
+						(double)mycoeff, kparam, tloc);	\
     }else{								\
       do_siteComputeGenStapleParity12Kernel<mu,nu, odd_bit>		\
 	<<<halfGridDim, blockDim, 0, *stream>>>((double2*)staple_even, (double2*)staple_odd, \
 						(double2*)sitelink_even, (double2*)sitelink_odd, \
 						(double2*)fatlink_even, (double2*)fatlink_odd, \
-						(double)mycoeff, tloc);	\
+						(double)mycoeff, kparam, tloc);	\
     }									\
   }else {								\
     if(recon == QUDA_RECONSTRUCT_NO){					\
@@ -782,13 +782,13 @@ void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd,
 	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
 						(float2*)sitelink_even, (float2*)sitelink_odd, \
 						(float2*)fatlink_even, (float2*)fatlink_odd, \
-						(float)mycoeff, tloc);	\
+						(float)mycoeff, kparam, tloc);	\
     }else{								\
       do_siteComputeGenStapleParity12Kernel<mu,nu, odd_bit>		\
 	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
 						(float4*)sitelink_even, (float4*)sitelink_odd, \
 						(float2*)fatlink_even, (float2*)fatlink_odd, \
-						(float)mycoeff, tloc);	\
+						(float)mycoeff, kparam, tloc);	\
     }									\
   }
   

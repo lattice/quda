@@ -7,6 +7,22 @@
 extern "C"{
 #endif
 
+#define LLFAT_INTERIOR_KERNEL 0
+#define LLFAT_EXTERIOR_KERNEL_FWD_X 1
+#define LLFAT_EXTERIOR_KERNEL_BACK_X 2
+#define LLFAT_EXTERIOR_KERNEL_FWD_Y 3
+#define LLFAT_EXTERIOR_KERNEL_BACK_Y 4
+#define LLFAT_EXTERIOR_KERNEL_FWD_Z 5
+#define LLFAT_EXTERIOR_KERNEL_BACK_Z 6
+#define LLFAT_EXTERIOR_KERNEL_FWD_T 7
+#define LLFAT_EXTERIOR_KERNEL_BACK_T 8
+
+typedef struct llfat_kernel_param_s{
+        unsigned long threads;
+        int kernel_type;
+}llfat_kernel_param_t;
+
+
   void llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink, 
 		  FullStaple cudaStaple, FullStaple cudaStaple1,
 		  QudaGaugeParam* param, double* act_path_coeff);
@@ -29,7 +45,7 @@ extern "C"{
 					int mu, int nu,int odd_bit,
 					double mycoeff,
 					QudaReconstructType recon, QudaPrecision prec,
-					int2 tloc, dim3 halfGridDim, 
+					int2 tloc, dim3 halfGridDim, llfat_kernel_param_t kparam,
 					cudaStream_t* stream); 
 
   void llfatOneLinkKernel(FullGauge cudaFatLink, FullGauge cudaSiteLink,

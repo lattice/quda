@@ -1445,7 +1445,8 @@ freeStapleQuda(FullStaple *cudaStaple)
     cudaStaple->odd = NULL;
 }
 void
-packGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf_gpu, void** back_nbr_buf_gpu,
+packGhostStaple(FullStaple* cudaStaple, int dir, int whichway,
+		void** fwd_nbr_buf_gpu, void** back_nbr_buf_gpu,
 		void** fwd_nbr_buf, void** back_nbr_buf,
 		void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream)
 {
@@ -1532,15 +1533,12 @@ packGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf_gpu, void** back_nbr_
   //even and odd ness switch (if necessary) is taken caren of in collectGhostStaple();
   int prec= cudaStaple->precision;
   void* gpu_buf;
-  int whichway =  QUDA_BACKWARDS;
-  for(int i=0;i < 4;i++){
+  int i =dir;
+  if (whichway ==  QUDA_BACKWARDS){
     gpu_buf = back_nbr_buf_gpu[i];
     collectGhostStaple(cudaStaple, gpu_buf, i, whichway, stream);
     cudaMemcpyAsync(back_nbr_buf[i], gpu_buf, Vs[i]*gaugeSiteSize*prec, cudaMemcpyDeviceToHost, *stream);
-  }
-  
-  whichway= QUDA_FORWARDS;
-  for(int i=0;i < 4; i++){
+  }else{//whichway is  QUDA_FORWARDS;
     gpu_buf = fwd_nbr_buf_gpu[i];
     collectGhostStaple(cudaStaple, gpu_buf, i, whichway, stream);
     cudaMemcpyAsync(fwd_nbr_buf[i], gpu_buf, Vs[i]*gaugeSiteSize*prec, cudaMemcpyDeviceToHost, *stream);        
@@ -1551,7 +1549,7 @@ packGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf_gpu, void** back_nbr_
 
 
 void 
-unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_buf,
+unpackGhostStaple(FullStaple* cudaStaple, int dir, int whichway, void** fwd_nbr_buf, void** back_nbr_buf,
 		  void* f_norm_buf, void* b_norm_buf, cudaStream_t* stream)
 {
 
@@ -1585,10 +1583,10 @@ unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_bu
     Vsh_x + Vsh_y + Vsh_z, 
   };
   
-  for(int dir=0; dir < 4; dir++){
     even = ((char*)cudaStaple->even) + Vh*sizeOfFloatN + 2*tmpint[dir]*sizeOfFloatN;
     odd = ((char*)cudaStaple->odd) + Vh*sizeOfFloatN +2*tmpint[dir]*sizeOfFloatN;
-    
+  
+    if(whichway == QUDA_BACKWARDS){   
     //back,even
     for(int i=0;i < 9; i++){
       void* dst = even + i*cudaStaple->stride*sizeOfFloatN;
@@ -1601,7 +1599,7 @@ unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_bu
       void* src = ((char*)back_nbr_buf[dir]) + 9*len[dir] + i*len[dir] ; 
       cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
     }
-    
+    }else { //QUDA_FORWARDS
     //fwd,even
     for(int i=0;i < 9; i++){
       void* dst = even + Vsh[dir]*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
@@ -1614,7 +1612,7 @@ unpackGhostStaple(FullStaple* cudaStaple, void** fwd_nbr_buf, void** back_nbr_bu
       void* src = ((char*)fwd_nbr_buf[dir]) + 9*len[dir] + i*len[dir] ; 
       cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
     }
-  }  
+    }
 }
 #endif
 

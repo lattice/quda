@@ -12,7 +12,6 @@
 
 #define BLOCK_DIM 64
 
-
 void
 llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink, 
 	   FullStaple cudaStaple, FullStaple cudaStaple1,
@@ -64,31 +63,70 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   tloc_exterior.x = 0;
   tloc_exterior.y = param->X[3] - 1;
   
+
+  llfat_kernel_param_t kparam;
+  int ktype[8] = {
+		LLFAT_EXTERIOR_KERNEL_BACK_X, 
+		LLFAT_EXTERIOR_KERNEL_FWD_X, 
+		LLFAT_EXTERIOR_KERNEL_BACK_Y, 
+		LLFAT_EXTERIOR_KERNEL_FWD_Y, 
+		LLFAT_EXTERIOR_KERNEL_BACK_Z, 
+		LLFAT_EXTERIOR_KERNEL_FWD_Z, 
+		LLFAT_EXTERIOR_KERNEL_BACK_T, 
+		LLFAT_EXTERIOR_KERNEL_FWD_T, 
+  };
+
+
   for(int dir = 0;dir < 4; dir++){
     for(int nu = 0; nu < 4; nu++){
       if (nu != dir){
 
+	
+	for (int k = 0; k <8;k++){
+        kparam.kernel_type = ktype[k];
+        //even kernel
+        siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
+                                         (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
+                                         (void*)cudaFatLink.even, (void*)cudaFatLink.odd,
+                                         dir, nu,0,
+                                         act_path_coeff[2],
+                                         recon, prec, tloc,  halfGridDim,
+                                         kparam, &stream[0]); CUERR;
+        //odd kernel
+        siteComputeGenStapleParityKernel((void*)cudaStaple.odd, (void*)cudaStaple.even,
+                                         (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
+                                         (void*)cudaFatLink.odd, (void*)cudaFatLink.even,
+                                         dir, nu,1,
+                                         act_path_coeff[2],
+                                         recon, prec, tloc, halfGridDim,
+                                         kparam, &stream[0]); CUERR;
 
+	}
+ 	for(int k=0; k < 4 ;k++){
+        	exchange_gpu_staple_start(param->X, &cudaStaple, k, (int)QUDA_BACKWARDS, &stream[0]);  CUERR;
+        	exchange_gpu_staple_start(param->X, &cudaStaple, k, (int)QUDA_FORWARDS, &stream[0]);  CUERR;
+	}
+        kparam.kernel_type = LLFAT_INTERIOR_KERNEL;
 	//even kernel
 	siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
 					 (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
 					 (void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
 					 dir, nu,0,
 					 act_path_coeff[2],
-					 recon, prec, tloc,  halfGridDim, &stream[0]); CUERR;
+					 recon, prec, tloc,  halfGridDim, 
+					 kparam, &stream[0]); CUERR;
 	//odd kernel
 	siteComputeGenStapleParityKernel((void*)cudaStaple.odd, (void*)cudaStaple.even,
 					 (void*)cudaSiteLink.odd, (void*)cudaSiteLink.even,
 					 (void*)cudaFatLink.odd, (void*)cudaFatLink.even, 
 					 dir, nu,1,
 					 act_path_coeff[2],
-					 recon, prec, tloc, halfGridDim, &stream[0]); CUERR;	
-
-	
-#ifdef MULTI_GPU	
-	exchange_gpu_staple_start(param->X, &cudaStaple, &stream[0]);  CUERR;
-	exchange_gpu_staple_wait(param->X, &cudaStaple, &stream[0]); CUERR;
-#endif	
+					 recon, prec, tloc, halfGridDim, 
+					 kparam, &stream[0]); CUERR;	
+	for(int k = 0; k  < 4; k++){
+        	exchange_gpu_staple_wait(param->X, &cudaStaple, k, (int)QUDA_BACKWARDS, &stream[0]); CUERR;
+        	exchange_gpu_staple_wait(param->X, &cudaStaple, k, (int)QUDA_FORWARDS, &stream[0]); CUERR;
+	}
 	//even
 	computeGenStapleFieldParityKernel((void*)NULL, (void*)NULL,
 					  (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
@@ -129,8 +167,14 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					      recon, prec, tloc,  halfGridDim,&stream[0]); CUERR;
 
 #ifdef MULTI_GPU
-	    exchange_gpu_staple_start(param->X, &cudaStaple1, &stream[0]); CUERR;
-	    exchange_gpu_staple_wait(param->X, &cudaStaple1, &stream[0]); CUERR;
+        for(int k=0; k < 4 ;k++){
+                exchange_gpu_staple_start(param->X, &cudaStaple1, k, (int)QUDA_BACKWARDS, &stream[0]);  CUERR;
+                exchange_gpu_staple_start(param->X, &cudaStaple1, k, (int)QUDA_FORWARDS, &stream[0]);  CUERR;
+        }
+	for(int k=0; k < 4; k++){
+	    exchange_gpu_staple_wait(param->X, &cudaStaple1, k, QUDA_BACKWARDS, &stream[0]); CUERR;
+	    exchange_gpu_staple_wait(param->X, &cudaStaple1, k, QUDA_FORWARDS, &stream[0]); CUERR;
+	}
 #endif	    
 	    for(int sig = 0; sig < 4; sig++){
 	      if (sig != dir && sig != nu && sig != rho){				
