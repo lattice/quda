@@ -337,7 +337,7 @@ comm_send(void* buf, int len, int dst)
   }
 
   int dstproc;
-  int sendtag;
+  int sendtag=99;
   if (dst == BACK_NBR){
     dstproc = back_nbr;
     sendtag = BACK_NBR;
@@ -367,7 +367,7 @@ comm_send_to_rank(void* buf, int len, int dst_rank)
     printf("ERROR: Invalid dst rank(%d)\n", dst_rank);
     comm_exit(1);
   }
-  int sendtag = -1;
+  int sendtag = 99;
   MPI_Isend(buf, len, MPI_BYTE, dst_rank, sendtag, MPI_COMM_WORLD, request);  
   return (unsigned long)request;  
 }
@@ -429,7 +429,7 @@ comm_recv(void* buf, int len, int src)
   }
   
   int srcproc=-1;
-  int recvtag=-1; //recvtag is opposite to the sendtag
+  int recvtag=99; //recvtag is opposite to the sendtag
   if (src == BACK_NBR){
     srcproc = back_nbr;
     recvtag = FWD_NBR;
@@ -460,7 +460,7 @@ comm_recv_from_rank(void* buf, int len, int src_rank)
     comm_exit(1);
   }
   
-  int recvtag = -1;
+  int recvtag = 99;
   MPI_Irecv(buf, len, MPI_BYTE, src_rank, recvtag, MPI_COMM_WORLD, request);
   
   return (unsigned long)request;

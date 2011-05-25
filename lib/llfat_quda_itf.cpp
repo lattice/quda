@@ -17,7 +17,7 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 	   FullStaple cudaStaple, FullStaple cudaStaple1,
 	   QudaGaugeParam* param, double* act_path_coeff)
 {
-
+  
   int Vs = param->X[0]*param->X[1]*param->X[2];
   int Vsh = Vs /2;
   
