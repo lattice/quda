@@ -511,77 +511,65 @@ llfat_init_cuda(QudaGaugeParam* param)
 
 
 
-#define ENUMERATE_FUNCS(mu,nu,odd_bit)	switch(mu) {			\
+#define ENUMERATE_FUNCS(mu,nu)	switch(mu) {				\
   case 0:								\
     switch(nu){								\
     case 0:								\
       printf("ERROR: invalid direction combination\n"); exit(1);	\
       break;								\
     case 1:								\
-      if (!odd_bit) { CALL_FUNCTION(0,1,0); }				\
-      else {CALL_FUNCTION(0,1,1); }					\
+      CALL_FUNCTION(0,1);						\
       break;								\
     case 2:								\
-      if (!odd_bit) { CALL_FUNCTION(0,2,0); }				\
-      else {CALL_FUNCTION(0,2,1); }					\
+      CALL_FUNCTION(0,2);						\
       break;								\
     case 3:								\
-      if (!odd_bit) { CALL_FUNCTION(0,3,0); }				\
-      else {CALL_FUNCTION(0,3,1); }					\
+      CALL_FUNCTION(0,3); 						\
       break;								\
     }									\
     break;								\
   case 1:								\
     switch(nu){								\
     case 0:								\
-      if (!odd_bit) { CALL_FUNCTION(1,0,0); }				\
-      else {CALL_FUNCTION(1,0,1); }					\
+      CALL_FUNCTION(1,0);						\
       break;								\
     case 1:								\
       printf("ERROR: invalid direction combination\n"); exit(1);	\
       break;								\
     case 2:								\
-      if (!odd_bit) { CALL_FUNCTION(1,2,0); }				\
-      else {CALL_FUNCTION(1,2,1); }					\
+      CALL_FUNCTION(1,2);						\
       break;								\
     case 3:								\
-      if (!odd_bit) { CALL_FUNCTION(1,3,0); }				\
-      else {CALL_FUNCTION(1,3,1); }					\
+      CALL_FUNCTION(1,3);						\
       break;								\
     }									\
     break;								\
   case 2:								\
     switch(nu){								\
     case 0:								\
-      if (!odd_bit) { CALL_FUNCTION(2,0,0); }				\
-      else {CALL_FUNCTION(2,0,1); }					\
+      CALL_FUNCTION(2,0);						\
       break;								\
     case 1:								\
-      if (!odd_bit) { CALL_FUNCTION(2,1,0); }				\
-      else {CALL_FUNCTION(2,1,1); }					\
+      CALL_FUNCTION(2,1);						\
       break;								\
     case 2:								\
       printf("ERROR: invalid direction combination\n"); exit(1);	\
       break;								\
     case 3:								\
-      if (!odd_bit) { CALL_FUNCTION(2,3,0); }				\
-      else {CALL_FUNCTION(2,3,1); }					\
+      CALL_FUNCTION(2,3);						\
       break;								\
     }									\
     break;								\
   case 3:								\
     switch(nu){								\
     case 0:								\
-      if (!odd_bit) { CALL_FUNCTION(3,0,0); }				\
-      else {CALL_FUNCTION(3,0,1); }					\
+      CALL_FUNCTION(3,0);						\
       break;								\
     case 1:								\
-      if (!odd_bit) { CALL_FUNCTION(3,1,0); }				\
-      else {CALL_FUNCTION(3,1,1); }					\
+      CALL_FUNCTION(3,1);						\
       break;								\
     case 2:								\
-      if (!odd_bit) { CALL_FUNCTION(3,2,0); }				\
-      else {CALL_FUNCTION(3,2,1); }					\
+      CALL_FUNCTION(3,2);						\
       break;								\
     case 3:								\
       printf("ERROR: invalid direction combination\n"); exit(1);	\
@@ -590,7 +578,7 @@ llfat_init_cuda(QudaGaugeParam* param)
     break;								\
   }
 
-#define ENUMERATE_FUNCS_SAVE(mu,nu,odd_bit, save_staple) if(save_staple){ \
+#define ENUMERATE_FUNCS_SAVE(mu,nu, save_staple) if(save_staple){ \
     switch(mu) {							\
     case 0:								\
       switch(nu){							\
@@ -598,70 +586,58 @@ llfat_init_cuda(QudaGaugeParam* param)
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
 	break;								\
       case 1:								\
-	if (!odd_bit) { CALL_FUNCTION(0,1,0,1); }			\
-	else {CALL_FUNCTION(0,1,1,1); }					\
+	CALL_FUNCTION(0,1,1); 						\
 	break;								\
       case 2:								\
-	if (!odd_bit) { CALL_FUNCTION(0,2,0,1); }			\
-	else {CALL_FUNCTION(0,2,1,1); }					\
+	CALL_FUNCTION(0,2,1);						\
 	break;								\
       case 3:								\
-	if (!odd_bit) { CALL_FUNCTION(0,3,0,1); }			\
-	else {CALL_FUNCTION(0,3,1,1); }					\
+	CALL_FUNCTION(0,3,1);						\
 	break;								\
       }									\
       break;								\
     case 1:								\
       switch(nu){							\
       case 0:								\
-	if (!odd_bit) { CALL_FUNCTION(1,0,0,1); }			\
-	else {CALL_FUNCTION(1,0,1,1); }					\
+	CALL_FUNCTION(1,0,1);						\
 	break;								\
       case 1:								\
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
 	break;								\
       case 2:								\
-	if (!odd_bit) { CALL_FUNCTION(1,2,0,1); }			\
-	else {CALL_FUNCTION(1,2,1,1); }					\
+	CALL_FUNCTION(1,2,1);						\
 	break;								\
       case 3:								\
-	if (!odd_bit) { CALL_FUNCTION(1,3,0,1); }			\
-	else {CALL_FUNCTION(1,3,1,1); }					\
+	CALL_FUNCTION(1,3,1); 						\
 	break;								\
       }									\
       break;								\
     case 2:								\
       switch(nu){							\
       case 0:								\
-	if (!odd_bit) { CALL_FUNCTION(2,0,0,1); }			\
-	else {CALL_FUNCTION(2,0,1,1); }					\
+	CALL_FUNCTION(2,0,1);						\
 	break;								\
       case 1:								\
-	if (!odd_bit) { CALL_FUNCTION(2,1,0,1); }			\
-	else {CALL_FUNCTION(2,1,1,1); }					\
+	CALL_FUNCTION(2,1,1); 						\
 	break;								\
       case 2:								\
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
 	break;								\
       case 3:								\
-	if (!odd_bit) { CALL_FUNCTION(2,3,0,1); }			\
-	else {CALL_FUNCTION(2,3,1,1); }					\
+	CALL_FUNCTION(2,3,1);						\
 	break;								\
       }									\
       break;								\
     case 3:								\
       switch(nu){							\
       case 0:								\
-	if (!odd_bit) { CALL_FUNCTION(3,0,0,1); }			\
-	else {CALL_FUNCTION(3,0,1,1); }					\
+	CALL_FUNCTION(3,0,1);						\
 	break;								\
       case 1:								\
-	if (!odd_bit) { CALL_FUNCTION(3,1,0,1); }			\
-	else {CALL_FUNCTION(3,1,1,1); }					\
+	CALL_FUNCTION(3,1,1);						\
 	break;								\
       case 2:								\
-	if (!odd_bit) { CALL_FUNCTION(3,2,0,1); }			\
-	else {CALL_FUNCTION(3,2,1,1); }					\
+	CALL_FUNCTION(3,2,1);						\
 	break;								\
       case 3:								\
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
@@ -677,70 +653,58 @@ llfat_init_cuda(QudaGaugeParam* param)
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
 	break;								\
       case 1:								\
-	if (!odd_bit) { CALL_FUNCTION(0,1,0,0); }			\
-	else {CALL_FUNCTION(0,1,1,0); }					\
+	CALL_FUNCTION(0,1,0);						\
 	break;								\
       case 2:								\
-	if (!odd_bit) { CALL_FUNCTION(0,2,0,0); }			\
-	else {CALL_FUNCTION(0,2,1,0); }					\
+	CALL_FUNCTION(0,2,0);						\
 	break;								\
       case 3:								\
-	if (!odd_bit) { CALL_FUNCTION(0,3,0,0); }			\
-	else {CALL_FUNCTION(0,3,1,0); }					\
+	CALL_FUNCTION(0,3,0);						\
 	break;								\
       }									\
       break;								\
     case 1:								\
       switch(nu){							\
       case 0:								\
-	if (!odd_bit) { CALL_FUNCTION(1,0,0,0); }			\
-	else {CALL_FUNCTION(1,0,1,0); }					\
+	CALL_FUNCTION(1,0,0);						\
 	break;								\
       case 1:								\
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
 	break;								\
       case 2:								\
-	if (!odd_bit) { CALL_FUNCTION(1,2,0,0); }			\
-	else {CALL_FUNCTION(1,2,1,0); }					\
+	CALL_FUNCTION(1,2,0);						\
 	break;								\
       case 3:								\
-	if (!odd_bit) { CALL_FUNCTION(1,3,0,0); }			\
-	else {CALL_FUNCTION(1,3,1,0); }					\
+	CALL_FUNCTION(1,3,0); 						\
 	break;								\
       }									\
       break;								\
     case 2:								\
       switch(nu){							\
       case 0:								\
-	if (!odd_bit) { CALL_FUNCTION(2,0,0,0); }			\
-	else {CALL_FUNCTION(2,0,1,0); }					\
+	CALL_FUNCTION(2,0,0);						\
 	break;								\
       case 1:								\
-	if (!odd_bit) { CALL_FUNCTION(2,1,0,0); }			\
-	else {CALL_FUNCTION(2,1,1,0); }					\
+	CALL_FUNCTION(2,1,0);						\
 	break;								\
       case 2:								\
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
 	break;								\
       case 3:								\
-	if (!odd_bit) { CALL_FUNCTION(2,3,0,0); }			\
-	else {CALL_FUNCTION(2,3,1,0); }					\
+	CALL_FUNCTION(2,3,0);						\
 	break;								\
       }									\
       break;								\
     case 3:								\
       switch(nu){							\
       case 0:								\
-	if (!odd_bit) { CALL_FUNCTION(3,0,0,0); }			\
-	else {CALL_FUNCTION(3,0,1,0); }					\
+	CALL_FUNCTION(3,0,0);						\
 	break;								\
       case 1:								\
-	if (!odd_bit) { CALL_FUNCTION(3,1,0,0); }			\
-	else {CALL_FUNCTION(3,1,1,0); }					\
+	CALL_FUNCTION(3,1,0);						\
 	break;								\
       case 2:								\
-	if (!odd_bit) { CALL_FUNCTION(3,2,0,0); }			\
-	else {CALL_FUNCTION(3,2,1,0); }					\
+	CALL_FUNCTION(3,2,0); 						\
 	break;								\
       case 3:								\
 	printf("ERROR: invalid direction combination\n"); exit(1);	\
@@ -753,8 +717,7 @@ llfat_init_cuda(QudaGaugeParam* param)
 void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd, 
 				      void* sitelink_even, void* sitelink_odd, 
 				      void* fatlink_even, void* fatlink_odd,	
-				      int mu, int nu,int odd_bit,
-				      double mycoeff,
+				      int mu, int nu, double mycoeff,
 				      QudaReconstructType recon, QudaPrecision prec,
 				      dim3 halfGridDim,  llfat_kernel_param_t kparam,
 				      cudaStream_t* stream)
@@ -762,7 +725,7 @@ void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd,
 
   //compute even and odd
   
-#define  CALL_FUNCTION(mu, nu, odd_bit)					\
+#define  CALL_FUNCTION(mu, nu)						\
   if (prec == QUDA_DOUBLE_PRECISION){					\
     if(recon == QUDA_RECONSTRUCT_NO){					\
       do_siteComputeGenStapleParity18Kernel<mu,nu, 0>		\
@@ -815,7 +778,7 @@ void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd,
   
 
   dim3 blockDim(BLOCK_DIM , 1, 1);  
-  ENUMERATE_FUNCS(mu,nu,odd_bit);  
+  ENUMERATE_FUNCS(mu,nu);  
 
 #undef CALL_FUNCTION
     
@@ -828,14 +791,14 @@ computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd,
 				  void* sitelink_even, void* sitelink_odd,
 				  void* fatlink_even, void* fatlink_odd,			    
 				  void* mulink_even, void* mulink_odd, 
-				  int mu, int nu, int odd_bit, int save_staple,
+				  int mu, int nu, int save_staple,
 				  double mycoeff,
 				  QudaReconstructType recon, QudaPrecision prec,
 				  dim3 halfGridDim, llfat_kernel_param_t kparam,
 				  cudaStream_t* stream)
 {
 
-#define  CALL_FUNCTION(mu, nu, odd_bit, save_staple)			\
+#define  CALL_FUNCTION(mu, nu, save_staple)				\
   if (prec == QUDA_DOUBLE_PRECISION){					\
     if(recon == QUDA_RECONSTRUCT_NO){					\
       do_computeGenStapleFieldParity18Kernel<mu,nu, 0, save_staple>	\
@@ -895,7 +858,7 @@ computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd,
   }
   
   dim3 blockDim(BLOCK_DIM , 1, 1);
-  ENUMERATE_FUNCS_SAVE(mu,nu,odd_bit, save_staple);
+  ENUMERATE_FUNCS_SAVE(mu,nu,save_staple);
 
 
 #undef CALL_FUNCTION 
