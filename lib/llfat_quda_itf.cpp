@@ -17,7 +17,6 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 	   FullStaple cudaStaple, FullStaple cudaStaple1,
 	   QudaGaugeParam* param, double* act_path_coeff)
 {
-
   int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
   int Vh = volume/2;
   dim3 gridDim(volume/BLOCK_DIM,1,1);
