@@ -55,8 +55,8 @@ extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
 extern QudaReconstructType link_recon;
-QudaPrecision  link_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision  cpu_link_prec = QUDA_DOUBLE_PRECISION;
+extern QudaPrecision  prec;
+QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
 size_t gSize;
 
 typedef struct {
@@ -102,8 +102,8 @@ llfat_init(void)
 
   setDims(gaugeParam.X);
     
-  gaugeParam.cpu_prec = cpu_link_prec;
-  gaugeParam.cuda_prec = link_prec;
+  gaugeParam.cpu_prec = cpu_prec;
+  gaugeParam.cuda_prec = prec;
         
   gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     
@@ -363,7 +363,7 @@ display_test_info()
     
   printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension\n");
   printfQuda("%s                       %s                         %d/%d/%d/                  %d\n", 
-	     get_prec_str(link_prec),
+	     get_prec_str(prec),
 	     get_recon_str(link_recon), 
 	     xdim, ydim, zdim,
 	     tdim);
@@ -395,6 +395,7 @@ main(int argc, char **argv)
   //default to 18 reconstruct, 8^3 x 8 
   link_recon = QUDA_RECONSTRUCT_NO;
   xdim=ydim=zdim=tdim=8;
+  cpu_prec = prec = QUDA_DOUBLE_PRECISION;
 
   int i;
   for (i =1;i < argc; i++){
@@ -407,7 +408,7 @@ main(int argc, char **argv)
       if (i+1 >= argc){
 	usage(argv);
       }	    
-      cpu_link_prec =  get_prec(argv[i+1]);
+      cpu_prec =  get_prec(argv[i+1]);
       i++;
       continue;	    
     }	 
