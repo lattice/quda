@@ -251,9 +251,10 @@ llfat_end()
   freeStapleQuda(&cudaStaple1);
 
 #ifdef MULTI_GPU
-  //exchange_cleanup();
+  exchange_llfat_cleanup();
 #endif
 
+  endQuda();
 }
 
 

@@ -823,7 +823,7 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
 }
 
 
-static void
+void
 exchange_llfat_cleanup(void)
 {
   

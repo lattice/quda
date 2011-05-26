@@ -157,6 +157,8 @@ extern "C" {
   void exchange_cpu_staple(int* X, void* staple, void** ghost_staple,
 			   QudaPrecision gPrecision);
   void exchange_llfat_init(FullStaple* cudaStaple);
+  void exchange_llfat_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif
