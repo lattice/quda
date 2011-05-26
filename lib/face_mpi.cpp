@@ -776,13 +776,6 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
 {
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;  
 
-  int fwd_neighbors[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
-  int back_neighbors[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
-  int up_tags[4] = {XUP, YUP, ZUP, TUP};
-  int down_tags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
-
-  //cudaStreamSynchronize(*stream);  
-
   int recv_whichway;
   if(whichway == QUDA_BACKWARDS){
     recv_whichway = QUDA_FORWARDS;
@@ -796,24 +789,12 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
   int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   
-    /*
-    llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple_cpu[i], len, back_neighbors[i], up_tags[i]);
-    memcpy(fwd_nbr_staple_sendbuf_cpu[i], fwd_nbr_staple_sendbuf[i], len);
-    llfat_send_request1[i]= comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i]);
-    */
-
     comm_wait(llfat_recv_request1[i]);
     comm_wait(llfat_send_request1[i]);
     
     memcpy(back_nbr_staple[i], back_nbr_staple_cpu[i], len);
     unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
   } else { // QUDA_FORWARDS
-    /*
-    llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple_cpu[i], len, fwd_neighbors[i], down_tags[i]);
-    memcpy(back_nbr_staple_sendbuf_cpu[i], back_nbr_staple_sendbuf[i], len);
-    llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[i], len, back_neighbors[i] ,down_tags[i]);
-    */
-
     comm_wait(llfat_recv_request2[i]);  
     comm_wait(llfat_send_request2[i]);
     
