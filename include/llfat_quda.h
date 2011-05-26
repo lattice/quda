@@ -19,6 +19,7 @@ extern "C"{
 
 typedef struct llfat_kernel_param_s{
         unsigned long threads;
+	int ghostDim[4]; // Whether a ghost zone has been allocated for a given dimension
         int kernel_type;
 }llfat_kernel_param_t;
 
