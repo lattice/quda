@@ -367,7 +367,7 @@
 	new_x4 = x4+1;							\
 	break;								\
       }									\
-      switch(mydir1){							\
+      switch(mydir1){/*mydir1 is 0 here */				\
       case 0:								\
 	new_mem_idx = (2*(Vh)+(new_x4*X3X2+new_x3*X2+new_x2))*xcomm+(new_mem_idx+X1m1)*(1-xcomm); 		\
 	new_x1 = X1m1;							\

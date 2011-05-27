@@ -716,7 +716,7 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
 
 
 template <typename Float>
-void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace) {
+void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd, int dir, int nFace) {
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
   //loop variables: a, b, c with a the most signifcant and c the least significant
@@ -757,7 +757,7 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd,
     }
     
     //collect back ghost gauge field
-    for(int dir =0; dir < 4; dir++){
+    //for(int dir =0; dir < 4; dir++){
       int d;
       int a,b,c;
       
@@ -816,7 +816,7 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd,
 	assert( odd_dst_index == nFace*faceVolumeCB[dir]);	
       }//linkdir
       
-    }//dir
+    //}//dir
   }//ite
 }
 
@@ -847,12 +847,12 @@ void pack_ghost(void **cpuLink, void **cpuGhost, int nFace, QudaPrecision precis
 
 }
 
-void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFwd, int nFace, QudaPrecision precision) {
+void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFwd, int dir, int nFace, QudaPrecision precision) {
   
   if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhostAllLinks((double**)cpuLink, (double**)cpuGhostBack, (double**) cpuGhostFwd, nFace);
+    packGhostAllLinks((double**)cpuLink, (double**)cpuGhostBack, (double**) cpuGhostFwd, dir,  nFace);
   } else {
-    packGhostAllLinks((float**)cpuLink, (float**)cpuGhostBack, (float**)cpuGhostFwd, nFace);
+    packGhostAllLinks((float**)cpuLink, (float**)cpuGhostBack, (float**)cpuGhostFwd, dir, nFace);
   }
   
 }
@@ -1966,39 +1966,103 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
 
 
 void 
-loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, void** ghost_cpuGauge,
-	      void** ghost_cpuGauge_diag, QudaGaugeParam* param)
+loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
 {
-  QudaPrecision cpu_prec = param->cpu_prec;
-  QudaPrecision cuda_prec= param->cuda_prec;
+
+  if (param->cpu_prec  != param->cuda_prec){
+    printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  QudaPrecision prec= param->cpu_prec;
+
+  int* Z = param->X;
   int pad = param->ga_pad;
   int Vsh_x = param->X[1]*param->X[2]*param->X[3]/2;
   int Vsh_y = param->X[0]*param->X[2]*param->X[3]/2;
   int Vsh_z = param->X[0]*param->X[1]*param->X[3]/2;
   int Vsh_t = param->X[0]*param->X[1]*param->X[2]/2;
-  
-  
-  if (cpu_prec  != cuda_prec){
-    printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
-    exit(1);
+
+  int Vs[4] = {2*Vsh_x, 2*Vsh_y, 2*Vsh_z, 2*Vsh_t};
+
+  void* ghost_cpuGauge[4];
+  void* ghost_cpuGauge_diag[16];
+
+  for(int i=0;i < 4; i++){
+    ghost_cpuGauge[i] = malloc(8*Vs[i]*gaugeSiteSize*prec);
+    if (ghost_cpuGauge[i] == NULL){
+      printf("ERROR: malloc failed for ghost_sitelink[%d] \n",i);
+      exit(1);
+    }
   }
-  
-  if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+
+  /*
+    nu |     |
+       |_____|
+          mu     
+  */
+
+  for(int nu=0;nu < 4;nu++){
+    for(int mu=0; mu < 4;mu++){
+      if(nu == mu){
+        ghost_cpuGauge_diag[nu*4+mu] = NULL;
+      }else{
+        //the other directions
+        int dir1, dir2;
+        for(dir1= 0; dir1 < 4; dir1++){
+          if(dir1 !=nu && dir1 != mu){
+            break;
+          }
+        }
+        for(dir2=0; dir2 < 4; dir2++){
+          if(dir2 != nu && dir2 != mu && dir2 != dir1){
+            break;
+          }
+        }
+        ghost_cpuGauge_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
+        if(ghost_cpuGauge_diag[nu*4+mu] == NULL){
+          errorQuda("malloc failed for ghost_sitelink_diag\n");
+        }
+
+        memset(ghost_cpuGauge_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
+      }
+
+    }
+  }
+
+   int optflag=1;
+   exchange_cpu_sitelink(param->X, cpuGauge, ghost_cpuGauge, ghost_cpuGauge_diag, prec, optflag);
+
+  if (prec == QUDA_DOUBLE_PRECISION) {
     do_loadLinkToGPU(param->X, (double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
 		     (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 
 		     cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
 		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
-		     cuda_prec);
-  } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
+		     prec);
+  } else if (prec == QUDA_SINGLE_PRECISION) {
     do_loadLinkToGPU(param->X, (float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
 		     (float**)ghost_cpuGauge, (float**)ghost_cpuGauge_diag, 
 		     cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
 		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
-		     cuda_prec);    
+		     prec);    
   }else{
     printf("ERROR: half precision not supported in this funciton %s\n", __FUNCTION__);
     exit(1);
   }
+
+
+  for(int i=0;i < 4;i++){
+    free(ghost_cpuGauge[i]);
+  }
+  for(int i=0;i <4; i++){ 
+    for(int j=0;j <4; j++){
+      if (i==j){
+        continue;
+      }
+      free(ghost_cpuGauge_diag[i*4+j]);
+    }
+  }
+
+
 }
 
 

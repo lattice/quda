@@ -445,7 +445,7 @@ exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag)
 template<typename Float>
 void
 exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost_sitelink_diag, 
-		  Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf)
+		  Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf, int optflag)
 {
 
 
@@ -482,7 +482,11 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
     
   }
 #else
-  pack_ghost_all_links((void**)sitelink, (void**)sitelink_back_sendbuf, (void**)sitelink_fwd_sendbuf, 1, (QudaPrecision)(sizeof(Float)));
+  int nFace =1;
+  for(int dir=0; dir < 4; dir++){
+    if(optflag && !commDimPartitioned(dir)) continue;
+    pack_ghost_all_links((void**)sitelink, (void**)sitelink_back_sendbuf, (void**)sitelink_fwd_sendbuf, dir, nFace, (QudaPrecision)(sizeof(Float)));
+  }
 #endif
 
 
@@ -492,6 +496,7 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
   int down_tags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
 
   for(int dir  =0; dir < 4; dir++){
+    if(optflag && !commDimPartitioned(dir)) continue;
     int len = Vsh[dir]*gaugeSiteSize*sizeof(Float);
     Float* ghost_sitelink_back = ghost_sitelink[dir];
     Float* ghost_sitelink_fwd = ghost_sitelink[dir] + 8*Vsh[dir]*gaugeSiteSize;
@@ -510,10 +515,12 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
 }
 
 //this function is used for link fattening computation
+//@optflag: if this flag is set, we only communicate in directions that are partitioned
+//          if not set, then we communicate in all directions regradless of partitions
 void exchange_cpu_sitelink(int* X,
 			   void** sitelink, void** ghost_sitelink,
 			   void** ghost_sitelink_diag,
-			   QudaPrecision gPrecision)
+			   QudaPrecision gPrecision, int optflag)
 {  
   setup_dims(X);
   set_dim(X);
@@ -532,10 +539,10 @@ void exchange_cpu_sitelink(int* X,
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
     exchange_sitelink(X, (double**)sitelink, (double**)(ghost_sitelink), (double**)ghost_sitelink_diag, 
-		      (double**)sitelink_fwd_sendbuf, (double**)sitelink_back_sendbuf);
+		      (double**)sitelink_fwd_sendbuf, (double**)sitelink_back_sendbuf, optflag);
   }else{ //single
     exchange_sitelink(X, (float**)sitelink, (float**)(ghost_sitelink), (float**)ghost_sitelink_diag, 
-		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf);
+		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf, optflag);
   }
   
   for(int i=0;i < 4;i++){
