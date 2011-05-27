@@ -40,12 +40,6 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   for(int i=0;i < 4;i++){
      kparam.ghostDim[i] = commDimPartitioned(i);
   }
-    printf("kparam.ghostdim=%d %d %d %d\n", 
-	kparam.ghostDim[0],
-	kparam.ghostDim[1],
-	kparam.ghostDim[2],
-	kparam.ghostDim[3]);
-
   int ktype[8] = {
 		LLFAT_EXTERIOR_KERNEL_BACK_X, 
 		LLFAT_EXTERIOR_KERNEL_FWD_X, 
