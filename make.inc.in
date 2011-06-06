@@ -31,7 +31,8 @@ BUILD_MPI = @BUILD_MPI@        # set to 'yes' to build the MPI multi-GPU code
 OVERLAP_COMMS = @OVERLAP_COMMS@  # set to 'yes' to overlap comms and compute
 
 # Do we compile the numa support
-HAVE_NUMA = @HAVE_NUMA@
+#HAVE_NUMA = @HAVE_NUMA@
+HAVE_NUMA = no
 
 FECC = @FECC@ 	      # Front end CC
 FECXX = @FECXX@           # Front end CXX
