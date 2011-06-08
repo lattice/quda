@@ -877,6 +877,7 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
 			in->x, in->length, in->ghost_length, block);
   }
 
+  cudaThreadSynchronize();
   if (!dslashTuning) checkCudaError();
   
 #else
