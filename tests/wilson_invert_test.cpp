@@ -95,6 +95,17 @@ int main(int argc, char **argv)
     
 
   }
+
+
+  if (prec_sloppy == QUDA_INVALID_PRECISION){
+    prec_sloppy = prec;
+  }
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
+    link_recon_sloppy = link_recon;
+  }
+
+
+
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
   // *** QUDA parameters begin here.
