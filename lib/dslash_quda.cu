@@ -506,6 +506,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
     dslash.apply(blockDim[i+1], shared_bytes, streams[Nstream-1]); // all faces use this stream
   }
+  cudaStreamSynchronize(streams[Nstream-1]);
 
 #endif // MULTI_GPU
 }
@@ -814,8 +815,8 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     dslashParam.threads = 6*Vsh[i];
     STAGGERED_DSLASH(exteriorGridDim[i], blockDim[i+1], shared_bytes, streams[Nstream-1], dslashParam,
 		     out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a); CUERR;
-
   }
+  cudaStreamSynchronize(streams[Nstream-1]);
 
 #endif
 }
@@ -877,7 +878,6 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge,
 			in->x, in->length, in->ghost_length, block);
   }
 
-  cudaThreadSynchronize();
   if (!dslashTuning) checkCudaError();
   
 #else
