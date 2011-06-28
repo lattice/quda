@@ -59,7 +59,7 @@ void
 link_format_cpu_to_gpu(void* dst, void* src, 
 		       int reconstruct, int bytes, int Vh, int pad, 
 		       int ghostV,
-		       QudaPrecision prec)
+		       QudaPrecision prec, cudaStream_t stream)
 {
   dim3 blockDim(BLOCKSIZE);
 #ifdef MULTI_GPU  
@@ -78,13 +78,13 @@ link_format_cpu_to_gpu(void* dst, void* src,
   
   switch (prec){
   case QUDA_DOUBLE_PRECISION:
-    do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, 
+    do_link_format_cpu_to_gpu<<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, 
 						     ghostV);
     break;
     
   case QUDA_SINGLE_PRECISION:
     if(reconstruct == QUDA_RECONSTRUCT_NO){
-      do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad,
+      do_link_format_cpu_to_gpu<<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad,
 						       ghostV);   
     }else if (reconstruct == QUDA_RECONSTRUCT_12){
       //not working yet

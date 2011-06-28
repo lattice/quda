@@ -320,8 +320,6 @@ llfat_test(void)
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-  printf("total time=%f s, h2d=%f s, computation in gpu=%f s, d2h=%f s\n", 
-	 TDIFF(t0, t3), TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3));
   double secs = TDIFF(t0,t3);
   
   gaugeParam.ga_pad = gaugeParam.llfat_ga_pad;
@@ -373,6 +371,9 @@ llfat_test(void)
     printfQuda("	Did you check the GPU health by running cuda memtest?\n");
   }
 
+  printfQuda("total time=%f s, h2d=%f s, computation in gpu=%f s, d2h=%f s\n", 
+	 TDIFF(t0, t3), TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3));
+  
 
   return accuracy_level;
 }            

@@ -10,8 +10,10 @@
 #include <face_quda.h>
 #include "misc_helpers.h"
 #include <assert.h>
+#include <cuda.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#define ALIGNMENT 4096 
 
 #ifdef MPI_COMMS
 #include "face_quda.h"
@@ -1843,6 +1845,8 @@ createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param)
     return;
 }
 
+#define TVERSION 4000
+
 
 template<typename FloatN, typename Float>
 static void 
@@ -1852,23 +1856,29 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
 		 int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t,
 		 QudaPrecision prec) 
 {
+  cudaStream_t streams[2];
+  for(int i=0;i < 2; i++){
+    cudaStreamCreate(&streams[i]);
+  }
+
+  
   int Vh_2d_max = MAX(X[0]*X[1]/2, X[0]*X[2]/2);
   Vh_2d_max = MAX(Vh_2d_max, X[0]*X[3]/2);
   Vh_2d_max = MAX(Vh_2d_max, X[1]*X[2]/2);
   Vh_2d_max = MAX(Vh_2d_max, X[1]*X[3]/2);
   Vh_2d_max = MAX(Vh_2d_max, X[2]*X[3]/2);
 
-  // Use pinned memory
   int i;
-  char* tmp;
+  char* tmp_even;
+  char* tmp_odd;
   int len = Vh*gaugeSiteSize*sizeof(Float);
 
 #ifdef MULTI_GPU    
   int glen[4] = {
-      Vsh_x*gaugeSiteSize*sizeof(Float),
-      Vsh_y*gaugeSiteSize*sizeof(Float),
-      Vsh_z*gaugeSiteSize*sizeof(Float),
-      Vsh_t*gaugeSiteSize*sizeof(Float)
+    Vsh_x*gaugeSiteSize*sizeof(Float),
+    Vsh_y*gaugeSiteSize*sizeof(Float),
+    Vsh_z*gaugeSiteSize*sizeof(Float),
+    Vsh_t*gaugeSiteSize*sizeof(Float)
   };
   
   int ghostV = 2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t)+4*Vh_2d_max;
@@ -1877,58 +1887,84 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
 #endif  
 
   int glen_sum = ghostV*gaugeSiteSize*sizeof(Float);
-  cudaMalloc(&tmp, 4*(len+glen_sum)); CUERR;
-
+  cudaMalloc(&tmp_even, 4*(len+glen_sum)); CUERR;
+  cudaMalloc(&tmp_odd, 4*(len+glen_sum)); CUERR;
+  
   //even links
   for(i=0;i < 4; i++){
-      cudaMemcpy(tmp + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice); 
+#if (CUDA_VERSION >=TVERSION)
+    cudaMemcpyAsync(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]); 
+#else
+    cudaMemcpy(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice); 
+#endif
+  
 #ifdef MULTI_GPU  
-      //dir: the source direction
-      char* dest = tmp + i*(len+glen_sum)+len;
-      for(int dir = 0; dir < 4; dir++){
-	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
-	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
-	dest += 2*glen[dir];
+    //dir: the source direction
+    char* dest = tmp_even + i*(len+glen_sum)+len;
+    for(int dir = 0; dir < 4; dir++){
+#if (CUDA_VERSION >=TVERSION)
+      cudaMemcpyAsync(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[0]); 
+      cudaMemcpyAsync(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[0]); 	
+#else
+      cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+      cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+#endif
+      dest += 2*glen[dir];
+  }
+    //fill in diag 
+    //@nu is @i, mu iterats from 0 to 4 and mu != nu
+    int nu = i;
+    for(int mu = 0; mu < 4; mu++){
+      if(nu  == mu ){
+	continue;
       }
-      //fill in diag 
-      //@nu is @i, mu iterats from 0 to 4 and mu != nu
-      int nu = i;
-      for(int mu = 0; mu < 4; mu++){
-	if(nu  == mu ){
-	  continue;
+      int dir1, dir2;
+      for(dir1=0; dir1 < 4; dir1 ++){
+	if(dir1 != nu && dir1 != mu){
+	  break;
 	}
-	int dir1, dir2;
-	for(dir1=0; dir1 < 4; dir1 ++){
-	  if(dir1 != nu && dir1 != mu){
-	    break;
-	  }
-	}
-	for(dir2=0; dir2 < 4; dir2 ++){
-	  if(dir2 != nu && dir2 != mu && dir2 != dir1){
-	    break;
-	  }
-	}
-	
-	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu], 
-		   X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice);	
-
-
       }
- 
+      for(dir2=0; dir2 < 4; dir2 ++){
+	if(dir2 != nu && dir2 != mu && dir2 != dir1){
+	  break;
+	}
+      }
+#if (CUDA_VERSION >=TVERSION)
+      cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu], 
+		      X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice, streams[0]);	
+#else	
+      cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu], 
+		 X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice);	
+#endif
+      
+    }
+    
 #endif
   }    
   
-  
-  link_format_cpu_to_gpu((void*)even, (void*)tmp,  reconstruct, bytes, Vh, pad, ghostV, prec); CUERR;
+  link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, bytes, Vh, pad, ghostV, prec, streams[0]); CUERR;
 
   //odd links
   for(i=0;i < 4; i++){
-      cudaMemcpy(tmp + i*(len+glen_sum), cpuGauge[i] + Vh*gaugeSiteSize, len, cudaMemcpyHostToDevice);CUERR;
+#if (CUDA_VERSION >=TVERSION)
+    cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), cpuGauge[i] + Vh*gaugeSiteSize, len, cudaMemcpyHostToDevice, streams[1]);CUERR;
+#else
+    cudaMemcpy(tmp_odd + i*(len+glen_sum), cpuGauge[i] + Vh*gaugeSiteSize, len, cudaMemcpyHostToDevice);CUERR;
+#endif
+
 #ifdef MULTI_GPU  
-      char* dest = tmp + i*(len+glen_sum)+len;
+      char* dest = tmp_odd + i*(len+glen_sum)+len;
       for(int dir = 0; dir < 4; dir++){
+#if (CUDA_VERSION >=TVERSION)
+	cudaMemcpyAsync(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[1]); CUERR;
+	cudaMemcpyAsync(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], 
+			cudaMemcpyHostToDevice, streams[1]); CUERR;
+#else
 	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
 	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
+
+#endif
+
 	dest += 2*glen[dir];
       }
       //fill in diag 
@@ -1949,18 +1985,30 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
 	    break;
 	  }
 	}
-	
+#if (CUDA_VERSION >=TVERSION)
+	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize, 
+			X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice, streams[1]);	
+#else
 	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize, 
-		   X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice);	
-
+		   X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice );		
+#endif
       }
       
 
 #endif
   }
-  link_format_cpu_to_gpu((void*)odd, (void*)tmp, reconstruct, bytes, Vh, pad, ghostV, prec); CUERR;
+  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, bytes, Vh, pad, ghostV, prec, streams[1]); CUERR;
   
-  cudaFree(tmp);
+  for(int i=0;i < 2;i++){
+    cudaStreamSynchronize(streams[i]);
+  }
+
+  cudaFree(tmp_even);
+  cudaFree(tmp_odd);
+
+  for(int i=0;i < 2;i++){
+    cudaStreamDestroy(streams[i]);
+  }
   CUERR;
 }
 
@@ -1988,8 +2036,8 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
   void* ghost_cpuGauge_diag[16];
 
   for(int i=0;i < 4; i++){
-    ghost_cpuGauge[i] = malloc(8*Vs[i]*gaugeSiteSize*prec);
-    if (ghost_cpuGauge[i] == NULL){
+    int rc = posix_memalign((void**)&ghost_cpuGauge[i], ALIGNMENT, 8*Vs[i]*gaugeSiteSize*prec);
+    if (rc != 0){
       printf("ERROR: malloc failed for ghost_sitelink[%d] \n",i);
       exit(1);
     }
@@ -2001,6 +2049,7 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
           mu     
   */
 
+  int ghost_diag_len[16];
   for(int nu=0;nu < 4;nu++){
     for(int mu=0; mu < 4;mu++){
       if(nu == mu){
@@ -2018,12 +2067,13 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
             break;
           }
         }
-        ghost_cpuGauge_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
-        if(ghost_cpuGauge_diag[nu*4+mu] == NULL){
+	int rc = posix_memalign((void**)&ghost_cpuGauge_diag[nu*4+mu], ALIGNMENT, Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
+	if(rc != 0){
           errorQuda("malloc failed for ghost_sitelink_diag\n");
         }
 
         memset(ghost_cpuGauge_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
+	ghost_diag_len[nu*4+mu] = Z[dir1]*Z[dir2]*gaugeSiteSize*prec;
       }
 
     }
@@ -2031,17 +2081,29 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
 
    int optflag=1;
    exchange_cpu_sitelink(param->X, cpuGauge, ghost_cpuGauge, ghost_cpuGauge_diag, prec, optflag);
+   
+#if (CUDA_VERSION >= TVERSION)
+   for(int i=0;i < 4; i++){
+     cudaHostRegister(ghost_cpuGauge[i], 8*Vs[i]*gaugeSiteSize*prec, 0);
+   }
+
+   for(int i=0;i < 16; i++){
+     if(ghost_cpuGauge_diag[i] != NULL){
+       cudaHostRegister(ghost_cpuGauge_diag[i], ghost_diag_len[i], 0);
+     }
+   }
+#endif
 
    if (prec == QUDA_DOUBLE_PRECISION) {
-    do_loadLinkToGPU(param->X, (double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
-		     (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 
+     do_loadLinkToGPU(param->X, (double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
+		      (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 
 		     cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
 		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
-		     prec);
-  } else if (prec == QUDA_SINGLE_PRECISION) {
-    do_loadLinkToGPU(param->X, (float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
+		      prec);
+   } else if (prec == QUDA_SINGLE_PRECISION) {
+     do_loadLinkToGPU(param->X, (float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
 		     (float**)ghost_cpuGauge, (float**)ghost_cpuGauge_diag, 
-		     cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
+		      cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
 		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
 		     prec);    
   }else{
@@ -2097,7 +2159,7 @@ do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd,
   link_format_gpu_to_cpu((void*)unpackedDataOdd, (void*)odd,  bytes, Vh, stride, prec, streams[1]);
 #if (CUDA_VERSION >=4000)
   cudaMemcpyAsync(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost, streams[1]);  
-  for(i=0;i < 2; i++){
+  for(int i=0;i < 2; i++){
     cudaStreamSynchronize(streams[i]);
   }
 #else
