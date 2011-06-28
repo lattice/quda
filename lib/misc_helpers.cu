@@ -222,7 +222,7 @@ do_link_format_gpu_to_cpu(FloatN* dst, FloatN* src,
 
 void 
 link_format_gpu_to_cpu(void* dst, void* src, 
-		       int bytes, int Vh, int stride, QudaPrecision prec)
+		       int bytes, int Vh, int stride, QudaPrecision prec, cudaStream_t stream)
 {
   
   dim3 blockDim(BLOCKSIZE);
@@ -233,9 +233,9 @@ link_format_gpu_to_cpu(void* dst, void* src,
     exit(1);
   }
   if(prec == QUDA_DOUBLE_PRECISION){
-    do_link_format_gpu_to_cpu<<<gridDim, blockDim>>>((double2*)dst, (double2*)src, bytes, Vh, stride);
+    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, bytes, Vh, stride);
   }else if(prec == QUDA_SINGLE_PRECISION){
-    do_link_format_gpu_to_cpu<<<gridDim, blockDim>>>((float2*)dst, (float2*)src,  bytes, Vh, stride);
+    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float2*)src,  bytes, Vh, stride);
   }else{
     printf("ERROR: half precision is not supported in %s\n",__FUNCTION__);
     exit(1);

@@ -2032,7 +2032,7 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
    int optflag=1;
    exchange_cpu_sitelink(param->X, cpuGauge, ghost_cpuGauge, ghost_cpuGauge_diag, prec, optflag);
 
-  if (prec == QUDA_DOUBLE_PRECISION) {
+   if (prec == QUDA_DOUBLE_PRECISION) {
     do_loadLinkToGPU(param->X, (double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
 		     (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 
 		     cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
@@ -2066,24 +2066,51 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
 }
 
 
+//cpuGauge must be aligned to 4096 if it is to be pinned when CUDA_VERSION >=4000
 template<typename FloatN, typename Float>
 static void 
 do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd, 
 		  int bytes, int Vh, int stride, QudaPrecision prec) 
 {  
-  double* unpackedData;
+  cudaStream_t streams[2];
+  for(int i=0;i < 2; i++){
+    cudaStreamCreate(&streams[i]);
+  }
+  
+
+  double* unpackedDataEven;
+  double* unpackedDataOdd;
   int datalen = 4*Vh*gaugeSiteSize*sizeof(Float);
-  cudaMalloc(&unpackedData, datalen); CUERR;
+  cudaMalloc(&unpackedDataEven, datalen); CUERR;
+  cudaMalloc(&unpackedDataOdd, datalen); CUERR;
   
   //unpack even data kernel
-  link_format_gpu_to_cpu((void*)unpackedData, (void*)even, bytes, Vh, stride, prec);
-  cudaMemcpy(cpuGauge, unpackedData, datalen, cudaMemcpyDeviceToHost);
+  link_format_gpu_to_cpu((void*)unpackedDataEven, (void*)even, bytes, Vh, stride, prec, streams[0]);
+#if (CUDA_VERSION >= 4000)
+  cudaHostRegister(cpuGauge, 2*datalen, 0);
+  cudaMemcpyAsync(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost, streams[0]);
+#else
+  cudaMemcpy(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost);
+#endif
   
   //unpack odd data kernel
-  link_format_gpu_to_cpu((void*)unpackedData, (void*)odd,  bytes, Vh, stride, prec);
-  cudaMemcpy(cpuGauge + 4*Vh*gaugeSiteSize, unpackedData, datalen, cudaMemcpyDeviceToHost);  
+  link_format_gpu_to_cpu((void*)unpackedDataOdd, (void*)odd,  bytes, Vh, stride, prec, streams[1]);
+#if (CUDA_VERSION >=4000)
+  cudaMemcpyAsync(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost, streams[1]);  
+  for(i=0;i < 2; i++){
+    cudaStreamSynchronize(streams[i]);
+  }
+#else
+  cudaMemcpy(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost);  
+#endif
   
-  cudaFree(unpackedData);
+  cudaFree(unpackedDataEven);
+  cudaFree(unpackedDataOdd);
+  
+  for(int i=0;i < 2;i++){
+    cudaStreamDestroy(streams[i]);
+  }
+
 
   CUERR;
 }
@@ -2107,7 +2134,7 @@ storeLinkToCPU(void* cpuGauge, FullGauge *cudaGauge, QudaGaugeParam* param)
     exit(1);
   }
   
-  int stride = cudaGauge->volumeCB + param->ga_pad;
+  int stride = cudaGauge->volumeCB + cudaGauge->pad;
   
   if (cuda_prec == QUDA_DOUBLE_PRECISION){
     do_storeLinkToCPU( (double*)cpuGauge, (double2*) cudaGauge->even, (double2*)cudaGauge->odd, 
