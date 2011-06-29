@@ -13,6 +13,7 @@
 #include <test_util.h>
 #include <llfat_reference.h>
 #include "misc.h"
+#include <cuda.h>
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
@@ -108,14 +109,22 @@ llfat_init(void)
   gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     
   int i;
+#if (CUDA_VERSION >=4000)
   cudaMallocHost((void**)&fatlink,  4*V*gaugeSiteSize*gSize);
+#else
+  fatlink = malloc(4*V*gaugeSiteSize*gSize);
+#endif
   if (fatlink == NULL){
     fprintf(stderr, "ERROR: malloc failed for fatlink\n");
     exit(1);
   }
   
   for(i=0;i < 4;i++){
+#if (CUDA_VERSION >=4000)
     cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize* gSize);
+#else
+    sitelink[i] = malloc(V*gaugeSiteSize* gSize);
+#endif
     if (sitelink[i] == NULL){
       fprintf(stderr, "ERROR: malloc failed for sitelink[%d]\n", i);
       exit(1);
@@ -220,10 +229,18 @@ void
 llfat_end()  
 {  
   int i;
+#if (CUDA_VERSION >= 4000)
   cudaFreeHost(fatlink);
   for(i=0;i < 4 ;i++){
     cudaFreeHost(sitelink[i]);
   }
+#else
+  free(fatlink);
+  for(i=0;i < 4 ;i++){
+    free(sitelink[i]);
+  }
+
+#endif
 
 #ifdef MULTI_GPU  
   for(i=0;i < 4;i++){

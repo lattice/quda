@@ -842,7 +842,7 @@ computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd,
 						(float2*)mulink_odd, (float2*)mulink_even, \
 						(float)mycoeff, kparam); \
     }else{								\
-      do_computeGenStapleFieldParity12Kernel<mu,nu, 0, save_staple> \
+      do_computeGenStapleFieldParity12Kernel<mu,nu, 0, save_staple>	\
 	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
 						(float4*)sitelink_even, (float4*)sitelink_odd, \
 						(float2*)fatlink_even, (float2*)fatlink_odd, \

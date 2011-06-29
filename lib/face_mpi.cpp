@@ -693,7 +693,7 @@ exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway, cuda
   exchange_llfat_init(cudaStaple);
   
   packGhostStaple(cudaStaple, dir, whichway, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
-		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, NULL, NULL, stream);
+		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, stream);
 }
 
 
@@ -769,19 +769,19 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
     comm_wait(llfat_recv_request1[i]);
     comm_wait(llfat_send_request1[i]);
 #if (CUDA_VERSION >= 4000)
-    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
+    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else
     memcpy(back_nbr_staple[i], back_nbr_staple_cpu[i], len);
-    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
+    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #endif
   } else { // QUDA_FORWARDS
     comm_wait(llfat_recv_request2[i]);  
     comm_wait(llfat_send_request2[i]);
 #if (CUDA_VERSION >= 4000)
-    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
+    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else    
     memcpy(fwd_nbr_staple[i], fwd_nbr_staple_cpu[i], len);
-    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
+    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #endif
   }
 }
