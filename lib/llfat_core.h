@@ -247,18 +247,40 @@
 
 
 //fat link is not compressible
+/*
 #define fat00_re FAT0.x
 #define fat00_im FAT0.y
 #define fat01_re FAT1.x
 #define fat01_im FAT1.y
+*/
+#define SHARED_STRIDE 16 
+#define SHARED_FLOATS_PER_THREAD 12
+
+#define fat00_re s[0*SHARED_STRIDE]
+#define fat00_im s[1*SHARED_STRIDE]
+#define fat01_re s[2*SHARED_STRIDE]
+#define fat01_im s[3*SHARED_STRIDE]
+#define fat02_re s[4*SHARED_STRIDE]
+#define fat02_im s[5*SHARED_STRIDE]
+#define fat10_re s[6*SHARED_STRIDE]
+#define fat10_im s[7*SHARED_STRIDE]
+#define fat11_re s[8*SHARED_STRIDE]
+#define fat11_im s[9*SHARED_STRIDE]
+#define fat12_re s[10*SHARED_STRIDE]
+#define fat12_im s[11*SHARED_STRIDE]
+
+/*
 #define fat02_re FAT2.x
 #define fat02_im FAT2.y
 #define fat10_re FAT3.x
 #define fat10_im FAT3.y
+
 #define fat11_re FAT4.x
 #define fat11_im FAT4.y
 #define fat12_re FAT5.x
 #define fat12_im FAT5.y
+*/
+
 #define fat20_re FAT6.x
 #define fat20_im FAT6.y
 #define fat21_re FAT7.x
@@ -485,6 +507,10 @@ template<int mu, int nu, int odd_bit>
 							   FloatM* fatlink_even, FloatM* fatlink_odd,	
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
+  __shared__ Float sd_data[256*3];
+  Float *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+    + (threadIdx.x % SHARED_STRIDE);
+
   FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
   FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
     
@@ -520,10 +546,10 @@ template<int mu, int nu, int odd_bit>
   int x[4] = {x1,x2,x3, x4};
   int Z[4] ={X1,X2,X3,X4};
 
-  int spacecon_x = (x4*X3*X2+x3*X2+x2)>>1;
-  int spacecon_y = (x4*X3*X1+x3*X1+x1)>>1;
-  int spacecon_z = (x4*X2*X1+x2*X1+x1)>>1;
-  int spacecon_t = (x3*X2*X1+x2*X1+x1)>>1;
+  int spacecon_x = (x4*X3X2+x3*X2+x2)>>1;
+  int spacecon_y = (x4*X3X1+x3*X1+x1)>>1;
+  int spacecon_z = (x4*X2X1+x2*X1+x1)>>1;
+  int spacecon_t = (x3*X2X1+x2*X1+x1)>>1;
   /* Upper staple */
   /* Computes the staple :
    *                 mu (B)
@@ -587,18 +613,8 @@ template<int mu, int nu, int odd_bit>
     
     /* load matrix C*/
     if(x[nu] == 0 && x[mu] == Z[mu] - 1){
-      int dir1, dir2;
-      for(dir1=0; dir1 < 4; dir1 ++){
-	if(dir1 != nu && dir1 != mu){
-	  break;
-	}
-      }
-      for(dir2=0; dir2 < 4; dir2 ++){
-	if(dir2 != nu && dir2 != mu && dir2 != dir1){
-	  break;
-	}
-      }      
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2);
+      int idx = nu*4+mu;
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
     }else{
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
     }
@@ -630,6 +646,11 @@ template<int mu, int nu, int odd_bit, int save_staple>
 							   FloatM* mulink_even, FloatM* mulink_odd, 
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
+  __shared__ Float sd_data[256*3];
+  Float *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+    + (threadIdx.x % SHARED_STRIDE);
+  
+    
   FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
   FloatM TEMPB0, TEMPB1, TEMPB2, TEMPB3, TEMPB4, TEMPB5, TEMPB6, TEMPB7, TEMPB8;
   FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
@@ -667,10 +688,10 @@ template<int mu, int nu, int odd_bit, int save_staple>
   int new_x4 = x4;
   int offset = x3*X2X1+x2*X1+x1;
 
-  int spacecon_x = (x4*X3*X2+x3*X2+x2)>>1;
-  int spacecon_y = (x4*X3*X1+x3*X1+x1)>>1;
-  int spacecon_z = (x4*X2*X1+x2*X1+x1)>>1;
-  int spacecon_t = (x3*X2*X1+x2*X1+x1)>>1;
+  int spacecon_x = (x4*X3X2+x3*X2+x2)>>1;
+  int spacecon_y = (x4*X3X1+x3*X1+x1)>>1;
+  int spacecon_z = (x4*X2X1+x2*X1+x1)>>1;
+  int spacecon_t = (x3*X2X1+x2*X1+x1)>>1;
 
   /* Upper staple */
   /* Computes the staple :
@@ -732,18 +753,8 @@ template<int mu, int nu, int odd_bit, int save_staple>
     
     /* load matrix C*/
     if(x[nu] == 0 && x[mu] == Z[mu] - 1){
-      int dir1, dir2;
-      for(dir1=0; dir1 < 4; dir1 ++){
-	if(dir1 != nu && dir1 != mu){
-	  break;
-	}
-      }
-      for(dir2=0; dir2 < 4; dir2 ++){
-	if(dir2 != nu && dir2 != mu && dir2 != dir1){
-	  break;
-	}
-      }      
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2);
+      int idx = nu*4+mu; 
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
     }else{
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
     }
@@ -785,6 +796,9 @@ LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_
 					FloatM* fatlink_even, FloatM* fatlink_odd,
 					Float coeff0, Float coeff5)
 {
+  __shared__ Float sd_data[256*3];
+  Float *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+    + (threadIdx.x % SHARED_STRIDE);
 
   FloatN* my_sitelink;
   FloatM* my_fatlink;

@@ -204,7 +204,8 @@
   mc##22_re = ma##22_re + mb##22_re;		\
   mc##22_im = ma##22_im + mb##22_im;		
 
-
+__constant__ int dir1_array[16];
+__constant__ int dir2_array[16];
 
 void
 llfat_init_cuda(QudaGaugeParam* param)
@@ -225,6 +226,33 @@ llfat_init_cuda(QudaGaugeParam* param)
   cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));  
   cudaMemcpyToSymbol("staple_stride", &staple_stride, sizeof(int));  
   cudaMemcpyToSymbol("llfat_ga_stride", &llfat_ga_stride, sizeof(int));
+
+  int dir1[16];
+  int dir2[16];
+  
+  for(int nu =0; nu < 4; nu++)
+    for(int mu=0; mu < 4; mu++){
+      if(nu == mu) continue;
+      int d1, d2;
+      for(d1=0; d1 < 4; d1 ++){
+	if(d1 != nu && d1 != mu){
+	  break;
+	}
+      }
+      dir1[nu*4+mu] = d1;
+
+      for(d2=0; d2 < 4; d2 ++){
+	if(d2 != nu && d2 != mu && d2 != d1){
+	  break;
+	}
+      }    
+      
+      dir2[nu*4+mu] = d2;
+    }
+  
+  cudaMemcpyToSymbol("dir1_array", &dir1, sizeof(dir1));  
+  cudaMemcpyToSymbol("dir2_array", &dir2, sizeof(dir2));  
+  
 }
 
 
