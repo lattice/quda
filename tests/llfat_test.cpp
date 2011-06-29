@@ -371,8 +371,8 @@ llfat_test(void)
     printfQuda("	Did you check the GPU health by running cuda memtest?\n");
   }
 
-  printfQuda("total time=%f s, h2d=%f s, computation in gpu=%f s, d2h=%f s\n", 
-	 TDIFF(t0, t3), TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3));
+  printfQuda(" h2d=%f s, computation in gpu=%f s, d2h=%f s, total time=%f s\n", 
+	     TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3), TDIFF(t0, t3));
   
 
   return accuracy_level;

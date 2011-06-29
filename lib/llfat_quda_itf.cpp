@@ -23,7 +23,6 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   dim3 halfGridDim(Vh/BLOCK_DIM,1,1);
   dim3 blockDim(BLOCK_DIM , 1, 1);
   
-  
   QudaPrecision prec = cudaSiteLink.precision;
   QudaReconstructType recon = cudaSiteLink.reconstruct;
 
