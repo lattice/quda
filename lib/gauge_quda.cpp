@@ -2131,7 +2131,6 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
 }
 
 
-//cpuGauge must be aligned to 4096 if it is to be pinned when CUDA_VERSION >=4000
 template<typename FloatN, typename Float>
 static void 
 do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd, 

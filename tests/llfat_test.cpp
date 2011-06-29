@@ -21,7 +21,6 @@
 #endif
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
-#define  ALIGNMENT  4096
 
 FullGauge cudaSiteLink;
 FullGauge cudaFatLink;
@@ -109,15 +108,14 @@ llfat_init(void)
   gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
     
   int i;
-  //fatlink = malloc(4*V*gaugeSiteSize* gSize);
-  posix_memalign((void**)&fatlink, ALIGNMENT, 4*V*gaugeSiteSize*gSize);
+  cudaMallocHost((void**)&fatlink,  4*V*gaugeSiteSize*gSize);
   if (fatlink == NULL){
     fprintf(stderr, "ERROR: malloc failed for fatlink\n");
     exit(1);
   }
   
   for(i=0;i < 4;i++){
-    sitelink[i] = malloc(V*gaugeSiteSize* gSize);
+    cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize* gSize);
     if (sitelink[i] == NULL){
       fprintf(stderr, "ERROR: malloc failed for sitelink[%d]\n", i);
       exit(1);
@@ -222,9 +220,9 @@ void
 llfat_end()  
 {  
   int i;
-  free(fatlink);
+  cudaFreeHost(fatlink);
   for(i=0;i < 4 ;i++){
-    free(sitelink[i]);
+    cudaFreeHost(sitelink[i]);
   }
 
 #ifdef MULTI_GPU  
