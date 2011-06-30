@@ -13,7 +13,7 @@
 #define FATLINK_LOAD_TEX 1
 
 
-#define WRITE_FAT_MATRIX(gauge, dir, idx)do {		       \
+#define WRITE_FAT_MATRIX(gauge, dir, idx)do {			\
     gauge[idx + dir*9*llfat_ga_stride] = FAT0;			\
     gauge[idx + (dir*9+1) * llfat_ga_stride] = FAT1;			\
     gauge[idx + (dir*9+2) * llfat_ga_stride] = FAT2;			\
@@ -294,16 +294,16 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define Float  float
 #define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_SINGLE(gauge, dir, idx, FAT, llfat_ga_stride)
 #if (MULINK_LOAD_TEX == 1)
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink0TexSingle, dir, idx, var, staple_stride)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink1TexSingle, dir, idx, var, staple_stride)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?muLink1TexSingle:muLink0TexSingle), dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?muLink0TexSingle:muLink1TexSingle), dir, idx, var, staple_stride)
 #else
 #define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_even, dir, idx, var, staple_stride)
 #define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_odd, dir, idx, var, staple_stride)
 #endif
 
 #if (FATLINK_LOAD_TEX == 1)
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge0TexSingle, dir, idx, FAT, llfat_ga_stride); 
-#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge1TexSingle, dir, idx, FAT, llfat_ga_stride); 
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?fatGauge1TexSingle:fatGauge0TexSingle), dir, idx, FAT, llfat_ga_stride); 
+#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?fatGauge0TexSingle:fatGauge1TexSingle), dir, idx, FAT, llfat_ga_stride); 
 
 #else
 #define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
@@ -342,8 +342,8 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define SITELINK0TEX siteLink0TexSingle_norecon
 #define SITELINK1TEX siteLink1TexSingle_norecon
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?SITELINK1TEX:SITELINK0TEX), dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?SITELINK0TEX:SITELINK1TEX), dir, idx, var, site_ga_stride)
 #else
 #define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
