@@ -80,6 +80,7 @@
 #define a11_im A4.y
 #define a12_re A5.x
 #define a12_im A5.y
+
 #define a20_re A6.x
 #define a20_im A6.y
 #define a21_re A7.x
@@ -245,42 +246,25 @@
 #define tempb22_re TEMPB8.x
 #define tempb22_im TEMPB8.y
 
+#define NUM_FLOATS 5
+#define TEMPA0 sd_data[threadIdx.x * NUM_FLOATS] 
+#define TEMPA1 sd_data[threadIdx.x * NUM_FLOATS + 1] 
+#define TEMPA2 sd_data[threadIdx.x * NUM_FLOATS + 2] 
+#define TEMPA3 sd_data[threadIdx.x * NUM_FLOATS + 3] 
+#define TEMPA4 sd_data[threadIdx.x * NUM_FLOATS + 4] 
 
-//fat link is not compressible
-/*
 #define fat00_re FAT0.x
 #define fat00_im FAT0.y
 #define fat01_re FAT1.x
 #define fat01_im FAT1.y
-*/
-#define SHARED_STRIDE 16 
-#define SHARED_FLOATS_PER_THREAD 12
-
-#define fat00_re s[0*SHARED_STRIDE]
-#define fat00_im s[1*SHARED_STRIDE]
-#define fat01_re s[2*SHARED_STRIDE]
-#define fat01_im s[3*SHARED_STRIDE]
-#define fat02_re s[4*SHARED_STRIDE]
-#define fat02_im s[5*SHARED_STRIDE]
-#define fat10_re s[6*SHARED_STRIDE]
-#define fat10_im s[7*SHARED_STRIDE]
-#define fat11_re s[8*SHARED_STRIDE]
-#define fat11_im s[9*SHARED_STRIDE]
-#define fat12_re s[10*SHARED_STRIDE]
-#define fat12_im s[11*SHARED_STRIDE]
-
-/*
 #define fat02_re FAT2.x
 #define fat02_im FAT2.y
 #define fat10_re FAT3.x
 #define fat10_im FAT3.y
-
 #define fat11_re FAT4.x
 #define fat11_im FAT4.y
 #define fat12_re FAT5.x
 #define fat12_im FAT5.y
-*/
-
 #define fat20_re FAT6.x
 #define fat20_im FAT6.y
 #define fat21_re FAT7.x
@@ -507,12 +491,12 @@ template<int mu, int nu, int odd_bit>
 							   FloatM* fatlink_even, FloatM* fatlink_odd,	
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
-  __shared__ Float sd_data[256*3];
-  Float *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
-    + (threadIdx.x % SHARED_STRIDE);
+  __shared__ FloatM sd_data[64*NUM_FLOATS];
 
-  FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
+  //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
+  FloatM  TEMPA5,TEMPA6, TEMPA7, TEMPA8;
   FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
+  //FloatM STAPLE6, STAPLE7, STAPLE8;
     
   int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -646,14 +630,14 @@ template<int mu, int nu, int odd_bit, int save_staple>
 							   FloatM* mulink_even, FloatM* mulink_odd, 
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
-  __shared__ Float sd_data[256*3];
-  Float *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
-    + (threadIdx.x % SHARED_STRIDE);
+  __shared__ FloatM sd_data[64*NUM_FLOATS];
   
     
-  FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
+  //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
+  FloatM TEMPA5,TEMPA6, TEMPA7, TEMPA8;  
   FloatM TEMPB0, TEMPB1, TEMPB2, TEMPB3, TEMPB4, TEMPB5, TEMPB6, TEMPB7, TEMPB8;
   FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
+  //FloatM STAPLE6, STAPLE7, STAPLE8;
     
   int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -796,10 +780,6 @@ LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_
 					FloatM* fatlink_even, FloatM* fatlink_odd,
 					Float coeff0, Float coeff5)
 {
-  __shared__ Float sd_data[256*3];
-  Float *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
-    + (threadIdx.x % SHARED_STRIDE);
-
   FloatN* my_sitelink;
   FloatM* my_fatlink;
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
