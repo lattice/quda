@@ -31,6 +31,7 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   for(int i = 0;i < nStream; i++){
     cudaStreamCreate(&stream[i]);
   }
+
   
   llfatOneLinkKernel(cudaFatLink, cudaSiteLink,cudaStaple, cudaStaple1,
 		     param, act_path_coeff); CUERR;
