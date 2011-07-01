@@ -190,7 +190,7 @@ llfat_init(void)
   gaugeParam.site_ga_pad = gaugeParam.ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + 4*Vh_2d_max;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, sitelink, &gaugeParam);
+  //loadLinkToGPU(cudaSiteLink, sitelink, &gaugeParam);
 
   gaugeParam.staple_pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
   createStapleQuda(&cudaStaple, &gaugeParam);
@@ -199,7 +199,7 @@ llfat_init(void)
   gaugeParam.site_ga_pad = gaugeParam.ga_pad = Vsh_t;
   gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &gaugeParam);
+  //loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &gaugeParam);
 
   gaugeParam.staple_pad = Vsh_t;
   createStapleQuda(&cudaStaple, &gaugeParam);
@@ -297,17 +297,28 @@ llfat_test(void)
   llfat_init_cuda(&gaugeParam);
   //The number comes from CPU implementation in MILC, fermion_links_helpers.c    
   int flops= 61632; 
-    
-  struct timeval t0, t1;
+
+  struct timeval t0, t1, t2, t3;
   gettimeofday(&t0, NULL);
-  llfat_cuda(cudaFatLink, cudaSiteLink, cudaStaple, cudaStaple1, &gaugeParam, act_path_coeff_2);
-  cudaThreadSynchronize();
-  gettimeofday(&t1, NULL);
-  double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
+
+#ifdef MULTI_GPU
+  gaugeParam.ga_pad = gaugeParam.site_ga_pad;
+  gaugeParam.reconstruct = link_recon;
+  loadLinkToGPU(cudaSiteLink, sitelink, &gaugeParam);
+#else
+  loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &gaugeParam);
+#endif
   
-  gaugeParam.ga_pad = gaugeParam.llfat_ga_pad;
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  storeLinkToCPU(fatlink, &cudaFatLink, &gaugeParam);    
+  gettimeofday(&t1, NULL);  
+
+  llfat_cuda(cudaFatLink, cudaSiteLink, cudaStaple, cudaStaple1, &gaugeParam, act_path_coeff_2);
+  
+  gettimeofday(&t2, NULL);
+  storeLinkToCPU(fatlink, &cudaFatLink, &gaugeParam);
+  gettimeofday(&t3, NULL);
+
+#define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
+  double secs = TDIFF(t0,t3);
  
   int i;
   void* myfatlink[4];
@@ -355,6 +366,10 @@ llfat_test(void)
     printfQuda("	Did you check the GPU health by running cuda memtest?\n");
   }
 
+
+  printfQuda(" h2d=%f s, computation in gpu=%f s, d2h=%f s, total time=%f s\n",
+             TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3), TDIFF(t0, t3));
+  
 
   return accuracy_level;
 }            

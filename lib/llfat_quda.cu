@@ -8,9 +8,9 @@
 #include <gauge_quda.h>
 #include <force_common.h>
 
-#define SITE_MATRIX_LOAD_TEX 0
-#define MULINK_LOAD_TEX 0
-#define FATLINK_LOAD_TEX 0
+#define SITE_MATRIX_LOAD_TEX 1
+#define MULINK_LOAD_TEX 1
+#define FATLINK_LOAD_TEX 1
 
 
 #define WRITE_FAT_MATRIX(gauge, dir, idx)do {		       \
@@ -204,7 +204,9 @@
   mc##22_re = ma##22_re + mb##22_re;		\
   mc##22_im = ma##22_im + mb##22_im;		
 
-
+__constant__ int dir1_array[16];
+__constant__ int dir2_array[16];
+unsigned long staple_bytes=0;
 
 void
 llfat_init_cuda(QudaGaugeParam* param)
@@ -225,6 +227,36 @@ llfat_init_cuda(QudaGaugeParam* param)
   cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));  
   cudaMemcpyToSymbol("staple_stride", &staple_stride, sizeof(int));  
   cudaMemcpyToSymbol("llfat_ga_stride", &llfat_ga_stride, sizeof(int));
+  
+  int dir1[16];
+  int dir2[16];
+
+  for(int nu =0; nu < 4; nu++)
+    for(int mu=0; mu < 4; mu++){
+      if(nu == mu) continue;
+      int d1, d2;
+      for(d1=0; d1 < 4; d1 ++){
+        if(d1 != nu && d1 != mu){
+          break;
+        }
+      }
+      dir1[nu*4+mu] = d1;
+
+      for(d2=0; d2 < 4; d2 ++){
+        if(d2 != nu && d2 != mu && d2 != d1){
+          break;
+        }
+      }
+
+      dir2[nu*4+mu] = d2;
+    }
+
+  cudaMemcpyToSymbol("dir1_array", &dir1, sizeof(dir1));
+  cudaMemcpyToSymbol("dir2_array", &dir2, sizeof(dir2));
+ 
+  
+
+
 }
 
 
@@ -265,16 +297,16 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define Float  float
 #define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_SINGLE(gauge, dir, idx, FAT, llfat_ga_stride)
 #if (MULINK_LOAD_TEX == 1)
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink0TexSingle, dir, idx, var, staple_stride)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(muLink1TexSingle, dir, idx, var, staple_stride)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?muLink1TexSingle:muLink0TexSingle), dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?muLink0TexSingle:muLink1TexSingle), dir, idx, var, staple_stride)
 #else
 #define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_even, dir, idx, var, staple_stride)
 #define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_odd, dir, idx, var, staple_stride)
 #endif
 
 #if (FATLINK_LOAD_TEX == 1)
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge0TexSingle, dir, idx, FAT, llfat_ga_stride)
-#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX(fatGauge1TexSingle, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?fatGauge1TexSingle:fatGauge0TexSingle), dir, idx, FAT, llfat_ga_stride);
+#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?fatGauge0TexSingle:fatGauge1TexSingle), dir, idx, FAT, llfat_ga_stride);
 #else
 #define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
 #define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_SINGLE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
@@ -312,8 +344,8 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define SITELINK0TEX siteLink0TexSingle_norecon
 #define SITELINK1TEX siteLink1TexSingle_norecon
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var)  LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?SITELINK1TEX:SITELINK0TEX), dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?SITELINK0TEX:SITELINK1TEX), dir, idx, var, site_ga_stride)
 #else
 #define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
@@ -349,16 +381,16 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define Float double
 #define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_DOUBLE(gauge, dir, idx, FAT, llfat_ga_stride)
 #if (MULINK_LOAD_TEX == 1)
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(muLink0TexDouble, dir, idx, var, staple_stride)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(muLink1TexDouble, dir, idx, var, staple_stride)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?muLink1TexDouble:muLink0TexDouble), dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?muLink0TexDouble:muLink1TexDouble), dir, idx, var, staple_stride)
 #else
 #define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_even, dir, idx, var, staple_stride)
 #define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_odd, dir, idx, var, staple_stride)
 #endif
 
 #if (FATLINK_LOAD_TEX == 1)
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX(fatGauge0TexDouble, dir, idx, FAT, llfat_ga_stride)
-#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX(fatGauge1TexDouble, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?fatGauge1TexDouble:fatGauge0TexDouble), dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?fatGauge0TexDouble:fatGauge1TexDouble), dir, idx, FAT, llfat_ga_stride)
 #else
 #define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
 #define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_DOUBLE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
@@ -368,8 +400,8 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define SITELINK0TEX siteLink0TexDouble
 #define SITELINK1TEX siteLink1TexDouble
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(SITELINK0TEX, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(SITELINK1TEX, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?SITELINK1TEX:SITELINK0TEX), dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?SITELINK0TEX:SITELINK1TEX), dir, idx, var, site_ga_stride)
 #else
 #define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
@@ -470,6 +502,28 @@ llfat_init_cuda(QudaGaugeParam* param)
       cudaUnbindTexture(fatGauge1TexSingle);				\
     }									\
   }while(0)
+
+
+#define BIND_MU_LINK() do{						\
+    if(prec == QUDA_DOUBLE_PRECISION){					\
+      cudaBindTexture(0, muLink0TexDouble, mulink_even, staple_bytes);  \
+      cudaBindTexture(0, muLink1TexDouble, mulink_odd, staple_bytes);	\
+    }else{								\
+      cudaBindTexture(0, muLink0TexSingle, mulink_even, staple_bytes);  \
+      cudaBindTexture(0, muLink1TexSingle, mulink_odd, staple_bytes);	\
+    }									\
+  }while(0)
+
+#define UNBIND_MU_LINK() do{			  \
+    if(prec == QUDA_DOUBLE_PRECISION){		  \
+      cudaUnbindTexture(muLink0TexSingle);        \
+      cudaUnbindTexture(muLink1TexSingle);        \
+    }else{					  \
+      cudaUnbindTexture(muLink0TexDouble);        \
+      cudaUnbindTexture(muLink1TexDouble);        \
+    }						  \
+  }while(0)                
+
 
 #define BIND_SITE_AND_FAT_LINK do {					\
   if(prec == QUDA_DOUBLE_PRECISION){					\
@@ -857,9 +911,11 @@ computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd,
     }									\
   }
   
+  BIND_MU_LINK();
   dim3 blockDim(BLOCK_DIM , 1, 1);
   ENUMERATE_FUNCS_SAVE(mu,nu,save_staple);
 
+  UNBIND_MU_LINK();
 
 #undef CALL_FUNCTION 
     
@@ -874,9 +930,13 @@ void llfatOneLinkKernel(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   QudaPrecision prec = cudaSiteLink.precision;
   QudaReconstructType recon = cudaSiteLink.reconstruct;
   
+  BIND_SITE_AND_FAT_LINK;
+  
   int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];  
   dim3 gridDim(volume/BLOCK_DIM,1,1);
   dim3 blockDim(BLOCK_DIM , 1, 1);
+  
+  staple_bytes = cudaStaple.bytes;
 
   if(prec == QUDA_DOUBLE_PRECISION){
     if(recon == QUDA_RECONSTRUCT_NO){
