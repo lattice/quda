@@ -6,7 +6,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <mpicomm.h>
-#include <cuda.h>
 
 using namespace std;
 
@@ -274,12 +273,10 @@ void commBarrier() { comm_barrier(); }
 
 #define gaugeSiteSize 18
 
-#if (CUDA_VERSION < 4000)
 static void* fwd_nbr_staple_cpu[4];
 static void* back_nbr_staple_cpu[4];
 static void* fwd_nbr_staple_sendbuf_cpu[4];
 static void* back_nbr_staple_sendbuf_cpu[4];
-#endif
 
 static void* fwd_nbr_staple_gpu[4];
 static void* back_nbr_staple_gpu[4];
@@ -357,7 +354,6 @@ exchange_llfat_init(FullStaple* cudaStaple)
   
   CUERR;
 
-#if (CUDA_VERSION < 4000)
   for(int i=0;i < 4; i++){
     fwd_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
     back_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
@@ -365,6 +361,7 @@ exchange_llfat_init(FullStaple* cudaStaple)
       printf("ERROR: malloc failed for fwd_nbr_staple_cpu/back_nbr_staple_cpu\n");
       comm_exit(1);
     }
+
   }
 
   for(int i=0;i < 4; i++){
@@ -375,8 +372,6 @@ exchange_llfat_init(FullStaple* cudaStaple)
       comm_exit(1);
     }
   }
-#endif
-
   
   return;
 }
@@ -398,16 +393,11 @@ exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag)
   * and we need to send our data to neighbor with dx[nu]=+1, dx[mu]=-1
   */
   
-  unsigned long recv_request[16];
-  unsigned long send_request[16];
-
   for(int nu = XUP; nu <=TUP; nu++){
     for(int mu = XUP; mu <= TUP; mu++){
       if(nu == mu){
 	continue;
       }
-      int idx = nu*4+mu;
-      
       int dir1, dir2; //other two dimensions
       for(dir1=0; dir1 < 4; dir1 ++){
 	if(dir1 != nu && dir1 != mu){
@@ -436,29 +426,21 @@ exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag)
       dx[nu]=-1;
       dx[mu]=+1;
       int src_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
-      recv_request[idx] = comm_recv_from_rank(ghost_sitelink_diag[nu*4+mu], len, src_rank);
+      unsigned long recv_request = comm_recv_from_rank(ghost_sitelink_diag[nu*4+mu], len, src_rank);
       //do send
       dx[nu]=+1;
       dx[mu]=-1;
       int dst_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
-      send_request[idx] = comm_send_to_rank(sendbuf, len, dst_rank);
+      unsigned long send_request = comm_send_to_rank(sendbuf, len, dst_rank);
       
+      comm_wait(recv_request);
+      comm_wait(send_request);
             
       free(sendbuf);
     }//mu
   }//nu
-
-  for(int nu = XUP; nu <=TUP; nu++){
-    for(int mu = XUP; mu <= TUP; mu++){
-      if(nu == mu){
-	continue;
-      }
-      int idx = nu*4+mu;
-      comm_wait(recv_request[idx]);
-      comm_wait(send_request[idx]);
-    }
-  }
 }
+
 
 template<typename Float>
 void
@@ -513,28 +495,20 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
   int up_tags[4] = {XUP, YUP, ZUP, TUP};
   int down_tags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
 
-  unsigned long recv_request1[4];
-  unsigned long recv_request2[4];
-  unsigned long send_request1[4];
-  unsigned long send_request2[4];
   for(int dir  =0; dir < 4; dir++){
     if(optflag && !commDimPartitioned(dir)) continue;
     int len = Vsh[dir]*gaugeSiteSize*sizeof(Float);
     Float* ghost_sitelink_back = ghost_sitelink[dir];
     Float* ghost_sitelink_fwd = ghost_sitelink[dir] + 8*Vsh[dir]*gaugeSiteSize;
     
-    recv_request1[dir] = comm_recv_with_tag(ghost_sitelink_back, 8*len, back_neighbors[dir], up_tags[dir]);
-    recv_request2[dir] = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, fwd_neighbors[dir], down_tags[dir]);
-    send_request1[dir] = comm_send_with_tag(sitelink_fwd_sendbuf[dir], 8*len, fwd_neighbors[dir], up_tags[dir]);
-    send_request2[dir] = comm_send_with_tag(sitelink_back_sendbuf[dir], 8*len, back_neighbors[dir], down_tags[dir]);
-  }
-
-  for(int dir  =0; dir < 4; dir++){
-    if(optflag && !commDimPartitioned(dir)) continue;
-    comm_wait(recv_request1[dir]);
-    comm_wait(recv_request2[dir]);
-    comm_wait(send_request1[dir]);
-    comm_wait(send_request2[dir]);    
+    unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, back_neighbors[dir], up_tags[dir]);
+    unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, fwd_neighbors[dir], down_tags[dir]);
+    unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf[dir], 8*len, fwd_neighbors[dir], up_tags[dir]);
+    unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf[dir], 8*len, back_neighbors[dir], down_tags[dir]);
+    comm_wait(recv_request1);
+    comm_wait(recv_request2);
+    comm_wait(send_request1);
+    comm_wait(send_request2);
   }
 
   exchange_sitelink_diag(X, sitelink, ghost_sitelink_diag);
@@ -693,7 +667,7 @@ exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway, cuda
   exchange_llfat_init(cudaStaple);
   
   packGhostStaple(cudaStaple, dir, whichway, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
-		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, stream);
+		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, NULL, NULL, stream);
 }
 
 
@@ -724,24 +698,13 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
   int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   
-#if (CUDA_VERSION >= 4000)
-    llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple[i], len, back_neighbors[i], up_tags[i]);
-    llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf[i], len, fwd_neighbors[i],  up_tags[i]);
-#else
     llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple_cpu[i], len, back_neighbors[i], up_tags[i]);
     memcpy(fwd_nbr_staple_sendbuf_cpu[i], fwd_nbr_staple_sendbuf[i], len);
     llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i]);
-#endif
-
   } else { // QUDA_FORWARDS
-#if (CUDA_VERSION >= 4000)
-    llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple[i], len, fwd_neighbors[i], down_tags[i]);
-    llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf[i], len, back_neighbors[i] ,down_tags[i]);
-#else
     llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple_cpu[i], len, fwd_neighbors[i], down_tags[i]);
     memcpy(back_nbr_staple_sendbuf_cpu[i], back_nbr_staple_sendbuf[i], len);
     llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[i], len, back_neighbors[i] ,down_tags[i]);
-#endif
   }
 }
 
@@ -768,21 +731,15 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
   if(recv_whichway == QUDA_BACKWARDS){   
     comm_wait(llfat_recv_request1[i]);
     comm_wait(llfat_send_request1[i]);
-#if (CUDA_VERSION >= 4000)
-    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
-#else
+    
     memcpy(back_nbr_staple[i], back_nbr_staple_cpu[i], len);
-    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
-#endif
+    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
   } else { // QUDA_FORWARDS
     comm_wait(llfat_recv_request2[i]);  
     comm_wait(llfat_send_request2[i]);
-#if (CUDA_VERSION >= 4000)
-    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
-#else    
+    
     memcpy(fwd_nbr_staple[i], fwd_nbr_staple_cpu[i], len);
-    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
-#endif
+    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, NULL, NULL, stream);
   }
 }
 
@@ -801,7 +758,6 @@ exchange_llfat_cleanup(void)
 
   }
 
-#if (CUDA_VERSION < 4000)
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_cpu[i]){
       free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] =NULL;
@@ -818,8 +774,6 @@ exchange_llfat_cleanup(void)
       free(back_nbr_staple_sendbuf_cpu[i]); back_nbr_staple_sendbuf_cpu[i] = NULL;
     }    
   }
-#endif
-
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple[i]){
       cudaFreeHost(fwd_nbr_staple[i]); fwd_nbr_staple[i] = NULL;

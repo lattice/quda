@@ -1485,8 +1485,6 @@ packGhostStaple(FullStaple* cudaStaple, int dir, int whichway,
     int sizeOfFloatN = 2*prec;
     int len = Vsh*sizeOfFloatN;
     int i;
-
-
     if(cudaStaple->X[3] %2 == 0){
       //back,even
       for(i=0;i < 9; i++){
@@ -1500,7 +1498,6 @@ packGhostStaple(FullStaple* cudaStaple, int dir, int whichway,
 	void* src = ((char*)odd) + i*cudaStaple->stride*sizeOfFloatN;
 	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
       }
-
       //fwd,even
       for(i=0;i < 9; i++){
 	void* dst = ((char*)fwd_nbr_buf[3]) + i*len ; 
@@ -1513,7 +1510,6 @@ packGhostStaple(FullStaple* cudaStaple, int dir, int whichway,
 	void* src = ((char*)odd) + (Vh-Vsh)*sizeOfFloatN + i*cudaStaple->stride*sizeOfFloatN;
 	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
       }
-
     }else{
       //reverse even and odd position
       //back,odd
@@ -1528,7 +1524,6 @@ packGhostStaple(FullStaple* cudaStaple, int dir, int whichway,
 	void* src = ((char*)even) + i*cudaStaple->stride*sizeOfFloatN;
 	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
       }
-
       //fwd,odd
       for(i=0;i < 9; i++){
 	void* dst = ((char*)fwd_nbr_buf[3]) + i*len ; 

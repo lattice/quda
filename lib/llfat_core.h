@@ -272,6 +272,12 @@
 #define fat22_re FAT8.x
 #define fat22_im FAT8.y
 
+#define NUM_FLOATS 5
+#define TEMPA0 sd_data[threadIdx.x + 0*blockDim.x]
+#define TEMPA1 sd_data[threadIdx.x + 1*blockDim.x ]
+#define TEMPA2 sd_data[threadIdx.x + 2*blockDim.x ]
+#define TEMPA3 sd_data[threadIdx.x + 3*blockDim.x ]
+#define TEMPA4 sd_data[threadIdx.x + 4*blockDim.x ]
     
 #ifdef MULTI_GPU
 
@@ -491,10 +497,10 @@ template<int mu, int nu, int odd_bit>
 							   FloatM* fatlink_even, FloatM* fatlink_odd,	
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
-  __shared__ FloatM sd_data[64*NUM_FLOATS];
-
+  __shared__ FloatM sd_data[NUM_FLOATS*64];
+  
   //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
-  FloatM  TEMPA5, TEMPA6, TEMPA7, TEMPA8;
+  FloatM TEMPA5, TEMPA6, TEMPA7, TEMPA8;
   FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
   //FloatM STAPLE6, STAPLE7, STAPLE8;
     
@@ -630,11 +636,9 @@ template<int mu, int nu, int odd_bit, int save_staple>
 							   FloatM* mulink_even, FloatM* mulink_odd, 
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
-  __shared__ FloatM sd_data[64*NUM_FLOATS];
-  
-    
+  __shared__ FloatM sd_data[NUM_FLOATS*64];
   //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
-  FloatM TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
+  FloatM  TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
   FloatM TEMPB0, TEMPB1, TEMPB2, TEMPB3, TEMPB4, TEMPB5, TEMPB6, TEMPB7, TEMPB8;
   FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
   //FloatM STAPLE6, STAPLE7, STAPLE8;

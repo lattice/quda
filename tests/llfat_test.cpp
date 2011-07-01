@@ -314,10 +314,9 @@ llfat_test(void)
   llfat_init_cuda(&gaugeParam);
   //The number comes from CPU implementation in MILC, fermion_links_helpers.c    
   int flops= 61632; 
-    
+
   struct timeval t0, t1, t2, t3;
   gettimeofday(&t0, NULL);
-  
 #ifdef MULTI_GPU
   gaugeParam.ga_pad = gaugeParam.site_ga_pad;
   gaugeParam.reconstruct = link_recon;
@@ -326,19 +325,16 @@ llfat_test(void)
   loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &gaugeParam);
 #endif
   
-  gettimeofday(&t1, NULL);
+  gettimeofday(&t1, NULL);  
 
   llfat_cuda(cudaFatLink, cudaSiteLink, cudaStaple, cudaStaple1, &gaugeParam, act_path_coeff_2);
+  
   gettimeofday(&t2, NULL);
-  storeLinkToCPU(fatlink, &cudaFatLink, &gaugeParam);      
+  storeLinkToCPU(fatlink, &cudaFatLink, &gaugeParam);
   gettimeofday(&t3, NULL);
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
-
   double secs = TDIFF(t0,t3);
-  
-  gaugeParam.ga_pad = gaugeParam.llfat_ga_pad;
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
  
   int i;
   void* myfatlink[4];
@@ -388,6 +384,10 @@ llfat_test(void)
 
   printfQuda(" h2d=%f s, computation in gpu=%f s, d2h=%f s, total time=%f s\n", 
 	     TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3), TDIFF(t0, t3));
+  
+
+  printfQuda(" h2d=%f s, computation in gpu=%f s, d2h=%f s, total time=%f s\n",
+             TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3), TDIFF(t0, t3));
   
 
   return accuracy_level;
