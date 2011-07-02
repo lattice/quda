@@ -273,10 +273,12 @@ void commBarrier() { comm_barrier(); }
 
 #define gaugeSiteSize 18
 
+#if (CUDA_VERSION < 4000)
 static void* fwd_nbr_staple_cpu[4];
 static void* back_nbr_staple_cpu[4];
 static void* fwd_nbr_staple_sendbuf_cpu[4];
 static void* back_nbr_staple_sendbuf_cpu[4];
+#endif
 
 static void* fwd_nbr_staple_gpu[4];
 static void* back_nbr_staple_gpu[4];
@@ -354,6 +356,7 @@ exchange_llfat_init(FullStaple* cudaStaple)
   
   CUERR;
 
+#if (CUDA_VERSION < 4000)
   for(int i=0;i < 4; i++){
     fwd_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
     back_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
@@ -372,6 +375,7 @@ exchange_llfat_init(FullStaple* cudaStaple)
       comm_exit(1);
     }
   }
+#endif
   
   return;
 }
@@ -698,13 +702,23 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
   int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   
+#if (CUDA_VERSION >= 4000)
+    llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple[i], len, back_neighbors[i], up_tags[i]);
+    llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf[i], len, fwd_neighbors[i],  up_tags[i]);
+#else
     llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple_cpu[i], len, back_neighbors[i], up_tags[i]);
     memcpy(fwd_nbr_staple_sendbuf_cpu[i], fwd_nbr_staple_sendbuf[i], len);
     llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i]);
+#endif
   } else { // QUDA_FORWARDS
+#if (CUDA_VERSION >= 4000)
+    llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple[i], len, fwd_neighbors[i], down_tags[i]);
+    llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf[i], len, back_neighbors[i] ,down_tags[i]);
+#else
     llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple_cpu[i], len, fwd_neighbors[i], down_tags[i]);
     memcpy(back_nbr_staple_sendbuf_cpu[i], back_nbr_staple_sendbuf[i], len);
     llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[i], len, back_neighbors[i] ,down_tags[i]);
+#endif
   }
 }
 
@@ -731,15 +745,25 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
   if(recv_whichway == QUDA_BACKWARDS){   
     comm_wait(llfat_recv_request1[i]);
     comm_wait(llfat_send_request1[i]);
-    
+
+#if (CUDA_VERSION >= 4000)
+    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+#else   
     memcpy(back_nbr_staple[i], back_nbr_staple_cpu[i], len);
     unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+#endif
+
   } else { // QUDA_FORWARDS
     comm_wait(llfat_recv_request2[i]);  
     comm_wait(llfat_send_request2[i]);
-    
+
+#if (CUDA_VERSION >= 4000)
+    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+#else        
     memcpy(fwd_nbr_staple[i], fwd_nbr_staple_cpu[i], len);
     unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+#endif
+
   }
 }
 
@@ -758,6 +782,7 @@ exchange_llfat_cleanup(void)
 
   }
 
+#if (CUDA_VERSION < 4000)
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_cpu[i]){
       free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] =NULL;
@@ -774,6 +799,8 @@ exchange_llfat_cleanup(void)
       free(back_nbr_staple_sendbuf_cpu[i]); back_nbr_staple_sendbuf_cpu[i] = NULL;
     }    
   }
+#endif
+
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple[i]){
       cudaFreeHost(fwd_nbr_staple[i]); fwd_nbr_staple[i] = NULL;
