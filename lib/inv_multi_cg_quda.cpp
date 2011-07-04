@@ -60,7 +60,7 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
 
   cudaColorSpinorField *r = new cudaColorSpinorField(b);
   
-  cudaColorSpinorField *x_sloppy[num_offsets], *r_sloppy;
+  cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offsets], *r_sloppy;
   
   ColorSpinorParam param;
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -80,7 +80,7 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
     r_sloppy = new cudaColorSpinorField(*r, param);
   }
   
-  cudaColorSpinorField* p[num_offsets];  
+  cudaColorSpinorField **p = new cudaColorSpinorField*[num_offsets];  
   for(i=0;i < num_offsets;i++){
     p[i]= new cudaColorSpinorField(*r_sloppy);    
   }
@@ -224,6 +224,7 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
   for(i=0;i < num_offsets; i++){
     delete p[i];
   }
+  delete p;
   delete Ap;
   
   if (invert_param->cuda_prec_sloppy != x[0]->Precision()) {
@@ -232,14 +233,15 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
     }
     delete r_sloppy;
   }
+  delete x_sloppy;
   
   delete []finished;
   delete []zeta_i;
   delete []zeta_im1;
-  double []zeta_ip1;
-  double []beta_i;
-  double []beta_im1;
-  double []alpha;
+  delete []zeta_ip1;
+  delete []beta_i;
+  delete []beta_im1;
+  delete []alpha;
  
   return k;
 }
