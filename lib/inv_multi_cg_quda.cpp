@@ -10,7 +10,7 @@
 #include <util_quda.h>
 #include <face_quda.h>
 
-#include <sys/time.h>
+//#include <sys/time.h>
 
 
 
@@ -38,9 +38,13 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
     return 0;
   }
 
-  int finished[num_offsets];
-  double zeta_i[num_offsets], zeta_im1[num_offsets], zeta_ip1[num_offsets];
-  double beta_i[num_offsets], beta_im1[num_offsets], alpha[num_offsets];
+  int *finished = new int [num_offsets];
+  double *zeta_i = new double[num_offsets];
+  double *zeta_im1 = new double[num_offsets];
+  double *zeta_ip1 = new double[num_offsets];
+  double *beta_i = new double[num_offsets];
+  double *beta_im1 = new double[num_offsets];
+  double *alpha = new double[num_offsets];
   int i, j;
   
   int j_low = 0;   
@@ -229,7 +233,14 @@ int invertMultiShiftCgCuda(const DiracMatrix &mat,
     delete r_sloppy;
   }
   
-  
+  delete []finished;
+  delete []zeta_i;
+  delete []zeta_im1;
+  double []zeta_ip1;
+  double []beta_i;
+  double []beta_im1;
+  double []alpha;
+ 
   return k;
 }
 
