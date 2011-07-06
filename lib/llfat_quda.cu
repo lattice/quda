@@ -8,10 +8,15 @@
 #include <gauge_quda.h>
 #include <force_common.h>
 
+#if (__CUDA_ARCH__ >= 200)
 #define SITE_MATRIX_LOAD_TEX 1
 #define MULINK_LOAD_TEX 1
 #define FATLINK_LOAD_TEX 1
-
+#else
+#define SITE_MATRIX_LOAD_TEX 0
+#define MULINK_LOAD_TEX 1
+#define FATLINK_LOAD_TEX 1
+#endif
 
 #define WRITE_FAT_MATRIX(gauge, dir, idx)do {			\
     gauge[idx + dir*9*llfat_ga_stride] = FAT0;			\
