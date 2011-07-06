@@ -246,13 +246,6 @@
 #define tempb22_re TEMPB8.x
 #define tempb22_im TEMPB8.y
 
-#define NUM_FLOATS 5
-#define TEMPA0 sd_data[threadIdx.x + 0*blockDim.x]
-#define TEMPA1 sd_data[threadIdx.x + 1*blockDim.x ]
-#define TEMPA2 sd_data[threadIdx.x + 2*blockDim.x ]
-#define TEMPA3 sd_data[threadIdx.x + 3*blockDim.x ]
-#define TEMPA4 sd_data[threadIdx.x + 4*blockDim.x ]
-
 #define fat00_re FAT0.x
 #define fat00_im FAT0.y
 #define fat01_re FAT1.x
