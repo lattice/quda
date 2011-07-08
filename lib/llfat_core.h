@@ -275,46 +275,51 @@
 #ifdef MULTI_GPU
 
 #define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {                     \
+    new_x1 = x1; new_x2 = x2; new_x3 = x3; new_x4 = x4;			\
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_mem_idx = (x1==X1m1)? ((Vh+Vsh_x+ spacecon_x)*xcomm+(idx - X1m1)/2*(1-xcomm)):((idx+1)>>1);	\
+      new_mem_idx = (x1==X1m1)? ((Vh+Vsh_x+ spacecon_x)*xcomm+(idx - X1m1)/2*(1-xcomm)):((idx+1)>>1); \
+      new_x1 = (x1 == X1m1)? 0: (x1+1);					\
       break;                                                            \
     case 1:                                                             \
       new_mem_idx = (x2==X2m1)? ((Vh+2*(Vsh_x)+Vsh_y+ spacecon_y)*ycomm+(idx-X2X1mX1)/2*(1-ycomm)):((idx+X1)>>1); \
+      new_x2 = (x2 == X2m1)? 0: (x2+1);					\
       break;                                                            \
     case 2:                                                             \
       new_mem_idx = (x3==X3m1)? ((Vh+2*(Vsh_x+Vsh_y)+Vsh_z+ spacecon_z))*zcomm+(idx-X3X2X1mX2X1)/2*(1-zcomm):((idx+X2X1)>>1); \
       break;                                                            \
-    case 3:                                                             \
+    case 3:								\
       new_mem_idx = ( (x4==X4m1)? ((Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+spacecon_t))*tcomm+(idx-X4X3X2X1mX3X2X1)/2*(1-tcomm): (idx+X3X2X1)>>1); \
+      new_x4 = (x4 == X4m1)?0: (x4+1);					\
       break;                                                            \
     }                                                                   \
   }while(0)
 
 
 #define LLFAT_COMPUTE_NEW_IDX_MINUS(mydir, idx) do {			\
+    new_x1 = x1; new_x2 = x2; new_x3 = x3; new_x4 = x4;			\
     switch(mydir){                                                      \
     case 0:                                                             \
       new_mem_idx = (x1==0)?( (Vh+spacecon_x)*xcomm+(idx+X1m1)/2*(1-xcomm)):((idx-1) >> 1);		\
+      new_x1 = (x1==0)?X1m1:(x1-1);					\
       break;                                                            \
     case 1:                                                             \
       new_mem_idx = (x2==0)?( (Vh+2*Vsh_x+spacecon_y)*ycomm+(idx+X2X1mX1)/2*(1-ycomm)):((idx-X1) >> 1);	\
+      new_x2 = (x2==0)?X2m1:(x2-1);					\
       break;                                                            \
     case 2:                                                             \
       new_mem_idx = (x3==0)?((Vh+2*(Vsh_x+Vsh_y)+spacecon_z)*zcomm+(idx+X3X2X1mX2X1)/2*(1-zcomm)):((idx-X2X1) >> 1); \
       break;                                                            \
     case 3:                                                             \
       new_mem_idx = (x4==0)?((Vh+2*(Vsh_x+Vsh_y+Vsh_z)+ spacecon_t)*tcomm + (idx+X4X3X2X1mX3X2X1)/2*(1-tcomm)):((idx-X3X2X1) >> 1); \
+      new_x4 = (x4==0)?X4m1:(x4-1);					\
       break;                                                            \
     }                                                                   \
   }while(0)
 
 
 #define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {	\
-    new_x1 = x1;                                                        \
-    new_x2 = x2;                                                        \
-    new_x3 = x3;                                                        \
-    new_x4 = x4;                                                        \
+    new_x1 = x1; new_x2 = x2; new_x3 = x3; new_x4 = x4;			\
     new_mem_idx=X;							\
     if(x[mydir1] > 0){/*mydir1 is not out of boundary*/			\
       switch(mydir1){							\
@@ -328,7 +333,6 @@
 	break;								\
       case 2:								\
 	new_mem_idx = new_mem_idx-X2X1;					\
-	new_x3 = x3 - 1;						\
 	break;								\
       case 3:								\
 	new_mem_idx = new_mem_idx-X3X2X1;				\
@@ -338,18 +342,18 @@
       switch(mydir2){							\
       case 0:								\
 	new_mem_idx = (x1==X1m1)?(2*(Vh+Vsh_x)+((new_x4*X3X2+new_x3*X2+new_x2)))*xcomm+(new_mem_idx-X1m1)*(1-xcomm):(new_mem_idx+1); \
-	new_x1 = (x1==X1m1)?0:x1+1;					\
+	new_x1 = (x1==X1m1)?0:(x1+1);					\
 	break;								\
       case 1:								\
 	new_mem_idx = (x2==X2m1)?(2*(Vh+2*(Vsh_x)+Vsh_y)+((new_x4*X3X1+new_x3*X1+new_x1)))*ycomm+(new_mem_idx-X2X1mX1)*(1-ycomm):(new_mem_idx+X1); \
-	new_x2 = (x2==X2m1)?0:x2+1;					\
+	new_x2 = (x2==X2m1)?0:(x2+1);					\
 	break;								\
       case 2:								\
 	new_mem_idx = (x3==X3m1)?(2*(Vh+2*(Vsh_x+Vsh_y)+Vsh_z)+((new_x4*X2X1+new_x2*X1+new_x1)))*zcomm+(new_mem_idx-X3X2X1mX2X1)*(1-zcomm):(new_mem_idx+X2X1); \
 	break;								\
       case 3:								\
 	new_mem_idx = (x4==X4m1)?(2*(Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t)+((new_x3*X2X1+new_x2*X1+new_x1)))*tcomm+(new_mem_idx-X4X3X2X1mX3X2X1)*(1-tcomm):(new_mem_idx+X3X2X1); \
-	new_x4 = (x4==X4m1)?0:x4+1;					\
+	new_x4 = (x4==X4m1)?0:(x4+1);					\
 	break;								\
       }									\
     }else{/*mydir1 is out of boundary, means mydir2 must be within boundary*/ \
@@ -365,7 +369,6 @@
 	break;								\
       case 2:								\
 	new_mem_idx = new_mem_idx+X2X1;					\
-	new_x3 = x3+1;							\
 	break;								\
       case 3:								\
 	new_mem_idx = new_mem_idx+X3X2X1;				\
@@ -393,8 +396,15 @@
     new_mem_idx = new_mem_idx >> 1;					\
   }while(0)
 
-#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do {	\
+#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do { \
+    int	new_x[4]; 							\
+    new_x[3] = x4; new_x[1] = x2; new_x[0] = x1;			\
     new_mem_idx = Vh+2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + mu*Vh_2d_max + ((x[dir2]*Z[dir1] + x[dir1])>>1); \
+    new_x[nu] = Z[nu] -1;						\
+    new_x[mu] = 0;							\
+    new_x1 = new_x[0]; 							\
+    new_x2 = new_x[1]; 							\
+    new_x4 = new_x[3]; 							\
   }while(0)
 
 
@@ -578,7 +588,6 @@ template<int mu, int nu, int odd_bit>
    *                  mu (B)
    *
    *********************************************/
-
   {
     /* load matrix A*/
     LLFAT_COMPUTE_NEW_IDX_MINUS(nu,X);    

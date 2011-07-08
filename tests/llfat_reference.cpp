@@ -651,6 +651,7 @@ void llfat_cpu_mg(void** fatlink, su3_matrix** sitelink, su3_matrix** ghost_site
     }
   }
 
+  
   for (int dir=XUP; dir<=TUP; dir++){
     for(int nu=XUP; nu<=TUP; nu++){
       if(nu!=dir){

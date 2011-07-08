@@ -188,7 +188,7 @@ llfat_init(void)
     
     
   createSiteLinkCPU(sitelink, gaugeParam.cpu_prec, 1);
-  
+
 #ifdef MULTI_GPU
   int Vh_2d_max = MAX(xdim*ydim/2, xdim*zdim/2);
   Vh_2d_max = MAX(Vh_2d_max, xdim*tdim/2);
