@@ -36,7 +36,6 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   llfatOneLinkKernel(cudaFatLink, cudaSiteLink,cudaStaple, cudaStaple1,
 		     param, act_path_coeff); CUERR;
   
-
   llfat_kernel_param_t kparam;
   for(int i=0;i < 4;i++){
      kparam.ghostDim[i] = commDimPartitioned(i);

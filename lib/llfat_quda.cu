@@ -9,9 +9,9 @@
 #include <force_common.h>
 
 #if (__CUDA_ARCH__ >= 200)
-#define SITE_MATRIX_LOAD_TEX 0
-#define MULINK_LOAD_TEX 0
-#define FATLINK_LOAD_TEX 0
+#define SITE_MATRIX_LOAD_TEX 1
+#define MULINK_LOAD_TEX 1
+#define FATLINK_LOAD_TEX 1
 #else
 #define SITE_MATRIX_LOAD_TEX 0
 #define MULINK_LOAD_TEX 1
@@ -108,18 +108,23 @@
   double2 var##8 = fetch_double2(gauge, idx + dir*9*stride + 8*stride);	
 
 
-
 #define LOAD_MATRIX_12_SINGLE_DECLARE(gauge, dir, idx, var, stride)	\
-  float4 var##0 = gauge[idx + dir*3*stride];				\
-  float4 var##1 = gauge[idx + dir*3*stride + stride];			\
-  float4 var##2 = gauge[idx + dir*3*stride + 2*stride];			\
-  float4 var##3, var##4;
+  float2 var##0 = gauge[idx + dir*6*stride];				\
+  float2 var##1 = gauge[idx + dir*6*stride + stride];			\
+  float2 var##2 = gauge[idx + dir*6*stride + 2*stride];			\
+  float2 var##3 = gauge[idx + dir*6*stride + 3*stride];			\
+  float2 var##4 = gauge[idx + dir*6*stride + 4*stride];			\
+  float2 var##5 = gauge[idx + dir*6*stride + 5*stride];			\
+  float2 var##6, var##7, var##8;
 
 #define LOAD_MATRIX_12_SINGLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
-  float4 var##0 = tex1Dfetch(gauge, idx + dir*3*stride);		\
-  float4 var##1 = tex1Dfetch(gauge, idx + dir*3*stride + stride);	\
-  float4 var##2 = tex1Dfetch(gauge, idx + dir*3*stride + 2*stride);	\
-  float4 var##3, var##4;
+  float2 var##0 = tex1Dfetch(gauge, idx + dir*6*stride);		\
+  float2 var##1 = tex1Dfetch(gauge, idx + dir*6*stride + stride);	\
+  float2 var##2 = tex1Dfetch(gauge, idx + dir*6*stride + 2*stride);	\
+  float2 var##3 = tex1Dfetch(gauge, idx + dir*6*stride + 3*stride);	\
+  float2 var##4 = tex1Dfetch(gauge, idx + dir*6*stride + 4*stride);	\
+  float2 var##5 = tex1Dfetch(gauge, idx + dir*6*stride + 5*stride);	\
+  float2 var##6, var##7, var##8;
 
 #define LOAD_MATRIX_18_SINGLE_DECLARE(gauge, dir, idx, var, stride)	\
   float2 var##0 = gauge[idx + dir*9*stride];				\
@@ -331,7 +336,7 @@ llfat_init_cuda(QudaGaugeParam* param)
 #define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
 
 #define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  RECONSTRUCT_LINK_12(dir, idx, sign, var);
-#define FloatN float4
+#define FloatN float2
 #define FloatM float2
 #define RECONSTRUCT 12
 #include "llfat_core.h"
@@ -844,12 +849,12 @@ void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd,
     }else{								\
       do_siteComputeGenStapleParity12Kernel<mu,nu, 0>		\
 	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
-						(float4*)sitelink_even, (float4*)sitelink_odd, \
+						(float2*)sitelink_even, (float2*)sitelink_odd, \
 						(float2*)fatlink_even, (float2*)fatlink_odd, \
 						(float)mycoeff, kparam); \
       do_siteComputeGenStapleParity12Kernel<mu,nu, 1>		\
 	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_odd, (float2*)staple_even, \
-						(float4*)sitelink_odd, (float4*)sitelink_even, \
+						(float2*)sitelink_odd, (float2*)sitelink_even, \
 						(float2*)fatlink_odd, (float2*)fatlink_even, \
 						(float)mycoeff, kparam); \
     }									\
@@ -923,13 +928,13 @@ computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd,
     }else{								\
       do_computeGenStapleFieldParity12Kernel<mu,nu, 0, save_staple>	\
 	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_even, (float2*)staple_odd, \
-						(float4*)sitelink_even, (float4*)sitelink_odd, \
+						(float2*)sitelink_even, (float2*)sitelink_odd, \
 						(float2*)fatlink_even, (float2*)fatlink_odd, \
 						(float2*)mulink_even, (float2*)mulink_odd, \
 						(float)mycoeff, kparam); \
       do_computeGenStapleFieldParity12Kernel<mu,nu, 1, save_staple> \
 	<<<halfGridDim, blockDim, 0, *stream>>>((float2*)staple_odd, (float2*)staple_even, \
-						(float4*)sitelink_odd, (float4*)sitelink_even, \
+						(float2*)sitelink_odd, (float2*)sitelink_even, \
 						(float2*)fatlink_odd, (float2*)fatlink_even, \
 						(float2*)mulink_odd, (float2*)mulink_even, \
 						(float)mycoeff, kparam); \
@@ -980,7 +985,7 @@ void llfatOneLinkKernel(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 						  (float2*)cudaFatLink.even, (float2*)cudaFatLink.odd,
 						  (float)act_path_coeff[0], (float)act_path_coeff[5]);    						  
     }else{
-      llfatOneLink12Kernel<<<gridDim, blockDim>>>((float4*)cudaSiteLink.even, (float4*)cudaSiteLink.odd,
+      llfatOneLink12Kernel<<<gridDim, blockDim>>>((float2*)cudaSiteLink.even, (float2*)cudaSiteLink.odd,
 						  (float2*)cudaFatLink.even, (float2*)cudaFatLink.odd,
 						  (float)act_path_coeff[0], (float)act_path_coeff[5]);    
     }

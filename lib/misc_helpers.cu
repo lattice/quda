@@ -63,7 +63,6 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
       dst_start[tid + j*(Vh+pad)] = buf[M/N*threadIdx.x + j];
     }
     __syncthreads();
-    
   }//dir
 }
 
@@ -107,7 +106,7 @@ link_format_cpu_to_gpu(void* dst, void* src,
       do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, ghostV);   
       break;
     case QUDA_RECONSTRUCT_12:
-      do_link_format_cpu_to_gpu<4, 12><<<gridDim, blockDim>>>((float4*)dst, (float*)src, reconstruct, bytes, Vh, pad, Vsh);   
+      do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, ghostV);   
       break;
     default:
       errorQuda("reconstruct type not supported\n");      

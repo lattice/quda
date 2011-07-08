@@ -186,7 +186,7 @@ llfat_init(void)
     }
   }
     
-    
+  
   createSiteLinkCPU(sitelink, gaugeParam.cpu_prec, 1);
 
 #ifdef MULTI_GPU
