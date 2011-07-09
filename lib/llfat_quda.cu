@@ -263,39 +263,6 @@ llfat_init_cuda(QudaGaugeParam* param)
   cudaMemcpyToSymbol("dir2_array", &dir2, sizeof(dir2));   
 }
 
-#if 1
-#define COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) do {	\
-    sign =1;							\
-    switch(dir){						\
-    case XUP:							\
-      if ( (i4 & 1) == 1){					\
-	sign = -1;						\
-      }								\
-      break;							\
-    case YUP:							\
-      if ( ((i4+i1) & 1) == 1){					\
-	sign = -1;						\
-      }								\
-      break;							\
-    case ZUP:							\
-      if ( ((i4+i1+i2) & 1) == 1){				\
-	sign = -1;						\
-      }								\
-      break;							\
-    case TUP:							\
-      if (i4 == X4m1 ){						\
-	sign = -1;						\
-      }								\
-      break;							\
-    }								\
-  }while (0)
-#else
-
-#define COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) do {\
-    sign = 1;						     \
-  }while(0)
-#endif
-
 
 #define LLFAT_CONCAT(a,b) a##b##Kernel
 #define LLFAT_KERNEL(a,b) LLFAT_CONCAT(a,b)
