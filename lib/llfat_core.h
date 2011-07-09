@@ -448,7 +448,7 @@
 	break;								\
       case 2:								\
 	new_mem_idx = new_mem_idx+X2X1;					\
-	local_new_x3 = (x3=X3m1)?0:(x3+1);					\
+	local_new_x3 = (x3==X3m1)?0:(x3+1);					\
 	break;								\
       case 3:								\
 	new_mem_idx = new_mem_idx+X3X2X1;				\
