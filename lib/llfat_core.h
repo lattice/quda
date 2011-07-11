@@ -222,15 +222,15 @@
     new_x1 = x1; new_x2 = x2; new_x4 = x4;				\
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_x1 = (x1 == X1m1)? 0: (x1+1);					\
+      new_x1 = x1+1;							\
       break;                                                            \
     case 1:                                                             \
-      new_x2 = (x2 == X2m1)? 0: (x2+1);					\
+      new_x2 = x2+1;							\
       break;                                                            \
     case 2:                                                             \
       break;                                                            \
     case 3:								\
-      new_x4 = (x4 == X4m1)?0: (x4+1);					\
+      new_x4 = x4+1;							\
       break;                                                            \
     }                                                                   \
   }while(0)
@@ -239,15 +239,15 @@
     new_x1 = x1; new_x2 = x2; new_x4 = x4;				\
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_x1 = (x1==0)?X1m1:(x1-1);					\
+      new_x1 = x1-1;							\
       break;                                                            \
     case 1:                                                             \
-      new_x2 = (x2==0)?X2m1:(x2-1);					\
+      new_x2 = x2-1;							\
       break;                                                            \
     case 2:                                                             \
       break;                                                            \
     case 3:                                                             \
-      new_x4 = (x4==0)?X4m1:(x4-1);					\
+      new_x4 = x4-1;							\
       break;                                                            \
     }                                                                   \
   }while(0)
@@ -257,56 +257,56 @@
     if(dimcomm[mydir1] == 0 || x[mydir1] > 0){				\
       switch(mydir1){							\
       case 0:								\
-	new_x1 = (x1==0)?X1m1:(x1 - 1);					\
+	new_x1 = x1 - 1;						\
 	break;								\
       case 1:								\
-	new_x2 = (x2==0)?X2m1:(x2 - 1);					\
+	new_x2 = x2 - 1;						\
 	break;								\
       case 2:								\
 	break;								\
       case 3:								\
-	new_x4 = (x4==0)?X4m1:(x4 - 1);					\
+	new_x4 = x4 - 1;						\
 	break;								\
       }									\
       switch(mydir2){							\
       case 0:								\
-	new_x1 = (x1==X1m1)?0:(x1+1);					\
+	new_x1 = x1+1;							\
 	break;								\
       case 1:								\
-	new_x2 = (x2==X2m1)?0:(x2+1);					\
+	new_x2 = x2+1;							\
 	break;								\
       case 2:								\
 	break;								\
       case 3:								\
-	new_x4 = (x4==X4m1)?0:(x4+1);					\
+	new_x4 = x4+1;							\
 	break;								\
       }									\
     }else{								\
       /*the case where both dir1/dir2 are out of boundary are dealed with a different macro (_DIAG)*/ \
       switch(mydir2){							\
       case 0:								\
-	new_x1 = (x1==X1m1)?0:(x1+1);					\
+	new_x1 = x1+1;							\
 	break;								\
       case 1:								\
-	new_x2 = (x2==X2m1)?0:(x2+1);					\
+	new_x2 = x2+1;							\
 	break;								\
       case 2:								\
 	break;								\
       case 3:								\
-	new_x4 = (x4==X4m1)?0:(x4+1);					\
+	new_x4 = x4+1;							\
 	break;								\
       }									\
       switch(mydir1){/*mydir1 is 0 here */				\
       case 0:								\
-	new_x1 = (x1==0)?X1m1:(x1-1);					\
+	new_x1 = x1-1;							\
 	break;								\
       case 1:								\
-	new_x2 = (x2==0)?X2m1:(x2-1);					\
+	new_x2 = x2-1;							\
 	break;								\
       case 2:								\
 	break;								\
       case 3:								\
-	new_x4 = (x4==0)?X4m1:(x4-1);					\
+	new_x4 = x4-1;							\
 	break;								\
       }									\
     }									\
@@ -315,7 +315,7 @@
 #define UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do {		\
     int	new_x[4]; 							\
     new_x[3] = x4; new_x[1] = x2; new_x[0] = x1;			\
-    new_x[nu] = Z[nu] -1;						\
+    new_x[nu] =  -1;							\
     new_x[mu] = 0;							\
     new_x1 = new_x[0]; 							\
     new_x2 = new_x[1]; 							\
@@ -326,22 +326,24 @@
     sign =1;							\
     switch(dir){						\
     case XUP:							\
-      if ( (i4 & 1) == 1){					\
+      if ( (i4 & 1) != 0){					\
 	sign = -1;						\
       }								\
       break;							\
     case YUP:							\
-      if ( ((i4+i1) & 1) == 1){					\
+      if ( ((i4+i1) & 1) != 0){					\
 	sign = -1;						\
       }								\
       break;							\
     case ZUP:							\
-      if ( ((i4+i1+i2) & 1) == 1){				\
+      if ( ((i4+i1+i2) & 1) != 0){				\
 	sign = -1;						\
       }								\
       break;							\
     case TUP:							\
-      if (i4 == X4m1 ){						\
+      if (i4 == X4m1 && last_proc_in_tdim){			\
+	sign = -1;						\
+      }else if(i4 == -1 && first_proc_in_tdim){			\
 	sign = -1;						\
       }								\
       break;							\

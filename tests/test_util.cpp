@@ -956,26 +956,25 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 		double coeff= 1.0;
 		switch(dir){
 		case XUP:
-		    if ( (i4 & 1) == 1){
+		    if ( (i4 & 1) != 0){
 		      coeff *= -1;
 		    }
 		    break;
 
 		case YUP:
-		    if ( ((i4+i1) & 1) == 1){
+		    if ( ((i4+i1) & 1) != 0){
 		      coeff *= -1;
 		    }
 		    break;
 
 		case ZUP:
-		    if ( ((i4+i1+i2) & 1) == 1){
+		    if ( ((i4+i1+i2) & 1) != 0){
 		      coeff *= -1;
 		    }
 		    break;
 		
 		case TUP:
-		  //if (commCoords(3) == (commDim(3) -1) && i4 == (X4-1) ){
-		  if (i4 == (X4-1) ){
+		  if ((commCoords(3) == commDim(3) -1) && i4 == (X4-1) ){
 		    coeff *= -1;
 		  }
 		    break;

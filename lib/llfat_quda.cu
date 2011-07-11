@@ -216,6 +216,9 @@
 
 __constant__ int dir1_array[16];
 __constant__ int dir2_array[16];
+__constant__ int last_proc_in_tdim;
+__constant__ int first_proc_in_tdim;
+
 unsigned long staple_bytes=0;
 
 void
@@ -258,9 +261,23 @@ llfat_init_cuda(QudaGaugeParam* param)
 
       dir2[nu*4+mu] = d2;
     }
-
+  
   cudaMemcpyToSymbol("dir1_array", &dir1, sizeof(dir1));
   cudaMemcpyToSymbol("dir2_array", &dir2, sizeof(dir2));   
+  
+  int first_proc_in_tdim = 0;
+  int last_proc_in_tdim = 0;
+  if(commCoords(3) == (commDim(3) -1)){
+    last_proc_in_tdim =  1;
+  }
+  
+  if(commCoords(3) == 0){
+    first_proc_in_tdim =  1;    
+  }
+
+  cudaMemcpyToSymbol("last_proc_in_tdim", &last_proc_in_tdim, sizeof(int));
+  cudaMemcpyToSymbol("first_proc_in_tdim", &first_proc_in_tdim, sizeof(int));
+  
 }
 
 
