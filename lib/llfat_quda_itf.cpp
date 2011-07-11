@@ -25,7 +25,16 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   
   QudaPrecision prec = cudaSiteLink.precision;
   QudaReconstructType recon = cudaSiteLink.reconstruct;
-
+  
+  if( ((param->X[0] % 2 != 0)
+       ||(param->X[1] % 2 != 0)
+       ||(param->X[2] % 2 != 0)
+       ||(param->X[3] % 2 != 0))
+      && (recon  == QUDA_RECONSTRUCT_12)){
+    errorQuda("12 reconstruct and odd dimensionsize is not supported by link fattening code (yet)\n");
+    
+  }
+      
   int nStream=9;
   cudaStream_t stream[nStream];
   for(int i = 0;i < nStream; i++){
