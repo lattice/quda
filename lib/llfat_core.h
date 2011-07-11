@@ -7,6 +7,7 @@
 #define ycomm kparam.ghostDim[1]
 #define zcomm kparam.ghostDim[2]
 #define tcomm kparam.ghostDim[3]
+#define dimcomm kparam.ghostDim
 
 #define a00_re A0.x
 #define a00_im A0.y
@@ -253,18 +254,18 @@
 
 #define UPDATE_COOR_LOWER_STAPLE(mydir1, mydir2) do {	\
     new_x1 = x1; new_x2 = x2;  new_x4 = x4;				\
-    if(x[mydir1] > 0){/*mydir1 is not out of boundary*/			\
+    if(dimcomm[mydir1] == 0 || x[mydir1] > 0){				\
       switch(mydir1){							\
       case 0:								\
-	new_x1 = x1 - 1;						\
+	new_x1 = (x1==0)?X1m1:(x1 - 1);					\
 	break;								\
       case 1:								\
-	new_x2 = x2 - 1;						\
+	new_x2 = (x2==0)?X2m1:(x2 - 1);					\
 	break;								\
       case 2:								\
 	break;								\
       case 3:								\
-	new_x4 = x4 - 1;						\
+	new_x4 = (x4==0)?X4m1:(x4 - 1);					\
 	break;								\
       }									\
       switch(mydir2){							\
@@ -280,32 +281,32 @@
 	new_x4 = (x4==X4m1)?0:(x4+1);					\
 	break;								\
       }									\
-    }else{/*mydir1 is out of boundary, means mydir2 must be within boundary*/ \
+    }else{								\
       /*the case where both dir1/dir2 are out of boundary are dealed with a different macro (_DIAG)*/ \
       switch(mydir2){							\
       case 0:								\
-	new_x1 = x1+1;							\
+	new_x1 = (x1==X1m1)?0:(x1+1);					\
 	break;								\
       case 1:								\
-	new_x2 = x2+1;							\
+	new_x2 = (x2==X2m1)?0:(x2+1);					\
 	break;								\
       case 2:								\
 	break;								\
       case 3:								\
-	new_x4 = x4+1;							\
+	new_x4 = (x4==X4m1)?0:(x4+1);					\
 	break;								\
       }									\
       switch(mydir1){/*mydir1 is 0 here */				\
       case 0:								\
-	new_x1 = X1m1;							\
+	new_x1 = (x1==0)?X1m1:(x1-1);					\
 	break;								\
       case 1:								\
-	new_x2 = X2m1;							\
+	new_x2 = (x2==0)?X2m1:(x2-1);					\
 	break;								\
       case 2:								\
 	break;								\
       case 3:								\
-	new_x4 = X4m1;							\
+	new_x4 = (x4==0)?X4m1:(x4-1);					\
 	break;								\
       }									\
     }									\
@@ -396,29 +397,29 @@
   }while(0)
 
 
-#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {	\
+#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {		\
     int local_new_x1=x1;						\
     int local_new_x2=x2;						\
     int local_new_x3=x3;						\
     int local_new_x4=x4;						\
     new_mem_idx=X;							\
-    if(x[mydir1] > 0){/*mydir1 is not out of boundary*/			\
-      switch(mydir1){							\
+    if(dimcomm[mydir1] == 0 || x[mydir1] > 0){				\
+      switch(mydir1){/*mydir1 is not partitioned or x[mydir1]!=  0*/	\
       case 0:								\
-	new_mem_idx = new_mem_idx-1;					\
-	local_new_x1 = x1 - 1;						\
+	new_mem_idx = (x1==0)?(new_mem_idx+X1m1):(new_mem_idx-1);	\
+	local_new_x1 = (x1==0)?X1m1:(x1 - 1);				\
 	break;								\
       case 1:								\
-	new_mem_idx = new_mem_idx-X1;					\
-	local_new_x2 = x2 - 1;						\
+	new_mem_idx = (x2==0)?(new_mem_idx+X2X1mX1):(new_mem_idx-X1);	\
+	local_new_x2 = (x2==0)?X2m1:(x2 - 1);				\
 	break;								\
       case 2:								\
-	new_mem_idx = new_mem_idx-X2X1;					\
-	local_new_x3 = x3 -1;							\
+	new_mem_idx = (x3==0)?(new_mem_idx+X3X2X1mX2X1):(new_mem_idx-X2X1); \
+	local_new_x3 = (x3==0)?X3m1:(x3 -1);				\
 	break;								\
       case 3:								\
-	new_mem_idx = new_mem_idx-X3X2X1;				\
-	local_new_x4 = x4 - 1;						\
+	new_mem_idx = (x4==0)?(new_mem_idx+X4X3X2X1mX3X2X1):(new_mem_idx-X3X2X1); \
+	local_new_x4 = (x4==0)?X4m1:(x4 - 1);				\
 	break;								\
       }									\
       switch(mydir2){							\
@@ -435,38 +436,38 @@
 	new_mem_idx = (x4==X4m1)?(2*(Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t)+((local_new_x3*X2X1+local_new_x2*X1+local_new_x1)))*tcomm+(new_mem_idx-X4X3X2X1mX3X2X1)*(1-tcomm):(new_mem_idx+X3X2X1); \
 	break;								\
       }									\
-    }else{/*mydir1 is out of boundary, means mydir2 must be within boundary*/ \
+    }else{								\
       /*the case where both dir1/dir2 are out of boundary are dealed with a different macro (_DIAG)*/ \
-      switch(mydir2){							\
+      switch(mydir2){	/*mydir2 is not partitioned or x[mydir2]!=  0*/	\
       case 0:								\
-	new_mem_idx = new_mem_idx+1;					\
-	local_new_x1 = (x1==X1m1)?0:(x1+1);					\
+	new_mem_idx = (x1==X1m1)?(new_mem_idx-X1m1):(new_mem_idx+1);	\
+	local_new_x1 = (x1==X1m1)?0:(x1+1);				\
 	break;								\
       case 1:								\
-	new_mem_idx = new_mem_idx+X1;					\
-	local_new_x2 = (x2==X2m1)?0:(x2+1);					\
+	new_mem_idx = (x2==X2m1)?(new_mem_idx-X2X1mX1):(new_mem_idx+X1); \
+	local_new_x2 = (x2==X2m1)?0:(x2+1);				\
 	break;								\
       case 2:								\
-	new_mem_idx = new_mem_idx+X2X1;					\
-	local_new_x3 = (x3==X3m1)?0:(x3+1);					\
+	new_mem_idx = (x3==X3m1)?(new_mem_idx-X3X2X1mX2X1):(new_mem_idx+X2X1); \
+	local_new_x3 = (x3==X3m1)?0:(x3+1);				\
 	break;								\
       case 3:								\
-	new_mem_idx = new_mem_idx+X3X2X1;				\
-	local_new_x4 = (x4==X4m1)?0:(x4+1);					\
+	new_mem_idx = (x4==X4m1)?(new_mem_idx-X4X3X2X1mX3X2X1):(new_mem_idx+X3X2X1); \
+	local_new_x4 = (x4==X4m1)?0:(x4+1);				\
 	break;								\
       }									\
       switch(mydir1){/*mydir1 is 0 here */				\
       case 0:								\
-	new_mem_idx = (2*(Vh)+(local_new_x4*X3X2+local_new_x3*X2+local_new_x2))*xcomm+(new_mem_idx+X1m1)*(1-xcomm); 		\
+	new_mem_idx = (x1==0)?(2*(Vh)+(local_new_x4*X3X2+local_new_x3*X2+local_new_x2))*xcomm+(new_mem_idx+X1m1)*(1-xcomm):(new_mem_idx -1); \
 	break;								\
       case 1:								\
-	new_mem_idx = (2*(Vh+2*Vsh_x)+(local_new_x4*X3X1+local_new_x3*X1+local_new_x1))*ycomm+(new_mem_idx+X2X1mX1)*(1-ycomm);  \
+	new_mem_idx = (x2==0)?(2*(Vh+2*Vsh_x)+(local_new_x4*X3X1+local_new_x3*X1+local_new_x1))*ycomm+(new_mem_idx+X2X1mX1)*(1-ycomm):(new_mem_idx-X1); \
 	break;								\
       case 2:								\
-	new_mem_idx = (2*(Vh+2*(Vsh_x+Vsh_y))+(local_new_x4*X2X1+local_new_x2*X1+local_new_x1))*zcomm+(new_mem_idx+X3X2X1mX2X1)*(1-zcomm); \
+	new_mem_idx = (x3==0)?(2*(Vh+2*(Vsh_x+Vsh_y))+(local_new_x4*X2X1+local_new_x2*X1+local_new_x1))*zcomm+(new_mem_idx+X3X2X1mX2X1)*(1-zcomm):(new_mem_idx-X2X1); \
 	break;								\
       case 3:								\
-	new_mem_idx = (2*(Vh+2*(Vsh_x+Vsh_y+Vsh_z))+(local_new_x3*X2X1+local_new_x2*X1+local_new_x1))*tcomm+(new_mem_idx+X4X3X2X1mX3X2X1)*(1-tcomm); \
+	new_mem_idx = (x4==0)?(2*(Vh+2*(Vsh_x+Vsh_y+Vsh_z))+(local_new_x3*X2X1+local_new_x2*X1+local_new_x1))*tcomm+(new_mem_idx+X4X3X2X1mX3X2X1)*(1-tcomm):(new_mem_idx-X3X2X1); \
 	break;								\
       }									\
     }									\
@@ -677,7 +678,8 @@ template<int mu, int nu, int odd_bit>
     MULT_SU3_AN(a, b, tempa);
     
     /* load matrix C*/
-    if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+    //if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+    if(dimcomm[nu] && dimcomm[mu] && x[nu] == 0 && x[mu] == Z[mu] - 1){
       int idx = nu*4+mu;
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
     }else{
@@ -815,7 +817,8 @@ template<int mu, int nu, int odd_bit, int save_staple>
     MULT_SU3_AN(a, bb, tempa);
     
     /* load matrix C*/
-    if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+    //if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+    if(dimcomm[nu] && dimcomm[mu] && x[nu] == 0 && x[mu] == Z[mu] - 1){
       int idx = nu*4+mu; 
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
     }else{

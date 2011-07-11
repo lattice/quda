@@ -382,7 +382,7 @@ exchange_llfat_init(FullStaple* cudaStaple)
 
 template<typename Float>
 void
-exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag)
+exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag, int optflag)
 {
   /*
     nu |          |
@@ -402,6 +402,10 @@ exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag)
       if(nu == mu){
 	continue;
       }
+      if(optflag && (!commDimPartitioned(mu) || !commDimPartitioned(nu))){
+	continue;
+      }
+
       int dir1, dir2; //other two dimensions
       for(dir1=0; dir1 < 4; dir1 ++){
 	if(dir1 != nu && dir1 != mu){
@@ -515,7 +519,7 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
     comm_wait(send_request2);
   }
 
-  exchange_sitelink_diag(X, sitelink, ghost_sitelink_diag);
+  exchange_sitelink_diag(X, sitelink, ghost_sitelink_diag, optflag);
 }
 
 //this function is used for link fattening computation

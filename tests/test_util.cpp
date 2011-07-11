@@ -974,9 +974,10 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 		    break;
 		
 		case TUP:
-		    if (i4 == (X4-1) ){
-		      coeff *= -1;
-		    }
+		  //if (commCoords(3) == (commDim(3) -1) && i4 == (X4-1) ){
+		  if (i4 == (X4-1) ){
+		    coeff *= -1;
+		  }
 		    break;
 
 		default:
