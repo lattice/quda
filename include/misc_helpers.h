@@ -5,9 +5,10 @@
 void link_format_cpu_to_gpu(void* dst, void* src,
 			    int reconstruct, int bytes, int Vh, int pad,
 			    int ghostV,
-			    QudaPrecision prec);
+			    QudaPrecision prec, cudaStream_t stream);
 void link_format_gpu_to_cpu(void* dst, void* src, 
-			    int bytes, int Vh, int stride, QudaPrecision prec);
+			    int bytes, int Vh, int stride, QudaPrecision prec,
+			    cudaStream_t stream);
 
 void collectGhostSpinor(void *in, const void *inNorm,
 			void* ghost_spinor_gpu,		   

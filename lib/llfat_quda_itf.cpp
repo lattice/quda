@@ -23,15 +23,24 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
   dim3 halfGridDim(Vh/BLOCK_DIM,1,1);
   dim3 blockDim(BLOCK_DIM , 1, 1);
   
-  
   QudaPrecision prec = cudaSiteLink.precision;
   QudaReconstructType recon = cudaSiteLink.reconstruct;
-
+  
+  if( ((param->X[0] % 2 != 0)
+       ||(param->X[1] % 2 != 0)
+       ||(param->X[2] % 2 != 0)
+       ||(param->X[3] % 2 != 0))
+      && (recon  == QUDA_RECONSTRUCT_12)){
+    errorQuda("12 reconstruct and odd dimensionsize is not supported by link fattening code (yet)\n");
+    
+  }
+      
   int nStream=9;
   cudaStream_t stream[nStream];
   for(int i = 0;i < nStream; i++){
     cudaStreamCreate(&stream[i]);
   }
+
   
   llfatOneLinkKernel(cudaFatLink, cudaSiteLink,cudaStaple, cudaStaple1,
 		     param, act_path_coeff); CUERR;
@@ -57,21 +66,28 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
       if (nu != dir){
 
 	//start of one call
-	for (int k = 0; k <8;k++){
-	  if(!commDimPartitioned(k/2)) continue;
-	  kparam.kernel_type = ktype[k];
+ 	for(int k=3; k >= 0 ;k--){
+	  if(!commDimPartitioned(k)) continue;
+	  
+	  kparam.kernel_type = ktype[2*k];
 	  siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
 					   (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
 					   (void*)cudaFatLink.even, (void*)cudaFatLink.odd,
 					   dir, nu,
 					   act_path_coeff[2],
 					   recon, prec, halfGridDim,
-					   kparam, &stream[k]); CUERR;
-	}
-
- 	for(int k=0; k < 4 ;k++){
-	  if(!commDimPartitioned(k)) continue;
+					   kparam, &stream[2*k]); CUERR;	  
+	  
 	  exchange_gpu_staple_start(param->X, &cudaStaple, k, (int)QUDA_BACKWARDS, &stream[2*k]);  CUERR;
+	  
+	  kparam.kernel_type = ktype[2*k+1];
+	  siteComputeGenStapleParityKernel((void*)cudaStaple.even, (void*)cudaStaple.odd,
+					   (void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
+					   (void*)cudaFatLink.even, (void*)cudaFatLink.odd,
+					   dir, nu,
+					   act_path_coeff[2],
+					   recon, prec, halfGridDim,
+					   kparam, &stream[2*k+1]); CUERR;
 	  exchange_gpu_staple_start(param->X, &cudaStaple, k, (int)QUDA_FORWARDS, &stream[2*k+1]);  CUERR;
 	}
         kparam.kernel_type = LLFAT_INTERIOR_KERNEL;
@@ -83,17 +99,17 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					 recon, prec, halfGridDim, 
 					 kparam, &stream[nStream-1]); CUERR;
 	
-	for(int k = 0; k  < 4; k++){
+ 	for(int k=3; k >= 0 ;k--){
 	  if(!commDimPartitioned(k)) continue;
 	  exchange_gpu_staple_comms(param->X, &cudaStaple, k, (int)QUDA_BACKWARDS, &stream[2*k]); CUERR;
 	  exchange_gpu_staple_comms(param->X, &cudaStaple, k, (int)QUDA_FORWARDS, &stream[2*k+1]); CUERR;
 	}	
-	for(int k = 0; k  < 4; k++){
+ 	for(int k=3; k >= 0 ;k--){
 	  if(!commDimPartitioned(k)) continue;
 	  exchange_gpu_staple_wait(param->X, &cudaStaple, k, (int)QUDA_BACKWARDS, &stream[2*k]); CUERR;
 	  exchange_gpu_staple_wait(param->X, &cudaStaple, k, (int)QUDA_FORWARDS, &stream[2*k+1]); CUERR;
 	}
-	for(int k = 0; k  < 4; k++){
+ 	for(int k=3; k >= 0 ;k--){
 	  if(!commDimPartitioned(k)) continue;
 	  cudaStreamSynchronize(stream[2*k]);
 	  cudaStreamSynchronize(stream[2*k+1]);
@@ -114,21 +130,25 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 	  if (rho != dir && rho != nu){
 
 	    //start of one call
-	    for (int k = 0; k <8;k++){
-	      if(!commDimPartitioned(k/2)) continue;
-	      kparam.kernel_type = ktype[k];	    
+	    for(int k=3; k >= 0 ;k--){
+	      if(!commDimPartitioned(k)) continue;
+	      kparam.kernel_type = ktype[2*k];	    
 	      computeGenStapleFieldParityKernel((void*)cudaStaple1.even, (void*)cudaStaple1.odd,
 						(void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
 						(void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
 						(void*)cudaStaple.even, (void*)cudaStaple.odd,
 						dir, rho, 1,
 						act_path_coeff[3],
-						recon, prec, halfGridDim, kparam, &stream[k]); CUERR;
-
-	    }
-	    for(int k=0; k < 4 ;k++){
-	      if(!commDimPartitioned(k)) continue;
+						recon, prec, halfGridDim, kparam, &stream[2*k]); CUERR;	      
 	      exchange_gpu_staple_start(param->X, &cudaStaple1, k, (int)QUDA_BACKWARDS, &stream[2*k]);  CUERR;
+	      kparam.kernel_type = ktype[2*k+1];	    
+	      computeGenStapleFieldParityKernel((void*)cudaStaple1.even, (void*)cudaStaple1.odd,
+						(void*)cudaSiteLink.even, (void*)cudaSiteLink.odd,
+						(void*)cudaFatLink.even, (void*)cudaFatLink.odd, 
+						(void*)cudaStaple.even, (void*)cudaStaple.odd,
+						dir, rho, 1,
+						act_path_coeff[3],
+						recon, prec, halfGridDim, kparam, &stream[2*k+1]); CUERR;
 	      exchange_gpu_staple_start(param->X, &cudaStaple1, k, (int)QUDA_FORWARDS, &stream[2*k+1]);  CUERR;
 	    }	    
 
@@ -142,17 +162,17 @@ llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 					      recon, prec, halfGridDim, kparam, &stream[nStream-1]); CUERR;
 
 #ifdef MULTI_GPU
-	    for(int k = 0; k  < 4; k++){
+	    for(int k=3; k >= 0 ;k--){
 	      if(!commDimPartitioned(k)) continue;
 	      exchange_gpu_staple_comms(param->X, &cudaStaple1, k, (int)QUDA_BACKWARDS, &stream[2*k]); CUERR;
 	      exchange_gpu_staple_comms(param->X, &cudaStaple1, k, (int)QUDA_FORWARDS, &stream[2*k+1]); CUERR;
 	    }
-	    for(int k=0; k < 4; k++){
+	    for(int k=3; k >= 0 ;k--){
 	      if(!commDimPartitioned(k)) continue;
 	      exchange_gpu_staple_wait(param->X, &cudaStaple1, k, QUDA_BACKWARDS, &stream[2*k]); CUERR;
 	      exchange_gpu_staple_wait(param->X, &cudaStaple1, k, QUDA_FORWARDS, &stream[2*k+1]); CUERR;
 	    }
-	    for(int k = 0; k  < 4; k++){
+	    for(int k=3; k >= 0 ;k--){
 	      if(!commDimPartitioned(k)) continue;
 	      cudaStreamSynchronize(stream[2*k]);
 	      cudaStreamSynchronize(stream[2*k+1]);

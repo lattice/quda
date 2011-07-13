@@ -4,23 +4,27 @@
 #define BLOCKSIZE 64
 
 /* This function converts format in CPU form 
-   into forms in GPU so as to enable coalesce access
-   The function only converts half(even or odd) of the links
-   Therefore the entire link conversion need to call this 
-   function twice
-   
-   Without loss of generarity, the parity is assume to be even.
-   The actual data format in cpu is following
-   [a0a1 .... a17] [a18a19 .....a35] ...[b0b1 ... b17] ...
-     X links                             Y links         T,Z links
-   
-   The GPU format of data looks like the following
-   [a0a1][a18a19]  ....[pad][a2a3][a20a21]..... [b0b1][b18b19]....
-    X links                                      Y links      T,Z links
-   
-*/
+ * into forms in GPU so as to enable coalesce access
+ * The function only converts half(even or odd) of the links
+ * Therefore the entire link conversion need to call this 
+ * function twice
+ *   
+ * Without loss of generarity, the parity is assume to be even.
+ * The actual data format in cpu is following
+ * [a0a1 .... a17] [a18a19 .....a35] ...[b0b1 ... b17] ...
+ *  X links                             Y links         T,Z links
+ *
+ * The GPU format of data looks like the following
+ * [a0a1][a18a19]  ....[pad][a2a3][a20a21]..... [b0b1][b18b19]....
+ *  X links                                      Y links      T,Z links
+ *   
+ * N: sizeof(FloatN)/sizeof(Float)
+ * M: # of floats in gpu memory per link
+ *    12 for 12-reconstruct
+ *    18 for no-reconstruct
+ */
 
-template<typename FloatN, typename Float>
+template<int N, int M, typename FloatN, typename Float>
 __global__ void
 do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
 			  int reconstruct,
@@ -28,7 +32,7 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
 {
   int tid = blockIdx.x * blockDim.x +  threadIdx.x;
   int thread0_tid = blockIdx.x * blockDim.x;
-  __shared__ FloatN buf[gaugeSiteSize/2*BLOCKSIZE];
+  __shared__ FloatN buf[M/N*BLOCKSIZE];
   
   int dir;
   int j;
@@ -39,27 +43,35 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
 #else
     FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh) + thread0_tid*gaugeSiteSize);   
 #endif
-    for(j=0; j < gaugeSiteSize/2; j++){
-	  buf[j*blockDim.x + threadIdx.x] =  src_start[j*blockDim.x + threadIdx.x];
+    for(j=0; j < gaugeSiteSize/N; j++){
+      if( M == 18){
+	buf[j*blockDim.x + threadIdx.x] =  src_start[j*blockDim.x + threadIdx.x];
+      }else{ //M=12
+	int idx = j*blockDim.x + threadIdx.x;
+	int modval = idx%(gaugeSiteSize/N);
+	int divval = idx/(gaugeSiteSize/N);
+	if(modval < (M/N)){
+	  buf[divval*(M/N)+modval] = src_start[idx];
+	}
+
       }
-      __syncthreads();
-      
-      FloatN* dst_start = (FloatN*)(dst+dir*gaugeSiteSize/2*(Vh+pad));
-      for(j=0; j < gaugeSiteSize/2; j++){
-	  dst_start[tid + j*(Vh+pad)] = buf[gaugeSiteSize/2*threadIdx.x + j];
-      }
-      __syncthreads();
-      
+    }
+    __syncthreads();
+    
+    FloatN* dst_start = (FloatN*)(dst+dir*M/N*(Vh+pad));
+    for(j=0; j < M/N; j++){
+      dst_start[tid + j*(Vh+pad)] = buf[M/N*threadIdx.x + j];
+    }
+    __syncthreads();
   }//dir
 }
-
 
 
 void 
 link_format_cpu_to_gpu(void* dst, void* src, 
 		       int reconstruct, int bytes, int Vh, int pad, 
 		       int ghostV,
-		       QudaPrecision prec)
+		       QudaPrecision prec, cudaStream_t stream)
 {
   dim3 blockDim(BLOCKSIZE);
 #ifdef MULTI_GPU  
@@ -67,9 +79,7 @@ link_format_cpu_to_gpu(void* dst, void* src,
 #else
   dim3 gridDim(Vh/blockDim.x);
 #endif
-  //(Vh+2*Vsh) must be multipl of BLOCKSIZE or the kernel does not work
-  //because the intermediae GPU data has stride=Vh+2*Vsh and the extra two
-  //Vsh is occupied by the back and forward neighbor
+  //(Vh+ghostV) must be multipl of BLOCKSIZE or the kernel does not work
   if ((Vh+ghostV) % blockDim.x != 0){
     printf("ERROR: Vh(%d) is not multiple of blocksize(%d), exitting\n", Vh, blockDim.x);
     exit(1);
@@ -78,36 +88,34 @@ link_format_cpu_to_gpu(void* dst, void* src,
   
   switch (prec){
   case QUDA_DOUBLE_PRECISION:
-    do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, 
-						     ghostV);
-    break;
-    
+    switch( reconstruct){
+    case QUDA_RECONSTRUCT_NO:
+      do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, ghostV);
+      break;
+    case QUDA_RECONSTRUCT_12:
+      do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, ghostV);
+      break;
+    default:
+      errorQuda("reconstruct type not supported\n");
+    }
+    break;    
+
   case QUDA_SINGLE_PRECISION:
-    if(reconstruct == QUDA_RECONSTRUCT_NO){
-      do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad,
-						       ghostV);   
-    }else if (reconstruct == QUDA_RECONSTRUCT_12){
-      //not working yet
-      //do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float4*)dst, (float*)src, reconstruct, bytes, Vh, pad, Vsh);   
-      
+    switch( reconstruct){
+    case QUDA_RECONSTRUCT_NO:
+      do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, ghostV);   
+      break;
+    case QUDA_RECONSTRUCT_12:
+      do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, ghostV);   
+      break;
+    default:
+      errorQuda("reconstruct type not supported\n");      
     }
     break;
     
   default:
-    printf("ERROR: half precision not support in %s\n", __FUNCTION__);
-    exit(1);
+    errorQuda("ERROR: half precision not support in %s\n", __FUNCTION__);
   }
-  
-  /*
-    if (cuda_prec == QUDA_DOUBLE_PRECISION){
-    do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, Vsh);
-    }else if( cuda_prec == QUDA_SINGLE_PRECISION){
-    do_link_format_cpu_to_gpu<<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, Vsh);      
-    }else{
-    printf("ERROR: half precision is not supported in %s\n", __FUNCTION__);
-    exit(1);
-    }
-  */
   
   return;
   
@@ -222,7 +230,7 @@ do_link_format_gpu_to_cpu(FloatN* dst, FloatN* src,
 
 void 
 link_format_gpu_to_cpu(void* dst, void* src, 
-		       int bytes, int Vh, int stride, QudaPrecision prec)
+		       int bytes, int Vh, int stride, QudaPrecision prec, cudaStream_t stream)
 {
   
   dim3 blockDim(BLOCKSIZE);
@@ -233,9 +241,9 @@ link_format_gpu_to_cpu(void* dst, void* src,
     exit(1);
   }
   if(prec == QUDA_DOUBLE_PRECISION){
-    do_link_format_gpu_to_cpu<<<gridDim, blockDim>>>((double2*)dst, (double2*)src, bytes, Vh, stride);
+    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, bytes, Vh, stride);
   }else if(prec == QUDA_SINGLE_PRECISION){
-    do_link_format_gpu_to_cpu<<<gridDim, blockDim>>>((float2*)dst, (float2*)src,  bytes, Vh, stride);
+    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float2*)src,  bytes, Vh, stride);
   }else{
     printf("ERROR: half precision is not supported in %s\n",__FUNCTION__);
     exit(1);

@@ -49,8 +49,8 @@ texture<int4, 1> siteLink0TexDouble;
 texture<int4, 1> siteLink1TexDouble;
 
 //Single precision for site link
-texture<float4, 1, cudaReadModeElementType> siteLink0TexSingle;
-texture<float4, 1, cudaReadModeElementType> siteLink1TexSingle;
+texture<float2, 1, cudaReadModeElementType> siteLink0TexSingle;
+texture<float2, 1, cudaReadModeElementType> siteLink1TexSingle;
 
 texture<float2, 1, cudaReadModeElementType> siteLink0TexSingle_norecon;
 texture<float2, 1, cudaReadModeElementType> siteLink1TexSingle_norecon;
