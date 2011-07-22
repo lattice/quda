@@ -505,9 +505,9 @@ o02_re = o02_im = 0.f;
 	sign =1;
     }    
     int dir =1;
-    int space_con = (x4*X3X2 + x3*X2+ x2) >>1;
 
 #ifdef MULTI_GPU
+    int space_con = (x4*X3X2 + x3*X2+ x2) >>1;
     if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 1)) || (kernel_type == EXTERIOR_KERNEL_X && x1 < 1))
 #endif
 	{
@@ -597,9 +597,9 @@ o02_re = o02_im = 0.f;
     }
    
     int ga_idx = sid;
-    int space_con = (x4*X3X1+x3*X1+x1)/2;
 
 #ifdef MULTI_GPU
+    int space_con = (x4*X3X1+x3*X1+x1)/2;
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2m1))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= X2m1))
 #endif
 	{
@@ -675,8 +675,8 @@ o02_re = o02_im = 0.f;
     }
 
     int dir=3;
-    int space_con = (x4*X3X1 + x3*X1+ x1) >>1;    
 #ifdef MULTI_GPU
+    int space_con = (x4*X3X1 + x3*X1+ x1) >>1;    
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 1)) || (kernel_type == EXTERIOR_KERNEL_Y && x2 < 1))
 #endif
 	{
@@ -765,9 +765,9 @@ o02_re = o02_im = 0.f;
     }
     
     int ga_idx = sid;
-    int space_con = (x4*X2X1+x2*X1+x1)/2;
 
 #ifdef MULTI_GPU
+    int space_con = (x4*X2X1+x2*X1+x1)/2;
 if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m1))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= X3m1))
 #endif
     {
@@ -844,9 +844,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
     }
 
     int dir = 5;
-    int space_con = (x4*X2X1 + x2*X1+ x1) >>1;    
 
 #ifdef MULTI_GPU
+    int space_con = (x4*X2X1 + x2*X1+ x1) >>1;    
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 1)) || (kernel_type == EXTERIOR_KERNEL_Z && x3 < 1))
 #endif
 	{
@@ -934,9 +934,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
     }
 
     int ga_idx = sid;
-    int space_con = (x3*X2X1+x2*X1+x1)/2;
 
 #ifdef MULTI_GPU
+    int space_con = (x3*X2X1+x2*X1+x1)/2;
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < X4m1))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= X4m1))
 #endif
 	{    
@@ -1013,9 +1013,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
     }
     
     int dir = 7;
-    int space_con = (x3*X2X1+x2*X1+x1)/2;
 
 #ifdef MULTI_GPU
+    int space_con = (x3*X2X1+x2*X1+x1)/2;
     if ((kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 1)) || (kernel_type == EXTERIOR_KERNEL_T && x4 < 1))
 #endif
 	{
@@ -1234,3 +1234,10 @@ WRITE_SPINOR();
 #undef Vsh_z
 #undef Vsh_t
 #undef kernel_type
+
+#undef o00_re
+#undef o00_im
+#undef o01_re
+#undef o01_im
+#undef o02_re
+#undef o02_im
