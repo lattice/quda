@@ -507,12 +507,13 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
   }
     
   if (param->gauge_fix) {
-    // set all gauge links (except for the first Z[0]*Z[1]*Z[2]/2) to the identity,
+    // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
+    int iMax = ( Ntm1 ? (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1) : Vh );
     int dir = 3; // time direction only
     Float *even = gauge[dir];
     Float *odd  = gauge[dir]+Vh*gaugeSiteSize;
-    for (int i = Z[0]*Z[1]*Z[2]/2; i < Vh; i++) {
+    for (int i = 0; i< iMax; i++) {
       for (int m = 0; m < 3; m++) {
 	for (int n = 0; n < 3; n++) {
 	  even[i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
@@ -724,10 +725,10 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
     }
   }
   if (param->type == QUDA_WILSON_LINKS){  
-      applyGaugeFieldScaling(res, Vh, param);
-  }else if (param->type == QUDA_ASQTAD_LONG_LINKS){
-      applyGaugeFieldScaling_long(res, Vh, param);      
-  }else if (param->type == QUDA_ASQTAD_FAT_LINKS){
+    applyGaugeFieldScaling(res, Vh, param);
+  } else if (param->type == QUDA_ASQTAD_LONG_LINKS){
+    applyGaugeFieldScaling_long(res, Vh, param);      
+  } else if (param->type == QUDA_ASQTAD_FAT_LINKS){
     for (int dir = 0; dir < 4; dir++){ 
       for (int i = 0; i < Vh; i++) {
 	for (int m = 0; m < 3; m++) { // last 2 rows
