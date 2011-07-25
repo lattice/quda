@@ -30,6 +30,12 @@ BUILD_QMP = yes      # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = no        # set to 'yes' to build the MPI multi-GPU code
 OVERLAP_COMMS = yes  # set to 'yes' to overlap comms and compute
 
+# Do we have qio support?
+BUILD_QIO = no # set to 'yes' to build QIO code for binary i/o
+
+# Do we compile the numa support
+HAVE_NUMA = no
+
 FECC = gcc	      # Front end CC
 FECXX = g++           # Front end CXX
 
@@ -38,6 +44,8 @@ MPICC = $(MPI_HOME)/bin/mpicc
 MPICXX = $(MPI_HOME)/bin/mpicxx
 
 QMP_HOME=/home/bjoo/Devel/QCD/install/qmp/qmp2-1-6/openmpi
+
+QIO_HOME=/home/mikec/lqcd/install/qio
 
 DSLASH_SHARED_FLOATS=0
 
@@ -107,6 +115,11 @@ endif
 ifeq ($(strip $(OVERLAP_COMMS)), yes)
   COPT += -DOVERLAP_COMMS
   NVCCOPT += -DOVERLAP_COMMS
+endif
+
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio
 endif
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)

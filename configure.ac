@@ -1,4 +1,4 @@
-AC_INIT([quda-0.2-qmp],[0.2-qmp],[mikec@seas.harvard.edu])
+AC_INIT([quda],[0.4],[mikec@seas.harvard.edu])
 
 AC_PROG_CC(gcc cc)
 AC_PROG_CXX(g++ CC cxx)
@@ -144,6 +144,12 @@ AC_ARG_WITH(qmp,
  AC_HELP_STRING([--with-qmp=QMPDIR], [ Specify QMP installation directory ]),
  [ qmp_home=${withval} ; build_qmp="yes" ],
  [ qmp_home="" ; build_qmp="no" ]
+)
+
+AC_ARG_WITH(qio,
+ AC_HELP_STRING([--with-qio=QIODIR], [ Specify QIO installation directory ]),
+ [ qio_home=${withval} ; build_qio="yes" ],
+ [ qio_home="" ; build_qio="no" ]
 )
 
 
@@ -414,6 +420,9 @@ AC_SUBST( MPI_HOME, [${mpi_home}] )
 
 AC_MSG_NOTICE([Setting HAVE_NUMA=${ac_cv_header_numa_h}])
 AC_SUBST( HAVE_NUMA, [${ac_cv_header_numa_h}] )
+
+AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
+AC_SUBST( BUILD_QIO, [${build_qio}])
 
 AC_CONFIG_FILES(make.inc)
 AC_OUTPUT
