@@ -1,7 +1,8 @@
 /* Utilities for testing QIO */
-#include "qio-util.h"
 #include <stdio.h>
 #include <string.h>
+
+#include <qio_util.h>
 
 void print_m(suN_matrix *a)
 {

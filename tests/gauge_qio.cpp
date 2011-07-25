@@ -1,7 +1,5 @@
-#include <qcd.h>
-
 #include <qio.h>
-#include "qio-util.h"
+#include <qio_util.h>
 
 QIO_Layout layout;
 int lattice_dim;
@@ -54,7 +52,7 @@ int read_su3_field(QIO_Reader *infile, int count,
   return 0;
 }
 
-void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]) {
+void readGaugeField(char *filename, float *gauge[], int *X, int argc, char *argv[]) {
   QIO_Reader *infile;
   int status;
   int sites_on_node = 0;
@@ -68,10 +66,10 @@ void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]) {
 
   /* Lattice dimensions */
   lattice_dim = 4;
-  lattice_size[0] = L1;
-  lattice_size[1] = L2;
-  lattice_size[2] = L3;
-  lattice_size[3] = L4;
+  lattice_size[0] = X[0];
+  lattice_size[1] = X[1];
+  lattice_size[2] = X[2];
+  lattice_size[3] = X[3];
 
   /* Set the mapping of coordinates to nodes */
   if(setup_layout(lattice_size, 4, QMP_get_number_of_nodes())!=0)
@@ -87,7 +85,7 @@ void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]) {
   layout.num_sites       = num_sites;
   layout.latsize         = lattice_size;
   layout.latdim          = lattice_dim;
-  layout.volume          = N;
+  layout.volume          = X[0]*X[1]*X[2]*X[3];
   layout.sites_on_node   = sites_on_node;
   layout.this_node       = this_node;
   layout.number_of_nodes = QMP_get_number_of_nodes();
