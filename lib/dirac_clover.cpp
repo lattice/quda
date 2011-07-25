@@ -249,11 +249,21 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
   if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
     Clover(out, in, QUDA_EVEN_PARITY);
-    DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, out, kappa2); // safe since out is not read after writing
+#ifdef MULTI_GPU // not safe to alias because of partial updates
+    cudaColorSpinorField tmp3(in);
+#else // safe since out is not read after writing
+    cudaColorSpinorField &tmp3 = out; 
+#endif
+    DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, tmp3, kappa2); 
   } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     Dslash(*tmp1, in, QUDA_EVEN_PARITY);
     Clover(out, in, QUDA_ODD_PARITY);
-    DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, out, kappa2);
+#ifdef MULTI_GPU // not safe to alias because of partial updates
+    cudaColorSpinorField tmp3(in);
+#else // safe since out is not read after writing
+    cudaColorSpinorField &tmp3 = out; 
+#endif
+    DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, tmp3, kappa2);
   } else if (!dagger) { // symmetric preconditioning
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
