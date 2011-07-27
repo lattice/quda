@@ -34,8 +34,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <qmp.h>
+#include <layout_hyper.h>
 
-#include <qio_util.h>
+//#include <qio_util.h>
 
 /* The following globals are required:
 

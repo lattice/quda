@@ -134,7 +134,6 @@ void vget_M(char *s1, size_t index, int count, void *s2)
     }
 }
 
-
 /* Copy a subset */
 int inside_subset(int x[], int lower[], int upper[])
 {

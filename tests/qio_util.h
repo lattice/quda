@@ -4,30 +4,12 @@
 #include <qmp.h>
 #include <qio.h>
 #define mynode QMP_get_node_number
-#ifdef MAIN
-#define EXTERN
-#else
-#define EXTERN extern
-#endif
 
-EXTERN QIO_Layout layout;
-EXTERN int lattice_dim;
-EXTERN int lattice_size[4];
+extern QIO_Layout layout;
+extern int lattice_dim;
+extern int lattice_size[4];
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-  /* layout_hyper */
-  int setup_layout(int len[], int nd, int numnodes);
-  int node_number(const int x[]);
-  int node_index(const int x[]);
-  void get_coords(int x[], int node, int index);
-  int num_sites(int node);
-  EXTERN int this_node;
-
-#ifdef __cplusplus
-}
-#endif
+#include <layout_hyper.h>
 
 #define NCLR 3
 
@@ -46,6 +28,40 @@ void vput_M(char *buf, size_t index, int count, void *qfin);
 void vget_M(char *buf, size_t index, int count, void *qfin);
 void vput_r(char *buf, size_t index, int count, void *qfin);
 void vget_r(char *buf, size_t index, int count, void *qfin);
+
+// templatized version of vput_M to allow for precision conversion
+template <typename oFloat, typename iFloat, int len>
+void vputM(char *s1, size_t index, int count, void *s2)
+{
+  oFloat **field = (oFloat **)s2;
+  iFloat *src = (iFloat *)s1;
+  
+  //For the site specified by "index", move an array of "count" data
+  //from the read buffer to an array of fields
+
+  for (int i=0;i<count;i++)
+    {
+      oFloat *dest = field[i] + len*index;
+      for (int j=0; j<len; j++) dest[j] = src[i*len+j];
+    }
+}
+
+// templatized version of vget_M to allow for precision conversion
+template <typename oFloat, typename iFloat, int len>
+void vgetM(char *s1, size_t index, int count, void *s2)
+{
+  iFloat **field = (iFloat **)s2;
+  oFloat *dest = (oFloat *)s1;
+
+/* For the site specified by "index", move an array of "count" data
+   from the array of fields to the write buffer */
+  for (int i=0; i<count; i++, dest+=18)
+    {
+      iFloat *src = field[i] + len*index;
+      for (int j=0; j<len; j++) dest[j] = src[j];
+    }
+}
+
 
 int vcreate_R(float *field_out[],int count);
 int vcreate_M(suN_matrix *field[] , int count);

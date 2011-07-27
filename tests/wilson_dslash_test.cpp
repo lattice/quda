@@ -15,6 +15,8 @@
 #include <wilson_dslash_reference.h>
 #include "misc.h"
 
+#include <gauge_qio.h>
+
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
@@ -58,7 +60,9 @@ extern QudaPrecision prec;
 extern bool kernelPackT;
 extern QudaDagType dagger;
 
-void init() {
+extern char latfile[];
+
+void init(int argc, char **argv) {
 
   kernelPackT = false; // Set true for kernel T face packing
   cuda_prec= prec;
@@ -72,7 +76,7 @@ void init() {
   gauge_param.X[3] = tdim;
   setDims(gauge_param.X);
 
-  gauge_param.anisotropy = 2.3;
+  gauge_param.anisotropy = 1.0;
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -184,7 +188,13 @@ void init() {
   
   printfQuda("Randomizing fields... ");
 
-  construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
+  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
+    read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate a random SU(3) field
+    construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
+  }
+
   spinor->Source(QUDA_RANDOM_SOURCE);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -443,7 +453,7 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  init();
+  init(argc, argv);
 
   float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
   printfQuda("\nSpinor mem: %.3f GiB\n", spinorGiB);

@@ -1,5 +1,6 @@
 #include <qio.h>
 #include <qio_util.h>
+#include <quda.h>
 
 QIO_Layout layout;
 int lattice_dim;
@@ -33,34 +34,63 @@ QIO_Reader *open_test_input(char *filename, int volfmt, int serpar,
   return infile;
 }
 
-int read_su3_field(QIO_Reader *infile, int count, 
-		    suN_matrix *field_in[], char *myname)
+/* get QIO record precision */
+QudaPrecision get_prec(QIO_Reader *infile) {
+  QIO_RecordInfo *rec_info = QIO_create_record_info(0, NULL, NULL, 0, "", "", 0, 0, 0, 0);
+  QIO_String *xml_file = QIO_string_create();
+  int status = QIO_read_record_info(infile, rec_info, xml_file);
+  int prec = *QIO_get_precision(rec_info);
+  QIO_destroy_record_info(rec_info);
+  QIO_string_destroy(xml_file);
+
+  return (prec == 70) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
+}
+
+int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, char *myname)
 {
   QIO_String *xml_record_in;
   QIO_RecordInfo rec_info;
   int status;
   
+  /* Query the precision */
+  QudaPrecision file_prec = get_prec(infile);
+  size_t rec_size = file_prec*count*18;
+
   /* Create the record XML */
   xml_record_in = QIO_string_create();
 
-  /* Read the field record */
-  status = QIO_read(infile, &rec_info, xml_record_in, 
-		    vput_M, sizeof(suN_matrix)*count, sizeof(float), field_in);
+  /* Read the field record and convert to cpu precision*/
+  if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+    if (file_prec == QUDA_DOUBLE_PRECISION) {
+      status = QIO_read(infile, &rec_info, xml_record_in, vputM<double,double,18>, 
+			rec_size, QUDA_DOUBLE_PRECISION, field_in);
+    } else {
+      status = QIO_read(infile, &rec_info, xml_record_in, vputM<double,float,18>, 
+			rec_size, QUDA_SINGLE_PRECISION, field_in);
+    }
+  } else {
+    if (file_prec == QUDA_DOUBLE_PRECISION) {
+      status = QIO_read(infile, &rec_info, xml_record_in, vputM<float,double,18>, 
+			rec_size, QUDA_DOUBLE_PRECISION, field_in);
+    } else {
+      status = QIO_read(infile, &rec_info, xml_record_in, vputM<float,float,18>, 
+			rec_size, QUDA_SINGLE_PRECISION, field_in);
+    }
+  }
+
   printf("%s(%d): QIO_read_record_data returns status %d\n",
 	 myname,this_node,status);
   if(status != QIO_SUCCESS)return 1;
   return 0;
 }
 
-void readGaugeField(char *filename, float *gauge[], int *X, int argc, char *argv[]) {
+void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, int *X, int argc, char *argv[]) {
   QIO_Reader *infile;
   int status;
   int sites_on_node = 0;
   QMP_thread_level_t provided;
   char myname[] = "qio_load";
 
-  /* Start message passing */
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &provided);
   this_node = mynode();
   printf("%s(%d) QMP_init_msg_passing done\n",myname,this_node);
 
@@ -96,13 +126,11 @@ void readGaugeField(char *filename, float *gauge[], int *X, int argc, char *argv
 
   /* Read the su3 field record */
   printf("%s(%d) reading su3 field\n",myname,this_node); fflush(stdout);
-  status = read_su3_field(infile, 4, (suN_matrix **)gauge, myname);
+  status = read_su3_field(infile, 4, gauge, precision, myname);
   if(status) { printf("read_su3_field failed %d\n", status); exit(0); }
 
   /* Close the file */
   QIO_close_read(infile);
   printf("%s(%d): Closed file for reading\n",myname,this_node);  
     
-  /* Shut down QMP */
-  QMP_finalize_msg_passing();
 }

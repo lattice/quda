@@ -32,7 +32,7 @@ domain_wall_invert_test: domain_wall_invert_test.o test_util.o domain_wall_dslas
 	blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-su3_test: su3_test.o test_util.o wilson_dslash_reference.o misc.o $(QUDA)
+su3_test: su3_test.o test_util.o wilson_dslash_reference.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 pack_test: pack_test.o test_util.o wilson_dslash_reference.o misc.o $(QUDA)

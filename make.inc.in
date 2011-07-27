@@ -119,7 +119,7 @@ ifeq ($(strip $(OVERLAP_COMMS)), yes)
 endif
 
 ifeq ($(strip $(BUILD_QIO)), yes)
-  INC += -I$(QIO_HOME)/include
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
   LIB += -L$(QIO_HOME)/lib -lqio -llime
   QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
 endif
