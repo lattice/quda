@@ -195,7 +195,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   int aux1 = X / X1;
   x1 = X - aux1 * X1;
   int aux2 = aux1 / X2;
-  x2 = aux1 - aux2 * X3;
+  x2 = aux1 - aux2 * X2;
   x4 = aux2 / X3;
   x3 = aux2 - x4 * X3;
   aux1 = (param.parity + x4 + x3 + x2) & 1;
