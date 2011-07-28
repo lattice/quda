@@ -33,6 +33,8 @@ const int transfer = 0; // include transfer time in the benchmark?
 
 const int loops = 100;
 
+bool tune = false;
+
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec;
 
@@ -80,7 +82,7 @@ void init(int argc, char **argv) {
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
@@ -301,7 +303,7 @@ void end() {
 // execute kernel
 double dslashCUDA() {
 
-  if (!transfer) {
+  if (!transfer && tune) {
     if (test_type < 2) {
       dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp1);
     } else {
@@ -462,7 +464,6 @@ int main(int argc, char **argv)
   int attempts = 1;
   dslashRef();
   for (int i=0; i<attempts; i++) {
-    
     double secs = dslashCUDA();
 
     if (!transfer) *spinorOut = *cudaSpinorOut;

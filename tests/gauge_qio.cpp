@@ -96,10 +96,11 @@ void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, in
 
   /* Lattice dimensions */
   lattice_dim = 4;
-  lattice_size[0] = X[0];
-  lattice_size[1] = X[1];
-  lattice_size[2] = X[2];
-  lattice_size[3] = X[3];
+  int lattice_volume = 1;
+  for (int d=0; d<4; d++) {
+    lattice_size[d] = QMP_get_logical_dimensions()[d]*X[d];
+    lattice_volume *= lattice_size[d];
+  }
 
   /* Set the mapping of coordinates to nodes */
   if(setup_layout(lattice_size, 4, QMP_get_number_of_nodes())!=0)
@@ -115,7 +116,7 @@ void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, in
   layout.num_sites       = num_sites;
   layout.latsize         = lattice_size;
   layout.latdim          = lattice_dim;
-  layout.volume          = X[0]*X[1]*X[2]*X[3];
+  layout.volume          = lattice_volume;
   layout.sites_on_node   = sites_on_node;
   layout.this_node       = this_node;
   layout.number_of_nodes = QMP_get_number_of_nodes();
