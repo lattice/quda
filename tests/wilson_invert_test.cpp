@@ -16,6 +16,8 @@
 #include <qmp.h>
 #endif
 
+#include <gauge_qio.h>
+
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 // In a typical application, quda.h is the only QUDA header required.
@@ -30,6 +32,8 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
+
+extern char latfile[];
 
 void
 display_test_info()
@@ -135,7 +139,7 @@ int main(int argc, char **argv)
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
 
-  gauge_param.anisotropy = 3.5;
+  gauge_param.anisotropy = 2.38;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -149,7 +153,7 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.57;//-0.48725;
+  double mass = -0.4180;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -163,14 +167,14 @@ int main(int argc, char **argv)
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
   inv_param.gcrNkrylov = 30;
   inv_param.tol = 5e-7;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-2; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
+  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1000;
   inv_param.verbosity_precondition = QUDA_SILENT;
@@ -230,7 +234,13 @@ int main(int argc, char **argv)
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
-  construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+
+  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
+    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate a random SU(3) field
+    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+  }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
