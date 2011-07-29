@@ -21,7 +21,7 @@ void init() {
   param = newQudaGaugeParam();
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  param.cuda_prec = QUDA_HALF_PRECISION;
+  param.cuda_prec = QUDA_SINGLE_PRECISION;
   param.reconstruct = QUDA_RECONSTRUCT_8;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
@@ -73,7 +73,7 @@ void SU3Test(int argc, char **argv) {
 
   init();
 
-  //char *latfile = "16_64.lat";
+  char *latfile = "";//"16_64.lat";
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, param.cpu_prec, param.X, argc, argv);
     construct_gauge_field((void**)gauge, 2, param.cpu_prec, &param);
