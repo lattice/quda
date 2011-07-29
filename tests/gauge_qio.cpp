@@ -1,6 +1,7 @@
 #include <qio.h>
 #include <qio_util.h>
 #include <quda.h>
+#include <util_quda.h>
 
 QIO_Layout layout;
 int lattice_dim;
@@ -26,9 +27,8 @@ QIO_Reader *open_test_input(char *filename, int volfmt, int serpar,
     return NULL;
   }
 
-  printf("%s(%d): QIO_open_read done.\n",myname,this_node);
-  printf("%s(%d): User file info is \"%s\"\n",myname,this_node,
-	 QIO_string_ptr(xml_file_in));
+  printfQuda("%s: QIO_open_read done.\n",myname,this_node);
+  printfQuda("%s: User file info is \"%s\"\n", myname, QIO_string_ptr(xml_file_in));
 
   QIO_string_destroy(xml_file_in);
   return infile;
@@ -78,8 +78,7 @@ int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecisio
     }
   }
 
-  printf("%s(%d): QIO_read_record_data returns status %d\n",
-	 myname,this_node,status);
+  printfQuda("%s: QIO_read_record_data returns status %d\n", myname, status);
   if(status != QIO_SUCCESS)return 1;
   return 0;
 }
@@ -92,7 +91,6 @@ void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, in
   char myname[] = "qio_load";
 
   this_node = mynode();
-  printf("%s(%d) QMP_init_msg_passing done\n",myname,this_node);
 
   /* Lattice dimensions */
   lattice_dim = 4;
@@ -104,9 +102,8 @@ void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, in
 
   /* Set the mapping of coordinates to nodes */
   if(setup_layout(lattice_size, 4, QMP_get_number_of_nodes())!=0)
-    { printf("Setup layout failed\n"); exit(0); }
-  printf("%s(%d) layout set for %d nodes\n",myname,this_node,
-	 QMP_get_number_of_nodes());
+    { printfQuda("Setup layout failed\n"); exit(0); }
+  printfQuda("%s layout set for %d nodes\n", myname, QMP_get_number_of_nodes());
   sites_on_node = num_sites(this_node);
 
   /* Build the layout structure */
@@ -126,12 +123,12 @@ void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, in
   if(infile == NULL) { printf("Open file failed\n"); exit(0); }
 
   /* Read the su3 field record */
-  printf("%s(%d) reading su3 field\n",myname,this_node); fflush(stdout);
+  printfQuda("%s: reading su3 field\n",myname); fflush(stdout);
   status = read_su3_field(infile, 4, gauge, precision, myname);
   if(status) { printf("read_su3_field failed %d\n", status); exit(0); }
 
   /* Close the file */
   QIO_close_read(infile);
-  printf("%s(%d): Closed file for reading\n",myname,this_node);  
+  printf("%s: Closed file for reading\n",myname);  
     
 }

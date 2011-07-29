@@ -292,7 +292,6 @@ yes|no);;
 esac
 
 
-
 dnl Configuration phase
 dnl ===================
 dnl
@@ -334,6 +333,12 @@ then
       AC_MSG_WARN([ It looks like QMP is being used, but --with-mpi is NOT set... BEWARE ])
     fi
   fi 
+fi
+
+if test "X${build_qio}X" = "XyesX"; then   
+  if test "X${build_qmp}X" = "XnoX"; then
+    AC_MSG_ERROR([QMP must enabled for QIO support ])
+  fi	
 fi
  
 dnl Output Substitutions
@@ -403,6 +408,9 @@ AC_SUBST( BUILD_MPI, [${build_mpi}])
 AC_MSG_NOTICE([Setting OVERLAP_COMMS= ${overlap_comms}])
 AC_SUBST( OVERLAP_COMMS, [${overlap_comms}])
 
+AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
+AC_SUBST( BUILD_QIO, [${build_qio}])
+
 AC_MSG_NOTICE([Setting FECC = ${CC} ])
 AC_SUBST( FECC, [${CC}])
 
@@ -415,14 +423,11 @@ AC_SUBST( MPI_HOME, [${mpi_home}] )
 AC_MSG_NOTICE([Setting QMP_HOME=${qmp_home}])
 AC_SUBST( QMP_HOME, [${qmp_home}] )
 
-AC_MSG_NOTICE([Setting MPI_HOME=${mpi_home}])
-AC_SUBST( MPI_HOME, [${mpi_home}] )
+AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
+AC_SUBST( QIO_HOME, [${qio_home}] )
 
 AC_MSG_NOTICE([Setting HAVE_NUMA=${ac_cv_header_numa_h}])
 AC_SUBST( HAVE_NUMA, [${ac_cv_header_numa_h}] )
-
-AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
-AC_SUBST( BUILD_QIO, [${build_qio}])
 
 AC_CONFIG_FILES(make.inc)
 AC_OUTPUT

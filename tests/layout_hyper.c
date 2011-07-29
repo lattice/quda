@@ -58,6 +58,17 @@ static int *mcoord;
 
 #define MAXPRIMES (sizeof(prime)/sizeof(int))
 
+// MAC this function assumes that the QMP geometry has been predetermined
+static void setup_qmp_fixed(int len[], int nd, int numnodes) {
+  int i;
+
+  for (i=0; i<ndim; i++) {
+    nsquares[i] = QMP_get_logical_dimensions()[i];
+    squaresize[i] = len[i]/nsquares[i];
+  }
+
+}
+
 static void setup_qmp_grid(int len[], int nd, int numnodes){
   int ndim2, i;
   const int *nsquares2;
@@ -78,7 +89,7 @@ static void setup_qmp_grid(int len[], int nd, int numnodes){
   }
 }
 
-void setup_hyper_prime(int len[], int nd, int numnodes)
+static void setup_hyper_prime(int len[], int nd, int numnodes)
 {
   int i, j, k, n;
 
@@ -134,10 +145,22 @@ int setup_layout(int len[], int nd, int numnodes){
   nsquares = (int *) malloc(ndim*sizeof(int));
   mcoord = (int *) malloc(ndim*sizeof(int));
 
-  if(QMP_get_msg_passing_type()==QMP_GRID)
+  /*
+   MAC: The miniminum surface area partitioning is disabled and QUDA
+   expects it to be determined by the user or calling application, but
+   this functionality is included for possible future use.
+  */
+
+#if 0
+  if(QMP_get_msg_passing_type()==QMP_GRID) {
+    printf("grid\n");
     setup_qmp_grid(len, ndim, numnodes);
-  else
-    setup_hyper_prime(len, ndim, numnodes);
+  }  else {
+    printf("prime\n");    setup_hyper_prime(len, ndim, numnodes);
+  }
+#else
+  setup_qmp_fixed(len, ndim, numnodes); // use the predetermined geometry
+#endif
 
   /* setup QMP logical topology */
   if(!QMP_logical_topology_is_declared()) {

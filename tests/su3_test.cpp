@@ -73,7 +73,7 @@ void SU3Test(int argc, char **argv) {
 
   init();
 
-  char *latfile = "16_64.lat";
+  //char *latfile = "16_64.lat";
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, param.cpu_prec, param.X, argc, argv);
     construct_gauge_field((void**)gauge, 2, param.cpu_prec, &param);

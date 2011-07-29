@@ -595,12 +595,13 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
-BUILD_QIO
 HAVE_NUMA
+QIO_HOME
 QMP_HOME
 MPI_HOME
 FECXX
 FECC
+BUILD_QIO
 OVERLAP_COMMS
 BUILD_MPI
 BUILD_QMP
@@ -3680,7 +3681,6 @@ esac
 
 
 
-
 if test "X${build_qmp}X" = "XyesX";
 then
   build_mpi="no"
@@ -3715,6 +3715,12 @@ $as_echo "$as_me: WARNING:  Multi-GPU build without QMP. Will build single node 
       { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:  It looks like QMP is being used, but --with-mpi is NOT set... BEWARE " >&5
 $as_echo "$as_me: WARNING:  It looks like QMP is being used, but --with-mpi is NOT set... BEWARE " >&2;}
     fi
+  fi
+fi
+
+if test "X${build_qio}X" = "XyesX"; then
+  if test "X${build_qmp}X" = "XnoX"; then
+    as_fn_error "QMP must enabled for QIO support " "$LINENO" 5
   fi
 fi
 
@@ -3828,6 +3834,11 @@ $as_echo "$as_me: Setting OVERLAP_COMMS= ${overlap_comms}" >&6;}
 OVERLAP_COMMS=${overlap_comms}
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QIO = ${build_qio} " >&5
+$as_echo "$as_me: Setting BUILD_QIO = ${build_qio} " >&6;}
+BUILD_QIO=${build_qio}
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting FECC = ${CC} " >&5
 $as_echo "$as_me: Setting FECC = ${CC} " >&6;}
 FECC=${CC}
@@ -3848,19 +3859,14 @@ $as_echo "$as_me: Setting QMP_HOME=${qmp_home}" >&6;}
 QMP_HOME=${qmp_home}
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_HOME=${mpi_home}" >&5
-$as_echo "$as_me: Setting MPI_HOME=${mpi_home}" >&6;}
-MPI_HOME=${mpi_home}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting QIO_HOME=${qio_home}" >&5
+$as_echo "$as_me: Setting QIO_HOME=${qio_home}" >&6;}
+QIO_HOME=${qio_home}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting HAVE_NUMA=${ac_cv_header_numa_h}" >&5
 $as_echo "$as_me: Setting HAVE_NUMA=${ac_cv_header_numa_h}" >&6;}
 HAVE_NUMA=${ac_cv_header_numa_h}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QIO = ${build_qio} " >&5
-$as_echo "$as_me: Setting BUILD_QIO = ${build_qio} " >&6;}
-BUILD_QIO=${build_qio}
 
 
 ac_config_files="$ac_config_files make.inc"
