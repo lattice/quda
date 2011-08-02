@@ -94,7 +94,8 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
     if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
   }
   
-  if (k>=invert_param->maxiter) warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
+  if (k>=invert_param->maxiter && invert_param->verbosity >= QUDA_SUMMARIZE) 
+    warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
   
   if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) {
     invert_param->secs += stopwatchReadSeconds();
