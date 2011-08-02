@@ -129,6 +129,6 @@ void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, in
 
   /* Close the file */
   QIO_close_read(infile);
-  printf("%s: Closed file for reading\n",myname);  
+  printfQuda("%s: Closed file for reading\n",myname);  
     
 }

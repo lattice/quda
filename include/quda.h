@@ -105,6 +105,8 @@ extern "C" {
     int maxiter_precondition; // max number of iterations used by inner solver    
     QudaPrecision prec_precondition; // the precision for the preconditioned solver
 
+    double omega; // the relaxation parameter that is used in GCR-DD (default = 1.0)
+
     //int commDim[QUDA_MAX_DIM];
     //int commDimSloppy[QUDA_MAX_DIM];
     //int ghostDim[QUDA_MAX_DIM];

@@ -167,11 +167,15 @@ void printQudaInvertParam(QudaInvertParam *param) {
   }
 #endif
 
-  //set the default to no
+
+
+  
 #ifdef INIT_PARAM
-  P(use_init_guess, QUDA_USE_INIT_GUESS_NO);
+  P(use_init_guess, QUDA_USE_INIT_GUESS_NO); //set the default to no
+  P(omega, 1.0); // set default to no relaxation
 #else
   P(use_init_guess, QUDA_USE_INIT_GUESS_INVALID);
+  P(omega, INVALID_DOUBLE);
 #endif
 
 #ifndef INIT_PARAM

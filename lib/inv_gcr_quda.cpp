@@ -212,7 +212,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   double r2_old = r2;
 
   if (invert_param->verbosity >= QUDA_VERBOSE) 
-      printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
+    printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
 
   double orthT = 0, matT = 0, preT = 0, resT = 0;
 
@@ -236,10 +236,14 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
       else
 	errorQuda("Unknown inner solver %d", invert_param->inv_type_precondition);
 
+      // relaxation p = omega*p + (1-omega)*r
+      if (omega!=1.0) axpbyCuda((1.0-invert_param->omega), rPre, invert_param->omega, pPre);
+
       copyCuda(*p[k], pPre);
     } else { // no preconditioner
       *p[k] = rSloppy;
     } 
+
 
     gettimeofday(&pre1, NULL);
 
@@ -250,6 +254,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     orthoDir(beta, Ap, k);
 
     double3 Apr = cDotProductNormACuda(*Ap[k], rSloppy);
+
     gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
     if (gamma[k] == 0.0) errorQuda("GCR breakdown\n");
     alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
@@ -257,8 +262,13 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
     r2 = cabxpyAxNormCuda(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 
 
-    if (invert_param->verbosity >= QUDA_DEBUG_VERBOSE) 
-      printfQuda("GCR: alpha = (%e,%e), x2 = %e\n", real(alpha[k]), imag(alpha[k]), norm2(x));
+    if (invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
+      double x2 = norm2(x);
+      double p2 = norm2(*p[k]);
+      double Ap2 = norm2(*Ap[k]);
+      printfQuda("GCR: alpha = (%e,%e), norm2(x) = %e, norm2(p) = %e, norm2(Ap) = %e\n", 
+		 real(alpha[k]), imag(alpha[k]), x2, p2, Ap2);
+    }
 
     k++;
     total_iter++;
@@ -312,7 +322,8 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
 
   copyCuda(x, y);
 
-  if (k>=invert_param->maxiter) warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
+  if (k>=invert_param->maxiter && invert_param->verbosity >= QUDA_SUMMARIZE) 
+    warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
 
   if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
   
