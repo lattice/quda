@@ -237,7 +237,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
 	errorQuda("Unknown inner solver %d", invert_param->inv_type_precondition);
 
       // relaxation p = omega*p + (1-omega)*r
-      if (omega!=1.0) axpbyCuda((1.0-invert_param->omega), rPre, invert_param->omega, pPre);
+      if (invert_param->omega!=1.0) axpbyCuda((1.0-invert_param->omega), rPre, invert_param->omega, pPre);
 
       copyCuda(*p[k], pPre);
     } else { // no preconditioner
