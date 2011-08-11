@@ -33,7 +33,7 @@ const int transfer = 0; // include transfer time in the benchmark?
 
 const int loops = 100;
 
-bool tune = false;
+bool tune = true;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec;
