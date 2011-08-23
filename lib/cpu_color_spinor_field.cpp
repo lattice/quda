@@ -101,10 +101,6 @@ void cpuColorSpinorField::create(const QudaFieldCreate create) {
     errorQuda("Half precision not supported");
   }
 
-  if (gammaBasis != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-    errorQuda("Basis not implemented");
-  }
-
   if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
       fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
     errorQuda("Field order %d not supported", fieldOrder);

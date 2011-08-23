@@ -84,6 +84,7 @@ void init() {
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   if (test_type == 2) {
@@ -117,7 +118,7 @@ void init() {
   }    
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
   
   spinor = new cpuColorSpinorField(csParam);

@@ -59,7 +59,7 @@ class ColorSpinorParam {
     nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
     precision(inv_param.cpu_prec), pad(0), twistFlavor(inv_param.twist_flavor), 
     siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
-    fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
+    fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
     create(QUDA_REFERENCE_FIELD_CREATE), v(V), verbose(inv_param.verbosity)
   { 
 

@@ -125,6 +125,7 @@ void init(int argc, char **argv) {
   //inv_param.sp_pad = 24*24*24;
   //inv_param.cl_pad = 24*24*24;
 
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // test code only supports DeGrand-Rossi Basis
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   if (test_type == 2) {
@@ -176,7 +177,7 @@ void init(int argc, char **argv) {
   }    
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  csParam.gammaBasis = inv_param.gamma_basis; 
   csParam.create = QUDA_ZERO_FIELD_CREATE;
 
   //csParam.verbose = QUDA_DEBUG_VERBOSE;

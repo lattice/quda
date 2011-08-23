@@ -127,6 +127,7 @@ void init()
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
@@ -160,7 +161,7 @@ void init()
 
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
   csParam.create = QUDA_ZERO_FIELD_CREATE;    
 
   spinor = new cpuColorSpinorField(csParam);
@@ -275,7 +276,6 @@ void init()
 	
     csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
     if (test_type < 2){

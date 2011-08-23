@@ -134,6 +134,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cpu_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
+  P(gamma_basis, QUDA_INVALID_GAMMA_BASIS);
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
   P(sp_pad, INVALID_INT);
 

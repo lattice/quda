@@ -158,6 +158,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->cuda_prec = prec; 
   inv_param->cuda_prec_sloppy = prec_sloppy;
   inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+  inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
   inv_param->dirac_tune = QUDA_TUNE_YES;
@@ -274,7 +275,7 @@ invert_test(void)
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;  
   in = new cpuColorSpinorField(csParam);  
   out = new cpuColorSpinorField(csParam);  

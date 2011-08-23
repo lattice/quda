@@ -74,6 +74,7 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy;
 
     QudaDiracFieldOrder dirac_order;
+    QudaGammaBasis gamma_basis; // the gamma basis of the input and output cpu fields 
 
     QudaPrecision clover_cpu_prec;
     QudaPrecision clover_cuda_prec;
