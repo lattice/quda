@@ -22,7 +22,7 @@ void init() {
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;
   param.cuda_prec = QUDA_SINGLE_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_8;
+  param.reconstruct = QUDA_RECONSTRUCT_12;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
@@ -47,6 +47,8 @@ void init() {
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
   param.ga_pad = pad_size;    
+#else
+  param.ga_pad = 0;    
 #endif
 
   // construct gauge fields
