@@ -29,7 +29,7 @@ extern QudaDslashType dslash_type;
 //const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
-const int transfer = 0; // include transfer time in the benchmark?
+const int transfer = 1; // include transfer time in the benchmark?
 
 const int loops = 100;
 
@@ -488,8 +488,8 @@ int main(int argc, char **argv)
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
       double norm2_cpu = norm2(*spinorRef);
-      double norm2_cuda= norm2(*cudaSpinorOut);
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cuda);
+      double norm2_cpu_cuda= norm2(*spinorOut);
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
     
     cpuColorSpinorField::Compare(*spinorRef, *spinorOut);
