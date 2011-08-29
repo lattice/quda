@@ -91,10 +91,43 @@ void FaceBuffer::setupDims(const int* X)
 FaceBuffer::~FaceBuffer()
 {
   for(int dir =0; dir < 4; dir++){
-    if(fwd_nbr_spinor_sendbuf[dir]) cudaFreeHost(fwd_nbr_spinor_sendbuf[dir]);
-    if(back_nbr_spinor_sendbuf[dir]) cudaFreeHost(back_nbr_spinor_sendbuf[dir]);
-    if(fwd_nbr_spinor[dir]) cudaFreeHost(fwd_nbr_spinor[dir]);
-    if(back_nbr_spinor[dir]) cudaFreeHost(back_nbr_spinor[dir]);
+    if(fwd_nbr_spinor_sendbuf[dir]) {
+      cudaFreeHost(fwd_nbr_spinor_sendbuf[dir]);
+      fwd_nbr_spinor_sendbuf[dir] = NULL;
+    }
+    if(back_nbr_spinor_sendbuf[dir]) {
+      cudaFreeHost(back_nbr_spinor_sendbuf[dir]);
+      back_nbr_spinor_sendbuf[dir] = NULL;
+    }
+    if(fwd_nbr_spinor[dir]) {
+      cudaFreeHost(fwd_nbr_spinor[dir]);
+      fwd_nbr_spinor[dir] = NULL;
+    }
+    if(back_nbr_spinor[dir]) {
+      cudaFreeHost(back_nbr_spinor[dir]);
+      back_nbr_spinor[dir] = NULL;
+    }    
+
+    if(pageable_fwd_nbr_spinor_sendbuf[dir]){
+      free(pageable_fwd_nbr_spinor_sendbuf[dir]);
+      pageable_fwd_nbr_spinor_sendbuf[dir] = NULL;
+    }
+
+    if(pageable_back_nbr_spinor_sendbuf[dir]){
+      free(pageable_back_nbr_spinor_sendbuf[dir]);
+      pageable_back_nbr_spinor_sendbuf[dir]=NULL;
+    }
+    
+    if(pageable_fwd_nbr_spinor[dir]){
+      free(pageable_fwd_nbr_spinor[dir]);
+      pageable_fwd_nbr_spinor[dir]=NULL;
+    }
+    
+    if(pageable_back_nbr_spinor[dir]){
+      free(pageable_back_nbr_spinor[dir]);
+      pageable_back_nbr_spinor[dir]=NULL;
+    }
+    
   }
 }
 
