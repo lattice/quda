@@ -20,7 +20,7 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 1;
+const int test_type = 0;
 
 // Dirac operator type
 extern QudaDslashType dslash_type;
