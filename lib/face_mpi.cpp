@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <mpicomm.h>
+#include <cuda.h>
 
 using namespace std;
 
@@ -47,6 +48,12 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     if (fwd_nbr_spinor[dir] == NULL || back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
 
+#if (CUDA_VERSION >=4000)
+    pageable_fwd_nbr_spinor_sendbuf[dir] = fwd_nbr_spinor_sendbuf[dir];
+    pageable_back_nbr_spinor_sendbuf[dir] = back_nbr_spinor_sendbuf[dir];
+    pageable_fwd_nbr_spinor[dir] = fwd_nbr_spinor[dir];
+    pageable_back_nbr_spinor[dir] = back_nbr_spinor[dir];
+#else
     pageable_fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
     pageable_back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
     
@@ -58,7 +65,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     
     if (pageable_fwd_nbr_spinor[dir] == NULL || pageable_back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for pageable_fwd_nbr_spinor/pageable_back_nbr_spinor"); 
-
+#endif
+    
   }
   
   return;
@@ -107,7 +115,12 @@ FaceBuffer::~FaceBuffer()
       cudaFreeHost(back_nbr_spinor[dir]);
       back_nbr_spinor[dir] = NULL;
     }    
-
+#if (CUDA_VERSION >= 4000)
+    pageable_fwd_nbr_spinor_sendbuf[dir] = NULL;
+    pageable_back_nbr_spinor_sendbuf[dir]=NULL;
+    pageable_fwd_nbr_spinor[dir]=NULL;
+    pageable_back_nbr_spinor[dir]=NULL;
+#else
     if(pageable_fwd_nbr_spinor_sendbuf[dir]){
       free(pageable_fwd_nbr_spinor_sendbuf[dir]);
       pageable_fwd_nbr_spinor_sendbuf[dir] = NULL;
@@ -127,6 +140,8 @@ FaceBuffer::~FaceBuffer()
       free(pageable_back_nbr_spinor[dir]);
       pageable_back_nbr_spinor[dir]=NULL;
     }
+#endif
+
     
   }
 }
@@ -174,11 +189,15 @@ void FaceBuffer::exchangeFacesComms(int dir)
 
 
   cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]); //required the data to be there before sending out
+#if (CUDA_VERSION < 4000)
   memcpy(pageable_back_nbr_spinor_sendbuf[dir], back_nbr_spinor_sendbuf[dir], nbytes[dir]);
+#endif
   send_request2[dir] = comm_send_with_tag(pageable_back_nbr_spinor_sendbuf[dir], nbytes[dir], back_nbr[dir], downtags[dir]);
     
   cudaStreamSynchronize(stream[2*dir + sendFwdStrmIdx]); //required the data to be there before sending out
+#if (CUDA_VERSION < 4000)
   memcpy(pageable_fwd_nbr_spinor_sendbuf[dir], fwd_nbr_spinor_sendbuf[dir], nbytes[dir]);
+#endif
   send_request1[dir]= comm_send_with_tag(pageable_fwd_nbr_spinor_sendbuf[dir], nbytes[dir], fwd_nbr[dir], uptags[dir]);
   
 } 
@@ -192,14 +211,16 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   
   comm_wait(recv_request2[dir]);  
   comm_wait(send_request2[dir]);
-
+#if (CUDA_VERSION < 4000)
   memcpy(fwd_nbr_spinor[dir], pageable_fwd_nbr_spinor[dir], nbytes[dir]);
+#endif
   out.unpackGhost(fwd_nbr_spinor[dir], dir, QUDA_FORWARDS,  dagger, &stream[2*dir + recFwdStrmIdx]); CUERR;
 
   comm_wait(recv_request1[dir]);
   comm_wait(send_request1[dir]);
-
+#if (CUDA_VERSION < 4000)
   memcpy(back_nbr_spinor[dir], pageable_back_nbr_spinor[dir], nbytes[dir]);  
+#endif
   out.unpackGhost(back_nbr_spinor[dir], dir, QUDA_BACKWARDS,  dagger, &stream[2*dir + recBackStrmIdx]); CUERR;
 }
 
