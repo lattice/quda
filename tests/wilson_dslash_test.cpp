@@ -29,7 +29,7 @@ extern QudaDslashType dslash_type;
 //const QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
-const int transfer = 1; // include transfer time in the benchmark?
+const int transfer = 0; // include transfer time in the benchmark?
 
 const int loops = 100;
 
@@ -65,6 +65,8 @@ extern QudaDagType dagger;
 extern char latfile[];
 
 void init(int argc, char **argv) {
+
+  //qudaSetNumaConfig("/usr/local/gpu_numa_config.txt");
 
   kernelPackT = false; // Set true for kernel T face packing
   cuda_prec= prec;

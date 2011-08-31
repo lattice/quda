@@ -1,6 +1,7 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
+#include <cuda.h>
 #include <cuda_runtime.h>
 
 #ifdef QMP_COMMS
