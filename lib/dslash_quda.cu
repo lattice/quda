@@ -61,6 +61,8 @@ static const int Nstream = 9;
 static const int Nstream = 1;
 #endif
 static cudaStream_t streams[Nstream];
+static cudaEvent_t scatterEvent[Nstream];
+static cudaEvent_t dslashEnd;
 
 FaceBuffer *face;
 cudaColorSpinorField *inSpinor;
@@ -465,13 +467,15 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.parity = parity;
 
   dslashParam.kernel_type = INTERIOR_KERNEL;
-
   dslashParam.tOffset = 0;
   dslashParam.tMul = 1;
   dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-    // Gather from source spinor
+  // wait for any previous outstanding dslashes to finish
+  cudaStreamWaitEvent(0, dslashEnd, 0);
+
+  // Gather from source spinor
   for(int dir = 3; dir >=0; dir--){ // count down for Wilson
     if (!dslashParam.commDim[dir]) continue;
     face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
@@ -491,6 +495,10 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     
     // Wait for comms to finish, and scatter into the end zone
     face->exchangeFacesWait(*inSpinor, dagger, i);
+
+    // Record the end of the scattering
+    cudaEventRecord(scatterEvent[2*i], streams[2*i]);
+    cudaEventRecord(scatterEvent[2*i+1], streams[2*i+1]);
   }
 
   for (int i=3; i>=0; i--) { // count down for Wilson
@@ -498,15 +506,21 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
     shared_bytes = blockDim[i+1].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_COORDS);
     
-    cudaStreamSynchronize(streams[2*i]);
-    cudaStreamSynchronize(streams[2*i + 1]);
+    //cudaStreamSynchronize(streams[2*i]);
+    //cudaStreamSynchronize(streams[2*i + 1]);
+    
     dslashParam.kernel_type = static_cast<KernelType>(i);
     //dslashParam.tOffset = dims[i]-2; // is this redundant?
     dslashParam.threads = 2*faceVolumeCB[i]; // updating 2 faces
 
+    // wait for scattering to finish and then launch dslash
+    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i], 0);
+    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i+1], 0);
     dslash.apply(blockDim[i+1], shared_bytes, streams[Nstream-1]); // all faces use this stream
   }
-  cudaStreamSynchronize(streams[Nstream-1]);
+
+  cudaEventRecord(dslashEnd, streams[Nstream-1]);
+  //cudaStreamSynchronize(streams[Nstream-1]);
 
 #endif // MULTI_GPU
 }
