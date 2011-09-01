@@ -16,24 +16,26 @@ void TuneBase::Benchmark(dim3 &block)  {
     cudaEvent_t start, end;
     cudaEventCreate(&start);
     cudaEventCreate(&end);
-    cudaEventRecord(start, 0);
-    cudaEventSynchronize(start);
 
     block = dim3(threads,1,1);
 
     Flops(); // resets the flops counter
-
     cudaGetLastError(); // clear error counter
+
+    cudaEventRecord(start, 0);
+    cudaEventSynchronize(start);
 
     for (int c=0; c<count; c++) Apply();
 
-    error = cudaGetLastError();
     cudaEventRecord(end, 0);
     cudaEventSynchronize(end);
+
     float runTime;
     cudaEventElapsedTime(&runTime, start, end);
     cudaEventDestroy(start);
     cudaEventDestroy(end);
+
+    error = cudaGetLastError();
 
     time = runTime / 1000;
     double flops = (double)Flops();

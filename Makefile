@@ -16,7 +16,7 @@ tune:
 	      "Please type 'make' to rebuild library."
 numa:
 	$(MAKE) -C tools/
-	tools/gpu_affinity_test > gpu_numa_config.txt
+	tools/gpu_affinity_test > tools/gpu_numa_config.txt
 	echo The generated numa file is 
 	cat tools/gpu_numa_config.txt
 gen:

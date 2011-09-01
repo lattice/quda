@@ -6,6 +6,9 @@
 
 #ifndef MPI_COMMS
 
+//experimental cpu spin waiting to replace cudaStreamSynchronize()
+//#define CPU_SPIN_WAIT
+
 class FaceBuffer {
 
  private:  
@@ -31,6 +34,11 @@ class FaceBuffer {
   void* ib_my_back_face[QUDA_MAX_DIM];  
   void* ib_from_back_face[QUDA_MAX_DIM];
   void* ib_from_fwd_face[QUDA_MAX_DIM];
+
+#ifdef CPU_SPIN_WAIT 
+  unsigned long long *gather_back[QUDA_MAX_DIM];
+  unsigned long long *gather_fwd[QUDA_MAX_DIM];
+#endif
 
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
