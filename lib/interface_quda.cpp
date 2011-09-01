@@ -242,7 +242,9 @@ void initQuda(int dev)
   if(numa_config_set){
     if(gpu_affinity[dev] >=0){
       printfQuda("Numa setting to cpu node %d\n", gpu_affinity[dev]);
-      numa_run_on_node(gpu_affinity[dev]);
+      if(numa_run_on_node(gpu_affinity[dev]) != 0){
+        printfQuda("Warning: Setting numa to cpu node %d failed\n", gpu_affinity[dev]);
+      }
     }
 
   }
