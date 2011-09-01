@@ -11,7 +11,7 @@
 #endif
 
 #if (CUDA_VERSION >= 4000)
-//#define GPU_DIRECT
+#define GPU_DIRECT
 #endif
 
 /*
@@ -233,8 +233,7 @@ void FaceBuffer::exchangeFacesComms(int dir) {
   cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]);
 #endif
 
-#ifdef QMP_COMMS
-  // Begin backward send
+#ifdef QMP_COMMS  // Begin backward send
 #ifndef GPU_DIRECT
   memcpy(ib_my_back_face[dir], my_back_face[dir], nbytes[dir]);
 #endif
