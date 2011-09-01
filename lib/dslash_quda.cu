@@ -774,7 +774,7 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge,
 
 
 template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
-  void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
+void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
 			   const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
 			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
 			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
@@ -796,6 +796,9 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
   dslashParam.tOffset =  0;
   dslashParam.threads = volume;
 #ifdef MULTI_GPU
+  // wait for any previous outstanding dslashes to finish
+  cudaStreamWaitEvent(0, dslashEnd, 0);
+
   // Gather from source spinor
   for(int dir = 0; dir <4; dir++){
     if (!dslashParam.commDim[dir]) continue;
@@ -815,22 +818,30 @@ template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
     face->exchangeFacesComms(i);
     // Wait for comms to finish, and scatter into the end zone
     face->exchangeFacesWait(*inSpinor, dagger,i);    
+
+    // Record the end of the scattering
+    cudaEventRecord(scatterEvent[2*i], streams[2*i]);
+    cudaEventRecord(scatterEvent[2*i+1], streams[2*i+1]);
   }
 
   for(int i=0 ;i < 4;i++){
     if(!dslashParam.commDim[i]) continue;
 
     shared_bytes = blockDim[i+1].x*6*regSize;
-    
-    cudaStreamSynchronize(streams[2*i]);
-    cudaStreamSynchronize(streams[2*i + 1]);
+
+    //cudaStreamSynchronize(streams[2*i]);
+    //cudaStreamSynchronize(streams[2*i + 1]);
     dslashParam.kernel_type = static_cast<KernelType>(i);
     dslashParam.tOffset =  dims[i]-6;
     dslashParam.threads = 6*Vsh[i];
+    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i], 0);
+    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i+1], 0);
     STAGGERED_DSLASH(exteriorGridDim[i], blockDim[i+1], shared_bytes, streams[Nstream-1], dslashParam,
 		     out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a); CUERR;
   }
-  cudaStreamSynchronize(streams[Nstream-1]);
+
+  cudaEventRecord(dslashEnd, streams[Nstream-1]);
+  //cudaStreamSynchronize(streams[Nstream-1]);
 
 #endif
 }
