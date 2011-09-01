@@ -18,6 +18,8 @@
 #include <invert_quda.h>
 #include <color_spinor_field.h>
 
+#include <cuda.h>
+
 #ifdef MULTI_GPU
 #ifdef MPI_COMMS
 #include <mpi.h>
@@ -172,6 +174,17 @@ void initQuda(int dev)
   }
   initialized = 1;
 
+#if (CUDA_VERSION >= 4000)
+  //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
+  char* cni_str = getenv("CUDA_NIC_INTEROP");
+  if(cni_str == NULL){
+    errorQuda("Environment variable CUDA_NIC_INTEROP is not set\n");
+  }
+  int cni_int = atoi(cni_str);
+  if (cni_int != 1){
+    errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1\n");    
+  }
+#endif
 
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
