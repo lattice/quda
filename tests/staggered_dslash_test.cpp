@@ -578,6 +578,7 @@ int main(int argc, char **argv)
     usage(argv);
   }
   
+  //qudaSetNumaConfig("/usr/local/gpu_numa_config.txt");
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
   
   display_test_info();
