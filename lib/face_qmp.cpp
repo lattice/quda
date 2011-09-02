@@ -137,13 +137,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   }
 #endif
 
-#ifdef CPU_SPIN_WAIT
-  for (int i=0; i<nDim; i++) {
-    gather_back[i] = (unsigned long long*)((char*)my_back_face[i] + nbytes[i] - sizeof(unsigned long long));
-    gather_fwd[i] = (unsigned long long*)((char*)my_fwd_face[i] + nbytes[i] - sizeof(unsigned long long));
-  }
-#endif
-
 }
 
 FaceBuffer::FaceBuffer(const FaceBuffer &face) {
@@ -223,11 +216,6 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
   QMP_start(mh_from_back[dir]);
 #endif
   
-#ifdef CPU_SPIN_WAIT
-  *(gather_back[dir]) = ULLONG_MAX;
-  *(gather_fwd[dir]) = ULLONG_MAX;
-#endif
-  
   // gather for backwards send
   in.packGhost(my_back_face[dir], dir, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dir+sendBackStrmIdx]);
   
@@ -240,12 +228,7 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 #ifdef OVERLAP_COMMS
   { // Need to wait for copy to finish before sending to neighbour
-#ifdef CPU_SPIN_WAIT
-    volatile unsigned long long *gather = gather_back[dir];
-    while(*gather == ULLONG_MAX) { __asm__ __volatile__ ("pause"); }
-#else
     cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]);
-#endif
   }
 #endif
 
@@ -258,12 +241,7 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 #ifdef OVERLAP_COMMS
   { // Need to wait for copy to finish before sending to neighbour
-#ifdef CPU_SPIN_WAIT
-    volatile unsigned long long *gather = gather_fwd[dir];
-    while(*gather == ULLONG_MAX) { __asm__ __volatile__ ("pause"); }
-#else
     cudaStreamSynchronize(stream[2*dir + sendFwdStrmIdx]);
-#endif
   }
 #endif
 
