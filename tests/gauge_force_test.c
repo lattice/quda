@@ -10,6 +10,8 @@
 #include "gauge_force_quda.h"
 #include <sys/time.h>
 
+
+
 typedef struct {
     double real;
     double imag;
@@ -18,6 +20,7 @@ typedef struct {
 typedef struct { dcomplex e[3][3]; } dsu3_matrix;
 
 extern void initDslashCuda(FullGauge gauge);
+extern void initDslashConstants(const FullGauge gauge, const int sp_stride);
 
 int device = 0;
 
@@ -31,14 +34,17 @@ void* refMom;
 int verify_results = 0;
 int ODD_BIT = 1;
 int sdim= 8;
-int tdim = 8;
+extern int tdim;
 
 int Z[4];
 int V;
 int Vh;
 
-QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
+extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
+
+extern int gridsize_from_cmdline[];
+
 
 void
 setDims(int *X) {
@@ -75,6 +81,11 @@ gauge_force_init()
 	exit(1);
     }
 
+    void* siteLink_2d[4];
+    for(int i=0;i < 4;i++){
+      siteLink_2d[i] = ((char*)siteLink) + i*V*gaugeSiteSize* gSize;
+    }
+
     
     mom = malloc(4*V*momSiteSize*gSize);
     if (mom == NULL){
@@ -82,7 +93,7 @@ gauge_force_init()
 	exit(1);
     }
     
-    createSiteLinkCPU(siteLink, gaugeParam.cpu_prec, 0);
+    createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
 
 #if 0
     site_link_sanity_check(siteLink, V, gaugeParam.cpu_prec, &gaugeParam);
@@ -435,7 +446,7 @@ gauge_force_test(void)
     
     gauge_force_init();
 
-    initDslashConstants(cudaSiteLink, 0,0);
+    initDslashConstants(cudaSiteLink, 0);
     gauge_force_init_cuda(&gaugeParam, max_length); 
     
     double eb3 = 0.3;
@@ -458,7 +469,7 @@ gauge_force_test(void)
     }
     
     loadMomToGPU(cudaMom, mom, &gaugeParam);
-    loadLinkToGPU(cudaSiteLink, siteLink, &gaugeParam);
+    loadLinkToGPU_gf(cudaSiteLink, siteLink, &gaugeParam);
     
 #define CX 1
 #define CY 1
@@ -665,11 +676,21 @@ main(int argc, char **argv)
         fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
         usage(argv);
     }
+
     
+    link_recon = QUDA_RECONSTRUCT_12;
+    tdim = 8;
+#ifdef MULTI_GPU
+    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+#endif
+
     display_test_info();
     
     gauge_force_test();
     
+#ifdef MULTI_GPU
+    endCommsQuda();
+#endif
     
     return 0;
 }

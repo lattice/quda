@@ -1049,6 +1049,8 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 }
 
 
+
+
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
   int fail_check = 16;

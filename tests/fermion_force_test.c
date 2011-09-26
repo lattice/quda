@@ -22,16 +22,20 @@ static void* refMom;
 static void* hw; //the array of half_wilson_vector
 static int X[4];
 
+extern int gridsize_from_cmdline[];
+
 int verify_results = 0;
 
 extern void initDslashCuda(FullGauge gauge);
+extern void initDslashConstants(const FullGauge gauge, const int sp_stride);
+
 
 static int sdim= 8;
 
 int ODD_BIT = 1;
 static int tdim = 8;
 
-QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
+extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision hw_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision mom_prec = QUDA_SINGLE_PRECISION;
@@ -84,9 +88,15 @@ fermion_force_init()
     fprintf(stderr, "ERROR: malloc failed for sitelink\n");
     exit(1);
   }
-  createSiteLinkCPU(siteLink, gaugeParam.cpu_prec,1);
 
-#if 1
+  void* siteLink_2d[4];
+  for(int i=0;i < 4;i++){
+    siteLink_2d[i] = ((char*)siteLink) + i*V*gaugeSiteSize* gSize;
+  }
+  
+  createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec,0);
+
+#if 0
   site_link_sanity_check(siteLink, V, gaugeParam.cpu_prec, &gaugeParam);
 #endif
 
@@ -113,7 +123,8 @@ fermion_force_init()
   }
   createHwCPU(hw, hw_prec);
     
-    
+  //gaugeParam.site_ga_pad = gaugeParam.ga_pad = 0;
+  //gaugeParam.reconstruct = link_recon;
   createLinkQuda(&cudaSiteLink, &gaugeParam);
   createMomQuda(&cudaMom, &gaugeParam);    
   cudaHw = createHwQuda(X, hw_prec);
@@ -139,7 +150,7 @@ fermion_force_test(void)
 {
  
   fermion_force_init();
-  initDslashConstants(cudaSiteLink, Vh, Vh);
+  initDslashConstants(cudaSiteLink, Vh);
   fermion_force_init_cuda(&gaugeParam);
 
     
@@ -156,7 +167,7 @@ fermion_force_test(void)
   act_path_coeff[5] = -0.123113;        
     
   loadMomToGPU(cudaMom, mom, &gaugeParam);
-  loadLinkToGPU(cudaSiteLink, siteLink, &gaugeParam);
+  loadLinkToGPU_gf(cudaSiteLink, siteLink, &gaugeParam);
   loadHwToGPU(cudaHw, hw, cpu_hw_prec);
 
     
@@ -308,10 +319,21 @@ main(int argc, char **argv)
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+
+#ifdef MULTI_GPU
+    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+#endif
+
+  link_recon = QUDA_RECONSTRUCT_12;
     
   display_test_info();
     
   fermion_force_test();
+
+
+#ifdef MULTI_GPU
+    endCommsQuda();
+#endif
     
     
   return 0;

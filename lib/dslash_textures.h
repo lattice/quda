@@ -52,6 +52,9 @@ texture<int4, 1> siteLink1TexDouble;
 texture<float2, 1, cudaReadModeElementType> siteLink0TexSingle;
 texture<float2, 1, cudaReadModeElementType> siteLink1TexSingle;
 
+texture<float4, 1, cudaReadModeElementType> siteLink0TexSingle_recon;
+texture<float4, 1, cudaReadModeElementType> siteLink1TexSingle_recon;
+
 texture<float2, 1, cudaReadModeElementType> siteLink0TexSingle_norecon;
 texture<float2, 1, cudaReadModeElementType> siteLink1TexSingle_norecon;
 
