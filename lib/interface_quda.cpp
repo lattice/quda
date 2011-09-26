@@ -1040,21 +1040,32 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       copyCuda(*out, *in);
       dirac.Mdag(*in, *out);
     }
-    invertCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), *out, *in, param);
+    {
+      CG cg(DiracMdagM(dirac), DiracMdagM(diracSloppy), *param);
+      cg(*out, *in);
+    }
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *out, *in, param);
+      BiCGstab bicg(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *param);
+      bicg(*out, *in);
       copyCuda(*in, *out);
     }
-    invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *out, *in, param);
+    {
+      BiCGstab bicg(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *param);
+      bicg(*out, *in);
+    }
     break;
   case QUDA_GCR_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertGCRCuda(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *out, *in, param);
+      GCR gcr(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *param);
+      gcr(*out, *in);
       copyCuda(*in, *out);
     }
-    invertGCRCuda(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *out, *in, param);
+    {
+      GCR gcr(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *param);
+      gcr(*out, *in);
+    }
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);
@@ -1100,6 +1111,16 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
   checkInvertParam(param);
+
+  param->num_offset = num_offsets;
+  if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
+    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
+	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+  for (int i=0; i<param->num_offset; i++) {
+    param->offset[i] = offsets[i];
+    param->tol_offset[i] = residue_sq[i];
+  }
+
   verbosity = param->verbosity;
 
   // Are we doing a preconditioned solve */
@@ -1124,12 +1145,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // **** WARNING *** this may not match implementation... 
   if( param->inv_type == QUDA_CG_INVERTER ) { 
     // CG-M needs 5 vectors for the smallest shift + 2 for each additional shift
-    param->spinorGiB *= (5 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (5 + 2*(param->num_offset-1))/(double)(1<<30);
   }
   else {
     // BiCGStab-M needs 7 for the original shift + 2 for each additional shift + 1 auxiliary
     // (Jegerlehner hep-lat/9612014 eq (3.13)
-    param->spinorGiB *= (7 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (7 + 2*(param->num_offset-1))/(double)(1<<30);
   }
 
   // Timing and FLOP counters
@@ -1138,21 +1159,21 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   param->iter = 0;
   
   // Find the smallest shift and its offset.
-  double low_offset = offsets[0];
+  double low_offset = param->offset[0];
   int low_index = 0;
-  for (int i=1;i < num_offsets;i++){
-    if (offsets[i] < low_offset){
-      low_offset = offsets[i];
+  for (int i=1;i < param->num_offset;i++){
+    if (param->offset[i] < low_offset){
+      low_offset = param->offset[i];
       low_index = i;
     }
   }
   
   // Host pointers for x, take a copy of the input host pointers
   void** hp_x;
-  hp_x = new void* [ num_offsets ];
+  hp_x = new void* [ param->num_offset ];
 
   void* hp_b = _hp_b;
-  for(int i=0;i < num_offsets;i++){
+  for(int i=0;i < param->num_offset;i++){
     hp_x[i] = _hp_x[i];
   }
   
@@ -1163,9 +1184,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     hp_x[0] = hp_x[low_index] ;
     hp_x[low_index] = tmp;
     
-    double tmp1 = offsets[0];
-    offsets[0]= offsets[low_index];
-    offsets[low_index] =tmp1;
+    double tmp1 = param->offset[0];
+    param->offset[0]= param->offset[low_index];
+    param->offset[low_index] =tmp1;
   }
     
   // Create the matrix.
@@ -1176,7 +1197,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // expedient but yucky.
   DiracParam diracParam; 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
-    param->mass = sqrt(offsets[0]/4);  
+    param->mass = sqrt(param->offset[0]/4);  
   }
   createDirac(diracParam, *param, pc_solve);
   Dirac &dirac = *d;
@@ -1200,8 +1221,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
   h_b = new cpuColorSpinorField(cpuParam);
 
-  h_x = new cpuColorSpinorField* [ num_offsets ]; // DYNAMIC ALLOCATION
-  for(int i=0; i < num_offsets; i++) { 
+  h_x = new cpuColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
+  for(int i=0; i < param->num_offset; i++) { 
     cpuParam.v = hp_x[i];
     h_x[i] = new cpuColorSpinorField(cpuParam);
   }
@@ -1213,9 +1234,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
 
   // Create the solution fields filled with zero
-  x = new cudaColorSpinorField* [ num_offsets ];
+  x = new cudaColorSpinorField* [ param->num_offset ];
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  for(int i=0; i < num_offsets; i++) { 
+  for(int i=0; i < param->num_offset; i++) { 
     x[i] = new cudaColorSpinorField(cudaParam);
   }
 
@@ -1231,21 +1252,24 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
-  double *rescaled_shifts = new double [num_offsets];
-  for(int i=0; i < num_offsets; i++){ 
-    rescaled_shifts[i] = offsets[i];
+  double *rescaled_shifts = new double [param->num_offset];
+  for(int i=0; i < param->num_offset; i++){ 
+    rescaled_shifts[i] = param->offset[i];
     massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
   }
-  invertMultiShiftCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), x, *b, param, rescaled_shifts, num_offsets, residue_sq);
-  
-  
+
+  {
+    MultiShiftCG cg_m(DiracMdagM(dirac), DiracMdagM(diracSloppy), *param);
+    cg_m(x, *b);  
+  }
+
   delete [] rescaled_shifts;
 
-  for(int i=0; i < num_offsets; i++) { 
+  for(int i=0; i < param->num_offset; i++) { 
     x[i]->saveCPUSpinorField(*h_x[i]);
   }
 
-  for(int i=0; i < num_offsets; i++){ 
+  for(int i=0; i < param->num_offset; i++){ 
     delete h_x[i];
     delete x[i];
   }
@@ -1270,9 +1294,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 }
 
 void endInvertQuda() {
-  freeMR();
-  freeBiCGstab();
-
   if (diracCreation) {
     if (d){
       delete d;
@@ -1411,6 +1432,15 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   QudaPrecision high_prec = param->cuda_prec;
   param->cuda_prec = param->cuda_prec_sloppy;
   
+  param->num_offset = num_offsets;
+  if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
+    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
+	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+  for (int i=0; i<param->num_offset; i++) {
+    param->offset[i] = offsets[i];
+    param->tol_offset[i] = residue_sq[i];
+  }
+
   do_create_sloppy_cuda_gauge();
 
   checkInvertParam(param);
@@ -1438,12 +1468,12 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // **** WARNING *** this may not match implementation... 
   if( param->inv_type == QUDA_CG_INVERTER ) { 
     // CG-M needs 5 vectors for the smallest shift + 2 for each additional shift
-    param->spinorGiB *= (5 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (5 + 2*(param->num_offset-1))/(double)(1<<30);
   }
   else {
     // BiCGStab-M needs 7 for the original shift + 2 for each additional shift + 1 auxiliary
     // (Jegerlehner hep-lat/9612014 eq (3.13)
-    param->spinorGiB *= (7 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (7 + 2*(param->num_offset-1))/(double)(1<<30);
   }
 
   // Timing and FLOP counters
@@ -1452,21 +1482,21 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   param->iter = 0;
   
   // Find the smallest shift and its offset.
-  double low_offset = offsets[0];
+  double low_offset = param->offset[0];
   int low_index = 0;
-  for (int i=1;i < num_offsets;i++){
-    if (offsets[i] < low_offset){
-      low_offset = offsets[i];
+  for (int i=1;i < param->num_offset;i++){
+    if (param->offset[i] < low_offset){
+      low_offset = param->offset[i];
       low_index = i;
     }
   }
   
   // Host pointers for x, take a copy of the input host pointers
   void** hp_x;
-  hp_x = new void* [ num_offsets ];
+  hp_x = new void* [ param->num_offset ];
 
   void* hp_b = _hp_b;
-  for(int i=0;i < num_offsets;i++){
+  for(int i=0;i < param->num_offset;i++){
     hp_x[i] = _hp_x[i];
   }
   
@@ -1477,9 +1507,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     hp_x[0] = hp_x[low_index] ;
     hp_x[low_index] = tmp;
     
-    double tmp1 = offsets[0];
-    offsets[0]= offsets[low_index];
-    offsets[low_index] =tmp1;
+    double tmp1 = param->offset[0];
+    param->offset[0]= param->offset[low_index];
+    param->offset[low_index] =tmp1;
   }
     
   // Create the matrix.
@@ -1490,7 +1520,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // expedient but yucky.
   DiracParam diracParam; 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
-    param->mass = sqrt(offsets[0]/4);  
+    param->mass = sqrt(param->offset[0]/4);  
   }
   createDirac(diracParam, *param, pc_solve);
   Dirac &dirac = *d;
@@ -1514,8 +1544,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
   h_b = new cpuColorSpinorField(cpuParam);
 
-  h_x = new cpuColorSpinorField* [ num_offsets ]; // DYNAMIC ALLOCATION
-  for(int i=0; i < num_offsets; i++) { 
+  h_x = new cpuColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
+  for(int i=0; i < param->num_offset; i++) { 
     cpuParam.v = hp_x[i];
     h_x[i] = new cpuColorSpinorField(cpuParam);
   }
@@ -1527,9 +1557,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
 
   // Create the solution fields filled with zero
-  x = new cudaColorSpinorField* [ num_offsets ];
+  x = new cudaColorSpinorField* [ param->num_offset ];
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  for(int i=0; i < num_offsets; i++) { 
+  for(int i=0; i < param->num_offset; i++) { 
     x[i] = new cudaColorSpinorField(cudaParam);
   }
 
@@ -1544,12 +1574,16 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // if set, tunning will happen in the first multishift call
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
-  double *rescaled_shifts = new double [num_offsets];
-  for(int i=0; i < num_offsets; i++){ 
-    rescaled_shifts[i] = offsets[i];
+  double *rescaled_shifts = new double [param->num_offset];
+  for(int i=0; i < param->num_offset; i++){ 
+    rescaled_shifts[i] = param->offset[i];
     massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
   }
-  invertMultiShiftCgCuda(DiracMdagM(diracSloppy), DiracMdagM(diracSloppy), x, *b, param, rescaled_shifts, num_offsets, residue_sq);
+
+  {
+    MultiShiftCG cg_m(DiracMdagM(diracSloppy), DiracMdagM(diracSloppy), *param);
+    cg_m(x, *b);  
+  }
     
   delete [] rescaled_shifts;
   
@@ -1576,13 +1610,14 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     
     cudaColorSpinorField* high_x;
     high_x = new cudaColorSpinorField(cudaParam);
-    for(int i=0;i < num_offsets; i++){
+    for(int i=0;i < param->num_offset; i++){
       *high_x  = *x[i];
       delete x[i];
-      double mass = sqrt(offsets[i]/4);
+      double mass = sqrt(param->offset[i]/4);
       dirac2.setMass(mass);
       diracSloppy2.setMass(mass);
-      invertCgCuda(DiracMdagM(dirac2), DiracMdagM(diracSloppy2), *high_x, *b, param);      
+      CG cg(DiracMdagM(dirac2), DiracMdagM(diracSloppy2), *param);
+      cg(*high_x, *b);      
       total_iters += param->iter;
       total_secs  += param->secs;
       total_gflops += param->gflops;      
@@ -1595,7 +1630,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
   
   
-  for(int i=0; i < num_offsets; i++){ 
+  for(int i=0; i < param->num_offset; i++){ 
     delete h_x[i];
   }
 

@@ -12,6 +12,8 @@ extern "C" {
   // When adding new members to QudaGaugeParam and QudaInvertParam, 
   // be sure to update lib/check_params.h
 #define QUDA_MAX_DIM 6
+#define QUDA_MAX_MULTI_SHIFT 32 // the maximum number of shifts for the multi-shift solver
+
   typedef struct QudaGaugeParam_s {
 
     int X[4];
@@ -60,6 +62,10 @@ extern "C" {
     double tol;
     int maxiter;
     double reliable_delta; // reliable update tolerance
+
+    int num_offset; // number of offsets
+    double offset[QUDA_MAX_MULTI_SHIFT]; // shift offsets for multi-shift solver
+    double tol_offset[QUDA_MAX_MULTI_SHIFT]; // solver tolerance for each offset
 
     QudaSolutionType solution_type; // type of system to solve
     QudaSolveType solve_type; // how to solve it
