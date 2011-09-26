@@ -1386,7 +1386,114 @@ void restoreGaugeField(void *cpuGauge, FullGauge *cudaGauge, QudaPrecision cpu_p
 
 /********************** Staple code, used by link fattening **************/
 
-#ifdef GPU_FATLINK
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
+
+
+template <typename Float, typename FloatN>
+void
+packGaugeField(FloatN *res, Float *gauge, int oddBit, ReconstructType reconstruct, int Vh)
+{
+    int dir, i;
+    if (reconstruct == QUDA_RECONSTRUCT_12) {
+        for (dir = 0; dir < 4; dir++) {
+            Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
+            for (i = 0; i < Vh; i++) {
+                pack12(res+i, g+4*i*gaugeSiteSize+dir*gaugeSiteSize, dir, Vh);
+            }
+        }
+    } else if (reconstruct == QUDA_RECONSTRUCT_8){
+        for (dir = 0; dir < 4; dir++) {
+            Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
+            for (i = 0; i < Vh; i++) {
+                pack8(res+i, g+4*i*gaugeSiteSize + dir*gaugeSiteSize, dir, Vh);
+            }
+        }
+    }else{
+        for (dir = 0; dir < 4; dir++) {
+            Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
+            for (i = 0; i < Vh; i++) {
+                pack18(res+i, g+i*gaugeSiteSize+dir, dir*gaugeSiteSize, Vh);
+            }
+        }
+    }
+}
+
+template <typename Float, typename FloatN>
+void
+loadGaugeFromCPUArrayQuda(FloatN *even, FloatN *odd, Float *cpuGauge,
+                          ReconstructType reconstruct, int bytes, int Vh)
+{
+
+    // Use pinned memory
+
+    FloatN *packedEven, *packedOdd;
+    cudaMallocHost((void**)&packedEven, bytes);
+    cudaMallocHost((void**)&packedOdd, bytes);
+
+
+    packGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, Vh);
+    packGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, Vh);
+
+
+    cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(odd,  packedOdd, bytes, cudaMemcpyHostToDevice);
+
+    cudaFreeHost(packedEven);
+    cudaFreeHost(packedOdd);
+}
+
+
+
+void 
+loadLinkToGPU_gf(FullGauge cudaGauge, void *cpuGauge, QudaGaugeParam* param)
+{
+    QudaPrecision cpu_prec = param->cpu_prec;
+    QudaPrecision cuda_prec= param->cuda_prec;
+
+    if (cuda_prec == QUDA_DOUBLE_PRECISION) {
+        loadGaugeFromCPUArrayQuda((double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double*)cpuGauge,
+                                  cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+    } else if (cuda_prec == QUDA_SINGLE_PRECISION) {
+        if (cpu_prec == QUDA_DOUBLE_PRECISION){
+            if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
+                loadGaugeFromCPUArrayQuda((float4*)(cudaGauge.even), (float4*)(cudaGauge.odd), (double*)cpuGauge,
+                                          cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }else{
+                loadGaugeFromCPUArrayQuda((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (double*)cpuGauge,
+                                          cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }
+        }
+        else if (cpu_prec == QUDA_SINGLE_PRECISION){
+            if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
+                loadGaugeFromCPUArrayQuda((float4*)(cudaGauge.even), (float4*)(cudaGauge.odd), (float*)cpuGauge,
+                                          cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }else{
+                loadGaugeFromCPUArrayQuda((float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float*)cpuGauge,
+                                          cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }
+        }
+    } else if (cuda_prec == QUDA_HALF_PRECISION) {
+        if (cpu_prec == QUDA_DOUBLE_PRECISION){
+            if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
+                loadGaugeFromCPUArrayQuda((short4*)(cudaGauge.even), (short4*)(cudaGauge.odd), (double*)cpuGauge,
+                               cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }else{
+                loadGaugeFromCPUArrayQuda((short2*)(cudaGauge.even), (short2*)(cudaGauge.odd), (double*)cpuGauge,
+                                          cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }
+        }
+        else if (cpu_prec == QUDA_SINGLE_PRECISION){
+            if (cudaGauge.reconstruct != QUDA_RECONSTRUCT_NO){
+                loadGaugeFromCPUArrayQuda((short4*)(cudaGauge.even), (short4*)(cudaGauge.odd), (float*)cpuGauge,
+                                          cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }else{
+                loadGaugeFromCPUArrayQuda((short2*)(cudaGauge.even), (short2*)(cudaGauge.odd), (float*)cpuGauge,
+                                          cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB);
+            }
+        }
+    }
+}
+
 
 static void 
 allocateStapleQuda(FullStaple *cudaStaple, QudaPrecision precision) 
@@ -1612,8 +1719,8 @@ unpackGhostStaple(FullStaple* cudaStaple, int dir, int whichway, void** fwd_nbr_
 
 
 /******************************** Mom code, used by Fermi force code ****************************/
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 
-#ifdef GPU_FERMION_FORCE
 static void 
 allocateMomQuda(FullMom *cudaMom, QudaPrecision precision) 
 {
@@ -1801,8 +1908,7 @@ storeMomToCPU(void* mom, FullMom cudaMom, QudaGaugeParam* param)
 
 /********** link code, used by link fattening  **********************/
 
-#ifdef GPU_FATLINK
-
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 void
 createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param)
 {
@@ -1872,6 +1978,7 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
   
   int ghostV = 2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t)+4*Vh_2d_max;
 #else
+  int ghostV = 0;
   int glen[4] = {0,0,0,0};
 #endif  
 
@@ -2036,6 +2143,9 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
     }
   }
 
+
+#ifdef MULTI_GPU
+
   /*
     nu |     |
        |_____|
@@ -2079,7 +2189,9 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
 
    int optflag=1;
    exchange_cpu_sitelink(param->X, cpuGauge, ghost_cpuGauge, ghost_cpuGauge_diag, prec, optflag);
-   
+
+#endif
+
    if (prec == QUDA_DOUBLE_PRECISION) {
      do_loadLinkToGPU(param->X, (double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
 		      (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 

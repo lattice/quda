@@ -293,8 +293,8 @@
 
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
 
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var)
 #else
 #define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var)
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var)
@@ -586,8 +586,8 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
     float4* linkEven = (float4*)cudaSiteLink.even;
     float4* linkOdd = (float4*)cudaSiteLink.odd;        
 
-    cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
-    cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
     parity_compute_gauge_force_kernel<0><<<halfGridDim, blockDim>>>(momEven, momOdd,
 								  dir, eb3,
 								  linkEven, linkOdd, 
@@ -605,8 +605,8 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
     
 
     
-    cudaUnbindTexture(siteLink0TexSingle);
-    cudaUnbindTexture(siteLink1TexSingle);
+    cudaUnbindTexture(siteLink0TexSingle_recon);
+    cudaUnbindTexture(siteLink1TexSingle_recon);
     
     checkCudaError();
     
