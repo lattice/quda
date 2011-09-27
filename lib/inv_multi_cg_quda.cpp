@@ -24,7 +24,7 @@
  *
  */
 
-MultiShiftCG::MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, QudaInvertParam &invParam) 
+MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam) 
   : MultiShiftSolver(invParam), mat(mat), matSloppy(matSloppy) {
 
 }

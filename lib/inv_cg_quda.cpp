@@ -14,7 +14,7 @@
 
 #include <iostream>
 
-CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, QudaInvertParam &invParam) :
+CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam) :
   Solver(invParam), mat(mat), matSloppy(matSloppy)
 {
 

@@ -25,7 +25,7 @@ class CG : public Solver {
   const DiracMatrix &matSloppy;
 
  public:
-  CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, QudaInvertParam &invParam);
+  CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
   virtual ~CG();
 
   void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -34,7 +34,7 @@ class CG : public Solver {
 class BiCGstab : public Solver {
 
  private:
-  const DiracMatrix &mat;
+  DiracMatrix &mat;
   const DiracMatrix &matSloppy;
   const DiracMatrix &matPrecon;
 
@@ -43,7 +43,7 @@ class BiCGstab : public Solver {
   bool init;
 
  public:
-  BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+  BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
 	   QudaInvertParam &invParam);
   virtual ~BiCGstab();
 
@@ -61,7 +61,7 @@ class GCR : public Solver {
   QudaInvertParam Kparam; // parameters for preconditioner solve
 
  public:
-  GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+  GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
       QudaInvertParam &invParam);
   virtual ~GCR();
 
@@ -78,10 +78,23 @@ class MR : public Solver {
   bool init;
 
  public:
-  MR(const DiracMatrix &mat, QudaInvertParam &invParam);
+  MR(DiracMatrix &mat, QudaInvertParam &invParam);
   virtual ~MR();
 
   void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+};
+
+// multigrid solver
+class alphaSA : public Solver {
+
+ protected:
+  const DiracMatrix &mat;
+
+ public:
+  alphaSA(DiracMatrix &mat, QudaInvertParam &invParam);
+  virtual ~alphaSA() { ; }
+
+  void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
 };
 
 class MultiShiftSolver {
@@ -103,7 +116,7 @@ class MultiShiftCG : public MultiShiftSolver {
   const DiracMatrix &matSloppy;
 
  public:
-  MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, QudaInvertParam &invParam);
+  MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
   virtual ~MultiShiftCG();
 
   void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
@@ -129,37 +142,6 @@ extern "C" {
 
   extern FullClover cudaCloverInvPrecise;
   extern FullClover cudaCloverInvSloppy;
-
-  /*
-  // defined in inv_cg_cuda.cpp
-
-  void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
-		    cudaColorSpinorField &b, QudaInvertParam *param);
-
-  // defined in inv_multi_cg_quda.cpp
-
-  int invertMultiShiftCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField **x, 
-			     cudaColorSpinorField b, QudaInvertParam *param, double *offsets, 
-			     int num_offsets, double *residue_sq);
-
-  // defined in inv_bicgstab_cuda.cpp
-
-  void invertBiCGstabCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &pre,
-			  cudaColorSpinorField &x, cudaColorSpinorField &b, QudaInvertParam *param);
-
-  void freeBiCGstab();
-
-  // defined in inv_gcr_cuda.cpp
-
-  void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &pre,
-		     cudaColorSpinorField &x, cudaColorSpinorField &b, QudaInvertParam *param);
-
-  // defined in inv_mr_cuda.cpp
-
-  void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, 
-		    cudaColorSpinorField &b, QudaInvertParam *param);
-
-  void freeMR();*/
 
 #ifdef __cplusplus
 }

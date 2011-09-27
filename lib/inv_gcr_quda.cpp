@@ -134,8 +134,7 @@ void updateSolution(cudaColorSpinorField &x, const Complex *alpha, Complex** con
   delete []delta;
 }
 
-GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-	 QudaInvertParam &invParam) :
+GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam) :
   Solver(invParam), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0)
 {
 

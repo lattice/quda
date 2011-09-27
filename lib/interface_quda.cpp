@@ -1041,29 +1041,34 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       dirac.Mdag(*in, *out);
     }
     {
-      CG cg(DiracMdagM(dirac), DiracMdagM(diracSloppy), *param);
+      DiracMdagM m(dirac), mSloppy(diracSloppy);
+      CG cg(m, mSloppy, *param);
       cg(*out, *in);
     }
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      BiCGstab bicg(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *param);
+      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      BiCGstab bicg(m, mSloppy, mPre, *param);
       bicg(*out, *in);
       copyCuda(*in, *out);
     }
     {
-      BiCGstab bicg(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *param);
+      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      BiCGstab bicg(m, mSloppy, mPre, *param);
       bicg(*out, *in);
     }
     break;
   case QUDA_GCR_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      GCR gcr(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *param);
+      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      GCR gcr(m, mSloppy, mPre, *param);
       gcr(*out, *in);
       copyCuda(*in, *out);
     }
     {
-      GCR gcr(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *param);
+      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      GCR gcr(m, mSloppy, mPre, *param);
       gcr(*out, *in);
     }
     break;
@@ -1259,7 +1264,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   {
-    MultiShiftCG cg_m(DiracMdagM(dirac), DiracMdagM(diracSloppy), *param);
+    DiracMdagM m(dirac), mSloppy(diracSloppy);
+    MultiShiftCG cg_m(m, mSloppy, *param);
     cg_m(x, *b);  
   }
 
@@ -1523,7 +1529,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     param->mass = sqrt(param->offset[0]/4);  
   }
   createDirac(diracParam, *param, pc_solve);
-  Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
 
   cpuColorSpinorField *h_b = NULL; // Host RHS
@@ -1571,7 +1576,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   // tune the Dirac Kernel
-  // if set, tunning will happen in the first multishift call
+  // if set, tuning will happen in the first multishift call
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [param->num_offset];
@@ -1581,7 +1586,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   {
-    MultiShiftCG cg_m(DiracMdagM(diracSloppy), DiracMdagM(diracSloppy), *param);
+    DiracMdagM m(diracSloppy);
+    MultiShiftCG cg_m(m, m, *param);
     cg_m(x, *b);  
   }
     
@@ -1616,7 +1622,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
       double mass = sqrt(param->offset[i]/4);
       dirac2.setMass(mass);
       diracSloppy2.setMass(mass);
-      CG cg(DiracMdagM(dirac2), DiracMdagM(diracSloppy2), *param);
+      DiracMdagM m(dirac2), mSloppy(diracSloppy2);
+      CG cg(m, mSloppy, *param);
       cg(*high_x, *b);      
       total_iters += param->iter;
       total_secs  += param->secs;

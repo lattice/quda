@@ -14,7 +14,7 @@
 
 #include <color_spinor_field.h>
 
-MR::MR(const DiracMatrix &mat, QudaInvertParam &invParam) :
+MR::MR(DiracMatrix &mat, QudaInvertParam &invParam) :
   Solver(invParam), mat(mat), init(false)
 {
  

@@ -24,8 +24,7 @@ double resNorm(const DiracMatrix &mat, cudaColorSpinorField &b, cudaColorSpinorF
 }
 
 
-BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-		   QudaInvertParam &invParam) :
+BiCGstab::BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam) :
   Solver(invParam), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false) {
 
 }
