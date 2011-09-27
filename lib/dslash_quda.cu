@@ -800,7 +800,7 @@ void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *
   cudaStreamWaitEvent(0, dslashEnd, 0);
 
   // Gather from source spinor
-  for(int dir = 0; dir <4; dir++){
+  for(int dir = 3; dir >=0 ; dir--){
     if (!dslashParam.commDim[dir]) continue;
     face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
   }
@@ -811,7 +811,7 @@ void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *
 
 #ifdef MULTI_GPU
 
-  for(int i=0 ;i < 4;i++){
+  for(int i=3 ;i >= 0;i--){
     if (!dslashParam.commDim[i]) continue;
 
     // Finish gather and start comms
@@ -824,7 +824,7 @@ void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *
     cudaEventRecord(scatterEvent[2*i+1], streams[2*i+1]);
   }
 
-  for(int i=0 ;i < 4;i++){
+  for(int i=3 ;i >= 0;i--){
     if(!dslashParam.commDim[i]) continue;
 
     shared_bytes = blockDim[i+1].x*6*regSize;
