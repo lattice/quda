@@ -33,7 +33,11 @@ void* refMom;
 
 int verify_results = 0;
 int ODD_BIT = 1;
-int sdim= 8;
+extern int tdim;
+extern QudaPrecision prec;
+extern int xdim;
+extern int ydim;
+extern int zdim;
 extern int tdim;
 
 int Z[4];
@@ -60,12 +64,13 @@ setDims(int *X) {
 static void
 gauge_force_init()
 { 
+
     initQuda(device);
     //cudaSetDevice(dev); CUERR;
     
-    gaugeParam.X[0] = sdim;
-    gaugeParam.X[1] = sdim;
-    gaugeParam.X[2] = sdim;
+    gaugeParam.X[0] = xdim;
+    gaugeParam.X[1] = ydim;
+    gaugeParam.X[2] = zdim;
     gaugeParam.X[3] = tdim;
     
     setDims(gaugeParam.X);
@@ -580,11 +585,11 @@ display_test_info()
 {
     printf("running the following test:\n");
     
-    printf("link_precision           link_reconstruct           S_dimension              T_dimension\n");
-    printf("%s                       %s                         %d                       %d\n", 
+    printf("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension\n");
+    printf("%s                       %s                         %d/%d/%d                       %d\n", 
 	   get_prec_str(link_prec),
 	   get_recon_str(link_recon), 
-	   sdim, tdim);
+	   xdim,ydim,zdim, tdim);
     return ;
     
 }
@@ -610,76 +615,39 @@ main(int argc, char **argv)
     int i;
     for (i =1;i < argc; i++){
 	
-        if( strcmp(argv[i], "--help")== 0){
+      if(process_command_line_option(argc, argv, &i) == 0){
+	continue;
+      }
+      
+      
+      if( strcmp(argv[i], "--help")== 0){
             usage(argv);
         }
 	
-	if( strcmp(argv[i], "--gprec") == 0){
-            if (i+1 >= argc){
-                usage(argv);
-            }	    
-	    link_prec =  get_prec(argv[i+1]);
-            i++;
-            continue;	    
-        }
-	
-	if( strcmp(argv[i], "--recon") == 0){
-            if (i+1 >= argc){
-                usage(argv);
-            }	    
-	    link_recon =  get_recon(argv[i+1]);
-            i++;
-            continue;	    
-        }
-	
-	if( strcmp(argv[i], "--tdim") == 0){
-            if (i+1 >= argc){
-                usage(argv);
-            }	    
-	    tdim =  atoi(argv[i+1]);
-	    if (tdim < 0 || tdim > 128){
-		fprintf(stderr, "Error: invalid t dimention\n");
-		exit(1);
-	    }
-            i++;
-            continue;	    
-        }
-	if( strcmp(argv[i], "--sdim") == 0){
-            if (i+1 >= argc){
-                usage(argv);
-            }	    
-	    sdim =  atoi(argv[i+1]);
-	    if (sdim < 0 || sdim > 128){
-		fprintf(stderr, "Error: invalid space dimention\n");
-		exit(1);
-	    }
-            i++;
-            continue;	    
-        }
-        if( strcmp(argv[i], "--device") == 0){
-            if (i+1 >= argc){
-                usage(argv);
+      if( strcmp(argv[i], "--device") == 0){
+	if (i+1 >= argc){
+	  usage(argv);
             }
-            device =  atoi(argv[i+1]);
-            if (device < 0){
-                fprintf(stderr, "Error: invalid device number(%d)\n", device);
-                exit(1);
-            }
-            i++;
-            continue;
-        }
-
-	if( strcmp(argv[i], "--verify") == 0){
-	    verify_results=1;
-            continue;	    
-        }	
-        fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-        usage(argv);
+	device =  atoi(argv[i+1]);
+	if (device < 0){
+	  fprintf(stderr, "Error: invalid device number(%d)\n", device);
+	  exit(1);
+	}
+	i++;
+	continue;
+      }
+      
+      if( strcmp(argv[i], "--verify") == 0){
+	verify_results=1;
+	continue;	    
+      }	
+      fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+      usage(argv);
     }
-
     
+    
+    link_prec = prec;
     link_recon = QUDA_RECONSTRUCT_12;
-    tdim = 8;
 #ifdef MULTI_GPU
     initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 #endif

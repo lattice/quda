@@ -30,13 +30,12 @@ extern void initDslashCuda(FullGauge gauge);
 extern void initDslashConstants(const FullGauge gauge, const int sp_stride);
 
 
-static int sdim= 8;
-
 int ODD_BIT = 1;
-static int tdim = 8;
+extern int xdim, ydim, zdim, tdim;
 
 extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
+extern QudaPrecision prec;
 QudaPrecision hw_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision mom_prec = QUDA_SINGLE_PRECISION;
 
@@ -69,9 +68,9 @@ fermion_force_init()
   initQuda(device);
   //cudaSetDevice(dev); CUERR;
     
-  X[0] = gaugeParam.X[0] = sdim;
-  X[1] = gaugeParam.X[1] = sdim;
-  X[2] = gaugeParam.X[2] = sdim;
+  X[0] = gaugeParam.X[0] = xdim;
+  X[1] = gaugeParam.X[1] = ydim;
+  X[2] = gaugeParam.X[2] = zdim;
   X[3] = gaugeParam.X[3] = tdim;
     
   setDims(gaugeParam.X);
@@ -222,11 +221,11 @@ display_test_info()
 {
   printf("running the following fermion force computation test:\n");
     
-  printf("link_precision           link_reconstruct           S_dimension         T_dimension\n");
-  printf("%s                       %s                         %d                  %d \n", 
+  printf("link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
+  printf("%s                       %s                         %d/%d/%d                  %d \n", 
 	 get_prec_str(link_prec),
 	 get_recon_str(link_recon), 
-	 sdim, tdim);
+	 xdim, ydim, zdim, tdim);
   return ;
     
 }
@@ -253,52 +252,11 @@ main(int argc, char **argv)
   int i;
   for (i =1;i < argc; i++){
 	
-    if( strcmp(argv[i], "--help")== 0){
-      usage(argv);
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
     }
-	
-    if( strcmp(argv[i], "--gprec") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_prec =  get_prec(argv[i+1]);
-      i++;
-      continue;	    
-    }
-	
-    if( strcmp(argv[i], "--recon") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      link_recon =  get_recon(argv[i+1]);
-      i++;
-      continue;	    
-    }
-	
-    if( strcmp(argv[i], "--tdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      tdim =  atoi(argv[i+1]);
-      if (tdim < 0 || tdim > 128){
-	fprintf(stderr, "Error: invalid t dimention\n");
-	exit(1);
-      }
-      i++;
-      continue;	    
-    }
-    if( strcmp(argv[i], "--sdim") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      sdim =  atoi(argv[i+1]);
-      if (sdim < 0 || sdim > 128){
-	fprintf(stderr, "Error: invalid space dimention\n");
-	exit(1);
-      }
-      i++;
-      continue;	    
-    }
+    
+
     if( strcmp(argv[i], "--device") == 0){
         if (i+1 >= argc){
                 usage(argv);
@@ -325,7 +283,8 @@ main(int argc, char **argv)
 #endif
 
   link_recon = QUDA_RECONSTRUCT_12;
-    
+  link_prec = prec;
+
   display_test_info();
     
   fermion_force_test();
