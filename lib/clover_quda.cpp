@@ -193,7 +193,6 @@ void loadParityClover(ParityClover ret, void *clover, QudaPrecision cpu_prec,
     errorQuda("Invalid clover_order");
   }
 
-#ifndef __DEVICE_EMULATION__
   if (cudaMallocHost(&packedClover, ret.bytes) == cudaErrorMemoryAllocation) {
     errorQuda("Error allocating clover pinned memory");
   }  
@@ -201,10 +200,6 @@ void loadParityClover(ParityClover ret, void *clover, QudaPrecision cpu_prec,
     if (cudaMallocHost(&packedCloverNorm, ret.bytes/18) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating clover pinned memory");
     } 
-#else
-  packedClover = malloc(ret.bytes);
-  if (ret.precision == QUDA_HALF_PRECISION) packedCloverNorm = malloc(ret.bytes/18);
-#endif
     
   if (ret.precision == QUDA_DOUBLE_PRECISION) {
     packParityClover((double2 *)packedClover, (double *)clover, ret.volume, ret.pad);
@@ -229,14 +224,8 @@ void loadParityClover(ParityClover ret, void *clover, QudaPrecision cpu_prec,
     cudaMemcpy(ret.cloverNorm, packedCloverNorm, ret.bytes/18, cudaMemcpyHostToDevice);
   }
 
-#ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedClover);
   if (ret.precision == QUDA_HALF_PRECISION) cudaFreeHost(packedCloverNorm);
-#else
-  free(packedClover);
-  if (ret.precision == QUDA_HALF_PRECISION) free(packedCloverNorm);
-#endif
-
 }
 
 void loadFullClover(FullClover ret, void *clover, QudaPrecision cpu_prec,
@@ -252,21 +241,12 @@ void loadFullClover(FullClover ret, void *clover, QudaPrecision cpu_prec,
     errorQuda("Invalid clover order");
   }
 
-#ifndef __DEVICE_EMULATION__
   cudaMallocHost(&packedEven, ret.even.bytes);
   cudaMallocHost(&packedOdd, ret.even.bytes);
   if (ret.even.precision == QUDA_HALF_PRECISION) {
     cudaMallocHost(&packedEvenNorm, ret.even.bytes/18);
     cudaMallocHost(&packedOddNorm, ret.even.bytes/18);
   }
-#else
-  packedEven = malloc(ret.even.bytes);
-  packedOdd = malloc(ret.even.bytes);
-  if (ret.even.precision == QUDA_HALF_PRECISION) {
-    packedEvenNorm = malloc(ret.even.bytes/18);
-    packedOddNorm = malloc(ret.even.bytes/18);
-  }
-#endif
     
   if (ret.even.precision == QUDA_DOUBLE_PRECISION) {
     packFullClover((double2 *)packedEven, (double2 *)packedOdd, (double *)clover, ret.even.X, ret.even.pad);
@@ -293,22 +273,12 @@ void loadFullClover(FullClover ret, void *clover, QudaPrecision cpu_prec,
     cudaMemcpy(ret.odd.cloverNorm, packedOddNorm, ret.even.bytes/18, cudaMemcpyHostToDevice);
   }
 
-#ifndef __DEVICE_EMULATION__
   cudaFreeHost(packedEven);
   cudaFreeHost(packedOdd);
   if (ret.even.precision == QUDA_HALF_PRECISION) {
     cudaFreeHost(packedEvenNorm);
     cudaFreeHost(packedOddNorm);
   }
-#else
-  free(packedEven);
-  free(packedOdd);
-  if (ret.even.precision == QUDA_HALF_PRECISION) {
-    free(packedEvenNorm);
-    free(packedOddNorm);
-  }
-#endif
-
 }
 
 void loadCloverField(FullClover ret, void *clover, QudaPrecision cpu_prec, CloverFieldOrder clover_order)

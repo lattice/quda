@@ -42,18 +42,15 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
   if (reduce_threads >= 256) { if (tid < 128) { DSACC3(s[0],s[1],s[256+0],s[256+1]); } __syncthreads(); }
   if (reduce_threads >= 128) { if (tid <  64) { DSACC3(s[0],s[1],s[128+0],s[128+1]); } __syncthreads(); }    
 
-#ifndef __DEVICE_EMULATION__
-  if (tid < 32) 
-#endif
-    {
-      volatile QudaSumFloat3 *sv = s;
-      if (reduce_threads >=  64) { DSACC3(sv[0],sv[1],sv[64+0],sv[64+1]); EMUSYNC; }
-      if (reduce_threads >=  32) { DSACC3(sv[0],sv[1],sv[32+0],sv[32+1]); EMUSYNC; }
-      if (reduce_threads >=  16) { DSACC3(sv[0],sv[1],sv[16+0],sv[16+1]); EMUSYNC; }
-      if (reduce_threads >=   8) { DSACC3(sv[0],sv[1], sv[8+0], sv[8+1]); EMUSYNC; }
-      if (reduce_threads >=   4) { DSACC3(sv[0],sv[1], sv[4+0], sv[4+1]); EMUSYNC; } 
-      if (reduce_threads >=   2) { DSACC3(sv[0],sv[1], sv[2+0], sv[2+1]); EMUSYNC; }
-    }
+  if (tid < 32) {
+    volatile QudaSumFloat3 *sv = s;
+    if (reduce_threads >=  64) { DSACC3(sv[0],sv[1],sv[64+0],sv[64+1]); }
+    if (reduce_threads >=  32) { DSACC3(sv[0],sv[1],sv[32+0],sv[32+1]); }
+    if (reduce_threads >=  16) { DSACC3(sv[0],sv[1],sv[16+0],sv[16+1]); }
+    if (reduce_threads >=   8) { DSACC3(sv[0],sv[1], sv[8+0], sv[8+1]); }
+    if (reduce_threads >=   4) { DSACC3(sv[0],sv[1], sv[4+0], sv[4+1]); } 
+    if (reduce_threads >=   2) { DSACC3(sv[0],sv[1], sv[2+0], sv[2+1]); }
+  }
     
   // write result for this block to global mem as single QudaSumFloat3
   if (tid == 0) {
@@ -111,20 +108,17 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumFloat3 *g_odata, 
   if (reduce_threads >= 128) 
     { if (tid <  64) { SUM_DOUBLE3(s, 0, 64); } __syncthreads(); }
     
-#ifndef __DEVICE_EMULATION__
-  if (tid < 32) 
-#endif
-    {
-      volatile QudaSumFloat *svx = sx;
-      volatile QudaSumFloat *svy = sy;
-      volatile QudaSumFloat *svz = sz;
-      if (reduce_threads >=  64) { SUM_DOUBLE3(sv, 0,32); EMUSYNC; }
-      if (reduce_threads >=  32) { SUM_DOUBLE3(sv, 0,16); EMUSYNC; }
-      if (reduce_threads >=  16) { SUM_DOUBLE3(sv, 0,8); EMUSYNC; }
-      if (reduce_threads >=   8) { SUM_DOUBLE3(sv, 0,4); EMUSYNC; }
-      if (reduce_threads >=   4) { SUM_DOUBLE3(sv, 0,2); EMUSYNC; }
-      if (reduce_threads >=   2) { SUM_DOUBLE3(sv, 0,1); EMUSYNC; }
-    }
+  if (tid < 32) {
+    volatile QudaSumFloat *svx = sx;
+    volatile QudaSumFloat *svy = sy;
+    volatile QudaSumFloat *svz = sz;
+    if (reduce_threads >=  64) { SUM_DOUBLE3(sv, 0,32); }
+    if (reduce_threads >=  32) { SUM_DOUBLE3(sv, 0,16); }
+    if (reduce_threads >=  16) { SUM_DOUBLE3(sv, 0,8); }
+    if (reduce_threads >=   8) { SUM_DOUBLE3(sv, 0,4); }
+    if (reduce_threads >=   4) { SUM_DOUBLE3(sv, 0,2); }
+    if (reduce_threads >=   2) { SUM_DOUBLE3(sv, 0,1); }
+  }
     
   // write result for this block to global mem 
   if (tid == 0) {
