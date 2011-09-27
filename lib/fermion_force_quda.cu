@@ -359,6 +359,11 @@
 void
 fermion_force_init_cuda(QudaGaugeParam* param)
 {
+
+#ifdef MULTI_GPU
+#error "multi gpu is not supported for fermion force computation"  
+#endif
+
     static int fermion_force_init_cuda_flag = 0; 
     
     if (fermion_force_init_cuda_flag){

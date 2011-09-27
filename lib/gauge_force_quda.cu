@@ -312,6 +312,11 @@ __constant__ int path_max_length;
 void
 gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
 {    
+  
+#ifdef MULTI_GPU
+#error "multi gpu is not supported for gauge force computation"  
+#endif
+  
     static int gauge_force_init_cuda_flag = 0;
     if (gauge_force_init_cuda_flag){
 	return;
@@ -371,7 +376,7 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
         switch(dir){							\
         case XUP:							\
             if ( (i4 & 1) == 1){					\
-                sign = 1;						\
+	      sign = 1;							\
             }								\
             break;							\
         case YUP:							\
