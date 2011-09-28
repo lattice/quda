@@ -481,7 +481,7 @@ inline void unpack18(Float *h_gauge, short2 *d_gauge, int dir, int V) {
 // voxels[i] = face volume[i]
 template <typename Float, typename FloatN>
 static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit, 
-			      ReconstructType reconstruct, int Vh, int *voxels,
+			      QudaReconstructType reconstruct, int Vh, int *voxels,
 			      int pad, int offset, int nFace, QudaLinkType type) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
@@ -514,7 +514,7 @@ static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit,
 // space-time, row-column ordering, even-odd space-time
 template <typename Float, typename FloatN>
 static void unpackQDPGaugeField(Float **h_gauge, FloatN *d_gauge, int oddBit, 
-				ReconstructType reconstruct, int V, int pad) {
+				QudaReconstructType reconstruct, int V, int pad) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge[dir] + oddBit*V*18;
@@ -544,7 +544,7 @@ static void transposeScale(Float *gT, Float *g, const Float2 &a) {
 // space-time column-row ordering even-odd space-time
 template <typename Float, typename FloatN>
 static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit, 
-			      ReconstructType reconstruct, int V, int pad) {
+			      QudaReconstructType reconstruct, int V, int pad) {
   Float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
@@ -578,7 +578,7 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
 // space-time column-row ordering even-odd space-time
 template <typename Float, typename FloatN>
 static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
-				ReconstructType reconstruct, int V, int pad) {
+				QudaReconstructType reconstruct, int V, int pad) {
   Float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {

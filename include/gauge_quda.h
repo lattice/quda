@@ -3,50 +3,82 @@
 
 #include <quda_internal.h>
 #include <quda.h>
+#include <lattice_field.h>
 
-class cpuGaugeField;
-class cudaGaugeField;
+struct GaugeFieldParam : public LatticeFieldParam {
+  int nColor;
+  int nDim;
+  int nFace;
 
-class GaugeField {
+  QudaReconstructType reconstruct;
+  QudaGaugeFieldOrder order;
+  QudaGaugeFixed fixed;
+  QudaLinkType link_type;
+  QudaTboundary t_boundary;
+
+  double anisotropy;
+
+  void *gauge[QUDA_MAX_DIM]; // used when we use a reference to an external field
+
+  QudaFieldCreate create; // used to determine the type of field created
+};
+
+class GaugeField : LatticeField {
 
  protected:
   size_t bytes; // bytes allocated per clover full field 
-  size_t norm_bytes; // sizeof each norm full field
-  size_t total_bytes; // total bytes allocated
-  QudaPrecision precision;
   int length;
   int real_length;
-  int volume;
-  int volumeCB;
-  int X[QUDA_MAX_DIM];
-  int Nc;
-  int Ns;
-  int pad;
-  int stride;
+  int nColor;
+  int nFace;
+
+  QudaReconstructType reconstruct;
+  QudaGaugeFieldOrder order;
+  QudaGaugeFixed fixed;
+  QudaLinkType link_type;
+  QudaTboundary t_boundary;
+
+  double anisotropy;
+
+  QudaFieldCreate create; // used to determine the type of field created
 
  public:
-  GaugeField();
+  GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &location);
   virtual ~GaugeField();
 
+  int Ncolor() const { return nColor; }
+  QudaReconstructType Reconstruct() const { return reconstruct; }
+  double Anisotropy() const { return anisotropy; }
+  QudaTboundary TBoundary() const { return t_boundary; }
+  QudaLinkType LinkType() const { return link_type; }
+  QudaGaugeFixed GaugeFixed() const { return fixed; }
 };
 
 class cudaGaugeField : public GaugeField {
 
+ private:
+  double fat_link_max;
+
  public:
-  cudaGaugeField();
+  cudaGaugeField(const GaugeFieldParam &);
   virtual ~cudaGaugeField();
 
-  void loadCPUGaugeField(const cpuGaugeField &);
-  void saveCPUGaugeField(cpuGaugeField &) const;
+  void loadCPUField(const cpuGaugeField &);
+  void saveCPUField(cpuGaugeField &) const;
 
 };
 
 class cpuGaugeField : public GaugeField {
 
+ private:
+  void *gauge[QUDA_MAX_DIM]; // the actual gauge field
+  void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field
+
  public:
-  cpuGaugeField();
+  cpuGaugeField(const GaugeFieldParam &);
   virtual ~cpuGaugeField();
 
+  void exchangeGhost();
 };
 
 #ifdef __cplusplus
@@ -54,7 +86,7 @@ extern "C" {
 #endif
 
   void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
-			GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
+			GaugeFieldOrder gauge_order, QudaReconstructType reconstruct, QudaGaugeFixed gauge_fixed,
 			Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, 
 			QudaLinkType type);
 

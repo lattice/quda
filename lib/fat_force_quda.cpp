@@ -337,7 +337,7 @@ void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir
 
 template <typename Float, typename FloatN>
 void
-packGaugeField(FloatN *res, Float *gauge, int oddBit, ReconstructType reconstruct, int Vh)
+packGaugeField(FloatN *res, Float *gauge, int oddBit, QudaReconstructType reconstruct, int Vh)
 {
     int dir, i;
     if (reconstruct == QUDA_RECONSTRUCT_12) {
@@ -367,7 +367,7 @@ packGaugeField(FloatN *res, Float *gauge, int oddBit, ReconstructType reconstruc
 template <typename Float, typename FloatN>
 void
 loadGaugeFromCPUArrayQuda(FloatN *even, FloatN *odd, Float *cpuGauge,
-                          ReconstructType reconstruct, int bytes, int Vh)
+                          QudaReconstructType reconstruct, int bytes, int Vh)
 {
 
     // Use pinned memory
@@ -882,7 +882,7 @@ storeMomToCPU(void* mom, FullMom cudaMom, QudaGaugeParam* param)
 
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 
-static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct, QudaPrecision precision) {
+static void allocateGaugeField(FullGauge *cudaGauge, QudaReconstructType reconstruct, QudaPrecision precision) {
 
   cudaGauge->reconstruct = reconstruct;
   cudaGauge->precision = precision;
@@ -955,7 +955,7 @@ template<typename FloatN, typename Float>
 static void 
 do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuGauge,
 		 Float** ghost_cpuGauge_diag, 
-		 ReconstructType reconstruct, int bytes, int Vh, int pad, 
+		 QudaReconstructType reconstruct, int bytes, int Vh, int pad, 
 		 int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t,
 		 QudaPrecision prec) 
 {

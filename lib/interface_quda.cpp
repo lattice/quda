@@ -399,18 +399,20 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     warningQuda("Uninverted clover term not loaded");
   }
 
-  int X[4];
-  for (int i=0; i<4; i++) X[i] = cudaGaugePrecise.X[i];
+  CloverFieldParam clover_param;
+  clover_param.nDim = 4;
+  for (int i=0; i<4; i++) clover_param.x[i] = cudaGaugePrecise.X[i];
+  clover_param.precision = inv_param->clover_cuda_prec;
+  clover_param.pad = inv_param->cl_pad;
 
-  cloverPrecise = new cudaCloverField(h_clover, h_clovinv, X, inv_param->cl_pad, 
-				      inv_param->clover_cuda_prec, inv_param->clover_cpu_prec, 
-				      inv_param->clover_order);
+  cloverPrecise = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
+				      inv_param->clover_order, clover_param);
   inv_param->cloverGiB = cloverPrecise->GBytes();
   
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-    cloverSloppy = new cudaCloverField(h_clover, h_clovinv, X, inv_param->cl_pad, 
-				       inv_param->cuda_prec_sloppy, inv_param->clover_cpu_prec, 
-				       inv_param->clover_order); 
+    clover_param.precision = inv_param->clover_cuda_prec_sloppy;
+    cloverSloppy = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
+				       inv_param->clover_order, clover_param); 
     inv_param->cloverGiB += cloverSloppy->GBytes();
   } else {
     cloverSloppy = cloverPrecise;

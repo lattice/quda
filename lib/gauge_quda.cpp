@@ -12,101 +12,35 @@
 #include <assert.h>
 #include <cuda.h>
 
-#ifdef MPI_COMMS
-#include "face_quda.h"
-#endif
-
 static double Anisotropy;
 static QudaTboundary tBoundary;
-static int X[4];
-static int faceVolumeCB[4]; // checkboarded face volume
+static int X[QUDA_MAX_DIM];
+static int faceVolumeCB[QUDA_MAX_DIM]; // checkboarded face volume
 static int volumeCB; // checkboarded volume
 extern float fat_link_max;
 
 #include <pack_gauge.h>
 
-template <typename Float>
-void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
-  int XY=X[0]*X[1];
-  int XYZ=X[0]*X[1]*X[2];
 
-  //loop variables: a, b, c with a the most signifcant and c the least significant
-  //A, B, C the maximum value
-  //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
-  int A[4], B[4], C[4];
-  
-  //X dimension
-  A[0] = X[3]; B[0] = X[2]; C[0] = X[1];
-  
-  //Y dimension
-  A[1] = X[3]; B[1] = X[2]; C[1] = X[0];
+GaugeField::GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &loation) :
+  LatticeField(param, location), bytes(0), nColor(param.nColor), nFace(param.nFace),
+  reconstruct(param.reconstruct), order(param.order), fixed(param.fixed), 
+  link_type(param.link_type), t_boundary(param.t_boundary), anisotropy(param.anisotropy),
+  create(param.create)
+{
+  if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
+  if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
-  //Z dimension
-  A[2] = X[3]; B[2] = X[1]; C[2] = X[0];
+  real_length = volume*reconstruct*4;
+  length = stride*reconstruct*4;
 
-  //T dimension
-  A[3] = X[2]; B[3] = X[1]; C[3] = X[0];
-
-
-  //multiplication factor to compute index in original cpu memory
-  int f[4][4]={
-    {XYZ,    XY, X[0],     1},
-    {XYZ,    XY,    1,  X[0]},
-    {XYZ,  X[0],    1,    XY},
-    { XY,  X[0],    1,   XYZ}
-  };
-
-  for(int dir =0; dir < 4; dir++)
-    {
-      Float* even_src = cpuLink[dir];
-      Float* odd_src = cpuLink[dir] + volumeCB*gaugeSiteSize;
-
-      Float* even_dst;
-      Float* odd_dst;
-     
-     //switching odd and even ghost cpuLink when that dimension size is odd
-     //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
-      if((X[dir] % 2 ==0) || (commDim(dir) == 1)){
-        even_dst = cpuGhost[dir];
-        odd_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;	
-     }else{
-	even_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;
-        odd_dst = cpuGhost[dir];
-     }
-
-      int even_dst_index = 0;
-      int odd_dst_index = 0;
-
-      int d;
-      int a,b,c;
-      for(d = X[dir]- nFace; d < X[dir]; d++){
-        for(a = 0; a < A[dir]; a++){
-          for(b = 0; b < B[dir]; b++){
-            for(c = 0; c < C[dir]; c++){
-              int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
-              int oddness = (a+b+c+d)%2;
-              if (oddness == 0){ //even
-                for(int i=0;i < 18;i++){
-                  even_dst[18*even_dst_index+i] = even_src[18*index + i];
-                }
-                even_dst_index++;
-              }else{ //odd
-                for(int i=0;i < 18;i++){
-                  odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
-                }
-                odd_dst_index++;
-              }
-            }//c
-          }//b
-        }//a
-      }//d
-
-      assert( even_dst_index == nFace*faceVolumeCB[dir]);
-      assert( odd_dst_index == nFace*faceVolumeCB[dir]);
-    }
-
+  bytes = length*precision;
+  total_bytes = bytes;
 }
 
+GaugeField::~GaugeField() {
+
+}
 
 
 void set_dim(int *XX) {
@@ -126,19 +60,7 @@ void set_dim(int *XX) {
 
 }
 
-void pack_ghost(void **cpuLink, void **cpuGhost, int nFace, QudaPrecision precision) {
-
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhost((double**)cpuLink, (double**)cpuGhost, nFace);
-  } else {
-    packGhost((float**)cpuLink, (float**)cpuGhost, nFace);
-  }
-
-}
-
-
-
-static void allocateGaugeField(FullGauge *cudaGauge, ReconstructType reconstruct, QudaPrecision precision) {
+static void allocateGaugeField(FullGauge *cudaGauge, QudaReconstructType reconstruct, QudaPrecision precision) {
 
   cudaGauge->reconstruct = reconstruct;
   cudaGauge->precision = precision;
@@ -179,7 +101,7 @@ void freeGaugeField(FullGauge *cudaGauge) {
 
 template <typename Float, typename FloatN>
 static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, 
-			   GaugeFieldOrder gauge_order, ReconstructType reconstruct, 
+			   GaugeFieldOrder gauge_order, QudaReconstructType reconstruct, 
 			   int bytes, int Vh, int pad, QudaLinkType type) {
   
 
@@ -296,7 +218,7 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge,
 
 template <typename Float, typename FloatN>
 static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, GaugeFieldOrder gauge_order,
-			       ReconstructType reconstruct, int bytes, int Vh, int pad) {
+			       QudaReconstructType reconstruct, int bytes, int Vh, int pad) {
 
   // Use pinned memory
   FloatN *packedEven, *packedOdd;
@@ -322,7 +244,7 @@ static void retrieveGaugeField(Float *cpuGauge, FloatN *even, FloatN *odd, Gauge
 }
 
 void createGaugeField(FullGauge *cudaGauge, void *cpuGauge, QudaPrecision cuda_prec, QudaPrecision cpu_prec,
-		      GaugeFieldOrder gauge_order, ReconstructType reconstruct, GaugeFixed gauge_fixed,
+		      GaugeFieldOrder gauge_order, QudaReconstructType reconstruct, QudaGaugeFixed gauge_fixed,
 		      Tboundary t_boundary, int *XX, double anisotropy, double tadpole_coeff, int pad, QudaLinkType type)
 {
 

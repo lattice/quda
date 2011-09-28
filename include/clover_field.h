@@ -2,31 +2,25 @@
 #define _CLOVER_QUDA_H
 
 #include <quda_internal.h>
+#include <lattice_field.h>
 
-class CloverField {
+struct CloverFieldParam : public LatticeFieldParam {
+  
+};
+
+class CloverField : public LatticeField {
 
  protected:
   size_t bytes; // bytes allocated per clover full field 
   size_t norm_bytes; // sizeof each norm full field
-  size_t total_bytes; // total bytes allocated
-  QudaPrecision precision;
   int length;
   int real_length;
-  int volume;
-  int volumeCB;
-  int X[QUDA_MAX_DIM];
-  int Nc;
-  int Ns;
-  int pad;
-  int stride;
+  int nColor;
+  int nSpin;
 
  public:
-  CloverField(const int *, const int pad, const QudaPrecision);
+  CloverField(const CloverFieldParam &param, const QudaFieldLocation &location);
   virtual ~CloverField();
-
-  int Volume() const { return volume; }
-  int VolumeCB() const { return volumeCB; }
-  size_t GBytes() const { return total_bytes / (1<<30); } // returns total storage allocated in the clover object
 };
 
 class cudaCloverField : public CloverField {
@@ -46,9 +40,10 @@ class cudaCloverField : public CloverField {
 		     const void *h_clover, const QudaPrecision cpu_prec, const CloverFieldOrder cpu_order);
 
  public:
-  cudaCloverField(const void *, const void *, const int *X, const int pad, 
-		  const QudaPrecision precision, const QudaPrecision cpu_prec,
-		  const QudaCloverFieldOrder cpu_order);
+  cudaCloverField(const void *h_clov, const void *h_clov_inv, 
+		  const QudaPrecision cpu_prec, 
+		  const QudaCloverFieldOrder cpu_order,
+		  const CloverFieldParam &param);
   virtual ~cudaCloverField();
 
 

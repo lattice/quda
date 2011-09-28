@@ -21,8 +21,6 @@
 #define SolutionType QudaSolutionType
 #define MassNormalization QudaMassNormalization
 #define PreserveSource QudaPreserveSource
-#define ReconstructType QudaReconstructType
-#define GaugeFixed QudaGaugeFixed
 #define DagType QudaDagType
 #define Tboundary QudaTboundary
 
@@ -44,10 +42,10 @@ extern "C" {
     int volumeCB; // geometric volume (single parity)
     int pad; // padding from end of array to start of next
     int stride; // geometric stride between volume lengthed arrays
-    int X[4]; // the geometric lengths
+    int X[QUDA_MAX_DIM]; // the geometric lengths
     int Nc; // number of colors
-    ReconstructType reconstruct;
-    GaugeFixed gauge_fixed;
+    QudaReconstructType reconstruct;
+    QudaGaugeFixed gauge_fixed;
     Tboundary t_boundary;
     ParityGauge odd;
     ParityGauge even;
@@ -60,7 +58,7 @@ extern "C" {
     QudaPrecision precision;
     int length; // total length
     int volume; // geometric volume (single parity)
-    int X[4]; // the geometric lengths (single parity)
+    int X[QUDA_MAX_DIM]; // the geometric lengths (single parity)
     int Nc; // number of colors
     ParityGauge odd;
     ParityGauge even;
@@ -74,7 +72,7 @@ extern "C" {
     QudaPrecision precision;
     int length; // total length
     int volume; // geometric volume (single parity)
-    int X[4]; // the geometric lengths (single parity)
+    int X[QUDA_MAX_DIM]; // the geometric lengths (single parity)
     int Nc; // number of colors
     ParityGauge odd;
     ParityGauge even;
@@ -87,7 +85,7 @@ extern "C" {
     QudaPrecision precision;
     int length; // total length
     int volume; // geometric volume (single parity)
-    int X[4]; // the geometric lengths (single parity)
+    int X[QUDA_MAX_DIM]; // the geometric lengths (single parity)
     int Nc; // length of color dimension
     int Ns; // length of spin dimension
     void *data; // either (double2*), (float4 *) or (short4 *), depending on precision

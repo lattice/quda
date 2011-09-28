@@ -452,7 +452,7 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
 
 
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
-			int Nvec, ReconstructType reconstruct, int V, int Vs)
+			int Nvec, QudaReconstructType reconstruct, int V, int Vs)
 {
   int nblocks, ndim=4;
   size_t blocksize;//, nbytes;

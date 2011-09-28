@@ -5,34 +5,31 @@
 #include <quda_internal.h>
 #include <clover_field.h>
 
-CloverField::CloverField(const int *X, const int pad, const QudaPrecision precision) :
-  bytes(0), norm_bytes(0), precision(precision), volume(1), volumeCB(1), Nc(3), Ns(4), pad(pad)
+CloverField::CloverField(const CloverFieldParam &param, const QudaFieldLocation &location) :
+  LatticeField(param, location), bytes(0), norm_bytes(0), nColor(3), nSpin(4)
 {
-  for (int d=0; d<4; d++) {
-    this->X[d] = X[d];
-    volume *= X[d];
-  }
+  if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
-  volumeCB = volume/2;
-  stride = volumeCB+pad; // the stride is always based on the checkerboard volume
-
-  real_length = 2*volumeCB*Nc*Nc*Ns*Ns/2;  // block-diagonal Hermitian (72 reals)
-  length = 2*stride*Nc*Nc*Ns*Ns/2;
+  real_length = 2*volumeCB*nColor*nColor*nSpin*nSpin/2;  // block-diagonal Hermitian (72 reals)
+  length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
   bytes = length*precision;
   if (precision == QUDA_HALF_PRECISION) norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
+
+  total_bytes = bytes + norm_bytes;
 }
 
 CloverField::~CloverField() {
 
 }
 
-cudaCloverField::cudaCloverField(const void *h_clov, const void *h_clov_inv, const int *X,
-				 const int pad, const QudaPrecision precision,
+cudaCloverField::cudaCloverField(const void *h_clov, const void *h_clov_inv, 
 				 const QudaPrecision cpu_prec, 
-				 const QudaCloverFieldOrder order) 
-  : CloverField(X, pad, precision), clover(0), norm(0), cloverInv(0), invNorm(0)
+				 const QudaCloverFieldOrder cpu_order,
+				 const CloverFieldParam &param)
+  : CloverField(param, QUDA_CUDA_FIELD_LOCATION), clover(0), norm(0), cloverInv(0), invNorm(0)
 {
+  
 
   if (h_clov) {
     if (cudaMalloc((void**)&clover, bytes) == cudaErrorMemoryAllocation) {
@@ -51,9 +48,7 @@ cudaCloverField::cudaCloverField(const void *h_clov, const void *h_clov_inv, con
     evenNorm = norm;
     oddNorm = (char*)norm + norm_bytes/2;
 
-    total_bytes = bytes + norm_bytes;
-
-    loadCPUField(clover, norm, h_clov, cpu_prec, order);
+    loadCPUField(clover, norm, h_clov, cpu_prec, cpu_order);
   } 
 
   if (h_clov_inv) {
@@ -75,7 +70,7 @@ cudaCloverField::cudaCloverField(const void *h_clov, const void *h_clov_inv, con
 
     total_bytes += bytes + norm_bytes;
 
-    loadCPUField(cloverInv, invNorm, h_clov_inv, cpu_prec, order);
+    loadCPUField(cloverInv, invNorm, h_clov_inv, cpu_prec, cpu_order);
 
     // this is a hack to ensure that we can autotune the clover
     // operator when just using symmetric preconditioning
@@ -298,20 +293,20 @@ void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void 
   }
     
   if (precision == QUDA_DOUBLE_PRECISION) {
-    packFullClover((double2 *)packedEven, (double2 *)packedOdd, (double *)clover, X, pad);
+    packFullClover((double2 *)packedEven, (double2 *)packedOdd, (double *)clover, x, pad);
   } else if (precision == QUDA_SINGLE_PRECISION) {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (double *)clover, X, pad);
+      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (double *)clover, x, pad);
     } else {
-      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (float *)clover, X, pad);    
+      packFullClover((float4 *)packedEven, (float4 *)packedOdd, (float *)clover, x, pad);    
     }
   } else {
     if (cpu_prec == QUDA_DOUBLE_PRECISION) {
       packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
-			 (float *) packedOddNorm, (double *)clover, X, pad);
+			 (float *) packedOddNorm, (double *)clover, x, pad);
     } else {
       packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
-			 (float * )packedOddNorm, (float *)clover, X, pad);    
+			 (float * )packedOddNorm, (float *)clover, x, pad);    
     }
   }
 
