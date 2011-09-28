@@ -5,6 +5,7 @@
 #include <quda.h>
 #include "test_util.h"
 #include "gauge_quda.h"
+#include "fat_force_quda.h"
 #include "misc.h"
 #include "fermion_force_reference.h"
 #include "fermion_force_quda.h"
