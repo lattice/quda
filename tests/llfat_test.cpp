@@ -14,6 +14,7 @@
 #include <llfat_reference.h>
 #include "misc.h"
 #include <cuda.h>
+#include <fat_force_quda.h>
 
 #ifdef MULTI_GPU
 #include "face_quda.h"

@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 
+  void loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param);
   void loadLinkToGPU_gf(FullGauge cudaGauge, void *cpuGauge, QudaGaugeParam* param);
   void storeLinkToCPU(void* cpuGauge, FullGauge *cudaGauge, QudaGaugeParam* param);
   void createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param);
