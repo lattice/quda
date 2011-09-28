@@ -9,7 +9,7 @@
 #include "gauge_force_reference.h"
 #include "gauge_force_quda.h"
 #include <sys/time.h>
-
+#include "fat_force_quda.h"
 
 
 typedef struct {
@@ -18,10 +18,14 @@ typedef struct {
 } dcomplex;
 
 typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern void initDslashCuda(FullGauge gauge);
 extern void initDslashConstants(const FullGauge gauge, const int sp_stride);
-
+#ifdef __cplusplus
+}
+#endif
 int device = 0;
 
 FullGauge cudaSiteLink;
