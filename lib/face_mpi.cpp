@@ -8,6 +8,8 @@
 #include <mpicomm.h>
 #include <cuda.h>
 
+#include <fat_force_quda.h>
+
 using namespace std;
 
 #if (CUDA_VERSION >=4000)
