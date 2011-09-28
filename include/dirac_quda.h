@@ -3,6 +3,7 @@
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
+#include <clover_field.h>
 #include <dslash_quda.h>
 
 #include <face_quda.h>
@@ -20,8 +21,7 @@ class DiracParam {
   FullGauge *gauge;
   FullGauge *fatGauge;  // used by staggered only
   FullGauge *longGauge; // used by staggered only
-  FullClover *clover;
-  FullClover *cloverInv;
+  cudaCloverField *clover;
   
   double mu; // used by twisted mass only
 
@@ -34,7 +34,7 @@ class DiracParam {
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-    dagger(QUDA_DAG_INVALID), gauge(0), clover(0), cloverInv(0), mu(0.0), 
+    dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), 
     tmp1(0), tmp2(0), verbose(QUDA_SILENT)
   {
 
@@ -169,15 +169,11 @@ class DiracWilsonPC : public DiracWilson {
 // Full clover
 class DiracClover : public DiracWilson {
 
- private:
-  dim3 blockClover; // thread block size for applying clover (or inverse) term
-
  protected:
-  FullClover &clover;
+  cudaCloverField &clover;
+  dim3 blockClover; // thread block size for applying clover (or inverse) term
   void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
-			 const FullClover &) const;
-  void cloverApply(cudaColorSpinorField &out, const FullClover &clover, const cudaColorSpinorField &in, 
-		   const QudaParity parity) const;
+			 const cudaCloverField &) const;
 
  public:
   DiracClover(const DiracParam &param);
@@ -204,7 +200,6 @@ class DiracCloverPC : public DiracClover {
  private:
   dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
   dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
-  FullClover &cloverInv;
 
  public:
   DiracCloverPC(const DiracParam &param);

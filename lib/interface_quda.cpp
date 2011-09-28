@@ -14,9 +14,9 @@
 #include <gauge_quda.h>
 #include <dirac_quda.h>
 #include <dslash_quda.h>
-#include <clover_quda.h>
 #include <invert_quda.h>
 #include <color_spinor_field.h>
+#include <clover_field.h>
 
 #include <cuda.h>
 
@@ -43,13 +43,6 @@ FullGauge cudaFatLinkSloppy;
 
 FullGauge cudaLongLinkPrecise;   // asqtad long links
 FullGauge cudaLongLinkSloppy;
-
-FullClover cudaCloverPrecise;    // clover term
-FullClover cudaCloverSloppy;
-
-FullClover cudaCloverInvPrecise; // inverted clover term
-FullClover cudaCloverInvSloppy;
-
 
 #define MAX_GPU_NUM_PER_NODE 16
 
@@ -79,6 +72,9 @@ extern bool qudaPtNm1;
 
 QudaVerbosity verbosity;
 int verbose = 0;
+
+cudaCloverField *cloverPrecise = NULL;
+cudaCloverField *cloverSloppy = NULL;
 
 Dirac *d = NULL;
 Dirac *dSloppy = NULL;
@@ -265,16 +261,6 @@ void initQuda(int dev)
   cudaLongLinkSloppy.even = NULL;
   cudaLongLinkSloppy.odd = NULL;
 
-  cudaCloverPrecise.even.clover = NULL;
-  cudaCloverPrecise.odd.clover = NULL;
-  cudaCloverSloppy.even.clover = NULL;
-  cudaCloverSloppy.odd.clover = NULL;
-
-  cudaCloverInvPrecise.even.clover = NULL;
-  cudaCloverInvPrecise.odd.clover = NULL;
-  cudaCloverInvSloppy.even.clover = NULL;
-  cudaCloverInvSloppy.odd.clover = NULL;
-
   initCache();
   initBlas();
 }
@@ -414,67 +400,24 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   int X[4];
-  for (int i=0; i<4; i++) {
-    X[i] = cudaGaugePrecise.X[i];
-  }
-  X[0] /= 2; // X defines the full lattice now
-  // FIXME: clover should take the full lattice dims not the CB dims
+  for (int i=0; i<4; i++) X[i] = cudaGaugePrecise.X[i];
 
-  inv_param->cloverGiB = 0;
-
-  if (h_clover) {
-    allocateCloverField(&cudaCloverPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
-    loadCloverField(cudaCloverPrecise, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
-    inv_param->cloverGiB += 2.0*cudaCloverPrecise.even.bytes / (1<<30);
-
-    if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-      allocateCloverField(&cudaCloverSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
-      loadCloverField(cudaCloverSloppy, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
-      inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
-    } else {
-      cudaCloverSloppy = cudaCloverPrecise;
-    }
-  }
-
-  if (h_clovinv) {
-    allocateCloverField(&cudaCloverInvPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
-    loadCloverField(cudaCloverInvPrecise, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
-    inv_param->cloverGiB += 2.0*cudaCloverInvPrecise.even.bytes / (1<<30);
-    
-    if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-      allocateCloverField(&cudaCloverInvSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
-      loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
-      inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
-    } else {
-      cudaCloverInvSloppy = cudaCloverInvPrecise;
-    }
-
-    // FIXME: hack to allow tuning of DiracClover with only cloverInv defined
-    // Balint: This is BAD BAD BAD BAD and NAUGHTY.
-    //         It gives the impression that both cudaCloverPrecise and Sloppy are
-    //         Indepenently malloced, and leads to double frees for the unwary integrator.
-    if (!h_clover) {
-      cudaCloverPrecise = cudaCloverInvPrecise;
-      cudaCloverSloppy = cudaCloverInvSloppy;
-    }
+  cloverPrecise = new cudaCloverField(h_clover, h_clovinv, X, inv_param->cl_pad, 
+				      inv_param->clover_cuda_prec, inv_param->clover_cpu_prec, 
+				      inv_param->clover_order);
+  inv_param->cloverGiB = cloverPrecise->GBytes();
+  
+  if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
+    cloverSloppy = new cudaCloverField(h_clover, h_clovinv, X, inv_param->cl_pad, 
+				       inv_param->cuda_prec_sloppy, inv_param->clover_cpu_prec, 
+				       inv_param->clover_order); 
+    inv_param->cloverGiB += cloverSloppy->GBytes();
+  } else {
+    cloverSloppy = cloverPrecise;
   }
 
   endInvertQuda(); // need to delete any persistant dirac operators
 }
-
-
-#if 0
-// discard clover term but keep the inverse
-void discardCloverQuda(QudaInvertParam *inv_param)
-{
-  inv_param->cloverGiB -= 2.0*cudaCloverPrecise.even.bytes / (1<<30);
-  freeCloverField(&cudaCloverPrecise);
-  if (cudaCloverSloppy.even.clover) {
-    inv_param->cloverGiB -= 2.0*cudaCloverSloppy.even.bytes / (1<<30);
-    freeCloverField(&cudaCloverSloppy);
-  }
-}
-#endif
 
 void freeGaugeQuda(void) 
 {
@@ -527,83 +470,15 @@ void freeGaugeQuda(void)
 
 void freeCloverQuda(void)
 {
-  // This check tests that whether the sloppy and precise fields are the same
-  // NB: The test is sufficient because: CloverInvTerm is always allocated
-  //     Both Even and Odd fields are allocated
-  //     when soppy is the same as precise, a struct level assignment is done which assigns both even and odd parts
-  bool sloppyIsPrecise = ( cudaCloverInvPrecise.even.clover == cudaCloverInvSloppy.even.clover )
-    && ( cudaCloverInvPrecise.odd.clover == cudaCloverInvSloppy.odd.clover );
+  if (cloverSloppy != cloverPrecise && cloverSloppy) {
+    delete cloverSloppy;
+    cloverSloppy = NULL;
+  } 
 
-  // This term tests whether the cloverTermPrecise is the same as the CloverInvPrecise
- 
-  bool cloverPreciseIsInv = ( cudaCloverPrecise.even.clover == cudaCloverInvPrecise.even.clover) 
-    && (cudaCloverPrecise.odd.clover == cudaCloverInvPrecise.odd.clover );
-
-   // Free the inverse first, because it always exists
-  if ( sloppyIsPrecise ) {
-    freeCloverField(&cudaCloverInvPrecise ); 
-    checkCudaError();
-
-    // Sloppy was a copy of precise so set its now stale pointers to NULL
-    cudaCloverInvSloppy.even.clover = NULL;
-    cudaCloverInvSloppy.odd.clover = NULL;
-    cudaCloverInvSloppy.even.cloverNorm = NULL;
-    cudaCloverInvSloppy.odd.cloverNorm = NULL;
-      
-  }
-  else {
-    freeCloverField(&cudaCloverInvPrecise);	
-    checkCudaError();
-      
-    freeCloverField(&cudaCloverInvSloppy);
-    checkCudaError();
-  }  
-
-
-
-
-  // Now deal with the clover Term.
-  // It is possible that in the case of symmetric pre-conditioning (no clover term, only inverse)
-  // the cudaCloverPrecise is a copy of cudaCloverInvPrecise due to this hack at the end of the loadCloverQuda() 
-  // function:
-  //     if (!h_clover) {
-  //      cudaCloverPrecise = cudaCloverInvPrecise;
-  //      cudaCloverSloppy = cudaCloverInvSloppy;
-  //     }
-  
-  // in this case the actual memory has already been freed by the above frees of the InvTerms.
-  // However, The flags of whether this is the case are indicated by cloverPreciseIsCopy and
-  //  cloverSloppyIsCopy which are checked for by comparing pointers in cudaCloverPrecise
-  //  and cudaCloverSloppy
-
-  if( ! cloverPreciseIsInv ) {   // If clover term is NOT copy of the Inverse try to free, otherwise already freed
-
-  
-    if ( sloppyIsPrecise ) { 
-      freeCloverField(&cudaCloverPrecise);
-      checkCudaError();
-    }
-    else { 
-      freeCloverField(&cudaCloverPrecise);
-      checkCudaError();
-      freeCloverField(&cudaCloverSloppy);
-      checkCudaError();
-    }
-  }
-  
-  // NB: Stale copies may be lying around depending on which free actually happened above.
-  // If the precise and Sloppy were copies (due to autotune hack, none of them may need to have been called)
-  // So just make sure everything is set to null.
-  //  If they were NULL already fine, if they wre not, they are stale and should be.
-  cudaCloverPrecise.even.clover = NULL;
-  cudaCloverPrecise.odd.clover = NULL;
-  cudaCloverSloppy.even.clover = NULL;
-  cudaCloverSloppy.odd.clover = NULL;
-  
-  cudaCloverPrecise.even.cloverNorm = NULL;
-  cudaCloverPrecise.odd.cloverNorm = NULL;
-  cudaCloverSloppy.even.cloverNorm = NULL;
-  cudaCloverSloppy.odd.cloverNorm = NULL;
+  if (cloverPrecise) {
+    delete cloverPrecise;
+    cloverPrecise = NULL;
+  } 
   
 }
 
@@ -653,8 +528,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
   diracParam.gauge = &cudaGaugePrecise;
   diracParam.fatGauge = &cudaFatLinkPrecise;
   diracParam.longGauge = &cudaLongLinkPrecise;    
-  diracParam.clover = &cudaCloverPrecise;
-  diracParam.cloverInv = &cudaCloverInvPrecise;
+  diracParam.clover = cloverPrecise;
   diracParam.kappa = kappa;
   diracParam.mass = inv_param->mass;
   diracParam.m5 = inv_param->m5;
@@ -674,8 +548,7 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, con
   diracParam.gauge = &cudaGaugeSloppy;
   diracParam.fatGauge = &cudaFatLinkSloppy;
   diracParam.longGauge = &cudaLongLinkSloppy;    
-  diracParam.clover = &cudaCloverSloppy;
-  diracParam.cloverInv = &cudaCloverInvSloppy;
+  diracParam.clover = cloverSloppy;
 
   for (int i=0; i<4; i++) {
     diracParam.commDim[i] = 1;   // comms are always on
@@ -691,8 +564,7 @@ void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const 
   diracParam.gauge = &cudaGaugeSloppy;
   diracParam.fatGauge = &cudaFatLinkSloppy;
   diracParam.longGauge = &cudaLongLinkSloppy;    
-  diracParam.clover = &cudaCloverSloppy;
-  diracParam.cloverInv = &cudaCloverInvSloppy;
+  diracParam.clover = cloverSloppy;
 
   for (int i=0; i<4; i++) {
     diracParam.commDim[i] = 0; // comms are always off

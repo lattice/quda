@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include <color_spinor_field.h>
+#include <clover_field.h>
 
 #define BLOCK_DIM 64
 

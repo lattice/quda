@@ -14,6 +14,8 @@ typedef std::complex<double> Complex;
 // forward declaration
 class ColorSpinorField;
 
+struct FullClover;
+
 class ColorSpinorParam {
  public:
   QudaFieldLocation fieldLocation; // cpu, cuda etc. 

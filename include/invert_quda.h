@@ -137,12 +137,6 @@ extern "C" {
   extern FullGauge cudaLongLinkPrecise;
   extern FullGauge cudaLongLinkSloppy;
 
-  extern FullClover cudaCloverPrecise;
-  extern FullClover cudaCloverSloppy;
-
-  extern FullClover cudaCloverInvPrecise;
-  extern FullClover cudaCloverInvSloppy;
-
 #ifdef __cplusplus
 }
 #endif

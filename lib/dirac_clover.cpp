@@ -4,13 +4,13 @@
 #include <tune_quda.h>
 
 DiracClover::DiracClover(const DiracParam &param)
-  : DiracWilson(param), blockClover(64, 1, 1), clover(*(param.clover))
+  : DiracWilson(param), clover(*(param.clover)), blockClover(64, 1, 1)
 {
 
 }
 
 DiracClover::DiracClover(const DiracClover &dirac) 
-  : DiracWilson(dirac), blockClover(64, 1, 1), clover(dirac.clover)
+  : DiracWilson(dirac), clover(dirac.clover), blockClover(64, 1, 1)
 {
 
 }
@@ -49,38 +49,31 @@ void DiracClover::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &in
 }
 
 void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in,
-				    const FullClover &clover) const
+				    const cudaCloverField &clover) const
 {
   Dirac::checkParitySpinor(out, in);
 
-  if (out.Volume() != clover.even.volume) {
-    errorQuda("Spinor volume %d doesn't match even clover volume %d",
-	      out.Volume(), clover.even.volume);
-  }
-  if (out.Volume() != clover.odd.volume) {
-    errorQuda("Spinor volume %d doesn't match odd clover volume %d",
-	      out.Volume(), clover.odd.volume);
+  if (out.Volume() != clover.VolumeCB()) {
+    errorQuda("Parity spinor volume %d doesn't match clover checkboard volume %d",
+	      out.Volume(), clover.VolumeCB());
   }
 
-}
-
-// Protected method, also used for applying cloverInv
-void DiracClover::cloverApply(cudaColorSpinorField &out, const FullClover &clover, 
-			      const cudaColorSpinorField &in, const QudaParity parity) const
-{
-  if (!initDslash) initDslashConstants(gauge, in.stride);
-  if (!initClover) initCloverConstants(clover.even.stride);
-  checkParitySpinor(in, out, clover);
-
-  cloverCuda(&out, gauge, clover, &in, parity, blockClover);
-
-  flops += 504*in.volume;
 }
 
 // Public method to apply the clover term only
 void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
 {
-  cloverApply(out, clover, in, parity);
+  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initClover) initCloverConstants(clover.stride);
+  checkParitySpinor(in, out, clover);
+
+  // regular clover term
+  FullClover cs;
+  cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
+  cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+  cloverCuda(&out, gauge, cs, &in, parity, blockClover);
+
+  flops += 504*in.volume;
 }
 
 // FIXME: create kernel to eliminate tmp
@@ -134,16 +127,19 @@ void DiracClover::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFiel
 }
 
 DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
-  DiracClover(param), cloverInv(*(param.cloverInv))
+  DiracClover(param)
 {
   for (int i=0; i<5; i++) {
     blockDslash[i] = dim3(64, 1, 1);
     blockDslashXpay[i] = dim3(64, 1, 1);
   }
+
+  // For the preconditioned operator, we need to check that the inverse of the clover term is present
+  if (!clover.cloverInv) errorQuda("Clover inverse required for DiracCloverPC");
 }
 
 DiracCloverPC::DiracCloverPC(const DiracCloverPC &dirac) : 
-  DiracClover(dirac), cloverInv(dirac.clover)
+  DiracClover(dirac)
 {
   for (int i=0; i<5; i++) {
     blockDslash[i] = dirac.blockDslash[i];
@@ -164,7 +160,6 @@ DiracCloverPC& DiracCloverPC::operator=(const DiracCloverPC &dirac)
       blockDslash[i] = dirac.blockDslash[i];
       blockDslashXpay[i] = dirac.blockDslashXpay[i];
     }
-    cloverInv = dirac.cloverInv;
   }
 
   return *this;
@@ -198,7 +193,17 @@ void DiracCloverPC::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &
 void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			      const QudaParity parity) const
 {
-  cloverApply(out, cloverInv, in, parity);
+  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initClover) initCloverConstants(clover.stride);
+  checkParitySpinor(in, out, clover);
+
+  // needs to be cloverinv
+  FullClover cs;
+  cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
+  cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+  cloverCuda(&out, gauge, cs, &in, parity, blockClover);
+
+  flops += 504*in.volume;
 }
 
 // apply hopping term, then clover: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
@@ -208,14 +213,16 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
 			   const QudaParity parity) const
 {
   if (!initDslash) initDslashConstants(gauge, in.stride);
-  if (!initClover) initCloverConstants(clover.even.stride);
-  checkParitySpinor(in, out, cloverInv);
+  if (!initClover) initCloverConstants(clover.stride);
+  checkParitySpinor(in, out, clover);
   checkSpinorAlias(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-  cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, 0, 0.0, 
-		   blockDslash, commDim);
+  FullClover cs;
+  cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
+  cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+  cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, 0, 0.0,  blockDslash, commDim);
 
   flops += (1320+504)*in.volume;
 }
@@ -226,14 +233,16 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
 			       const double &k) const
 {
   if (!initDslash) initDslashConstants(gauge, in.stride);
-  if (!initClover) initCloverConstants(clover.even.stride);
-  checkParitySpinor(in, out, cloverInv);
+  if (!initClover) initCloverConstants(clover.stride);
+  checkParitySpinor(in, out, clover);
   checkSpinorAlias(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-  cloverDslashCuda(&out, gauge, cloverInv, &in, parity, dagger, &x, k, 
-		   blockDslashXpay, commDim);
+  FullClover cs;
+  cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
+  cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+  cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, blockDslashXpay, commDim);
 
   flops += (1320+504+48)*in.volume;
 }

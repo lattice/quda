@@ -42,7 +42,6 @@ QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
 FullGauge gauge;
-FullClover clover, cloverInv;
 
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
@@ -225,8 +224,7 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     printfQuda("Sending clover field to GPU\n");
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
-    clover = cudaCloverPrecise;
-    cloverInv = cudaCloverInvPrecise;
+    //clover = cudaCloverPrecise;
   }
 
   if (!transfer) {
