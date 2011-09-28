@@ -13,7 +13,7 @@ QUDA_OBJS = blas_quda.o blas_cpu.o clover_quda.o color_spinor_field.o	\
 QUDA_HDRS = blas_quda.h clover_quda.h color_spinor_field.h dirac_quda.h	     \
 	dslash_quda.h enum_quda.h gauge_force_quda.h gauge_quda.h            \
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h        \
-	face_quda.h tune_quda.h mpicomm.h exchange_face.h
+	face_quda.h tune_quda.h mpicomm.h 
 
 # These are only inlined into blas_quad.cu
 BLAS_INLN = blas_param.h reduce_complex_core.h reduce_core.h reduce_triple_core.h 
