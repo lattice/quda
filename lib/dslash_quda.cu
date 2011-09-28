@@ -155,132 +155,55 @@ void setFace(const FaceBuffer &Face) {
   face = (FaceBuffer*)&Face; // nasty
 }
 
+#define MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...)            \
+  if (x==0) {                                                                                                     \
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                                     \
+      FUNC ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param);     \
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {                                                              \
+      FUNC ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param);     \
+    } else {                                                                                                      \
+      FUNC ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param);       \
+    }                                                                                                             \
+  } else {                                                                                                        \
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                                     \
+      FUNC ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {                                                              \
+      FUNC ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {                                                               \
+      FUNC ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    }                                                                                                             \
+  }
+
 #ifndef MULTI_GPU
 
-#define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
-  switch(param.kernel_type) {						\
- case INTERIOR_KERNEL:							\
-    if (x==0) {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
-      } else {								\
-	FUNC ## 8 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    } else {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel<INTERIOR_KERNEL> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    }									\
-    break;								\
-  default:								\
-   errorQuda("KernelType %d not defined for single GPU", param.kernel_type); \
- }
+#define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...)                          \
+  switch(param.kernel_type) {						                                      \
+  case INTERIOR_KERNEL:							                                      \
+    MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                      \
+  default:								                                      \
+    errorQuda("KernelType %d not defined for single GPU", param.kernel_type);                                 \
+  }
 
 #else
 
-#define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
-  switch(param.kernel_type) {						\
- case INTERIOR_KERNEL:							\
-    if (x==0) {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
-      } else {								\
-	FUNC ## 8 ## DAG ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    } else {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel<INTERIOR_KERNEL><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel<INTERIOR_KERNEL> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    }									\
-    break;\
- case EXTERIOR_KERNEL_X:						\
-    if (x==0) {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else {								\
-	FUNC ## 8 ## DAG ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    } else {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_X><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    }									\
- break;									\
- case EXTERIOR_KERNEL_Y:						\
-    if (x==0) {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else {								\
-	FUNC ## 8 ## DAG ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    } else {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Y><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    }									\
-    break;								\
- case EXTERIOR_KERNEL_Z:						\
-    if (x==0) {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else {								\
-	FUNC ## 8 ## DAG ## Kernel <EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    } else {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_Z><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    }									\
-    break;								\
- case EXTERIOR_KERNEL_T:						\
-    if (x==0) {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else {								\
-	FUNC ## 8 ## DAG ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    } else {								\
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-	FUNC ## 18 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-	FUNC ## 12 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-	FUNC ## 8 ## DAG ## X ## Kernel<EXTERIOR_KERNEL_T><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
-      }									\
-    }									\
-    break;								\
+#define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...)                            \
+  switch(param.kernel_type) {						                                        \
+  case INTERIOR_KERNEL:							                                        \
+    MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL,   gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_X:							                                \
+    MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_X, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_Y:							                                \
+    MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Y, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_Z:							                                \
+    MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Z, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_T:							                                \
+    MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
   }
 
 #endif
