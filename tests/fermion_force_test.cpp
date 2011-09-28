@@ -26,9 +26,16 @@ extern int gridsize_from_cmdline[];
 
 int verify_results = 0;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void initDslashCuda(FullGauge gauge);
 extern void initDslashConstants(const FullGauge gauge, const int sp_stride);
 
+#ifdef __cplusplus
+}
+#endif
 
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;

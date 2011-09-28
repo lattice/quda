@@ -48,7 +48,7 @@ gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o 
 	$(CC) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
-	$(CC) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
+	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
