@@ -620,7 +620,6 @@ HOST_DEBUG
 DEVICE
 QUDA_PYTHON
 QUDA_OS
-GPU_EMU
 GPU_ARCH
 CPU_ARCH
 CUDA_INSTALL_PATH
@@ -3737,11 +3736,6 @@ CPU_ARCH=${cpu_arch}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_ARCH = ${gpu_arch} " >&5
 $as_echo "$as_me: Setting GPU_ARCH = ${gpu_arch} " >&6;}
 GPU_ARCH=${gpu_arch}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_EMU = ${gpu_emu} " >&5
-$as_echo "$as_me: Setting GPU_EMU = ${gpu_emu} " >&6;}
-GPU_EMU=${gpu_emu}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting OS = ${quda_os} " >&5

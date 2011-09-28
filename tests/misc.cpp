@@ -244,9 +244,9 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
            }
        }
        if (dir == TUP){
-           if (i4 == (X4 -1)){
-               coeff *= -1;
-           } 
+	 if ((commCoords(3) == commDim(3) -1) && i4 == (X4-1) ){
+	   coeff *= -1;
+	 } 
        }       
    }
  
@@ -261,7 +261,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
 	double diff =  refc[i] -  c[i];
 	double absdiff = diff > 0? diff: (-diff);
 	if (absdiff  > delta){
-	    printf("ERROR: sanity check failed for link\n");
+	    printf("ERROR: sanity check failed for site link\n");
 	    display_link_internal(link);
 	    printf("refc = (%.10f,%.10f) (%.10f,%.10f) (%.10f,%.10f)\n", 
 		   refc[0], refc[1], refc[2], refc[3], refc[4], refc[5]);

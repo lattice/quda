@@ -37,8 +37,8 @@
 #define FF_SITE_MATRIX_LOAD_TEX 1
 
 #if (FF_SITE_MATRIX_LOAD_TEX == 1)
-#define linkEvenTex siteLink0TexSingle
-#define linkOddTex siteLink1TexSingle
+#define linkEvenTex siteLink0TexSingle_recon
+#define linkOddTex siteLink1TexSingle_recon
 #define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(src##Tex, dir, idx, var)
 #else
 #define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
@@ -268,22 +268,22 @@
         switch(dir){                                                    \
         case XUP:                                                       \
             if ( (i4 & 1) == 1){                                        \
-                sign = -1;                                              \
+                sign = 1;                                              \
             }                                                           \
             break;                                                      \
         case YUP:                                                       \
             if ( ((i4+i1) & 1) == 1){                                   \
-                sign = -1;                                              \
+                sign = 1;                                              \
             }                                                           \
             break;                                                      \
         case ZUP:                                                       \
             if ( ((i4+i1+i2) & 1) == 1){                                \
-                sign = -1;                                              \
+                sign = 1;                                              \
             }                                                           \
             break;                                                      \
         case TUP:                                                       \
             if (i4 == X4m1 ){                                           \
-                sign = -1;                                              \
+                sign = 1;                                              \
             }                                                           \
             break;                                                      \
         }                                                               \
@@ -359,6 +359,11 @@
 void
 fermion_force_init_cuda(QudaGaugeParam* param)
 {
+
+#ifdef MULTI_GPU
+#error "multi gpu is not supported for fermion force computation"  
+#endif
+
     static int fermion_force_init_cuda_flag = 0; 
     
     if (fermion_force_init_cuda_flag){
@@ -382,11 +387,11 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 {
     int sid = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int z1 = FAST_INT_DIVIDE(sid, X1h);
+    int z1 = sid / X1h;
     int x1h = sid - z1*X1h;
-    int z2 = FAST_INT_DIVIDE(z1, X2);
+    int z2 = z1 / X2;
     int x2 = z1 - z2*X2;
-    int x4 = FAST_INT_DIVIDE(z2, X3);
+    int x4 = z2 / X3;
     int x3 = z2 - x4*X3;
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
     int x1 = 2*x1h + x1odd;
@@ -537,8 +542,8 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 {
     dim3 halfGridDim(gridDim.x/2, 1,1);
 
-    cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
-    cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
    
     if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
 	do_middle_link_kernel<1,1,0><<<halfGridDim, BlockDim>>>( tempxEven,  tempxOdd, 
@@ -547,12 +552,12 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 								 sig, mu, coeff,
 								 linkEven, linkOdd,
 								 momEven,  momOdd);
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_middle_link_kernel<1,1,1><<<halfGridDim, BlockDim>>>( tempxOdd,  tempxEven, 
 								 PmuOdd,  PmuEven,
@@ -567,12 +572,12 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 								 sig, mu, coeff,
 								 linkEven, linkOdd,
 								 momEven,  momOdd);	
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_middle_link_kernel<1,0,1><<<halfGridDim, BlockDim>>>( tempxOdd,  tempxEven, 
 								 PmuOdd,  PmuEven,
@@ -588,12 +593,12 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 								 sig, mu, coeff,
 								 linkEven, linkOdd,
 								 momEven,  momOdd);	
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_middle_link_kernel<0,1,1><<<halfGridDim, BlockDim>>>( tempxOdd,  tempxEven, 
 								 PmuOdd,  PmuEven,
@@ -609,12 +614,12 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 								 linkEven, linkOdd,
 								 momEven,  momOdd);		
 
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_middle_link_kernel<0,0,1><<<halfGridDim, BlockDim>>>( tempxOdd,  tempxEven, 
 								 PmuOdd,  PmuEven,
@@ -623,8 +628,8 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 								 linkOdd, linkEven,
 								 momOdd,  momEven);		
     }
-    cudaUnbindTexture(siteLink0TexSingle);
-    cudaUnbindTexture(siteLink1TexSingle);    
+    cudaUnbindTexture(siteLink0TexSingle_recon);
+    cudaUnbindTexture(siteLink1TexSingle_recon);    
     
 }
 
@@ -645,11 +650,11 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
     
     int sid = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int z1 = FAST_INT_DIVIDE(sid, X1h);
+    int z1 = sid / X1h;
     int x1h = sid - z1*X1h;
-    int z2 = FAST_INT_DIVIDE(z1, X2);
+    int z2 = z1 / X2;
     int x2 = z1 - z2*X2;
-    int x4 = FAST_INT_DIVIDE(z2, X3);
+    int x4 = z2 / X3;
     int x3 = z2 - x4*X3;
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
     int x1 = 2*x1h + x1odd;
@@ -761,8 +766,8 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
 {
     dim3 halfGridDim(gridDim.x/2,1,1);
     
-    cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
-    cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);   
+    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);   
 
     if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
 	do_side_link_kernel<1,1,0><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, 
@@ -773,12 +778,12 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
 							       sig, mu, coeff, accumu_coeff,
 							       linkEven, linkOdd,
 							       momEven, momOdd);
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_side_link_kernel<1,1,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
 							       P3muOdd,  P3muEven,
@@ -798,12 +803,12 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
 							       sig, mu, coeff, accumu_coeff,
 							       linkEven,  linkOdd,
 							       momEven, momOdd);		
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_side_link_kernel<1,0,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
 							       P3muOdd,  P3muEven,
@@ -822,12 +827,12 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
 							       sig, mu, coeff, accumu_coeff,
 							       linkEven,  linkOdd,
 							       momEven, momOdd);
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_side_link_kernel<0,1,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
 							       P3muOdd,  P3muEven,
@@ -847,12 +852,12 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
 							       sig, mu, coeff, accumu_coeff,
 							       linkEven, linkOdd,
 							       momEven, momOdd);
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 	
 	do_side_link_kernel<0,0,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
 							       P3muOdd,  P3muEven,
@@ -864,8 +869,8 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
 							       momOdd, momEven);
     }
     
-    cudaUnbindTexture(siteLink0TexSingle);
-    cudaUnbindTexture(siteLink1TexSingle);    
+    cudaUnbindTexture(siteLink0TexSingle_recon);
+    cudaUnbindTexture(siteLink1TexSingle_recon);    
 
 }
 
@@ -882,11 +887,11 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
 {
     int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    int z1 = FAST_INT_DIVIDE(sid, X1h);
+    int z1 = sid / X1h;
     int x1h = sid - z1*X1h;
-    int z2 = FAST_INT_DIVIDE(z1, X2);
+    int z2 = z1 / X2;
     int x2 = z1 - z2*X2;
-    int x4 = FAST_INT_DIVIDE(z2, X3);
+    int x4 = z2 / X3;
     int x3 = z2 - x4*X3;
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
     int x1 = 2*x1h + x1odd;
@@ -1080,8 +1085,8 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
 {
     dim3 halfGridDim(gridDim.x/2, 1,1);
 
-    cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
-    cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
     
     if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){		
 	do_all_link_kernel<1,1,0><<<halfGridDim, blockDim>>>( tempxEven,  tempxOdd, 
@@ -1092,12 +1097,12 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
 							      sig,  mu, coeff, mcoeff, accumu_coeff,
 							      linkEven, linkOdd,
 							      momEven, momOdd);
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 	do_all_link_kernel<1,1,1><<<halfGridDim, blockDim>>>( tempxOdd,  tempxEven, 
 							      PmuOdd,  PmuEven,
 							      P3Odd,  P3Even,
@@ -1118,12 +1123,12 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
 							      sig,  mu, coeff, mcoeff, accumu_coeff,
 							      linkEven, linkOdd,
 							      momEven, momOdd);	
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_all_link_kernel<1,0,1><<<halfGridDim, blockDim>>>( tempxOdd,  tempxEven, 
 							      PmuOdd,  PmuEven,
@@ -1143,12 +1148,12 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
 							      sig,  mu, coeff, mcoeff, accumu_coeff,
 							      linkEven, linkOdd,
 							      momEven, momOdd);	
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	
 	do_all_link_kernel<0,1,1><<<halfGridDim, blockDim>>>( tempxOdd,  tempxEven, 
@@ -1169,12 +1174,12 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
 							      linkEven, linkOdd,
 							      momEven, momOdd);	
 
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
 
 	//opposive binding
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
 
 	do_all_link_kernel<0,0,1><<<halfGridDim, blockDim>>>( tempxOdd,  tempxEven, 
 							      PmuOdd,  PmuEven,
@@ -1186,8 +1191,8 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
 							      momOdd, momEven);	
     }
 
-    cudaUnbindTexture(siteLink0TexSingle);
-    cudaUnbindTexture(siteLink1TexSingle);
+    cudaUnbindTexture(siteLink0TexSingle_recon);
+    cudaUnbindTexture(siteLink1TexSingle_recon);
     
 }
 
@@ -1234,11 +1239,11 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
 	otherLink = linkEven;
     }
     
-    int z1 = FAST_INT_DIVIDE(sid, X1h);
+    int z1 = sid / X1h;
     int x1h = sid - z1*X1h;
-    int z2 = FAST_INT_DIVIDE(z1, X2);
+    int z2 = z1 / X2;
     int x2 = z1 - z2*X2;
-    int x4 = FAST_INT_DIVIDE(z2, X3);
+    int x4 = z2 / X3;
     int x3 = z2 - x4*X3;
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
     int x1 = 2*x1h + x1odd;

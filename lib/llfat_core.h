@@ -584,11 +584,11 @@ template<int mu, int nu, int odd_bit>
     
   int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     
-  int z1 = FAST_INT_DIVIDE(mem_idx, X1h);
+  int z1 = mem_idx / X1h;
   short x1h = mem_idx - z1*X1h;
-  int z2 = FAST_INT_DIVIDE(z1, X2);
+  int z2 = z1 / X2;
   short x2 = z1 - z2*X2;
-  short x4 = FAST_INT_DIVIDE(z2, X3);
+  short x4 = z2 / X3;
   short x3 = z2 - x4*X3;
 
   short x1odd = (x2 + x3 + x4 + odd_bit) & 1;
@@ -724,11 +724,11 @@ template<int mu, int nu, int odd_bit, int save_staple>
     
   int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     
-  int z1 = FAST_INT_DIVIDE(mem_idx, X1h);
+  int z1 = mem_idx / X1h;
   int x1h = mem_idx - z1*X1h;
-  int z2 = FAST_INT_DIVIDE(z1, X2);
+  int z2 = z1 / X2;
   int x2 = z1 - z2*X2;
-  int x4 = FAST_INT_DIVIDE(z2, X3);
+  int x4 = z2 / X3;
   int x3 = z2 - x4*X3;
 
   int x1odd = (x2 + x3 + x4 + odd_bit) & 1;
@@ -885,11 +885,11 @@ LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_
   }
    
 #if (RECONSTRUCT != 18)
-  int z1 = FAST_INT_DIVIDE(mem_idx, X1h);
+  int z1 = mem_idx / X1h;
   int x1h = mem_idx - z1*X1h;
-  int z2 = FAST_INT_DIVIDE(z1, X2);
+  int z2 = z1 / X2;
   int x2 = z1 - z2*X2;
-  int x4 = FAST_INT_DIVIDE(z2, X3);
+  int x4 = z2 / X3;
   int x3 = z2 - x4*X3;
   int x1odd = (x2 + x3 + x4 + odd_bit) & 1;
   int x1 = 2*x1h + x1odd; 

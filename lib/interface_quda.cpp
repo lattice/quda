@@ -14,9 +14,9 @@
 #include <gauge_quda.h>
 #include <dirac_quda.h>
 #include <dslash_quda.h>
-#include <clover_quda.h>
 #include <invert_quda.h>
 #include <color_spinor_field.h>
+#include <clover_field.h>
 
 #include <cuda.h>
 
@@ -43,13 +43,6 @@ FullGauge cudaFatLinkSloppy;
 
 FullGauge cudaLongLinkPrecise;   // asqtad long links
 FullGauge cudaLongLinkSloppy;
-
-FullClover cudaCloverPrecise;    // clover term
-FullClover cudaCloverSloppy;
-
-FullClover cudaCloverInvPrecise; // inverted clover term
-FullClover cudaCloverInvSloppy;
-
 
 #define MAX_GPU_NUM_PER_NODE 16
 
@@ -79,6 +72,9 @@ extern bool qudaPtNm1;
 
 QudaVerbosity verbosity;
 int verbose = 0;
+
+cudaCloverField *cloverPrecise = NULL;
+cudaCloverField *cloverSloppy = NULL;
 
 Dirac *d = NULL;
 Dirac *dSloppy = NULL;
@@ -265,16 +261,6 @@ void initQuda(int dev)
   cudaLongLinkSloppy.even = NULL;
   cudaLongLinkSloppy.odd = NULL;
 
-  cudaCloverPrecise.even.clover = NULL;
-  cudaCloverPrecise.odd.clover = NULL;
-  cudaCloverSloppy.even.clover = NULL;
-  cudaCloverSloppy.odd.clover = NULL;
-
-  cudaCloverInvPrecise.even.clover = NULL;
-  cudaCloverInvPrecise.odd.clover = NULL;
-  cudaCloverInvSloppy.even.clover = NULL;
-  cudaCloverInvSloppy.odd.clover = NULL;
-
   initCache();
   initBlas();
 }
@@ -414,67 +400,24 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   int X[4];
-  for (int i=0; i<4; i++) {
-    X[i] = cudaGaugePrecise.X[i];
-  }
-  X[0] /= 2; // X defines the full lattice now
-  // FIXME: clover should take the full lattice dims not the CB dims
+  for (int i=0; i<4; i++) X[i] = cudaGaugePrecise.X[i];
 
-  inv_param->cloverGiB = 0;
-
-  if (h_clover) {
-    allocateCloverField(&cudaCloverPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
-    loadCloverField(cudaCloverPrecise, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
-    inv_param->cloverGiB += 2.0*cudaCloverPrecise.even.bytes / (1<<30);
-
-    if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-      allocateCloverField(&cudaCloverSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
-      loadCloverField(cudaCloverSloppy, h_clover, inv_param->clover_cpu_prec, inv_param->clover_order);
-      inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
-    } else {
-      cudaCloverSloppy = cudaCloverPrecise;
-    }
-  }
-
-  if (h_clovinv) {
-    allocateCloverField(&cudaCloverInvPrecise, X, inv_param->cl_pad, inv_param->clover_cuda_prec);
-    loadCloverField(cudaCloverInvPrecise, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
-    inv_param->cloverGiB += 2.0*cudaCloverInvPrecise.even.bytes / (1<<30);
-    
-    if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-      allocateCloverField(&cudaCloverInvSloppy, X, inv_param->cl_pad, inv_param->clover_cuda_prec_sloppy);
-      loadCloverField(cudaCloverInvSloppy, h_clovinv, inv_param->clover_cpu_prec, inv_param->clover_order);
-      inv_param->cloverGiB += 2.0*cudaCloverInvSloppy.even.bytes / (1<<30);
-    } else {
-      cudaCloverInvSloppy = cudaCloverInvPrecise;
-    }
-
-    // FIXME: hack to allow tuning of DiracClover with only cloverInv defined
-    // Balint: This is BAD BAD BAD BAD and NAUGHTY.
-    //         It gives the impression that both cudaCloverPrecise and Sloppy are
-    //         Indepenently malloced, and leads to double frees for the unwary integrator.
-    if (!h_clover) {
-      cudaCloverPrecise = cudaCloverInvPrecise;
-      cudaCloverSloppy = cudaCloverInvSloppy;
-    }
+  cloverPrecise = new cudaCloverField(h_clover, h_clovinv, X, inv_param->cl_pad, 
+				      inv_param->clover_cuda_prec, inv_param->clover_cpu_prec, 
+				      inv_param->clover_order);
+  inv_param->cloverGiB = cloverPrecise->GBytes();
+  
+  if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
+    cloverSloppy = new cudaCloverField(h_clover, h_clovinv, X, inv_param->cl_pad, 
+				       inv_param->cuda_prec_sloppy, inv_param->clover_cpu_prec, 
+				       inv_param->clover_order); 
+    inv_param->cloverGiB += cloverSloppy->GBytes();
+  } else {
+    cloverSloppy = cloverPrecise;
   }
 
   endInvertQuda(); // need to delete any persistant dirac operators
 }
-
-
-#if 0
-// discard clover term but keep the inverse
-void discardCloverQuda(QudaInvertParam *inv_param)
-{
-  inv_param->cloverGiB -= 2.0*cudaCloverPrecise.even.bytes / (1<<30);
-  freeCloverField(&cudaCloverPrecise);
-  if (cudaCloverSloppy.even.clover) {
-    inv_param->cloverGiB -= 2.0*cudaCloverSloppy.even.bytes / (1<<30);
-    freeCloverField(&cudaCloverSloppy);
-  }
-}
-#endif
 
 void freeGaugeQuda(void) 
 {
@@ -527,83 +470,15 @@ void freeGaugeQuda(void)
 
 void freeCloverQuda(void)
 {
-  // This check tests that whether the sloppy and precise fields are the same
-  // NB: The test is sufficient because: CloverInvTerm is always allocated
-  //     Both Even and Odd fields are allocated
-  //     when soppy is the same as precise, a struct level assignment is done which assigns both even and odd parts
-  bool sloppyIsPrecise = ( cudaCloverInvPrecise.even.clover == cudaCloverInvSloppy.even.clover )
-    && ( cudaCloverInvPrecise.odd.clover == cudaCloverInvSloppy.odd.clover );
+  if (cloverSloppy != cloverPrecise && cloverSloppy) {
+    delete cloverSloppy;
+    cloverSloppy = NULL;
+  } 
 
-  // This term tests whether the cloverTermPrecise is the same as the CloverInvPrecise
- 
-  bool cloverPreciseIsInv = ( cudaCloverPrecise.even.clover == cudaCloverInvPrecise.even.clover) 
-    && (cudaCloverPrecise.odd.clover == cudaCloverInvPrecise.odd.clover );
-
-   // Free the inverse first, because it always exists
-  if ( sloppyIsPrecise ) {
-    freeCloverField(&cudaCloverInvPrecise ); 
-    checkCudaError();
-
-    // Sloppy was a copy of precise so set its now stale pointers to NULL
-    cudaCloverInvSloppy.even.clover = NULL;
-    cudaCloverInvSloppy.odd.clover = NULL;
-    cudaCloverInvSloppy.even.cloverNorm = NULL;
-    cudaCloverInvSloppy.odd.cloverNorm = NULL;
-      
-  }
-  else {
-    freeCloverField(&cudaCloverInvPrecise);	
-    checkCudaError();
-      
-    freeCloverField(&cudaCloverInvSloppy);
-    checkCudaError();
-  }  
-
-
-
-
-  // Now deal with the clover Term.
-  // It is possible that in the case of symmetric pre-conditioning (no clover term, only inverse)
-  // the cudaCloverPrecise is a copy of cudaCloverInvPrecise due to this hack at the end of the loadCloverQuda() 
-  // function:
-  //     if (!h_clover) {
-  //      cudaCloverPrecise = cudaCloverInvPrecise;
-  //      cudaCloverSloppy = cudaCloverInvSloppy;
-  //     }
-  
-  // in this case the actual memory has already been freed by the above frees of the InvTerms.
-  // However, The flags of whether this is the case are indicated by cloverPreciseIsCopy and
-  //  cloverSloppyIsCopy which are checked for by comparing pointers in cudaCloverPrecise
-  //  and cudaCloverSloppy
-
-  if( ! cloverPreciseIsInv ) {   // If clover term is NOT copy of the Inverse try to free, otherwise already freed
-
-  
-    if ( sloppyIsPrecise ) { 
-      freeCloverField(&cudaCloverPrecise);
-      checkCudaError();
-    }
-    else { 
-      freeCloverField(&cudaCloverPrecise);
-      checkCudaError();
-      freeCloverField(&cudaCloverSloppy);
-      checkCudaError();
-    }
-  }
-  
-  // NB: Stale copies may be lying around depending on which free actually happened above.
-  // If the precise and Sloppy were copies (due to autotune hack, none of them may need to have been called)
-  // So just make sure everything is set to null.
-  //  If they were NULL already fine, if they wre not, they are stale and should be.
-  cudaCloverPrecise.even.clover = NULL;
-  cudaCloverPrecise.odd.clover = NULL;
-  cudaCloverSloppy.even.clover = NULL;
-  cudaCloverSloppy.odd.clover = NULL;
-  
-  cudaCloverPrecise.even.cloverNorm = NULL;
-  cudaCloverPrecise.odd.cloverNorm = NULL;
-  cudaCloverSloppy.even.cloverNorm = NULL;
-  cudaCloverSloppy.odd.cloverNorm = NULL;
+  if (cloverPrecise) {
+    delete cloverPrecise;
+    cloverPrecise = NULL;
+  } 
   
 }
 
@@ -653,8 +528,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
   diracParam.gauge = &cudaGaugePrecise;
   diracParam.fatGauge = &cudaFatLinkPrecise;
   diracParam.longGauge = &cudaLongLinkPrecise;    
-  diracParam.clover = &cudaCloverPrecise;
-  diracParam.cloverInv = &cudaCloverInvPrecise;
+  diracParam.clover = cloverPrecise;
   diracParam.kappa = kappa;
   diracParam.mass = inv_param->mass;
   diracParam.m5 = inv_param->m5;
@@ -674,8 +548,7 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, con
   diracParam.gauge = &cudaGaugeSloppy;
   diracParam.fatGauge = &cudaFatLinkSloppy;
   diracParam.longGauge = &cudaLongLinkSloppy;    
-  diracParam.clover = &cudaCloverSloppy;
-  diracParam.cloverInv = &cudaCloverInvSloppy;
+  diracParam.clover = cloverSloppy;
 
   for (int i=0; i<4; i++) {
     diracParam.commDim[i] = 1;   // comms are always on
@@ -691,8 +564,7 @@ void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const 
   diracParam.gauge = &cudaGaugeSloppy;
   diracParam.fatGauge = &cudaFatLinkSloppy;
   diracParam.longGauge = &cudaLongLinkSloppy;    
-  diracParam.clover = &cudaCloverSloppy;
-  diracParam.cloverInv = &cudaCloverInvSloppy;
+  diracParam.clover = cloverSloppy;
 
   for (int i=0; i<4; i++) {
     diracParam.commDim[i] = 0; // comms are always off
@@ -1040,21 +912,37 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       copyCuda(*out, *in);
       dirac.Mdag(*in, *out);
     }
-    invertCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), *out, *in, param);
+    {
+      DiracMdagM m(dirac), mSloppy(diracSloppy);
+      CG cg(m, mSloppy, *param);
+      cg(*out, *in);
+    }
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertBiCGstabCuda(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *out, *in, param);
+      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      BiCGstab bicg(m, mSloppy, mPre, *param);
+      bicg(*out, *in);
       copyCuda(*in, *out);
     }
-    invertBiCGstabCuda(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *out, *in, param);
+    {
+      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      BiCGstab bicg(m, mSloppy, mPre, *param);
+      bicg(*out, *in);
+    }
     break;
   case QUDA_GCR_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      invertGCRCuda(DiracMdag(dirac), DiracMdag(diracSloppy), DiracMdag(diracPre), *out, *in, param);
+      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      GCR gcr(m, mSloppy, mPre, *param);
+      gcr(*out, *in);
       copyCuda(*in, *out);
     }
-    invertGCRCuda(DiracM(dirac), DiracM(diracSloppy), DiracM(diracPre), *out, *in, param);
+    {
+      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      GCR gcr(m, mSloppy, mPre, *param);
+      gcr(*out, *in);
+    }
     break;
   default:
     errorQuda("Inverter type %d not implemented", param->inv_type);
@@ -1100,6 +988,16 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
   checkInvertParam(param);
+
+  param->num_offset = num_offsets;
+  if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
+    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
+	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+  for (int i=0; i<param->num_offset; i++) {
+    param->offset[i] = offsets[i];
+    param->tol_offset[i] = residue_sq[i];
+  }
+
   verbosity = param->verbosity;
 
   // Are we doing a preconditioned solve */
@@ -1124,12 +1022,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // **** WARNING *** this may not match implementation... 
   if( param->inv_type == QUDA_CG_INVERTER ) { 
     // CG-M needs 5 vectors for the smallest shift + 2 for each additional shift
-    param->spinorGiB *= (5 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (5 + 2*(param->num_offset-1))/(double)(1<<30);
   }
   else {
     // BiCGStab-M needs 7 for the original shift + 2 for each additional shift + 1 auxiliary
     // (Jegerlehner hep-lat/9612014 eq (3.13)
-    param->spinorGiB *= (7 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (7 + 2*(param->num_offset-1))/(double)(1<<30);
   }
 
   // Timing and FLOP counters
@@ -1138,21 +1036,21 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   param->iter = 0;
   
   // Find the smallest shift and its offset.
-  double low_offset = offsets[0];
+  double low_offset = param->offset[0];
   int low_index = 0;
-  for (int i=1;i < num_offsets;i++){
-    if (offsets[i] < low_offset){
-      low_offset = offsets[i];
+  for (int i=1;i < param->num_offset;i++){
+    if (param->offset[i] < low_offset){
+      low_offset = param->offset[i];
       low_index = i;
     }
   }
   
   // Host pointers for x, take a copy of the input host pointers
   void** hp_x;
-  hp_x = new void* [ num_offsets ];
+  hp_x = new void* [ param->num_offset ];
 
   void* hp_b = _hp_b;
-  for(int i=0;i < num_offsets;i++){
+  for(int i=0;i < param->num_offset;i++){
     hp_x[i] = _hp_x[i];
   }
   
@@ -1163,9 +1061,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     hp_x[0] = hp_x[low_index] ;
     hp_x[low_index] = tmp;
     
-    double tmp1 = offsets[0];
-    offsets[0]= offsets[low_index];
-    offsets[low_index] =tmp1;
+    double tmp1 = param->offset[0];
+    param->offset[0]= param->offset[low_index];
+    param->offset[low_index] =tmp1;
   }
     
   // Create the matrix.
@@ -1176,7 +1074,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // expedient but yucky.
   DiracParam diracParam; 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
-    param->mass = sqrt(offsets[0]/4);  
+    param->mass = sqrt(param->offset[0]/4);  
   }
   createDirac(diracParam, *param, pc_solve);
   Dirac &dirac = *d;
@@ -1200,8 +1098,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
   h_b = new cpuColorSpinorField(cpuParam);
 
-  h_x = new cpuColorSpinorField* [ num_offsets ]; // DYNAMIC ALLOCATION
-  for(int i=0; i < num_offsets; i++) { 
+  h_x = new cpuColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
+  for(int i=0; i < param->num_offset; i++) { 
     cpuParam.v = hp_x[i];
     h_x[i] = new cpuColorSpinorField(cpuParam);
   }
@@ -1213,9 +1111,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
 
   // Create the solution fields filled with zero
-  x = new cudaColorSpinorField* [ num_offsets ];
+  x = new cudaColorSpinorField* [ param->num_offset ];
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  for(int i=0; i < num_offsets; i++) { 
+  for(int i=0; i < param->num_offset; i++) { 
     x[i] = new cudaColorSpinorField(cudaParam);
   }
 
@@ -1231,21 +1129,25 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
-  double *rescaled_shifts = new double [num_offsets];
-  for(int i=0; i < num_offsets; i++){ 
-    rescaled_shifts[i] = offsets[i];
+  double *rescaled_shifts = new double [param->num_offset];
+  for(int i=0; i < param->num_offset; i++){ 
+    rescaled_shifts[i] = param->offset[i];
     massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
   }
-  invertMultiShiftCgCuda(DiracMdagM(dirac), DiracMdagM(diracSloppy), x, *b, param, rescaled_shifts, num_offsets, residue_sq);
-  
-  
+
+  {
+    DiracMdagM m(dirac), mSloppy(diracSloppy);
+    MultiShiftCG cg_m(m, mSloppy, *param);
+    cg_m(x, *b);  
+  }
+
   delete [] rescaled_shifts;
 
-  for(int i=0; i < num_offsets; i++) { 
+  for(int i=0; i < param->num_offset; i++) { 
     x[i]->saveCPUSpinorField(*h_x[i]);
   }
 
-  for(int i=0; i < num_offsets; i++){ 
+  for(int i=0; i < param->num_offset; i++){ 
     delete h_x[i];
     delete x[i];
   }
@@ -1270,9 +1172,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 }
 
 void endInvertQuda() {
-  freeMR();
-  freeBiCGstab();
-
   if (diracCreation) {
     if (d){
       delete d;
@@ -1411,6 +1310,15 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   QudaPrecision high_prec = param->cuda_prec;
   param->cuda_prec = param->cuda_prec_sloppy;
   
+  param->num_offset = num_offsets;
+  if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
+    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
+	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+  for (int i=0; i<param->num_offset; i++) {
+    param->offset[i] = offsets[i];
+    param->tol_offset[i] = residue_sq[i];
+  }
+
   do_create_sloppy_cuda_gauge();
 
   checkInvertParam(param);
@@ -1438,12 +1346,12 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // **** WARNING *** this may not match implementation... 
   if( param->inv_type == QUDA_CG_INVERTER ) { 
     // CG-M needs 5 vectors for the smallest shift + 2 for each additional shift
-    param->spinorGiB *= (5 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (5 + 2*(param->num_offset-1))/(double)(1<<30);
   }
   else {
     // BiCGStab-M needs 7 for the original shift + 2 for each additional shift + 1 auxiliary
     // (Jegerlehner hep-lat/9612014 eq (3.13)
-    param->spinorGiB *= (7 + 2*(num_offsets-1))/(double)(1<<30);
+    param->spinorGiB *= (7 + 2*(param->num_offset-1))/(double)(1<<30);
   }
 
   // Timing and FLOP counters
@@ -1452,21 +1360,21 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   param->iter = 0;
   
   // Find the smallest shift and its offset.
-  double low_offset = offsets[0];
+  double low_offset = param->offset[0];
   int low_index = 0;
-  for (int i=1;i < num_offsets;i++){
-    if (offsets[i] < low_offset){
-      low_offset = offsets[i];
+  for (int i=1;i < param->num_offset;i++){
+    if (param->offset[i] < low_offset){
+      low_offset = param->offset[i];
       low_index = i;
     }
   }
   
   // Host pointers for x, take a copy of the input host pointers
   void** hp_x;
-  hp_x = new void* [ num_offsets ];
+  hp_x = new void* [ param->num_offset ];
 
   void* hp_b = _hp_b;
-  for(int i=0;i < num_offsets;i++){
+  for(int i=0;i < param->num_offset;i++){
     hp_x[i] = _hp_x[i];
   }
   
@@ -1477,9 +1385,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     hp_x[0] = hp_x[low_index] ;
     hp_x[low_index] = tmp;
     
-    double tmp1 = offsets[0];
-    offsets[0]= offsets[low_index];
-    offsets[low_index] =tmp1;
+    double tmp1 = param->offset[0];
+    param->offset[0]= param->offset[low_index];
+    param->offset[low_index] =tmp1;
   }
     
   // Create the matrix.
@@ -1490,10 +1398,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // expedient but yucky.
   DiracParam diracParam; 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
-    param->mass = sqrt(offsets[0]/4);  
+    param->mass = sqrt(param->offset[0]/4);  
   }
   createDirac(diracParam, *param, pc_solve);
-  Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
 
   cpuColorSpinorField *h_b = NULL; // Host RHS
@@ -1514,8 +1421,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
   h_b = new cpuColorSpinorField(cpuParam);
 
-  h_x = new cpuColorSpinorField* [ num_offsets ]; // DYNAMIC ALLOCATION
-  for(int i=0; i < num_offsets; i++) { 
+  h_x = new cpuColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
+  for(int i=0; i < param->num_offset; i++) { 
     cpuParam.v = hp_x[i];
     h_x[i] = new cpuColorSpinorField(cpuParam);
   }
@@ -1527,9 +1434,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
 
   // Create the solution fields filled with zero
-  x = new cudaColorSpinorField* [ num_offsets ];
+  x = new cudaColorSpinorField* [ param->num_offset ];
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  for(int i=0; i < num_offsets; i++) { 
+  for(int i=0; i < param->num_offset; i++) { 
     x[i] = new cudaColorSpinorField(cudaParam);
   }
 
@@ -1541,15 +1448,20 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   // tune the Dirac Kernel
-  // if set, tunning will happen in the first multishift call
+  // if set, tuning will happen in the first multishift call
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
-  double *rescaled_shifts = new double [num_offsets];
-  for(int i=0; i < num_offsets; i++){ 
-    rescaled_shifts[i] = offsets[i];
+  double *rescaled_shifts = new double [param->num_offset];
+  for(int i=0; i < param->num_offset; i++){ 
+    rescaled_shifts[i] = param->offset[i];
     massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
   }
-  invertMultiShiftCgCuda(DiracMdagM(diracSloppy), DiracMdagM(diracSloppy), x, *b, param, rescaled_shifts, num_offsets, residue_sq);
+
+  {
+    DiracMdagM m(diracSloppy);
+    MultiShiftCG cg_m(m, m, *param);
+    cg_m(x, *b);  
+  }
     
   delete [] rescaled_shifts;
   
@@ -1576,13 +1488,15 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     
     cudaColorSpinorField* high_x;
     high_x = new cudaColorSpinorField(cudaParam);
-    for(int i=0;i < num_offsets; i++){
+    for(int i=0;i < param->num_offset; i++){
       *high_x  = *x[i];
       delete x[i];
-      double mass = sqrt(offsets[i]/4);
+      double mass = sqrt(param->offset[i]/4);
       dirac2.setMass(mass);
       diracSloppy2.setMass(mass);
-      invertCgCuda(DiracMdagM(dirac2), DiracMdagM(diracSloppy2), *high_x, *b, param);      
+      DiracMdagM m(dirac2), mSloppy(diracSloppy2);
+      CG cg(m, mSloppy, *param);
+      cg(*high_x, *b);      
       total_iters += param->iter;
       total_secs  += param->secs;
       total_gflops += param->gflops;      
@@ -1595,7 +1509,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
   
   
-  for(int i=0; i < num_offsets; i++){ 
+  for(int i=0; i < param->num_offset; i++){ 
     delete h_x[i];
   }
 

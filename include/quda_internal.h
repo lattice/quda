@@ -27,6 +27,7 @@
 #define Tboundary QudaTboundary
 
 #include <enum_quda.h>
+#include <quda.h>
 #include <util_quda.h>
 
 #ifdef __cplusplus
@@ -79,48 +80,7 @@ extern "C" {
     ParityGauge even;
     double anisotropy;
   } FullMom;
-    
-  
-  typedef struct {
-    size_t bytes;
-    QudaPrecision precision;
-    int length;
-    int real_length; // physical length (excluding padding)
-    int volume;
-    int pad; // padding from end of array to start of next
-    int stride; // geometric stride between volume lengthed arrays
-    int X[4];
-    int Nc;
-    int Ns;
-    void *clover;
-    float *cloverNorm;
-  } ParityClover;
-
-  typedef struct {
-    ParityClover odd;
-    ParityClover even;
-  } FullClover;
-
-  /* typedef struct {
-    size_t bytes;
-    QudaPrecision precision;
-    int length; // total length
-    int real_length; // physical length (excluding padding)
-    int volume; // geometric volume (single parity)
-    int pad; // padding from end of array to start of next
-    int stride; // geometric stride between volume lengthed arrays
-    int X[4]; // the geometric lengths (single parity)
-    int Nc; // length of color dimension
-    int Ns; // length of spin dimension
-    void *spinor; // either (double2*), (float4 *) or (short4 *), depending on precision
-    float *spinorNorm; // used only when precision is QUDA_HALF_PRECISION
-  } ParitySpinor;
-
-  typedef struct {
-    ParitySpinor odd;
-    ParitySpinor even;
-    } FullSpinor;*/
-
+      
   // replace below with ColorSpinorField
   typedef struct {
     size_t bytes;

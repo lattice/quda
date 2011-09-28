@@ -293,8 +293,8 @@
 
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
 
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var)
 #else
 #define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var)
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var)
@@ -312,6 +312,11 @@ __constant__ int path_max_length;
 void
 gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
 {    
+  
+#ifdef MULTI_GPU
+#error "multi gpu is not supported for gauge force computation"  
+#endif
+  
     static int gauge_force_init_cuda_flag = 0;
     if (gauge_force_init_cuda_flag){
 	return;
@@ -371,7 +376,7 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
         switch(dir){							\
         case XUP:							\
             if ( (i4 & 1) == 1){					\
-                sign = 1;						\
+	      sign = 1;							\
             }								\
             break;							\
         case YUP:							\
@@ -407,11 +412,11 @@ parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
     int i,j=0;
     int sid = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int z1 = FAST_INT_DIVIDE(sid, X1h);
+    int z1 = sid / X1h;
     int x1h = sid - z1*X1h;
-    int z2 = FAST_INT_DIVIDE(z1, X2);
+    int z2 = z1 / X2;
     int x2 = z1 - z2*X2;
-    int x4 = FAST_INT_DIVIDE(z2, X3);
+    int x4 = z2 / X3;
     int x3 = z2 - x4*X3;
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
     int x1 = 2*x1h + x1odd;  
@@ -586,8 +591,8 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
     float4* linkEven = (float4*)cudaSiteLink.even;
     float4* linkOdd = (float4*)cudaSiteLink.odd;        
 
-    cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.even, cudaSiteLink.bytes);
-    cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
     parity_compute_gauge_force_kernel<0><<<halfGridDim, blockDim>>>(momEven, momOdd,
 								  dir, eb3,
 								  linkEven, linkOdd, 
@@ -605,8 +610,8 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
     
 
     
-    cudaUnbindTexture(siteLink0TexSingle);
-    cudaUnbindTexture(siteLink1TexSingle);
+    cudaUnbindTexture(siteLink0TexSingle_recon);
+    cudaUnbindTexture(siteLink1TexSingle_recon);
     
     checkCudaError();
     

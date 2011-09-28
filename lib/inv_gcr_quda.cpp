@@ -134,12 +134,33 @@ void updateSolution(cudaColorSpinorField &x, const Complex *alpha, Complex** con
   delete []delta;
 }
 
-void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &pre, 
-		   cudaColorSpinorField &x, cudaColorSpinorField &b, QudaInvertParam *invert_param)
+GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam) :
+  Solver(invParam), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0)
+{
+
+  Kparam = newQudaInvertParam();
+  fillInnerInvertParam(Kparam, invParam);
+
+  if (invParam.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
+    K = new CG(matPrecon, matPrecon, Kparam);
+  else if (invParam.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
+    K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam);
+  else if (invParam.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
+    K = new MR(matPrecon, Kparam);
+  else if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
+    errorQuda("Unknown inner solver %d", invParam.inv_type_precondition);
+
+}
+
+GCR::~GCR() {
+  if (K) delete K;
+}
+
+void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 {
   typedef std::complex<double> Complex;
 
-  int Nkrylov = invert_param->gcrNkrylov; // size of Krylov space
+  int Nkrylov = invParam.gcrNkrylov; // size of Krylov space
 
   ColorSpinorParam param(x);
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -148,7 +169,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   cudaColorSpinorField y(x, param); // high precision accumulator
 
   // create sloppy fields used for orthogonalization
-  param.precision = invert_param->cuda_prec_sloppy;
+  param.precision = invParam.cuda_prec_sloppy;
   cudaColorSpinorField *p[Nkrylov], *Ap[Nkrylov];
   for (int i=0; i<Nkrylov; i++) {
     p[i] = new cudaColorSpinorField(x, param);
@@ -158,8 +179,8 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   cudaColorSpinorField tmp(x, param); //temporary for sloppy mat-vec
 
   cudaColorSpinorField *x_sloppy, *r_sloppy;
-  if (invert_param->cuda_prec_sloppy != invert_param->cuda_prec) {
-    param.precision = invert_param->cuda_prec_sloppy;
+  if (invParam.cuda_prec_sloppy != invParam.cuda_prec) {
+    param.precision = invParam.cuda_prec_sloppy;
     x_sloppy = new cudaColorSpinorField(x, param);
     r_sloppy = new cudaColorSpinorField(x, param);
   } else {
@@ -173,8 +194,8 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   // these low precision fields are used by the inner solver
   bool precMatch = true;
   cudaColorSpinorField *r_pre, *p_pre;
-  if (invert_param->prec_precondition != invert_param->cuda_prec_sloppy) {
-    param.precision = invert_param->prec_precondition;
+  if (invParam.prec_precondition != invParam.cuda_prec_sloppy) {
+    param.precision = invParam.prec_precondition;
     p_pre = new cudaColorSpinorField(x, param);
     r_pre = new cudaColorSpinorField(x, param);
     precMatch = false;
@@ -184,9 +205,6 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   }
   cudaColorSpinorField &rPre = *r_pre;
 
-  QudaInvertParam invert_param_inner = newQudaInvertParam();
-  fillInnerInvertParam(invert_param_inner, *invert_param);
-
   Complex *alpha = new Complex[Nkrylov];
   Complex **beta = new Complex*[Nkrylov];
   for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
@@ -194,7 +212,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
 
   double b2 = normCuda(b);
 
-  double stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
+  double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
 
   int k = 0;
 
@@ -211,33 +229,24 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
   int restart = 0;
   double r2_old = r2;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) 
+  if (invParam.verbosity >= QUDA_VERBOSE) 
     printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
 
   double orthT = 0, matT = 0, preT = 0, resT = 0;
 
-  while (r2 > stop && total_iter < invert_param->maxiter) {
+  while (r2 > stop && total_iter < invParam.maxiter) {
     
     gettimeofday(&pre0, NULL);
 
-    if (invert_param->inv_type_precondition != QUDA_INVALID_INVERTER) {
-      //if (invert_param->tol/(sqrt(r2/b2)) > invert_param->tol_precondition) // don'trelax stoppng condition
-	//invert_param_inner.tol = invert_param->tol/sqrt(r2/b2);
-
+    if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) {
       cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
 
       copyCuda(rPre, rSloppy);
-      if (invert_param->inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
-	invertCgCuda(pre, pre, pPre, rPre, &invert_param_inner);
-      else if (invert_param->inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
-	invertBiCGstabCuda(pre, pre, pre, pPre, rPre, &invert_param_inner);
-      else if (invert_param->inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
-	invertMRCuda(pre, pPre, rPre, &invert_param_inner);
-      else
-	errorQuda("Unknown inner solver %d", invert_param->inv_type_precondition);
+
+      (*K)(pPre, rPre);
 
       // relaxation p = omega*p + (1-omega)*r
-      if (invert_param->omega!=1.0) axpbyCuda((1.0-invert_param->omega), rPre, invert_param->omega, pPre);
+      if (invParam.omega!=1.0) axpbyCuda((1.0-invParam.omega), rPre, invParam.omega, pPre);
 
       copyCuda(*p[k], pPre);
     } else { // no preconditioner
@@ -262,7 +271,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
     r2 = cabxpyAxNormCuda(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 
 
-    if (invert_param->verbosity >= QUDA_DEBUG_VERBOSE) {
+    if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
       double x2 = norm2(x);
       double p2 = norm2(*p[k]);
       double Ap2 = norm2(*Ap[k]);
@@ -273,12 +282,12 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
     k++;
     total_iter++;
 
-    if (invert_param->verbosity >= QUDA_VERBOSE) 
+    if (invParam.verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter, k, r2);
 
     gettimeofday(&rst0, NULL);
     // update solution and residual since max Nkrylov reached, converged or reliable update required
-    if (k==Nkrylov || r2 < stop || r2/r2_old < invert_param->reliable_delta) { 
+    if (k==Nkrylov || r2 < stop || r2/r2_old < invParam.reliable_delta) { 
 
       // update the solution vector
       updateSolution(xSloppy, alpha, beta, gamma, k, p);
@@ -296,7 +305,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
       if (r2 > stop) {
 	restart++; // restarting if residual is still too great
 
-	if (invert_param->verbosity >= QUDA_VERBOSE) 
+	if (invParam.verbosity >= QUDA_VERBOSE) 
 	  printfQuda("\nGCR: restart %d, iterated r2 = %e, true r2 = %e\n", restart, r2Sloppy, r2);
       }
 
@@ -304,7 +313,7 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
       zeroCuda(xSloppy);
 
       if (r2_old < r2) {
-	if (invert_param->verbosity >= QUDA_VERBOSE) 
+	if (invParam.verbosity >= QUDA_VERBOSE) 
 	  printfQuda("GCR: precision limit reached, r2_old = %e < r2 = %e\n", r2_old, r2);
 	break;
       }
@@ -322,22 +331,22 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
 
   copyCuda(x, y);
 
-  if (k>=invert_param->maxiter && invert_param->verbosity >= QUDA_SUMMARIZE) 
-    warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
+  if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
+    warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
+  if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
   
-  invert_param->secs += stopwatchReadSeconds();
+  invParam.secs += stopwatchReadSeconds();
   
-  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + pre.flops())*1e-9;
+  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
   reduceDouble(gflops);
 
   printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
-  	     gflops / stopwatchReadSeconds(), invert_param->secs, preT, matT, orthT, resT);
-  invert_param->gflops += gflops;
-  invert_param->iter += total_iter;
+  	     gflops / stopwatchReadSeconds(), invParam.secs, preT, matT, orthT, resT);
+  invParam.gflops += gflops;
+  invParam.iter += total_iter;
   
-  if (invert_param->verbosity >= QUDA_SUMMARIZE) {
+  if (invParam.verbosity >= QUDA_SUMMARIZE) {
     // Calculate the true residual
     mat(r, x);
     double true_res = xmyNormCuda(b, r);
@@ -346,12 +355,12 @@ void invertGCRCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, const D
 	       total_iter, sqrt(r2/b2), sqrt(true_res / b2));    
   }
 
-  if (invert_param->cuda_prec_sloppy != invert_param->cuda_prec) {
+  if (invParam.cuda_prec_sloppy != invParam.cuda_prec) {
     delete x_sloppy;
     delete r_sloppy;
   }
 
-  if (invert_param->prec_precondition != invert_param->cuda_prec_sloppy) {
+  if (invParam.prec_precondition != invParam.cuda_prec_sloppy) {
     delete p_pre;
     delete r_pre;
   }

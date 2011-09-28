@@ -14,49 +14,46 @@
 
 #include <color_spinor_field.h>
 
-cudaColorSpinorField *rp_mr = 0;
-cudaColorSpinorField *Arp_mr = 0;
-cudaColorSpinorField *tmpp_mr = 0;
+MR::MR(DiracMatrix &mat, QudaInvertParam &invParam) :
+  Solver(invParam), mat(mat), init(false)
+{
+ 
+}
 
-bool initMR = false;
-
-void freeMR() {
-  if (initMR) {
-    if (rp_mr) delete rp_mr;
-    delete Arp_mr;
-    delete tmpp_mr;
-
-    initMR = false;
+MR::~MR() {
+  if (init) {
+    if (rp) delete rp;
+    delete Arp;
+    delete tmpp;
   }
 }
 
-void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpinorField &b, 
-		  QudaInvertParam *invert_param)
+void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 {
 
   globalReduce = false; // use local reductions for DD solver
 
   typedef std::complex<double> Complex;
 
-  if (!initMR) {
+  if (!init) {
     ColorSpinorParam param(x);
     param.create = QUDA_ZERO_FIELD_CREATE;
-    if (invert_param->preserve_source == QUDA_PRESERVE_SOURCE_YES)
-      rp_mr = new cudaColorSpinorField(x, param); 
-    Arp_mr = new cudaColorSpinorField(x);
-    tmpp_mr = new cudaColorSpinorField(x, param); //temporary for mat-vec
+    if (invParam.preserve_source == QUDA_PRESERVE_SOURCE_YES)
+      rp = new cudaColorSpinorField(x, param); 
+    Arp = new cudaColorSpinorField(x);
+    tmpp = new cudaColorSpinorField(x, param); //temporary for mat-vec
 
-    initMR = true;
+    init = true;
   }
   cudaColorSpinorField &r = 
-    (invert_param->preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp_mr : b;
-  cudaColorSpinorField &Ar = *Arp_mr;
-  cudaColorSpinorField &tmp = *tmpp_mr;
+    (invParam.preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp : b;
+  cudaColorSpinorField &Ar = *Arp;
+  cudaColorSpinorField &tmp = *tmpp;
 
   if (&r != &b) copyCuda(r, b);
 
   double b2 = normCuda(b);
-  double stop = b2*invert_param->tol*invert_param->tol; // stopping condition of solver
+  double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
 
   // calculate initial residual
   //mat(Ar, x, tmp);
@@ -66,7 +63,7 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
   zeroCuda(x);
   double r2 = b2;
 
-  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) {
+  if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
     blas_quda_flops = 0;
     stopwatchStart();
   }
@@ -74,10 +71,10 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
   double omega = 1.0;
 
   int k = 0;
-  if (invert_param->verbosity >= QUDA_VERBOSE) 
+  if (invParam.verbosity >= QUDA_VERBOSE) 
     printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
 
-  while (r2 > stop && k < invert_param->maxiter) {
+  while (r2 > stop && k < invParam.maxiter) {
     
     mat(Ar, r, tmp);
     
@@ -91,23 +88,23 @@ void invertMRCuda(const DiracMatrix &mat, cudaColorSpinorField &x, cudaColorSpin
 
     k++;
 
-    if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
+    if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
   }
   
-  if (k>=invert_param->maxiter && invert_param->verbosity >= QUDA_SUMMARIZE) 
-    warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
+  if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
+    warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
   
-  if (invert_param->inv_type_precondition != QUDA_GCR_INVERTER) {
-    invert_param->secs += stopwatchReadSeconds();
+  if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
+    invParam.secs += stopwatchReadSeconds();
   
     double gflops = (blas_quda_flops + mat.flops())*1e-9;
     reduceDouble(gflops);
 
     //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
-    invert_param->gflops += gflops;
-    invert_param->iter += k;
+    invParam.gflops += gflops;
+    invParam.iter += k;
     
-    if (invert_param->verbosity >= QUDA_SUMMARIZE) {
+    if (invParam.verbosity >= QUDA_SUMMARIZE) {
       // Calculate the true residual
       mat(r, x);
       double true_res = xmyNormCuda(b, r);

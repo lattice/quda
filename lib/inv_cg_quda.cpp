@@ -14,8 +14,17 @@
 
 #include <iostream>
 
-void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColorSpinorField &x,
-		  cudaColorSpinorField &b, QudaInvertParam *invert_param)
+CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam) :
+  Solver(invParam), mat(mat), matSloppy(matSloppy)
+{
+
+}
+
+CG::~CG() {
+
+}
+
+void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
 {
   int k=0;
   int rUpdate = 0;
@@ -32,13 +41,13 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   double r2 = xmyNormCuda(b, r);
   rUpdate ++;
   
-  param.precision = invert_param->cuda_prec_sloppy;
+  param.precision = invParam.cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
   cudaColorSpinorField tmp(x, param);
   cudaColorSpinorField tmp2(x, param); // only needed for clover and twisted mass
 
   cudaColorSpinorField *x_sloppy, *r_sloppy;
-  if (invert_param->cuda_prec_sloppy == x.Precision()) {
+  if (invParam.cuda_prec_sloppy == x.Precision()) {
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     x_sloppy = &x;
     r_sloppy = &r;
@@ -55,7 +64,7 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
 
   double r2_old;
   double src_norm = norm2(b);
-  double stop = src_norm*invert_param->tol*invert_param->tol; // stopping condition of solver
+  double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver
 
   double alpha, beta;
   double pAp;
@@ -64,14 +73,14 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
   double r0Norm = rNorm;
   double maxrx = rNorm;
   double maxrr = rNorm;
-  double delta = invert_param->reliable_delta;
+  double delta = invParam.reliable_delta;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+  if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
 
   blas_quda_flops = 0;
 
   stopwatchStart();
-  while (r2 > stop && k<invert_param->maxiter) {
+  while (r2 > stop && k<invParam.maxiter) {
 
     matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
@@ -111,39 +120,39 @@ void invertCgCuda(const DiracMatrix &mat, const DiracMatrix &matSloppy, cudaColo
     }
 
     k++;
-    if (invert_param->verbosity >= QUDA_VERBOSE)
+    if (invParam.verbosity >= QUDA_VERBOSE)
       printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
   }
 
   if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
   xpyCuda(y, x);
 
-  invert_param->secs = stopwatchReadSeconds();
+  invParam.secs = stopwatchReadSeconds();
 
   
-  if (k==invert_param->maxiter) 
-    warningQuda("Exceeded maximum iterations %d", invert_param->maxiter);
+  if (k==invParam.maxiter) 
+    warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
-  if (invert_param->verbosity >= QUDA_SUMMARIZE)
+  if (invParam.verbosity >= QUDA_SUMMARIZE)
     printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
   double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
   reduceDouble(gflops);
 
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
-  invert_param->gflops = gflops;
-  invert_param->iter = k;
+  invParam.gflops = gflops;
+  invParam.iter = k;
 
   blas_quda_flops = 0;
 
-  if (invert_param->verbosity >= QUDA_SUMMARIZE){
+  if (invParam.verbosity >= QUDA_SUMMARIZE){
     mat(r, x, y);
     double true_res = xmyNormCuda(b, r);
     printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 	       k, sqrt(r2/src_norm), sqrt(true_res / src_norm));    
   }
 
-  if (invert_param->cuda_prec_sloppy != x.Precision()) {
+  if (invParam.cuda_prec_sloppy != x.Precision()) {
     delete r_sloppy;
     delete x_sloppy;
   }

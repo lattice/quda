@@ -52,6 +52,9 @@ texture<int4, 1> siteLink1TexDouble;
 texture<float2, 1, cudaReadModeElementType> siteLink0TexSingle;
 texture<float2, 1, cudaReadModeElementType> siteLink1TexSingle;
 
+texture<float4, 1, cudaReadModeElementType> siteLink0TexSingle_recon;
+texture<float4, 1, cudaReadModeElementType> siteLink1TexSingle_recon;
+
 texture<float2, 1, cudaReadModeElementType> siteLink0TexSingle_norecon;
 texture<float2, 1, cudaReadModeElementType> siteLink1TexSingle_norecon;
 
@@ -397,30 +400,30 @@ static QudaPrecision bindCloverTex(const FullClover clover, const int oddBit,
 				   void **cloverP, void **cloverNormP)
 {
   if (oddBit) {
-    *cloverP = clover.odd.clover;
-    *cloverNormP = clover.odd.cloverNorm;
+    *cloverP = clover.odd;
+    *cloverNormP = clover.oddNorm;
   } else {
-    *cloverP = clover.even.clover;
-    *cloverNormP = clover.even.cloverNorm;
+    *cloverP = clover.even;
+    *cloverNormP = clover.evenNorm;
   }
 
-  if (clover.odd.precision == QUDA_DOUBLE_PRECISION) {
-    cudaBindTexture(0, cloverTexDouble, *cloverP, clover.odd.bytes); 
-  } else if (clover.odd.precision == QUDA_SINGLE_PRECISION) {
-    cudaBindTexture(0, cloverTexSingle, *cloverP, clover.odd.bytes); 
+  if (clover.precision == QUDA_DOUBLE_PRECISION) {
+    cudaBindTexture(0, cloverTexDouble, *cloverP, clover.bytes); 
+  } else if (clover.precision == QUDA_SINGLE_PRECISION) {
+    cudaBindTexture(0, cloverTexSingle, *cloverP, clover.bytes); 
   } else {
-    cudaBindTexture(0, cloverTexHalf, *cloverP, clover.odd.bytes); 
-    cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.odd.bytes/18);
+    cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes); 
+    cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
   }
 
-  return clover.odd.precision;
+  return clover.precision;
 }
 
 static void unbindCloverTex(const FullClover clover)
 {
-  if (clover.odd.precision == QUDA_DOUBLE_PRECISION) {
+  if (clover.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(cloverTexDouble);
-  } else if (clover.odd.precision == QUDA_SINGLE_PRECISION) {
+  } else if (clover.precision == QUDA_SINGLE_PRECISION) {
     cudaUnbindTexture(cloverTexSingle);
   } else {
     cudaUnbindTexture(cloverTexHalf);

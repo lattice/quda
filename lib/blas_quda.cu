@@ -25,13 +25,6 @@
 #define QudaSumFloat3 float3
 #endif
 
-// Required for the reduction kernels
-#ifdef __DEVICE_EMULATION__
-#define EMUSYNC __syncthreads()
-#else
-#define EMUSYNC
-#endif
-
 // These are used for reduction kernels
 static QudaSumFloat *d_reduceFloat=0;
 static QudaSumComplex *d_reduceComplex=0;

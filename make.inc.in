@@ -4,7 +4,6 @@ CUDA_INSTALL_PATH = @CUDA_INSTALL_PATH@
 
 CPU_ARCH = @CPU_ARCH@  	  # x86 or x86_64
 GPU_ARCH = @GPU_ARCH@	  # sm_10, sm_11, sm_12, sm_13, sm_20 or sm_21
-GPU_EMU  = @GPU_EMU@      # set to 'yes' for device emulation (CUDA 3.0 only)
 OS       = @QUDA_OS@	  # linux or osx
 
 PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
@@ -68,11 +67,6 @@ endif
 
 COPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
 NVCCOPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
-
-ifeq ($(strip $(GPU_EMU)), yes)
-  COPT += -D__DEVICE_EMULATION__
-  NVCCOPT = -deviceemu
-endif
 
 ifeq ($(strip $(GPU_ARCH)), sm_20)
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false

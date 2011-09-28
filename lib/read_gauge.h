@@ -1,7 +1,5 @@
 //#include <half_quda.h>
 
-#define FAST_INT_DIVIDE(a, b) ( a/b )
-
 // Performs complex addition
 #define COMPLEX_ADD_TO(a, b)			\
   a##_re += b##_re,				\

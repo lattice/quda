@@ -37,18 +37,15 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
   if (reduce_threads >= 256) { if (tid < 128) { ZCACC(s[0],s[1],s[256+0],s[256+1]); } __syncthreads(); }
   if (reduce_threads >= 128) { if (tid <  64) { ZCACC(s[0],s[1],s[128+0],s[128+1]); } __syncthreads(); }    
 
-#ifndef __DEVICE_EMULATION__
-  if (tid < 32) 
-#endif
-    {
-      volatile QudaSumComplex *sv = s;
-      if (reduce_threads >=  64) { ZCACC(sv[0],sv[1],sv[64+0],sv[64+1]); EMUSYNC; }
-      if (reduce_threads >=  32) { ZCACC(sv[0],sv[1],sv[32+0],sv[32+1]); EMUSYNC; }
-      if (reduce_threads >=  16) { ZCACC(sv[0],sv[1],sv[16+0],sv[16+1]); EMUSYNC; }
-      if (reduce_threads >=   8) { ZCACC(sv[0],sv[1], sv[8+0], sv[8+1]); EMUSYNC; }
-      if (reduce_threads >=   4) { ZCACC(sv[0],sv[1], sv[4+0], sv[4+1]); EMUSYNC; }
-      if (reduce_threads >=   2) { ZCACC(sv[0],sv[1], sv[2+0], sv[2+1]); EMUSYNC; }
-    }
+  if (tid < 32) {
+    volatile QudaSumComplex *sv = s;
+    if (reduce_threads >=  64) { ZCACC(sv[0],sv[1],sv[64+0],sv[64+1]); }
+    if (reduce_threads >=  32) { ZCACC(sv[0],sv[1],sv[32+0],sv[32+1]); }
+    if (reduce_threads >=  16) { ZCACC(sv[0],sv[1],sv[16+0],sv[16+1]); }
+    if (reduce_threads >=   8) { ZCACC(sv[0],sv[1], sv[8+0], sv[8+1]); }
+    if (reduce_threads >=   4) { ZCACC(sv[0],sv[1], sv[4+0], sv[4+1]); }
+    if (reduce_threads >=   2) { ZCACC(sv[0],sv[1], sv[2+0], sv[2+1]); }
+  }
   
   // write result for this block to global mem as single QudaSumComplex
   if (tid == 0) {
@@ -91,19 +88,16 @@ __global__ void REDUCE_FUNC_NAME(Kernel) (REDUCE_TYPES, QudaSumComplex *g_odata,
   if (reduce_threads >= 256) { if (tid < 128) { sx[0] += sx[128]; sy[0] += sy[128]; } __syncthreads(); }
   if (reduce_threads >= 128) { if (tid <  64) { sx[0] += sx[ 64]; sy[0] += sy[ 64]; } __syncthreads(); }
   
-#ifndef __DEVICE_EMULATION__
-  if (tid < 32) 
-#endif
-    {
-      volatile QudaSumFloat *svx = sx;
-      volatile QudaSumFloat *svy = sy;
-      if (reduce_threads >=  64) { svx[0] += svx[32]; svy[0] += svy[32]; EMUSYNC; }
-      if (reduce_threads >=  32) { svx[0] += svx[16]; svy[0] += svy[16]; EMUSYNC; }
-      if (reduce_threads >=  16) { svx[0] += svx[ 8]; svy[0] += svy[ 8]; EMUSYNC; }
-      if (reduce_threads >=   8) { svx[0] += svx[ 4]; svy[0] += svy[ 4]; EMUSYNC; }
-      if (reduce_threads >=   4) { svx[0] += svx[ 2]; svy[0] += svy[ 2]; EMUSYNC; }
-      if (reduce_threads >=   2) { svx[0] += svx[ 1]; svy[0] += svy[ 1]; EMUSYNC; }
-    }
+  if (tid < 32) {
+    volatile QudaSumFloat *svx = sx;
+    volatile QudaSumFloat *svy = sy;
+    if (reduce_threads >=  64) { svx[0] += svx[32]; svy[0] += svy[32]; }
+    if (reduce_threads >=  32) { svx[0] += svx[16]; svy[0] += svy[16]; }
+    if (reduce_threads >=  16) { svx[0] += svx[ 8]; svy[0] += svy[ 8]; }
+    if (reduce_threads >=   8) { svx[0] += svx[ 4]; svy[0] += svy[ 4]; }
+    if (reduce_threads >=   4) { svx[0] += svx[ 2]; svy[0] += svy[ 2]; }
+    if (reduce_threads >=   2) { svx[0] += svx[ 1]; svy[0] += svy[ 1]; ; }
+  }
   
   // write result for this block to global mem 
   if (tid == 0) {

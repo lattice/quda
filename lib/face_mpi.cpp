@@ -8,6 +8,8 @@
 #include <mpicomm.h>
 #include <cuda.h>
 
+#include <fat_force_quda.h>
+
 using namespace std;
 
 #if (CUDA_VERSION >=4000)
@@ -330,7 +332,7 @@ void commBarrier() { comm_barrier(); }
  * Staple exchange routine
  * used in fat link computation
  ***************************************************************/
-#ifdef GPU_FATLINK
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
 
 #define gaugeSiteSize 18
 

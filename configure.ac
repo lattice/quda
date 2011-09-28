@@ -171,14 +171,6 @@ sm_10 | sm_11 | sm_12 | sm_13 | sm_20 | sm_21 ) ;;
   ;;
 esac
 
-dnl CPU EMU
-case ${gpu_emu} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value --enable-gpu-emu ])
-  ;;
-esac
-
 dnl OS
 case ${quda_os} in
 linux|osx);;
@@ -350,9 +342,6 @@ AC_SUBST( CPU_ARCH, [${cpu_arch}] )
 
 AC_MSG_NOTICE([Setting GPU_ARCH = ${gpu_arch} ])
 AC_SUBST( GPU_ARCH, [${gpu_arch}] )
-
-AC_MSG_NOTICE([Setting GPU_EMU = ${gpu_emu} ])
-AC_SUBST( GPU_EMU,  [${gpu_emu}]  )
 
 AC_MSG_NOTICE([Setting OS = ${quda_os} ])
 AC_SUBST( QUDA_OS,  [${quda_os}]  )
