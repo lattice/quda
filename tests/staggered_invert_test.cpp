@@ -39,6 +39,9 @@ cpuColorSpinorField* out;
 cpuColorSpinorField* ref;
 cpuColorSpinorField* tmp;
 
+cpuGaugeField *cpuFat = NULL;
+cpuGaugeField *cpuLong = NULL;
+
 static double tol = 1e-6;
 
 static int testtype = 0;
@@ -247,15 +250,15 @@ invert_test(void)
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
     GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
-    cpuGaugeField cpuFat(cpuFatParam);
-    cpuFat.exchangeGhost();
-    ghost_fatlink = (void**)cpuFat.Ghost();
+    cpuFat = new cpuGaugeField(cpuFatParam);
+    cpuFat->exchangeGhost();
+    ghost_fatlink = (void**)cpuFat->Ghost();
     
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
     GaugeFieldParam cpuLongParam(longlink, gaugeParam);
-    cpuGaugeField cpuLong(cpuLongParam);
-    cpuLong.exchangeGhost();
-    ghost_longlink = (void**)cpuLong.Ghost();
+    cpuLong = new cpuGaugeField(cpuLongParam);
+    cpuLong->exchangeGhost();
+    ghost_longlink = (void**)cpuLong->Ghost();
 
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.ga_pad = fat_pad;
@@ -288,7 +291,6 @@ invert_test(void)
   double src2=0;
   int ret = 0;
 
-
   switch(testtype){
   case 0: //even
     volume = Vh;
@@ -300,7 +302,7 @@ invert_test(void)
     time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU    
-    matdagmat_mg4dir(ref, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+    matdagmat_mg4dir(ref, fatlink, longlink, ghost_fatlink, ghost_longlink, 
 		     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
     matdagmat(ref->V(), fatlink, longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
@@ -309,6 +311,11 @@ invert_test(void)
     mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+
+    {
+      double sol = norm_2(out->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      double refe = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+    }
     break;
 
   case 1: //odd
@@ -320,7 +327,7 @@ invert_test(void)
     time0 /= CLOCKS_PER_SEC;
     
 #ifdef MULTI_GPU
-    matdagmat_mg4dir(ref, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+    matdagmat_mg4dir(ref, fatlink, longlink, ghost_fatlink, ghost_longlink, 
 		     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
 #else
     matdagmat(ref->V(), fatlink, longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);	
@@ -408,7 +415,7 @@ invert_test(void)
     for(int i=0;i < num_offsets;i++){
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, fatlink, ghost_fatlink, longlink, ghost_longlink, 
+      matdagmat_mg4dir(ref, fatlink, longlink, ghost_fatlink, ghost_longlink, 
 		       spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
 #else
       matdagmat(ref->V(), fatlink, longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
@@ -471,6 +478,9 @@ end(void)
   delete ref;
   delete tmp;
   
+  if (cpuFat) delete cpuFat;
+  if (cpuLong) delete cpuLong;
+
   endQuda();
 }
 

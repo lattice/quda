@@ -24,8 +24,8 @@ void staggered_matpc(void *out, void **fatlink, void ** longlink, void *in, doub
 		     int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision);
 void matdagmat(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
 	       QudaPrecision sPrecision, QudaPrecision gPrecision, void* tmp, QudaParity parity);    
-void matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** ghost_fatlink, void** longlink, 
-		      void** ghost_longlink, cpuColorSpinorField* in, double mass, int dagger_bit,
+void matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void **longlink, void** ghost_fatlink, void** ghost_longlink,
+		      cpuColorSpinorField* in, double mass, int dagger_bit,
 		      QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity);
 
 #endif // _QUDA_DLASH_REF_H

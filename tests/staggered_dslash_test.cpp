@@ -31,8 +31,8 @@ bool tune = false;
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
 
-cpuGaugeField *cpuFat;
-cpuGaugeField *cpuLong;
+cpuGaugeField *cpuFat = NULL;
+cpuGaugeField *cpuLong = NULL;
 
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
@@ -304,8 +304,8 @@ void end(void)
   delete spinorOut;
   delete spinorRef;
 
-  delete cpuFat;
-  delete cpuLong;
+  if (cpuFat) delete cpuFat;
+  if (cpuLong) delete cpuLong;
     
   endQuda();
 }
