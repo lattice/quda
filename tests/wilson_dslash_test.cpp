@@ -320,7 +320,7 @@ double dslashCUDA() {
     switch (test_type) {
     case 0:
       if (transfer) {
-	dslashQuda(spinorOut->v, spinor->v, &inv_param, parity);
+	dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
       } else {
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
@@ -328,7 +328,7 @@ double dslashCUDA() {
     case 1:
     case 2:
       if (transfer) {
-	MatQuda(spinorOut->v, spinor->v, &inv_param);
+	MatQuda(spinorOut->V(), spinor->V(), &inv_param);
       } else {
 	dirac->M(*cudaSpinorOut, *cudaSpinor);
       }
@@ -375,14 +375,14 @@ void dslashRef() {
       dslash_type == QUDA_WILSON_DSLASH) {
     switch (test_type) {
     case 0:
-      wil_dslash(spinorRef->v, hostGauge, spinor->v, parity, dagger, inv_param.cpu_prec, gauge_param);
+      wil_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case 1:    
-      wil_matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.matpc_type, dagger, 
+      wil_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.matpc_type, dagger, 
 		inv_param.cpu_prec, gauge_param);
       break;
     case 2:
-      wil_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, dagger, inv_param.cpu_prec, gauge_param);
+      wil_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, dagger, inv_param.cpu_prec, gauge_param);
       break;
     default:
       printf("Test type not defined\n");
@@ -391,15 +391,15 @@ void dslashRef() {
   } else { // twisted mass
     switch (test_type) {
     case 0:
-      tm_dslash(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+      tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 		parity, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case 1:    
-      tm_matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+      tm_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case 2:
-      tm_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+      tm_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	     dagger, inv_param.cpu_prec, gauge_param);
       break;
     default:

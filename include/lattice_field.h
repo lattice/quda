@@ -59,30 +59,7 @@ class LatticeField {
   QudaVerbosity verbosity;
 
  public:
- LatticeField(const LatticeFieldParam &param, const QudaFieldLocation &Location)
-    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision), 
-    location(Location), verbosity(param.verbosity) 
-    {
-      if (location == QUDA_CPU_FIELD_LOCATION) {
-	if (precision == QUDA_HALF_PRECISION) errorQuda("CPU fields do not support half precision");
-	if (pad != 0) errorQuda("CPU fields do not support non-zero padding");
-      }
-      
-      for (int i=0; i<nDim; i++) {
-	x[i] = param.x[i];
-	volume *= param.x[i];
-	surface[i] = 1;
-	for (int j=0; j<nDim; j++) {
-	  if (i==j) continue;
-	  surface[i] *= param.x[i];
-	}
-      }
-      volumeCB = volume / 2;
-      stride = volumeCB + pad;
-  
-      for (int i=0; i<nDim; i++) surfaceCB[i] = surface[i] / 2;
-    }
-
+  LatticeField(const LatticeFieldParam &param, const QudaFieldLocation &Location);
   virtual ~LatticeField() { ; }
 
   const int* X() const { return x; }

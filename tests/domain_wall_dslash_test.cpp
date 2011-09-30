@@ -225,7 +225,7 @@ double dslashCUDA() {
     switch (test_type) {
     case 0:
       if (transfer) {
-	dslashQuda(spinorOut->v, spinor->v, &inv_param, parity);
+	dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
       } else {
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
@@ -233,7 +233,7 @@ double dslashCUDA() {
     case 1:
     case 2:
       if (transfer) {
-	MatQuda(spinorOut->v, spinor->v, &inv_param);
+	MatQuda(spinorOut->V(), spinor->V(), &inv_param);
       } else {
 	dirac->M(*cudaSpinorOut, *cudaSpinor);
       }
@@ -275,15 +275,15 @@ void dslashRef() {
   fflush(stdout);
   switch (test_type) {
   case 0:
-    dslash(spinorRef->v, hostGauge, spinor->v, parity, dagger, 
+    dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, 
 	   inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   case 1:    
-    matpc(spinorRef->v, hostGauge, spinor->v, kappa5, inv_param.matpc_type, dagger, 
+    matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   case 2:
-    mat(spinorRef->v, hostGauge, spinor->v, kappa5, dagger, 
+    mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, 
 	inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   default:

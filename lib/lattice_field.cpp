@@ -1,6 +1,30 @@
 #include <quda_internal.h>
 #include <lattice_field.h>
 
+LatticeField::LatticeField(const LatticeFieldParam &param, const QudaFieldLocation &location)
+  : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim),
+    precision(param.precision), location(location), verbosity(param.verbosity) 
+{
+  if (location == QUDA_CPU_FIELD_LOCATION) {
+    if (precision == QUDA_HALF_PRECISION) errorQuda("CPU fields do not support half precision");
+    if (pad != 0) errorQuda("CPU fields do not support non-zero padding");
+  }
+  
+  for (int i=0; i<nDim; i++) {
+    x[i] = param.x[i];
+    volume *= param.x[i];
+    surface[i] = 1;
+    for (int j=0; j<nDim; j++) {
+      if (i==j) continue;
+      surface[i] *= param.x[j];
+    }
+  }
+  volumeCB = volume / 2;
+  stride = volumeCB + pad;
+  
+  for (int i=0; i<nDim; i++) surfaceCB[i] = surface[i] / 2;
+}
+
 void LatticeField::checkField(const LatticeField &a) {
   if (a.volume != volume) errorQuda("Volume does not match %d %d", volume, a.volume);
   if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %d %d", volumeCB, a.volumeCB);
