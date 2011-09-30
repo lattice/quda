@@ -3,6 +3,7 @@
 
 #include <quda_internal.h>
 #include <face_quda.h>
+#include <gauge_field.h>
 
 void setFace(const FaceBuffer &face);
 
@@ -20,42 +21,43 @@ extern "C" {
 
   void setDslashTuning(QudaTune tune);
 
-  void initCommonConstants(const FullGauge gauge);
-  void initDslashConstants(const FullGauge gauge, const int sp_stride);
-  void initCloverConstants(const int cl_stride);
-  void initDomainWallConstants(const int Ls);
-  void initStaggeredConstants(FullGauge fatgauge, FullGauge longgauge);
 #ifdef __cplusplus
 }
 #endif
 
+void initCommonConstants(const LatticeField &lat);
+void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
+void initCloverConstants(const int cl_stride);
+void initDomainWallConstants(const int Ls);
+void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
+
 // plain Wilson Dslash  
-void wilsonDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 		      const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
 		      const double &k, const dim3 *block, const int *commDim);
 
 // clover Dslash
-void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
+void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 		      const FullClover cloverInv, const cudaColorSpinorField *in, 
 		      const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
 		      const double &k, const dim3 *block, const int *commDim);
 
 // solo clover term
-void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover clover, 
-		const cudaColorSpinorField *in, const int oddBit, const dim3 &block, const int *commDim);
+void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
+		const cudaColorSpinorField *in, const int oddBit, const dim3 &block);
 
 // domain wall Dslash  
-void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in, 
+void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
 			  const int parity, const int dagger, const cudaColorSpinorField *x, 
 			  const double &m_f, const double &k, const dim3 *blockDim);
 
 // staggered Dslash    
-void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, FullGauge longGauge,
+void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge,
 			 const cudaColorSpinorField *in, const int parity, const int dagger, 
 			 const cudaColorSpinorField *x, const double &k, const dim3 *block, const int *commDim);
 
 // twisted mass Dslash  
-void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			   const int parity, const int dagger, const cudaColorSpinorField *x, 
 			   const double &kappa, const double &mu, const double &a, 
 			   const dim3 *block, const int *commDim);

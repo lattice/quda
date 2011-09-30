@@ -10,7 +10,7 @@
 #include <string.h>
 #include <face_quda.h>
 #include "misc.h"
-#include "gauge_quda.h"
+#include <gauge_field.h>
 
 #ifdef MULTI_GPU
 #include <face_quda.h>
@@ -23,15 +23,10 @@ void *fatlink[4];
 void *longlink[4];  
 
 #ifdef MULTI_GPU
-void* ghost_fatlink[4], *ghost_longlink[4];
+void** ghost_fatlink, **ghost_longlink;
 #endif
 
 int device = 0;
-
-extern FullGauge cudaFatLinkPrecise;
-extern FullGauge cudaFatLinkSloppy;
-extern FullGauge cudaLongLinkPrecise;
-extern FullGauge cudaLongLinkSloppy;
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
@@ -124,6 +119,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->cuda_prec_sloppy = prec_sloppy;
   gaugeParam->reconstruct_sloppy = link_recon_sloppy;
   gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gaugeParam->anisotropy = 1.0;
   gaugeParam->tadpole_coeff = tadpole_coeff;
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -204,61 +200,7 @@ invert_test(void)
 	((float*)fatlink[dir])[i] = 0.5* rand()/RAND_MAX;
       }
     }
-  }
-
-  
-#ifdef MULTI_GPU
-
-  //exchange_init_dims(gaugeParam.X);
-  int ghost_link_len[4] = {
-    Vs_x*gaugeSiteSize*gSize,
-    Vs_y*gaugeSiteSize*gSize,
-    Vs_z*gaugeSiteSize*gSize,
-    Vs_t*gaugeSiteSize*gSize
-  };
-
-  for(int i=0;i < 4;i++){
-    ghost_fatlink[i] = malloc(ghost_link_len[i]);
-    ghost_longlink[i] = malloc(3*ghost_link_len[i]);
-    if (ghost_fatlink[i] == NULL || ghost_longlink[i] == NULL){
-      printf("ERROR: malloc failed for ghost fatlink or ghost longlink\n");
-      exit(1);
-    }
-  }
-
-  //exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
-
-  void *fat_send[4], *long_send[4];
-  for(int i=0;i < 4;i++){
-    fat_send[i] = malloc(ghost_link_len[i]);
-    long_send[i] = malloc(3*ghost_link_len[i]);
-  }
-
-  set_dim(Z);
-  pack_ghost(fatlink, fat_send, 1, gaugeParam.cpu_prec);
-  pack_ghost(longlink, long_send, 3, gaugeParam.cpu_prec);
-
-  printf("CPU Link Exchange started\n");
-
-  {
-    FaceBuffer faceBuf(Z, 4, 18, 1, gaugeParam.cpu_prec);
-    faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send);
-  }
-
-  {    
-    FaceBuffer faceBuf(Z, 4, 18, 3, gaugeParam.cpu_prec);
-    faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send);
-  }
-
-  printf("CPU Link Exchange finished\n");
-
-  for (int i=0; i<4; i++) {
-    free(fat_send[i]);
-    free(long_send[i]);
-  }
-
-#endif
-
+  }  
  
   ColorSpinorParam csParam;
   csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
@@ -283,9 +225,9 @@ invert_test(void)
   tmp = new cpuColorSpinorField(csParam);  
   
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    constructSpinorField((float*)in->v);    
+    constructSpinorField((float*)in->V());    
   }else{
-    constructSpinorField((double*)in->v);
+    constructSpinorField((double*)in->V());
   }
 
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
@@ -303,6 +245,19 @@ invert_test(void)
     
 #ifdef MULTI_GPU
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+    gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+    cpuGaugeField cpuFat(cpuFatParam);
+    cpuFat.exchangeGhost();
+    ghost_fatlink = (void**)cpuFat.Ghost();
+    
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+    GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+    cpuGaugeField cpuLong(cpuLongParam);
+    cpuLong.exchangeGhost();
+    ghost_longlink = (void**)cpuLong.Ghost();
+
+    gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(fatlink, &gaugeParam);
@@ -312,7 +267,6 @@ invert_test(void)
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);
-
 #else
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
@@ -340,7 +294,7 @@ invert_test(void)
     volume = Vh;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
-    invertQuda(out->v, in->v, &inv_param);
+    invertQuda(out->V(), in->V(), &inv_param);
     
     time0 += clock(); 
     time0 /= CLOCKS_PER_SEC;
@@ -349,19 +303,19 @@ invert_test(void)
     matdagmat_mg4dir(ref, fatlink, ghost_fatlink, longlink, ghost_longlink, 
 		     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
-    matdagmat(ref->v, fatlink, longlink, out->v, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->v, QUDA_EVEN_PARITY);
+    matdagmat(ref->V(), fatlink, longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
     
-    mxpy(in->v, ref->v, Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->v, Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->v, Vh*mySpinorSiteSize, inv_param.cpu_prec);
+    mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
     break;
 
   case 1: //odd
 	
     volume = Vh;    
     inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
-    invertQuda(out->v, in->v, &inv_param);	
+    invertQuda(out->V(), in->V(), &inv_param);	
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     
@@ -369,11 +323,11 @@ invert_test(void)
     matdagmat_mg4dir(ref, fatlink, ghost_fatlink, longlink, ghost_longlink, 
 		     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
 #else
-    matdagmat(ref->v, fatlink, longlink, out->v, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->v, QUDA_ODD_PARITY);	
+    matdagmat(ref->V(), fatlink, longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);	
 #endif
-    mxpy(in->v, ref->v, Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->v, Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->v, Vh*mySpinorSiteSize, inv_param.cpu_prec);
+    mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
 	
     break;
     
@@ -403,7 +357,7 @@ invert_test(void)
     }
     
     for(int i=0;i < num_offsets; i++){
-      outArray[i] = spinorOutArray[i]->v;
+      outArray[i] = spinorOutArray[i]->V();
     }
 
     for (int i=0; i< num_offsets;i++){
@@ -423,9 +377,9 @@ invert_test(void)
     
     double residue_sq;
     if (testtype == 6){
-      invertMultiShiftQudaMixed(outArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);
+      invertMultiShiftQudaMixed(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);
     }else{      
-      invertMultiShiftQuda(outArray, in->v, &inv_param, offsets, num_offsets, &residue_sq);	
+      invertMultiShiftQuda(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);	
     }
     cudaThreadSynchronize();
     printfQuda("Final residue squred =%g\n", residue_sq);
@@ -457,11 +411,11 @@ invert_test(void)
       matdagmat_mg4dir(ref, fatlink, ghost_fatlink, longlink, ghost_longlink, 
 		       spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
 #else
-      matdagmat(ref->v, fatlink, longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->v, parity);
+      matdagmat(ref->V(), fatlink, longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
 #endif
-      mxpy(in->v, ref->v, len*mySpinorSiteSize, inv_param.cpu_prec);
-      double nrm2 = norm_2(ref->v, len*mySpinorSiteSize, inv_param.cpu_prec);
-      double src2 = norm_2(in->v, len*mySpinorSiteSize, inv_param.cpu_prec);
+      mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       
       printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
@@ -511,12 +465,6 @@ end(void)
     free(fatlink[i]);
     free(longlink[i]);
   }
-#ifdef MULTI_GPU
-  for(int i=0;i < 4;i++){
-    free(ghost_fatlink[i]);
-    free(ghost_longlink[i]);
-  }
-#endif  
 
   delete in;
   delete out;
@@ -570,11 +518,6 @@ usage(char** argv )
 
 int main(int argc, char** argv)
 {
-
-  int xsize=1;
-  int ysize=1;
-  int zsize=1;
-  int tsize=1;
 
   int i;
   for (i =1;i < argc; i++){

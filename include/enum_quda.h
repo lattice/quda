@@ -20,6 +20,9 @@ extern "C" {
   } QudaLinkType;
 
   typedef enum QudaGaugeFieldOrder_s {
+    QUDA_FLOAT_GAUGE_ORDER = 1,
+    QUDA_FLOAT2_GAUGE_ORDER = 2, // no reconstruct and double precision
+    QUDA_FLOAT4_GAUGE_ORDER = 4, // 8 and 12 reconstruct half and single
     QUDA_QDP_GAUGE_ORDER, // expect *gauge[4], even-odd, row-column color
     QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu inside, column-row color
     QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
@@ -188,8 +191,8 @@ extern "C" {
 
   // Where the field is stored
   typedef enum QudaFieldLocation_s {
-    QUDA_CPU_FIELD_LOCATION,
-    QUDA_CUDA_FIELD_LOCATION,
+    QUDA_CPU_FIELD_LOCATION = 1,
+    QUDA_CUDA_FIELD_LOCATION = 2,
     QUDA_INVALID_FIELD_LOCATION = QUDA_INVALID_ENUM
   } QudaFieldLocation;
   

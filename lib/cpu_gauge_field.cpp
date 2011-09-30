@@ -1,17 +1,21 @@
 #include <gauge_field.h>
 #include <face_quda.h>
+#include <assert.h>
 
 cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
   GaugeField(param, QUDA_CPU_FIELD_LOCATION) {
 
   if (reconstruct != QUDA_RECONSTRUCT_NO)
-    errorQuda("Reconstruction type %d not supported", recoconstruct);
+    errorQuda("Reconstruction type %d not supported", reconstruct);
 
   for (int d=0; d<nDim; d++) {
     if (create == QUDA_NULL_FIELD_CREATE) {
-      gauge[d] = malloc(volume[d] * reconstruct * precision * 4);
+      gauge[d] = malloc(volume * reconstruct * precision * 4);
     } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
-      gauge[d] = param.gauge[d];
+      if (order == QUDA_QDP_GAUGE_ORDER) 
+	gauge[d] = ((void**)param.gauge)[d];
+      else
+	errorQuda("Unsupported gauge order type %d", order);
     } else {
       errorQuda("Unsupported creation type %d", create);
     }
@@ -30,7 +34,8 @@ cpuGaugeField::~cpuGaugeField() {
 }
 
 template <typename Float>
-void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
+void packGhost(Float **gauge, Float **ghost, const int nFace, const int *X, 
+	       const int volumeCB, const int *surfaceCB) {
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
 
@@ -51,7 +56,6 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
   //T dimension
   A[3] = X[2]; B[3] = X[1]; C[3] = X[0];
 
-
   //multiplication factor to compute index in original cpu memory
   int f[4][4]={
     {XYZ,    XY, X[0],     1},
@@ -62,20 +66,20 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
 
   for(int dir =0; dir < 4; dir++)
     {
-      Float* even_src = cpuLink[dir];
-      Float* odd_src = cpuLink[dir] + volumeCB*gaugeSiteSize;
+      Float* even_src = gauge[dir];
+      Float* odd_src = gauge[dir] + volumeCB*gaugeSiteSize;
 
       Float* even_dst;
       Float* odd_dst;
      
-     //switching odd and even ghost cpuLink when that dimension size is odd
+     //switching odd and even ghost gauge when that dimension size is odd
      //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
       if((X[dir] % 2 ==0) || (commDim(dir) == 1)){
-        even_dst = cpuGhost[dir];
-        odd_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;	
+        even_dst = ghost[dir];
+        odd_dst = ghost[dir] + nFace*surfaceCB[dir]*gaugeSiteSize;	
      }else{
-	even_dst = cpuGhost[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;
-        odd_dst = cpuGhost[dir];
+	even_dst = ghost[dir] + nFace*surfaceCB[dir]*gaugeSiteSize;
+        odd_dst = ghost[dir];
      }
 
       int even_dst_index = 0;
@@ -105,29 +109,39 @@ void packGhost(Float **cpuLink, Float **cpuGhost, int nFace) {
         }//a
       }//d
 
-      assert( even_dst_index == nFace*faceVolumeCB[dir]);
-      assert( odd_dst_index == nFace*faceVolumeCB[dir]);
+      assert( even_dst_index == nFace*surfaceCB[dir]);
+      assert( odd_dst_index == nFace*surfaceCB[dir]);
     }
 
 }
 
 // This does the exchange of the gauge field ghost zone and places it
 // into the ghost array.
-void cpuGaugeField::exchangeGhost() {
+// This should be optimized so it is reused if called multiple times
+void cpuGaugeField::exchangeGhost() const {
   void *send[QUDA_MAX_DIM];
 
   for (int d=0; d<nDim; d++) {
     send[d] = malloc(nFace * surface[d] * reconstruct * precision);
   }
 
+  // get the links into a contiguous buffer
   if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhost((double**)gauge, (double**)send, nFace);
+    packGhost((double**)gauge, (double**)send, nFace, x, volumeCB, surfaceCB);
   } else {
-    packGhost((float**)gauge, (float**)send, nFace);
+    packGhost((float**)gauge, (float**)send, nFace, x, volumeCB, surfaceCB);
   }
 
+  // communicate between nodes
   FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
   faceBuf.exchangeCpuLink(ghost, send);
+
+  for (int i=0; i<4; i++) {
+    double sum = 0.0;
+    for (int j=0; j<nFace*surface[i]*reconstruct; j++) {
+      sum += ((double*)(ghost[i]))[j];
+    }
+  }
 
   for (int d=0; d<nDim; d++) free(send[d]);
 }

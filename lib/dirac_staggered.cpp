@@ -4,7 +4,7 @@
 
 DiracStaggered::DiracStaggered(const DiracParam &param) : 
   Dirac(param), fatGauge(param.fatGauge), longGauge(param.longGauge), 
-  face(param.fatGauge->X, 4, 6, 3, param.fatGauge->precision) 
+  face(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
   //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
 {
   for (int i=0; i<5; i++) {
@@ -81,9 +81,9 @@ void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cud
 	      in.SiteSubset(), out.SiteSubset());
   }
 
-  if ((out.Volume() != 2*fatGauge->volumeCB && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-      (out.Volume() != fatGauge->volumeCB && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge->volumeCB);
+  if ((out.Volume() != 2*fatGauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+      (out.Volume() != fatGauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+    errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge->VolumeCB());
   }
 }
 

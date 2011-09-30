@@ -122,23 +122,4 @@ class MultiShiftCG : public MultiShiftSolver {
   void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-  // defined in interface_quda.cpp
-
-  extern FullGauge cudaGaugePrecise;
-  extern FullGauge cudaGaugeSloppy;
-
-  extern FullGauge cudaFatLinkPrecise;
-  extern FullGauge cudaFatLinkSloppy;
-
-  extern FullGauge cudaLongLinkPrecise;
-  extern FullGauge cudaLongLinkSloppy;
-
-#ifdef __cplusplus
-}
-#endif
-
 #endif // _INVERT_QUDA_H

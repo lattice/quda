@@ -102,30 +102,28 @@ int initStaggered = 0;
 
 bool qudaPt0 = true;   // Single core versions always to Boundary
 bool qudaPtNm1 = true;
-float fat_link_max = 1.0; //it is set somewhere else
 
-void initCommonConstants(const FullGauge gauge) {
-  int Vh = gauge.volumeCB;
+void initCommonConstants(const LatticeField &lat) {
+  int Vh = lat.VolumeCB();
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
   
-  Vspatial = gauge.X[0]*gauge.X[1]*gauge.X[2]/2; // FIXME - this should not be called Vs, rather Vsh
+  Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
   cudaMemcpyToSymbol("Vs", &Vspatial, sizeof(int));
 
   int half_Vspatial = Vspatial;
   cudaMemcpyToSymbol("Vsh", &half_Vspatial, sizeof(int));
 
-  int X1 = gauge.X[0];
+  int X1 = lat.X()[0];
   cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
 
-  int X2 = gauge.X[1];
+  int X2 = lat.X()[1];
   cudaMemcpyToSymbol("X2", &X2, sizeof(int));  
 
-  int X3 = gauge.X[2];
+  int X3 = lat.X()[2];
   cudaMemcpyToSymbol("X3", &X3, sizeof(int));  
 
-  int X4 = gauge.X[3];
+  int X4 = lat.X()[3];
   cudaMemcpyToSymbol("X4", &X4, sizeof(int));  
-
 
   int ghostFace[4];
   ghostFace[0] = X2*X3*X4/2;
@@ -254,39 +252,39 @@ void initCommonConstants(const FullGauge gauge) {
 }
 
 
-void initDslashConstants(const FullGauge gauge, const int sp_stride) 
+void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride) 
 {
 
   initCommonConstants(gauge);
 
   cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));  
   
-  int ga_stride = gauge.stride;
+  int ga_stride = gauge.Stride();
   cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
 
-  int gf = (gauge.gauge_fixed == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
+  int gf = (gauge.GaugeFixed() == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
   cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
 
-  cudaMemcpyToSymbol("anisotropy", &(gauge.anisotropy), sizeof(double));
+  double anisotropy_ = gauge.Anisotropy();
+  cudaMemcpyToSymbol("anisotropy", &(anisotropy_), sizeof(double));
 
-  double t_bc = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+  double t_bc = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary", &(t_bc), sizeof(double));
 
-  double coeff = -24.0*gauge.tadpole_coeff*gauge.tadpole_coeff;
+  double coeff = -24.0*gauge.Tadpole()*gauge.Tadpole();
   cudaMemcpyToSymbol("coeff", &(coeff), sizeof(double));
 
-
-  float anisotropy_f = gauge.anisotropy;
+  float anisotropy_f = gauge.Anisotropy();
   cudaMemcpyToSymbol("anisotropy_f", &(anisotropy_f), sizeof(float));
 
-  float t_bc_f = (gauge.t_boundary == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+  float t_bc_f = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol("t_boundary_f", &(t_bc_f), sizeof(float));
 
-  float coeff_f = -24.0*gauge.tadpole_coeff*gauge.tadpole_coeff;
+  float coeff_f = -24.0*gauge.Tadpole()*gauge.Tadpole();
   cudaMemcpyToSymbol("coeff_f", &(coeff_f), sizeof(float));
 
 
-  float2 An2 = make_float2(gauge.anisotropy, 1.0 / (gauge.anisotropy*gauge.anisotropy));
+  float2 An2 = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
   cudaMemcpyToSymbol("An2", &(An2), sizeof(float2));
   float2 TB2 = make_float2(t_bc_f, 1.0 / (t_bc_f * t_bc_f));
   cudaMemcpyToSymbol("TB2", &(TB2), sizeof(float2));
@@ -328,12 +326,13 @@ void initDomainWallConstants(const int Ls) {
 }
 
 void
-initStaggeredConstants(FullGauge fatgauge, FullGauge longgauge)
+initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge)
 {
   
-  int fat_ga_stride = fatgauge.stride;
-  int long_ga_stride = longgauge.stride;
-    
+  int fat_ga_stride = fatgauge.Stride();
+  int long_ga_stride = longgauge.Stride();
+  float fat_link_max = fatgauge.LinkMax();
+  
   cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));  
   cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));  
   

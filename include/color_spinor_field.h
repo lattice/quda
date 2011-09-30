@@ -11,8 +11,7 @@ typedef std::complex<double> Complex;
 // Probably want some checking for this limit
 #define QUDA_MAX_DIM 6
 
-// forward declaration
-class ColorSpinorField;
+#include <lattice_field.h>
 
 struct FullClover;
 
@@ -296,27 +295,27 @@ class cudaColorSpinorField : public ColorSpinorField {
   friend Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 				cudaColorSpinorField &z);
 
-  friend void wilsonDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const cudaColorSpinorField *in,
+  friend void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			       const int parity, const int dagger, const cudaColorSpinorField *x,
 			       const double &k, const dim3 *block, const int *commDim);
-  friend void cloverDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover cloverInv,
+  friend void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
 			       const cudaColorSpinorField *in, const int parity, const int dagger, 
 			       const cudaColorSpinorField *x, const double &a,
 			       const dim3 *block, const int *commDim);
-  friend void domainWallDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
+  friend void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 				   const cudaColorSpinorField *in, const int parity, const int dagger, 
 				   const cudaColorSpinorField *x, const double &m_f, const double &k2,
 				   const dim3 *block);
-  friend void staggeredDslashCuda(cudaColorSpinorField *out, const FullGauge fatGauge, 
-				  const FullGauge longGauge, const cudaColorSpinorField *in,
+  friend void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
+				  const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 				  const int parity, const int dagger, const cudaColorSpinorField *x,
 				  const double &k, const dim3 *block, const int *commDim);
-  friend void twistedMassDslashCuda(cudaColorSpinorField *out, const FullGauge gauge, 
+  friend void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 				    const cudaColorSpinorField *in, const int parity, const int dagger, 
 				    const cudaColorSpinorField *x, const double &kappa, const double &mu, 
 				    const double &a, const dim3 *block, const int *commDim);
 
-  friend void cloverCuda(cudaColorSpinorField *out, const FullGauge gauge, const FullClover clover, 
+  friend void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
 			 const cudaColorSpinorField *in, const int parity, const dim3 &blockDim);
   friend void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 			      const int dagger, const double &kappa, const double &mu,
@@ -417,17 +416,6 @@ class cpuColorSpinorField : public ColorSpinorField {
 						   const Complex &b, cpuColorSpinorField &y, 
 						   cpuColorSpinorField &z, const cpuColorSpinorField &w, 
 						   const cpuColorSpinorField &u);
-
-  friend double dslashCUDA();
-  friend void dslashRef();
-  friend void staggeredDslashRef();
-  friend void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink,
-				      cpuColorSpinorField* in, int oddBit, int daggerBit,
-				      QudaPrecision sPrecision, QudaPrecision gPrecision);
-  friend void  matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** ghost_fatlink, void** longlink, void** ghost_longlink, 
-				cpuColorSpinorField* in, double mass, int dagger_bit,
-				QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity);
-  friend int invert_test(void);
   
   template <typename Float> friend class SpaceColorSpinOrder;
   template <typename Float> friend class SpaceSpinColorOrder;
@@ -478,7 +466,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   void unpackGhost(void* ghost_spinor, const int dim, 
 		   const QudaDirection dir, const int dagger);
   
-
+  void* V() { return v; }
 };
 
 

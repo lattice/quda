@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <quda.h>
 #include <string.h>
-#include <gauge_quda.h>
+#include <gauge_field.h>
 
 #ifdef QMP_COMMS
 #include <qmp.h>

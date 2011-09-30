@@ -5,7 +5,7 @@
 #include <tune_quda.h>
 
 DiracWilson::DiracWilson(const DiracParam &param) : 
-  Dirac(param), face(param.gauge->X, 4, 12, 1, param.gauge->precision)
+  Dirac(param), face(param.gauge->X(), 4, 12, 1, param.gauge->Precision())
 {
   for (int i=0; i<5; i++) {
     blockDslash[i] = dim3(64, 1, 1);

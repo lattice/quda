@@ -19,12 +19,10 @@
 #include "face_quda.h"
 #endif
 
-static double Anisotropy;
-extern float fat_link_max;
-static int X[4];
-static QudaTboundary tBoundary;
-static int volumeCB; // checkboarded volume
-static int faceVolumeCB[4]; // checkboarded face volume
+static double anisotropy_;
+extern float fat_link_max_;
+static int X_[4];
+static QudaTboundary t_boundary_;
 
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
@@ -497,8 +495,9 @@ createStapleQuda(FullStaple* cudaStaple, QudaGaugeParam* param)
       cudaStaple->X[d] = param->X[d];
       cudaStaple->volume *= param->X[d];
     }
-    Anisotropy = param->anisotropy;
-    tBoundary = param->t_boundary;
+    anisotropy_ = param->anisotropy;
+    t_boundary_ = param->t_boundary;
+    fat_link_max_ = param->fat_link_max;
 
     //cudaStaple->X[0] /= 2; // actually store the even-odd sublattice dimensions
     cudaStaple->volume /= 2;    

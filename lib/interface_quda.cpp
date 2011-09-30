@@ -11,7 +11,7 @@
 #include <quda.h>
 #include <quda_internal.h>
 #include <blas_quda.h>
-#include <gauge_quda.h>
+#include <gauge_field.h>
 #include <dirac_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
@@ -34,15 +34,6 @@
 
 
 #define spinorSiteSize 24 // real numbers per spinor
-
-FullGauge cudaGaugePrecise;      // Wilson links
-FullGauge cudaGaugeSloppy;
-
-FullGauge cudaFatLinkPrecise;    // asqtad fat links
-FullGauge cudaFatLinkSloppy;
-
-FullGauge cudaLongLinkPrecise;   // asqtad long links
-FullGauge cudaLongLinkSloppy;
 
 #define MAX_GPU_NUM_PER_NODE 16
 
@@ -72,6 +63,15 @@ extern bool qudaPtNm1;
 
 QudaVerbosity verbosity;
 int verbose = 0;
+
+cudaGaugeField *gaugePrecise = NULL;
+cudaGaugeField *gaugeSloppy = NULL;
+
+cudaGaugeField *gaugeFatPrecise = NULL;
+cudaGaugeField *gaugeFatSloppy = NULL;
+
+cudaGaugeField *gaugeLongPrecise = NULL;
+cudaGaugeField *gaugeLongSloppy = NULL;
 
 cudaCloverField *cloverPrecise = NULL;
 cudaCloverField *cloverSloppy = NULL;
@@ -246,21 +246,6 @@ void initQuda(int dev)
   }
 #endif
 
-  cudaGaugePrecise.even = NULL;
-  cudaGaugePrecise.odd = NULL;
-  cudaGaugeSloppy.even = NULL;
-  cudaGaugeSloppy.odd = NULL;
-
-  cudaFatLinkPrecise.even = NULL;
-  cudaFatLinkPrecise.odd = NULL;
-  cudaFatLinkSloppy.even = NULL;
-  cudaFatLinkSloppy.odd = NULL;
-
-  cudaLongLinkPrecise.even = NULL;
-  cudaLongLinkPrecise.odd = NULL;
-  cudaLongLinkSloppy.even = NULL;
-  cudaLongLinkSloppy.odd = NULL;
-
   initCache();
   initBlas();
 }
@@ -269,71 +254,75 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-
-  double anisotropy;
-  FullGauge *precise = NULL, *sloppy = NULL;
-
   checkGaugeParam(param);
 
-  param->packed_size = param->reconstruct;
+  // Set the specific cpu parameters and create the cpu gauge field
+  GaugeFieldParam gauge_param(h_gauge, *param);
 
+  cpuGaugeField cpu(gauge_param);
+
+  // switch the parameters for creating the mirror precise cuda gauge field
+  gauge_param.create = QUDA_NULL_FIELD_CREATE;
+  gauge_param.precision = param->cuda_prec;
+  gauge_param.reconstruct = param->reconstruct;
+  gauge_param.pad = param->ga_pad;
+  gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
+		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+
+  cudaGaugeField *precise = new cudaGaugeField(gauge_param);
+
+  precise->loadCPUField(cpu);
+
+  param->gaugeGiB += precise->GBytes();
+
+  // switch the parameters for creating the mirror sloppy cuda gauge field
+  gauge_param.precision = param->cuda_prec_sloppy;
+  gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
+		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  cudaGaugeField *sloppy = NULL;
+  if (param->cuda_prec != param->cuda_prec_sloppy) {
+    sloppy = new cudaGaugeField(gauge_param);
+    sloppy->loadCPUField(cpu);
+    param->gaugeGiB += sloppy->GBytes();
+  } else {
+    sloppy = precise;
+  }
+  
   switch (param->type) {
   case QUDA_WILSON_LINKS:
-    precise = &cudaGaugePrecise;
-    sloppy = &cudaGaugeSloppy;
+    if (gaugePrecise) errorQuda("Precise gauge field already allocated");
+    gaugePrecise = precise;
+    if (gaugeSloppy) errorQuda("Sloppy gauge field already allocated");
+    gaugeSloppy = sloppy;
     break;
   case QUDA_ASQTAD_FAT_LINKS:
-    precise = &cudaFatLinkPrecise;
-    sloppy = &cudaFatLinkSloppy;
+    if (gaugeFatPrecise) errorQuda("Precise gauge fat field already allocated");
+    gaugeFatPrecise = precise;
+    if (gaugeFatSloppy) errorQuda("Sloppy gauge fat field already allocated");
+    gaugeFatSloppy = sloppy;
     break;
   case QUDA_ASQTAD_LONG_LINKS:
-    precise = &cudaLongLinkPrecise;
-    sloppy = &cudaLongLinkSloppy;
+    if (gaugeLongPrecise) errorQuda("Preise gauge long field already allocated");
+    gaugeLongPrecise = precise;
+    if (gaugeLongSloppy) errorQuda("Sloppy gauge long field already allocated");
+    gaugeLongSloppy = sloppy;
     break;
   default:
     errorQuda("Invalid gauge type");   
   }
 
-  if (param->type == QUDA_WILSON_LINKS) {
-    anisotropy = param->anisotropy;
-  } else {
-    anisotropy = 1.0;
-  }
-
-  if (param->type != QUDA_WILSON_LINKS &&
-      param->gauge_fix == QUDA_GAUGE_FIXED_YES) {
-    errorQuda("Temporal gauge fixing not supported for staggered");
-  }
-
-  createGaugeField(precise, h_gauge, param->cuda_prec, param->cpu_prec, param->gauge_order, param->reconstruct, param->gauge_fix,
-		   param->t_boundary, param->X, anisotropy, param->tadpole_coeff, param->ga_pad, param->type); 
-  checkCudaError();
-  param->gaugeGiB += 2.0 * precise->bytes / (1 << 30);
-
-  if (param->cuda_prec_sloppy != param->cuda_prec ||
-      param->reconstruct_sloppy != param->reconstruct) {
-    checkCudaError();
-    createGaugeField(sloppy, h_gauge, param->cuda_prec_sloppy, param->cpu_prec, param->gauge_order,
-		     param->reconstruct_sloppy, param->gauge_fix, param->t_boundary,
-		     param->X, anisotropy, param->tadpole_coeff, param->ga_pad, param->type);
-     checkCudaError();
-    param->gaugeGiB += 2.0 * sloppy->bytes / (1 << 30);
-  } else {
-    // This has copy semantics... 
-    // It is equivalent to 
-    // qudaGaugeSloppy = qudaGaugePrecise
-    //   NB: even and odd in qudaGaugeSloppy point to even and odd in qudaGaugePrecise... 
-    *sloppy = *precise;
-  }
-
   endInvertQuda(); // need to delete any persistant dirac operators
 }
 
-
-
-
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
+
+  // FIXME
+  errorQuda("Not supported");
+
+  /*
   FullGauge *gauge = NULL;
 
   switch (param->type) {
@@ -350,7 +339,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
-  restoreGaugeField(h_gauge, gauge, param->cpu_prec, param->gauge_order);
+  restoreGaugeField(h_gauge, gauge, param->cpu_prec, param->gauge_order);*/
 }
 
 
@@ -363,7 +352,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
     errorQuda("Half precision not supported on CPU");
   }
-  if (cudaGaugePrecise.even == NULL) {
+  if (gaugePrecise == NULL) {
     errorQuda("Gauge field must be loaded before clover");
   }
   if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
@@ -401,7 +390,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
-  for (int i=0; i<4; i++) clover_param.x[i] = cudaGaugePrecise.X[i];
+  for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
   clover_param.precision = inv_param->clover_cuda_prec;
   clover_param.pad = inv_param->cl_pad;
 
@@ -422,52 +411,36 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 }
 
 void freeGaugeQuda(void) 
-{
-  if ( cudaGaugeSloppy.even == cudaGaugePrecise.even ) { 
-	// Buffer shared between precise and sloppy.
-	// Free the precise one, and set the sloppy pointers to NULL
-	freeGaugeField(&cudaGaugePrecise);
-	checkCudaError();
-	cudaGaugeSloppy.even = NULL;
-	cudaGaugeSloppy.odd = NULL;
-  }
-  else { 
-	freeGaugeField(&cudaGaugePrecise);
-	checkCudaError();
-        freeGaugeField(&cudaGaugeSloppy);
-	checkCudaError();
+{  
+  if (gaugePrecise != gaugeSloppy && gaugeSloppy) {
+    delete gaugeSloppy;
+    gaugeSloppy = NULL;
   }
 
-  if ( cudaFatLinkSloppy.even == cudaFatLinkPrecise.even ) {
-        // Buffer shared between precise and sloppy.
-        // Free the precise one, and set the sloppy pointers to NULL
-        freeGaugeField(&cudaFatLinkPrecise);
-	checkCudaError();
-        cudaFatLinkSloppy.even = NULL;
-        cudaFatLinkSloppy.odd = NULL;
-  }
-  else {
-        freeGaugeField(&cudaFatLinkPrecise);
-	checkCudaError();
-        freeGaugeField(&cudaFatLinkSloppy);
-	checkCudaError();
+  if (gaugePrecise) {
+    delete gaugePrecise;
+    gaugePrecise = NULL;
   }
 
-  if ( cudaLongLinkSloppy.even == cudaLongLinkPrecise.even ) {
-        // Buffer shared between precise and sloppy.
-        // Free the precise one, and set the sloppy pointers to NULL
-        freeGaugeField(&cudaLongLinkPrecise);
-	checkCudaError();
-        cudaLongLinkSloppy.even = NULL;
-        cudaLongLinkSloppy.odd = NULL;
-  }
-  else {
-        freeGaugeField(&cudaLongLinkPrecise);
-	checkCudaError();
-        freeGaugeField(&cudaLongLinkSloppy);
-	checkCudaError();
+  if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) {
+    delete gaugeLongSloppy;
+    gaugeLongSloppy = NULL;
   }
 
+  if (gaugeLongPrecise) {
+    delete gaugeLongPrecise;
+    gaugeLongPrecise = NULL;
+  }
+
+  if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) {
+    delete gaugeFatSloppy;
+    gaugeFatSloppy = NULL;
+  }
+
+  if (gaugeFatPrecise) {
+    delete gaugeFatPrecise;
+    gaugeFatPrecise = NULL;
+  }
 }
 
 void freeCloverQuda(void)
@@ -481,7 +454,6 @@ void freeCloverQuda(void)
     delete cloverPrecise;
     cloverPrecise = NULL;
   } 
-  
 }
 
 void endQuda(void)
@@ -502,7 +474,7 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
 {
   double kappa = inv_param->kappa;
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-    kappa *= cudaGaugePrecise.anisotropy;
+    kappa *= gaugePrecise->Anisotropy();
   }
 
   switch (inv_param->dslash_type) {
@@ -527,9 +499,9 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
 
   diracParam.matpcType = inv_param->matpc_type;
   diracParam.dagger = inv_param->dagger;
-  diracParam.gauge = &cudaGaugePrecise;
-  diracParam.fatGauge = &cudaFatLinkPrecise;
-  diracParam.longGauge = &cudaLongLinkPrecise;    
+  diracParam.gauge = gaugePrecise;
+  diracParam.fatGauge = gaugeFatPrecise;
+  diracParam.longGauge = gaugeLongPrecise;    
   diracParam.clover = cloverPrecise;
   diracParam.kappa = kappa;
   diracParam.mass = inv_param->mass;
@@ -547,9 +519,9 @@ void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, con
 {
   setDiracParam(diracParam, inv_param, pc);
 
-  diracParam.gauge = &cudaGaugeSloppy;
-  diracParam.fatGauge = &cudaFatLinkSloppy;
-  diracParam.longGauge = &cudaLongLinkSloppy;    
+  diracParam.gauge = gaugeSloppy;
+  diracParam.fatGauge = gaugeFatSloppy;
+  diracParam.longGauge = gaugeLongSloppy;    
   diracParam.clover = cloverSloppy;
 
   for (int i=0; i<4; i++) {
@@ -563,9 +535,9 @@ void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const 
 {
   setDiracParam(diracParam, inv_param, pc);
 
-  diracParam.gauge = &cudaGaugeSloppy;
-  diracParam.fatGauge = &cudaFatLinkSloppy;
-  diracParam.longGauge = &cudaLongLinkSloppy;    
+  diracParam.gauge = gaugeSloppy;
+  diracParam.fatGauge = gaugeFatSloppy;
+  diracParam.longGauge = gaugeLongSloppy;    
   diracParam.clover = cloverSloppy;
 
   for (int i=0; i<4; i++) {
@@ -668,7 +640,7 @@ static void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolu
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
-  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X, 1);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1);
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -684,7 +656,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     } else {
       parity = QUDA_EVEN_PARITY;
     }
-    axCuda(cudaGaugePrecise.anisotropy, in);
+    axCuda(gaugePrecise->Anisotropy(), in);
   }
   bool pc = true;
 
@@ -706,7 +678,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X, pc);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
@@ -747,7 +719,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, cudaGaugePrecise.X, pc);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc);
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -756,7 +728,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaColorSpinorField out(in, cudaParam);
 
   //  double kappa = inv_param->kappa;
-  //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= cudaGaugePrecise.anisotropy;
+  //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= gaugePrecise->anisotropy;
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
@@ -829,8 +801,28 @@ void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
   }
 }
 
+cudaGaugeField* checkGauge(QudaInvertParam *param) {
+  cudaGaugeField *cudaGauge = NULL;
+  if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+    if (gaugePrecise == NULL) errorQuda("Precise gauge field doesn't exist");
+    if (gaugeSloppy == NULL) errorQuda("Sloppy gauge field doesn't exist");
+    cudaGauge = gaugePrecise;
+  } else {
+    if (gaugeFatPrecise == NULL) errorQuda("Precise gauge fat field doesn't exist");
+    if (gaugeFatSloppy == NULL) errorQuda("Sloppy gauge fat field doesn't exist");
+
+    if (gaugeLongPrecise == NULL) errorQuda("Precise gauge long field doesn't exist");
+    if (gaugeLongSloppy == NULL) errorQuda("Sloppy gauge long field doesn't exist");
+    cudaGauge = gaugeFatPrecise;
+  }
+  return cudaGauge;
+}
+
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
+
   checkInvertParam(param);
   if (param->cuda_prec_sloppy != param->prec_precondition && 
       param->inv_type_precondition != QUDA_INVALID_INVERTER)
@@ -844,7 +836,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION ||
 		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  param->spinorGiB = cudaGaugePrecise.volumeCB * spinorSiteSize;
+  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
   param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
   if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
@@ -871,8 +863,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cudaColorSpinorField *in = NULL;
   cudaColorSpinorField *out = NULL;
 
-  int *X = param->dslash_type == QUDA_ASQTAD_DSLASH ? 
-    cudaFatLinkPrecise.X : cudaGaugePrecise.X;
+  const int *X = cudaGauge->X();
 
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
@@ -989,6 +980,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
   checkInvertParam(param);
 
   param->num_offset = num_offsets;
@@ -1018,7 +1011,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION );
 
   // No of GiB in a checkerboard of a spinor
-  param->spinorGiB = cudaGaugePrecise.volumeCB * spinorSiteSize;
+  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if( !pc_solve) param->spinorGiB *= 2; // Double volume for non PC solve
   
   // **** WARNING *** this may not match implementation... 
@@ -1088,8 +1081,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   cudaColorSpinorField **x = NULL;  // Cuda Solutions
 
   // Grab the dimension array of the input gauge field.
-  int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ? 
-    cudaFatLinkPrecise.X : cudaGaugePrecise.X;
+  const int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ? 
+    gaugeFatPrecise->X() : gaugeFatPrecise->X();
 
   // Wrap CPU host side pointers
   // 
@@ -1213,10 +1206,13 @@ record_gauge(int* X, void *_fatlink, int _fatlink_pad, void* _longlink, int _lon
 	     QudaGaugeParam *_param)
 {
   
-  //the X and precsion in fatlink must be set because we use them in dirac creatation
+  errorQuda("This has not been updated for cudaGaugeField");
+
+  /*
+  //the X and precision in fatlink must be set because we use them in dirac creatation
   //See dirac_staggered.cpp
   for(int i =0;i < 4;i++){
-    cudaFatLinkPrecise.X[i]= cudaFatLinkSloppy.X[i] = X[i];
+    cudaFatLinkPrecise.X[i] = cudaFatLinkSloppy.X[i] = X[i];
   }
   cudaFatLinkPrecise.precision = _param->cuda_prec;
   cudaFatLinkSloppy.precision = _param->cuda_prec_sloppy;
@@ -1229,7 +1225,7 @@ record_gauge(int* X, void *_fatlink, int _fatlink_pad, void* _longlink, int _lon
   longlink_recon = _longlink_recon;
   longlink_recon_sloppy = _longlink_recon_sloppy;
   
-  gauge_param = _param;
+  gauge_param = _param;*/
 
   return;
 
@@ -1243,8 +1239,8 @@ do_create_precise_cuda_gauge(void)
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;
 
   //the sloppy gauge field will be filled, and needs to backup
-  FullGauge tmp_fat = cudaFatLinkSloppy;
-  FullGauge tmp_long= cudaLongLinkSloppy;
+  cudaGaugeField *tmp_fat = gaugeFatSloppy;
+  cudaGaugeField *tmp_long= gaugeLongSloppy;
 
   //create precise links
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec;
@@ -1265,20 +1261,22 @@ do_create_precise_cuda_gauge(void)
   gauge_param->cuda_prec_sloppy =prec_sloppy;
   
   //set the sloopy gauge filed back
-  cudaFatLinkSloppy = tmp_fat;
-  cudaLongLinkSloppy = tmp_long;
+  gaugeFatSloppy = tmp_fat;
+  gaugeLongSloppy = tmp_long;
   return;
 }
 
 void 
 do_create_sloppy_cuda_gauge(void)
 {
+  errorQuda("This has not been updated for cudaGaugeField");
+
   QudaPrecision prec = gauge_param->cuda_prec;
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;  
 
   //the precise gauge field will be filled, and needs to backup
-  FullGauge tmp_fat = cudaFatLinkPrecise;
-  FullGauge tmp_long= cudaLongLinkPrecise;
+  cudaGaugeField *tmp_fat = gaugeFatPrecise;
+  cudaGaugeField *tmp_long = gaugeLongPrecise;
   
   //create sloppy links
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec_sloppy; 
@@ -1298,8 +1296,8 @@ do_create_sloppy_cuda_gauge(void)
   gauge_param->cuda_prec_sloppy =prec_sloppy;
   
   //set the sloopy gauge filed back
-  cudaFatLinkPrecise = tmp_fat;
-  cudaLongLinkPrecise = tmp_long;  
+  gaugeFatPrecise = tmp_fat;
+  gaugeLongPrecise = tmp_long;  
   return;
 }
 
@@ -1308,6 +1306,9 @@ void
 invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
+
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
 
   QudaPrecision high_prec = param->cuda_prec;
   param->cuda_prec = param->cuda_prec_sloppy;
@@ -1342,7 +1343,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION );
 
   // No of GiB in a checkerboard of a spinor
-  param->spinorGiB = cudaGaugePrecise.volumeCB * spinorSiteSize;
+  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if( !pc_solve) param->spinorGiB *= 2; // Double volume for non PC solve
   
   // **** WARNING *** this may not match implementation... 
@@ -1411,8 +1412,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   cudaColorSpinorField **x = NULL;  // Cuda Solutions
 
   // Grab the dimension array of the input gauge field.
-  int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ? 
-    cudaFatLinkPrecise.X : cudaGaugePrecise.X;
+  const int *X = cudaGauge->X();
 
   // Wrap CPU host side pointers
   // 

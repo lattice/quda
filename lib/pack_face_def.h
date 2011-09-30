@@ -439,7 +439,7 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 		   dim, dir, dagger, parity, gridDim, blockDim, stream);
     break;
   }  
-  CUERR;
+  if (dslashTuning) CUERR;
 
   //printfQuda("Completed face packing\n", dim, dir, ghostFace[dir]);
 }

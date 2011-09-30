@@ -14,7 +14,7 @@
 #include <misc.h>
 #include <test_util.h>
 #include <staggered_dslash_reference.h>
-#include "gauge_quda.h"
+#include <gauge_field.h>
 
 #include <face_quda.h>
 
@@ -26,11 +26,13 @@
 int test_type = 0;
 int device = 0;
 
+bool tune = false;
+
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
 
-FullGauge cudaFatLink;
-FullGauge cudaLongLink;
+cpuGaugeField *cpuFat;
+cpuGaugeField *cpuLong;
 
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
@@ -41,7 +43,7 @@ void *hostGauge[4];
 void *fatlink[4], *longlink[4];
 
 #ifdef MULTI_GPU
-void* ghost_fatlink[4], *ghost_longlink[4];
+const void **ghost_fatlink, **ghost_longlink;
 #endif
 
 const int loops = 100;
@@ -118,6 +120,7 @@ void init()
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
     
+  gaugeParam.anisotropy = 1.0;
   gaugeParam.tadpole_coeff = 0.8;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -186,62 +189,20 @@ void init()
   }
   construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
   
-
 #ifdef MULTI_GPU
-
-  //exchange_init_dims(X);
-  ghost_fatlink[0] = malloc(Vs_x*gaugeSiteSize*gSize);
-  ghost_fatlink[1] = malloc(Vs_y*gaugeSiteSize*gSize);
-  ghost_fatlink[2] = malloc(Vs_z*gaugeSiteSize*gSize);
-  ghost_fatlink[3] = malloc(Vs_t*gaugeSiteSize*gSize);
-  ghost_longlink[0] = malloc(3*Vs_x*gaugeSiteSize*gSize);
-  ghost_longlink[1] = malloc(3*Vs_y*gaugeSiteSize*gSize);
-  ghost_longlink[2] = malloc(3*Vs_z*gaugeSiteSize*gSize);
-  ghost_longlink[3] = malloc(3*Vs_t*gaugeSiteSize*gSize);
-  if (ghost_fatlink[0] == NULL || ghost_longlink[0] == NULL ||
-      ghost_fatlink[1] == NULL || ghost_longlink[1] == NULL ||
-      ghost_fatlink[2] == NULL || ghost_longlink[2] == NULL ||
-      ghost_fatlink[3] == NULL || ghost_longlink[3] == NULL){
-    errorQuda("ERROR: malloc failed for ghost fatlink/longlink");
-  }
-  //exchange_cpu_links(fatlink, ghost_fatlink[3], longlink, ghost_longlink[3], gaugeParam.cpu_prec);
-  //exchange_cpu_links4dir(fatlink, ghost_fatlink, longlink, ghost_longlink, gaugeParam.cpu_prec);
-
-  void *fat_send[4], *long_send[4];
-  fat_send[0] = malloc(Vs_x*gaugeSiteSize*gSize);
-  fat_send[1] = malloc(Vs_y*gaugeSiteSize*gSize);
-  fat_send[2] = malloc(Vs_z*gaugeSiteSize*gSize);
-  fat_send[3] = malloc(Vs_t*gaugeSiteSize*gSize);
-  long_send[0] = malloc(3*Vs_x*gaugeSiteSize*gSize);
-  long_send[1] = malloc(3*Vs_y*gaugeSiteSize*gSize);
-  long_send[2] = malloc(3*Vs_z*gaugeSiteSize*gSize);
-  long_send[3] = malloc(3*Vs_t*gaugeSiteSize*gSize);
-
-  set_dim(Z);
-  pack_ghost(fatlink, fat_send, 1, gaugeParam.cpu_prec);
-  pack_ghost(longlink, long_send, 3, gaugeParam.cpu_prec);
-
-
-  {
-    FaceBuffer faceBuf(X, 4, 18, 1, gaugeParam.cpu_prec);
-    faceBuf.exchangeCpuLink((void**)ghost_fatlink, (void**)fat_send);
-  }
-
-  {    
-    FaceBuffer faceBuf(X, 4, 18, 3, gaugeParam.cpu_prec);
-    faceBuf.exchangeCpuLink((void**)ghost_longlink, (void**)long_send);
-  }
-
-  for (int i=0; i<4; i++) {
-    free(fat_send[i]);
-    free(long_send[i]);
-  }
-  
-#endif   
-
-  
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-#ifdef MULTI_GPU
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+  cpuFat = new cpuGaugeField(cpuFatParam);
+  cpuFat->exchangeGhost();
+  ghost_fatlink = cpuFat->Ghost();
+
+  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+  GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+  cpuLong = new cpuGaugeField(cpuLongParam);
+  cpuLong->exchangeGhost();
+  ghost_longlink = cpuLong->Ghost();
+
   int x_face_size = X[1]*X[2]*X[3]/2;
   int y_face_size = X[0]*X[2]*X[3]/2;
   int z_face_size = X[0]*X[1]*X[3]/2;
@@ -251,24 +212,26 @@ void init()
   pad_size = MAX(pad_size, t_face_size);
   gaugeParam.ga_pad = pad_size;    
 #endif
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+
+  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+
   printfQuda("Fat links sending..."); 
   loadGaugeQuda(fatlink, &gaugeParam);
-  printfQuda("Fat links sent"); 
+  printfQuda("Fat links sent\n"); 
   
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
+
 #ifdef MULTI_GPU
   gaugeParam.ga_pad = 3*pad_size;
 #endif
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = link_recon;
+
+  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
   printfQuda("Long links sending..."); 
   loadGaugeQuda(longlink, &gaugeParam);
-  printfQuda("Long links sent..."); 
+  printfQuda("Long links sent...\n"); 
 
-  cudaFatLink = cudaFatLinkPrecise;
-  cudaLongLink = cudaLongLinkPrecise;
-  
-  printfQuda("Sending fields to GPU..."); 
+    printfQuda("Sending fields to GPU..."); 
     
   if (!transfer) {
 
@@ -308,15 +271,13 @@ void init()
     bool pc = (test_type != 2);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.fatGauge = &cudaFatLinkPrecise;
-    diracParam.longGauge = &cudaLongLinkPrecise;
 
     //diracParam.verbose = QUDA_DEBUG_VERBOSE;
     diracParam.tmp1=tmp;
 
     dirac = Dirac::create(diracParam);
 	
-    //dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp);
+    if (tune) dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp);
 
   } else {
     errorQuda("Error not suppported");
@@ -332,14 +293,6 @@ void end(void)
     free(longlink[dir]);
   }
 
-#ifdef MULTI_GPU
-  for(int i=0;i < 4;i++){
-    free(ghost_fatlink[i]);
-    free(ghost_longlink[i]);
-  }
-
-#endif
-
   if (!transfer){
     delete dirac;
     delete cudaSpinor;
@@ -350,6 +303,9 @@ void end(void)
   delete spinor;
   delete spinorOut;
   delete spinorRef;
+
+  delete cpuFat;
+  delete cpuLong;
     
   endQuda();
 }
@@ -422,17 +378,8 @@ void staggeredDslashRef()
   case 0:    
 #ifdef MULTI_GPU
 
-#if 1
-    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-			    spinor, parity, dagger,
-			    inv_param.cpu_prec, gaugeParam.cpu_prec);
-#else
-
-    staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, 0, dagger, 
-		     inv_param.cpu_prec, gaugeParam.cpu_prec);
-#endif
-
-
+    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
+			    spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
     cpu_parity = 0; //EVEN
     staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
@@ -444,9 +391,8 @@ void staggeredDslashRef()
     break;
   case 1: 
 #ifdef MULTI_GPU
-    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-			    spinor, parity, dagger,
-			    inv_param.cpu_prec, gaugeParam.cpu_prec);    
+    staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
+			    spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);    
     
 #else
     cpu_parity=1; //ODD

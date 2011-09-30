@@ -46,12 +46,18 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
   } else {
     errorQuda("Creation type %d not supported", param.create);
   }
+
+  if (fieldLocation != QUDA_CPU_FIELD_LOCATION) 
+    errorQuda("Location incorrectly set");
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) : 
   ColorSpinorField(src), init(false), order_double(NULL), order_single(NULL) {
   create(QUDA_COPY_FIELD_CREATE);
   memcpy(v,src.v,bytes);
+
+  if (fieldLocation != QUDA_CPU_FIELD_LOCATION) 
+    errorQuda("Location incorrectly set");
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) : 
@@ -64,6 +70,9 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) :
   } else {
     errorQuda("FieldType not supported");
   }
+
+  if (fieldLocation != QUDA_CPU_FIELD_LOCATION) 
+    errorQuda("Location incorrectly set");
 }
 
 cpuColorSpinorField::~cpuColorSpinorField() {

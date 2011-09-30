@@ -1,5 +1,7 @@
 // Routines used to pack the gauge field matrices
 
+#include <math.h>
+
 #define SHORT_LENGTH 65536
 #define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
@@ -186,8 +188,8 @@ inline void fatlink_short_pack18(short2 *d_gauge, Float *h_gauge, int dir, int V
 {
   short2 *dg = d_gauge + dir*9*V;
   for (int j=0; j<9; j++) {
-    dg[j*V].x = FloatToShort((h_gauge[j*2+0]/fat_link_max)); 
-    dg[j*V].y = FloatToShort((h_gauge[j*2+1]/fat_link_max)); 
+    dg[j*V].x = FloatToShort((h_gauge[j*2+0]/fat_link_max_)); 
+    dg[j*V].y = FloatToShort((h_gauge[j*2+1]/fat_link_max_)); 
   }
 }
 
@@ -231,7 +233,7 @@ inline void reconstruct8(Float *mat, int dir, int idx) {
   row_sum += mat[3]*mat[3];
   row_sum += mat[4]*mat[4];
   row_sum += mat[5]*mat[5];
-  Float u0 = (dir < 3 ? Anisotropy : (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
+  Float u0 = (dir < 3 ? anisotropy_ : (idx >= (X_[3]-1)*X_[0]*X_[1]*X_[2]/2 ? t_boundary_ : 1));
   Float diff = 1.f/(u0*u0) - row_sum;
   Float U00_mag = sqrt(diff >= 0 ? diff : 0.0);
 
@@ -358,8 +360,8 @@ inline void reconstruct12(Float *mat, int dir, int idx) {
   accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
   accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
   accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-  Float u0 = (dir < 3 ? Anisotropy :
-	      (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
+  Float u0 = (dir < 3 ? anisotropy_ :
+	      (idx >= (X_[3]-1)*X_[0]*X_[1]*X_[2]/2 ? t_boundary_ : 1));
   w[0]*=u0; w[1]*=u0; w[2]*=u0; w[3]*=u0; w[4]*=u0; w[5]*=u0;
 }
 
@@ -550,7 +552,7 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	transposeScale(gT, g, 1.0 / Anisotropy);
+	transposeScale(gT, g, 1.0 / anisotropy_);
 	pack12(d_gauge+i, gT, dir, V+pad);
       }
     } 
@@ -558,7 +560,7 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	transposeScale(gT, g, 1.0 / Anisotropy);
+	transposeScale(gT, g, 1.0 / anisotropy_);
 	pack8(d_gauge+i, gT, dir, V+pad);
       }
     }
@@ -566,7 +568,7 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	transposeScale(gT, g, 1.0 / Anisotropy);
+	transposeScale(gT, g, 1.0 / anisotropy_);
 	pack18(d_gauge+i, gT, dir, V+pad);
       }
     }
@@ -585,7 +587,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
 	unpack12(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg, gT, Anisotropy);
+	transposeScale(hg, gT, anisotropy_);
       }
     } 
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {
@@ -593,7 +595,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
 	unpack8(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg, gT, Anisotropy);
+	transposeScale(hg, gT, anisotropy_);
       }
     }
   } else {
@@ -601,7 +603,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
 	unpack18(gT, d_gauge+i, dir, V+pad);
-	transposeScale(hg, gT, Anisotropy);
+	transposeScale(hg, gT, anisotropy_);
       }
     }
   }

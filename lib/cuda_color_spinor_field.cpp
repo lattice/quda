@@ -506,11 +506,11 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
       (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
 
     if (nSpin == 1) { // use different packing kernels for staggered and Wilson
-      collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); CUERR;
+      collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); 
     } else {
-      packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, *stream); CUERR;
+      packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, *stream); 
     }
-    CUDAMEMCPY(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); CUERR;
+    CUDAMEMCPY(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
   } else { // do multiple cudaMemcpys 
 
     int Npad = Nint / Nvec; // number Nvec buffers we have
@@ -537,20 +537,21 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
       int len = nFace*ghostFace[3]*Nvec*precision;     
       void *dst = (char*)ghost_spinor + i*len;
       void *src = (char*)v + (offset + i*stride)* Nvec*precision;
-      CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+      CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
     }
     
     if (precision == QUDA_HALF_PRECISION) {
       int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
       void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision;
       void *src = (char*)norm + norm_offset;
-      CUDAMEMCPY(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); CUERR;
+      CUDAMEMCPY(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); 
     }
   }
 #else
   errorQuda("packGhost not built on single-GPU build");
 #endif
 
+  CUERR;
 }
     
 
@@ -558,7 +559,6 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 				       const QudaDirection dir, 
 				       const int dagger, cudaStream_t* stream) 
 {
-  CUERR;
   int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
@@ -569,7 +569,7 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   void *dst = (char*)v + precision*offset;
   void *src = ghost_spinor;
 
-  CUDAMEMCPY(dst, src, len*precision, cudaMemcpyHostToDevice, *stream); CUERR;
+  CUDAMEMCPY(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
     
   if (precision == QUDA_HALF_PRECISION) {
     int normlen = nFace*ghostFace[dim];
@@ -578,7 +578,8 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 
     void *dst = (char*)norm + norm_offset*sizeof(float);
     void *src = (char*)ghost_spinor+nFace*Nint*ghostFace[dim]*precision; // norm region of host ghost zone
-    CUDAMEMCPY(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);  CUERR;
+    CUDAMEMCPY(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
   }
-  
+
+  CUERR;
 }

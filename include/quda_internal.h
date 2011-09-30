@@ -22,7 +22,6 @@
 #define MassNormalization QudaMassNormalization
 #define PreserveSource QudaPreserveSource
 #define DagType QudaDagType
-#define Tboundary QudaTboundary
 
 #include <enum_quda.h>
 #include <quda.h>
@@ -46,7 +45,7 @@ extern "C" {
     int Nc; // number of colors
     QudaReconstructType reconstruct;
     QudaGaugeFixed gauge_fixed;
-    Tboundary t_boundary;
+    QudaTboundary t_boundary;
     ParityGauge odd;
     ParityGauge even;
     double anisotropy;

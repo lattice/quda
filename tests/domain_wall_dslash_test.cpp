@@ -31,8 +31,6 @@ QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
-FullGauge gauge;
-
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp=0, *tmp2=0;
 
@@ -141,7 +139,6 @@ void init() {
   printfQuda("Sending gauge field to GPU\n");
 
   loadGaugeQuda(hostGauge, &gauge_param);
-  gauge = cudaGaugePrecise;
 
   if (!transfer) {
     csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;

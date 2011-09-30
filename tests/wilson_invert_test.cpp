@@ -153,7 +153,7 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.955; // -0.4180;
+  double mass = -0.4180;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
   }
 
   inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
@@ -324,14 +324,14 @@ int main(int argc, char **argv)
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
-		 inv_param.matpc_type, 0, inv_param.cpu_prec);
+		 inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
 	tm_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
-		 inv_param.matpc_type, 1, inv_param.cpu_prec);
+		 inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
       } else {
 	wil_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.matpc_type, 0,
-		  inv_param.cpu_prec);
+		  inv_param.cpu_prec, gauge_param);
 	wil_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
-		  inv_param.cpu_prec);
+		  inv_param.cpu_prec, gauge_param);
       }
 
       axpy(offsets[i], spinorOutMulti[i], spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
@@ -347,10 +347,10 @@ int main(int argc, char **argv)
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
-	       0, inv_param.cpu_prec); 
+	       0, inv_param.cpu_prec, gauge_param); 
       } else {
 	wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, 
-		inv_param.cpu_prec);
+		inv_param.cpu_prec, gauge_param);
       }
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
@@ -358,10 +358,10 @@ int main(int argc, char **argv)
     } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {   
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
-		 inv_param.matpc_type, 0, inv_param.cpu_prec);
+		 inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
       } else {
 	wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
-		  inv_param.cpu_prec);
+		  inv_param.cpu_prec, gauge_param);
       }
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);

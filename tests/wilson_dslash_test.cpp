@@ -41,8 +41,6 @@ QudaPrecision cuda_prec;
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
-FullGauge gauge;
-
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
 
@@ -217,9 +215,7 @@ void init(int argc, char **argv) {
   initQuda(dev);
 
   printfQuda("Sending gauge field to GPU\n");
-
   loadGaugeQuda(hostGauge, &gauge_param);
-  gauge = cudaGaugePrecise;
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     printfQuda("Sending clover field to GPU\n");
@@ -379,14 +375,14 @@ void dslashRef() {
       dslash_type == QUDA_WILSON_DSLASH) {
     switch (test_type) {
     case 0:
-      wil_dslash(spinorRef->v, hostGauge, spinor->v, parity, dagger, inv_param.cpu_prec);
+      wil_dslash(spinorRef->v, hostGauge, spinor->v, parity, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case 1:    
       wil_matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.matpc_type, dagger, 
-		inv_param.cpu_prec);
+		inv_param.cpu_prec, gauge_param);
       break;
     case 2:
-      wil_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, dagger, inv_param.cpu_prec);
+      wil_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, dagger, inv_param.cpu_prec, gauge_param);
       break;
     default:
       printf("Test type not defined\n");
@@ -396,15 +392,15 @@ void dslashRef() {
     switch (test_type) {
     case 0:
       tm_dslash(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-		parity, dagger, inv_param.cpu_prec);
+		parity, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case 1:    
       tm_matpc(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-	       inv_param.matpc_type, dagger, inv_param.cpu_prec);
+	       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case 2:
       tm_mat(spinorRef->v, hostGauge, spinor->v, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-	     dagger, inv_param.cpu_prec);
+	     dagger, inv_param.cpu_prec, gauge_param);
       break;
     default:
       printf("Test type not defined\n");

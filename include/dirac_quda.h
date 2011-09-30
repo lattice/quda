@@ -3,6 +3,7 @@
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
+#include <gauge_field.h>
 #include <clover_field.h>
 #include <dslash_quda.h>
 
@@ -18,9 +19,9 @@ class DiracParam {
   double m5; // used by domain wall only
   MatPCType matpcType;
   DagType dagger;
-  FullGauge *gauge;
-  FullGauge *fatGauge;  // used by staggered only
-  FullGauge *longGauge; // used by staggered only
+  cudaGaugeField *gauge;
+  cudaGaugeField *fatGauge;  // used by staggered only
+  cudaGaugeField *longGauge; // used by staggered only
   cudaCloverField *clover;
   
   double mu; // used by twisted mass only
@@ -60,7 +61,7 @@ class Dirac {
   friend class DiracMdag;
 
   protected:
-  FullGauge &gauge;
+  cudaGaugeField &gauge;
   double kappa;
   double mass;
   MatPCType matpcType;
@@ -352,8 +353,8 @@ class DiracStaggered : public Dirac {
   dim3 blockDslashXpay[5]; // thread block size for DslashXpay (body + face kernels)
 
  protected:
-  FullGauge *fatGauge;
-  FullGauge *longGauge;
+  cudaGaugeField *fatGauge;
+  cudaGaugeField *longGauge;
   FaceBuffer face; // multi-gpu communication buffers
 
  public:

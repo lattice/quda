@@ -59,12 +59,24 @@ extern char hostname[];
   printfQuda("\n");                          \
 } while (0)
 
+#ifdef HOST_DEBUG
+
 #define checkCudaError() do {                           \
     cudaThreadSynchronize();				\
   cudaError_t error = cudaGetLastError();               \
   if (error != cudaSuccess)                             \
     errorQuda("(CUDA) %s", cudaGetErrorString(error));  \
 } while (0)
+
+#else
+
+#define checkCudaError() do {                           \
+  cudaError_t error = cudaGetLastError();               \
+  if (error != cudaSuccess)                             \
+    errorQuda("(CUDA) %s", cudaGetErrorString(error));  \
+} while (0)
+
+#endif
 
 #ifdef __cplusplus
 extern "C" {

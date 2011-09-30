@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include <quda_internal.h>
-#include <gauge_quda.h>
+#include <gauge_field.h>
 #include <util_quda.h>
 
 #include <test_util.h>
@@ -13,11 +13,10 @@
 #include <blas_quda.h>
 
 QudaGaugeParam param;
-FullGauge cudaGauge;
 cudaColorSpinorField *cudaSpinor;
 
-void *qdpGauge[4];
-void *cpsGauge;
+void *qdpCpuGauge_p[4];
+void *cpsCpuGauge_p;
 cpuColorSpinorField *spinor, *spinor2;
 
 ColorSpinorParam csParam;
@@ -47,9 +46,9 @@ void init() {
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) {
-    qdpGauge[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
+    qdpCpuGauge_p[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
   }
-  cpsGauge = malloc(4*V*gaugeSiteSize*param.cpu_prec);
+  cpsCpuGauge_p = malloc(4*V*gaugeSiteSize*param.cpu_prec);
 
   csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor = 3;
@@ -86,8 +85,8 @@ void end() {
   delete spinor2;
   delete spinor;
 
-  for (int dir = 0; dir < 4; dir++) free(qdpGauge[dir]);
-  free(cpsGauge);
+  for (int dir = 0; dir < 4; dir++) free(qdpCpuGauge_p[dir]);
+  free(cpsCpuGauge_p);
   endQuda();
 }
 
@@ -99,29 +98,55 @@ void packTest() {
 
   printf("Sending fields to GPU...\n"); fflush(stdout);
   
-  stopwatchStart();
-  param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-  createGaugeField(&cudaGauge, cpsGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
-		   param.gauge_fix, param.t_boundary, param.X, 1.0, 1.0, param.ga_pad, param.type);
-  double cpsGtime = stopwatchReadSeconds();
-  printf("CPS Gauge send time = %e seconds\n", cpsGtime);
+  /*{
+    param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
+    
+    GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
+    cpuGaugeField cpsCpuGauge(cpsParam);
+    cpsParam.create = QUDA_NULL_FIELD_CREATE;
+    cpsParam.precision = param.cuda_prec;
+    cpsParam.reconstruct = param.reconstruct;
+    cpsParam.pad = param.ga_pad;
+    cpsParam.order = (cpsParam.precision == QUDA_DOUBLE_PRECISION || 
+		      cpsParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    cudaGaugeField cudaCpsGauge(cpsParam);
 
-  stopwatchStart();
-  restoreGaugeField(cpsGauge, &cudaGauge, param.cpu_prec, param.gauge_order);
-  double cpsGRtime = stopwatchReadSeconds();
-  printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
+    stopwatchStart();
+    cudaCpsGauge.loadCPUField(cpsCpuGauge);    
+    double cpsGtime = stopwatchReadSeconds();
+    printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
-  stopwatchStart();
-  param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  createGaugeField(&cudaGauge, qdpGauge, param.cuda_prec, param.cpu_prec, param.gauge_order, param.reconstruct, 
-		   param.gauge_fix, param.t_boundary, param.X, 1.0, 1.0, param.ga_pad, param.type);
-  double qdpGtime = stopwatchReadSeconds();
-  printf("QDP Gauge send time = %e seconds\n", qdpGtime);
+    stopwatchStart();
+    cudaCpsGauge.saveCPUField(cpsCpuGauge);
+    double cpsGRtime = stopwatchReadSeconds();
+    printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
+  }*/
 
-  stopwatchStart();
-  restoreGaugeField(qdpGauge, &cudaGauge, param.cpu_prec, param.gauge_order);
-  double qdpGRtime = stopwatchReadSeconds();
-  printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
+  {
+    param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    
+    GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
+    cpuGaugeField qdpCpuGauge(qdpParam);
+    qdpParam.create = QUDA_NULL_FIELD_CREATE;
+    qdpParam.precision = param.cuda_prec;
+    qdpParam.reconstruct = param.reconstruct;
+    qdpParam.pad = param.ga_pad;
+    qdpParam.order = (qdpParam.precision == QUDA_DOUBLE_PRECISION || 
+		      qdpParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    cudaGaugeField cudaQdpGauge(qdpParam);
+
+    stopwatchStart();
+    cudaQdpGauge.loadCPUField(qdpCpuGauge);    
+    double qdpGtime = stopwatchReadSeconds();
+    printf("QDP Gauge send time = %e seconds\n", qdpGtime);
+
+    stopwatchStart();
+    cudaQdpGauge.saveCPUField(qdpCpuGauge);
+    double qdpGRtime = stopwatchReadSeconds();
+    printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
+  }
 
   stopwatchStart();
   *cudaSpinor = *spinor;
