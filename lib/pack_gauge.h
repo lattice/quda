@@ -552,7 +552,7 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	transposeScale(gT, g, 1.0 / anisotropy_);
+	transposeScale(gT, g+4*i*18, 1.0 / anisotropy_);
 	pack12(d_gauge+i, gT, dir, V+pad);
       }
     } 
@@ -560,7 +560,7 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	transposeScale(gT, g, 1.0 / anisotropy_);
+	transposeScale(gT, g+4*i*18, 1.0 / anisotropy_);
 	pack8(d_gauge+i, gT, dir, V+pad);
       }
     }
@@ -568,7 +568,7 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	transposeScale(gT, g, 1.0 / anisotropy_);
+	transposeScale(gT, g+4*i*18, 1.0 / anisotropy_);
 	pack18(d_gauge+i, gT, dir, V+pad);
       }
     }
@@ -608,4 +608,36 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
     }
   }
 
+}
+
+
+// Assume the gauge field is MILC ordered: directions inside of
+// space-time row-column ordering even-odd space-time
+template <typename Float, typename FloatN>
+void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit, 
+			QudaReconstructType reconstruct, int Vh, int pad)
+{
+  int dir, i;
+  if (reconstruct == QUDA_RECONSTRUCT_12) {
+    for (dir = 0; dir < 4; dir++) {
+      Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
+      for (i = 0; i < Vh; i++) {
+	pack12(res+i, g+4*i*gaugeSiteSize+dir*gaugeSiteSize, dir, Vh);
+      }
+    }
+  } else if (reconstruct == QUDA_RECONSTRUCT_8){
+    for (dir = 0; dir < 4; dir++) {
+      Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
+      for (i = 0; i < Vh; i++) {
+	pack8(res+i, g+4*i*gaugeSiteSize + dir*gaugeSiteSize, dir, Vh);
+      }
+    }
+  }else{
+    for (dir = 0; dir < 4; dir++) {
+      Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
+      for (i = 0; i < Vh; i++) {
+	pack18(res+i, g+i*gaugeSiteSize+dir, dir*gaugeSiteSize, Vh);
+      }
+    }
+  }
 }

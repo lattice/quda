@@ -8,28 +8,46 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
   if (reconstruct != QUDA_RECONSTRUCT_NO)
     errorQuda("Reconstruction type %d not supported", reconstruct);
 
-  for (int d=0; d<nDim; d++) {
-    if (create == QUDA_NULL_FIELD_CREATE) {
-      gauge[d] = malloc(volume * reconstruct * precision * 4);
-    } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
-      if (order == QUDA_QDP_GAUGE_ORDER) 
+  if (order == QUDA_QDP_GAUGE_ORDER) {
+    gauge = (void**)malloc(nDim * sizeof(void*));
+    for (int d=0; d<nDim; d++) {
+      if (create == QUDA_NULL_FIELD_CREATE) {
+	gauge[d] = malloc(volume * reconstruct * precision * 4);
+      } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge[d] = ((void**)param.gauge)[d];
-      else
-	errorQuda("Unsupported gauge order type %d", order);
+      } else {
+	errorQuda("Unsupported creation type %d", create);
+      }
+    }
+  } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || 
+	     order == QUDA_MILC_GAUGE_ORDER) {
+    if (create == QUDA_NULL_FIELD_CREATE) {
+      gauge = (void**)malloc(nDim * volume * reconstruct * precision);
+    } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
+      gauge = (void**)param.gauge;
     } else {
       errorQuda("Unsupported creation type %d", create);
     }
-    ghost[d] = malloc(nFace * surface[d] * reconstruct * precision);
+  } else {
+    errorQuda("Unsupported gauge order type %d", order);
+  }
+
+  // Ghost zone is always 2-dimensional
+  for (int i=0; i<nDim; i++) {
+    ghost[i] = malloc(nFace * surface[i] * reconstruct * precision);
   }
 
 }
 
 cpuGaugeField::~cpuGaugeField() {
 
-  for (int d=0; d<nDim; d++) {
-    if (create == QUDA_NULL_FIELD_CREATE) free(gauge[d]);
-    if (ghost[d]) free(ghost[d]);
+  if (create == QUDA_NULL_FIELD_CREATE) {
+    if (order == QUDA_QDP_GAUGE_ORDER)
+      for (int d=0; d<nDim; d++) if (gauge[d]) free(gauge[d]);
+    if (gauge) free(gauge);
   }
+
+  for (int i=0; i<nDim; i++) if (ghost[i]) free(ghost[i]);
 
 }
 
@@ -145,3 +163,4 @@ void cpuGaugeField::exchangeGhost() const {
 
   for (int d=0; d<nDim; d++) free(send[d]);
 }
+

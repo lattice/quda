@@ -69,6 +69,9 @@ class GaugeField : public LatticeField {
   QudaGaugeFixed GaugeFixed() const { return fixed; }
 
   virtual void checkField(const GaugeField &);
+
+  const size_t& Bytes() const { return bytes; }
+
 };
 
 class cudaGaugeField : public GaugeField {
@@ -94,19 +97,24 @@ class cudaGaugeField : public GaugeField {
   cudaGaugeField(const GaugeFieldParam &);
   virtual ~cudaGaugeField();
 
-  void loadCPUField(const cpuGaugeField &);
-  void saveCPUField(cpuGaugeField &) const;
+  void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
+  void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
 
   double LinkMax() const { return fat_link_max; }
+
+  // (ab)use with care
+  void* Gauge_p() { return gauge; }
+  void* Even_p() { return even; }
+  void* Odd_p() { return odd; }
 };
 
 class cpuGaugeField : public GaugeField {
 
-  friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu);
-  friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const;
+  friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &);
+  friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &) const;
 
  private:
-  void *gauge[QUDA_MAX_DIM]; // the actual gauge field
+  void **gauge; // the actual gauge field
   mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field
 
  public:

@@ -25,6 +25,10 @@ float kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
     
+// where is the packing / unpacking taking place
+//most orders are CPU only currently
+const QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION;
+
 void init() {
 
   param.cpu_prec = QUDA_SINGLE_PRECISION;
@@ -98,7 +102,7 @@ void packTest() {
 
   printf("Sending fields to GPU...\n"); fflush(stdout);
   
-  /*{
+  {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
     
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
@@ -113,15 +117,15 @@ void packTest() {
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     stopwatchStart();
-    cudaCpsGauge.loadCPUField(cpsCpuGauge);    
+    cudaCpsGauge.loadCPUField(cpsCpuGauge, location);    
     double cpsGtime = stopwatchReadSeconds();
     printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
     stopwatchStart();
-    cudaCpsGauge.saveCPUField(cpsCpuGauge);
+    cudaCpsGauge.saveCPUField(cpsCpuGauge, location);
     double cpsGRtime = stopwatchReadSeconds();
     printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
-  }*/
+  }
 
   {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -138,12 +142,12 @@ void packTest() {
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     stopwatchStart();
-    cudaQdpGauge.loadCPUField(qdpCpuGauge);    
+    cudaQdpGauge.loadCPUField(qdpCpuGauge, location);    
     double qdpGtime = stopwatchReadSeconds();
     printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 
     stopwatchStart();
-    cudaQdpGauge.saveCPUField(qdpCpuGauge);
+    cudaQdpGauge.saveCPUField(qdpCpuGauge, location);
     double qdpGRtime = stopwatchReadSeconds();
     printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
   }
