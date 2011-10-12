@@ -34,8 +34,10 @@ static QudaSumFloat *h_reduceFloat=0;
 static QudaSumComplex *h_reduceComplex=0;
 static QudaSumFloat3 *h_reduceFloat3=0;
 
-unsigned long long blas_quda_flops;
-unsigned long long blas_quda_bytes;
+namespace quda {
+  unsigned long long blas_flops;
+  unsigned long long blas_bytes;
+}
 
 static dim3 blasBlock;
 static dim3 blasGrid;
@@ -102,6 +104,11 @@ __device__ float4 operator*=(float4 &a, const Float &b) {
 
 void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 
+// blasTuning = 1 turns off error checking
+static QudaTune blasTuning = QUDA_TUNE_NO;
+
+namespace quda {
+
 void initBlas(void)
 {  
   if (!d_reduceFloat) {
@@ -141,6 +148,7 @@ void initBlas(void)
   }
 }
 
+
 void endBlas(void)
 {
   if (d_reduceFloat) cudaFree(d_reduceFloat);
@@ -150,9 +158,6 @@ void endBlas(void)
   if (h_reduceComplex) cudaFreeHost(h_reduceComplex);
   if (h_reduceFloat3) cudaFreeHost(h_reduceFloat3);
 }
-
-// blasTuning = 1 turns off error checking
-static QudaTune blasTuning = QUDA_TUNE_NO;
 
 void setBlasTuning(QudaTune tune)
 {
@@ -164,6 +169,9 @@ void setBlasParam(int kernel, int prec, int threads, int blocks)
   blas_threads[kernel][prec] = threads;
   blas_blocks[kernel][prec] = blocks;
 }
+
+} 
+
 
 void setBlock(int kernel, int length, QudaPrecision precision)
 {
@@ -834,7 +842,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
   }
   setBlock(id, dst.stride, dst.Precision());
 
-  blas_quda_bytes += src.real_length*((int)src.precision + (int)dst.precision);
+  quda::blas_bytes += src.real_length*((int)src.precision + (int)dst.precision);
 
   if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
       if (src.nSpin == 4){
@@ -850,7 +858,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 	  convertSDKernel<<<blasGrid, blasBlock>>>((float2*)dst.v, (double2*)src.v, src.stride);
       }
   } else if (dst.precision == QUDA_SINGLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
-      blas_quda_bytes += src.volume*sizeof(float);
+      quda::blas_bytes += src.volume*sizeof(float);
       int spinor_bytes = src.length*sizeof(short);
       if (src.nSpin == 4){      
 	cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
@@ -866,7 +874,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 	cudaUnbindTexture(texNorm1);
       }
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_SINGLE_PRECISION) {
-    blas_quda_bytes += dst.volume*sizeof(float);
+    quda::blas_bytes += dst.volume*sizeof(float);
     int spinor_bytes = src.length*sizeof(float);
     if (src.nSpin == 4){
 	cudaBindTexture(0, xTexSingle4, src.v, spinor_bytes); 
@@ -878,7 +886,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 	cudaUnbindTexture(xTexSingle2); 
     }
   } else if (dst.precision == QUDA_DOUBLE_PRECISION && src.precision == QUDA_HALF_PRECISION) {
-    blas_quda_bytes += src.volume*sizeof(float);
+    quda::blas_bytes += src.volume*sizeof(float);
     int spinor_bytes = src.length*sizeof(short);
     if (src.nSpin == 4){
 	cudaBindTexture(0, texHalf1, src.v, spinor_bytes); 
@@ -894,7 +902,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 	cudaUnbindTexture(texNorm1);
     }
   } else if (dst.precision == QUDA_HALF_PRECISION && src.precision == QUDA_DOUBLE_PRECISION) {
-    blas_quda_bytes += dst.volume*sizeof(float);
+    quda::blas_bytes += dst.volume*sizeof(float);
     int spinor_bytes = src.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, src.v, spinor_bytes); 
     if (src.nSpin == 4){
@@ -907,7 +915,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     cudaMemcpy(dst.v, src.v, dst.bytes, cudaMemcpyDeviceToDevice);
     if (dst.precision == QUDA_HALF_PRECISION) {
       cudaMemcpy(dst.norm, src.norm, dst.bytes/(dst.nColor*dst.nSpin), cudaMemcpyDeviceToDevice);
-      blas_quda_bytes += 2*dst.real_length*sizeof(float);
+      quda::blas_bytes += 2*dst.real_length*sizeof(float);
     }
   }
   
@@ -992,10 +1000,10 @@ void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaCo
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);
     }
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 3*x.real_length*x.precision;
-  blas_quda_flops += 3*x.real_length;
+  quda::blas_bytes += 3*x.real_length*x.precision;
+  quda::blas_flops += 3*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -1073,10 +1081,10 @@ void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);
     }
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 3*x.real_length*x.precision;
-  blas_quda_flops += x.real_length;
+  quda::blas_bytes += 3*x.real_length*x.precision;
+  quda::blas_flops += x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -1155,10 +1163,10 @@ void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y)
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);
     }
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 3*x.real_length*x.precision;
-  blas_quda_flops += 2*x.real_length;
+  quda::blas_bytes += 3*x.real_length*x.precision;
+  quda::blas_flops += 2*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -1235,10 +1243,10 @@ void xpayCuda(const cudaColorSpinorField &x, const double &a, cudaColorSpinorFie
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);      
     }
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 3*x.real_length*x.precision;
-  blas_quda_flops += 2*x.real_length;
+  quda::blas_bytes += 3*x.real_length*x.precision;
+  quda::blas_flops += 2*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -1317,10 +1325,10 @@ void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);      
     }
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 3*x.real_length*x.precision;
-  blas_quda_flops += x.real_length;
+  quda::blas_bytes += 3*x.real_length*x.precision;
+  quda::blas_flops += x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -1385,10 +1393,10 @@ void axCuda(const double &a, cudaColorSpinorField &x) {
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);           
     }
-    blas_quda_bytes += 2*x.volume*sizeof(float);
+    quda::blas_bytes += 2*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 2*x.real_length*x.precision;
-  blas_quda_flops += x.real_length;
+  quda::blas_bytes += 2*x.real_length*x.precision;
+  quda::blas_flops += x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -1461,8 +1469,8 @@ void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &
   checkSpinor(x,y);
   int length = x.length/2;
   setBlock(8, length, x.precision);
-  blas_quda_bytes += 3*x.real_length*x.precision;
-  blas_quda_flops += 4*x.real_length;
+  quda::blas_bytes += 3*x.real_length*x.precision;
+  quda::blas_flops += 4*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = x.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
@@ -1496,7 +1504,7 @@ void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);     
     }
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
   }
 
   if (!blasTuning) checkCudaError();
@@ -1569,8 +1577,8 @@ void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cud
   checkSpinor(x,y);
   int length = x.length/2;
   setBlock(9, length, x.precision);
-  blas_quda_bytes += 3*x.real_length*x.precision;
-  blas_quda_flops += 7*x.real_length;
+  quda::blas_bytes += 3*x.real_length*x.precision;
+  quda::blas_flops += 7*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = x.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
@@ -1608,7 +1616,7 @@ void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cud
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);     
     }
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
   }
 
   if (!blasTuning) checkCudaError();
@@ -1700,8 +1708,8 @@ void cxpaypbzCuda(cudaColorSpinorField &x, const Complex &a, cudaColorSpinorFiel
   checkSpinor(x,z);
   int length = x.length/2;
   setBlock(10, length, x.precision);
-  blas_quda_bytes += 4*x.real_length*x.precision;
-  blas_quda_flops += 8*x.real_length;
+  quda::blas_bytes += 4*x.real_length*x.precision;
+  quda::blas_flops += 8*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = x.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
@@ -1720,7 +1728,7 @@ void cxpaypbzCuda(cudaColorSpinorField &x, const Complex &a, cudaColorSpinorFiel
       return;
     }
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 4*x.volume*sizeof(float);
+    quda::blas_bytes += 4*x.volume*sizeof(float);
     if (x.nSpin ==4 ){//wilson 
       cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
       cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
@@ -1881,10 +1889,10 @@ void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorFiel
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);    
     }
-    blas_quda_bytes += 5*x.volume*sizeof(float);
+    quda::blas_bytes += 5*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 5*x.real_length*x.precision;
-  blas_quda_flops += 10*x.real_length;
+  quda::blas_bytes += 5*x.real_length*x.precision;
+  quda::blas_flops += 10*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -2011,10 +2019,10 @@ void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);           
     }
-    blas_quda_bytes += 5*x.volume*sizeof(float);
+    quda::blas_bytes += 5*x.volume*sizeof(float);
   }
-  blas_quda_bytes += 5*x.real_length*x.precision;
-  blas_quda_flops += 8*x.real_length;
+  quda::blas_bytes += 5*x.real_length*x.precision;
+  quda::blas_flops += 8*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -2154,7 +2162,7 @@ void caxpbypzYmbwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &
       return;
     }
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 6*x.volume*sizeof(float);
+    quda::blas_bytes += 6*x.volume*sizeof(float);
     float2 a2 = make_float2(real(a), imag(a));
     float2 b2 = make_float2(real(b), imag(b));
     if (x.nSpin == 4){ //wilson
@@ -2185,8 +2193,8 @@ void caxpbypzYmbwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &
      errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);                 
     }
   }
-  blas_quda_bytes += 6*x.real_length*x.precision;
-  blas_quda_flops += 12*x.real_length;
+  quda::blas_bytes += 6*x.real_length*x.precision;
+  quda::blas_flops += 12*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -2327,8 +2335,8 @@ template <unsigned int reduce_threads, typename Float>
 double normCuda(const cudaColorSpinorField &a) {
   if (a.siteSubset == QUDA_FULL_SITE_SUBSET) return normCuda(a.Even()) + normCuda(a.Odd());
   const int id = 14;
-  blas_quda_flops += 2*a.real_length;
-  blas_quda_bytes += a.real_length*a.precision;
+  quda::blas_flops += 2*a.real_length;
+  quda::blas_bytes += a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return normDCuda((double*)a.v, a.length, id, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
@@ -2336,7 +2344,7 @@ double normCuda(const cudaColorSpinorField &a) {
   } else {
     int spinor_bytes = a.length*sizeof(short);
     int half_norm_ratio = (a.nColor*a.nSpin*2*sizeof(short))/sizeof(float);
-    blas_quda_bytes += (a.real_length*a.precision) / (a.nColor * a.nSpin);
+    quda::blas_bytes += (a.real_length*a.precision) / (a.nColor * a.nSpin);
     cudaBindTexture(0, texNorm1, a.norm, spinor_bytes/half_norm_ratio);    
     if (a.nSpin == 4){ //wilson
 	cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 
@@ -2430,15 +2438,15 @@ double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b) {
     return reDotProductCuda(a.Even(), b.Even()) + reDotProductCuda(a.Odd(), b.Odd());
   }
   const int id = 15;
-  blas_quda_flops += 2*a.real_length;
+  quda::blas_flops += 2*a.real_length;
   checkSpinor(a, b);
-  blas_quda_bytes += 2*a.real_length*a.precision;
+  quda::blas_bytes += 2*a.real_length*a.precision;
   if (a.precision == QUDA_DOUBLE_PRECISION) {
     return reDotProductDCuda((double*)a.v, (double*)b.v, a.length, id, a.precision);
   } else if (a.precision == QUDA_SINGLE_PRECISION) {
     return reDotProductSCuda((float2*)a.v, (float2*)b.v, a.length/2, id, a.precision);
   } else {
-    blas_quda_bytes += 2*a.volume*sizeof(float);
+    quda::blas_bytes += 2*a.volume*sizeof(float);
     int spinor_bytes = a.length*sizeof(short);
     if (a.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, a.v, spinor_bytes); 
@@ -2537,9 +2545,9 @@ double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorFie
     return axpyNormCuda(a, x.Even(), y.Even()) + axpyNormCuda(a, x.Odd(), y.Odd());
 
   const int id = 16;
-  blas_quda_flops += 4*x.real_length;
+  quda::blas_flops += 4*x.real_length;
   checkSpinor(x,y);
-  blas_quda_bytes += 3*x.real_length*x.precision;
+  quda::blas_bytes += 3*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return axpyNormFCuda(a, (double*)x.v, (double*)y.v, x.length, id, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -2547,7 +2555,7 @@ double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorFie
   } else {
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
     
     if (x.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, x.v, x.bytes); 
@@ -2643,9 +2651,9 @@ double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return xmyNormCuda(x.Even(), y.Even()) + xmyNormCuda(x.Odd(), y.Odd());
 
   const int id = 17;
-  blas_quda_flops += 3*x.real_length;
+  quda::blas_flops += 3*x.real_length;
   checkSpinor(x,y);
-  blas_quda_bytes += 3*x.real_length*x.precision;
+  quda::blas_bytes += 3*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     return xmyNormFCuda((double*)x.v, (double*)y.v, x.length, id, x.precision);
   } else if (x.precision == QUDA_SINGLE_PRECISION) {
@@ -2653,7 +2661,7 @@ double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   } else { 
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
     
     if (x.nSpin ==4 ){ //wilsin
       cudaBindTexture(0, texHalf1, x.v, x.bytes); 
@@ -2774,10 +2782,10 @@ Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return cDotProductCuda(x.Even(), y.Even()) + cDotProductCuda(x.Odd(), y.Odd());
 
   const int id = 18;
-  blas_quda_flops += 4*x.real_length;
+  quda::blas_flops += 4*x.real_length;
   checkSpinor(x,y);
   int length = x.length/2;
-  blas_quda_bytes += 2*x.real_length*x.precision;
+  quda::blas_bytes += 2*x.real_length*x.precision;
   double2 dot;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     char c = 0;
@@ -2793,7 +2801,7 @@ Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     dot = cDotProductSCuda((float2*)x.v, (float2*)y.v, c, length, id, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 2*x.volume*sizeof(float);
+    quda::blas_bytes += 2*x.volume*sizeof(float);
     if (x.nSpin == 4){
       cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
       cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
@@ -2936,11 +2944,11 @@ Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinor
     return xpaycDotzyCuda(x.Even(), a, y.Even(), z.Even()) + xpaycDotzyCuda(x.Odd(), a, y.Odd(), z.Odd());
 
   const int id = 19;
-  blas_quda_flops += 6*x.real_length;
+  quda::blas_flops += 6*x.real_length;
   checkSpinor(x,y);
   checkSpinor(x,z);
   int length = x.length/2;
-  blas_quda_bytes += 4*x.real_length*x.precision;
+  quda::blas_bytes += 4*x.real_length*x.precision;
   double2 dot;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = x.length*sizeof(double);
@@ -2952,7 +2960,7 @@ Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinor
     dot = xpaycDotzySCuda((float2*)x.v, (float)a, (float2*)y.v, (float2*)z.v, length, id, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 4*x.volume*sizeof(float);
+    quda::blas_bytes += 4*x.volume*sizeof(float);
     if (x.nSpin ==4 ){//wilson
       cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
       cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
@@ -3106,10 +3114,10 @@ double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return cDotProductNormACuda(x.Even(), y.Even()) + cDotProductNormACuda(x.Odd(), y.Odd());
 
   const int id = 20;
-  blas_quda_flops += 6*x.real_length;
+  quda::blas_flops += 6*x.real_length;
   checkSpinor(x,y);
   int length = x.length/2;
-  blas_quda_bytes += 2*x.real_length*x.precision;
+  quda::blas_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = x.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
@@ -3119,7 +3127,7 @@ double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return cDotProductNormASCuda((float2*)x.v, (float2*)y.v, length, id, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 2*x.volume*sizeof(float);
+    quda::blas_bytes += 2*x.volume*sizeof(float);
     if (x.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
       cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
@@ -3269,10 +3277,10 @@ double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return cDotProductNormBCuda(x.Even(), y.Even()) + cDotProductNormBCuda(x.Odd(), y.Odd());
 
   const int id = 21;
-  blas_quda_flops += 6*x.real_length;
+  quda::blas_flops += 6*x.real_length;
   checkSpinor(x,y);
   int length = x.length/2;
-  blas_quda_bytes += 2*x.real_length*x.precision;
+  quda::blas_bytes += 2*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = x.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
@@ -3282,7 +3290,7 @@ double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return cDotProductNormBSCuda((float2*)x.v, (float2*)y.v, length, id, x.precision);
   } else {
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 2*x.volume*sizeof(float);
+    quda::blas_bytes += 2*x.volume*sizeof(float);
     if (x.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
       cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
@@ -3500,13 +3508,13 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorFiel
       caxpbypzYmbwcDotProductUYNormYCuda(a, x.Odd(), b, y.Odd(), z.Odd(), w.Odd(), u.Odd());
 
   const int id = 22;
-  blas_quda_flops += 18*x.real_length;
+  quda::blas_flops += 18*x.real_length;
   checkSpinor(x,y);
   checkSpinor(x,z);
   checkSpinor(x,w);
   checkSpinor(x,u);
   int length = x.length/2;
-  blas_quda_bytes += 7*x.real_length*x.precision;
+  quda::blas_bytes += 7*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     int spinor_bytes = x.length*sizeof(double);
     cudaBindTexture(0, xTexDouble2, x.v, spinor_bytes); 
@@ -3532,7 +3540,7 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorFiel
     }
      
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 7*x.volume*sizeof(float);
+    quda::blas_bytes += 7*x.volume*sizeof(float);
     if (x.nSpin == 4) { // wilson
       cudaBindTexture(0, texHalf1, x.v, spinor_bytes); 
       cudaBindTexture(0, texNorm1, x.norm, spinor_bytes/12);    
@@ -3644,8 +3652,8 @@ void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cu
   checkSpinor(x,y);
   int length = x.length/2;
   setBlock(23, length, x.precision);
-  blas_quda_bytes += 4*x.real_length*x.precision;
-  blas_quda_flops += 5*x.real_length;
+  quda::blas_bytes += 4*x.real_length*x.precision;
+  quda::blas_flops += 5*x.real_length;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     double2 b2 = make_double2(real(b), imag(b));
     cabxpyAxKernel<<<blasGrid, blasBlock>>>((double)a, b2, (double2*)x.v, (double2*)y.v, length);
@@ -3676,7 +3684,7 @@ void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cu
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);     
     }
-    blas_quda_bytes += 4*x.volume*sizeof(float);
+    quda::blas_bytes += 4*x.volume*sizeof(float);
   }
 
   if (!blasTuning) checkCudaError();
@@ -3761,9 +3769,9 @@ double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorF
     return caxpyNormCuda(a, x.Even(), y.Even()) + caxpyNormCuda(a, x.Odd(), y.Odd());
 
   const int id = 24;
-  blas_quda_flops += 6*x.real_length;
+  quda::blas_flops += 6*x.real_length;
   checkSpinor(x,y);
-  blas_quda_bytes += 3*x.real_length*x.precision;
+  quda::blas_bytes += 3*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     double2 a2 = make_double2(real(a), imag(a));
     return caxpyNormFCuda(a2, (double2*)x.v, (double2*)y.v, x.length/2, id, x.precision);
@@ -3773,7 +3781,7 @@ double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorF
   } else {
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
     
     if (x.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, x.v, x.bytes); 
@@ -3891,9 +3899,9 @@ double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x,
       caxpyXmazNormXCuda(a, x.Odd(), y.Odd(), z.Odd());
 
   const int id = 25;
-  blas_quda_flops += 10*x.real_length;
+  quda::blas_flops += 10*x.real_length;
   checkSpinor(x,y);
-  blas_quda_bytes += 5*x.real_length*x.precision;
+  quda::blas_bytes += 5*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     double2 a2 = make_double2(real(a), imag(a));
     return caxpyXmazNormXFCuda(a2, (double2*)x.v, (double2*)y.v, (double2*)z.v, x.length/2, id, x.precision);
@@ -3904,7 +3912,7 @@ double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x,
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm3, z.norm, z.bytes/(z.nColor*z.nSpin));    
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
     
     if (x.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, x.v, x.bytes); 
@@ -4019,9 +4027,9 @@ double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField 
     return cabxpyAxNormCuda(a, b, x.Even(), y.Even()) + cabxpyAxNormCuda(a, b, x.Odd(), y.Odd());
 
   const int id = 26;
-  blas_quda_flops += 7*x.real_length;
+  quda::blas_flops += 7*x.real_length;
   checkSpinor(x,y);
-  blas_quda_bytes += 4*x.real_length*x.precision;
+  quda::blas_bytes += 4*x.real_length*x.precision;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     double2 a2 = make_double2(a, 0);
     double2 b2 = make_double2(real(b), imag(b));
@@ -4033,7 +4041,7 @@ double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField 
   } else {
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
     
     if (x.nSpin == 4){ //wilson
       cudaBindTexture(0, texHalf1, x.v, x.bytes); 
@@ -4163,7 +4171,7 @@ void caxpbypzCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b,
       return;
     }
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 6*x.volume*sizeof(float);
+    quda::blas_bytes += 6*x.volume*sizeof(float);
     float2 a2 = make_float2(real(a), imag(a));
     float2 b2 = make_float2(real(b), imag(b));
     if (x.nSpin == 4){ //wilson
@@ -4188,8 +4196,8 @@ void caxpbypzCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b,
      errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);                 
     }
   }
-  blas_quda_bytes += 4*x.real_length*x.precision;
-  blas_quda_flops += 8*x.real_length;
+  quda::blas_bytes += 4*x.real_length*x.precision;
+  quda::blas_flops += 8*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -4342,7 +4350,7 @@ void caxpbypczpwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b
       return;
     }
     int spinor_bytes = x.length*sizeof(short);
-    blas_quda_bytes += 6*x.volume*sizeof(float);
+    quda::blas_bytes += 6*x.volume*sizeof(float);
     float2 a2 = make_float2(real(a), imag(a));
     float2 b2 = make_float2(real(b), imag(b));
     float2 c2 = make_float2(real(c), imag(c));
@@ -4374,8 +4382,8 @@ void caxpbypczpwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b
      errorQuda("ERROR: nSpin=%d is not supported\n", x.nSpin);                 
     }
   }
-  blas_quda_bytes += 5*x.real_length*x.precision;
-  blas_quda_flops += 12*x.real_length;
+  quda::blas_bytes += 5*x.real_length*x.precision;
+  quda::blas_flops += 12*x.real_length;
 
   if (!blasTuning) checkCudaError();
 }
@@ -4484,9 +4492,9 @@ Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpino
       caxpyDotzyCuda(a, x.Odd(), y.Odd(), z.Odd());
 
   const int id = 29;
-  blas_quda_flops += 8*x.real_length;
+  quda::blas_flops += 8*x.real_length;
   checkSpinor(x,y);
-  blas_quda_bytes += 4*x.real_length*x.precision;
+  quda::blas_bytes += 4*x.real_length*x.precision;
   double2 dot;
   if (x.precision == QUDA_DOUBLE_PRECISION) {
     char c = 0;
@@ -4500,7 +4508,7 @@ Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpino
     cudaBindTexture(0, texNorm1, x.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm2, y.norm, x.bytes/(x.nColor*x.nSpin));    
     cudaBindTexture(0, texNorm3, z.norm, x.bytes/(x.nColor*x.nSpin));    
-    blas_quda_bytes += 3*x.volume*sizeof(float);
+    quda::blas_bytes += 3*x.volume*sizeof(float);
     float2 a2 = make_float2(real(a), imag(a));
     
     if (x.nSpin == 4){ //wilson

@@ -64,7 +64,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double r2 = b2;
 
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
-    blas_quda_flops = 0;
+    quda::blas_flops = 0;
     stopwatchStart();
   }
 
@@ -97,7 +97,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
     invParam.secs += stopwatchReadSeconds();
   
-    double gflops = (blas_quda_flops + mat.flops())*1e-9;
+    double gflops = (quda::blas_flops + mat.flops())*1e-9;
     reduceDouble(gflops);
 
     //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());

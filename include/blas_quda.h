@@ -4,15 +4,9 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
-
-// keep these with C-linkage for the moment
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
   // ---------- blas_quda.cu ---------- 
 
+namespace quda {
   // creates and destroys reduction buffers  
   void initBlas(void); 
   void endBlas(void);
@@ -20,12 +14,10 @@ extern "C" {
   void setBlasTuning(QudaTune tune);
   void setBlasParam(int kernel, int prec, int threads, int blocks);
 
-  extern unsigned long long blas_quda_flops;
-  extern unsigned long long blas_quda_bytes;
-
-#ifdef __cplusplus
+  extern unsigned long long blas_flops;
+  extern unsigned long long blas_bytes;
 }
-#endif
+
 
 // C++ linkage
 

@@ -198,7 +198,7 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
     warningQuda("Exceeded maximum iterations %d\n", invParam.maxiter);
   }
     
-  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+  double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
   reduceDouble(gflops);
 
   invParam.gflops = gflops;

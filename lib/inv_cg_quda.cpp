@@ -77,7 +77,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
 
-  blas_quda_flops = 0;
+  quda::blas_flops = 0;
 
   stopwatchStart();
   while (r2 > stop && k<invParam.maxiter) {
@@ -136,14 +136,14 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.verbosity >= QUDA_SUMMARIZE)
     printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
-  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops())*1e-9;
+  double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
   reduceDouble(gflops);
 
   //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
   invParam.gflops = gflops;
   invParam.iter = k;
 
-  blas_quda_flops = 0;
+  quda::blas_flops = 0;
 
   if (invParam.verbosity >= QUDA_SUMMARIZE){
     mat(r, x, y);

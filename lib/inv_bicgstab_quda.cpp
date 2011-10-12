@@ -134,7 +134,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: %d iterations, r2 = %e\n", k, r2);
 
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
-    blas_quda_flops = 0;    
+    quda::blas_flops = 0;    
     stopwatchStart();
   }
 
@@ -236,7 +236,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
     invParam.secs += stopwatchReadSeconds();
 
-    double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
     //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
@@ -261,4 +261,3 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   return;
 }
-

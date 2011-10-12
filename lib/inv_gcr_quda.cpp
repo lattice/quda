@@ -221,7 +221,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double r2 = xmyNormCuda(b, r);  
   copyCuda(rSloppy, r);
 
-  blas_quda_flops = 0;
+  quda::blas_flops = 0;
 
   stopwatchStart();
 
@@ -338,7 +338,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   
   invParam.secs += stopwatchReadSeconds();
   
-  double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+  double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
   reduceDouble(gflops);
 
   printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
