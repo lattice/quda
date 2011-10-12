@@ -170,7 +170,8 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   // create sloppy fields used for orthogonalization
   param.precision = invParam.cuda_prec_sloppy;
-  cudaColorSpinorField *p[Nkrylov], *Ap[Nkrylov];
+  cudaColorSpinorField **p = new cudaColorSpinorField*[Nkrylov];
+  cudaColorSpinorField **Ap = new cudaColorSpinorField*[Nkrylov];
   for (int i=0; i<Nkrylov; i++) {
     p[i] = new cudaColorSpinorField(x, param);
     Ap[i] = new cudaColorSpinorField(x, param);
@@ -369,6 +370,8 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     delete p[i];
     delete Ap[i];
   }
+  delete[] p;
+  delete[] Ap;
 
   delete alpha;
   for (int i=0; i<Nkrylov; i++) delete []beta[i];
