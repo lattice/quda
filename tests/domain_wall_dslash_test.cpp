@@ -299,7 +299,7 @@ int main(int argc, char **argv)
 {
   init();
 
-  float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
+  float spinorGiB = (float)Vh*Ls*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
   
@@ -317,10 +317,17 @@ int main(int argc, char **argv)
     
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    int floats = test_type ? 2*(7*24+8*gauge_param.reconstruct+24)+24 : 7*24+8*gauge_param.reconstruct+24;
-    printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/loops)*(1<<30)));
-    
+
+    int spinor_floats = test_type ? 2*(9*24+24)+24 : 9*24+24;
+    if (inv_param.cuda_prec == QUDA_HALF_PRECISION) 
+      spinor_floats += test_type ? 2*(9*2 + 2) + 2 : 9*2 + 2; // relative size of norm is twice a short
+    int gauge_floats = (test_type ? 2 : 1) * (gauge_param.gauge_fix ? 6 : 8) * gauge_param.reconstruct;
+
+    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printfQuda("GiB/s = %f\n\n", 
+	       Vh*Ls*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*(1<<30)));
+
+
     if (!transfer) {
       std::cout << "Results: CPU = " << norm2(*spinorRef) << ", CUDA = " << norm2(*cudaSpinorOut) << 
 	", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
