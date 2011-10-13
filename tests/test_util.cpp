@@ -1053,7 +1053,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
-  int fail_check = 16;
+  const int fail_check = 16;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
@@ -1207,7 +1207,7 @@ createHwCPU(void* hw,  QudaPrecision precision)
 
 template <typename Float>
 void compare_mom(Float *momA, Float *momB, int len) {
-  int fail_check = 16;
+  const int fail_check = 16;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
