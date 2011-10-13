@@ -14,6 +14,7 @@
 
 #include <color_spinor_field.h>
 
+/*
 #include <sys/time.h>
 
 struct timeval orth0, orth1, pre0, pre1, mat0, mat1, rst0, rst1;
@@ -23,6 +24,7 @@ double timeInterval(struct timeval start, struct timeval end) {
   long dus = end.tv_usec - start.tv_usec;
   return ds + 0.000001*dus;
 }
+*/
 
 // set the required parameters for the inner solver
 void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) {
@@ -48,7 +50,7 @@ void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) 
 }
 
 void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
-  gettimeofday(&orth0, NULL);
+  //  gettimeofday(&orth0, NULL);
 
   int type = 1;
 
@@ -100,7 +102,7 @@ void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
     errorQuda("Orthogonalization type not defined");
   }
 
-  gettimeofday(&orth1, NULL);
+  //  gettimeofday(&orth1, NULL);
 }   
 
 void backSubs(const Complex *alpha, Complex** const beta, const double *gamma, Complex *delta, int n) {
@@ -237,7 +239,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   while (r2 > stop && total_iter < invParam.maxiter) {
     
-    gettimeofday(&pre0, NULL);
+    //    gettimeofday(&pre0, NULL);
 
     if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) {
       cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
@@ -255,11 +257,11 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     } 
 
 
-    gettimeofday(&pre1, NULL);
+    //    gettimeofday(&pre1, NULL);
 
-    gettimeofday(&mat0, NULL);
+    //    gettimeofday(&mat0, NULL);
     matSloppy(*Ap[k], *p[k], tmp);
-    gettimeofday(&mat1, NULL);
+    //    gettimeofday(&mat1, NULL);
 
     orthoDir(beta, Ap, k);
 
@@ -286,7 +288,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     if (invParam.verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter, k, r2);
 
-    gettimeofday(&rst0, NULL);
+    //gettimeofday(&rst0, NULL);
     // update solution and residual since max Nkrylov reached, converged or reliable update required
     if (k==Nkrylov || r2 < stop || r2/r2_old < invParam.reliable_delta) { 
 
@@ -321,13 +323,14 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
       r2_old = r2;
     }
+    /*
     gettimeofday(&rst1, NULL);
 
     orthT += timeInterval(orth0, orth1);
     matT += timeInterval(mat0, mat1);
     preT += timeInterval(pre0, pre1);
     resT += timeInterval(rst0, rst1);
-
+    */
   }
 
   copyCuda(x, y);

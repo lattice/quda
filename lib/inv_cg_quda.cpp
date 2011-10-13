@@ -8,7 +8,7 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
+//#include <sys/time.h>
 
 #include <face_quda.h>
 

@@ -26,7 +26,7 @@
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
-#include <sys/time.h>
+//#include <sys/time.h>
 
 enum KernelType {
   INTERIOR_KERNEL = 5,

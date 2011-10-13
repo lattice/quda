@@ -14,41 +14,41 @@ TESTS = su3_test blas_test pack_test $(WILSON_DIRAC_TEST) 		\
 all: $(TESTS)
 
 staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 wilson_dslash_test: wilson_dslash_test.o test_util.o wilson_dslash_reference.o misc.o $(QIO_UTIL) $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 wilson_invert_test: wilson_invert_test.o test_util.o wilson_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 domain_wall_dslash_test: domain_wall_dslash_test.o test_util.o domain_wall_dslash_reference.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 domain_wall_invert_test: domain_wall_invert_test.o test_util.o domain_wall_dslash_reference.o misc.o \
 	blas_reference.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 su3_test: su3_test.o test_util.o wilson_dslash_reference.o misc.o $(QIO_UTIL) $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 pack_test: pack_test.o test_util.o wilson_dslash_reference.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 blas_test: blas_test.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ /Fe$@ $(LDFLAGS)
 
 llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
+	$(CXX) $^  /Fe$@  $(LDFLAGS)
 
 gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o $(QUDA)
-	$(CC) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
+	$(CC) $^  /Fe$@  $(LDFLAGS)
 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
+	$(CXX) $^  /Fe$@  $(LDFLAGS)
 
 tune: blas_test
 	./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
@@ -60,10 +60,10 @@ clean:
 	llfat_test gauge_force_test fermion_force_test
 
 %.o: %.c $(HDRS)
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $(CFLAGS) $< -c /Fo$@
 
 %.o: %.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) $< -c -o $@
+	$(CXX) $(CXXFLAGS) $< -c /Fo$@
 
 %.o: %.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@

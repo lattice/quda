@@ -66,7 +66,7 @@ clean:
 	-rm -f *.o $(QUDA)
 
 %.o: %.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) $< -c -o $@
+	$(CXX) $(CXXFLAGS) $< -c /Fo$@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@ #-Xptxas -abi=no # CUDA 3.1 and up only
