@@ -33,8 +33,6 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   globalReduce = false; // use local reductions for DD solver
 
-  typedef std::complex<double> Complex;
-
   if (!init) {
     ColorSpinorParam param(x);
     param.create = QUDA_ZERO_FIELD_CREATE;
@@ -79,7 +77,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     mat(Ar, r, tmp);
     
     double3 Ar3 = cDotProductNormACuda(Ar, r);
-    Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
+    quda::Complex alpha = quda::Complex(Ar3.x, Ar3.y) / Ar3.z;
 
     //printfQuda("%d MR %e %e %e\n", k, Ar3.x, Ar3.y, Ar3.z);
 

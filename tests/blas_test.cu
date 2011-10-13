@@ -170,7 +170,7 @@ void freeFields()
 double benchmark(int kernel, int niter) {
 
   double a, b, c;
-  Complex a2, b2, c2;
+  quda::Complex a2, b2, c2;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -326,7 +326,7 @@ double benchmark(int kernel, int niter) {
 double test(int kernel) {
 
   double a = 1.5, b = 2.5, c = 3.5;
-  Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
+  quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
 
   switch (kernel) {
@@ -334,14 +334,14 @@ double test(int kernel) {
   case 0:
     *hD = *hH;
     copyCuda(*yD, *hD);
-    copyCpu(*yH, *hH);
+    yH->copy(*hH);
     error = ERROR(y);
     break;
 
   case 1:
     *lD = *lH;
     copyCuda(*yD, *lD);
-    copyCpu(*yH, *lH);
+    yH->copy(*lH);
     error = ERROR(y);
     break;
       
@@ -484,8 +484,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    { Complex d = xpaycDotzyCuda(*xD, a, *yD, *zD);
-      Complex h = xpaycDotzyCpu(*xH, a, *yH, *zH);
+    { quda::Complex d = xpaycDotzyCuda(*xD, a, *yD, *zD);
+      quda::Complex h = xpaycDotzyCpu(*xH, a, *yH, *zH);
       error =  fabs(norm2(*yD) - norm2(*yH)) / norm2(*yH) + abs(d-h)/abs(h);
     }
     break;
@@ -575,8 +575,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
-      Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
+    {quda::Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
+      quda::Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
     error = ERROR(y) + abs(d-h)/abs(h);}
     break;
 

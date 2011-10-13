@@ -47,7 +47,7 @@ void fillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) 
 
 }
 
-void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
+void orthoDir(quda::Complex **beta, cudaColorSpinorField *Ap[], int k) {
   gettimeofday(&orth0, NULL);
 
   int type = 1;
@@ -103,7 +103,7 @@ void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
   gettimeofday(&orth1, NULL);
 }   
 
-void backSubs(const Complex *alpha, Complex** const beta, const double *gamma, Complex *delta, int n) {
+void backSubs(const quda::Complex *alpha, quda::Complex** const beta, const double *gamma, quda::Complex *delta, int n) {
   for (int k=n-1; k>=0;k--) {
     delta[k] = alpha[k];
     for (int j=k+1;j<n; j++) {
@@ -113,10 +113,10 @@ void backSubs(const Complex *alpha, Complex** const beta, const double *gamma, C
   }
 }
 
-void updateSolution(cudaColorSpinorField &x, const Complex *alpha, Complex** const beta, 
+void updateSolution(cudaColorSpinorField &x, const quda::Complex *alpha, quda::Complex** const beta, 
 		    double *gamma, int k, cudaColorSpinorField *p[]) {
 
-  Complex *delta = new Complex[k];
+  quda::Complex *delta = new quda::Complex[k];
 
   // Update the solution vector
   backSubs(alpha, beta, gamma, delta, k);
@@ -158,8 +158,6 @@ GCR::~GCR() {
 
 void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 {
-  typedef std::complex<double> Complex;
-
   int Nkrylov = invParam.gcrNkrylov; // size of Krylov space
 
   ColorSpinorParam param(x);
@@ -205,9 +203,9 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   }
   cudaColorSpinorField &rPre = *r_pre;
 
-  Complex *alpha = new Complex[Nkrylov];
-  Complex **beta = new Complex*[Nkrylov];
-  for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
+  quda::Complex *alpha = new quda::Complex[Nkrylov];
+  quda::Complex **beta = new quda::Complex*[Nkrylov];
+  for (int i=0; i<Nkrylov; i++) beta[i] = new quda::Complex[Nkrylov];
   double *gamma = new double[Nkrylov];
 
   double b2 = normCuda(b);
@@ -266,7 +264,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
     gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
     if (gamma[k] == 0.0) errorQuda("GCR breakdown\n");
-    alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
+    alpha[k] = quda::Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
     // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
     r2 = cabxpyAxNormCuda(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 

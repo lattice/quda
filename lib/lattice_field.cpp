@@ -31,7 +31,7 @@ void LatticeField::checkField(const LatticeField &a) {
   if (a.nDim != nDim) errorQuda("nDim does not match %d %d", nDim, a.nDim);
   for (int i=0; i<nDim; i++) {
     if (a.x[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]);
-    if (a.surface[i] != surface[i]) errorQuda("surface does not match %d %d", i, surface[i], a.surface[i]);
+    if (a.surface[i] != surface[i]) errorQuda("surface %d does not match %d %d", i, surface[i], a.surface[i]);
     if (a.surfaceCB[i] != surfaceCB[i]) errorQuda("surfaceCB does not match %d %d", i, surfaceCB[i], a.surfaceCB[i]);  
   }
 }

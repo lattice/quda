@@ -382,7 +382,7 @@ void staggeredDslashRef()
 			    spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
     cpu_parity = 0; //EVEN
-    staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
+    staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
 		     inv_param.cpu_prec, gaugeParam.cpu_prec);
     
 #endif    
@@ -396,12 +396,12 @@ void staggeredDslashRef()
     
 #else
     cpu_parity=1; //ODD
-    staggered_dslash(spinorRef->v, fatlink, longlink, spinor->v, cpu_parity, dagger, 
+    staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
 		     inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif
     break;
   case 2:
-    //mat(spinorRef->v, fatlink, longlink, spinor->v, kappa, dagger, 
+    //mat(spinorRef->V(), fatlink, longlink, spinor->V(), kappa, dagger, 
     //inv_param.cpu_prec, gaugeParam.cpu_prec);
     break;
   default:

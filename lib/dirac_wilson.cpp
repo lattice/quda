@@ -51,7 +51,7 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
 
   wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, blockDslash, commDim);
 
-  flops += 1320ll*in.volume;
+  flops += 1320ll*in.Volume();
 }
 
 void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -66,7 +66,7 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
 
   wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, blockDslashXpay, commDim);
 
-  flops += 1368ll*in.volume;
+  flops += 1368ll*in.Volume();
 }
 
 void DiracWilson::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const

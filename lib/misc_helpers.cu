@@ -550,7 +550,7 @@ collectGhostSpinor(void *in, const void *inNorm,
     }
   }else if(inSpinor->Precision() == QUDA_HALF_PRECISION){
     int nFace =3 ;
-    float* ghost_norm_gpu = (float*)(((char*)ghost_spinor_gpu) + nFace*6*inSpinor->Precision()*inSpinor->ghostFace[dir]);
+    float* ghost_norm_gpu = (float*)(((char*)ghost_spinor_gpu) + nFace*6*inSpinor->Precision()*inSpinor->GhostFace()[dir]);
     switch(dir){
     case 0:
       switch(whichway){

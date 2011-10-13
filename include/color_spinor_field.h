@@ -3,7 +3,10 @@
 
 #include <iostream>
 #include <complex>
-typedef std::complex<double> Complex;
+
+namespace quda {
+  typedef std::complex<double> Complex;
+}
 
 #ifndef _COLOR_SPINOR_FIELD_H
 #define _COLOR_SPINOR_FIELD_H
@@ -36,7 +39,6 @@ class ColorSpinorParam {
 
   void *v; // pointer to field
   void *norm;
-
 
   ColorSpinorParam(const ColorSpinorField &a);
 
@@ -211,10 +213,14 @@ class ColorSpinorField {
   int Nspin() const { return nSpin; } 
   int TwistFlavor() const { return twistFlavor; } 
   int Ndim() const { return nDim; }
+  const int* X() const { return x; }
   int X(int d) const { return x[d]; }
+  int RealLength() const { return real_length; }
   int Length() const { return length; }
   int Stride() const { return stride; }
   int Volume() const { return volume; }
+  size_t Bytes() const { return bytes; }
+  size_t NormBytes() const { return norm_bytes; }
   void PrintDims() const { printf("dimensions=%d %d %d %d\n",
 				  x[0], x[1], x[2], x[3]);}
   
@@ -224,104 +230,19 @@ class ColorSpinorField {
   QudaFieldOrder FieldOrder() const { return fieldOrder; }
   QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
+  int GhostLength() const { return ghost_length; }
+  const int *GhostFace() const { return ghostFace; }  
+  int GhostOffset(const int i) const { return ghostFace[i]; }  
+  int GhostNormOffset(const int i ) const { return ghostFace[i]; }  
+
   friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
   friend class ColorSpinorParam;
-
-  friend void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
-			     const int parity, const cudaStream_t &stream);
-  friend void collectGhostSpinor(void *in, const void *inNorm, void* ghost_spinor_gpu, int dir, int whichway,
-				 const int parity, cudaColorSpinorField* inSpinor, cudaStream_t* stream);
 };
 
 // CUDA implementation
 class cudaColorSpinorField : public ColorSpinorField {
 
-  friend class FaceBuffer; // class for QMP communication
   friend class cpuColorSpinorField;
-
-  friend double normEven(const cudaColorSpinorField &b);
-
-  friend class Dirac;
-  friend class DiracWilson;
-  friend class DiracClover;
-  friend class DiracCloverPC;
-  friend class DiracDomainWall;
-  friend class DiracDomainWallPC;
-  friend class DiracStaggered;
-  friend class DiracStaggeredPC;
-  friend class DiracTwistedMass;
-  friend class DiracTwistedMassPC;
-  friend void zeroCuda(cudaColorSpinorField &a);
-  friend void copyCuda(cudaColorSpinorField &, const cudaColorSpinorField &);
-  friend double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend double normCuda(const cudaColorSpinorField &b);
-  friend double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  friend double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  friend void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y);
-  friend void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend void axCuda(const double &a, cudaColorSpinorField &x);
-  friend void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend void xpayCuda(const cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y);
-  friend void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, 
-			   cudaColorSpinorField &z, const double &b);
-  friend void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y,
-			    const double &b, cudaColorSpinorField& z, const double &c); 
-  
-  friend void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y);
-  friend void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend void cxpaypbzCuda(cudaColorSpinorField &, const Complex &b, cudaColorSpinorField &y, 
-			   const Complex &c, cudaColorSpinorField &z);
-  friend void caxpbypzYmbwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
-			       cudaColorSpinorField &, cudaColorSpinorField &); 
-  friend Complex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
-  friend Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, 
-					cudaColorSpinorField &z);
-  friend double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  friend double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  friend double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
-						    cudaColorSpinorField &y, cudaColorSpinorField &z, 
-						    cudaColorSpinorField &w, cudaColorSpinorField &u);
-  friend void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  
-  friend double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-
-  friend double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z);
-  friend double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  friend void caxpbypzCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
-			   cudaColorSpinorField &);
-  friend void caxpbypczpwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
-			      const Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
-  friend Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
-				cudaColorSpinorField &z);
-
-  friend void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			       const int parity, const int dagger, const cudaColorSpinorField *x,
-			       const double &k, const dim3 *block, const int *commDim);
-  friend void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
-			       const cudaColorSpinorField *in, const int parity, const int dagger, 
-			       const cudaColorSpinorField *x, const double &a,
-			       const dim3 *block, const int *commDim);
-  friend void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-				   const cudaColorSpinorField *in, const int parity, const int dagger, 
-				   const cudaColorSpinorField *x, const double &m_f, const double &k2,
-				   const dim3 *block);
-  friend void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
-				  const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
-				  const int parity, const int dagger, const cudaColorSpinorField *x,
-				  const double &k, const dim3 *block, const int *commDim);
-  friend void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-				    const cudaColorSpinorField *in, const int parity, const int dagger, 
-				    const cudaColorSpinorField *x, const double &kappa, const double &mu, 
-				    const double &a, const dim3 *block, const int *commDim);
-
-  friend void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
-			 const cudaColorSpinorField *in, const int parity, const dim3 &blockDim);
-  friend void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-			      const int dagger, const double &kappa, const double &mu,
-			      const QudaTwistGamma5Type twist, const dim3 &block);
-  friend void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
-			     const int parity, const cudaStream_t &stream);
 
  private:
   void *v; // the field elements
@@ -340,7 +261,6 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   void create(const QudaFieldCreate);
   void destroy();
-  void zero();
   void copy(const cudaColorSpinorField &);
 
  public:
@@ -365,14 +285,18 @@ class cudaColorSpinorField : public ColorSpinorField {
 		 const int dagger, cudaStream_t* stream);
   void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		   const int dagger, cudaStream_t* stream);
-  void* getV(){ return v;}
-  void* getNorm(){return norm;}
+
+  void* V() {return v;}
+  const void* V() const {return v;}
+  void* Norm(){return norm;}
+  const void* Norm() const {return norm;}
 
   cudaColorSpinorField& Even() const;
   cudaColorSpinorField& Odd() const;
 
   static void freeBuffer();
 
+  void zero();
 };
 
 // Forward declaration of accessor functors
@@ -385,38 +309,6 @@ class cpuColorSpinorField : public ColorSpinorField {
 
   friend class cudaColorSpinorField;
 
-  friend void copyCpu(cpuColorSpinorField&, const cpuColorSpinorField &);
-  friend double axpyNormCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  friend double normCpu(const cpuColorSpinorField &b);
-  friend double reDotProductCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
-  friend double xmyNormCpu(const cpuColorSpinorField &a, cpuColorSpinorField &b);
-  friend void axpbyCpu(const double &a, const cpuColorSpinorField &x, const double &b, cpuColorSpinorField &y);
-  friend void axpyCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  friend void axCpu(const double &a, cpuColorSpinorField &x);
-  friend void xpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  friend void xpayCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y);
-  friend void mxpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  friend void axpyZpbxCpu(const double &a, cpuColorSpinorField &x, cpuColorSpinorField &y, 
-			   const cpuColorSpinorField &z, const double &b);
-  friend void axpyBzpcxCpu(const double &a, cpuColorSpinorField& x, cpuColorSpinorField& y,
-			   const double &b, const cpuColorSpinorField& z, const double &c); 
-  
-  friend void caxpbyCpu(const Complex &a, const cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y);
-  friend void caxpyCpu(const Complex &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  friend void cxpaypbzCpu(const cpuColorSpinorField &x, const Complex &b, const cpuColorSpinorField &y, 
-			   const Complex &c, cpuColorSpinorField &z);
-  friend void caxpbypzYmbwCpu(const Complex &, const cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
-			       cpuColorSpinorField &, const cpuColorSpinorField &); 
-  friend Complex cDotProductCpu(const cpuColorSpinorField &, const cpuColorSpinorField &);
-  friend Complex xpaycDotzyCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y, 
-			       const cpuColorSpinorField &z);
-  friend double3 cDotProductNormACpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
-  friend double3 cDotProductNormBCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
-  friend double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinorField &x, 
-						   const Complex &b, cpuColorSpinorField &y, 
-						   cpuColorSpinorField &z, const cpuColorSpinorField &w, 
-						   const cpuColorSpinorField &u);
-  
   template <typename Float> friend class SpaceColorSpinOrder;
   template <typename Float> friend class SpaceSpinColorOrder;
 
@@ -434,8 +326,6 @@ class cpuColorSpinorField : public ColorSpinorField {
   
   void create(const QudaFieldCreate);
   void destroy();
-  void copy(const cpuColorSpinorField&);
-  void zero();
 
   void createOrder(); // create the accessor for a given field ordering
   ColorSpinorFieldOrder<double> *order_double; // accessor functor used to access fp64 elements
@@ -467,6 +357,10 @@ class cpuColorSpinorField : public ColorSpinorField {
 		   const QudaDirection dir, const int dagger);
   
   void* V() { return v; }
+  const void * V() const { return v; }
+
+  void copy(const cpuColorSpinorField&);
+  void zero();
 };
 
 
