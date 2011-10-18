@@ -151,12 +151,30 @@ void initBlas(void)
 
 void endBlas(void)
 {
-  if (d_reduceFloat) cudaFree(d_reduceFloat);
-  if (d_reduceComplex) cudaFree(d_reduceComplex);
-  if (d_reduceFloat3) cudaFree(d_reduceFloat3);
-  if (h_reduceFloat) cudaFreeHost(h_reduceFloat);
-  if (h_reduceComplex) cudaFreeHost(h_reduceComplex);
-  if (h_reduceFloat3) cudaFreeHost(h_reduceFloat3);
+  if (d_reduceFloat) {
+    cudaFree(d_reduceFloat);
+    d_reduceFloat = 0;
+  }
+  if (d_reduceComplex) {
+    cudaFree(d_reduceComplex);
+    d_reduceComplex = 0;
+  }
+  if (d_reduceFloat3) {
+    cudaFree(d_reduceFloat3);
+    d_reduceFloat3 = 0;
+  }
+  if (h_reduceFloat) {
+    cudaFreeHost(h_reduceFloat);
+    h_reduceFloat = 0;
+  }
+  if (h_reduceComplex) {
+    cudaFreeHost(h_reduceComplex);
+    h_reduceComplex = 0;
+  }
+  if (h_reduceFloat3) {
+    cudaFreeHost(h_reduceFloat3);
+    h_reduceFloat3 = 0;
+  }
 }
 
 void setBlasTuning(QudaTune tune)
