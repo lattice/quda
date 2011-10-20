@@ -5,14 +5,15 @@
 cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
   GaugeField(param, QUDA_CPU_FIELD_LOCATION) {
 
-  if (reconstruct != QUDA_RECONSTRUCT_NO)
+  if (reconstruct != QUDA_RECONSTRUCT_NO && 
+      reconstruct != QUDA_RECONSTRUCT_10)
     errorQuda("Reconstruction type %d not supported", reconstruct);
 
   if (order == QUDA_QDP_GAUGE_ORDER) {
     gauge = (void**)malloc(nDim * sizeof(void*));
     for (int d=0; d<nDim; d++) {
       if (create == QUDA_NULL_FIELD_CREATE) {
-	gauge[d] = malloc(volume * reconstruct * precision * 4);
+	gauge[d] = malloc(volume * reconstruct * precision);
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge[d] = ((void**)param.gauge)[d];
       } else {

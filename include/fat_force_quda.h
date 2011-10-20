@@ -14,10 +14,10 @@ extern "C" {
   void createLinkQuda(FullGauge* cudaGauge, QudaGaugeParam* param);
   void createStapleQuda(FullStaple* cudaStaple, QudaGaugeParam* param);
   void freeStapleQuda(FullStaple* cudaStaple);
-  void createMomQuda(FullMom* cudaMom, QudaGaugeParam* param);
+  /*  void createMomQuda(FullMom* cudaMom, QudaGaugeParam* param);
   void freeMomQuda(FullMom *cudaMom);
   void storeMomToCPU(void* mom, FullMom cudaMom, QudaGaugeParam* param);
-  void loadMomToGPU(FullMom cudaMom, void* mom, QudaGaugeParam* param);
+  void loadMomToGPU(FullMom cudaMom, void* mom, QudaGaugeParam* param);*/
   void packGhostStaple(FullStaple* cudaStaple, int dir, int whichway, void** fwd_nbr_buf_gpu, void** back_nbr_buf_gpu, 
 		       void** fwd_nbr_buf, void** back_nbr_buf, cudaStream_t* stream);
   void  unpackGhostStaple(FullStaple* cudaStaple, int dir, int whichway, void** fwd_nbr_buf, void** back_nbr_buf, 

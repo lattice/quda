@@ -7,7 +7,8 @@ extern "C"{
 
   void fermion_force_init_cuda(QudaGaugeParam* param);
   void fermion_force_cuda(double eps, double weight1, double weight2, void* act_path_coeff,
-			  FullHw cudaHw, FullGauge cudaSiteLink, FullMom cudaMom, QudaGaugeParam* param);
+			  FullHw cudaHw, cudaGaugeField &cudaSiteLink, cudaGaugeField &cudaMom, 
+			  QudaGaugeParam* param);
     
 #ifdef __cplusplus
 }

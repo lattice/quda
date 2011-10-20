@@ -66,7 +66,7 @@ extern "C" {
     double anisotropy;
   } FullStaple;
   
-  typedef struct {
+  /*  typedef struct {
     size_t bytes;
     QudaPrecision precision;
     int length; // total length
@@ -76,7 +76,7 @@ extern "C" {
     ParityGauge odd;
     ParityGauge even;
     double anisotropy;
-  } FullMom;
+    } FullMom;*/
       
   // replace below with ColorSpinorField
   typedef struct {

@@ -4,7 +4,7 @@
 
 #include <quda.h>
 #include "test_util.h"
-#include "gauge_quda.h"
+#include "gauge_field.h"
 #include "fat_force_quda.h"
 #include "misc.h"
 #include "fermion_force_reference.h"
@@ -13,30 +13,20 @@
 #include <sys/time.h>
 
 int device = 0;
-static FullGauge cudaSiteLink;
-static FullMom cudaMom;
+cudaGaugeField *cudaGauge = NULL;
+cpuGaugeField *cpuGauge = NULL;
+
+cudaGaugeField *cudaMom = NULL;
+cpuGaugeField *cpuMom = NULL;
+cpuGaugeField *refMom = NULL;
+
 static FullHw cudaHw;
 static QudaGaugeParam gaugeParam;
-static void* siteLink;
-static void* mom;
-static void* refMom;
 static void* hw; //the array of half_wilson_vector
-static int X[4];
 
 extern int gridsize_from_cmdline[];
 
 int verify_results = 0;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern void initDslashCuda(FullGauge gauge);
-extern void initDslashConstants(const FullGauge gauge, const int sp_stride);
-
-#ifdef __cplusplus
-}
-#endif
 
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
@@ -56,7 +46,6 @@ typedef struct {
 
 typedef struct { dcomplex e[3][3]; } dsu3_matrix;
 
-
 int Z[4];
 int V;
 int Vh;
@@ -70,71 +59,71 @@ setDims(int *X) {
   Vh = V/2;
 }
 
+void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
+
 static void
 fermion_force_init()
 { 
   initQuda(device);
   //cudaSetDevice(dev); CUERR;
     
-  X[0] = gaugeParam.X[0] = xdim;
-  X[1] = gaugeParam.X[1] = ydim;
-  X[2] = gaugeParam.X[2] = zdim;
-  X[3] = gaugeParam.X[3] = tdim;
-    
+  gaugeParam.X[0] = xdim;
+  gaugeParam.X[1] = ydim;
+  gaugeParam.X[2] = zdim;
+  gaugeParam.X[3] = tdim;
   setDims(gaugeParam.X);
-    
+
   gaugeParam.cpu_prec = link_prec;
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
     
-    
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-    
-  siteLink = malloc(4*V*gaugeSiteSize* gSize);
-  if (siteLink == NULL){
-    fprintf(stderr, "ERROR: malloc failed for sitelink\n");
-    exit(1);
-  }
+  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
+  GaugeFieldParam gParam(0, gaugeParam);
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+
+  cpuGauge = new cpuGaugeField(gParam);
+    
+  // this is a hack to get the gauge field to appear as a void** rather than void*
   void* siteLink_2d[4];
   for(int i=0;i < 4;i++){
-    siteLink_2d[i] = ((char*)siteLink) + i*V*gaugeSiteSize* gSize;
+    siteLink_2d[i] = ((char*)cpuGauge->Gauge_p()) + i*cpuGauge->Volume()* gaugeSiteSize* gaugeParam.cpu_prec;
   }
   
-  createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec,0);
+  // fills the gauge field with random numbers
+  createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
 
 #if 0
   site_link_sanity_check(siteLink, V, gaugeParam.cpu_prec, &gaugeParam);
 #endif
 
-  mom = malloc(4*V*momSiteSize*gSize);
-  if (mom == NULL){
-    fprintf(stderr, "ERROR: malloc failed for mom\n");
-    exit(1);
-  }
-  createMomCPU(mom,mom_prec);    
-  memset(mom, 0, 4*V*momSiteSize*gSize);
+  //gaugeParam.site_ga_pad = gaugeParam.ga_pad = 0;
+  //gaugeParam.reconstruct = link_recon;
 
-  refMom = malloc(4*V*momSiteSize*gSize);
-  if (refMom == NULL){
-    fprintf(stderr, "ERROR: malloc failed for refMom\n");
-    exit(1);
-  }    
-  memcpy(refMom, mom, 4*V*momSiteSize*gSize);
+  gParam.precision = gaugeParam.cuda_prec;
+  cudaGauge = new cudaGaugeField(gParam);
+
+  gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.precision = gaugeParam.cpu_prec;
+  cpuMom = new cpuGaugeField(gParam);
+  refMom = new cpuGaugeField(gParam);
+
+  createMomCPU(cpuMom->Gauge_p(), mom_prec);    
+  memset(cpuMom->Gauge_p(), 0, 4*cpuMom->Volume()*momSiteSize*gaugeParam.cpu_prec);
+
+  memcpy(refMom->Gauge_p(), cpuMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize*gaugeParam.cpu_prec);
     
+  gParam.precision = gaugeParam.cuda_prec;
+  cudaMom = new cudaGaugeField(gParam);
     
-  hw = malloc(4*V*hwSiteSize*gSize);
+  hw = malloc(4*cpuGauge->Volume()*hwSiteSize*gaugeParam.cpu_prec);
   if (hw == NULL){
     fprintf(stderr, "ERROR: malloc failed for hw\n");
     exit(1);	
   }
   createHwCPU(hw, hw_prec);
-    
-  //gaugeParam.site_ga_pad = gaugeParam.ga_pad = 0;
-  //gaugeParam.reconstruct = link_recon;
-  createLinkQuda(&cudaSiteLink, &gaugeParam);
-  createMomQuda(&cudaMom, &gaugeParam);    
-  cudaHw = createHwQuda(X, hw_prec);
+
+  cudaHw = createHwQuda(gaugeParam.X, hw_prec);
     
   return;
 }
@@ -142,13 +131,12 @@ fermion_force_init()
 static void 
 fermion_force_end() 
 {
-  free(siteLink);
-  free(mom);
-  free(refMom);
+  delete cudaMom;
+  delete cudaGauge;
+  delete cpuGauge;
+  delete cpuMom;
+  delete refMom;
   free(hw);
-    
-  freeLinkQuda(&cudaSiteLink);
-  freeMomQuda(&cudaMom);
 }
 
 
@@ -157,7 +145,7 @@ fermion_force_test(void)
 {
  
   fermion_force_init();
-  initDslashConstants(cudaSiteLink, Vh);
+  initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
   fermion_force_init_cuda(&gaugeParam);
 
     
@@ -173,13 +161,17 @@ fermion_force_test(void)
   act_path_coeff[4] = -0.007200;
   act_path_coeff[5] = -0.123113;        
     
-  loadMomToGPU(cudaMom, mom, &gaugeParam);
-  loadLinkToGPU_gf(cudaSiteLink, siteLink, &gaugeParam);
+  // download the momentum field to the GPU
+  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+
+  // download the gauge field to the GPU
+  cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+
   loadHwToGPU(cudaHw, hw, cpu_hw_prec);
 
     
   if (verify_results){	
-    fermion_force_reference(eps, weight1, weight2, act_path_coeff, hw, siteLink, refMom);
+    fermion_force_reference(eps, weight1, weight2, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
   }
     
     
@@ -193,17 +185,18 @@ fermion_force_test(void)
   struct timeval t0, t1;
   gettimeofday(&t0, NULL);
     
-  fermion_force_cuda(eps, weight1, weight2, act_path_coeff, cudaHw, cudaSiteLink, cudaMom, &gaugeParam);
+  fermion_force_cuda(eps, weight1, weight2, act_path_coeff, cudaHw, *cudaGauge, *cudaMom, &gaugeParam);
   cudaThreadSynchronize();
   gettimeofday(&t1, NULL);
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
     
-  storeMomToCPU(mom, cudaMom, &gaugeParam);
-    
+  // copy the new momentum back on the CPU
+  cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+
   int res;
-  res = compare_floats(mom, refMom, 4*V*momSiteSize, 1e-5, gaugeParam.cpu_prec);
+  res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize, 1e-5, gaugeParam.cpu_prec);
     
-  strong_check_mom(mom, refMom, 4*V, gaugeParam.cpu_prec);
+  strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
     
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
     

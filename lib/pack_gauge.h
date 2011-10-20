@@ -16,6 +16,12 @@ inline void ShortToFloat(Float &a, const short &b) {
   a = ((Float)b/SCALE_FLOAT-SHIFT_FLOAT);
 }
 
+/*template <int N, typename FloatN, typename Float>
+inline void pack8(FloatN *res, Float *g, int dir, int V) {
+  Float *r = res + N*dir*4*V;
+  r[0] = atan2(g[1], g[0]);
+  r[1] = atan2(g[13], g[12]);
+}*/
 
 template <typename Float>
 inline void pack8(double2 *res, Float *g, int dir, int V) {
@@ -622,22 +628,105 @@ void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit,
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
       for (i = 0; i < Vh; i++) {
-	pack12(res+i, g+4*i*gaugeSiteSize+dir*gaugeSiteSize, dir, Vh);
+	pack12(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh);
       }
     }
   } else if (reconstruct == QUDA_RECONSTRUCT_8){
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
       for (i = 0; i < Vh; i++) {
-	pack8(res+i, g+4*i*gaugeSiteSize + dir*gaugeSiteSize, dir, Vh);
+	pack8(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh);
       }
     }
   }else{
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
       for (i = 0; i < Vh; i++) {
-	pack18(res+i, g+i*gaugeSiteSize+dir, dir*gaugeSiteSize, Vh);
+	pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh);
       }
     }
   }
 }
+
+// Assume the gauge field is MILC ordered: directions inside of
+// space-time row-column ordering even-odd space-time
+template <typename Float, typename FloatN>
+static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
+				 QudaReconstructType reconstruct, int V, int pad) {
+  if (reconstruct == QUDA_RECONSTRUCT_12) {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
+      for (int i = 0; i < V; i++) {
+	unpack12(hg, d_gauge+i, dir, V+pad, i);
+      }
+    } 
+  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
+      for (int i = 0; i < V; i++) {
+	unpack8(hg, d_gauge+i, dir, V+pad, i);
+      }
+    }
+  } else {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
+      for (int i = 0; i < V; i++) {
+	unpack18(hg, d_gauge+i, dir, V+pad);
+      }
+    }
+  }
+
+}
+
+/*
+  Momentum packing/unpacking routines: these are for length 10
+  vectors, stored in Float2 format.
+ */
+
+template <typename Float, typename Float2>
+inline void pack10(Float2 *res, Float *m, int dir, int Vh) 
+{
+  Float2 *r = res + dir*5*Vh;
+  for (int j=0; j<5; j++) {
+    r[j*Vh].x = (float)m[j*2+0]; 
+    r[j*Vh].y = (float)m[j*2+1]; 
+  }
+}
+
+template <typename Float, typename Float2>
+void packMomField(Float2 *res, Float *mom, int oddBit, int Vh) 
+{    
+  for (int dir = 0; dir < 4; dir++) {
+    Float *g = mom + (oddBit*Vh*4 + dir)*10;
+    for (int i = 0; i < Vh; i++) {
+      pack10(res+i, g + 4*i*10, dir, Vh);
+    }
+  }      
+}
+
+
+
+template <typename Float, typename Float2>
+inline void unpack10(Float* m, Float2 *res, int dir, int Vh) 
+{
+  Float2 *r = res + dir*5*Vh;
+  for (int j=0; j<5; j++) {
+    m[j*2+0] = r[j*Vh].x;
+    m[j*2+1] = r[j*Vh].y;
+  }    
+}
+
+template <typename Float, typename Float2>
+void unpackMomField(Float* mom, Float2 *res, int oddBit, int Vh) 
+{
+  int dir, i;
+  Float *m = mom + oddBit*Vh*10*4;
+  
+  for (i = 0; i < Vh; i++) {
+    for (dir = 0; dir < 4; dir++) {	
+      Float* thismom = m + (4*i+dir)*10;
+      unpack10(thismom, res+i, dir, Vh);
+    }
+  }
+}
+

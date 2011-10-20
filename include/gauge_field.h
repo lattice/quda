@@ -123,6 +123,8 @@ class cpuGaugeField : public GaugeField {
 
   void exchangeGhost() const;
   const void** Ghost() const { return (const void**)ghost; }
+
+  void* Gauge_p() { return (void*)gauge; }
 };
 
 #define gaugeSiteSize 18 // real numbers per gauge field
