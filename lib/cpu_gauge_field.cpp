@@ -9,6 +9,9 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
       reconstruct != QUDA_RECONSTRUCT_10)
     errorQuda("Reconstruction type %d not supported", reconstruct);
 
+  if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER)
+    errorQuda("10 reconstruction only supported with MILC gauge order");
+
   if (order == QUDA_QDP_GAUGE_ORDER) {
     gauge = (void**)malloc(nDim * sizeof(void*));
     for (int d=0; d<nDim; d++) {

@@ -593,7 +593,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
 	unpack12(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg, gT, anisotropy_);
+	transposeScale(hg+4*i*18, gT, anisotropy_);
       }
     } 
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {
@@ -601,7 +601,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
 	unpack8(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg, gT, anisotropy_);
+	transposeScale(hg+4*i*18, gT, anisotropy_);
       }
     }
   } else {
@@ -609,7 +609,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
 	unpack18(gT, d_gauge+i, dir, V+pad);
-	transposeScale(hg, gT, anisotropy_);
+	transposeScale(hg+4*i*18, gT, anisotropy_);
       }
     }
   }
@@ -657,21 +657,21 @@ static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	unpack12(hg, d_gauge+i, dir, V+pad, i);
+	unpack12(hg+4*i*18, d_gauge+i, dir, V+pad, i);
       }
     } 
   } else if (reconstruct == QUDA_RECONSTRUCT_8) {
     for (int dir = 0; dir < 4; dir++) {
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	unpack8(hg, d_gauge+i, dir, V+pad, i);
+	unpack8(hg+4*i*18, d_gauge+i, dir, V+pad, i);
       }
     }
   } else {
     for (int dir = 0; dir < 4; dir++) {
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	unpack18(hg, d_gauge+i, dir, V+pad);
+	unpack18(hg+4*i*18, d_gauge+i, dir, V+pad);
       }
     }
   }

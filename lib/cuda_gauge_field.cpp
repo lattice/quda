@@ -222,11 +222,11 @@ static void storeGaugeField(Float *cpuGauge, FloatN *gauge, GaugeFieldOrder cpu_
 
   // Use pinned memory
   FloatN *packed;
-  FloatN *packedEven = packed;
-  FloatN *packedOdd = (FloatN*)((char*)packed + bytes/2);
-    
   cudaMallocHost((void**)&packed, bytes);
   cudaMemcpy(packed, gauge, bytes, cudaMemcpyDeviceToHost);
+    
+  FloatN *packedEven = packed;
+  FloatN *packedOdd = (FloatN*)((char*)packed + bytes/2);
     
   if (cpu_order == QUDA_QDP_GAUGE_ORDER) {
     unpackQDPGaugeField((Float**)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad);
