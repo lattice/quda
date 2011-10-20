@@ -109,7 +109,7 @@ fermion_force_init()
   refMom = new cpuGaugeField(gParam);
 
   createMomCPU(cpuMom->Gauge_p(), mom_prec);    
-  memset(cpuMom->Gauge_p(), 0, 4*cpuMom->Volume()*momSiteSize*gaugeParam.cpu_prec);
+  //memset(cpuMom->Gauge_p(), 0, 4*cpuMom->Volume()*momSiteSize*gaugeParam.cpu_prec);
 
   memcpy(refMom->Gauge_p(), cpuMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize*gaugeParam.cpu_prec);
     
