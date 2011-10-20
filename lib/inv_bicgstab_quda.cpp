@@ -47,8 +47,6 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.cuda_prec_sloppy != invParam.prec_precondition)
     errorQuda("BiCGstab does not yet support different sloppy and preconditioner precisions");
 
-  typedef std::complex<double> Complex;
-
   if (!init) {
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -117,11 +115,11 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   int k = 0;
   int rUpdate = 0;
   
-  Complex rho(1.0, 0.0);
-  Complex rho0 = rho;
-  Complex alpha(1.0, 0.0);
-  Complex omega(1.0, 0.0);
-  Complex beta;
+  quda::Complex rho(1.0, 0.0);
+  quda::Complex rho0 = rho;
+  quda::Complex alpha(1.0, 0.0);
+  quda::Complex omega(1.0, 0.0);
+  quda::Complex beta;
 
   double3 rho_r2;
   double3 omega_t2;
@@ -134,7 +132,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: %d iterations, r2 = %e\n", k, r2);
 
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
-    blas_quda_flops = 0;    
+    quda::blas_flops = 0;    
     stopwatchStart();
   }
 
@@ -174,7 +172,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     
     // omega = (t, r) / (t, t)
     omega_t2 = cDotProductNormACuda(t, rSloppy);
-    omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
+    omega = quda::Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
     if (invParam.inv_type_precondition == QUDA_MR_INVERTER) {
       //x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
@@ -188,7 +186,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     }
 
     rho0 = rho;
-    rho = Complex(rho_r2.x, rho_r2.y);
+    rho = quda::Complex(rho_r2.x, rho_r2.y);
     r2 = rho_r2.z;
 
     if (invParam.verbosity == QUDA_DEBUG_VERBOSE)
@@ -236,7 +234,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
     invParam.secs += stopwatchReadSeconds();
 
-    double gflops = (blas_quda_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
     //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
@@ -261,4 +259,3 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   return;
 }
-

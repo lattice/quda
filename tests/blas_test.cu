@@ -170,7 +170,7 @@ void freeFields()
 double benchmark(int kernel, int niter) {
 
   double a, b, c;
-  Complex a2, b2, c2;
+  quda::Complex a2, b2, c2;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -326,7 +326,7 @@ double benchmark(int kernel, int niter) {
 double test(int kernel) {
 
   double a = 1.5, b = 2.5, c = 3.5;
-  Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
+  quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
 
   switch (kernel) {
@@ -334,14 +334,14 @@ double test(int kernel) {
   case 0:
     *hD = *hH;
     copyCuda(*yD, *hD);
-    copyCpu(*yH, *hH);
+    yH->copy(*hH);
     error = ERROR(y);
     break;
 
   case 1:
     *lD = *lH;
     copyCuda(*yD, *lD);
-    copyCpu(*yH, *lH);
+    yH->copy(*lH);
     error = ERROR(y);
     break;
       
@@ -484,8 +484,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    { Complex d = xpaycDotzyCuda(*xD, a, *yD, *zD);
-      Complex h = xpaycDotzyCpu(*xH, a, *yH, *zH);
+    { quda::Complex d = xpaycDotzyCuda(*xD, a, *yD, *zD);
+      quda::Complex h = xpaycDotzyCpu(*xH, a, *yH, *zH);
       error =  fabs(norm2(*yD) - norm2(*yH)) / norm2(*yH) + abs(d-h)/abs(h);
     }
     break;
@@ -575,8 +575,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
-      Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
+    {quda::Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
+      quda::Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
     error = ERROR(y) + abs(d-h)/abs(h);}
     break;
 
@@ -669,7 +669,7 @@ int main(int argc, char** argv)
   int niter = Niter;
 
   // turn off error checking in blas kernels for tuning
-  setBlasTuning(QUDA_TUNE_YES);
+  quda::setBlasTuning(QUDA_TUNE_YES);
 
   for (int prec = 0; prec < Nprec; prec++) {
 
@@ -694,18 +694,18 @@ int main(int argc, char** argv)
 	if (isReduction(kernel) && (thread & (thread-1))) continue;
 
 	for (unsigned int grid = GridMin; grid <= GridMax; grid *= 2) {
-	  setBlasParam(kernel, prec, thread, grid);
+	  quda::setBlasParam(kernel, prec, thread, grid);
 	  
 	  // first do warmup run
 	  benchmark(kernel, 1);
 	  
-	  blas_quda_flops = 0;
-	  blas_quda_bytes = 0;
+	  quda::blas_flops = 0;
+	  quda::blas_bytes = 0;
 
 	  double secs = benchmark(kernel, niter);
 	  error = cudaGetLastError();
-	  double flops = blas_quda_flops;
-	  double bytes = blas_quda_bytes;
+	  double flops = quda::blas_flops;
+	  double bytes = quda::blas_bytes;
 	  
 	  double gflops = (flops*1e-9)/(secs);
 	  double gbytes = bytes/(secs*(1<<30));
@@ -726,15 +726,15 @@ int main(int argc, char** argv)
 	errorQuda("Autotuning failed for %s kernel: %s", names[kernel], cudaGetErrorString(error));
       } else {
 	// now rerun with more iterations to get accurate speed measurements
-	setBlasParam(kernel, prec, threads_max, blocks_max);
+	quda::setBlasParam(kernel, prec, threads_max, blocks_max);
 	benchmark(kernel, 1);
-	blas_quda_flops = 0;
-	blas_quda_bytes = 0;
+	quda::blas_flops = 0;
+	quda::blas_bytes = 0;
 	
 	double secs = benchmark(kernel, 100*niter);
 	
-	gflops_max = (blas_quda_flops*1e-9)/(secs);
-	gbytes_max = blas_quda_bytes/(secs*(1<<30));
+	gflops_max = (quda::blas_flops*1e-9)/(secs);
+	gbytes_max = quda::blas_bytes/(secs*(1<<30));
       }
 
       printf("%-35s: %4d threads per block, %5d blocks per grid, Gflop/s = %8.4f, GiB/s = %8.4f\n", 
@@ -754,7 +754,7 @@ int main(int argc, char** argv)
   cudaGetLastError();
 
   // turn on error checking in blas kernels
-  setBlasTuning(QUDA_TUNE_NO);
+  quda::setBlasTuning(QUDA_TUNE_NO);
 
   // lastly check for correctness
   for (int prec = 0; prec < Nprec; prec++) {

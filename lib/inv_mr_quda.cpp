@@ -33,8 +33,6 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   globalReduce = false; // use local reductions for DD solver
 
-  typedef std::complex<double> Complex;
-
   if (!init) {
     ColorSpinorParam param(x);
     param.create = QUDA_ZERO_FIELD_CREATE;
@@ -64,7 +62,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double r2 = b2;
 
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
-    blas_quda_flops = 0;
+    quda::blas_flops = 0;
     stopwatchStart();
   }
 
@@ -79,7 +77,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     mat(Ar, r, tmp);
     
     double3 Ar3 = cDotProductNormACuda(Ar, r);
-    Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
+    quda::Complex alpha = quda::Complex(Ar3.x, Ar3.y) / Ar3.z;
 
     //printfQuda("%d MR %e %e %e\n", k, Ar3.x, Ar3.y, Ar3.z);
 
@@ -97,7 +95,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
     invParam.secs += stopwatchReadSeconds();
   
-    double gflops = (blas_quda_flops + mat.flops())*1e-9;
+    double gflops = (quda::blas_flops + mat.flops())*1e-9;
     reduceDouble(gflops);
 
     //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());

@@ -20,6 +20,7 @@ void TuneBase::Benchmark(dim3 &block)  {
     block = dim3(threads,1,1);
 
     Flops(); // resets the flops counter
+    cudaThreadSynchronize();
     cudaGetLastError(); // clear error counter
 
     cudaEventRecord(start, 0);
@@ -35,6 +36,7 @@ void TuneBase::Benchmark(dim3 &block)  {
     cudaEventDestroy(start);
     cudaEventDestroy(end);
 
+    cudaThreadSynchronize();
     error = cudaGetLastError();
 
     time = runTime / 1000;

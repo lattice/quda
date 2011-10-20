@@ -4,15 +4,9 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
-
-// keep these with C-linkage for the moment
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
   // ---------- blas_quda.cu ---------- 
 
+namespace quda {
   // creates and destroys reduction buffers  
   void initBlas(void); 
   void endBlas(void);
@@ -20,12 +14,10 @@ extern "C" {
   void setBlasTuning(QudaTune tune);
   void setBlasParam(int kernel, int prec, int threads, int blocks);
 
-  extern unsigned long long blas_quda_flops;
-  extern unsigned long long blas_quda_bytes;
-
-#ifdef __cplusplus
+  extern unsigned long long blas_flops;
+  extern unsigned long long blas_bytes;
 }
-#endif
+
 
 // C++ linkage
 
@@ -53,35 +45,33 @@ void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
 void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z, const double &b);
 void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, cudaColorSpinorField& z, const double &c); 
 
-void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y);
-void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-void cxpaypbzCuda(cudaColorSpinorField &, const Complex &b, cudaColorSpinorField &y, const Complex &c, cudaColorSpinorField &z);
-void caxpbypzYmbwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, cudaColorSpinorField &, cudaColorSpinorField &);
+void caxpbyCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, cudaColorSpinorField &y);
+void caxpyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+void cxpaypbzCuda(cudaColorSpinorField &, const quda::Complex &b, cudaColorSpinorField &y, const quda::Complex &c, cudaColorSpinorField &z);
+void caxpbypzYmbwCuda(const quda::Complex &, cudaColorSpinorField &, const quda::Complex &, cudaColorSpinorField &, cudaColorSpinorField &, cudaColorSpinorField &);
 
-Complex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
-Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z);
+quda::Complex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
+quda::Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z);
 
 double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y, 
+double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, cudaColorSpinorField &y, 
 					   cudaColorSpinorField &z, cudaColorSpinorField &w, cudaColorSpinorField &u);
 
-void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
-double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, 
+void cabxpyAxCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
+double caxpyNormCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+double caxpyXmazNormXCuda(const quda::Complex &a, cudaColorSpinorField &x, 
 			  cudaColorSpinorField &y, cudaColorSpinorField &z);
-double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
+double cabxpyAxNormCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
 
-void caxpbypzCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
+void caxpbypzCuda(const quda::Complex &, cudaColorSpinorField &, const quda::Complex &, cudaColorSpinorField &, 
 		  cudaColorSpinorField &);
-void caxpbypczpwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
-		     const Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
-Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
+void caxpbypczpwCuda(const quda::Complex &, cudaColorSpinorField &, const quda::Complex &, cudaColorSpinorField &, 
+		     const quda::Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
+quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 		       cudaColorSpinorField &z);
 
 // CPU variants
-
-void copyCpu(cpuColorSpinorField &dst, const cpuColorSpinorField &src);
 
 double axpyNormCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
 double normCpu(const cpuColorSpinorField &b);
@@ -98,36 +88,36 @@ void axpyZpbxCpu(const double &a, cpuColorSpinorField &x, cpuColorSpinorField &y
 void axpyBzpcxCpu(const double &a, cpuColorSpinorField& x, cpuColorSpinorField& y,
 		  const double &b, const cpuColorSpinorField& z, const double &c); 
 
-void caxpbyCpu(const Complex &a, const cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y);
-void caxpyCpu(const Complex &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
-void cxpaypbzCpu(const cpuColorSpinorField &x, const Complex &b, const cpuColorSpinorField &y, 
-		 const Complex &c, cpuColorSpinorField &z);
-void caxpbypzYmbwCpu(const Complex &, const cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
+void caxpbyCpu(const quda::Complex &a, const cpuColorSpinorField &x, const quda::Complex &b, cpuColorSpinorField &y);
+void caxpyCpu(const quda::Complex &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
+void cxpaypbzCpu(const cpuColorSpinorField &x, const quda::Complex &b, const cpuColorSpinorField &y, 
+		 const quda::Complex &c, cpuColorSpinorField &z);
+void caxpbypzYmbwCpu(const quda::Complex &, const cpuColorSpinorField &, const quda::Complex &, cpuColorSpinorField &, 
 		     cpuColorSpinorField &, const cpuColorSpinorField &); 
-Complex cDotProductCpu(const cpuColorSpinorField &, const cpuColorSpinorField &);
-Complex xpaycDotzyCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y, 
+quda::Complex cDotProductCpu(const cpuColorSpinorField &, const cpuColorSpinorField &);
+quda::Complex xpaycDotzyCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y, 
 		      const cpuColorSpinorField &z);
 double3 cDotProductNormACpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
 double3 cDotProductNormBCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
-double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinorField &x, 
-					  const Complex &b, cpuColorSpinorField &y, 
+double3 caxpbypzYmbwcDotProductUYNormYCpu(const quda::Complex &a, const cpuColorSpinorField &x, 
+					  const quda::Complex &b, cpuColorSpinorField &y, 
 					  cpuColorSpinorField &z, const cpuColorSpinorField &w, 
 					  const cpuColorSpinorField &u);
 
-void cabxpyAxCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
+void cabxpyAxCpu(const double &a, const quda::Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
 
-double caxpyNormCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y);
+double caxpyNormCpu(const quda::Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y);
 
-double caxpyXmazNormXCpu(const Complex &a, cpuColorSpinorField &x, 
+double caxpyXmazNormXCpu(const quda::Complex &a, cpuColorSpinorField &x, 
 			 cpuColorSpinorField &y, cpuColorSpinorField &z);
-double cabxpyAxNormCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
+double cabxpyAxNormCpu(const double &a, const quda::Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
 
-void caxpbypzCpu(const Complex &, cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
+void caxpbypzCpu(const quda::Complex &, cpuColorSpinorField &, const quda::Complex &, cpuColorSpinorField &, 
 		 cpuColorSpinorField &);
 
-void caxpbypczpwCpu(const Complex &, cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
-		    const Complex &, cpuColorSpinorField &, cpuColorSpinorField &);
-Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
+void caxpbypczpwCpu(const quda::Complex &, cpuColorSpinorField &, const quda::Complex &, cpuColorSpinorField &, 
+		    const quda::Complex &, cpuColorSpinorField &, cpuColorSpinorField &);
+quda::Complex caxpyDotzyCpu(const quda::Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
 		      cpuColorSpinorField &z);
 
 #endif // _QUDA_BLAS_H

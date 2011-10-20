@@ -457,44 +457,44 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_WILSON_DIRAC
-  int Npad = (in->nColor*in->nSpin*2)/in->fieldOrder; // SPINOR_HOP in old code
+  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-    dslashParam.ghostOffset[i] = Npad*(in->ghostOffset[i] + in->stride);
-    dslashParam.ghostNormOffset[i] = in->ghostNormOffset[i] + in->stride;
+    dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
+    dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
     dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
-  if (in->precision != gauge.Precision())
+  if (in->Precision() != gauge.Precision())
     errorQuda("Mixing gauge and spinor precision not supported");
 
-  void *xv = (x ? x->v : 0);
-  void *xn = (x ? x->norm : 0);
+  const void *xv = (x ? x->V() : 0);
+  const void *xn = (x ? x->Norm() : 0);
 
   DslashCuda *dslash = 0;
   size_t regSize = sizeof(float);
-  if (in->precision == QUDA_DOUBLE_PRECISION) {
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    dslash = new WilsonDslashCuda<double2, double2>((double2*)out->v, (float*)out->norm, (double2*)gauge0, (double2*)gauge1, 
-						    gauge.Reconstruct(), (double2*)in->v, (float*)in->norm, 
-						    (double2*)xv, (float*)xn, k, dagger, in->bytes, in->norm_bytes);
+    dslash = new WilsonDslashCuda<double2, double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, (double2*)gauge1, 
+						    gauge.Reconstruct(), (double2*)in->V(), (float*)in->Norm(), 
+						    (double2*)xv, (float*)xn, k, dagger, in->Bytes(), in->NormBytes());
     regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
-  } else if (in->precision == QUDA_SINGLE_PRECISION) {
-    dslash = new WilsonDslashCuda<float4, float4>((float4*)out->v, (float*)out->norm, (float4*)gauge0, (float4*)gauge1,
-						  gauge.Reconstruct(), (float4*)in->v, (float*)in->norm, 
-						  (float4*)xv, (float*)xn, k, dagger, in->bytes, in->norm_bytes);
-  } else if (in->precision == QUDA_HALF_PRECISION) {
-    dslash = new WilsonDslashCuda<short4, short4>((short4*)out->v, (float*)out->norm, (short4*)gauge0, (short4*)gauge1,
-						  gauge.Reconstruct(), (short4*)in->v, (float*)in->norm,
-						  (short4*)xv, (float*)xn, k, dagger, in->bytes, in->norm_bytes);
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    dslash = new WilsonDslashCuda<float4, float4>((float4*)out->V(), (float*)out->Norm(), (float4*)gauge0, (float4*)gauge1,
+						  gauge.Reconstruct(), (float4*)in->V(), (float*)in->Norm(), 
+						  (float4*)xv, (float*)xn, k, dagger, in->Bytes(), in->NormBytes());
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {
+    dslash = new WilsonDslashCuda<short4, short4>((short4*)out->V(), (float*)out->Norm(), (short4*)gauge0, (short4*)gauge1,
+						  gauge.Reconstruct(), (short4*)in->V(), (float*)in->Norm(),
+						  (short4*)xv, (float*)xn, k, dagger, in->Bytes(), in->NormBytes());
   }
-  dslashCuda(*dslash, regSize, parity, dagger, in->volume, in->ghostFace, blockDim);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), blockDim);
 
   delete dslash;
   unbindGaugeTex(gauge);
@@ -514,11 +514,11 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_CLOVER_DIRAC
-  int Npad = (in->nColor*in->nSpin*2)/in->fieldOrder; // SPINOR_HOP in old code
+  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-    dslashParam.ghostOffset[i] = Npad*(in->ghostOffset[i] + in->stride);
-    dslashParam.ghostNormOffset[i] = in->ghostNormOffset[i] + in->stride;
+    dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
+    dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
     dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
@@ -528,41 +528,41 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
-  if (in->precision != gauge.Precision())
+  if (in->Precision() != gauge.Precision())
     errorQuda("Mixing gauge and spinor precision not supported");
 
-  if (in->precision != clover_prec)
+  if (in->Precision() != clover_prec)
     errorQuda("Mixing clover and spinor precision not supported");
 
-  void *xv = x ? x->v : 0;
-  void *xn = x ? x->norm : 0;
+  const void *xv = x ? x->V() : 0;
+  const void *xn = x ? x->Norm() : 0;
 
   DslashCuda *dslash = 0;
   size_t regSize = sizeof(float);
 
-  if (in->precision == QUDA_DOUBLE_PRECISION) {
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    dslash = new CloverDslashCuda<double2, double2, double2>((double2*)out->v, (float*)out->norm, (double2*)gauge0, 
+    dslash = new CloverDslashCuda<double2, double2, double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, 
 							     (double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, 
-							     (float*)cloverNormP, (double2*)in->v, (float*)in->norm,
-							     (double2*)xv, (float*)xn, a, dagger, in->bytes, in->norm_bytes);
+							     (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(),
+							     (double2*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
     regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
-  } else if (in->precision == QUDA_SINGLE_PRECISION) {
-    dslash = new CloverDslashCuda<float4, float4, float4>((float4*)out->v, (float*)out->norm, (float4*)gauge0, 
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    dslash = new CloverDslashCuda<float4, float4, float4>((float4*)out->V(), (float*)out->Norm(), (float4*)gauge0, 
 							  (float4*)gauge1, gauge.Reconstruct(), (float4*)cloverP, 
-							  (float*)cloverNormP, (float4*)in->v, (float*)in->norm, 
-							  (float4*)xv, (float*)xn, a, dagger, in->bytes, in->norm_bytes);
-  } else if (in->precision == QUDA_HALF_PRECISION) {
-    dslash = new CloverDslashCuda<short4, short4, short4>((short4*)out->v, (float*)out->norm, (short4*)gauge0, 
+							  (float*)cloverNormP, (float4*)in->V(), (float*)in->Norm(), 
+							  (float4*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {
+    dslash = new CloverDslashCuda<short4, short4, short4>((short4*)out->V(), (float*)out->Norm(), (short4*)gauge0, 
 							  (short4*)gauge1, gauge.Reconstruct(), (short4*)cloverP, 
-							  (float*)cloverNormP, (short4*)in->v, (float*)in->norm, 
-							  (short4*)xv, (float*)xn, a, dagger, in->bytes, in->norm_bytes);
+							  (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
+							  (short4*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
   }
 
-  dslashCuda(*dslash, regSize, parity, dagger, in->volume, in->ghostFace, blockDim);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), blockDim);
 
   delete dslash;
   unbindGaugeTex(gauge);
@@ -584,48 +584,48 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gaug
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_TWISTED_MASS_DIRAC
-  int Npad = (in->nColor*in->nSpin*2)/in->fieldOrder; // SPINOR_HOP in old code
+  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-    dslashParam.ghostOffset[i] = Npad*(in->ghostOffset[i] + in->stride);
-    dslashParam.ghostNormOffset[i] = in->ghostNormOffset[i] + in->stride;
+    dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
+    dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
     dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
 
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
-  if (in->precision != gauge.Precision())
+  if (in->Precision() != gauge.Precision())
     errorQuda("Mixing gauge and spinor precision not supported");
 
-  void *xv = x ? x->v : 0;
-  void *xn = x ? x->norm : 0;
+  const void *xv = x ? x->V() : 0;
+  const void *xn = x ? x->Norm() : 0;
 
   DslashCuda *dslash = 0;
   size_t regSize = sizeof(float);
 
-  if (in->precision == QUDA_DOUBLE_PRECISION) {
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    dslash = new TwistedDslashCuda<double2,double2>((double2*)out->v, (float*)out->norm, (double2*)gauge0, 
-						    (double2*)gauge1, gauge.Reconstruct(), (double2*)in->v, 
-						    (float*)in->norm, (double2*)xv, (float*)xn, 
-						    kappa, mu, a, dagger, in->bytes, in->norm_bytes);
+    dslash = new TwistedDslashCuda<double2,double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, 
+						    (double2*)gauge1, gauge.Reconstruct(), (double2*)in->V(), 
+						    (float*)in->Norm(), (double2*)xv, (float*)xn, 
+						    kappa, mu, a, dagger, in->Bytes(), in->NormBytes());
     regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
-  } else if (in->precision == QUDA_SINGLE_PRECISION) {
-    dslash = new TwistedDslashCuda<float4,float4>((float4*)out->v, (float*)out->norm, (float4*)gauge0, (float4*)gauge1, 
-						  gauge.Reconstruct(), (float4*)in->v, (float*)in->norm, 
-						  (float4*)xv, (float*)xn, kappa, mu, a, dagger, in->bytes, in->norm_bytes);
-  } else if (in->precision == QUDA_HALF_PRECISION) {
-    dslash = new TwistedDslashCuda<short4,short4>((short4*)out->v, (float*)out->norm, (short4*)gauge0, (short4*)gauge1, 
-						  gauge.Reconstruct(), (short4*)in->v, (float*)in->norm, 
-						  (short4*)xv, (float*)xn, kappa, mu, a, dagger, in->bytes, in->norm_bytes);
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    dslash = new TwistedDslashCuda<float4,float4>((float4*)out->V(), (float*)out->Norm(), (float4*)gauge0, (float4*)gauge1, 
+						  gauge.Reconstruct(), (float4*)in->V(), (float*)in->Norm(), 
+						  (float4*)xv, (float*)xn, kappa, mu, a, dagger, in->Bytes(), in->NormBytes());
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {
+    dslash = new TwistedDslashCuda<short4,short4>((short4*)out->V(), (float*)out->Norm(), (short4*)gauge0, (short4*)gauge1, 
+						  gauge.Reconstruct(), (short4*)in->V(), (float*)in->Norm(), 
+						  (short4*)xv, (float*)xn, kappa, mu, a, dagger, in->Bytes(), in->NormBytes());
     
   }
 
-  dslashCuda(*dslash, regSize, parity, dagger, in->volume, in->ghostFace, blockDim);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), blockDim);
 
   delete dslash;
   unbindGaugeTex(gauge);
@@ -649,41 +649,41 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge
 #endif
 
   dslashParam.parity = parity;
-  dslashParam.threads = in->volume;
+  dslashParam.threads = in->Volume();
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
-  if (in->precision != gauge.Precision())
+  if (in->Precision() != gauge.Precision())
     errorQuda("Mixing gauge and spinor precision not supported");
 
-  void *xv = x ? x->v : 0;
-  void *xn = x ? x->norm : 0;
+  const void *xv = x ? x->V() : 0;
+  const void *xn = x ? x->Norm() : 0;
 
   DslashCuda *dslash = 0;
   size_t regSize = sizeof(float);
 
-  if (in->precision == QUDA_DOUBLE_PRECISION) {
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    dslash = new DomainWallDslashCuda<double2,double2>((double2*)out->v, (float*)out->norm, (double2*)gauge0, (double2*)gauge1, 
-						       gauge.Reconstruct(), (double2*)in->v, (float*)in->norm, (double2*)xv, 
-						       (float*)xn, m_f, k2, dagger, in->bytes, in->norm_bytes);
+    dslash = new DomainWallDslashCuda<double2,double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, (double2*)gauge1, 
+						       gauge.Reconstruct(), (double2*)in->V(), (float*)in->Norm(), (double2*)xv, 
+						       (float*)xn, m_f, k2, dagger, in->Bytes(), in->NormBytes());
     regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
-  } else if (in->precision == QUDA_SINGLE_PRECISION) {
-    dslash = new DomainWallDslashCuda<float4,float4>((float4*)out->v, (float*)out->norm, (float4*)gauge0, (float4*)gauge1, 
-						     gauge.Reconstruct(), (float4*)in->v, (float*)in->norm, (float4*)xv, 
-						     (float*)xn, m_f, k2, dagger, in->bytes, in->norm_bytes);
-  } else if (in->precision == QUDA_HALF_PRECISION) {
-    dslash = new DomainWallDslashCuda<short4,short4>((short4*)out->v, (float*)out->norm, (short4*)gauge0, (short4*)gauge1, 
-						     gauge.Reconstruct(), (short4*)in->v, (float*)in->norm, (short4*)xv, 
-						     (float*)xn, m_f, k2, dagger, in->bytes, in->norm_bytes);
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    dslash = new DomainWallDslashCuda<float4,float4>((float4*)out->V(), (float*)out->Norm(), (float4*)gauge0, (float4*)gauge1, 
+						     gauge.Reconstruct(), (float4*)in->V(), (float*)in->Norm(), (float4*)xv, 
+						     (float*)xn, m_f, k2, dagger, in->Bytes(), in->NormBytes());
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {
+    dslash = new DomainWallDslashCuda<short4,short4>((short4*)out->V(), (float*)out->Norm(), (short4*)gauge0, (short4*)gauge1, 
+						     gauge.Reconstruct(), (short4*)in->V(), (float*)in->Norm(), (short4*)xv, 
+						     (float*)xn, m_f, k2, dagger, in->Bytes(), in->NormBytes());
   }
 
-  dslashCuda(*dslash, regSize, parity, dagger, in->volume, in->ghostFace, blockDim);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), blockDim);
 
   delete dslash;
   unbindGaugeTex(gauge);
@@ -783,12 +783,12 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
 #ifdef GPU_STAGGERED_DIRAC
 
   dslashParam.parity = parity;
-  dslashParam.threads = in->volume;
-  int Npad = (in->nColor*in->nSpin*2)/in->fieldOrder; // SPINOR_HOP in old code
+  dslashParam.threads = in->Volume();
+  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-    dslashParam.ghostOffset[i] = Npad*(in->ghostOffset[i] + in->stride);
-    dslashParam.ghostNormOffset[i] = in->ghostNormOffset[i] + in->stride;
+    dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
+    dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
     dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
   }
   void *fatGauge0, *fatGauge1;
@@ -796,37 +796,37 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
   bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
   bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
     
-  if (in->precision != fatGauge.Precision() || in->precision != longGauge.Precision()){
+  if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
     errorQuda("Mixing gauge and spinor precision not supported"
 	      "(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
-	      in->precision, fatGauge.Precision(), longGauge.Precision());
+	      in->Precision(), fatGauge.Precision(), longGauge.Precision());
   }
     
-  void *xv = x ? x->v : 0;
-  void *xn = x ? x->norm : 0;
+  const void *xv = x ? x->V() : 0;
+  const void *xn = x ? x->Norm() : 0;
 
-  if (in->precision == QUDA_DOUBLE_PRECISION) {
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    staggeredDslashCuda((double2*)out->v, (float*)out->norm, (double2*)fatGauge0, (double2*)fatGauge1,
+    staggeredDslashCuda((double2*)out->V(), (float*)out->Norm(), (double2*)fatGauge0, (double2*)fatGauge1,
 			(double2*)longGauge0, (double2*)longGauge1, longGauge.Reconstruct(), 
-			(double2*)in->v, (float*)in->norm, parity, dagger, 
-			(double2*)xv, (float*)x, k, in->volume, in->ghostFace, 
-			in->x, in->length, in->ghost_length, block);
+			(double2*)in->V(), (float*)in->Norm(), parity, dagger, 
+			(double2*)xv, (float*)x, k, in->Volume(), in->GhostFace(), 
+			in->X(), in->Length(), in->GhostLength(), block);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
-  } else if (in->precision == QUDA_SINGLE_PRECISION) {
-    staggeredDslashCuda((float2*)out->v, (float*)out->norm, (float2*)fatGauge0, (float2*)fatGauge1,
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    staggeredDslashCuda((float2*)out->V(), (float*)out->Norm(), (float2*)fatGauge0, (float2*)fatGauge1,
 			(float4*)longGauge0, (float4*)longGauge1, longGauge.Reconstruct(), 
-			(float2*)in->v, (float*)in->norm, parity, dagger, 
-			(float2*)xv, (float*)xn, k, in->volume, in->ghostFace, 
-			in->x, in->length, in->ghost_length, block);
-  } else if (in->precision == QUDA_HALF_PRECISION) {	
-    staggeredDslashCuda((short2*)out->v, (float*)out->norm, (short2*)fatGauge0, (short2*)fatGauge1,
+			(float2*)in->V(), (float*)in->Norm(), parity, dagger, 
+			(float2*)xv, (float*)xn, k, in->Volume(), in->GhostFace(), 
+			in->X(), in->Length(), in->GhostLength(), block);
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {	
+    staggeredDslashCuda((short2*)out->V(), (float*)out->Norm(), (short2*)fatGauge0, (short2*)fatGauge1,
 			(short4*)longGauge0, (short4*)longGauge1, longGauge.Reconstruct(), 
-			(short2*)in->v, (float*)in->norm, parity, dagger, 
-			(short2*)xv, (float*)xn, k, in->volume, in->ghostFace, 
-			in->x, in->length, in->ghost_length, block);
+			(short2*)in->V(), (float*)in->Norm(), parity, dagger, 
+			(short2*)xv, (float*)xn, k, in->Volume(), in->GhostFace(), 
+			in->X(), in->Length(), in->GhostLength(), block);
   }
 
   if (!dslashTuning) checkCudaError();
@@ -856,31 +856,31 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
   dslashParam.parity = parity;
   dslashParam.tOffset = 0;
   dslashParam.tMul = 1;
-  dslashParam.threads = in->volume;
+  dslashParam.threads = in->Volume();
 
 #ifdef GPU_CLOVER_DIRAC
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
 
-  if (in->precision != clover_prec)
+  if (in->Precision() != clover_prec)
     errorQuda("Mixing clover and spinor precision not supported");
 
-  if (in->precision == QUDA_DOUBLE_PRECISION) {
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    cloverCuda((double2*)out->v, (float*)out->norm, (double2*)cloverP, 
-	       (float*)cloverNormP, (double2*)in->v, (float*)in->norm, 
-	       in->bytes, in->norm_bytes, blockDim);
+    cloverCuda((double2*)out->V(), (float*)out->Norm(), (double2*)cloverP, 
+	       (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(), 
+	       in->Bytes(), in->NormBytes(), blockDim);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
-  } else if (in->precision == QUDA_SINGLE_PRECISION) {
-    cloverCuda((float4*)out->v, (float*)out->norm, (float4*)cloverP, 
-	       (float*)cloverNormP, (float4*)in->v, (float*)in->norm,
-	       in->bytes, in->norm_bytes, blockDim);
-  } else if (in->precision == QUDA_HALF_PRECISION) {
-    cloverCuda((short4*)out->v, (float*)out->norm, (short4*)cloverP, 
-	       (float*)cloverNormP, (short4*)in->v, (float*)in->norm, 
-	       in->bytes, in->norm_bytes, blockDim);
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    cloverCuda((float4*)out->V(), (float*)out->Norm(), (float4*)cloverP, 
+	       (float*)cloverNormP, (float4*)in->V(), (float*)in->Norm(),
+	       in->Bytes(), in->NormBytes(), blockDim);
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {
+    cloverCuda((short4*)out->V(), (float*)out->Norm(), (short4*)cloverP, 
+	       (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
+	       in->Bytes(), in->NormBytes(), blockDim);
   }
   unbindCloverTex(clover);
 
@@ -916,25 +916,25 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
   dslashParam.threads = in->Volume();
 
 #ifdef GPU_TWISTED_MASS_DIRAC
-  if (in->precision == QUDA_DOUBLE_PRECISION) {
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    twistGamma5Cuda((double2*)out->v, (float*)out->norm, 
-		    (double2*)in->v, (float*)in->norm, 
-		    dagger, kappa, mu, in->bytes, 
-		    in->norm_bytes, twist, block);
+    twistGamma5Cuda((double2*)out->V(), (float*)out->Norm(), 
+		    (double2*)in->V(), (float*)in->Norm(), 
+		    dagger, kappa, mu, in->Bytes(), 
+		    in->NormBytes(), twist, block);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
-  } else if (in->precision == QUDA_SINGLE_PRECISION) {
-    twistGamma5Cuda((float4*)out->v, (float*)out->norm,
-		    (float4*)in->v, (float*)in->norm, 
-		    dagger, kappa, mu, in->bytes, 
-		    in->norm_bytes, twist, block);
-  } else if (in->precision == QUDA_HALF_PRECISION) {
-    twistGamma5Cuda((short4*)out->v, (float*)out->norm,
-		    (short4*)in->v, (float*)in->norm, 
-		    dagger, kappa, mu, in->bytes, 
-		    in->norm_bytes, twist, block);
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    twistGamma5Cuda((float4*)out->V(), (float*)out->Norm(),
+		    (float4*)in->V(), (float*)in->Norm(), 
+		    dagger, kappa, mu, in->Bytes(), 
+		    in->NormBytes(), twist, block);
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {
+    twistGamma5Cuda((short4*)out->V(), (float*)out->Norm(),
+		    (short4*)in->V(), (float*)in->Norm(), 
+		    dagger, kappa, mu, in->Bytes(), 
+		    in->NormBytes(), twist, block);
   }
   if (!dslashTuning) checkCudaError();
 #else

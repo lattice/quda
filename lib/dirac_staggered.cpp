@@ -100,7 +100,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
   staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, 0, 0, blockDslash, commDim);
   
-  flops += 1146*in.volume;
+  flops += 1146*in.Volume();
 }
 
 void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -116,7 +116,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
   staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, &x, k, blockDslashXpay, commDim);
   
-  flops += (1146+12)*in.volume;
+  flops += (1146+12)*in.Volume();
 }
 
 // Full staggered operator
@@ -145,11 +145,11 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
   
   bool reset = newTmp(&tmp1, in);
   
-  cudaColorSpinorField* mytmp = dynamic_cast<cudaColorSpinorField*>(tmp1->even);
-  cudaColorSpinorField* ineven = dynamic_cast<cudaColorSpinorField*>(in.even);
-  cudaColorSpinorField* inodd = dynamic_cast<cudaColorSpinorField*>(in.odd);
-  cudaColorSpinorField* outeven = dynamic_cast<cudaColorSpinorField*>(out.even);
-  cudaColorSpinorField* outodd = dynamic_cast<cudaColorSpinorField*>(out.odd);
+  cudaColorSpinorField* mytmp = dynamic_cast<cudaColorSpinorField*>(&(tmp1->Even()));
+  cudaColorSpinorField* ineven = dynamic_cast<cudaColorSpinorField*>(&(in.Even()));
+  cudaColorSpinorField* inodd = dynamic_cast<cudaColorSpinorField*>(&(in.Odd()));
+  cudaColorSpinorField* outeven = dynamic_cast<cudaColorSpinorField*>(&(out.Even()));
+  cudaColorSpinorField* outodd = dynamic_cast<cudaColorSpinorField*>(&(out.Odd()));
   
   //even
   Dslash(*mytmp, *ineven, QUDA_ODD_PARITY);  

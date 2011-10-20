@@ -116,7 +116,7 @@ void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpin
 }
 
 void Dirac::checkSpinorAlias(const cudaColorSpinorField &a, const cudaColorSpinorField &b) const {
-  if (a.v == b.v) errorQuda("Aliasing pointers");
+  if (a.V() == b.V()) errorQuda("Aliasing pointers");
 }
 
 // Dirac operator factory

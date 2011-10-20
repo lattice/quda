@@ -48,7 +48,6 @@ class cudaCloverField : public CloverField {
 
 
   // TODO - improve memory efficiency for asymmetric clover?
-
   friend class DiracClover;
   friend class DiracCloverPC;
 };

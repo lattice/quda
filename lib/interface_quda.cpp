@@ -247,7 +247,7 @@ void initQuda(int dev)
 #endif
 
   initCache();
-  initBlas();
+  quda::initBlas();
 }
 
 
@@ -466,7 +466,7 @@ void endQuda(void)
   freeGaugeQuda();
   freeCloverQuda();
 
-  endBlas();
+  quda::endBlas();
 }
 
 

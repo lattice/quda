@@ -52,16 +52,16 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 {
   checkParitySpinor(out, in);
   
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
 
-  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
-    errorQuda("Twist flavor not set %d\n", in.twistFlavor);
+  if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
+    errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
-  double flavor_mu = in.twistFlavor * mu;
+  double flavor_mu = in.TwistFlavor() * mu;
   
   twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType, blockTwist);
 
-  flops += 24*in.volume;
+  flops += 24*in.Volume();
 }
 
 
@@ -74,11 +74,11 @@ void DiracTwistedMass::Twist(cudaColorSpinorField &out, const cudaColorSpinorFie
 void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   checkFullSpinor(out, in);
-  if (in.twistFlavor != out.twistFlavor) 
-    errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
+  if (in.TwistFlavor() != out.TwistFlavor()) 
+    errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
 
-  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID) {
-    errorQuda("Twist flavor not set %d\n", in.twistFlavor);
+  if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID) {
+    errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
   }
 
   // We can eliminate this temporary at the expense of more kernels (like clover)
@@ -195,31 +195,31 @@ void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpin
 void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 				const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
-  if (in.twistFlavor != out.twistFlavor) 
-    errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
-  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
-    errorQuda("Twist flavor not set %d\n", in.twistFlavor);
+  if (in.TwistFlavor() != out.TwistFlavor()) 
+    errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
+  if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
+    errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
   if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-    double flavor_mu = in.twistFlavor * mu;
+    double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, 
 			  flavor_mu, 0.0, blockDslash, commDim);
-    flops += (1320+72)*in.volume;
+    flops += (1320+72)*in.Volume();
   } else { // safe to use tmp2 here which may alias in
     bool reset = newTmp(&tmp2, in);
 
     TwistInv(*tmp2, in);
     DiracWilson::Dslash(out, *tmp2, parity);
 
-    flops += 72*in.volume;
+    flops += 72*in.Volume();
 
     // if the pointers alias, undo the twist
-    if (tmp2->v == in.v) Twist(*tmp2, *tmp2); 
+    if (tmp2->V() == in.V()) Twist(*tmp2, *tmp2); 
 
     deleteTmp(&tmp2, reset);
   }
@@ -231,31 +231,31 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
 				    const QudaParity parity, const cudaColorSpinorField &x,
 				    const double &k) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.stride);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
-  if (in.twistFlavor != out.twistFlavor) 
-    errorQuda("Twist flavors %d %d don't match", in.twistFlavor, out.twistFlavor);
-  if (in.twistFlavor == QUDA_TWIST_NO || in.twistFlavor == QUDA_TWIST_INVALID)
-    errorQuda("Twist flavor not set %d\n", in.twistFlavor);  
+  if (in.TwistFlavor() != out.TwistFlavor()) 
+    errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
+  if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
+    errorQuda("Twist flavor not set %d\n", in.TwistFlavor());  
 
   if (!dagger) {
-    double flavor_mu = in.twistFlavor * mu;
+    double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, 
 			  flavor_mu, k, blockDslashXpay, commDim);
-    flops += (1320+96)*in.volume;
+    flops += (1320+96)*in.Volume();
   } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
     bool reset = newTmp(&tmp1, in);
 
     TwistInv(*tmp1, in);
     DiracWilson::Dslash(out, *tmp1, parity);
     xpayCuda(x, k, out);
-    flops += 96*in.volume;
+    flops += 96*in.Volume();
 
     // if the pointers alias, undo the twist
-    if (tmp1->v == in.v) Twist(*tmp1, *tmp1); 
+    if (tmp1->V() == in.V()) Twist(*tmp1, *tmp1); 
 
     deleteTmp(&tmp1, reset);
   }

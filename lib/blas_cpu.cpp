@@ -2,10 +2,6 @@
 #include <blas_quda.h>
 #include <face_quda.h>
 
-void copyCpu(cpuColorSpinorField &a, const cpuColorSpinorField &b) {
-  a.copy(b);
-}
-
 template <typename Float>
 void axpby(const Float &a, const Float *x, const Float &b, Float *y, const int N) {
   for (int i=0; i<N; i++) y[i] = a*x[i] + b*y[i];
@@ -13,59 +9,59 @@ void axpby(const Float &a, const Float *x, const Float &b, Float *y, const int N
 
 void axpbyCpu(const double &a, const cpuColorSpinorField &x, 
 	      const double &b, cpuColorSpinorField &y) {
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    axpby(a, (double*)x.v, b, (double*)y.v, x.length);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    axpby((float)a, (float*)x.v, (float)b, (float*)y.v, x.length);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    axpby(a, (double*)x.V(), b, (double*)y.V(), x.Length());
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    axpby((float)a, (float*)x.V(), (float)b, (float*)y.V(), x.Length());
   else
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 void xpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y) {
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    axpby(1.0, (double*)x.v, 1.0, (double*)y.v, x.length);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    axpby(1.0f, (float*)x.v, 1.0f, (float*)y.v, x.length);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    axpby(1.0, (double*)x.V(), 1.0, (double*)y.V(), x.Length());
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    axpby(1.0f, (float*)x.V(), 1.0f, (float*)y.V(), x.Length());
   else
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 void axpyCpu(const double &a, const cpuColorSpinorField &x, 
 	     cpuColorSpinorField &y) {
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    axpby(a, (double*)x.v, 1.0, (double*)y.v, x.length);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    axpby((float)a, (float*)x.v, 1.0f, (float*)y.v, x.length);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    axpby(a, (double*)x.V(), 1.0, (double*)y.V(), x.Length());
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    axpby((float)a, (float*)x.V(), 1.0f, (float*)y.V(), x.Length());
   else
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 void xpayCpu(const cpuColorSpinorField &x, const double &a, 
 	     cpuColorSpinorField &y) {
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    axpby(1.0, (double*)x.v, a, (double*)y.v, x.length);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    axpby(1.0f, (float*)x.v, (float)a, (float*)y.v, x.length);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    axpby(1.0, (double*)x.V(), a, (double*)y.V(), x.Length());
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    axpby(1.0f, (float*)x.V(), (float)a, (float*)y.V(), x.Length());
   else
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 void mxpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y) {
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    axpby(-1.0, (double*)x.v, 1.0, (double*)y.v, x.length);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    axpby(-1.0f, (float*)x.v, 1.0f, (float*)y.v, x.length);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    axpby(-1.0, (double*)x.V(), 1.0, (double*)y.V(), x.Length());
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    axpby(-1.0f, (float*)x.V(), 1.0f, (float*)y.V(), x.Length());
   else
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 void axCpu(const double &a, cpuColorSpinorField &x) {
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    axpby(0.0, (double*)x.v, a, (double*)x.v, x.length);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    axpby(0.0f, (float*)x.v, (float)a, (float*)x.v, x.length);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    axpby(0.0, (double*)x.V(), a, (double*)x.V(), x.Length());
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    axpby(0.0f, (float*)x.V(), (float)a, (float*)x.V(), x.Length());
   else
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 template <typename Float>
@@ -78,29 +74,29 @@ void caxpby(const std::complex<Float> &a, const std::complex<Float> *x,
 
 }
 
-void caxpyCpu(const Complex &a, const cpuColorSpinorField &x,
+void caxpyCpu(const quda::Complex &a, const cpuColorSpinorField &x,
 	      cpuColorSpinorField &y) {
 
-  if ( x.precision == QUDA_DOUBLE_PRECISION)
-    caxpby(a, (Complex*)x.v, Complex(1.0), 
-	   (Complex*)y.v, x.length/2);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    caxpby((std::complex<float>)a, (std::complex<float>*)x.v, std::complex<float>(1.0), 
-	   (std::complex<float>*)y.v, x.length/2);
+  if ( x.Precision() == QUDA_DOUBLE_PRECISION)
+    caxpby(a, (quda::Complex*)x.V(), quda::Complex(1.0), 
+	   (quda::Complex*)y.V(), x.Length()/2);
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    caxpby((std::complex<float>)a, (std::complex<float>*)x.V(), std::complex<float>(1.0), 
+	   (std::complex<float>*)y.V(), x.Length()/2);
   else 
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
-void caxpbyCpu(const Complex &a, const cpuColorSpinorField &x,
-	       const Complex &b, cpuColorSpinorField &y) {
+void caxpbyCpu(const quda::Complex &a, const cpuColorSpinorField &x,
+	       const quda::Complex &b, cpuColorSpinorField &y) {
 
-  if ( x.precision == QUDA_DOUBLE_PRECISION)
-    caxpby(a, (Complex*)x.v, b, (Complex*)y.v, x.length/2);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    caxpby((std::complex<float>)a, (std::complex<float>*)x.v, (std::complex<float>)b, 
-	  (std::complex<float>*)y.v, x.length/2);
+  if ( x.Precision() == QUDA_DOUBLE_PRECISION)
+    caxpby(a, (quda::Complex*)x.V(), b, (quda::Complex*)y.V(), x.Length()/2);
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    caxpby((std::complex<float>)a, (std::complex<float>*)x.V(), (std::complex<float>)b, 
+	  (std::complex<float>*)y.V(), x.Length()/2);
   else 
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 template <typename Float>
@@ -114,18 +110,18 @@ void caxpbypcz(const std::complex<Float> &a, const std::complex<Float> *x,
 
 }
 
-void cxpaypbzCpu(const cpuColorSpinorField &x, const Complex &a, 
-		 const cpuColorSpinorField &y, const Complex &b,
+void cxpaypbzCpu(const cpuColorSpinorField &x, const quda::Complex &a, 
+		 const cpuColorSpinorField &y, const quda::Complex &b,
 		 cpuColorSpinorField &z) {
 
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    caxpbypcz(Complex(1, 0), (Complex*)x.v, a, (Complex*)y.v, 
-	     b, (Complex*)z.v, x.length/2);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    caxpbypcz(std::complex<float>(1, 0), (std::complex<float>*)x.v, (std::complex<float>)a, (std::complex<float>*)y.v, 
-	     (std::complex<float>)b, (std::complex<float>*)z.v, x.length/2);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    caxpbypcz(quda::Complex(1, 0), (quda::Complex*)x.V(), a, (quda::Complex*)y.V(), 
+	     b, (quda::Complex*)z.V(), x.Length()/2);
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    caxpbypcz(std::complex<float>(1, 0), (std::complex<float>*)x.V(), (std::complex<float>)a, (std::complex<float>*)y.V(), 
+	     (std::complex<float>)b, (std::complex<float>*)z.V(), x.Length()/2);
   else 
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 }
 
 void axpyBzpcxCpu(const double &a, cpuColorSpinorField& x, cpuColorSpinorField& y, 
@@ -142,18 +138,18 @@ void axpyZpbxCpu(const double &a, cpuColorSpinorField &x, cpuColorSpinorField &y
 }
 
 // performs the operation z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
-void caxpbypzYmbwCpu(const Complex &a, const cpuColorSpinorField &x, const Complex &b, 
+void caxpbypzYmbwCpu(const quda::Complex &a, const cpuColorSpinorField &x, const quda::Complex &b, 
 		     cpuColorSpinorField &y, cpuColorSpinorField &z, const cpuColorSpinorField &w) {
 
-  if (x.precision == QUDA_DOUBLE_PRECISION)
-    caxpbypcz(a, (Complex*)x.v, b, (Complex*)y.v, 
-	      Complex(1, 0), (Complex*)z.v, x.length/2);
-  else if (x.precision == QUDA_SINGLE_PRECISION)
-    caxpbypcz((std::complex<float>)a, (std::complex<float>*)x.v, 
-	      (std::complex<float>)b, (std::complex<float>*)y.v, 
-	      (std::complex<float>)(1.0f), (std::complex<float>*)z.v, x.length/2);
+  if (x.Precision() == QUDA_DOUBLE_PRECISION)
+    caxpbypcz(a, (quda::Complex*)x.V(), b, (quda::Complex*)y.V(), 
+	      quda::Complex(1, 0), (quda::Complex*)z.V(), x.Length()/2);
+  else if (x.Precision() == QUDA_SINGLE_PRECISION)
+    caxpbypcz((std::complex<float>)a, (std::complex<float>*)x.V(), 
+	      (std::complex<float>)b, (std::complex<float>*)y.V(), 
+	      (std::complex<float>)(1.0f), (std::complex<float>*)z.V(), x.Length()/2);
   else 
-    errorQuda("Precision type %d not implemented", x.precision);
+    errorQuda("Precision type %d not implemented", x.Precision());
 
   caxpyCpu(-b, w, y);
 }
@@ -167,12 +163,12 @@ double norm(const Float *a, const int N) {
 
 double normCpu(const cpuColorSpinorField &a) {
   double norm2 = 0.0;
-  if (a.precision == QUDA_DOUBLE_PRECISION)
-    norm2 = norm((double*)a.v, a.length);
-  else if (a.precision == QUDA_SINGLE_PRECISION)
-    norm2 = norm((float*)a.v, a.length);
+  if (a.Precision() == QUDA_DOUBLE_PRECISION)
+    norm2 = norm((double*)a.V(), a.Length());
+  else if (a.Precision() == QUDA_SINGLE_PRECISION)
+    norm2 = norm((float*)a.V(), a.Length());
   else
-    errorQuda("Precision type %d not implemented", a.precision);
+    errorQuda("Precision type %d not implemented", a.Precision());
   reduceDouble(norm2);
   return norm2;
 }
@@ -192,12 +188,12 @@ double reDotProduct(const Float *a, const Float *b, const int N) {
 
 double reDotProductCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b) {
   double dot = 0.0;
-  if (a.precision == QUDA_DOUBLE_PRECISION)
-    dot = reDotProduct((double*)a.v, (double*)b.v, a.length);
-  else if (a.precision == QUDA_SINGLE_PRECISION)
-    dot = reDotProduct((float*)a.v, (float*)b.v, a.length);
+  if (a.Precision() == QUDA_DOUBLE_PRECISION)
+    dot = reDotProduct((double*)a.V(), (double*)b.V(), a.Length());
+  else if (a.Precision() == QUDA_SINGLE_PRECISION)
+    dot = reDotProduct((float*)a.V(), (float*)b.V(), a.Length());
   else
-    errorQuda("Precision type %d not implemented", a.precision);
+    errorQuda("Precision type %d not implemented", a.Precision());
   reduceDouble(dot);
   return dot;
 }
@@ -210,47 +206,47 @@ double xmyNormCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y) {
 }
 
 template <typename Float>
-Complex cDotProduct(const std::complex<Float> *a, const std::complex<Float> *b, const int N) {
-  Complex dot = 0;
+quda::Complex cDotProduct(const std::complex<Float> *a, const std::complex<Float> *b, const int N) {
+  quda::Complex dot = 0;
   for (int i=0; i<N; i++) dot += conj(a[i])*b[i];
   return dot;
 }
 
-Complex cDotProductCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b) {
-  Complex dot = 0.0;
-  if (a.precision == QUDA_DOUBLE_PRECISION)
-    dot = cDotProduct((Complex*)a.v, (Complex*)b.v, a.length/2);
-  else if (a.precision == QUDA_SINGLE_PRECISION)
-    dot = cDotProduct((std::complex<float>*)a.v, (std::complex<float>*)b.v, a.length/2);
+quda::Complex cDotProductCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b) {
+  quda::Complex dot = 0.0;
+  if (a.Precision() == QUDA_DOUBLE_PRECISION)
+    dot = cDotProduct((quda::Complex*)a.V(), (quda::Complex*)b.V(), a.Length()/2);
+  else if (a.Precision() == QUDA_SINGLE_PRECISION)
+    dot = cDotProduct((std::complex<float>*)a.V(), (std::complex<float>*)b.V(), a.Length()/2);
   else
-    errorQuda("Precision type %d not implemented", a.precision);
+    errorQuda("Precision type %d not implemented", a.Precision());
   reduceDoubleArray((double*)&dot, 2);
   return dot;
 }
 
 // First performs the operation y = x + a*y
 // Second returns complex dot product (z,y)
-Complex xpaycDotzyCpu(const cpuColorSpinorField &x, const double &a, 
+quda::Complex xpaycDotzyCpu(const cpuColorSpinorField &x, const double &a, 
 		      cpuColorSpinorField &y, const cpuColorSpinorField &z) {
   xpayCpu(x, a, y);
   return cDotProductCpu(z,y);
 }
 
 double3 cDotProductNormACpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b) {
-  Complex dot = cDotProductCpu(a, b);
+  quda::Complex dot = cDotProductCpu(a, b);
   double norm = normCpu(a);
   return make_double3(real(dot), imag(dot), norm);
 }
 
 double3 cDotProductNormBCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b) {
-  Complex dot = cDotProductCpu(a, b);
+  quda::Complex dot = cDotProductCpu(a, b);
   double norm = normCpu(b);
   return make_double3(real(dot), imag(dot), norm);
 }
 
 // This convoluted kernel does the following: z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
-double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinorField &x, 
-					  const Complex &b, cpuColorSpinorField &y, 
+double3 caxpbypzYmbwcDotProductUYNormYCpu(const quda::Complex &a, const cpuColorSpinorField &x, 
+					  const quda::Complex &b, cpuColorSpinorField &y, 
 					  cpuColorSpinorField &z, const cpuColorSpinorField &w, 
 					  const cpuColorSpinorField &u) {
 
@@ -258,45 +254,45 @@ double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinor
   return cDotProductNormBCpu(u, y);
 }
 
-void cabxpyAxCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
+void cabxpyAxCpu(const double &a, const quda::Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
   axCpu(a, x);
   caxpyCpu(b, x, y);
 }
 
-double caxpyNormCpu(const Complex &a, cpuColorSpinorField &x, 
+double caxpyNormCpu(const quda::Complex &a, cpuColorSpinorField &x, 
 		    cpuColorSpinorField &y) {
   caxpyCpu(a, x, y);
   return norm2(y);
 }
 
-double caxpyXmazNormXCpu(const Complex &a, cpuColorSpinorField &x, 
+double caxpyXmazNormXCpu(const quda::Complex &a, cpuColorSpinorField &x, 
 			 cpuColorSpinorField &y, cpuColorSpinorField &z) {
   caxpyCpu(a, x, y);
   caxpyCpu(-a, z, x);
   return norm2(x);
 }
 
-double cabxpyAxNormCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
+double cabxpyAxNormCpu(const double &a, const quda::Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
   axCpu(a, x);
   caxpyCpu(b, x, y);
   return norm2(y);
 }
 
-void caxpbypzCpu(const Complex &a, cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y, 
+void caxpbypzCpu(const quda::Complex &a, cpuColorSpinorField &x, const quda::Complex &b, cpuColorSpinorField &y, 
 		 cpuColorSpinorField &z) {
   caxpyCpu(a, x, z);
   caxpyCpu(b, y, z);
 }
 
-void caxpbypczpwCpu(const Complex &a, cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y, 
-		    const Complex &c, cpuColorSpinorField &z, cpuColorSpinorField &w) {
+void caxpbypczpwCpu(const quda::Complex &a, cpuColorSpinorField &x, const quda::Complex &b, cpuColorSpinorField &y, 
+		    const quda::Complex &c, cpuColorSpinorField &z, cpuColorSpinorField &w) {
   caxpyCpu(a, x, w);
   caxpyCpu(b, y, w);
   caxpyCpu(c, z, w);
 
 }
 
-Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
+quda::Complex caxpyDotzyCpu(const quda::Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
 		      cpuColorSpinorField &z) {
   caxpyCpu(a, x, y);
   return cDotProductCpu(z, y);
