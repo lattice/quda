@@ -1,5 +1,5 @@
 #include <read_gauge.h>
-#include <gauge_quda.h>
+#include <gauge_field.h>
 
 #include "gauge_force_quda.h"
 
@@ -537,7 +537,7 @@ parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
 }
 
 void
-gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
+gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& cudaSiteLink,
                  QudaGaugeParam* param, int** input_path, 
 		 int* length, void* path_coeff, int num_paths, int max_length)
 {
@@ -586,18 +586,18 @@ gauge_force_cuda(FullMom  cudaMom, int dir, double eb3, FullGauge cudaSiteLink,
     dim3 gridDim(volume/blockDim.x, 1, 1);
     dim3 halfGridDim(volume/(2*blockDim.x), 1, 1);
     
-    float2* momEven = (float2*)cudaMom.even;
-    float2* momOdd = (float2*)cudaMom.odd;
-    float4* linkEven = (float4*)cudaSiteLink.even;
-    float4* linkOdd = (float4*)cudaSiteLink.odd;        
+    float2* momEven = (float2*)cudaMom.Even_p();
+    float2* momOdd = (float2*)cudaMom.Odd_p();
+    float4* linkEven = (float4*)cudaSiteLink.Even_p();
+    float4* linkOdd = (float4*)cudaSiteLink.Odd_p();        
 
-    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.even, cudaSiteLink.bytes);
-    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.odd, cudaSiteLink.bytes);
+    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
+    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());
     parity_compute_gauge_force_kernel<0><<<halfGridDim, blockDim>>>(momEven, momOdd,
-								  dir, eb3,
-								  linkEven, linkOdd, 
-								  input_path_d, length_d, (float*)path_coeff_d,
-								  num_paths);   
+								    dir, eb3,
+								    linkEven, linkOdd, 
+								    input_path_d, length_d, (float*)path_coeff_d,
+								    num_paths);   
     //odd
     /* The reason we do not switch the even/odd function input paramemters and the texture binding
      * is that we use the oddbit to decided where to load, in the kernel function

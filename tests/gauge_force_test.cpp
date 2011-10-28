@@ -4,7 +4,7 @@
 
 #include <quda.h>
 #include <test_util.h>
-#include <gauge_quda.h>
+#include <gauge_field.h>
 #include "misc.h"
 #include "gauge_force_reference.h"
 #include "gauge_force_quda.h"
@@ -18,25 +18,23 @@ typedef struct {
 } dcomplex;
 
 typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-#ifdef __cplusplus
-extern "C" {
-#endif
-extern void initDslashCuda(FullGauge gauge);
-extern void initDslashConstants(const FullGauge gauge, const int sp_stride);
-#ifdef __cplusplus
-}
-#endif
+
+extern void initDslashConstants(const cudaGaugeField& gauge, const int sp_stride);
+
 int device = 0;
 
-FullGauge cudaSiteLink;
-FullMom cudaMom;
-QudaGaugeParam gaugeParam;
-void* siteLink;
-void* mom;
-void* refMom;
+cudaGaugeField* cudaSiteLink = NULL;
+
+cudaGaugeField* cudaMom = NULL;
+
+static QudaGaugeParam gaugeParam;
+cpuGaugeField* siteLink = NULL;
+cpuGaugeField* mom = NULL;
+cpuGaugeField* refMom = NULL;
 
 int verify_results = 0;
 int ODD_BIT = 1;
+
 extern int tdim;
 extern QudaPrecision prec;
 extern int xdim;
@@ -79,52 +77,47 @@ gauge_force_init()
     
     setDims(gaugeParam.X);
     
-    gaugeParam.cpu_prec = QUDA_SINGLE_PRECISION;
+    gaugeParam.cpu_prec = link_prec;
     gaugeParam.cuda_prec = link_prec;
+    gaugeParam.reconstruct = link_recon;
     
-    size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-    
-    siteLink = malloc(4*V*gaugeSiteSize* gSize);
-    if (siteLink == NULL){
-	fprintf(stderr, "ERROR: malloc failed for sitelink\n");
-	exit(1);
-    }
+    gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
+    GaugeFieldParam gParam(0, gaugeParam);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    siteLink = new cpuGaugeField(gParam);
+
+    // this is a hack to get the gauge field to appear as a void** rather than void*
     void* siteLink_2d[4];
     for(int i=0;i < 4;i++){
-      siteLink_2d[i] = ((char*)siteLink) + i*V*gaugeSiteSize* gSize;
+      siteLink_2d[i] = ((char*)siteLink->Gauge_p()) + i*siteLink->Volume()*gaugeSiteSize* gaugeParam.cpu_prec;
     }
 
-    
-    mom = malloc(4*V*momSiteSize*gSize);
-    if (mom == NULL){
-	fprintf(stderr, "ERROR: malloc failed for mom\n");
-	exit(1);
-    }
-    
+    // fills the gauge field with random numbers
     createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
 
 #if 0
     site_link_sanity_check(siteLink, V, gaugeParam.cpu_prec, &gaugeParam);
 #endif
 
-    createMomCPU(mom, gaugeParam.cpu_prec);    
-    memset(mom, 0, 4*V*momSiteSize*gSize);
+    gParam.precision = gaugeParam.cuda_prec;
+    gParam.reconstruct = link_recon;
+    cudaSiteLink = new cudaGaugeField(gParam);
     
-    refMom = malloc(4*V*momSiteSize*gSize);
-    if (refMom == NULL){
-	fprintf(stderr, "ERROR: malloc failed for refMom\n");
-	exit(1);
-    }
+    gParam.reconstruct = QUDA_RECONSTRUCT_10;
+    gParam.precision = gaugeParam.cpu_prec;
+    mom = new cpuGaugeField(gParam);
+    refMom = new cpuGaugeField(gParam);
     
-    memcpy(refMom, mom, 4*V*momSiteSize*gSize);
-    
-    gaugeParam.reconstruct = link_recon;
-    createLinkQuda(&cudaSiteLink, &gaugeParam);
-    
-    createMomQuda(&cudaMom, &gaugeParam);
 
+    createMomCPU(mom->Gauge_p(),  gaugeParam.cpu_prec);    
+    //memset(mom, 0, 4*V*momSiteSize*gSize);
     
+    memcpy(refMom->Gauge_p(), mom->Gauge_p(), 4*mom->Volume()*momSiteSize*gaugeParam.cpu_prec);
+    
+
+    gParam.precision = gaugeParam.cuda_prec;
+    cudaMom = new cudaGaugeField(gParam);
     
     return;
 }
@@ -132,11 +125,11 @@ gauge_force_init()
 static void 
 gauge_force_end() 
 {
-    free(siteLink);
-    free(mom);
-    
-    freeLinkQuda(&cudaSiteLink);
-    freeMomQuda(&cudaMom);
+  delete siteLink;
+  delete mom;
+  
+  delete cudaSiteLink;
+  delete cudaMom;
 }
 
 
@@ -455,7 +448,7 @@ gauge_force_test(void)
     
     gauge_force_init();
 
-    initDslashConstants(cudaSiteLink, 0);
+    initDslashConstants(*cudaSiteLink, 0);
     gauge_force_init_cuda(&gaugeParam, max_length); 
     
     double eb3 = 0.3;
@@ -477,8 +470,11 @@ gauge_force_test(void)
 	}
     }
     
-    loadMomToGPU(cudaMom, mom, &gaugeParam);
-    loadLinkToGPU_gf(cudaSiteLink, siteLink, &gaugeParam);
+    // download the momentum field to the GPU
+    cudaMom->loadCPUField(*mom, QUDA_CPU_FIELD_LOCATION);
+
+    // download the gauge field to the GPU
+    cudaSiteLink->loadCPUField(*siteLink, QUDA_CPU_FIELD_LOCATION);
     
 #define CX 1
 #define CY 1
@@ -491,28 +487,28 @@ gauge_force_test(void)
 	for(i=0;i < num_paths;i++){
 	    memcpy(input_path[i], path_dir_x, length[i]*sizeof(int));
 	}
-	gauge_force_reference(refMom, 0, eb3, siteLink, gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
+	gauge_force_reference(refMom->Gauge_p(), 0, eb3, siteLink->Gauge_p(), gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
 #endif
 
 #ifdef CY	
 	for(i=0;i < num_paths;i++){
 	    memcpy(input_path[i], path_dir_y, length[i]*sizeof(int));
 	}
-	gauge_force_reference(refMom, 1, eb3, siteLink, gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
+	gauge_force_reference(refMom->Gauge_p(), 1, eb3, siteLink->Gauge_p(), gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
 #endif	
 
 #ifdef CZ	
 	for(i=0;i < num_paths;i++){
 	    memcpy(input_path[i], path_dir_z, length[i]*sizeof(int));
 	}
-	gauge_force_reference(refMom, 2, eb3, siteLink, gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
+	gauge_force_reference(refMom->Gauge_p(), 2, eb3, siteLink->Gauge_p(), gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
 #endif
 	
 #ifdef CT	
 	for(i=0;i < num_paths;i++){
 	    memcpy(input_path[i], path_dir_t, length[i]*sizeof(int));
 	}
-	gauge_force_reference(refMom, 3, eb3, siteLink, gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
+	gauge_force_reference(refMom->Gauge_p(), 3, eb3, siteLink->Gauge_p(), gaugeParam.cpu_prec, input_path, length, loop_coeff, num_paths);
 #endif
 	
     }
@@ -530,40 +526,41 @@ gauge_force_test(void)
     for(i=0;i < num_paths;i++){
 	memcpy(input_path[i], path_dir_x, length[i]*sizeof(int));
     }
-    gauge_force_cuda(cudaMom, 0, eb3, cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
+    gauge_force_cuda(*cudaMom, 0, eb3, *cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
 #endif
 
 #ifdef CY
     for(i=0;i < num_paths;i++){
 	memcpy(input_path[i], path_dir_y, length[i]*sizeof(int));
     }
-    gauge_force_cuda(cudaMom, 1, eb3, cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
+    gauge_force_cuda(*cudaMom, 1, eb3, *cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
 #endif
 
 #ifdef CZ
     for(i=0;i < num_paths;i++){
 	memcpy(input_path[i], path_dir_z, length[i]*sizeof(int));
     }
-    gauge_force_cuda(cudaMom, 2, eb3, cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
+    gauge_force_cuda(*cudaMom, 2, eb3, *cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
 #endif
     
 #ifdef CT
     for(i=0;i < num_paths;i++){
-	memcpy(input_path[i], path_dir_t, length[i]*sizeof(int));
+      memcpy(input_path[i], path_dir_t, length[i]*sizeof(int));
     }       
-    gauge_force_cuda(cudaMom, 3, eb3, cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
+    gauge_force_cuda(*cudaMom, 3, eb3, *cudaSiteLink, &gaugeParam, input_path, length, loop_coeff, num_paths, max_length);
 #endif
     
     
     gettimeofday(&t1, NULL);
     double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
-    
-    storeMomToCPU(mom, cudaMom, &gaugeParam);
+
+    // copy the new momentum back on the CPU
+    cudaMom->saveCPUField(*mom, QUDA_CPU_FIELD_LOCATION);
     
     int res;
-    res = compare_floats(mom, refMom, 4*V*momSiteSize, 1e-3, gaugeParam.cpu_prec);
+    res = compare_floats(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume()*momSiteSize, 1e-3, gaugeParam.cpu_prec);
     
-    strong_check_mom(mom, refMom, 4*V, gaugeParam.cpu_prec);
+    strong_check_mom(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume(), gaugeParam.cpu_prec);
     
     printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
     
