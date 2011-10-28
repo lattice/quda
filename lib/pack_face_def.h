@@ -418,24 +418,24 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 		    const int parity, const cudaStream_t &stream) {
 
   dim3 blockDim(64, 1, 1); // TODO: make this a parameter for auto-tuning
-  dim3 gridDim( (in.ghostFace[dim]+blockDim.x-1) / blockDim.x, 1, 1);
+  dim3 gridDim( (in.GhostFace()[dim]+blockDim.x-1) / blockDim.x, 1, 1);
 
-  int Ninternal = in.nColor * in.nSpin; // assume spin projection
-  float *ghostNorm = (float*)((char*)ghost_buf + Ninternal*in.ghostFace[dim]*in.precision); // norm zone
+  int Ninternal = in.Ncolor() * in.Nspin(); // assume spin projection
+  float *ghostNorm = (float*)((char*)ghost_buf + Ninternal*in.GhostFace()[dim]*in.Precision()); // norm zone
 
   //printfQuda("Starting face packing: dimension = %d, direction = %d, face size = %d\n", dim, dir, in.ghostFace[dim]);
 
-  switch(in.precision) {
+  switch(in.Precision()) {
   case QUDA_DOUBLE_PRECISION:
-    packFaceWilson((double2*)ghost_buf, ghostNorm, (double2*)in.v, (float*)in.norm, 
+    packFaceWilson((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
 		   dim, dir, dagger, parity, gridDim, blockDim, stream);
     break;
   case QUDA_SINGLE_PRECISION:
-    packFaceWilson((float4*)ghost_buf, ghostNorm, (float4*)in.v, (float*)in.norm, 
+    packFaceWilson((float4*)ghost_buf, ghostNorm, (float4*)in.V(), (float*)in.Norm(), 
 		   dim, dir, dagger, parity, gridDim, blockDim, stream);
     break;
   case QUDA_HALF_PRECISION:
-    packFaceWilson((short4*)ghost_buf, ghostNorm, (short4*)in.v, (float*)in.norm, 
+    packFaceWilson((short4*)ghost_buf, ghostNorm, (short4*)in.V(), (float*)in.Norm(), 
 		   dim, dir, dagger, parity, gridDim, blockDim, stream);
     break;
   }  

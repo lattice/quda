@@ -7,6 +7,7 @@
 #include <iostream>
 #include "misc_helpers.h"
 #include <face_quda.h>
+#include <dslash_quda.h>
 
 // Easy to switch between overlapping communication or not
 #ifdef OVERLAP_COMMS
