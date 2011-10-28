@@ -1507,6 +1507,12 @@ fermion_force_cuda(double eps, double weight1, double weight2, void* act_path_co
   int i;
   FullHw tempvec[8];
     
+  if (siteLink.Reconstruct() != QUDA_RECONSTRUCT_12) 
+    errorQuda("Reconstruct type %d not supported for gauge field", siteLink.Reconstruct());
+
+  if (cudaMom.Reconstruct() != QUDA_RECONSTRUCT_10)
+    errorQuda("Reconstruct type %d not supported for momentum field", cudaMom.Reconstruct());
+
   for(i=0;i < 8;i++){
     tempvec[i]  = createHwQuda(param->X, param->cuda_prec);
   }

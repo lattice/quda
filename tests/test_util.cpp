@@ -1164,6 +1164,7 @@ createMomCPU(void* mom,  QudaPrecision precision)
 	double* thismom = (double*)mom;	    
 	for(int k=0; k < momSiteSize; k++){
 	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;				
+	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
 	}	    
       }	    
     }else{
@@ -1171,6 +1172,7 @@ createMomCPU(void* mom,  QudaPrecision precision)
 	float* thismom=(float*)mom;
 	for(int k=0; k < momSiteSize; k++){
 	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;		
+	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
 	}	    
       }
     }

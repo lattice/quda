@@ -101,6 +101,7 @@ fermion_force_init()
   //gaugeParam.reconstruct = link_recon;
 
   gParam.precision = gaugeParam.cuda_prec;
+  gParam.reconstruct = link_recon;
   cudaGauge = new cudaGaugeField(gParam);
 
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
@@ -125,6 +126,8 @@ fermion_force_init()
 
   cudaHw = createHwQuda(gaugeParam.X, hw_prec);
     
+  printf("%d %d %d %d\n", cpuMom->Reconstruct(), cudaMom->Reconstruct(), cpuGauge->Reconstruct(), cudaGauge->Reconstruct());
+
   return;
 }
 
@@ -237,7 +240,7 @@ usage(char** argv )
   printf("Usage: %s <args>\n", argv[0]);
   printf("  --device <dev_id>               Set which device to run on\n");
   printf("  --gprec <double/single/half>    Link precision\n"); 
-  printf("  --recon <8/12>                  Link reconstruction type\n"); 
+  printf("  --recon <8/12/18>                  Link reconstruction type\n"); 
   printf("  --sdim <n>                      Set spacial dimention\n");
   printf("  --tdim                          Set T dimention size(default 24)\n"); 
   printf("  --sdim                          Set spalce dimention size(default 16)\n"); 
@@ -283,7 +286,6 @@ main(int argc, char **argv)
     initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 #endif
 
-  link_recon = QUDA_RECONSTRUCT_12;
   link_prec = prec;
 
   display_test_info();
