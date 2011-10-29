@@ -264,22 +264,22 @@
     switch(dir){							\
     case XUP:								\
       if ( (i4 & 1) == 1){						\
-	sign = 1;							\
+	sign = -1;							\
       }									\
       break;								\
     case YUP:								\
       if ( ((i4+i1) & 1) == 1){						\
-	sign = 1;							\
+	sign = -1;							\
       }									\
       break;								\
     case ZUP:								\
       if ( ((i4+i1+i2) & 1) == 1){					\
-	sign = 1;							\
+	sign = -1;							\
       }									\
       break;								\
     case TUP:								\
       if (i4 == X4m1 ){							\
-	sign = 1;							\
+	sign = -1;							\
       }									\
       break;								\
     }									\

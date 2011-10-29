@@ -84,15 +84,32 @@ fermion_force_init()
 
   cpuGauge = new cpuGaugeField(gParam);
     
-  // this is a hack to get the gauge field to appear as a void** rather than void*
+  // this is a hack to have site link generated in 2d 
+  // then copied to 1d array in "MILC" format
   void* siteLink_2d[4];
   for(int i=0;i < 4;i++){
-    siteLink_2d[i] = ((char*)cpuGauge->Gauge_p()) + i*cpuGauge->Volume()* gaugeSiteSize* gaugeParam.cpu_prec;
+    siteLink_2d[i] = malloc(cpuGauge->Volume()*gaugeSiteSize*gaugeParam.cpu_prec);
+    if (siteLink_2d[i] == NULL){
+      errorQuda("ERROR: malloc failed for siteLink_2d\n");
+    }
+  }
+    
+  // fills the gauge field with random numbers
+  createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 1);
+
+  //copy the 2d sitelink to 1d milc format 
+  for(int dir=0;dir < 4; dir++){
+    for(int i=0;i < cpuGauge->Volume(); i++){
+      char* src =  ((char*)siteLink_2d[dir]) + i * gaugeSiteSize* gaugeParam.cpu_prec;
+      char* dst =  ((char*)cpuGauge->Gauge_p()) + (4*i+dir)*gaugeSiteSize*gaugeParam.cpu_prec ;
+      memcpy(dst, src, gaugeSiteSize*gaugeParam.cpu_prec);
+    }
+  }
+
+  for(int i=0;i < 4;i++){
+    free(siteLink_2d[i]);
   }
   
-  // fills the gauge field with random numbers
-  createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
-
 #if 0
   site_link_sanity_check(siteLink, V, gaugeParam.cpu_prec, &gaugeParam);
 #endif
