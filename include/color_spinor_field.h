@@ -232,8 +232,8 @@ class ColorSpinorField {
 
   int GhostLength() const { return ghost_length; }
   const int *GhostFace() const { return ghostFace; }  
-  int GhostOffset(const int i) const { return ghostFace[i]; }  
-  int GhostNormOffset(const int i ) const { return ghostFace[i]; }  
+  int GhostOffset(const int i) const { return ghostOffset[i]; }  
+  int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
 
   friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
   friend class ColorSpinorParam;
