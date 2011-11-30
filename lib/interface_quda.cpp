@@ -419,6 +419,10 @@ void freeGaugeQuda(void)
 
   if (gaugePrecise) {
     delete gaugePrecise;
+    if(gaugePrecise == gaugeSloppy){
+      gaugeSloppy = NULL;
+    }
+    
     gaugePrecise = NULL;
   }
 
@@ -429,6 +433,9 @@ void freeGaugeQuda(void)
 
   if (gaugeLongPrecise) {
     delete gaugeLongPrecise;
+    if(gaugeLongPrecise == gaugeLongSloppy){
+      gaugeLongSloppy = NULL;
+    }
     gaugeLongPrecise = NULL;
   }
 
@@ -436,9 +443,12 @@ void freeGaugeQuda(void)
     delete gaugeFatSloppy;
     gaugeFatSloppy = NULL;
   }
-
+  
   if (gaugeFatPrecise) {
     delete gaugeFatPrecise;
+    if(gaugeFatPrecise == gaugeFatSloppy){
+      gaugeFatSloppy = NULL;
+    }
     gaugeFatPrecise = NULL;
   }
 }

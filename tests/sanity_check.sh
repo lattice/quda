@@ -18,11 +18,11 @@ for prog in $progs ; do
   fi
   for prec in $precs ; do 
     for recon in $recons ; do
-	cmd="$prog --sdim 8 --tdim 16 --recon $recon --prec $prec"
-	echo running ./$cmd
+	cmd="mpirun -n 1 ./$prog --sdim 8 --tdim 16 --recon $recon --prec $prec"
+	echo running $cmd
 	echo "----------------------------------------------------------" >>$OUTFILE
         echo $cmd >> $OUTFILE
-	./$cmd >> $OUTFILE 2>&1|| (echo "$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
+	$cmd >> $OUTFILE 2>&1|| (echo "$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
     done
   done
 done
