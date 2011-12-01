@@ -1216,16 +1216,16 @@ record_gauge(int* X, void *_fatlink, int _fatlink_pad, void* _longlink, int _lon
 	     QudaGaugeParam *_param)
 {
   
-  errorQuda("This has not been updated for cudaGaugeField");
 
-  /*
-  //the X and precision in fatlink must be set because we use them in dirac creatation
+  //the X and precision in fatlink must be set because we use them in dirac creation
   //See dirac_staggered.cpp
+  /*
   for(int i =0;i < 4;i++){
     cudaFatLinkPrecise.X[i] = cudaFatLinkSloppy.X[i] = X[i];
   }
   cudaFatLinkPrecise.precision = _param->cuda_prec;
   cudaFatLinkSloppy.precision = _param->cuda_prec_sloppy;
+  */
 
   fatlink = _fatlink;
   fatlink_pad = _fatlink_pad;
@@ -1235,7 +1235,7 @@ record_gauge(int* X, void *_fatlink, int _fatlink_pad, void* _longlink, int _lon
   longlink_recon = _longlink_recon;
   longlink_recon_sloppy = _longlink_recon_sloppy;
   
-  gauge_param = _param;*/
+  gauge_param = _param;
 
   return;
 
@@ -1252,6 +1252,9 @@ do_create_precise_cuda_gauge(void)
   cudaGaugeField *tmp_fat = gaugeFatSloppy;
   cudaGaugeField *tmp_long= gaugeLongSloppy;
 
+  gaugeFatPrecise = gaugeFatSloppy = NULL;
+  gaugeLongPrecise = gaugeLongSloppy = NULL;
+  
   //create precise links
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec;
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
@@ -1279,7 +1282,6 @@ do_create_precise_cuda_gauge(void)
 void 
 do_create_sloppy_cuda_gauge(void)
 {
-  errorQuda("This has not been updated for cudaGaugeField");
 
   QudaPrecision prec = gauge_param->cuda_prec;
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;  
@@ -1288,6 +1290,10 @@ do_create_sloppy_cuda_gauge(void)
   cudaGaugeField *tmp_fat = gaugeFatPrecise;
   cudaGaugeField *tmp_long = gaugeLongPrecise;
   
+
+  gaugeFatPrecise = gaugeFatSloppy = NULL;
+  gaugeLongPrecise = gaugeLongSloppy = NULL;
+
   //create sloppy links
   gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec_sloppy; 
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
@@ -1317,8 +1323,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
 
-  // check the gauge fields have been created
-  cudaGaugeField *cudaGauge = checkGauge(param);
 
   QudaPrecision high_prec = param->cuda_prec;
   param->cuda_prec = param->cuda_prec_sloppy;
@@ -1333,6 +1337,11 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   do_create_sloppy_cuda_gauge();
+
+  // check the gauge fields have been created
+  //cudaGaugeField *cudaGauge = checkGauge(param);
+  cudaGaugeField *cudaGauge = gaugeFatSloppy;
+
 
   checkInvertParam(param);
   verbosity = param->verbosity;
@@ -1413,7 +1422,15 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
     param->mass = sqrt(param->offset[0]/4);  
   }
+  //FIXME: Dirty dirty hack
+  // At this moment, the precise fat gauge is not created (NULL)
+  // but we set it to be the same as sloppy to avoid segfault 
+  // in creating the dirac since it is needed 
+  gaugeFatPrecise = gaugeFatSloppy;
   createDirac(diracParam, *param, pc_solve);
+  // resetting to NULL
+  gaugeFatPrecise = NULL;
+
   Dirac &diracSloppy = *dSloppy;
 
   cpuColorSpinorField *h_b = NULL; // Host RHS

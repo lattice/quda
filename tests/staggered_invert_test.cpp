@@ -239,6 +239,22 @@ invert_test(void)
 
   int fat_pad = tmp_value;
   int link_pad =  3*tmp_value;
+
+#ifdef MULTI_GPU
+  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+  cpuFat = new cpuGaugeField(cpuFatParam);
+  cpuFat->exchangeGhost();
+  ghost_fatlink = (void**)cpuFat->Ghost();
+  
+  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+  GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+  cpuLong = new cpuGaugeField(cpuLongParam);
+  cpuLong->exchangeGhost();
+  ghost_longlink = (void**)cpuLong->Ghost();
+#endif
+  
   if(testtype == 6){    
     record_gauge(gaugeParam.X, fatlink, fat_pad,
 		 longlink, link_pad,
@@ -247,18 +263,7 @@ invert_test(void)
    }else{ 
     
 #ifdef MULTI_GPU
-    gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-    gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
-    cpuFat = new cpuGaugeField(cpuFatParam);
-    cpuFat->exchangeGhost();
-    ghost_fatlink = (void**)cpuFat->Ghost();
-    
-    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-    GaugeFieldParam cpuLongParam(longlink, gaugeParam);
-    cpuLong = new cpuGaugeField(cpuLongParam);
-    cpuLong->exchangeGhost();
-    ghost_longlink = (void**)cpuLong->Ghost();
+ 
 
     gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
     gaugeParam.ga_pad = fat_pad;
@@ -411,7 +416,6 @@ invert_test(void)
       errorQuda("ERROR: invalid spinor parity \n");
       exit(1);
     }
-    
     for(int i=0;i < num_offsets;i++){
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU

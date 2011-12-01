@@ -533,6 +533,9 @@ int main(int argc, char **argv)
   int accuracy_level = dslashTest();
 
   printfQuda("accuracy_level =%d\n", accuracy_level);
+
+  endQuda();
+
   if (accuracy_level >= 1) ret = 0;    //probably no error, -1 means no matching  
   endCommsQuda();
   return ret;
