@@ -37,7 +37,6 @@ enum KernelType {
 };
 
 struct DslashParam {
-  int tOffset; // offset into the T dimension (multi gpu only)
   int tMul;    // spatial volume distance between the T faces being updated (multi gpu only)
   int threads; // the desired number of active threads
   int parity;  // Even-Odd or Odd-Even
@@ -229,6 +228,8 @@ public:
   DslashCuda() { ; }
   virtual ~DslashCuda() { ; }
   virtual void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) = 0;
+  virtual int SharedPerThread() = 0;
+  virtual int Nface() { return 2; }
 };
 
 
@@ -259,11 +260,11 @@ public:
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    //printfQuda("Applying dslash: threads = %d, type = %d\n", dslashParam.threads, dslashParam.kernel_type);
     DSLASH(dslash, gridDim, blockDim, shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
   }
 
+  int SharedPerThread() { return DSLASH_SHARED_FLOATS_PER_THREAD; };
 };
 
 template <typename sFloat, typename gFloat, typename cFloat>
@@ -300,6 +301,7 @@ public:
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
   }
 
+  int SharedPerThread() { return DSLASH_SHARED_FLOATS_PER_THREAD; };
 };
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
@@ -350,6 +352,7 @@ public:
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
   }
 
+  int SharedPerThread() { return DSLASH_SHARED_FLOATS_PER_THREAD; };
 };
 
 template <typename sFloat, typename gFloat>
@@ -383,6 +386,44 @@ public:
     	   out, outNorm, gauge0, gauge1, in, inNorm, mferm, x, xNorm, a);
   }
 
+  int SharedPerThread() { return 0; };
+};
+
+template <typename sFloat, typename fatGFloat, typename longGFloat>
+class StaggeredDslashCuda : public DslashCuda {
+
+private:
+  sFloat *out;
+  float *outNorm;
+  const sFloat *in, *x;
+  const float *inNorm, *xNorm;
+  const fatGFloat *fat0, *fat1;
+  const longGFloat *long0, *long1;
+  const QudaReconstructType reconstruct;
+  const int dagger;
+  const double a;
+
+public:
+  StaggeredDslashCuda(sFloat *out, float *outNorm, const gFloat *fat0, const gFloat *fat1,
+		      const longGFloat *long0, const longGFloat *long1,
+		      const QudaReconstructType reconstruct, const sFloat *in, 
+		      const float *inNorm, const sFloat *x, const float *xNorm, const double a,
+		      const int dagger, const size_t bytes, const size_t norm_bytes) :
+    DslashCuda(), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
+    in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
+    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
+  }
+
+  virtual ~StaggeredDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
+
+  void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
+    dim3 gridDim((dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
+    STAGGERED_DSLASH(dslash, gridDim, blockDim, shared_bytes, stream, dslashParam,
+		     out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
+  }
+
+  int SharedPerThread() { return 6; }
+  int Nface() { return 6; }
 };
 
 void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
@@ -391,7 +432,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.parity = parity;
 
   dslashParam.kernel_type = INTERIOR_KERNEL;
-  dslashParam.tOffset = 0;
   dslashParam.tMul = 1;
   dslashParam.threads = volume;
 
@@ -406,7 +446,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  int shared_bytes = blockDim[0].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_COORDS);
+  int shared_bytes = blockDim[0].x*(dslash.SharedPerThread()*regSize + SHARED_COORDS);
   dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]); // stream 0 or 8
 
 #ifdef MULTI_GPU
@@ -428,14 +468,13 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for (int i=3; i>=0; i--) { // count down for Wilson
     if (!dslashParam.commDim[i]) continue;
 
-    shared_bytes = blockDim[i+1].x*(DSLASH_SHARED_FLOATS_PER_THREAD*regSize + SHARED_COORDS);
+    shared_bytes = blockDim[i+1].x*(dslash.SharedPerThread()*regSize + SHARED_COORDS);
     
     //cudaStreamSynchronize(streams[2*i]);
     //cudaStreamSynchronize(streams[2*i + 1]);
     
     dslashParam.kernel_type = static_cast<KernelType>(i);
-    //dslashParam.tOffset = dims[i]-2; // is this redundant?
-    dslashParam.threads = 2*faceVolumeCB[i]; // updating 2 faces
+    dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
     // wait for scattering to finish and then launch dslash
     cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i], 0);
@@ -478,9 +517,11 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   size_t regSize = sizeof(float);
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    dslash = new WilsonDslashCuda<double2, double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, (double2*)gauge1, 
-						    gauge.Reconstruct(), (double2*)in->V(), (float*)in->Norm(), 
-						    (double2*)xv, (float*)xn, k, dagger, in->Bytes(), in->NormBytes());
+    dslash = new WilsonDslashCuda<double2, double2>((double2*)out->V(), (float*)out->Norm(), 
+						    (double2*)gauge0, (double2*)gauge1, 
+						    gauge.Reconstruct(), (double2*)in->V(), 
+						    (float*)in->Norm(), (double2*)xv, (float*)xn,
+						    k, dagger, in->Bytes(), in->NormBytes());
     regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
@@ -695,83 +736,6 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge
 
 }
 
-
-template <typename spinorFloat, typename fatGaugeFloat, typename longGaugeFloat>
-void staggeredDslashCuda(spinorFloat *out, float *outNorm, const fatGaugeFloat *fatGauge0, const fatGaugeFloat *fatGauge1, 
-			   const longGaugeFloat* longGauge0, const longGaugeFloat* longGauge1, 
-			   const QudaReconstructType reconstruct, const spinorFloat *in, const float *inNorm,
-			   const int parity, const int dagger, const spinorFloat *x, const float *xNorm, 
-			   const double &a, const int volume, const int* Vsh, const int* dims,
-			   const int length, const int ghost_length, const dim3 *blockDim) {
-    
-  dim3 interiorGridDim( (dslashParam.threads + blockDim[0].x -1)/blockDim[0].x, 1, 1);
-  dim3 exteriorGridDim[4]  = {
-    dim3((6*Vsh[0] + blockDim[1].x -1)/blockDim[1].x, 1, 1),
-    dim3((6*Vsh[1] + blockDim[2].x -1)/blockDim[2].x, 1, 1),
-    dim3((6*Vsh[2] + blockDim[3].x -1)/blockDim[3].x, 1, 1),
-    dim3((6*Vsh[3] + blockDim[4].x -1)/blockDim[4].x, 1, 1)
-  };
-    
-  size_t regSize = bindSpinorTex_mg(length, ghost_length, in, inNorm, x, xNorm);
-  int shared_bytes = blockDim[0].x*6*regSize;
-  
-  dslashParam.kernel_type = INTERIOR_KERNEL;
-  dslashParam.tOffset =  0;
-  dslashParam.threads = volume;
-#ifdef MULTI_GPU
-  // wait for any previous outstanding dslashes to finish
-  cudaStreamWaitEvent(0, dslashEnd, 0);
-
-  // Gather from source spinor
-  for(int dir = 3; dir >=0 ; dir--){
-    if (!dslashParam.commDim[dir]) continue;
-    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
-  }
-#endif
-
-  STAGGERED_DSLASH(interiorGridDim, blockDim[0], shared_bytes, streams[Nstream-1], dslashParam,
-		   out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a); 
-
-  if (!dslashTuning) checkCudaError();
-
-#ifdef MULTI_GPU
-
-  for(int i=3 ;i >= 0;i--){
-    if (!dslashParam.commDim[i]) continue;
-
-    // Finish gather and start comms
-    face->exchangeFacesComms(i);
-    // Wait for comms to finish, and scatter into the end zone
-    face->exchangeFacesWait(*inSpinor, dagger,i);    
-
-    // Record the end of the scattering
-    cudaEventRecord(scatterEvent[2*i], streams[2*i]);
-    cudaEventRecord(scatterEvent[2*i+1], streams[2*i+1]);
-  }
-
-  for(int i=3 ;i >= 0;i--){
-    if(!dslashParam.commDim[i]) continue;
-
-    shared_bytes = blockDim[i+1].x*6*regSize;
-
-    //cudaStreamSynchronize(streams[2*i]);
-    //cudaStreamSynchronize(streams[2*i + 1]);
-    dslashParam.kernel_type = static_cast<KernelType>(i);
-    dslashParam.tOffset =  dims[i]-6;
-    dslashParam.threads = 6*Vsh[i];
-    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i], 0);
-    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i+1], 0);
-    STAGGERED_DSLASH(exteriorGridDim[i], blockDim[i+1], shared_bytes, streams[Nstream-1], dslashParam,
-		     out, outNorm, fatGauge0, fatGauge1, longGauge0, longGauge1, in, inNorm, x, xNorm, a);
-    if (!dslashTuning) checkCudaError();
-  }
-
-  cudaEventRecord(dslashEnd, streams[Nstream-1]);
-  //cudaStreamSynchronize(streams[Nstream-1]);
-
-#endif
-}
-
 void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 			 const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 			 const int parity, const int dagger, const cudaColorSpinorField *x,
@@ -781,10 +745,10 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_STAGGERED_DIRAC
+  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
   dslashParam.parity = parity;
   dslashParam.threads = in->Volume();
-  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
   for(int i=0;i<4;i++){
     dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
     dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
@@ -805,35 +769,46 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
   const void *xv = x ? x->V() : 0;
   const void *xn = x ? x->Norm() : 0;
 
+  DslashCuda *dslash = 0;
+  size_t regSize = sizeof(float);
+
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    staggeredDslashCuda((double2*)out->V(), (float*)out->Norm(), (double2*)fatGauge0, (double2*)fatGauge1,
-			(double2*)longGauge0, (double2*)longGauge1, longGauge.Reconstruct(), 
-			(double2*)in->V(), (float*)in->Norm(), parity, dagger, 
-			(double2*)xv, (float*)x, k, in->Volume(), in->GhostFace(), 
-			in->X(), in->Length(), in->GhostLength(), block);
+    dslash = staggeredDslashCuda((double2*)out->V(), (float*)out->Norm(), 
+				 (double2*)fatGauge0, (double2*)fatGauge1,
+				 (double2*)longGauge0, (double2*)longGauge1, 
+				 longGauge.Reconstruct(), (double2*)in->V(), 
+				 (float*)in->Norm(), (double2*)xv, (float*)xn, 
+				 k, dagger, in->Bytes(), in->NormBytes());
+    regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    staggeredDslashCuda((float2*)out->V(), (float*)out->Norm(), (float2*)fatGauge0, (float2*)fatGauge1,
+    dslash = staggeredDslashCuda((float2*)out->V(), (float*)out->Norm(), (float2*)fatGauge0, (float2*)fatGauge1,
 			(float4*)longGauge0, (float4*)longGauge1, longGauge.Reconstruct(), 
-			(float2*)in->V(), (float*)in->Norm(), parity, dagger, 
+			(float2*)in->V(), (float*)in->Norm(), dagger, 
 			(float2*)xv, (float*)xn, k, in->Volume(), in->GhostFace(), 
 			in->X(), in->Length(), in->GhostLength(), block);
   } else if (in->Precision() == QUDA_HALF_PRECISION) {	
-    staggeredDslashCuda((short2*)out->V(), (float*)out->Norm(), (short2*)fatGauge0, (short2*)fatGauge1,
+    dslash = staggeredDslashCuda((short2*)out->V(), (float*)out->Norm(), (short2*)fatGauge0, (short2*)fatGauge1,
 			(short4*)longGauge0, (short4*)longGauge1, longGauge.Reconstruct(), 
-			(short2*)in->V(), (float*)in->Norm(), parity, dagger, 
+			(short2*)in->V(), (float*)in->Norm(), dagger, 
 			(short2*)xv, (float*)xn, k, in->Volume(), in->GhostFace(), 
 			in->X(), in->Length(), in->GhostLength(), block);
   }
+
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), blockDim);
+
+  delete dslash;
+  unbindGaugeTex(fatGauge);
+  unbindGaugeTex(longGauge);
 
   if (!dslashTuning) checkCudaError();
   
 #else
   errorQuda("Staggered dslash has not been built");
-#endif  
+#endif  // GPU_STAGGERED_DIRAC
 }
 
 
@@ -854,7 +829,6 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
 		const cudaColorSpinorField *in, const int parity, const dim3 &blockDim) {
 
   dslashParam.parity = parity;
-  dslashParam.tOffset = 0;
   dslashParam.tMul = 1;
   dslashParam.threads = in->Volume();
 
@@ -911,7 +885,6 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const int dagger, const double &kappa, const double &mu,
 		     const QudaTwistGamma5Type twist, const dim3 &block) {
 
-  dslashParam.tOffset = 0;
   dslashParam.tMul = 1;
   dslashParam.threads = in->Volume();
 
