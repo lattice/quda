@@ -73,7 +73,7 @@ class LatticeField {
   QudaVerbosity Verbosity() const { return verbosity; }
   size_t GBytes() const { return total_bytes / (1<<30); } // returns total storage allocated
 
-  virtual void checkField(const LatticeField &);
+  void checkField(const LatticeField &);
 };
 
 #endif // _LATTICE_FIELD_H

@@ -68,7 +68,7 @@ class GaugeField : public LatticeField {
   QudaLinkType LinkType() const { return link_type; }
   QudaGaugeFixed GaugeFixed() const { return fixed; }
 
-  virtual void checkField(const GaugeField &);
+  void checkField(const GaugeField &);
 
   const size_t& Bytes() const { return bytes; }
 

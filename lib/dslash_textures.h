@@ -301,7 +301,7 @@ int bindSpinorTex(const size_t spinor_bytes, const size_t norm_bytes, const spin
     errorQuda("Unsupported precision and short vector type");
   }
 
-  return -1;
+  return size;
 }
 
 template <typename spinorFloat>

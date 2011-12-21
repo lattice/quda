@@ -404,7 +404,7 @@ private:
   const double a;
 
 public:
-  StaggeredDslashCuda(sFloat *out, float *outNorm, const gFloat *fat0, const gFloat *fat1,
+  StaggeredDslashCuda(sFloat *out, float *outNorm, const fatGFloat *fat0, const fatGFloat *fat1,
 		      const longGFloat *long0, const longGFloat *long1,
 		      const QudaReconstructType reconstruct, const sFloat *in, 
 		      const float *inNorm, const sFloat *x, const float *xNorm, const double a,
@@ -418,7 +418,7 @@ public:
 
   void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
     dim3 gridDim((dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    STAGGERED_DSLASH(dslash, gridDim, blockDim, shared_bytes, stream, dslashParam,
+    STAGGERED_DSLASH(gridDim, blockDim, shared_bytes, stream, dslashParam,
 		     out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
   }
 
@@ -739,7 +739,7 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge
 void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 			 const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 			 const int parity, const int dagger, const cudaColorSpinorField *x,
-			 const double &k, const dim3 *block, const int *commOverride)
+			 const double &k, const dim3 *blockDim, const int *commOverride)
 {
   
   inSpinor = (cudaColorSpinorField*)in; // EVIL
@@ -774,28 +774,30 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__CUDA_ARCH__ >= 130)
-    dslash = staggeredDslashCuda((double2*)out->V(), (float*)out->Norm(), 
-				 (double2*)fatGauge0, (double2*)fatGauge1,
-				 (double2*)longGauge0, (double2*)longGauge1, 
-				 longGauge.Reconstruct(), (double2*)in->V(), 
-				 (float*)in->Norm(), (double2*)xv, (float*)xn, 
-				 k, dagger, in->Bytes(), in->NormBytes());
+    dslash = new StaggeredDslashCuda<double2, double2, double2>((double2*)out->V(), (float*)out->Norm(), 
+								(double2*)fatGauge0, (double2*)fatGauge1,
+								(double2*)longGauge0, (double2*)longGauge1, 
+								longGauge.Reconstruct(), (double2*)in->V(), 
+								(float*)in->Norm(), (double2*)xv, (float*)xn, 
+								k, dagger, in->Bytes(), in->NormBytes());
     regSize = sizeof(double);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    dslash = staggeredDslashCuda((float2*)out->V(), (float*)out->Norm(), (float2*)fatGauge0, (float2*)fatGauge1,
-			(float4*)longGauge0, (float4*)longGauge1, longGauge.Reconstruct(), 
-			(float2*)in->V(), (float*)in->Norm(), dagger, 
-			(float2*)xv, (float*)xn, k, in->Volume(), in->GhostFace(), 
-			in->X(), in->Length(), in->GhostLength(), block);
+    dslash = new StaggeredDslashCuda<float2, float2, float4>((float2*)out->V(), (float*)out->Norm(), 
+							     (float2*)fatGauge0, (float2*)fatGauge1,
+							     (float4*)longGauge0, (float4*)longGauge1, 
+							     longGauge.Reconstruct(), (float2*)in->V(),
+							     (float*)in->Norm(), (float2*)xv, (float*)xn, 
+							     k, dagger, in->Bytes(), in->NormBytes());
   } else if (in->Precision() == QUDA_HALF_PRECISION) {	
-    dslash = staggeredDslashCuda((short2*)out->V(), (float*)out->Norm(), (short2*)fatGauge0, (short2*)fatGauge1,
-			(short4*)longGauge0, (short4*)longGauge1, longGauge.Reconstruct(), 
-			(short2*)in->V(), (float*)in->Norm(), dagger, 
-			(short2*)xv, (float*)xn, k, in->Volume(), in->GhostFace(), 
-			in->X(), in->Length(), in->GhostLength(), block);
+    dslash = new StaggeredDslashCuda<short2, short2, short4>((short2*)out->V(), (float*)out->Norm(), 
+							     (short2*)fatGauge0, (short2*)fatGauge1,
+							     (short4*)longGauge0, (short4*)longGauge1, 
+							     longGauge.Reconstruct(), (short2*)in->V(), 
+							     (float*)in->Norm(), (short2*)xv, (float*)xn, 
+							     k, dagger,  in->Bytes(), in->NormBytes());
   }
 
   dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), blockDim);
