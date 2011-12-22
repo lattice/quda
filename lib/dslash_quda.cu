@@ -455,7 +455,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     face->exchangeFacesComms(i);
   }
 
-  for (int i=0; i>=0; i--) {
+  for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
     // Wait for comms to finish, and scatter into the end zone
     face->exchangeFacesWait(*inSpinor, dagger, i);
