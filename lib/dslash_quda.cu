@@ -61,6 +61,7 @@ static const int Nstream = 1;
 #endif
 static cudaStream_t streams[Nstream];
 static cudaEvent_t dslashStart;
+static cudaEvent_t dslashEnd;
 static cudaEvent_t gatherStart[Nstream];
 static cudaEvent_t gatherEnd[Nstream];
 static cudaEvent_t scatterStart[Nstream];
@@ -458,7 +459,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     cudaEventRecord(gatherStart[2*i], streams[2*i]);
     cudaEventRecord(gatherStart[2*i+1], streams[2*i+1]);
 
-    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
+    face->exchangeFacesStart(*inSpinor, 1-parity, dagger, i, streams);
   }
 #endif
 
@@ -491,8 +492,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     face->exchangeFacesWait(*inSpinor, dagger, i);
 
     // Record the end of the scattering
-    cudaEventRecord(scatterEvent[2*i], streams[2*i]);
-    cudaEventRecord(scatterEvent[2*i+1], streams[2*i+1]);
+    cudaEventRecord(scatterEnd[2*i], streams[2*i]);
+    cudaEventRecord(scatterEnd[2*i+1], streams[2*i+1]);
   }
 
   for (int i=3; i>=0; i--) {
@@ -504,8 +505,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
     // wait for scattering to finish and then launch dslash
-    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i], 0);
-    cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i+1], 0);
+    cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
+    cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+1], 0);
 
     cudaEventRecord(kernelStart[2*i], streams[Nstream-1]);
     dslash.apply(blockDim[i+1], shared_bytes, streams[Nstream-1]); // all faces use this stream
@@ -515,7 +516,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   cudaEventRecord(dslashEnd, 0);
   cudaEventSynchronize(dslashEnd);
   float runTime;
-  cudaElapsedTime(&runTime, dslashStart, dslashEnd);
+  cudaEventElapsedTime(&runTime, dslashStart, dslashEnd);
   dslashTime += runTime;
 
   for (int i=0; i<Nstream; i++) {
