@@ -445,6 +445,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.threads = volume;
 
   cudaEventRecord(dslashStart, 0);
+  cudaEventSynchronize(dslashStart);
 
 #ifdef MULTI_GPU
   // Gather from source spinor
@@ -523,19 +524,19 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     // kernel timing
     cudaEventElapsedTime(&runTime, kernelStart[i], kernelEnd[i]);
     kernelTime[i][0] += runTime; // relative
-    cudaEventElapsedTime(&runTime, dslashStart[i], kernelEnd[i]);
+    cudaEventElapsedTime(&runTime, dslashStart, kernelEnd[i]);
     kernelTime[i][1] += runTime; // absolute
 
     // gather timing
     cudaEventElapsedTime(&runTime, gatherStart[i], gatherEnd[i]);
     gatherTime[i][0] += runTime; // relative
-    cudaEventElapsedTime(&runTime, dslashStart[i], gatherEnd[i]);
+    cudaEventElapsedTime(&runTime, dslashStart, gatherEnd[i]);
     gatherTime[i][1] += runTime; // absolute
 
     // scatter timing
     cudaEventElapsedTime(&runTime, scatterStart[i], scatterEnd[i]);
     scatterTime[i][0] += runTime; // relative
-    cudaEventElapsedTime(&runTime, dslashStart[i], scatterEnd[i]);
+    cudaEventElapsedTime(&runTime, dslashStart, scatterEnd[i]);
     scatterTime[i][1] += runTime; // absolute
   }
   
