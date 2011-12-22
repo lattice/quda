@@ -263,11 +263,11 @@ def def_output_spinor():
             if 2*i < sharedFloats:
                 str += "#define "+out_re(s,c)+" s["+`(2*i+0)`+"*SHARED_STRIDE]\n"
             else:
-                str += "volatile spinorFloat "+out_re(s,c)+";\n"
+                str += "VOLATILE spinorFloat "+out_re(s,c)+";\n"
             if 2*i+1 < sharedFloats:
                 str += "#define "+out_im(s,c)+" s["+`(2*i+1)`+"*SHARED_STRIDE]\n"
             else:
-                str += "volatile spinorFloat "+out_im(s,c)+";\n"
+                str += "VOLATILE spinorFloat "+out_im(s,c)+";\n"
     return str
 # end def def_output_spinor
 
@@ -275,6 +275,15 @@ def def_output_spinor():
 def prolog():
     prolog_str= ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
     prolog_str+= "#define DSLASH_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
+
+    prolog_str+= (
+"""
+#if (CUDA_VERSION >= 4100)
+#define VOLATILE
+#else
+#define VOLATILE volatile
+#endif
+""")
 
     prolog_str+= def_input_spinor()
     prolog_str+= def_gauge()
@@ -307,7 +316,7 @@ extern __shared__ char s_data[];
     if sharedFloats > 0:
         prolog_str += (
 """
-volatile spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+VOLATILE spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 """)
 
@@ -749,8 +758,8 @@ def twisted_rotate(x):
                     strRe += sign(-im*x)+out_im(s,c) + "*a"
                     strIm += sign(im*x)+out_re(s,c) + "*a"
 
-            str += "volatile spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
-            str += "volatile spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
+            str += "VOLATILE spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
+            str += "VOLATILE spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
         str += "\n"
     
     return str+"\n"
@@ -896,7 +905,10 @@ case EXTERIOR_KERNEL_Y:
 #undef x2
 #undef x3
 #undef x4
-""")
+"""
+)
+
+    str += "#undef VOLATILE\n" 
 
     return str
 # end def epilog

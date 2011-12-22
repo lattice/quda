@@ -2,6 +2,12 @@
 
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
 
+
+#if (CUDA_VERSION >= 4100)
+#define VOLATILE
+#else
+#define VOLATILE volatile
+#endif
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
@@ -128,30 +134,30 @@
 #define gT22_im (-g22_im)
 
 // output spinor
-volatile spinorFloat o00_re;
-volatile spinorFloat o00_im;
-volatile spinorFloat o01_re;
-volatile spinorFloat o01_im;
-volatile spinorFloat o02_re;
-volatile spinorFloat o02_im;
-volatile spinorFloat o10_re;
-volatile spinorFloat o10_im;
-volatile spinorFloat o11_re;
-volatile spinorFloat o11_im;
-volatile spinorFloat o12_re;
-volatile spinorFloat o12_im;
-volatile spinorFloat o20_re;
-volatile spinorFloat o20_im;
-volatile spinorFloat o21_re;
-volatile spinorFloat o21_im;
-volatile spinorFloat o22_re;
-volatile spinorFloat o22_im;
-volatile spinorFloat o30_re;
-volatile spinorFloat o30_im;
-volatile spinorFloat o31_re;
-volatile spinorFloat o31_im;
-volatile spinorFloat o32_re;
-volatile spinorFloat o32_im;
+VOLATILE spinorFloat o00_re;
+VOLATILE spinorFloat o00_im;
+VOLATILE spinorFloat o01_re;
+VOLATILE spinorFloat o01_im;
+VOLATILE spinorFloat o02_re;
+VOLATILE spinorFloat o02_im;
+VOLATILE spinorFloat o10_re;
+VOLATILE spinorFloat o10_im;
+VOLATILE spinorFloat o11_re;
+VOLATILE spinorFloat o11_im;
+VOLATILE spinorFloat o12_re;
+VOLATILE spinorFloat o12_im;
+VOLATILE spinorFloat o20_re;
+VOLATILE spinorFloat o20_im;
+VOLATILE spinorFloat o21_re;
+VOLATILE spinorFloat o21_im;
+VOLATILE spinorFloat o22_re;
+VOLATILE spinorFloat o22_im;
+VOLATILE spinorFloat o30_re;
+VOLATILE spinorFloat o30_im;
+VOLATILE spinorFloat o31_re;
+VOLATILE spinorFloat o31_im;
+VOLATILE spinorFloat o32_re;
+VOLATILE spinorFloat o32_im;
 
 #ifdef SPINOR_DOUBLE
 #if (__CUDA_ARCH__ >= 200)
@@ -1942,33 +1948,33 @@ if (!incomplete)
   
   {
     // apply twisted mass rotation
-    volatile spinorFloat tmp00_re = +o00_re-o20_im*a;
-    volatile spinorFloat tmp00_im = +o00_im+o20_re*a;
-    volatile spinorFloat tmp01_re = +o01_re-o21_im*a;
-    volatile spinorFloat tmp01_im = +o01_im+o21_re*a;
-    volatile spinorFloat tmp02_re = +o02_re-o22_im*a;
-    volatile spinorFloat tmp02_im = +o02_im+o22_re*a;
+    VOLATILE spinorFloat tmp00_re = +o00_re-o20_im*a;
+    VOLATILE spinorFloat tmp00_im = +o00_im+o20_re*a;
+    VOLATILE spinorFloat tmp01_re = +o01_re-o21_im*a;
+    VOLATILE spinorFloat tmp01_im = +o01_im+o21_re*a;
+    VOLATILE spinorFloat tmp02_re = +o02_re-o22_im*a;
+    VOLATILE spinorFloat tmp02_im = +o02_im+o22_re*a;
     
-    volatile spinorFloat tmp10_re = +o10_re-o30_im*a;
-    volatile spinorFloat tmp10_im = +o10_im+o30_re*a;
-    volatile spinorFloat tmp11_re = +o11_re-o31_im*a;
-    volatile spinorFloat tmp11_im = +o11_im+o31_re*a;
-    volatile spinorFloat tmp12_re = +o12_re-o32_im*a;
-    volatile spinorFloat tmp12_im = +o12_im+o32_re*a;
+    VOLATILE spinorFloat tmp10_re = +o10_re-o30_im*a;
+    VOLATILE spinorFloat tmp10_im = +o10_im+o30_re*a;
+    VOLATILE spinorFloat tmp11_re = +o11_re-o31_im*a;
+    VOLATILE spinorFloat tmp11_im = +o11_im+o31_re*a;
+    VOLATILE spinorFloat tmp12_re = +o12_re-o32_im*a;
+    VOLATILE spinorFloat tmp12_im = +o12_im+o32_re*a;
     
-    volatile spinorFloat tmp20_re = -o00_im*a+o20_re;
-    volatile spinorFloat tmp20_im = +o00_re*a+o20_im;
-    volatile spinorFloat tmp21_re = -o01_im*a+o21_re;
-    volatile spinorFloat tmp21_im = +o01_re*a+o21_im;
-    volatile spinorFloat tmp22_re = -o02_im*a+o22_re;
-    volatile spinorFloat tmp22_im = +o02_re*a+o22_im;
+    VOLATILE spinorFloat tmp20_re = -o00_im*a+o20_re;
+    VOLATILE spinorFloat tmp20_im = +o00_re*a+o20_im;
+    VOLATILE spinorFloat tmp21_re = -o01_im*a+o21_re;
+    VOLATILE spinorFloat tmp21_im = +o01_re*a+o21_im;
+    VOLATILE spinorFloat tmp22_re = -o02_im*a+o22_re;
+    VOLATILE spinorFloat tmp22_im = +o02_re*a+o22_im;
     
-    volatile spinorFloat tmp30_re = -o10_im*a+o30_re;
-    volatile spinorFloat tmp30_im = +o10_re*a+o30_im;
-    volatile spinorFloat tmp31_re = -o11_im*a+o31_re;
-    volatile spinorFloat tmp31_im = +o11_re*a+o31_im;
-    volatile spinorFloat tmp32_re = -o12_im*a+o32_re;
-    volatile spinorFloat tmp32_im = +o12_re*a+o32_im;
+    VOLATILE spinorFloat tmp30_re = -o10_im*a+o30_re;
+    VOLATILE spinorFloat tmp30_im = +o10_re*a+o30_im;
+    VOLATILE spinorFloat tmp31_re = -o11_im*a+o31_re;
+    VOLATILE spinorFloat tmp31_im = +o11_re*a+o31_im;
+    VOLATILE spinorFloat tmp32_re = -o12_im*a+o32_re;
+    VOLATILE spinorFloat tmp32_im = +o12_re*a+o32_im;
     
     
 #ifndef DSLASH_XPAY
@@ -2139,3 +2145,4 @@ WRITE_SPINOR(sp_stride);
 #undef i32_im
 
 
+#undef VOLATILE

@@ -44,7 +44,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
   setupDims(X);
 
-  // set these both = 0 `for no overlap of qmp and cudamemcpyasync
+  // set these both = 0 separate streams for forwards and backwards comms
   // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
   sendBackStrmIdx = 0;
   sendFwdStrmIdx = 1;

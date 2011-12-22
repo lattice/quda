@@ -2,6 +2,12 @@
 
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
 
+
+#if (CUDA_VERSION >= 4100)
+#define VOLATILE
+#else
+#define VOLATILE volatile
+#endif
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
@@ -304,30 +310,30 @@
 #define c32_32_re c12_12_re
 
 // output spinor
-volatile spinorFloat o00_re;
-volatile spinorFloat o00_im;
-volatile spinorFloat o01_re;
-volatile spinorFloat o01_im;
-volatile spinorFloat o02_re;
-volatile spinorFloat o02_im;
-volatile spinorFloat o10_re;
-volatile spinorFloat o10_im;
-volatile spinorFloat o11_re;
-volatile spinorFloat o11_im;
-volatile spinorFloat o12_re;
-volatile spinorFloat o12_im;
-volatile spinorFloat o20_re;
-volatile spinorFloat o20_im;
-volatile spinorFloat o21_re;
-volatile spinorFloat o21_im;
-volatile spinorFloat o22_re;
-volatile spinorFloat o22_im;
-volatile spinorFloat o30_re;
-volatile spinorFloat o30_im;
-volatile spinorFloat o31_re;
-volatile spinorFloat o31_im;
-volatile spinorFloat o32_re;
-volatile spinorFloat o32_im;
+VOLATILE spinorFloat o00_re;
+VOLATILE spinorFloat o00_im;
+VOLATILE spinorFloat o01_re;
+VOLATILE spinorFloat o01_im;
+VOLATILE spinorFloat o02_re;
+VOLATILE spinorFloat o02_im;
+VOLATILE spinorFloat o10_re;
+VOLATILE spinorFloat o10_im;
+VOLATILE spinorFloat o11_re;
+VOLATILE spinorFloat o11_im;
+VOLATILE spinorFloat o12_re;
+VOLATILE spinorFloat o12_im;
+VOLATILE spinorFloat o20_re;
+VOLATILE spinorFloat o20_im;
+VOLATILE spinorFloat o21_re;
+VOLATILE spinorFloat o21_im;
+VOLATILE spinorFloat o22_re;
+VOLATILE spinorFloat o22_im;
+VOLATILE spinorFloat o30_re;
+VOLATILE spinorFloat o30_im;
+VOLATILE spinorFloat o31_re;
+VOLATILE spinorFloat o31_im;
+VOLATILE spinorFloat o32_re;
+VOLATILE spinorFloat o32_im;
 
 #ifdef SPINOR_DOUBLE
 #if (__CUDA_ARCH__ >= 200)
@@ -2836,3 +2842,4 @@ WRITE_SPINOR(sp_stride);
 #undef c12_11_im
 
 
+#undef VOLATILE
