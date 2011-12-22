@@ -37,7 +37,6 @@ enum KernelType {
 };
 
 struct DslashParam {
-  int tMul;    // spatial volume distance between the T faces being updated (multi gpu only)
   int threads; // the desired number of active threads
   int parity;  // Even-Odd or Odd-Even
   int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
@@ -430,9 +429,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 		const int volume, const int *faceVolumeCB, const dim3 *blockDim) {
 
   dslashParam.parity = parity;
-
   dslashParam.kernel_type = INTERIOR_KERNEL;
-  dslashParam.tMul = 1;
   dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
@@ -440,7 +437,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   cudaStreamWaitEvent(0, dslashEnd, 0);
 
   // Gather from source spinor
-  for(int dir = 3; dir >=0; dir--){ // count down for Wilson
+  for(int dir = 3; dir >=0; dir--){
     if (!dslashParam.commDim[dir]) continue;
     face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
   }
@@ -451,7 +448,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
 #ifdef MULTI_GPU
 
-  for (int i=3; i>=0; i--) { // count down for Wilson
+  for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
     // Finish gather and start comms
@@ -459,6 +456,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 
   for (int i=0; i>=0; i--) {
+    if (!dslashParam.commDim[dir]) continue;
     // Wait for comms to finish, and scatter into the end zone
     face->exchangeFacesWait(*inSpinor, dagger, i);
 
@@ -467,13 +465,10 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     cudaEventRecord(scatterEvent[2*i+1], streams[2*i+1]);
   }
 
-  for (int i=3; i>=0; i--) { // count down for Wilson
+  for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
     shared_bytes = blockDim[i+1].x*(dslash.SharedPerThread()*regSize + SHARED_COORDS);
-    
-    //cudaStreamSynchronize(streams[2*i]);
-    //cudaStreamSynchronize(streams[2*i + 1]);
     
     dslashParam.kernel_type = static_cast<KernelType>(i);
     dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
@@ -485,7 +480,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 
   cudaEventRecord(dslashEnd, streams[Nstream-1]);
-  //cudaStreamSynchronize(streams[Nstream-1]);
 
 #endif // MULTI_GPU
 }
@@ -833,7 +827,6 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
 		const cudaColorSpinorField *in, const int parity, const dim3 &blockDim) {
 
   dslashParam.parity = parity;
-  dslashParam.tMul = 1;
   dslashParam.threads = in->Volume();
 
 #ifdef GPU_CLOVER_DIRAC
@@ -889,7 +882,6 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const int dagger, const double &kappa, const double &mu,
 		     const QudaTwistGamma5Type twist, const dim3 &block) {
 
-  dslashParam.tMul = 1;
   dslashParam.threads = in->Volume();
 
 #ifdef GPU_TWISTED_MASS_DIRAC
