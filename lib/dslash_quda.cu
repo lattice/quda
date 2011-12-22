@@ -456,7 +456,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
     // Finish gather and start comms
     face->exchangeFacesComms(i);
-    
+  }
+
+  for (int i=0; i>=0; i--) {
     // Wait for comms to finish, and scatter into the end zone
     face->exchangeFacesWait(*inSpinor, dagger, i);
 
