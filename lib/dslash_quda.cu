@@ -60,8 +60,18 @@ static const int Nstream = 9;
 static const int Nstream = 1;
 #endif
 static cudaStream_t streams[Nstream];
-static cudaEvent_t scatterEvent[Nstream];
-static cudaEvent_t dslashEnd;
+static cudaEvent_t dslashStart;
+static cudaEvent_t gatherStart[Nstream];
+static cudaEvent_t gatherEnd[Nstream];
+static cudaEvent_t scatterStart[Nstream];
+static cudaEvent_t scatterEnd[Nstream];
+static cudaEvent_t kernelStart[Nstream];
+static cudaEvent_t kernelEnd[Nstream];
+
+// dimension 2 because we want absolute and relative
+float gatherTime[Nstream][2];
+float scatterTime[Nstream][2];
+float dslashTime[Nstream][2];
 
 FaceBuffer *face;
 cudaColorSpinorField *inSpinor;
@@ -432,19 +442,29 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.kernel_type = INTERIOR_KERNEL;
   dslashParam.threads = volume;
 
-#ifdef MULTI_GPU
-  // wait for any previous outstanding dslashes to finish
-  cudaStreamWaitEvent(0, dslashEnd, 0);
+  cudaEventRecord(dslashStart, 0);
 
+#ifdef MULTI_GPU
   // Gather from source spinor
-  for(int dir = 3; dir >=0; dir--){
+  for(int i = 3; i >=0; i--){
     if (!dslashParam.commDim[dir]) continue;
+
+    // wait for any previous outstanding dslashes to finish
+    cudaStreamWaitEvent(streams[2*i], dslashEnd[i+1], 0);
+    cudaStreamWaitEvent(streams[2*i+1], dslashEnd[i+1], 0);
+
+    // Record the start of the gathering
+    cudaEventRecord(gatherStart[2*i], streams[2*i]);
+    cudaEventRecord(gatherStart[2*i+1], streams[2*i+1]);
+
     face->exchangeFacesStart(*inSpinor, 1-parity, dagger, dir, streams);
   }
 #endif
 
   int shared_bytes = blockDim[0].x*(dslash.SharedPerThread()*regSize + SHARED_COORDS);
+  cudaEventRecord(kernelStart[Nstream-1], streams[Nstream-1]);
   dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]); // stream 0 or 8
+  cudaEventRecord(kernelEnd[Nstream-1], streams[Nstream-1]);
 
 #ifdef MULTI_GPU
 
@@ -453,10 +473,19 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
     // Finish gather and start comms
     face->exchangeFacesComms(i);
+
+    // Record the end of the gathering
+    cudaEventRecord(gatherEnd[2*i], streams[2*i]);
+    cudaEventRecord(gatherEnd[2*i+1], streams[2*i+1]);
   }
 
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
+
+    // Record the start of the scattering
+    cudaEventRecord(scatterStart[2*i], streams[2*i]);
+    cudaEventRecord(scatterStart[2*i+1], streams[2*i+1]);
+
     // Wait for comms to finish, and scatter into the end zone
     face->exchangeFacesWait(*inSpinor, dagger, i);
 
@@ -476,10 +505,34 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     // wait for scattering to finish and then launch dslash
     cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i], 0);
     cudaStreamWaitEvent(streams[Nstream-1], scatterEvent[2*i+1], 0);
+
+    cudaEventRecord(kernelStart[2*i], streams[Nstream-1]);
     dslash.apply(blockDim[i+1], shared_bytes, streams[Nstream-1]); // all faces use this stream
+    cudaEventRecord(kernelEnd[2*i], streams[Nstream-1]);
   }
 
-  cudaEventRecord(dslashEnd, streams[Nstream-1]);
+  cudaThreadSynchronize();
+  float runTime;
+  for (int i=0; i<Nstream; i++) {
+    // kernel timing
+    cudaEventElapsedTime(&runTime, kernelStart[i], kernelEnd[i]);
+    kernelTime[i][0] = runTime; // relative
+    cudaEventElapsedTime(&runTime, dslashStart[i], kernelEnd[i]);
+    kernelTime[i][1] = runTime; // absolute
+
+    // gather timing
+    cudaEventElapsedTime(&runTime, gatherStart[i], gatherEnd[i]);
+    gatherTime[i][0] = runTime; // relative
+    cudaEventElapsedTime(&runTime, dslashStart[i], gatherEnd[i]);
+    gatherTime[i][1] = runTime; // absolute
+
+    // scatter timing
+    cudaEventElapsedTime(&runTime, scatterStart[i], scatterEnd[i]);
+    scatterTime[i][0] = runTime; // relative
+    cudaEventElapsedTime(&runTime, dslashStart[i], scatterEnd[i]);
+    scatterTime[i][1] = runTime; // absolute
+  }
+  
 
 #endif // MULTI_GPU
 }
