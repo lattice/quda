@@ -71,7 +71,8 @@ static cudaEvent_t kernelEnd[Nstream];
 // dimension 2 because we want absolute and relative
 float gatherTime[Nstream][2];
 float scatterTime[Nstream][2];
-float dslashTime[Nstream][2];
+float kernelTime[Nstream][2];
+float dslashTime;
 
 FaceBuffer *face;
 cudaColorSpinorField *inSpinor;
@@ -447,11 +448,11 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 #ifdef MULTI_GPU
   // Gather from source spinor
   for(int i = 3; i >=0; i--){
-    if (!dslashParam.commDim[dir]) continue;
+    if (!dslashParam.commDim[i]) continue;
 
     // wait for any previous outstanding dslashes to finish
-    cudaStreamWaitEvent(streams[2*i], dslashEnd[i+1], 0);
-    cudaStreamWaitEvent(streams[2*i+1], dslashEnd[i+1], 0);
+    cudaStreamWaitEvent(streams[2*i], kernelEnd[2*i], 0);
+    cudaStreamWaitEvent(streams[2*i+1], kernelEnd[2*i], 0);
 
     // Record the start of the gathering
     cudaEventRecord(gatherStart[2*i], streams[2*i]);
@@ -511,26 +512,30 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     cudaEventRecord(kernelEnd[2*i], streams[Nstream-1]);
   }
 
-  cudaThreadSynchronize();
+  cudaEventRecord(dslashEnd, 0);
+  cudaEventSynchronize(dslashEnd);
   float runTime;
+  cudaElapsedTime(&runTime, dslashStart, dslashEnd);
+  dslashTime += runTime;
+
   for (int i=0; i<Nstream; i++) {
     // kernel timing
     cudaEventElapsedTime(&runTime, kernelStart[i], kernelEnd[i]);
-    kernelTime[i][0] = runTime; // relative
+    kernelTime[i][0] += runTime; // relative
     cudaEventElapsedTime(&runTime, dslashStart[i], kernelEnd[i]);
-    kernelTime[i][1] = runTime; // absolute
+    kernelTime[i][1] += runTime; // absolute
 
     // gather timing
     cudaEventElapsedTime(&runTime, gatherStart[i], gatherEnd[i]);
-    gatherTime[i][0] = runTime; // relative
+    gatherTime[i][0] += runTime; // relative
     cudaEventElapsedTime(&runTime, dslashStart[i], gatherEnd[i]);
-    gatherTime[i][1] = runTime; // absolute
+    gatherTime[i][1] += runTime; // absolute
 
     // scatter timing
     cudaEventElapsedTime(&runTime, scatterStart[i], scatterEnd[i]);
-    scatterTime[i][0] = runTime; // relative
+    scatterTime[i][0] += runTime; // relative
     cudaEventElapsedTime(&runTime, dslashStart[i], scatterEnd[i]);
-    scatterTime[i][1] = runTime; // absolute
+    scatterTime[i][1] += runTime; // absolute
   }
   
 
