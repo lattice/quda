@@ -193,7 +193,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, int di
   }
 }
 
-void FaceBuffer::exchangeFacesComms(int dir) 
+void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart) { 
 {  
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
@@ -202,6 +202,7 @@ void FaceBuffer::exchangeFacesComms(int dir)
     int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
     int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
     cudaStreamSynchronize(stream[2*dim + sendBackStrmIdx]); //required the data to be there before sending out
+    CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendBackStrmIdx]);
 #ifndef GPU_DIRECT
     memcpy(pageable_back_nbr_spinor_sendbuf[dim], back_nbr_spinor_sendbuf[dim], nbytes[dim]);
 #endif
@@ -210,6 +211,7 @@ void FaceBuffer::exchangeFacesComms(int dir)
     int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
     int uptags[4] = {XUP, YUP, ZUP, TUP};
     cudaStreamSynchronize(stream[2*dim + sendFwdStrmIdx]); //required the data to be there before sending out
+    CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendFwdStrmIdx]);
 #ifndef GPU_DIRECT
     memcpy(pageable_fwd_nbr_spinor_sendbuf[dim], fwd_nbr_spinor_sendbuf[dim], nbytes[dim]);
 #endif
@@ -218,7 +220,8 @@ void FaceBuffer::exchangeFacesComms(int dir)
 } 
 
 
-void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
+ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir, 
+				    cudaEvent_t &scatterStart)
 {
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
@@ -230,7 +233,8 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
 #ifndef GPU_DIRECT
     memcpy(fwd_nbr_spinor[dim], pageable_fwd_nbr_spinor[dim], nbytes[dim]);
 #endif
-    out.unpackGhost(fwd_nbr_spinor[dim], dim, QUDA_FORWARDS,  dagger, &stream[2*dim + recFwdStrmIdx]); CUERR;
+    CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recFwdStrmIdx]);
+   out.unpackGhost(fwd_nbr_spinor[dim], dim, QUDA_FORWARDS,  dagger, &stream[2*dim + recFwdStrmIdx]); CUERR;
   } else {
     comm_wait(recv_request1[dim]);
     comm_wait(send_request1[dim]);
@@ -238,6 +242,7 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
 #ifndef GPU_DIRECT
     memcpy(back_nbr_spinor[dim], pageable_back_nbr_spinor[dim], nbytes[dim]);  
 #endif
+    CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recBackStrmIdx]);
     out.unpackGhost(back_nbr_spinor[dim], dim, QUDA_BACKWARDS,  dagger, &stream[2*dim + recBackStrmIdx]); CUERR;
   }
 }

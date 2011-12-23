@@ -13,7 +13,7 @@
 //#define DIRECT_ACCESS_WILSON_INTER
 //#define DIRECT_ACCESS_WILSON_PACK_SPINOR
 
-//these are access control for staggered action
+dx//these are access control for staggered action
 #if (__CUDA_ARCH__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
@@ -61,11 +61,12 @@ static const int Nstream = 1;
 #endif
 static cudaStream_t streams[Nstream];
 static cudaEvent_t dslashEnd;
+static cudaEvent_t scatterStart[Nstream];
 static cudaEvent_t scatterEnd[Nstream];
+static cudaEvent_t commsStart[Nstream];
 
 // these events are only used for profiling
 #ifdef DSLASH_PROFILING
-#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
 #define DSLASH_TIME_PROFILE() dslashTimeProfile()
 
 static cudaEvent_t dslashStart;
@@ -73,18 +74,17 @@ static cudaEvent_t packStart[Nstream];
 static cudaEvent_t packEnd[Nstream];
 static cudaEvent_t gatherStart[Nstream];
 static cudaEvent_t gatherEnd[Nstream];
-static cudaEvent_t scatterStart[Nstream];
 static cudaEvent_t kernelStart[Nstream];
 static cudaEvent_t kernelEnd[Nstream];
 
 // dimension 2 because we want absolute and relative
 float packTime[Nstream][2];
 float gatherTime[Nstream][2];
+float commsTime[Nstream][2];
 float scatterTime[Nstream][2];
 float kernelTime[Nstream][2];
 float dslashTime;
 #else
-#define CUDA_EVENT_RECORD(a,b)
 #define DSLASH_TIME_PROFILE()
 #endif
 
@@ -484,6 +484,12 @@ void dslashTimeProfile() {
       cudaEventElapsedTime(&runTime, dslashStart, gatherEnd[2*i+dir]);
       gatherTime[2*i+dir][1] += runTime; // end time
       
+      // comms timing
+      cudaEventElapsedTime(&runTime, dslashStart, commsStart[2*i+dir]);
+      commsTime[2*i+dir][0] += runTime; // start time
+      cudaEventElapsedTime(&runTime, dslashStart, scatterStart[2*i+dir]);
+      commsTime[2*i+dir][1] += runTime; // end time
+
       // scatter timing
       cudaEventElapsedTime(&runTime, dslashStart, scatterStart[2*i+dir]);
       scatterTime[2*i+dir][0] += runTime; // start time
@@ -513,6 +519,7 @@ void printDslashProfile() {
       printfQuda("%8s ", dimstr[2*i+dir]);
       printfQuda("%6.2f %6.2f ", packTime[2*i+dir][0], packTime[2*i+dir][1]);
       printfQuda("%6.2f %6.2f ", gatherTime[2*i+dir][0], gatherTime[2*i+dir][1]);
+      printfQuda("%6.2f %6.2f ", commsTime[2*i+dir][0], commsTime[2*i+dir][1]);
       printfQuda("%6.2f %6.2f ", scatterTime[2*i+dir][0], scatterTime[2*i+dir][1]);
 
       if (dir==0) printfQuda("%6.2f %6.2f\n", kernelTime[2*i][0], kernelTime[2*i][1]);
@@ -578,7 +585,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     
     for (int dir=0; dir<2; dir++) {
       // Finish gather and start comms
-      face->exchangeFacesComms(2*i+dir);
+      face->exchangeFacesComms(2*i+dir, commsStart[2*i+dir]);
     }
   }
 
@@ -586,11 +593,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     if (!dslashParam.commDim[i]) continue;
 
     for (int dir=0; dir<2; dir++) {
-      // Record the start of the scattering
-      CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
-
       // Wait for comms to finish, and scatter into the end zone
-      face->exchangeFacesWait(*inSpinor, dagger, 2*i+dir);
+      face->exchangeFacesWait(*inSpinor, dagger, 2*i+dir, scatterStart[2*i+dir]);
 
       // Record the end of the scattering
       cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]);

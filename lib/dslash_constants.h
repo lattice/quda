@@ -310,7 +310,9 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
   cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
+    cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
     cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&commsStart[i], cudaEventDisableTiming);
   }
 #else
   cudaEventCreate(&dslashStart);
@@ -324,6 +326,8 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
     cudaEventCreate(&gatherStart[i]);
     cudaEventCreate(&gatherEnd[i]);
 
+    cudaEventCreate(&commsStart[i]);
+
     cudaEventCreate(&scatterStart[i]);
     cudaEventCreate(&scatterEnd[i]);
 
@@ -336,6 +340,9 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
 
     gatherTime[i][0] = 0.0;
     gatherTime[i][1] = 0.0;
+
+    commsTime[i][0] = 0.0;
+    commsTime[i][1] = 0.0;
 
     scatterTime[i][0] = 0.0;
     scatterTime[i][1] = 0.0;

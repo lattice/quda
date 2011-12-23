@@ -242,7 +242,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, int di
   }
 }
 
-void FaceBuffer::exchangeFacesComms(int dir) {
+void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart) {
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
 
@@ -253,6 +253,8 @@ void FaceBuffer::exchangeFacesComms(int dir) {
       cudaStreamSynchronize(stream[2*dim + sendBackStrmIdx]);
     }
 #endif
+
+    CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendBackStrmIdx]);
     
 #ifdef QMP_COMMS  // Begin backward send
 #ifndef GPU_DIRECT
@@ -269,6 +271,8 @@ void FaceBuffer::exchangeFacesComms(int dir) {
     }
 #endif
     
+    CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendFwdStrmIdx]);
+
 #ifdef QMP_COMMS
     // Begin forward send
 #ifndef GPU_DIRECT
@@ -315,7 +319,8 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 #endif
 
-void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
+void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir, 
+				   cudaEvent_t &scatterStart)
 {
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
@@ -323,9 +328,13 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   if (dir%2==0) {// receive from forwards
     // Scatter faces.
     QMP_finish_from_fwd(dim);
+    // Record the start of the scattering
+    CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recFwdStrmIdx]);
     out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+recFwdStrmIdx]); // 0, 2, 4, 6
   } else { // receive from backwards
     QMP_finish_from_back(dim);
+    // Record the start of the scattering
+    CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recBackStrmIdx]);
     out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+recBackStrmIdx]); // 1, 3, 5, 7
   }
 }
