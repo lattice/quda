@@ -496,6 +496,8 @@ void dslashTimeProfile() {
 
 void printDslashProfile() {
   
+  printfQuda("Total Dslash time = %6.2f\n", dslashTime);
+
   char dimstr[8][8] = {"X-", "X+", "Y-", "Y+", "Z-", "Z+", "T-", "T+"};
 
   printfQuda("         %13s %13s %13s %13s\n", "Pack", "Gather", "Scatter", "Kernel");
