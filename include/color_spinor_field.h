@@ -280,9 +280,10 @@ class cudaColorSpinorField : public ColorSpinorField {
   void allocateGhostBuffer(void);
   static void freeGhostBuffer(void);
 
-  void packGhost(void* ghost_spinor, const int dim, 
-		 const QudaDirection dir, const QudaParity parity, 
+  void packGhost(const int dim, const QudaDirection dir, const QudaParity parity, 
 		 const int dagger, cudaStream_t* stream);
+  void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
+		 const int dagger, cudaStream_t *stream);
   void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		   const int dagger, cudaStream_t* stream);
 

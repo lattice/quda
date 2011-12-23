@@ -490,11 +490,33 @@ void cudaColorSpinorField::freeGhostBuffer(void) {
   initGhostFaceBuffer = 0;  
 }
 
-void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
+// pack the ghost zone into a contiguous buffer for communications
+void cudaColorSpinorField::packGhost(const int dim, const QudaDirection dir,
 				     const QudaParity parity, const int dagger, cudaStream_t *stream) 
 {
 
 #ifdef MULTI_GPU
+  if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+    void* gpu_buf = 
+      (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
+
+    if (nSpin == 1) { // use different packing kernels for staggered and Wilson
+      collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); 
+    } else {
+      packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, *stream); 
+    }
+  }
+#else
+  errorQuda("packGhost not built on single-GPU build");
+#endif
+
+  CUERR;
+}
+ 
+// send the ghost zone to the host
+void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
+				     const int dagger, cudaStream_t *stream) {
+
   int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
@@ -506,11 +528,6 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
     void* gpu_buf = 
       (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
 
-    if (nSpin == 1) { // use different packing kernels for staggered and Wilson
-      collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); 
-    } else {
-      packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, *stream); 
-    }
     CUDAMEMCPY(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
   } else { // do multiple cudaMemcpys 
 
@@ -549,12 +566,11 @@ void cudaColorSpinorField::packGhost(void *ghost_spinor, const int dim, const Qu
     }
   }
 #else
-  errorQuda("packGhost not built on single-GPU build");
+  errorQuda("sendGhost not built on single-GPU build");
 #endif
 
   CUERR;
 }
-    
 
 void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
 				       const QudaDirection dir, 
