@@ -69,50 +69,56 @@ AC_ARG_ENABLE(verbose-build,
    [ quda_verbose_build="no" ]
 )
 
+AC_ARG_ENABLE(dslash-profiling, 
+  AC_HELP_STRING([--enable-dslash-profiling], [ Enable profiling of multi-GPU dslash ]),
+  [ quda_dslash_profiling=${enableval} ], 
+  [ quda_dslash_profiling="no" ]
+)
+
 AC_ARG_ENABLE(wilson-dirac,
-  AC_HELP_STRING([ --enable-wilson-dirac], [ Build Wilson Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-wilson-dirac], [ Build Wilson Dirac Op  (default=enabled) ]),
   [ build_wilson_dirac=${enableval} ], 
   [ build_wilson_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(clover-dirac,
-  AC_HELP_STRING([ --enable-clover-dirac], [ Build Clover Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-clover-dirac], [ Build Clover Dirac Op  (default=enabled) ]),
   [ build_clover_dirac=${enableval} ], 
   [ build_clover_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(domain-wall-dirac,
-  AC_HELP_STRING([ --enable-domain-wall-dirac], [ Build Domain Wall Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-domain-wall-dirac], [ Build Domain Wall Dirac Op  (default=enabled) ]),
   [ build_dwf_dirac=${enableval} ], 
   [ build_dwf_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(staggered-dirac,
-  AC_HELP_STRING([ --enable-staggered-dirac], [ Build Staggered Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-staggered-dirac], [ Build Staggered Dirac Op  (default=enabled) ]),
   [ build_staggered_dirac=${enableval} ], 
   [ build_staggered_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(twisted-mass-dirac,
-  AC_HELP_STRING([ --enable-twisted-mass-dirac], [ Build Twisted Mass Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-twisted-mass-dirac], [ Build Twisted Mass Dirac Op  (default=enabled) ]),
   [ build_twm_dirac=${enableval} ], 
   [ build_twm_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(staggered-fatlink,
-  AC_HELP_STRING([ --enable-staggered-fatlink], [ Build Staggered Fat Link Code (default=disabled) ]),
+  AC_HELP_STRING([--enable-staggered-fatlink], [ Build Staggered Fat Link Code (default=disabled) ]),
   [ build_staggered_fatlink=${enableval} ], 
   [ build_staggered_fatlink="no" ]
 )
 
 AC_ARG_ENABLE(gauge-force,
-  AC_HELP_STRING([ --enable-gauge-force], [ Build 1 loop Symanzik gauge force (default=disabled) ]),
+  AC_HELP_STRING([--enable-gauge-force], [ Build 1 loop Symanzik gauge force (default=disabled) ]),
   [ build_gauge_force=${enableval} ], 
   [ build_gauge_force="no" ]
 )
 
 AC_ARG_ENABLE(staggered-force,
-  AC_HELP_STRING([ --enable-staggered-force], [ Build Staggered Force Term (default=disabled) ]),
+  AC_HELP_STRING([--enable-staggered-force], [ Build Staggered Force Term (default=disabled) ]),
   [ build_staggered_force=${enableval} ], 
   [ build_staggered_force="no" ]
 )
@@ -200,6 +206,14 @@ case ${quda_verbose_build} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-quda-verbose-build ])
+  ;;
+esac
+
+dnl DSLASH_PROFILING
+case ${quda_dslash_profiling} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-dslash-profiling ])
   ;;
 esac
 
@@ -360,6 +374,9 @@ AC_SUBST( DEVICE_DEBUG,  [${quda_device_debug}] )
 
 AC_MSG_NOTICE([Setting VERBOSE = ${quda_verbose_build} ])
 AC_SUBST( VERBOSE,	 [${quda_verbose_build}] )
+
+AC_MSG_NOTICE([Setting DSLASH_PROFILING = ${quda_dslash_profiling} ])
+AC_SUBST( VERBOSE,	 [${quda_dslash_profiling}] )
 
 AC_MSG_NOTICE([Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} ])
 AC_SUBST( BUILD_WILSON_DIRAC, [${build_wilson_dirac}])
