@@ -496,23 +496,25 @@ void dslashTimeProfile() {
 
 void printDslashProfile() {
   
-  for (int i=4; i>=0; i--) {
-    if (!dslashParam.commDim[i] && i<4) continue;
+  char dimstr[8][8] = {"X-", "X+", "Y-", "Y+", "Z-", "Z+", "T-", "T+"};
 
-    printfQuda("Kernel       %d %f %f %f\n", i, kernelTime[2*i][0], kernelTime[2*i][1], 
-	       kernelTime[2*i][1]-kernelTime[2*i][0]);
-  }
+  printfQuda("         %13s %13s %13s %13s\n", "Pack", "Gather", "Scatter", "Kernel");
+  printfQuda("         %6s %6s %6s %6s %6s %6s %6s %6s\n", 
+	     "Start", "End", "Start", "End", "Start", "End", "Start", "End");
+
+  printfQuda("%8s %6.2f %6.2f\n", "Interior", kernelTime[8][0], kernelTime[8][1]);
       
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
     for (int dir = 0; dir < 2; dir ++) {
-      printfQuda("Pack         %d %d %f %f\n", i, dir, packTime[2*i+dir][0], packTime[2*i+dir][1],
-		 packTime[2*i+dir][1] - packTime[2*i+dir][0]);
-      printfQuda("Gather       %d %d %f %f\n", i, dir, gatherTime[2*i+dir][0], gatherTime[2*i+dir][1],
-		 gatherTime[2*i+dir][1] - gatherTime[2*i+dir][0]);
-      printfQuda("Scatter      %d %d %f %f\n", i, dir, scatterTime[2*i+dir][0], scatterTime[2*i+dir][1],
-		 scatterTime[2*i+dir][1] - scatterTime[2*i+dir][0]);
+      printfQuda("%8s ", dimstr[2*i+dir]);
+      printfQuda("%6.2f %6.2f ", packTime[2*i+dir][0], packTime[2*i+dir][1]);
+      printfQuda("%6.2f %6.2f ", gatherTime[2*i+dir][0], gatherTime[2*i+dir][1]);
+      printfQuda("%6.2f %6.2f", scatterTime[2*i+dir][0], scatterTime[2*i+dir][1]);
+
+      if (i%2==0) printfQuda("%6.2f %6.2f\n", kernelTime[2*i][0], kernelTime[2*i][1]);
+      else printfQuda("\n");
     }
   }
 
