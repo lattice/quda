@@ -557,6 +557,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
       // Initialize host transfer from source spinor
       face->exchangeFacesStart(*inSpinor, dagger, 2*i+dir);
+
+      // Record the end of the gathering
+      CUDA_EVENT_RECORD(gatherEnd[2*i+dir], streams[2*i+dir]);
     }
   }
 #endif
@@ -574,9 +577,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     for (int dir=0; dir<2; dir++) {
       // Finish gather and start comms
       face->exchangeFacesComms(2*i+dir);
-
-      // Record the end of the gathering
-      CUDA_EVENT_RECORD(gatherEnd[2*i+dir], streams[2*i+dir]);
     }
   }
 
