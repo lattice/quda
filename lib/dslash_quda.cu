@@ -486,8 +486,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.threads = volume;
 
   cudaStreamWaitEvent(0, dslashEnd, 0);
-
   CUDA_EVENT_RECORD(dslashStart, 0);
+  //cudaEventSynchronize(dslashStart);
 
 #ifdef MULTI_GPU
   for(int i = 3; i >=0; i--){
