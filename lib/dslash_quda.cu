@@ -85,7 +85,7 @@ float kernelTime[Nstream][2];
 float dslashTime;
 #else
 #define CUDA_EVENT_RECORD(a,b)
-#define DSLASH_TIMING()
+#define DSLASH_TIME_PROFILE()
 #endif
 
 FaceBuffer *face;
@@ -457,40 +457,39 @@ void dslashTimeProfile() {
   float runTime;
   cudaEventElapsedTime(&runTime, dslashStart, dslashEnd);
   dslashTime += runTime;
-    checkCudaError();
 
-  for (int i=0; i<Nstream; i++) {
-    printf("time %d\n", i);
-    if (i%2==0) {
-      // kernel timing
-      cudaEventElapsedTime(&runTime, kernelStart[i], kernelEnd[i]);
-      kernelTime[i][0] += runTime; // relative
-      checkCudaError();
-      cudaEventElapsedTime(&runTime, dslashStart, kernelEnd[i]);
-      kernelTime[i][1] += runTime; // absolute
-      checkCudaError();
+  for (int i=4; i>=0; i--) {
+    if (!dslashParam.commDim[i]) continue;
+
+    // kernel timing
+    cudaEventElapsedTime(&runTime, kernelStart[2*i], kernelEnd[2*i]);
+    kernelTime[2*i][0] += runTime; // relative
+    cudaEventElapsedTime(&runTime, dslashStart, kernelEnd[2*i]);
+    kernelTime[2*i][1] += runTime; // absolute
+  }
+      
+  for (int i=3; i>=0; i--) {
+    if (!dslashParam.commDim[i]) continue;
+
+    for (int dir = 0; dir < 2; dir ++) {
+      // pack timing
+      cudaEventElapsedTime(&runTime, packStart[2*i+dir], packEnd[2*i+dir]);
+      packTime[2*i+dir][0] += runTime; // relative
+      cudaEventElapsedTime(&runTime, dslashStart, packEnd[2*i+dir]);
+      packTime[2*i+dir][1] += runTime; // absolute
+      
+      // gather timing
+      cudaEventElapsedTime(&runTime, gatherStart[2*i+dir], gatherEnd[2*i+dir]);
+      gatherTime[2*i+dir][0] += runTime; // relative
+      cudaEventElapsedTime(&runTime, dslashStart, gatherEnd[2*i+dir]);
+      gatherTime[2*i+dir][1] += runTime; // absolute
+      
+      // scatter timing
+      cudaEventElapsedTime(&runTime, scatterStart[2*i+dir], scatterEnd[2*i+dir]);
+      scatterTime[2*i+dir][0] += runTime; // relative
+      cudaEventElapsedTime(&runTime, dslashStart, scatterEnd[2*i+dir]);
+      scatterTime[2*i+dir][1] += runTime; // absolute
     }
-
-    // pack timing
-    cudaEventElapsedTime(&runTime, packStart[i], packEnd[i]);
-    packTime[i][0] += runTime; // relative
-    cudaEventElapsedTime(&runTime, dslashStart, packEnd[i]);
-    packTime[i][1] += runTime; // absolute
-    checkCudaError();
-
-    // gather timing
-    cudaEventElapsedTime(&runTime, gatherStart[i], gatherEnd[i]);
-    gatherTime[i][0] += runTime; // relative
-    cudaEventElapsedTime(&runTime, dslashStart, gatherEnd[i]);
-    gatherTime[i][1] += runTime; // absolute
-    checkCudaError();
-
-    // scatter timing
-    cudaEventElapsedTime(&runTime, scatterStart[i], scatterEnd[i]);
-    scatterTime[i][0] += runTime; // relative
-    cudaEventElapsedTime(&runTime, dslashStart, scatterEnd[i]);
-    scatterTime[i][1] += runTime; // absolute
-    checkCudaError();
   }
 
 }
@@ -523,8 +522,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     }
   }
 
-  checkCudaError();
-
   for(int i = 3; i >=0; i--){
     if (!dslashParam.commDim[i]) continue;
 
@@ -538,14 +535,10 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  checkCudaError();
-
   int shared_bytes = blockDim[0].x*(dslash.SharedPerThread()*regSize + SHARED_COORDS);
   CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
   dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]);
   CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
-
-  checkCudaError();
 
 #ifdef MULTI_GPU
 
@@ -561,8 +554,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     }
   }
 
-  checkCudaError();
-
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
@@ -577,8 +568,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
       cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]);
     }
   }
-
-  checkCudaError();
 
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
@@ -597,12 +586,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);
   }
 
-  checkCudaError();
-
   cudaEventRecord(dslashEnd, 0);
   DSLASH_TIME_PROFILE();
-
-  checkCudaError();
 
 #endif // MULTI_GPU
 }
