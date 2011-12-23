@@ -61,7 +61,7 @@ static const int Nstream = 1;
 #endif
 static cudaStream_t streams[Nstream];
 static cudaEvent_t dslashEnd;
-static cudaEvent_t gatherEnd[Nstream];
+static cudaEvent_t scatterEnd[Nstream];
 
 // these events are only used for profiling
 #ifdef DSLASH_PROFILING
@@ -505,8 +505,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   int shared_bytes = blockDim[0].x*(dslash.SharedPerThread()*regSize + SHARED_COORDS);
   CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
-  dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]); // stream 0 or 8
-  CUDE_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
+  dslash.apply(blockDim[0], shared_bytes, streams[Nstream-1]);
+  CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
 
 #ifdef MULTI_GPU
 
@@ -530,7 +530,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
       CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
 
       // Wait for comms to finish, and scatter into the end zone
-      face->exchangeFacesWait(*inSpinor, dagger, i);
+      face->exchangeFacesWait(*inSpinor, dagger, 2*i+dir);
 
       // Record the end of the scattering
       cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]);

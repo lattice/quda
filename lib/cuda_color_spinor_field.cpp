@@ -517,6 +517,7 @@ void cudaColorSpinorField::packGhost(const int dim, const QudaDirection dir,
 void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
 				     const int dagger, cudaStream_t *stream) {
 
+#ifdef MULTI_GPU
   int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
   int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
   int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom

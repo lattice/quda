@@ -217,8 +217,8 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
     QMP_start(mh_from_fwd[dim]);
 #endif
     // gather for backwards send
-    in.packGhost(dir, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendBackStrmIdx]);  
-    in.sendGhost(my_back_face[dim], dir, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]);  
+    in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendBackStrmIdx]);  
+    in.sendGhost(my_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]);  
 
   } else { // sending forwards
 
@@ -227,8 +227,8 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
     QMP_start(mh_from_back[dim]);
 #endif
     // gather for forwards send
-    in.packGhost(dir, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendFwdStrmIdx]);
-    in.sendGhost(my_fwd_face[dim], dir, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
+    in.packGhost(dim, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendFwdStrmIdx]);
+    in.sendGhost(my_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
 
   }
 }
