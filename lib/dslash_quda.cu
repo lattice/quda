@@ -13,7 +13,7 @@
 //#define DIRECT_ACCESS_WILSON_INTER
 //#define DIRECT_ACCESS_WILSON_PACK_SPINOR
 
-dx//these are access control for staggered action
+//these are access control for staggered action
 #if (__CUDA_ARCH__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
