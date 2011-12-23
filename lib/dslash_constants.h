@@ -318,6 +318,9 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
 
+    cudaEventCreate(&packStart[i]);
+    cudaEventCreate(&packEnd[i]);
+
     cudaEventCreate(&gatherStart[i]);
     cudaEventCreate(&gatherEnd[i]);
 
