@@ -84,7 +84,9 @@ float commsTime[Nstream][2];
 float scatterTime[Nstream][2];
 float kernelTime[Nstream][2];
 float dslashTime;
+#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
 #else
+#define CUDA_EVENT_RECORD(a,b)
 #define DSLASH_TIME_PROFILE()
 #endif
 
@@ -506,11 +508,11 @@ void printDslashProfile() {
 
   char dimstr[8][8] = {"X-", "X+", "Y-", "Y+", "Z-", "Z+", "T-", "T+"};
 
-  printfQuda("         %13s %13s %13s %13s\n", "Pack", "Gather", "Scatter", "Kernel");
-  printfQuda("         %6s %6s %6s %6s %6s %6s %6s %6s\n", 
-	     "Start", "End", "Start", "End", "Start", "End", "Start", "End");
+  printfQuda("         %13s %13s %13s %13s %13s\n", "Pack", "Gather", "Comms", "Scatter", "Kernel");
+  printfQuda("         %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s\n", 
+	     "Start", "End", "Start", "End", "Start", "End", "Start", "End", "Start", "End");
 
-  printfQuda("%8s %41s %6.2f %6.2f\n", "Interior", "", kernelTime[8][0], kernelTime[8][1]);
+  printfQuda("%8s %55s %6.2f %6.2f\n", "Interior", "", kernelTime[8][0], kernelTime[8][1]);
       
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;

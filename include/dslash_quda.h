@@ -23,9 +23,6 @@ extern "C" {
 
 #ifdef DSLASH_PROFILING
   void printDslashProfile();
-#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
-#else
-#define CUDA_EVENT_RECORD(a,b)
 #endif
 
 #ifdef __cplusplus

@@ -14,6 +14,14 @@
 #define GPU_DIRECT
 #endif
 
+#ifdef DSLASH_PROFILING
+  void printDslashProfile();
+#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
+#else
+#define CUDA_EVENT_RECORD(a,b)
+#define DSLASH_TIME_PROFILE()
+#endif
+
 /*
   Multi-GPU TODOs
   - test qmp code

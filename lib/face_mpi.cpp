@@ -16,6 +16,13 @@ using namespace std;
 #define GPU_DIRECT
 #endif
 
+#ifdef DSLASH_PROFILING
+  void printDslashProfile();
+#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
+#else
+#define CUDA_EVENT_RECORD(a,b)
+#define DSLASH_TIME_PROFILE()
+#endif
 
 cudaStream_t *stream;
 
@@ -194,7 +201,6 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, int di
 }
 
 void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart) { 
-{  
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
 
