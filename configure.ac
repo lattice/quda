@@ -376,7 +376,7 @@ AC_MSG_NOTICE([Setting VERBOSE = ${quda_verbose_build} ])
 AC_SUBST( VERBOSE,	 [${quda_verbose_build}] )
 
 AC_MSG_NOTICE([Setting DSLASH_PROFILING = ${quda_dslash_profiling} ])
-AC_SUBST( VERBOSE,	 [${quda_dslash_profiling}] )
+AC_SUBST( DSLASH_PROFILING,	 [${quda_dslash_profiling}] )
 
 AC_MSG_NOTICE([Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} ])
 AC_SUBST( BUILD_WILSON_DIRAC, [${build_wilson_dirac}])

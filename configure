@@ -614,6 +614,7 @@ BUILD_STAGGERED_DIRAC
 BUILD_DOMAIN_WALL_DIRAC
 BUILD_CLOVER_DIRAC
 BUILD_WILSON_DIRAC
+DSLASH_PROFILING
 VERBOSE
 DEVICE_DEBUG
 HOST_DEBUG
@@ -3782,7 +3783,7 @@ VERBOSE=${quda_verbose_build}
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting DSLASH_PROFILING = ${quda_dslash_profiling} " >&5
 $as_echo "$as_me: Setting DSLASH_PROFILING = ${quda_dslash_profiling} " >&6;}
-VERBOSE=${quda_dslash_profiling}
+DSLASH_PROFILING=${quda_dslash_profiling}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} " >&5
