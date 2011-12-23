@@ -502,7 +502,7 @@ void printDslashProfile() {
   printfQuda("         %6s %6s %6s %6s %6s %6s %6s %6s\n", 
 	     "Start", "End", "Start", "End", "Start", "End", "Start", "End");
 
-  printfQuda("%8s %6.2f %6.2f\n", "Interior", kernelTime[8][0], kernelTime[8][1]);
+  printfQuda("%8s %41s %6.2f %6.2f\n", "Interior", "", kernelTime[8][0], kernelTime[8][1]);
       
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
@@ -511,9 +511,9 @@ void printDslashProfile() {
       printfQuda("%8s ", dimstr[2*i+dir]);
       printfQuda("%6.2f %6.2f ", packTime[2*i+dir][0], packTime[2*i+dir][1]);
       printfQuda("%6.2f %6.2f ", gatherTime[2*i+dir][0], gatherTime[2*i+dir][1]);
-      printfQuda("%6.2f %6.2f", scatterTime[2*i+dir][0], scatterTime[2*i+dir][1]);
+      printfQuda("%6.2f %6.2f ", scatterTime[2*i+dir][0], scatterTime[2*i+dir][1]);
 
-      if (i%2==0) printfQuda("%6.2f %6.2f\n", kernelTime[2*i][0], kernelTime[2*i][1]);
+      if (dir==0) printfQuda("%6.2f %6.2f\n", kernelTime[2*i][0], kernelTime[2*i][1]);
       else printfQuda("\n");
     }
   }
@@ -613,7 +613,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 
   cudaEventRecord(dslashEnd, 0);
-  DSLASH_TIME_PROFILE();
+  if (!dslashTuning) DSLASH_TIME_PROFILE();
 
 #endif // MULTI_GPU
 }
