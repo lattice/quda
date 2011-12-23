@@ -459,13 +459,13 @@ void dslashTimeProfile() {
   dslashTime += runTime;
 
   for (int i=4; i>=0; i--) {
-    if (!dslashParam.commDim[i]) continue;
+    if (!dslashParam.commDim[i] && i<4) continue;
 
     // kernel timing
-    cudaEventElapsedTime(&runTime, kernelStart[2*i], kernelEnd[2*i]);
-    kernelTime[2*i][0] += runTime; // relative
+    cudaEventElapsedTime(&runTime, dslashStart, kernelStart[2*i]);
+    kernelTime[2*i][0] += runTime; // start time
     cudaEventElapsedTime(&runTime, dslashStart, kernelEnd[2*i]);
-    kernelTime[2*i][1] += runTime; // absolute
+    kernelTime[2*i][1] += runTime; // end time
   }
       
   for (int i=3; i>=0; i--) {
@@ -473,22 +473,46 @@ void dslashTimeProfile() {
 
     for (int dir = 0; dir < 2; dir ++) {
       // pack timing
-      cudaEventElapsedTime(&runTime, packStart[2*i+dir], packEnd[2*i+dir]);
-      packTime[2*i+dir][0] += runTime; // relative
+      cudaEventElapsedTime(&runTime, dslashStart, packStart[2*i+dir]);
+      packTime[2*i+dir][0] += runTime; // start time
       cudaEventElapsedTime(&runTime, dslashStart, packEnd[2*i+dir]);
-      packTime[2*i+dir][1] += runTime; // absolute
+      packTime[2*i+dir][1] += runTime; // end time
       
       // gather timing
-      cudaEventElapsedTime(&runTime, gatherStart[2*i+dir], gatherEnd[2*i+dir]);
-      gatherTime[2*i+dir][0] += runTime; // relative
+      cudaEventElapsedTime(&runTime, dslashStart, gatherStart[2*i+dir]);
+      gatherTime[2*i+dir][0] += runTime; // start time
       cudaEventElapsedTime(&runTime, dslashStart, gatherEnd[2*i+dir]);
-      gatherTime[2*i+dir][1] += runTime; // absolute
+      gatherTime[2*i+dir][1] += runTime; // end time
       
       // scatter timing
-      cudaEventElapsedTime(&runTime, scatterStart[2*i+dir], scatterEnd[2*i+dir]);
-      scatterTime[2*i+dir][0] += runTime; // relative
+      cudaEventElapsedTime(&runTime, dslashStart, scatterStart[2*i+dir]);
+      scatterTime[2*i+dir][0] += runTime; // start time
       cudaEventElapsedTime(&runTime, dslashStart, scatterEnd[2*i+dir]);
-      scatterTime[2*i+dir][1] += runTime; // absolute
+      scatterTime[2*i+dir][1] += runTime; // end time
+    }
+  }
+
+}
+
+void printDslashProfile() {
+  
+  for (int i=4; i>=0; i--) {
+    if (!dslashParam.commDim[i] && i<4) continue;
+
+    printfQuda("Kernel       %d %f %f %f\n", i, kernelTime[2*i][0], kernelTime[2*i][1], 
+	       kernelTime[2*i][1]-kernelTime[2*i][0]);
+  }
+      
+  for (int i=3; i>=0; i--) {
+    if (!dslashParam.commDim[i]) continue;
+
+    for (int dir = 0; dir < 2; dir ++) {
+      printfQuda("Pack         %d %d %f %f\n", i, dir, packTime[2*i+dir][0], packTime[2*i+dir][1],
+		 packTime[2*i+dir][1] - packTime[2*i+dir][0]);
+      printfQuda("Gather       %d %d %f %f\n", i, dir, gatherTime[2*i+dir][0], gatherTime[2*i+dir][1],
+		 gatherTime[2*i+dir][1] - gatherTime[2*i+dir][0]);
+      printfQuda("Scatter      %d %d %f %f\n", i, dir, scatterTime[2*i+dir][0], scatterTime[2*i+dir][1],
+		 scatterTime[2*i+dir][1] - scatterTime[2*i+dir][0]);
     }
   }
 

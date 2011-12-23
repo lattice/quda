@@ -19,15 +19,11 @@ extern "C" {
   extern bool qudaPt0;
   extern bool qudaPtNm1;
 
-#ifdef DSLASH_PROFILING
-  extern float packTime[Nstream][2];
-  extern float gatherTime[Nstream][2];
-  extern float scatterTime[Nstream][2];
-  extern float kernelTime[Nstream][2];
-  extern float dslashTime;  
-#endif
-
   void setDslashTuning(QudaTune tune);
+
+#ifdef DSLASH_PROFILING
+  void printDslashProfile();
+#endif
 
 #ifdef __cplusplus
 }

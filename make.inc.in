@@ -171,6 +171,7 @@ ifeq ($(strip $(VERBOSE)), yes)
 endif
 ifeq ($(strip $(DSLASH_PROFILING)), yes)
   NVCCOPT += -DDSLASH_PROFILING
+  COPT +=  -DDSLASH_PROFILING
 endif
 
 ifeq ($(strip $(HAVE_NUMA)), yes)
