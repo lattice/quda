@@ -170,7 +170,7 @@ void FaceBuffer::exchangeFacesPack(cudaColorSpinorField &in, int parity,
     recv_request1[dim] = comm_recv_with_tag(pageable_back_nbr_spinor[dim], nbytes[dim], back_nbr[dim], uptags[dim]);
     
     // gather for backwards send
-    in.packGhost(dim, QUDA_BACKWARDS, dagger, &stream[2*dim + sendBackStrmIdx]);
+    in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim + sendBackStrmIdx]);
   } else { // forwards send
     int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
     int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
