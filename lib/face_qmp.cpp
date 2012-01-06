@@ -250,7 +250,7 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, int di
   }
 }
 
-void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_t &gatherEnd) {
+void FaceBuffer::exchangeFacesComms(int dir, struct timeval &commsStart, cudaEvent_t &gatherEnd) {
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
 
@@ -263,7 +263,7 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_
     while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
 #endif
 
-    CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendBackStrmIdx]);
+    gettimeofday(&commsStart, NULL);
     
 #ifdef QMP_COMMS  // Begin backward send
 #ifndef GPU_DIRECT
@@ -281,7 +281,7 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_
     while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
 #endif
     
-    CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendFwdStrmIdx]);
+    gettimeofday(&commsStart, NULL);
 
 #ifdef QMP_COMMS
     // Begin forward send
@@ -330,7 +330,7 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_
 #endif
 
 void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir, 
-				   cudaEvent_t &scatterStart)
+				   cudaEvent_t &scatterStart, struct timeval &commsEnd)
 {
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
@@ -338,11 +338,15 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   if (dir%2==0) {// receive from forwards
     // Scatter faces.
     QMP_finish_from_fwd(dim);
+    gettimeofday(&commsEnd, NULL);
+
     // Record the start of the scattering
     CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recFwdStrmIdx]);
     out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+recFwdStrmIdx]); // 0, 2, 4, 6
   } else { // receive from backwards
     QMP_finish_from_back(dim);
+    gettimeofday(&commsEnd, NULL);
+
     // Record the start of the scattering
     CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recBackStrmIdx]);
     out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+recBackStrmIdx]); // 1, 3, 5, 7

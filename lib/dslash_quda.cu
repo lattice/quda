@@ -63,7 +63,10 @@ static cudaStream_t streams[Nstream];
 static cudaEvent_t dslashEnd;
 static cudaEvent_t scatterStart[Nstream];
 static cudaEvent_t scatterEnd[Nstream];
-static cudaEvent_t commsStart[Nstream];
+
+static struct timeval dslashStart_h;
+static struct timeval commsStart[Nstream];
+static struct timeval commsEnd[Nstream];
 
 // these events are only used for profiling
 #ifdef DSLASH_PROFILING
@@ -453,6 +456,9 @@ public:
 };
 
 #ifdef DSLASH_PROFILING
+
+#define TDIFF(a,b) 1e3*(b.tv_sec - a.tv_sec + 1e-6*(b.tv_usec - a.tv_usec))
+
 void dslashTimeProfile() {
 
   cudaEventSynchronize(dslashEnd);
@@ -487,9 +493,9 @@ void dslashTimeProfile() {
       gatherTime[2*i+dir][1] += runTime; // end time
       
       // comms timing
-      cudaEventElapsedTime(&runTime, dslashStart, commsStart[2*i+dir]);
+      runTime = TDIFF(dslashStart_h, commsStart[2*i+dir]);
       commsTime[2*i+dir][0] += runTime; // start time
-      cudaEventElapsedTime(&runTime, dslashStart, scatterStart[2*i+dir]);
+      runTime = TDIFF(dslashStart_h, commsEnd[2*i+dir]);
       commsTime[2*i+dir][1] += runTime; // end time
 
       // scatter timing
@@ -541,6 +547,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   cudaStreamWaitEvent(0, dslashEnd, 0);
   CUDA_EVENT_RECORD(dslashStart, 0);
+  gettimeofday(&dslashStart_h, NULL);
   //cudaEventSynchronize(dslashStart);
 
 #ifdef MULTI_GPU
@@ -596,7 +603,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
     for (int dir=0; dir<2; dir++) {
       // Wait for comms to finish, and scatter into the end zone
-      face->exchangeFacesWait(*inSpinor, dagger, 2*i+dir, scatterStart[2*i+dir]);
+      face->exchangeFacesWait(*inSpinor, dagger, 2*i+dir, scatterStart[2*i+dir], commsEnd[2*i+dir]);
 
       // Record the end of the scattering
       cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]);
