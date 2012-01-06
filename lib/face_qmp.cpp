@@ -250,16 +250,17 @@ void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, int di
   }
 }
 
-void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart) {
+void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_t &gatherEnd) {
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
 
 
   if (dir%2 == 0) { // sending backwards
 #ifdef OVERLAP_COMMS
-    { // Need to wait for copy to finish before sending to neighbour
+    /*{ // Need to wait for copy to finish before sending to neighbour
       cudaStreamSynchronize(stream[2*dim + sendBackStrmIdx]);
-    }
+      }*/
+    while (cudaErrNotReady == cudaEventQuery(gatherEnd));
 #endif
 
     CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendBackStrmIdx]);
@@ -274,9 +275,10 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart) {
   } else { //sending forwards
     
 #ifdef OVERLAP_COMMS
-    { // Need to wait for copy to finish before sending to neighbour
+    /*{ // Need to wait for copy to finish before sending to neighbour
       cudaStreamSynchronize(stream[2*dim + sendFwdStrmIdx]);
-    }
+      }*/
+    while (cudaErrNotReady == cudaEventQuery(gatherEnd));
 #endif
     
     CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendFwdStrmIdx]);
