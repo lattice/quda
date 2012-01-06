@@ -75,7 +75,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
   for (int i=0; i<nDim; i++) {
 #ifdef QMP_COMMS
-    unsigned int flag = cudaHostAllocWriteCombined;
     cudaHostAlloc(&(from_fwd_face[i]), nbytes[i], flag);
     if( !from_fwd_face[i] ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes[i]);
     
