@@ -260,7 +260,7 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_
     /*{ // Need to wait for copy to finish before sending to neighbour
       cudaStreamSynchronize(stream[2*dim + sendBackStrmIdx]);
       }*/
-    while (cudaErrNotReady == cudaEventQuery(gatherEnd));
+    while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
 #endif
 
     CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendBackStrmIdx]);
@@ -278,7 +278,7 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_
     /*{ // Need to wait for copy to finish before sending to neighbour
       cudaStreamSynchronize(stream[2*dim + sendFwdStrmIdx]);
       }*/
-    while (cudaErrNotReady == cudaEventQuery(gatherEnd));
+    while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
 #endif
     
     CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendFwdStrmIdx]);

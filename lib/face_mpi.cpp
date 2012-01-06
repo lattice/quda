@@ -208,7 +208,7 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_
     int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
     int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
     //cudaStreamSynchronize(stream[2*dim + sendBackStrmIdx]); //required the data to be there before sending out
-    while (cudaErrNotReady == cudaEventQuery(gatherEnd));
+    while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
     CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendBackStrmIdx]);
 #ifndef GPU_DIRECT
     memcpy(pageable_back_nbr_spinor_sendbuf[dim], back_nbr_spinor_sendbuf[dim], nbytes[dim]);
@@ -218,7 +218,7 @@ void FaceBuffer::exchangeFacesComms(int dir, cudaEvent_t &commsStart, cudaEvent_
     int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
     int uptags[4] = {XUP, YUP, ZUP, TUP};
     //cudaStreamSynchronize(stream[2*dim + sendFwdStrmIdx]); //required the data to be there before sending out
-    while (cudaErrNotReady == cudaEventQuery(gatherEnd));
+    while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
     CUDA_EVENT_RECORD(commsStart, stream[2*dim + sendFwdStrmIdx]);
 #ifndef GPU_DIRECT
     memcpy(pageable_fwd_nbr_spinor_sendbuf[dim], fwd_nbr_spinor_sendbuf[dim], nbytes[dim]);
