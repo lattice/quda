@@ -508,7 +508,7 @@ void printDslashProfile() {
 
   char dimstr[8][8] = {"X-", "X+", "Y-", "Y+", "Z-", "Z+", "T-", "T+"};
 
-  printfQuda("         %13s %13s %13s %13s %13s\n", "Pack", "Gather", "Comms", "Scatter", "Kernel");
+  printfQuda("     %13s %13s %13s %13s %13s\n", "Pack", "Gather", "Comms", "Scatter", "Kernel");
   printfQuda("         %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s\n", 
 	     "Start", "End", "Start", "End", "Start", "End", "Start", "End", "Start", "End");
 
@@ -548,13 +548,13 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     if (!dslashParam.commDim[i]) continue;
 
     for (int dir = 0; dir<2; dir++) {
-      // Record the start of the gathering
+      // Record the start of the packing
       CUDA_EVENT_RECORD(packStart[2*i+dir], streams[2*i+dir]);
 
       // Initialize pack from source spinor
       face->exchangeFacesPack(*inSpinor, 1-parity, dagger, 2*i+dir, streams);
 
-      // Record the end of the gathering
+      // Record the end of the packing
       CUDA_EVENT_RECORD(packEnd[2*i+dir], streams[2*i+dir]);
     }
   }
@@ -622,6 +622,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   cudaEventRecord(dslashEnd, 0);
   if (!dslashTuning) DSLASH_TIME_PROFILE();
+
 
 #endif // MULTI_GPU
 }
