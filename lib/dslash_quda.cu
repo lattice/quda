@@ -587,7 +587,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     
     for (int dir=0; dir<2; dir++) {
       // Finish gather and start comms
-      face->exchangeFacesComms(2*i+dir, commsStart[2*i+dir]);
+      face->exchangeFacesComms(2*i+dir, commsStart[2*i+dir], gatherEnd[2*i+dir]);
     }
   }
 
