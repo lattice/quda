@@ -352,7 +352,6 @@ double dslashCUDA() {
 
   printfQuda("done.\n\n");
 
-
 #ifdef DSLASH_PROFILING
   printDslashProfile();
 #endif

@@ -255,7 +255,6 @@ void FaceBuffer::exchangeFacesComms(int dir, struct timeval &commsStart, cudaEve
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
 
-
   if (dir%2 == 0) { // sending backwards
 #ifdef OVERLAP_COMMS
     /*{ // Need to wait for copy to finish before sending to neighbour
@@ -265,7 +264,7 @@ void FaceBuffer::exchangeFacesComms(int dir, struct timeval &commsStart, cudaEve
 #endif
 
     gettimeofday(&commsStart, NULL);
-    
+
 #ifdef QMP_COMMS  // Begin backward send
 #ifndef GPU_DIRECT
     memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
@@ -339,6 +338,7 @@ void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int di
   if (dir%2==0) {// receive from forwards
     // Scatter faces.
     QMP_finish_from_fwd(dim);
+
     gettimeofday(&commsEnd, NULL);
 
     // Record the start of the scattering

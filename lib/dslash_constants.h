@@ -307,9 +307,12 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
 
   // create streams and events
 #ifndef DSLASH_PROFILING
+  // add cudaEventDisableTiming for lower sync overhead
   cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
+    cudaEventCreate(&gatherStart[i], cudaEventDisableTiming);
+    cudaEventCreate(&gatherEnd[i], cudaEventDisableTiming);
     cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
     cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
   }
@@ -330,7 +333,6 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
 
     cudaEventCreate(&kernelStart[i]);
     cudaEventCreate(&kernelEnd[i]);
-    // add cudaEventDisableTiming for lower sync overhead
 
     kernelTime[i][0] = 0.0;
     kernelTime[i][1] = 0.0;

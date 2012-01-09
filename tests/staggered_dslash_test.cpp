@@ -26,7 +26,7 @@
 int test_type = 0;
 int device = 0;
 
-bool tune = false;
+bool tune = true;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -272,7 +272,7 @@ void init()
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
 
-    //diracParam.verbose = QUDA_DEBUG_VERBOSE;
+    diracParam.verbose = QUDA_VERBOSE;
     diracParam.tmp1=tmp;
 
     dirac = Dirac::create(diracParam);
@@ -362,6 +362,10 @@ double dslashCUDA() {
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
     
+#ifdef DSLASH_PROFILING
+  printDslashProfile();
+#endif
+
   return secs;
 }
 

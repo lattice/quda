@@ -61,6 +61,8 @@ static const int Nstream = 1;
 #endif
 static cudaStream_t streams[Nstream];
 static cudaEvent_t dslashEnd;
+static cudaEvent_t gatherStart[Nstream];
+static cudaEvent_t gatherEnd[Nstream];
 static cudaEvent_t scatterStart[Nstream];
 static cudaEvent_t scatterEnd[Nstream];
 
@@ -75,8 +77,6 @@ static struct timeval commsEnd[Nstream];
 static cudaEvent_t dslashStart;
 static cudaEvent_t packStart[Nstream];
 static cudaEvent_t packEnd[Nstream];
-static cudaEvent_t gatherStart[Nstream];
-static cudaEvent_t gatherEnd[Nstream];
 static cudaEvent_t kernelStart[Nstream];
 static cudaEvent_t kernelEnd[Nstream];
 
@@ -548,7 +548,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   cudaStreamWaitEvent(0, dslashEnd, 0);
   CUDA_EVENT_RECORD(dslashStart, 0);
   gettimeofday(&dslashStart_h, NULL);
-  //cudaEventSynchronize(dslashStart);
 
 #ifdef MULTI_GPU
   for(int i = 3; i >=0; i--){
@@ -629,7 +628,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   cudaEventRecord(dslashEnd, 0);
   if (!dslashTuning) DSLASH_TIME_PROFILE();
-
 
 #endif // MULTI_GPU
 }
