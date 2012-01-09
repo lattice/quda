@@ -5,6 +5,7 @@
 #include <quda.h>
 #include <string.h>
 #include <gauge_field.h>
+#include <sys/time.h>
 
 #ifdef QMP_COMMS
 #include <qmp.h>
