@@ -305,12 +305,49 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
 
   initDslash = 1;
 
-  // create the streams and scatter events
+  // create streams and events
+#ifndef DSLASH_PROFILING
+  // add cudaEventDisableTiming for lower sync overhead
+  cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
-    cudaEventCreate(&scatterEvent[i], cudaEventDisableTiming);
+    cudaEventCreate(&gatherStart[i], cudaEventDisableTiming);
+    cudaEventCreate(&gatherEnd[i], cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
   }
-  cudaEventCreate(&dslashEnd, cudaEventDisableTiming);
+#else
+  cudaEventCreate(&dslashStart);
+  cudaEventCreate(&dslashEnd);
+  for (int i=0; i<Nstream; i++) {
+    cudaStreamCreate(&streams[i]);
+
+    cudaEventCreate(&packStart[i]);
+    cudaEventCreate(&packEnd[i]);
+
+    cudaEventCreate(&gatherStart[i]);
+    cudaEventCreate(&gatherEnd[i]);
+
+    cudaEventCreate(&scatterStart[i]);
+    cudaEventCreate(&scatterEnd[i]);
+
+    cudaEventCreate(&kernelStart[i]);
+    cudaEventCreate(&kernelEnd[i]);
+
+    kernelTime[i][0] = 0.0;
+    kernelTime[i][1] = 0.0;
+
+    gatherTime[i][0] = 0.0;
+    gatherTime[i][1] = 0.0;
+
+    commsTime[i][0] = 0.0;
+    commsTime[i][1] = 0.0;
+
+    scatterTime[i][0] = 0.0;
+    scatterTime[i][1] = 0.0;
+  }
+#endif
+
 }
 
 void initCloverConstants (const int cl_stride) {

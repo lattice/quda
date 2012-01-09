@@ -614,6 +614,7 @@ BUILD_STAGGERED_DIRAC
 BUILD_DOMAIN_WALL_DIRAC
 BUILD_CLOVER_DIRAC
 BUILD_WILSON_DIRAC
+DSLASH_PROFILING
 VERBOSE
 DEVICE_DEBUG
 HOST_DEBUG
@@ -687,6 +688,7 @@ enable_tune_device
 enable_host_debug
 enable_device_debug
 enable_verbose_build
+enable_dslash_profiling
 enable_wilson_dirac
 enable_clover_dirac
 enable_domain_wall_dirac
@@ -1333,18 +1335,20 @@ Optional Features:
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
   --enable-verbose-build  Display Kernel Register Usage
-   --enable-wilson-dirac  Build Wilson Dirac Op (default=enabled)
-   --enable-clover-dirac  Build Clover Dirac Op (default=enabled)
-   --enable-domain-wall-dirac
+  --enable-dslash-profiling
+                          Enable profiling of multi-GPU dslash
+  --enable-wilson-dirac   Build Wilson Dirac Op (default=enabled)
+  --enable-clover-dirac   Build Clover Dirac Op (default=enabled)
+  --enable-domain-wall-dirac
                           Build Domain Wall Dirac Op (default=enabled)
-   --enable-staggered-dirac
+  --enable-staggered-dirac
                           Build Staggered Dirac Op (default=enabled)
-   --enable-twisted-mass-dirac
+  --enable-twisted-mass-dirac
                           Build Twisted Mass Dirac Op (default=enabled)
-   --enable-staggered-fatlink
+  --enable-staggered-fatlink
                           Build Staggered Fat Link Code (default=disabled)
-   --enable-gauge-force   Build 1 loop Symanzik gauge force (default=disabled)
-   --enable-staggered-force
+  --enable-gauge-force    Build 1 loop Symanzik gauge force (default=disabled)
+  --enable-staggered-force
                           Build Staggered Force Term (default=disabled)
   --enable-multi-gpu      Enable Multi-GPU mode (default is no)
   --enable-overlap-comms  Enable comms/compute overlap (default is yes)
@@ -3435,6 +3439,15 @@ else
 fi
 
 
+# Check whether --enable-dslash-profiling was given.
+if test "${enable_dslash_profiling+set}" = set; then :
+  enableval=$enable_dslash_profiling;  quda_dslash_profiling=${enableval}
+else
+   quda_dslash_profiling="no"
+
+fi
+
+
 # Check whether --enable-wilson-dirac was given.
 if test "${enable_wilson_dirac+set}" = set; then :
   enableval=$enable_wilson_dirac;  build_wilson_dirac=${enableval}
@@ -3572,13 +3585,6 @@ sm_10 | sm_11 | sm_12 | sm_13 | sm_20 | sm_21 ) ;;
   ;;
 esac
 
-case ${gpu_emu} in
-yes|no);;
-*)
-  as_fn_error " invalid value --enable-gpu-emu " "$LINENO" 5
-  ;;
-esac
-
 case ${quda_os} in
 linux|osx);;
 *)
@@ -3604,6 +3610,13 @@ case ${quda_verbose_build} in
 yes|no);;
 *)
   as_fn_error " invalid value for --enable-quda-verbose-build " "$LINENO" 5
+  ;;
+esac
+
+case ${quda_dslash_profiling} in
+yes|no);;
+*)
+  as_fn_error " invalid value for --enable-dslash-profiling " "$LINENO" 5
   ;;
 esac
 
@@ -3766,6 +3779,11 @@ DEVICE_DEBUG=${quda_device_debug}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting VERBOSE = ${quda_verbose_build} " >&5
 $as_echo "$as_me: Setting VERBOSE = ${quda_verbose_build} " >&6;}
 VERBOSE=${quda_verbose_build}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DSLASH_PROFILING = ${quda_dslash_profiling} " >&5
+$as_echo "$as_me: Setting DSLASH_PROFILING = ${quda_dslash_profiling} " >&6;}
+DSLASH_PROFILING=${quda_dslash_profiling}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} " >&5

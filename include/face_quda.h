@@ -63,10 +63,11 @@ class FaceBuffer {
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void exchangeFacesStart(cudaColorSpinorField &in, int parity,
-			  int dagger, int dir, cudaStream_t *stream);
-  void exchangeFacesComms(int dir);
-  void exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir);
+  void exchangeFacesPack(cudaColorSpinorField &in, int parity,
+			 int dagger, int dir, cudaStream_t *stream);
+  void exchangeFacesStart(cudaColorSpinorField &in, int dagger, int dir);
+  void exchangeFacesComms(int dir, struct timeval &, cudaEvent_t &);
+  void exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir, cudaEvent_t &, struct timeval &);
 
   void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
 
@@ -132,10 +133,11 @@ class FaceBuffer {
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void exchangeFacesStart(cudaColorSpinorField &in, int parity,
-			  int dagger, int dir, cudaStream_t *stream);
-  void exchangeFacesComms(int dir);
-  void exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir);
+  void exchangeFacesPack(cudaColorSpinorField &in, int parity,
+			 int dagger, int dir, cudaStream_t *stream);
+  void exchangeFacesStart(cudaColorSpinorField &in, int dagger, int dir);
+  void exchangeFacesComms(int dir, struct timeval &, cudaEvent_t &);
+  void exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir, cudaEvent_t &, struct timeval &);
 
   void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
 

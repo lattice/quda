@@ -21,6 +21,10 @@ extern "C" {
 
   void setDslashTuning(QudaTune tune);
 
+#ifdef DSLASH_PROFILING
+  void printDslashProfile();
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -313,8 +313,8 @@ double dslashCUDA() {
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
+  cudaEventCreate(&end);
   cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
 
   for (int i = 0; i < loops; i++) {
     switch (test_type) {
@@ -336,7 +336,6 @@ double dslashCUDA() {
     }
   }
     
-  cudaEventCreate(&end);
   cudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
@@ -352,6 +351,10 @@ double dslashCUDA() {
     printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   printfQuda("done.\n\n");
+
+#ifdef DSLASH_PROFILING
+  printDslashProfile();
+#endif
 
   return secs;
 }

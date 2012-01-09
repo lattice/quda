@@ -5,6 +5,7 @@
 #include <quda.h>
 #include <string.h>
 #include <gauge_field.h>
+#include <sys/time.h>
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -12,6 +13,14 @@
 
 #if (CUDA_VERSION >= 4000)
 #define GPU_DIRECT
+#endif
+
+#ifdef DSLASH_PROFILING
+  void printDslashProfile();
+#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
+#else
+#define CUDA_EVENT_RECORD(a,b)
+#define DSLASH_TIME_PROFILE()
 #endif
 
 /*
@@ -200,57 +209,87 @@ FaceBuffer::~FaceBuffer()
   }
 }
 
-void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int parity,
-				    int dagger, int dir, cudaStream_t *stream_p)
+void FaceBuffer::exchangeFacesPack(cudaColorSpinorField &in, int parity,
+				   int dagger, int dir, cudaStream_t *stream_p)
 {
-  if(!commDimPartitioned(dir)) return;
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
 
   in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated
-
   stream = stream_p;
-  
+
+  if (dir%2==0) { // sending backwards
 #ifdef QMP_COMMS
-  // Prepost all receives
-  QMP_start(mh_from_fwd[dir]);
-  QMP_start(mh_from_back[dir]);
+    // Prepost receive
+    QMP_start(mh_from_fwd[dim]);
 #endif
-  
-  // gather for backwards send
-  in.packGhost(my_back_face[dir], dir, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dir+sendBackStrmIdx]);
-  
-  // gather for forwards send
-  in.packGhost(my_fwd_face[dir], dir, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dir+sendFwdStrmIdx]);
+    // gather for backwards send
+    in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendBackStrmIdx]);  
+  } else { // sending forwards
+
+#ifdef QMP_COMMS
+    // Prepost receive
+    QMP_start(mh_from_back[dim]);
+#endif
+    // gather for forwards send
+    in.packGhost(dim, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendFwdStrmIdx]);
+  }
 }
 
-void FaceBuffer::exchangeFacesComms(int dir) {
-  if(!commDimPartitioned(dir)) return;
+void FaceBuffer::exchangeFacesStart(cudaColorSpinorField &in, int dagger, int dir)
+{
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
 
-#ifdef OVERLAP_COMMS
-  { // Need to wait for copy to finish before sending to neighbour
-    cudaStreamSynchronize(stream[2*dir + sendBackStrmIdx]);
+  if (dir%2==0) {
+    // backwards copy to host
+    in.sendGhost(my_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]);  
+  } else {
+    // forwards copy to host
+    in.sendGhost(my_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
   }
+}
+
+void FaceBuffer::exchangeFacesComms(int dir, struct timeval &commsStart, cudaEvent_t &gatherEnd) {
+  int dim = dir / 2;
+  if(!commDimPartitioned(dim)) return;
+
+  if (dir%2 == 0) { // sending backwards
+#ifdef OVERLAP_COMMS
+    /*{ // Need to wait for copy to finish before sending to neighbour
+      cudaStreamSynchronize(stream[2*dim + sendBackStrmIdx]);
+      }*/
+    while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
 #endif
+
+    gettimeofday(&commsStart, NULL);
 
 #ifdef QMP_COMMS  // Begin backward send
 #ifndef GPU_DIRECT
-  memcpy(ib_my_back_face[dir], my_back_face[dir], nbytes[dir]);
+    memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
 #endif
-  QMP_start(mh_send_back[dir]);
+    QMP_start(mh_send_back[dim]);
 #endif
 
+  } else { //sending forwards
+    
 #ifdef OVERLAP_COMMS
-  { // Need to wait for copy to finish before sending to neighbour
-    cudaStreamSynchronize(stream[2*dir + sendFwdStrmIdx]);
-  }
+    /*{ // Need to wait for copy to finish before sending to neighbour
+      cudaStreamSynchronize(stream[2*dim + sendFwdStrmIdx]);
+      }*/
+    while (cudaErrorNotReady == cudaEventQuery(gatherEnd));
 #endif
+    
+    gettimeofday(&commsStart, NULL);
 
 #ifdef QMP_COMMS
-  // Begin forward send
+    // Begin forward send
 #ifndef GPU_DIRECT
-  memcpy(ib_my_fwd_face[dir], my_fwd_face[dir], nbytes[dir]);
+    memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
 #endif
-  QMP_start(mh_send_fwd[dir]);
+    QMP_start(mh_send_fwd[dim]);
 #endif
+  }
 
 } 
 
@@ -289,25 +328,29 @@ void FaceBuffer::exchangeFacesComms(int dir) {
 
 #endif
 
-void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir)
+void FaceBuffer::exchangeFacesWait(cudaColorSpinorField &out, int dagger, int dir, 
+				   cudaEvent_t &scatterStart, struct timeval &commsEnd)
 {
-  if(!commDimPartitioned(dir)) return;
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
 
-  // replaced this memcopy with aliasing pointers - useful benchmarking
-#ifndef QMP_COMMS
-  // NO QMP -- do copies
-  //CUDAMEMCPY(from_fwd_face, my_back_face, nbytes, cudaMemcpyHostToHost, stream[sendBackStrmIdx]); // 174 without these
-  //CUDAMEMCPY(from_back_face, my_fwd_face, nbytes, cudaMemcpyHostToHost, stream[sendFwdStrmIdx]);
-#endif // QMP_COMMS
+  if (dir%2==0) {// receive from forwards
+    // Scatter faces.
+    QMP_finish_from_fwd(dim);
 
-  // Scatter faces.
-  QMP_finish_from_fwd(dir);
-  
-  out.unpackGhost(from_fwd_face[dir], dir, QUDA_FORWARDS, dagger, &stream[2*dir+recFwdStrmIdx]); // 0, 2, 4, 6
+    gettimeofday(&commsEnd, NULL);
 
-  QMP_finish_from_back(dir);
-  
-  out.unpackGhost(from_back_face[dir], dir, QUDA_BACKWARDS, dagger, &stream[2*dir+recBackStrmIdx]); // 1, 3, 5, 7
+    // Record the start of the scattering
+    CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recFwdStrmIdx]);
+    out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+recFwdStrmIdx]); // 0, 2, 4, 6
+  } else { // receive from backwards
+    QMP_finish_from_back(dim);
+    gettimeofday(&commsEnd, NULL);
+
+    // Record the start of the scattering
+    CUDA_EVENT_RECORD(scatterStart, stream[2*dim+recBackStrmIdx]);
+    out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+recBackStrmIdx]); // 1, 3, 5, 7
+  }
 }
 
 // This is just an initial hack for CPU comms - should be creating the message handlers at instantiation
