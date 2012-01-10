@@ -576,7 +576,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
       face->exchangeFacesStart(*inSpinor, dagger, 2*i+dir);
 
       // Record the end of the gathering
-      CUDA_EVENT_RECORD(gatherEnd[2*i+dir], streams[2*i+dir]);
+      cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]);
     }
   }
 #endif
