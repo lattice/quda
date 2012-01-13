@@ -12,7 +12,7 @@
 const int LX = 32;
 const int LY = 32;
 const int LZ = 32;
-const int LT = 8;
+const int LT = 64;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
@@ -167,15 +167,15 @@ void freeFields()
 }
 
 
-double benchmark(int kernel, int niter) {
+double benchmark(int kernel, const int niter) {
 
   double a, b, c;
   quda::Complex a2, b2, c2;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
+  cudaEventCreate(&end);
   cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
 
   for (int i=0; i < niter; ++i) {
 
@@ -309,7 +309,6 @@ double benchmark(int kernel, int niter) {
     }
   }
   
-  cudaEventCreate(&end);
   cudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
@@ -671,7 +670,7 @@ int main(int argc, char** argv)
   // turn off error checking in blas kernels for tuning
   quda::setBlasTuning(QUDA_TUNE_YES);
 
-  for (int prec = 0; prec < Nprec; prec++) {
+  for (int prec = 2; prec < Nprec; prec++) {
 
     printf("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
     initFields(prec);
@@ -683,10 +682,10 @@ int main(int argc, char** argv)
       int threads_max = 0; 
       int blocks_max = 0;
 
-      cudaError_t error;
-
       // only benchmark "high precision" copyCuda() if double is supported
       if ((Nprec < 3) && (kernel == 0)) continue;
+
+      cudaError_t error;
 
       for (unsigned int thread = ThreadMin; thread <= ThreadMax; thread+=32) {
 
@@ -696,29 +695,32 @@ int main(int argc, char** argv)
 	for (unsigned int grid = GridMin; grid <= GridMax; grid *= 2) {
 	  quda::setBlasParam(kernel, prec, thread, grid);
 	  
-	  // first do warmup run
+	  // first do warmup run and check for error
 	  benchmark(kernel, 1);
-	  
-	  quda::blas_flops = 0;
-	  quda::blas_bytes = 0;
+	  cudaThreadSynchronize();
 
-	  double secs = benchmark(kernel, niter);
 	  error = cudaGetLastError();
-	  double flops = quda::blas_flops;
-	  double bytes = quda::blas_bytes;
-	  
-	  double gflops = (flops*1e-9)/(secs);
-	  double gbytes = bytes/(secs*(1<<30));
+	  if (error  == cudaSuccess) {   // prevents selection of failed parameters
+	    quda::blas_flops = 0;
+	    quda::blas_bytes = 0;
+	    
+	    double secs = benchmark(kernel, niter);
 
-	  // prevents selection of failed parameters
-	  if (gbytes > gbytes_max && error == cudaSuccess) { 
-	    gflops_max = gflops;
-	    gbytes_max = gbytes;
-	    threads_max = thread;
-	    blocks_max = grid;
-	  }
+	    double flops = quda::blas_flops;
+	    double bytes = quda::blas_bytes;
+	    
+	    double gflops = (flops*1e-9)/(secs);
+	    double gbytes = bytes/(secs*(1<<30));
+	    
+	    if (gbytes > gbytes_max) { 
+	      gflops_max = gflops;
+	      gbytes_max = gbytes;
+	      threads_max = thread;
+	      blocks_max = grid;
+	    }
 	  //printf("%d %d %-35s %f s, flops = %e, Gflop/s = %f, GiB/s = %f\n", 
 	  // thread, grid, names[kernel], secs, flops, gflops, gbytes);
+	  }
 	}
       }
 
