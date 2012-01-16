@@ -481,8 +481,8 @@ int main(int argc, char **argv)
       gauge_floats += test_type ? 72*2 : 72;
     }
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GiB/s = %f\n\n", 
-	       Vh*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*(1<<30)));
+    printfQuda("GB/s = %f\n\n", 
+	       Vh*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*1e+9));
     
     if (!transfer) {
       double norm2_cpu = norm2(*spinorRef);

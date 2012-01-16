@@ -325,7 +325,7 @@ int main(int argc, char **argv)
 
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printfQuda("GiB/s = %f\n\n", 
-	       Vh*Ls*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*(1<<30)));
+	       Vh*Ls*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*1e+9));
 
 
     if (!transfer) {
