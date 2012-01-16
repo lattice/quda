@@ -96,7 +96,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
     int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
-    if ( (!(updateR || updateX)) && (r2 > stop)) {
+    if ( !(updateR || updateX)) {
       beta = r2 / r2_old;
       axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
     } else {
