@@ -26,7 +26,7 @@ void *longlink[4];
 void** ghost_fatlink, **ghost_longlink;
 #endif
 
-int device = 0;
+extern int device;
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;

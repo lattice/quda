@@ -24,7 +24,6 @@
 #define staggeredSpinorSiteSize 6
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
-int device = 0;
 
 bool tune = true;
 
@@ -58,6 +57,8 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
+
+extern int device;
 
 int X[4];
 

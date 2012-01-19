@@ -48,7 +48,7 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac;
 
-
+extern int device;
 extern int xdim;
 extern int ydim;
 extern int zdim;
@@ -211,8 +211,7 @@ void init(int argc, char **argv) {
   }
   printfQuda("done.\n"); fflush(stdout);
   
-  int dev = 0;
-  initQuda(dev);
+  initQuda(device);
 
   printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);

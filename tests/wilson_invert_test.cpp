@@ -23,6 +23,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+extern int device;
 extern int xdim;
 extern int ydim;
 extern int zdim;
@@ -113,8 +114,6 @@ int main(int argc, char **argv)
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
   // *** QUDA parameters begin here.
-
-  int device = 0; // CUDA device number
 
   int multi_shift = 0; // whether to test multi-shift or standard solver
 

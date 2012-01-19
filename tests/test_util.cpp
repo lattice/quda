@@ -1287,7 +1287,7 @@ void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
  *
  */
 
-
+int device = 0;
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
@@ -1306,6 +1306,7 @@ void usage(char** argv )
 {
   printf("Usage: %s [options]\n", argv[0]);
   printf("Available options: \n");
+  printf("    --device <n>                                # Set the CUDA device to use (default 0)\n");     
   printf("    --prec <double/single/half>               # Precision in GPU\n"); 
   printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
   printf("    --recon <8/12/18>                         # Link reconstruction type\n"); 
@@ -1341,6 +1342,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     usage(argv);
   }
   
+  if( strcmp(argv[i], "--device") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    device= atoi(argv[i+1]);
+    if (device < 0 || device > 16){
+      printf("ERROR: invalid CUDA device number (%d)\n", device);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--prec") == 0){
     if (i+1 >= argc){
       usage(argv);
