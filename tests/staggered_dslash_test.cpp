@@ -25,7 +25,7 @@
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 int test_type = 0;
 
-bool tune = true;
+extern bool tune;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;

@@ -27,6 +27,7 @@ void** ghost_fatlink, **ghost_longlink;
 #endif
 
 extern int device;
+extern bool tune;
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
@@ -160,7 +161,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
-  inv_param->dirac_tune = QUDA_TUNE_YES;
+  inv_param->dirac_tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
   inv_param->preserve_dirac = QUDA_PRESERVE_DIRAC_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;

@@ -1301,6 +1301,7 @@ extern bool kernelPackT;
 int gridsize_from_cmdline[4]={1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
+bool tune = true;
 
 void usage(char** argv )
 {
@@ -1323,9 +1324,10 @@ void usage(char** argv )
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
-  printf("    --dslash_type <type>                      # Set the dslash type, the following vlaues are valid\n"
+  printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted_mass/asqtad/domain_wall\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
+  printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --help                                    # Print out this message\n"); 
   
   exit(1);
@@ -1493,6 +1495,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+
+  if( strcmp(argv[i], "--tune") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      tune = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      tune = false;
+    }else{
+      fprintf(stderr, "Error: invalid tuning type\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
 
   if( strcmp(argv[i], "--xgridsize") == 0){
     if (i+1 >= argc){ 
