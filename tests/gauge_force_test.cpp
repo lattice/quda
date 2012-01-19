@@ -21,7 +21,7 @@ typedef struct { dcomplex e[3][3]; } dsu3_matrix;
 
 extern void initDslashConstants(const cudaGaugeField& gauge, const int sp_stride);
 
-int device = 0;
+static int device = 0;
 
 cudaGaugeField* cudaSiteLink = NULL;
 
@@ -95,7 +95,7 @@ gauge_force_init()
     }
 
     // fills the gauge field with random numbers
-    createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 1);
+    createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
     
     //copy the 2d sitelink to 1d milc format 
     for(int dir=0;dir < 4; dir++){
