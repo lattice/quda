@@ -1,11 +1,11 @@
 #include <stdio.h>
+#include <cuda_runtime.h>
+#include <cuda.h>
 
 #include <quda_internal.h>
 #include <llfat_quda.h>
-#include <cuda_runtime.h>
-#include <cuda.h>
 #include <read_gauge.h>
-#include <gauge_quda.h>
+#include "gauge_field.h"
 #include <force_common.h>
 
 #if (__CUDA_ARCH__ >= 200)
@@ -521,20 +521,20 @@ llfat_init_cuda(QudaGaugeParam* param)
 
 #define BIND_SITE_AND_FAT_LINK do {					\
   if(prec == QUDA_DOUBLE_PRECISION){					\
-    cudaBindTexture(0, siteLink0TexDouble, cudaSiteLink.even, cudaSiteLink.bytes); \
-    cudaBindTexture(0, siteLink1TexDouble, cudaSiteLink.odd, cudaSiteLink.bytes); \
-    cudaBindTexture(0, fatGauge0TexDouble, cudaFatLink.even, cudaFatLink.bytes); \
-    cudaBindTexture(0, fatGauge1TexDouble, cudaFatLink.odd,  cudaFatLink.bytes); \
+    cudaBindTexture(0, siteLink0TexDouble, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()); \
+    cudaBindTexture(0, siteLink1TexDouble, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()); \
+    cudaBindTexture(0, fatGauge0TexDouble, cudaFatLink.Even_p(), cudaFatLink.Bytes()); \
+    cudaBindTexture(0, fatGauge1TexDouble, cudaFatLink.Odd_p(),  cudaFatLink.Bytes()); \
   }else{								\
-    if(cudaSiteLink.reconstruct == QUDA_RECONSTRUCT_NO){		\
-      cudaBindTexture(0, siteLink0TexSingle_norecon, cudaSiteLink.even, cudaSiteLink.bytes); \
-      cudaBindTexture(0, siteLink1TexSingle_norecon, cudaSiteLink.odd, cudaSiteLink.bytes); \
+    if(cudaSiteLink.Reconstruct() == QUDA_RECONSTRUCT_NO){		\
+      cudaBindTexture(0, siteLink0TexSingle_norecon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()); \
+      cudaBindTexture(0, siteLink1TexSingle_norecon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()); \
     }else{								\
-      cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.even, cudaSiteLink.bytes); \
-      cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.odd, cudaSiteLink.bytes); \
+      cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()); \
+      cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()); \
     }									\
-    cudaBindTexture(0, fatGauge0TexSingle, cudaFatLink.even, cudaFatLink.bytes); \
-    cudaBindTexture(0, fatGauge1TexSingle, cudaFatLink.odd,  cudaFatLink.bytes); \
+    cudaBindTexture(0, fatGauge0TexSingle, cudaFatLink.Even_p(), cudaFatLink.Bytes()); \
+    cudaBindTexture(0, fatGauge1TexSingle, cudaFatLink.Odd_p(),  cudaFatLink.Bytes()); \
     }									\
   }while(0)
 
@@ -937,12 +937,12 @@ computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd,
 
 
 
-void llfatOneLinkKernel(FullGauge cudaFatLink, FullGauge cudaSiteLink,
+void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
            FullStaple cudaStaple, FullStaple cudaStaple1,
            QudaGaugeParam* param, double* act_path_coeff)
 {  
-  QudaPrecision prec = cudaSiteLink.precision;
-  QudaReconstructType recon = cudaSiteLink.reconstruct;
+  QudaPrecision prec = cudaSiteLink.Precision();
+  QudaReconstructType recon = cudaSiteLink.Reconstruct();
   
   BIND_SITE_AND_FAT_LINK;
   int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];  
@@ -953,24 +953,24 @@ void llfatOneLinkKernel(FullGauge cudaFatLink, FullGauge cudaSiteLink,
 
   if(prec == QUDA_DOUBLE_PRECISION){
     if(recon == QUDA_RECONSTRUCT_NO){
-      llfatOneLink18Kernel<<<gridDim, blockDim>>>((double2*)cudaSiteLink.even, (double2*)cudaSiteLink.odd,
-						  (double2*)cudaFatLink.even, (double2*)cudaFatLink.odd,
+      llfatOneLink18Kernel<<<gridDim, blockDim>>>((double2*)cudaSiteLink.Even_p(), (double2*)cudaSiteLink.Odd_p(),
+						  (double2*)cudaFatLink.Even_p(), (double2*)cudaFatLink.Odd_p(),
 						  (double)act_path_coeff[0], (double)act_path_coeff[5]);    
     }else{
       
-      llfatOneLink12Kernel<<<gridDim, blockDim>>>((double2*)cudaSiteLink.even, (double2*)cudaSiteLink.odd,
-						  (double2*)cudaFatLink.even, (double2*)cudaFatLink.odd,
+      llfatOneLink12Kernel<<<gridDim, blockDim>>>((double2*)cudaSiteLink.Even_p(), (double2*)cudaSiteLink.Odd_p(),
+						  (double2*)cudaFatLink.Even_p(), (double2*)cudaFatLink.Odd_p(),
 						  (double)act_path_coeff[0], (double)act_path_coeff[5]);    
       
     }
   }else{ //single precision
     if(recon == QUDA_RECONSTRUCT_NO){    
-      llfatOneLink18Kernel<<<gridDim, blockDim>>>((float2*)cudaSiteLink.even, (float2*)cudaSiteLink.odd,
-						  (float2*)cudaFatLink.even, (float2*)cudaFatLink.odd,
+      llfatOneLink18Kernel<<<gridDim, blockDim>>>((float2*)cudaSiteLink.Even_p(), (float2*)cudaSiteLink.Odd_p(),
+						  (float2*)cudaFatLink.Even_p(), (float2*)cudaFatLink.Odd_p(),
 						  (float)act_path_coeff[0], (float)act_path_coeff[5]);    						  
     }else{
-      llfatOneLink12Kernel<<<gridDim, blockDim>>>((float2*)cudaSiteLink.even, (float2*)cudaSiteLink.odd,
-						  (float2*)cudaFatLink.even, (float2*)cudaFatLink.odd,
+      llfatOneLink12Kernel<<<gridDim, blockDim>>>((float2*)cudaSiteLink.Even_p(), (float2*)cudaSiteLink.Odd_p(),
+						  (float2*)cudaFatLink.Even_p(), (float2*)cudaFatLink.Odd_p(),
 						  (float)act_path_coeff[0], (float)act_path_coeff[5]);    
     }
   }

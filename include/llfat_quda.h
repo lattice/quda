@@ -24,7 +24,7 @@ typedef struct llfat_kernel_param_s{
 }llfat_kernel_param_t;
 
 
-  void llfat_cuda(FullGauge cudaFatLink, FullGauge cudaSiteLink, 
+  void llfat_cuda(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink, 
 		  FullStaple cudaStaple, FullStaple cudaStaple1,
 		  QudaGaugeParam* param, double* act_path_coeff);
 
@@ -48,7 +48,7 @@ typedef struct llfat_kernel_param_s{
 					dim3 halfGridDim, llfat_kernel_param_t kparam,
 					cudaStream_t* stream); 
 
-  void llfatOneLinkKernel(FullGauge cudaFatLink, FullGauge cudaSiteLink,
+  void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 			  FullStaple cudaStaple, FullStaple cudaStaple1,
 			  QudaGaugeParam* param, double* act_path_coeff);
   

@@ -67,6 +67,7 @@ class LatticeField {
   int VolumeCB() const { return volumeCB; }
   int SurfaceCB(const int i) const { return surfaceCB[i]; }
   int Stride() const { return stride; }
+  int Pad() const { return pad; }
 
   QudaPrecision Precision() const { return precision; }
   QudaFieldLocation Location() const { return location; }

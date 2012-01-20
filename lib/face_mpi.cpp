@@ -389,7 +389,7 @@ static unsigned long llfat_recv_request1[4];
 static unsigned long llfat_send_request2[4];
 static unsigned long llfat_recv_request2[4];
 
-#include <gauge_quda.h>
+#include "gauge_field.h"
 extern void setup_dims_in_gauge(int *XX);
 
 static void
@@ -582,7 +582,7 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
   int nFace =1;
   for(int dir=0; dir < 4; dir++){
     if(optflag && !commDimPartitioned(dir)) continue;
-    pack_ghost_all_links((void**)sitelink, (void**)sitelink_back_sendbuf, (void**)sitelink_fwd_sendbuf, dir, nFace, (QudaPrecision)(sizeof(Float)));
+    pack_ghost_all_links((void**)sitelink, (void**)sitelink_back_sendbuf, (void**)sitelink_fwd_sendbuf, dir, nFace, (QudaPrecision)(sizeof(Float)), X);
   }
 #endif
 
@@ -620,7 +620,6 @@ void exchange_cpu_sitelink(int* X,
 			   QudaPrecision gPrecision, int optflag)
 {  
   setup_dims(X);
-  set_dim(X);
   void*  sitelink_fwd_sendbuf[4];
   void*  sitelink_back_sendbuf[4];
   
@@ -653,7 +652,7 @@ void exchange_cpu_sitelink(int* X,
 
 template<typename Float>
 void
-do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_sendbuf, Float** staple_back_sendbuf)
+do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_sendbuf, Float** staple_back_sendbuf, int* X)
 {
 
 
@@ -687,7 +686,7 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
 #else
   int nFace =1;
   pack_ghost_all_staples_cpu(staple, (void**)staple_back_sendbuf, 
-			     (void**)staple_fwd_sendbuf,  nFace, (QudaPrecision)(sizeof(Float)));
+			     (void**)staple_fwd_sendbuf,  nFace, (QudaPrecision)(sizeof(Float)), X);
 
 #endif  
   
@@ -742,10 +741,10 @@ void exchange_cpu_staple(int* X,
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
     do_exchange_cpu_staple((double*)staple, (double**)ghost_staple, 
-			   (double**)staple_fwd_sendbuf, (double**)staple_back_sendbuf);
+			   (double**)staple_fwd_sendbuf, (double**)staple_back_sendbuf, X);
   }else{ //single
     do_exchange_cpu_staple((float*)staple, (float**)ghost_staple, 
-			   (float**)staple_fwd_sendbuf, (float**)staple_back_sendbuf);
+			   (float**)staple_fwd_sendbuf, (float**)staple_back_sendbuf, X);
   }
   
   for(int i=0;i < 4;i++){

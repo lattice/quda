@@ -22,6 +22,8 @@ struct GaugeFieldParam : public LatticeFieldParam {
 
   QudaFieldCreate create; // used to determine the type of field created
 
+  int pinned; //used in cpu field only, where the host memory is pinned
+
  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
     nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
     order(param.gauge_order), fixed(param.gauge_fix), link_type(param.type), 
@@ -54,7 +56,7 @@ class GaugeField : public LatticeField {
   double tadpole;
 
   QudaFieldCreate create; // used to determine the type of field created
-
+  
  public:
   GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &location);
   virtual ~GaugeField();
@@ -116,7 +118,8 @@ class cpuGaugeField : public GaugeField {
  private:
   void **gauge; // the actual gauge field
   mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field
-
+  int pinned;
+  
  public:
   cpuGaugeField(const GaugeFieldParam &);
   virtual ~cpuGaugeField();

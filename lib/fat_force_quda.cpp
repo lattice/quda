@@ -5,7 +5,7 @@
 
 #include <typeinfo>
 #include <quda.h>
-#include <fat_force_quda.h>
+#include "fat_force_quda.h"
 #include <quda_internal.h>
 #include <face_quda.h>
 #include "misc_helpers.h"
@@ -29,8 +29,7 @@ static QudaTboundary t_boundary_;
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
 
 #include <pack_gauge.h>
-
-#if 0
+#include "gauge_field.h"
 
 /********************** Staple code, used by link fattening **************/
 
@@ -38,9 +37,17 @@ static QudaTboundary t_boundary_;
 
 
 template <typename Float>
-void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace) {
+void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace, int* X) {
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
+  int volumeCB = X[0]*X[1]*X[2]*X[3]/2;
+  int faceVolumeCB[4]={
+    X[1]*X[2]*X[3]/2,
+    X[0]*X[2]*X[3]/2,
+    X[0]*X[1]*X[3]/2,
+    X[0]*X[1]*X[2]/2
+  };
+
   //loop variables: a, b, c with a the most signifcant and c the least significant
   //A, B, C the maximum value
   //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
@@ -143,12 +150,13 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
 }
 
 
-void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void** cpuGhostStapleFwd, int nFace, QudaPrecision precision) {
+void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void** cpuGhostStapleFwd, 
+				int nFace, QudaPrecision precision, int* X) {
   
   if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhostAllStaples((double*)staple, (double**)cpuGhostStapleBack, (double**) cpuGhostStapleFwd, nFace);
+    packGhostAllStaples((double*)staple, (double**)cpuGhostStapleBack, (double**) cpuGhostStapleFwd, nFace, X);
   } else {
-    packGhostAllStaples((float*)staple, (float**)cpuGhostStapleBack, (float**)cpuGhostStapleFwd, nFace);
+    packGhostAllStaples((float*)staple, (float**)cpuGhostStapleBack, (float**)cpuGhostStapleFwd, nFace, X);
   }
   
 }
@@ -237,6 +245,7 @@ allocateStapleQuda(FullStaple *cudaStaple, QudaPrecision precision)
 
 void set_dim_ff(int *XX) {
 
+  /*
   volumeCB = 1;
   for (int i=0; i<4; i++) {
     X[i] = XX[i];
@@ -249,6 +258,7 @@ void set_dim_ff(int *XX) {
     faceVolumeCB[i] /= 2;
   }
   volumeCB /= 2;
+  */
 
 }
 
@@ -273,9 +283,9 @@ createStapleQuda(FullStaple* cudaStaple, QudaGaugeParam* param)
       cudaStaple->X[d] = param->X[d];
       cudaStaple->volume *= param->X[d];
     }
-    anisotropy_ = param->anisotropy;
-    t_boundary_ = param->t_boundary;
-    fat_link_max_ = param->fat_link_max;
+    //anisotropy_ = param->anisotropy; //?? gshi: why do we need to set that in staple function?
+    //t_boundary_ = param->t_boundary;
+    //fat_link_max_ = param->fat_link_max; 
 
     //cudaStaple->X[0] /= 2; // actually store the even-odd sublattice dimensions
     cudaStaple->volume /= 2;    
@@ -477,9 +487,18 @@ unpackGhostStaple(FullStaple* cudaStaple, int dir, int whichway, void** fwd_nbr_
   routine which uses an enlarged domain instead of a ghost zone.
  */
 template <typename Float>
-void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd, int dir, int nFace) {
+void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd, int dir, int nFace, int* X) {
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
+
+  int volumeCB = X[0]*X[1]*X[2]*X[3]/2;
+  int faceVolumeCB[4]={
+    X[1]*X[2]*X[3]/2,
+    X[0]*X[2]*X[3]/2,
+    X[0]*X[1]*X[3]/2,
+    X[0]*X[1]*X[2]/2
+  };
+
   //loop variables: a, b, c with a the most signifcant and c the least significant
   //A, B, C the maximum value
   //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
@@ -583,12 +602,12 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd,
 
 
 void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFwd, 
-			  int dir, int nFace, QudaPrecision precision) {
+			  int dir, int nFace, QudaPrecision precision, int *X) {
   
   if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhostAllLinks((double**)cpuLink, (double**)cpuGhostBack, (double**) cpuGhostFwd, dir,  nFace);
+    packGhostAllLinks((double**)cpuLink, (double**)cpuGhostBack, (double**) cpuGhostFwd, dir,  nFace, X);
   } else {
-    packGhostAllLinks((float**)cpuLink, (float**)cpuGhostBack, (float**)cpuGhostFwd, dir, nFace);
+    packGhostAllLinks((float**)cpuLink, (float**)cpuGhostBack, (float**)cpuGhostFwd, dir, nFace, X);
   }
   
 }
@@ -893,6 +912,86 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
 
 }
 
+
+template<typename FloatN, typename Float>
+static void 
+do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd, 
+		  int bytes, int Vh, int stride, QudaPrecision prec) 
+{  
+  cudaStream_t streams[2];
+  for(int i=0;i < 2; i++){
+    cudaStreamCreate(&streams[i]);
+  }
+  
+
+  double* unpackedDataEven;
+  double* unpackedDataOdd;
+  int datalen = 4*Vh*gaugeSiteSize*sizeof(Float);
+  cudaMalloc(&unpackedDataEven, datalen); CUERR;
+  cudaMalloc(&unpackedDataOdd, datalen); CUERR;
+  
+  //unpack even data kernel
+  link_format_gpu_to_cpu((void*)unpackedDataEven, (void*)even, bytes, Vh, stride, prec, streams[0]);
+#if (CUDA_VERSION >= 4000)
+  cudaMemcpyAsync(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost, streams[0]);
+#else
+  cudaMemcpy(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost);
 #endif
+  
+  //unpack odd data kernel
+  link_format_gpu_to_cpu((void*)unpackedDataOdd, (void*)odd,  bytes, Vh, stride, prec, streams[1]);
+#if (CUDA_VERSION >=4000)
+  cudaMemcpyAsync(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost, streams[1]);  
+  for(int i=0;i < 2; i++){
+    cudaStreamSynchronize(streams[i]);
+  }
+#else
+  cudaMemcpy(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost);  
+#endif
+  
+  cudaFree(unpackedDataEven);
+  cudaFree(unpackedDataOdd);
+  
+  for(int i=0;i < 2;i++){
+    cudaStreamDestroy(streams[i]);
+  }
+
+
+  CUERR;
+}
+void 
+storeLinkToCPU(void* cpuGauge, cudaGaugeField *cudaGauge, QudaGaugeParam* param)
+{
+  
+  QudaPrecision cpu_prec = param->cpu_prec;
+  QudaPrecision cuda_prec= param->cuda_prec;
+
+  if (cpu_prec  != cuda_prec){
+    printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  
+  if (cudaGauge->Reconstruct() != QUDA_RECONSTRUCT_NO){
+    printf("ERROR: it makes no sense to get data back to cpu for 8/12 reconstruct, function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  
+  int stride = cudaGauge->VolumeCB() + cudaGauge->Pad();
+  
+  if (cuda_prec == QUDA_DOUBLE_PRECISION){
+    do_storeLinkToCPU( (double*)cpuGauge, (double2*) cudaGauge->Even_p(), (double2*)cudaGauge->Odd_p(), 
+		       cudaGauge->Bytes(), cudaGauge->VolumeCB(), stride, cuda_prec);
+  }else if (cuda_prec == QUDA_SINGLE_PRECISION){
+    do_storeLinkToCPU( (float*)cpuGauge, (float2*) cudaGauge->Even_p(), (float2*)cudaGauge->Odd_p(), 
+		       cudaGauge->Bytes(), cudaGauge->VolumeCB(), stride, cuda_prec);
+  }else{
+    printf("ERROR: half precision not supported in this function %s\n", __FUNCTION__);
+    exit(1);
+  }
+}
+
+
+
 
 #endif
+
