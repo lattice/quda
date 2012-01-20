@@ -566,10 +566,10 @@ namespace hisq {
           const RealA* const oprodEven, 
           const RealA* const oprodOdd,
           const RealA* const QprevOdd, 		
-          int sig, int mu, 
-          typename RealTypeId<RealA>::Type coeff,
           const RealB* const linkEven, 
           const RealB* const linkOdd,
+          int sig, int mu, 
+          typename RealTypeId<RealA>::Type coeff,
           RealA* const PmuOdd, 
           RealA* const P3Even,
           RealA* const QmuEven, 
@@ -811,12 +811,6 @@ namespace hisq {
     template<class RealA, class RealB>
       static void
       middle_link_kernel(
-          RealA* const PmuEven, // write only  
-          RealA* const PmuOdd, // write only
-          RealA* const P3Even, // write only   
-          RealA* const P3Odd,  // write only
-          RealA* const QmuEven,  // write only
-          RealA* const QmuOdd,   // write only
           const RealA* const oprodEven, 
           const RealA* const oprodOdd, 
           const RealA* const QprevEven, 
@@ -827,6 +821,12 @@ namespace hisq {
           int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff,
           dim3 gridDim, dim3 BlockDim,
+          RealA* const PmuEven, // write only  
+          RealA* const PmuOdd, // write only
+          RealA* const P3Even, // write only   
+          RealA* const P3Odd,  // write only
+          RealA* const QmuEven,  // write only
+          RealA* const QmuOdd,   // write only
           RealA* const newOprodEven, 
           RealA* const newOprodOdd)
       {
@@ -838,8 +838,8 @@ namespace hisq {
         if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
           do_middle_link_kernel<RealA, RealB, 1, 1, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
               QprevOdd,
-              sig, mu, coeff,
               linkEven, linkOdd,
+              sig, mu, coeff,
               PmuOdd,  P3Even,
               QmuEven, 
               newOprodEven);
@@ -852,8 +852,8 @@ namespace hisq {
 
           do_middle_link_kernel<RealA, RealB, 1, 1, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
               QprevEven,
-              sig, mu, coeff,
               linkOdd, linkEven,
+              sig, mu, coeff,
               PmuEven,  P3Odd,
               QmuOdd, 
               newOprodOdd);
@@ -861,8 +861,8 @@ namespace hisq {
         }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
           do_middle_link_kernel<RealA, RealB, 1, 0, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
               QprevOdd,
-              sig, mu, coeff,
               linkEven, linkOdd,
+              sig, mu, coeff,
               PmuOdd,  P3Even,
               QmuEven,
               newOprodEven);
@@ -876,8 +876,8 @@ namespace hisq {
 
           do_middle_link_kernel<RealA, RealB, 1, 0, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
               QprevEven,
-              sig, mu, coeff,
               linkOdd, linkEven,
+              sig, mu, coeff,
               PmuEven,  P3Odd,
               QmuOdd,  
               newOprodOdd);
@@ -886,8 +886,8 @@ namespace hisq {
 
           do_middle_link_kernel<RealA, RealB, 0, 1, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
               QprevOdd,
-              sig, mu, coeff,
               linkEven, linkOdd,
+              sig, mu, coeff,
               PmuOdd,  P3Even,
               QmuEven, 
               newOprodEven);
@@ -901,8 +901,8 @@ namespace hisq {
 
           do_middle_link_kernel<RealA, RealB, 0, 1, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
               QprevEven, 
-              sig, mu, coeff,
               linkOdd, linkEven,
+              sig, mu, coeff,
               PmuEven,  P3Odd,
               QmuOdd, 
               newOprodOdd);
@@ -911,8 +911,8 @@ namespace hisq {
 
           do_middle_link_kernel<RealA, RealB, 0, 0, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
               QprevOdd,
-              sig, mu, coeff,
               linkEven, linkOdd,
+              sig, mu, coeff,
               PmuOdd, P3Even,
               QmuEven, 
               newOprodEven);		
@@ -926,8 +926,8 @@ namespace hisq {
 
           do_middle_link_kernel<RealA, RealB, 0, 0, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
               QprevEven,
-              sig, mu, coeff,
               linkOdd, linkEven,
+              sig, mu, coeff,
               PmuEven,  P3Odd,
               QmuOdd,  
               newOprodOdd);		
@@ -1600,15 +1600,15 @@ namespace hisq {
             if(GOES_BACKWARDS(sig)){ new_sig = OPP_DIR(sig); }else{ new_sig = sig; }
 
             middle_link_kernel( 
-                (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,                               // write only
-                (RealA*)P3.even.data, (RealA*)P3.odd.data,                                 // write only
-                (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,                               // write only     
                 (RealA*)cudaOprod.Even_p(), (RealA*)cudaOprod.Odd_p(),                     // read only
                 (RealA*)NULL,         (RealA*)NULL,                                        // read only
-                (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
+                (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(),	           // read only 
                 cudaSiteLink,  // read only
                 sig, mu, mThreeSt,
                 gridDim, blockDim,
+                (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,                               // write only
+                (RealA*)P3.even.data, (RealA*)P3.odd.data,                                 // write only
+                (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,                               // write only     
                 (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
 
             checkCudaError();
@@ -1622,15 +1622,15 @@ namespace hisq {
               //5-link: middle link
               //Kernel B
               middle_link_kernel( 
-                  (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,  // write only
-                  (RealA*)P5.even.data, (RealA*)P5.odd.data,        // write only
-                  (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,  // write only
                   (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,      // read only
                   (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,      // read only
                   (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                   cudaSiteLink, 
                   sig, nu, FiveSt,
                   gridDim, blockDim,
+                  (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,  // write only
+                  (RealA*)P5.even.data, (RealA*)P5.odd.data,        // write only
+                  (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,  // write only
                   (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
 
               checkCudaError();
@@ -1675,15 +1675,15 @@ namespace hisq {
 
             //lepage
             middle_link_kernel( 
-                (RealA*)NULL, (RealA*)NULL,                      // write only
-                (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
-                (RealA*)NULL, (RealA*)NULL,                      // write only
                 (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,     // read only
                 (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,     // read only
                 (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                 cudaSiteLink, 
                 sig, mu, Lepage,
                 gridDim, blockDim,
+                (RealA*)NULL, (RealA*)NULL,                      // write only
+                (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
+                (RealA*)NULL, (RealA*)NULL,                      // write only
 		(RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
 
             checkCudaError();		
