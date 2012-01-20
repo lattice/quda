@@ -301,16 +301,13 @@ namespace hisq{
       Cmplx w, tau, z;
 
       if(norm1 == 0 && mat(0,0).y == 0){
-        setIdentity(&temp);
+     //   setIdentity(&temp);
         p = mat;
       }else{
         Array<Cmplx,3> temp_vec;
         copyColumn(mat, 0, &temp_vec);
 
-
         beta = getNorm(temp_vec); 
-
-
 
         if(mat(0,0).x > 0.0){ beta = -beta; }
 
@@ -334,14 +331,14 @@ namespace hisq{
 
       // Step 2: build the first right reflector
       typename RealTypeId<Cmplx>::Type norm2 = cabs(p(0,2));
-      if(norm2 == 0 && p(0,1).y == 0) {
-        setIdentity(&temp);
-      }else{
+      // if(norm2 == 0 && p(0,1).y == 0) {
+      //  setIdentity(&temp);
+      // }else{
+      if(norm2 != 0.0 || p(0,1).y != 0.0){
         norm1 = cabs(p(0,1));
         beta  = quadSum(norm1,norm2);
         vec[0] = COMPLEX_ZERO;
-        vec[1] = COMPLEX_UNITY; // Actually, COMPLEX_ZERO and COMPLEX_UNITY should probably 
-        // be declared in constant memory.
+        vec[1] = COMPLEX_UNITY;  
 
         if( p(0,1).x > 0.0 ){ beta = -beta; }
         w = p(0,1)-beta;
@@ -359,9 +356,10 @@ namespace hisq{
 
       // Step 3: build the second left reflector
       norm2 = cabs(p(2,1));
-      if(norm2==0 && p(1,1).y==0){
-        setIdentity(&temp);
-      }else{
+      //if(norm2==0 && p(1,1).y==0){
+      //  setIdentity(&temp);
+      // }else{
+      if(norm2 != 0.0 || p(1,1).y != 0.0){
         norm1 = cabs(p(1,1));
         beta  = quadSum(norm1,norm2);
 
@@ -389,19 +387,17 @@ namespace hisq{
 
       // Step 4: build the second right reflector
       setIdentity(&temp);
-      if( p(1,1).y != 0 ){
+      if( p(1,2).y != 0.0 ){
         beta = cabs(p(1,2));
-        if( p(1,2).x > 0 ){ beta = -beta; }
+        if( p(1,2).x > 0.0 ){ beta = -beta; }
         temp(2,2) = conj(p(1,2))/beta;
-	// since temp is an identity matrix, I can simplify the following code
-	p(2,2) = p(2,0)*temp(0,2) + p(2,1)*temp(1,2) + p(2,2)*temp(2,2);
+	p(2,2) = p(2,2)*temp(2,2); // This is the only element of p needed below
         v = v*temp;
       }
 
 
       // Step 5: build the third left reflector
-     // setIdentity(&temp);
-      if( p(2,2).y != 0 ){
+      if( p(2,2).y != 0.0 ){
         beta = cabs(p(2,2));
         if( p(2,2).x > 0.0 ){ beta = -beta; }
         temp(2,2) = p(2,2)/beta;
@@ -417,7 +413,7 @@ namespace hisq{
     void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
     {
 
-      // SVDPREC should be defined by the user
+      // SVDPREC should really be defined by the user
       const Real SVDPREC = 0.000000001;
       Real c,s;
 
@@ -580,7 +576,7 @@ namespace hisq{
           m_small(1,0) = b(2,1);
           m_small(1,1) = b(2,2);
 
-          smallSVD(u_small, v_small, m_small); // need to write code for smallSVD
+          smallSVD(u_small, v_small, m_small); 
 
           b(1,1) = m_small(0,0);	
           b(1,2) = m_small(0,1);	
@@ -629,7 +625,6 @@ namespace hisq{
           }
 
         } // end if b(1,2) == 0
-        // I should be able to factor the code so I minimise the repitition between b(0,1) == 0 and b(1,2) == 0
       } while( (b(0,1) != 0.0 || b(1,2) != 0.0) && it < max_it);
 
 
@@ -646,7 +641,6 @@ namespace hisq{
 
 
 
-  // Need to actually compute the singular value decomposition!
   template<class Cmplx>
     DEVICEHOST
     void computeSVD(Matrix<Cmplx,3> & m, 
@@ -666,7 +660,7 @@ namespace hisq{
         }
       }
 
-      bdSVD(u_real, v_real, bd, 30);
+      bdSVD(u_real, v_real, bd, 40);
        
       for(int i=0; i<3; ++i){
         singular_values[i] = bd(i,i);
