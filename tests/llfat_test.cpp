@@ -44,7 +44,7 @@ int verify_results = 0;
 
 #define DIM 24
 
-int device = 0;
+extern int device;
 int ODD_BIT = 1;
 int Z[4];
 int V;
