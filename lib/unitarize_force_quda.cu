@@ -16,20 +16,23 @@
 #define FORCE_UNITARIZE_PI23 FORCE_UNITARIZE_PI*2.0/3.0
 #define FORCE_UNITARIZE_EPS 1e-5
 #define HISQ_FORCE_FILTER 5e-5
+#define ACCEPTABLE_DET_ERROR 1e-12
 
 // constants - File scope only
 //__device__ __constant__ double FORCE_UNITARIZE_EPS;
 //__device__ __constant__ double HISQ_FORCE_FILTER;
+//__device__ __constant__ double ACCEPTABLE_DET_ERROR;
 
 
 
 namespace hisq{
   namespace fermion_force{
 
-    void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter)
+    void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double acceptable_det_error)
     {
       cudaMemcpyToSymbol("FORCE_UNITARIZE_EPS", &unitarize_eps, sizeof(double));
       cudaMemcpyToSymbol("HISQ_FORCE_FILTER", &hisq_force_filter, sizeof(double));
+      cudaMemcpyToSymbol("ACCEPTABLE_DET_ERROR", &acceptable_det_error, sizeof(double));
       return;
     }
 
@@ -263,32 +266,21 @@ namespace hisq{
         // eigenvalues have been computed 
         // compute the eigenvalues using the singular value decomposition
         computeSVD<Cmplx>(q,tempq,tmp2,g);
-        // g are the eigenvalues of the matrix q
-		 	  // The determinant is the product of the eigenvalues, and I can use this
+        // The array g contains the eigenvalues of the matrix q
+	// The determinant is the product of the eigenvalues, and I can use this
         // to check the SVD
         typename RealTypeId<Cmplx>::Type determinant = getDeterminant(q).x;
         typename RealTypeId<Cmplx>::Type gprod = g[0]*g[1]*g[2];
+       
+
+#if (__CUDA_ARCH__ >= 200)
+        if(fabs(gprod - determinant) > ACCEPTABLE_DET_ERROR){
+	  printf("Warning: Error in determinant computed by SVD : %g > %g", fabs(gprod-determinant), ACCEPTABLE_DET_ERROR);
+	}
+#endif
         
-        if(fabs(gprod - determinant) > 1e-12){
-				  printf("SVD error?: %g\n", fabs(gprod-determinant));
-				}
-        
 
 
-
-        float sum1, sum2;
-        sum1 = 0.; sum2 = 0.;
-       // printf("Eigenvalues\n");
-        for(int i=0; i<3; ++i){
-        //  printf("%2.10f, %2.10f\n",c[i], g[i]);
-          sum1 += c[i]; sum2 += g[i];
-        }
-       // printf("difference of the sums = %2.20f\n",fabs(sum1-sum2));
-       // if(fabs(sum1-sum2)>0.001){
-      //    printf("Discrepancy\n");
-      //  }
-
-      //  printf("\n\n");
 
         // New code!
         // Augment the eigenvalues
@@ -340,8 +332,7 @@ namespace hisq{
       // "v" denotes a "fattened" link variable
       template<class Cmplx>
       __device__ __host__
-     // __host__
-        void getUnitarizeForceSite(Matrix<Cmplx,3>* result, const Matrix<Cmplx,3> & v, const Matrix<Cmplx,3> & outer_prod)
+        void getUnitarizeForceSite(const Matrix<Cmplx,3> & v, const Matrix<Cmplx,3> & outer_prod, Matrix<Cmplx,3>* result)
         {
           typename RealTypeId<Cmplx>::Type f[3]; 
           typename RealTypeId<Cmplx>::Type b[6];
@@ -404,9 +395,9 @@ namespace hisq{
 
       // I don't need to swap between odd and even half lattices, do I
         template<class Cmplx>
-          __global__ void getUnitarizeForceField(Cmplx* force_even, Cmplx* force_odd,
-                                                 Cmplx* link_even, Cmplx* link_odd,
-                                                 Cmplx* old_force_even, Cmplx* old_force_odd)
+          __global__ void getUnitarizeForceField(Cmplx* link_even, Cmplx* link_odd,
+                                                 Cmplx* old_force_even, Cmplx* old_force_odd,
+						 Cmplx* force_even, Cmplx* force_odd)
           {
             int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
        
@@ -424,21 +415,21 @@ namespace hisq{
               old_force = old_force_odd;
             }
 
-            Matrix<double2,3> v, result, oprod;
-           // Matrix<Cmplx,3> v, result, oprod;
 
+            // This part of the calculation is always done in double precision
+            Matrix<double2,3> v, result, oprod;
            
             for(int dir=0; dir<4; ++dir){
               loadLinkVariableFromArray(old_force, dir, mem_idx, Vh, &oprod);
               loadLinkVariableFromArray(link, dir, mem_idx, Vh, &v);
 
-              //getUnitarizeForceSite<Cmplx>(&result, v, oprod); 
-              getUnitarizeForceSite<double2>(&result, v, oprod); 
+              getUnitarizeForceSite<double2>(v, oprod, &result); 
 
               writeLinkVariableToArray(result, dir, mem_idx, Vh, force); 
             }
             return;
-          }
+          } // getUnitarizeForceField
+
 
         // template this! 
         void copyArrayToLink(Matrix<float2,3>* link, float* array){
@@ -479,33 +470,21 @@ namespace hisq{
 
         void unitarize_force_cpu(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField &cpuNewForce)
         {
-          printf("In unitarize_force_cpu\n");
-          printf("Volume = %d\n",cpuOldForce.Volume());
 
-
-          printf("FILTER = %lf\n",HISQ_FORCE_FILTER);
           Matrix<float2,3> old_force, new_force, v;
           for(int i=0; i<cpuGauge.Volume(); ++i){
            for(int dir=0; dir<4; ++dir){
              copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
              copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
-     
-             if(i==0 && dir==0){
-               printf("Printing link variable\n");
-               printLink(v);
-             } 
 
-             printf("Calling getUnitarizeForceSite\n"); 
-             getUnitarizeForceSite<float2>(&new_force, v, old_force);
+             getUnitarizeForceSite<float2>(v, old_force, &new_force);
             
-             printLink(new_force);
-
              copyLinkToArray(((float*)(cpuNewForce.Gauge_p()) + (i*4 + dir)*18), new_force); 
 
            } // dir
           } // i
           return;
-        }
+        } // unitarize_force_cpu
 
 
         void unitarize_force_cuda(cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField& cudaNewForce)
@@ -514,13 +493,11 @@ namespace hisq{
           dim3 gridDim(cudaGauge.Volume()/BLOCK_DIM,1,1);
           dim3 blockDim(BLOCK_DIM,1,1);
 
-          printf("Vh = %d\n",Vh);
-          printf("BLOCK_DIM = %d\n",BLOCK_DIM);
-          getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaNewForce.Even_p(), (float2*)cudaNewForce.Odd_p(), 
-                                                       (float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
-                                                      (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p());
+          getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
+                                                      (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p(),
+                                                      (float2*)cudaNewForce.Even_p(), (float2*)cudaNewForce.Odd_p());
           return;
-        }
+        } // unitarize_force_cuda
 
 
   } // namespace fermion_force

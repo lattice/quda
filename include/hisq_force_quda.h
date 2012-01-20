@@ -19,14 +19,7 @@ namespace hisq {
 
   void set_unitarize_force_contants(double unitarize_eps, double hisq_force_filter);
 
-  void unitarize_force_cuda(cudaGaugeField &cudaOldForce,
-                            cudaGaugeField &cudaGauge,
-                            cudaGaugeField &cudaNewForce);
-
-  void unitarize_force_cpu(cpuGaugeField &cpuOldForce,
-                            cpuGaugeField &cpuGauge,
-                            cpuGaugeField &cpuNewForce);
-
+  
   void rescaleHalfFieldCuda(cudaGaugeField &cudaField, 
                             const QudaGaugeParam& param,
                             int oddBit,
@@ -45,6 +38,13 @@ namespace hisq {
                                  cudaGaugeField &force);
 
 
+  void unitarize_force_cuda(cudaGaugeField &cudaOldForce,
+                            cudaGaugeField &cudaGauge,
+                            cudaGaugeField &cudaNewForce);
+
+  void unitarize_force_cpu(cpuGaugeField &cpuOldForce,
+                            cpuGaugeField &cpuGauge,
+                            cpuGaugeField &cpuNewForce);
 
 
  } // namespace fermion_force
