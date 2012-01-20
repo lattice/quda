@@ -22,6 +22,9 @@
 //__device__ __constant__ double FORCE_UNITARIZE_EPS;
 //__device__ __constant__ double HISQ_FORCE_FILTER;
 //__device__ __constant__ double ACCEPTABLE_DET_ERROR;
+// static double FORCE_UNITARIZE_EPS;
+// static double HISQ_FORCE_FILTER;
+// static double ACCEPTABLE_DET_ERROR;
 
 
 
@@ -33,8 +36,15 @@ namespace hisq{
       cudaMemcpyToSymbol("FORCE_UNITARIZE_EPS", &unitarize_eps, sizeof(double));
       cudaMemcpyToSymbol("HISQ_FORCE_FILTER", &hisq_force_filter, sizeof(double));
       cudaMemcpyToSymbol("ACCEPTABLE_DET_ERROR", &acceptable_det_error, sizeof(double));
+/*
+      FORCE_UNITARIZE_EPS  = unitarize_eps;
+      HISQ_FORCE_FILTER    = hisq_force_filter;
+      ACCEPTABLE_DET_ERROR = acceptable_det_error;
+*/
       return;
     }
+
+  
 
 
 

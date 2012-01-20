@@ -50,7 +50,7 @@ gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-hisq_force_test: hisq_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
+hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 tune: blas_test
@@ -60,7 +60,7 @@ clean:
 	-rm -f *.o staggered_dslash_test staggered_invert_test		\
 	wilson_dslash_test wilson_invert_test domain_wall_dslash_test	\
 	domain_wall_invert_test su3_test pack_test blas_test		\
-	llfat_test gauge_force_test fermion_force_test hisq_force_test
+	llfat_test gauge_force_test fermion_force_test hisq_paths_force_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@
