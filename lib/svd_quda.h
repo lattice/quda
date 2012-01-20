@@ -393,23 +393,18 @@ namespace hisq{
         beta = cabs(p(1,2));
         if( p(1,2).x > 0 ){ beta = -beta; }
         temp(2,2) = conj(p(1,2))/beta;
-
+	// since temp is an identity matrix, I can simplify the following code
 	p(2,2) = p(2,0)*temp(0,2) + p(2,1)*temp(1,2) + p(2,2)*temp(2,2);
-      //  p = p*temp; // strictly speaking, I don't need to do full matrix multiplication here, as I only require p(2,2) for the next step
         v = v*temp;
       }
 
 
       // Step 5: build the third left reflector
-      setIdentity(&temp);
+     // setIdentity(&temp);
       if( p(2,2).y != 0 ){
         beta = cabs(p(2,2));
         if( p(2,2).x > 0.0 ){ beta = -beta; }
         temp(2,2) = p(2,2)/beta;
-        // WARNING!
-        // Why am I updating p here?
-        // I shouldn't be
-    //    p = conj(temp)*p; // would be easy to change to get rid of the adjoint
         u = u*temp;
       }
       return;
