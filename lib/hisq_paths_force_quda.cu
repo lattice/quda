@@ -11,7 +11,7 @@
 #define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
 
 
-// Disable texture read for now, need to revisit this.
+// Disable texture read for now. Need to revisit this.
 //#define FF_SITE_MATRIX_LOAD_TEX 1
 
 #if (FF_SITE_MATRIX_LOAD_TEX == 1)
@@ -25,7 +25,9 @@
 #endif
 
 
-#define SIMPLE_MAT_FORCE_TO_MOM(mat, mom, idx, dir, temp_mat, coeff) do { \
+
+
+#define MAT_TO_MOM_FIELD(mat, mom, idx, dir, temp_mat, coeff) do { \
   {                                                             \
     float2 AH0, AH1, AH2, AH3, AH4;                             \
     LOAD_ANTI_HERMITIAN(mom, dir, idx, AH);			\
@@ -288,10 +290,10 @@ namespace hisq {
 
     template<class RealA, class RealB, int oddBit>
       __global__ void 
-      do_compute_force_kernel(const RealB* const linkEven, 
-                              const RealA* const momMatrixEven,      
-                              int sig,
-                              RealA* const momEven)
+      do_compute_momentum_kernel(const RealB* const linkEven, 
+                                 const RealA* const oprodEven,      
+                                 int sig,
+                                 RealA* const momEven)
       {
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -318,12 +320,12 @@ namespace hisq {
           RECONSTRUCT_LINK_12(sig, sid, link_sign, link_W);
         }
 
-        loadMatrixFromField(momMatrixEven, sig, sid, COLOR_MAT_X);
+        loadMatrixFromField(oprodEven, sig, sid, COLOR_MAT_X);
         MAT_MUL_MAT(link_W, color_mat_X, color_mat_W);
    
 	typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
 			 
-        SIMPLE_MAT_FORCE_TO_MOM(color_mat_W, momEven, sid, sig, link_W, coeff);
+        MAT_TO_MOM_FIELD(color_mat_W, momEven, sid, sig, link_W, coeff);
           
         return;
       }
@@ -334,7 +336,7 @@ namespace hisq {
           const RealA* const oprodEven, 
           int sig, 
           typename RealTypeId<RealA>::Type coeff,
-          RealA* const momMatrixEven
+          RealA* const outputEven
           )
       {
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -370,20 +372,20 @@ namespace hisq {
         RealA COLOR_MAT_W[ArrayLength<RealA>::result];
         if(GOES_FORWARDS(sig)){
           loadMatrixFromField(oprodEven, sig, point_a, COLOR_MAT_W);
-          addMatrixToField(COLOR_MAT_W, sig, point_a, coeff, momMatrixEven);
+          addMatrixToField(COLOR_MAT_W, sig, point_a, coeff, outputEven);
         }
         return;
       }
-
+ 
     template<class RealA, int oddBit>
       __global__ void 
       do_naik_terms_kernel(
-          RealA* const momMatrixEven,
           const RealA* const linkEven,
           const RealA* const linkOdd,
           const RealA* const naikOprodEven,
           const RealA* const naikOprodOdd,
-          int sig, typename RealTypeId<RealA>::Type naik_coeff)
+          int sig, typename RealTypeId<RealA>::Type naik_coeff,
+	  RealA* const outputEven)
       {
        
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -465,9 +467,9 @@ namespace hisq {
           MAT_MUL_MAT(color_mat_W, link_X, color_mat_T);
 
 
-          addMatrixToField(COLOR_MAT_T, sig, sid, naik_coeff, momMatrixEven);
-          addMatrixToField(COLOR_MAT_U, sig, sid, -naik_coeff, momMatrixEven);
-          addMatrixToField(COLOR_MAT_V, sig, sid, naik_coeff, momMatrixEven);
+          addMatrixToField(COLOR_MAT_T, sig, sid, naik_coeff, outputEven);
+          addMatrixToField(COLOR_MAT_U, sig, sid, -naik_coeff, outputEven);
+          addMatrixToField(COLOR_MAT_V, sig, sid, naik_coeff, outputEven);
         }
 
         return;
@@ -478,40 +480,39 @@ namespace hisq {
 
     template<class RealA>
       void naik_terms(
-          RealA* const momMatrixEven,
-          RealA* const momMatrixOdd,
           const RealA* const linkEven,
           const RealA* const linkOdd,
           const RealA* const naikOprodEven,
           const RealA* const naikOprodOdd,
           int sig, typename RealTypeId<RealA>::Type naik_coeff,
-          dim3 gridDim, dim3 blockDim)
+          dim3 gridDim, dim3 blockDim,
+	  RealA* const outputEven,
+	  RealA* const outputOdd)
       {
 
         dim3 halfGridDim(gridDim.x/2,1,1);
 
 
-        printf("naik_coeff = %lf\n", naik_coeff);
 
         if(GOES_FORWARDS(sig)){
           // Even half lattice
-          do_naik_terms_kernel<RealA,0><<<halfGridDim,blockDim>>>(momMatrixEven,
-                                                               linkEven,
+          do_naik_terms_kernel<RealA,0><<<halfGridDim,blockDim>>>(linkEven,
                                                                linkOdd,
                                                                naikOprodEven,
                                                                naikOprodOdd,
-                                                               sig, naik_coeff);
+                                                               sig, naik_coeff,
+							       outputEven);
 
           // Odd half lattice
-          do_naik_terms_kernel<RealA,1><<<halfGridDim,blockDim>>>(momMatrixOdd,
-                                                                linkOdd,
+          do_naik_terms_kernel<RealA,1><<<halfGridDim,blockDim>>>(linkOdd,
                                                                 linkEven,
                                                                 naikOprodOdd,
                                                                 naikOprodEven,
-                                                                sig, naik_coeff);
+                                                                sig, naik_coeff,
+								outputOdd);
         }
         else {
-          printf("sig does not go forward\n");
+          errorQuda("sig does not go forward\n");
         }
 
         return;
@@ -526,14 +527,14 @@ namespace hisq {
     template<class RealA>
       static void
       one_link_term(
-          RealA* const ForceMatrixEven,   
-          RealA* const  ForceMatrixOdd,
           const RealA* const oprodEven, 
           const RealA* const oprodOdd,
           int sig, 
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type naik_coeff,
-          dim3 gridDim, dim3 blockDim)
+          dim3 gridDim, dim3 blockDim,
+          RealA* const ForceMatrixEven,
+	  RealA* const ForceMatrixOdd)
       {
 
         dim3 halfGridDim(gridDim.x/2,1,1);
@@ -679,10 +680,8 @@ namespace hisq {
         // load the link variable connecting a and b 
         // Store in link_W 
         if(sig_positive){
-          //loadMatrixFromField(LINK_W, mysig, ab_link_nbr_idx, linkEven);
           loadMatrixFromField(linkEven, mysig, ab_link_nbr_idx, LINK_W);
         }else{
-          //loadMatrixFromField(LINK_W, mysig, ab_link_nbr_idx, linkOdd);
           loadMatrixFromField(linkOdd, mysig, ab_link_nbr_idx, LINK_W);
         }
         if(ArrayLength<RealB>::compressed){
@@ -692,10 +691,8 @@ namespace hisq {
         // load the link variable connecting b and c 
         // Store in link_X
         if(mu_positive){
-          //loadMatrixFromField(LINK_X, mymu, bc_link_nbr_idx, linkEven);
           loadMatrixFromField(linkEven, mymu, bc_link_nbr_idx, LINK_X);
         }else{ 
-          //loadMatrixFromField(LINK_X, mymu, bc_link_nbr_idx, linkOdd);
           loadMatrixFromField(linkOdd, mymu, bc_link_nbr_idx, LINK_X);
         }
         if(ArrayLength<RealB>::compressed){
@@ -707,15 +704,12 @@ namespace hisq {
 
         if(QprevOdd == NULL){
           if(sig_positive){
-            //loadMatrixFromField(COLOR_MAT_Y, sig, point_d, oprodOdd);
             loadMatrixFromField(oprodOdd, sig, point_d, COLOR_MAT_Y);
           }else{
-            //loadMatrixFromField(COLOR_MAT_Z, OPP_DIR(sig), point_c, oprodEven);
             loadMatrixFromField(oprodEven, OPP_DIR(sig), point_c, COLOR_MAT_Z);
             ADJ_MAT(color_mat_Z, color_mat_Y);
           }
         }else{ // QprevOdd != NULL
-          //loadMatrixFromField(COLOR_MAT_Y, point_c, oprodEven);
           loadMatrixFromField(oprodEven, point_c, COLOR_MAT_Y);
         }
        
@@ -730,13 +724,11 @@ namespace hisq {
 
 
         if(mu_positive){
-          // loadMatrixFromField(LINK_Y, mymu, ad_link_nbr_idx, linkOdd);
           loadMatrixFromField(linkOdd, mymu, ad_link_nbr_idx, LINK_Y);
           if(ArrayLength<RealB>::compressed){
             RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, link_Y);
           }
         }else{
-          // loadMatrixFromField(LINK_X, mymu, ad_link_nbr_idx, linkEven);
           loadMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_X);
           if(ArrayLength<RealB>::compressed){
             RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, link_X);
@@ -754,7 +746,6 @@ namespace hisq {
             WRITE_MATRIX_18_SINGLE(QmuEven, sid, COLOR_MAT_X);
           }
         }else{ 
-          // loadMatrixFromField(COLOR_MAT_Y, point_d, QprevOdd);
           loadMatrixFromField(QprevOdd, point_d, COLOR_MAT_Y);
           MAT_MUL_MAT(color_mat_Y, link_Y, color_mat_X);
           if(QmuEven){
@@ -767,7 +758,6 @@ namespace hisq {
 
 
         if(sig_positive){
-          //addMatrixToField(momMatrixEven, sig, sid, coeff, COLOR_MAT_Y);
           addMatrixToField(COLOR_MAT_Y, sig, sid, coeff, momMatrixEven);
         }
 
@@ -779,9 +769,9 @@ namespace hisq {
 
     template<class RealA, class RealB>
       static void 
-      compute_force_kernel(
-          const RealA* const momMatrixEven, 
-          const RealA* const momMatrixOdd,
+      compute_momentum_kernel(
+          const RealA* const oprodEven, 
+          const RealA* const oprodOdd,
           const RealB* const linkEven, 
           const RealB* const linkOdd, 
           cudaGaugeField &cudaSiteLink,
@@ -794,10 +784,10 @@ namespace hisq {
         cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
         cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Odd_p(),  cudaSiteLink.Bytes()/2);
 
-        do_compute_force_kernel<RealA, RealB, 0><<<halfGridDim, blockDim>>>(linkEven,
-                                                                          momMatrixEven,
-                                                                          sig,
-                                                                          momEven);
+        do_compute_momentum_kernel<RealA, RealB, 0><<<halfGridDim, blockDim>>>(linkEven,
+                                                                               oprodEven,
+                                                                               sig,
+                                                                               momEven);
 
         cudaUnbindTexture(siteLink0TexSingle_recon);
         cudaUnbindTexture(siteLink1TexSingle_recon);
@@ -805,10 +795,10 @@ namespace hisq {
         cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);
         cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
 
-        do_compute_force_kernel<RealA, RealB, 1><<<halfGridDim, blockDim>>>(linkOdd,
-                                                                          momMatrixOdd,
-                                                                          sig,
-                                                                          momOdd);
+        do_compute_momentum_kernel<RealA, RealB, 1><<<halfGridDim, blockDim>>>(linkOdd,
+                                                                               oprodOdd,
+                                                                               sig,
+                                                                               momOdd);
 
         cudaUnbindTexture(siteLink0TexSingle_recon);
         cudaUnbindTexture(siteLink1TexSingle_recon);
@@ -821,8 +811,6 @@ namespace hisq {
     template<class RealA, class RealB>
       static void
       middle_link_kernel(
-          RealA* const momMatrixEven, 
-          RealA* const momMatrixOdd,
           RealA* const PmuEven, // write only  
           RealA* const PmuOdd, // write only
           RealA* const P3Even, // write only   
@@ -838,7 +826,9 @@ namespace hisq {
           cudaGaugeField &cudaSiteLink,
           int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff,
-          dim3 gridDim, dim3 BlockDim)
+          dim3 gridDim, dim3 BlockDim,
+          RealA* const momMatrixEven, 
+          RealA* const momMatrixOdd)
       {
         dim3 halfGridDim(gridDim.x/2, 1,1);
 
@@ -1091,8 +1081,6 @@ namespace hisq {
     template<class RealA, class RealB>
       static void
       side_link_kernel(
-          RealA* momMatrixEven, 
-          RealA* momMatrixOdd,
           RealA* shortPEven,  
           RealA* shortPOdd,
           const RealA* const P3Even, 
@@ -1105,7 +1093,9 @@ namespace hisq {
           int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type accumu_coeff,
-          dim3 gridDim, dim3 blockDim)
+          dim3 gridDim, dim3 blockDim,
+          RealA* momMatrixEven, 
+          RealA* momMatrixOdd)
       {
         dim3 halfGridDim(gridDim.x/2,1,1);
 
@@ -1420,8 +1410,6 @@ namespace hisq {
     template<class RealA, class RealB>
       static void
       all_link_kernel(
-          RealA* const momMatrixEven, 
-          RealA* const momMatrixOdd,
           RealA* const shortPEven, 
           RealA* const shortPOdd,
           const RealA* const oprodEven, 
@@ -1434,7 +1422,9 @@ namespace hisq {
           int sig, int mu,
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type  accumu_coeff,
-          dim3 gridDim, dim3 blockDim)
+          dim3 gridDim, dim3 blockDim,
+          RealA* const momMatrixEven, 
+          RealA* const momMatrixOdd)
           {
             dim3 halfGridDim(gridDim.x/2, 1,1);
 
@@ -1603,7 +1593,6 @@ namespace hisq {
             if(GOES_BACKWARDS(sig)){ new_sig = OPP_DIR(sig); }else{ new_sig = sig; }
 
             middle_link_kernel( 
-                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                 (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,                               // write only
                 (RealA*)P3.even.data, (RealA*)P3.odd.data,                                 // write only
                 (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,                               // write only     
@@ -1612,7 +1601,8 @@ namespace hisq {
                 (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                 cudaSiteLink,  // read only
                 sig, mu, mThreeSt,
-                gridDim, blockDim);
+                gridDim, blockDim,
+                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
 
             checkCudaError();
 
@@ -1625,7 +1615,6 @@ namespace hisq {
               //5-link: middle link
               //Kernel B
               middle_link_kernel( 
-                  (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                   (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,  // write only
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,        // write only
                   (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,  // write only
@@ -1634,7 +1623,8 @@ namespace hisq {
                   (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                   cudaSiteLink, 
                   sig, nu, FiveSt,
-                  gridDim, blockDim);
+                  gridDim, blockDim,
+                  (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
 
               checkCudaError();
 
@@ -1647,14 +1637,15 @@ namespace hisq {
                 //7-link: middle link and side link
                 if(FiveSt != 0)coeff = SevenSt/FiveSt; else coeff = 0;
                 all_link_kernel(
-                    (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                     (RealA*)P5.even.data, (RealA*)P5.odd.data, 
                     (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,
                     (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,
                     (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                     cudaSiteLink,
                     sig, rho, SevenSt, coeff,
-                    gridDim, blockDim);
+                    gridDim, blockDim,
+                    (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
+
                 checkCudaError();
 
               }//rho  		
@@ -1663,21 +1654,20 @@ namespace hisq {
               //5-link: side link
               if(ThreeSt != 0)coeff = FiveSt/ThreeSt; else coeff = 0;
               side_link_kernel(
-                  (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,    // write
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,    // read only
                   (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,  // read only
                   (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                   cudaSiteLink,
                   sig, nu, mFiveSt, coeff,
-                  gridDim, blockDim);
+                  gridDim, blockDim,
+                  (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
               checkCudaError();
 
             } //nu 
 
             //lepage
             middle_link_kernel( 
-                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                 (RealA*)NULL, (RealA*)NULL,                      // write only
                 (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
                 (RealA*)NULL, (RealA*)NULL,                      // write only
@@ -1686,34 +1676,37 @@ namespace hisq {
                 (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                 cudaSiteLink, 
                 sig, mu, Lepage,
-                gridDim, blockDim);
+                gridDim, blockDim,
+		(RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
+
             checkCudaError();		
 
             if(ThreeSt != 0)coeff = Lepage/ThreeSt ; else coeff = 0;
 
             side_link_kernel(
-                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                 (RealA*)P3.even.data, (RealA*)P3.odd.data,           // write only
                 (RealA*)P5.even.data, (RealA*)P5.odd.data,           // read only
                 (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,         // read only
                 (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                 cudaSiteLink,
                 sig, mu, mLepage, coeff,
-                gridDim, blockDim);
+                gridDim, blockDim,
+                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
+
             checkCudaError();		
 
 
             //3-link side link
             coeff=0.;
             side_link_kernel(
-                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                 (RealA*)NULL, (RealA*)NULL,                // write
                 (RealA*)P3.even.data, (RealA*)P3.odd.data, // read only
                 (RealA*)NULL, (RealA*)NULL,                // read only
                 (RealB*)cudaSiteLink.Even_p(), (RealB*)cudaSiteLink.Odd_p(), 
                 cudaSiteLink,
                 sig, mu, ThreeSt, coeff,
-                gridDim, blockDim);
+                gridDim, blockDim, 
+		(RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
 
             checkCudaError();			    
 
@@ -1724,10 +1717,10 @@ namespace hisq {
         for(int sig=0; sig<8; ++sig){
           if(GOES_FORWARDS(sig)){
             one_link_term(
-                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p(),
                 (RealA*)cudaOprod.Even_p(), (RealA*)cudaOprod.Odd_p(),
                 sig, OneLink, 0.0,
-                gridDim, blockDim);
+                gridDim, blockDim,
+                (RealA*)cudaForceMatrix.Even_p(), (RealA*)cudaForceMatrix.Odd_p());
           } // GOES_FORWARDS(sig)
           checkCudaError();
         }
@@ -1745,9 +1738,7 @@ namespace hisq {
        if(GOES_FORWARDS(sig)){
          int sid = blockIdx.x*blockDim.x + threadIdx.x;
          RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-         //loadMatrixFromField(COLOR_MAT_W, sig, sid, Oprod);
          loadMatrixFromField(Oprod, sig, sid, COLOR_MAT_W);
-         //storeMatrixToField(momMatrix, sig, sid, COLOR_MAT_W);
          storeMatrixToField(COLOR_MAT_W, sig, sid, momMatrix);
        }
        return;
@@ -1760,14 +1751,14 @@ namespace hisq {
      static void 
      rewrite_oprod_kernel(RealA* const momMatrixEven,
                           RealA* const momMatrixOdd,
-                          const RealA* const OprodEven,
-                          const RealA* const OprodOdd,
+                          const RealA* const oprodEven,
+                          const RealA* const oprodOdd,
                           int sig, dim3 gridDim, dim3 blockDim)
      {
        dim3 halfGridDim(gridDim.x/2, 1, 1);
    
-       do_rewrite_oprod_kernel<RealA><<<halfGridDim, blockDim>>>(momMatrixEven, OprodEven, sig);
-       do_rewrite_oprod_kernel<RealA><<<halfGridDim, blockDim>>>(momMatrixOdd, OprodOdd, sig);
+       do_rewrite_oprod_kernel<RealA><<<halfGridDim, blockDim>>>(momMatrixEven, oprodEven, sig);
+       do_rewrite_oprod_kernel<RealA><<<halfGridDim, blockDim>>>(momMatrixOdd, oprodOdd, sig);
        return;
      }
 
@@ -1800,19 +1791,16 @@ namespace hisq {
    __global__ void 
    do_rescaleHalfField(RealA* const halfField, typename  RealTypeId<RealA>::Type coeff)
    {
-
      // Note: 
      // At the moment, this will only work for float2, double2 
      RealA matrix[ArrayLength<RealA>::result];    
      int sid = blockIdx.x*blockDim.x + threadIdx.x; 
      for(int sig=0; sig<4; ++sig){
-      // loadMatrixFromField(matrix, sig, sid, halfField);
        loadMatrixFromField(halfField, sig, sid, matrix);
        for(int i=0; i<ArrayLength<RealA>::result; ++i){
         matrix[i].x = coeff*matrix[i].x;
         matrix[i].y = coeff*matrix[i].y;
        }
-       //storeMatrixToField(halfField, sig, sid, matrix);
        storeMatrixToField(matrix, sig, sid, halfField);
      }
      
@@ -1851,37 +1839,37 @@ namespace hisq {
 
 
    void hisq_contract_cuda(cudaGaugeField &cudaOprod,
-													 cudaGaugeField &cudaLink,
-													 QudaGaugeParam* param,
-													 cudaGaugeField &cudaForce)
-  {
+		   cudaGaugeField &cudaLink,
+		   QudaGaugeParam* param,
+		   cudaGaugeField &cudaMom)
+   {
 
-    int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
-    dim3 blockDim(BLOCK_DIM,1,1);
-    dim3 gridDim(volume/blockDim.x, 1, 1);
-    
-    for(int sig=0; sig<4; sig++){
-          if(GOES_FORWARDS(sig)){
-            compute_force_kernel( 
-                (float2*)cudaOprod.Even_p(), (float2*)cudaOprod.Odd_p(),
-                (float2*)cudaLink.Even_p(), (float2*)cudaLink.Odd_p(), 
-                cudaLink,
-                sig, gridDim, blockDim,
-                (float2*)cudaForce.Even_p(), (float2*)cudaForce.Odd_p());
-          } 
-        }
-    return;
-  }
+	   int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
+	   dim3 blockDim(BLOCK_DIM,1,1);
+	   dim3 gridDim(volume/blockDim.x, 1, 1);
+
+	   for(int sig=0; sig<4; sig++){
+		   if(GOES_FORWARDS(sig)){
+			   compute_momentum_kernel( 
+					   (float2*)cudaOprod.Even_p(), (float2*)cudaOprod.Odd_p(),
+					   (float2*)cudaLink.Even_p(), (float2*)cudaLink.Odd_p(), 
+					   cudaLink,
+					   sig, gridDim, blockDim,
+					   (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p());
+		   } 
+	   }
+	   return;
+   }
 
 
 
 
 
    void hisq_naik_force_cuda(void* path_coeff_array,
-                             cudaGaugeField &cudaOprod,
+                             cudaGaugeField &oldOprod,
                              cudaGaugeField &cudaLink,
                              QudaGaugeParam* param,
-                             cudaGaugeField &cudaForce)
+                             cudaGaugeField &newOprod)
    {
      int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
      dim3 blockDim(BLOCK_DIM,1,1);
@@ -1889,19 +1877,20 @@ namespace hisq {
 
      if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
        for(int sig=0; sig<4; ++sig){
-         naik_terms((double2*)cudaForce.Even_p(), (double2*)cudaForce.Odd_p(), 
-             (double2*)cudaLink.Even_p(), (double2*)cudaLink.Odd_p(),
-             (double2*)cudaOprod.Even_p(), (double2*)cudaOprod.Odd_p(),
-             sig, ((double*)path_coeff_array)[1], 
-             gridDim, blockDim);
+         naik_terms((double2*)cudaLink.Even_p(), (double2*)cudaLink.Odd_p(),
+                    (double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
+                   sig, ((double*)path_coeff_array)[1], 
+                   gridDim, blockDim,
+	           (double2*)newOprod.Even_p(), (double2*)newOprod.Odd_p());
        }
      }else if(param->cuda_prec == QUDA_SINGLE_PRECISION){
        for(int sig=0; sig<4; ++sig){
-         naik_terms((float2*)cudaForce.Even_p(), (float2*)cudaForce.Odd_p(), 
+         naik_terms( 
              (float2*)cudaLink.Even_p(), (float2*)cudaLink.Odd_p(),
-             (float2*)cudaOprod.Even_p(), (float2*)cudaOprod.Odd_p(),
+             (float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
              sig, ((float*)path_coeff_array)[1], 
-             gridDim, blockDim);
+             gridDim, blockDim,
+	     (float2*)newOprod.Even_p(), (float2*)newOprod.Odd_p());
        }
      }else{
        errorQuda("Unsupported precision\n");
