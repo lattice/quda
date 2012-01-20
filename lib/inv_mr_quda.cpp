@@ -48,18 +48,18 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   cudaColorSpinorField &Ar = *Arp;
   cudaColorSpinorField &tmp = *tmpp;
 
+  // set initial guess to zero and thus the residual is just the source
+  zeroCuda(x);  // can get rid of this for a special first update kernel  
+  double b2 = normCuda(b);
   if (&r != &b) copyCuda(r, b);
 
-  double b2 = normCuda(b);
+  // domain-wise normalization of the initial residual to prevent underflow
+  double r2=0.0; // if zero source then we will exit immediately doing no work
+  if (b2 > 0.0) {
+    axCuda(1/sqrt(b2), r); // can merge this with the prior copy
+    r2 = 1.0; // by definition by this is now true
+  }
   double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
-
-  // calculate initial residual
-  //mat(Ar, x, tmp);
-  //double r2 = xmyNormCuda(b, Ar);  
-  //r = Ar;
-
-  zeroCuda(x);
-  double r2 = b2;
 
   if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
     quda::blas_flops = 0;
@@ -69,8 +69,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double omega = 1.0;
 
   int k = 0;
-  if (invParam.verbosity >= QUDA_VERBOSE) 
-    printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
+  if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
 
   while (r2 > stop && k < invParam.maxiter) {
     
@@ -79,16 +78,24 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     double3 Ar3 = cDotProductNormACuda(Ar, r);
     quda::Complex alpha = quda::Complex(Ar3.x, Ar3.y) / Ar3.z;
 
-    //printfQuda("%d MR %e %e %e\n", k, Ar3.x, Ar3.y, Ar3.z);
-
     // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = norm2(r)
     r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
 
     k++;
 
-    if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
+    if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
+      double x2 = norm2(x);
+      double r2 = norm2(r);
+      double Ar2 = norm2(Ar);
+      printfQuda("MR: %d iterations, r2 = %e, Ar2 = %e, x2 = %e\n", k, r2, Ar2, x2);
+    } else if (invParam.verbosity >= QUDA_VERBOSE) {
+      printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
+    }
   }
   
+  // Obtain global solution by rescaling
+  if (b2 > 0.0) axCuda(sqrt(b2), x);
+
   if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
     warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
   
@@ -98,7 +105,6 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     double gflops = (quda::blas_flops + mat.flops())*1e-9;
     reduceDouble(gflops);
 
-    //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
     invParam.gflops += gflops;
     invParam.iter += k;
     
