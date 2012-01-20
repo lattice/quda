@@ -371,32 +371,6 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
         }                                                               \
     }while(0)
 
-#define GF_COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) do {	\
-        sign =1;							\
-        switch(dir){							\
-        case XUP:							\
-            if ( (i4 & 1) == 1){					\
-	      sign = -1;							\
-            }								\
-            break;							\
-        case YUP:							\
-            if ( ((i4+i1) & 1) == 1){					\
-                sign = -1;						\
-            }								\
-            break;							\
-        case ZUP:							\
-            if ( ((i4+i1+i2) & 1) == 1){				\
-                sign = -1;						\
-            }								\
-            break;							\
-        case TUP:							\
-            if (i4 == X4m1 ){						\
-                sign = -1;						\
-            }								\
-            break;							\
-        }								\
-    }while (0)
-
 
 
 //for now we only consider 12-reconstruct and single precision
@@ -422,7 +396,7 @@ parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
     int x1 = 2*x1h + x1odd;  
     int X = 2*sid + x1odd;
     
-    int sign = 1;
+    const int sign = 1;
     
     float2* mymom=momEven;
     if (oddBit){
@@ -470,7 +444,6 @@ parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
 	    LOAD_EVEN_MATRIX( lnkdir, nbr_idx, LINKB);
 	}
 	
-	GF_COMPUTE_RECONSTRUCT_SIGN(sign, lnkdir, new_x1, new_x2, new_x3, new_x4);
 	RECONSTRUCT_MATRIX(lnkdir, nbr_idx, sign, linkb);
 	if (GOES_FORWARDS(path0)){
 	    COPY_SU3_MATRIX(linkb, linka);
@@ -499,7 +472,6 @@ parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
 	    }else{
 		LOAD_EVEN_MATRIX(lnkdir, nbr_idx, LINKB);
 	    }
-	    GF_COMPUTE_RECONSTRUCT_SIGN(sign, lnkdir, new_x1, new_x2, new_x3, new_x4);
 	    RECONSTRUCT_MATRIX(lnkdir, nbr_idx, sign, linkb);
 	    if (GOES_FORWARDS(pathj)){
 	      MULT_SU3_NN_TEST(linka, linkb);
@@ -523,7 +495,6 @@ parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
     }else{
 	LOAD_EVEN_MATRIX(dir, sid, LINKA);
     }
-    GF_COMPUTE_RECONSTRUCT_SIGN(sign, dir, x1, x2, x3, x4);
     RECONSTRUCT_MATRIX(dir, sid, sign, linka);
     MULT_SU3_NN_TEST(linka, staple);
     LOAD_ANTI_HERMITIAN(mymom, dir, sid, AH);
