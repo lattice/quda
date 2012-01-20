@@ -29,7 +29,6 @@ cudaGaugeField* cudaFatLink;
 FullStaple cudaStaple;
 FullStaple cudaStaple1;
 QudaGaugeParam gaugeParam;
-//void *fatlink, *sitelink[4], *reflink[4];
 cpuGaugeField* fatlink;
 cpuGaugeField* sitelink;
 cpuGaugeField* reflink;
@@ -303,14 +302,14 @@ llfat_test(void)
 #ifdef MULTI_GPU
   gaugeParam.ga_pad = gaugeParam.site_ga_pad;
   gaugeParam.reconstruct = link_recon;
-  //loadLinkToGPU(cudaSiteLink, sitelink, &gaugeParam);
 
-  cudaSiteLink->loadCPUField(*sitelink, QUDA_CPU_FIELD_LOCATION);
+  loadLinkToGPU(cudaSiteLink, sitelink, &gaugeParam);
+  //cudaSiteLink->loadCPUField(*sitelink, QUDA_CPU_FIELD_LOCATION);
 
 #else
-  //loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &gaugeParam);
+  loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &gaugeParam);
   
-  cudaSiteLink->loadCPUField(*sitelink, QUDA_CPU_FIELD_LOCATION);
+  //cudaSiteLink->loadCPUField(*sitelink, QUDA_CPU_FIELD_LOCATION);
 #endif
   
   gettimeofday(&t1, NULL);  
@@ -321,9 +320,9 @@ llfat_test(void)
   
   
   gettimeofday(&t2, NULL);
-  //storeLinkToCPU(fatlink, cudaFatLink, &gaugeParam);
+  storeLinkToCPU(fatlink, cudaFatLink, &gaugeParam);
   
-  cudaFatLink->saveCPUField(*fatlink, QUDA_CPU_FIELD_LOCATION);
+  //cudaFatLink->saveCPUField(*fatlink, QUDA_CPU_FIELD_LOCATION);
   gettimeofday(&t3, NULL);
   
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))

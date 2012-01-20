@@ -352,11 +352,13 @@
 
 
 #else
+
 #define UPDATE_COOR_PLUS(mydir, idx)
 #define UPDATE_COOR_MINUS(mydir, idx)
 #define UPDATE_COOR_LOWER_STAPLE(mydir1, mydir2)
 #define UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2)
 #define COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) 
+
 #endif
 
 

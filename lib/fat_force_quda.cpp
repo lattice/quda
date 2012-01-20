@@ -786,7 +786,7 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
 
 
 void 
-loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
+loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam* param)
 {
 
   if (param->cpu_prec  != param->cuda_prec){
@@ -867,20 +867,20 @@ loadLinkToGPU(FullGauge cudaGauge, void **cpuGauge, QudaGaugeParam* param)
 
    int optflag=1;
    // driver for for packalllink
-   exchange_cpu_sitelink(param->X, cpuGauge, ghost_cpuGauge, ghost_cpuGauge_diag, prec, optflag);
+   exchange_cpu_sitelink(param->X, (void**)cpuGauge->Gauge_p(), ghost_cpuGauge, ghost_cpuGauge_diag, prec, optflag);
 
 #endif
 
    if (prec == QUDA_DOUBLE_PRECISION) {
-     do_loadLinkToGPU(param->X, (double2*)(cudaGauge.even), (double2*)(cudaGauge.odd), (double**)cpuGauge, 
+     do_loadLinkToGPU(param->X, (double2*)(cudaGauge->Even_p()), (double2*)(cudaGauge->Odd_p()), (double**)cpuGauge->Gauge_p(), 
 		      (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 
-		      cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
+		      cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad, 
 		      Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
 		      prec);
    } else if (prec == QUDA_SINGLE_PRECISION) {
-     do_loadLinkToGPU(param->X, (float2*)(cudaGauge.even), (float2*)(cudaGauge.odd), (float**)cpuGauge, 
+     do_loadLinkToGPU(param->X, (float2*)(cudaGauge->Even_p()), (float2*)(cudaGauge->Odd_p()), (float**)cpuGauge->Gauge_p(), 
 		      (float**)ghost_cpuGauge, (float**)ghost_cpuGauge_diag, 
-		      cudaGauge.reconstruct, cudaGauge.bytes, cudaGauge.volumeCB, pad, 
+		      cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad, 
 		      Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
 		      prec);    
    }else{
@@ -960,7 +960,7 @@ do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd,
   CUERR;
 }
 void 
-storeLinkToCPU(void* cpuGauge, cudaGaugeField *cudaGauge, QudaGaugeParam* param)
+storeLinkToCPU(cpuGaugeField* cpuGauge, cudaGaugeField *cudaGauge, QudaGaugeParam* param)
 {
   
   QudaPrecision cpu_prec = param->cpu_prec;
@@ -979,10 +979,10 @@ storeLinkToCPU(void* cpuGauge, cudaGaugeField *cudaGauge, QudaGaugeParam* param)
   int stride = cudaGauge->VolumeCB() + cudaGauge->Pad();
   
   if (cuda_prec == QUDA_DOUBLE_PRECISION){
-    do_storeLinkToCPU( (double*)cpuGauge, (double2*) cudaGauge->Even_p(), (double2*)cudaGauge->Odd_p(), 
+    do_storeLinkToCPU( (double*)cpuGauge->Gauge_p(), (double2*) cudaGauge->Even_p(), (double2*)cudaGauge->Odd_p(), 
 		       cudaGauge->Bytes(), cudaGauge->VolumeCB(), stride, cuda_prec);
   }else if (cuda_prec == QUDA_SINGLE_PRECISION){
-    do_storeLinkToCPU( (float*)cpuGauge, (float2*) cudaGauge->Even_p(), (float2*)cudaGauge->Odd_p(), 
+    do_storeLinkToCPU( (float*)cpuGauge->Gauge_p(), (float2*) cudaGauge->Even_p(), (float2*)cudaGauge->Odd_p(), 
 		       cudaGauge->Bytes(), cudaGauge->VolumeCB(), stride, cuda_prec);
   }else{
     printf("ERROR: half precision not supported in this function %s\n", __FUNCTION__);
