@@ -8,11 +8,11 @@
 namespace hisq {
   namespace fermion_force {
   void hisq_force_init_cuda(QudaGaugeParam* param);
-  void hisq_force_cuda(void* act_path_coeff, 
-                       cudaGaugeField &cudaOprod, 
-                       cudaGaugeField &cudaSiteLink, 
-                       QudaGaugeParam* param,
-                       cudaGaugeField &cudaForceMatrix);
+  void hisq_staples_force_cuda(void* act_path_coeff, 
+                              cudaGaugeField &oprod, 
+                              cudaGaugeField &link, 
+                              QudaGaugeParam* param,
+                              cudaGaugeField &newOprod);
 
   void rewriteOprodCuda(cudaGaugeField &cudaForceMatrix, cudaGaugeField &cudaOprod, QudaGaugeParam* param);
 
@@ -34,15 +34,15 @@ namespace hisq {
 
 
    void hisq_naik_force_cuda(void* path_coeff_array,
-                             cudaGaugeField &cudaOprod,
-                             cudaGaugeField &cudaLink,
+                             cudaGaugeField &oprod,
+                             cudaGaugeField &link,
                              QudaGaugeParam* param,
-                             cudaGaugeField &cudaForce);
+                             cudaGaugeField &newOprod);
 
-   void hisq_contract_cuda(cudaGaugeField &cudaOprod,
-                           cudaGaugeField &cudaLink,
-                           QudaGaugeParam* param,
-                           cudaGaugeField &cudaForce);
+   void hisq_complete_force_cuda(cudaGaugeField &oprod,
+                                 cudaGaugeField &link,
+                                 QudaGaugeParam* param,
+                                 cudaGaugeField &force);
 
 
 
