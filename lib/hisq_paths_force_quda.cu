@@ -774,7 +774,7 @@ namespace hisq {
           const RealA* const oprodOdd,
           const RealB* const linkEven, 
           const RealB* const linkOdd, 
-          cudaGaugeField &link,
+          const cudaGaugeField &link,
           int sig, dim3 gridDim, dim3 blockDim,
           RealA* const momEven, 
           RealA* const momOdd)
@@ -817,7 +817,7 @@ namespace hisq {
           const RealA* const QprevOdd,
           const RealB* const linkEven, 
           const RealB* const linkOdd, 
-          cudaGaugeField &link,
+          const cudaGaugeField &link,
           int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff,
           dim3 gridDim, dim3 BlockDim,
@@ -1079,7 +1079,7 @@ namespace hisq {
           const RealA* const oprodOdd,
           const RealB* const linkEven, 
           const RealB* const linkOdd, 
-          cudaGaugeField &link,
+          const cudaGaugeField &link,
           int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type accumu_coeff,
@@ -1395,7 +1395,7 @@ namespace hisq {
           const RealA* const QprevOdd, 
           const RealB* const linkEven, 
           const RealB* const linkOdd, 
-          cudaGaugeField &link,
+          const cudaGaugeField &link,
           int sig, int mu,
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type  accumu_coeff,
@@ -1536,12 +1536,12 @@ namespace hisq {
     template<class Real, class  RealA, class RealB>
       static void
       do_hisq_staples_force_cuda( PathCoefficients<Real> act_path_coeff,
-                                cudaGaugeField &oprod, 
-                          cudaGaugeField &link,
-                          cudaGaugeField &newOprod, 
-                          FullMatrix tempmat[4], 
-                          FullMatrix tempCmat[2], 
-                          QudaGaugeParam* param)
+                          	 const QudaGaugeParam& param,
+                                 const cudaGaugeField &oprod, 
+                          	 const cudaGaugeField &link,
+                          	 FullMatrix tempmat[4], 
+                         	 FullMatrix tempCmat[2], 
+                          	 cudaGaugeField &newOprod)
       {
 
 
@@ -1559,7 +1559,7 @@ namespace hisq {
         Lepage  = act_path_coeff.lepage; mLepage  = -Lepage;
 
 
-        int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
+        int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
         dim3 blockDim(BLOCK_DIM,1,1);
         dim3 gridDim(volume/blockDim.x, 1, 1);
 
@@ -1575,9 +1575,9 @@ namespace hisq {
             if(GOES_BACKWARDS(sig)){ new_sig = OPP_DIR(sig); }else{ new_sig = sig; }
 
             middle_link_kernel( 
-                (RealA*)oprod.Even_p(), (RealA*)oprod.Odd_p(),                     // read only
-                (RealA*)NULL,         (RealA*)NULL,                                        // read only
-                (RealB*)link.Even_p(), (RealB*)link.Odd_p(),	           // read only 
+                (RealA*)oprod.Even_p(), (RealA*)oprod.Odd_p(),                            // read only
+                (RealA*)NULL,         (RealA*)NULL,                                       // read only
+                (RealB*)link.Even_p(), (RealB*)link.Odd_p(),	                          // read only 
                 link,  // read only
                 sig, mu, mThreeSt,
                 gridDim, blockDim,
@@ -1820,13 +1820,13 @@ namespace hisq {
 #undef Qnumu
 
 
-   void hisq_complete_force_cuda(cudaGaugeField &oprod,
-		   		 cudaGaugeField &link,
-		                 QudaGaugeParam* param,
-		   		 cudaGaugeField &force)
+   void hisq_complete_force_cuda(const QudaGaugeParam &param,
+				 const cudaGaugeField &oprod,
+		   		 const cudaGaugeField &link,
+		   		 cudaGaugeField* force)
    {
 
-	   int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
+	   int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
 	   dim3 blockDim(BLOCK_DIM,1,1);
 	   dim3 gridDim(volume/blockDim.x, 1, 1);
 
@@ -1837,7 +1837,7 @@ namespace hisq {
 					   (float2*)link.Even_p(), (float2*)link.Odd_p(), 
 					   link,
 					   sig, gridDim, blockDim,
-					   (float2*)force.Even_p(), (float2*)force.Odd_p());
+					   (float2*)force->Even_p(), (float2*)force->Odd_p());
 		   } 
 	   }
 	   return;
@@ -1848,31 +1848,31 @@ namespace hisq {
 
 
    void hisq_naik_force_cuda(void* path_coeff_array,
-                             cudaGaugeField &oldOprod,
-                             cudaGaugeField &link,
-                             QudaGaugeParam* param,
-                             cudaGaugeField &newOprod)
+                             const QudaGaugeParam &param,
+                             const cudaGaugeField &oldOprod,
+                             const cudaGaugeField &link,
+                             cudaGaugeField  *newOprod)
    {
-     int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
+     int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
      dim3 blockDim(BLOCK_DIM,1,1);
      dim3 gridDim(volume/blockDim.x, 1, 1);
 
-     if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
+     if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
        for(int sig=0; sig<4; ++sig){
          naik_terms((double2*)link.Even_p(), (double2*)link.Odd_p(),
                     (double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
                    sig, ((double*)path_coeff_array)[1], 
                    gridDim, blockDim,
-	           (double2*)newOprod.Even_p(), (double2*)newOprod.Odd_p());
+	           (double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p());
        }
-     }else if(param->cuda_prec == QUDA_SINGLE_PRECISION){
+     }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
        for(int sig=0; sig<4; ++sig){
          naik_terms( 
              (float2*)link.Even_p(), (float2*)link.Odd_p(),
              (float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
              sig, ((float*)path_coeff_array)[1], 
              gridDim, blockDim,
-	     (float2*)newOprod.Even_p(), (float2*)newOprod.Odd_p());
+	     (float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p());
        }
      }else{
        errorQuda("Unsupported precision\n");
@@ -1887,24 +1887,24 @@ namespace hisq {
 
     void
       hisq_staples_force_cuda(void* path_coeff_array,
-                              cudaGaugeField &oprod, 
-                              cudaGaugeField &link, 
-                              QudaGaugeParam* param,
-                              cudaGaugeField &newOprod)
+                              const QudaGaugeParam &param,
+                              const cudaGaugeField &oprod, 
+                              const cudaGaugeField &link, 
+                              cudaGaugeField* newOprod)
       {
 
         FullMatrix tempmat[4];
         for(int i=0; i<4; i++){
-          tempmat[i]  = createMatQuda(param->X, param->cuda_prec);
+          tempmat[i]  = createMatQuda(param.X, param.cuda_prec);
         }
 
         FullMatrix tempCompmat[2];
         for(int i=0; i<2; i++){
-          tempCompmat[i] = createMatQuda(param->X, param->cuda_prec);
+          tempCompmat[i] = createMatQuda(param.X, param.cuda_prec);
         }	
 
 
-        if (param->cuda_prec == QUDA_DOUBLE_PRECISION){
+        if (param.cuda_prec == QUDA_DOUBLE_PRECISION){
           errorQuda("Double precision not supported\n");
         }else{	
 
@@ -1917,8 +1917,12 @@ namespace hisq {
           act_path_coeff.lepage = ((float*)path_coeff_array)[5];
 
           do_hisq_staples_force_cuda<float,float2,float2>( act_path_coeff,
-                                                        oprod,
-                                                        link, newOprod, tempmat, tempCompmat, param);
+							   param,
+                                                           oprod,
+                                                           link, 
+							   tempmat, 
+							   tempCompmat, 
+							   *newOprod);
         }
         for(int i=0; i<4; i++){
           freeMatQuda(tempmat[i]);

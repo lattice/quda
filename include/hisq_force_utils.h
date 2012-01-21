@@ -30,8 +30,8 @@ namespace hisq{
     } FullCompMatrix; // compressed matrix 
 
 
-    FullMatrix createMatQuda(int *X, QudaPrecision precision);
-    FullCompMatrix createCompMatQuda(int *X, QudaPrecision precision);
+    FullMatrix createMatQuda(const int X[4], QudaPrecision precision);
+    FullCompMatrix createCompMatQuda(const int X[4], QudaPrecision precision);
     void freeMatQuda(FullMatrix mat);
     void freeCompMatQuda(FullCompMatrix mat);
 

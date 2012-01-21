@@ -210,15 +210,15 @@ hisq_force_test()
   gettimeofday(&t0, NULL);
   
   // First of all we fatten the links on the GPU
-  hisq_staples_force_cuda(act_path_coeff, *cudaOprod, *cudaGauge, &gaugeParam, *cudaForce);
+  hisq_staples_force_cuda(act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
   cudaThreadSynchronize();
   checkCudaError();
   cudaForce->saveCPUField(*cpuForce, QUDA_CPU_FIELD_LOCATION);
 
 
-  unitarize_force_cuda(*cudaForce, *cudaGauge, *cudaOprod); // output is written to cudaOprod.
+  unitarize_force_cuda(*cudaForce, *cudaGauge, cudaOprod); // output is written to cudaOprod.
   if(verify_results){
-    unitarize_force_cpu(*cpuForce, *cpuGauge, *cpuOprod); 
+    unitarize_force_cpu(*cpuForce, *cpuGauge, cpuOprod); 
   }
   cudaThreadSynchronize();
   checkCudaError();

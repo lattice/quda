@@ -7,24 +7,27 @@
 
 namespace hisq {
   namespace fermion_force {
+
   void hisq_force_init_cuda(QudaGaugeParam* param);
+
   void hisq_staples_force_cuda(void* act_path_coeff, 
-                              cudaGaugeField &oprod, 
-                              cudaGaugeField &link, 
-                              QudaGaugeParam* param,
-                              cudaGaugeField &newOprod);
+                              const QudaGaugeParam& param,
+                              const cudaGaugeField& oprod, 
+                              const cudaGaugeField& link, 
+                              cudaGaugeField *newOprod);
 
 
    void hisq_naik_force_cuda(void* path_coeff_array,
-                             cudaGaugeField &oprod,
-                             cudaGaugeField &link,
-                             QudaGaugeParam* param,
-                             cudaGaugeField &newOprod);
+                             const QudaGaugeParam& param,
+                             const cudaGaugeField &oprod,
+                             const cudaGaugeField &link,
+                             cudaGaugeField *newOprod);
 
-   void hisq_complete_force_cuda(cudaGaugeField &oprod,
-                                 cudaGaugeField &link,
-                                 QudaGaugeParam* param,
-                                 cudaGaugeField &force);
+
+   void hisq_complete_force_cuda(const QudaGaugeParam &param,
+				 const cudaGaugeField &oprod,
+                                 const cudaGaugeField &link,
+                                 cudaGaugeField *force);
 
 
 
@@ -32,11 +35,11 @@ namespace hisq {
 
   void unitarize_force_cuda(cudaGaugeField &cudaOldForce,
                             cudaGaugeField &cudaGauge,
-                            cudaGaugeField &cudaNewForce);
+                            cudaGaugeField *cudaNewForce);
 
   void unitarize_force_cpu(cpuGaugeField &cpuOldForce,
                             cpuGaugeField &cpuGauge,
-                            cpuGaugeField &cpuNewForce);
+                            cpuGaugeField *cpuNewForce);
 
 
  } // namespace fermion_force

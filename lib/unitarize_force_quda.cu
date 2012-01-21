@@ -492,7 +492,7 @@ namespace hisq{
         }
 
 
-        void unitarize_force_cpu(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField &cpuNewForce)
+        void unitarize_force_cpu(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
         {
 	
           Matrix<double2,3> old_force, new_force, v;
@@ -503,7 +503,7 @@ namespace hisq{
 
              getUnitarizeForceSite<double2>(v, old_force, &new_force);
             
-             copyLinkToArray(((float*)(cpuNewForce.Gauge_p()) + (i*4 + dir)*18), new_force); 
+             copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
 
            } // dir
           } // i
@@ -511,7 +511,7 @@ namespace hisq{
         } // unitarize_force_cpu
 
 
-        void unitarize_force_cuda(cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField& cudaNewForce)
+        void unitarize_force_cuda(cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce)
         {
 
           dim3 gridDim(cudaGauge.Volume()/BLOCK_DIM,1,1);
@@ -519,7 +519,7 @@ namespace hisq{
 
           getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
                                                       (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p(),
-                                                      (float2*)cudaNewForce.Even_p(), (float2*)cudaNewForce.Odd_p());
+                                                      (float2*)cudaNewForce->Even_p(), (float2*)cudaNewForce->Odd_p());
           return;
         } // unitarize_force_cuda
 

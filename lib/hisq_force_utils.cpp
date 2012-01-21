@@ -32,7 +32,7 @@ namespace hisq{
 
 
     static ParityMatrix
-      allocateParityMatrix(int *X, QudaPrecision precision, bool compressed)
+      allocateParityMatrix(const int X[4], QudaPrecision precision, bool compressed)
       {
         if(precision == QUDA_DOUBLE_PRECISION && compressed) {
           printf("Error: double precision not supported for compressed matrix\n");
@@ -80,7 +80,7 @@ namespace hisq{
       }
 
     FullMatrix
-      createMatQuda(int *X, QudaPrecision precision)
+      createMatQuda(const int X[4], QudaPrecision precision)
       {
         FullMatrix ret;
         ret.even = allocateParityMatrix(X, precision, false); // compressed = false
@@ -90,7 +90,7 @@ namespace hisq{
 
 
     FullCompMatrix
-      createCompMatQuda(int *X, QudaPrecision precision)
+      createCompMatQuda(const int X[4], QudaPrecision precision)
       {
         FullCompMatrix ret;
         ret.even = allocateParityMatrix(X, precision, true); // compressed = true

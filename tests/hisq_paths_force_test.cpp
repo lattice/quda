@@ -217,11 +217,11 @@ hisq_force_test()
   gettimeofday(&t0, NULL);
   
 
-  hisq_staples_force_cuda(act_path_coeff, *cudaOprod, *cudaGauge, &gaugeParam, *cudaForce);
+  hisq_staples_force_cuda(act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
   cudaThreadSynchronize();
   checkCudaError();
 
-  hisq_complete_force_cuda(*cudaForce, *cudaGauge, &gaugeParam, *cudaMom);
+  hisq_complete_force_cuda(gaugeParam, *cudaForce, *cudaGauge, cudaMom);
   cudaThreadSynchronize();
   checkCudaError();
 
