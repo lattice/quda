@@ -644,8 +644,8 @@ namespace hisq{
   template<class Cmplx>
     DEVICEHOST
     void computeSVD(Matrix<Cmplx,3> & m, 
-        Matrix<Cmplx,3>& const u,
-        Matrix<Cmplx,3>& const v,
+        Matrix<Cmplx,3>&  u,
+        Matrix<Cmplx,3>&  v,
         typename RealTypeId<Cmplx>::Type singular_values[3])
     {
         

@@ -14,17 +14,6 @@ namespace hisq {
                               QudaGaugeParam* param,
                               cudaGaugeField &newOprod);
 
-  void rewriteOprodCuda(cudaGaugeField &cudaForceMatrix, cudaGaugeField &cudaOprod, QudaGaugeParam* param);
-
-
-  void set_unitarize_force_contants(double unitarize_eps, double hisq_force_filter);
-
-  
-  void rescaleHalfFieldCuda(cudaGaugeField &cudaField, 
-                            const QudaGaugeParam& param,
-                            int oddBit,
-                            double coeff);
-
 
    void hisq_naik_force_cuda(void* path_coeff_array,
                              cudaGaugeField &oprod,
@@ -37,6 +26,9 @@ namespace hisq {
                                  QudaGaugeParam* param,
                                  cudaGaugeField &force);
 
+
+
+  void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double acceptable_det_error);
 
   void unitarize_force_cuda(cudaGaugeField &cudaOldForce,
                             cudaGaugeField &cudaGauge,

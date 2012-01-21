@@ -11,41 +11,29 @@
 
 
 
-
-#define FORCE_UNITARIZE_PI  3.141592653589793
+#define FORCE_UNITARIZE_PI 3.14159265358979323846
 #define FORCE_UNITARIZE_PI23 FORCE_UNITARIZE_PI*2.0/3.0
+
 #define FORCE_UNITARIZE_EPS 1e-5
 #define HISQ_FORCE_FILTER 5e-5
 #define ACCEPTABLE_DET_ERROR 1e-12
 
 // constants - File scope only
-//__device__ __constant__ double FORCE_UNITARIZE_EPS;
-//__device__ __constant__ double HISQ_FORCE_FILTER;
-//__device__ __constant__ double ACCEPTABLE_DET_ERROR;
-// static double FORCE_UNITARIZE_EPS;
-// static double HISQ_FORCE_FILTER;
-// static double ACCEPTABLE_DET_ERROR;
-
-
+//__constant__ double FORCE_UNITARIZE_EPS;
+//__constant__ double HISQ_FORCE_FILTER;
+//__constant__ double ACCEPTABLE_DET_ERROR;
 
 namespace hisq{
   namespace fermion_force{
 
-    void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double acceptable_det_error)
-    {
-      cudaMemcpyToSymbol("FORCE_UNITARIZE_EPS", &unitarize_eps, sizeof(double));
-      cudaMemcpyToSymbol("HISQ_FORCE_FILTER", &hisq_force_filter, sizeof(double));
-      cudaMemcpyToSymbol("ACCEPTABLE_DET_ERROR", &acceptable_det_error, sizeof(double));
-/*
-      FORCE_UNITARIZE_EPS  = unitarize_eps;
-      HISQ_FORCE_FILTER    = hisq_force_filter;
-      ACCEPTABLE_DET_ERROR = acceptable_det_error;
-*/
-      return;
-    }
-
-  
-
+      void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double acceptable_det_error)
+      {
+        cudaMemcpyToSymbol("FORCE_UNITARIZE_EPS", &unitarize_eps, sizeof(double));
+        cudaMemcpyToSymbol("HISQ_FORCE_FILTER", &hisq_force_filter, sizeof(double));
+        cudaMemcpyToSymbol("ACCEPTABLE_DET_ERROR", &acceptable_det_error, sizeof(double));
+	checkCudaError();
+	return;
+      }
 
 
     template<class Real>
@@ -235,7 +223,6 @@ namespace hisq{
     // What a hack! Yuck!
     template<class Cmplx> 
       __device__  __host__ 
-     // __host__ 
       void reciprocalRoot(Matrix<Cmplx,3>* res, DerivativeCoefficients<typename RealTypeId<Cmplx>::Type>* deriv_coeffs, 
 								typename RealTypeId<Cmplx>::Type f[3], Matrix<Cmplx,3> & q){
 
@@ -285,7 +272,7 @@ namespace hisq{
 
 #if (__CUDA_ARCH__ >= 200)
         if(fabs(gprod - determinant) > ACCEPTABLE_DET_ERROR){
-	  printf("Warning: Error in determinant computed by SVD : %g > %g", fabs(gprod-determinant), ACCEPTABLE_DET_ERROR);
+	  printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), ACCEPTABLE_DET_ERROR);
 	}
 #endif
         
@@ -451,6 +438,18 @@ namespace hisq{
           }
           return;
         }
+	
+	template<class Cmplx, class Real>
+        void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
+          for(int i=0; i<3; ++i){
+            for(int j=0; j<3; ++j){
+              (*link)(i,j).x = array[(i*3+j)*2];
+              (*link)(i,j).y = array[(i*3+j)*2 + 1];
+            }
+          }
+          return;
+        }
+	
         
         // and this!
         void copyLinkToArray(float* array, const Matrix<float2,3>& link){
@@ -464,7 +463,22 @@ namespace hisq{
         }
 
         // and this!
-        void printLink(Matrix<float2,3>& link){
+	template<class Cmplx, class Real>
+        void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
+          for(int i=0; i<3; ++i){
+            for(int j=0; j<3; ++j){
+              array[(i*3+j)*2] = link(i,j).x;
+              array[(i*3+j)*2 + 1] = link(i,j).y;
+            }
+          }
+          return;
+        }
+
+
+
+        // and this!
+	template<class Cmplx>
+        void printLink(Matrix<Cmplx,3>& link){
           printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
           printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
           printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
@@ -480,14 +494,14 @@ namespace hisq{
 
         void unitarize_force_cpu(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField &cpuNewForce)
         {
-
-          Matrix<float2,3> old_force, new_force, v;
+	
+          Matrix<double2,3> old_force, new_force, v;
           for(int i=0; i<cpuGauge.Volume(); ++i){
            for(int dir=0; dir<4; ++dir){
              copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
              copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
 
-             getUnitarizeForceSite<float2>(v, old_force, &new_force);
+             getUnitarizeForceSite<double2>(v, old_force, &new_force);
             
              copyLinkToArray(((float*)(cpuNewForce.Gauge_p()) + (i*4 + dir)*18), new_force); 
 
