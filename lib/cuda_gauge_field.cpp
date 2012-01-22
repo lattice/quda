@@ -6,13 +6,21 @@
 cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
   GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0)
 {
+  if(create != QUDA_NULL_FIELD_CREATE &&  create != QUDA_ZERO_FIELD_CREATE){
+    errorQuda("ERROR: create type(%d) not supported yet\n", create);
+  }
+  
   if (cudaMalloc((void **)&gauge, bytes) == cudaErrorMemoryAllocation) {
     errorQuda("Error allocating gauge field");
   }
-
+  
+  if(create == QUDA_ZERO_FIELD_CREATE){
+    cudaMemset(gauge, 0, bytes);
+  }
+  
   even = gauge;
   odd = (char*)gauge + bytes/2;
-
+ 
 }
 
 cudaGaugeField::~cudaGaugeField() {

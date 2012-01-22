@@ -912,6 +912,97 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 
 }
 
+template<typename FloatN, typename Float>
+static void
+do_loadLinkToGPU_ex(int* X, FloatN *even, FloatN *odd, Float **cpuGauge,
+                    QudaReconstructType reconstruct, int bytes, int Vh_ex, int pad,
+                    QudaPrecision prec)
+{
+  cudaStream_t streams[2];
+  for(int i=0;i < 2; i++){
+    cudaStreamCreate(&streams[i]);
+  }
+
+
+  int i;
+  char* tmp_even = NULL;
+  char* tmp_odd = NULL;
+  int len = Vh_ex*gaugeSiteSize*sizeof(Float);
+
+  cudaMalloc(&tmp_even, 8*len);
+  if(tmp_even == NULL){
+    errorQuda("Error: cudaMalloc failed\n");
+  }
+  tmp_odd = tmp_even + 4*len;
+
+  //even links
+  for(i=0;i < 4; i++){
+#if (CUDA_VERSION >=4000)
+    cudaMemcpyAsync(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]);
+#else
+    cudaMemcpy(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
+#endif
+
+  }
+
+  link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, bytes, Vh_ex, pad, 0, prec, streams[0]);
+
+  //odd links
+  for(i=0;i < 4; i++){
+#if (CUDA_VERSION >=4000)
+    cudaMemcpyAsync(tmp_odd + i*len, cpuGauge[i] + Vh_ex*gaugeSiteSize, len, cudaMemcpyHostToDevice, streams[1]);
+#else
+    cudaMemcpy(tmp_odd + i*len, cpuGauge[i] + Vh_ex*gaugeSiteSize, len, cudaMemcpyHostToDevice);
+#endif
+  }
+  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, bytes, Vh_ex, pad, 0, prec, streams[1]);
+
+
+  for(int i=0;i < 2;i++){
+    cudaStreamSynchronize(streams[i]);
+  }
+
+  cudaFree(tmp_even);
+
+  for(int i=0;i < 2;i++){
+    cudaStreamDestroy(streams[i]);
+  }
+  CUERR;
+}
+
+
+
+
+void
+loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam* param_ex)
+{
+
+  if (param_ex->cpu_prec  != param_ex->cuda_prec){
+    printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
+    exit(1);
+  }
+  QudaPrecision prec= param_ex->cpu_prec;
+
+  int* E = param_ex->X;
+  int pad = param_ex->ga_pad;
+
+   int optflag=1;
+
+   if (prec == QUDA_DOUBLE_PRECISION) {
+     do_loadLinkToGPU_ex(E, (double2*)(cudaGauge->Even_p()), (double2*)(cudaGauge->Odd_p()), (double**)cpuGauge->Gauge_p(),
+                         cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
+                         prec);
+   } else if (prec == QUDA_SINGLE_PRECISION) {
+     do_loadLinkToGPU_ex(E, (float2*)(cudaGauge->Even_p()), (float2*)(cudaGauge->Odd_p()), (float**)cpuGauge->Gauge_p(),
+                         cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
+                         prec);
+   }else{
+     printf("ERROR: half precision not supported in this funciton %s\n", __FUNCTION__);
+     exit(1);
+   }
+
+}
+
 
 template<typename FloatN, typename Float>
 static void 
