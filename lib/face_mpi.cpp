@@ -421,7 +421,7 @@ setup_dims(int* X)
 }
 
 void 
-exchange_llfat_init(FullStaple* cudaStaple)
+exchange_llfat_init(QudaPrecision prec)
 {
   static int initialized = 0;
   if (initialized){
@@ -429,7 +429,6 @@ exchange_llfat_init(FullStaple* cudaStaple)
   }
   initialized = 1;
   
-  QudaPrecision prec = cudaStaple->precision;
 
   for(int i=0;i < 4; i++){
     cudaMalloc((void**)&fwd_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec);
@@ -1041,9 +1040,17 @@ exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway, cuda
   setup_dims(X);
   
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;
-  exchange_llfat_init(cudaStaple);
+  exchange_llfat_init(cudaStaple->precision);
   
-  packGhostStaple(cudaStaple, dir, whichway, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
+
+  void* even = cudaStaple->even;
+  void* odd = cudaStaple->odd;
+  int volume = cudaStaple->volume;
+  QudaPrecision prec = cudaStaple->precision;
+  int stride = cudaStaple->stride;
+  
+  packGhostStaple(X, even, odd, volume, prec, stride, 
+		  dir, whichway, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
 		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, stream);
 }
 
@@ -1054,7 +1061,8 @@ void
 exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream)
 {
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;  
-
+  QudaPrecision prec = cudaStaple->precision;
+  
   int fwd_neighbors[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
   int back_neighbors[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
   int up_tags[4] = {XUP, YUP, ZUP, TUP};
@@ -1071,7 +1079,7 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
   
 
   int i = dir;
-  int len = Vs[i]*gaugeSiteSize*cudaStaple->precision;
+  int len = Vs[i]*gaugeSiteSize*prec;
   int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   
@@ -1103,6 +1111,12 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
 {
   FullStaple* cudaStaple = (FullStaple*) _cudaStaple;  
 
+  void* even = cudaStaple->even;
+  void* odd = cudaStaple->odd;
+  int volume = cudaStaple->volume;
+  QudaPrecision prec = cudaStaple->precision;
+  int stride = cudaStaple->stride;
+
   int recv_whichway;
   if(whichway == QUDA_BACKWARDS){
     recv_whichway = QUDA_FORWARDS;
@@ -1120,10 +1134,12 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
     comm_wait(llfat_send_request1[i]);
 
 #if (CUDA_VERSION >= 4000)
-    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+    unpackGhostStaple(X, even, odd, volume, prec, stride, 
+		      i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else   
     memcpy(back_nbr_staple[i], back_nbr_staple_cpu[i], len);
-    unpackGhostStaple(cudaStaple, i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+    unpackGhostStaple(X, even, odd, volume, prec, stride, 
+		      i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #endif
 
   } else { // QUDA_FORWARDS
@@ -1131,10 +1147,12 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
     comm_wait(llfat_send_request2[i]);
 
 #if (CUDA_VERSION >= 4000)
-    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+    unpackGhostStaple(X, even, odd, volume, prec, stride, 
+		      i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else        
     memcpy(fwd_nbr_staple[i], fwd_nbr_staple_cpu[i], len);
-    unpackGhostStaple(cudaStaple, i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
+    unpackGhostStaple(X, even, odd, volume, prec, stride,
+		      i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #endif
 
   }

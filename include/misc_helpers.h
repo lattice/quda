@@ -15,7 +15,7 @@ void collectGhostSpinor(void *in, const void *inNorm,
 			int dir, int whichway,
 			const int parity, cudaColorSpinorField* inSpinor,
 			cudaStream_t* stream);
-void collectGhostStaple(FullStaple* cudaStaple, void* ghost_staple_gpu,		   
-		   int dir, int whichway, cudaStream_t* stream);
-
+void collectGhostStaple(int* X, void* even, void* odd, int volume, 
+			QudaPrecision precision, void* ghost_staple_gpu,		   
+			int dir, int whichway, cudaStream_t* stream);
 #endif

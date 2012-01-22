@@ -730,35 +730,32 @@ template<int dir, int whichway, typename Float2>
 //@dir can be 0, 1, 2, 3 (X,Y,Z,T directions)
 //@whichway can be QUDA_FORWARDS, QUDA_BACKWORDS
 void
-collectGhostStaple(FullStaple* cudaStaple, void* ghost_staple_gpu,		   
+collectGhostStaple(int* X, void* even, void* odd, int volume, QudaPrecision precision,
+		   void* ghost_staple_gpu,		   
 		   int dir, int whichway, cudaStream_t* stream)
 {
-  int* X = cudaStaple->X;
   int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
   
   Vsh_x = X[1]*X[2]*X[3]/2;
   Vsh_y = X[0]*X[2]*X[3]/2;
   Vsh_z = X[0]*X[1]*X[3]/2;
   Vsh_t = X[0]*X[1]*X[2]/2;  
-  
-  void* even = cudaStaple->even;
-  void* odd = cudaStaple->odd;
-  
-  dim3 gridDim(cudaStaple->volume/BLOCKSIZE, 1, 1);
+    
+  dim3 gridDim(volume/BLOCKSIZE, 1, 1);
   dim3 blockDim(BLOCKSIZE, 1, 1);
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
     
   void* gpu_buf_even = ghost_staple_gpu;
-  void* gpu_buf_odd = ((char*)ghost_staple_gpu) + Vsh[dir]*gaugeSiteSize*cudaStaple->precision ;
+  void* gpu_buf_odd = ((char*)ghost_staple_gpu) + Vsh[dir]*gaugeSiteSize*precision ;
   if (X[dir] % 2 ==1){ //need switch even/odd
     gpu_buf_odd = ghost_staple_gpu;
-    gpu_buf_even = ((char*)ghost_staple_gpu) + Vsh[dir]*gaugeSiteSize*cudaStaple->precision ;    
+    gpu_buf_even = ((char*)ghost_staple_gpu) + Vsh[dir]*gaugeSiteSize*precision ;    
   }
 
   int even_parity = 0;
   int odd_parity = 1;
   
-  if (cudaStaple->precision == QUDA_DOUBLE_PRECISION){
+  if (precision == QUDA_DOUBLE_PRECISION){
     switch(dir){
     case 0:
       switch(whichway){
@@ -824,7 +821,7 @@ collectGhostStaple(FullStaple* cudaStaple, void* ghost_staple_gpu,
       }
       break;      
     }
-  }else if(cudaStaple->precision == QUDA_SINGLE_PRECISION){
+  }else if(precision == QUDA_SINGLE_PRECISION){
    switch(dir){
     case 0:
       switch(whichway){
