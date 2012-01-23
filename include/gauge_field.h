@@ -109,6 +109,11 @@ class cudaGaugeField : public GaugeField {
   void* Gauge_p() { return gauge; }
   void* Even_p() { return even; }
   void* Odd_p() { return odd; }
+
+  const void* Gauge_p() const { return gauge; }
+  const void* Even_p() const { return even; }
+  const void* Odd_p() const { return odd; }	
+
 };
 
 class cpuGaugeField : public GaugeField {

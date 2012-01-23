@@ -312,9 +312,8 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
       zeroCuda(xSloppy);
 
       if (r2_old < r2) {
-	if (invParam.verbosity >= QUDA_VERBOSE) 
-	  printfQuda("GCR: precision limit reached, r2_old = %e < r2 = %e\n", r2_old, r2);
-	break;
+	if (invParam.verbosity >= QUDA_SUMMARIZE) 
+	  printfQuda("GCR: irregular convergence precision limit reached, r2_old = %e < r2 = %e\n", r2_old, r2);
       }
 
       r2_old = r2;
