@@ -1039,15 +1039,15 @@ exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway, cuda
 {
   setup_dims(X);
   
-  FullStaple* cudaStaple = (FullStaple*) _cudaStaple;
-  exchange_llfat_init(cudaStaple->precision);
+  cudaGaugeField* cudaStaple = (cudaGaugeField*) _cudaStaple;
+  exchange_llfat_init(cudaStaple->Precision());
   
 
-  void* even = cudaStaple->even;
-  void* odd = cudaStaple->odd;
-  int volume = cudaStaple->volume;
-  QudaPrecision prec = cudaStaple->precision;
-  int stride = cudaStaple->stride;
+  void* even = cudaStaple->Even_p();
+  void* odd = cudaStaple->Odd_p();
+  int volume = cudaStaple->VolumeCB();
+  QudaPrecision prec = cudaStaple->Precision();
+  int stride = cudaStaple->Stride();
   
   packGhostStaple(X, even, odd, volume, prec, stride, 
 		  dir, whichway, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
@@ -1060,8 +1060,8 @@ exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway, cuda
 void
 exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream)
 {
-  FullStaple* cudaStaple = (FullStaple*) _cudaStaple;  
-  QudaPrecision prec = cudaStaple->precision;
+  cudaGaugeField* cudaStaple = (cudaGaugeField*) _cudaStaple;  
+  QudaPrecision prec = cudaStaple->Precision();
   
   int fwd_neighbors[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR, T_FWD_NBR};
   int back_neighbors[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR, T_BACK_NBR};
@@ -1109,13 +1109,13 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
 void
 exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream)
 {
-  FullStaple* cudaStaple = (FullStaple*) _cudaStaple;  
+  cudaGaugeField* cudaStaple = (cudaGaugeField*) _cudaStaple;  
 
-  void* even = cudaStaple->even;
-  void* odd = cudaStaple->odd;
-  int volume = cudaStaple->volume;
-  QudaPrecision prec = cudaStaple->precision;
-  int stride = cudaStaple->stride;
+  void* even = cudaStaple->Even_p();
+  void* odd = cudaStaple->Odd_p();
+  int volume = cudaStaple->VolumeCB();
+  QudaPrecision prec = cudaStaple->Precision();
+  int stride = cudaStaple->Stride();
 
   int recv_whichway;
   if(whichway == QUDA_BACKWARDS){
@@ -1126,7 +1126,7 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
   
 
   int i = dir;
-  int len = Vs[i]*gaugeSiteSize*cudaStaple->precision;
+  int len = Vs[i]*gaugeSiteSize*prec;
   int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   

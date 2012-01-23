@@ -1178,8 +1178,8 @@ computeGenStapleFieldParityKernel_ex(void* staple_even, void* staple_odd,
 
 
 void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
-           FullStaple cudaStaple, FullStaple cudaStaple1,
-           QudaGaugeParam* param, double* act_path_coeff)
+			cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
+			QudaGaugeParam* param, double* act_path_coeff)
 {  
   QudaPrecision prec = cudaSiteLink.Precision();
   QudaReconstructType recon = cudaSiteLink.Reconstruct();
@@ -1189,7 +1189,7 @@ void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLin
   dim3 gridDim(volume/BLOCK_DIM,1,1);
   dim3 blockDim(BLOCK_DIM , 1, 1);
 
-  staple_bytes = cudaStaple.bytes;
+  staple_bytes = cudaStaple.Bytes();
 
   if(prec == QUDA_DOUBLE_PRECISION){
     if(recon == QUDA_RECONSTRUCT_NO){

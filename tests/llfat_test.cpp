@@ -28,6 +28,8 @@ cudaGaugeField *cudaSiteLink, *cudaSiteLink_ex;
 cudaGaugeField *cudaFatLink;
 FullStaple cudaStaple, cudaStaple1;
 FullStaple cudaStaple_ex, cudaStaple1_ex;
+cudaGaugeField* cudaStapleField, *cudaStapleField1;
+
 
 QudaGaugeParam qudaGaugeParam;
 QudaGaugeParam qudaGaugeParam_ex;
@@ -133,7 +135,7 @@ llfat_init(int test)
   initQuda(device);
 
   gSize = cpu_prec;
-  
+
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
   qudaGaugeParam.X[2] = zdim;
@@ -147,7 +149,6 @@ llfat_init(int test)
   
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
-  
   gParam.order = QUDA_MILC_GAUGE_ORDER;
   gParam.pinned = 1;
   fatlink = new cpuGaugeField(gParam);
@@ -298,10 +299,34 @@ llfat_init(int test)
       qudaGaugeParam.site_ga_pad = gParam.pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + 4*Vh_2d_max;
       gParam.reconstruct = link_recon;
       cudaSiteLink = new cudaGaugeField(gParam);  
+ 
+
+      GaugeFieldParam gStapleParam(0, qudaGaugeParam);
+      gStapleParam.create = QUDA_NULL_FIELD_CREATE;  
+      gStapleParam.reconstruct = QUDA_RECONSTRUCT_NO;
+      gStapleParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
+      gStapleParam.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
+      cudaStapleField = new cudaGaugeField(gStapleParam);
+      cudaStapleField1 = new cudaGaugeField(gStapleParam);
       
+
       qudaGaugeParam.staple_pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
       createStapleQuda(&cudaStaple, &qudaGaugeParam);
       createStapleQuda(&cudaStaple1, &qudaGaugeParam);
+      
+      /*
+      printf("volume: cudaStapleField=%d, cudaStaple=%d\n", 
+	     cudaStapleField->Volume(), cudaStaple.volume);
+      printf("stride: cudaStapleField=%d, cudaStaple=%d\n", 
+	     cudaStapleField->Stride(), cudaStaple.stride);
+      printf("X: cudaStapleField=%d %d %d %d , cudaStaple=%d %d %d %d\n", 
+	     cudaStapleField->X()[0],cudaStapleField->X()[1],cudaStapleField->X()[2],cudaStapleField->X()[3],
+	     cudaStaple.X[0],cudaStaple.X[1],cudaStaple.X[2],cudaStaple.X[3]);
+	     printf("prec: cudaStapleField=%d, cudaStaple=%d\n", 
+	     cudaStapleField->Precision(), cudaStaple.precision);
+      */
+
+
 #else
       qudaGaugeParam.site_ga_pad = gParam.pad = Vsh_t;
       qudaGaugeParam.reconstruct = link_recon;
@@ -369,6 +394,9 @@ llfat_end(int test)
     delete cudaSiteLink;
     freeStapleQuda(&cudaStaple);
     freeStapleQuda(&cudaStaple1);
+    delete cudaStapleField;
+    delete cudaStapleField1;
+
   case 1:
     delete cudaSiteLink_ex;
     freeStapleQuda(&cudaStaple_ex);
@@ -452,7 +480,7 @@ llfat_test(int test)
       gettimeofday(&t1, NULL);  
       
       
-      llfat_cuda(*cudaFatLink, *cudaSiteLink, cudaStaple, cudaStaple1, 
+      llfat_cuda(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, 
 		 &qudaGaugeParam, act_path_coeff_2);
       break;
 

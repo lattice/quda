@@ -64,6 +64,13 @@ extern "C" {
     int pad;
     int stride;
     double anisotropy;
+    void* Even_p(){ return even;}
+    void* Odd_p(){ return odd;}
+    int VolumeCB(){return volume;}
+    int Stride(){ return stride;}
+    int Bytes(){ return bytes;}
+    QudaPrecision Precision(){ return precision;}
+
   } FullStaple;
   
   /*  typedef struct {

@@ -23,12 +23,12 @@ struct GaugeFieldParam : public LatticeFieldParam {
   QudaFieldCreate create; // used to determine the type of field created
 
   int pinned; //used in cpu field only, where the host memory is pinned
-
+  int is_staple; //set to 1 for staple, used in fatlink computation
  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
     nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
     order(param.gauge_order), fixed(param.gauge_fix), link_type(param.type), 
     t_boundary(param.t_boundary), anisotropy(param.anisotropy), tadpole(param.tadpole_coeff),
-    gauge(h_gauge), create(QUDA_REFERENCE_FIELD_CREATE) {
+    gauge(h_gauge), create(QUDA_REFERENCE_FIELD_CREATE), is_staple(0) {
 
     if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
     else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
@@ -56,6 +56,7 @@ class GaugeField : public LatticeField {
   double tadpole;
 
   QudaFieldCreate create; // used to determine the type of field created
+  int is_staple; //set to 1 for staple, used in fatlink computation
   
  public:
   GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &location);
@@ -94,7 +95,7 @@ class cudaGaugeField : public GaugeField {
   void *odd;
 
   double fat_link_max;
-
+  
  public:
   cudaGaugeField(const GaugeFieldParam &);
   virtual ~cudaGaugeField();

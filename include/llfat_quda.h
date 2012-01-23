@@ -32,7 +32,7 @@ extern "C"{
   
 
   void llfat_cuda(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink, 
-		  FullStaple cudaStaple, FullStaple cudaStaple1,
+		  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 		  QudaGaugeParam* param, double* act_path_coeff);
   void llfat_cuda_ex(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink, 
 		     FullStaple cudaStaple, FullStaple cudaStaple1,
@@ -72,7 +72,7 @@ extern "C"{
 					   QudaReconstructType recon, QudaPrecision prec,
 					   llfat_kernel_param_t kparam);
   void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
-			  FullStaple cudaStaple, FullStaple cudaStaple1,
+			  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,			 
 			  QudaGaugeParam* param, double* act_path_coeff);  
   void llfatOneLinkKernel_ex(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 			     FullStaple cudaStaple, FullStaple cudaStaple1,
