@@ -10,14 +10,14 @@ namespace hisq {
 
   void hisq_force_init_cuda(QudaGaugeParam* param);
 
-  void hisq_staples_force_cuda(void* act_path_coeff, 
+  void hisq_staples_force_cuda(const void* const act_path_coeff, 
                               const QudaGaugeParam& param,
                               const cudaGaugeField& oprod, 
                               const cudaGaugeField& link, 
                               cudaGaugeField *newOprod);
 
 
-   void hisq_naik_force_cuda(void* path_coeff_array,
+   void hisq_naik_force_cuda(const void* const path_coeff_array,
                              const QudaGaugeParam& param,
                              const cudaGaugeField &oprod,
                              const cudaGaugeField &link,

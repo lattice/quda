@@ -276,12 +276,12 @@ namespace hisq {
     void
       hisq_force_init_cuda(QudaGaugeParam* param)
       {
-        static int fermion_force_init_cuda_flag = 0; 
+        static int hisq_force_init_cuda_flag = 0; 
 
-        if (fermion_force_init_cuda_flag){
+        if (hisq_force_init_cuda_flag){
           return;
         }
-        fermion_force_init_cuda_flag=1;
+        hisq_force_init_cuda_flag=1;
         init_kernel_cuda(param);    
       }
 
@@ -1847,7 +1847,7 @@ namespace hisq {
 
 
 
-   void hisq_naik_force_cuda(void* path_coeff_array,
+   void hisq_naik_force_cuda(const void* const path_coeff_array,
                              const QudaGaugeParam &param,
                              const cudaGaugeField &oldOprod,
                              const cudaGaugeField &link,
@@ -1886,7 +1886,7 @@ namespace hisq {
 
 
     void
-      hisq_staples_force_cuda(void* path_coeff_array,
+      hisq_staples_force_cuda(const void* const  path_coeff_array,
                               const QudaGaugeParam &param,
                               const cudaGaugeField &oprod, 
                               const cudaGaugeField &link, 
