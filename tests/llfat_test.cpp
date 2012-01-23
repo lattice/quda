@@ -26,9 +26,8 @@
 
 cudaGaugeField *cudaSiteLink, *cudaSiteLink_ex;
 cudaGaugeField *cudaFatLink;
-FullStaple cudaStaple, cudaStaple1;
-FullStaple cudaStaple_ex, cudaStaple1_ex;
 cudaGaugeField* cudaStapleField, *cudaStapleField1;
+cudaGaugeField* cudaStapleField_ex, *cudaStapleField1_ex;
 
 
 QudaGaugeParam qudaGaugeParam;
@@ -311,21 +310,6 @@ llfat_init(int test)
       
 
       qudaGaugeParam.staple_pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
-      createStapleQuda(&cudaStaple, &qudaGaugeParam);
-      createStapleQuda(&cudaStaple1, &qudaGaugeParam);
-      
-      /*
-      printf("volume: cudaStapleField=%d, cudaStaple=%d\n", 
-	     cudaStapleField->Volume(), cudaStaple.volume);
-      printf("stride: cudaStapleField=%d, cudaStaple=%d\n", 
-	     cudaStapleField->Stride(), cudaStaple.stride);
-      printf("X: cudaStapleField=%d %d %d %d , cudaStaple=%d %d %d %d\n", 
-	     cudaStapleField->X()[0],cudaStapleField->X()[1],cudaStapleField->X()[2],cudaStapleField->X()[3],
-	     cudaStaple.X[0],cudaStaple.X[1],cudaStaple.X[2],cudaStaple.X[3]);
-	     printf("prec: cudaStapleField=%d, cudaStaple=%d\n", 
-	     cudaStapleField->Precision(), cudaStaple.precision);
-      */
-
 
 #else
       qudaGaugeParam.site_ga_pad = gParam.pad = Vsh_t;
@@ -333,8 +317,6 @@ llfat_init(int test)
       cudaSiteLink = new cudaGaugeField(param);
       
       qudaGaugeParam.staple_pad = Vsh_t;
-      createStapleQuda(&cudaStaple, &qudaGaugeParam);
-      createStapleQuda(&cudaStaple1, &qudaGaugeParam);
 #endif
       break;
     }      
@@ -345,9 +327,16 @@ llfat_init(int test)
       //createLinkQuda(&cudaSiteLink_ex, &qudaGaugeParam_ex);
       cudaSiteLink_ex = new cudaGaugeField(gParam_ex);
       
+      GaugeFieldParam gStapleParam_ex(0, qudaGaugeParam_ex);
+      gStapleParam_ex.create = QUDA_NULL_FIELD_CREATE;  
+      gStapleParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
+      gStapleParam_ex.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
+      gStapleParam_ex.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
+      cudaStapleField_ex = new cudaGaugeField(gStapleParam_ex);
+      cudaStapleField1_ex = new cudaGaugeField(gStapleParam_ex);
+      
+
       qudaGaugeParam_ex.staple_pad =  E1*E2*E2/2*3;
-      createStapleQuda(&cudaStaple_ex, &qudaGaugeParam_ex);
-      createStapleQuda(&cudaStaple1_ex, &qudaGaugeParam_ex);
 
 
       //set llfat_ga_gad in qudaGaugeParam.ex as well
@@ -392,15 +381,13 @@ llfat_end(int test)
   switch(test){
   case 0:
     delete cudaSiteLink;
-    freeStapleQuda(&cudaStaple);
-    freeStapleQuda(&cudaStaple1);
     delete cudaStapleField;
     delete cudaStapleField1;
 
   case 1:
     delete cudaSiteLink_ex;
-    freeStapleQuda(&cudaStaple_ex);
-    freeStapleQuda(&cudaStaple1_ex);
+    delete cudaStapleField_ex;
+    delete cudaStapleField1_ex;
     break;
   default:
     errorQuda("Error: invalid test type(%d)\n", test);
@@ -495,8 +482,7 @@ llfat_test(int test)
       qudaGaugeParam_ex.reconstruct = link_recon;
       loadLinkToGPU_ex(cudaSiteLink_ex, sitelink_ex, &qudaGaugeParam_ex);
       gettimeofday(&t1, NULL);
-      llfat_cuda_ex(*cudaFatLink, *cudaSiteLink_ex, cudaStaple_ex, cudaStaple1_ex, &qudaGaugeParam, act_path_coeff_2);
-      printf("After calling llfat_cuda_ex()\n");
+      llfat_cuda_ex(*cudaFatLink, *cudaSiteLink_ex, *cudaStapleField_ex, *cudaStapleField1_ex, &qudaGaugeParam, act_path_coeff_2);
       break;
     }
 

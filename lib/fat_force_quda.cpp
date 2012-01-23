@@ -225,23 +225,6 @@ void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir
 
 }
 
-static void 
-allocateStapleQuda(FullStaple *cudaStaple, QudaPrecision precision) 
-{
-    cudaStaple->precision = precision;    
-    cudaStaple->Nc = 3;
-    
-    if (precision == QUDA_HALF_PRECISION) {
-      errorQuda("ERROR: stape does not support half precision\n");
-    }
-    
-    int elements = 18;
-    
-    cudaStaple->bytes = cudaStaple->stride*elements*precision;
-    
-    cudaMalloc((void **)&cudaStaple->even, cudaStaple->bytes);
-    cudaMalloc((void **)&cudaStaple->odd, cudaStaple->bytes); 	    
-}
 
 void set_dim_ff(int *XX) {
 
@@ -262,53 +245,6 @@ void set_dim_ff(int *XX) {
 
 }
 
-
-void
-createStapleQuda(FullStaple* cudaStaple, QudaGaugeParam* param)
-{
-    QudaPrecision cpu_prec = param->cpu_prec;
-    QudaPrecision cuda_prec= param->cuda_prec;
-    
-    if (cpu_prec == QUDA_HALF_PRECISION) {
-      errorQuda("ERROR: %s:  half precision not supported on cpu\n", __FUNCTION__);
-    }
-    
-    if (cuda_prec == QUDA_DOUBLE_PRECISION && param->cpu_prec != QUDA_DOUBLE_PRECISION) {
-      errorQuda("Error: can only create a double GPU gauge field from a double CPU gauge field\n");
-    }
-
-    set_dim_ff(param->X);
-    cudaStaple->volume = 1;
-    for (int d=0; d<4; d++) {
-      cudaStaple->X[d] = param->X[d];
-      cudaStaple->volume *= param->X[d];
-    }
-    //anisotropy_ = param->anisotropy; //?? gshi: why do we need to set that in staple function?
-    //t_boundary_ = param->t_boundary;
-    //fat_link_max_ = param->fat_link_max; 
-
-    //cudaStaple->X[0] /= 2; // actually store the even-odd sublattice dimensions
-    cudaStaple->volume /= 2;    
-    cudaStaple->pad = param->staple_pad;
-    cudaStaple->stride = cudaStaple->volume + cudaStaple->pad;
-    allocateStapleQuda(cudaStaple,  param->cuda_prec);
-    
-    return;
-}
-
-
-void
-freeStapleQuda(FullStaple *cudaStaple) 
-{
-    if (cudaStaple->even) {
-	cudaFree(cudaStaple->even);
-    }
-    if (cudaStaple->odd) {
-	cudaFree(cudaStaple->odd);
-    }
-    cudaStaple->even = NULL;
-    cudaStaple->odd = NULL;
-}
 void
 packGhostStaple(int* X, void* even, void* odd, int volume, QudaPrecision prec,
 		int stride, 

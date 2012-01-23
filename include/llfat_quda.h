@@ -35,7 +35,7 @@ extern "C"{
 		  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 		  QudaGaugeParam* param, double* act_path_coeff);
   void llfat_cuda_ex(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink, 
-		     FullStaple cudaStaple, FullStaple cudaStaple1,
+		     cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 		     QudaGaugeParam* param, double* act_path_coeff);
   
   void llfat_init_cuda(QudaGaugeParam* param);
@@ -75,7 +75,7 @@ extern "C"{
 			  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,			 
 			  QudaGaugeParam* param, double* act_path_coeff);  
   void llfatOneLinkKernel_ex(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
-			     FullStaple cudaStaple, FullStaple cudaStaple1,
+			     cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 			     QudaGaugeParam* param, double* act_path_coeff,
 			     llfat_kernel_param_t kparam);
 #ifdef __cplusplus
