@@ -736,12 +736,16 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 
   int Vs[4] = {2*Vsh_x, 2*Vsh_y, 2*Vsh_z, 2*Vsh_t};
 
+
   void* ghost_cpuGauge[4];
   void* ghost_cpuGauge_diag[16];
+  
+#ifdef MULTI_GPU
 
   for(int i=0;i < 4; i++){
     
-#if (CUDA_VERSION >= 4000)
+#if (CUDA_VERSION >= 4000)    
+    int len = 8*Vs[i]*gaugeSiteSize*prec;
     cudaMallocHost((void**)&ghost_cpuGauge[i], 8*Vs[i]*gaugeSiteSize*prec);
 #else
     ghost_cpuGauge[i] = malloc(8*Vs[i]*gaugeSiteSize*prec);
@@ -751,8 +755,6 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
     }
   }
 
-
-#ifdef MULTI_GPU
 
   /*
     nu |     |
@@ -818,7 +820,8 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
     exit(1);
   }
 
-   
+#ifdef MULTI_GPU
+
   for(int i=0;i < 4;i++){
 #if (CUDA_VERSION >= 4000)
     cudaFreeHost(ghost_cpuGauge[i]);
@@ -838,7 +841,7 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 #endif
     }
   }
-
+#endif
 
 }
 

@@ -156,11 +156,14 @@ llfat_init(int test)
   }
    
   gParam.order = QUDA_QDP_GAUGE_ORDER;
-  gParam.pinned = 0;
+  gParam.pinned = 1;
   sitelink = new cpuGaugeField(gParam);
   if(sitelink == NULL){
     errorQuda("ERROR: Creating sitelink failed\n");
   }
+  
+  //reset pinned
+  gParam.pinned = 0;
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam)); 
   qudaGaugeParam_ex.X[0] = xdim+4;
@@ -254,13 +257,14 @@ llfat_init(int test)
       int x1odd = (x2 + x3 + x4 + oddBit) & 1;
       int x1 = 2*x1h + x1odd;
 
-
+      /*
       if( x1< 2 || x1 >= X1 +2
           || x2< 2 || x2 >= X2 +2
           || x3< 2 || x3 >= X3 +2
           || x4< 2 || x4 >= X4 +2){
         continue;
       }
+      */
 
 
       x1 = (x1 - 2 + X1) % X1;
@@ -313,10 +317,19 @@ llfat_init(int test)
 
 #else
       qudaGaugeParam.site_ga_pad = gParam.pad = Vsh_t;
-      qudaGaugeParam.reconstruct = link_recon;
-      cudaSiteLink = new cudaGaugeField(param);
+      gParam.reconstruct = link_recon;
+      cudaSiteLink = new cudaGaugeField(gParam);
+      
+      GaugeFieldParam gStapleParam(0, qudaGaugeParam);
+      gStapleParam.create = QUDA_NULL_FIELD_CREATE;  
+      gStapleParam.reconstruct = QUDA_RECONSTRUCT_NO;
+      gStapleParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
+      gStapleParam.pad = 3*Vsh_t;
+      cudaStapleField = new cudaGaugeField(gStapleParam);
+      cudaStapleField1 = new cudaGaugeField(gStapleParam);
       
       qudaGaugeParam.staple_pad = Vsh_t;
+
 #endif
       break;
     }      
@@ -430,10 +443,8 @@ llfat_test(int test)
   if (verify_results){
 
     int optflag = 0;
-    exchange_cpu_sitelink(qudaGaugeParam.X, (void**)sitelink->Gauge_p(), ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, optflag);
-
-
 #ifdef MULTI_GPU
+    exchange_cpu_sitelink(qudaGaugeParam.X, (void**)sitelink->Gauge_p(), ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, optflag);
     llfat_reference_mg((void**)reflink->Gauge_p(), (void**)sitelink->Gauge_p(), ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, act_path_coeff);
     
     //llfat_reference((void**)reflink->Gauge_p(), (void**)sitelink->Gauge_p(), qudaGaugeParam.cpu_prec, act_path_coeff);
@@ -460,8 +471,12 @@ llfat_test(int test)
       //cudaSiteLink->loadCPUField(*sitelink, QUDA_CPU_FIELD_LOCATION);
       
 #else
-      loadLinkToGPU(cudaSiteLink, sitelink, NULL, NULL, &qudaGaugeParam);
+      qudaGaugeParam.ga_pad = qudaGaugeParam.site_ga_pad;
+      qudaGaugeParam.reconstruct = link_recon;
+
+      loadLinkToGPU(cudaSiteLink, sitelink, &qudaGaugeParam);
       //cudaSiteLink->loadCPUField(*sitelink, QUDA_CPU_FIELD_LOCATION); 
+
 #endif
       
       gettimeofday(&t1, NULL);  
@@ -475,7 +490,7 @@ llfat_test(int test)
   case 1:    
     {
       llfat_init_cuda_ex(&qudaGaugeParam_ex);
-      
+#ifdef MULTI_GPU
       gettimeofday(&t0, NULL);
       exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex->Gauge_p(), qudaGaugeParam.cpu_prec, 1);    
       qudaGaugeParam_ex.ga_pad = qudaGaugeParam_ex.site_ga_pad;
@@ -483,6 +498,16 @@ llfat_test(int test)
       loadLinkToGPU_ex(cudaSiteLink_ex, sitelink_ex, &qudaGaugeParam_ex);
       gettimeofday(&t1, NULL);
       llfat_cuda_ex(*cudaFatLink, *cudaSiteLink_ex, *cudaStapleField_ex, *cudaStapleField1_ex, &qudaGaugeParam, act_path_coeff_2);
+#else
+      gettimeofday(&t0, NULL);
+      //exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex->Gauge_p(), qudaGaugeParam.cpu_prec, 1);    
+      qudaGaugeParam_ex.ga_pad = qudaGaugeParam_ex.site_ga_pad;
+      qudaGaugeParam_ex.reconstruct = link_recon;
+      loadLinkToGPU_ex(cudaSiteLink_ex, sitelink_ex, &qudaGaugeParam_ex);
+      gettimeofday(&t1, NULL);
+      llfat_cuda_ex(*cudaFatLink, *cudaSiteLink_ex, *cudaStapleField_ex, *cudaStapleField1_ex, &qudaGaugeParam, act_path_coeff_2);
+#endif
+
       break;
     }
 
