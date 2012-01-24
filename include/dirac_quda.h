@@ -9,6 +9,8 @@
 
 #include <face_quda.h>
 
+class TuneParam;
+
 // Params for Dirac operator
 class DiracParam {
 

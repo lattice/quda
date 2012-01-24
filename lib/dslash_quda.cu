@@ -539,7 +539,7 @@ void printDslashProfile() {
 #endif
 
 void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
-		const int volume, const int *faceVolumeCB, const tuneParam *tune) {
+		const int volume, const int *faceVolumeCB, const TuneParam *tune) {
 
   dslashParam.parity = parity;
   dslashParam.kernel_type = INTERIOR_KERNEL;

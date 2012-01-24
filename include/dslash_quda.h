@@ -48,7 +48,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
 
 // solo clover term
 void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
-		const cudaColorSpinorField *in, const int oddBit, const TuneParam &, const int shared);
+		const cudaColorSpinorField *in, const int oddBit, const TuneParam &);
 
 // domain wall Dslash  
 void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
@@ -70,7 +70,7 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gaug
 // solo twist term
 void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const int dagger, const double &kappa, const double &mu,
-		     const QudaTwistGamma5Type, const TuneParam *);
+		     const QudaTwistGamma5Type, const TuneParam &);
 
 // face packing routines
 void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 

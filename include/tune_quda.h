@@ -4,23 +4,6 @@
 #include <quda_internal.h>
 #include <dirac_quda.h>
 
-class TuneParam {
-
-  dim3 block;
-  int shared_bytes;
-
-  TuneParam() : block(32, 1, 1), shared_bytes(0) { ; }
-  TuneParam(const TuneParam &param) : block(param.block), shared_bytes(param.shared_bytes) { ; }
-  TuneParam& operator=(const TuneParam &param) {
-    if (&tune != this) {
-      block = param.block;
-      shared_bytes = param.shared_bytes;
-    }
-    return *this;
-  }
-
-};
-
 // Curried wrappers to Cuda functions used for auto-tuning
 class TuneBase {
 

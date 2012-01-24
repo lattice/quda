@@ -3,7 +3,7 @@
 void TuneBase::Benchmark(TuneParam &tune)  {
 
   dim3 &block = tune.block;
-  int &sharedBytes = tune.sharedBytes;
+  int &sharedBytes = tune.shared_bytes;
 
   int count = 10;
   int threadBlockMin = 32;
