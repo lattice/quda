@@ -80,7 +80,9 @@ gauge_force_init()
     gaugeParam.cpu_prec = link_prec;
     gaugeParam.cuda_prec = link_prec;
     gaugeParam.reconstruct = link_recon;
-    
+   
+    gaugeParam.type = QUDA_WILSON_LINKS; // in this context, just means these are site links   
+ 
     gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
     GaugeFieldParam gParam(0, gaugeParam);
