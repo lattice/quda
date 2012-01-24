@@ -4,16 +4,21 @@ GaugeField::GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &lo
   LatticeField(param, location), bytes(0), nColor(param.nColor), nFace(param.nFace),
   reconstruct(param.reconstruct), order(param.order), fixed(param.fixed), 
   link_type(param.link_type), t_boundary(param.t_boundary), anisotropy(param.anisotropy),
-  tadpole(param.tadpole), create(param.create)
+  tadpole(param.tadpole), create(param.create), is_staple(param.is_staple)
 {
   if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
-  if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
+  if (nDim != 4 && nDim != 1) errorQuda("Number of dimensions must be 4 or 1, not %d", nDim);
   if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0) errorQuda("Anisotropy only supported for Wilson links");
   if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
     errorQuda("Temporal gauge fixing only supported for Wilson links");
 
-  real_length = 4*volume*reconstruct;
-  length = 2*4*stride*reconstruct; // two comes from being full lattice
+  if(is_staple){
+    real_length = volume*reconstruct;
+    length = 2*stride*reconstruct; // two comes from being full lattice
+  }else{
+    real_length = 4*volume*reconstruct;
+    length = 2*4*stride*reconstruct; // two comes from being full lattice
+  }
 
   bytes = length*precision;
   total_bytes = bytes;

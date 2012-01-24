@@ -1,10 +1,13 @@
 #include <gauge_field.h>
 #include <face_quda.h>
 #include <assert.h>
+#include <string.h>
 
 cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
   GaugeField(param, QUDA_CPU_FIELD_LOCATION) {
 
+  pinned = param.pinned ;
+  
   if (reconstruct != QUDA_RECONSTRUCT_NO && 
       reconstruct != QUDA_RECONSTRUCT_10)
     errorQuda("Reconstruction type %d not supported", reconstruct);
@@ -14,45 +17,92 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
 
   if (order == QUDA_QDP_GAUGE_ORDER) {
     gauge = (void**)malloc(nDim * sizeof(void*));
+
     for (int d=0; d<nDim; d++) {
-      if (create == QUDA_NULL_FIELD_CREATE) {
-	gauge[d] = malloc(volume * reconstruct * precision);
+      if (create == QUDA_NULL_FIELD_CREATE 
+	  || create == QUDA_ZERO_FIELD_CREATE) {
+	if(pinned){
+	  cudaMallocHost((void**)&gauge[d], volume * reconstruct * precision);
+	}else{
+	  gauge[d] = malloc(volume * reconstruct * precision);
+	}
+	
+	if(create == QUDA_ZERO_FIELD_CREATE){
+	  memset(gauge[d], 0, volume * reconstruct * precision);
+	}
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge[d] = ((void**)param.gauge)[d];
       } else {
 	errorQuda("Unsupported creation type %d", create);
       }
     }
+    
   } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || 
 	     order == QUDA_MILC_GAUGE_ORDER) {
-    if (create == QUDA_NULL_FIELD_CREATE) {
-      gauge = (void**)malloc(nDim * volume * reconstruct * precision);
+    if (create == QUDA_NULL_FIELD_CREATE ||
+	create == QUDA_ZERO_FIELD_CREATE) {
+      if(pinned){
+	cudaMallocHost((void**)&gauge, nDim*volume*reconstruct*precision);
+      }else{
+	gauge = (void**)malloc(nDim * volume * reconstruct * precision);
+      }
+      if(create == QUDA_ZERO_FIELD_CREATE){
+	memset(gauge, 0, nDim*volume * reconstruct * precision);
+      }
     } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
       gauge = (void**)param.gauge;
     } else {
       errorQuda("Unsupported creation type %d", create);
     }
   } else {
-    errorQuda("Unsupported gauge order type %d", order);
+  errorQuda("Unsupported gauge order type %d", order);
   }
-
+  
   // Ghost zone is always 2-dimensional
   for (int i=0; i<nDim; i++) {
-    ghost[i] = malloc(nFace * surface[i] * reconstruct * precision);
+    if(pinned){
+      cudaMallocHost(&ghost[i], nFace * surface[i] * reconstruct * precision);
+    }else{
+      ghost[i] = malloc(nFace * surface[i] * reconstruct * precision);
+    }
   }
-
+  
 }
 
 cpuGaugeField::~cpuGaugeField() {
 
-  if (create == QUDA_NULL_FIELD_CREATE) {
-    if (order == QUDA_QDP_GAUGE_ORDER)
-      for (int d=0; d<nDim; d++) if (gauge[d]) free(gauge[d]);
-    if (gauge) free(gauge);
+#if 1
+  if (create == QUDA_NULL_FIELD_CREATE  
+      || create == QUDA_ZERO_FIELD_CREATE  ) {
+    if (order == QUDA_QDP_GAUGE_ORDER){
+      for (int d=0; d<nDim; d++) {
+	if(pinned){
+	  if (gauge[d]) cudaFreeHost(gauge[d]);	  
+	}else{
+	  if (gauge[d]) free(gauge[d]);
+	}
+      }
+      if (gauge) free(gauge);
+    }else{      
+      if(pinned){
+	  if (gauge) cudaFreeHost(gauge);	  
+	}else{
+	  if (gauge) free(gauge);
+	}
+    }
+  }
+  
+  
+  for (int i=0; i<nDim; i++) {
+    if(pinned){
+      if (ghost[i]) cudaFreeHost(ghost[i]);
+    }else{
+      if (ghost[i]) free(ghost[i]);
+    }
   }
 
-  for (int i=0; i<nDim; i++) if (ghost[i]) free(ghost[i]);
-
+ #endif
+  
 }
 
 template <typename Float>

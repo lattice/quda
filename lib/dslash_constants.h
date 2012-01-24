@@ -252,6 +252,7 @@ void initCommonConstants(const LatticeField &lat) {
 }
 
 
+
 void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride) 
 {
 
@@ -273,6 +274,8 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
 
   double coeff = -24.0*gauge.Tadpole()*gauge.Tadpole();
   cudaMemcpyToSymbol("coeff", &(coeff), sizeof(double));
+
+
 
   float anisotropy_f = gauge.Anisotropy();
   cudaMemcpyToSymbol("anisotropy_f", &(anisotropy_f), sizeof(float));
@@ -347,7 +350,6 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride)
     scatterTime[i][1] = 0.0;
   }
 #endif
-
 }
 
 void initCloverConstants (const int cl_stride) {

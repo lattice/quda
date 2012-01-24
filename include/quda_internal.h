@@ -52,19 +52,6 @@ extern "C" {
     double tadpole_coeff;
   } FullGauge;
 
-  typedef struct {
-    size_t bytes;
-    QudaPrecision precision;
-    int length; // total length
-    int volume; // geometric volume (single parity)
-    int X[QUDA_MAX_DIM]; // the geometric lengths (single parity)
-    int Nc; // number of colors
-    ParityGauge odd;
-    ParityGauge even;
-    int pad;
-    int stride;
-    double anisotropy;
-  } FullStaple;
   
   /*  typedef struct {
     size_t bytes;

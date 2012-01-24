@@ -299,7 +299,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
       k = 0;
       mat(r, y);
-      double r2 = xmyNormCuda(b, r);  
+      r2 = xmyNormCuda(b, r);  
 
       if (r2 > stop) {
 	restart++; // restarting if residual is still too great
@@ -310,12 +310,6 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
       copyCuda(rSloppy, r);
       zeroCuda(xSloppy);
-
-      if (r2_old < r2) {
-	if (invParam.verbosity >= QUDA_VERBOSE) 
-	  printfQuda("GCR: precision limit reached, r2_old = %e < r2 = %e\n", r2_old, r2);
-	break;
-      }
 
       r2_old = r2;
     }

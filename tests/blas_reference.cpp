@@ -2,6 +2,8 @@
 #include <stdio.h>
 #ifdef MPI_COMMS
 #include "mpicomm.h"
+#elif QMP_COMMS
+#include <qmp.h>
 #endif
 
 template <typename Float>
@@ -45,6 +47,8 @@ inline double norm2(Float *v, int len) {
   for (int i=0; i<len; i++) sum += v[i]*v[i];
 #ifdef MPI_COMMS
   comm_allreduce(&sum);
+#elif QMP_COMMS
+  QMP_sum_double(&sum);
 #endif
   return sum;
 }

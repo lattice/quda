@@ -23,6 +23,8 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+extern bool tune;
+extern int device;
 extern int xdim;
 extern int ydim;
 extern int zdim;
@@ -114,8 +116,6 @@ int main(int argc, char **argv)
 
   // *** QUDA parameters begin here.
 
-  int device = 0; // CUDA device number
-
   int multi_shift = 0; // whether to test multi-shift or standard solver
 
   // Wilson, clover-improved Wilson, and twisted mass are supported.
@@ -188,7 +188,7 @@ int main(int argc, char **argv)
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  inv_param.dirac_tune = QUDA_TUNE_YES;
+  inv_param.dirac_tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
   inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_YES;
 
   gauge_param.ga_pad = 0; // 24*24*24/2;
