@@ -12,11 +12,13 @@ void TuneBase::Benchmark(TuneParam &tune)  {
   double timeMin = 1e10;
   double gflopsMax = 0.0;
   dim3 blockOpt(1,1,1);
+  int sharedOpt = 0;
+
+  cudaDeviceProp deviceProp;
+  cudaGetDeviceProperties(&deviceProp, 0);
+  int sharedMax = deviceProp.sharedMemPerBlock;
 
   cudaError_t error;
-
-  int sharedOpt = 0;
-  int sharedMax = 1024*48;
 
   // loop over amount of shared memory to add
   for (int shared = 0; shared<sharedMax; shared+=1024) { // 1 KiB granularity
@@ -34,7 +36,6 @@ void TuneBase::Benchmark(TuneParam &tune)  {
       cudaGetLastError(); // clear error counter
       
       cudaEventRecord(start, 0);
-      cudaEventSynchronize(start);
       
       for (int c=0; c<count; c++) Apply();
       
@@ -74,7 +75,7 @@ void TuneBase::Benchmark(TuneParam &tune)  {
   }
 
   if (verbose >= QUDA_VERBOSE) 
-    printfQuda("Tuned %-15s with (%d,%d,%d) threads per block, %d KiB per block, Gflop/s = %f\n", 
-	       name, block.x, block.y, block.z, sharedOpt, gflopsMax);    
+    printfQuda("Tuned %-15s with (%d,%d,%d) threads per block, %d bytes per block, Gflop/s = %f\n", 
+	       name, block.x, block.y, block.z, sharedBytes, gflopsMax);    
 
 }
