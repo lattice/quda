@@ -134,6 +134,11 @@ llfat_init(int test)
   initQuda(device);
 
   gSize = cpu_prec;
+  
+  qudaGaugeParam = newQudaGaugeParam();
+  qudaGaugeParam_ex = newQudaGaugeParam();
+  
+  qudaGaugeParam.anisotropy = 1.0;
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -145,11 +150,13 @@ llfat_init(int test)
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
   qudaGaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  
+  qudaGaugeParam.type=QUDA_WILSON_LINKS;
+
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.order = QUDA_MILC_GAUGE_ORDER;
   gParam.pinned = 1;
+  gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
   fatlink = new cpuGaugeField(gParam);
   if(fatlink == NULL){
     printfQuda("ERROR: Creating fatlink failed\n");
@@ -157,6 +164,7 @@ llfat_init(int test)
    
   gParam.order = QUDA_QDP_GAUGE_ORDER;
   gParam.pinned = 1;
+  gParam.link_type = QUDA_WILSON_LINKS;
   sitelink = new cpuGaugeField(gParam);
   if(sitelink == NULL){
     errorQuda("ERROR: Creating sitelink failed\n");
@@ -287,6 +295,7 @@ llfat_init(int test)
   qudaGaugeParam.llfat_ga_pad = gParam.pad = Vsh_t;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
   cudaFatLink = new cudaGaugeField(gParam);
 
   switch(test){
@@ -301,6 +310,7 @@ llfat_init(int test)
       
       qudaGaugeParam.site_ga_pad = gParam.pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + 4*Vh_2d_max;
       gParam.reconstruct = link_recon;
+      gParam.link_type = QUDA_WILSON_LINKS;
       cudaSiteLink = new cudaGaugeField(gParam);  
  
 

@@ -3,6 +3,10 @@
 #include <typeinfo>
 #include <misc_helpers.h>
 
+#if (CUDA_VERSION >=4000)
+#define GPU_DIRECT
+#endif
+
 cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
   GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0)
 {
@@ -280,7 +284,7 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
   
   //unpack even data kernel
   link_format_gpu_to_cpu((void*)unpackedEven, (void*)even, bytes/2, volumeCB, stride, prec, streams[0]);
-#if (CUDA_VERSION >= 4000)
+#ifdef GPU_DIRECT
   cudaMemcpyAsync(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost, streams[0]);
 #else
   cudaMemcpy(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost);
@@ -288,7 +292,7 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
   
   //unpack odd data kernel
   link_format_gpu_to_cpu((void*)unpackedOdd, (void*)odd, bytes/2, volumeCB, stride, prec, streams[1]);
-#if (CUDA_VERSION >=4000)
+#ifdef GPU_DIRECT
   cudaMemcpyAsync(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
   for(int i=0; i<2; i++) cudaStreamSynchronize(streams[i]);
 #else
