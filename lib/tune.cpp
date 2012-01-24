@@ -1,6 +1,9 @@
 #include <tune_quda.h>
 
-void TuneBase::Benchmark(dim3 &block)  {
+void TuneBase::Benchmark(TuneParam &tune)  {
+
+  dim3 &block = tune.block;
+  int &sharedBytes = tune.sharedBytes;
 
   int count = 10;
   int threadBlockMin = 32;
@@ -12,48 +15,57 @@ void TuneBase::Benchmark(dim3 &block)  {
 
   cudaError_t error;
 
-  for (int threads=threadBlockMin; threads<=threadBlockMax; threads+=32) {
-    cudaEvent_t start, end;
-    cudaEventCreate(&start);
-    cudaEventCreate(&end);
+  int sharedOpt = 0;
+  int sharedMax = 0;
 
-    block = dim3(threads,1,1);
+  // loop over amount of shared memory to add
+  for (int shared = 0; shared<sharedMax; shared+=1024) { // 1 KiB granularity
 
-    Flops(); // resets the flops counter
-    cudaThreadSynchronize();
-    cudaGetLastError(); // clear error counter
-
-    cudaEventRecord(start, 0);
-    cudaEventSynchronize(start);
-
-    for (int c=0; c<count; c++) Apply();
-
-    cudaEventRecord(end, 0);
-    cudaEventSynchronize(end);
-
-    float runTime;
-    cudaEventElapsedTime(&runTime, start, end);
-    cudaEventDestroy(start);
-    cudaEventDestroy(end);
-
-    cudaThreadSynchronize();
-    error = cudaGetLastError();
-
-    time = runTime / 1000;
-    double flops = (double)Flops();
-    double gflops = (flops*1e-9)/(time);
-
-    if (time < timeMin && error == cudaSuccess) {
-      timeMin = time;
-      blockOpt = block;
-      gflopsMax = gflops;
-    }
-
-    if (verbose >= QUDA_DEBUG_VERBOSE && error == cudaSuccess) 
-      printfQuda("%-15s %d %f s, flops = %e, Gflop/s = %f\n", name, threads, time, (double)flops, gflops);
-  }
-
+    for (int threads=threadBlockMin; threads<=threadBlockMax; threads+=32) {
+      cudaEvent_t start, end;
+      cudaEventCreate(&start);
+      cudaEventCreate(&end);
+      
+      block = dim3(threads,1,1);
+      
+      Flops(); // resets the flops counter
+      cudaThreadSynchronize();
+      cudaGetLastError(); // clear error counter
+      
+      cudaEventRecord(start, 0);
+      cudaEventSynchronize(start);
+      
+      for (int c=0; c<count; c++) Apply();
+      
+      cudaEventRecord(end, 0);
+      cudaEventSynchronize(end);
+      
+      float runTime;
+      cudaEventElapsedTime(&runTime, start, end);
+      cudaEventDestroy(start);
+      cudaEventDestroy(end);
+      
+      cudaThreadSynchronize();
+      error = cudaGetLastError();
+      
+      time = runTime / 1000;
+      double flops = (double)Flops();
+      double gflops = (flops*1e-9)/(time);
+      
+      if (time < timeMin && error == cudaSuccess) {
+	timeMin = time;
+	blockOpt = block;
+	sharedOpt = shared;
+	gflopsMax = gflops;
+      }
+      
+      if (verbose >= QUDA_DEBUG_VERBOSE && error == cudaSuccess) 
+	printfQuda("%-15s %d %d %f s, flops = %e, Gflop/s = %f\n", name, threads, shared, time, (double)flops, gflops);
+    } // block loop
+  } // shared loop
+    
   block = blockOpt;
+  sharedBytes = sharedOpt;
   Flops(); // reset the flop counter
 
   if (block.x == 1) {
@@ -61,6 +73,7 @@ void TuneBase::Benchmark(dim3 &block)  {
   }
 
   if (verbose >= QUDA_VERBOSE) 
-    printfQuda("Tuned %-15s with (%d,%d,%d) threads per block, Gflop/s = %f\n", name, block.x, block.y, block.z, gflopsMax);    
+    printfQuda("Tuned %-15s with (%d,%d,%d) threads per block, %d KiB per block, Gflop/s = %f\n", 
+	       name, block.x, block.y, block.z, sharedOpt, gflopsMax);    
 
 }
