@@ -16,7 +16,7 @@ void TuneBase::Benchmark(TuneParam &tune)  {
   cudaError_t error;
 
   int sharedOpt = 0;
-  int sharedMax = 0;
+  int sharedMax = 1024*48;
 
   // loop over amount of shared memory to add
   for (int shared = 0; shared<sharedMax; shared+=1024) { // 1 KiB granularity
@@ -27,7 +27,8 @@ void TuneBase::Benchmark(TuneParam &tune)  {
       cudaEventCreate(&end);
       
       block = dim3(threads,1,1);
-      
+      sharedBytes = shared;
+
       Flops(); // resets the flops counter
       cudaThreadSynchronize();
       cudaGetLastError(); // clear error counter
