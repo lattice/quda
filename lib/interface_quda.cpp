@@ -225,7 +225,6 @@ void initQuda(int dev)
   if( commCoords(3) == commDim(3)-1 ) qudaPtNm1=true;
   else qudaPtNm1=false;
 
-  cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);

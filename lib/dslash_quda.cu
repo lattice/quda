@@ -49,6 +49,8 @@ struct DslashParam {
 // determines whether the temporal ghost zones are packed with a gather kernel,
 // as opposed to multiple calls to cudaMemcpy()
 bool kernelPackT = false;
+bool dslash_launch = true;
+bool getDslashLaunch() { return dslash_launch; }
 
 DslashParam dslashParam;
 
@@ -538,6 +540,20 @@ void printDslashProfile() {
 }
 #endif
 
+bool checkLaunchParam(const int shared_bytes) {
+
+  bool launch;
+
+  // only launch if not over-allocating shared memory
+  if (shared_bytes > deviceProp.sharedMemPerBlock) {
+    launch = false;
+  } else {
+    launch = true;
+  }
+
+  return launch;
+}
+
 void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		const int volume, const int *faceVolumeCB, const TuneParam *tune) {
 
@@ -583,6 +599,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   int shared_bytes = tune[0].block.x*(dslash.SharedPerThread()*regSize + SHARED_COORDS) + 
     tune[0].shared_bytes;
+  if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
+
   CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
   dslash.apply(tune[0].block, shared_bytes, streams[Nstream-1]);
   CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
@@ -615,6 +633,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
     shared_bytes = tune[i+1].block.x*(dslash.SharedPerThread()*regSize + SHARED_COORDS) + 
       tune[i+1].shared_bytes;
+    if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
     
     dslashParam.kernel_type = static_cast<KernelType>(i);
     dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
@@ -970,6 +989,7 @@ void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
   int shared_bytes = 
     tune.block.x*(CLOVER_SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm))
     + tune.shared_bytes;
+  if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
   cloverKernel<<<gridDim, tune.block, shared_bytes>>> 
     (out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
   unbindSpinorTex(in, inNorm);

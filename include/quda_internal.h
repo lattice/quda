@@ -105,4 +105,6 @@ class TuneParam {
 
 };
 
+cudaDeviceProp deviceProp;
+
 #endif // _QUDA_INTERNAL_H

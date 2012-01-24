@@ -29,6 +29,8 @@ extern "C" {
 }
 #endif
 
+bool getDslashLaunch();
+
 void initCommonConstants(const LatticeField &lat);
 void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
 void initCloverConstants(const int cl_stride);

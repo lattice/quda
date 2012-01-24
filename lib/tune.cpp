@@ -14,8 +14,6 @@ void TuneBase::Benchmark(TuneParam &tune)  {
   dim3 blockOpt(1,1,1);
   int sharedOpt = 0;
 
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, 0);
   int sharedMax = deviceProp.sharedMemPerBlock;
 
   cudaError_t error;
@@ -54,7 +52,7 @@ void TuneBase::Benchmark(TuneParam &tune)  {
       double flops = (double)Flops();
       double gflops = (flops*1e-9)/(time);
       
-      if (time < timeMin && error == cudaSuccess) {
+      if (time < timeMin && error == cudaSuccess && checkLaunch()) {
 	timeMin = time;
 	blockOpt = block;
 	sharedOpt = shared;
