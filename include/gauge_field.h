@@ -32,6 +32,7 @@ struct GaugeFieldParam : public LatticeFieldParam {
 
     if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
     else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
+    else errorQuda("Error: invalid link type(%d)\n", link_type);
   }
 };
 
