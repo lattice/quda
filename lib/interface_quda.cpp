@@ -82,6 +82,8 @@ Dirac *dPre = NULL; // the DD preconditioning operator
 bool diracCreation = false;
 bool diracTune = false;
 
+cudaDeviceProp deviceProp;
+
 static int gpu_affinity[MAX_GPU_NUM_PER_NODE]; 
 static int numa_config_set = 0;
 void qudaSetNumaConfig(char* filename)
@@ -247,6 +249,7 @@ void initQuda(int dev)
 #endif
 
   initCache();
+  cudaGetDeviceProperties(&deviceProp, dev);
   quda::initBlas();
 }
 
