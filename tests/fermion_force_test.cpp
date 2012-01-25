@@ -12,7 +12,7 @@
 #include "hw_quda.h"
 #include <sys/time.h>
 
-int device = 0;
+extern int device;
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField *cpuGauge = NULL;
 
@@ -143,8 +143,6 @@ fermion_force_init()
 
   cudaHw = createHwQuda(gaugeParam.X, hw_prec);
     
-  printf("%d %d %d %d\n", cpuMom->Reconstruct(), cudaMom->Reconstruct(), cpuGauge->Reconstruct(), cudaGauge->Reconstruct());
-
   return;
 }
 
@@ -160,7 +158,7 @@ fermion_force_end()
 }
 
 
-static void 
+static int 
 fermion_force_test(void) 
 {
  
@@ -216,8 +214,9 @@ fermion_force_test(void)
   int res;
   res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize, 1e-5, gaugeParam.cpu_prec);
     
-  strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
-    
+  int accuracy_level;
+  accuracy_level =  strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
+  
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
     
   int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
@@ -233,7 +232,7 @@ fermion_force_test(void)
     printf("        Did you check the GPU health by running cuda memtest?\n");
   }
 
-    
+  return accuracy_level;
 }            
 
 
@@ -306,14 +305,22 @@ main(int argc, char **argv)
   link_prec = prec;
 
   display_test_info();
+  
+  int accuracy_level = fermion_force_test();
+  printfQuda("accuracy_level=%d\n", accuracy_level);
     
-  fermion_force_test();
-
 
 #ifdef MULTI_GPU
     endCommsQuda();
 #endif
     
+    int ret;
+    if(accuracy_level >=3 ){
+      ret = 0;
+    }else{
+      ret = 1; //we delclare the test failed
+    }
+
     
   return 0;
 }

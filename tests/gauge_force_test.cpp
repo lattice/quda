@@ -148,7 +148,7 @@ gauge_force_end()
 }
 
 
-static void 
+static int
 gauge_force_test(void) 
 {
     int path_dir_x[][5] = {
@@ -575,7 +575,8 @@ gauge_force_test(void)
     int res;
     res = compare_floats(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume()*momSiteSize, 1e-3, gaugeParam.cpu_prec);
     
-    strong_check_mom(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume(), gaugeParam.cpu_prec);
+    int accuracy_level;
+    accuracy_level = strong_check_mom(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume(), gaugeParam.cpu_prec);
     
     printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
     
@@ -591,8 +592,8 @@ gauge_force_test(void)
         printf("        Did you use --verify?\n");
         printf("        Did you check the GPU health by running cuda memtest?\n");
     }
-
     
+    return accuracy_level;
 }            
 
 
@@ -670,11 +671,19 @@ main(int argc, char **argv)
 
     display_test_info();
     
-    gauge_force_test();
-    
+    int accuracy_level = gauge_force_test();
+    printfQuda("accuracy_level=%d\n", accuracy_level);
+
 #ifdef MULTI_GPU
     endCommsQuda();
 #endif
     
-    return 0;
+    int ret;
+    if(accuracy_level >=3 ){
+      ret = 0; 
+    }else{
+      ret = 1; //we delclare the test failed
+    }
+
+    return ret;
 }

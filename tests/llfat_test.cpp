@@ -24,47 +24,40 @@
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 
-cudaGaugeField *cudaSiteLink, *cudaSiteLink_ex;
-cudaGaugeField *cudaFatLink;
-cudaGaugeField* cudaStapleField, *cudaStapleField1;
-cudaGaugeField* cudaStapleField_ex, *cudaStapleField1_ex;
+static cudaGaugeField *cudaSiteLink, *cudaSiteLink_ex;
+static cudaGaugeField *cudaFatLink;
+static cudaGaugeField* cudaStapleField, *cudaStapleField1;
+static cudaGaugeField* cudaStapleField_ex, *cudaStapleField1_ex;
 
-
-QudaGaugeParam qudaGaugeParam;
-QudaGaugeParam qudaGaugeParam_ex;
-cpuGaugeField *fatlink, *sitelink, *reflink;
-cpuGaugeField *sitelink_ex;
+static QudaGaugeParam qudaGaugeParam;
+static QudaGaugeParam qudaGaugeParam_ex;
+static cpuGaugeField *fatlink, *reflink;
+static cpuGaugeField *sitelink, *sitelink_ex;
 
 #ifdef MULTI_GPU
-void* ghost_sitelink[4];
-void* ghost_sitelink_diag[16];
+static void* ghost_sitelink[4];
+static void* ghost_sitelink_diag[16];
 #endif
 
-int verify_results = 0;
+static int verify_results = 0;
 
 
 #define DIM 24
 
 extern int device;
-int ODD_BIT = 1;
 int Z[4];
 int V;
 int Vh;
 int Vs[4];
 int Vsh[4];
-int Vs_x, Vs_y, Vs_z, Vs_t;
-int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+static int Vs_x, Vs_y, Vs_z, Vs_t;
+static int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 
-int Z_ex[4];
-int V_ex;
-int Vh_ex;
-int Vs_ex[4];
-int Vsh_ex[4];
-int Vs_ex_x, Vs_ex_y, Vs_ex_z, Vs_ex_t;
-int Vsh_ex_x, Vsh_ex_y, Vsh_ex_z, Vsh_ex_t;
+static int V_ex;
+static int Vh_ex;
 
-int X1, X1h, X2, X3, X4;
-int E1, E1h, E2, E3, E4;
+static int X1, X1h, X2, X3, X4;
+static int E1, E1h, E2, E3, E4;
 
 
 extern int xdim, ydim, zdim, tdim;
@@ -72,17 +65,8 @@ extern int gridsize_from_cmdline[];
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision  prec;
-QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
-size_t gSize;
-
-typedef struct {
-  double real;
-  double imag;
-} dcomplex;
-
-typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-
-
+static QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
+static size_t gSize;
 
 void
 setDims(int *X) {
@@ -106,19 +90,8 @@ setDims(int *X) {
   V_ex = 1;
   for (int d=0; d< 4; d++) {
     V_ex *= X[d]+4;
-    Z_ex[d] = X[d]+4;
   }
-  Vh_ex = V_ex/2;
-
-  Vs_ex[0] = Vs_ex_x = Z_ex[1]*Z_ex[2]*Z_ex[3];
-  Vs_ex[1] = Vs_ex_y = Z_ex[0]*Z_ex[2]*Z_ex[3];
-  Vs_ex[2] = Vs_ex_z = Z_ex[0]*Z_ex[1]*Z_ex[3];
-  Vs_ex[3] = Vs_ex_t = Z_ex[0]*Z_ex[1]*Z_ex[2];
-
-  Vsh_ex[0] = Vsh_ex_x = Vs_ex_x/2;
-  Vsh_ex[1] = Vsh_ex_y = Vs_ex_y/2;
-  Vsh_ex[2] = Vsh_ex_z = Vs_ex_z/2;
-  Vsh_ex[3] = Vsh_ex_t = Vs_ex_t/2;
+  Vh_ex = V_ex/2; 
 
   X1=X[0]; X2 = X[1]; X3=X[2]; X4=X[3];
   X1h=X1/2;
@@ -379,13 +352,13 @@ llfat_init(int test)
 void 
 llfat_end(int test)  
 {   
-  int i;
 
   delete fatlink;
   delete sitelink;
   delete sitelink_ex;
   
 #ifdef MULTI_GPU  
+  int i;
   for(i=0;i < 4;i++){
     free(ghost_sitelink[i]);
   }
@@ -452,12 +425,10 @@ llfat_test(int test)
   }
   if (verify_results){
 
-    int optflag = 0;
 #ifdef MULTI_GPU
+    int optflag = 0;
     exchange_cpu_sitelink(qudaGaugeParam.X, (void**)sitelink->Gauge_p(), ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, optflag);
     llfat_reference_mg((void**)reflink->Gauge_p(), (void**)sitelink->Gauge_p(), ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, act_path_coeff);
-    
-    //llfat_reference((void**)reflink->Gauge_p(), (void**)sitelink->Gauge_p(), qudaGaugeParam.cpu_prec, act_path_coeff);
 #else
     llfat_reference((void**)reflink->Gauge_p(), (void**)sitelink->Gauge_p(), qudaGaugeParam.cpu_prec, act_path_coeff);
 #endif
@@ -578,12 +549,8 @@ llfat_test(int test)
     printfQuda("	Did you use --verify?\n");
     printfQuda("	Did you check the GPU health by running cuda memtest?\n");
   }
-
-  printfQuda(" h2d=%f s, computation in gpu=%f s, d2h=%f s, total time=%f s\n", 
-	     TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3), TDIFF(t0, t3));
   
-
-  printfQuda(" h2d=%f s, computation in gpu=%f s, d2h=%f s, total time=%f s\n",
+  printfQuda("h2d=%f s, computation in gpu=%f s, d2h=%f s, total time=%f s\n",
              TDIFF(t0, t1), TDIFF(t1, t2), TDIFF(t2, t3), TDIFF(t0, t3));
   
   
@@ -669,19 +636,6 @@ main(int argc, char **argv)
       verify_results=1;
       continue;	    
     }	
-
-    if( strcmp(argv[i], "--device") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      device =  atoi(argv[i+1]);
-      if (device < 0){
-	fprintf(stderr, "Error: invalid device number(%d)\n", device);
-	exit(1);
-      }
-      i++;
-      continue;
-    }
 
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);

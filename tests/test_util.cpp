@@ -1208,7 +1208,7 @@ createHwCPU(void* hw,  QudaPrecision precision)
 
 
 template <typename Float>
-void compare_mom(Float *momA, Float *momB, int len) {
+int compare_mom(Float *momA, Float *momB, int len) {
   const int fail_check = 16;
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
@@ -1227,12 +1227,20 @@ void compare_mom(Float *momA, Float *momB, int len) {
     }
   }
   
+  int accuracy_level = 0;
+  for(int f =0; f < fail_check; f++){
+    if(fail[f] == 0){
+      accuracy_level =f;
+    }
+  }
+
   for (int i=0; i<momSiteSize; i++) printf("%d fails = %d\n", i, iter[i]);
   
   for (int f=0; f<fail_check; f++) {
     printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*momSiteSize, fail[f] / (double)(len*6));
   }
   
+  return accuracy_level;
 }
 
 static void 
@@ -1248,7 +1256,7 @@ printMomElement(void *mom, int X, QudaPrecision precision)
     printf("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);	
   }
 }
-void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec) 
+int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec) 
 {    
   printf("mom:\n");
   printMomElement(momA, 0, prec); 
@@ -1259,7 +1267,7 @@ void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
   printf("\n");
   printMomElement(momA, 3, prec); 
   printf("...\n");
-
+  
   printf("\nreference mom:\n");
   printMomElement(momB, 0, prec); 
   printf("\n");
@@ -1269,13 +1277,15 @@ void strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
   printf("\n");
   printMomElement(momB, 3, prec); 
   printf("\n");
-
-    
+  
+  int ret;
   if (prec == QUDA_DOUBLE_PRECISION){
-    compare_mom((double*)momA, (double*)momB, len);
+    ret = compare_mom((double*)momA, (double*)momB, len);
   }else{
-    compare_mom((float*)momA, (float*)momB, len);
+    ret = compare_mom((float*)momA, (float*)momB, len);
   }
+  
+  return ret;
 }
 
 
@@ -1307,7 +1317,7 @@ void usage(char** argv )
 {
   printf("Usage: %s [options]\n", argv[0]);
   printf("Available options: \n");
-  printf("    --device <n>                                # Set the CUDA device to use (default 0)\n");     
+  printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
   printf("    --prec <double/single/half>               # Precision in GPU\n"); 
   printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
   printf("    --recon <8/12/18>                         # Link reconstruction type\n"); 
@@ -1343,7 +1353,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
   if( strcmp(argv[i], "--help")== 0){
     usage(argv);
   }
-  
+
+#ifndef MULTI_GPU
   if( strcmp(argv[i], "--device") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -1357,6 +1368,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+#endif
 
   if( strcmp(argv[i], "--prec") == 0){
     if (i+1 >= argc){
