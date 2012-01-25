@@ -313,13 +313,12 @@ def prolog():
 #endif
 """)
 
-    if sharedCoords or sharedFloats > 0:
+    if sharedFloats > 0:
         prolog_str += (
 """
 extern __shared__ char s_data[];
 """)
 
-    if sharedFloats > 0:
         if dslash:
             prolog_str += (
 """
@@ -335,29 +334,13 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
 
 
     if dslash:
-        if sharedCoords:
-            prolog_str += (
-"""
-short *coords = (short*)((spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*blockDim.x) + 4*threadIdx.x;
-#define SHARED_COORDS (4*sizeof(short)) 
-#define x1 coords[0]
-#define x2 coords[1]
-#define x3 coords[2]
-#define x4 coords[3]
-""")
-        else:
-            prolog_str += (
-"""
-int x1, x2, x3, x4;
-#define SHARED_COORDS 0 
-""")
-
-        prolog_str+= (
+        prolog_str += (
 """
 #include "read_gauge.h"
 #include "read_clover.h"
 #include "io_spinor.h"
 
+int x1, x2, x3, x4;
 int X;
 
 #if (defined MULTI_GPU) && (DD_PREC==2) // half precision
@@ -936,16 +919,6 @@ case EXTERIOR_KERNEL_Y:
                     str += "#undef "+out_im(s,c)+"\n"
     str += "\n"
 
-    if sharedCoords:
-        str += (
-"""
-#undef x1
-#undef x2
-#undef x3
-#undef x4
-"""
-)
-
     str += "#undef VOLATILE\n" 
 
     return str
@@ -1004,7 +977,6 @@ def generate_clover():
 
 sharedFloats = 0
 cloverSharedFloats = 0
-sharedCoords = False
 if(len(sys.argv) > 1):
     if (sys.argv[1] == '--shared'):
         sharedFloats = int(sys.argv[2])
