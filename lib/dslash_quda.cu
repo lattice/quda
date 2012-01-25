@@ -154,10 +154,6 @@ void setDslashTuning(QudaTune tune)
 #define CLOVER_SHARED_FLOATS_PER_THREAD 0
 #endif
 
-#ifndef SHARED_COORDS
-#define SHARED_COORDS 0
-#endif
-
 #include <blas_quda.h>
 #include <face_quda.h>
 
@@ -597,7 +593,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  int shared_bytes = tune[0].block.x*(dslash.SharedPerThread()*regSize + SHARED_COORDS) + 
+  int shared_bytes = tune[0].block.x*dslash.SharedPerThread()*regSize + 
     tune[0].shared_bytes;
   if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
 
@@ -631,7 +627,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
-    shared_bytes = tune[i+1].block.x*(dslash.SharedPerThread()*regSize + SHARED_COORDS) + 
+    shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize + 
       tune[i+1].shared_bytes;
     if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
     
