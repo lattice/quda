@@ -408,23 +408,18 @@ if(kernel_type == INTERIOR_KERNEL){
   X = 2*sid + x1odd;
  }
 
-int sign;
-
 o00_re = o00_im = 0.f;
 o01_re = o01_im = 0.f;
 o02_re = o02_im = 0.f;
 
 
-
-
 {
     //direction: +X
 
-    if(x4%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = (x4%2 == 1) ? -1 : 1;
+#endif
+
     int ga_idx = sid;
 
 #ifdef MULTI_GPU
@@ -499,11 +494,9 @@ o02_re = o02_im = 0.f;
 
 {
     // direction: -X
-    if(x4%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }    
+#if (DD_RECON < 2)
+    int sign = (x4%2 == 1) ? -1 : 1;
+#endif
     int dir =1;
 
 #ifdef MULTI_GPU
@@ -590,11 +583,9 @@ o02_re = o02_im = 0.f;
 
 {
     //direction: +Y
-    if((x4+x1)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ((x4+x1)%2 == 1) ? -1 : 1;
+#endif
    
     int ga_idx = sid;
 
@@ -668,11 +659,9 @@ o02_re = o02_im = 0.f;
 {
     //direction: -Y
 
-    if((x4+x1)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ((x4+x1)%2 == 1) ? -1 : 1;
+#endif
 
     int dir=3;
 #ifdef MULTI_GPU
@@ -758,12 +747,10 @@ o02_re = o02_im = 0.f;
 {
     //direction: +Z
 
-    if((x4+x1+x2)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
-    
+#if (DD_RECON < 2)
+    int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
+#endif
+
     int ga_idx = sid;
 
 #ifdef MULTI_GPU
@@ -837,11 +824,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 {
     //direction: -Z
 
-    if((x4+x1+x2)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
+#endif
 
     int dir = 5;
 
@@ -927,11 +912,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 
 {
     //direction: +T
-    if (x4>= (X4-3)){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = (x4 >= (X4-3)) ? -1 : 1;
+#endif
 
     int ga_idx = sid;
 
@@ -1006,11 +989,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 
 {
     //direction: -T
-    if ( ((x4+X4m3)%X4)>= X4m3 ){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ( ((x4+X4m3)%X4)>= X4m3 ) ? -1 : 1;
+#endif
     
     int dir = 7;
 

@@ -318,10 +318,6 @@ invert_test(void)
     nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
 
-    {
-      double sol = norm_2(out->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      double refe = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    }
     break;
 
   case 1: //odd

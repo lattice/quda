@@ -322,9 +322,9 @@ void FaceBuffer::exchangeFacesComms(int dir, struct timeval &commsStart, cudaEve
 #endif
 
 #else
-#define QMP_finish_from_fwd					
+#define QMP_finish_from_fwd(dim)
 
-#define QMP_finish_from_back					
+#define QMP_finish_from_back(dim)				
 
 #endif
 
