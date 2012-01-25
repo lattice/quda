@@ -69,8 +69,10 @@ static cudaEvent_t scatterStart[Nstream];
 static cudaEvent_t scatterEnd[Nstream];
 
 static struct timeval dslashStart_h;
+#ifdef MULTI_GPU
 static struct timeval commsStart[Nstream];
 static struct timeval commsEnd[Nstream];
+#endif
 
 // these events are only used for profiling
 #ifdef DSLASH_PROFILING
@@ -474,6 +476,7 @@ void dslashTimeProfile() {
     kernelTime[2*i][1] += runTime; // end time
   }
       
+#ifdef MULTI_GPU
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
@@ -503,6 +506,7 @@ void dslashTimeProfile() {
       scatterTime[2*i+dir][1] += runTime; // end time
     }
   }
+#endif
 
 }
 
@@ -523,10 +527,12 @@ void printDslashProfile() {
 
     for (int dir = 0; dir < 2; dir ++) {
       printfQuda("%8s ", dimstr[2*i+dir]);
+#ifdef MULTI_GPU
       printfQuda("%6.2f %6.2f ", packTime[2*i+dir][0], packTime[2*i+dir][1]);
       printfQuda("%6.2f %6.2f ", gatherTime[2*i+dir][0], gatherTime[2*i+dir][1]);
       printfQuda("%6.2f %6.2f ", commsTime[2*i+dir][0], commsTime[2*i+dir][1]);
       printfQuda("%6.2f %6.2f ", scatterTime[2*i+dir][0], scatterTime[2*i+dir][1]);
+#endif
 
       if (dir==0) printfQuda("%6.2f %6.2f\n", kernelTime[2*i][0], kernelTime[2*i][1]);
       else printfQuda("\n");
@@ -595,8 +601,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 #endif
 
   int shared_bytes = tune[0].block.x*dslash.SharedPerThread()*regSize;
-  shared_bytes = tune[0].shared_bytes > shared_bytes ? tune[0].shared_bytes;
-  if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
+  shared_bytes = tune[0].shared_bytes > shared_bytes ? tune[0].shared_bytes : shared_bytes;
 
   CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
   dslash.apply(tune[0].block, shared_bytes, streams[Nstream-1]);
@@ -628,10 +633,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
-    shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize + 
-      tune[i+1].shared_bytes;
-    shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize;
-    shared_bytes = tune[i+1].shared_bytes > shared_bytes ? tune[i+1].shared_bytes;
+    int shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize;
+    shared_bytes = tune[i+1].shared_bytes > shared_bytes ? tune[i+1].shared_bytes : shared_bytes;
     if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
     
     dslashParam.kernel_type = static_cast<KernelType>(i);
@@ -987,7 +990,7 @@ void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
 
   int shared_bytes = 
     tune.block.x*(CLOVER_SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm));
-  shared_bytes = tune.shared_bytes > shared_bytes ? tune.shared_bytes;
+  shared_bytes = tune.shared_bytes > shared_bytes ? tune.shared_bytes : shared_bytes;
   if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
 
   cloverKernel<<<gridDim, tune.block, shared_bytes>>> 

@@ -16,13 +16,14 @@ void TuneBase::Benchmark(TuneParam &tune)  {
 
   // set to a max of 16KiB, since higher will switch the cache config
   int sharedMax = 16384; //deviceProp.sharedMemPerBlock;
+  //sharedMax = 0;
 
   cudaError_t error;
 
   // loop over amount of shared memory to add
   // this is the minimum amount, if kernel requests more it will use more
-  shared = 0;
-  while (int shared < sharedMax) {
+  int shared = 0;
+  while (shared <= sharedMax) {
     for (int threads=threadBlockMin; threads<=threadBlockMax; threads+=32) {
       cudaEvent_t start, end;
       cudaEventCreate(&start);
