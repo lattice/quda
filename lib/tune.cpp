@@ -20,8 +20,9 @@ void TuneBase::Benchmark(TuneParam &tune)  {
   cudaError_t error;
 
   // loop over amount of shared memory to add
-  for (int shared = 0; shared<=sharedMax; shared+=1024) { // 1 KiB granularity
-
+  // this is the minimum amount, if kernel requests more it will use more
+  shared = 0;
+  while (int shared < sharedMax) {
     for (int threads=threadBlockMin; threads<=threadBlockMax; threads+=32) {
       cudaEvent_t start, end;
       cudaEventCreate(&start);
@@ -63,6 +64,9 @@ void TuneBase::Benchmark(TuneParam &tune)  {
       if (verbose >= QUDA_DEBUG_VERBOSE && error == cudaSuccess) 
 	printfQuda("%-15s %d %d %f s, flops = %e, Gflop/s = %f\n", name, threads, shared, time, (double)flops, gflops);
     } // block loop
+
+    if (shared == 0) shared = 128;
+    else shared *= 2;
   } // shared loop
     
   block = blockOpt;

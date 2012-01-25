@@ -594,8 +594,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  int shared_bytes = tune[0].block.x*dslash.SharedPerThread()*regSize + 
-    tune[0].shared_bytes;
+  int shared_bytes = tune[0].block.x*dslash.SharedPerThread()*regSize;
+  shared_bytes = tune[0].shared_bytes > shared_bytes ? tune[0].shared_bytes;
   if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
 
   CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
@@ -630,6 +630,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
     shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize + 
       tune[i+1].shared_bytes;
+    shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize;
+    shared_bytes = tune[i+1].shared_bytes > shared_bytes ? tune[i+1].shared_bytes;
     if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
     
     dslashParam.kernel_type = static_cast<KernelType>(i);
@@ -984,9 +986,10 @@ void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
   dim3 gridDim( (dslashParam.threads+tune.block.x-1) / tune.block.x, 1, 1);
 
   int shared_bytes = 
-    tune.block.x*(CLOVER_SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm))
-    + tune.shared_bytes;
+    tune.block.x*(CLOVER_SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm));
+  shared_bytes = tune.shared_bytes > shared_bytes ? tune.shared_bytes;
   if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
+
   cloverKernel<<<gridDim, tune.block, shared_bytes>>> 
     (out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
   unbindSpinorTex(in, inNorm);
