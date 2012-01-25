@@ -82,9 +82,29 @@ extern "C" {
     ParityHw odd;
     ParityHw even;
   } FullHw;
+
+  extern cudaDeviceProp deviceProp;
   
 #ifdef __cplusplus
 }
 #endif
+
+class TuneParam {
+
+ public:
+  dim3 block;
+  int shared_bytes;
+
+  TuneParam() : block(32, 1, 1), shared_bytes(0) { ; }
+  TuneParam(const TuneParam &param) : block(param.block), shared_bytes(param.shared_bytes) { ; }
+  TuneParam& operator=(const TuneParam &param) {
+    if (&param != this) {
+      block = param.block;
+      shared_bytes = param.shared_bytes;
+    }
+    return *this;
+  }
+
+};
 
 #endif // _QUDA_INTERNAL_H

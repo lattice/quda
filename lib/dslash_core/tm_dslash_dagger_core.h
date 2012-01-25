@@ -35,7 +35,6 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
-
 #else
 #define spinorFloat float
 #define i00_re I0.x
@@ -173,13 +172,11 @@ VOLATILE spinorFloat o32_im;
 #endif
 #endif
 
-int x1, x2, x3, x4;
-#define SHARED_COORDS 0 
-
 #include "read_gauge.h"
 #include "read_clover.h"
 #include "io_spinor.h"
 
+int x1, x2, x3, x4;
 int X;
 
 #if (defined MULTI_GPU) && (DD_PREC==2) // half precision
@@ -2143,6 +2140,7 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
+
 
 
 #undef VOLATILE

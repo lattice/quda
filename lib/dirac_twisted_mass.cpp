@@ -4,13 +4,13 @@
 #include <tune_quda.h>
 
 DiracTwistedMass::DiracTwistedMass(const DiracParam &param)
-  : DiracWilson(param), blockTwist(64, 1, 1), mu(param.mu)
+  : DiracWilson(param), mu(param.mu)
 {
 
 }
 
 DiracTwistedMass::DiracTwistedMass(const DiracTwistedMass &dirac) 
-  : DiracWilson(dirac), blockTwist(64, 1, 1), mu(dirac.mu)
+  : DiracWilson(dirac), mu(dirac.mu)
 {
 
 }
@@ -25,7 +25,7 @@ DiracTwistedMass& DiracTwistedMass::operator=(const DiracTwistedMass &dirac)
   if (&dirac != this) {
     DiracWilson::operator=(dirac);
 
-    blockTwist = dirac.blockTwist;
+    tuneTwist = dirac.tuneTwist;
   }
   return *this;
 }
@@ -40,7 +40,7 @@ void DiracTwistedMass::Tune(cudaColorSpinorField &out, const cudaColorSpinorFiel
 
   { // Tune twist application
     TuneDiracTwistedMass twistTune(*this, out, in);
-    twistTune.Benchmark(blockTwist);
+    twistTune.Benchmark(tuneTwist);
   }
 
   setDslashTuning(QUDA_TUNE_NO);
@@ -59,7 +59,7 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 
   double flavor_mu = in.TwistFlavor() * mu;
   
-  twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType, blockTwist);
+  twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType, tuneTwist);
 
   flops += 24*in.Volume();
 }
@@ -129,17 +129,14 @@ void DiracTwistedMass::reconstruct(cudaColorSpinorField &x, const cudaColorSpino
 
 DiracTwistedMassPC::DiracTwistedMassPC(const DiracParam &param) : DiracTwistedMass(param)
 {
-  for (int i=0; i<5; i++) {
-    blockDslash[i] = dim3(64, 1, 1);
-    blockDslashXpay[i] = dim3(64, 1, 1);
-  }
+
 }
 
 DiracTwistedMassPC::DiracTwistedMassPC(const DiracTwistedMassPC &dirac) : DiracTwistedMass(dirac)
 {
   for (int i=0; i<5; i++) {
-    blockDslash[i] = dirac.blockDslash[i];
-    blockDslashXpay[i] = dirac.blockDslashXpay[i];
+    tuneDslash[i] = dirac.tuneDslash[i];
+    tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
   }
 }
 
@@ -153,8 +150,8 @@ DiracTwistedMassPC& DiracTwistedMassPC::operator=(const DiracTwistedMassPC &dira
   if (&dirac != this) {
     DiracTwistedMass::operator=(dirac);
     for (int i=0; i<5; i++) {
-      blockDslash[i] = dirac.blockDslash[i];
-      blockDslashXpay[i] = dirac.blockDslashXpay[i];
+      tuneDslash[i] = dirac.tuneDslash[i];
+      tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
     }
   }
   return *this;
@@ -169,16 +166,17 @@ void DiracTwistedMassPC::Tune(cudaColorSpinorField &out, const cudaColorSpinorFi
 
   { // Tune Dslash
     TuneDiracTwistedMassDslash dslashTune(*this, out, in);
-    dslashTune.Benchmark(blockDslash[0]);
+    dslashTune.Benchmark(tuneDslash[0]);
     for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) dslashTune.Benchmark(blockDslash[i+1]);
+      if (commDimPartitioned(i)) dslashTune.Benchmark(tuneDslash[i+1]);
   }
 
   { // Tune DslashXpay
     TuneDiracTwistedMassDslashXpay dslashXpayTune(*this, out, in, x);
-    dslashXpayTune.Benchmark(blockDslashXpay[0]);
+    dslashXpayTune.Benchmark(tuneDslashXpay[0]);
     for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) dslashXpayTune.Benchmark(blockDslashXpay[i+1]);
+      if (commDimPartitioned(i)) 
+	dslashXpayTune.Benchmark(tuneDslashXpay[i+1]);
   }
 
   setDslashTuning(QUDA_TUNE_NO);
@@ -208,7 +206,7 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
     double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, 
-			  flavor_mu, 0.0, blockDslash, commDim);
+			  flavor_mu, 0.0, tuneDslash, commDim);
     flops += (1320+72)*in.Volume();
   } else { // safe to use tmp2 here which may alias in
     bool reset = newTmp(&tmp2, in);
@@ -244,7 +242,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
     double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, 
-			  flavor_mu, k, blockDslashXpay, commDim);
+			  flavor_mu, k, tuneDslashXpay, commDim);
     flops += (1320+96)*in.Volume();
   } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
     bool reset = newTmp(&tmp1, in);
