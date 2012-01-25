@@ -1313,11 +1313,15 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 bool tune = true;
 
+void __attribute__((weak)) usage_extra(char** argv){};
+
 void usage(char** argv )
 {
   printf("Usage: %s [options]\n", argv[0]);
-  printf("Available options: \n");
+  printf("Common options: \n");
+#ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
+#endif
   printf("    --prec <double/single/half>               # Precision in GPU\n"); 
   printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
   printf("    --recon <8/12/18>                         # Link reconstruction type\n"); 
@@ -1339,7 +1343,13 @@ void usage(char** argv )
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --help                                    # Print out this message\n"); 
-  
+  usage_extra(argv); 
+#ifdef MULTI_GPU
+  char msg[]="multi";
+#else
+  char msg[]="single";
+#endif  
+  printf("Note: this program is %s GPU build\n", msg);
   exit(1);
   return ;
 }

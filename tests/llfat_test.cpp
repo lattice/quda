@@ -24,6 +24,8 @@
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 
+extern void usage(char** argv );
+
 static cudaGaugeField *cudaSiteLink, *cudaSiteLink_ex;
 static cudaGaugeField *cudaFatLink;
 static cudaGaugeField* cudaStapleField, *cudaStapleField1;
@@ -580,18 +582,15 @@ display_test_info(int test)
   
 }
 
-static void
-usage(char** argv )
+void
+usage_extra(char** argv )
 {
-  printfQuda("Usage: %s <args>\n", argv[0]);
-  printfQuda("  --device <dev_id>               Set which device to run on\n");
-  printfQuda("  --gprec <double/single/half>    Link precision\n"); 
-  printfQuda("  --recon <8/12>                  Link reconstruction type\n"); 
-  printfQuda("  --sdim <n>                      Set spacial dimention\n");
-  printfQuda("  --tdim <n>                      Set T dimention size(default 24)\n"); 
-  printfQuda("  --verify                        Verify the GPU results using CPU results\n");
-  printfQuda("  --help                          Print out this message\n"); 
-  exit(1);
+  printfQuda("Extra options:\n");
+  printfQuda("    --cpu_prec <double/single/half>          # The CPU precision\n"); 
+  printfQuda("    --test <0/1>                             # Test method\n");
+  printfQuda("                                                0: standard method\n");
+  printfQuda("                                                1: extended volume method\n");
+  printfQuda("    --verify                                 # Verify the GPU results using CPU results\n");
   return ;
 }
 

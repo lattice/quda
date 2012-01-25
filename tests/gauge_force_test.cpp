@@ -21,26 +21,23 @@ typedef struct { dcomplex e[3][3]; } dsu3_matrix;
 
 extern void initDslashConstants(const cudaGaugeField& gauge, const int sp_stride);
 
-static int device = 0;
+extern int device;
 
-cudaGaugeField* cudaSiteLink = NULL;
-
-cudaGaugeField* cudaMom = NULL;
-
+static cudaGaugeField* cudaSiteLink = NULL;
+static cudaGaugeField* cudaMom = NULL;
 static QudaGaugeParam gaugeParam;
-cpuGaugeField* siteLink = NULL;
-cpuGaugeField* mom = NULL;
-cpuGaugeField* refMom = NULL;
+static cpuGaugeField* siteLink = NULL;
+static cpuGaugeField* mom = NULL;
+static cpuGaugeField* refMom = NULL;
 
-int verify_results = 0;
-int ODD_BIT = 1;
-
+static int verify_results = 0;
 extern int tdim;
 extern QudaPrecision prec;
 extern int xdim;
 extern int ydim;
 extern int zdim;
 extern int tdim;
+extern void usage(char** argv);
 
 int Z[4];
 int V;
@@ -68,7 +65,6 @@ gauge_force_init()
 { 
 
     initQuda(device);
-    //cudaSetDevice(dev); CUERR;
     
     gaugeParam.X[0] = xdim;
     gaugeParam.X[1] = ydim;
@@ -121,12 +117,13 @@ gauge_force_init()
     
     gParam.reconstruct = QUDA_RECONSTRUCT_10;
     gParam.precision = gaugeParam.cpu_prec;
-    mom = new cpuGaugeField(gParam);
+    gParam.create =QUDA_ZERO_FIELD_CREATE;
+    mom = new cpuGaugeField(gParam);    
     refMom = new cpuGaugeField(gParam);
     
-
+    
+    //initiaze some data in mom
     createMomCPU(mom->Gauge_p(),  gaugeParam.cpu_prec);    
-    //memset(mom, 0, 4*V*momSiteSize*gSize);
     
     memcpy(refMom->Gauge_p(), mom->Gauge_p(), 4*mom->Volume()*momSiteSize*gaugeParam.cpu_prec);
     
@@ -611,19 +608,12 @@ display_test_info()
     
 }
 
-static void
-usage(char** argv )
+void
+usage_extra(char** argv )
 {
-    printf("Usage: %s <args>\n", argv[0]);
-    printf("  --device <dev_id>               Set which device to run on\n");
-    printf("  --gprec <double/single/half>    Link precision\n"); 
-    printf("  --recon <8/12>                  Link reconstruction type\n"); 
-    printf("  --sdim <n>                      Set spacial dimention\n");
-    printf("  --tdim                          Set T dimention size(default 24)\n"); 
-    printf("  --verify                        Verify the GPU results using CPU results\n");
-    printf("  --help                          Print out this message\n"); 
-    exit(1);
-    return ;
+  printf("Extra options:\n");
+  printf("    --verify                                  # Verify the GPU results using CPU results\n");
+  return ;
 }
 
 int 
@@ -636,28 +626,11 @@ main(int argc, char **argv)
 	continue;
       }
       
-      
-      if( strcmp(argv[i], "--help")== 0){
-            usage(argv);
-        }
-	
-      if( strcmp(argv[i], "--device") == 0){
-	if (i+1 >= argc){
-	  usage(argv);
-            }
-	device =  atoi(argv[i+1]);
-	if (device < 0){
-	  fprintf(stderr, "Error: invalid device number(%d)\n", device);
-	  exit(1);
-	}
-	i++;
-	continue;
-      }
-      
       if( strcmp(argv[i], "--verify") == 0){
 	verify_results=1;
 	continue;	    
       }	
+      
       fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
       usage(argv);
     }
