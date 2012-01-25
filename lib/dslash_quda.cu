@@ -545,7 +545,8 @@ bool checkLaunchParam(const int shared_bytes) {
   bool launch;
 
   // only launch if not over-allocating shared memory
-  if (shared_bytes > deviceProp.sharedMemPerBlock) {
+  // hard code for the moment until we have more robust cache setting mechanism
+  if (shared_bytes > 16384 /*deviceProp.sharedMemPerBlock*/) {
     launch = false;
   } else {
     launch = true;
