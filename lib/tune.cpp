@@ -5,21 +5,22 @@ void TuneBase::Benchmark(TuneParam &tune)  {
   dim3 &block = tune.block;
   int &sharedBytes = tune.shared_bytes;
 
-  int count = 10;
+  int count = 1;
   int threadBlockMin = 32;
-  int threadBlockMax = 256;
+  int threadBlockMax = 512;
   double time;
   double timeMin = 1e10;
   double gflopsMax = 0.0;
   dim3 blockOpt(1,1,1);
   int sharedOpt = 0;
 
-  int sharedMax = deviceProp.sharedMemPerBlock;
+  // set to a max of 16KiB, since higher will switch the cache config
+  int sharedMax = 16384; //deviceProp.sharedMemPerBlock;
 
   cudaError_t error;
 
   // loop over amount of shared memory to add
-  for (int shared = 0; shared<sharedMax; shared+=1024) { // 1 KiB granularity
+  for (int shared = 0; shared<=sharedMax; shared+=1024) { // 1 KiB granularity
 
     for (int threads=threadBlockMin; threads<=threadBlockMax; threads+=32) {
       cudaEvent_t start, end;

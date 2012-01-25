@@ -18,7 +18,8 @@ class TuneBase {
   virtual ~TuneBase() { ; }
   virtual void Apply() const = 0;
   virtual unsigned long long Flops() const = 0;
- 
+  virtual bool checkLaunch() const = 0;
+
   const char* Name() const { return name; }
 
   // Varies the block size of the given function and finds the performance maxiumum
@@ -27,18 +28,17 @@ class TuneBase {
 
 class TuneDiracBase : public TuneBase {
 
- private:
+ protected:
+  bool checkLaunch() const { return getDslashLaunch(); }
 
  public:
   TuneDiracBase(const char *name, QudaVerbosity verbose) 
     : TuneBase(name, verbose) { ; }
-  virtual ~TuneDiracBase();
+    virtual ~TuneDiracBase() { ; }
 
-  bool checkLaunch() { return getDslashLaunch(); }
+};
 
-}
-
-class TuneDiracWilsonDslash : public TuneBase {
+class TuneDiracWilsonDslash : public TuneDiracBase {
 
  private:
   const DiracWilson &dirac;

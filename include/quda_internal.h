@@ -82,6 +82,8 @@ extern "C" {
     ParityHw odd;
     ParityHw even;
   } FullHw;
+
+  extern cudaDeviceProp deviceProp;
   
 #ifdef __cplusplus
 }
@@ -104,7 +106,5 @@ class TuneParam {
   }
 
 };
-
-cudaDeviceProp deviceProp;
 
 #endif // _QUDA_INTERNAL_H
