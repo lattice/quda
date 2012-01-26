@@ -645,7 +645,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+1], 0);
 
     CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
-    dslash.apply(tune.block[i+1], shared_bytes, streams[Nstream-1]); // all faces use this stream
+    dslash.apply(tune[i+1].block, shared_bytes, streams[Nstream-1]); // all faces use this stream
     CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);
   }
 
