@@ -41,5 +41,5 @@ for prog in $progs ; do
     done
   done
 done
-
+echo "output file: $OUTFILE"
 echo $success_msg

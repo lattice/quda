@@ -11,14 +11,6 @@
 #include <sys/time.h>
 #include "fat_force_quda.h"
 
-
-typedef struct {
-    double real;
-    double imag;
-} dcomplex;
-
-typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-
 extern void initDslashConstants(const cudaGaugeField& gauge, const int sp_stride);
 
 extern int device;
@@ -63,7 +55,6 @@ setDims(int *X) {
 static void
 gauge_force_init()
 { 
-
     initQuda(device);
     
     gaugeParam.X[0] = xdim;
@@ -83,6 +74,7 @@ gauge_force_init()
 
     GaugeFieldParam gParam(0, gaugeParam);
     gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.pad = 0;
     siteLink = new cpuGaugeField(gParam);
 
     // this is a hack to have site link generated in 2d 
@@ -127,7 +119,6 @@ gauge_force_init()
     
     memcpy(refMom->Gauge_p(), mom->Gauge_p(), 4*mom->Volume()*momSiteSize*gaugeParam.cpu_prec);
     
-
     gParam.precision = gaugeParam.cuda_prec;
     cudaMom = new cudaGaugeField(gParam);
     
@@ -148,6 +139,9 @@ gauge_force_end()
 static int
 gauge_force_test(void) 
 {
+  gauge_force_init();
+  
+
     int path_dir_x[][5] = {
 	{1, 7, 6 },
         {6, 7, 1 },
@@ -251,56 +245,68 @@ gauge_force_test(void)
 	5, 
     };
     
-    float loop_coeff[]={
-        1.1,
-        1.2,
-        1.3,
-        1.4,
-        1.5,
-        1.6,
-        2.5,
-        2.6,
-        2.7,
-        2.8,
-        2.9,
-        3.0,
-        3.1,
-        3.2,
-        3.3,
-        3.4,
-        3.5,
-        3.6,
-        3.7,
-        3.8,
-        3.9,
-        4.0,
-        4.1,
-        4.2,
-        4.3,
-        4.4,
-        4.5,
-        4.6,
-        4.7,
-        4.8,
-        4.9,
-        5.0,
-        5.1,
-        5.2,
-        5.3,
-        5.4,
-        5.5,
-        5.6,
-        5.7,
-        5.8,
-        5.9,
-        5.0,
-        6.1,
-        6.2,
-        6.3,
-        6.4,
-        6.5,
-        6.6,
+    float loop_coeff_f[]={
+      1.1,
+      1.2,
+      1.3,
+      1.4,
+      1.5,
+      1.6,
+      2.5,
+      2.6,
+      2.7,
+      2.8,
+      2.9,
+      3.0,
+      3.1,
+      3.2,
+      3.3,
+      3.4,
+      3.5,
+      3.6,
+      3.7,
+      3.8,
+      3.9,
+      4.0,
+      4.1,
+      4.2,
+      4.3,
+      4.4,
+      4.5,
+      4.6,
+      4.7,
+      4.8,
+      4.9,
+      5.0,
+      5.1,
+      5.2,
+      5.3,
+      5.4,
+      5.5,
+      5.6,
+      5.7,
+      5.8,
+      5.9,
+      5.0,
+      6.1,
+      6.2,
+      6.3,
+      6.4,
+      6.5,
+      6.6,
     };
+
+    double loop_coeff_d[sizeof(loop_coeff_f)/sizeof(float)];
+    for(unsigned int i=0;i < sizeof(loop_coeff_f)/sizeof(float); i++){
+      loop_coeff_d[i] = loop_coeff_f[i];
+    }
+    
+    void* loop_coeff;
+    if(gaugeParam.cuda_prec == QUDA_SINGLE_PRECISION){
+      loop_coeff = (void*)&loop_coeff_f[0];
+    }else{
+      loop_coeff = loop_coeff_d;
+    }
 
     int path_dir_y[][5] = {
         { 2 ,6 ,5 },
@@ -458,7 +464,6 @@ gauge_force_test(void)
     int max_length = 6;
 
     
-    gauge_force_init();
 
     initDslashConstants(*cudaSiteLink, 0);
     gauge_force_init_cuda(&gaugeParam, max_length); 
@@ -488,11 +493,11 @@ gauge_force_test(void)
     // download the gauge field to the GPU
     cudaSiteLink->loadCPUField(*siteLink, QUDA_CPU_FIELD_LOCATION);
     
-#define CX 1
-#define CY 1
-#define CZ 1
-#define CT 1
-
+#define CX 
+#define CY 
+#define CZ 
+#define CT 
+    
     if (verify_results){
 	
 #ifdef CX
@@ -637,7 +642,6 @@ main(int argc, char **argv)
     
     
     link_prec = prec;
-    link_recon = QUDA_RECONSTRUCT_12;
 #ifdef MULTI_GPU
     initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 #endif

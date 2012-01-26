@@ -688,8 +688,8 @@ inline void pack10(Float2 *res, Float *m, int dir, int Vh)
 {
   Float2 *r = res + dir*5*Vh;
   for (int j=0; j<5; j++) {
-    r[j*Vh].x = (float)m[j*2+0]; 
-    r[j*Vh].y = (float)m[j*2+1]; 
+    r[j*Vh].x = m[j*2+0]; 
+    r[j*Vh].y = m[j*2+1]; 
   }
 }
 

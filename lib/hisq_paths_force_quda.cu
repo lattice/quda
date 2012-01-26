@@ -7,7 +7,7 @@
 
 #include<utility>
 
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_SINGLE
+#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
 
 
@@ -34,7 +34,7 @@
     UNCOMPRESS_ANTI_HERMITIAN(ah, temp_mat);			\
     SCALAR_MULT_ADD_SU3_MATRIX(temp_mat, mat, coeff, link_W);	\
     MAKE_ANTI_HERMITIAN(temp_mat, ah);				\
-    WRITE_ANTI_HERMITIAN_SINGLE(mom, dir, idx, AH);		\
+    WRITE_ANTI_HERMITIAN(mom, dir, idx, AH);			\
   }                                                             \
 }while(0)
 
