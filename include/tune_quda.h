@@ -18,14 +18,27 @@ class TuneBase {
   virtual ~TuneBase() { ; }
   virtual void Apply() const = 0;
   virtual unsigned long long Flops() const = 0;
- 
+  virtual bool checkLaunch() const = 0;
+
   const char* Name() const { return name; }
 
   // Varies the block size of the given function and finds the performance maxiumum
-  void Benchmark(dim3 &block); 
+  void Benchmark(TuneParam &tune); 
 };
 
-class TuneDiracWilsonDslash : public TuneBase {
+class TuneDiracBase : public TuneBase {
+
+ protected:
+  bool checkLaunch() const { return getDslashLaunch(); }
+
+ public:
+  TuneDiracBase(const char *name, QudaVerbosity verbose) 
+    : TuneBase(name, verbose) { ; }
+    virtual ~TuneDiracBase() { ; }
+
+};
+
+class TuneDiracWilsonDslash : public TuneDiracBase {
 
  private:
   const DiracWilson &dirac;
@@ -35,14 +48,14 @@ class TuneDiracWilsonDslash : public TuneBase {
  public:
   TuneDiracWilsonDslash(const DiracWilson &d, cudaColorSpinorField &a, 
 			const cudaColorSpinorField &b) : 
-  TuneBase("DiracWilsonDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
+  TuneDiracBase("DiracWilsonDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
   virtual ~TuneDiracWilsonDslash() { ; }
 
   void Apply() const { dirac.DiracWilson::Dslash(a, b, QUDA_EVEN_PARITY); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracWilsonDslashXpay : public TuneBase {
+class TuneDiracWilsonDslashXpay : public TuneDiracBase {
 
  private:
   const DiracWilson &dirac;
@@ -53,14 +66,14 @@ class TuneDiracWilsonDslashXpay : public TuneBase {
  public:
   TuneDiracWilsonDslashXpay(const DiracWilson &d, cudaColorSpinorField &a, 
 		      const cudaColorSpinorField &b, const cudaColorSpinorField &c) : 
-  TuneBase("DiracWilsonDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
+  TuneDiracBase("DiracWilsonDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
   virtual ~TuneDiracWilsonDslashXpay() { ; }
 
   void Apply() const { dirac.DiracWilson::DslashXpay(a, b, QUDA_EVEN_PARITY, c, 1.0); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracClover : public TuneBase {
+class TuneDiracClover : public TuneDiracBase {
 
  private:
   const DiracClover &dirac;
@@ -70,14 +83,14 @@ class TuneDiracClover : public TuneBase {
  public:
   TuneDiracClover(const DiracClover &d, cudaColorSpinorField &a, 
 		  const cudaColorSpinorField &b) : 
-  TuneBase("DiracClover", d.Verbose()), dirac(d), a(a), b(b) { ; }
+  TuneDiracBase("DiracClover", d.Verbose()), dirac(d), a(a), b(b) { ; }
   virtual ~TuneDiracClover() { ; }
 
   void Apply() const { dirac.Clover(a, b, QUDA_EVEN_PARITY); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracCloverDslash : public TuneBase {
+class TuneDiracCloverDslash : public TuneDiracBase {
 
  private:
   const DiracCloverPC &dirac;
@@ -87,14 +100,14 @@ class TuneDiracCloverDslash : public TuneBase {
  public:
   TuneDiracCloverDslash(const DiracCloverPC &d, cudaColorSpinorField &a, 
 		  const cudaColorSpinorField &b) : 
-  TuneBase("DiracCloverDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
+  TuneDiracBase("DiracCloverDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
   virtual ~TuneDiracCloverDslash() { ; }
 
   void Apply() const { dirac.Dslash(a, b, QUDA_EVEN_PARITY); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracCloverDslashXpay : public TuneBase {
+class TuneDiracCloverDslashXpay : public TuneDiracBase {
 
  private:
   const DiracCloverPC &dirac;
@@ -105,14 +118,14 @@ class TuneDiracCloverDslashXpay : public TuneBase {
  public:
   TuneDiracCloverDslashXpay(const DiracCloverPC &d, cudaColorSpinorField &a, 
 		      const cudaColorSpinorField &b, const cudaColorSpinorField &c) : 
-  TuneBase("DiracCloverDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
+  TuneDiracBase("DiracCloverDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
   virtual ~TuneDiracCloverDslashXpay() { ; }
 
   void Apply() const { dirac.DslashXpay(a, b, QUDA_EVEN_PARITY, c, 1.0); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracTwistedMass : public TuneBase {
+class TuneDiracTwistedMass : public TuneDiracBase {
 
  private:
   const DiracTwistedMass &dirac;
@@ -122,14 +135,14 @@ class TuneDiracTwistedMass : public TuneBase {
  public:
   TuneDiracTwistedMass(const DiracTwistedMass &d, cudaColorSpinorField &a, 
 		       const cudaColorSpinorField &b) : 
-  TuneBase("DiracTwistedMass", d.Verbose()), dirac(d), a(a), b(b) { ; }
+  TuneDiracBase("DiracTwistedMass", d.Verbose()), dirac(d), a(a), b(b) { ; }
   virtual ~TuneDiracTwistedMass() { ; }
 
   void Apply() const { dirac.Twist(a, b); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracTwistedMassDslash : public TuneBase {
+class TuneDiracTwistedMassDslash : public TuneDiracBase {
 
  private:
   const DiracTwistedMassPC &dirac;
@@ -139,14 +152,14 @@ class TuneDiracTwistedMassDslash : public TuneBase {
  public:
   TuneDiracTwistedMassDslash(const DiracTwistedMassPC &d, cudaColorSpinorField &a, 
 			     const cudaColorSpinorField &b) : 
-  TuneBase("DiracTwistedMassDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
+  TuneDiracBase("DiracTwistedMassDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
   virtual ~TuneDiracTwistedMassDslash() { ; }
 
   void Apply() const { dirac.Dslash(a, b, QUDA_EVEN_PARITY); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracTwistedMassDslashXpay : public TuneBase {
+class TuneDiracTwistedMassDslashXpay : public TuneDiracBase {
 
  private:
   const DiracTwistedMassPC &dirac;
@@ -157,14 +170,14 @@ class TuneDiracTwistedMassDslashXpay : public TuneBase {
  public:
   TuneDiracTwistedMassDslashXpay(const DiracTwistedMassPC &d, cudaColorSpinorField &a, 
 				 const cudaColorSpinorField &b, const cudaColorSpinorField &c) : 
-  TuneBase("DiracTwistedMassDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
+  TuneDiracBase("DiracTwistedMassDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
   virtual ~TuneDiracTwistedMassDslashXpay() { ; }
 
   void Apply() const { dirac.DslashXpay(a, b, QUDA_EVEN_PARITY, c, 1.0); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracDomainWallDslash : public TuneBase {
+class TuneDiracDomainWallDslash : public TuneDiracBase {
 
  private:
   const DiracDomainWall &dirac;
@@ -174,14 +187,14 @@ class TuneDiracDomainWallDslash : public TuneBase {
  public:
   TuneDiracDomainWallDslash(const DiracDomainWall &d, cudaColorSpinorField &a, 
 			    const cudaColorSpinorField &b) : 
-  TuneBase("DiracDomainWallDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
+  TuneDiracBase("DiracDomainWallDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
   virtual ~TuneDiracDomainWallDslash() { ; }
 
   void Apply() const { dirac.Dslash(a, b, QUDA_EVEN_PARITY); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracDomainWallDslashXpay : public TuneBase {
+class TuneDiracDomainWallDslashXpay : public TuneDiracBase {
 
  private:
   const DiracDomainWall &dirac;
@@ -192,14 +205,14 @@ class TuneDiracDomainWallDslashXpay : public TuneBase {
  public:
   TuneDiracDomainWallDslashXpay(const DiracDomainWall &d, cudaColorSpinorField &a, 
 				const cudaColorSpinorField &b, const cudaColorSpinorField &c) : 
-  TuneBase("DiracDomainWallDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
+  TuneDiracBase("DiracDomainWallDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
   virtual ~TuneDiracDomainWallDslashXpay() { ; }
 
   void Apply() const { dirac.DslashXpay(a, b, QUDA_EVEN_PARITY, c, 1.0); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracStaggeredDslash : public TuneBase {
+class TuneDiracStaggeredDslash : public TuneDiracBase {
 
  private:
   const DiracStaggered &dirac;
@@ -209,14 +222,14 @@ class TuneDiracStaggeredDslash : public TuneBase {
  public:
   TuneDiracStaggeredDslash(const DiracStaggered &d, cudaColorSpinorField &a, 
 			const cudaColorSpinorField &b) : 
-  TuneBase("DiracStaggeredDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
+  TuneDiracBase("DiracStaggeredDslash", d.Verbose()), dirac(d), a(a), b(b) { ; }
   virtual ~TuneDiracStaggeredDslash() { ; }
 
   void Apply() const { dirac.DiracStaggered::Dslash(a, b, QUDA_EVEN_PARITY); }
   unsigned long long Flops() const { return dirac.Flops(); }
 };
 
-class TuneDiracStaggeredDslashXpay : public TuneBase {
+class TuneDiracStaggeredDslashXpay : public TuneDiracBase {
 
  private:
   const DiracStaggered &dirac;
@@ -227,7 +240,7 @@ class TuneDiracStaggeredDslashXpay : public TuneBase {
  public:
   TuneDiracStaggeredDslashXpay(const DiracStaggered &d, cudaColorSpinorField &a, 
 		      const cudaColorSpinorField &b, const cudaColorSpinorField &c) : 
-  TuneBase("DiracStaggeredDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
+  TuneDiracBase("DiracStaggeredDslashXpay", d.Verbose()), dirac(d), a(a), b(b), c(c) { ; }
   virtual ~TuneDiracStaggeredDslashXpay() { ; }
 
   void Apply() const { dirac.DiracStaggered::DslashXpay(a, b, QUDA_EVEN_PARITY, c, 1.0); }

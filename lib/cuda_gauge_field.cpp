@@ -40,13 +40,13 @@ static QudaTboundary t_boundary_;
 #include <pack_gauge.h>
 
 template <typename Float, typename FloatN>
-static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float *cpuGhost,
+static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **cpuGhost,
 			   GaugeFieldOrder cpu_order, QudaReconstructType reconstruct, 
 			   size_t bytes, int volumeCB, int *surfaceCB, int pad, int nFace,
 			   QudaLinkType type, double &fat_link_max) {
   // Use pinned memory
   FloatN *packed, *packedEven, *packedOdd;
-  cudaMallocHost((void**)&packed, bytes);
+  cudaMallocHost(&packed, bytes);
   packedEven = packed;
   packedOdd = (FloatN*)((char*)packed + bytes/2);
 
@@ -118,20 +118,19 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float *cp
 
 template <typename Float, typename Float2>
 void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh) 
-{
+{  
+  Float2 *packedEven, *packedOdd;
+  cudaMallocHost(&packedEven, bytes/2); 
+  cudaMallocHost(&packedOdd, bytes/2); 
     
-    Float2 *packedEven, *packedOdd;
-    cudaMallocHost((void**)&packedEven, bytes/2); 
-    cudaMallocHost((void**)&packedOdd, bytes/2);
+  packMomField(packedEven, (Float*)mom, 0, Vh);
+  packMomField(packedOdd,  (Float*)mom, 1, Vh);
     
-    packMomField(packedEven, (Float*)mom, 0, Vh);
-    packMomField(packedOdd,  (Float*)mom, 1, Vh);
-    
-    cudaMemcpy(even, packedEven, bytes/2, cudaMemcpyHostToDevice);
-    cudaMemcpy(odd,  packedOdd, bytes/2, cudaMemcpyHostToDevice); 
-    
-    cudaFreeHost(packedEven);
-    cudaFreeHost(packedOdd);
+  cudaMemcpy(even, packedEven, bytes/2, cudaMemcpyHostToDevice);
+  cudaMemcpy(odd,  packedOdd, bytes/2, cudaMemcpyHostToDevice); 
+  
+  cudaFreeHost(packedEven);
+  cudaFreeHost(packedOdd);
 }
 
 void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
@@ -155,10 +154,10 @@ void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocat
       if (precision == QUDA_DOUBLE_PRECISION) {
 	
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  loadGaugeField((double2*)(even), (double2*)(odd), (double*)cpu.gauge, (double*)cpu.ghost,
+	  loadGaugeField((double2*)(even), (double2*)(odd), (double*)cpu.gauge, (double**)cpu.ghost,
 			 cpu.Order(), reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  loadGaugeField((double2*)(even), (double2*)(odd), (float*)cpu.gauge, (float*)cpu.ghost,
+	  loadGaugeField((double2*)(even), (double2*)(odd), (float*)cpu.gauge, (float**)cpu.ghost,
 			 cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);
 	}
 	
@@ -166,18 +165,18 @@ void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocat
 	
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
 	  if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	    loadGaugeField((float2*)(even), (float2*)(odd), (double*)cpu.gauge, (double*)cpu.ghost, 
+	    loadGaugeField((float2*)(even), (float2*)(odd), (double*)cpu.gauge, (double**)cpu.ghost, 
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);	      
 	  } else {
-	    loadGaugeField((float4*)(even), (float4*)(odd), (double*)cpu.gauge, (double*)cpu.ghost,
+	    loadGaugeField((float4*)(even), (float4*)(odd), (double*)cpu.gauge, (double**)cpu.ghost,
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);
 	  }
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
 	  if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	    loadGaugeField((float2*)(even), (float2*)(odd), (float*)cpu.gauge, (float*)cpu.ghost,
+	    loadGaugeField((float2*)(even), (float2*)(odd), (float*)cpu.gauge, (float**)cpu.ghost,
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);
 	  } else {
-	    loadGaugeField((float4*)(even), (float4*)(odd), (float*)cpu.gauge, (float*)cpu.ghost,
+	    loadGaugeField((float4*)(even), (float4*)(odd), (float*)cpu.gauge, (float**)cpu.ghost,
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);
 	  }
 	}
@@ -186,18 +185,18 @@ void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocat
 	
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
 	  if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	    loadGaugeField((short2*)(even), (short2*)(odd), (double*)cpu.gauge, (double*)cpu.ghost,
+	    loadGaugeField((short2*)(even), (short2*)(odd), (double*)cpu.gauge, (double**)cpu.ghost,
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);
 	  } else {
-	    loadGaugeField((short4*)(even), (short4*)(odd), (double*)cpu.gauge, (double*)cpu.ghost,
+	    loadGaugeField((short4*)(even), (short4*)(odd), (double*)cpu.gauge, (double**)cpu.ghost,
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);	      
 	  }
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
 	  if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	    loadGaugeField((short2*)(even), (short2*)(odd), (float*)cpu.gauge, (float*)cpu.ghost,
+	    loadGaugeField((short2*)(even), (short2*)(odd), (float*)cpu.gauge, (float**)cpu.ghost,
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);
 	  } else {
-	    loadGaugeField((short4*)(even), (short4*)(odd), (float*)cpu.gauge, (float*)cpu.ghost,
+	    loadGaugeField((short4*)(even), (short4*)(odd), (float*)cpu.gauge, (float**)(cpu.ghost),
 			   cpu.order, reconstruct, bytes, volumeCB, surfaceCB, pad, nFace, link_type, fat_link_max);	      
 	  }
 	}
@@ -234,7 +233,7 @@ static void storeGaugeField(Float *cpuGauge, FloatN *gauge, GaugeFieldOrder cpu_
 
   // Use pinned memory
   FloatN *packed;
-  cudaMallocHost((void**)&packed, bytes);
+  cudaMallocHost(&packed, bytes);
   cudaMemcpy(packed, gauge, bytes, cudaMemcpyDeviceToHost);
     
   FloatN *packedEven = packed;
@@ -309,17 +308,17 @@ void
 storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd, 
 		   int bytes, int V) 
 {    
-    Float2 *packedEven, *packedOdd;   
-    cudaMallocHost((void**)&packedEven, bytes/2); 
-    cudaMallocHost((void**)&packedOdd, bytes/2); 
-    cudaMemcpy(packedEven, even, bytes/2, cudaMemcpyDeviceToHost); 
-    cudaMemcpy(packedOdd, odd, bytes/2, cudaMemcpyDeviceToHost);  
-
-    unpackMomField((Float*)mom, packedEven,0, V/2);
-    unpackMomField((Float*)mom, packedOdd, 1, V/2);
-        
-    cudaFreeHost(packedEven); 
-    cudaFreeHost(packedOdd); 
+  Float2 *packedEven, *packedOdd;   
+  cudaMallocHost(&packedEven, bytes/2); 
+  cudaMallocHost(&packedOdd, bytes/2); 
+  cudaMemcpy(packedEven, even, bytes/2, cudaMemcpyDeviceToHost); 
+  cudaMemcpy(packedOdd, odd, bytes/2, cudaMemcpyDeviceToHost);  
+  
+  unpackMomField((Float*)mom, packedEven,0, V/2);
+  unpackMomField((Float*)mom, packedOdd, 1, V/2);
+  
+  cudaFreeHost(packedEven); 
+  cudaFreeHost(packedOdd); 
 }
 
 void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const

@@ -216,8 +216,8 @@ namespace hisq{
       {
         // Use pinned memory 
         float2 *packedEven, *packedOdd;
-        cudaMallocHost((void**)&packedEven, bytes_per_dir); // now
-        cudaMallocHost((void**)&packedOdd, bytes_per_dir);
+        cudaMallocHost(&packedEven, bytes_per_dir); // now
+        cudaMallocHost(&packedOdd, bytes_per_dir);
         for(int dir=0; dir<4; dir++){
           packOprodFieldDir(packedEven, (float*)cpuOprod, dir, 0, Vh);
           packOprodFieldDir(packedOdd,  (float*)cpuOprod, dir, 1, Vh);
@@ -268,8 +268,8 @@ namespace hisq{
       fetchOprodFromGPUArraysQuda(void *cudaOprodEven, void *cudaOprodOdd, void *cpuOprod, size_t bytes, int Vh)
       {
         float2 *packedEven, *packedOdd;
-        cudaMallocHost((void**)&packedEven,bytes);
-        cudaMallocHost((void**)&packedOdd, bytes);
+        cudaMallocHost(&packedEven,bytes);
+        cudaMallocHost(&packedOdd, bytes);
 
 
         cudaMemcpy(packedEven, cudaOprodEven, bytes, cudaMemcpyDeviceToHost);
@@ -302,8 +302,8 @@ namespace hisq{
 	float2 *packedEven, *packedOdd;
         checkCudaError();
 
-        cudaMallocHost((void**)&packedEven, bytes);
-        cudaMallocHost((void**)&packedOdd, bytes);
+        cudaMallocHost(&packedEven, bytes);
+        cudaMallocHost(&packedOdd, bytes);
         checkCudaError();
 
 

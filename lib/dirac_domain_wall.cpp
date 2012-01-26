@@ -6,18 +6,15 @@
 DiracDomainWall::DiracDomainWall(const DiracParam &param) : 
   DiracWilson(param), m5(param.m5), kappa5(0.5/(5.0 + m5))
 {
-  for (int i=0; i<5; i++) {
-    blockDslash[i] = dim3(64, 1, 1);
-    blockDslashXpay[i] = dim3(64, 1, 1);
-  }
+
 }
 
 DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) : 
   DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5))
 {
   for (int i=0; i<5; i++) {
-    blockDslash[i] = dirac.blockDslash[i];
-    blockDslashXpay[i] = dirac.blockDslashXpay[i];
+    tuneDslash[i] = dirac.tuneDslash[i];
+    tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
   }
 }
 
@@ -35,8 +32,8 @@ DiracDomainWall& DiracDomainWall::operator=(const DiracDomainWall &dirac)
     kappa5 = dirac.kappa5;
 
     for (int i=0; i<5; i++) {
-      blockDslash[i] = dirac.blockDslash[i];
-      blockDslashXpay[i] = dirac.blockDslashXpay[i];
+      tuneDslash[i] = dirac.tuneDslash[i];
+      tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
     }
   }
 
@@ -51,16 +48,18 @@ void DiracDomainWall::Tune(cudaColorSpinorField &out, const cudaColorSpinorField
 
   { // Tune Dslash
     TuneDiracDomainWallDslash dslashTune(*this, out, in);
-    dslashTune.Benchmark(blockDslash[0]);
+    dslashTune.Benchmark(tuneDslash[0]);
     for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) dslashTune.Benchmark(blockDslash[i+1]);
+      if (commDimPartitioned(i)) 
+	dslashTune.Benchmark(tuneDslash[i+1]);
   }
 
   { // Tune DslashXpay
     TuneDiracDomainWallDslashXpay dslashXpayTune(*this, out, in, x);
-    dslashXpayTune.Benchmark(blockDslashXpay[0]);
+    dslashXpayTune.Benchmark(tuneDslashXpay[0]);
     for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) dslashXpayTune.Benchmark(blockDslashXpay[i+1]);
+      if (commDimPartitioned(i)) 
+	dslashXpayTune.Benchmark(tuneDslashXpay[i+1]);
   }
 
   setDslashTuning(QUDA_TUNE_NO);
@@ -75,7 +74,7 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
   
-  domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, blockDslash);
+  domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, tuneDslash);
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -93,7 +92,7 @@ void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpino
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
-  domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, blockDslashXpay);
+  domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, tuneDslashXpay);
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.Volume()/Ls);

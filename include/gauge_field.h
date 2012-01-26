@@ -124,7 +124,8 @@ class cpuGaugeField : public GaugeField {
 
  private:
   void **gauge; // the actual gauge field
-  mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field
+
+  mutable void **ghost; // stores the ghost zone of the gauge field
   int pinned;
   
  public:
@@ -134,7 +135,7 @@ class cpuGaugeField : public GaugeField {
   void exchangeGhost() const;
   const void** Ghost() const { return (const void**)ghost; }
 
-  void* Gauge_p() { return (void*)gauge; }
+  void* Gauge_p() { return gauge; }
 };
 
 #define gaugeSiteSize 18 // real numbers per gauge field

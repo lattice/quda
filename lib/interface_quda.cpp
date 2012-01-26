@@ -82,6 +82,8 @@ Dirac *dPre = NULL; // the DD preconditioning operator
 bool diracCreation = false;
 bool diracTune = false;
 
+cudaDeviceProp deviceProp;
+
 static int gpu_affinity[MAX_GPU_NUM_PER_NODE]; 
 static int numa_config_set = 0;
 void qudaSetNumaConfig(char* filename)
@@ -225,7 +227,6 @@ void initQuda(int dev)
   if( commCoords(3) == commDim(3)-1 ) qudaPtNm1=true;
   else qudaPtNm1=false;
 
-  cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
@@ -248,6 +249,7 @@ void initQuda(int dev)
 #endif
 
   initCache();
+  cudaGetDeviceProperties(&deviceProp, dev);
   quda::initBlas();
 }
 
