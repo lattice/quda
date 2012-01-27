@@ -157,6 +157,20 @@
   double2 I10 = fetch_double2((spinor), sp_idx + 10*(stride)); \
   double2 I11 = fetch_double2((spinor), sp_idx + 11*(stride));
 
+#define READ_ACCUM_DOUBLE_TEX(spinor, stride)			\
+  double2 accum0 = fetch_double2((spinor), sid + 0*(stride));   \
+  double2 accum1 = fetch_double2((spinor), sid + 1*(stride));   \
+  double2 accum2 = fetch_double2((spinor), sid + 2*(stride));   \
+  double2 accum3 = fetch_double2((spinor), sid + 3*(stride));   \
+  double2 accum4 = fetch_double2((spinor), sid + 4*(stride));   \
+  double2 accum5 = fetch_double2((spinor), sid + 5*(stride));   \
+  double2 accum6 = fetch_double2((spinor), sid + 6*(stride));   \
+  double2 accum7 = fetch_double2((spinor), sid + 7*(stride));   \
+  double2 accum8 = fetch_double2((spinor), sid + 8*(stride));   \
+  double2 accum9 = fetch_double2((spinor), sid + 9*(stride));   \
+  double2 accum10 = fetch_double2((spinor), sid + 10*(stride)); \
+  double2 accum11 = fetch_double2((spinor), sid + 11*(stride));	
+
 #define READ_SPINOR_SINGLE_TEX(spinor, stride, sp_idx, norm_idx)	   \
   float4 I0 = tex1Dfetch((spinor), sp_idx + 0*(stride));   \
   float4 I1 = tex1Dfetch((spinor), sp_idx + 1*(stride));   \
@@ -216,20 +230,6 @@
 
 #define READ_SPINOR_HALF_DOWN_TEX(spinor, stride, sp_idx, norm_idx)	\
   READ_SPINOR_HALF_DOWN_TEX_(spinor, stride, sp_idx, norm_idx)	\
-
-#define READ_ACCUM_DOUBLE_TEX(spinor, stride)			\
-  double2 accum0 = fetch_double2((spinor), sid + 0*(stride));   \
-  double2 accum1 = fetch_double2((spinor), sid + 1*(stride));   \
-  double2 accum2 = fetch_double2((spinor), sid + 2*(stride));   \
-  double2 accum3 = fetch_double2((spinor), sid + 3*(stride));   \
-  double2 accum4 = fetch_double2((spinor), sid + 4*(stride));   \
-  double2 accum5 = fetch_double2((spinor), sid + 5*(stride));   \
-  double2 accum6 = fetch_double2((spinor), sid + 6*(stride));   \
-  double2 accum7 = fetch_double2((spinor), sid + 7*(stride));   \
-  double2 accum8 = fetch_double2((spinor), sid + 8*(stride));   \
-  double2 accum9 = fetch_double2((spinor), sid + 9*(stride));   \
-  double2 accum10 = fetch_double2((spinor), sid + 10*(stride)); \
-  double2 accum11 = fetch_double2((spinor), sid + 11*(stride));	
 
 #define READ_ACCUM_SINGLE_TEX(spinor, stride)			\
   float4 accum0 = tex1Dfetch((spinor), sid + 0*(stride));       \
@@ -683,3 +683,4 @@
   double2 accum0 = fetch_double2((spinor), sid + 0*(sp_stride));   \
   double2 accum1 = fetch_double2((spinor), sid + 1*(sp_stride));   \
   double2 accum2 = fetch_double2((spinor), sid + 2*(sp_stride));   
+

@@ -188,7 +188,14 @@
 
 // gauge field
 #define DD_PREC_F D
-#ifndef DIRECT_ACCESS_FAT_LINK
+#if (__CUDA_ARCH__ >= 200 || __CUDA_ARCH__ < 300)
+#define FATLINK0TEX fatGauge0
+#define FATLINK1TEX fatGauge1
+#define LONGLINK0TEX longGauge0
+#define LONGLINK1TEX longGauge1
+#else
+
+#ifndef DIRECT_ACCESS_FAT_LINK 
 #define FATLINK0TEX fatGauge0TexDouble
 #define FATLINK1TEX fatGauge1TexDouble
 #else
@@ -196,13 +203,15 @@
 #define FATLINK1TEX fatGauge1
 #endif
 
-#ifndef DIRECT_ACCESS_LONG_LINK //longlink access
+#ifndef DIRECT_ACCESS_LONG_LINK
 #define LONGLINK0TEX longGauge0TexDouble
 #define LONGLINK1TEX longGauge1TexDouble
 #else
 #define LONGLINK0TEX longGauge0
 #define LONGLINK1TEX longGauge1
 #endif
+
+#endif // end Fermi double precision patch
 
 #define GAUGE_DOUBLE
 

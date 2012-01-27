@@ -42,17 +42,6 @@
   a##_im -= b##_re * c##_im;			\
   a##_im -= b##_im * c##_re
 
-#define READ_GAUGE_MATRIX_18_DOUBLE2_TEX(G, gauge, dir, idx, stride) \
-  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*stride); \
-  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*stride); \
-  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*stride); \
-  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*stride); \
-  double2 G##4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*stride); \
-  double2 G##5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*stride); \
-  double2 G##6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*stride); \
-  double2 G##7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*stride); \
-  double2 G##8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*stride); \
-
 #define READ_GAUGE_MATRIX_18_FLOAT2_TEX(G, gauge, dir, idx, stride)	\
   float2 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*stride);	\
   float2 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*stride);	\
@@ -75,17 +64,6 @@
   float2 G##7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*stride);	\
   float2 G##8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*stride);	\
 
-#define READ_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
-  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*6+0)*stride);	\
-  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*6+1)*stride);	\
-  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*stride);	\
-  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*6+3)*stride);	\
-  double2 G##4 = fetch_double2((gauge), idx + ((dir/2)*6+4)*stride);	\
-  double2 G##5 = fetch_double2((gauge), idx + ((dir/2)*6+5)*stride);	\
-  double2 G##6 = make_double2(0,0);					\
-  double2 G##7 = make_double2(0,0);					\
-  double2 G##8 = make_double2(0,0);					\
-
 #define READ_GAUGE_MATRIX_12_FLOAT4_TEX(G, gauge, dir, idx, stride)	\
   float4 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*stride);	\
   float4 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*stride);	\
@@ -99,21 +77,6 @@
   float4 G##2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*stride);	\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);
-
-// set A to be last components of G4 (otherwise unused)
-#define READ_GAUGE_MATRIX_8_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
-  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*4+0)*stride);	\
-  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*4+1)*stride);	\
-  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*4+2)*stride);	\
-  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*4+3)*stride);	\
-  double2 G##4 = make_double2(0,0);					\
-  double2 G##5 = make_double2(0,0);					\
-  double2 G##6 = make_double2(0,0);					\
-  double2 G##7 = make_double2(0,0);					\
-  double2 G##8 = make_double2(0,0);					\
-  double2 G##9 = make_double2(0,0);					\
-  (G##7).x = (G##0).x;							\
-  (G##7).y = (G##0).y;
 
 // set A to be last components of G4 (otherwise unused)
 #define READ_GAUGE_MATRIX_8_FLOAT4_TEX(G, gauge, dir, idx, stride)	\
@@ -446,3 +409,52 @@
     ACC_COMPLEX_PROD(gauge##22, A, gauge##02);				\
     gauge##22_re *= -r_inv2;						\
     gauge##22_im *= -r_inv2;}
+
+// Fermi patch to disable double precision texture reads
+#if (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
+#define READ_GAUGE_MATRIX_18_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  READ_GAUGE_MATRIX_18_DOUBLE2(G, gauge, dir, idx, stride)
+#define READ_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  READ_GAUGE_MATRIX_12_DOUBLE2(G, gauge, dir, idx, stride)
+#define READ_GAUGE_MATRIX_8_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  READ_GAUGE_MATRIX_8_DOUBLE2(G, gauge, dir, idx, stride)
+#else
+#define READ_GAUGE_MATRIX_18_DOUBLE2_TEX(G, gauge, dir, idx, stride) \
+  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*stride); \
+  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*stride); \
+  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*stride); \
+  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*stride); \
+  double2 G##4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*stride); \
+  double2 G##5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*stride); \
+  double2 G##6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*stride); \
+  double2 G##7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*stride); \
+  double2 G##8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*stride); \
+
+#define READ_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*6+0)*stride);	\
+  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*6+1)*stride);	\
+  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*stride);	\
+  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*6+3)*stride);	\
+  double2 G##4 = fetch_double2((gauge), idx + ((dir/2)*6+4)*stride);	\
+  double2 G##5 = fetch_double2((gauge), idx + ((dir/2)*6+5)*stride);	\
+  double2 G##6 = make_double2(0,0);					\
+  double2 G##7 = make_double2(0,0);					\
+  double2 G##8 = make_double2(0,0);					\
+
+// set A to be last components of G4 (otherwise unused)
+#define READ_GAUGE_MATRIX_8_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*4+0)*stride);	\
+  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*4+1)*stride);	\
+  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*4+2)*stride);	\
+  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*4+3)*stride);	\
+  double2 G##4 = make_double2(0,0);					\
+  double2 G##5 = make_double2(0,0);					\
+  double2 G##6 = make_double2(0,0);					\
+  double2 G##7 = make_double2(0,0);					\
+  double2 G##8 = make_double2(0,0);					\
+  double2 G##9 = make_double2(0,0);					\
+  (G##7).x = (G##0).x;							\
+  (G##7).y = (G##0).y;
+
+#endif
+
