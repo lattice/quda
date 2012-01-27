@@ -602,11 +602,11 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   int shared_bytes = tune[0].block.x*dslash.SharedPerThread()*regSize;
   shared_bytes = tune[0].shared_bytes > shared_bytes ? tune[0].shared_bytes : shared_bytes;
-  if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
-
-  CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
-  dslash.apply(tune[0].block, shared_bytes, streams[Nstream-1]);
-  CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
+  if (dslash_launch = checkLaunchParam(shared_bytes)) {
+    CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
+    dslash.apply(tune[0].block, shared_bytes, streams[Nstream-1]);
+    CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
+  }
 
 #ifdef MULTI_GPU
 
@@ -634,10 +634,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for (int i=3; i>=0; i--) {
     if (!dslashParam.commDim[i]) continue;
 
-    int shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize;
-    shared_bytes = tune[i+1].shared_bytes > shared_bytes ? tune[i+1].shared_bytes : shared_bytes;
-    if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
-    
     dslashParam.kernel_type = static_cast<KernelType>(i);
     dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
@@ -645,9 +641,13 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
     cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+1], 0);
 
-    CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
-    dslash.apply(tune[i+1].block, shared_bytes, streams[Nstream-1]); // all faces use this stream
-    CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);
+    int shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize;
+    shared_bytes = tune[i+1].shared_bytes > shared_bytes ? tune[i+1].shared_bytes : shared_bytes;
+    if (dslash_launch = checkLaunchParam(shared_bytes)) {    
+      CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
+      dslash.apply(tune[i+1].block, shared_bytes, streams[Nstream-1]); // all faces use this stream
+      CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);
+    }
   }
 
   cudaEventRecord(dslashEnd, 0);
