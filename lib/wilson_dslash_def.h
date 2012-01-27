@@ -163,7 +163,7 @@
 #define TPROJSCALE tProjScale
 
 // double-precision gauge field
-#ifdef DIRECT_ACCESS_LINK
+#if (DIRECT_ACCESS_WILSON_SPINOR == 100) || (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
@@ -176,7 +176,8 @@
 // double-precision spinor fields
 #define DD_PARAM_OUT double2* out, float *null1,
 #define DD_PARAM_IN const double2* in, const float *null4,
-#ifdef DIRECT_ACCESS_WILSON_SPINOR
+
+#if (DIRECT_ACCESS_WILSON_SPINOR == 100) || (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
