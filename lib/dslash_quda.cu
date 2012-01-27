@@ -1058,7 +1058,7 @@ void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in,
   setTwistParam(a, b, kappa, mu, dagger, twist);
 
   bindSpinorTex(bytes, norm_bytes, in, inNorm);
-  twistGamma5Kernel<<<gridDim, tune.block, tune.shared_bytes>>> (out, outNorm, a, b, dslashParam);
+  twistGamma5Kernel<<<gridDim, tune.block, tune.shared_bytes>>> (out, outNorm, a, b, in, inNorm, dslashParam);
   unbindSpinorTex(in, inNorm);
 }
 
