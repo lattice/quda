@@ -31,7 +31,7 @@
 #define DD_PARAM3 const double2* in, const float *null3
 #if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
-#define SPINORTEX spinor
+#define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define SPINORTEX spinorTexDouble
@@ -48,7 +48,7 @@
 #define DD_PARAM3 const float4* in, const float *null3
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
-#define SPINORTEX spinor
+#define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define SPINORTEX spinorTexSingle
@@ -62,7 +62,7 @@
 #define DD_PREC_F H
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_HALF
-#define SPINORTEX spinor
+#define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define SPINORTEX spinorTexHalf

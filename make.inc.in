@@ -176,7 +176,7 @@ ifeq ($(strip $(DSLASH_PROFILING)), yes)
   COPT +=  -DDSLASH_PROFILING
 endif
 
-ifeq ($strip $(FERMI_DBLE_TEX)), no)
+ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   NVCCOPT += -DFERMI_NO_DBLE_TEX
   COPT += -DFERMI_NO_DBLE_TEX
 endif

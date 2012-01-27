@@ -110,16 +110,16 @@ cudaColorSpinorField *inSpinor;
 #define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5f) // 32767.5
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1)) // 1.5259021897e-5
 
+static inline __device__ float short2float(short a) {
+  return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
+}
+
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
   defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
 static inline __device__ short float2short(float c, float a) {
   //return (short)(a*MAX_SHORT);
   short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
   return rtn;
-}
-
-static inline __device__ float short2float(short a) {
-  return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
 }
 
 static inline __device__ short4 float42short4(float c, float4 a) {

@@ -28,7 +28,7 @@ __device__ float4 operator*(const float &x, const float4 &y)
 
 #if (__CUDA_ARCH__ >= 130)
 __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, 
-				  double2 *in, null *inNorm, DslashParam param)
+				  const double2 *in, const float *null2, DslashParam param)
 {
 
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -171,7 +171,7 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 #define tmp3_im tmp1.w
 
 __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, 
-				  float4 *in, float *inNorm, DslashParam param)
+				  const float4 *in, const float *null2, DslashParam param)
 {
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
@@ -268,7 +268,7 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
 
 
 __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, 
-				  short4 *in, float *inNorm, DslashParam param)
+				  const short4 *in, const float *inNorm, DslashParam param)
 {
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;

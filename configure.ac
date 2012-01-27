@@ -334,10 +334,10 @@ then
   build_staggered_force="no"
 
 
-  if test "X${qmp_home}X" = "XX";
-  then
-    dnl qmp_home is empty 
-    AC_MSG_WARN([ Multi-GPU build without QMP. Will build single node code with copies ])
+  if test "X${qmp_home}X" = "XX"; then
+    if test "X${mpi_home}X" = "XX"; then
+        AC_MSG_WARN([ Multi-GPU build without QMP or MPI. Will build single node code with copies ])
+    fi
   else
  
     dnl qmp home is not empty 
