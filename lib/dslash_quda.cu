@@ -602,6 +602,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   int shared_bytes = tune[0].block.x*dslash.SharedPerThread()*regSize;
   shared_bytes = tune[0].shared_bytes > shared_bytes ? tune[0].shared_bytes : shared_bytes;
+  dslash_launch = true;
   if (checkLaunchParam(shared_bytes)) {
     CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
     dslash.apply(tune[0].block, shared_bytes, streams[Nstream-1]);
