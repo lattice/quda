@@ -410,8 +410,8 @@
     gauge##22_re *= -r_inv2;						\
     gauge##22_im *= -r_inv2;}
 
-// Fermi patch to disable double precision texture reads
-#if (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
+// Fermi patch to disable double-precision texture reads
+#ifdef FERMI_NO_DBLE_TEX
 #define READ_GAUGE_MATRIX_18_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
   READ_GAUGE_MATRIX_18_DOUBLE2(G, gauge, dir, idx, stride)
 #define READ_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
