@@ -683,3 +683,19 @@
   double2 accum0 = fetch_double2((spinor), sid + 0*(sp_stride));   \
   double2 accum1 = fetch_double2((spinor), sid + 1*(sp_stride));   \
   double2 accum2 = fetch_double2((spinor), sid + 2*(sp_stride));   
+
+// Fermi patch to disable double precision texture reads
+#if (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
+#undef READ_SPINOR_DOUBLE
+#undef READ_SPINOR_DOUBLE_UP
+#undef READ_SPINOR_DOUBLE_DOWN
+#undef READ_ACCUM_DOUBLE_TEX
+#define READ_SPINOR_DOUBLE(spinor, stride, sp_idx, norm_idx)	\
+  READ_SPINOR_DOUBLE_TEX(spinor, stride, sp_idx, norm_idx)	
+#define READ_SPINOR_DOUBLE_UP(spinor, stride, sp_idx, norm_idx)	\
+  READ_SPINOR_DOUBLE_UP_TEX(spinor, stride, sp_idx, norm_idx)	
+#define READ_SPINOR_DOUBLE_DOWN(spinor, stride, sp_idx, norm_idx)	\
+  READ_SPINOR_DOUBLE_DOWN(spinor, stride, sp_idx, norm_idx)	
+#define READ_ACCUM_DOUBLE_TEX(spinor, stride)	\
+  READ_ACCUM_DOUBLE(spinor, stride)
+#endif
