@@ -7,15 +7,15 @@
 
 __constant__ int path_max_length;
 
-#define GF_SITE_MATRIX_LOAD_TEX 0
+#define GF_SITE_MATRIX_LOAD_TEX 1
 
 //single precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, Vh)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, Vh)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
@@ -33,11 +33,11 @@ __constant__ int path_max_length;
 
 //double precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, Vh)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, Vh)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
@@ -55,11 +55,11 @@ __constant__ int path_max_length;
 
 //single precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_TEX_SINGLE(siteLink0TexSingle, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_TEX_SINGLE(siteLink1TexSingle, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, Vh)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, Vh)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
@@ -77,11 +77,11 @@ __constant__ int path_max_length;
 
 //double precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_TEX_DOUBLE(siteLink0TexDouble, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_TEX_DOUBLE(siteLink1TexDouble, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, Vh)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, Vh)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) 

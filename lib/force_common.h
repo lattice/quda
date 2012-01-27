@@ -134,70 +134,79 @@
 #define stapleT22_re (+staple22_re)
 #define stapleT22_im (-staple22_im)
 
-#define LOAD_MATRIX_12_SINGLE(gauge, dir, idx, var)do{			\
-    var##0 = gauge[idx + dir*Vhx3];					\
-    var##1 = gauge[idx + dir*Vhx3 + Vh];				\
-    var##2 = gauge[idx + dir*Vhx3 + Vhx2];				\
+//#ifdef FERMI_DBLE_NO_TEX
+
+#ifdef FERMI_DBLE_NO_TEX
+#define READ_DOUBLE2_TEXTURE(x_tex, x, i)      x[i]
+#else
+#define READ_DOUBLE2_TEXTURE(x_tex, x, i)  fetch_double2(x_tex, i)
+#endif
+
+
+#define LOAD_MATRIX_12_SINGLE(gauge, dir, idx, var, stride)do{		\
+    var##0 = gauge[idx + dir*stride*3];					\
+    var##1 = gauge[idx + dir*stride*3 + stride];			\
+    var##2 = gauge[idx + dir*stride*3 + stride*2];			\
   }while(0)
 
-#define LOAD_MATRIX_12_SINGLE_TEX(gauge, dir, idx, var)do{		\
-    var##0 = tex1Dfetch(gauge, idx + dir*Vhx3);				\
-    var##1 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vh);			\
-    var##2 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vhx2);			\
+#define LOAD_MATRIX_12_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    var##0 = tex1Dfetch(gauge, idx + dir*stride*3);			\
+    var##1 = tex1Dfetch(gauge, idx + dir*stride*3 + stride);		\
+    var##2 = tex1Dfetch(gauge, idx + dir*stride*3 + stride*2);		\
   }while(0)
 
-#define LOAD_MATRIX_12_DOUBLE(gauge, dir, idx, var)do{			\
-    var##0 = gauge[idx + dir*Vhx6];					\
-    var##1 = gauge[idx + dir*Vhx6 + Vh];				\
-    var##2 = gauge[idx + dir*Vhx6 + Vhx2];				\
-    var##3 = gauge[idx + dir*Vhx6 + Vhx3];				\
-    var##4 = gauge[idx + dir*Vhx6 + Vhx4];				\
-    var##5 = gauge[idx + dir*Vhx6 + Vhx5];				\
+#define LOAD_MATRIX_12_DOUBLE(gauge, dir, idx, var, stride)do{		\
+    var##0 = gauge[idx + dir*stride*6];					\
+    var##1 = gauge[idx + dir*stride*6 + stride];			\
+    var##2 = gauge[idx + dir*stride*6 + stride*2];			\
+    var##3 = gauge[idx + dir*stride*6 + stride*3];			\
+    var##4 = gauge[idx + dir*stride*6 + stride*4];			\
+    var##5 = gauge[idx + dir*stride*6 + stride*5];			\
   }while(0)
 
-#define LOAD_MATRIX_12_DOUBLE_TEX(gauge, dir, idx, var)do{		\
-    var##0 = fetch_double2(gauge, idx + dir*Vhx6);			\
-    var##1 = fetch_double2(gauge, idx + dir*Vhx6 + Vh);			\
-    var##2 = fetch_double2(gauge, idx + dir*Vhx6 + Vhx2);		\
-    var##3 = fetch_double2(gauge, idx + dir*Vhx6 + Vhx3);		\
-    var##4 = fetch_double2(gauge, idx + dir*Vhx6 + Vhx4);		\
-    var##5 = fetch_double2(gauge, idx + dir*Vhx6 + Vhx5);		\
+#define LOAD_MATRIX_12_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
+    var##0 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6); \
+    var##1 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride); \
+    var##2 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*2); \
+    var##3 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*3); \
+    var##4 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*4); \
+    var##5 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*5); \
   }while(0)
 
-#define LOAD_MATRIX_18(gauge, dir, idx, var)do{			\
-    var##0 = gauge[idx + dir*Vh*9];					\
-    var##1 = gauge[idx + dir*Vh*9 + Vh];				\
-    var##2 = gauge[idx + dir*Vh*9 + Vh*2];				\
-    var##3 = gauge[idx + dir*Vh*9 + Vh*3];				\
-    var##4 = gauge[idx + dir*Vh*9 + Vh*4];				\
-    var##5 = gauge[idx + dir*Vh*9 + Vh*5];				\
-    var##6 = gauge[idx + dir*Vh*9 + Vh*6];				\
-    var##7 = gauge[idx + dir*Vh*9 + Vh*7];				\
-    var##8 = gauge[idx + dir*Vh*9 + Vh*8];				\
+#define LOAD_MATRIX_18(gauge, dir, idx, var, stride)do{			\
+    var##0 = gauge[idx + dir*stride*9];					\
+    var##1 = gauge[idx + dir*stride*9 + stride];			\
+    var##2 = gauge[idx + dir*stride*9 + stride*2];			\
+    var##3 = gauge[idx + dir*stride*9 + stride*3];			\
+    var##4 = gauge[idx + dir*stride*9 + stride*4];			\
+    var##5 = gauge[idx + dir*stride*9 + stride*5];			\
+    var##6 = gauge[idx + dir*stride*9 + stride*6];			\
+    var##7 = gauge[idx + dir*stride*9 + stride*7];			\
+    var##8 = gauge[idx + dir*stride*9 + stride*8];			\
   }while(0)
 
-#define LOAD_MATRIX_18_TEX_SINGLE(gauge, dir, idx, var)do{			\
-    var##0 = tex1Dfetch(gauge, idx + dir*Vh*9);				\
-    var##1 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh);			\
-    var##2 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh*2);			\
-    var##3 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh*3);			\
-    var##4 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh*4);			\
-    var##5 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh*5);			\
-    var##6 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh*6);			\
-    var##7 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh*7);			\
-    var##8 = tex1Dfetch(gauge, idx + dir*Vh*9 + Vh*8);			\
+#define LOAD_MATRIX_18_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    var##0 = tex1Dfetch(gauge, idx + dir*stride*9);			\
+    var##1 = tex1Dfetch(gauge, idx + dir*stride*9 + stride);		\
+    var##2 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*2);		\
+    var##3 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*3);		\
+    var##4 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*4);		\
+    var##5 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*5);		\
+    var##6 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*6);		\
+    var##7 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*7);		\
+    var##8 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*8);		\
   }while(0)
 
-#define LOAD_MATRIX_18_TEX_DOUBLE(gauge, dir, idx, var)do{		\
-    var##0 = fetch_double2(gauge, idx + dir*Vh*9);			\
-    var##1 = fetch_double2(gauge, idx + dir*Vh*9 + Vh);			\
-    var##2 = fetch_double2(gauge, idx + dir*Vh*9 + Vh*2);		\
-    var##3 = fetch_double2(gauge, idx + dir*Vh*9 + Vh*3);		\
-    var##4 = fetch_double2(gauge, idx + dir*Vh*9 + Vh*4);		\
-    var##5 = fetch_double2(gauge, idx + dir*Vh*9 + Vh*5);		\
-    var##6 = fetch_double2(gauge, idx + dir*Vh*9 + Vh*6);		\
-    var##7 = fetch_double2(gauge, idx + dir*Vh*9 + Vh*7);		\
-    var##8 = fetch_double2(gauge, idx + dir*Vh*9 + Vh*8);		\
+#define LOAD_MATRIX_18_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
+    var##0 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9); \
+    var##1 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride); \
+    var##2 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*2); \
+    var##3 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*3); \
+    var##4 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*4); \
+    var##5 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*5); \
+    var##6 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*6); \
+    var##7 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*7); \
+    var##8 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*8); \
   }while(0)
 
 #define MULT_SU3_NN(ma, mb, mc)					\
@@ -536,30 +545,30 @@
 
 
 #define LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var) do{			\
-	int start_pos = idx + dir*Vhx5;					\
+	int start_pos = idx + dir*Vh*5;					\
 	var##0 = src[start_pos];					\
 	var##1 = src[start_pos + Vh];					\
-	var##2 = src[start_pos + Vhx2];					\
-	var##3 = src[start_pos + Vhx3];					\
-	var##4 = src[start_pos + Vhx4];					\
+	var##2 = src[start_pos + Vh*2];					\
+	var##3 = src[start_pos + Vh*3];					\
+	var##4 = src[start_pos + Vh*4];					\
     }while(0)
 
 #define LOAD_ANTI_HERMITIAN_SINGLE_TEX(src, dir, idx, var) do{		\
-	int start_pos = idx + dir*Vhx5;					\
+	int start_pos = idx + dir*Vh*5;					\
 	var##0 = tex1Dfetch(src, start_pos);				\
 	var##1 = tex1Dfetch(src, start_pos + Vh);			\
-	var##2 = tex1Dfetch(src, start_pos + Vhx2);			\
-	var##3 = tex1Dfetch(src, start_pos + Vhx3);			\
-	var##4 = tex1Dfetch(src, start_pos + Vhx4);			\
+	var##2 = tex1Dfetch(src, start_pos + Vh*2);			\
+	var##3 = tex1Dfetch(src, start_pos + Vh*3);			\
+	var##4 = tex1Dfetch(src, start_pos + Vh*4);			\
     }while(0)
 
 #define WRITE_ANTI_HERMITIAN(mem, dir, idx, var) do{		\
-    int start_ps = idx + dir*Vhx5;				\
+    int start_ps = idx + dir*Vh*5;				\
     mem[start_ps] = var##0;					\
     mem[start_ps + Vh] = var##1;				\
-    mem[start_ps + Vhx2] = var##2;				\
-    mem[start_ps + Vhx3] = var##3;				\
-    mem[start_ps + Vhx4] = var##4;				\
+    mem[start_ps + Vh*2] = var##2;				\
+    mem[start_ps + Vh*3] = var##3;				\
+    mem[start_ps + Vh*4] = var##4;				\
   }while(0)
 
 #define COPY_SU3_MATRIX(a, b)		\

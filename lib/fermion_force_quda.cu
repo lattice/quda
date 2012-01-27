@@ -29,7 +29,7 @@
 
 #define LOAD_HW(hw, idx, var) LOAD_HW_SINGLE(hw, idx, var)
 #define WRITE_HW(hw, idx, var) WRITE_HW_SINGLE(hw, idx, var)
-#define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
+#define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var, Vh)
 //#define LOAD_ANTI_HERMITIAN(mom, mydir, idx, AH);
 
 #define FF_SITE_MATRIX_LOAD_TEX 1
@@ -37,9 +37,9 @@
 #if (FF_SITE_MATRIX_LOAD_TEX == 1)
 #define linkEvenTex siteLink0TexSingle_recon
 #define linkOddTex siteLink1TexSingle_recon
-#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(src##Tex, dir, idx, var)
+#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(src##Tex, dir, idx, var, Vh)
 #else
-#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
+#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var, Vh)
 #endif
 
 

@@ -26,7 +26,7 @@ for prog in $progs ; do
     for recon in $recons ; do
 
 	#FIXME: now we only support 12-recon and single precision
-        if [ "$prog" = "gauge_force_test" -o "$prog" = "fermion_force_test" ]; then
+        if [ "$prog" = "fermion_force_test" ]; then
 	  prec="single"	
 	  recon="12"
         fi
