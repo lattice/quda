@@ -446,3 +446,17 @@
     ACC_COMPLEX_PROD(gauge##22, A, gauge##02);				\
     gauge##22_re *= -r_inv2;						\
     gauge##22_im *= -r_inv2;}
+
+// Fermi patch for double precision texture reads
+#if (__CUDA_ARCH__ > 200)
+#undef READ_GAUGE_MATRIX_18_DOUBLE2_TEX
+#undef READ_GAUGE_MATRIX_12_DOUBLE2_TEX
+#undef READ_GAUGE_MATRIX_8_DOUBLE2_TEX
+#define READ_GAUGE_MATRIX_18_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  READ_GAUGE_MATRIX_18_DOUBLE2(G, gauge, dir, idx, stride)
+#define READ_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  READ_GAUGE_MATRIX_12_DOUBLE2(G, gauge, dir, idx, stride)
+#define READ_GAUGE_MATRIX_8_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
+  READ_GAUGE_MATRIX_8_DOUBLE2(G, gauge, dir, idx, stride)
+#endif
+
