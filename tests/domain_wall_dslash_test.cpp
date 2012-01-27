@@ -26,7 +26,7 @@ const int Ls = 16;
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -43,10 +43,10 @@ void init() {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 12;
-  gauge_param.X[1] = 12;
-  gauge_param.X[2] = 12;
-  gauge_param.X[3] = 12;
+  gauge_param.X[0] = 16;
+  gauge_param.X[1] = 16;
+  gauge_param.X[2] = 16;
+  gauge_param.X[3] = 16;
   
   setDims(gauge_param.X, Ls);
 
@@ -324,8 +324,8 @@ int main(int argc, char **argv)
     int gauge_floats = (test_type ? 2 : 1) * (gauge_param.gauge_fix ? 6 : 8) * gauge_param.reconstruct;
 
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GiB/s = %f\n\n", 
-	       Vh*Ls*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*1e+9));
+    printfQuda("GB/s = %f\n\n", 
+	       (float)Vh*Ls*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*1e+9));
 
 
     if (!transfer) {

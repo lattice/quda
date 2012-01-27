@@ -12,16 +12,19 @@
 //#define DIRECT_ACCESS_WILSON_ACCUM
 //#define DIRECT_ACCESS_WILSON_INTER
 //#define DIRECT_ACCESS_WILSON_PACK_SPINOR
+//#define DIRECT_ACCESS_CLOVER
 
 //these are access control for staggered action
 #if (__CUDA_ARCH__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
+//#define DIRECT_ACCESS_ACCUM
 #else
 #define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 //#define DIRECT_ACCESS_SPINOR
+//#define DIRECT_ACCESS_ACCUM
 #endif
 
 #include <quda_internal.h>
@@ -104,8 +107,12 @@ cudaColorSpinorField *inSpinor;
 #include <dslash_constants.h>
 
 #define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5) // 32767.5
+#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5f) // 32767.5
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1)) // 1.5259021897e-5
+
+static inline __device__ float short2float(short a) {
+  return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
+}
 
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
   defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
@@ -113,10 +120,6 @@ static inline __device__ short float2short(float c, float a) {
   //return (short)(a*MAX_SHORT);
   short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
   return rtn;
-}
-
-static inline __device__ float short2float(short a) {
-  return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
 }
 
 static inline __device__ short4 float42short4(float c, float4 a) {
@@ -1055,7 +1058,7 @@ void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in,
   setTwistParam(a, b, kappa, mu, dagger, twist);
 
   bindSpinorTex(bytes, norm_bytes, in, inNorm);
-  twistGamma5Kernel<<<gridDim, tune.block, tune.shared_bytes>>> (out, outNorm, a, b, dslashParam);
+  twistGamma5Kernel<<<gridDim, tune.block, tune.shared_bytes>>> (out, outNorm, a, b, in, inNorm, dslashParam);
   unbindSpinorTex(in, inNorm);
 }
 

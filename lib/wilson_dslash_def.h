@@ -163,7 +163,7 @@
 #define TPROJSCALE tProjScale
 
 // double-precision gauge field
-#if (DIRECT_ACCESS_WILSON_SPINOR == 100) || (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
+#if (defined DIRECT_ACCESS_WILSON_GAUGE) || (defined FERMI_NO_DBLE_TEX)
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
@@ -177,7 +177,7 @@
 #define DD_PARAM_OUT double2* out, float *null1,
 #define DD_PARAM_IN const double2* in, const float *null4,
 
-#if (DIRECT_ACCESS_WILSON_SPINOR == 100) || (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
+#if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
@@ -188,7 +188,7 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #define SPINORTEX spinorTexDouble
 #endif
-#ifdef DIRECT_ACCESS_WILSON_INTER
+#if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
 #define INTERTEX out
 #else
@@ -198,7 +198,7 @@
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
 #if (DD_XPAY==1)
-#ifdef DIRECT_ACCESS_WILSON_ACCUM
+#if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
@@ -216,8 +216,13 @@
 #else
 #define DD_PARAM_CLOVER const double2 *clover, const float *null3,
 #endif
-#define CLOVERTEX cloverTexDouble
+#if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
+#define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_DOUBLE
+#else
+#define CLOVERTEX cloverTexDouble
+#define READ_CLOVER READ_CLOVER_DOUBLE_TEX
+#endif
 #define CLOVER_DOUBLE
 
 #elif (DD_PREC==1) // single-precision fields
@@ -279,8 +284,13 @@
 #else
 #define DD_PARAM_CLOVER const float4 *clover, const float *null3,
 #endif
-#define CLOVERTEX cloverTexSingle
+#ifdef DIRECT_ACCESS_CLOVER
+#define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_SINGLE
+#else
+#define CLOVERTEX cloverTexSingle
+#define READ_CLOVER READ_CLOVER_SINGLE_TEX
+#endif
 
 #else             // half-precision fields
 
@@ -341,8 +351,13 @@
 #else
 #define DD_PARAM_CLOVER const short4 *clover, const float *cloverNorm,
 #endif
-#define CLOVERTEX cloverTexHalf
+#ifdef DIRECT_ACCESS_CLOVER
+#define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_HALF
+#else
+#define CLOVERTEX cloverTexHalf
+#define READ_CLOVER READ_CLOVER_HALF_TEX
+#endif
 
 #endif
 
