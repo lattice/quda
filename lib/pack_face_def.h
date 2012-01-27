@@ -273,7 +273,7 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y,
 #ifdef GPU_WILSON_DIRAC
 
 // double precision
-#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
+#if (defined DIRECT_ACCESS_WILSON_PACK_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN

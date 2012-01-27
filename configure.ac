@@ -21,7 +21,7 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch],  [ Set GPU arch=sm_10, sm_12,sm_13,sm_20, sm_21 (default: sm_20)] ),
+ AC_HELP_STRING([--enable-gpu-arch=arch],  [ Set GPU arch=sm_10, sm_12, sm_13, sm_20, sm_21 (default: sm_20)] ),
  [ gpu_arch=${enableval} ],
  [ gpu_arch="sm_20" ]
 )
@@ -158,6 +158,12 @@ AC_ARG_WITH(qio,
  [ qio_home="" ; build_qio="no" ]
 )
 
+AC_ARG_ENABLE(fermi-double-tex,
+ AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default is no) ]),
+ [ fermi_double_tex=${enableval}],
+ [ fermi_double_tex="no" ]
+)
+
 
 dnl Input validation
 
@@ -289,7 +295,8 @@ yes|no);;
   AC_MSG_ERROR([ invalid value for --enable-multi-gpu ])
   ;;
 esac
-dnl Build Staggered force
+
+dnl Enables overlapping comms
 case ${overlap_comms} in
 yes|no);;
 *) 
@@ -347,6 +354,14 @@ if test "X${build_qio}X" = "XyesX"; then
   fi	
 fi
  
+dnl Enables overlapping comms
+case ${fermi_double_tex} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-fermi-double-tex ])
+  ;;
+esac
+
 dnl Output Substitutions
 AC_MSG_NOTICE([Setting CUDA_INSTALL_PATH = ${cuda_home} ])
 AC_SUBST( CUDA_INSTALL_PATH, [${cuda_home} ])
@@ -434,6 +449,9 @@ AC_SUBST( QIO_HOME, [${qio_home}] )
 
 AC_MSG_NOTICE([Setting HAVE_NUMA=${ac_cv_header_numa_h}])
 AC_SUBST( HAVE_NUMA, [${ac_cv_header_numa_h}] )
+
+AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
+AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
 
 AC_CONFIG_FILES(make.inc)
 AC_OUTPUT

@@ -12,16 +12,19 @@
 //#define DIRECT_ACCESS_WILSON_ACCUM
 //#define DIRECT_ACCESS_WILSON_INTER
 //#define DIRECT_ACCESS_WILSON_PACK_SPINOR
+//#define DIRECT_ACCESS_CLOVER
 
 //these are access control for staggered action
 #if (__CUDA_ARCH__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
+//#define DIRECT_ACCESS_ACCUM
 #else
 #define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 //#define DIRECT_ACCESS_SPINOR
+//#define DIRECT_ACCESS_ACCUM
 #endif
 
 #include <quda_internal.h>
@@ -104,7 +107,7 @@ cudaColorSpinorField *inSpinor;
 #include <dslash_constants.h>
 
 #define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5) // 32767.5
+#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5f) // 32767.5
 #define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1)) // 1.5259021897e-5
 
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \

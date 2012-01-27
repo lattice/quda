@@ -595,6 +595,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+FERMI_DBLE_TEX
 HAVE_NUMA
 QIO_HOME
 QMP_HOME
@@ -702,6 +703,7 @@ enable_overlap_comms
 with_mpi
 with_qmp
 with_qio
+enable_fermi_double_tex
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1326,7 +1328,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-cpu-arch=arch  Set CPU arch: x86 or x86_64 (default: x86_64)
-  --enable-gpu-arch=arch  Set GPU arch=sm_10, sm_12,sm_13,sm_20, sm_21
+  --enable-gpu-arch=arch  Set GPU arch=sm_10, sm_12, sm_13, sm_20, sm_21
                           (default: sm_20)
   --enable-gpu-emulation  Enable GPU emulation (CUDA v3.0). (default is 'no' )
   --enable-os=os          Set OS Build style: linux, osx (default is linux)
@@ -1352,6 +1354,9 @@ Optional Features:
                           Build Staggered Force Term (default=disabled)
   --enable-multi-gpu      Enable Multi-GPU mode (default is no)
   --enable-overlap-comms  Enable comms/compute overlap (default is yes)
+  --enable-fermi-double-tex
+                          Enable double-precision texture reads on Fermi
+                          (default is no)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -3569,6 +3574,15 @@ else
 fi
 
 
+# Check whether --enable-fermi-double-tex was given.
+if test "${enable_fermi_double_tex+set}" = set; then :
+  enableval=$enable_fermi_double_tex;  fermi_double_tex=${enableval}
+else
+   fermi_double_tex="no"
+
+fi
+
+
 
 
 case ${cpu_arch} in
@@ -3683,6 +3697,7 @@ yes|no);;
   as_fn_error " invalid value for --enable-multi-gpu " "$LINENO" 5
   ;;
 esac
+
 case ${overlap_comms} in
 yes|no);;
 *)
@@ -3735,6 +3750,13 @@ if test "X${build_qio}X" = "XyesX"; then
     as_fn_error "QMP must enabled for QIO support " "$LINENO" 5
   fi
 fi
+
+case ${fermi_double_tex} in
+yes|no);;
+*)
+  as_fn_error " invalid value for --enable-fermi-double-tex " "$LINENO" 5
+  ;;
+esac
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting CUDA_INSTALL_PATH = ${cuda_home} " >&5
 $as_echo "$as_me: Setting CUDA_INSTALL_PATH = ${cuda_home} " >&6;}
@@ -3879,6 +3901,11 @@ QIO_HOME=${qio_home}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting HAVE_NUMA=${ac_cv_header_numa_h}" >&5
 $as_echo "$as_me: Setting HAVE_NUMA=${ac_cv_header_numa_h}" >&6;}
 HAVE_NUMA=${ac_cv_header_numa_h}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting FERMI_DBLE_TEX= ${fermi_double_tex}" >&5
+$as_echo "$as_me: Setting FERMI_DBLE_TEX= ${fermi_double_tex}" >&6;}
+FERMI_DBLE_TEX=${fermi_double_tex}
 
 
 ac_config_files="$ac_config_files make.inc"

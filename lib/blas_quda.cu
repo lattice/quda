@@ -238,7 +238,7 @@ double2 __device__ read_Float2(double2 *x, int i) {
   return make_double2(x[i].x, x[i].y);
 }
 
-#if (__CUDA_ARCH__ >= 200 && __CUDA_ARCH__ < 300)
+#if FERMI_NO_DBLE_TEX
 #define READ_DOUBLE2_TEXTURE(x, i) \
   read_Float2(x, i)
 #else
