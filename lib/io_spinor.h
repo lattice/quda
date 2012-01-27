@@ -509,17 +509,17 @@
   double2 accum2 = spinor[sid + 2*(sp_stride)];   
 
 #define READ_ST_ACCUM_SINGLE(spinor)				\
-  float2 accum0 = spinor[sid + 0*sp_stride)];			\
-  float2 accum1 = spinor[sid + 1*sp_stride)];			\
-  float2 accum2 = spinor[sid + 2*sp_stride);     
+  float2 accum0 = spinor[sid + 0*(sp_stride)];			\
+  float2 accum1 = spinor[sid + 1*(sp_stride)];			\
+  float2 accum2 = spinor[sid + 2*(sp_stride)];     
 
-#define READ_ST_ACCUM_HALF(spinor, stride)				\
+#define READ_ST_ACCUM_HALF(spinor)					\
   float2 accum0, accum1, accum2;					\
   {									\
-    short2 S0 = x[sid + 0*stride];					\
-    short2 S1 = x[sid + 1*stride];					\
-    short2 S2 = x[sid + 2*stride];					\
-    float C = spinor##Norm[sid];						\
+    short2 S0 = x[sid + 0*sp_stride];					\
+    short2 S1 = x[sid + 1*sp_stride];					\
+    short2 S2 = x[sid + 2*sp_stride];					\
+    float C = spinor##Norm[sid];					\
     accum0.x =C*short2float(S0.x); accum0.y =C*short2float(S0.y);	\
     accum1.x =C*short2float(S1.x); accum1.y =C*short2float(S1.y);	\
     accum2.x =C*short2float(S2.x); accum2.y =C*short2float(S2.y);	\

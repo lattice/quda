@@ -179,7 +179,7 @@ endif
 ifeq ($strip $(FERMI_DBLE_TEX)), no)
   NVCCOPT += -DFERMI_NO_DBLE_TEX
   COPT += -DFERMI_NO_DBLE_TEX
-#endif
+endif
 
 ifeq ($(strip $(HAVE_NUMA)), yes)
   COPT += -DHAVE_NUMA
