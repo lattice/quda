@@ -442,15 +442,11 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   int x1 = 2*x1h + x1odd;  
   int X = 2*sid + x1odd;
     
-  const int sign = 1;
-    
   Float2* mymom=momEven;
   if (oddBit){
     mymom = momOdd;
   }
 
-  //FloatN LINKA0, LINKA1, LINKA2, LINKA3, LINKA4;
-  //FloatN LINKB0, LINKB1, LINKB2, LINKB3, LINKB4;
   DECLARE_LINK_VARS(LINKA);
   DECLARE_LINK_VARS(LINKB);
   Float2 STAPLE0, STAPLE1, STAPLE2, STAPLE3,STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
@@ -491,7 +487,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
     }else{
       LOAD_EVEN_MATRIX( lnkdir, nbr_idx, LINKB);
     }
-    RECONSTRUCT_MATRIX(lnkdir, nbr_idx, sign, linkb);
+    RECONSTRUCT_MATRIX(lnkdir, nbr_idx, 1, linkb);
     
     if (GOES_FORWARDS(path0)){
       COPY_SU3_MATRIX(linkb, linka);
@@ -520,7 +516,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
       }else{
 	LOAD_EVEN_MATRIX(lnkdir, nbr_idx, LINKB);
       }
-      RECONSTRUCT_MATRIX(lnkdir, nbr_idx, sign, linkb);
+      RECONSTRUCT_MATRIX(lnkdir, nbr_idx, 1, linkb);
       if (GOES_FORWARDS(pathj)){
 	MULT_SU3_NN_TEST(linka, linkb);
 		
@@ -543,7 +539,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   }else{
     LOAD_EVEN_MATRIX(dir, sid, LINKA);
   }
-  RECONSTRUCT_MATRIX(dir, sid, sign, linka);
+  RECONSTRUCT_MATRIX(dir, sid, 1, linka);
   MULT_SU3_NN_TEST(linka, staple);
   LOAD_ANTI_HERMITIAN(mymom, dir, sid, AH);
   UNCOMPRESS_ANTI_HERMITIAN(ah, linkb);

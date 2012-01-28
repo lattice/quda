@@ -712,18 +712,17 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
   int Vsh_z = param->X[0]*param->X[1]*param->X[3]/2;
   int Vsh_t = param->X[0]*param->X[1]*param->X[2]/2;
 
-  int Vs[4] = {2*Vsh_x, 2*Vsh_y, 2*Vsh_z, 2*Vsh_t};
 
 
   void* ghost_cpuGauge[4];
   void* ghost_cpuGauge_diag[16];
   
 #ifdef MULTI_GPU
-
+  int Vs[4] = {2*Vsh_x, 2*Vsh_y, 2*Vsh_z, 2*Vsh_t};
+  
   for(int i=0;i < 4; i++){
     
 #ifdef GPU_DIRECT 
-    int len = 8*Vs[i]*gaugeSiteSize*prec;
     cudaMallocHost((void**)&ghost_cpuGauge[i], 8*Vs[i]*gaugeSiteSize*prec);
 #else
     ghost_cpuGauge[i] = malloc(8*Vs[i]*gaugeSiteSize*prec);
@@ -896,8 +895,6 @@ loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugePa
 
   int* E = param_ex->X;
   int pad = param_ex->ga_pad;
-
-   int optflag=1;
 
    if (prec == QUDA_DOUBLE_PRECISION) {
      do_loadLinkToGPU_ex(E, (double2*)(cudaGauge->Even_p()), (double2*)(cudaGauge->Odd_p()), (double**)cpuGauge->Gauge_p(),

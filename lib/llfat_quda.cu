@@ -331,6 +331,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 
 
 //single precision, 12-reconstruct
+#define DECLARE_VAR_SIGN short sign=1
 #define SITELINK0TEX siteLink0TexSingle
 #define SITELINK1TEX siteLink1TexSingle
 #if (SITE_MATRIX_LOAD_TEX == 1)
@@ -348,6 +349,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #define RECONSTRUCT 12
 #define sd_data float_12_sd_data
 #include "llfat_core.h"
+#undef DECLARE_VAR_SIGN
 #undef SITELINK0TEX
 #undef SITELINK1TEX
 #undef LOAD_EVEN_SITE_MATRIX
