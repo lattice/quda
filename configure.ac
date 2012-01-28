@@ -123,6 +123,11 @@ AC_ARG_ENABLE(staggered-force,
   [ build_staggered_force="no" ]
 )
 
+AC_ARG_ENABLE(hisq-force,
+  AC_HELP_STRING([--enable-hisq-force], [ Build Hisq Force Term (default=disabled) ]),
+  [ build_hisq_force=${enableval} ],
+  [ build_hisq_force="no" ]
+)
 dnl Multi-GPU options
 dnl ==================
 
@@ -416,6 +421,9 @@ AC_SUBST( BUILD_GAUGE_FORCE, [${build_gauge_force}])
 
 AC_MSG_NOTICE([Setting BUILD_FERMION_FORCE = ${build_staggered_force} ] )
 AC_SUBST( BUILD_FERMION_FORCE, [${build_staggered_force}])
+
+AC_MSG_NOTICE([Setting BUILD_HISQ_FORCE = ${build_hisq_force} ] )
+AC_SUBST( BUILD_HISQ_FORCE, [${build_hisq_force}])
 
 AC_MSG_NOTICE([Setting BUILD_MULTI_GPU = ${multi_gpu} ] )
 AC_SUBST( BUILD_MULTI_GPU, [${multi_gpu}])
