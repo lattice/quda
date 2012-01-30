@@ -15,7 +15,7 @@
 //#define DIRECT_ACCESS_CLOVER
 
 //these are access control for staggered action
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
@@ -169,7 +169,7 @@ __global__ void dummyKernel() {
 
 void initCache() {
 
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 
   static int firsttime = 1;
   if (firsttime){	
@@ -692,7 +692,7 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   DslashCuda *dslash = 0;
   size_t regSize = sizeof(float);
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     dslash = new WilsonDslashCuda<double2, double2>((double2*)out->V(), (float*)out->Norm(), 
 						    (double2*)gauge0, (double2*)gauge1, 
 						    gauge.Reconstruct(), (double2*)in->V(), 
@@ -758,7 +758,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   size_t regSize = sizeof(float);
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     dslash = new CloverDslashCuda<double2, double2, double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, 
 							     (double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, 
 							     (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(),
@@ -822,7 +822,7 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gaug
   size_t regSize = sizeof(float);
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     dslash = new TwistedDslashCuda<double2,double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, 
 						    (double2*)gauge1, gauge.Reconstruct(), (double2*)in->V(), 
 						    (float*)in->Norm(), (double2*)xv, (float*)xn, 
@@ -882,7 +882,7 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge
   size_t regSize = sizeof(float);
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     dslash = new DomainWallDslashCuda<double2,double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, (double2*)gauge1, 
 						       gauge.Reconstruct(), (double2*)in->V(), (float*)in->Norm(), (double2*)xv, 
 						       (float*)xn, m_f, k2, dagger, in->Bytes(), in->NormBytes());
@@ -949,7 +949,7 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
   size_t regSize = sizeof(float);
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     dslash = new StaggeredDslashCuda<double2, double2, double2>((double2*)out->V(), (float*)out->Norm(), 
 								(double2*)fatGauge0, (double2*)fatGauge1,
 								(double2*)longGauge0, (double2*)longGauge1, 
@@ -1021,7 +1021,7 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
     errorQuda("Mixing clover and spinor precision not supported");
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     cloverCuda((double2*)out->V(), (float*)out->Norm(), (double2*)cloverP, 
 	       (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(), 
 	       in->Bytes(), in->NormBytes(), tune);
@@ -1070,7 +1070,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 
 #ifdef GPU_TWISTED_MASS_DIRAC
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     twistGamma5Cuda((double2*)out->V(), (float*)out->Norm(), 
 		    (double2*)in->V(), (float*)in->Norm(), 
 		    dagger, kappa, mu, in->Bytes(), 

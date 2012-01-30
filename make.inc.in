@@ -23,7 +23,7 @@ BUILD_TWISTED_MASS_DIRAC = @BUILD_TWISTED_MASS_DIRAC@	# build twisted mass Dirac
 BUILD_FATLINK = @BUILD_FATLINK@             	# build code for computing asqtad fat links?
 BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@         	# build code for (1-loop Symanzik) gauge force?
 BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@	      	# build code for asqtad fermion force?
-BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@			# build code for hisq fermion force
+BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@			# build code for hisq fermion force?
 
 
 
@@ -72,8 +72,8 @@ else
   COPT = -malign-double
 endif
 
-COPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
-NVCCOPT += -D__CUDA_ARCH__=$(GPU_ARCH:sm_%=%0)
+COPT += -D__COMPUTE_CAPABILITY__=$(GPU_ARCH:sm_%=%0)
+NVCCOPT += -D__COMPUTE_CAPABILITY__=$(GPU_ARCH:sm_%=%0)
 
 ifeq ($(strip $(GPU_ARCH)), sm_20)
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false

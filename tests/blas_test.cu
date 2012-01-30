@@ -659,7 +659,7 @@ int main(int argc, char** argv)
   char *prec_str[] = {"half", "single", "double"};
   
   // Only benchmark double precision if supported
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
   int Nprec = 3;
 #else
   int Nprec = 2;

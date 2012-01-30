@@ -114,7 +114,7 @@
 #define DD_FUNC(x) DD_CONCAT(x)
 
 // define the kernel
-#if !(__CUDA_ARCH__ < 130 && DD_PREC == 0)
+#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 
 __global__ void DD_FUNC(DD_XPAY_F)(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 

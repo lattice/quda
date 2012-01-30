@@ -270,7 +270,7 @@ namespace hisq{
         typename RealTypeId<Cmplx>::Type gprod = g[0]*g[1]*g[2];
        
 
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
         if(fabs(gprod - determinant) > ACCEPTABLE_DET_ERROR){
 	  printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), ACCEPTABLE_DET_ERROR);
 	}
