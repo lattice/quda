@@ -31,11 +31,15 @@ namespace hisq {
 
 
 
-  void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double acceptable_det_error);
+  void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double max_det_error,
+				     bool allow_svd, bool svd_only,
+				     double svd_rel_error,
+				     double svd_abs_error);
 
   void unitarize_force_cuda(cudaGaugeField &cudaOldForce,
                             cudaGaugeField &cudaGauge,
-                            cudaGaugeField *cudaNewForce);
+                            cudaGaugeField *cudaNewForce,
+			    int* unitarization_failed);
 
   void unitarize_force_cpu(cpuGaugeField &cpuOldForce,
                             cpuGaugeField &cpuGauge,

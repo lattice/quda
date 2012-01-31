@@ -147,17 +147,8 @@ hisq_force_init()
   gParam.precision = hw_prec;
   cudaOprod = new cudaGaugeField(gParam);
 
-  // hard coded for the time being.
-  //const double unitarize_eps = 1e-5;
-  //const double hisq_force_filter = 5e-5;
-  //const double acceptable_det_error = 1e-12;
-  // Set the constants needed by the unitarization routine on the device
-  //set_unitarize_force_constants(unitarize_eps, hisq_force_filter, acceptable_det_error);
   checkCudaError();	
   
-
-  
-
   return;
 }
 
@@ -205,6 +196,15 @@ hisq_force_test()
   loadHwToGPU(cudaHw, hw, cpu_hw_prec);
 
 
+  const double unitarize_eps = 1e-5;
+  const double hisq_force_filter = 5e-5;
+  const double max_det_error = 1e-12;
+  const bool allow_svd = true;
+  const bool svd_only = false;
+  const double svd_rel_err = 1e-8;
+  const double svd_abs_err = 1e-8;
+
+  set_unitarize_force_constants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
   struct timeval t0, t1;
   bool shouldCompute = true;
   gettimeofday(&t0, NULL);
@@ -216,12 +216,16 @@ hisq_force_test()
   cudaForce->saveCPUField(*cpuForce, QUDA_CPU_FIELD_LOCATION);
 
 
-  unitarize_force_cuda(*cudaForce, *cudaGauge, cudaOprod); // output is written to cudaOprod.
+  int* unitarization_failed_dev; 
+  cudaMalloc((void**)&unitarization_failed_dev, sizeof(int));
+
+  unitarize_force_cuda(*cudaForce, *cudaGauge, cudaOprod, unitarization_failed_dev); // output is written to cudaOprod.
   if(verify_results){
-    unitarize_force_cpu(*cpuForce, *cpuGauge, cpuOprod); 
+    unitarize_force_cpu(*cpuForce, *cpuGauge, cpuOprod);
   }
   cudaThreadSynchronize();
   checkCudaError();
+  cudaFree(unitarization_failed_dev);
 
   cudaOprod->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION); 
 
