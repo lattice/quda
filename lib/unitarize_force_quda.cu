@@ -610,39 +610,47 @@ namespace hisq{
         }
 
 
-        void unitarize_force_cpu(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
-        {
+	void unitarize_force_cpu(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
+	{
 
-          int num_failures = 0;	
-          Matrix<double2,3> old_force, new_force, v;
-          for(int i=0; i<cpuGauge.Volume(); ++i){
-           for(int dir=0; dir<4; ++dir){
-             copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
-             copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
+		int num_failures = 0;	
+		Matrix<double2,3> old_force, new_force, v;
+		for(int i=0; i<cpuGauge.Volume(); ++i){
+			for(int dir=0; dir<4; ++dir){
+				if(param.cpu_prec == QUDA_SINGLE_PRECISION){
+					copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
+					copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
+					getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+					copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
+				}else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
+					copyArrayToLink(&old_force, ((double*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
+					copyArrayToLink(&v, ((double*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
+					getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+					copyLinkToArray(((double*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
+				} // precision?
+			} // dir
+		} // i
+		return;
+	} // unitarize_force_cpu
 
-             getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-            
-             copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
 
-           } // dir
-          } // i
-          return;
-        } // unitarize_force_cpu
-
-
-        void unitarize_force_cuda(cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce, int* unitarization_failed)
+        void unitarize_force_cuda(const QudaGaugeParam& param, cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce, int* unitarization_failed)
         {
 
           dim3 gridDim(cudaGauge.Volume()/BLOCK_DIM,1,1);
           dim3 blockDim(BLOCK_DIM,1,1);
 
-
-          getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
-                                                      (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p(),
-                                                      (float2*)cudaNewForce->Even_p(), (float2*)cudaNewForce->Odd_p(),
-																											unitarization_failed);
-
- 
+	  if(param.cuda_prec == QUDA_SINGLE_PRECISION){
+		  getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
+				  (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p(),
+				  (float2*)cudaNewForce->Even_p(), (float2*)cudaNewForce->Odd_p(),
+				  unitarization_failed);
+	  }else if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
+		  getUnitarizeForceField<<<gridDim,blockDim>>>((double2*)cudaGauge.Even_p(), (double2*)cudaGauge.Odd_p(),
+				  (double2*)cudaOldForce.Even_p(), (double2*)cudaOldForce.Odd_p(),
+				  (double2*)cudaNewForce->Even_p(), (double2*)cudaNewForce->Odd_p(),
+				  unitarization_failed);
+	  } // precision?
           return;
         } // unitarize_force_cuda
 

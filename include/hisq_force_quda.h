@@ -36,12 +36,14 @@ namespace hisq {
 				     double svd_rel_error,
 				     double svd_abs_error);
 
-  void unitarize_force_cuda(cudaGaugeField &cudaOldForce,
+  void unitarize_force_cuda(const QudaGaugeParam &param,
+			    cudaGaugeField &cudaOldForce,
                             cudaGaugeField &cudaGauge,
                             cudaGaugeField *cudaNewForce,
 			    int* unitarization_failed);
 
-  void unitarize_force_cpu(cpuGaugeField &cpuOldForce,
+  void unitarize_force_cpu( const QudaGaugeParam &param,
+			    cpuGaugeField &cpuOldForce,
                             cpuGaugeField &cpuGauge,
                             cpuGaugeField *cpuNewForce);
 
