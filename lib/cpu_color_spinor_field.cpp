@@ -111,13 +111,20 @@ void cpuColorSpinorField::create(const QudaFieldCreate create) {
   }
 
   if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
-      fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
+      fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
     errorQuda("Field order %d not supported", fieldOrder);
   }
 
   if (create != QUDA_REFERENCE_FIELD_CREATE) {
-    v = (void*)malloc(bytes);
-    init = true;
+    // array of 4-d fields
+    if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+      v = (void**)malloc(X[nDim-1] * sizeof(void*));
+      for (int i=0; i<nDim-1; i++) v[i] = (void*)malloc(bytes / X[nDim-1]);
+    } else {
+      v = (void*)malloc(bytes);
+      init = true;
+    }
   }
  
   createOrder(); // need to do this for references?
@@ -130,6 +137,8 @@ void cpuColorSpinorField::createOrder() {
       order_double = new SpaceSpinColorOrder<double>(*this);
     else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
       order_double = new SpaceColorSpinOrder<double>(*this);
+    else if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
+      order_double = new QOPDomainWallFieldOrder<double>(*this);
     else
       errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
   } else if (precision == QUDA_SINGLE_PRECISION) {
@@ -137,6 +146,8 @@ void cpuColorSpinorField::createOrder() {
       order_single = new SpaceSpinColorOrder<float>(*this);
     else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
       order_single = new SpaceColorSpinOrder<float>(*this);
+    else if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
+      order_single = new QOPDomainWallFieldOrder<float>(*this);
     else
       errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
   } else {
@@ -156,6 +167,7 @@ void cpuColorSpinorField::destroy() {
   }
   
   if (init) {
+    if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) for (int i=0; i<x[nDim-1]; i++) free(v[i]);
     free(v);
     init = false;
   }
@@ -199,34 +211,27 @@ void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
 }
 
 void cpuColorSpinorField::zero() {
-  memset(v, '0', bytes);
+  if (fieldOrder != QUDA_QOP_DOMAIN_WALL_ORDER) memset(v, '\0', bytes);
+  else for (int i=0; i<nDim-1; i++) memset(v[i], '\0', bytes/N[nDim-1]);
 }
 
-/*
-cpuColorSpinorField& cpuColorSpinorField::Even() const { 
-  if (subset == QUDA_FULL_FIELD_SUBSET) {
-    return *(dynamic_cast<cpuColorSpinorField*>(even)); 
-  } else {
-    errorQuda("Cannot return even subset of %d subset", subset);
+// Order-safe random number insertion
+template <class T>
+void random() {
+  for (int x=0; x<dst.Volume(); x++) {
+    for (int s=0; s<dst.Nspin(); s++) {
+      for (int c=0; c<dst.Ncolor(); c++) {
+	for (int z=0; z<2; z++) {
+	  t(x,s,c,z) = rand() / (double)RAND_MAX;
+	}
+      }
+    }
   }
 }
-
-cpuColorSpinorField& cpuColorSpinorField::Odd() const {
-  if (subset == QUDA_FULL_FIELD_SUBSET) {
-    return *(dynamic_cast<cpuColorSpinorField*>(odd)); 
-  } else {
-    errorQuda("Cannot return odd subset of %d subset", subset);
-  }
-}
-*/
-
-//sets the elements of the field to random [0, 1]
 // FIXME: needs to be made "order safe"
 template <typename Float>
 void random(Float *v, const int length) {    
-  for(int i = 0; i < length; i++) {
-    v[i] = rand() / (double)RAND_MAX;
-  }
+
 }
 
 // create a point source at spacetime point st, spin s and colour c
@@ -530,7 +535,4 @@ void cpuColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
     errorQuda("Full spinor is not supported in unpackGhost for cpu\n");
   }
-  
-  
-  
 }
