@@ -194,6 +194,12 @@
 #define longT22_re (+long22_re)
 #define longT22_im (-long22_im)
 
+#if (CUDA_VERSION >= 4010)
+#define VOLATILE
+#else
+#define VOLATILE volatile
+#endif
+
 // output spinor
 #if (DD_PREC == 0)
 #if (__COMPUTE_CAPABILITY__ >= 200)
@@ -202,7 +208,7 @@
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat sd_data[];
-volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+VOLATILE spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #else
 #if (__COMPUTE_CAPABILITY__ >= 200)
@@ -211,7 +217,7 @@ volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat ss_data[];
-volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #endif
 
@@ -1222,3 +1228,5 @@ WRITE_SPINOR();
 #undef o01_im
 #undef o02_re
 #undef o02_im
+
+#undef VOLATILE
