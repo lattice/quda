@@ -272,6 +272,17 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
     return;
   }
 
+  // no native support for this yet - copy to a native supported order
+  if (src.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+    ColorSpinorParam param(src); // acquire all attributes of this
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    cpuColorSpinorField tmp(param);
+    tmp.copy(src);
+    loadCPUSpinorField(tmp);
+    return;
+  }
+
   // (temporary?) bug fix for padding
   memset(buffer, 0, bufferBytes);
   
@@ -376,6 +387,17 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
     param.create = QUDA_COPY_FIELD_CREATE; 
     cudaColorSpinorField tmp(*this, param);
     tmp.saveCPUSpinorField(dest);
+    return;
+  }
+
+  // no native support for this yet - copy to a native supported order
+  if (dest.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+    ColorSpinorParam param(dest); // acquire all attributes of this
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    cpuColorSpinorField tmp(param);
+    saveCPUSpinorField(tmp);
+    dest.copy(tmp);
     return;
   }
 

@@ -81,8 +81,8 @@ class QOPDomainWallOrder : public ColorSpinorFieldOrder<Float> {
     field(field), volume_4d(1), Ls(0)
   { 
     if (field.Ndim() != 5) errorQuda("Error, wrong number of dimensions for this ColorSpinorFieldOrder");
-    for (int i=0; i<4; i++) volume_4d *= field.X[i];
-    Ls = field.X[4];
+    for (int i=0; i<4; i++) volume_4d *= field.x[i];
+    Ls = field.x[4];
   }
   virtual ~QOPDomainWallOrder() { ; }
 

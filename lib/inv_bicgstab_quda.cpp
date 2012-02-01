@@ -125,7 +125,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double3 omega_t2;
   
   double rNorm = sqrt(r2);
-  double r0Norm = rNorm;
+  //double r0Norm = rNorm;
   double maxrr = rNorm;
   double maxrx = rNorm;
 
@@ -215,7 +215,7 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
       rNorm = sqrt(r2);
       maxrr = rNorm;
       maxrx = rNorm;
-      r0Norm = rNorm;      
+      //r0Norm = rNorm;      
       rUpdate++;
     }
     

@@ -119,8 +119,9 @@ void cpuColorSpinorField::create(const QudaFieldCreate create) {
   if (create != QUDA_REFERENCE_FIELD_CREATE) {
     // array of 4-d fields
     if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-      v = (void**)malloc(X[nDim-1] * sizeof(void*));
-      for (int i=0; i<nDim-1; i++) v[i] = (void*)malloc(bytes / X[nDim-1]);
+      int Ls = x[nDim-1];
+      v = (void**)malloc(Ls * sizeof(void*));
+      for (int i=0; i<Ls; i++) ((void**)v)[i] = (void*)malloc(bytes / Ls);
     } else {
       v = (void*)malloc(bytes);
       init = true;
@@ -138,7 +139,7 @@ void cpuColorSpinorField::createOrder() {
     else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
       order_double = new SpaceColorSpinOrder<double>(*this);
     else if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-      order_double = new QOPDomainWallFieldOrder<double>(*this);
+      order_double = new QOPDomainWallOrder<double>(*this);
     else
       errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
   } else if (precision == QUDA_SINGLE_PRECISION) {
@@ -147,7 +148,7 @@ void cpuColorSpinorField::createOrder() {
     else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
       order_single = new SpaceColorSpinOrder<float>(*this);
     else if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-      order_single = new QOPDomainWallFieldOrder<float>(*this);
+      order_single = new QOPDomainWallOrder<float>(*this);
     else
       errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
   } else {
@@ -167,7 +168,8 @@ void cpuColorSpinorField::destroy() {
   }
   
   if (init) {
-    if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) for (int i=0; i<x[nDim-1]; i++) free(v[i]);
+    if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
+      for (int i=0; i<x[nDim-1]; i++) free(((void**)v)[i]);
     free(v);
     init = false;
   }
@@ -192,7 +194,10 @@ void genericCopy(D &dst, const S &src) {
 void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
   checkField(*this, src);
   if (fieldOrder == src.fieldOrder) {
-    memcpy(v, src.v, bytes);
+    if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
+      for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes);
+    else 
+      memcpy(v, src.v, bytes);
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (src.precision == QUDA_DOUBLE_PRECISION) {
@@ -211,16 +216,16 @@ void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
 }
 
 void cpuColorSpinorField::zero() {
-  if (fieldOrder != QUDA_QOP_DOMAIN_WALL_ORDER) memset(v, '\0', bytes);
-  else for (int i=0; i<nDim-1; i++) memset(v[i], '\0', bytes/N[nDim-1]);
+  if (fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) memset(v, '\0', bytes);
+  else for (int i=0; i<x[nDim-1]; i++) memset(((void**)v)[i], '\0', bytes/x[nDim-1]);
 }
 
-// Order-safe random number insertion
+// Random number insertion over all field elements
 template <class T>
-void random() {
-  for (int x=0; x<dst.Volume(); x++) {
-    for (int s=0; s<dst.Nspin(); s++) {
-      for (int c=0; c<dst.Ncolor(); c++) {
+void random(T &t) {
+  for (int x=0; x<t.Volume(); x++) {
+    for (int s=0; s<t.Nspin(); s++) {
+      for (int c=0; c<t.Ncolor(); c++) {
 	for (int z=0; z<2; z++) {
 	  t(x,s,c,z) = rand() / (double)RAND_MAX;
 	}
@@ -228,42 +233,25 @@ void random() {
     }
   }
 }
-// FIXME: needs to be made "order safe"
-template <typename Float>
-void random(Float *v, const int length) {    
 
-}
+// Create a point source at spacetime point x, spin s and colour c
+template <class T>
+void point(T &t, const int x, const int s, const int c) { t(x, s, c, 0) = 1.0; }
 
-// create a point source at spacetime point st, spin s and colour c
-// FIXME: Use accessors to make generic
-template <typename Float>
-void point(Float *v, const int st, const int s, const int c, const int nSpin, 
-	   const int nColor, const QudaFieldOrder fieldOrder) {
-  switch(fieldOrder) {
-  case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER: 
-    v[(st*nSpin+s)*nColor+c] = 1.0;
-    break;
-  case QUDA_SPACE_COLOR_SPIN_FIELD_ORDER:
-    v[(st*nColor+c)*nSpin+s] = 1.0;
-    break;
-  default:
-    errorQuda("Field ordering %d not supported", fieldOrder);
-  }
-}
-
-void cpuColorSpinorField::Source(const QudaSourceType sourceType, const int st, const int s, const int c) {
+void cpuColorSpinorField::Source(const QudaSourceType sourceType, const int x,
+				 const int s, const int c) {
 
   switch(sourceType) {
 
   case QUDA_RANDOM_SOURCE:
-    if (precision == QUDA_DOUBLE_PRECISION) random((double*)v, length);
-    else if (precision == QUDA_SINGLE_PRECISION) random((float*)v, length);
+    if (precision == QUDA_DOUBLE_PRECISION) random(*order_double);
+    else if (precision == QUDA_SINGLE_PRECISION) random(*order_single);
     else errorQuda("Precision not supported");
     break;
 
   case QUDA_POINT_SOURCE:
-    if (precision == QUDA_DOUBLE_PRECISION) point((double*)v, st, s, c, nSpin, nColor, fieldOrder);
-    else if (precision == QUDA_SINGLE_PRECISION) point((float*)v, st, s, c, nSpin, nColor, fieldOrder);
+    if (precision == QUDA_DOUBLE_PRECISION) point(*order_double, x, s, c);
+    else if (precision == QUDA_SINGLE_PRECISION) point(*order_single, x, s, c);
     else errorQuda("Precision not supported");
     break;
 
@@ -274,39 +262,42 @@ void cpuColorSpinorField::Source(const QudaSourceType sourceType, const int st, 
 
 }
 
-template <typename FloatA, typename FloatB>
-static int  compareSpinor(const FloatA *u, const FloatB *v, const int volume, 
-			  const int N, const int resolution) {
-  int fail_check = 16*resolution;
+template <class U, class V>
+int compareSpinor(const U &u, const V &v, const int tol) {
+  int fail_check = 16*tol;
   int *fail = new int[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
+  int N = u.Nspin()*u.Ncolor();
   int *iter = new int[N];
-
   for (int i=0; i<N; i++) iter[i] = 0;
 
-  for (int i=0; i<volume; i++) {
-    for (int j=0; j<N; j++) {
-      int is = i*N+j;
-      double diff = fabs(u[is]-v[is]);
-      for (int f=0; f<fail_check; f++)
-	if (diff > pow(10.0,-(f+1)/(double)resolution)) fail[f]++;
-      if (diff > 1e-3) iter[j]++;
+  for (int x=0; x<u.Volume(); x++) {
+    for (int s=0; s<u.Nspin(); s++) {
+      for (int c=0; c<u.Ncolor(); c++) {
+	for (int z=0; z<2; z++) {
+	  double diff = fabs(u(x,s,c,z) - v(x,s,c,z));
+
+	  for (int f=0; f<fail_check; f++)
+	    if (diff > pow(10.0,-(f+1)/(double)tol)) fail[f]++;
+
+	  int j = s*u.Nspin() + c;
+	  if (diff > 1e-3) iter[j]++;
+	}
+      }
     }
   }
-    
+
   for (int i=0; i<N; i++) printfQuda("%d fails = %d\n", i, iter[i]);
     
   int accuracy_level =0;
   for (int f=0; f<fail_check; f++) {
-    if (fail[f] == 0){
-      accuracy_level = f;
-    }
+    if (fail[f] == 0) accuracy_level = f;
   }
 
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)resolution), 
-	       fail[f], volume*N, fail[f] / (double)(volume*N));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)tol), 
+	       fail[f], u.Volume()*N, fail[f] / (double)(u.Volume()*N));
   }
   
   delete []iter;
@@ -316,27 +307,20 @@ static int  compareSpinor(const FloatA *u, const FloatB *v, const int volume,
 }
 
 int cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, 
-				  const int resolution) {
-  int ret = 0;
-  
+				 const int tol) {
   checkField(a, b);
-  if (a.precision == QUDA_HALF_PRECISION || b.precision == QUDA_HALF_PRECISION) 
-    errorQuda("Half precision not implemented");
-  if (a.fieldOrder != b.fieldOrder || 
-      (a.fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && a.fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER))
-    errorQuda("Field ordering not supported");
-  
+
+  int ret = 0;
   if (a.precision == QUDA_DOUBLE_PRECISION) 
     if (b.precision == QUDA_DOUBLE_PRECISION)
-      ret = compareSpinor((double*)a.v, (double*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+      ret = compareSpinor(*(a.order_double), *(b.order_double), tol);
     else
-      ret = compareSpinor((double*)a.v, (float*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+      ret = compareSpinor(*(a.order_double), *(b.order_single), tol);
   else 
     if (b.precision == QUDA_DOUBLE_PRECISION)
-      ret = compareSpinor((float*)a.v, (double*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
+      ret = compareSpinor(*(a.order_single), *(b.order_double), tol);
     else
-      ret =compareSpinor((float*)a.v, (float*)b.v, a.volume, 2*a.nSpin*a.nColor, resolution);
-
+      ret =compareSpinor(*(a.order_single), *(b.order_single), tol);
 
   return ret;
 }
@@ -431,9 +415,13 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
 				    const QudaDirection dir, const QudaParity oddBit, const int dagger)
 {
   if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
-    errorQuda("Full spinor is not supported in packGhost for cpu\n");
+    errorQuda("Full spinor is not supported in packGhost for cpu");
   }
   
+  if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+    errorQuda("Field order %d not supported", fieldOrder);
+  }
+
   int num_faces=1;
   if(this->nSpin == 1){ //staggered
     num_faces=3;
@@ -533,6 +521,6 @@ void cpuColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 				      const QudaDirection dir, const int dagger)
 {
   if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
-    errorQuda("Full spinor is not supported in unpackGhost for cpu\n");
+    errorQuda("Full spinor is not supported in unpackGhost for cpu");
   }
 }

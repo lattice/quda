@@ -304,6 +304,7 @@ class cudaColorSpinorField : public ColorSpinorField {
 template <typename Float> class ColorSpinorFieldOrder;
 template <typename Float> class SpaceColorSpinOrder;
 template <typename Float> class SpaceSpinColorOrder;
+template <typename Float> class QOPDomainWallOrder;
 
 // CPU implementation
 class cpuColorSpinorField : public ColorSpinorField {
@@ -312,6 +313,7 @@ class cpuColorSpinorField : public ColorSpinorField {
 
   template <typename Float> friend class SpaceColorSpinOrder;
   template <typename Float> friend class SpaceSpinColorOrder;
+  template <typename Float> friend class QOPDomainWallOrder;
 
  public:
   static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; //cpu memory
