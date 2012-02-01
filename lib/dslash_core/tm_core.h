@@ -26,7 +26,7 @@ __device__ float4 operator*(const float &x, const float4 &y)
 #define tmp3_re tmp3.x
 #define tmp3_im tmp3.y
 
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
 __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, 
 				  const double2 *in, const float *null2, DslashParam param)
 {
@@ -150,7 +150,7 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 
    return;  
 }
-#endif // (__CUDA_ARCH__ >= 130)
+#endif // (__COMPUTE_CAPABILITY__ >= 130)
 
 #undef tmp0_re
 #undef tmp0_im

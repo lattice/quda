@@ -314,7 +314,7 @@
 #endif
 
 // only build double precision if supported
-#if !(__CUDA_ARCH__ < 130 && DD_PREC == 0) 
+#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
 
 #define DD_CONCAT(n,r,x) n ## r ## x ## Kernel
 #define DD_FUNC(n,r,x) DD_CONCAT(n,r,x)
@@ -329,7 +329,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #endif
 }
 
-#endif // !(__CUDA_ARCH__ < 130 && DD_PREC == 0)
+#endif // !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 
 
 // clean up

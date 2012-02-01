@@ -290,13 +290,13 @@ template <int dim, int dagger>
 static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, const double2 *in, const float *inNorm,
 						 const int &idx, const int &face_idx, const int &face_volume, const int &face_num)
 {
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif // (__CUDA_ARCH__ >= 130)
+#endif // (__COMPUTE_CAPABILITY__ >= 130)
 }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP

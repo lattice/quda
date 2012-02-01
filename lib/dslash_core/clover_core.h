@@ -3,7 +3,7 @@
 #define CLOVER_SHARED_FLOATS_PER_THREAD 0
 
 
-#if (CUDA_VERSION >= 4100)
+#if (CUDA_VERSION >= 4010)
 #define VOLATILE
 #else
 #define VOLATILE volatile
@@ -266,13 +266,13 @@ VOLATILE spinorFloat o32_re;
 VOLATILE spinorFloat o32_im;
 
 #ifdef SPINOR_DOUBLE
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #endif
 #else
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200

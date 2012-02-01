@@ -8,7 +8,7 @@
 #include "gauge_field.h"
 #include <force_common.h>
 
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SITE_MATRIX_LOAD_TEX 1
 #define MULINK_LOAD_TEX 1
 #define FATLINK_LOAD_TEX 1

@@ -1,6 +1,6 @@
 #include <typeinfo>
 
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
 static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 {
   int4 v = tex1Dfetch(t,i);

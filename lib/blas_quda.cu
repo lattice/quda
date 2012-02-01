@@ -13,7 +13,7 @@
 #define REDUCE_DOUBLE 64
 #define REDUCE_KAHAN 32
 
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
 #define REDUCE_TYPE REDUCE_DOUBLE
 #define QudaSumFloat double
 #define QudaSumComplex cuDoubleComplex
@@ -216,7 +216,7 @@ void setBlock(int kernel, int length, QudaPrecision precision)
   blasGrid.z = 1;
 }
 
-#if (__CUDA_ARCH__ >= 130)
+#if (__COMPUTE_CAPABILITY__ >= 130)
 static __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 {
   int4 v = tex1Dfetch(t,i);
@@ -411,7 +411,7 @@ __device__ float fast_abs_max(float4 a) {
 #define SUM_FLOAT2(sum, a)			\
   float sum = fabs(a.x) + fabs(a.y);
 
-#if (__CUDA_ARCH__ < 200) 
+#if (__COMPUTE_CAPABILITY__ < 200) 
 #define REAL_DOT_FLOAT4(dot, a, b) \
   float dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
 #else
@@ -425,7 +425,7 @@ __device__ float fast_abs_max(float4 a) {
 #define REAL_DOT_FLOAT2(dot, a, b) \
   float dot = a.x*b.x + a.y*b.y;
 
-#if (__CUDA_ARCH__ < 200) 
+#if (__COMPUTE_CAPABILITY__ < 200) 
 #define IMAG_DOT_FLOAT4(dot, a, b)			\
   float dot = a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z;
 #else
@@ -463,7 +463,7 @@ __device__ float fast_abs_max(float4 a) {
 #define MXPY_FLOAT2(X, Y)		     \
   Y.x -= X.x; Y.y -= X.y; 
 
-#if (__CUDA_ARCH__ < 200) 
+#if (__COMPUTE_CAPABILITY__ < 200) 
 #define AXPY_FLOAT4(a, X, Y)		     \
   Y.x += a*X.x;	Y.y += a*X.y;		     \
   Y.z += a*X.z;	Y.w += a*X.w;
@@ -483,7 +483,7 @@ __device__ float fast_abs_max(float4 a) {
 #define AXPBY_FLOAT2(a, X, b, Y)			\
   Y.x = b*Y.x; Y.x += a*X.x; Y.y = b*Y.y; Y.y += a*X.y;		\
 
-#if (__CUDA_ARCH__ < 200)
+#if (__COMPUTE_CAPABILITY__ < 200)
 #define XPAY_FLOAT4(X, a, Y)			     \
   Y.x = X.x + a*Y.x; Y.y = X.y + a*Y.y;		     \
   Y.z = X.z + a*Y.z; Y.w = X.w + a*Y.w;
@@ -496,7 +496,7 @@ __device__ float fast_abs_max(float4 a) {
 #define XPAY_FLOAT2(X, a, Y)			     \
   Y.x = X.x + a*Y.x; Y.y = X.y + a*Y.y;		     
 
-#if (__CUDA_ARCH__ < 200)
+#if (__COMPUTE_CAPABILITY__ < 200)
 #define CAXPY_FLOAT4(a, X, Y)		\
   Y.x += a.x*X.x; Y.x -= a.y*X.y;	\
   Y.y += a.y*X.x; Y.y += a.x*X.y;	\
@@ -508,9 +508,9 @@ __device__ float fast_abs_max(float4 a) {
   Y.y = fmaf(a.y, X.x, Y.y); Y.y = fmaf( a.x, X.y, Y.y);	\
   Y.z = fmaf(a.x, X.z, Y.z); Y.z = fmaf(-a.y, X.w, Y.z);	\
   Y.w = fmaf(a.y, X.z, Y.w); Y.w = fmaf( a.x, X.w, Y.w);
-#endif // (__CUDA_ARCH__ < 200)
+#endif // (__COMPUTE_CAPABILITY__ < 200)
 
-#if (__CUDA_ARCH__ < 200)
+#if (__COMPUTE_CAPABILITY__ < 200)
 #define CAXPY_FLOAT2(a, X, Y)		\
   Y.x += a.x*X.x; Y.x -= a.y*X.y;	\
   Y.y += a.y*X.x; Y.y += a.x*X.y;
@@ -518,7 +518,7 @@ __device__ float fast_abs_max(float4 a) {
 #define CAXPY_FLOAT2(a, X, Y)					\
   Y.x = fmaf(a.x, X.x, Y.x); Y.x = fmaf(-a.y, X.y, Y.x);	\
   Y.y = fmaf(a.y, X.x, Y.y); Y.y = fmaf( a.x, X.y, Y.y);
-#endif // (__CUDA_ARCH__ < 200)
+#endif // (__COMPUTE_CAPABILITY__ < 200)
 
 #define CAXPY_DOUBLE2(a, X, Y)		\
   Y.x += a.x*X.x; Y.x -= a.y*X.y;	\
@@ -565,7 +565,7 @@ __device__ float fast_abs_max(float4 a) {
   z.y = X.y + a.y*Y.x; z.y += a.x*Y.y; z.y += b.y*Z.x; z.y += b.x*Z.y; \
   Z.x = z.x; Z.y = z.y;}
 
-#if (__CUDA_ARCH__ < 200)
+#if (__COMPUTE_CAPABILITY__ < 200)
 #define CAXPBYPZ_FLOAT4(a, X, b, Y, Z)		  \
   Z.x += a.x*X.x - a.y*X.y + b.x*Y.x - b.y*Y.y;   \
   Z.y += a.y*X.x + a.x*X.y + b.y*Y.x + b.x*Y.y;   \
@@ -577,9 +577,9 @@ __device__ float fast_abs_max(float4 a) {
   Z.y = fmaf(a.y, X.x, Z.y); Z.y = fmaf( a.x, X.y, Z.y); Z.y = fmaf(b.y, Y.x, Z.y); Z.y = fmaf( b.x, Y.y, Z.y); \
   Z.z = fmaf(a.x, X.z, Z.z); Z.z = fmaf(-a.y, X.w, Z.z); Z.z = fmaf(b.x, Y.z, Z.z); Z.z = fmaf(-b.y, Y.w, Z.z); \
   Z.w = fmaf(a.y, X.z, Z.w); Z.w = fmaf( a.x, X.w, Z.w); Z.w = fmaf(b.y, Y.z, Z.w); Z.w = fmaf( b.x, Y.w, Z.w);
-#endif // (__CUDA_ARCH__ < 200)
+#endif // (__COMPUTE_CAPABILITY__ < 200)
 
-#if (__CUDA_ARCH__ < 200)
+#if (__COMPUTE_CAPABILITY__ < 200)
 #define CAXPBYPZ_FLOAT2(a, X, b, Y, Z)		  \
   Z.x += a.x*X.x - a.y*X.y + b.x*Y.x - b.y*Y.y;   \
   Z.y += a.y*X.x + a.x*X.y + b.y*Y.x + b.x*Y.y;
@@ -587,7 +587,7 @@ __device__ float fast_abs_max(float4 a) {
 #define CAXPBYPZ_FLOAT2(a, X, b, Y, Z)				\
   Z.x = fmaf(a.x, X.x, Z.x); Z.x = fmaf(-a.y, X.y, Z.x); Z.x = fmaf(b.x, Y.x, Z.x); Z.x = fmaf(-b.y, Y.y, Z.x); \
   Z.y = fmaf(a.y, X.x, Z.y); Z.y = fmaf( a.x, X.y, Z.y); Z.y = fmaf(b.y, Y.x, Z.y); Z.y = fmaf( b.x, Y.y, Z.y);
-#endif // (__CUDA_ARCH__ < 200)
+#endif // (__COMPUTE_CAPABILITY__ < 200)
 
 // Double precision input spinor field
 texture<int4, 1> xTexDouble2;
@@ -2223,7 +2223,7 @@ void caxpbypzYmbwCuda(const quda::Complex &a, cudaColorSpinorField &x, const qud
   if (!blasTuning) checkCudaError();
 }
 
-#if (__CUDA_ARCH__ < 130)
+#if (__COMPUTE_CAPABILITY__ < 130)
 // Computes c = a + b in "double single" precision.
 __device__ void dsadd(volatile QudaSumFloat &c0, volatile QudaSumFloat &c1, const volatile QudaSumFloat &a0, 
 		      const volatile QudaSumFloat &a1, const float b0, const float b1) {
@@ -3558,7 +3558,7 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpin
   } else {
     // fused nSpin=4 kernel is slow on Fermi
     // N.B. this introduces an extra half truncation so will affect convergence (for the better?)
-    if (!blasTuning && (__CUDA_ARCH__ >= 200) && x.Nspin() == 4) {
+    if (!blasTuning && (__COMPUTE_CAPABILITY__ >= 200) && x.Nspin() == 4) {
       caxpbypzYmbwCuda(a, x, b, y, z, w);
       return cDotProductNormBCuda(u, y);
     }
