@@ -4,34 +4,20 @@
 #include <sys/time.h>
 #include <cuda.h>
 
-#include <quda_internal.h>
-
 #include "quda.h"
-#include "dslash_quda.h"
-#include "llfat_quda.h"
-
 #include "test_util.h"
 #include "llfat_reference.h"
 #include "misc.h"
-#include "gauge_field.h"
-#include "fat_force_quda.h"
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
 #include "mpicomm.h"
-#include <mpi.h>
 #endif
 
-#define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-extern void usage(char** argv );
-
-
+extern void usage(char** argv);
 static int verify_results = 0;
-
-
-#define DIM 24
 
 extern int device;
 int Z[4];
@@ -70,11 +56,11 @@ setDims(int *X) {
   Vs[1] = Vs_y = X[0]*X[2]*X[3];
   Vs[2] = Vs_z = X[0]*X[1]*X[3];
   Vs[3] = Vs_t = X[0]*X[1]*X[2];
-
   Vsh[0] = Vsh_x = Vs_x/2;
   Vsh[1] = Vsh_y = Vs_y/2;
   Vsh[2] = Vsh_z = Vs_z/2;
   Vsh[3] = Vsh_t = Vs_t/2;
+
 
   V_ex = 1;
   for (int d=0; d< 4; d++) {
@@ -102,7 +88,7 @@ llfat_test(int test)
   
 
   initQuda(device);
-  
+
   gSize = cpu_prec;  
   qudaGaugeParam = newQudaGaugeParam();
   

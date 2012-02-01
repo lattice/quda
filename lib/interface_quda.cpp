@@ -1630,7 +1630,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     }    
   }
   
-  
   qudaGaugeParam->llfat_ga_pad = gParam.pad = Vsh_t;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
