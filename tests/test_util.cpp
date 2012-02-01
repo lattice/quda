@@ -1121,9 +1121,11 @@ printLinkElement(void *link, int X, QudaPrecision precision)
   }
 }
 
-int strong_check_link(void** linkA, void **linkB, int len, QudaPrecision prec) 
+int strong_check_link(void** linkA, const char* msgA, 
+		      void **linkB, const char* msgB, 
+		      int len, QudaPrecision prec) 
 {
-  printfQuda("LinkA:\n");
+  printfQuda("%s\n", msgA);
   printLinkElement(linkA[0], 0, prec); 
   printfQuda("\n");
   printLinkElement(linkA[0], 1, prec); 
@@ -1131,7 +1133,7 @@ int strong_check_link(void** linkA, void **linkB, int len, QudaPrecision prec)
   printLinkElement(linkA[3], len-1, prec); 
   printfQuda("\n");    
     
-  printfQuda("\nlinkB:\n");
+  printfQuda("\n%s\n", msgB);
   printLinkElement(linkB[0], 0, prec); 
   printfQuda("\n");
   printLinkElement(linkB[0], 1, prec); 
