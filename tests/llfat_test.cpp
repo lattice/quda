@@ -288,6 +288,7 @@ llfat_init(int test)
       gParam.link_type = QUDA_WILSON_LINKS;
       cudaSiteLink = new cudaGaugeField(gParam);  
  
+      
 
       GaugeFieldParam gStapleParam(0, qudaGaugeParam);
       gStapleParam.create = QUDA_NULL_FIELD_CREATE;  
@@ -304,7 +305,9 @@ llfat_init(int test)
       qudaGaugeParam.site_ga_pad = gParam.pad = Vsh_t;
       gParam.reconstruct = link_recon;
       cudaSiteLink = new cudaGaugeField(gParam);
-      
+
+      GaugeFieldParam test_param;
+
       GaugeFieldParam gStapleParam(0, qudaGaugeParam);
       gStapleParam.create = QUDA_NULL_FIELD_CREATE;  
       gStapleParam.reconstruct = QUDA_RECONSTRUCT_NO;
