@@ -428,8 +428,8 @@ invert_test(void)
       
       printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
-      //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
-      if (sqrt(nrm2/src2) > 100*inv_param.tol){
+      //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+      if (sqrt(nrm2/src2) > 10*inv_param.tol){
 	ret |=1;
       }
     }
