@@ -3,7 +3,7 @@
 #define CLOVER_SHARED_FLOATS_PER_THREAD 0
 
 
-#if (CUDA_VERSION >= 4100)
+#if (CUDA_VERSION >= 4010)
 #define VOLATILE
 #else
 #define VOLATILE volatile
