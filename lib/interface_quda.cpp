@@ -1568,6 +1568,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   return;
 }
 
+#ifdef GPU_FATLINK 
 /*   @method  
  *   QUDA_COMPUTE_FAT_STANDARD: standard method (default)
  *   QUDA_COMPUTE_FAT_EXTENDED_VOLUME, extended volume method
@@ -1696,7 +1697,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     qudaGaugeParam_ex->llfat_ga_pad = qudaGaugeParam->llfat_ga_pad;
   }
 
-  initDslashConstants(*cudaFatLink, 0);
+  initCommonConstants(*cudaFatLink);
 
   if(method == QUDA_COMPUTE_FAT_STANDARD){
     llfat_init_cuda(qudaGaugeParam);
@@ -1715,7 +1716,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     
     llfat_cuda(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, 
 	       qudaGaugeParam, act_path_coeff);
-  }else{ //method == 1
+  }else{ //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
     llfat_init_cuda_ex(qudaGaugeParam_ex);
 #ifdef MULTI_GPU
     exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink_ex->Gauge_p(), qudaGaugeParam->cpu_prec, 1);
@@ -1747,6 +1748,8 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   
   return 0;
 }
+
+#endif
 
 void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
 
