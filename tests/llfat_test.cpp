@@ -183,7 +183,8 @@ llfat_test(int test)
   struct timeval t0, t1;
   gettimeofday(&t0, NULL);
   if(test == 0){
-    computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam);
+    computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
+		       QUDA_COMPUTE_FAT_STANDARD);
   }else{
     computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam, 
 		       QUDA_COMPUTE_FAT_EXTENDED_VOLUME);

@@ -1576,7 +1576,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
  */
 int
 computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff, 
-		   QudaGaugeParam* qudaGaugeParam, QudaComputeFatMethod method)
+		   QudaGaugeParam* qudaGaugeParam, 
+		   QudaComputeFatMethod method)
 {
   cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL, *cpuSiteLink_ex=NULL;
   cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL, *cudaSiteLink_ex=NULL;

@@ -166,7 +166,7 @@ extern "C" {
   
   int computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff, 
 			 QudaGaugeParam* param, 
-			 QudaComputeFatMethod method=QUDA_COMPUTE_FAT_STANDARD);
+			 QudaComputeFatMethod method);
   
   
 #ifdef HOST_DEBUG
