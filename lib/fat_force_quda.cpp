@@ -922,7 +922,8 @@ do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd,
     cudaStreamCreate(&streams[i]);
   }
   
-
+  cudaThreadSynchronize(); checkCudaError();
+  
   double* unpackedDataEven;
   double* unpackedDataOdd;
   int datalen = 4*Vh*gaugeSiteSize*sizeof(Float);
@@ -931,6 +932,9 @@ do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd,
   
   //unpack even data kernel
   link_format_gpu_to_cpu((void*)unpackedDataEven, (void*)even, bytes, Vh, stride, prec, streams[0]);
+
+  cudaThreadSynchronize(); checkCudaError();
+
 #ifdef GPU_DIRECT 
   cudaMemcpyAsync(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost, streams[0]);
 #else

@@ -267,7 +267,12 @@ extern "C" {
     QUDA_BACKWARDS,
     QUDA_FORWARDS
   } QudaDirection;
-
+  
+  typedef enum QudaComputeFatMethod_s{
+    QUDA_COMPUTE_FAT_STANDARD,
+    QUDA_COMPUTE_FAT_EXTENDED_VOLUME,
+    QUDA_COMPUTE_FAT_INVALID=  QUDA_INVALID_ENUM
+  }QudaComputeFatMethod;
 #ifdef __cplusplus
 }
 #endif
