@@ -89,6 +89,7 @@ llfat_test(int test)
 
   initQuda(device);
 
+  cpu_prec = prec;
   gSize = cpu_prec;  
   qudaGaugeParam = newQudaGaugeParam();
   
@@ -202,7 +203,20 @@ llfat_test(int test)
   }
   
   if (verify_results){
-
+    
+    //FIXME: we have this compplication because references takes coeff as float/double 
+    //        depending on the precision while the GPU code aways take coeff as double
+    void* coeff;
+    double coeff_dp[6];
+    float  coeff_sp[6];
+    for(int i=0;i < 6;i++){
+      coeff_sp[i] = coeff_dp[i] = act_path_coeff[i];
+    }
+    if(prec == QUDA_DOUBLE_PRECISION){
+      coeff = coeff_dp;
+    }else{
+      coeff = coeff_sp;
+    }
 #ifdef MULTI_GPU
     int optflag = 0;
     //we need x,y,z site links in the back and forward T slice
@@ -250,9 +264,9 @@ llfat_test(int test)
     }
     
     exchange_cpu_sitelink(qudaGaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, optflag);
-    llfat_reference_mg(reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference_mg(reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, coeff);
 #else
-    llfat_reference(reflink, sitelink, qudaGaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference(reflink, sitelink, qudaGaugeParam.cpu_prec, coeff);
 #endif
     
   }//verify_results
@@ -361,7 +375,6 @@ void
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
-  printfQuda("    --cpu_prec <double/single/half>          # The CPU precision\n"); 
   printfQuda("    --test <0/1>                             # Test method\n");
   printfQuda("                                                0: standard method\n");
   printfQuda("                                                1: extended volume method\n");
@@ -386,15 +399,6 @@ main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }
-
-    if( strcmp(argv[i], "--cpu_prec") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      cpu_prec =  get_prec(argv[i+1]);
-      i++;
-      continue;	    
-    }	 
     
     if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
