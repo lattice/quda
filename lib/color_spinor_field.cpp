@@ -153,8 +153,9 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
   createGhostZone();
 
   bytes = total_length * precision; // includes pads and ghost zones
+  bytes = ALIGNMENT_ADJUST(bytes);
   norm_bytes = total_norm_length * sizeof(float);
-
+  norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
   init = true;
 }
 
