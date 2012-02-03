@@ -3,11 +3,13 @@
 #include <string.h>
 #include <sys/time.h>
 #include <cuda.h>
+#include <cuda_runtime.h>
 
 #include "quda.h"
 #include "test_util.h"
 #include "llfat_reference.h"
 #include "misc.h"
+#include "util_quda.h"
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
@@ -360,12 +362,14 @@ display_test_info(int test)
 	     get_recon_str(link_recon), 
 	     xdim, ydim, zdim, tdim, test);
 
+#ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n",
              commDimPartitioned(0),
              commDimPartitioned(1),
              commDimPartitioned(2),
              commDimPartitioned(3));
+#endif
 
   return ;
   
