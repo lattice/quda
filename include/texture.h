@@ -38,16 +38,16 @@
   // double2
   template<> __device__ inline double2 Texture<double2,0>::fetch(unsigned int idx) 
     { int4 v = tex1Dfetch(tex_int4_0,idx); 
-      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.z, v.w)); }
+      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
   template<> __device__ inline double2 Texture<double2,1>::fetch(unsigned int idx) 
     { int4 v = tex1Dfetch(tex_int4_1,idx); 
-      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.z, v.w)); }
+      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
   template<> __device__ inline double2 Texture<double2,2>::fetch(unsigned int idx) 
     { int4 v = tex1Dfetch(tex_int4_2,idx); 
-      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.z, v.w)); }
+      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
   template<> __device__ inline double2 Texture<double2,3>::fetch(unsigned int idx) 
     { int4 v = tex1Dfetch(tex_int4_3,idx); 
-      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.z, v.w)); }
+      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
   template<> __device__ inline double2 Texture<double2,4>::fetch(unsigned int idx) 
     { int4 v = tex1Dfetch(tex_int4_4,idx); 
-      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.z, v.w)); }
+      return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }

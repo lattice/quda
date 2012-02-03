@@ -624,8 +624,8 @@ __device__ void cxpaypbz(float4 &x, const float2 &a, float4 &y, const float2 &b,
   float4 zz;
   zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
   zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
-  zz.z = x.z + a.x*y.z; zz.x -= a.y*y.w; zz.x += b.x*z.z; zz.x -= b.y*z.w;
-  zz.w = x.w + a.y*y.z; zz.y += a.x*y.w; zz.y += b.y*z.z; zz.y += b.x*z.w;
+  zz.z = x.z + a.x*y.z; zz.z -= a.y*y.w; zz.z += b.x*z.z; zz.z -= b.y*z.w;
+  zz.w = x.w + a.y*y.z; zz.w += a.x*y.w; zz.w += b.y*z.z; zz.w += b.x*z.w;
   z = zz;
 }
 
