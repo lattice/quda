@@ -1182,9 +1182,36 @@ template <typename floatN, typename shortN, int M, int texIdx>
 __forceinline__ __device__ void loadSpinor(floatN x[], int i, int stride) {
 
   float xN = tex1Dfetch(getTexture<float, cudaReadModeElementType>(texIdx), i);
-  for (int j=0; j<M; j++) {
-    x[j] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + j*stride);
-    x[j] *= xN;
+
+  switch (M) {
+  case 6:
+    x[0] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 0*stride);
+    x[0] *= xN;
+    x[1] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 1*stride);
+    x[1] *= xN;
+    x[2] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 2*stride);
+    x[2] *= xN;
+    x[3] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 3*stride);
+    x[3] *= xN;
+    x[4] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 4*stride);
+    x[4] *= xN;
+    x[5] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 5*stride);
+    x[5] *= xN;
+    break;
+  case 3:
+    x[0] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 0*stride);
+    x[0] *= xN;
+    x[1] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 1*stride);
+    x[1] *= xN;
+    x[2] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + 2*stride);
+    x[2] *= xN;
+    break;
+  default:
+#pragma unroll
+    for (int j=0; j<M; j++) {
+      x[j] = tex1Dfetch((getTexture<shortN, cudaReadModeNormalizedFloat>(texIdx)), i + j*stride);
+      x[j] *= xN;
+    }
   }
 
 }
@@ -1211,11 +1238,14 @@ template <typename floatN, typename shortN, int M>
 __forceinline__ __device__ void saveSpinor(shortN *xH, float *xN, floatN x[M], int i, int stride) {
 
   float c[M];
+#pragma unroll
   for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
+#pragma unroll
   for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
   xN[i] = c[0];
   float C = __fdividef(MAX_SHORT, c[0]);
 
+#pragma unroll
   for (int j=0; j<M; j++) {    
     xH[i+j*stride] = make_shortN(C*x[j]);
   }
@@ -1234,6 +1264,7 @@ __global__ void xpyKernel(shortN *yH, float *yN, int stride, int length) {
     loadSpinor<floatN, shortN, M, 1>(x, i, stride);
     loadSpinor<floatN, shortN, M, 2>(y, i, stride);
 
+#pragma unroll
     for (int j=0; j<M; j++) y[j] += x[j];
 
     saveSpinor<floatN, shortN, M>(yH, yN, y, i, stride);
@@ -1241,6 +1272,7 @@ __global__ void xpyKernel(shortN *yH, float *yN, int stride, int length) {
     i += gridSize;
   }
 }
+
 // performs the operation y[i] = x[i] + y[i]
 void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   checkSpinor(x,y);
@@ -1283,6 +1315,27 @@ __global__ void axpyKernel(Float a, Float2 *x, Float2 *y, int len) {
     y[i] += a*x[i];
     i += gridSize;
   } 
+}
+
+template <typename floatN, typename shortN, int M>
+__global__ void axpyKernel(float a, shortN *yH, float *yN, int stride, int length) {
+
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+
+    floatN x[M];
+    floatN y[M];
+    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
+    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
+
+#pragma unroll
+    for (int j=0; j<M; j++) y[j] += a*x[j];
+
+    saveSpinor<floatN, shortN, M>(yH, yN, y, i, stride);
+
+    i += gridSize;
+  }
 }
 
 __global__ void axpyHKernel(float a, short4 *yH, float *yN, int stride, int length) {
@@ -1337,9 +1390,11 @@ void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y)
   } else {
     bindTexture(&x, &y);
     if (x.Nspin() == 4){ //wilson
-      axpyHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      axpyKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((float)a, (short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      //axpyHKernel<<<blasGrid, blasBlock>>>((float)a, (short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
     }else if (x.Nspin() == 1){ //staggered
-      axpyHKernel<<<blasGrid, blasBlock>>>((float)a, (short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      axpyKernel<float2, short2, 3><<<blasGrid, blasBlock>>>((float)a, (short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      //axpyHKernel<<<blasGrid, blasBlock>>>((float)a, (short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
     }
