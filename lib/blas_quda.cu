@@ -556,8 +556,8 @@ __device__ void caxpby(const float2 &a, float4 &x, const float2 &b, float4 &y)
   { float4 yy;								
   yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
   yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
-  yy.z = a.x*x.z; yy.x -= a.y*x.w; yy.x += b.x*y.z; yy.x -= b.y*y.w;	
-  yy.w = a.y*x.z; yy.y += a.x*x.w; yy.y += b.y*y.z; yy.y += b.x*y.w;	
+  yy.z = a.x*x.z; yy.z -= a.y*x.w; yy.z += b.x*y.z; yy.z -= b.y*y.w;	
+  yy.w = a.y*x.z; yy.w += a.x*x.w; yy.w += b.y*y.z; yy.w += b.x*y.w;	
   y = yy; }
 
 __device__ void caxpby(const float2 &a, float2 &x, const float2 &b, float2 &y)					
