@@ -1595,33 +1595,6 @@ __global__ void caxpyKernel(Float2 a, T x, Float2 *y, int len) {
   
 }
 
-/*
-template <typename Float2>
-__global__ void caxpyDKernel(Float2 a, Float2 *x, Float2 *y, int len) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 X = READ_DOUBLE2_TEXTURE(x, i);
-    y[i].x += a.x*X.x - a.y*X.y;
-    y[i].y += a.y*X.x + a.x*X.y;
-    i += gridSize;
-  } 
-}
-
-template <typename Float2>
-__global__ void caxpySKernel(Float2 a, Float2 *x, Float2 *y, int len) {
-  
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 X = read_Float2(x, i);
-    y[i].x += a.x*X.x - a.y*X.y;
-    y[i].y += a.y*X.x + a.x*X.y;
-    i += gridSize;
-  } 
-  
-  }*/
-
 template <typename floatN, typename shortN, int M>
 __global__ void caxpyKernel(float2 a, shortN *yH, float *yN, int stride, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
@@ -1655,11 +1628,9 @@ void caxpyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorF
   quda::blas_flops += 4*x.RealLength();
   
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    //bindTexture(&x, &y);
     double2 a2 = make_double2(real(a), imag(a));
-    Texture<double2, 0> xTex;
-    xTex.bind((double2*)x.V());
-    caxpyKernel<<<blasGrid, blasBlock>>>(a2, xTex /*(double2*)x.V()*/, (double2*)y.V(), length);
+    Texture<double2, 0> xTex((double2*)x.V(), x.Bytes());
+    caxpyKernel<<<blasGrid, blasBlock>>>(a2, xTex, (double2*)y.V(), length);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     float2 a2 = make_float2(real(a), imag(a));
     caxpyKernel<<<blasGrid, blasBlock>>>(a2, (float2*)x.V(), (float2*)y.V(), length);
