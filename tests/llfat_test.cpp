@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <cuda.h>
+#include <cuda_runtime.h>
 
 #include "quda.h"
 #include "test_util.h"
@@ -90,7 +91,8 @@ llfat_test(int test)
 
   initQuda(device);
 
-  gSize = cpu_prec;
+  cpu_prec = prec;
+  gSize = cpu_prec;  
   qudaGaugeParam = newQudaGaugeParam();
   
   qudaGaugeParam.anisotropy = 1.0;
@@ -203,7 +205,20 @@ QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
   }
   
   if (verify_results){
-
+    
+    //FIXME: we have this compplication because references takes coeff as float/double 
+    //        depending on the precision while the GPU code aways take coeff as double
+    void* coeff;
+    double coeff_dp[6];
+    float  coeff_sp[6];
+    for(int i=0;i < 6;i++){
+      coeff_sp[i] = coeff_dp[i] = act_path_coeff[i];
+    }
+    if(prec == QUDA_DOUBLE_PRECISION){
+      coeff = coeff_dp;
+    }else{
+      coeff = coeff_sp;
+    }
 #ifdef MULTI_GPU
     int optflag = 0;
     //we need x,y,z site links in the back and forward T slice
@@ -251,9 +266,9 @@ memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
     }
     
     exchange_cpu_sitelink(qudaGaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, optflag);
-    llfat_reference_mg(reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference_mg(reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, coeff);
 #else
-    llfat_reference(reflink, sitelink, qudaGaugeParam.cpu_prec, act_path_coeff);
+    llfat_reference(reflink, sitelink, qudaGaugeParam.cpu_prec, coeff);
 #endif
     
   }//verify_results
@@ -340,20 +355,21 @@ display_test_info(int test)
 {
   printfQuda("running the following test:\n");
     
-  printfQuda("link_precision link_reconstruct space_dimension T_dimension Test\n");
-  printfQuda("%s %s %d/%d/%d/ %d %d\n",
-get_prec_str(prec),
-get_recon_str(link_recon),
-xdim, ydim, zdim, tdim, test);
+  printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       Test\n");
+  printfQuda("%s                       %s                         %d/%d/%d/                  %d            %d\n", 
+	     get_prec_str(prec),
+	     get_recon_str(link_recon), 
+	     xdim, ydim, zdim, tdim, test);
 
 #ifdef MULTI_GPU
-  printfQuda("Grid partition info: X Y Z T\n");
-  printfQuda(" %d %d %d %d\n",
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n",
              commDimPartitioned(0),
              commDimPartitioned(1),
              commDimPartitioned(2),
              commDimPartitioned(3));
-#endif 
+#endif
+
   return ;
   
 }
@@ -362,11 +378,10 @@ void
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
-  printfQuda(" --cpu_prec <double/single/half> # The CPU precision\n");
-  printfQuda(" --test <0/1> # Test method\n");
-  printfQuda(" 0: standard method\n");
-  printfQuda(" 1: extended volume method\n");
-  printfQuda(" --verify # Verify the GPU results using CPU results\n");
+  printfQuda("    --test <0/1>                             # Test method\n");
+  printfQuda("                                                0: standard method\n");
+  printfQuda("                                                1: extended volume method\n");
+  printfQuda("    --verify                                 # Verify the GPU results using CPU results\n");
   return ;
 }
 
@@ -388,14 +403,6 @@ main(int argc, char **argv)
       continue;
     }
 
-    if( strcmp(argv[i], "--cpu_prec") == 0){
-      if (i+1 >= argc){
-usage(argv);
-      }
-      cpu_prec = get_prec(argv[i+1]);
-      i++;
-      continue;
-    }
     
     if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
