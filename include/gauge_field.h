@@ -46,7 +46,7 @@ struct GaugeFieldParam : public LatticeFieldParam {
 	  verbosity = QUDA_SILENT;
 	  nDim = 4;
 	  pad  = 0;
-	  for(int dir=0; dir<nDim; ++dir) x[dir] = -1;
+	  for(int dir=0; dir<nDim; ++dir) x[dir] = 0;
 	}
 	
   
