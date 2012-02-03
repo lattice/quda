@@ -1150,12 +1150,12 @@ __global__ void xpyHKernel(short2 *yH, float *yN, int stride, int length) {
 }
 
 template <typename T, enum cudaTextureReadMode mode>
-__device__ texture<T, 1, mode>& getTexture(const int texIdx) {
+__forceinline__ __device__ texture<T, 1, mode> getTexture(int texIdx) {
   // do nothing
 }
 
 template <>
-__device__ texture<float, 1, cudaReadModeElementType>& getTexture<float, cudaReadModeElementType>(const int texIdx) {
+__forceinline__ __device__ texture<float, 1, cudaReadModeElementType> getTexture<float, cudaReadModeElementType>(int texIdx) {
   if (texIdx == 1) return texNorm1;
   else if (texIdx == 2) return texNorm2;
 
@@ -1163,7 +1163,7 @@ __device__ texture<float, 1, cudaReadModeElementType>& getTexture<float, cudaRea
 }
 
 template <>
-__device__ texture<short4, 1, cudaReadModeNormalizedFloat>& getTexture<short4, cudaReadModeNormalizedFloat>(const int texIdx) {
+__forceinline__ __device__ texture<short4, 1, cudaReadModeNormalizedFloat> getTexture<short4, cudaReadModeNormalizedFloat>(int texIdx) {
   if (texIdx == 1) return texHalf1;
   else if (texIdx == 2) return texHalf2;
 
@@ -1171,15 +1171,15 @@ __device__ texture<short4, 1, cudaReadModeNormalizedFloat>& getTexture<short4, c
 }
 
 template <>
-__device__ texture<short2, 1, cudaReadModeNormalizedFloat>& getTexture<short2, cudaReadModeNormalizedFloat>(const int texIdx) {
+__forceinline__ __device__ texture<short2, 1, cudaReadModeNormalizedFloat> getTexture<short2, cudaReadModeNormalizedFloat>(int texIdx) {
   if (texIdx == 1) return texHalfSt1;
   else if (texIdx == 2) return texHalfSt2;
 
   return texHalfSt1;
 }
 
-template <typename floatN, typename shortN, int M>
-__device__ void loadSpinor(floatN x[], const int texIdx, int i, int stride) {
+template <typename floatN, typename shortN, int M, int texIdx>
+__forceinline__ __device__ void loadSpinor(floatN x[], int i, int stride) {
 
   float xN = tex1Dfetch(getTexture<float, cudaReadModeElementType>(texIdx), i);
   for (int j=0; j<M; j++) {
@@ -1189,26 +1189,26 @@ __device__ void loadSpinor(floatN x[], const int texIdx, int i, int stride) {
 
 }
 
-__device__ float max_fabs(const float4 &c) {
+__forceinline__ __device__ float max_fabs(const float4 &c) {
   float a = fmaxf(fabsf(c.x), fabsf(c.y));
   float b = fmaxf(fabsf(c.z), fabsf(c.w));
   return fmaxf(a, b);
 };
 
-__device__ float max_fabs(const float2 &b) {
+__forceinline__ __device__ float max_fabs(const float2 &b) {
   return fmaxf(fabsf(b.x), fabsf(b.y));
 };
 
-__device__ short4 make_shortN(const float4 &a) {
+__forceinline__ __device__ short4 make_shortN(const float4 &a) {
   return make_short4(a.x, a.y, a.z, a.w);
 }
 
-__device__ short2 make_shortN(const float2 &a) {
+__forceinline__ __device__ short2 make_shortN(const float2 &a) {
   return make_short2(a.x, a.y);
 }
 
 template <typename floatN, typename shortN, int M>
-__device__ void saveSpinor(shortN *xH, float *xN, floatN x[M], int i, int stride) {
+__forceinline__ __device__ void saveSpinor(shortN *xH, float *xN, floatN x[M], int i, int stride) {
 
   float c[M];
   for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
@@ -1231,8 +1231,8 @@ __global__ void xpyKernel(shortN *yH, float *yN, int stride, int length) {
 
     floatN x[M];
     floatN y[M];
-    loadSpinor<floatN, shortN, M>(x, 1, i, stride);
-    loadSpinor<floatN, shortN, M>(y, 2, i, stride);
+    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
+    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
 
     for (int j=0; j<M; j++) y[j] += x[j];
 
@@ -1259,8 +1259,8 @@ void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   } else {
     bindTexture(&x, &y);
     if (x.Nspin() == 4){ //wilson
-      //xpyKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
-      xpyHKernel<<<blasGrid, blasBlock>>>((short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      xpyKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      //xpyHKernel<<<blasGrid, blasBlock>>>((short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
     }else if (x.Nspin() == 1){ //staggered
       xpyKernel<float2, short2, 3><<<blasGrid, blasBlock>>>((short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
       //xpyHKernel<<<blasGrid, blasBlock>>>((short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
