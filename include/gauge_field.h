@@ -22,8 +22,8 @@ struct GaugeFieldParam : public LatticeFieldParam {
 
   QudaFieldCreate create; // used to determine the type of field created
 
-  int pinned; //used in cpu field only, where the host memory is pinned
   int is_staple; //set to 1 for staple, used in fatlink computation
+  int pinned; //used in cpu field only, where the host memory is pinned
 
   // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
