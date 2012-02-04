@@ -632,8 +632,8 @@ void bindTexture(const cudaColorSpinorField *x, const cudaColorSpinorField *y=0,
 		 const cudaColorSpinorField *u=0)
 {
   QudaPrecision precision = x->Precision();
-  size_t spinor_bytes = x->Length() * precision;
-
+  size_t spinor_bytes = x->Bytes() * precision;
+  size_t norm_bytes = x->NormBytes();
   if (precision == QUDA_DOUBLE_PRECISION) {
 
     cudaBindTexture(0, xTexDouble2, x->V(), spinor_bytes); 
@@ -657,41 +657,41 @@ void bindTexture(const cudaColorSpinorField *x, const cudaColorSpinorField *y=0,
 
     if (x->Nspin() == 4){ //wilson
       cudaBindTexture(0, texHalf1, x->V(), spinor_bytes); 
-      cudaBindTexture(0, texNorm1, x->Norm(), spinor_bytes/12);    
+      cudaBindTexture(0, texNorm1, x->Norm(), norm_bytes);    
       if (y) {
 	cudaBindTexture(0, texHalf2, y->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm2, y->Norm(), spinor_bytes/12);    
+	cudaBindTexture(0, texNorm2, y->Norm(), norm_bytes);  
       }
       if (z) {
 	cudaBindTexture(0, texHalf3, z->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm3, z->Norm(), spinor_bytes/12);    
+	cudaBindTexture(0, texNorm3, z->Norm(), norm_bytes);  
       }
       if (w) {
 	cudaBindTexture(0, texHalf4, w->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm4, w->Norm(), spinor_bytes/12);    
+	cudaBindTexture(0, texNorm4, w->Norm(), norm_bytes);  
       }
       if (u) {
 	cudaBindTexture(0, texHalf5, u->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm5, u->Norm(), spinor_bytes/12);    
+	cudaBindTexture(0, texNorm5, u->Norm(), norm_bytes);  
       }
     } else if (x->Nspin() == 1){ //staggered
       cudaBindTexture(0, texHalfSt1, x->V(), spinor_bytes); 
-      cudaBindTexture(0, texNorm1, x->Norm(), spinor_bytes/3);    
+      cudaBindTexture(0, texNorm1, x->Norm(), norm_bytes);    
       if (y) {
 	cudaBindTexture(0, texHalfSt2, y->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm2, y->Norm(), spinor_bytes/3);
+	cudaBindTexture(0, texNorm2, y->Norm(), norm_bytes);
       }
       if (z) {
 	cudaBindTexture(0, texHalfSt3, z->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm3, z->Norm(), spinor_bytes/3);
+	cudaBindTexture(0, texNorm3, z->Norm(), norm_bytes);
       }
       if (w) {
 	cudaBindTexture(0, texHalfSt4, w->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm4, w->Norm(), spinor_bytes/3);
+	cudaBindTexture(0, texNorm4, w->Norm(), norm_bytes);
       }
       if (u) {
 	cudaBindTexture(0, texHalfSt5, u->V(), spinor_bytes); 
-	cudaBindTexture(0, texNorm5, u->Norm(), spinor_bytes/3);
+	cudaBindTexture(0, texNorm5, u->Norm(), norm_bytes);
       }
     } else {
       errorQuda("Number of spins undefined");
