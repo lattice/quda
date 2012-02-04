@@ -1663,6 +1663,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     qudaGaugeParam->staple_pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
     
 #else
+    gParam.reconstruct = qudaGaugeParam->reconstruct;
     qudaGaugeParam->site_ga_pad = gParam.pad = Vsh_t;
     cudaSiteLink = new cudaGaugeField(gParam);
     
@@ -1678,6 +1679,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     
 #endif
   }else{    
+    gParam_ex.reconstruct = qudaGaugeParam->reconstruct;
     qudaGaugeParam_ex->site_ga_pad = gParam_ex.pad = E1*E2*E3/2*3;
     gParam_ex.create = QUDA_NULL_FIELD_CREATE;
     cudaSiteLink_ex = new cudaGaugeField(gParam_ex);

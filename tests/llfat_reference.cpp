@@ -344,7 +344,7 @@ llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_p
     break;
   }
   default:
-    fprintf(stderr, "ERROR: unsupported precision\n");
+    fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
     exit(1);
     break;
 	
@@ -726,7 +726,7 @@ llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink,
     break;
   }
   default:
-    fprintf(stderr, "ERROR: unsupported precision\n");
+    fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
     exit(1);
     break;
 	
