@@ -19,6 +19,8 @@ extern "C" {
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
 
+  
+
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,
     QUDA_FLOAT2_GAUGE_ORDER = 2, // no reconstruct and double precision

@@ -41,8 +41,8 @@ extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
 extern QudaReconstructType link_recon;
-extern QudaPrecision  prec;
-static QudaPrecision  cpu_prec = QUDA_DOUBLE_PRECISION;
+extern QudaPrecision prec;
+static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static size_t gSize;
 
 void
@@ -68,7 +68,7 @@ setDims(int *X) {
   for (int d=0; d< 4; d++) {
     V_ex *= X[d]+4;
   }
-  Vh_ex = V_ex/2; 
+  Vh_ex = V_ex/2;
 
   X1=X[0]; X2 = X[1]; X3=X[2]; X4=X[3];
   X1h=X1/2;
@@ -79,8 +79,8 @@ setDims(int *X) {
 }
 
 static int
-llfat_test(int test) 
-{  
+llfat_test(int test)
+{
 
   QudaGaugeParam qudaGaugeParam;
 #ifdef MULTI_GPU
@@ -152,13 +152,13 @@ llfat_test(int test)
     int x1 = 2*x1h + x1odd;
     
     /*
-      if( x1< 2 || x1 >= X1 +2
-      || x2< 2 || x2 >= X2 +2
-      || x3< 2 || x3 >= X3 +2
-      || x4< 2 || x4 >= X4 +2){
-      continue;
-      }
-    */
+if( x1< 2 || x1 >= X1 +2
+|| x2< 2 || x2 >= X2 +2
+|| x3< 2 || x3 >= X3 +2
+|| x4< 2 || x4 >= X4 +2){
+continue;
+}
+*/
     
     
     x1 = (x1 - 2 + X1) % X1;
@@ -178,7 +178,7 @@ llfat_test(int test)
   }//i
   
 
-  double act_path_coeff[6];  
+  double act_path_coeff[6];
   for(int i=0;i < 6;i++){
     act_path_coeff[i]= 0.1*i;
   }
@@ -187,10 +187,10 @@ llfat_test(int test)
   gettimeofday(&t0, NULL);
   if(test == 0){
     computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
-		       QUDA_COMPUTE_FAT_STANDARD);
+QUDA_COMPUTE_FAT_STANDARD);
   }else{
-    computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam, 
-		       QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
+    computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam,
+QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
   }
 
   gettimeofday(&t1, NULL);
@@ -232,36 +232,36 @@ llfat_test(int test)
     }
     
     /*
-      nu |     |
-         |_____|
-	   mu     
-    */
+nu | |
+|_____|
+mu
+*/
     
     for(int nu=0;nu < 4;nu++){
       for(int mu=0; mu < 4;mu++){
-	if(nu == mu){
-	  ghost_sitelink_diag[nu*4+mu] = NULL;
-	}else{
-	  //the other directions
-	  int dir1, dir2;
-	  for(dir1= 0; dir1 < 4; dir1++){
-	    if(dir1 !=nu && dir1 != mu){
-	      break;
-	    }
-	  }
-	  for(dir2=0; dir2 < 4; dir2++){
-	    if(dir2 != nu && dir2 != mu && dir2 != dir1){
-	      break;
-	    }
+if(nu == mu){
+ghost_sitelink_diag[nu*4+mu] = NULL;
+}else{
+//the other directions
+int dir1, dir2;
+for(dir1= 0; dir1 < 4; dir1++){
+if(dir1 !=nu && dir1 != mu){
+break;
+}
+}
+for(dir2=0; dir2 < 4; dir2++){
+if(dir2 != nu && dir2 != mu && dir2 != dir1){
+break;
+}
         }
-	  ghost_sitelink_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-	  if(ghost_sitelink_diag[nu*4+mu] == NULL){
-	    errorQuda("malloc failed for ghost_sitelink_diag\n");
-	  }
-	  
-	  memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-	}
-	
+ghost_sitelink_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+if(ghost_sitelink_diag[nu*4+mu] == NULL){
+errorQuda("malloc failed for ghost_sitelink_diag\n");
+}
+
+memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+}
+
       }
     }
     
@@ -274,23 +274,23 @@ llfat_test(int test)
   }//verify_results
 
     //format change for fatlink
-    void* myfatlink[4];  
+    void* myfatlink[4];
     for(int i=0;i < 4;i++){
       myfatlink[i] = malloc(V*gaugeSiteSize*gSize);
       if(myfatlink[i] == NULL){
-	printf("Error: malloc failed for myfatlink[%d]\n", i);
-	exit(1);
+printf("Error: malloc failed for myfatlink[%d]\n", i);
+exit(1);
       }
       memset(myfatlink[i], 0, V*gaugeSiteSize*gSize);
     }
     
     for(int i=0;i < V; i++){
       for(int dir=0; dir< 4; dir++){
-	char* src = ((char*)fatlink)+ (4*i+dir)*gaugeSiteSize*gSize;
-	char* dst = ((char*)myfatlink[dir]) + i*gaugeSiteSize*gSize;
-	memcpy(dst, src, gaugeSiteSize*gSize);
+char* src = ((char*)fatlink)+ (4*i+dir)*gaugeSiteSize*gSize;
+char* dst = ((char*)myfatlink[dir]) + i*gaugeSiteSize*gSize;
+memcpy(dst, src, gaugeSiteSize*gSize);
       }
-    } 
+    }
 
     int res=1;
     for(int i=0;i < 4;i++){
@@ -298,13 +298,13 @@ llfat_test(int test)
     }
     int accuracy_level;
     
-    accuracy_level = strong_check_link(myfatlink, "GPU results: ", 
-				       reflink, "CPU reference results:",
-				       V, qudaGaugeParam.cpu_prec);  
+    accuracy_level = strong_check_link(myfatlink, "GPU results: ",
+reflink, "CPU reference results:",
+V, qudaGaugeParam.cpu_prec);
     
-    printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
+    printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
     int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
-    int flops= 61632;  
+    int flops= 61632;
     double perf = 1.0* flops*volume/(secs*1024*1024*1024);
     printfQuda("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
     
@@ -316,32 +316,31 @@ llfat_test(int test)
     if (res == 0){//failed
       printfQuda("\n");
       printfQuda("Warning: your test failed. \n");
-      printfQuda("	Did you use --verify?\n");
-      printfQuda("	Did you check the GPU health by running cuda memtest?\n");
-    }           
+      printfQuda(" Did you use --verify?\n");
+      printfQuda(" Did you check the GPU health by running cuda memtest?\n");
+    }
   
-#ifdef MULTI_GPU  
+#ifdef MULTI_GPU
     int i;
     for(i=0;i < 4;i++){
       free(ghost_sitelink[i]);
     }
     for(i=0;i <4; i++){
       for(int j=0;j <4; j++){
-	if (i==j){
-	  continue;
-	}
-	free(ghost_sitelink_diag[i*4+j]);
-      }    
+if (i==j){
+continue;
+}
+free(ghost_sitelink_diag[i*4+j]);
+      }
     }
 #endif
     
     for(int i=0;i < 4; i++){
-      cudaFreeHost(sitelink[i]);    
-      cudaFreeHost(sitelink_ex[i]);    
+      cudaFreeHost(sitelink[i]);
+      cudaFreeHost(sitelink_ex[i]);
       free(reflink[i]);
     }
     cudaFreeHost(fatlink);
-    
 #ifdef MULTI_GPU
     exchange_llfat_cleanup();
 #endif
@@ -386,13 +385,13 @@ usage_extra(char** argv )
   return ;
 }
 
-int 
-main(int argc, char **argv) 
+int
+main(int argc, char **argv)
 {
 
   int test = 0;
   
-  //default to 18 reconstruct, 8^3 x 8 
+  //default to 18 reconstruct, 8^3 x 8
   link_recon = QUDA_RECONSTRUCT_NO;
   xdim=ydim=zdim=tdim=8;
   cpu_prec = prec = QUDA_DOUBLE_PRECISION;
@@ -403,12 +402,13 @@ main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }
+
     
     if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
-	usage(argv);
+usage(argv);
       }
-      test =  atoi(argv[i+1]);
+      test = atoi(argv[i+1]);
       i++;
       continue;
     }
@@ -416,8 +416,8 @@ main(int argc, char **argv)
 
     if( strcmp(argv[i], "--verify") == 0){
       verify_results=1;
-      continue;	    
-    }	
+      continue;
+    }
 
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
@@ -437,7 +437,7 @@ main(int argc, char **argv)
 
   int ret;
   if(accuracy_level >=3 ){
-    ret = 0; 
+    ret = 0;
   }else{
     ret = 1; //we delclare the test failed
   }
