@@ -187,10 +187,10 @@ continue;
   gettimeofday(&t0, NULL);
   if(test == 0){
     computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
-QUDA_COMPUTE_FAT_STANDARD);
+		       QUDA_COMPUTE_FAT_STANDARD);
   }else{
     computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam,
-QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
+		       QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
   }
 
   gettimeofday(&t1, NULL);
@@ -232,36 +232,36 @@ QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
     }
     
     /*
-nu | |
-|_____|
-mu
-*/
+      nu |     |
+         |_____|
+	   mu
+    */
     
     for(int nu=0;nu < 4;nu++){
       for(int mu=0; mu < 4;mu++){
-if(nu == mu){
-ghost_sitelink_diag[nu*4+mu] = NULL;
-}else{
-//the other directions
-int dir1, dir2;
-for(dir1= 0; dir1 < 4; dir1++){
-if(dir1 !=nu && dir1 != mu){
-break;
-}
-}
-for(dir2=0; dir2 < 4; dir2++){
-if(dir2 != nu && dir2 != mu && dir2 != dir1){
-break;
-}
-        }
-ghost_sitelink_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-if(ghost_sitelink_diag[nu*4+mu] == NULL){
-errorQuda("malloc failed for ghost_sitelink_diag\n");
-}
-
-memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-}
-
+	if(nu == mu){
+	  ghost_sitelink_diag[nu*4+mu] = NULL;
+	}else{
+	  //the other directions
+	  int dir1, dir2;
+	  for(dir1= 0; dir1 < 4; dir1++){
+	    if(dir1 !=nu && dir1 != mu){
+	      break;
+	    }
+	  }
+	  for(dir2=0; dir2 < 4; dir2++){
+	    if(dir2 != nu && dir2 != mu && dir2 != dir1){
+	      break;
+	    }
+	  }
+	  ghost_sitelink_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+	  if(ghost_sitelink_diag[nu*4+mu] == NULL){
+	    errorQuda("malloc failed for ghost_sitelink_diag\n");
+	  }
+	  
+	  memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+	}
+	
       }
     }
     
@@ -272,26 +272,26 @@ memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
 #endif
     
   }//verify_results
-
-    //format change for fatlink
-    void* myfatlink[4];
-    for(int i=0;i < 4;i++){
-      myfatlink[i] = malloc(V*gaugeSiteSize*gSize);
-      if(myfatlink[i] == NULL){
-printf("Error: malloc failed for myfatlink[%d]\n", i);
-exit(1);
-      }
-      memset(myfatlink[i], 0, V*gaugeSiteSize*gSize);
+  
+  //format change for fatlink
+  void* myfatlink[4];
+  for(int i=0;i < 4;i++){
+    myfatlink[i] = malloc(V*gaugeSiteSize*gSize);
+    if(myfatlink[i] == NULL){
+      printf("Error: malloc failed for myfatlink[%d]\n", i);
+      exit(1);
     }
-    
-    for(int i=0;i < V; i++){
-      for(int dir=0; dir< 4; dir++){
-char* src = ((char*)fatlink)+ (4*i+dir)*gaugeSiteSize*gSize;
-char* dst = ((char*)myfatlink[dir]) + i*gaugeSiteSize*gSize;
-memcpy(dst, src, gaugeSiteSize*gSize);
-      }
+    memset(myfatlink[i], 0, V*gaugeSiteSize*gSize);
+  }
+  
+  for(int i=0;i < V; i++){
+    for(int dir=0; dir< 4; dir++){
+      char* src = ((char*)fatlink)+ (4*i+dir)*gaugeSiteSize*gSize;
+      char* dst = ((char*)myfatlink[dir]) + i*gaugeSiteSize*gSize;
+      memcpy(dst, src, gaugeSiteSize*gSize);
     }
-
+  }
+  
     int res=1;
     for(int i=0;i < 4;i++){
       res &= compare_floats(reflink[i], myfatlink[i], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
@@ -299,8 +299,8 @@ memcpy(dst, src, gaugeSiteSize*gSize);
     int accuracy_level;
     
     accuracy_level = strong_check_link(myfatlink, "GPU results: ",
-reflink, "CPU reference results:",
-V, qudaGaugeParam.cpu_prec);
+				       reflink, "CPU reference results:",
+				       V, qudaGaugeParam.cpu_prec);
     
     printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
     int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
@@ -319,7 +319,7 @@ V, qudaGaugeParam.cpu_prec);
       printfQuda(" Did you use --verify?\n");
       printfQuda(" Did you check the GPU health by running cuda memtest?\n");
     }
-  
+    
 #ifdef MULTI_GPU
     int i;
     for(i=0;i < 4;i++){
@@ -327,10 +327,10 @@ V, qudaGaugeParam.cpu_prec);
     }
     for(i=0;i <4; i++){
       for(int j=0;j <4; j++){
-if (i==j){
-continue;
-}
-free(ghost_sitelink_diag[i*4+j]);
+	if (i==j){
+	  continue;
+	}
+	free(ghost_sitelink_diag[i*4+j]);
       }
     }
 #endif
@@ -406,13 +406,13 @@ main(int argc, char **argv)
     
     if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
-usage(argv);
+	usage(argv);
       }
       test = atoi(argv[i+1]);
       i++;
       continue;
     }
-   
+    
 
     if( strcmp(argv[i], "--verify") == 0){
       verify_results=1;
@@ -427,7 +427,7 @@ usage(argv);
 
 
   display_test_info(test);
-
+  
     
   int accuracy_level = llfat_test(test);
   

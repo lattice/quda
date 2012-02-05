@@ -464,7 +464,7 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd,
 	  odd_dst = even_dst + nFace*faceVolumeCB[dir]*gaugeSiteSize;	
 	}else{
 	  odd_dst = dst[dir] + 2*linkdir* nFace *faceVolumeCB[dir]*gaugeSiteSize;
-	  even_dst = dst[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;
+	  even_dst = odd_dst + nFace*faceVolumeCB[dir]*gaugeSiteSize;
 	}
 
 	int even_dst_index = 0;
