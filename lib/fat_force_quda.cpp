@@ -541,7 +541,6 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
     cudaStreamCreate(&streams[i]);
   }
 
-  
   int Vh_2d_max = MAX(X[0]*X[1]/2, X[0]*X[2]/2);
   Vh_2d_max = MAX(Vh_2d_max, X[0]*X[3]/2);
   Vh_2d_max = MAX(Vh_2d_max, X[1]*X[2]/2);
@@ -828,6 +827,7 @@ do_loadLinkToGPU_ex(int* X, FloatN *even, FloatN *odd, Float **cpuGauge,
                     QudaReconstructType reconstruct, int bytes, int Vh_ex, int pad,
                     QudaPrecision prec)
 {
+
   cudaStream_t streams[2];
   for(int i=0;i < 2; i++){
     cudaStreamCreate(&streams[i]);

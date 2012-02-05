@@ -740,11 +740,20 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 	    for (c=startc[dir]; c < endc[dir]; c++){
 	      int oddness = (a+b+c+d)%2;
 	      int src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + d*f_main[dir][3])>> 1;
-	      int dst_idx = ( a*f_bound[dir][0] + b*f_bound[dir][1]+ c*f_bound[dir][2] + (d-2)*f_bound[dir][3])>> 1;
-	      if(oddness){
+	      int dst_idx = ( a*f_bound[dir][0] + b*f_bound[dir][1]+ c*f_bound[dir][2] + (d-2)*f_bound[dir][3])>> 1;	      
+	      
+	      int src_oddness = oddness;
+	      int dst_oddness = oddness;
+	      if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
+		dst_oddness = 1-oddness;
+	      }
+	      if(src_oddness){
 		src_idx += Vh_ex;
+	      }
+	      if(dst_oddness){
 		dst_idx += nslices*slice_3d[dir]/2;
 	      }
+
 	      for(int linkdir=0; linkdir<4;linkdir++){
 		char* src = (char*)sitelink[linkdir];
 		char* dst = ((char*)(ghost_sitelink_back_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;		
@@ -760,10 +769,21 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 	      int oddness = (a+b+c+d)%2;
 	      int src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + d*f_main[dir][3])>> 1;
 	      int dst_idx = ( a*f_bound[dir][0] + b*f_bound[dir][1]+ c*f_bound[dir][2] + (d-X[dir])*f_bound[dir][3])>> 1;
-	      if(oddness){
+
+	      int src_oddness = oddness;
+	      int dst_oddness = oddness;
+	      if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
+		dst_oddness = 1-oddness;
+	      }
+	      
+	      if(src_oddness){
 		src_idx += Vh_ex;
+	      }
+	      
+	      if(dst_oddness){
 		dst_idx += nslices*slice_3d[dir]/2;
 	      }
+
 	      for(int linkdir=0; linkdir<4;linkdir++){
 		char* src = (char*)sitelink[linkdir];
 		char* dst = ((char*)(ghost_sitelink_fwd_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
