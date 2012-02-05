@@ -1675,7 +1675,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     cudaStapleField = new cudaGaugeField(gStapleParam);
     cudaStapleField1 = new cudaGaugeField(gStapleParam);
     
-    qudaGaugeParam->staple_pad = Vsh_t;
+    qudaGaugeParam->staple_pad = 3*Vsh_t;
     
 #endif
   }else{    
