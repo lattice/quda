@@ -1688,7 +1688,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     gStapleParam_ex.create = QUDA_NULL_FIELD_CREATE;
     gStapleParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
     gStapleParam_ex.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
-    gStapleParam_ex.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
+    gStapleParam_ex.pad = E1*E2*E2/2*3;
     cudaStapleField_ex = new cudaGaugeField(gStapleParam_ex);
     cudaStapleField1_ex = new cudaGaugeField(gStapleParam_ex);
     
