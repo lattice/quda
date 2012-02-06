@@ -1568,6 +1568,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   return;
 }
 
+
 #ifdef GPU_FATLINK 
 /*   @method  
  *   QUDA_COMPUTE_FAT_STANDARD: standard method (default)
@@ -1579,14 +1580,14 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 		   QudaGaugeParam* qudaGaugeParam, 
 		   QudaComputeFatMethod method)
 {
-  cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL, *cpuSiteLink_ex=NULL;
-  cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL, *cudaSiteLink_ex=NULL;
+  cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL;
+  cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL;
   cudaGaugeField* cudaStapleField=NULL, *cudaStapleField1=NULL;
-  cudaGaugeField* cudaStapleField_ex=NULL, *cudaStapleField1_ex=NULL;
+  
   QudaGaugeParam qudaGaugeParam_ex_buf;
   QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;
-  
   memcpy(qudaGaugeParam_ex, qudaGaugeParam, sizeof(QudaGaugeParam));
+
   qudaGaugeParam_ex->X[0] = qudaGaugeParam->X[0]+4;
   qudaGaugeParam_ex->X[1] = qudaGaugeParam->X[1]+4;
   qudaGaugeParam_ex->X[2] = qudaGaugeParam->X[2]+4;
@@ -1605,39 +1606,43 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   int E4 = X[3] + 4;
   
   GaugeFieldParam gParam(0, *qudaGaugeParam);
+
+  // create the host fatlink
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge= fatlink;
   gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
   gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.gauge= fatlink;
   cpuFatLink = new cpuGaugeField(gParam);
   if(cpuFatLink == NULL){
     errorQuda("ERROR: Creating cpuFatLink failed\n");
   }
-  
-  if(method == QUDA_COMPUTE_FAT_STANDARD){
-    gParam.gauge=sitelink;
-    gParam.link_type = QUDA_WILSON_LINKS;
-    gParam.order = QUDA_QDP_GAUGE_ORDER;
-    cpuSiteLink = new cpuGaugeField(gParam);
-    if(cpuSiteLink == NULL){
-      errorQuda("ERROR: Creating cpuSiteLink failed\n");
-    }
-  }else{
-    gParam_ex.gauge=sitelink; //here the input sitelink has +4 dimension sizes
-    gParam_ex.order = QUDA_QDP_GAUGE_ORDER;
-    gParam.order = QUDA_QDP_GAUGE_ORDER;
-    cpuSiteLink_ex = new cpuGaugeField(gParam_ex);
-    if(cpuSiteLink_ex == NULL){
-      errorQuda("ERROR: Creating cpuSiteLink_ex failed\n");
-    }    
-  }
-  
-  qudaGaugeParam->llfat_ga_pad = gParam.pad = Vsh_t;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  // create the device fatlink
+  qudaGaugeParam_ex->llfat_ga_pad = qudaGaugeParam->llfat_ga_pad = gParam.pad = Vsh_t;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
+	gParam.order = QUDA_QDP_GAUGE_ORDER;
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaFatLink = new cudaGaugeField(gParam);
 
+  // create the host sitelink	
+  gParam.pad = 0; 
+  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = qudaGaugeParam->type;
+  gParam.order     = qudaGaugeParam->gauge_order;
+  gParam.gauge     = sitelink;
+  if(method != QUDA_COMPUTE_FAT_STANDARD){
+    for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];	
+  }
+  cpuSiteLink      = new cpuGaugeField(gParam);
+  if(cpuSiteLink == NULL){
+    errorQuda("ERROR: Creating cpuSiteLink failed\n");
+  }
+
+  // create the device sitelink
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
+  gParam.link_type   = qudaGaugeParam->type;
+  gParam.reconstruct = qudaGaugeParam->reconstruct;
   if(method ==  QUDA_COMPUTE_FAT_STANDARD){
 #ifdef MULTI_GPU
     int Vh_2d_max = MAX(X[0]*X[1]/2, X[0]*X[2]/2);
@@ -1645,112 +1650,80 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     Vh_2d_max = MAX(Vh_2d_max, X[1]*X[2]/2);  
     Vh_2d_max = MAX(Vh_2d_max, X[1]*X[3]/2);  
     Vh_2d_max = MAX(Vh_2d_max, X[2]*X[3]/2);  
-    
     qudaGaugeParam->site_ga_pad = gParam.pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + 4*Vh_2d_max;
-    gParam.reconstruct = qudaGaugeParam->reconstruct;
-    gParam.link_type = QUDA_WILSON_LINKS;
-    cudaSiteLink = new cudaGaugeField(gParam);  
-  
-  
-    GaugeFieldParam gStapleParam(0, *qudaGaugeParam);
-    gStapleParam.create = QUDA_NULL_FIELD_CREATE;  
-    gStapleParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gStapleParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
-    gStapleParam.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
-    cudaStapleField = new cudaGaugeField(gStapleParam);
-    cudaStapleField1 = new cudaGaugeField(gStapleParam);
-    
-    qudaGaugeParam->staple_pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
-    
 #else
-    gParam.reconstruct = qudaGaugeParam->reconstruct;
     qudaGaugeParam->site_ga_pad = gParam.pad = Vsh_t;
-    cudaSiteLink = new cudaGaugeField(gParam);
-    
-    GaugeFieldParam gStapleParam(0, *qudaGaugeParam);
-    gStapleParam.create = QUDA_NULL_FIELD_CREATE;  
-    gStapleParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gStapleParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
-    gStapleParam.pad = 3*Vsh_t;
-    cudaStapleField = new cudaGaugeField(gStapleParam);
-    cudaStapleField1 = new cudaGaugeField(gStapleParam);
-    
-    qudaGaugeParam->staple_pad = 3*Vsh_t;
-    
 #endif
-  }else{    
-    gParam_ex.reconstruct = qudaGaugeParam->reconstruct;
-    qudaGaugeParam_ex->site_ga_pad = gParam_ex.pad = E1*E2*E3/2*3;
-    gParam_ex.create = QUDA_NULL_FIELD_CREATE;
-    cudaSiteLink_ex = new cudaGaugeField(gParam_ex);
-    
-    GaugeFieldParam gStapleParam_ex(0, *qudaGaugeParam_ex);
-    gStapleParam_ex.create = QUDA_NULL_FIELD_CREATE;
-    gStapleParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
-    gStapleParam_ex.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
-    gStapleParam_ex.pad = E1*E2*E2/2*3;
-    cudaStapleField_ex = new cudaGaugeField(gStapleParam_ex);
-    cudaStapleField1_ex = new cudaGaugeField(gStapleParam_ex);
-    
+    }else{
+      qudaGaugeParam_ex->site_ga_pad = gParam.pad = E1*E2*E3/2*3;
+      qudaGaugeParam->site_ga_pad = E1*E2*E3/2*3;  // Added by J.F.
+    }
+    cudaSiteLink = new cudaGaugeField(gParam);
 
+
+  // create the staples (device)
+  if(method == QUDA_COMPUTE_FAT_STANDARD){
+#ifdef MULTI_GPU
+    gParam.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
+#else
+    gParam.pad = 3*Vsh_t;
+#endif
+  }else{
+    gParam.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
     qudaGaugeParam_ex->staple_pad =  E1*E2*E2/2*3;
-    
-    
-    //set llfat_ga_gad in qudaGaugeParam.ex as well
-    qudaGaugeParam_ex->llfat_ga_pad = qudaGaugeParam->llfat_ga_pad;
   }
+  qudaGaugeParam->staple_pad = gParam.pad;
+  gParam.create = QUDA_NULL_FIELD_CREATE;  
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field
+  cudaStapleField  = new cudaGaugeField(gParam);
+  cudaStapleField1 = new cudaGaugeField(gParam);
+
 
   initCommonConstants(*cudaFatLink);
 
   if(method == QUDA_COMPUTE_FAT_STANDARD){
     llfat_init_cuda(qudaGaugeParam);
-    
+    qudaGaugeParam->ga_pad = qudaGaugeParam->site_ga_pad;
+
+    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){
+		  loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
+    }else{
 #ifdef MULTI_GPU
-    qudaGaugeParam->ga_pad = qudaGaugeParam->site_ga_pad;
-  
-    loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
-    
+	 	  errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
 #else
-    qudaGaugeParam->ga_pad = qudaGaugeParam->site_ga_pad;
-    
-    loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
-    
+      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
 #endif
-    
+		}
     llfat_cuda(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, 
 	       qudaGaugeParam, act_path_coeff);
   }else{ //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
     llfat_init_cuda_ex(qudaGaugeParam_ex);
 #ifdef MULTI_GPU
-    exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink_ex->Gauge_p(), qudaGaugeParam->cpu_prec, 1);
-    qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
-    loadLinkToGPU_ex(cudaSiteLink_ex, cpuSiteLink_ex, qudaGaugeParam_ex);
-    llfat_cuda_ex(*cudaFatLink, *cudaSiteLink_ex, *cudaStapleField_ex, *cudaStapleField1_ex, qudaGaugeParam, act_path_coeff);
-#else
-    qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
-    loadLinkToGPU_ex(cudaSiteLink_ex, cpuSiteLink_ex, qudaGaugeParam_ex);
-    llfat_cuda_ex(*cudaFatLink, *cudaSiteLink_ex, *cudaStapleField_ex, *cudaStapleField1_ex, qudaGaugeParam, act_path_coeff);
+    exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), qudaGaugeParam->cpu_prec, 1);
 #endif
-    
+    qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
+ 
+    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){ 
+      loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
+	  }else{
+      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
+    }
+
+    llfat_cuda_ex(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
   }
   storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
   
   delete cpuFatLink;
   delete cudaFatLink;
-  if(method == QUDA_COMPUTE_FAT_STANDARD){
-    delete cpuSiteLink;
-    delete cudaSiteLink;
-    delete cudaStapleField;
-    delete cudaStapleField1;
-  }else{
-    delete cpuSiteLink_ex;
-    delete cudaSiteLink_ex;
-    delete cudaStapleField_ex;
-    delete cudaStapleField1_ex;
-  }
+  delete cpuSiteLink;
+  delete cudaSiteLink;
+  delete cudaStapleField;
+  delete cudaStapleField1;
   
   return 0;
 }
+
 
 #endif
 
