@@ -174,12 +174,17 @@ hisq_force_end()
   delete cudaMom;
   delete cudaForce;
   delete cudaGauge;
+  delete cudaOprod;
+  freeHwQuda(cudaHw);
+
   delete cpuGauge;
   delete cpuForce;
   delete cpuMom;
   delete refMom;
-  delete cpuOprod;
+  delete cpuOprod;  
   free(hw);
+
+  endQuda();
 
   return;
 }
@@ -231,7 +236,7 @@ hisq_force_test()
   if (verify_results){
     if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
       const float eps = 0.5;
-    halfwilson_hisq_force_reference(eps, weight, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
+      halfwilson_hisq_force_reference(eps, weight, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
     }else if(cpu_hw_prec == QUDA_DOUBLE_PRECISION){
       const double eps = 0.5;
       halfwilson_hisq_force_reference(eps, d_weight, d_act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
