@@ -152,10 +152,15 @@ fermion_force_end()
 {
   delete cudaMom;
   delete cudaGauge;
+  
   delete cpuGauge;
   delete cpuMom;
   delete refMom;
+
+  freeHwQuda(cudaHw);
   free(hw);
+  
+  endQuda();
 }
 
 
@@ -232,7 +237,7 @@ fermion_force_test(void)
     printf("        Did you use --verify?\n");
     printf("        Did you check the GPU health by running cuda memtest?\n");
   }
-
+  
   return accuracy_level;
 }            
 
