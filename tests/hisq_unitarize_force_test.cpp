@@ -167,12 +167,15 @@ hisq_force_end()
   delete cudaForce;
   delete cudaOprod;
   delete cudaGauge;
+  freeHwQuda(cudaHw);
+  
   delete cpuGauge;
   delete cpuForce;
   delete cpuOprod;
   delete cpuReference;
   free(hw);
 
+  endQuda();
   return;
 }
 
