@@ -216,6 +216,10 @@ template<> __device__ inline float4 Texture<float4,float4,3>::fetch(unsigned int
 template<> __device__ inline float4 Texture<float4,float4,4>::fetch(unsigned int idx) 
 { return tex1Dfetch(tex_float4_4,idx); }
 
+#if (__COMPUTE_CAPABILITY__ < 130) // double precision not supported
+__device__ double __hiloint2double(int hi, int lo) { return 0.0; }
+#endif
+
 // double2
 template<> __device__ inline double2 Texture<double2,double2,0>::fetch(unsigned int idx) 
 { return fetch_double2(tex_int4_0,idx); }
@@ -355,3 +359,4 @@ __device__ inline void Spinor<double2, double4, short4, 12>::save(double2 x[12],
   convert<double4, double2>(y, x, 6);
   saveHalf<short4, double4, 6>(spinor, norm, y, i, stride);
 }
+
