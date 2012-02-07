@@ -38,6 +38,10 @@ template<> inline void Texture<double2,2>::unbind() { cudaUnbindTexture(tex_int4
 template<> inline void Texture<double2,3>::unbind() { cudaUnbindTexture(tex_int4_3); }
 template<> inline void Texture<double2,4>::unbind() { cudaUnbindTexture(tex_int4_4); }
 
+#if (__COMPUTE_CAPABILITY__ < 130) // double precision not supported
+__device__ double __hiloint2double(int hi, int lo) { return 0.0; }
+#endif
+
 // double2
 template<> __device__ inline double2 Texture<double2,0>::fetch(unsigned int idx) 
 { int4 v = tex1Dfetch(tex_int4_0,idx); 
@@ -51,6 +55,6 @@ template<> __device__ inline double2 Texture<double2,2>::fetch(unsigned int idx)
 template<> __device__ inline double2 Texture<double2,3>::fetch(unsigned int idx) 
 { int4 v = tex1Dfetch(tex_int4_3,idx); 
   return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
-  template<> __device__ inline double2 Texture<double2,4>::fetch(unsigned int idx) 
-  { int4 v = tex1Dfetch(tex_int4_4,idx); 
-    return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
+template<> __device__ inline double2 Texture<double2,4>::fetch(unsigned int idx) 
+{ int4 v = tex1Dfetch(tex_int4_4,idx); 
+  return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
