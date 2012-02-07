@@ -1840,7 +1840,7 @@ namespace hisq {
 
 
 
-   void hisq_naik_force_cuda(const void* const path_coeff_array,
+   void hisq_longlink_force_cuda(double coeff,
 		   const QudaGaugeParam &param,
 		   const cudaGaugeField &oldOprod,
 		   const cudaGaugeField &link,
@@ -1854,14 +1854,14 @@ namespace hisq {
 		   if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
 			   longlink_terms((double2*)link.Even_p(), (double2*)link.Odd_p(),
 					   (double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
-					   sig, ((double*)path_coeff_array)[1], 
+					   sig, coeff, 
 					   gridDim, blockDim,
 					   (double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p());
 		   }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
 			   longlink_terms( 
 					   (float2*)link.Even_p(), (float2*)link.Odd_p(),
 					   (float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
-					   sig, ((float*)path_coeff_array)[1], 
+					   sig, static_cast<float>(coeff), 
 					   gridDim, blockDim,
 					   (float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p());
 		   }else{
@@ -1877,7 +1877,7 @@ namespace hisq {
 
 
     void
-      hisq_staples_force_cuda(const void* const  path_coeff_array,
+      hisq_staples_force_cuda(const double path_coeff_array[6],
                               const QudaGaugeParam &param,
                               const cudaGaugeField &oprod, 
                               const cudaGaugeField &link, 
@@ -1897,12 +1897,12 @@ namespace hisq {
 
         if (param.cuda_prec == QUDA_DOUBLE_PRECISION){
           PathCoefficients<double> act_path_coeff;
-          act_path_coeff.one    = ((double*)path_coeff_array)[0];
-          act_path_coeff.naik   = ((double*)path_coeff_array)[1];
-          act_path_coeff.three  = ((double*)path_coeff_array)[2];
-          act_path_coeff.five   = ((double*)path_coeff_array)[3];
-          act_path_coeff.seven  = ((double*)path_coeff_array)[4];
-          act_path_coeff.lepage = ((double*)path_coeff_array)[5];
+          act_path_coeff.one    = path_coeff_array[0];
+          act_path_coeff.naik   = path_coeff_array[1];
+          act_path_coeff.three  = path_coeff_array[2];
+          act_path_coeff.five   = path_coeff_array[3];
+          act_path_coeff.seven  = path_coeff_array[4];
+          act_path_coeff.lepage = path_coeff_array[5];
 
           do_hisq_staples_force_cuda<double,double2,double2>( act_path_coeff,
 							   param,
@@ -1913,12 +1913,12 @@ namespace hisq {
 							   *newOprod);
         }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){	
           PathCoefficients<float> act_path_coeff;
-          act_path_coeff.one    = ((float*)path_coeff_array)[0];
-          act_path_coeff.naik   = ((float*)path_coeff_array)[1];
-          act_path_coeff.three  = ((float*)path_coeff_array)[2];
-          act_path_coeff.five   = ((float*)path_coeff_array)[3];
-          act_path_coeff.seven  = ((float*)path_coeff_array)[4];
-          act_path_coeff.lepage = ((float*)path_coeff_array)[5];
+          act_path_coeff.one    = path_coeff_array[0];
+          act_path_coeff.naik   = path_coeff_array[1];
+          act_path_coeff.three  = path_coeff_array[2];
+          act_path_coeff.five   = path_coeff_array[3];
+          act_path_coeff.seven  = path_coeff_array[4];
+          act_path_coeff.lepage = path_coeff_array[5];
 
           do_hisq_staples_force_cuda<float,float2,float2>( act_path_coeff,
 							   param,

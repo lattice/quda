@@ -36,6 +36,8 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
 void initCloverConstants(const int cl_stride);
 void initDomainWallConstants(const int Ls);
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
+void initGaugeFieldConstants(const cudaGaugeField &gauge);
+
 
 // plain Wilson Dslash  
 void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

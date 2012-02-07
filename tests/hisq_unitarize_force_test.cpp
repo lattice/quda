@@ -225,11 +225,7 @@ hisq_force_test()
   gettimeofday(&t0, NULL);
   
   // First of all we fatten the links on the GPU
-  if(hw_prec == QUDA_SINGLE_PRECISION){
-    hisq_staples_force_cuda(act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
-  }else{
-    hisq_staples_force_cuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
-  }
+  hisq_staples_force_cuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
 
   cudaThreadSynchronize();
   checkCudaError();
