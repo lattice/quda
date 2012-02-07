@@ -1015,6 +1015,14 @@ void do_halfwilson_hisq_force_reference(Real eps, Real weight,
       side_link_force(mu, sig, ThreeSt, id, P3, Qmu, P3mu, mom);
     } // end loop over mu
   } // end loop over sig
+
+  for(mu=0; mu<9; mu++){	
+    free(tempmat[mu]);
+  }
+  
+  free(id);
+  free(id4);
+  free(temp_mat);
 }
 
 #undef Pmu
