@@ -103,12 +103,15 @@ llfat_test(int test)
   qudaGaugeParam.X[3] = tdim;
 
   setDims(qudaGaugeParam.X);
-  
+   
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
   qudaGaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   qudaGaugeParam.type=QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
+  qudaGaugeParam.flag = QUDA_FAT_PRESERVE_CPU_GAUGE
+    | QUDA_FAT_PRESERVE_GPU_GAUGE
+    | QUDA_FAT_PRESERVE_COMM_MEM;
   
   void* fatlink;
   cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize);
@@ -183,17 +186,22 @@ continue;
     act_path_coeff[i]= 0.1*i;
   }
 
+  
+  //only record the last call's performance
+  //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
-  gettimeofday(&t0, NULL);
-  if(test == 0){
-    computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
-		       QUDA_COMPUTE_FAT_STANDARD);
-  }else{
-    computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam,
-		       QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
+  for(int i=0;i < 2;i++){
+    gettimeofday(&t0, NULL);
+    if(test == 0){
+      computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
+			 QUDA_COMPUTE_FAT_STANDARD);
+    }else{
+      computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam,
+			 QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
+    }
+    gettimeofday(&t1, NULL);
   }
 
-  gettimeofday(&t1, NULL);
   double secs = TDIFF(t0,t1);
 
   void* reflink[4];
@@ -265,7 +273,7 @@ continue;
       }
     }
     
-    exchange_cpu_sitelink(qudaGaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, optflag);
+    exchange_cpu_sitelink(qudaGaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
     llfat_reference_mg(reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, coeff);
 #else
     llfat_reference(reflink, sitelink, qudaGaugeParam.cpu_prec, coeff);
@@ -306,7 +314,7 @@ continue;
     int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
     int flops= 61632;
     double perf = 1.0* flops*volume/(secs*1024*1024*1024);
-    printfQuda("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
+    printfQuda("fatlink computation time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
     
     
     for(int i=0;i < 4;i++){

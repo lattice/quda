@@ -150,7 +150,7 @@ extern "C" {
 #endif
   void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
 			     void** ghost_sitelink_diag, 
-			     QudaPrecision gPrecision, int optflag); 
+			     QudaPrecision gPrecision, QudaGaugeParam* param, int optflag); 
   void exchange_cpu_sitelink_ex(int* X, void** sitelink,
                                 QudaPrecision gPrecision, int optflag);
   void exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway,  cudaStream_t * stream);

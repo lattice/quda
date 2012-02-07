@@ -76,6 +76,11 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
 
+#if defined INIT_PARAM
+  P(flag, 0);
+#else
+  P(flag, INVALID_INT);
+#endif
 
 #ifdef INIT_PARAM
   return ret;

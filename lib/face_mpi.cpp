@@ -616,20 +616,24 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
 void exchange_cpu_sitelink(int* X,
 			   void** sitelink, void** ghost_sitelink,
 			   void** ghost_sitelink_diag,
-			   QudaPrecision gPrecision, int optflag)
+			   QudaPrecision gPrecision, QudaGaugeParam* param, int optflag)
 {  
   setup_dims(X);
-  void*  sitelink_fwd_sendbuf[4];
-  void*  sitelink_back_sendbuf[4];
-  
-  for(int i=0;i < 4;i++){
-    sitelink_fwd_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
-    sitelink_back_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
-    if (sitelink_fwd_sendbuf[i] == NULL|| sitelink_back_sendbuf[i] == NULL){
-      errorQuda("ERROR: malloc failed for sitelink_sendbuf/site_link_back_sendbuf\n");
-    }  
-    memset(sitelink_fwd_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
-    memset(sitelink_back_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+  static void*  sitelink_fwd_sendbuf[4];
+  static void*  sitelink_back_sendbuf[4];
+  static int allocated = 0;
+
+  if(!allocated){
+    for(int i=0;i < 4;i++){
+      sitelink_fwd_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
+      sitelink_back_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
+      if (sitelink_fwd_sendbuf[i] == NULL|| sitelink_back_sendbuf[i] == NULL){
+	errorQuda("ERROR: malloc failed for sitelink_sendbuf/site_link_back_sendbuf\n");
+      }  
+      memset(sitelink_fwd_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+      memset(sitelink_back_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+    }
+    allocated = 1;
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
@@ -640,9 +644,12 @@ void exchange_cpu_sitelink(int* X,
 		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf, optflag);
   }
   
-  for(int i=0;i < 4;i++){
-    free(sitelink_fwd_sendbuf[i]);
-    free(sitelink_back_sendbuf[i]);
+  if(!(param->flag & QUDA_FAT_PRESERVE_COMM_MEM)){
+    for(int i=0;i < 4;i++){
+      free(sitelink_fwd_sendbuf[i]);
+      free(sitelink_back_sendbuf[i]);
+    }
+    allocated = 0;
   }
 }
 

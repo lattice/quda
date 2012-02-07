@@ -163,6 +163,7 @@ class cpuGaugeField : public GaugeField {
   const void** Ghost() const { return (const void**)ghost; }
 
   void* Gauge_p() { return gauge; }
+  void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 };
 
 #define gaugeSiteSize 18 // real numbers per gauge field
