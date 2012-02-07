@@ -3,9 +3,9 @@
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
 
 
-#if (CUDA_VERSION >= 4010)
+#if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
 #define VOLATILE
-#else
+#else // Open64 compiler
 #define VOLATILE volatile
 #endif
 // input spinor
