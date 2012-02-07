@@ -1600,6 +1600,8 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   int Vsh_z = X[0]*X[1]*X[3]/2;
   int Vsh_t = X[0]*X[1]*X[2]/2;
 
+  int V = X[0]*X[1]*X[2]*X[3];
+
   int E1 = X[0] + 4;
   int E2 = X[1] + 4;
   int E3 = X[2] + 4;
@@ -1621,7 +1623,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   qudaGaugeParam_ex->llfat_ga_pad = qudaGaugeParam->llfat_ga_pad = gParam.pad = Vsh_t;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
-	gParam.order = QUDA_QDP_GAUGE_ORDER;
+   gParam.order = QUDA_QDP_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaFatLink = new cudaGaugeField(gParam);
 
@@ -1635,6 +1637,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];	
   }
   cpuSiteLink      = new cpuGaugeField(gParam);
+
   if(cpuSiteLink == NULL){
     errorQuda("ERROR: Creating cpuSiteLink failed\n");
   }
@@ -1690,11 +1693,11 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 		  loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
     }else{
 #ifdef MULTI_GPU
-	 	  errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
+      errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
 #else
       cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
 #endif
-		}
+    }
     llfat_cuda(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, 
 	       qudaGaugeParam, act_path_coeff);
   }else{ //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
@@ -1709,6 +1712,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 	  }else{
       cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
     }
+	
 
     llfat_cuda_ex(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
   }
