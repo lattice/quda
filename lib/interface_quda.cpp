@@ -1633,6 +1633,17 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     cpuFatLink->setGauge((void**)fatlink);
   }
   
+ // create the device fatlink
+  qudaGaugeParam_ex->llfat_ga_pad = qudaGaugeParam->llfat_ga_pad = gParam.pad = Vsh_t;
+  if(cudaFatLink == NULL){
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
+    gParam.order = QUDA_QDP_GAUGE_ORDER;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    cudaFatLink = new cudaGaugeField(gParam);
+  }
+  
+
   // create the host sitelink	
   if(cpuSiteLink == NULL){
     gParam.pad = 0; 
@@ -1653,16 +1664,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   
   gettimeofday(&t2, NULL);
   
-  // create the device fatlink
-  qudaGaugeParam_ex->llfat_ga_pad = qudaGaugeParam->llfat_ga_pad = gParam.pad = Vsh_t;
-  if(cudaFatLink == NULL){
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
-    gParam.order = QUDA_QDP_GAUGE_ORDER;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    cudaFatLink = new cudaGaugeField(gParam);
-  }
-  
+ 
   
   gettimeofday(&t3, NULL);
 

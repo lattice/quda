@@ -8,10 +8,11 @@ fail_msg="*****************************Sanity check for quda failed!************
 function basic_sanity_check {
 
     echo "Performing basic sanity test:"
-    progs="staggered_dslash_test staggered_invert_test llfat_test gauge_force_test fermion_force_test"
+    progs="staggered_dslash_test staggered_invert_test llfat_test llfat_test gauge_force_test fermion_force_test"
     precs="double"
     recons="18"
-
+    whichtest="1"
+	
     for prog in $progs ; do 
         if [ ! -e "$prog" ]; then
 	    echo "The program $prog not found!"
@@ -23,6 +24,11 @@ function basic_sanity_check {
         else
 	    extra_args=""
         fi 
+
+	if [ "$prog" = "llfat_test" ]; then
+	    whichtest=$((1-$whichtest))	
+	    extra_args+="  --test $whichtest"
+	fi
 
         for prec in $precs ; do 
             for recon in $recons ; do
