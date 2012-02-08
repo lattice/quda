@@ -251,6 +251,28 @@ void initCommonConstants(const LatticeField &lat) {
   checkCudaError();
 }
 
+void initGaugeFieldConstants(const cudaGaugeField &gauge) 
+{
+  initCommonConstants(gauge);
+
+  int ga_stride = gauge.Stride();
+  cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
+
+  int gf = (gauge.GaugeFixed() == QUDA_GAUGE_FIXED_YES) ? 1 : 0;
+  cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
+
+  double anisotropy_ = gauge.Anisotropy();
+  cudaMemcpyToSymbol("anisotropy", &(anisotropy_), sizeof(double));
+
+  double t_bc = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
+  cudaMemcpyToSymbol("t_boundary", &(t_bc), sizeof(double));
+
+  double coeff = -24.0*gauge.Tadpole()*gauge.Tadpole();
+  cudaMemcpyToSymbol("coeff", &(coeff), sizeof(double));
+
+  return;
+}
+
 
 
 void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride) 

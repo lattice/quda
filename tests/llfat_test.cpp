@@ -43,6 +43,8 @@ extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
+
 static size_t gSize;
 
 void
@@ -106,7 +108,7 @@ llfat_test(int test)
    
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
-  qudaGaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  qudaGaugeParam.gauge_order = gauge_order;
   qudaGaugeParam.type=QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
   qudaGaugeParam.flag = QUDA_FAT_PRESERVE_CPU_GAUGE
@@ -135,9 +137,35 @@ llfat_test(int test)
     }
   }
 
+
+  void* milc_sitelink;
+  milc_sitelink = (void*)malloc(4*V*gaugeSiteSize*gSize);
+  if(milc_sitelink == NULL){
+    errorQuda("ERROR: allocating milc_sitelink failed\n");
+  }
+
+  void* milc_sitelink_ex;
+  milc_sitelink_ex = (void*)malloc(4*V_ex*gaugeSiteSize*gSize);
+  if(milc_sitelink_ex == NULL){
+    errorQuda("Error: allocating milc_sitelink failed\n");
+  }
+
+
+
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
+
+  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
+	  for(int i=0; i<V; ++i){
+		  for(int dir=0; dir<4; ++dir){
+			  char* src = (char*)sitelink[dir];
+			  memcpy((char*)milc_sitelink + (i*4 + dir)*gaugeSiteSize*gSize, src+i*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+		  }	
+	  }
+  }
+
+
+
   for(int i=0; i < V_ex; i++){
-    
     int sid = i;
     int oddBit=0;
     if(i >= Vh_ex){
@@ -177,6 +205,9 @@ continue;
       char* src = (char*)sitelink[dir];
       char* dst = (char*)sitelink_ex[dir];
       memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+
+      // milc ordering 
+      memcpy((char*)milc_sitelink_ex + (i*4 + dir)*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
     }//dir
   }//i
   
@@ -190,20 +221,30 @@ continue;
   //only record the last call's performance
   //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
+  gettimeofday(&t0, NULL);
+  
   for(int i=0;i < 2;i++){
-    gettimeofday(&t0, NULL);
-    if(test == 0){
-      computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
-			 QUDA_COMPUTE_FAT_STANDARD);
-    }else{
-      computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam,
-			 QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
+    if(gauge_order == QUDA_QDP_GAUGE_ORDER){
+      if(test == 0){
+	computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
+			   QUDA_COMPUTE_FAT_STANDARD);
+      }else{
+	computeFatLinkQuda(fatlink, sitelink_ex, act_path_coeff, &qudaGaugeParam,
+			   QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
+      }
+    }else if(gauge_order == QUDA_MILC_GAUGE_ORDER){
+      if(test == 0){
+	computeFatLinkQuda(fatlink, (void**)milc_sitelink, act_path_coeff, &qudaGaugeParam,
+			   QUDA_COMPUTE_FAT_STANDARD);
+      }else{
+	computeFatLinkQuda(fatlink, (void**)milc_sitelink_ex, act_path_coeff, &qudaGaugeParam,
+			   QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
+      }
     }
-    gettimeofday(&t1, NULL);
   }
-
+  
   double secs = TDIFF(t0,t1);
-
+  
   void* reflink[4];
   for(int i=0;i < 4;i++){
     reflink[i] = malloc(V*gaugeSiteSize*gSize);
@@ -349,6 +390,8 @@ continue;
       free(reflink[i]);
     }
     cudaFreeHost(fatlink);
+    if(milc_sitelink) free(milc_sitelink);
+    if(milc_sitelink_ex) free(milc_sitelink_ex);
 #ifdef MULTI_GPU
     exchange_llfat_cleanup();
 #endif
@@ -363,11 +406,12 @@ display_test_info(int test)
 {
   printfQuda("running the following test:\n");
     
-  printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       Test\n");
-  printfQuda("%s                       %s                         %d/%d/%d/                  %d            %d\n", 
+  printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       Test          Ordering\n");
+  printfQuda("%s                       %s                         %d/%d/%d/                  %d             %d              %s \n", 
 	     get_prec_str(prec),
 	     get_recon_str(link_recon), 
-	     xdim, ydim, zdim, tdim, test);
+	     xdim, ydim, zdim, tdim, test, 
+	     get_gauge_order_str(gauge_order));
 
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
@@ -390,6 +434,7 @@ usage_extra(char** argv )
   printfQuda("                                                0: standard method\n");
   printfQuda("                                                1: extended volume method\n");
   printfQuda("    --verify                                 # Verify the GPU results using CPU results\n");
+  printfQuda("    --gauge-order <qdp/milc>		   # ordering of the input gauge-field\n");
   return ;
 }
 
@@ -418,6 +463,24 @@ main(int argc, char **argv)
       }
       test = atoi(argv[i+1]);
       i++;
+      continue;
+    }
+
+
+    if( strcmp(argv[i], "--gauge-order") == 0){
+      if(i+1 >= argc){
+	usage(argv);
+      }
+
+      if(strcmp(argv[i+1], "milc") == 0){
+	gauge_order = QUDA_MILC_GAUGE_ORDER;
+      }else if(strcmp(argv[i+1], "qdp") == 0){
+	gauge_order = QUDA_QDP_GAUGE_ORDER;
+      }else{
+	fprintf(stderr, "Error: unsupported gauge-field order\n");
+	exit(1);
+      }
+      i++;	
       continue;
     }
     

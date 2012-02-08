@@ -1609,6 +1609,8 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   int Vsh_z = X[0]*X[1]*X[3]/2;
   int Vsh_t = X[0]*X[1]*X[2]/2;
 
+  int V = X[0]*X[1]*X[2]*X[3];
+
   int E1 = X[0] + 4;
   int E2 = X[1] + 4;
   int E3 = X[2] + 4;
@@ -1716,7 +1718,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field      
     cudaStapleField  = new cudaGaugeField(gParam);
-      cudaStapleField1 = new cudaGaugeField(gParam);
+    cudaStapleField1 = new cudaGaugeField(gParam);
   }
   
   
@@ -1758,7 +1760,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     }else{
       cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
     }
-    
+	
     llfat_cuda_ex(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
   }
   storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
