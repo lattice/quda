@@ -221,9 +221,9 @@ continue;
   //only record the last call's performance
   //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
-  gettimeofday(&t0, NULL);
   
   for(int i=0;i < 2;i++){
+    gettimeofday(&t0, NULL);
     if(gauge_order == QUDA_QDP_GAUGE_ORDER){
       if(test == 0){
 	computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
@@ -241,6 +241,7 @@ continue;
 			   QUDA_COMPUTE_FAT_EXTENDED_VOLUME);
       }
     }
+    gettimeofday(&t1, NULL);
   }
   
   double secs = TDIFF(t0,t1);
