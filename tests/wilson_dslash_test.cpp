@@ -387,7 +387,7 @@ void dslashRef() {
       wil_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, dagger, inv_param.cpu_prec, gauge_param);
       break;
     default:
-      printf("Test type not defined\n");
+      printfQuda("Test type not defined\n");
       exit(-1);
     }
   } else { // twisted mass
@@ -405,7 +405,7 @@ void dslashRef() {
 	     dagger, inv_param.cpu_prec, gauge_param);
       break;
     default:
-      printf("Test type not defined\n");
+      printfQuda("Test type not defined\n");
       exit(-1);
     }
   }

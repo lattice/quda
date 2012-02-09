@@ -570,12 +570,19 @@ void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const Qu
     //  -- Dest will point to the right beginning PAD. 
     //  -- Each Pad has size Nvec*Vsh Floats. 
     //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
-    for(int i=0; i < Npad; i++) {
+
+    void *dst = (char*)ghost_spinor;
+    void *src = (char*)v + offset*Nvec*precision;
+    size_t len = nFace*ghostFace[3]*Nvec*precision;     
+    size_t spitch = stride*Nvec*precision;
+    cudaMemcpy2DAsync(dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
+
+    /*for(int i=0; i < Npad; i++) {
       int len = nFace*ghostFace[3]*Nvec*precision;     
       void *dst = (char*)ghost_spinor + i*len;
       void *src = (char*)v + (offset + i*stride)* Nvec*precision;
       CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
-    }
+    }*/
     
     if (precision == QUDA_HALF_PRECISION) {
       int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
