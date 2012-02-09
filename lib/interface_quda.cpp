@@ -1688,7 +1688,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 #endif
   }else{
     qudaGaugeParam_ex->site_ga_pad = gParam.pad = E1*E2*E3/2*3;
-    qudaGaugeParam->site_ga_pad = E1*E2*E3/2*3;  // Added by J.F.
+    qudaGaugeParam->site_ga_pad = E1*E2*E3/2*3;  // unnecessary?
   }  
   
   if(cudaSiteLink == NULL){
