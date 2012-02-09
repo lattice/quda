@@ -510,7 +510,23 @@ comm_recv_with_tag(void* buf, int len, int src, int tag)
   return (unsigned long)request;
 }
 
+int comm_query(unsigned long request) {
 
+  MPI_Status status;
+  int query;
+  int rc = MPI_Test( (MPI_Request*)request, &query, &status);
+  if (rc != MPI_SUCCESS) {
+    printf("ERROR: MPI_Test failed\n");
+    comm_exit(1);
+  }
+
+  return query;
+}
+
+void comm_free(unsigned long request) {
+  free((void*)request);
+  return;
+}
 
 //this request should be some return value from comm_recv
 void 
