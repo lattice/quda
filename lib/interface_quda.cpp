@@ -1707,11 +1707,10 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 #else
     gParam.pad = 3*Vsh_t;
 #endif
+    qudaGaugeParam->staple_pad = gParam.pad;
   }else{
-    gParam.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
-    qudaGaugeParam_ex->staple_pad =  E1*E2*E2/2*3;
+    qudaGaugeParam_ex->staple_pad = gParam.pad = E1*E2*E3/2*3;
   }
-  qudaGaugeParam->staple_pad = gParam.pad;
   
   if(cudaStapleField == NULL || cudaStapleField1 == NULL){
     gParam.create = QUDA_NULL_FIELD_CREATE;  
