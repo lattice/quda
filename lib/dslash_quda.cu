@@ -575,7 +575,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for(int i = 3; i >=0; i--){
     if (!dslashParam.commDim[i]) continue;
 
-    for (int dir = 0; dir<2; dir++) {
+    for (int dir=1; dir>=0; dir--) {
       // Record the start of the packing
       CUDA_EVENT_RECORD(packStart[2*i+dir], streams[2*i+dir]);
 
@@ -590,7 +590,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for(int i = 3; i >=0; i--){
     if (!dslashParam.commDim[i]) continue;
 
-    for (int dir = 0; dir<2; dir++) {
+    for (int dir=1; dir>=0; dir--) {
       // Record the start of the gathering
       CUDA_EVENT_RECORD(gatherStart[2*i+dir], streams[2*i+dir]);
 
@@ -623,6 +623,15 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     gatherCompleted[i] = 0;
     commsCompleted[i] = 0;
   }
+
+  int first = 0; // the first direcions in which we communicate
+  for (int i=3; i>=0; i--) 
+    if (dslashParam.commDim[i]) {
+      gatherCompleted[2*i+2] = 1;
+      commsCompleted[2*i+2] = 1;
+      break;
+    }
+  
   int commDimTotal = 0;
   for (int i=0; i<4; i++) commDimTotal += dslashParam.commDim[i];
   commDimTotal *= 4; // 2 from pipe length, 2 from direction
@@ -631,9 +640,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
       
-      for (int dir=0; dir<2; dir++) {
+      for (int dir=1; dir>=0; dir--) {
 	
-	if (!gatherCompleted[2*i+dir]) { // Query if gather has completed
+	if (!gatherCompleted[2*i+dir] && gatherCompleted[2*i+dir+1]) { // Query if gather has completed
 	  if (cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])) {
 	    gatherCompleted[2*i+dir] = 1;
 	    completeSum++;
@@ -642,7 +651,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 	  }
 	}
 	
-	if (!commsCompleted[2*i+dir]) {
+	if (!commsCompleted[2*i+dir] && commsCompleted[2*i+dir+1] &&
+	    gatherCompleted[2*i+dir]) {
 	  if (face->commsQuery(2*i+dir)) { // Query if comms has finished
 	    commsCompleted[2*i+dir] = 1;
 	    completeSum++;
@@ -651,6 +661,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 	    // Record the end of the scattering
 	    CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
 	    
+	    cudaStreamSynchronize(streams[2*i+dir]);
 	    // Scatter into the end zone
 	    face->scatter(*inSpinor, dagger, 2*i+dir);
 	    
