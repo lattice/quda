@@ -517,6 +517,10 @@ do_fermion_force_reference(Real eps, Real weight1, Real weight2,
 	    }//if
 	}//mu
     }//sig
+
+    for(mu=0;mu<8;mu++){
+      free(tempvec[mu]);
+    }
     
 }
 

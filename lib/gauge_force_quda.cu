@@ -123,7 +123,6 @@ gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& 
                  QudaGaugeParam* param, int** input_path, 
 		 int* length, void* path_coeff, int num_paths, int max_length)
 {
-
     int i, j;
     //input_path
     int bytes = num_paths*max_length* sizeof(int);

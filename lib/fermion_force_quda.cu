@@ -1546,7 +1546,7 @@ fermion_force_cuda(double eps, double weight1, double weight2, void* act_path_co
 {
   int i;
   FullHw tempvec[8];
-    
+  
   if (siteLink.Reconstruct() != QUDA_RECONSTRUCT_12) 
     errorQuda("Reconstruct type %d not supported for gauge field", siteLink.Reconstruct());
 

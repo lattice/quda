@@ -21,6 +21,7 @@ GaugeField::GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &lo
   }
 
   bytes = length*precision;
+  bytes = ALIGNMENT_ADJUST(bytes);
   total_bytes = bytes;
 }
 

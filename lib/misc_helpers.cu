@@ -3,6 +3,69 @@
 #define gaugeSiteSize 18
 #define BLOCKSIZE 64
 
+
+
+/*
+ * MILC order, CPU->GPU
+ *
+ *This function converts format in CPU form 
+ * into forms in GPU so as to enable coalesce access
+ * The function only converts half(even or odd) of the links
+ * Therefore the entire link conversion need to call this 
+ * function twice
+ *   
+ * Without loss of generarity, the parity is assume to be even.
+ * The actual data format in cpu is following
+ * [a0a1 .... a17][b0b1...b17][c..][d...][a18a19 .....a35] ...[b0b1 ... b17] ...
+ *  X links        Y links    T,Z links   X Links
+ * where a0->a17 is the X link in the first site
+ *       b0->b17 is the Y link in the first site
+ *       c0->c17 is the Z link in the first site
+ *       d0->d17 is the T link in the first site
+ *       a18->a35 is the X link in the second site
+ *       etc
+ *
+ * The GPU format of data looks like the following
+ * [a0a1][a18a19]  ....[pad][a2a3][a20a21]..... [b0b1][b18b19]....
+ *  X links                                      Y links      T,Z links
+ *   
+ * N: sizeof(FloatN)/sizeof(Float)
+ * M: # of floats in gpu memory per link
+ *    12 for 12-reconstruct
+ *    18 for no-reconstruct
+ */
+
+ /*
+ * N: sizeof(FloatN)/sizeof(Float)
+ * M: # of floats in gpu memory per link
+ *    12 for 12-reconstruct
+ *    18 for no-reconstruct
+ */
+template<int N, int M, typename FloatN>
+__global__ void
+do_link_format_cpu_to_gpu_milc(FloatN* dst, FloatN* src,
+				  int reconstruct, int stride)
+{
+  __shared__ FloatN buf[gaugeSiteSize/2*BLOCKSIZE];
+  
+  int j;
+  
+  int block_idx = blockIdx.x*blockDim.x/4;
+  int local_idx = 16*(threadIdx.x/64) + threadIdx.x%16;
+  int pos_idx = blockIdx.x * blockDim.x/4 + 16*(threadIdx.x/64) + threadIdx.x%16;
+  int mydir = (threadIdx.x >> 4)% 4;
+
+  for(j=0; j < 9; j++){
+    buf[j*blockDim.x + threadIdx.x] = src[block_idx*9*4 + j*blockDim.x + threadIdx.x ];
+  }  
+  __syncthreads();
+
+  for(j=0; j < 9; j++){
+    dst[pos_idx + mydir*9*stride + j*stride] = buf[local_idx*4*9+mydir*9+j]; 
+  } 
+  
+}
+
 /* This function converts format in CPU form 
  * into forms in GPU so as to enable coalesce access
  * The function only converts half(even or odd) of the links
@@ -27,8 +90,8 @@
 template<int N, int M, typename FloatN, typename Float>
 __global__ void
 do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
-			  int reconstruct,
-			  int bytes, int Vh, int pad, int ghostV)
+			   int reconstruct,
+			   int Vh, int pad, int ghostV, size_t threads)
 {
   int tid = blockIdx.x * blockDim.x +  threadIdx.x;
   int thread0_tid = blockIdx.x * blockDim.x;
@@ -44,77 +107,132 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
     FloatN* src_start = (FloatN*)( src + dir*gaugeSiteSize*(Vh) + thread0_tid*gaugeSiteSize);   
 #endif
     for(j=0; j < gaugeSiteSize/N; j++){
-      if( M == 18){
-	buf[j*blockDim.x + threadIdx.x] =  src_start[j*blockDim.x + threadIdx.x];
-      }else{ //M=12
-	int idx = j*blockDim.x + threadIdx.x;
-	int modval = idx%(gaugeSiteSize/N);
-	int divval = idx/(gaugeSiteSize/N);
-	if(modval < (M/N)){
-	  buf[divval*(M/N)+modval] = src_start[idx];
+      if(j*blockDim.x+threadIdx.x < 9*threads){
+	if( M == 18){
+	  buf[j*blockDim.x + threadIdx.x] =  src_start[j*blockDim.x + threadIdx.x];
+	}else{ //M==12
+	  int idx = j*blockDim.x + threadIdx.x;
+	  int modval = idx%(gaugeSiteSize/N);
+	  int divval = idx/(gaugeSiteSize/N);
+	  if(modval < (M/N)){
+	    buf[divval*(M/N)+modval] = src_start[idx];
+	  }
+	  
 	}
-
       }
     }
     __syncthreads();
-    
-    FloatN* dst_start = (FloatN*)(dst+dir*M/N*(Vh+pad));
-    for(j=0; j < M/N; j++){
-      dst_start[tid + j*(Vh+pad)] = buf[M/N*threadIdx.x + j];
+    if(tid < threads){
+      FloatN* dst_start = (FloatN*)(dst+dir*M/N*(Vh+pad));
+      for(j=0; j < M/N; j++){
+	dst_start[tid + j*(Vh+pad)] = buf[M/N*threadIdx.x + j];
+      }
     }
     __syncthreads();
   }//dir
 }
 
 
+
 void 
 link_format_cpu_to_gpu(void* dst, void* src, 
-		       int reconstruct, int bytes, int Vh, int pad, 
+		       int reconstruct, int Vh, int pad, 
 		       int ghostV,
-		       QudaPrecision prec, cudaStream_t stream)
+		       QudaPrecision prec, QudaGaugeFieldOrder cpu_order, 
+		       cudaStream_t stream)
 {
   dim3 blockDim(BLOCKSIZE);
 #ifdef MULTI_GPU  
-  dim3 gridDim((Vh+ghostV)/blockDim.x);
+  size_t threads=Vh+ghostV;
 #else
-  dim3 gridDim(Vh/blockDim.x);
+  size_t threads=Vh;
 #endif
-  //(Vh+ghostV) must be multipl of BLOCKSIZE or the kernel does not work
-  if ((Vh+ghostV) % blockDim.x != 0){
-    printf("ERROR: Vh(%d) is not multiple of blocksize(%d), exitting\n", Vh, blockDim.x);
-    exit(1);
-  }
   
-  
-  switch (prec){
-  case QUDA_DOUBLE_PRECISION:
-    switch( reconstruct){
-    case QUDA_RECONSTRUCT_NO:
-      do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, ghostV);
-      break;
-    case QUDA_RECONSTRUCT_12:
-      do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, bytes, Vh, pad, ghostV);
-      break;
-    default:
-      errorQuda("reconstruct type not supported\n");
-    }
-    break;    
+  dim3 gridDim ((threads + BLOCKSIZE -1)/BLOCKSIZE);
 
-  case QUDA_SINGLE_PRECISION:
-    switch( reconstruct){
-    case QUDA_RECONSTRUCT_NO:
-      do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, ghostV);   
+  //(Vh+ghostV) must be multipl of BLOCKSIZE or the kernel does not work
+  /*
+  if ((Vh+ghostV) % blockDim.x != 0){
+    errorQuda("ERROR: Vh+ghostV(%d+%d) is not multiple of blocksize(%d), exitting\n", Vh, ghostV, blockDim.x);
+  }
+  */
+  
+  int stride = Vh+pad;
+  
+  if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
+    switch (prec){
+    case QUDA_DOUBLE_PRECISION:
+      switch( reconstruct){
+      case QUDA_RECONSTRUCT_NO:
+	do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, Vh, pad, ghostV, threads);
+	break;
+      case QUDA_RECONSTRUCT_12:
+	do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, Vh, pad, ghostV, threads);
+	break;
+      default:
+	errorQuda("reconstruct type not supported\n");
+      }
+      break;    
+      
+    case QUDA_SINGLE_PRECISION:
+      switch( reconstruct){
+      case QUDA_RECONSTRUCT_NO:
+	do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float*)src, reconstruct,  Vh, pad, ghostV, threads);   
+	break;
+      case QUDA_RECONSTRUCT_12:
+	do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, Vh, pad, ghostV, threads);   
+	break;
+      default:
+	errorQuda("reconstruct type not supported\n");      
+      }
       break;
-    case QUDA_RECONSTRUCT_12:
-      do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, bytes, Vh, pad, ghostV);   
-      break;
+      
     default:
-      errorQuda("reconstruct type not supported\n");      
+      errorQuda("ERROR: half precision not support in %s\n", __FUNCTION__);
     }
-    break;
+  }else if (cpu_order == QUDA_MILC_GAUGE_ORDER){    
+
+    errorQuda("QUDA_MILC_GAUGE_ORDER is disabled");
+
+    if ((Vh+ghostV) % blockDim.x != 0){
+      errorQuda("ERROR: Vh+ghostV(%d+%d) is not multiple of blocksize(%d), exitting\n", Vh, ghostV, blockDim.x);
+    }
     
-  default:
-    errorQuda("ERROR: half precision not support in %s\n", __FUNCTION__);
+    switch (prec){
+    case QUDA_DOUBLE_PRECISION:
+      switch( reconstruct){
+      case QUDA_RECONSTRUCT_NO:
+	do_link_format_cpu_to_gpu_milc<2, 18><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, reconstruct, stride);
+	break;
+      case QUDA_RECONSTRUCT_12:
+	//do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, stride);
+	printf("12-reconstruct not supported yet\n");
+	break;
+      default:
+	errorQuda("reconstruct type not supported\n");
+      }
+      break;    
+      
+    case QUDA_SINGLE_PRECISION:
+      switch( reconstruct){
+      case QUDA_RECONSTRUCT_NO:
+	do_link_format_cpu_to_gpu_milc<2, 18><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float2*)src, reconstruct,  stride);
+	break;
+      case QUDA_RECONSTRUCT_12:
+	//do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, stride);
+	printf("12-reconstruct not supported yet\n");	
+	break;
+      default:
+	errorQuda("reconstruct type not supported\n");      
+      }
+      break;
+      
+    default:
+      errorQuda("ERROR: half precision not support in %s\n", __FUNCTION__);
+    }
+    
+  }else{
+    errorQuda("ERROR: invalid cpu ordering (%d)\n", cpu_order);
   }
   
   return;
@@ -126,7 +244,7 @@ link_format_cpu_to_gpu(void* dst, void* src,
  * dst format: an array of links where x,y,z,t links with the same node id is stored next to each other
  *             This format is used in destination in fatlink computation in cpu
  *    Without loss of generarity, the parity is assume to be even.
- * The actual data format in cpu is following
+ * The actual data format in GPU is the following
  *    [a0a1][a18a19]  ....[pad][a2a3][a20a21]..... [b0b1][b18b19]....
  *    X links                                      Y links      T,Z links
  * The temporary data store in GPU shared memory and the CPU format of data are the following
@@ -207,7 +325,7 @@ link_format_cpu_to_gpu(void* dst, void* src,
 template<typename FloatN>
 __global__ void
 do_link_format_gpu_to_cpu(FloatN* dst, FloatN* src,
-			  int bytes, int Vh, int stride)
+			  int Vh, int stride)
 {
   __shared__ FloatN buf[gaugeSiteSize/2*BLOCKSIZE];
   
@@ -230,399 +348,25 @@ do_link_format_gpu_to_cpu(FloatN* dst, FloatN* src,
 
 void 
 link_format_gpu_to_cpu(void* dst, void* src, 
-		       int bytes, int Vh, int stride, QudaPrecision prec, cudaStream_t stream)
+		       int Vh, int stride, QudaPrecision prec, cudaStream_t stream)
 {
   
   dim3 blockDim(BLOCKSIZE);
   dim3 gridDim(4*Vh/blockDim.x); //every 4 threads process one site's x,y,z,t links
   //4*Vh must be multipl of BLOCKSIZE or the kernel does not work
   if ((4*Vh) % blockDim.x != 0){
-    printf("ERROR: Vh(%d) is not multiple of blocksize(%d), exitting\n", Vh, blockDim.x);
-    exit(1);
+    errorQuda("ERROR: 4*Vh(%d) is not multiple of blocksize(%d), exitting\n", Vh, blockDim.x);
   }
   if(prec == QUDA_DOUBLE_PRECISION){
-    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, bytes, Vh, stride);
+    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, Vh, stride);
   }else if(prec == QUDA_SINGLE_PRECISION){
-    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float2*)src,  bytes, Vh, stride);
+    do_link_format_gpu_to_cpu<<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float2*)src, Vh, stride);
   }else{
     printf("ERROR: half precision is not supported in %s\n",__FUNCTION__);
     exit(1);
   }
   
 }
-
-
-
-#define READ_ST_SPINOR(spinor, idx, mystride)           \
-  Float2 I0 = spinor[idx + 0*mystride];                 \
-  Float2 I1 = spinor[idx + 1*mystride];                 \
-  Float2 I2 = spinor[idx + 2*mystride];
-
-#define WRITE_ST_SPINOR(spinor, idx, mystride)  \
-  spinor[idx + 0*mystride] = I0;                        \
-  spinor[idx + 1*mystride] = I1;                        \
-  spinor[idx + 2*mystride] = I2;
-
-
-template<int dir, int whichway, typename Float2>
-__global__ void
-staggeredCollectGhostSpinorKernel(Float2* in, const int oddBit,
-                                  Float2* nbr_spinor_gpu)
-{
-
-  int sid = blockIdx.x*blockDim.x + threadIdx.x;
-  int z1 = sid / X1h;
-  int x1h = sid - z1*X1h;
-  int z2 = z1 / X2;
-  int x2 = z1 - z2*X2;
-  int x4 = z2 / X3;
-  int x3 = z2 - x4*X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2*x1h + x1odd;
-  //int X = 2*sid + x1odd;
-
-  READ_ST_SPINOR(in, sid, sp_stride);
-  int ghost_face_idx;
-
-  if ( dir == 0 && whichway == QUDA_BACKWARDS){
-    if (x1 < 3){
-      ghost_face_idx = (x1*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X4*X3*X2/2);
-    }
-  }
-
-  if ( dir == 0 && whichway == QUDA_FORWARDS){
-    if (x1 >= X1 - 3){
-      ghost_face_idx = ((x1-X1+3)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X4*X3*X2/2);
-    }
-  }
-
-  if ( dir == 1 && whichway == QUDA_BACKWARDS){
-    if (x2 < 3){
-      ghost_face_idx = (x2*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X4*X3*X1/2);
-    }
-  }
-
-  if ( dir == 1 && whichway == QUDA_FORWARDS){
-    if (x2 >= X2 - 3){
-      ghost_face_idx = ((x2-X2+3)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X4*X3*X1/2);
-    }
-  }
-
-  if ( dir == 2 && whichway == QUDA_BACKWARDS){
-    if (x3 < 3){
-      ghost_face_idx = (x3*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X4*X2*X1/2);
-    }
-  }
-
-  if ( dir == 2 && whichway == QUDA_FORWARDS){
-    if (x3 >= X3 - 3){
-      ghost_face_idx = ((x3-X3+3)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X4*X2*X1/2);
-    }
-  }
-
-  if ( dir == 3 && whichway == QUDA_BACKWARDS){
-    if (x4 < 3){
-      ghost_face_idx = (x4*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X3*X2*X1/2);
-    }
-  }
-
-  if ( dir == 3 && whichway == QUDA_FORWARDS){
-    if (x4 >= X4 - 3){
-      ghost_face_idx = ((x4-X4+3)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-      WRITE_ST_SPINOR(nbr_spinor_gpu, ghost_face_idx, 3*X3*X2*X1/2);
-    }
-  }
-
-}
-
-template<int dir, int whichway>
-__global__ void
-staggeredCollectGhostSpinorNormKernel(float* in_norm, const int oddBit,
-				      float* nbr_spinor_norm_gpu)
-{
-
-  int sid = blockIdx.x*blockDim.x + threadIdx.x;
-  int z1 = sid / X1h;
-  int x1h = sid - z1*X1h;
-  int z2 = z1 / X2;
-  int x2 = z1 - z2*X2;
-  int x4 = z2 / X3;
-  int x3 = z2 - x4*X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2*x1h + x1odd;
-
-  int ghost_face_idx;
-
-  if ( dir == 0 && whichway == QUDA_BACKWARDS){
-    if (x1 < 3){
-      ghost_face_idx = (x1*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-
-  if ( dir == 0 && whichway == QUDA_FORWARDS){
-    if (x1 >= X1 - 3){
-      ghost_face_idx = ((x1-X1+3)*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-
-  if ( dir == 1 && whichway == QUDA_BACKWARDS){
-    if (x2 < 3){
-      ghost_face_idx = (x2*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-
-  if ( dir == 1 && whichway == QUDA_FORWARDS){
-    if (x2 >= X2 - 3){
-      ghost_face_idx = ((x2-X2+3)*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-
-  if ( dir == 2 && whichway == QUDA_BACKWARDS){
-    if (x3 < 3){
-      ghost_face_idx = (x3*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-
-  if ( dir == 2 && whichway == QUDA_FORWARDS){
-    if (x3 >= X3 - 3){
-      ghost_face_idx = ((x3-X3+3)*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-
-  if ( dir == 3 && whichway == QUDA_BACKWARDS){
-    if (x4 < 3){
-      ghost_face_idx = (x4*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-
-  if ( dir == 3 && whichway == QUDA_FORWARDS){
-    if (x4 >= X4 - 3){
-      ghost_face_idx = ((x4-X4+3)*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
-      nbr_spinor_norm_gpu[ghost_face_idx] = in_norm[sid];
-    }
-  }
-}
-
-//@dir can be 0, 1, 2, 3 (X,Y,Z,T directions)
-//@whichway can be QUDA_FORWARDS, QUDA_BACKWORDS
-void
-collectGhostSpinor(void *in, const void *inNorm,
-                   void* ghost_spinor_gpu,		   
-		   int dir, int whichway,
-                   const int parity, cudaColorSpinorField* inSpinor, 
-		   cudaStream_t* stream)
-{
-  
-  dim3 gridDim(inSpinor->Volume()/BLOCKSIZE, 1, 1);
-  dim3 blockDim(BLOCKSIZE, 1, 1);
-    
-  if (inSpinor->Precision() == QUDA_DOUBLE_PRECISION){
-    switch(dir){
-    case 0:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu);
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu);
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-    case 1:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-      
-    case 2:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-      
-    case 3:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)in, parity, (double2*)ghost_spinor_gpu); CUERR;
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-      
-    }
-  }else if(inSpinor->Precision() == QUDA_SINGLE_PRECISION){
-    switch(dir){
-    case 0:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu);
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu);
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-    case 1:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-    case 2:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-    case 3:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)in, parity, (float2*)ghost_spinor_gpu); CUERR;
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;      
-    }
-  }else if(inSpinor->Precision() == QUDA_HALF_PRECISION){
-    int nFace =3 ;
-    float* ghost_norm_gpu = (float*)(((char*)ghost_spinor_gpu) + nFace*6*inSpinor->Precision()*inSpinor->GhostFace()[dir]);
-    switch(dir){
-    case 0:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu);
-	staggeredCollectGhostSpinorNormKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu);
-	staggeredCollectGhostSpinorNormKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-    case 1:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
-	staggeredCollectGhostSpinorNormKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
-	staggeredCollectGhostSpinorNormKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-    case 2:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
-	staggeredCollectGhostSpinorNormKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
-	staggeredCollectGhostSpinorNormKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;
-
-    case 3:
-      switch(whichway){
-      case QUDA_BACKWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
-	staggeredCollectGhostSpinorNormKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      case QUDA_FORWARDS:
-	staggeredCollectGhostSpinorKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((short2*)in, parity, (short2*)ghost_spinor_gpu); CUERR;
-	staggeredCollectGhostSpinorNormKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float*)inNorm, parity, (float*)ghost_norm_gpu);
-	break;
-      default:
-	errorQuda("Invalid whichway");
-	break;
-      }
-      break;      
-    }
-  }else{
-    printf("ERROR: invalid  precision for %s\n", __FUNCTION__);
-    exit(1);
-  }
-  CUERR;
-}
-
 
 #define READ_ST_STAPLE(staple, idx, mystride)           \
   Float2 P0 = staple[idx + 0*mystride];                 \

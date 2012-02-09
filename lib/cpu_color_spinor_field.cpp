@@ -292,7 +292,7 @@ int compareSpinor(const U &u, const V &v, const int tol) {
     
   int accuracy_level =0;
   for (int f=0; f<fail_check; f++) {
-    if (fail[f] == 0) accuracy_level = f;
+    if (fail[f] == 0) accuracy_level = f+1;
   }
 
   for (int f=0; f<fail_check; f++) {

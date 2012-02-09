@@ -282,7 +282,7 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
   void *unpackedOdd = (char*)unpacked + datalen/2;
   
   //unpack even data kernel
-  link_format_gpu_to_cpu((void*)unpackedEven, (void*)even, bytes/2, volumeCB, stride, prec, streams[0]);
+  link_format_gpu_to_cpu((void*)unpackedEven, (void*)even, volumeCB, stride, prec, streams[0]);
 #ifdef GPU_DIRECT
   cudaMemcpyAsync(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost, streams[0]);
 #else
@@ -290,7 +290,7 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
 #endif
   
   //unpack odd data kernel
-  link_format_gpu_to_cpu((void*)unpackedOdd, (void*)odd, bytes/2, volumeCB, stride, prec, streams[1]);
+  link_format_gpu_to_cpu((void*)unpackedOdd, (void*)odd, volumeCB, stride, prec, streams[1]);
 #ifdef GPU_DIRECT
   cudaMemcpyAsync(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
   for(int i=0; i<2; i++) cudaStreamSynchronize(streams[i]);
