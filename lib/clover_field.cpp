@@ -14,7 +14,11 @@ CloverField::CloverField(const CloverFieldParam &param, const QudaFieldLocation 
   length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
   bytes = length*precision;
-  if (precision == QUDA_HALF_PRECISION) norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
+  bytes = ALIGNMENT_ADJUST(bytes);
+  if (precision == QUDA_HALF_PRECISION) {
+    norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
+    norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
+  }
 
   total_bytes = bytes + norm_bytes;
 }

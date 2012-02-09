@@ -670,8 +670,35 @@ get_prec_str(QudaPrecision prec)
     
     
     return ret;
-
 }
+
+
+const char* 
+get_gauge_order_str(QudaGaugeFieldOrder order)
+{
+  const char* ret;
+
+  switch(order){
+    case QUDA_QDP_GAUGE_ORDER:
+	ret = "qdp";
+	break;
+
+    case QUDA_MILC_GAUGE_ORDER:
+	ret = "milc";
+	break;
+
+    case QUDA_CPS_WILSON_GAUGE_ORDER:
+	ret = "cps_wilson";
+	break;
+
+    default:
+	ret = "unknown";
+	break;
+  }	
+
+  return ret;
+}
+
 
 const char* 
 get_recon_str(QudaReconstructType recon)

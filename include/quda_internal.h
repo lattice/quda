@@ -22,7 +22,8 @@
 #define MassNormalization QudaMassNormalization
 #define PreserveSource QudaPreserveSource
 #define DagType QudaDagType
-
+#define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
+#define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>
 #include <quda.h>
 #include <util_quda.h>
@@ -82,9 +83,29 @@ extern "C" {
     ParityHw odd;
     ParityHw even;
   } FullHw;
+
+  extern cudaDeviceProp deviceProp;
   
 #ifdef __cplusplus
 }
 #endif
+
+class TuneParam {
+
+ public:
+  dim3 block;
+  int shared_bytes;
+
+  TuneParam() : block(32, 1, 1), shared_bytes(0) { ; }
+  TuneParam(const TuneParam &param) : block(param.block), shared_bytes(param.shared_bytes) { ; }
+  TuneParam& operator=(const TuneParam &param) {
+    if (&param != this) {
+      block = param.block;
+      shared_bytes = param.shared_bytes;
+    }
+    return *this;
+  }
+
+};
 
 #endif // _QUDA_INTERNAL_H

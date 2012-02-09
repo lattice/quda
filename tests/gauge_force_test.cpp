@@ -11,36 +11,25 @@
 #include <sys/time.h>
 #include "fat_force_quda.h"
 
-
-typedef struct {
-    double real;
-    double imag;
-} dcomplex;
-
-typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-
 extern void initDslashConstants(const cudaGaugeField& gauge, const int sp_stride);
 
-static int device = 0;
+extern int device;
 
-cudaGaugeField* cudaSiteLink = NULL;
-
-cudaGaugeField* cudaMom = NULL;
-
+static cudaGaugeField* cudaSiteLink = NULL;
+static cudaGaugeField* cudaMom = NULL;
 static QudaGaugeParam gaugeParam;
-cpuGaugeField* siteLink = NULL;
-cpuGaugeField* mom = NULL;
-cpuGaugeField* refMom = NULL;
+static cpuGaugeField* siteLink = NULL;
+static cpuGaugeField* mom = NULL;
+static cpuGaugeField* refMom = NULL;
 
-int verify_results = 0;
-int ODD_BIT = 1;
-
+static int verify_results = 0;
 extern int tdim;
 extern QudaPrecision prec;
 extern int xdim;
 extern int ydim;
 extern int zdim;
 extern int tdim;
+extern void usage(char** argv);
 
 int Z[4];
 int V;
@@ -66,9 +55,7 @@ setDims(int *X) {
 static void
 gauge_force_init()
 { 
-
     initQuda(device);
-    //cudaSetDevice(dev); CUERR;
     
     gaugeParam.X[0] = xdim;
     gaugeParam.X[1] = ydim;
@@ -80,11 +67,14 @@ gauge_force_init()
     gaugeParam.cpu_prec = link_prec;
     gaugeParam.cuda_prec = link_prec;
     gaugeParam.reconstruct = link_recon;
-    
+   
+    gaugeParam.type = QUDA_WILSON_LINKS; // in this context, just means these are site links   
+ 
     gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
     GaugeFieldParam gParam(0, gaugeParam);
     gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.pad = 0;
     siteLink = new cpuGaugeField(gParam);
 
     // this is a hack to have site link generated in 2d 
@@ -119,16 +109,16 @@ gauge_force_init()
     
     gParam.reconstruct = QUDA_RECONSTRUCT_10;
     gParam.precision = gaugeParam.cpu_prec;
-    mom = new cpuGaugeField(gParam);
+    gParam.create =QUDA_ZERO_FIELD_CREATE;
+    mom = new cpuGaugeField(gParam);    
     refMom = new cpuGaugeField(gParam);
     
-
+    
+    //initiaze some data in mom
     createMomCPU(mom->Gauge_p(),  gaugeParam.cpu_prec);    
-    //memset(mom, 0, 4*V*momSiteSize*gSize);
     
     memcpy(refMom->Gauge_p(), mom->Gauge_p(), 4*mom->Volume()*momSiteSize*gaugeParam.cpu_prec);
     
-
     gParam.precision = gaugeParam.cuda_prec;
     cudaMom = new cudaGaugeField(gParam);
     
@@ -143,12 +133,18 @@ gauge_force_end()
   
   delete cudaSiteLink;
   delete cudaMom;
+  delete refMom;
+  
+  endQuda();
 }
 
 
-static void 
+static int
 gauge_force_test(void) 
 {
+  gauge_force_init();
+  
+
     int path_dir_x[][5] = {
 	{1, 7, 6 },
         {6, 7, 1 },
@@ -252,56 +248,68 @@ gauge_force_test(void)
 	5, 
     };
     
-    float loop_coeff[]={
-        1.1,
-        1.2,
-        1.3,
-        1.4,
-        1.5,
-        1.6,
-        2.5,
-        2.6,
-        2.7,
-        2.8,
-        2.9,
-        3.0,
-        3.1,
-        3.2,
-        3.3,
-        3.4,
-        3.5,
-        3.6,
-        3.7,
-        3.8,
-        3.9,
-        4.0,
-        4.1,
-        4.2,
-        4.3,
-        4.4,
-        4.5,
-        4.6,
-        4.7,
-        4.8,
-        4.9,
-        5.0,
-        5.1,
-        5.2,
-        5.3,
-        5.4,
-        5.5,
-        5.6,
-        5.7,
-        5.8,
-        5.9,
-        5.0,
-        6.1,
-        6.2,
-        6.3,
-        6.4,
-        6.5,
-        6.6,
+    float loop_coeff_f[]={
+      1.1,
+      1.2,
+      1.3,
+      1.4,
+      1.5,
+      1.6,
+      2.5,
+      2.6,
+      2.7,
+      2.8,
+      2.9,
+      3.0,
+      3.1,
+      3.2,
+      3.3,
+      3.4,
+      3.5,
+      3.6,
+      3.7,
+      3.8,
+      3.9,
+      4.0,
+      4.1,
+      4.2,
+      4.3,
+      4.4,
+      4.5,
+      4.6,
+      4.7,
+      4.8,
+      4.9,
+      5.0,
+      5.1,
+      5.2,
+      5.3,
+      5.4,
+      5.5,
+      5.6,
+      5.7,
+      5.8,
+      5.9,
+      5.0,
+      6.1,
+      6.2,
+      6.3,
+      6.4,
+      6.5,
+      6.6,
     };
+
+    double loop_coeff_d[sizeof(loop_coeff_f)/sizeof(float)];
+    for(unsigned int i=0;i < sizeof(loop_coeff_f)/sizeof(float); i++){
+      loop_coeff_d[i] = loop_coeff_f[i];
+    }
+    
+    void* loop_coeff;
+    if(gaugeParam.cuda_prec == QUDA_SINGLE_PRECISION){
+      loop_coeff = (void*)&loop_coeff_f[0];
+    }else{
+      loop_coeff = loop_coeff_d;
+    }
 
     int path_dir_y[][5] = {
         { 2 ,6 ,5 },
@@ -459,7 +467,6 @@ gauge_force_test(void)
     int max_length = 6;
 
     
-    gauge_force_init();
 
     initDslashConstants(*cudaSiteLink, 0);
     gauge_force_init_cuda(&gaugeParam, max_length); 
@@ -489,11 +496,11 @@ gauge_force_test(void)
     // download the gauge field to the GPU
     cudaSiteLink->loadCPUField(*siteLink, QUDA_CPU_FIELD_LOCATION);
     
-#define CX 1
-#define CY 1
-#define CZ 1
-#define CT 1
-
+#define CX 
+#define CY 
+#define CZ 
+#define CT 
+    
     if (verify_results){
 	
 #ifdef CX
@@ -573,7 +580,8 @@ gauge_force_test(void)
     int res;
     res = compare_floats(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume()*momSiteSize, 1e-3, gaugeParam.cpu_prec);
     
-    strong_check_mom(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume(), gaugeParam.cpu_prec);
+    int accuracy_level;
+    accuracy_level = strong_check_mom(mom->Gauge_p(), refMom->Gauge_p(), 4*mom->Volume(), gaugeParam.cpu_prec);
     
     printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
     
@@ -581,6 +589,11 @@ gauge_force_test(void)
     double perf = 1.0* flops*volume/(secs*1024*1024*1024);
     printf("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
     
+    for(i=0;i < num_paths; i++){
+      free(input_path[i]);
+    }
+    free(input_path);
+
     gauge_force_end();
 
     if (res == 0){//failed
@@ -589,8 +602,8 @@ gauge_force_test(void)
         printf("        Did you use --verify?\n");
         printf("        Did you check the GPU health by running cuda memtest?\n");
     }
-
     
+    return accuracy_level;
 }            
 
 
@@ -608,19 +621,12 @@ display_test_info()
     
 }
 
-static void
-usage(char** argv )
+void
+usage_extra(char** argv )
 {
-    printf("Usage: %s <args>\n", argv[0]);
-    printf("  --device <dev_id>               Set which device to run on\n");
-    printf("  --gprec <double/single/half>    Link precision\n"); 
-    printf("  --recon <8/12>                  Link reconstruction type\n"); 
-    printf("  --sdim <n>                      Set spacial dimention\n");
-    printf("  --tdim                          Set T dimention size(default 24)\n"); 
-    printf("  --verify                        Verify the GPU results using CPU results\n");
-    printf("  --help                          Print out this message\n"); 
-    exit(1);
-    return ;
+  printf("Extra options:\n");
+  printf("    --verify                                  # Verify the GPU results using CPU results\n");
+  return ;
 }
 
 int 
@@ -633,46 +639,36 @@ main(int argc, char **argv)
 	continue;
       }
       
-      
-      if( strcmp(argv[i], "--help")== 0){
-            usage(argv);
-        }
-	
-      if( strcmp(argv[i], "--device") == 0){
-	if (i+1 >= argc){
-	  usage(argv);
-            }
-	device =  atoi(argv[i+1]);
-	if (device < 0){
-	  fprintf(stderr, "Error: invalid device number(%d)\n", device);
-	  exit(1);
-	}
-	i++;
-	continue;
-      }
-      
       if( strcmp(argv[i], "--verify") == 0){
 	verify_results=1;
 	continue;	    
       }	
+      
       fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
       usage(argv);
     }
     
     
     link_prec = prec;
-    link_recon = QUDA_RECONSTRUCT_12;
 #ifdef MULTI_GPU
     initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 #endif
 
     display_test_info();
     
-    gauge_force_test();
-    
+    int accuracy_level = gauge_force_test();
+    printfQuda("accuracy_level=%d\n", accuracy_level);
+
 #ifdef MULTI_GPU
     endCommsQuda();
 #endif
     
-    return 0;
+    int ret;
+    if(accuracy_level >=3 ){
+      ret = 0; 
+    }else{
+      ret = 1; //we delclare the test failed
+    }
+
+    return ret;
 }

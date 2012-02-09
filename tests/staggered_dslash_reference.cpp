@@ -338,7 +338,7 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
 			     QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
 
-  QudaParity otherparity;
+  QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY){
     otherparity = QUDA_ODD_PARITY;
   }else if (oddBit == QUDA_ODD_PARITY){
@@ -388,7 +388,7 @@ matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void
     errorQuda("Spinor precision and gPrecison is not the same");
   }
   
-  QudaParity otherparity;
+  QudaParity otherparity = QUDA_INVALID_PARITY;
   if (parity == QUDA_EVEN_PARITY){
     otherparity = QUDA_ODD_PARITY;
   }else if (parity == QUDA_ODD_PARITY){

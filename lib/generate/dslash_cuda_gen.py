@@ -143,7 +143,6 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
-    str += "\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
     for s in range(0,4):
@@ -273,12 +272,19 @@ def def_output_spinor():
 
 
 def prolog():
-    prolog_str= ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
-    prolog_str+= "#define DSLASH_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
+    if dslash:
+        prolog_str= ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
+        prolog_str+= "#define DSLASH_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
+    elif clover:
+        prolog_str= ("// *** CUDA CLOVER ***\n\n")    
+        prolog_str+= "#define CLOVER_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
+    else:
+        print "Undefined prolog"
+        exit
 
     prolog_str+= (
 """
-#if (CUDA_VERSION >= 4100)
+#if (CUDA_VERSION >= 4010)
 #define VOLATILE
 #else
 #define VOLATILE volatile
@@ -286,20 +292,20 @@ def prolog():
 """)
 
     prolog_str+= def_input_spinor()
-    prolog_str+= def_gauge()
+    if dslash == True: prolog_str+= def_gauge()
     if clover == True: prolog_str+= def_clover()
     prolog_str+= def_output_spinor()
 
     prolog_str+= (
 """
 #ifdef SPINOR_DOUBLE
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #endif
 #else
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
@@ -307,42 +313,34 @@ def prolog():
 #endif
 """)
 
-    if sharedCoords or sharedFloats > 0:
+    if sharedFloats > 0:
         prolog_str += (
 """
 extern __shared__ char s_data[];
 """)
 
-    if sharedFloats > 0:
-        prolog_str += (
+        if dslash:
+            prolog_str += (
 """
 VOLATILE spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 """)
-
-    if sharedCoords:
-        prolog_str += (
+        else:
+            prolog_str += (
 """
-short *coords = (short*)((spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*blockDim.x) + 4*threadIdx.x;
-#define SHARED_COORDS (4*sizeof(short)) 
-#define x1 coords[0]
-#define x2 coords[1]
-#define x3 coords[2]
-#define x4 coords[3]
-""")
-    else:
-        prolog_str += (
-"""
-int x1, x2, x3, x4;
-#define SHARED_COORDS 0 
+VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+                                  + (threadIdx.x % SHARED_STRIDE);
 """)
 
-    prolog_str+= (
+
+    if dslash:
+        prolog_str += (
 """
 #include "read_gauge.h"
 #include "read_clover.h"
 #include "io_spinor.h"
 
+int x1, x2, x3, x4;
 int X;
 
 #if (defined MULTI_GPU) && (DD_PREC==2) // half precision
@@ -373,13 +371,13 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 """)
 
-    out = ""
-    for s in range(0,4):
-        for c in range(0,3):
-            out += out_re(s,c)+" = 0;  "+out_im(s,c)+" = 0;\n"
-    prolog_str+= indent(out)
+        out = ""
+        for s in range(0,4):
+            for c in range(0,3):
+                out += out_re(s,c)+" = 0;  "+out_im(s,c)+" = 0;\n"
+        prolog_str+= indent(out)
 
-    prolog_str+= (
+        prolog_str+= (
 """
 #ifdef MULTI_GPU
 } else { // exterior kernel
@@ -403,14 +401,27 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 """)
 
-    out = ""
-    for s in range(0,4):
-        for c in range(0,3):
-            out += out_re(s,c)+" = "+in_re(s,c)+";  "+out_im(s,c)+" = "+in_im(s,c)+";\n"
-    prolog_str+= indent(out)
-    prolog_str+= "}\n"
-    prolog_str+= "#endif // MULTI_GPU\n\n\n"
-            
+        out = ""
+        for s in range(0,4):
+            for c in range(0,3):
+                out += out_re(s,c)+" = "+in_re(s,c)+";  "+out_im(s,c)+" = "+in_im(s,c)+";\n"
+        prolog_str+= indent(out)
+        prolog_str+= "}\n"
+        prolog_str+= "#endif // MULTI_GPU\n\n\n"
+
+    else:
+        prolog_str+=(
+"""
+#include "read_clover.h"
+#include "io_spinor.h"
+
+int sid = blockIdx.x*blockDim.x + threadIdx.x;
+if (sid >= param.threads) return;
+
+// read spinor from device memory
+READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
+
+""")            
     return prolog_str
 # end def prolog
 
@@ -638,16 +649,24 @@ def gen(dir, pack_only=False):
 # end def gen
 
 
+def input_spinor(s,c,z):
+    if dslash:
+        if z==0: return out_re(s,c)
+        else: return out_im(s,c)
+    else:
+        if z==0: return in_re(s,c)
+        else: return in_im(s,c)        
+
 def to_chiral_basis(c):
     str = ""
-    str += "spinorFloat "+a_re(0,0,c)+" = -"+out_re(1,c)+" - "+out_re(3,c)+";\n"
-    str += "spinorFloat "+a_im(0,0,c)+" = -"+out_im(1,c)+" - "+out_im(3,c)+";\n"
-    str += "spinorFloat "+a_re(0,1,c)+" =  "+out_re(0,c)+" + "+out_re(2,c)+";\n"
-    str += "spinorFloat "+a_im(0,1,c)+" =  "+out_im(0,c)+" + "+out_im(2,c)+";\n"
-    str += "spinorFloat "+a_re(0,2,c)+" = -"+out_re(1,c)+" + "+out_re(3,c)+";\n"
-    str += "spinorFloat "+a_im(0,2,c)+" = -"+out_im(1,c)+" + "+out_im(3,c)+";\n"
-    str += "spinorFloat "+a_re(0,3,c)+" =  "+out_re(0,c)+" - "+out_re(2,c)+";\n"
-    str += "spinorFloat "+a_im(0,3,c)+" =  "+out_im(0,c)+" - "+out_im(2,c)+";\n"
+    str += "spinorFloat "+a_re(0,0,c)+" = -"+input_spinor(1,c,0)+" - "+input_spinor(3,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,0,c)+" = -"+input_spinor(1,c,1)+" - "+input_spinor(3,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,1,c)+" =  "+input_spinor(0,c,0)+" + "+input_spinor(2,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,1,c)+" =  "+input_spinor(0,c,1)+" + "+input_spinor(2,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,2,c)+" = -"+input_spinor(1,c,0)+" + "+input_spinor(3,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,2,c)+" = -"+input_spinor(1,c,1)+" + "+input_spinor(3,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,3,c)+" =  "+input_spinor(0,c,0)+" - "+input_spinor(2,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,3,c)+" =  "+input_spinor(0,c,1)+" - "+input_spinor(2,c,1)+";\n"
     str += "\n"
 
     for s in range (0,4):
@@ -712,7 +731,7 @@ def clover_mult(chi):
 
 def apply_clover():
     str = ""
-    str += "#ifdef DSLASH_CLOVER\n\n"
+    if dslash: str += "#ifdef DSLASH_CLOVER\n\n"
     str += "// change to chiral basis\n"
     str += to_chiral_basis(0) + to_chiral_basis(1) + to_chiral_basis(2)
     str += "// apply first chiral block\n"
@@ -722,7 +741,7 @@ def apply_clover():
     str += "// change back from chiral basis\n"
     str += "// (note: required factor of 1/2 is included in clover term normalization)\n"
     str += from_chiral_basis(0) + from_chiral_basis(1) + from_chiral_basis(2)
-    str += "#endif // DSLASH_CLOVER\n\n"
+    if dslash: str += "#endif // DSLASH_CLOVER\n\n"
 
     return str
 # end def clover
@@ -824,11 +843,12 @@ def xpay():
 
 def epilog():
     str = ""
-    if twist:
-        str += "#ifdef MULTI_GPU\n"
-    else:
-        str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
-    str += (
+    if dslash:
+        if twist:
+            str += "#ifdef MULTI_GPU\n"
+        else:
+            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
+        str += (
 """
 int incomplete = 0; // Have all 8 contributions been computed for this site?
 
@@ -844,8 +864,8 @@ case EXTERIOR_KERNEL_Y:
 }
 
 """)    
-    str += "if (!incomplete)\n"
-    str += "#endif // MULTI_GPU\n"
+        str += "if (!incomplete)\n"
+        str += "#endif // MULTI_GPU\n"
     
     str += block( "\n" + (twisted() if twist else apply_clover()) + xpay() )
     
@@ -857,15 +877,16 @@ case EXTERIOR_KERNEL_Y:
     str += "#undef spinorFloat\n"
     str += "#undef SHARED_STRIDE\n\n"
 
-    str += "#undef A_re\n"
-    str += "#undef A_im\n\n"
+    if dslash:
+        str += "#undef A_re\n"
+        str += "#undef A_im\n\n"
 
-    for m in range(0,3):
-        for n in range(0,3):
-            i = 3*m+n
-            str += "#undef "+g_re(0,m,n)+"\n"
-            str += "#undef "+g_im(0,m,n)+"\n"
-    str += "\n"
+        for m in range(0,3):
+            for n in range(0,3):
+                i = 3*m+n
+                str += "#undef "+g_re(0,m,n)+"\n"
+                str += "#undef "+g_im(0,m,n)+"\n"
+        str += "\n"
 
     for s in range(0,4):
         for c in range(0,3):
@@ -879,15 +900,15 @@ case EXTERIOR_KERNEL_Y:
             s = m/3
             c = m%3
             str += "#undef "+c_re(0,s,c,s,c)+"\n"
-            for n in range(0,6):
-                sn = n/3
-                cn = n%3
-                for m in range(n+1,6):
-                    sm = m/3
-                    cm = m%3
-                    str += "#undef "+c_re(0,sm,cm,sn,cn)+"\n"
-                    str += "#undef "+c_im(0,sm,cm,sn,cn)+"\n"
-        str += "\n"
+        for n in range(0,6):
+            sn = n/3
+            cn = n%3
+            for m in range(n+1,6):
+                sm = m/3
+                cm = m%3
+                str += "#undef "+c_re(0,sm,cm,sn,cn)+"\n"
+                str += "#undef "+c_im(0,sm,cm,sn,cn)+"\n"
+    str += "\n"
 
     for s in range(0,4):
         for c in range(0,3):
@@ -897,16 +918,6 @@ case EXTERIOR_KERNEL_Y:
                 if 2*i+1 < sharedFloats:
                     str += "#undef "+out_im(s,c)+"\n"
     str += "\n"
-
-    if sharedCoords:
-        str += (
-"""
-#undef x1
-#undef x2
-#undef x3
-#undef x4
-"""
-)
 
     str += "#undef VOLATILE\n" 
 
@@ -927,7 +938,6 @@ def pack_face(facenum):
     str += "}\n\n"
     return str
 # end def pack_face
-
 
 def generate_pack():
     assert (sharedFloats == 0)
@@ -959,15 +969,21 @@ def generate_pack():
 def generate_dslash():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + epilog()
 
+def generate_clover():
+    return prolog() + epilog()
+
 
 # To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
 
 sharedFloats = 0
-sharedCoords = False
+cloverSharedFloats = 0
 if(len(sys.argv) > 1):
     if (sys.argv[1] == '--shared'):
         sharedFloats = int(sys.argv[2])
 print "Shared floats set to " + str(sharedFloats);
+
+# generate Wilson-like Dslash kernels
+dslash = True
 
 twist = False
 clover = True
@@ -1012,6 +1028,11 @@ f = open('dslash_core/wilson_pack_face_dagger_core.h', 'w')
 f.write(generate_pack())
 f.close()
 
-#f = open('clover_core.h', 'w')
-#f.write(prolog() + clover() + epilog())
-#f.close()
+# generate clover solo term
+dslash = False
+clover = True
+sharedFloats = cloverSharedFloats
+print sys.argv[0] + ": generating clover_core.h";
+f = open('dslash_core/clover_core.h', 'w')
+f.write(generate_clover())
+f.close()

@@ -119,7 +119,7 @@ void read_gauge_field(char *filename, void *gauge[], QudaPrecision precision, in
   layout.number_of_nodes = QMP_get_number_of_nodes();
 
   /* Open the test file for reading */
-  infile = open_test_input(filename, QIO_UNKNOWN, QIO_SERIAL, myname);
+  infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL, myname);
   if(infile == NULL) { printf("Open file failed\n"); exit(0); }
 
   /* Read the su3 field record */

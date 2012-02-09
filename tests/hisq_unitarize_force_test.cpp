@@ -14,7 +14,7 @@
 #include <sys/time.h>
 
 using namespace hisq::fermion_force;
-
+extern void usage(char** argv);
 static int device = 0;
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField  *cpuGauge  = NULL;
@@ -38,13 +38,21 @@ int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
 
 extern QudaReconstructType link_recon;
-QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
 extern QudaPrecision prec;
+QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision hw_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision cpu_hw_prec = QUDA_SINGLE_PRECISION;
-
 QudaPrecision mom_prec = QUDA_SINGLE_PRECISION;
 
+void setPrecision(QudaPrecision precision)
+{
+  link_prec   = precision;
+  hw_prec     = precision;
+  cpu_hw_prec = precision;
+  mom_prec    = precision;
+  
+  return;
+}
 
 
 int Z[4];
@@ -141,23 +149,14 @@ hisq_force_init()
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.precision = gaugeParam.cpu_prec;
   cpuOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p());
+  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec);
 
 
   gParam.precision = hw_prec;
   cudaOprod = new cudaGaugeField(gParam);
 
-  // hard coded for the time being.
-  //const double unitarize_eps = 1e-5;
-  //const double hisq_force_filter = 5e-5;
-  //const double acceptable_det_error = 1e-12;
-  // Set the constants needed by the unitarization routine on the device
-  //set_unitarize_force_constants(unitarize_eps, hisq_force_filter, acceptable_det_error);
   checkCudaError();	
   
-
-  
-
   return;
 }
 
@@ -168,12 +167,15 @@ hisq_force_end()
   delete cudaForce;
   delete cudaOprod;
   delete cudaGauge;
+  freeHwQuda(cudaHw);
+  
   delete cpuGauge;
   delete cpuForce;
   delete cpuOprod;
   delete cpuReference;
   free(hw);
 
+  endQuda();
   return;
 }
 
@@ -185,9 +187,7 @@ hisq_force_test()
   initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
   hisq_force_init_cuda(&gaugeParam);
 
-  float weight = 1.0;
   float act_path_coeff[6];
-
   act_path_coeff[0] = 0.625000;
   // act_path_coeff[1] = -0.058479;
   act_path_coeff[1] = 0.0; // set Naik term to zero, temporarily
@@ -195,6 +195,12 @@ hisq_force_test()
   act_path_coeff[3] = 0.030778;
   act_path_coeff[4] = -0.007200;
   act_path_coeff[5] = -0.123113;
+
+  double d_act_path_coeff[6];
+  for(int i=0; i<6; ++i){
+    d_act_path_coeff[i] = act_path_coeff[i];
+  }
+
 
   // copy the gauge field to the GPU
   cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
@@ -205,23 +211,37 @@ hisq_force_test()
   loadHwToGPU(cudaHw, hw, cpu_hw_prec);
 
 
+  const double unitarize_eps = 1e-5;
+  const double hisq_force_filter = 5e-5;
+  const double max_det_error = 1e-12;
+  const bool allow_svd = true;
+  const bool svd_only = false;
+  const double svd_rel_err = 1e-8;
+  const double svd_abs_err = 1e-8;
+
+  set_unitarize_force_constants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
   struct timeval t0, t1;
   bool shouldCompute = true;
   gettimeofday(&t0, NULL);
   
   // First of all we fatten the links on the GPU
-  hisq_staples_force_cuda(act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+  hisq_staples_force_cuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+
   cudaThreadSynchronize();
   checkCudaError();
   cudaForce->saveCPUField(*cpuForce, QUDA_CPU_FIELD_LOCATION);
 
 
-  unitarize_force_cuda(*cudaForce, *cudaGauge, cudaOprod); // output is written to cudaOprod.
+  int* unitarization_failed_dev; 
+  cudaMalloc((void**)&unitarization_failed_dev, sizeof(int));
+
+  unitarize_force_cuda(gaugeParam, *cudaForce, *cudaGauge, cudaOprod, unitarization_failed_dev); // output is written to cudaOprod.
   if(verify_results){
-    unitarize_force_cpu(*cpuForce, *cpuGauge, cpuOprod); 
+    unitarize_force_cpu(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
   }
   cudaThreadSynchronize();
   checkCudaError();
+  cudaFree(unitarization_failed_dev);
 
   cudaOprod->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION); 
 
@@ -250,19 +270,11 @@ display_test_info()
     
 }
 
-static void
-usage(char** argv )
+void
+usage_extra(char** argv )
 {
-  printf("Usage: %s <args>\n", argv[0]);
-  printf("  --device <dev_id>               Set which device to run on\n");
-  printf("  --gprec <double/single/half>    Link precision\n"); 
-  printf("  --recon <8/12/18>                  Link reconstruction type\n"); 
-  printf("  --sdim <n>                      Set spacial dimention\n");
-  printf("  --tdim                          Set T dimention size(default 24)\n"); 
-  printf("  --sdim                          Set spalce dimention size(default 16)\n"); 
-  printf("  --verify                        Verify the GPU results using CPU results\n");
-  printf("  --help                          Print out this message\n"); 
-  exit(1);
+  printf("Extra options: \n");
+  printf("    --verify                                  # Verify the GPU results using CPU results\n");
   return ;
 }
 
@@ -274,21 +286,7 @@ main(int argc, char **argv)
 	
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
-    }
-    
-
-    if( strcmp(argv[i], "--device") == 0){
-        if (i+1 >= argc){
-                usage(argv);
-            }
-            device =  atoi(argv[i+1]);
-            if (device < 0){
-                fprintf(stderr, "Error: invalid device number(%d)\n", device);
-                exit(1);
-            }
-            i++;
-            continue;
-    }
+    }  
 
     if( strcmp(argv[i], "--verify") == 0){
       verify_results=1;
@@ -302,7 +300,7 @@ main(int argc, char **argv)
     initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 #endif
 
-  link_prec = prec;
+  setPrecision(prec);
 
   display_test_info();
     

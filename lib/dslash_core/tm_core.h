@@ -26,13 +26,15 @@ __device__ float4 operator*(const float &x, const float4 &y)
 #define tmp3_re tmp3.x
 #define tmp3_im tmp3.y
 
-#if (__CUDA_ARCH__ >= 130)
-__global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, DslashParam param)
+#if (__COMPUTE_CAPABILITY__ >= 130)
+__global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, 
+				  const double2 *in, const float *null2, DslashParam param)
 {
 
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
 
+#ifndef FERMI_NO_DBLE_TEX
    double2 I0  = fetch_double2(spinorTexDouble, sid + 0 * sp_stride);   
    double2 I1  = fetch_double2(spinorTexDouble, sid + 1 * sp_stride);   
    double2 I2  = fetch_double2(spinorTexDouble, sid + 2 * sp_stride);   
@@ -45,6 +47,20 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
    double2 I9  = fetch_double2(spinorTexDouble, sid + 9 * sp_stride);   
    double2 I10 = fetch_double2(spinorTexDouble, sid + 10 * sp_stride); 
    double2 I11 = fetch_double2(spinorTexDouble, sid + 11 * sp_stride);
+#else
+   double2 I0  = in[sid + 0 * sp_stride];   
+   double2 I1  = in[sid + 1 * sp_stride];   
+   double2 I2  = in[sid + 2 * sp_stride];   
+   double2 I3  = in[sid + 3 * sp_stride];   
+   double2 I4  = in[sid + 4 * sp_stride];   
+   double2 I5  = in[sid + 5 * sp_stride];   
+   double2 I6  = in[sid + 6 * sp_stride];   
+   double2 I7  = in[sid + 7 * sp_stride];   
+   double2 I8  = in[sid + 8 * sp_stride];   
+   double2 I9  = in[sid + 9 * sp_stride];   
+   double2 I10 = in[sid + 10 * sp_stride]; 
+   double2 I11 = in[sid + 11 * sp_stride];
+#endif
 
    volatile double2 tmp0, tmp1, tmp2, tmp3;
    
@@ -134,7 +150,7 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 
    return;  
 }
-#endif // (__CUDA_ARCH__ >= 130)
+#endif // (__COMPUTE_CAPABILITY__ >= 130)
 
 #undef tmp0_re
 #undef tmp0_im
@@ -154,7 +170,8 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 #define tmp3_re tmp1.z
 #define tmp3_im tmp1.w
 
-__global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, DslashParam param)
+__global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, 
+				  const float4 *in, const float *null2, DslashParam param)
 {
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
@@ -250,7 +267,8 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
 }
 
 
-__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, DslashParam param)
+__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, 
+				  const short4 *in, const float *inNorm, DslashParam param)
 {
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;

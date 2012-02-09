@@ -25,7 +25,6 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
-
 #else
 #define spinorFloat float
 #define i00_re I0.x

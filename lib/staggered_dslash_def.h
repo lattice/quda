@@ -188,20 +188,20 @@
 
 // gauge field
 #define DD_PREC_F D
-#ifndef DIRECT_ACCESS_FAT_LINK
-#define FATLINK0TEX fatGauge0TexDouble
-#define FATLINK1TEX fatGauge1TexDouble
-#else
+#if (defined DIRECT_ACCESS_FAT_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define FATLINK0TEX fatGauge0
 #define FATLINK1TEX fatGauge1
+#else
+#define FATLINK0TEX fatGauge0TexDouble
+#define FATLINK1TEX fatGauge1TexDouble
 #endif
 
-#ifndef DIRECT_ACCESS_LONG_LINK //longlink access
-#define LONGLINK0TEX longGauge0TexDouble
-#define LONGLINK1TEX longGauge1TexDouble
-#else
+#if (defined DIRECT_ACCESS_LONG_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define LONGLINK0TEX longGauge0
 #define LONGLINK1TEX longGauge1
+#else
+#define LONGLINK0TEX longGauge0TexDouble
+#define LONGLINK1TEX longGauge1TexDouble
 #endif
 
 #define GAUGE_DOUBLE
@@ -209,20 +209,27 @@
 // spinor fields
 #define DD_PARAM_OUT double2* g_out, float *null1
 #define DD_PARAM_IN const double2* in, const float *null4
-#ifndef DIRECT_ACCESS_SPINOR
-#define SPINORTEX spinorTexDouble
-#else
+#if (defined DIRECT_ACCESS_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define SPINORTEX in
-#endif
-#define WRITE_SPINOR WRITE_ST_SPINOR_DOUBLE2
-#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE
+#else
+#define SPINORTEX spinorTexDouble
+#define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE_TEX
+#define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE_TEX
+#endif
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
+#define WRITE_SPINOR WRITE_ST_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
 #if (DD_AXPY==1)
-#define ACCUMTEX accumTexDouble
+#if (defined DIRECT_ACCESS_ACCUM) || (defined FERMI_NO_DBLE_TEX)
+#define ACCUMTEX x
 #define READ_ACCUM READ_ST_ACCUM_DOUBLE
+#else
+#define ACCUMTEX accumTexDouble
+#define READ_ACCUM READ_ST_ACCUM_DOUBLE_TEX
 #endif
+#endif // DD_AXPY
 
 
 #elif (DD_PREC==1) // single-precision fields
@@ -254,22 +261,31 @@
 // spinor fields
 #define DD_PARAM_OUT float2* g_out, float *null1
 #define DD_PARAM_IN const float2* in, const float *null4
-#define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_SINGLE
-#define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_SINGLE
 #ifndef DIRECT_ACCESS_SPINOR
 #define SPINORTEX spinorTexSingle2
+#define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_SINGLE_TEX
+#define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_SINGLE_TEX
 #else
 #define SPINORTEX in
+#define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_SINGLE
+#define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_SINGLE
 #endif
-#define WRITE_SPINOR WRITE_ST_SPINOR_FLOAT2
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
+#define WRITE_SPINOR WRITE_ST_SPINOR_FLOAT2
 #if (DD_AXPY==1)
-#define ACCUMTEX accumTexSingle2
+#if (defined DIRECT_ACCESS_ACCUM) || (defined FERMI_NO_DBLE_TEX)
+#define ACCUMTEX x
 #define READ_ACCUM READ_ST_ACCUM_SINGLE
+#else
+#define ACCUMTEX accumTexSingle2
+#define READ_ACCUM READ_ST_ACCUM_SINGLE_TEX
 #endif
+#endif // DD_AXPY
 
 
 #else             // half-precision fields
+
+// all reads done through texture cache regardless
 
 // gauge fields
 #define DD_PREC_F H
@@ -283,22 +299,22 @@
 #define LONGLINK1TEX longGauge1TexHalf
 #endif
 
-#define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_HALF
-#define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_HALF
+#define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_HALF_TEX
+#define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_HALF_TEX
 #define SPINORTEX spinorTexHalf2
 #define DD_PARAM_OUT short2* g_out, float *outNorm
 #define DD_PARAM_IN const short2* in, const float *inNorm
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF // FIXME: this not done through tex
 #define WRITE_SPINOR WRITE_ST_SPINOR_SHORT2
-#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF
 #if (DD_AXPY==1)
 #define ACCUMTEX accumTexHalf2
-#define READ_ACCUM READ_ST_ACCUM_HALF
-#endif
+#define READ_ACCUM READ_ST_ACCUM_HALF_TEX
+#endif // DD_AXPY
 
 #endif
 
 // only build double precision if supported
-#if !(__CUDA_ARCH__ < 130 && DD_PREC == 0) 
+#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
 
 #define DD_CONCAT(n,r,x) n ## r ## x ## Kernel
 #define DD_FUNC(n,r,x) DD_CONCAT(n,r,x)
@@ -313,7 +329,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #endif
 }
 
-#endif // !(__CUDA_ARCH__ < 130 && DD_PREC == 0)
+#endif // !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 
 
 // clean up

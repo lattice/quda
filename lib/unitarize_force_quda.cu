@@ -7,31 +7,67 @@
 
 #include "quda_matrix.h"
 #include "svd_quda.h"
-//#include "unitarize_utilities.h"
 
 
 
-#define FORCE_UNITARIZE_PI 3.14159265358979323846
-#define FORCE_UNITARIZE_PI23 FORCE_UNITARIZE_PI*2.0/3.0
-
-#define FORCE_UNITARIZE_EPS 1e-5
-#define HISQ_FORCE_FILTER 5e-5
-#define ACCEPTABLE_DET_ERROR 1e-12
+#define HISQ_UNITARIZE_PI 3.14159265358979323846
+#define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
 
 // constants - File scope only
-//__constant__ double FORCE_UNITARIZE_EPS;
-//__constant__ double HISQ_FORCE_FILTER;
-//__constant__ double ACCEPTABLE_DET_ERROR;
+__constant__ double DEV_HISQ_UNITARIZE_EPS;
+__constant__ double DEV_HISQ_FORCE_FILTER;
+__constant__ double DEV_MAX_DET_ERROR;
+__constant__ bool DEV_REUNIT_ALLOW_SVD;
+__constant__ bool DEV_REUNIT_SVD_ONLY;
+__constant__ double DEV_REUNIT_SVD_REL_ERROR;
+__constant__ double DEV_REUNIT_SVD_ABS_ERROR;
 
+static double HOST_HISQ_UNITARIZE_EPS;
+static double HOST_HISQ_FORCE_FILTER;
+static double HOST_MAX_DET_ERROR;
+static bool   HOST_REUNIT_ALLOW_SVD;
+static bool   HOST_REUNIT_SVD_ONLY;
+static double HOST_REUNIT_SVD_REL_ERROR;
+static double HOST_REUNIT_SVD_ABS_ERROR;
+
+ 
 namespace hisq{
   namespace fermion_force{
 
-      void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double acceptable_det_error)
+     template<class Cmplx> 
+     __host__ __device__ 	
+     void printLink(Matrix<Cmplx,3>& link);
+
+
+
+      void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double max_det_error, 
+					bool allow_svd, bool svd_only,
+					double svd_rel_error, double svd_abs_error)
       {
-        cudaMemcpyToSymbol("FORCE_UNITARIZE_EPS", &unitarize_eps, sizeof(double));
-        cudaMemcpyToSymbol("HISQ_FORCE_FILTER", &hisq_force_filter, sizeof(double));
-        cudaMemcpyToSymbol("ACCEPTABLE_DET_ERROR", &acceptable_det_error, sizeof(double));
-	checkCudaError();
+
+	// not_set is only initialised once
+	static bool not_set=true;
+		
+	if(not_set){
+          cudaMemcpyToSymbol("DEV_HISQ_UNITARIZE_EPS", &unitarize_eps, sizeof(double));
+          cudaMemcpyToSymbol("DEV_HISQ_FORCE_FILTER", &hisq_force_filter, sizeof(double));
+          cudaMemcpyToSymbol("DEV_MAX_DET_ERROR", &max_det_error, sizeof(double));
+	  cudaMemcpyToSymbol("DEV_REUNIT_ALLOW_SVD", &allow_svd, sizeof(bool));
+          cudaMemcpyToSymbol("DEV_REUNIT_SVD_ONLY", &svd_only, sizeof(bool));
+	  cudaMemcpyToSymbol("DEV_REUNIT_SVD_REL_ERROR", &svd_rel_error, sizeof(double));
+          cudaMemcpyToSymbol("DEV_REUNIT_SVD_ABS_ERROR", &svd_abs_error, sizeof(double));
+	
+	  HOST_HISQ_UNITARIZE_EPS = unitarize_eps;
+          HOST_HISQ_FORCE_FILTER = hisq_force_filter;
+          HOST_MAX_DET_ERROR = max_det_error;     
+	  HOST_REUNIT_ALLOW_SVD = allow_svd;
+          HOST_REUNIT_SVD_ONLY = svd_only;
+	  HOST_REUNIT_SVD_REL_ERROR = svd_rel_error;
+          HOST_REUNIT_SVD_ABS_ERROR = svd_abs_error;
+
+          not_set = false;
+	}
+        checkCudaError();
 	return;
       }
 
@@ -208,7 +244,6 @@ namespace hisq{
       }
 
 
-    // Another real hack - fix this!
     template<class T>
       __device__ __host__
     T getAbsMin(const T* const array, int size){
@@ -220,77 +255,158 @@ namespace hisq{
       return min;
     }
 
-    // What a hack! Yuck!
+
+	  template<class Real>
+    __device__ __host__
+    inline bool checkAbsoluteError(Real a, Real b, Real epsilon)
+	  {
+			if( fabs(a-b) <  epsilon) return true;
+		 	return false;
+		}
+
+
+    template<class Real>
+    __device__ __host__ 
+    inline bool checkRelativeError(Real a, Real b, Real epsilon)
+    {
+      if( fabs((a-b)/b)  < epsilon ) return true;
+			return false;
+    }
+    
+
+
+
+    // Compute the reciprocal square root of the matrix q
+    // Also modify q if the eigenvalues are dangerously small.
     template<class Cmplx> 
       __device__  __host__ 
       void reciprocalRoot(Matrix<Cmplx,3>* res, DerivativeCoefficients<typename RealTypeId<Cmplx>::Type>* deriv_coeffs, 
-								typename RealTypeId<Cmplx>::Type f[3], Matrix<Cmplx,3> & q){
+								typename RealTypeId<Cmplx>::Type f[3], Matrix<Cmplx,3> & q, int *unitarization_failed){
 
         Matrix<Cmplx,3> qsq, tempq;
-        qsq = q*q;
-        tempq = qsq*q;
 
         typename RealTypeId<Cmplx>::Type c[3];
         typename RealTypeId<Cmplx>::Type g[3];
-        c[0] = getTrace(q).x;
-        c[1] = getTrace(qsq).x/2.0;
-        c[2] = getTrace(tempq).x/3.0;
 
-        g[0] = g[1] = g[2] = c[0]/3.;
-        typename RealTypeId<Cmplx>::Type r,s,theta;
-        s = c[1]/3. - c[0]*c[0]/18;
-        r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
-
-        typename RealTypeId<Cmplx>::Type cosTheta = r/sqrt(s*s*s);
-        if(fabs(s) < FORCE_UNITARIZE_EPS){
-          cosTheta = 1.;
-          s = 0.0; 
-        }
-        if(fabs(cosTheta)>1.0){ r>0 ? theta=0.0 : theta=FORCE_UNITARIZE_PI/3.0; }
-        else{ theta = acos(cosTheta)/3.0; }
-
-        s = 2.0*sqrt(s);
-        for(int i=0; i<3; ++i){
-          g[i] += s*cos(theta + (i-1)*FORCE_UNITARIZE_PI23);
-        }
-
-        for(int i=0; i<3; ++i){
-          c[i] = g[i];
-        }
-        
-
-        Matrix<Cmplx,3> tmp2;
-        // eigenvalues have been computed 
-        // compute the eigenvalues using the singular value decomposition
-        computeSVD<Cmplx>(q,tempq,tmp2,g);
-        // The array g contains the eigenvalues of the matrix q
-	// The determinant is the product of the eigenvalues, and I can use this
-        // to check the SVD
-        typename RealTypeId<Cmplx>::Type determinant = getDeterminant(q).x;
-        typename RealTypeId<Cmplx>::Type gprod = g[0]*g[1]*g[2];
-       
-
-#if (__CUDA_ARCH__ >= 200)
-        if(fabs(gprod - determinant) > ACCEPTABLE_DET_ERROR){
-	  printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), ACCEPTABLE_DET_ERROR);
-	}
+#ifdef __CUDA_ARCH__
+#define REUNIT_SVD_ONLY DEV_REUNIT_SVD_ONLY
+#else
+#define REUNIT_SVD_ONLY HOST_REUNIT_SVD_ONLY
 #endif
-        
+	if(!REUNIT_SVD_ONLY){
+		qsq = q*q;
+		tempq = qsq*q;
+
+		c[0] = getTrace(q).x;
+		c[1] = getTrace(qsq).x/2.0;
+		c[2] = getTrace(tempq).x/3.0;
+
+		g[0] = g[1] = g[2] = c[0]/3.;
+		typename RealTypeId<Cmplx>::Type r,s,theta;
+		s = c[1]/3. - c[0]*c[0]/18;
+		r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
+
+#ifdef __CUDA_ARCH__
+#define HISQ_UNITARIZE_EPS DEV_HISQ_UNITARIZE_EPS
+#else
+#define HISQ_UNITARIZE_EPS HOST_HISQ_UNITARIZE_EPS
+#endif
+
+		typename RealTypeId<Cmplx>::Type cosTheta = r/sqrt(s*s*s);
+		if(fabs(s) < HISQ_UNITARIZE_EPS){
+			cosTheta = 1.;
+			s = 0.0; 
+		}
+		if(fabs(cosTheta)>1.0){ r>0 ? theta=0.0 : theta=HISQ_UNITARIZE_PI/3.0; }
+		else{ theta = acos(cosTheta)/3.0; }
+
+		s = 2.0*sqrt(s);
+		for(int i=0; i<3; ++i){
+			g[i] += s*cos(theta + (i-1)*HISQ_UNITARIZE_PI23);
+		}
+
+	} // !REUNIT_SVD_ONLY?
+
+	//
+	// Compare the product of the eigenvalues computed thus far to the 
+	// absolute value of the determinant. 
+	// If the error is greater than some predefined value 
+	// then recompute the eigenvalues using a singular-value decomposition.
+	// We can compare either the absolute or relative error on the determinant. 
+	// and the choice of error is a run-time parameter.
+	// Note that this particular calculation contains multiple branches, 
+	// so it doesn't appear to be particularly well-suited to the GPU 
+	// programming model. However, the analytic calculation of the 
+	// unitarization is extremely fast, and if the SVD routine is not called 
+	// too often, we expect reasonable performance.
+	//
+
+#ifdef __CUDA_ARCH__
+#define REUNIT_ALLOW_SVD DEV_REUNIT_ALLOW_SVD
+#define REUNIT_SVD_REL_ERROR DEV_REUNIT_SVD_REL_ERROR
+#define REUNIT_SVD_ABS_ERROR DEV_REUNIT_SVD_ABS_ERROR
+#else // cpu
+#define REUNIT_ALLOW_SVD HOST_REUNIT_ALLOW_SVD
+#define REUNIT_SVD_REL_ERROR HOST_REUNIT_SVD_REL_ERROR
+#define REUNIT_SVD_ABS_ERROR HOST_REUNIT_SVD_ABS_ERROR
+#endif
+
+	if(REUNIT_ALLOW_SVD){
+		bool perform_svd = true;
+		if(!REUNIT_SVD_ONLY){
+		  const typename RealTypeId<Cmplx>::Type det = getDeterminant(q).x;
+		  if( fabs(det) >= REUNIT_SVD_ABS_ERROR){  
+		    if( checkRelativeError(g[0]*g[1]*g[2],det,REUNIT_SVD_REL_ERROR) ) perform_svd = false;
+		  }
+		}	
+
+		if(perform_svd){	
+			Matrix<Cmplx,3> tmp2;
+			// compute the eigenvalues using the singular value decomposition
+			computeSVD<Cmplx>(q,tempq,tmp2,g);
+			// The array g contains the eigenvalues of the matrix q
+			// The determinant is the product of the eigenvalues, and I can use this
+			// to check the SVD
+			const typename RealTypeId<Cmplx>::Type determinant = getDeterminant(q).x;
+			const typename RealTypeId<Cmplx>::Type gprod = g[0]*g[1]*g[2];
+			// Check the svd result for errors
+#ifdef __CUDA_ARCH__
+#define MAX_DET_ERROR DEV_MAX_DET_ERROR
+#else
+#define MAX_DET_ERROR HOST_MAX_DET_ERROR
+#endif
+			if(fabs(gprod - determinant) > MAX_DET_ERROR){
+#if  (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__ >= 200))
+				printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), MAX_DET_ERROR);
+				printLink(q);
+#endif
+
+#ifdef __CUDA_ARCH__
+				atomicAdd(unitarization_failed,1);
+#else
+				(*unitarization_failed)++;
+#endif
+			} 
+		} // perform_svd?
+
+	} // REUNIT_ALLOW_SVD?
+
+#ifdef __CUDA_ARCH__
+#define HISQ_FORCE_FILTER DEV_HISQ_FORCE_FILTER
+#else
+#define HISQ_FORCE_FILTER HOST_HISQ_FORCE_FILTER
+#endif	
 
 
+	typename RealTypeId<Cmplx>::Type delta = getAbsMin(g,3);
+	if(delta < HISQ_FORCE_FILTER){
+		for(int i=0; i<3; ++i){ 
+			g[i]     += HISQ_FORCE_FILTER; 
+			q(i,i).x += HISQ_FORCE_FILTER;
+		}
+		qsq = q*q; // recalculate Q^2
+	}
 
-        // New code!
-        // Augment the eigenvalues
-        // Also need to change q
-        typename RealTypeId<Cmplx>::Type delta = getAbsMin(g,3);
-        if(delta < HISQ_FORCE_FILTER){
-          for(int i=0; i<3; ++i){ 
-            g[i]     += HISQ_FORCE_FILTER; 
-            q(i,i).x += HISQ_FORCE_FILTER;
-          }
-          qsq = q*q; // recalculate Q^2
-        }
-        
 
         // At this point we have finished with the c's 
         // use these to store sqrt(g)
@@ -319,7 +435,6 @@ namespace hisq{
         f[1] = c[1];
         f[2] = c[2];
 
-
         *res = tempq;
         return;
       }
@@ -329,7 +444,7 @@ namespace hisq{
       // "v" denotes a "fattened" link variable
       template<class Cmplx>
       __device__ __host__
-        void getUnitarizeForceSite(const Matrix<Cmplx,3> & v, const Matrix<Cmplx,3> & outer_prod, Matrix<Cmplx,3>* result)
+        void getUnitarizeForceSite(const Matrix<Cmplx,3> & v, const Matrix<Cmplx,3> & outer_prod, Matrix<Cmplx,3>* result, int *unitarization_failed)
         {
           typename RealTypeId<Cmplx>::Type f[3]; 
           typename RealTypeId<Cmplx>::Type b[6];
@@ -341,7 +456,7 @@ namespace hisq{
 
           DerivativeCoefficients<typename RealTypeId<Cmplx>::Type> deriv_coeffs;
 
-          reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q);
+          reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed);
 
           // Pure hack here
           b[0] = deriv_coeffs.getB00();
@@ -394,10 +509,11 @@ namespace hisq{
         template<class Cmplx>
           __global__ void getUnitarizeForceField(Cmplx* link_even, Cmplx* link_odd,
                                                  Cmplx* old_force_even, Cmplx* old_force_odd,
-						 Cmplx* force_even, Cmplx* force_odd)
+						 																		 Cmplx* force_even, Cmplx* force_odd,
+																								 int* unitarization_failed)
           {
             int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
-       
+	
             Cmplx* force;
             Cmplx* link;
             Cmplx* old_force;
@@ -420,12 +536,13 @@ namespace hisq{
               loadLinkVariableFromArray(old_force, dir, mem_idx, Vh, &oprod);
               loadLinkVariableFromArray(link, dir, mem_idx, Vh, &v);
 
-              getUnitarizeForceSite<double2>(v, oprod, &result); 
+              getUnitarizeForceSite<double2>(v, oprod, &result, unitarization_failed); 
 
               writeLinkVariableToArray(result, dir, mem_idx, Vh, force); 
             }
             return;
           } // getUnitarizeForceField
+
 
 
         // template this! 
@@ -463,7 +580,7 @@ namespace hisq{
         }
 
         // and this!
-	template<class Cmplx, class Real>
+	      template<class Cmplx, class Real>
         void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
           for(int i=0; i<3; ++i){
             for(int j=0; j<3; ++j){
@@ -478,6 +595,7 @@ namespace hisq{
 
         // and this!
 	template<class Cmplx>
+	__host__ __device__
         void printLink(Matrix<Cmplx,3>& link){
           printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
           printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
@@ -492,34 +610,47 @@ namespace hisq{
         }
 
 
-        void unitarize_force_cpu(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
-        {
-	
-          Matrix<double2,3> old_force, new_force, v;
-          for(int i=0; i<cpuGauge.Volume(); ++i){
-           for(int dir=0; dir<4; ++dir){
-             copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
-             copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
+	void unitarize_force_cpu(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
+	{
 
-             getUnitarizeForceSite<double2>(v, old_force, &new_force);
-            
-             copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
+		int num_failures = 0;	
+		Matrix<double2,3> old_force, new_force, v;
+		for(int i=0; i<cpuGauge.Volume(); ++i){
+			for(int dir=0; dir<4; ++dir){
+				if(param.cpu_prec == QUDA_SINGLE_PRECISION){
+					copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
+					copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
+					getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+					copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
+				}else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
+					copyArrayToLink(&old_force, ((double*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
+					copyArrayToLink(&v, ((double*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
+					getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+					copyLinkToArray(((double*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
+				} // precision?
+			} // dir
+		} // i
+		return;
+	} // unitarize_force_cpu
 
-           } // dir
-          } // i
-          return;
-        } // unitarize_force_cpu
 
-
-        void unitarize_force_cuda(cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce)
+        void unitarize_force_cuda(const QudaGaugeParam& param, cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce, int* unitarization_failed)
         {
 
           dim3 gridDim(cudaGauge.Volume()/BLOCK_DIM,1,1);
           dim3 blockDim(BLOCK_DIM,1,1);
 
-          getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
-                                                      (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p(),
-                                                      (float2*)cudaNewForce->Even_p(), (float2*)cudaNewForce->Odd_p());
+	  if(param.cuda_prec == QUDA_SINGLE_PRECISION){
+		  getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
+				  (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p(),
+				  (float2*)cudaNewForce->Even_p(), (float2*)cudaNewForce->Odd_p(),
+				  unitarization_failed);
+	  }else if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
+		  getUnitarizeForceField<<<gridDim,blockDim>>>((double2*)cudaGauge.Even_p(), (double2*)cudaGauge.Odd_p(),
+				  (double2*)cudaOldForce.Even_p(), (double2*)cudaOldForce.Odd_p(),
+				  (double2*)cudaNewForce->Even_p(), (double2*)cudaNewForce->Odd_p(),
+				  unitarization_failed);
+	  } // precision?
           return;
         } // unitarize_force_cuda
 

@@ -29,20 +29,30 @@
 #define DD_PREC_F D
 #define DD_PARAM1 double2* out, float *null1
 #define DD_PARAM3 const double2* in, const float *null3
+#if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
+#define READ_SPINOR READ_SPINOR_DOUBLE
+#define SPINORTEX in
+#else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define SPINORTEX spinorTexDouble
-#define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
-#define SPINOR_DOUBLE
-#if (DD_XPAY==1)
+#endif
+#if (DD_XPAY==1)  // never used
 #define ACCUMTEX accumTexDouble
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #endif
+#define SPINOR_DOUBLE
+#define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #elif (DD_PREC==1) // single-precision spinor field
 #define DD_PREC_F S
 #define DD_PARAM1 float4* out, float *null1
 #define DD_PARAM3 const float4* in, const float *null3
+#ifdef DIRECT_ACCESS_WILSON_SPINOR
+#define READ_SPINOR READ_SPINOR_SINGLE
+#define SPINORTEX in
+#else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define SPINORTEX spinorTexSingle
+#endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY==1)
 #define ACCUMTEX accumTexSingle
@@ -50,8 +60,13 @@
 #endif
 #else            // half-precision spinor field
 #define DD_PREC_F H
+#ifdef DIRECT_ACCESS_WILSON_SPINOR
+#define READ_SPINOR READ_SPINOR_HALF
+#define SPINORTEX in
+#else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define SPINORTEX spinorTexHalf
+#endif
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
@@ -64,19 +79,34 @@
 #if (DD_PREC==0) // double-precision clover term
 #define DD_PREC_F D
 #define DD_PARAM2 const double2* clover, const float *null
-#define CLOVERTEX cloverTexDouble
+#if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
+#define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_DOUBLE
+#else
+#define CLOVERTEX cloverTexDouble
+#define READ_CLOVER READ_CLOVER_DOUBLE_TEX
+#endif
 #define CLOVER_DOUBLE
 #elif (DD_PREC==1) // single-precision clover term
 #define DD_PREC_F S
 #define DD_PARAM2 const float4* clover, const float *null
-#define CLOVERTEX cloverTexSingle
+#ifdef DIRECT_ACCESS_CLOVER
+#define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_SINGLE
+#else
+#define CLOVERTEX cloverTexSingle
+#define READ_CLOVER READ_CLOVER_SINGLE_TEX
+#endif
 #else               // half-precision clover term
 #define DD_PREC_F H
 #define DD_PARAM2 const short4* clover, const float *cloverNorm
-#define CLOVERTEX cloverTexHalf
+#ifdef DIRECT_ACCESS_CLOVER
+#define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_HALF
+#else
+#define CLOVERTEX cloverTexHalf
+#define READ_CLOVER READ_CLOVER_HALF_TEX
+#endif
 #endif
 
 //#define DD_CONCAT(s,c,x) clover ## s ## c ## x ## Kernel
@@ -84,7 +114,7 @@
 #define DD_FUNC(x) DD_CONCAT(x)
 
 // define the kernel
-#if !(__CUDA_ARCH__ < 130 && DD_PREC == 0)
+#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 
 __global__ void DD_FUNC(DD_XPAY_F)(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 

@@ -43,6 +43,9 @@ extern "C" {
     int packed_size;
     double gaugeGiB;
 
+    int flag;  //generic flag. In fatlink computation, it is used to indicate 
+	       //whether to preserve gauge field or not
+    
   } QudaGaugeParam;
 
   typedef struct QudaInvertParam_s {
@@ -163,7 +166,12 @@ extern "C" {
   // these are temporary additions until we objectify the gauge field
   void set_dim(int *);
   void pack_ghost(void **cpuLink, void **cpuGhost, int nFace, QudaPrecision precision);
-
+  
+  int computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff, 
+			 QudaGaugeParam* param, 
+			 QudaComputeFatMethod method);
+  
+  
 #ifdef HOST_DEBUG
 #define CUERR  do{ cudaError_t cuda_err;                                \
     if ((cuda_err = cudaGetLastError()) != cudaSuccess) {               \

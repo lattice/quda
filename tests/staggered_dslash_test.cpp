@@ -23,6 +23,9 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
+
+extern void usage(char** argv );
+
 int test_type = 0;
 
 extern bool tune;
@@ -488,7 +491,16 @@ void display_test_info()
     
 }
 
-extern void usage(char** argv );
+
+void
+usage_extra(char** argv )
+{
+  printfQuda("Extra options:\n");
+  printfQuda("    --test <0/1>                             # Test method\n");
+  printfQuda("                                                0: Even destination spinor\n");
+  printfQuda("                                                1: Odd destination spinor\n");
+  return ;
+}
 
 int main(int argc, char **argv) 
 {
@@ -499,20 +511,7 @@ int main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }    
-
-    if( strcmp(argv[i], "--device") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      device =  atoi(argv[i+1]);
-      if (device < 0){
-	errorQuda("Error: invalid device number(%d)", device);
-      }
-      i++;
-      continue;
-    }
     
-	
     if( strcmp(argv[i], "--test") == 0){
       if (i+1 >= argc){
 	usage(argv);

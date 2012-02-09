@@ -22,8 +22,35 @@ struct GaugeFieldParam : public LatticeFieldParam {
 
   QudaFieldCreate create; // used to determine the type of field created
 
-  int pinned; //used in cpu field only, where the host memory is pinned
   int is_staple; //set to 1 for staple, used in fatlink computation
+  int pinned; //used in cpu field only, where the host memory is pinned
+
+  // Default constructor
+  GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
+	nColor(3),
+	nFace(0),
+	reconstruct(QUDA_RECONSTRUCT_NO),
+	order(QUDA_INVALID_GAUGE_ORDER),
+	fixed(QUDA_GAUGE_FIXED_NO),
+	link_type(QUDA_WILSON_LINKS),
+	t_boundary(QUDA_INVALID_T_BOUNDARY),
+	anisotropy(1.0),
+	tadpole(1.0),
+	gauge(h_gauge),
+        create(QUDA_REFERENCE_FIELD_CREATE), 
+	is_staple(0), 
+	pinned(0)
+        {
+	  // variables declared in LatticeFieldParam
+	  precision = QUDA_INVALID_PRECISION;
+	  verbosity = QUDA_SILENT;
+	  nDim = 4;
+	  pad  = 0;
+	  for(int dir=0; dir<nDim; ++dir) x[dir] = 0;
+	}
+	
+  
+  
  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
     nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
     order(param.gauge_order), fixed(param.gauge_fix), link_type(param.type), 
@@ -32,6 +59,7 @@ struct GaugeFieldParam : public LatticeFieldParam {
 
     if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
     else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
+    else errorQuda("Error: invalid link type(%d)\n", link_type);
   }
 };
 
@@ -123,7 +151,8 @@ class cpuGaugeField : public GaugeField {
 
  private:
   void **gauge; // the actual gauge field
-  mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field
+
+  mutable void **ghost; // stores the ghost zone of the gauge field
   int pinned;
   
  public:
@@ -133,7 +162,8 @@ class cpuGaugeField : public GaugeField {
   void exchangeGhost() const;
   const void** Ghost() const { return (const void**)ghost; }
 
-  void* Gauge_p() { return (void*)gauge; }
+  void* Gauge_p() { return gauge; }
+  void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 };
 
 #define gaugeSiteSize 18 // real numbers per gauge field

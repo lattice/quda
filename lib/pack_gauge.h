@@ -628,21 +628,21 @@ void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit,
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
       for (i = 0; i < Vh; i++) {
-	pack12(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh);
+	pack12(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
       }
     }
   } else if (reconstruct == QUDA_RECONSTRUCT_8){
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
       for (i = 0; i < Vh; i++) {
-	pack8(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh);
+	pack8(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
       }
     }
   }else{
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
       for (i = 0; i < Vh; i++) {
-	pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh);
+	pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
       }
     }
   }
@@ -688,8 +688,8 @@ inline void pack10(Float2 *res, Float *m, int dir, int Vh)
 {
   Float2 *r = res + dir*5*Vh;
   for (int j=0; j<5; j++) {
-    r[j*Vh].x = (float)m[j*2+0]; 
-    r[j*Vh].y = (float)m[j*2+1]; 
+    r[j*Vh].x = m[j*2+0]; 
+    r[j*Vh].y = m[j*2+1]; 
   }
 }
 

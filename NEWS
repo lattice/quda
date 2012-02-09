@@ -1,6 +1,8 @@
 
 Version 0.4.0
 
+- Fermi-GeForce stability improvements.
+
 - Enabled arbitrary volumes for all Dirac operators.
 
 - Added auto-tuning for the Dirac operators.  This is controlled with

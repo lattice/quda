@@ -22,7 +22,7 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
       if (create == QUDA_NULL_FIELD_CREATE 
 	  || create == QUDA_ZERO_FIELD_CREATE) {
 	if(pinned){
-	  cudaMallocHost((void**)&gauge[d], volume * reconstruct * precision);
+	  cudaMallocHost(&gauge[d], volume * reconstruct * precision);
 	}else{
 	  gauge[d] = malloc(volume * reconstruct * precision);
 	}
@@ -42,7 +42,7 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
     if (create == QUDA_NULL_FIELD_CREATE ||
 	create == QUDA_ZERO_FIELD_CREATE) {
       if(pinned){
-	cudaMallocHost((void**)&gauge, nDim*volume*reconstruct*precision);
+	cudaMallocHost(&(gauge), nDim*volume*reconstruct*precision);
       }else{
 	gauge = (void**)malloc(nDim * volume * reconstruct * precision);
       }
@@ -59,6 +59,7 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
   }
   
   // Ghost zone is always 2-dimensional
+  ghost = (void**)malloc(sizeof(void*)*QUDA_MAX_DIM);
   for (int i=0; i<nDim; i++) {
     if(pinned){
       cudaMallocHost(&ghost[i], nFace * surface[i] * reconstruct * precision);
@@ -71,7 +72,6 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
 
 cpuGaugeField::~cpuGaugeField() {
 
-#if 1
   if (create == QUDA_NULL_FIELD_CREATE  
       || create == QUDA_ZERO_FIELD_CREATE  ) {
     if (order == QUDA_QDP_GAUGE_ORDER){
@@ -90,6 +90,10 @@ cpuGaugeField::~cpuGaugeField() {
 	  if (gauge) free(gauge);
 	}
     }
+  }else{ // QUDA_REFERENCE_FIELD_CREATE 
+    if (order == QUDA_QDP_GAUGE_ORDER){
+      free(gauge);
+    }
   }
   
   
@@ -100,8 +104,7 @@ cpuGaugeField::~cpuGaugeField() {
       if (ghost[i]) free(ghost[i]);
     }
   }
-
- #endif
+  free(ghost);
   
 }
 
@@ -191,7 +194,7 @@ void packGhost(Float **gauge, Float **ghost, const int nFace, const int *X,
 // into the ghost array.
 // This should be optimized so it is reused if called multiple times
 void cpuGaugeField::exchangeGhost() const {
-  void *send[QUDA_MAX_DIM];
+  void **send = (void**)malloc(sizeof(void*)*QUDA_MAX_DIM);
 
   for (int d=0; d<nDim; d++) {
     send[d] = malloc(nFace * surface[d] * reconstruct * precision);
@@ -216,5 +219,14 @@ void cpuGaugeField::exchangeGhost() const {
   }
 
   for (int d=0; d<nDim; d++) free(send[d]);
+  free(send);
 }
 
+void cpuGaugeField::setGauge(void**_gauge)
+{
+  if(create != QUDA_REFERENCE_FIELD_CREATE){
+    errorQuda("Setting gauge pointer is only allowed when cpu gauge"
+	      "is of QUDA_REFERENCE_FIELD_CREATE type\n");
+  }
+  gauge= _gauge;
+}

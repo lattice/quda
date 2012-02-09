@@ -6,7 +6,7 @@
 #include <force_common.h>
 #include <hw_quda.h>
 
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_SINGLE
+#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 
 #define LOAD_HW_SINGLE(hw, idx, var)	do{	\
     var##0 = hw[idx + 0*Vh];			\
@@ -29,7 +29,7 @@
 
 #define LOAD_HW(hw, idx, var) LOAD_HW_SINGLE(hw, idx, var)
 #define WRITE_HW(hw, idx, var) WRITE_HW_SINGLE(hw, idx, var)
-#define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
+#define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var, Vh)
 //#define LOAD_ANTI_HERMITIAN(mom, mydir, idx, AH);
 
 #define FF_SITE_MATRIX_LOAD_TEX 1
@@ -37,10 +37,50 @@
 #if (FF_SITE_MATRIX_LOAD_TEX == 1)
 #define linkEvenTex siteLink0TexSingle_recon
 #define linkOddTex siteLink1TexSingle_recon
-#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(src##Tex, dir, idx, var)
+#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(src##Tex, dir, idx, var, Vh)
 #else
-#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
+#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var, Vh)
 #endif
+
+
+
+#define linka00_re LINKA0.x
+#define linka00_im LINKA0.y
+#define linka01_re LINKA0.z
+#define linka01_im LINKA0.w
+#define linka02_re LINKA1.x
+#define linka02_im LINKA1.y
+#define linka10_re LINKA1.z
+#define linka10_im LINKA1.w
+#define linka11_re LINKA2.x
+#define linka11_im LINKA2.y
+#define linka12_re LINKA2.z
+#define linka12_im LINKA2.w
+#define linka20_re LINKA3.x
+#define linka20_im LINKA3.y
+#define linka21_re LINKA3.z
+#define linka21_im LINKA3.w
+#define linka22_re LINKA4.x
+#define linka22_im LINKA4.y
+
+#define linkb00_re LINKB0.x
+#define linkb00_im LINKB0.y
+#define linkb01_re LINKB0.z
+#define linkb01_im LINKB0.w
+#define linkb02_re LINKB1.x
+#define linkb02_im LINKB1.y
+#define linkb10_re LINKB1.z
+#define linkb10_im LINKB1.w
+#define linkb11_re LINKB2.x
+#define linkb11_im LINKB2.y
+#define linkb12_re LINKB2.z
+#define linkb12_im LINKB2.w
+#define linkb20_re LINKB3.x
+#define linkb20_im LINKB3.y
+#define linkb21_re LINKB3.z
+#define linkb21_im LINKB3.w
+#define linkb22_re LINKB4.x
+#define linkb22_im LINKB4.y
 
 
 #define MAT_MUL_HW(M, HW, HWOUT)				\
@@ -256,7 +296,7 @@
     SU3_PROJECTOR(hw1##1, hw2##1, linkb);				\
     SCALAR_MULT_ADD_SU3_MATRIX(linka, linkb, tmp_coeff.y, linka);	\
     MAKE_ANTI_HERMITIAN(linka, ah);					\
-    WRITE_ANTI_HERMITIAN_SINGLE(mom, mydir, idx, AH);			\
+    WRITE_ANTI_HERMITIAN(mom, mydir, idx, AH);				\
   }while(0)
 
 #define FF_COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) do {        \
@@ -1506,7 +1546,7 @@ fermion_force_cuda(double eps, double weight1, double weight2, void* act_path_co
 {
   int i;
   FullHw tempvec[8];
-    
+  
   if (siteLink.Reconstruct() != QUDA_RECONSTRUCT_12) 
     errorQuda("Reconstruct type %d not supported for gauge field", siteLink.Reconstruct());
 

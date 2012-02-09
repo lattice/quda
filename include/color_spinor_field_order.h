@@ -67,3 +67,36 @@ class SpaceColorSpinOrder : public ColorSpinorFieldOrder<Float> {
     return *((Float*)(field.v) + index);
   }
 };
+
+template <typename Float>
+class QOPDomainWallOrder : public ColorSpinorFieldOrder<Float> {
+
+ private:
+  cpuColorSpinorField &field;  // convenient to have a "local" reference for code brevity
+  int volume_4d;
+  int Ls;
+
+ public:
+  QOPDomainWallOrder(cpuColorSpinorField &field) : ColorSpinorFieldOrder<Float>(field), 
+    field(field), volume_4d(1), Ls(0)
+  { 
+    if (field.Ndim() != 5) errorQuda("Error, wrong number of dimensions for this ColorSpinorFieldOrder");
+    for (int i=0; i<4; i++) volume_4d *= field.x[i];
+    Ls = field.x[4];
+  }
+  virtual ~QOPDomainWallOrder() { ; }
+
+  const Float& operator()(const int &x, const int &s, const int &c, const int &z) const {
+    int ls = x / Ls;
+    int x_4d = x - ls*volume_4d;
+    unsigned long index_4d = ((x_4d*field.nColor+c)*field.nSpin+s)*2+z;
+    return ((Float**)(field.v))[ls][index_4d];
+  }
+
+  Float& operator()(const int &x, const int &s, const int &c, const int &z) {
+    int ls = x / Ls;
+    int x_4d = x - ls*volume_4d;
+    unsigned long index_4d = ((x_4d*field.nColor+c)*field.nSpin+s)*2+z;
+    return ((Float**)(field.v))[ls][index_4d];
+  }
+};

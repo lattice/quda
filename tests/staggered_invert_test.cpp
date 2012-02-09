@@ -19,6 +19,7 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define mySpinorSiteSize 6
 
+extern void usage(char** argv);
 void *fatlink[4];
 void *longlink[4];  
 
@@ -318,10 +319,6 @@ invert_test(void)
     nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
 
-    {
-      double sol = norm_2(out->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      double refe = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    }
     break;
 
   case 1: //odd
@@ -431,8 +428,8 @@ invert_test(void)
       
       printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
-      //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
-      if (sqrt(nrm2/src2) > 100*inv_param.tol){
+      //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+      if (sqrt(nrm2/src2) > 10*inv_param.tol){
 	ret |=1;
       }
     }
@@ -511,26 +508,22 @@ display_test_info()
   return ;
   
 }
-extern void usage(char** argv );
-/*
+
 void
-usage(char** argv )
+usage_extra(char** argv )
 {
-  printfQuda("Usage: %s <args>\n", argv[0]);
-  printfQuda("--prec         <double/single/half>     Spinor/gauge precision\n"); 
-  printfQuda("--prec_sloppy  <double/single/half>     Spinor/gauge sloppy precision\n"); 
-  printfQuda("--recon        <8/12>                   Long link reconstruction type\n"); 
-  printfQuda("--test         <0/1/2/3/4/5>            Testing type(0=even, 1=odd, 2=full, 3=multimass even,\n" 
-	 "                                                     4=multimass odd, 5=multimass full)\n"); 
-  printfQuda("--tdim                                  T dimension\n");
-  printfQuda("--sdim                                  S dimension\n");
-  printfQuda("--partition \t\t Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
-  printfQuda("--help                                  Print out this message\n"); 
-  exit(1);
+  printfQuda("Extra options:\n");
+  printfQuda("    --tol  <resid_tol>                       # Set residual tolerance\n");
+  printfQuda("    --test <0/1>                             # Test method\n");
+  printfQuda("                                                0: Even even spinor CG inverter\n");
+  printfQuda("                                                1: Odd odd spinor CG inverter\n");
+  printfQuda("                                                3: Even even spinor multishift CG inverter\n");
+  printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
+  printfQuda("                                                6: Even even spinor mixed precision multishift CG inverter\n");
+  printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
+  
   return ;
 }
-*/
-
 int main(int argc, char** argv)
 {
 
@@ -567,7 +560,7 @@ int main(int argc, char** argv)
       continue;	    
     }
     
-    if( strcmp(argv[i], "--cprec") == 0){
+    if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){
 	usage(argv);
       }
@@ -575,20 +568,7 @@ int main(int argc, char** argv)
       i++;
       continue;
     }
-    
-    
-    if( strcmp(argv[i], "--device") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      device =  atoi(argv[i+1]);
-      if (device < 0){
-	printf("Error: invalid device number(%d)\n", device);
-	exit(1);
-      }
-      i++;
-      continue;
-    }
+   
         
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);

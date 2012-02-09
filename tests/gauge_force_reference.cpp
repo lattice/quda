@@ -335,11 +335,12 @@ gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPre
     }        
     
     if (prec == QUDA_DOUBLE_PRECISION){
-	update_mom((danti_hermitmat*) refMom, dir, (dsu3_matrix*)sitelink, (dsu3_matrix*)staple, (double)eb3);
+      update_mom((danti_hermitmat*) refMom, dir, (dsu3_matrix*)sitelink, (dsu3_matrix*)staple, (double)eb3);
     }else{
 	update_mom((fanti_hermitmat*)refMom, dir, (fsu3_matrix*)sitelink, (fsu3_matrix*)staple, (float)eb3);
     }
     
+    free(staple);
 }
 
 

@@ -8,7 +8,7 @@
 #include "gauge_field.h"
 #include <force_common.h>
 
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SITE_MATRIX_LOAD_TEX 1
 #define MULINK_LOAD_TEX 1
 #define FATLINK_LOAD_TEX 1
@@ -61,52 +61,7 @@
   c##21_im = a*b##21_im;		\
   c##22_re = a*b##22_re;		\
   c##22_im = a*b##22_im;		\
-    
-
-#define LOAD_MATRIX_18_SINGLE(gauge, dir, idx, var, stride)		\
-  float2 var##0 = gauge[idx + dir*9*stride];				\
-  float2 var##1 = gauge[idx + dir*9*stride + stride];			\
-  float2 var##2 = gauge[idx + dir*9*stride + 2*stride];			\
-  float2 var##3 = gauge[idx + dir*9*stride + 3*stride];			\
-  float2 var##4 = gauge[idx + dir*9*stride + 4*stride];			\
-  float2 var##5 = gauge[idx + dir*9*stride + 5*stride];			\
-  float2 var##6 = gauge[idx + dir*9*stride + 6*stride];			\
-  float2 var##7 = gauge[idx + dir*9*stride + 7*stride];			\
-  float2 var##8 = gauge[idx + dir*9*stride + 8*stride];			
-
-#define LOAD_MATRIX_18_SINGLE_TEX(gauge, dir, idx, var, stride)		\
-  float2 var##0 = tex1Dfetch(gauge, idx + dir*9*stride);		\
-  float2 var##1 = tex1Dfetch(gauge, idx + dir*9*stride + stride);	\
-  float2 var##2 = tex1Dfetch(gauge, idx + dir*9*stride + 2*stride);	\
-  float2 var##3 = tex1Dfetch(gauge, idx + dir*9*stride + 3*stride);	\
-  float2 var##4 = tex1Dfetch(gauge, idx + dir*9*stride + 4*stride);	\
-  float2 var##5 = tex1Dfetch(gauge, idx + dir*9*stride + 5*stride);	\
-  float2 var##6 = tex1Dfetch(gauge, idx + dir*9*stride + 6*stride);	\
-  float2 var##7 = tex1Dfetch(gauge, idx + dir*9*stride + 7*stride);	\
-  float2 var##8 = tex1Dfetch(gauge, idx + dir*9*stride + 8*stride);	
-
-#define LOAD_MATRIX_18_DOUBLE(gauge, dir, idx, var, stride)		\
-  double2 var##0 = gauge[idx + dir*9*stride];				\
-  double2 var##1 = gauge[idx + dir*9*stride + stride];			\
-  double2 var##2 = gauge[idx + dir*9*stride + 2*stride];		\
-  double2 var##3 = gauge[idx + dir*9*stride + 3*stride];		\
-  double2 var##4 = gauge[idx + dir*9*stride + 4*stride];		\
-  double2 var##5 = gauge[idx + dir*9*stride + 5*stride];		\
-  double2 var##6 = gauge[idx + dir*9*stride + 6*stride];		\
-  double2 var##7 = gauge[idx + dir*9*stride + 7*stride];		\
-  double2 var##8 = gauge[idx + dir*9*stride + 8*stride];		
-
-#define LOAD_MATRIX_18_DOUBLE_TEX(gauge, dir, idx, var, stride)		\
-  double2 var##0 = fetch_double2(gauge, idx + dir*9*stride);		\
-  double2 var##1 = fetch_double2(gauge, idx + dir*9*stride + stride);	\
-  double2 var##2 = fetch_double2(gauge, idx + dir*9*stride + 2*stride);	\
-  double2 var##3 = fetch_double2(gauge, idx + dir*9*stride + 3*stride);	\
-  double2 var##4 = fetch_double2(gauge, idx + dir*9*stride + 4*stride);	\
-  double2 var##5 = fetch_double2(gauge, idx + dir*9*stride + 5*stride);	\
-  double2 var##6 = fetch_double2(gauge, idx + dir*9*stride + 6*stride);	\
-  double2 var##7 = fetch_double2(gauge, idx + dir*9*stride + 7*stride);	\
-  double2 var##8 = fetch_double2(gauge, idx + dir*9*stride + 8*stride);	
-
+  
 
 #define LOAD_MATRIX_12_SINGLE_DECLARE(gauge, dir, idx, var, stride)	\
   float2 var##0 = gauge[idx + dir*6*stride];				\
@@ -163,16 +118,16 @@
   double2 var##8 = gauge[idx + dir*9*stride + 8*stride];			
 
 
-#define LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
-  double2 var##0 = fetch_double2(gauge, idx + dir*9*stride);		\
-  double2 var##1 = fetch_double2(gauge, idx + dir*9*stride + stride);	\
-  double2 var##2 = fetch_double2(gauge, idx + dir*9*stride + 2*stride);	\
-  double2 var##3 = fetch_double2(gauge, idx + dir*9*stride + 3*stride);	\
-  double2 var##4 = fetch_double2(gauge, idx + dir*9*stride + 4*stride);	\
-  double2 var##5 = fetch_double2(gauge, idx + dir*9*stride + 5*stride);	\
-  double2 var##6 = fetch_double2(gauge, idx + dir*9*stride + 6*stride);	\
-  double2 var##7 = fetch_double2(gauge, idx + dir*9*stride + 7*stride);	\
-  double2 var##8 = fetch_double2(gauge, idx + dir*9*stride + 8*stride);	
+#define LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(gauge_tex, gauge, dir, idx, var, stride) \
+  double2 var##0 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride); \
+  double2 var##1 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + stride);	\
+  double2 var##2 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 2*stride); \
+  double2 var##3 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 3*stride); \
+  double2 var##4 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 4*stride); \
+  double2 var##5 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 5*stride); \
+  double2 var##6 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 6*stride); \
+  double2 var##7 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 7*stride); \
+  double2 var##8 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 8*stride);	
 
 
 #define LOAD_MATRIX_12_DOUBLE_DECLARE(gauge, dir, idx, var, stride)		\
@@ -185,13 +140,13 @@
   double2 var##6, var##7, var##8;
 
 
-#define LOAD_MATRIX_12_DOUBLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
-  double2 var##0 = fetch_double2(gauge, idx + dir*6*stride);		\
-  double2 var##1 = fetch_double2(gauge, idx + dir*6*stride + stride);	\
-  double2 var##2 = fetch_double2(gauge, idx + dir*6*stride + 2*stride);	\
-  double2 var##3 = fetch_double2(gauge, idx + dir*6*stride + 3*stride);	\
-  double2 var##4 = fetch_double2(gauge, idx + dir*6*stride + 4*stride);	\
-  double2 var##5 = fetch_double2(gauge, idx + dir*6*stride + 5*stride);	\
+#define LOAD_MATRIX_12_DOUBLE_TEX_DECLARE(gauge_tex, gauge, dir, idx, var, stride) \
+  double2 var##0 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*6*stride); \
+  double2 var##1 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*6*stride + stride);	\
+  double2 var##2 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*6*stride + 2*stride); \
+  double2 var##3 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*6*stride + 3*stride); \
+  double2 var##4 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*6*stride + 4*stride); \
+  double2 var##5 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*6*stride + 5*stride); \
   double2 var##6, var##7, var##8;
 
 #define LLFAT_ADD_SU3_MATRIX(ma, mb, mc)	\
@@ -357,25 +312,26 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 //single precision, common macro
 #define PRECISION 1
 #define Float  float
-#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_SINGLE(gauge, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_SINGLE_DECLARE(gauge, dir, idx, FAT, llfat_ga_stride)
 #if (MULINK_LOAD_TEX == 1)
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?muLink1TexSingle:muLink0TexSingle), dir, idx, var, staple_stride)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?muLink0TexSingle:muLink1TexSingle), dir, idx, var, staple_stride)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?muLink1TexSingle:muLink0TexSingle), dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?muLink0TexSingle:muLink1TexSingle), dir, idx, var, staple_stride)
 #else
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_even, dir, idx, var, staple_stride)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE(mulink_odd, dir, idx, var, staple_stride)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(mulink_even, dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(mulink_odd, dir, idx, var, staple_stride)
 #endif
 
 #if (FATLINK_LOAD_TEX == 1)
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?fatGauge1TexSingle:fatGauge0TexSingle), dir, idx, FAT, llfat_ga_stride);
-#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX((odd_bit?fatGauge0TexSingle:fatGauge1TexSingle), dir, idx, FAT, llfat_ga_stride);
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?fatGauge1TexSingle:fatGauge0TexSingle), dir, idx, FAT, llfat_ga_stride);
+#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_TEX_DECLARE((odd_bit?fatGauge0TexSingle:fatGauge1TexSingle), dir, idx, FAT, llfat_ga_stride);
 #else
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
-#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_SINGLE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_SINGLE_DECLARE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_SINGLE_DECLARE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
 #endif
 
 
 //single precision, 12-reconstruct
+#define DECLARE_VAR_SIGN short sign=1
 #define SITELINK0TEX siteLink0TexSingle
 #define SITELINK1TEX siteLink1TexSingle
 #if (SITE_MATRIX_LOAD_TEX == 1)
@@ -393,6 +349,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #define RECONSTRUCT 12
 #define sd_data float_12_sd_data
 #include "llfat_core.h"
+#undef DECLARE_VAR_SIGN
 #undef SITELINK0TEX
 #undef SITELINK1TEX
 #undef LOAD_EVEN_SITE_MATRIX
@@ -414,7 +371,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_SINGLE(sitelink, dir, idx, var, site_ga_stride)
+#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
 #define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  
 #define FloatN float2
 #define FloatM float2
@@ -445,34 +402,34 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 //double precision, common macro
 #define PRECISION 0
 #define Float double
-#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_DOUBLE(gauge, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_FAT_MATRIX(gauge, dir, idx) LOAD_MATRIX_18_DOUBLE_DECLARE(gauge, dir, idx, FAT, llfat_ga_stride)
 #if (MULINK_LOAD_TEX == 1)
-#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?muLink1TexDouble:muLink0TexDouble), dir, idx, var, staple_stride)
-#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?muLink0TexDouble:muLink1TexDouble), dir, idx, var, staple_stride)
+#define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(odd_bit?muLink1TexDouble:muLink0TexDouble), mulink_even, dir, idx, var, staple_stride)
+#define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?muLink0TexDouble:muLink1TexDouble), mulink_odd, dir, idx, var, staple_stride)
 #else
 #define LOAD_EVEN_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_even, dir, idx, var, staple_stride)
 #define LOAD_ODD_MULINK_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE(mulink_odd, dir, idx, var, staple_stride)
 #endif
 
 #if (FATLINK_LOAD_TEX == 1)
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?fatGauge1TexDouble:fatGauge0TexDouble), dir, idx, FAT, llfat_ga_stride)
-#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX((odd_bit?fatGauge0TexDouble:fatGauge1TexDouble), dir, idx, FAT, llfat_ga_stride)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?fatGauge1TexDouble:fatGauge0TexDouble), fatlink_even, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?fatGauge0TexDouble:fatGauge1TexDouble), fatlink_odd, dir, idx, FAT, llfat_ga_stride)
 #else
-#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
-#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_DOUBLE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_EVEN_FAT_MATRIX(dir, idx) LOAD_MATRIX_18_DOUBLE_DECLARE(fatlink_even, dir, idx, FAT, llfat_ga_stride)
+#define LOAD_ODD_FAT_MATRIX(dir, idx)  LOAD_MATRIX_18_DOUBLE_DECLARE(fatlink_odd, dir, idx, FAT, llfat_ga_stride)
 #endif
 
 //double precision,  18-reconstruct
 #define SITELINK0TEX siteLink0TexDouble
 #define SITELINK1TEX siteLink1TexDouble
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?SITELINK1TEX:SITELINK0TEX), dir, idx, var, site_ga_stride)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?SITELINK0TEX:SITELINK1TEX), dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?SITELINK1TEX:SITELINK0TEX), sitelink_even, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX_DECLARE((odd_bit?SITELINK0TEX:SITELINK1TEX), sitelink_odd, dir, idx, var, site_ga_stride)
 #else
 #define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_DOUBLE(sitelink, dir, idx, var, site_ga_stride)
+#define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
 #define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  
 #define FloatN double2
 #define FloatM double2
@@ -497,8 +454,8 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #define SITELINK0TEX siteLink0TexDouble
 #define SITELINK1TEX siteLink1TexDouble
 #if (SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX_DECLARE((odd_bit?SITELINK1TEX:SITELINK0TEX), dir, idx, var, site_ga_stride)
-#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX_DECLARE((odd_bit?SITELINK0TEX:SITELINK1TEX), dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX_DECLARE((odd_bit?SITELINK1TEX:SITELINK0TEX), sitelink_even, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX_DECLARE((odd_bit?SITELINK0TEX:SITELINK1TEX), sitelink_odd, dir, idx, var, site_ga_stride)
 #else
 #define LOAD_EVEN_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_DECLARE(sitelink_even, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)

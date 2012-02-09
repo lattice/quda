@@ -3,311 +3,99 @@
 
 #include "gauge_force_quda.h"
 
-#define MULT_SU3_NN_TEST(ma, mb) do{				\
-    float fa_re,fa_im, fb_re, fb_im, fc_re, fc_im;		\
-    fa_re =							\
-      ma##00_re * mb##00_re - ma##00_im * mb##00_im +		\
-	    ma##01_re * mb##10_re - ma##01_im * mb##10_im +	\
-	    ma##02_re * mb##20_re - ma##02_im * mb##20_im;	\
-	fa_im =							\
-	    ma##00_re * mb##00_im + ma##00_im * mb##00_re +	\
-	    ma##01_re * mb##10_im + ma##01_im * mb##10_re +	\
-	    ma##02_re * mb##20_im + ma##02_im * mb##20_re;	\
-	fb_re =							\
-	    ma##00_re * mb##01_re - ma##00_im * mb##01_im +	\
-	    ma##01_re * mb##11_re - ma##01_im * mb##11_im +	\
-	    ma##02_re * mb##21_re - ma##02_im * mb##21_im;	\
-	fb_im =							\
-	    ma##00_re * mb##01_im + ma##00_im * mb##01_re +	\
-	    ma##01_re * mb##11_im + ma##01_im * mb##11_re +	\
-	    ma##02_re * mb##21_im + ma##02_im * mb##21_re;	\
-	fc_re =							\
-	    ma##00_re * mb##02_re - ma##00_im * mb##02_im +	\
-	    ma##01_re * mb##12_re - ma##01_im * mb##12_im +	\
-	    ma##02_re * mb##22_re - ma##02_im * mb##22_im;	\
-	fc_im =							\
-	    ma##00_re * mb##02_im + ma##00_im * mb##02_re +	\
-	    ma##01_re * mb##12_im + ma##01_im * mb##12_re +	\
-	    ma##02_re * mb##22_im + ma##02_im * mb##22_re;	\
-	ma##00_re = fa_re;					\
-	ma##00_im = fa_im;					\
-	ma##01_re = fb_re;					\
-	ma##01_im = fb_im;					\
-	ma##02_re = fc_re;					\
-	ma##02_im = fc_im;					\
-	fa_re =							\
-	    ma##10_re * mb##00_re - ma##10_im * mb##00_im +	\
-	    ma##11_re * mb##10_re - ma##11_im * mb##10_im +	\
-	    ma##12_re * mb##20_re - ma##12_im * mb##20_im;	\
-	fa_im =							\
-	    ma##10_re * mb##00_im + ma##10_im * mb##00_re +	\
-	    ma##11_re * mb##10_im + ma##11_im * mb##10_re +	\
-	    ma##12_re * mb##20_im + ma##12_im * mb##20_re;	\
-	fb_re =							\
-	    ma##10_re * mb##01_re - ma##10_im * mb##01_im +	\
-	    ma##11_re * mb##11_re - ma##11_im * mb##11_im +	\
-	    ma##12_re * mb##21_re - ma##12_im * mb##21_im;	\
-	fb_im =							\
-	    ma##10_re * mb##01_im + ma##10_im * mb##01_re +	\
-	    ma##11_re * mb##11_im + ma##11_im * mb##11_re +	\
-	    ma##12_re * mb##21_im + ma##12_im * mb##21_re;	\
-	fc_re =							\
-	    ma##10_re * mb##02_re - ma##10_im * mb##02_im +	\
-	    ma##11_re * mb##12_re - ma##11_im * mb##12_im +	\
-	    ma##12_re * mb##22_re - ma##12_im * mb##22_im;	\
-	fc_im =							\
-	    ma##10_re * mb##02_im + ma##10_im * mb##02_re +	\
-	    ma##11_re * mb##12_im + ma##11_im * mb##12_re +	\
-	    ma##12_re * mb##22_im + ma##12_im * mb##22_re;	\
-	ma##10_re = fa_re;					\
-	ma##10_im = fa_im;					\
-	ma##11_re = fb_re;					\
-	ma##11_im = fb_im;					\
-	ma##12_re = fc_re;					\
-	ma##12_im = fc_im;					\
-	fa_re =							\
-	    ma##20_re * mb##00_re - ma##20_im * mb##00_im +	\
-	    ma##21_re * mb##10_re - ma##21_im * mb##10_im +	\
-	    ma##22_re * mb##20_re - ma##22_im * mb##20_im;	\
-	fa_im =							\
-	    ma##20_re * mb##00_im + ma##20_im * mb##00_re +	\
-	    ma##21_re * mb##10_im + ma##21_im * mb##10_re +	\
-	    ma##22_re * mb##20_im + ma##22_im * mb##20_re;	\
-	fb_re =							\
-	    ma##20_re * mb##01_re - ma##20_im * mb##01_im +	\
-	    ma##21_re * mb##11_re - ma##21_im * mb##11_im +	\
-	    ma##22_re * mb##21_re - ma##22_im * mb##21_im;	\
-	fb_im =							\
-	    ma##20_re * mb##01_im + ma##20_im * mb##01_re +	\
-	    ma##21_re * mb##11_im + ma##21_im * mb##11_re +	\
-	    ma##22_re * mb##21_im + ma##22_im * mb##21_re;	\
-	fc_re =							\
-	    ma##20_re * mb##02_re - ma##20_im * mb##02_im +	\
-	    ma##21_re * mb##12_re - ma##21_im * mb##12_im +	\
-	    ma##22_re * mb##22_re - ma##22_im * mb##22_im;	\
-	fc_im =							\
-	    ma##20_re * mb##02_im + ma##20_im * mb##02_re +	\
-	    ma##21_re * mb##12_im + ma##21_im * mb##12_re +	\
-	    ma##22_re * mb##22_im + ma##22_im * mb##22_re;	\
-	ma##20_re = fa_re;					\
-	ma##20_im = fa_im;					\
-	ma##21_re = fb_re;					\
-	ma##21_im = fb_im;					\
-	ma##22_re = fc_re;					\
-	ma##22_im = fc_im;					\
-    }while(0)
-
-
-#define MULT_SU3_NA_TEST(ma, mb)	do{				\
-	float fa_re, fa_im, fb_re, fb_im, fc_re, fc_im;			\
-	fa_re =								\
-	    ma##00_re * mb##T00_re - ma##00_im * mb##T00_im +		\
-	    ma##01_re * mb##T10_re - ma##01_im * mb##T10_im +		\
-	    ma##02_re * mb##T20_re - ma##02_im * mb##T20_im;		\
-	fa_im =								\
-	    ma##00_re * mb##T00_im + ma##00_im * mb##T00_re +		\
-	    ma##01_re * mb##T10_im + ma##01_im * mb##T10_re +		\
-	    ma##02_re * mb##T20_im + ma##02_im * mb##T20_re;		\
-	fb_re =								\
-	    ma##00_re * mb##T01_re - ma##00_im * mb##T01_im +		\
-	    ma##01_re * mb##T11_re - ma##01_im * mb##T11_im +		\
-	    ma##02_re * mb##T21_re - ma##02_im * mb##T21_im;		\
-	fb_im =								\
-	    ma##00_re * mb##T01_im + ma##00_im * mb##T01_re +		\
-	    ma##01_re * mb##T11_im + ma##01_im * mb##T11_re +		\
-	    ma##02_re * mb##T21_im + ma##02_im * mb##T21_re;		\
-	fc_re =								\
-	    ma##00_re * mb##T02_re - ma##00_im * mb##T02_im +		\
-	    ma##01_re * mb##T12_re - ma##01_im * mb##T12_im +		\
-	    ma##02_re * mb##T22_re - ma##02_im * mb##T22_im;		\
-	fc_im =								\
-	    ma##00_re * mb##T02_im + ma##00_im * mb##T02_re +		\
-	    ma##01_re * mb##T12_im + ma##01_im * mb##T12_re +		\
-	    ma##02_re * mb##T22_im + ma##02_im * mb##T22_re;		\
-	ma##00_re = fa_re;						\
-	ma##00_im = fa_im;						\
-	ma##01_re = fb_re;						\
-	ma##01_im = fb_im;						\
-	ma##02_re = fc_re;						\
-	ma##02_im = fc_im;						\
-	fa_re =								\
-	    ma##10_re * mb##T00_re - ma##10_im * mb##T00_im +		\
-	    ma##11_re * mb##T10_re - ma##11_im * mb##T10_im +		\
-	    ma##12_re * mb##T20_re - ma##12_im * mb##T20_im;		\
-	fa_im =								\
-	    ma##10_re * mb##T00_im + ma##10_im * mb##T00_re +		\
-	    ma##11_re * mb##T10_im + ma##11_im * mb##T10_re +		\
-	    ma##12_re * mb##T20_im + ma##12_im * mb##T20_re;		\
-	fb_re =								\
-	    ma##10_re * mb##T01_re - ma##10_im * mb##T01_im +		\
-	    ma##11_re * mb##T11_re - ma##11_im * mb##T11_im +		\
-	    ma##12_re * mb##T21_re - ma##12_im * mb##T21_im;		\
-	fb_im =								\
-	    ma##10_re * mb##T01_im + ma##10_im * mb##T01_re +		\
-	    ma##11_re * mb##T11_im + ma##11_im * mb##T11_re +		\
-	    ma##12_re * mb##T21_im + ma##12_im * mb##T21_re;		\
-	fc_re =								\
-	    ma##10_re * mb##T02_re - ma##10_im * mb##T02_im +		\
-	    ma##11_re * mb##T12_re - ma##11_im * mb##T12_im +		\
-	    ma##12_re * mb##T22_re - ma##12_im * mb##T22_im;		\
-	fc_im =								\
-	    ma##10_re * mb##T02_im + ma##10_im * mb##T02_re +		\
-	    ma##11_re * mb##T12_im + ma##11_im * mb##T12_re +		\
-	    ma##12_re * mb##T22_im + ma##12_im * mb##T22_re;		\
-	ma##10_re = fa_re;						\
-	ma##10_im = fa_im;						\
-	ma##11_re = fb_re;						\
-	ma##11_im = fb_im;						\
-	ma##12_re = fc_re;						\
-	ma##12_im = fc_im;						\
-	fa_re =								\
-	    ma##20_re * mb##T00_re - ma##20_im * mb##T00_im +		\
-	    ma##21_re * mb##T10_re - ma##21_im * mb##T10_im +		\
-	    ma##22_re * mb##T20_re - ma##22_im * mb##T20_im;		\
-	fa_im =								\
-	    ma##20_re * mb##T00_im + ma##20_im * mb##T00_re +		\
-	    ma##21_re * mb##T10_im + ma##21_im * mb##T10_re +		\
-	    ma##22_re * mb##T20_im + ma##22_im * mb##T20_re;		\
-	fb_re =								\
-	    ma##20_re * mb##T01_re - ma##20_im * mb##T01_im +		\
-	    ma##21_re * mb##T11_re - ma##21_im * mb##T11_im +		\
-	    ma##22_re * mb##T21_re - ma##22_im * mb##T21_im;		\
-	fb_im =								\
-	    ma##20_re * mb##T01_im + ma##20_im * mb##T01_re +		\
-	    ma##21_re * mb##T11_im + ma##21_im * mb##T11_re +		\
-	    ma##22_re * mb##T21_im + ma##22_im * mb##T21_re;		\
-	fc_re =								\
-	    ma##20_re * mb##T02_re - ma##20_im * mb##T02_im +		\
-	    ma##21_re * mb##T12_re - ma##21_im * mb##T12_im +		\
-	    ma##22_re * mb##T22_re - ma##22_im * mb##T22_im;		\
-	fc_im =								\
-	    ma##20_re * mb##T02_im + ma##20_im * mb##T02_re +		\
-	    ma##21_re * mb##T12_im + ma##21_im * mb##T12_re +		\
-	    ma##22_re * mb##T22_im + ma##22_im * mb##T22_re;		\
-	ma##20_re = fa_re;						\
-	ma##20_im = fa_im;						\
-	ma##21_re = fb_re;						\
-	ma##21_im = fb_im;						\
-	ma##22_re = fc_re;						\
-	ma##22_im = fc_im;						\
-    }while(0)
-
-
-
-#define MULT_SU3_AN_TEST(ma, mb)	do{				\
-	float fa_re, fa_im, fb_re, fb_im, fc_re, fc_im;			\
-	fa_re =								\
-	    ma##T00_re * mb##00_re - ma##T00_im * mb##00_im +		\
-	    ma##T01_re * mb##10_re - ma##T01_im * mb##10_im +		\
-	    ma##T02_re * mb##20_re - ma##T02_im * mb##20_im;		\
-	fa_im =								\
-	    ma##T00_re * mb##00_im + ma##T00_im * mb##00_re +		\
-	    ma##T01_re * mb##10_im + ma##T01_im * mb##10_re +		\
-	    ma##T02_re * mb##20_im + ma##T02_im * mb##20_re;		\
-	fb_re =								\
-	    ma##T10_re * mb##00_re - ma##T10_im * mb##00_im +		\
-	    ma##T11_re * mb##10_re - ma##T11_im * mb##10_im +		\
-	    ma##T12_re * mb##20_re - ma##T12_im * mb##20_im;		\
-	fb_im =								\
-	    ma##T10_re * mb##00_im + ma##T10_im * mb##00_re +		\
-	    ma##T11_re * mb##10_im + ma##T11_im * mb##10_re +		\
-	    ma##T12_re * mb##20_im + ma##T12_im * mb##20_re;		\
-	fc_re =								\
-	    ma##T20_re * mb##00_re - ma##T20_im * mb##00_im +		\
-	    ma##T21_re * mb##10_re - ma##T21_im * mb##10_im +		\
-	    ma##T22_re * mb##20_re - ma##T22_im * mb##20_im;		\
-	fc_im =								\
-	    ma##T20_re * mb##00_im + ma##T20_im * mb##00_re +		\
-	    ma##T21_re * mb##10_im + ma##T21_im * mb##10_re +		\
-	    ma##T22_re * mb##20_im + ma##T22_im * mb##20_re;		\
-	mb##00_re = fa_re;						\
-	mb##00_im = fa_im;						\
-	mb##10_re = fb_re;						\
-	mb##10_im = fb_im;						\
-	mb##20_re = fc_re;						\
-	mb##20_im = fc_im;						\
-	fa_re =								\
-	    ma##T00_re * mb##01_re - ma##T00_im * mb##01_im +		\
-	    ma##T01_re * mb##11_re - ma##T01_im * mb##11_im +		\
-	    ma##T02_re * mb##21_re - ma##T02_im * mb##21_im;		\
-	fa_im =								\
-	    ma##T00_re * mb##01_im + ma##T00_im * mb##01_re +		\
-	    ma##T01_re * mb##11_im + ma##T01_im * mb##11_re +		\
-	    ma##T02_re * mb##21_im + ma##T02_im * mb##21_re;		\
-	fb_re =								\
-	    ma##T10_re * mb##01_re - ma##T10_im * mb##01_im +		\
-	    ma##T11_re * mb##11_re - ma##T11_im * mb##11_im +		\
-	    ma##T12_re * mb##21_re - ma##T12_im * mb##21_im;		\
-	fb_im =								\
-	    ma##T10_re * mb##01_im + ma##T10_im * mb##01_re +		\
-	    ma##T11_re * mb##11_im + ma##T11_im * mb##11_re +		\
-	    ma##T12_re * mb##21_im + ma##T12_im * mb##21_re;		\
-	fc_re =								\
-	    ma##T20_re * mb##01_re - ma##T20_im * mb##01_im +		\
-	    ma##T21_re * mb##11_re - ma##T21_im * mb##11_im +		\
-	    ma##T22_re * mb##21_re - ma##T22_im * mb##21_im;		\
-	fc_im =								\
-	    ma##T20_re * mb##01_im + ma##T20_im * mb##01_re +		\
-	    ma##T21_re * mb##11_im + ma##T21_im * mb##11_re +		\
-	    ma##T22_re * mb##21_im + ma##T22_im * mb##21_re;		\
-	mb##01_re = fa_re;						\
-	mb##01_im = fa_im;						\
-	mb##11_re = fb_re;						\
-	mb##11_im = fb_im;						\
-	mb##21_re = fc_re;						\
-	mb##21_im = fc_im;						\
-	fa_re =								\
-	    ma##T00_re * mb##02_re - ma##T00_im * mb##02_im +		\
-	    ma##T01_re * mb##12_re - ma##T01_im * mb##12_im +		\
-	    ma##T02_re * mb##22_re - ma##T02_im * mb##22_im;		\
-	fa_im =								\
-	    ma##T00_re * mb##02_im + ma##T00_im * mb##02_re +		\
-	    ma##T01_re * mb##12_im + ma##T01_im * mb##12_re +		\
-	    ma##T02_re * mb##22_im + ma##T02_im * mb##22_re;		\
-	fb_re =								\
-	    ma##T10_re * mb##02_re - ma##T10_im * mb##02_im +		\
-	    ma##T11_re * mb##12_re - ma##T11_im * mb##12_im +		\
-	    ma##T12_re * mb##22_re - ma##T12_im * mb##22_im;		\
-	fb_im =								\
-	    ma##T10_re * mb##02_im + ma##T10_im * mb##02_re +		\
-	    ma##T11_re * mb##12_im + ma##T11_im * mb##12_re +		\
-	    ma##T12_re * mb##22_im + ma##T12_im * mb##22_re;		\
-	fc_re =								\
-	    ma##T20_re * mb##02_re - ma##T20_im * mb##02_im +		\
-	    ma##T21_re * mb##12_re - ma##T21_im * mb##12_im +		\
-	    ma##T22_re * mb##22_re - ma##T22_im * mb##22_im;		\
-	fc_im =								\
-	    ma##T20_re * mb##02_im + ma##T20_im * mb##02_re +		\
-	    ma##T21_re * mb##12_im + ma##T21_im * mb##12_re +		\
-	    ma##T22_re * mb##22_im + ma##T22_im * mb##22_re;		\
-	mb##02_re = fa_re;						\
-	mb##02_im = fa_im;						\
-	mb##12_re = fb_re;						\
-	mb##12_im = fb_im;						\
-	mb##22_re = fc_re;						\
-	mb##22_im = fc_im;						\
-    }while(0)
-
-
-#define GF_SITE_MATRIX_LOAD_TEX 1
-
-#if (GF_SITE_MATRIX_LOAD_TEX == 1)
-
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var)
-#else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var)
-#endif
-
-
-#define LOAD_MATRIX LOAD_MATRIX_12_SINGLE
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_SINGLE
-#define WRITE_ANTI_HERMITIAN WRITE_ANTI_HERMITIAN_SINGLE
-#define RECONSTRUCT_MATRIX RECONSTRUCT_LINK_12
 
 
 __constant__ int path_max_length;
+
+#define GF_SITE_MATRIX_LOAD_TEX 1
+
+//single precsison, 12-reconstruct
+#if (GF_SITE_MATRIX_LOAD_TEX == 1)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, Vh)
+#else
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, Vh)
+#endif
+#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
+#define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4
+#define N_IN_FLOATN 4
+#define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_sp12
+#include "gauge_force_core.h"
+#undef LOAD_EVEN_MATRIX 
+#undef LOAD_ODD_MATRIX
+#undef LOAD_ANTI_HERMITIAN 
+#undef RECONSTRUCT_MATRIX
+#undef DECLARE_LINK_VARS
+#undef N_IN_FLOATN 
+#undef GAUGE_FORCE_KERN_NAME
+
+//double precsison, 12-reconstruct
+#if (GF_SITE_MATRIX_LOAD_TEX == 1)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, Vh)
+#else
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, Vh)
+#endif
+#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
+#define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
+#define N_IN_FLOATN 2
+#define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_dp12
+#include "gauge_force_core.h"
+#undef LOAD_EVEN_MATRIX 
+#undef LOAD_ODD_MATRIX
+#undef LOAD_ANTI_HERMITIAN 
+#undef RECONSTRUCT_MATRIX
+#undef DECLARE_LINK_VARS
+#undef N_IN_FLOATN 
+#undef GAUGE_FORCE_KERN_NAME
+
+//single precision, 18-reconstruct
+#if (GF_SITE_MATRIX_LOAD_TEX == 1)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, Vh)
+#else
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, Vh)
+#endif
+#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
+#define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
+#define N_IN_FLOATN 2
+#define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_sp18
+#include "gauge_force_core.h"
+#undef LOAD_EVEN_MATRIX
+#undef LOAD_ODD_MATRIX
+#undef LOAD_ANTI_HERMITIAN 
+#undef RECONSTRUCT_MATRIX
+#undef DECLARE_LINK_VARS
+#undef N_IN_FLOATN 
+#undef GAUGE_FORCE_KERN_NAME
+
+//double precision, 18-reconstruct
+#if (GF_SITE_MATRIX_LOAD_TEX == 1)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, Vh)
+#else
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, Vh)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, Vh)
+#endif
+#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
+#define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
+#define N_IN_FLOATN 2
+#define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_dp18
+#include "gauge_force_core.h"
+#undef LOAD_EVEN_MATRIX
+#undef LOAD_ODD_MATRIX
+#undef LOAD_ANTI_HERMITIAN 
+#undef RECONSTRUCT_MATRIX
+#undef DECLARE_LINK_VARS
+#undef N_IN_FLOATN 
+#undef GAUGE_FORCE_KERN_NAME
 
 void
 gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
@@ -329,190 +117,12 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
 
 }
 
-#define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
-        switch(mydir){                                                  \
-        case 0:                                                         \
-            new_mem_idx = ( (new_x1==X1m1)?idx-X1m1:idx+1);		\
-	    new_x1 = (new_x1==X1m1)?0:new_x1+1;				\
-            break;                                                      \
-        case 1:                                                         \
-            new_mem_idx = ( (new_x2==X2m1)?idx-X2X1mX1:idx+X1);		\
-	    new_x2 = (new_x2==X2m1)?0:new_x2+1;				\
-            break;                                                      \
-        case 2:                                                         \
-            new_mem_idx = ( (new_x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1);	\
-	    new_x3 = (new_x3==X3m1)?0:new_x3+1;				\
-            break;                                                      \
-        case 3:                                                         \
-            new_mem_idx = ( (new_x4==X4m1)?idx-X4X3X2X1mX3X2X1:idx+X3X2X1); \
-	    new_x4 = (new_x4==X4m1)?0:new_x4+1;				\
-            break;                                                      \
-        }                                                               \
-    }while(0)
-
-#define COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx) do {		\
-        switch(mydir){                                                  \
-        case 0:                                                         \
-            new_mem_idx = ( (new_x1==0)?idx+X1m1:idx-1);		\
-	    new_x1 = (new_x1==0)?X1m1:new_x1 - 1;			\
-            break;                                                      \
-        case 1:                                                         \
-            new_mem_idx = ( (new_x2==0)?idx+X2X1mX1:idx-X1);		\
-	    new_x2 = (new_x2==0)?X2m1:new_x2 - 1;			\
-            break;                                                      \
-        case 2:                                                         \
-            new_mem_idx = ( (new_x3==0)?idx+X3X2X1mX2X1:idx-X2X1);	\
-	    new_x3 = (new_x3==0)?X3m1:new_x3 - 1;			\
-            break;                                                      \
-        case 3:                                                         \
-            new_mem_idx = ( (new_x4==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1); \
-	    new_x4 = (new_x4==0)?X4m1:new_x4 - 1;			\
-            break;                                                      \
-        }                                                               \
-    }while(0)
-
-
-
-//for now we only consider 12-reconstruct and single precision
-
-template<int oddBit>
-__global__ void
-parity_compute_gauge_force_kernel(float2* momEven, float2* momOdd,
-				  int dir, double eb3,
-				  float4* linkEven, float4* linkOdd,
-				  int* input_path, 
-				  int* length, float* path_coeff, int num_paths)
-{
-    int i,j=0;
-    int sid = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    int z1 = sid / X1h;
-    int x1h = sid - z1*X1h;
-    int z2 = z1 / X2;
-    int x2 = z1 - z2*X2;
-    int x4 = z2 / X3;
-    int x3 = z2 - x4*X3;
-    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-    int x1 = 2*x1h + x1odd;  
-    int X = 2*sid + x1odd;
-    
-    const int sign = 1;
-    
-    float2* mymom=momEven;
-    if (oddBit){
-	mymom = momOdd;
-    }
-
-    float4 LINKA0, LINKA1, LINKA2, LINKA3, LINKA4;
-    float4 LINKB0, LINKB1, LINKB2, LINKB3, LINKB4;
-    float2 STAPLE0, STAPLE1, STAPLE2, STAPLE3,STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
-    float2 AH0, AH1, AH2, AH3, AH4;
-
-    int new_mem_idx;
-    
-    
-    SET_SU3_MATRIX(staple, 0);
-    for(i=0;i < num_paths; i++){
-	int nbr_oddbit = (oddBit^1 );
-	
-	int new_x1 =x1;
-	int new_x2 =x2;
-	int new_x3 =x3;
-	int new_x4 =x4;
-	COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(dir, X);
-	
-	//linka: current matrix
-	//linkb: the loaded matrix in this round	
-	SET_UNIT_SU3_MATRIX(linka);	
-	int* path = input_path + i*path_max_length;
-	
-	int lnkdir;
-	int path0 = path[0];
-	if (GOES_FORWARDS(path0)){
-	    lnkdir=path0;
-	}else{
-	    lnkdir=OPP_DIR(path0);
-	    COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(path0), new_mem_idx);
-	    nbr_oddbit = nbr_oddbit^1;
-	    
-	}
-	
-	int nbr_idx = new_mem_idx >>1;
-	if (nbr_oddbit){
-	    LOAD_ODD_MATRIX( lnkdir, nbr_idx, LINKB);
-	}else{
-	    LOAD_EVEN_MATRIX( lnkdir, nbr_idx, LINKB);
-	}
-	
-	RECONSTRUCT_MATRIX(lnkdir, nbr_idx, sign, linkb);
-	if (GOES_FORWARDS(path0)){
-	    COPY_SU3_MATRIX(linkb, linka);
-	    COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(path0, new_mem_idx);
-	    nbr_oddbit = nbr_oddbit^1;
-	}else{
-	    SU3_ADJOINT(linkb, linka);
-	}	
-	
-	for(j=1; j < length[i]; j++){
-	    
-	    int lnkdir;
-	    int pathj = path[j];
-	    if (GOES_FORWARDS(pathj)){
-		lnkdir=pathj;
-	    }else{
-		lnkdir=OPP_DIR(pathj);
-		COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(pathj), new_mem_idx);
-		nbr_oddbit = nbr_oddbit^1;
-
-	    }
-	    
-	    int nbr_idx = new_mem_idx >>1;
-	    if (nbr_oddbit){
-		LOAD_ODD_MATRIX(lnkdir, nbr_idx, LINKB);
-	    }else{
-		LOAD_EVEN_MATRIX(lnkdir, nbr_idx, LINKB);
-	    }
-	    RECONSTRUCT_MATRIX(lnkdir, nbr_idx, sign, linkb);
-	    if (GOES_FORWARDS(pathj)){
-	      MULT_SU3_NN_TEST(linka, linkb);
-		
-		COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(pathj, new_mem_idx);
-		nbr_oddbit = nbr_oddbit^1;
-		
-		
-	    }else{
-		MULT_SU3_NA_TEST(linka, linkb);		
-	    }
-	    
-	}//j
-	SCALAR_MULT_ADD_SU3_MATRIX(staple, linka, path_coeff[i], staple);
-    }//i
-    
-
-    //update mom 
-    if (oddBit){
-	LOAD_ODD_MATRIX(dir, sid, LINKA);
-    }else{
-	LOAD_EVEN_MATRIX(dir, sid, LINKA);
-    }
-    RECONSTRUCT_MATRIX(dir, sid, sign, linka);
-    MULT_SU3_NN_TEST(linka, staple);
-    LOAD_ANTI_HERMITIAN(mymom, dir, sid, AH);
-    UNCOMPRESS_ANTI_HERMITIAN(ah, linkb);
-    SCALAR_MULT_SUB_SU3_MATRIX(linkb, linka, eb3, linka);
-    MAKE_ANTI_HERMITIAN(linka, ah);
-    
-    WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH);
-
-    return;
-}
 
 void
 gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& cudaSiteLink,
                  QudaGaugeParam* param, int** input_path, 
 		 int* length, void* path_coeff, int num_paths, int max_length)
 {
-
     int i, j;
     //input_path
     int bytes = num_paths*max_length* sizeof(int);
@@ -556,33 +166,99 @@ gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& 
     dim3 blockDim(BLOCK_DIM, 1,1);
     dim3 gridDim(volume/blockDim.x, 1, 1);
     dim3 halfGridDim(volume/(2*blockDim.x), 1, 1);
-    
-    float2* momEven = (float2*)cudaMom.Even_p();
-    float2* momOdd = (float2*)cudaMom.Odd_p();
-    float4* linkEven = (float4*)cudaSiteLink.Even_p();
-    float4* linkOdd = (float4*)cudaSiteLink.Odd_p();        
+        
+    void* momEven = (void*)cudaMom.Even_p();
+    void* momOdd = (void*)cudaMom.Odd_p();
 
-    cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
-    cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());
-    parity_compute_gauge_force_kernel<0><<<halfGridDim, blockDim>>>(momEven, momOdd,
-								    dir, eb3,
-								    linkEven, linkOdd, 
-								    input_path_d, length_d, (float*)path_coeff_d,
-								    num_paths);   
-    //odd
-    /* The reason we do not switch the even/odd function input paramemters and the texture binding
-     * is that we use the oddbit to decided where to load, in the kernel function
-     */
-    parity_compute_gauge_force_kernel<1><<<halfGridDim, blockDim>>>(momEven, momOdd,
-								  dir, eb3,
-								  linkEven, linkOdd, 
-								  input_path_d, length_d, (float*)path_coeff_d,
-								  num_paths);  
+    void* linkEven = (void*)cudaSiteLink.Even_p();
+    void* linkOdd = (void*)cudaSiteLink.Odd_p();        
+    
+    
+    if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
+      cudaBindTexture(0, siteLink0TexDouble, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
+      cudaBindTexture(0, siteLink1TexDouble, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());			      
+    }else{ //QUDA_SINGLE_PRECISION
+      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
+	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
+	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());		
+      }else{//QUDA_RECONSTRUCT_12
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());	
+      }
+    }
+    
+    if(param->cuda_prec == QUDA_DOUBLE_PRECISION){      
+      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
+	parity_compute_gauge_force_kernel_dp18<0><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
+									dir, eb3,
+									(double2*)linkEven, (double2*)linkOdd, 
+									input_path_d, length_d, (double*)path_coeff_d,
+									num_paths);   
+	parity_compute_gauge_force_kernel_dp18<1><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
+									dir, eb3,
+									(double2*)linkEven, (double2*)linkOdd, 
+									input_path_d, length_d, (double*)path_coeff_d,
+									num_paths);  
+		
+      }else{ //QUDA_RECONSTRUCT_12
+   	parity_compute_gauge_force_kernel_dp12<0><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
+									     dir, eb3,
+									     (double2*)linkEven, (double2*)linkOdd, 
+									     input_path_d, length_d, (double*)path_coeff_d,
+									     num_paths);   
+	parity_compute_gauge_force_kernel_dp12<1><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
+									     dir, eb3,
+									     (double2*)linkEven, (double2*)linkOdd, 
+									     input_path_d, length_d, (double*)path_coeff_d,
+									     num_paths);    
+      }
+    }else{ //QUDA_SINGLE_PRECISION
+      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
+	
+	parity_compute_gauge_force_kernel_sp18<0><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
+									     dir, eb3,
+									     (float2*)linkEven, (float2*)linkOdd, 
+									     input_path_d, length_d, (float*)path_coeff_d,
+									     num_paths);   
+	parity_compute_gauge_force_kernel_sp18<1><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
+									     dir, eb3,
+									     (float2*)linkEven, (float2*)linkOdd, 
+									     input_path_d, length_d, (float*)path_coeff_d,
+									     num_paths); 
+	
+      }else{ //QUDA_RECONSTRUCT_12
+	parity_compute_gauge_force_kernel_sp12<0><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
+									     dir, eb3,
+									     (float4*)linkEven, (float4*)linkOdd, 
+									     input_path_d, length_d, (float*)path_coeff_d,
+									     num_paths);   
+	//odd
+	/* The reason we do not switch the even/odd function input paramemters and the texture binding
+	 * is that we use the oddbit to decided where to load, in the kernel function
+	 */
+	parity_compute_gauge_force_kernel_sp12<1><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
+									     dir, eb3,
+									     (float4*)linkEven, (float4*)linkOdd, 
+									     input_path_d, length_d, (float*)path_coeff_d,
+									     num_paths);  
+      }
+      
+    }
     
 
-    
-    cudaUnbindTexture(siteLink0TexSingle_recon);
-    cudaUnbindTexture(siteLink1TexSingle_recon);
+    if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
+      cudaUnbindTexture(siteLink0TexDouble);
+      cudaUnbindTexture(siteLink1TexDouble);
+    }else{ //QUDA_SINGLE_PRECISION
+      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
+	cudaUnbindTexture(siteLink0TexSingle);
+	cudaUnbindTexture(siteLink1TexSingle);
+      }else{//QUDA_RECONSTRUCT_12
+	cudaUnbindTexture(siteLink0TexSingle_recon);
+	cudaUnbindTexture(siteLink1TexSingle_recon);
+      }
+    }
+
     
     checkCudaError();
     
@@ -596,9 +272,3 @@ gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& 
 }
 
 
-#undef LOAD_EVEN_MATRIX
-#undef LOAD_ODD_MATRIX
-#undef LOAD_MATRIX 
-#undef LOAD_ANTI_HERMITIAN 
-#undef WRITE_ANTI_HERMITIAN
-#undef RECONSTRUCT_MATRIX

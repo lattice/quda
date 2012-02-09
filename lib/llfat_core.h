@@ -16,6 +16,22 @@
 #define D4 kparam.D4
 #define D1h kparam.D1h
 
+#if (RECONSTRUCT == 18)
+#define DECLARE_VAR_SIGN 
+#define DECLARE_NEW_X 
+#ifdef MULTI_GPU
+#define DECLARE_X_ARRAY int x[4] = {x1,x2,x3, x4};
+#else
+#define DECLARE_X_ARRAY 
+#endif
+#else //RECONSTRUCT == 12
+#define DECLARE_VAR_SIGN short sign=1
+#define DECLARE_NEW_X short new_x1=x1; short new_x2=x2; \
+  /*short new_x3=x3; */short new_x4=x4; 
+#define DECLARE_X_ARRAY int x[4] = {x1,x2,x3, x4};
+
+#endif
+
 
 #define a00_re A0.x
 #define a00_im A0.y
@@ -218,12 +234,12 @@
 #define TEMPA3 sd_data[threadIdx.x + 3*blockDim.x ]
 #define TEMPA4 sd_data[threadIdx.x + 4*blockDim.x ]
     
-#ifdef MULTI_GPU
 
 #undef UPDATE_COOR_PLUS
 #undef UPDATE_COOR_MINUS
 #undef UPDATE_COOR_LOWER_STAPLE
 #undef UPDATE_COOR_LOWER_STAPLE_DIAG
+#undef UPDATE_COOR_LOWER_STAPLE_EX
 #undef COMPUTE_RECONSTRUCT_SIGN
 #if (RECONSTRUCT  != 18)
 #define UPDATE_COOR_PLUS(mydir, idx) do {				\
@@ -320,6 +336,18 @@
     }									\
   }while(0)
 
+
+
+#define UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do {		\
+    int	new_x[4]; 							\
+    new_x[3] = x4; new_x[1] = x2; new_x[0] = x1;			\
+    new_x[nu] =  -1;							\
+    new_x[mu] = 0;							\
+    new_x1 = new_x[0]; 							\
+    new_x2 = new_x[1]; 							\
+    new_x4 = new_x[3]; 							\
+  }while(0)
+
 #define UPDATE_COOR_LOWER_STAPLE_EX(mydir1, mydir2) do {                \
     new_x1 = x1; new_x2 = x2;  new_x4 = x4;                             \
     switch(mydir1){                                                     \
@@ -348,17 +376,6 @@
       new_x4 = x4+1;                                                    \
       break;                                                            \
     }                                                                   \
-  }while(0)
-
-
-#define UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do {		\
-    int	new_x[4]; 							\
-    new_x[3] = x4; new_x[1] = x2; new_x[0] = x1;			\
-    new_x[nu] =  -1;							\
-    new_x[mu] = 0;							\
-    new_x1 = new_x[0]; 							\
-    new_x2 = new_x[1]; 							\
-    new_x4 = new_x[3]; 							\
   }while(0)
 
 #define COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) do {	\
@@ -397,10 +414,10 @@
 #define UPDATE_COOR_LOWER_STAPLE(mydir1, mydir2)
 #define UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2)
 #define COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) 
-
+#define UPDATE_COOR_LOWER_STAPLE_EX(mydir1, mydir2)
 #endif
 
-
+#ifdef MULTI_GPU
 
 #define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {                     \
     switch(mydir){                                                      \
@@ -420,42 +437,6 @@
     UPDATE_COOR_PLUS(mydir, idx);					\
   }while(0)
 
-
-#define LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mydir, idx) do {                  \
-    switch(mydir){                                                      \
-    case 0:                                                             \
-      new_mem_idx = (idx+1)>>1;                                         \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = (idx+E1)>>1;                                        \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = (idx+E2E1)>>1;                                      \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = (idx+E3E2E1)>>1;                                    \
-      break;                                                            \
-    }                                                                   \
-    UPDATE_COOR_PLUS(mydir, idx);                                       \
-  }while(0)
-
-#define LLFAT_COMPUTE_NEW_IDX_MINUS_EX(mydir, idx) do {                 \
-    switch(mydir){                                                      \
-    case 0:                                                             \
-      new_mem_idx = (idx-1) >> 1;                                       \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = (idx-E1) >> 1;                                      \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = (idx-E2E1) >> 1;                                    \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = (idx-E3E2E1) >> 1;                                  \
-      break;                                                            \
-    }                                                                   \
-    UPDATE_COOR_MINUS(mydir, idx);                                      \
-  }while(0)
 
 
 #define LLFAT_COMPUTE_NEW_IDX_MINUS(mydir, idx) do {			\
@@ -556,6 +537,126 @@
   }while(0)
 
 
+
+
+#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do { \
+    new_mem_idx = Vh+2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + mu*Vh_2d_max + ((x[dir2]*Z[dir1] + x[dir1])>>1); \
+    UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2);			\
+  }while(0)
+
+
+#else
+
+#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {		\
+    switch(mydir){                                                      \
+    case 0:                                                             \
+      new_mem_idx = ( (x1==X1m1)?idx-X1m1:idx+1)>>1;                    \
+      break;                                                            \
+    case 1:                                                             \
+      new_mem_idx = ( (x2==X2m1)?idx-X2X1mX1:idx+X1)>>1;                \
+      break;                                                            \
+    case 2:                                                             \
+      new_mem_idx = ( (x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1)>>1;          \
+      break;                                                            \
+    case 3:                                                             \
+      new_mem_idx = ( (x4==X4m1)?idx-X4X3X2X1mX3X2X1: idx+X3X2X1)>>1;	\
+      break;                                                            \
+    }                                                                   \
+    UPDATE_COOR_PLUS(mydir, idx);					\
+  }while(0)
+
+
+#define LLFAT_COMPUTE_NEW_IDX_MINUS(mydir, idx) do {		\
+    switch(mydir){                                                      \
+    case 0:                                                             \
+      new_mem_idx = ( (x1==0)?idx+X1m1:idx-1) >> 1;                     \
+      break;                                                            \
+    case 1:                                                             \
+      new_mem_idx = ( (x2==0)?idx+X2X1mX1:idx-X1) >> 1;                 \
+      break;                                                            \
+    case 2:                                                             \
+      new_mem_idx = ( (x3==0)?idx+X3X2X1mX2X1:idx-X2X1) >> 1;           \
+      break;                                                            \
+    case 3:                                                             \
+      new_mem_idx = ( (x4==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1) >> 1;	\
+      break;                                                            \
+    }									\
+    UPDATE_COOR_MINUS(mydir, idx);					\
+     }while(0)
+
+ 
+#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {		\
+    switch(mydir1){                                                     \
+    case 0:                                                             \
+      new_mem_idx = ( (x1==0)?X+X1m1:X-1);                              \
+      break;                                                            \
+    case 1:                                                             \
+      new_mem_idx = ( (x2==0)?X+X2X1mX1:X-X1);                          \
+      break;                                                            \
+    case 2:                                                             \
+      new_mem_idx = ( (x3==0)?X+X3X2X1mX2X1:X-X2X1);                    \
+      break;                                                            \
+    case 3:                                                             \
+      new_mem_idx = ((x4==0)?X+X4X3X2X1mX3X2X1:X-X3X2X1);		\
+      break;                                                            \
+    }                                                                   \
+    switch(mydir2){                                                     \
+    case 0:                                                             \
+      new_mem_idx = ( (x1==X1m1)?new_mem_idx-X1m1:new_mem_idx+1)>> 1;   \
+      break;                                                            \
+    case 1:                                                             \
+      new_mem_idx = ( (x2==X2m1)?new_mem_idx-X2X1mX1:new_mem_idx+X1) >> 1; \
+      break;                                                            \
+    case 2:                                                             \
+      new_mem_idx = ( (x3==X3m1)?new_mem_idx-X3X2X1mX2X1:new_mem_idx+X2X1) >> 1; \
+      break;                                                            \
+    case 3:                                                             \
+      new_mem_idx = ( (x4==X4m1)?new_mem_idx-X4X3X2X1mX3X2X1:new_mem_idx+X3X2X1) >> 1; \
+      break;								\
+    }                                                                   \
+    UPDATE_COOR_LOWER_STAPLE(mydir1, mydir2);				\
+  }while(0)
+
+#endif
+
+
+#define LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mydir, idx) do {                  \
+    switch(mydir){                                                      \
+    case 0:                                                             \
+      new_mem_idx = (idx+1)>>1;                                         \
+      break;                                                            \
+    case 1:                                                             \
+      new_mem_idx = (idx+E1)>>1;                                        \
+      break;                                                            \
+    case 2:                                                             \
+      new_mem_idx = (idx+E2E1)>>1;                                      \
+      break;                                                            \
+    case 3:                                                             \
+      new_mem_idx = (idx+E3E2E1)>>1;                                    \
+      break;                                                            \
+    }                                                                   \
+    UPDATE_COOR_PLUS(mydir, idx);                                       \
+  }while(0)
+
+#define LLFAT_COMPUTE_NEW_IDX_MINUS_EX(mydir, idx) do {                 \
+    switch(mydir){                                                      \
+    case 0:                                                             \
+      new_mem_idx = (idx-1) >> 1;                                       \
+      break;                                                            \
+    case 1:                                                             \
+      new_mem_idx = (idx-E1) >> 1;                                      \
+      break;                                                            \
+    case 2:                                                             \
+      new_mem_idx = (idx-E2E1) >> 1;                                    \
+      break;                                                            \
+    case 3:                                                             \
+      new_mem_idx = (idx-E3E2E1) >> 1;                                  \
+      break;                                                            \
+    }                                                                   \
+    UPDATE_COOR_MINUS(mydir, idx);                                      \
+  }while(0)
+
+
 #define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_EX(mydir1, mydir2) do {      \
     switch(mydir1){                                                     \
     case 0:                                                             \
@@ -589,95 +690,6 @@
   }while(0)
 
 
-#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do { \
-    new_mem_idx = Vh+2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + mu*Vh_2d_max + ((x[dir2]*Z[dir1] + x[dir1])>>1); \
-    UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2);			\
-  }while(0)
-
-
-#else
-
-#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {		\
-    switch(mydir){                                                      \
-    case 0:                                                             \
-      new_mem_idx = ( (x1==X1m1)?idx-X1m1:idx+1)>>1;                    \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2==X2m1)?idx-X2X1mX1:idx+X1)>>1;                \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1)>>1;          \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ( (x4==X4m1)?idx-X4X3X2X1mX3X2X1: idx+X3X2X1)>>1;	\
-      break;                                                            \
-    }                                                                   \
-  }while(0)
-
-
-#define LLFAT_COMPUTE_NEW_IDX_MINUS(mydir, idx) do {		\
-    switch(mydir){                                                      \
-    case 0:                                                             \
-      new_mem_idx = ( (x1==0)?idx+X1m1:idx-1) >> 1;                     \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2==0)?idx+X2X1mX1:idx-X1) >> 1;                 \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3==0)?idx+X3X2X1mX2X1:idx-X2X1) >> 1;           \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ( (x4==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1) >> 1;	\
-      break;                                                            \
-    }                                                                   \
-  }while(0)
-
- 
-#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {	\
-    new_x1 = x1;                                                        \
-    new_x2 = x2;                                                        \
-    new_x3 = x3;                                                        \
-    new_x4 = x4;                                                        \
-    switch(mydir1){                                                     \
-    case 0:                                                             \
-      new_mem_idx = ( (x1==0)?X+X1m1:X-1);                              \
-      new_x1 = (x1==0)?X1m1:x1 - 1;                                     \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2==0)?X+X2X1mX1:X-X1);                          \
-      new_x2 = (x2==0)?X2m1:x2 - 1;                                     \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3==0)?X+X3X2X1mX2X1:X-X2X1);                    \
-      new_x3 = (x3==0)?X3m1:x3 - 1;                                     \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ((x4==0)?X+X4X3X2X1mX3X2X1:X-X3X2X1);		\
-      new_x4 = (x4==0)?X4m1:x4 - 1;                                     \
-      break;                                                            \
-    }                                                                   \
-    switch(mydir2){                                                     \
-    case 0:                                                             \
-      new_mem_idx = ( (x1==X1m1)?new_mem_idx-X1m1:new_mem_idx+1)>> 1;   \
-      new_x1 = (x1==X1m1)?0:x1+1;                                       \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2==X2m1)?new_mem_idx-X2X1mX1:new_mem_idx+X1) >> 1; \
-      new_x2 = (x2==X2m1)?0:x2+1;                                       \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3==X3m1)?new_mem_idx-X3X2X1mX2X1:new_mem_idx+X2X1) >> 1; \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ( (x4==X4m1)?new_mem_idx-X4X3X2X1mX3X2X1:new_mem_idx+X3X2X1) >> 1; \
-      new_x4 = (x4==X4m1)?0:x4+1; /*fixme*/				\
-      break;								\
-    }                                                                   \
-  }while(0)
-
-#endif
-
- 
 
 
 template<int mu, int nu, int odd_bit>
@@ -717,20 +729,19 @@ template<int mu, int nu, int odd_bit>
   if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_T && x4 != 0) return;
 
   int new_mem_idx;
-#if (RECONSTRUCT != 18)
-  float sign =1;    
-  int new_x1 = x1;
-  int new_x2 = x2;
-  int new_x4 = x4;
-#endif
-
-  int x[4] = {x1,x2,x3, x4};
+  DECLARE_VAR_SIGN;
+  DECLARE_NEW_X;
+  DECLARE_X_ARRAY;
+  
+  //int x[4] = {x1,x2,x3, x4};
+#ifdef MULTI_GPU
   int Z[4] ={X1,X2,X3,X4};
-
   int spacecon_x = (x4*X3X2+x3*X2+x2)>>1;
   int spacecon_y = (x4*X3X1+x3*X1+x1)>>1;
   int spacecon_z = (x4*X2X1+x2*X1+x1)>>1;
   int spacecon_t = (x3*X2X1+x2*X1+x1)>>1;
+#endif
+
   /* Upper staple */
   /* Computes the staple :
    *                 mu (B)
@@ -793,12 +804,17 @@ template<int mu, int nu, int odd_bit>
     
     /* load matrix C*/
     //if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+#ifdef MULTI_GPU
     if(dimcomm[nu] && dimcomm[mu] && x[nu] == 0 && x[mu] == Z[mu] - 1){
       int idx = nu*4+mu;
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
     }else{
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
     }
+#else
+      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
+#endif
+
     LOAD_EVEN_SITE_MATRIX(nu, new_mem_idx, C);
    
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, new_x3, new_x4);        
@@ -856,21 +872,18 @@ template<int mu, int nu, int odd_bit, int save_staple>
   if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_T && x4 != X4m1) return;
   if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_T && x4 != 0) return;
 
-
-  int x[4] = {x1,x2,x3, x4};
+  DECLARE_X_ARRAY;
+#ifdef MULTI_GPU
   int Z[4] ={X1,X2,X3,X4};  
-  int new_mem_idx;
-#if (RECONSTRUCT != 18)
-  int sign =1;
-  int new_x1 = x1;
-  int new_x2 = x2;
-  int new_x4 = x4;
-#endif
-
   int spacecon_x = (x4*X3X2+x3*X2+x2)>>1;
   int spacecon_y = (x4*X3X1+x3*X1+x1)>>1;
   int spacecon_z = (x4*X2X1+x2*X1+x1)>>1;
   int spacecon_t = (x3*X2X1+x2*X1+x1)>>1;
+#endif
+
+  int new_mem_idx;
+  DECLARE_VAR_SIGN;
+  DECLARE_NEW_X;
 
   /* Upper staple */
   /* Computes the staple :
@@ -932,12 +945,17 @@ template<int mu, int nu, int odd_bit, int save_staple>
     
     /* load matrix C*/
     //if(x[nu] == 0 && x[mu] == Z[mu] - 1){
+#ifdef MULTI_GPU
     if(dimcomm[nu] && dimcomm[mu] && x[nu] == 0 && x[mu] == Z[mu] - 1){
       int idx = nu*4+mu; 
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
     }else{
       LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
     }
+#else
+    LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
+#endif
+
     LOAD_EVEN_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, new_x3, new_x4);
     RECONSTRUCT_SITE_LINK(nu, new_mem_idx, sign, c);				
@@ -1005,7 +1023,7 @@ LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_
   int x3 = z2 - x4*X3;
   int x1odd = (x2 + x3 + x4 + odd_bit) & 1;
   int x1 = 2*x1h + x1odd; 
-  int sign =1;   	
+  DECLARE_VAR_SIGN;
 #endif
 
   for(int dir=0;dir < 4; dir++){
@@ -1062,11 +1080,8 @@ template<int mu, int nu, int odd_bit>
   mem_idx = X/2;
  
   int new_mem_idx;
-  float sign =1;    
-  short new_x1 = x1;
-  short new_x2 = x2;
-  short new_x3 = x3;
-  short new_x4 = x4;
+  DECLARE_VAR_SIGN;
+  DECLARE_NEW_X;
 
   /* Upper staple */
   /* Computes the staple :
@@ -1197,12 +1212,8 @@ template<int mu, int nu, int odd_bit, int save_staple>
   mem_idx = X/2;
 
   int new_mem_idx;
-  short sign =1;
-  short new_x1 = x1;
-  short new_x2 = x2;
-  short new_x3 = x3;
-  short new_x4 = x4;
-
+  DECLARE_VAR_SIGN;
+  DECLARE_NEW_X;
 
   /* Upper staple */
   /* Computes the staple :
@@ -1321,8 +1332,8 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* siteli
   short x3 = z2 - x4*D3;
   short x1odd = (x2 + x3 + x4 + odd_bit) & 1;
   short x1 = 2*x1h + x1odd; 
-  short sign =1;   	
-  
+  DECLARE_VAR_SIGN;
+
   x1 += kparam.base_idx;
   x2 += kparam.base_idx;
   x3 += kparam.base_idx;
@@ -1340,17 +1351,6 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* siteli
     SCALAR_MULT_SU3_MATRIX((coeff0 - 6.0*coeff5), a, fat); 
     
     WRITE_FAT_MATRIX(my_fatlink,dir, idx);	 
-    /*
-    if(dir == 3 && x1 == 5 && x2 == 2 && x3 == 2 && x4 == 7){
-      printf(" GPU link is\n");
-      printf("(%f %f) (%f %f) (%f %f)\n"
-	     "(%f %f) (%f %f) (%f %f)\n"
-	     "(%f %f) (%f %f) (%f %f)\n",
-	     a00_re, a00_im, a01_re, a01_im, a02_re, a02_im, 
-	     a10_re, a10_im, a11_re, a11_im, a12_re, a12_im, 
-	     a20_re, a20_im, a21_re, a21_im, a22_re, a22_im);
-    }
-    */ 
   }
 #endif
     
@@ -1359,6 +1359,9 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* siteli
 
 
 
+#undef DECLARE_VAR_SIGN 
+#undef DECLARE_NEW_X 
+#undef DECLARE_X_ARRAY
 
 #undef a00_re 
 #undef a00_im 

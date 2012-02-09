@@ -362,7 +362,7 @@ void commBarrier() { comm_barrier(); }
 
 #define gaugeSiteSize 18
 
-#if (CUDA_VERSION < 4000)
+#ifdef GPU_DIRECT
 static void* fwd_nbr_staple_cpu[4];
 static void* back_nbr_staple_cpu[4];
 static void* fwd_nbr_staple_sendbuf_cpu[4];
@@ -444,7 +444,7 @@ exchange_llfat_init(QudaPrecision prec)
   
   CUERR;
 
-#if (CUDA_VERSION < 4000)
+#ifdef GPU_DIRECT
   for(int i=0;i < 4; i++){
     fwd_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
     back_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
@@ -616,20 +616,24 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
 void exchange_cpu_sitelink(int* X,
 			   void** sitelink, void** ghost_sitelink,
 			   void** ghost_sitelink_diag,
-			   QudaPrecision gPrecision, int optflag)
+			   QudaPrecision gPrecision, QudaGaugeParam* param, int optflag)
 {  
   setup_dims(X);
-  void*  sitelink_fwd_sendbuf[4];
-  void*  sitelink_back_sendbuf[4];
-  
-  for(int i=0;i < 4;i++){
-    sitelink_fwd_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
-    sitelink_back_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
-    if (sitelink_fwd_sendbuf[i] == NULL|| sitelink_back_sendbuf[i] == NULL){
-      errorQuda("ERROR: malloc failed for sitelink_sendbuf/site_link_back_sendbuf\n");
-    }  
-    memset(sitelink_fwd_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
-    memset(sitelink_back_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+  static void*  sitelink_fwd_sendbuf[4];
+  static void*  sitelink_back_sendbuf[4];
+  static int allocated = 0;
+
+  if(!allocated){
+    for(int i=0;i < 4;i++){
+      sitelink_fwd_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
+      sitelink_back_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
+      if (sitelink_fwd_sendbuf[i] == NULL|| sitelink_back_sendbuf[i] == NULL){
+	errorQuda("ERROR: malloc failed for sitelink_sendbuf/site_link_back_sendbuf\n");
+      }  
+      memset(sitelink_fwd_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+      memset(sitelink_back_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+    }
+    allocated = 1;
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
@@ -640,9 +644,12 @@ void exchange_cpu_sitelink(int* X,
 		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf, optflag);
   }
   
-  for(int i=0;i < 4;i++){
-    free(sitelink_fwd_sendbuf[i]);
-    free(sitelink_back_sendbuf[i]);
+  if(!(param->flag & QUDA_FAT_PRESERVE_COMM_MEM)){
+    for(int i=0;i < 4;i++){
+      free(sitelink_fwd_sendbuf[i]);
+      free(sitelink_back_sendbuf[i]);
+    }
+    allocated = 0;
   }
 }
 
@@ -740,11 +747,20 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 	    for (c=startc[dir]; c < endc[dir]; c++){
 	      int oddness = (a+b+c+d)%2;
 	      int src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + d*f_main[dir][3])>> 1;
-	      int dst_idx = ( a*f_bound[dir][0] + b*f_bound[dir][1]+ c*f_bound[dir][2] + (d-2)*f_bound[dir][3])>> 1;
-	      if(oddness){
+	      int dst_idx = ( a*f_bound[dir][0] + b*f_bound[dir][1]+ c*f_bound[dir][2] + (d-2)*f_bound[dir][3])>> 1;	      
+	      
+	      int src_oddness = oddness;
+	      int dst_oddness = oddness;
+	      if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
+		dst_oddness = 1-oddness;
+	      }
+	      if(src_oddness){
 		src_idx += Vh_ex;
+	      }
+	      if(dst_oddness){
 		dst_idx += nslices*slice_3d[dir]/2;
 	      }
+
 	      for(int linkdir=0; linkdir<4;linkdir++){
 		char* src = (char*)sitelink[linkdir];
 		char* dst = ((char*)(ghost_sitelink_back_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;		
@@ -760,10 +776,21 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 	      int oddness = (a+b+c+d)%2;
 	      int src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + d*f_main[dir][3])>> 1;
 	      int dst_idx = ( a*f_bound[dir][0] + b*f_bound[dir][1]+ c*f_bound[dir][2] + (d-X[dir])*f_bound[dir][3])>> 1;
-	      if(oddness){
+
+	      int src_oddness = oddness;
+	      int dst_oddness = oddness;
+	      if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
+		dst_oddness = 1-oddness;
+	      }
+	      
+	      if(src_oddness){
 		src_idx += Vh_ex;
+	      }
+	      
+	      if(dst_oddness){
 		dst_idx += nslices*slice_3d[dir]/2;
 	      }
+
 	      for(int linkdir=0; linkdir<4;linkdir++){
 		char* src = (char*)sitelink[linkdir];
 		char* dst = ((char*)(ghost_sitelink_fwd_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
@@ -1083,7 +1110,7 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
   int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   
-#if (CUDA_VERSION >= 4000)
+#ifdef GPU_DIRECT
     llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple[i], len, back_neighbors[i], up_tags[i]);
     llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf[i], len, fwd_neighbors[i],  up_tags[i]);
 #else
@@ -1092,7 +1119,7 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
     llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i]);
 #endif
   } else { // QUDA_FORWARDS
-#if (CUDA_VERSION >= 4000)
+#ifdef GPU_DIRECT
     llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple[i], len, fwd_neighbors[i], down_tags[i]);
     llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf[i], len, back_neighbors[i] ,down_tags[i]);
 #else
@@ -1133,7 +1160,7 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
     comm_wait(llfat_recv_request1[i]);
     comm_wait(llfat_send_request1[i]);
 
-#if (CUDA_VERSION >= 4000)
+#ifdef GPU_DIRECT
     unpackGhostStaple(X, even, odd, volume, prec, stride, 
 		      i, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else   
@@ -1146,7 +1173,7 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
     comm_wait(llfat_recv_request2[i]);  
     comm_wait(llfat_send_request2[i]);
 
-#if (CUDA_VERSION >= 4000)
+#ifdef GPU_DIRECT
     unpackGhostStaple(X, even, odd, volume, prec, stride, 
 		      i, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else        
@@ -1173,7 +1200,7 @@ exchange_llfat_cleanup(void)
 
   }
 
-#if (CUDA_VERSION < 4000)
+#ifdef GPU_DIRECT
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_cpu[i]){
       free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] =NULL;

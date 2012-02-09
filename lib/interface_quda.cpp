@@ -17,9 +17,10 @@
 #include <invert_quda.h>
 #include <color_spinor_field.h>
 #include <clover_field.h>
+#include <llfat_quda.h>
+#include <fat_force_quda.h>
 
 #include <cuda.h>
-
 #ifdef MULTI_GPU
 #ifdef MPI_COMMS
 #include <mpi.h>
@@ -31,6 +32,8 @@
 #endif
 
 #include "mpicomm.h"
+
+#define MAX(a,b) ((a)>(b)? (a):(b))
 
 
 #define spinorSiteSize 24 // real numbers per spinor
@@ -81,6 +84,8 @@ Dirac *dSloppy = NULL;
 Dirac *dPre = NULL; // the DD preconditioning operator
 bool diracCreation = false;
 bool diracTune = false;
+
+cudaDeviceProp deviceProp;
 
 static int gpu_affinity[MAX_GPU_NUM_PER_NODE]; 
 static int numa_config_set = 0;
@@ -225,7 +230,6 @@ void initQuda(int dev)
   if( commCoords(3) == commDim(3)-1 ) qudaPtNm1=true;
   else qudaPtNm1=false;
 
-  cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
@@ -248,6 +252,7 @@ void initQuda(int dev)
 #endif
 
   initCache();
+  cudaGetDeviceProperties(&deviceProp, dev);
   quda::initBlas();
 }
 
@@ -1564,6 +1569,227 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 }
 
 
+#ifdef GPU_FATLINK 
+/*   @method  
+ *   QUDA_COMPUTE_FAT_STANDARD: standard method (default)
+ *   QUDA_COMPUTE_FAT_EXTENDED_VOLUME, extended volume method
+ *
+ */
+#include <sys/time.h>
+int
+computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff, 
+		   QudaGaugeParam* qudaGaugeParam, 
+		   QudaComputeFatMethod method)
+{
+#define TDIFF_MS(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))*1000
+
+  struct timeval t0, t1, t2, t3,t4, t5, t6;
+  struct timeval t7, t8, t9, t10, t11;
+
+  gettimeofday(&t0, NULL);
+
+  static cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL;
+  static cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL;
+  static cudaGaugeField* cudaStapleField=NULL, *cudaStapleField1=NULL;
+  int flag = qudaGaugeParam->flag;
+
+  QudaGaugeParam qudaGaugeParam_ex_buf;
+  QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;
+  memcpy(qudaGaugeParam_ex, qudaGaugeParam, sizeof(QudaGaugeParam));
+
+  qudaGaugeParam_ex->X[0] = qudaGaugeParam->X[0]+4;
+  qudaGaugeParam_ex->X[1] = qudaGaugeParam->X[1]+4;
+  qudaGaugeParam_ex->X[2] = qudaGaugeParam->X[2]+4;
+  qudaGaugeParam_ex->X[3] = qudaGaugeParam->X[3]+4;
+
+  GaugeFieldParam gParam_ex(0, *qudaGaugeParam_ex);
+  int* X= qudaGaugeParam->X;
+  int Vsh_x = X[1]*X[2]*X[3]/2;
+  int Vsh_y = X[0]*X[2]*X[3]/2;
+  int Vsh_z = X[0]*X[1]*X[3]/2;
+  int Vsh_t = X[0]*X[1]*X[2]/2;
+
+  int V = X[0]*X[1]*X[2]*X[3];
+
+  int E1 = X[0] + 4;
+  int E2 = X[1] + 4;
+  int E3 = X[2] + 4;
+  int E4 = X[3] + 4;
+  
+  GaugeFieldParam gParam(0, *qudaGaugeParam);
+
+
+  gettimeofday(&t1, NULL);
+
+  // create the host fatlink
+  if(cpuFatLink == NULL){
+    gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
+    gParam.order = QUDA_MILC_GAUGE_ORDER;
+    gParam.gauge= fatlink;
+    cpuFatLink = new cpuGaugeField(gParam);
+    if(cpuFatLink == NULL){
+      errorQuda("ERROR: Creating cpuFatLink failed\n");
+    }
+  }else{
+    cpuFatLink->setGauge((void**)fatlink);
+  }
+  
+ // create the device fatlink
+  qudaGaugeParam_ex->llfat_ga_pad = qudaGaugeParam->llfat_ga_pad = gParam.pad = Vsh_t;
+  if(cudaFatLink == NULL){
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
+    gParam.order = QUDA_QDP_GAUGE_ORDER;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    cudaFatLink = new cudaGaugeField(gParam);
+  }
+  
+
+  // create the host sitelink	
+  if(cpuSiteLink == NULL){
+    gParam.pad = 0; 
+    gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
+    gParam.link_type = qudaGaugeParam->type;
+    gParam.order     = qudaGaugeParam->gauge_order;
+    gParam.gauge     = sitelink;
+    if(method != QUDA_COMPUTE_FAT_STANDARD){
+      for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];	
+    }
+    cpuSiteLink      = new cpuGaugeField(gParam);
+    if(cpuSiteLink == NULL){
+      errorQuda("ERROR: Creating cpuSiteLink failed\n");
+    }
+  }else{
+    cpuSiteLink->setGauge(sitelink);
+  }
+  
+  gettimeofday(&t2, NULL);
+  
+ 
+  
+  gettimeofday(&t3, NULL);
+
+ 
+
+  gettimeofday(&t4, NULL);
+
+  // create the device sitelink
+  if(method ==  QUDA_COMPUTE_FAT_STANDARD){
+#ifdef MULTI_GPU
+    int Vh_2d_max = MAX(X[0]*X[1]/2, X[0]*X[2]/2);
+    Vh_2d_max = MAX(Vh_2d_max, X[0]*X[3]/2);
+    Vh_2d_max = MAX(Vh_2d_max, X[1]*X[2]/2);  
+    Vh_2d_max = MAX(Vh_2d_max, X[1]*X[3]/2);  
+    Vh_2d_max = MAX(Vh_2d_max, X[2]*X[3]/2);  
+    qudaGaugeParam->site_ga_pad = gParam.pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + 4*Vh_2d_max;
+#else
+    qudaGaugeParam->site_ga_pad = gParam.pad = Vsh_t;
+#endif
+  }else{
+    qudaGaugeParam_ex->site_ga_pad = gParam.pad = E1*E2*E3/2*3;
+    qudaGaugeParam->site_ga_pad = E1*E2*E3/2*3;  // Added by J.F.
+  }  
+  
+  if(cudaSiteLink == NULL){
+    gParam.create      = QUDA_NULL_FIELD_CREATE;
+    gParam.link_type   = qudaGaugeParam->type;
+    gParam.reconstruct = qudaGaugeParam->reconstruct;      
+    cudaSiteLink = new cudaGaugeField(gParam);
+  }
+  
+  gettimeofday(&t5, NULL);
+
+  // create the staples (device)
+  if(method == QUDA_COMPUTE_FAT_STANDARD){
+#ifdef MULTI_GPU
+    gParam.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
+#else
+    gParam.pad = 3*Vsh_t;
+#endif
+  }else{
+    gParam.pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
+    qudaGaugeParam_ex->staple_pad =  E1*E2*E2/2*3;
+  }
+  qudaGaugeParam->staple_pad = gParam.pad;
+  
+  if(cudaStapleField == NULL || cudaStapleField1 == NULL){
+    gParam.create = QUDA_NULL_FIELD_CREATE;  
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field      
+    cudaStapleField  = new cudaGaugeField(gParam);
+    cudaStapleField1 = new cudaGaugeField(gParam);
+  }
+  
+  
+  gettimeofday(&t6, NULL);
+  
+  initCommonConstants(*cudaFatLink);
+  
+  
+  if(method == QUDA_COMPUTE_FAT_STANDARD){
+    llfat_init_cuda(qudaGaugeParam);
+    qudaGaugeParam->ga_pad = qudaGaugeParam->site_ga_pad;
+  gettimeofday(&t7, NULL);
+    
+    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){
+      loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
+    }else{
+#ifdef MULTI_GPU
+      errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
+#else
+      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
+#endif
+    }
+    
+    gettimeofday(&t8, NULL);
+    
+    llfat_cuda(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, 
+	       qudaGaugeParam, act_path_coeff);
+    gettimeofday(&t9, NULL);
+    
+  }else{ //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
+    llfat_init_cuda_ex(qudaGaugeParam_ex);
+#ifdef MULTI_GPU
+    exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), qudaGaugeParam->cpu_prec, 1);
+#endif
+    qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
+    
+    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){ 
+      loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
+    }else{
+      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
+    }
+	
+    llfat_cuda_ex(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
+  }
+  storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
+  
+  gettimeofday(&t10, NULL);
+  
+  if (!(flag & QUDA_FAT_PRESERVE_CPU_GAUGE) ){
+    delete cpuFatLink; cpuFatLink = NULL;
+    delete cpuSiteLink; cpuSiteLink = NULL;
+  }  
+  if (!(flag & QUDA_FAT_PRESERVE_GPU_GAUGE) ){
+    delete cudaFatLink; cudaFatLink = NULL;
+    delete cudaSiteLink; cudaSiteLink = NULL;
+    delete cudaStapleField; cudaStapleField = NULL;
+    delete cudaStapleField1; cudaStapleField1 = NULL;
+  }
+  
+  gettimeofday(&t11, NULL);
+  /*
+  printfQuda("total time: %f ms, init(cuda/cpu gauge field creation,etc)=%f ms,"
+	     " sitelink cpu->gpu=%f ms, computation in gpu =%f ms, fatlink gpu->cpu=%f ms\n",
+	     TDIFF_MS(t0, t11), TDIFF_MS(t0, t7), TDIFF_MS(t7, t8), TDIFF_MS(t8, t9), TDIFF_MS(t9,t10));
+  printfQuda("finally cleanup =%f ms\n", TDIFF_MS(t10, t11));
+  */	     
+  return 0;
+}
+
+
+#endif
 
 void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
 

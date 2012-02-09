@@ -120,12 +120,14 @@ Known Issues:
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
 
-* At present, combining RECONSTRUCT_NO with half precision will give
-  wrong results unless all elements of the gauge field matrices have
-  magnitude bounded by 1.  In particular, half precision should
-  not be used with asqtad or HISQ fermions, since the "fat links" do
-  not satisfy this condition in general.
-
+* Fermi GeForce cards have hanging issues when accessing
+  double-precision textures.  This can lead to hanging and will put
+  the GPU in an error state only recoverable with a soft reset.  By
+  default QUDA will perform all double-precision loads directly on
+  Fermi, as the cost of some performance.  Configuring with the flag
+  --enable-fermi-double-tex will enable double precision textures for
+  use on Fermi Tesla / Quadro cards.  Pre-Fermi cards are unaffected
+  by this flag.
 
 Getting Help:
 

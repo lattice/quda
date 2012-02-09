@@ -155,7 +155,7 @@
 #if (DD_PREC==0) // double-precision fields
 
 // double-precision gauge field
-#ifdef DIRECT_ACCESS_LINK
+#if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
@@ -168,7 +168,7 @@
 // double-precision spinor fields
 #define DD_PARAM1 double2* out, float *null1
 #define DD_PARAM3 const double2* in, const float *null4
-#ifdef DIRECT_ACCESS_WILSON_SPINOR
+#if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
@@ -182,7 +182,7 @@
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
 #if (DD_XPAY==1)
-#ifdef DIRECT_ACCESS_WILSON_ACCUM
+#if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
@@ -281,7 +281,7 @@
 #endif
 
 // only build double precision if supported
-#if !(__CUDA_ARCH__ < 130 && DD_PREC == 0) 
+#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
 
 #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)

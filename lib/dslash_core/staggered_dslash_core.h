@@ -194,24 +194,30 @@
 #define longT22_re (+long22_re)
 #define longT22_im (-long22_im)
 
+#if (CUDA_VERSION >= 4010)
+#define VOLATILE
+#else
+#define VOLATILE volatile
+#endif
+
 // output spinor
 #if (DD_PREC == 0)
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat sd_data[];
-volatile spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+VOLATILE spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #else
-#if (__CUDA_ARCH__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
 #endif
 extern __shared__ spinorFloat ss_data[];
-volatile spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
+VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
                                   + (threadIdx.x % SHARED_STRIDE);
 #endif
 
@@ -408,23 +414,18 @@ if(kernel_type == INTERIOR_KERNEL){
   X = 2*sid + x1odd;
  }
 
-int sign;
-
 o00_re = o00_im = 0.f;
 o01_re = o01_im = 0.f;
 o02_re = o02_im = 0.f;
 
 
-
-
 {
     //direction: +X
 
-    if(x4%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = (x4%2 == 1) ? -1 : 1;
+#endif
+
     int ga_idx = sid;
 
 #ifdef MULTI_GPU
@@ -499,11 +500,9 @@ o02_re = o02_im = 0.f;
 
 {
     // direction: -X
-    if(x4%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }    
+#if (DD_RECON < 2)
+    int sign = (x4%2 == 1) ? -1 : 1;
+#endif
     int dir =1;
 
 #ifdef MULTI_GPU
@@ -590,11 +589,9 @@ o02_re = o02_im = 0.f;
 
 {
     //direction: +Y
-    if((x4+x1)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ((x4+x1)%2 == 1) ? -1 : 1;
+#endif
    
     int ga_idx = sid;
 
@@ -668,11 +665,9 @@ o02_re = o02_im = 0.f;
 {
     //direction: -Y
 
-    if((x4+x1)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ((x4+x1)%2 == 1) ? -1 : 1;
+#endif
 
     int dir=3;
 #ifdef MULTI_GPU
@@ -758,12 +753,10 @@ o02_re = o02_im = 0.f;
 {
     //direction: +Z
 
-    if((x4+x1+x2)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
-    
+#if (DD_RECON < 2)
+    int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
+#endif
+
     int ga_idx = sid;
 
 #ifdef MULTI_GPU
@@ -837,11 +830,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 {
     //direction: -Z
 
-    if((x4+x1+x2)%2 ==1){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
+#endif
 
     int dir = 5;
 
@@ -927,11 +918,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 
 {
     //direction: +T
-    if (x4>= (X4-3)){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = (x4 >= (X4-3)) ? -1 : 1;
+#endif
 
     int ga_idx = sid;
 
@@ -1006,11 +995,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 
 {
     //direction: -T
-    if ( ((x4+X4m3)%X4)>= X4m3 ){
-	sign = -1;
-    }else{
-	sign =1;
-    }
+#if (DD_RECON < 2)
+    int sign = ( ((x4+X4m3)%X4)>= X4m3 ) ? -1 : 1;
+#endif
     
     int dir = 7;
 
@@ -1241,3 +1228,5 @@ WRITE_SPINOR();
 #undef o01_im
 #undef o02_re
 #undef o02_im
+
+#undef VOLATILE

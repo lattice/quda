@@ -9,6 +9,8 @@
 
 #include <face_quda.h>
 
+class TuneParam;
+
 // Params for Dirac operator
 class DiracParam {
 
@@ -118,8 +120,8 @@ class Dirac {
 class DiracWilson : public Dirac {
 
  private:
-  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  TuneParam tuneDslash[5];
+  TuneParam tuneDslashXpay[5];
 
  protected:
   FaceBuffer face; // multi-gpu communication buffers
@@ -172,7 +174,7 @@ class DiracClover : public DiracWilson {
 
  protected:
   cudaCloverField &clover;
-  dim3 blockClover; // thread block size for applying clover (or inverse) term
+  TuneParam tuneClover;
   void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
 			 const cudaCloverField &) const;
 
@@ -199,8 +201,8 @@ class DiracClover : public DiracWilson {
 class DiracCloverPC : public DiracClover {
 
  private:
-  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  TuneParam tuneDslash[5];
+  TuneParam tuneDslashXpay[5];
 
  public:
   DiracCloverPC(const DiracParam &param);
@@ -232,8 +234,8 @@ class DiracCloverPC : public DiracClover {
 class DiracDomainWall : public DiracWilson {
 
  private:
-  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  TuneParam tuneDslash[5];
+  TuneParam tuneDslashXpay[5];
 
  protected:
   double m5;
@@ -287,7 +289,7 @@ class DiracDomainWallPC : public DiracDomainWall {
 class DiracTwistedMass : public DiracWilson {
 
  private:
-  dim3 blockTwist; // thread block size for applying the twist kernel
+  TuneParam tuneTwist;
 
  protected:
   double mu;
@@ -318,8 +320,8 @@ class DiracTwistedMass : public DiracWilson {
 class DiracTwistedMassPC : public DiracTwistedMass {
 
  private:
-  dim3 blockDslash[5]; // thread block size for Dslash (full volume or just body for overlapping comms)
-  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (full volume or just body for overlapping comms)
+  TuneParam tuneDslash[5];
+  TuneParam tuneDslashXpay[5];
 
  public:
   DiracTwistedMassPC(const DiracParam &param);
@@ -349,8 +351,8 @@ class DiracTwistedMassPC : public DiracTwistedMass {
 class DiracStaggered : public Dirac {
 
  private:
-  dim3 blockDslash[5]; // thread block size for Dslash (body + face kernels)
-  dim3 blockDslashXpay[5]; // thread block size for DslashXpay (body + face kernels)
+  TuneParam tuneDslash[5];
+  TuneParam tuneDslashXpay[5];
 
  protected:
   cudaGaugeField *fatGauge;

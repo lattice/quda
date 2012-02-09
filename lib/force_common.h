@@ -14,24 +14,6 @@
 #define GOES_FORWARDS(dir) (dir<=3)
 #define GOES_BACKWARDS(dir) (dir>3)
 
-#define linka00_re LINKA0.x
-#define linka00_im LINKA0.y
-#define linka01_re LINKA0.z
-#define linka01_im LINKA0.w
-#define linka02_re LINKA1.x
-#define linka02_im LINKA1.y
-#define linka10_re LINKA1.z
-#define linka10_im LINKA1.w
-#define linka11_re LINKA2.x
-#define linka11_im LINKA2.y
-#define linka12_re LINKA2.z
-#define linka12_im LINKA2.w
-#define linka20_re LINKA3.x
-#define linka20_im LINKA3.y
-#define linka21_re LINKA3.z
-#define linka21_im LINKA3.w
-#define linka22_re LINKA4.x
-#define linka22_im LINKA4.y
 
 #define linkaT00_re (+linka00_re)
 #define linkaT00_im (-linka00_im)
@@ -52,24 +34,6 @@
 #define linkaT22_re (+linka22_re)
 #define linkaT22_im (-linka22_im)
 
-#define linkb00_re LINKB0.x
-#define linkb00_im LINKB0.y
-#define linkb01_re LINKB0.z
-#define linkb01_im LINKB0.w
-#define linkb02_re LINKB1.x
-#define linkb02_im LINKB1.y
-#define linkb10_re LINKB1.z
-#define linkb10_im LINKB1.w
-#define linkb11_re LINKB2.x
-#define linkb11_im LINKB2.y
-#define linkb12_re LINKB2.z
-#define linkb12_im LINKB2.w
-#define linkb20_re LINKB3.x
-#define linkb20_im LINKB3.y
-#define linkb21_re LINKB3.z
-#define linkb21_im LINKB3.w
-#define linkb22_re LINKB4.x
-#define linkb22_im LINKB4.y
 
 #define linkbT00_re (+linkb00_re)
 #define linkbT00_im (-linkb00_im)
@@ -89,6 +53,9 @@
 #define linkbT21_im (-linkb12_im)
 #define linkbT22_re (+linkb22_re)
 #define linkbT22_im (-linkb22_im)
+
+
+
 
 #define linkc00_re LINKC0.x
 #define linkc00_im LINKC0.y
@@ -167,18 +134,80 @@
 #define stapleT22_re (+staple22_re)
 #define stapleT22_im (-staple22_im)
 
-#define LOAD_MATRIX_12_SINGLE(gauge, dir, idx, var)do{			\
-    var##0 = gauge[idx + dir*Vhx3];					\
-    var##1 = gauge[idx + dir*Vhx3 + Vh];				\
-    var##2 = gauge[idx + dir*Vhx3 + Vhx2];				\
+//#ifdef FERMI_DBLE_NO_TEX
+
+#ifdef FERMI_DBLE_NO_TEX
+#define READ_DOUBLE2_TEXTURE(x_tex, x, i)      x[i]
+#else
+#define READ_DOUBLE2_TEXTURE(x_tex, x, i)  fetch_double2(x_tex, i)
+#endif
+
+
+#define LOAD_MATRIX_12_SINGLE(gauge, dir, idx, var, stride)do{		\
+    var##0 = gauge[idx + dir*stride*3];					\
+    var##1 = gauge[idx + dir*stride*3 + stride];			\
+    var##2 = gauge[idx + dir*stride*3 + stride*2];			\
   }while(0)
 
-#define LOAD_MATRIX_12_SINGLE_TEX(gauge, dir, idx, var)do{		\
-    var##0 = tex1Dfetch(gauge, idx + dir*Vhx3);				\
-    var##1 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vh);			\
-    var##2 = tex1Dfetch(gauge, idx + dir*Vhx3 + Vhx2);			\
+#define LOAD_MATRIX_12_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    var##0 = tex1Dfetch(gauge, idx + dir*stride*3);			\
+    var##1 = tex1Dfetch(gauge, idx + dir*stride*3 + stride);		\
+    var##2 = tex1Dfetch(gauge, idx + dir*stride*3 + stride*2);		\
   }while(0)
 
+#define LOAD_MATRIX_12_DOUBLE(gauge, dir, idx, var, stride)do{		\
+    var##0 = gauge[idx + dir*stride*6];					\
+    var##1 = gauge[idx + dir*stride*6 + stride];			\
+    var##2 = gauge[idx + dir*stride*6 + stride*2];			\
+    var##3 = gauge[idx + dir*stride*6 + stride*3];			\
+    var##4 = gauge[idx + dir*stride*6 + stride*4];			\
+    var##5 = gauge[idx + dir*stride*6 + stride*5];			\
+  }while(0)
+
+#define LOAD_MATRIX_12_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
+    var##0 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6); \
+    var##1 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride); \
+    var##2 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*2); \
+    var##3 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*3); \
+    var##4 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*4); \
+    var##5 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*5); \
+  }while(0)
+
+#define LOAD_MATRIX_18(gauge, dir, idx, var, stride)do{			\
+    var##0 = gauge[idx + dir*stride*9];					\
+    var##1 = gauge[idx + dir*stride*9 + stride];			\
+    var##2 = gauge[idx + dir*stride*9 + stride*2];			\
+    var##3 = gauge[idx + dir*stride*9 + stride*3];			\
+    var##4 = gauge[idx + dir*stride*9 + stride*4];			\
+    var##5 = gauge[idx + dir*stride*9 + stride*5];			\
+    var##6 = gauge[idx + dir*stride*9 + stride*6];			\
+    var##7 = gauge[idx + dir*stride*9 + stride*7];			\
+    var##8 = gauge[idx + dir*stride*9 + stride*8];			\
+  }while(0)
+
+#define LOAD_MATRIX_18_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    var##0 = tex1Dfetch(gauge, idx + dir*stride*9);			\
+    var##1 = tex1Dfetch(gauge, idx + dir*stride*9 + stride);		\
+    var##2 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*2);		\
+    var##3 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*3);		\
+    var##4 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*4);		\
+    var##5 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*5);		\
+    var##6 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*6);		\
+    var##7 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*7);		\
+    var##8 = tex1Dfetch(gauge, idx + dir*stride*9 + stride*8);		\
+  }while(0)
+
+#define LOAD_MATRIX_18_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
+    var##0 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9); \
+    var##1 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride); \
+    var##2 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*2); \
+    var##3 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*3); \
+    var##4 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*4); \
+    var##5 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*5); \
+    var##6 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*6); \
+    var##7 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*7); \
+    var##8 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*8); \
+  }while(0)
 
 #define MULT_SU3_NN(ma, mb, mc)					\
     mc##00_re =							\
@@ -515,42 +544,32 @@
     }while(0)						
 
 
-#define LOAD_ANTI_HERMITIAN_SINGLE(src, dir, idx, var) do{		\
-	int start_pos = idx + dir*Vhx5;					\
+#define LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var) do{			\
+	int start_pos = idx + dir*Vh*5;					\
 	var##0 = src[start_pos];					\
 	var##1 = src[start_pos + Vh];					\
-	var##2 = src[start_pos + Vhx2];					\
-	var##3 = src[start_pos + Vhx3];					\
-	var##4 = src[start_pos + Vhx4];					\
+	var##2 = src[start_pos + Vh*2];					\
+	var##3 = src[start_pos + Vh*3];					\
+	var##4 = src[start_pos + Vh*4];					\
     }while(0)
 
 #define LOAD_ANTI_HERMITIAN_SINGLE_TEX(src, dir, idx, var) do{		\
-	int start_pos = idx + dir*Vhx5;					\
+	int start_pos = idx + dir*Vh*5;					\
 	var##0 = tex1Dfetch(src, start_pos);				\
 	var##1 = tex1Dfetch(src, start_pos + Vh);			\
-	var##2 = tex1Dfetch(src, start_pos + Vhx2);			\
-	var##3 = tex1Dfetch(src, start_pos + Vhx3);			\
-	var##4 = tex1Dfetch(src, start_pos + Vhx4);			\
+	var##2 = tex1Dfetch(src, start_pos + Vh*2);			\
+	var##3 = tex1Dfetch(src, start_pos + Vh*3);			\
+	var##4 = tex1Dfetch(src, start_pos + Vh*4);			\
     }while(0)
 
-#define WRITE_ANTI_HERMITIAN_SINGLE(mem, dir, idx, var) do{	\
-	int start_ps = idx + dir*Vhx5;				\
-	mem[start_ps] = var##0;					\
-	mem[start_ps + Vh] = var##1;				\
-	mem[start_ps + Vhx2] = var##2;				\
-	mem[start_ps + Vhx3] = var##3;				\
-	mem[start_ps + Vhx4] = var##4;				\
-    }while(0)
-
-#define WRITE_ANTI_HERMITIAN_SINGLE_A(mem, dir, idx, var) do{		\
-	int start_ps = idx + dir*Vhx5;					\
-	mem[start_ps] = (float2){1,1};					\
-	mem[start_ps + Vh] = (float2){2,2};				\
-	mem[start_ps + Vhx2] = (float2){3,3};				\
-	mem[start_ps + Vhx3] = (float2){4,4};				\
-	mem[start_ps + Vhx4] = (float2){5,5};				\
-    }while(0)
-
+#define WRITE_ANTI_HERMITIAN(mem, dir, idx, var) do{		\
+    int start_ps = idx + dir*Vh*5;				\
+    mem[start_ps] = var##0;					\
+    mem[start_ps + Vh] = var##1;				\
+    mem[start_ps + Vh*2] = var##2;				\
+    mem[start_ps + Vh*3] = var##3;				\
+    mem[start_ps + Vh*4] = var##4;				\
+  }while(0)
 
 #define COPY_SU3_MATRIX(a, b)		\
     b##00_re = a##00_re;		\

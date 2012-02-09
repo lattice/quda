@@ -15,6 +15,7 @@ extern "C" {
     QudaReconstructType get_recon(char* s);
     QudaPrecision   get_prec(char* s);
     const char* get_prec_str(QudaPrecision prec);
+    const char* get_gauge_order_str(QudaGaugeFieldOrder order);
     const char* get_recon_str(QudaReconstructType recon);
     const char* get_test_type(int t);
     void quda_set_verbose(int );

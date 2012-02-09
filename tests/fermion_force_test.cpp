@@ -12,7 +12,8 @@
 #include "hw_quda.h"
 #include <sys/time.h>
 
-int device = 0;
+extern void usage(char** argv);
+extern int device;
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField *cpuGauge = NULL;
 
@@ -143,8 +144,6 @@ fermion_force_init()
 
   cudaHw = createHwQuda(gaugeParam.X, hw_prec);
     
-  printf("%d %d %d %d\n", cpuMom->Reconstruct(), cudaMom->Reconstruct(), cpuGauge->Reconstruct(), cudaGauge->Reconstruct());
-
   return;
 }
 
@@ -153,14 +152,19 @@ fermion_force_end()
 {
   delete cudaMom;
   delete cudaGauge;
+  
   delete cpuGauge;
   delete cpuMom;
   delete refMom;
+
+  freeHwQuda(cudaHw);
   free(hw);
+  
+  endQuda();
 }
 
 
-static void 
+static int 
 fermion_force_test(void) 
 {
  
@@ -216,8 +220,9 @@ fermion_force_test(void)
   int res;
   res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize, 1e-5, gaugeParam.cpu_prec);
     
-  strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
-    
+  int accuracy_level;
+  accuracy_level =  strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
+  
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
     
   int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
@@ -232,8 +237,8 @@ fermion_force_test(void)
     printf("        Did you use --verify?\n");
     printf("        Did you check the GPU health by running cuda memtest?\n");
   }
-
-    
+  
+  return accuracy_level;
 }            
 
 
@@ -251,19 +256,11 @@ display_test_info()
     
 }
 
-static void
-usage(char** argv )
+void
+usage_extra(char** argv )
 {
-  printf("Usage: %s <args>\n", argv[0]);
-  printf("  --device <dev_id>               Set which device to run on\n");
-  printf("  --gprec <double/single/half>    Link precision\n"); 
-  printf("  --recon <8/12/18>                  Link reconstruction type\n"); 
-  printf("  --sdim <n>                      Set spacial dimention\n");
-  printf("  --tdim                          Set T dimention size(default 24)\n"); 
-  printf("  --sdim                          Set spalce dimention size(default 16)\n"); 
-  printf("  --verify                        Verify the GPU results using CPU results\n");
-  printf("  --help                          Print out this message\n"); 
-  exit(1);
+  printf("Extra options: \n");
+  printf("    --verify                                  # Verify the GPU results using CPU results\n");
   return ;
 }
 
@@ -271,26 +268,11 @@ int
 main(int argc, char **argv) 
 {
   int i;
-  for (i =1;i < argc; i++){
-	
+  for (i =1;i < argc; i++){	
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }
-    
-
-    if( strcmp(argv[i], "--device") == 0){
-        if (i+1 >= argc){
-                usage(argv);
-            }
-            device =  atoi(argv[i+1]);
-            if (device < 0){
-                fprintf(stderr, "Error: invalid device number(%d)\n", device);
-                exit(1);
-            }
-            i++;
-            continue;
-    }
-
+        
     if( strcmp(argv[i], "--verify") == 0){
       verify_results=1;
       continue;	    
@@ -306,14 +288,22 @@ main(int argc, char **argv)
   link_prec = prec;
 
   display_test_info();
+  
+  int accuracy_level = fermion_force_test();
+  printfQuda("accuracy_level=%d\n", accuracy_level);
     
-  fermion_force_test();
-
 
 #ifdef MULTI_GPU
     endCommsQuda();
 #endif
     
+    int ret;
+    if(accuracy_level >=3 ){
+      ret = 0;
+    }else{
+      ret = 1; //we delclare the test failed
+    }
+
     
-  return 0;
+  return ret;
 }

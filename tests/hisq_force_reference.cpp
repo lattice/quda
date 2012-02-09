@@ -405,9 +405,15 @@ computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix* dest)
   return;
 }
 
-void computeLinkOrderedOuterProduct(void *src, void *dst)
+void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision)
 {
-  computeLinkOrderedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dst);
+  if(precision == QUDA_SINGLE_PRECISION){
+    printf("Working in single precision\n");
+    computeLinkOrderedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dst);
+  }else{
+    printf("Working in double precision\n");
+    computeLinkOrderedOuterProduct((dhalf_wilson_vector*)src,(dsu3_matrix*)dst);
+  }
   return;
 }
 
@@ -428,8 +434,12 @@ static void forwardShiftedOuterProduct(half_wilson_vector *src, su3_matrix* dest
 }
 
 
-void computeHisqOuterProduct(void* src, void* dest){
-  forwardShiftedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dest);	
+void computeHisqOuterProduct(void* src, void* dest, QudaPrecision precision){
+  if(precision == QUDA_SINGLE_PRECISION){
+    forwardShiftedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dest);	
+  }else{
+    forwardShiftedOuterProduct((dhalf_wilson_vector*)src,(dsu3_matrix*)dest);	
+  }
 }
 
 
@@ -567,31 +577,20 @@ add_force_to_momentum(su3_matrix *back, su3_matrix *forw,
     my_coeff = coeff;	
   }
 
+
   for(i=0; i<V; i++){
     if(i<Vh){ tmp_coeff = my_coeff; }
     else{ tmp_coeff = -my_coeff; }
 
-    if (sizeof(Real) == sizeof(float)){
-      fsu3_matrix tmat;
-      fsu3_matrix mom_matrix;
-      anti_hermitmat* mom = momentum + 4*i + mydir;
-      uncompress_anti_hermitian(mom, &mom_matrix);
-      matrix_mult_na(&back[i], &forw[i], &tmat);
-      scalar_mult_add_su3_matrix(&mom_matrix, &tmat, tmp_coeff, &mom_matrix);  
 
-      make_anti_hermitian(&mom_matrix, mom);	
-    }
-    else{
-      printf("Double precision is not yet supported\n");
-      exit(1);
-    //  dsu3_matrix tmat;
-    //  dsu3_matrix mom_matrix;	
-    //  anti_hermitmat* mom = momentum + 4*i + mydir;
-     
-    //  matrix_mult_na(&back[i], &forw[i], &tmat);
-    //  scalar_mult_add_su3_matrix(&mom_matrix, &tmat, tmp_coeff, &mom_matrix);  
-    //  make_anti_hermitian(&mom_matrix, mom);	
-    }		
+    su3_matrix tmat;
+    su3_matrix mom_matrix;
+    anti_hermitmat* mom = momentum + 4*i + mydir;
+    uncompress_anti_hermitian(mom, &mom_matrix);
+    matrix_mult_na(&back[i], &forw[i], &tmat);
+    scalar_mult_add_su3_matrix(&mom_matrix, &tmat, tmp_coeff, &mom_matrix);  
+
+    make_anti_hermitian(&mom_matrix, mom);	
   }
   return;
 }
@@ -636,7 +635,6 @@ side_link_force(int mu, int nu, Real coeff, su3_matrix *Path,
 #define Prhonumu     tempmat[2]
 #define P7	     tempmat[3]
 #define P7rho	     tempmat[4]
-//#define P7rhonu      tempmat[5] // never used
 #define P5           tempmat[5]
 #define P3           tempmat[6]
 #define P5nu	     tempmat[3]
@@ -673,14 +671,6 @@ static void set_identity(su3_matrix* matrices, int num_dirs){
 }
 
 
-// The following is the core reference routine for 
-// the contribution from level-2 hisq smearing to 
-// the fermion force. In this case, we store the
-// parallel-transported outer product of the quark fields 
-// in a color matrices. This is needed for the multi-mass inverter.
-// The routine below omits the one-link force contribution,
-// but this can be added in by uncommenting a single line.
-// I need to do this!
 template <typename Real, typename su3_matrix, typename anti_hermitmat>
 void do_color_matrix_hisq_force_reference(Real eps, Real weight, 
 			   su3_matrix* temp_xx, Real* act_path_coeff,
@@ -914,7 +904,6 @@ void do_halfwilson_hisq_force_reference(Real eps, Real weight,
        add_force_to_momentum(Pmu, id, sig, OneLink, mom); 
     }
 
-
     for(mu = 0; mu < 8; mu++){
       if ( (mu == sig) || (mu == OPP_DIR(sig))){
 		continue;
@@ -1026,6 +1015,14 @@ void do_halfwilson_hisq_force_reference(Real eps, Real weight,
       side_link_force(mu, sig, ThreeSt, id, P3, Qmu, P3mu, mom);
     } // end loop over mu
   } // end loop over sig
+
+  for(mu=0; mu<9; mu++){	
+    free(tempmat[mu]);
+  }
+  
+  free(id);
+  free(id4);
+  free(temp_mat);
 }
 
 #undef Pmu
@@ -1276,7 +1273,6 @@ void set_identity(fsu3_matrix *sitelink){
 
 
 
-
 void halfwilson_hisq_force_reference(float eps, float weight, 
 			  void* act_path_coeff, void* temp_x,
 			  void* sitelink, void* mom)
@@ -1284,8 +1280,20 @@ void halfwilson_hisq_force_reference(float eps, float weight,
  do_halfwilson_hisq_force_reference((float)eps, (float)weight,
 			  (fhalf_wilson_vector*) temp_x, (float*)act_path_coeff,
 			  (fsu3_matrix*)sitelink, (fanti_hermitmat*)mom);
+ return;
 }
 
+
+
+void halfwilson_hisq_force_reference(double eps, double weight, 
+			  void* act_path_coeff, void* temp_x,
+			  void* sitelink, void* mom)
+{
+ do_halfwilson_hisq_force_reference((double)eps, (double)weight,
+			  (dhalf_wilson_vector*) temp_x, (double*)act_path_coeff,
+			  (dsu3_matrix*)sitelink, (danti_hermitmat*)mom);
+ return;
+}
 
 
 
@@ -1294,8 +1302,10 @@ void color_matrix_hisq_force_reference(float eps, float weight,
 			  void* act_path_coeff, void* temp_xx,
 			  void* sitelink, void* mom)
 {
-
+/*
  do_color_matrix_hisq_force_reference((float)eps, (float)weight,
 			  (fsu3_matrix*) temp_xx, (float*)act_path_coeff,
 			  (fsu3_matrix*)sitelink, (fanti_hermitmat*)mom);
+*/
+  return;
 }
