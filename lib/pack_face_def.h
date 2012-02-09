@@ -540,10 +540,8 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 }
 
 
-// At the moment, these staggered face-packing routines aren't actually used.
 //
 // TODO: add support for textured reads
-// TODO: pack only one face at a time
 
 #ifdef GPU_STAGGERED_DIRAC
 template <int dir, int ishalf, typename Float2>
