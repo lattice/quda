@@ -521,12 +521,8 @@ void cudaColorSpinorField::packGhost(const int dim, const QudaDirection dir,
   if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
     void* gpu_buf = 
       (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
-
-    if (nSpin == 1) { // use different packing kernels for staggered and Wilson
-      collectGhostSpinor(this->v, this->norm, gpu_buf, dim, dir, parity, this, stream); 
-    } else {
-      packFaceWilson(gpu_buf, *this, dim, dir, dagger, parity, *stream); 
-    }
+    
+    packFace(gpu_buf, *this, dim, dir, dagger, parity, *stream); 
   }
 #else
   errorQuda("packGhost not built on single-GPU build");
