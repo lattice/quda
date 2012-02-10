@@ -277,7 +277,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
   cudaGaugeField *precise = new cudaGaugeField(gauge_param);
-
   precise->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
 
   param->gaugeGiB += precise->GBytes();
@@ -324,28 +323,27 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
+  checkGaugeParam(param);
 
-  // FIXME
-  errorQuda("Not supported");
-
-  /*
-  FullGauge *gauge = NULL;
-
+  // Set the specific cpu parameters and create the cpu gauge field
+  GaugeFieldParam gauge_param(h_gauge, *param);
+  cpuGaugeField cpuGauge(gauge_param);
+  cudaGaugeField *cudaGauge = NULL;
   switch (param->type) {
   case QUDA_WILSON_LINKS:
-    gauge = &cudaGaugePrecise;
+    cudaGauge = gaugePrecise;
     break;
   case QUDA_ASQTAD_FAT_LINKS:
-    gauge = &cudaFatLinkPrecise;
+    cudaGauge = gaugeFatPrecise;
     break;
   case QUDA_ASQTAD_LONG_LINKS:
-    gauge = &cudaLongLinkPrecise;
+    cudaGauge = gaugeLongPrecise;
     break;
   default:
     errorQuda("Invalid gauge type");   
   }
 
-  restoreGaugeField(h_gauge, gauge, param->cpu_prec, param->gauge_order);*/
+  cudaGauge->saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
 }
 
 
