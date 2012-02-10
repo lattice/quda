@@ -78,6 +78,12 @@ extern "C"{
 			     cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 			     QudaGaugeParam* param, double* act_path_coeff,
 			     llfat_kernel_param_t kparam);
+
+
+  void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
+                        QudaGaugeParam* qudaGaugeParam, QudaComputeFatMethod method,
+                        cudaGaugeField* cudaFatLink, struct timeval time_array[]);
+
 #ifdef __cplusplus
 }
 #endif
