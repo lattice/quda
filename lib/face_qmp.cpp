@@ -270,14 +270,10 @@ void FaceBuffer::commsStart(int dir) {
 
 int FaceBuffer::commsQuery(int dir) {
 
+#ifdef QMP_COMMS
+
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return 0;
-
-  /*printf("%d %d %d %d %d\n", dir, dim,
-	 QMP_is_complete(mh_send_back[dim]),
-	 QMP_is_complete(mh_from_fwd[dim]),
-	 QMP_is_complete(mh_send_fwd[dim]),
-	 QMP_is_complete(mh_from_back[dim]));*/
 
   if (dir%2==0) {// receive from forwards
     if (QMP_is_complete(mh_send_back[dim]) == QMP_TRUE &&
@@ -296,8 +292,13 @@ int FaceBuffer::commsQuery(int dir) {
       return 1;
     }
   }
-
   return 0;
+
+#else // no communications so just return true
+
+  return 1;
+
+#endif
 }
 
 void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir)
