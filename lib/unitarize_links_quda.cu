@@ -7,6 +7,7 @@
 
 #include "quda_matrix.h"
 #include "svd_quda.h"
+#include <hisq_links_quda.h>
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
@@ -17,16 +18,15 @@ __constant__ int DEV_MAX_ITER = 20;
 
 static int HOST_MAX_ITER = 20;
 
-__constant__ double DEV_HISQ_UNITARIZE_EPS;
-__constant__ double DEV_HISQ_FORCE_FILTER;
-__constant__ double DEV_MAX_DET_ERROR;
-__constant__ bool DEV_REUNIT_ALLOW_SVD;
-__constant__ bool DEV_REUNIT_SVD_ONLY;
-__constant__ double DEV_REUNIT_SVD_REL_ERROR;
-__constant__ double DEV_REUNIT_SVD_ABS_ERROR;
+__constant__ double DEV_HISQ_UNITARIZE_EPS = 1e-6;
+__constant__ double DEV_MAX_DET_ERROR = 1e-9;
+__constant__ bool DEV_REUNIT_ALLOW_SVD = true;
+__constant__ bool DEV_REUNIT_SVD_ONLY = false;
+__constant__ double DEV_REUNIT_SVD_REL_ERROR = 1e-6;
+__constant__ double DEV_REUNIT_SVD_ABS_ERROR = 1e-6;
+
 
 static double HOST_HISQ_UNITARIZE_EPS;
-static double HOST_HISQ_FORCE_FILTER;
 static double HOST_MAX_DET_ERROR;
 static bool   HOST_REUNIT_ALLOW_SVD;
 static bool   HOST_REUNIT_SVD_ONLY;
@@ -72,11 +72,16 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 			        double max_error)	
 {
   Matrix<Cmplx,3> temporary; 
-  temporary = conj(initial_matrix)*unitary_matrix*unitary_matrix - initial_matrix;
+  //temporary = conj(initial_matrix)*unitary_matrix*unitary_matrix - initial_matrix;
+  temporary = conj(initial_matrix)*unitary_matrix;
+
+  temporary = temporary*temporary - conj(initial_matrix)*initial_matrix;
    
   for(int i=0; i<3; ++i){
     for(int j=0; j<3; ++j){
-	if( fabs(temporary(i,j).x) > max_error || fabs(temporary(i,j).y) > max_error) return false;
+	if( fabs(temporary(i,j).x) > max_error || fabs(temporary(i,j).y) > max_error){
+	 return false;
+	}
     }
   }
   return true;
@@ -251,7 +256,7 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 #define REUNIT_SVD_ONLY HOST_REUNIT_SVD_ONLY
 #endif
     if( !REUNIT_SVD_ONLY ){
-      if( reciprocalRoot<Cmplx>(in,&u) ){
+      if( reciprocalRoot<Cmplx>(conj(in)*in,&u) ){
 	*result = in*u;
 	return true;
       }
@@ -268,8 +273,12 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 #endif
     // Finally, check that the absolute value of the determinant does not 
     // differ significantly from one.
+    // We could be more rigorous by explicitly checking the unitarity of the 
+    // matrix, or, even more stringently, by verifying that W = V/sqrt(V^{dagger} V).
     const Cmplx det = getDeterminant(*result);
-    if( (fabs(det.x)+fabs(det.y)-1.0) > MAX_DET_ERROR) return false;
+    if( cabs(det)-1.0 > MAX_DET_ERROR){ 
+      return false;
+    }
     return true;
 #undef MAX_DET_ERROR
   } // unitarizeMILC
@@ -285,7 +294,7 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 
 	*result = u*conj(v);
 
-	if(isUnitarizedLinkConsistent(in,*result,0.0000001)==false)
+	if(isUnitary(*result,0.0000001)==false)
 	{
 #if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
           printf("ERROR: Unitarized link is not consistent with incoming link\n");
@@ -313,6 +322,7 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
          computeMatrixInverse(u, &uinv);
 	 u = 0.5*(u + conj(uinv));
       }
+
 #undef MAX_ITER	
       if(isUnitarizedLinkConsistent(in,u,0.0000001)==false)
       {
@@ -352,19 +362,16 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 
     // Unitarization is always done in double precision
     Matrix<double2,3> v, result;
-    
     for(int dir=0; dir<4; ++dir){
-      loadLinkVariableFromArray(inlink, dir, mem_idx, Vh+INPUT_PADDING, &v); // no padding for the time being
-
-      if( !unitarizeLinkNewton(v, &result) ){
+      loadLinkVariableFromArray(inlink, dir, mem_idx, Vh+INPUT_PADDING, &v); 
+       if( !unitarizeLinkMILC(v, &result) ){
 #if __CUDA_ARCH__
-	atomicAdd(num_failures,1);
-#else	
+	atomicAdd(num_failures, 1);
+#else 
 	(*num_failures)++;
 #endif
       }
-      writeLinkVariableToArray(v, dir, mem_idx, Vh+OUTPUT_PADDING, outlink); // need to address this!
-   //   writeLinkVariableToArray(result, dir, mem_idx, Vh+OUTPUT_PADDING, outlink); // need to address this!
+      writeLinkVariableToArray(result, dir, mem_idx, Vh+OUTPUT_PADDING, outlink); 
     }
     
     return;
@@ -377,6 +384,9 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
     dim3 gridDim(infield.Volume()/BLOCK_DIM,1,1);
     dim3 blockDim(BLOCK_DIM,1,1); 
 
+
+    checkCudaError();
+
     if(param.cuda_prec == QUDA_SINGLE_PRECISION){
       getUnitarizedField<<<gridDim,blockDim>>>((float2*)infield.Even_p(), (float2*)infield.Odd_p(),
 					       (float2*)outfield->Even_p(), (float2*)outfield->Odd_p(),
@@ -387,6 +397,8 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 					       (double2*)outfield->Even_p(), (double2*)outfield->Odd_p(),
 					       num_failures);
     }
+
+    checkCudaError();
     return;
   } // unitarize_links_cuda
 

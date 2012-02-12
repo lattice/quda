@@ -19,6 +19,8 @@
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
+#include <hisq_links_quda.h>
+
 
 #include <cuda.h>
 #ifdef MULTI_GPU
@@ -1725,14 +1727,15 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   
  // create the device fatlink
   if(cudaFatLink == NULL){
-	  gParam.pad    = qudaGaugeParam->llfat_ga_pad;
+    gParam.pad    = qudaGaugeParam->llfat_ga_pad;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
     gParam.order = QUDA_QDP_GAUGE_ORDER;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     cudaFatLink = new cudaGaugeField(gParam);
   }
-  
+
+
 
   // create the host sitelink	
   if(cpuSiteLink == NULL){
@@ -1805,7 +1808,9 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   
   // Actually do the fattening
   computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, cudaFatLink, time_array);
-  
+ 
+
+ 
   gettimeofday(&t9, NULL);
   storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
   gettimeofday(&t10, NULL);

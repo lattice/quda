@@ -20,7 +20,8 @@ BUILD_CLOVER_DIRAC = @BUILD_CLOVER_DIRAC@       	# build clover Dirac operators?
 BUILD_DOMAIN_WALL_DIRAC = @BUILD_DOMAIN_WALL_DIRAC@   	# build domain wall Dirac operators?
 BUILD_STAGGERED_DIRAC = @BUILD_STAGGERED_DIRAC@		# build staggered Dirac operators?
 BUILD_TWISTED_MASS_DIRAC = @BUILD_TWISTED_MASS_DIRAC@	# build twisted mass Dirac operators?
-BUILD_FATLINK = @BUILD_FATLINK@             	# build code for computing asqtad fat links?
+BUILD_FATLINK = @BUILD_FATLINK@             		# build code for computing asqtad fat links?
+BUILD_HISQLINK = @BUILD_HISQLINK@			# build code for computing hisq fat links?
 BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@         	# build code for (1-loop Symanzik) gauge force?
 BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@	      	# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@			# build code for hisq fermion force?
@@ -153,6 +154,16 @@ ifeq ($(strip $(BUILD_FATLINK)), yes)
   FATLINK_TEST=llfat_test
   COPT += -DGPU_FATLINK
   FATLINK_QUDA_ITF=llfat_quda_itf.o
+endif
+ifeq ($(strip $(BUILD_HISQLINK)), yes)
+  ifneq ($(strip $(BUILD_FATLINK)), yes) 
+    NVCCOPT += -DGPU_FATLINK
+    COPT    += -DGPU_FATLINK
+    FATLINK_TEST=llfat_test
+    FATLINK_QUDA_ITF=llfat_quda_itf.o
+  endif
+  NVCCOPT += -DGPU_UNITARIZE
+  COPT    += -DGPU_UNITARIZE
 endif
 ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   NVCCOPT += -DGPU_GAUGE_FORCE
