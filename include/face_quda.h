@@ -88,6 +88,7 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 #define YDOWN 6
 #define XDOWN 7
 
+
 class FaceBuffer {
 
  private:
@@ -122,9 +123,9 @@ class FaceBuffer {
   void* pageable_fwd_nbr_spinor[QUDA_MAX_DIM];
   void* pageable_back_nbr_spinor[QUDA_MAX_DIM];
   
-  unsigned long recv_request1[QUDA_MAX_DIM], recv_request2[QUDA_MAX_DIM];
-  unsigned long send_request1[QUDA_MAX_DIM], send_request2[QUDA_MAX_DIM];
-
+  void* recv_request1[QUDA_MAX_DIM], *recv_request2[QUDA_MAX_DIM];
+  void* send_request1[QUDA_MAX_DIM], *send_request2[QUDA_MAX_DIM];
+  
   void setupDims(const int *X);
   
  public:

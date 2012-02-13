@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <mpicomm.h>
+#include <mpi.h>
 #include <cuda.h>
 
 #include <fat_force_quda.h>
@@ -41,11 +42,18 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
 
+  
+  for(int i=0;i < QUDA_MAX_DIM; i++){
+    recv_request1[i] = malloc(sizeof(MPI_Request));
+    recv_request2[i] = malloc(sizeof(MPI_Request));
+    send_request1[i] = malloc(sizeof(MPI_Request));    
+    send_request2[i] = malloc(sizeof(MPI_Request));    
+    if( recv_request1[i] == 0 || recv_request2[i] == 0
+	|| send_request1[i] == 0 || send_request2[i] == 0){
+      errorQuda("ERROR: malloc failed for recv/send request handles\n");
+    }
+  }
 
-  memset(send_request1, 0, sizeof(send_request1));
-  memset(send_request1, 0, sizeof(recv_request1));
-  memset(send_request1, 0, sizeof(send_request2));
-  memset(send_request1, 0, sizeof(recv_request1));
   for(int dir =0 ; dir < 4;dir++){
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
     if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
@@ -112,6 +120,14 @@ void FaceBuffer::setupDims(const int* X)
 
 FaceBuffer::~FaceBuffer()
 {
+  
+  for(int i=0;i < QUDA_MAX_DIM; i++){
+    free((void*)recv_request1[i]);
+    free((void*)recv_request2[i]);
+    free((void*)send_request1[i]);
+    free((void*)send_request2[i]);
+  }
+
   for(int dir =0; dir < 4; dir++){
     if(fwd_nbr_spinor_sendbuf[dir]) {
       cudaFreeHost(fwd_nbr_spinor_sendbuf[dir]);
@@ -174,14 +190,14 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity,
     int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
     int uptags[4] = {XUP, YUP, ZUP, TUP};
     // Prepost all receives
-    recv_request1[dim] = comm_recv_with_tag(pageable_back_nbr_spinor[dim], nbytes[dim], back_nbr[dim], uptags[dim]);
+    comm_recv_with_tag(pageable_back_nbr_spinor[dim], nbytes[dim], back_nbr[dim], uptags[dim], recv_request1[dim]);
     
     // gather for backwards send
     in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim + sendBackStrmIdx]);
   } else { // forwards send
     int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
     int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
-    recv_request2[dim] = comm_recv_with_tag(pageable_fwd_nbr_spinor[dim], nbytes[dim], fwd_nbr[dim], downtags[dim]);
+    comm_recv_with_tag(pageable_fwd_nbr_spinor[dim], nbytes[dim], fwd_nbr[dim], downtags[dim], recv_request2[dim]);
     
     // gather for forwards send
     in.packGhost(dim, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim + sendFwdStrmIdx]);
@@ -211,7 +227,7 @@ void FaceBuffer::commsStart(int dir) {
     memcpy(pageable_back_nbr_spinor_sendbuf[dim], 
 	   back_nbr_spinor_sendbuf[dim], nbytes[dim]);
 #endif
-    send_request2[dim] = comm_send_with_tag(pageable_back_nbr_spinor_sendbuf[dim], nbytes[dim], back_nbr[dim], downtags[dim]);
+    comm_send_with_tag(pageable_back_nbr_spinor_sendbuf[dim], nbytes[dim], back_nbr[dim], downtags[dim], send_request2[dim]);
   } else {
     int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
     int uptags[4] = {XUP, YUP, ZUP, TUP};
@@ -219,7 +235,7 @@ void FaceBuffer::commsStart(int dir) {
     memcpy(pageable_fwd_nbr_spinor_sendbuf[dim], 
 	   fwd_nbr_spinor_sendbuf[dim], nbytes[dim]);
 #endif
-    send_request1[dim]= comm_send_with_tag(pageable_fwd_nbr_spinor_sendbuf[dim], nbytes[dim], fwd_nbr[dim], uptags[dim]);
+    comm_send_with_tag(pageable_fwd_nbr_spinor_sendbuf[dim], nbytes[dim], fwd_nbr[dim], uptags[dim], send_request1[dim]);
   }
 }
 
@@ -231,8 +247,6 @@ int FaceBuffer::commsQuery(int dir) {
   if(dir%2==0) {
     if (comm_query(recv_request2[dim]) && 
 	comm_query(send_request2[dim])) {
-      comm_free(recv_request2[dim]);
-      comm_free(send_request2[dim]);
 #ifndef GPU_DIRECT
       memcpy(fwd_nbr_spinor[dim], pageable_fwd_nbr_spinor[dim], nbytes[dim]);
 #endif
@@ -241,8 +255,6 @@ int FaceBuffer::commsQuery(int dir) {
   } else {
     if (comm_query(recv_request1[dim]) &&
 	comm_query(send_request1[dim])) {
-      comm_free(recv_request1[dim]);
-      comm_free(send_request1[dim]);
 #ifndef GPU_DIRECT
       memcpy(back_nbr_spinor[dim], pageable_back_nbr_spinor[dim], nbytes[dim]);
 #endif
@@ -283,18 +295,16 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
     spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, (QudaParity)oddBit, dagger);
   }
 
-  unsigned long recv_request1[4], recv_request2[4];
-  unsigned long send_request1[4], send_request2[4];
   int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
   int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
   for(int i= 0;i < 4; i++){
-    recv_request1[i] = comm_recv_with_tag(spinor.backGhostFaceBuffer[i], len[i], back_nbr[i], uptags[i]);
-    recv_request2[i] = comm_recv_with_tag(spinor.fwdGhostFaceBuffer[i], len[i], fwd_nbr[i], downtags[i]);    
-    send_request1[i]= comm_send_with_tag(spinor.fwdGhostFaceSendBuffer[i], len[i], fwd_nbr[i], uptags[i]);
-    send_request2[i] = comm_send_with_tag(spinor.backGhostFaceSendBuffer[i], len[i], back_nbr[i], downtags[i]);
+    comm_recv_with_tag(spinor.backGhostFaceBuffer[i], len[i], back_nbr[i], uptags[i], recv_request1[i]);
+    comm_recv_with_tag(spinor.fwdGhostFaceBuffer[i], len[i], fwd_nbr[i], downtags[i], recv_request2[i]);    
+    comm_send_with_tag(spinor.fwdGhostFaceSendBuffer[i], len[i], fwd_nbr[i], uptags[i], send_request1[i]);
+    comm_send_with_tag(spinor.backGhostFaceSendBuffer[i], len[i], back_nbr[i], downtags[i], send_request2[i]);
   }
 
   for(int i=0;i < 4;i++){
@@ -315,12 +325,12 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
   for(int dir =0; dir < 4; dir++)
     {
       int len = 2*nFace*faceVolumeCB[dir]*Ninternal;
-      unsigned long recv_request = 
-	comm_recv_with_tag(ghost_link[dir], len*precision, back_nbrs[dir], uptags[dir]);
-      unsigned long send_request = 
-	comm_send_with_tag(link_sendbuf[dir], len*precision, fwd_nbrs[dir], uptags[dir]);
-      comm_wait(recv_request);
-      comm_wait(send_request);
+      MPI_Request recv_request; 
+	comm_recv_with_tag(ghost_link[dir], len*precision, back_nbrs[dir], uptags[dir], &recv_request);
+      MPI_Request send_request;
+	comm_send_with_tag(link_sendbuf[dir], len*precision, fwd_nbrs[dir], uptags[dir], &send_request);
+      comm_wait(&recv_request);
+      comm_wait(&send_request);
     }
 }
 
@@ -389,10 +399,10 @@ static int Vh;
 static int Vs[4], Vsh[4];
 static int Vs_x, Vs_y, Vs_z, Vs_t;
 static int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
-static unsigned long llfat_send_request1[4];
-static unsigned long llfat_recv_request1[4];
-static unsigned long llfat_send_request2[4];
-static unsigned long llfat_recv_request2[4];
+static MPI_Request llfat_send_request1[4];
+static MPI_Request llfat_recv_request1[4];
+static MPI_Request llfat_send_request2[4];
+static MPI_Request llfat_recv_request2[4];
 
 #include "gauge_field.h"
 extern void setup_dims_in_gauge(int *XX);
@@ -527,15 +537,17 @@ exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag, i
       dx[nu]=-1;
       dx[mu]=+1;
       int src_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
-      unsigned long recv_request = comm_recv_from_rank(ghost_sitelink_diag[nu*4+mu], len, src_rank);
+      MPI_Request recv_request;
+      comm_recv_from_rank(ghost_sitelink_diag[nu*4+mu], len, src_rank, &recv_request);
       //do send
       dx[nu]=+1;
       dx[mu]=-1;
       int dst_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
-      unsigned long send_request = comm_send_to_rank(sendbuf, len, dst_rank);
+      MPI_Request send_request;
+      comm_send_to_rank(sendbuf, len, dst_rank, &send_request);
       
-      comm_wait(recv_request);
-      comm_wait(send_request);
+      comm_wait(&recv_request);
+      comm_wait(&send_request);
             
       free(sendbuf);
     }//mu
@@ -602,14 +614,18 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
     Float* ghost_sitelink_back = ghost_sitelink[dir];
     Float* ghost_sitelink_fwd = ghost_sitelink[dir] + 8*Vsh[dir]*gaugeSiteSize;
     
-    unsigned long recv_request1 = comm_recv_with_tag(ghost_sitelink_back, 8*len, back_neighbors[dir], up_tags[dir]);
-    unsigned long recv_request2 = comm_recv_with_tag(ghost_sitelink_fwd, 8*len, fwd_neighbors[dir], down_tags[dir]);
-    unsigned long send_request1 = comm_send_with_tag(sitelink_fwd_sendbuf[dir], 8*len, fwd_neighbors[dir], up_tags[dir]);
-    unsigned long send_request2 = comm_send_with_tag(sitelink_back_sendbuf[dir], 8*len, back_neighbors[dir], down_tags[dir]);
-    comm_wait(recv_request1);
-    comm_wait(recv_request2);
-    comm_wait(send_request1);
-    comm_wait(send_request2);
+    MPI_Request recv_request1;
+    MPI_Request recv_request2;
+    comm_recv_with_tag(ghost_sitelink_back, 8*len, back_neighbors[dir], up_tags[dir], &recv_request1);
+    comm_recv_with_tag(ghost_sitelink_fwd, 8*len, fwd_neighbors[dir], down_tags[dir], &recv_request2);
+    MPI_Request send_request1; 
+    MPI_Request send_request2;
+    comm_send_with_tag(sitelink_fwd_sendbuf[dir], 8*len, fwd_neighbors[dir], up_tags[dir], &send_request1);
+    comm_send_with_tag(sitelink_back_sendbuf[dir], 8*len, back_neighbors[dir], down_tags[dir], &send_request2);
+    comm_wait(&recv_request1);
+    comm_wait(&recv_request2);
+    comm_wait(&send_request1);
+    comm_wait(&send_request2);
   }
 
   exchange_sitelink_diag(X, sitelink, ghost_sitelink_diag, optflag);
@@ -737,8 +753,8 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
   int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
-  unsigned long recv_request1[4], recv_request2[4];
-  unsigned long send_request1[4], send_request2[4];
+  MPI_Request recv_request1[4], recv_request2[4];
+  MPI_Request send_request1[4], send_request2[4];
   
   int gaugebytes = gaugeSiteSize*gPrecision;
   int a, b, c,d;
@@ -803,16 +819,16 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 	      }//linkdir	
 	    }//c
       
-      recv_request1[dir] = comm_recv_with_tag(ghost_sitelink_back[dir], len[dir], back_nbr[dir], uptags[dir]);
-      recv_request2[dir] = comm_recv_with_tag(ghost_sitelink_fwd[dir], len[dir], fwd_nbr[dir], downtags[dir]);
-      send_request1[dir] = comm_send_with_tag(ghost_sitelink_fwd_sendbuf[dir], len[dir], fwd_nbr[dir], uptags[dir]);
-      send_request2[dir] = comm_send_with_tag(ghost_sitelink_back_sendbuf[dir], len[dir], back_nbr[dir], downtags[dir]);    
+      comm_recv_with_tag(ghost_sitelink_back[dir], len[dir], back_nbr[dir], uptags[dir], &recv_request1[dir]);
+      comm_recv_with_tag(ghost_sitelink_fwd[dir], len[dir], fwd_nbr[dir], downtags[dir], &recv_request2[dir]);
+      comm_send_with_tag(ghost_sitelink_fwd_sendbuf[dir], len[dir], fwd_nbr[dir], uptags[dir], &send_request1[dir]);
+      comm_send_with_tag(ghost_sitelink_back_sendbuf[dir], len[dir], back_nbr[dir], downtags[dir], &send_request2[dir]);    
       
       //need the messages to be here before we can send the next messages
-      comm_wait(recv_request1[dir]);
-      comm_wait(recv_request2[dir]);
-      comm_wait(send_request1[dir]);
-      comm_wait(send_request2[dir]);
+      comm_wait(&recv_request1[dir]);
+      comm_wait(&recv_request2[dir]);
+      comm_wait(&send_request1[dir]);
+      comm_wait(&send_request2[dir]);
     }//if
 
     //use the messages to fill the sitelink data
@@ -1019,15 +1035,19 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
     Float* ghost_staple_back = ghost_staple[dir];
     Float* ghost_staple_fwd = ghost_staple[dir] + 2*Vsh[dir]*gaugeSiteSize;
     
-    unsigned long recv_request1 = comm_recv_with_tag(ghost_staple_back, 2*len[dir], back_neighbors[dir], up_tags[dir]);
-    unsigned long recv_request2 = comm_recv_with_tag(ghost_staple_fwd, 2*len[dir], fwd_neighbors[dir], down_tags[dir]);
-    unsigned long send_request1 = comm_send_with_tag(staple_fwd_sendbuf[dir], 2*len[dir], fwd_neighbors[dir], up_tags[dir]);
-    unsigned long send_request2 = comm_send_with_tag(staple_back_sendbuf[dir], 2*len[dir], back_neighbors[dir], down_tags[dir]);
+    MPI_Request recv_request1;  
+    MPI_Request recv_request2;  
+    MPI_Request send_request1; 
+    MPI_Request send_request2; 
+    comm_recv_with_tag(ghost_staple_back, 2*len[dir], back_neighbors[dir], up_tags[dir], &recv_request1);
+    comm_recv_with_tag(ghost_staple_fwd, 2*len[dir], fwd_neighbors[dir], down_tags[dir], &recv_request2);
+    comm_send_with_tag(staple_fwd_sendbuf[dir], 2*len[dir], fwd_neighbors[dir], up_tags[dir], &send_request1);
+    comm_send_with_tag(staple_back_sendbuf[dir], 2*len[dir], back_neighbors[dir], down_tags[dir], &send_request2);
     
-    comm_wait(recv_request1);
-    comm_wait(recv_request2);
-    comm_wait(send_request1);
-    comm_wait(send_request2);
+    comm_wait(&recv_request1);
+    comm_wait(&recv_request2);
+    comm_wait(&send_request1);
+    comm_wait(&send_request2);
   }
 }
 //this function is used for link fattening computation
@@ -1116,21 +1136,21 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
   
   if(recv_whichway == QUDA_BACKWARDS){   
 #ifdef GPU_DIRECT
-    llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple[i], len, back_neighbors[i], up_tags[i]);
-    llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf[i], len, fwd_neighbors[i],  up_tags[i]);
+    comm_recv_with_tag(back_nbr_staple[i], len, back_neighbors[i], up_tags[i], &llfat_recv_request1[i]);
+    comm_send_with_tag(fwd_nbr_staple_sendbuf[i], len, fwd_neighbors[i],  up_tags[i], &llfat_send_request1[i]);
 #else
-    llfat_recv_request1[i] = comm_recv_with_tag(back_nbr_staple_cpu[i], len, back_neighbors[i], up_tags[i]);
+    comm_recv_with_tag(back_nbr_staple_cpu[i], len, back_neighbors[i], up_tags[i], &llfat_recv_request1[i]);
     memcpy(fwd_nbr_staple_sendbuf_cpu[i], fwd_nbr_staple_sendbuf[i], len);
-    llfat_send_request1[i] = comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i]);
+    comm_send_with_tag(fwd_nbr_staple_sendbuf_cpu[i], len, fwd_neighbors[i],  up_tags[i], &llfat_send_request1[i]);
 #endif
   } else { // QUDA_FORWARDS
 #ifdef GPU_DIRECT
-    llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple[i], len, fwd_neighbors[i], down_tags[i]);
-    llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf[i], len, back_neighbors[i] ,down_tags[i]);
+    comm_recv_with_tag(fwd_nbr_staple[i], len, fwd_neighbors[i], down_tags[i], &llfat_recv_request2[i]);
+    comm_send_with_tag(back_nbr_staple_sendbuf[i], len, back_neighbors[i] ,down_tags[i], &llfat_send_request2[i]);
 #else
-    llfat_recv_request2[i] = comm_recv_with_tag(fwd_nbr_staple_cpu[i], len, fwd_neighbors[i], down_tags[i]);
+    comm_recv_with_tag(fwd_nbr_staple_cpu[i], len, fwd_neighbors[i], down_tags[i], &llfat_recv_request2[i]);
     memcpy(back_nbr_staple_sendbuf_cpu[i], back_nbr_staple_sendbuf[i], len);
-    llfat_send_request2[i] = comm_send_with_tag(back_nbr_staple_sendbuf_cpu[i], len, back_neighbors[i] ,down_tags[i]);
+    comm_send_with_tag(back_nbr_staple_sendbuf_cpu[i], len, back_neighbors[i] ,down_tags[i], &llfat_send_request2[i]);
 #endif
   }
 }
@@ -1162,8 +1182,8 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
   int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   
-    comm_wait(llfat_recv_request1[i]);
-    comm_wait(llfat_send_request1[i]);
+    comm_wait(&llfat_recv_request1[i]);
+    comm_wait(&llfat_send_request1[i]);
 
 #ifdef GPU_DIRECT
     unpackGhostStaple(X, even, odd, volume, prec, stride, 
@@ -1175,8 +1195,8 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
 #endif
 
   } else { // QUDA_FORWARDS
-    comm_wait(llfat_recv_request2[i]);  
-    comm_wait(llfat_send_request2[i]);
+    comm_wait(&llfat_recv_request2[i]);  
+    comm_wait(&llfat_send_request2[i]);
 
 #ifdef GPU_DIRECT
     unpackGhostStaple(X, even, odd, volume, prec, stride, 
