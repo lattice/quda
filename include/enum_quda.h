@@ -19,6 +19,8 @@ extern "C" {
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
 
+  
+
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,
     QUDA_FLOAT2_GAUGE_ORDER = 2, // no reconstruct and double precision
@@ -273,6 +275,14 @@ extern "C" {
     QUDA_COMPUTE_FAT_EXTENDED_VOLUME,
     QUDA_COMPUTE_FAT_INVALID=  QUDA_INVALID_ENUM
   }QudaComputeFatMethod;
+
+  typedef enum QudaFatLinkFlag_s{
+    QUDA_FAT_PRESERVE_CPU_GAUGE=1,
+    QUDA_FAT_PRESERVE_GPU_GAUGE=2,
+
+    QUDA_FAT_PRESERVE_COMM_MEM=4,
+  }QudaFatLinkFlag;
+
 #ifdef __cplusplus
 }
 #endif

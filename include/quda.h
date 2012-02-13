@@ -43,6 +43,9 @@ extern "C" {
     int packed_size;
     double gaugeGiB;
 
+    int flag;  //generic flag. In fatlink computation, it is used to indicate 
+	       //whether to preserve gauge field or not
+    
   } QudaGaugeParam;
 
   typedef struct QudaInvertParam_s {

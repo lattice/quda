@@ -340,6 +340,7 @@ gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPre
 	update_mom((fanti_hermitmat*)refMom, dir, (fsu3_matrix*)sitelink, (fsu3_matrix*)staple, (float)eb3);
     }
     
+    free(staple);
 }
 
 

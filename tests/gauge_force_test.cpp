@@ -133,6 +133,9 @@ gauge_force_end()
   
   delete cudaSiteLink;
   delete cudaMom;
+  delete refMom;
+  
+  endQuda();
 }
 
 
@@ -586,6 +589,11 @@ gauge_force_test(void)
     double perf = 1.0* flops*volume/(secs*1024*1024*1024);
     printf("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
     
+    for(i=0;i < num_paths; i++){
+      free(input_path[i]);
+    }
+    free(input_path);
+
     gauge_force_end();
 
     if (res == 0){//failed

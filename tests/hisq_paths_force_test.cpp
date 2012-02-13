@@ -15,6 +15,7 @@
 
 using namespace hisq::fermion_force;
 
+extern void usage(char** argv);
 static int device = 0;
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField  *cpuGauge  = NULL;
@@ -174,12 +175,17 @@ hisq_force_end()
   delete cudaMom;
   delete cudaForce;
   delete cudaGauge;
+  delete cudaOprod;
+  freeHwQuda(cudaHw);
+
   delete cpuGauge;
   delete cpuForce;
   delete cpuMom;
   delete refMom;
-  delete cpuOprod;
+  delete cpuOprod;  
   free(hw);
+
+  endQuda();
 
   return;
 }
@@ -231,7 +237,7 @@ hisq_force_test()
   if (verify_results){
     if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
       const float eps = 0.5;
-    halfwilson_hisq_force_reference(eps, weight, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
+      halfwilson_hisq_force_reference(eps, weight, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
     }else if(cpu_hw_prec == QUDA_DOUBLE_PRECISION){
       const double eps = 0.5;
       halfwilson_hisq_force_reference(eps, d_weight, d_act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
@@ -242,11 +248,7 @@ hisq_force_test()
   bool shouldCompute = true;
   gettimeofday(&t0, NULL);
   
-  if(hw_prec == QUDA_SINGLE_PRECISION){
-    hisq_staples_force_cuda(act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
-  }else{
-    hisq_staples_force_cuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
-  }
+  hisq_staples_force_cuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
 
   cudaThreadSynchronize();
   checkCudaError();
@@ -282,22 +284,13 @@ display_test_info()
     
 }
 
-static void
-usage(char** argv )
+void
+usage_extra(char** argv )
 {
-  printf("Usage: %s <args>\n", argv[0]);
-  printf("  --device <dev_id>               Set which device to run on\n");
-  printf("  --prec <double/single/half>     precision\n"); 
-  printf("  --recon <8/12/18>               Link reconstruction type\n"); 
-  printf("  --sdim <n>                      Set spacial dimention\n");
-  printf("  --tdim                          Set T dimention size(default 4)\n"); 
-  printf("  --sdim                          Set spatial dimension size(default 4)\n"); 
-  printf("  --verify                        Verify the GPU results using CPU results\n");
-  printf("  --help                          Print out this message\n"); 
-  exit(1);
+  printf("Extra options: \n");
+  printf("    --verify                                  # Verify the GPU results using CPU results\n");
   return ;
 }
-
 int 
 main(int argc, char **argv) 
 {
@@ -306,21 +299,7 @@ main(int argc, char **argv)
 	
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
-    }
-    
-
-    if( strcmp(argv[i], "--device") == 0){
-        if (i+1 >= argc){
-                usage(argv);
-            }
-            device =  atoi(argv[i+1]);
-            if (device < 0){
-                fprintf(stderr, "Error: invalid device number(%d)\n", device);
-                exit(1);
-            }
-            i++;
-            continue;
-    }
+    }    
 
     if( strcmp(argv[i], "--verify") == 0){
       verify_results=1;

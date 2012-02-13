@@ -22,7 +22,8 @@
 #define MassNormalization QudaMassNormalization
 #define PreserveSource QudaPreserveSource
 #define DagType QudaDagType
-
+#define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
+#define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>
 #include <quda.h>
 #include <util_quda.h>

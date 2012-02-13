@@ -615,27 +615,6 @@
   // end of macros specific to hisq routines
 
 
-#define SU3_PROJECTOR(va, vb, m)                               \
-   m##00_re = va##0_re * vb##0_re + va##0_im * vb##0_im;       \
-  m##00_im = va##0_im * vb##0_re - va##0_re * vb##0_im;         \
-  m##01_re = va##0_re * vb##1_re + va##0_im * vb##1_im;         \
-  m##01_im = va##0_im * vb##1_re - va##0_re * vb##1_im;         \
-  m##02_re = va##0_re * vb##2_re + va##0_im * vb##2_im;         \
-  m##02_im = va##0_im * vb##2_re - va##0_re * vb##2_im;         \
-  m##10_re = va##1_re * vb##0_re + va##1_im * vb##0_im;         \
-  m##10_im = va##1_im * vb##0_re - va##1_re * vb##0_im;         \
-  m##11_re = va##1_re * vb##1_re + va##1_im * vb##1_im;         \
-  m##11_im = va##1_im * vb##1_re - va##1_re * vb##1_im;         \
-  m##12_re = va##1_re * vb##2_re + va##1_im * vb##2_im;         \
-  m##12_im = va##1_im * vb##2_re - va##1_re * vb##2_im;         \
-  m##20_re = va##2_re * vb##0_re + va##2_im * vb##0_im;         \
-  m##20_im = va##2_im * vb##0_re - va##2_re * vb##0_im;         \
-  m##21_re = va##2_re * vb##1_re + va##2_im * vb##1_im;         \
-  m##21_im = va##2_im * vb##1_re - va##2_re * vb##1_im;         \
-  m##22_re = va##2_re * vb##2_re + va##2_im * vb##2_im;         \
-  m##22_im = va##2_im * vb##2_re - va##2_re * vb##2_im;
-
-
 #define SCALAR_MULT_ADD_MATRIX(a, b, scalar, c) do{ \
     c##00_re = a##00_re + scalar*b##00_re;  \
     c##00_im = a##00_im + scalar*b##00_im;  \

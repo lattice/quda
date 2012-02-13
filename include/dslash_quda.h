@@ -36,6 +36,8 @@ void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
 void initCloverConstants(const int cl_stride);
 void initDomainWallConstants(const int Ls);
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
+void initGaugeFieldConstants(const cudaGaugeField &gauge);
+
 
 // plain Wilson Dslash  
 void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
@@ -75,7 +77,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const QudaTwistGamma5Type, const TuneParam &);
 
 // face packing routines
-void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
-		    const int parity, const cudaStream_t &stream);
+void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
+	      const int parity, const cudaStream_t &stream);
 
 #endif // _DSLASH_QUDA_H

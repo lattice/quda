@@ -280,7 +280,7 @@ namespace hisq{
   // as a complex matrix
   template<class Cmplx>
     DEVICEHOST
-    void getRealBidiagMatrix(Matrix<Cmplx,3> & mat, 
+    void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat, 
         Matrix<Cmplx,3> & u,
         Matrix<Cmplx,3> & v)
     {
@@ -643,7 +643,7 @@ namespace hisq{
 
   template<class Cmplx>
     DEVICEHOST
-    void computeSVD(Matrix<Cmplx,3> & m, 
+    void computeSVD(const Matrix<Cmplx,3> & m, 
         Matrix<Cmplx,3>&  u,
         Matrix<Cmplx,3>&  v,
         typename RealTypeId<Cmplx>::Type singular_values[3])
@@ -665,7 +665,11 @@ namespace hisq{
       for(int i=0; i<3; ++i){
         singular_values[i] = bd(i,i);
       }
-    
+
+      // Oops, I forgot to do this!
+      u = u*u_real;
+      v = v*v_real;
+
       return;
     }
 

@@ -717,8 +717,69 @@ namespace hisq{
 
       return;
     } 
+  // template this! 
+        void copyArrayToLink(Matrix<float2,3>* link, float* array){
+          for(int i=0; i<3; ++i){
+            for(int j=0; j<3; ++j){
+              (*link)(i,j).x = array[(i*3+j)*2];
+              (*link)(i,j).y = array[(i*3+j)*2 + 1];
+            }
+          }
+          return;
+        }
+	
+	template<class Cmplx, class Real>
+        void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
+          for(int i=0; i<3; ++i){
+            for(int j=0; j<3; ++j){
+              (*link)(i,j).x = array[(i*3+j)*2];
+              (*link)(i,j).y = array[(i*3+j)*2 + 1];
+            }
+          }
+          return;
+        }
+	
+        
+        // and this!
+        void copyLinkToArray(float* array, const Matrix<float2,3>& link){
+          for(int i=0; i<3; ++i){
+            for(int j=0; j<3; ++j){
+              array[(i*3+j)*2] = link(i,j).x;
+              array[(i*3+j)*2 + 1] = link(i,j).y;
+            }
+          }
+          return;
+        }
+
+        // and this!
+	      template<class Cmplx, class Real>
+        void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
+          for(int i=0; i<3; ++i){
+            for(int j=0; j<3; ++j){
+              array[(i*3+j)*2] = link(i,j).x;
+              array[(i*3+j)*2 + 1] = link(i,j).y;
+            }
+          }
+          return;
+        }
 
 
+
+        // and this!
+	template<class Cmplx>
+	__host__ __device__
+        void printLink(Matrix<Cmplx,3>& link){
+          printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
+          printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
+          printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
+          printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
+          printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
+          printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
+          printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
+          printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
+          printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
+          printf("\n");
+        }
 
 } // end namespace hisq
 #endif

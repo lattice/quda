@@ -292,15 +292,12 @@ invert_test(void)
   
   double time0 = -((double)clock()); // Start the timer
   
-  unsigned long volume = Vh;
-  unsigned long nflops=2*1187; //from MILC's CG routine
   double nrm2=0;
   double src2=0;
   int ret = 0;
 
   switch(testtype){
   case 0: //even
-    volume = Vh;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
     invertQuda(out->V(), in->V(), &inv_param);
@@ -323,7 +320,6 @@ invert_test(void)
 
   case 1: //odd
 	
-    volume = Vh;    
     inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
     invertQuda(out->V(), in->V(), &inv_param);	
     time0 += clock(); // stop the timer
@@ -353,7 +349,6 @@ invert_test(void)
 
 #define NUM_OFFSETS 7
         
-    nflops = 2*(1205 + 15* NUM_OFFSETS); //from MILC's multimass CG routine
     double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81};
     double offsets[NUM_OFFSETS];	
     int num_offsets =NUM_OFFSETS;
@@ -375,7 +370,6 @@ invert_test(void)
     }
     
     len=Vh;
-    volume = Vh;      
 
     if (testtype == 3 || testtype == 6){
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
@@ -402,7 +396,7 @@ invert_test(void)
     
     
     printfQuda("checking the solution\n");
-    QudaParity parity;
+    QudaParity parity = QUDA_INVALID_PARITY;
     if (inv_param.solve_type == QUDA_NORMEQ_SOLVE){
       //parity = QUDA_EVENODD_PARITY;
       errorQuda("full parity not supported\n");
@@ -418,7 +412,8 @@ invert_test(void)
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU
       matdagmat_mg4dir(ref, fatlink, longlink, ghost_fatlink, ghost_longlink, 
-		       spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, parity);
+		       spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, 
+		       gaugeParam.cpu_prec, tmp, parity);
 #else
       matdagmat(ref->V(), fatlink, longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
 #endif
@@ -428,8 +423,8 @@ invert_test(void)
       
       printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
-      //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
-      if (sqrt(nrm2/src2) > 100*inv_param.tol){
+      //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+      if (sqrt(nrm2/src2) > 10*inv_param.tol){
 	ret |=1;
       }
     }

@@ -207,7 +207,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   cpuColorSpinorField inField(csParam);
 
   {  // Now do the exchange
-    QudaParity otherParity;
+    QudaParity otherParity = QUDA_INVALID_PARITY;
     if (oddBit == QUDA_EVEN_PARITY) otherParity = QUDA_ODD_PARITY;
     else if (oddBit == QUDA_ODD_PARITY) otherParity = QUDA_EVEN_PARITY;
     else errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);

@@ -222,3 +222,11 @@ void cpuGaugeField::exchangeGhost() const {
   free(send);
 }
 
+void cpuGaugeField::setGauge(void**_gauge)
+{
+  if(create != QUDA_REFERENCE_FIELD_CREATE){
+    errorQuda("Setting gauge pointer is only allowed when cpu gauge"
+	      "is of QUDA_REFERENCE_FIELD_CREATE type\n");
+  }
+  gauge= _gauge;
+}
