@@ -117,6 +117,12 @@ __device__ float2 operator+=(float2 &x, const float2 y) {
   return x;
 }
 
+__device__ double2 operator+=(double2 &x, const double2 y) {
+  x.x += y.x;
+  x.y += y.y;
+  return x;
+}
+
 __device__ float4 operator-=(float4 &x, const float4 y) {
   x.x -= y.x;
   x.y -= y.y;
@@ -995,199 +1001,6 @@ void bindTexture(const cudaColorSpinorField *x, const cudaColorSpinorField *y=0,
       errorQuda("engths do not match: %d %d", a.Length(), b.Length());	\
     }									
 
-__global__ void convertDSKernel(double2 *dst, float4 *src, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    for (int k=0; k<6; k++) {
-      dst[2*k*length+i].x = src[k*length+i].x;
-      dst[2*k*length+i].y = src[k*length+i].y;
-      dst[(2*k+1)*length+i].x = src[k*length+i].z;
-      dst[(2*k+1)*length+i].y = src[k*length+i].w;
-    }
-    i += gridSize;
-  }   
-}
-
-__global__ void convertDSKernel(double2 *dst, float2 *src, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-      for (int k=0; k<3; k++) {
-	  dst[k*length+i].x = src[k*length+i].x;
-	  dst[k*length+i].y = src[k*length+i].y;
-      }
-      i += gridSize;
-  }   
-}
-
-__global__ void convertSDKernel(float4 *dst, double2 *src, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    for (int k=0; k<6; k++) {
-      dst[k*length+i].x = src[2*k*length+i].x;
-      dst[k*length+i].y = src[2*k*length+i].y;
-      dst[k*length+i].z = src[(2*k+1)*length+i].x;
-      dst[k*length+i].w = src[(2*k+1)*length+i].y;
-    }
-    i += gridSize;
-  }   
-}
-
-__global__ void convertSDKernel(float2 *dst, double2 *src, int length) {
-    unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    for (int k=0; k<3; k++) {
-	dst[k*length+i].x = src[k*length+i].x;
-	dst[k*length+i].y = src[k*length+i].y;
-    }
-    i += gridSize;
-  }   
-}
-
-__global__ void convertHSKernel(short4 *h, float *norm, int length, int real_length) {
-
-  int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-
-  while(i < real_length) {
-    float4 F0 = tex1Dfetch(xTexSingle4, i + 0*length);
-    float4 F1 = tex1Dfetch(xTexSingle4, i + 1*length);
-    float4 F2 = tex1Dfetch(xTexSingle4, i + 2*length);
-    float4 F3 = tex1Dfetch(xTexSingle4, i + 3*length);
-    float4 F4 = tex1Dfetch(xTexSingle4, i + 4*length);
-    float4 F5 = tex1Dfetch(xTexSingle4, i + 5*length);
-    CONSTRUCT_HALF_SPINOR_FROM_SINGLE(h, norm, F, length);
-    i += gridSize;
-  }
-
-}
-
-__global__ void convertHSKernel(short2 *h, float *norm, int length, int real_length) {
-
-  int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-
-  while(i < real_length) {
-      float2 F0 = tex1Dfetch(xTexSingle2, i + 0*length);
-      float2 F1 = tex1Dfetch(xTexSingle2, i + 1*length);
-      float2 F2 = tex1Dfetch(xTexSingle2, i + 2*length);
-      CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(h, norm, F, length);
-      i += gridSize;
-  }
-
-}
-
-
-__global__ void convertSHKernel(float4 *res, int length, int real_length) {
-
-  int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-
-  while (i<real_length) {
-    RECONSTRUCT_HALF_SPINOR(I, texHalf1, texNorm1, length);
-    res[0*length+i] = I0;
-    res[1*length+i] = I1;
-    res[2*length+i] = I2;
-    res[3*length+i] = I3;
-    res[4*length+i] = I4;
-    res[5*length+i] = I5;
-    i += gridSize;
-  }
-}
-
-__global__ void convertSHKernel(float2 *res, int length, int real_length) {
-
-    int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-    unsigned int gridSize = gridDim.x*blockDim.x;
-    
-    while (i<real_length) {
-	RECONSTRUCT_HALF_SPINOR_ST(I, texHalfSt1, texNorm1, length);
-	res[0*length+i] = I0;
-	res[1*length+i] = I1;
-	res[2*length+i] = I2;
-	i += gridSize;
-    }
-}
-
-__global__ void convertHDKernel(short4 *h, float *norm, int length, int real_length) {
-
-  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
-  unsigned int gridSize = gridDim.x*blockDim.x;
-
-  while(i < real_length) {
-    double2 F0 = fetch_double2(xTexDouble2, i+0*length);
-    double2 F1 = fetch_double2(xTexDouble2, i+1*length);
-    double2 F2 = fetch_double2(xTexDouble2, i+2*length);
-    double2 F3 = fetch_double2(xTexDouble2, i+3*length);
-    double2 F4 = fetch_double2(xTexDouble2, i+4*length);
-    double2 F5 = fetch_double2(xTexDouble2, i+5*length);
-    double2 F6 = fetch_double2(xTexDouble2, i+6*length);
-    double2 F7 = fetch_double2(xTexDouble2, i+7*length);
-    double2 F8 = fetch_double2(xTexDouble2, i+8*length);
-    double2 F9 = fetch_double2(xTexDouble2, i+9*length);
-    double2 F10 = fetch_double2(xTexDouble2, i+10*length);
-    double2 F11 = fetch_double2(xTexDouble2, i+11*length);
-    CONSTRUCT_HALF_SPINOR_FROM_DOUBLE(h, norm, F, length);
-    i += gridSize;
-  }
-}
-
-__global__ void convertHDKernel(short2 *h, float *norm, int length, int real_length) {
-
-  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
-  unsigned int gridSize = gridDim.x*blockDim.x;
-
-  while(i < real_length) {
-      double2 F0 = fetch_double2(xTexDouble2, i+0*length);
-      double2 F1 = fetch_double2(xTexDouble2, i+1*length);
-      double2 F2 = fetch_double2(xTexDouble2, i+2*length);
-      CONSTRUCT_HALF_SPINOR_FROM_DOUBLE_ST(h, norm, F, length);
-      i += gridSize;
-  }
-}
-
-__global__ void convertDHKernel(double2 *res, int length, int real_length) {
-
-  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
-  unsigned int gridSize = gridDim.x*blockDim.x;
-
-  while(i < real_length) {
-    RECONSTRUCT_HALF_SPINOR(I, texHalf1, texNorm1, length);
-    res[0*length+i] = make_double2(I0.x, I0.y);
-    res[1*length+i] = make_double2(I0.z, I0.w);
-    res[2*length+i] = make_double2(I1.x, I1.y);
-    res[3*length+i] = make_double2(I1.z, I1.w);
-    res[4*length+i] = make_double2(I2.x, I2.y);
-    res[5*length+i] = make_double2(I2.z, I2.w);
-    res[6*length+i] = make_double2(I3.x, I3.y);
-    res[7*length+i] = make_double2(I3.z, I3.w);
-    res[8*length+i] = make_double2(I4.x, I4.y);
-    res[9*length+i] = make_double2(I4.z, I4.w);
-    res[10*length+i] = make_double2(I5.x, I5.y);
-    res[11*length+i] = make_double2(I5.z, I5.w);
-    i += gridSize;
-  }
-
-}
-
-__global__ void convertDHKernelSt(double2 *res, int length, int real_length) {
-
-  int i = blockIdx.x*(blockDim.x) + threadIdx.x; 
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  
-  while(i < real_length) {
-      RECONSTRUCT_HALF_SPINOR_ST(I, texHalfSt1, texNorm1, length);
-      res[0*length+i] = make_double2(I0.x, I0.y);
-      res[1*length+i] = make_double2(I1.x, I1.y);
-      res[2*length+i] = make_double2(I2.x, I2.y);
-      i += gridSize;
-  }
-
-}
-
 
 template <typename FloatN, int N, typename Output, typename Input>
 __global__ void copyKernel(Output Y, Input X, int length) {
@@ -1304,59 +1117,61 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
   if (!blasTuning) checkCudaError();
 }
 
-
-template <typename floatN, int M, typename InputX, typename InputY, typename OutputY, typename Float>
-__global__ void axpbyKernel(Float a, Float b, InputX X, InputY Y, OutputY YY, int length) {
+/**
+   Generic blas kernel with two loads and one store.
+ */
+template <typename FloatN, int M, typename InputX, typename InputY, typename OutputY, typename Functor>
+__global__ void blasKernel(InputX X, InputY Y, Functor f, OutputY YY, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < length) {
-    floatN x[M], y[M];
+    FloatN x[M], y[M];
     X.load(x, i);
     Y.load(y, i);
 
 #pragma unroll
-    for (int j=0; j<M; j++) y[j]  = a*x[j] + b*y[j];
+    for (int j=0; j<M; j++) f(x[j], y[j]);
 
     YY.save(y, i);
     i += gridSize;
   }
 }
 
-// performs the operation y[i] = a*x[i] + b*y[i]
-void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y) {
-  setBlock(2, x.Length(), x.Precision());
+/**
+   Driver for generic blas routine with two loads and one store.
+ */
+template <template <typename Float, typename FloatN> class Functor, 
+	  typename Float, typename FloatN>
+void blasCuda(int kernel, Functor<Float,FloatN> f, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  setBlock(kernel, x.Length(), x.Precision());
   checkSpinor(x, y);
 
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    axpbyCuda(a, x.Even(), b, y.Even());
-    axpbyCuda(a, x.Odd(), b, y.Odd());
+    blasCuda(kernel, f, x.Even(), y.Even());
+    blasCuda(kernel, f, x.Odd(), y.Odd());
     return;
   }
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     Spinor<double2,double2,double2,1> X(x);
     Spinor<double2,double2,double2,1> Y(y);
-    axpbyKernel<double2,12><<<blasGrid, blasBlock>>>(a, b, X, Y, Y, x.Length()/2);
+    blasKernel<RegType,12><<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/2);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     Spinor<float4,float4,float4,1> X(x);
     Spinor<float4,float4,float4,1> Y(y);
-    axpbyKernel<float4,6><<<blasGrid, blasBlock>>>((float)a, (float)b, X, Y, Y, x.Length()/4);
+    blasKernel<RegType,6><<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/4);
   } else {
     if (x.Nspin() == 4){ //wilson
-      SpinorTexture<float4, float4, short4, 6, 0> xTex(x);
-      SpinorTexture<float4, float4, short4, 6, 1> yTex(y);
-      Spinor<float4, float4, short4, 6> yStore(y);
-      axpbyKernel<float4, 6> <<<blasGrid, blasBlock>>>
-	((float)a, (float)b, xTex, yTex, yStore, y.Volume());
-    }else if (x.Nspin() == 1) {//staggered
-      SpinorTexture<float2, float2, short2, 3, 0> xTex(x);
-      SpinorTexture<float2, float2, short2, 3, 1> yTex(y);
-      Spinor<float2, float2, short2, 3> yStore(y);
-      axpbyKernel<float2, 3> <<<blasGrid, blasBlock>>>
-	((float)a, (float)b, xTex, yTex, yStore, y.Volume());
-    }else{
-      errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
-    }
+      SpinorTexture<float4,float4,short4,6,0> xTex(x);
+      SpinorTexture<float4,float4,short4,6,1> yTex(y);
+      Spinor<float4,float4,short4,6> yStore(y);
+      blasKernel<RegType, 6> <<<blasGrid, blasBlock>>> (xTex, yTex, f, yStore, y.Volume());
+    } else if (x.Nspin() == 1) {//staggered
+      SpinorTexture<float2,float2,short2,3,0> xTex(x);
+      SpinorTexture<float2,float2,short2,3,1> yTex(y);
+      Spinor<float2,float2,short2,3> yStore(y);
+      blasKernel<RegType, 3> <<<blasGrid, blasBlock>>>(xTex, yTex, f, yStore, y.Volume());
+    } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     quda::blas_bytes += 3*x.Volume()*sizeof(float);
   }
   quda::blas_bytes += 3*x.RealLength()*x.Precision();
@@ -1365,32 +1180,34 @@ void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaCo
   if (!blasTuning) checkCudaError();
 }
 
-template <typename Float>
-__global__ void xpyKernel(Float *x, Float *y, int len) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    y[i] += x[i];
-    i += gridSize;
-  } 
-}
+/**
+   Functor to perform the operation y = a*x + b*y
+*/
+template <typename Float, typename FloatN>
+struct axpby {
+  const Float a;
+  const Float b;
+  axpby(const Float &a, const Float &b) : a(a), b(b) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y) { y = a*x + b*y; }
+};
 
-template <typename floatN, typename shortN, int M>
-__global__ void xpyKernel(shortN *yH, float *yN, int stride, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    floatN x[M], y[M];
-    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
-    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
+void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y) {
+  const int kernel = 2;
 
-#pragma unroll
-    for (int j=0; j<M; j++) y[j] += x[j];
-
-    saveSpinor<floatN, shortN, M>(yH, yN, y, i, stride);
-    i += gridSize;
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    axpby f(a, b);
+    blasCuda(kernel, f, x, y);
+  } else {
+    axpby f((float)a, (float)b);    
+    blasCuda(kernel, f, x, y);
   }
 }
+
+template <typename FloatN>
+struct xpy {
+  __device__ void operator()(const FloatN &x, FloatN &y) { y += x ; }
+};
+
 
 // performs the operation y[i] = x[i] + y[i]
 void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
@@ -1404,15 +1221,28 @@ void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   }
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    xpyKernel<<<blasGrid, blasBlock>>>((double*)x.V(), (double*)y.V(), x.Length());
+    Spinor<double2,double2,double2,1> X(x);
+    Spinor<double2,double2,double2,1> Y(y);
+    xpy<double2> f;
+    blasKernel<double2,1><<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/2);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    xpyKernel<<<blasGrid, blasBlock>>>((float2*)x.V(), (float2*)y.V(), x.Length()/2);
+    Spinor<float4,float4,float4,1> X(x);
+    Spinor<float4,float4,float4,1> Y(y);
+    xpy<float4> f;
+    blasKernel<float4,1><<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/4);
   } else {
-    bindTexture(&x, &y);
     if (x.Nspin() == 4){ //wilson
-      xpyKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      SpinorTexture<float4, float4, short4, 6, 0> Xtex(x);
+      SpinorTexture<float4, float4, short4, 6, 1> Ytex(y);
+      Spinor<float4, float4, short4, 6> Y(y);
+      xpy<float4> f;
+      blasKernel<float4, 6><<<blasGrid, blasBlock>>>(Xtex, Ytex, f, Y, x.Volume());
     }else if (x.Nspin() == 1){ //staggered
-      xpyKernel<float2, short2, 3><<<blasGrid, blasBlock>>>((short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      SpinorTexture<float2, float2, short2, 3, 0> Xtex(x);
+      SpinorTexture<float2, float2, short2, 3, 1> Ytex(y);
+      Spinor<float2, float2, short2, 3> Y(y);
+      xpy<float2> f;
+      blasKernel<float2, 3><<<blasGrid, blasBlock>>>(Xtex, Ytex, f, Y, x.Volume());
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
     }
@@ -1424,32 +1254,12 @@ void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   if (!blasTuning) checkCudaError();
 }
 
-template <typename Float, typename Float2>
-__global__ void axpyKernel(Float a, Float2 *x, Float2 *y, int len) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    y[i] += a*x[i];
-    i += gridSize;
-  } 
-}
-
-template <typename floatN, typename shortN, int M>
-__global__ void axpyKernel(float a, shortN *yH, float *yN, int stride, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    floatN x[M], y[M];
-    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
-    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
-
-#pragma unroll
-    for (int j=0; j<M; j++) y[j] += a*x[j];
-
-    saveSpinor<floatN, shortN, M>(yH, yN, y, i, stride);
-    i += gridSize;
-  }
-}
+template <typename Float, typename FloatN>
+struct axpy {
+  const Float a;
+  axpy(const Float &a) : a(a) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y) { y = a*x + y; }
+};
 
 // performs the operation y[i] = a*x[i] + y[i]
 void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
@@ -1463,15 +1273,28 @@ void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y)
   }
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    axpyKernel<<<blasGrid, blasBlock>>>(a, (double*)x.V(), (double*)y.V(), x.Length());
+    Spinor<double2,double2,double2,1> X(x);
+    Spinor<double2,double2,double2,1> Y(y);
+    axpy<double, double2> f(a);
+    blasKernel<double2, 1> <<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/2);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    axpyKernel<<<blasGrid, blasBlock>>>((float)a, (float2*)x.V(), (float2*)y.V(), x.Length()/2);
+    Spinor<float4,float4,float4,1> X(x);
+    Spinor<float4,float4,float4,1> Y(y);
+    axpy<float, float4> f(a);
+    blasKernel<float4, 1> <<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/4);
   } else {
-    bindTexture(&x, &y);
     if (x.Nspin() == 4){ //wilson
-      axpyKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((float)a, (short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      SpinorTexture<float4,float4,short4,6,0> Xtex(x);
+      SpinorTexture<float4,float4,short4,6,1> Ytex(y);
+      Spinor<float4,float4,short4,6> Y(y);
+      axpy<float, float4> f(a);
+      blasKernel<float4, 6> <<<blasGrid, blasBlock>>>(Xtex, Ytex, f, Y, y.Volume());
     }else if (x.Nspin() == 1){ //staggered
-      axpyKernel<float2, short2, 3><<<blasGrid, blasBlock>>>((float)a, (short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+      SpinorTexture<float2,float2,short2,3,0> Xtex(x);
+      SpinorTexture<float2,float2,short2,3,1> Ytex(y);
+      Spinor<float2,float2,short2,3> Y(y);
+      axpy<float, float2> f(a);
+      blasKernel<float2, 3> <<<blasGrid, blasBlock>>>(Xtex, Ytex, f, Y, y.Volume());
     }else{
       errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
     }
