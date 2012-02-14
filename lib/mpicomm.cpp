@@ -327,10 +327,10 @@ comm_coords(int dir) {
 }
 
 unsigned long
-comm_send(void* buf, int len, int dst)
+comm_send(void* buf, int len, int dst, void* _request)
 {
   
-  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  MPI_Request* request = (MPI_Request*)_request;
   if (request == NULL){
     printf("ERROR: malloc failed for mpi request\n");
     comm_exit(1);
@@ -354,10 +354,10 @@ comm_send(void* buf, int len, int dst)
 }
 
 unsigned long
-comm_send_to_rank(void* buf, int len, int dst_rank)
+comm_send_to_rank(void* buf, int len, int dst_rank, void* _request)
 {
   
-  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  MPI_Request* request = (MPI_Request*)_request;
   if (request == NULL){
     printf("ERROR: malloc failed for mpi request\n");
     comm_exit(1);
@@ -373,10 +373,10 @@ comm_send_to_rank(void* buf, int len, int dst_rank)
 }
 
 unsigned long
-comm_send_with_tag(void* buf, int len, int dst, int tag)
+comm_send_with_tag(void* buf, int len, int dst, int tag, void*_request)
 {
 
-  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  MPI_Request* request = (MPI_Request*)_request;
   if (request == NULL){
     printf("ERROR: malloc failed for mpi request\n");
     comm_exit(1);
@@ -420,9 +420,9 @@ comm_send_with_tag(void* buf, int len, int dst, int tag)
 
 
 unsigned long
-comm_recv(void* buf, int len, int src)
+comm_recv(void* buf, int len, int src, void*_request)
 {
-  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  MPI_Request* request = (MPI_Request*)_request;
   if (request == NULL){
     printf("ERROR: malloc failed for mpi request\n");
     comm_exit(1);
@@ -447,9 +447,9 @@ comm_recv(void* buf, int len, int src)
 }
 
 unsigned long
-comm_recv_from_rank(void* buf, int len, int src_rank)
+comm_recv_from_rank(void* buf, int len, int src_rank, void* _request)
 {
-  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  MPI_Request* request = (MPI_Request*)_request;
   if (request == NULL){
     printf("ERROR: malloc failed for mpi request\n");
     comm_exit(1);
@@ -467,9 +467,9 @@ comm_recv_from_rank(void* buf, int len, int src_rank)
 }
 
 unsigned long
-comm_recv_with_tag(void* buf, int len, int src, int tag)
+comm_recv_with_tag(void* buf, int len, int src, int tag, void* _request)
 { 
-  MPI_Request* request = (MPI_Request*)malloc(sizeof(MPI_Request));
+  MPI_Request* request = (MPI_Request*)_request;
   if (request == NULL){
     printf("ERROR: malloc failed for mpi request\n");
     comm_exit(1);
@@ -510,8 +510,8 @@ comm_recv_with_tag(void* buf, int len, int src, int tag)
   return (unsigned long)request;
 }
 
-int comm_query(unsigned long request) {
-
+int comm_query(void* request) 
+{
   MPI_Status status;
   int query;
   int rc = MPI_Test( (MPI_Request*)request, &query, &status);
@@ -523,14 +523,14 @@ int comm_query(unsigned long request) {
   return query;
 }
 
-void comm_free(unsigned long request) {
+void comm_free(void* request) {
   free((void*)request);
   return;
 }
 
 //this request should be some return value from comm_recv
 void 
-comm_wait(unsigned long request)
+comm_wait(void* request)
 {
   
   MPI_Status status;
@@ -539,8 +539,6 @@ comm_wait(unsigned long request)
     printf("ERROR: MPI_Wait failed\n");
     comm_exit(1);
   }
-  
-  free((void*)request);
   
   return;
 }

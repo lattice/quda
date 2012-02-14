@@ -164,7 +164,6 @@ llfat_test(int test)
   }
 
 
-
   for(int i=0; i < V_ex; i++){
     int sid = i;
     int oddBit=0;
@@ -182,14 +181,14 @@ llfat_test(int test)
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
     int x1 = 2*x1h + x1odd;
     
-    /*
-if( x1< 2 || x1 >= X1 +2
-|| x2< 2 || x2 >= X2 +2
-|| x3< 2 || x3 >= X3 +2
-|| x4< 2 || x4 >= X4 +2){
-continue;
-}
-*/
+    
+    if( x1< 2 || x1 >= X1 +2
+	|| x2< 2 || x2 >= X2 +2
+	|| x3< 2 || x3 >= X3 +2
+	|| x4< 2 || x4 >= X4 +2){
+      continue;
+    }
+    
     
     
     x1 = (x1 - 2 + X1) % X1;
