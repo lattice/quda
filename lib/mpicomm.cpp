@@ -510,7 +510,24 @@ comm_recv_with_tag(void* buf, int len, int src, int tag, void* _request)
   return (unsigned long)request;
 }
 
-int comm_query(void* request) {
+int comm_query(void* request) 
+{
+  if(request == NULL){
+	printf("ERROR: NULL request\n");
+	comm_exit(1);
+  }
+  
+ //test if the content in @request is 0
+  char* p = (char*)request;
+  int empty_content = 1;
+  for(int i=0; i < sizeof(MPI_Request);i++){
+    if ( p[i] != 0){
+        empty_content = 0;
+	break;
+     }
+  }
+
+  if(empty_content) return 0;
 
   MPI_Status status;
   int query;

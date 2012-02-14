@@ -187,19 +187,10 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity,
   stream = stream_p;
 
   if (dir%2==0){ // backwards send
-    int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
-    int uptags[4] = {XUP, YUP, ZUP, TUP};
-    // Prepost all receives
-    comm_recv_with_tag(pageable_back_nbr_spinor[dim], nbytes[dim], back_nbr[dim], uptags[dim], recv_request1[dim]);
-    
-    // gather for backwards send
+    memset(recv_request1[dim], 0, sizeof(MPI_Request));
     in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim + sendBackStrmIdx]);
   } else { // forwards send
-    int fwd_nbr[4] = {X_FWD_NBR, Y_FWD_NBR, Z_FWD_NBR,T_FWD_NBR};
-    int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
-    comm_recv_with_tag(pageable_fwd_nbr_spinor[dim], nbytes[dim], fwd_nbr[dim], downtags[dim], recv_request2[dim]);
-    
-    // gather for forwards send
+    memset(recv_request2[dim], 0, sizeof(MPI_Request));
     in.packGhost(dim, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim + sendFwdStrmIdx]);
   }
 }
@@ -223,6 +214,10 @@ void FaceBuffer::commsStart(int dir) {
   if (dir %2 == 0) {
     int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
     int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+    int uptags[4] = {XUP, YUP, ZUP, TUP};
+    // Prepost all receives
+    comm_recv_with_tag(pageable_back_nbr_spinor[dim], nbytes[dim], back_nbr[dim], uptags[dim], recv_request1[dim]);
+
 #ifndef GPU_DIRECT
     memcpy(pageable_back_nbr_spinor_sendbuf[dim], 
 	   back_nbr_spinor_sendbuf[dim], nbytes[dim]);
@@ -231,6 +226,9 @@ void FaceBuffer::commsStart(int dir) {
   } else {
     int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
     int uptags[4] = {XUP, YUP, ZUP, TUP};
+    int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+    comm_recv_with_tag(pageable_fwd_nbr_spinor[dim], nbytes[dim], fwd_nbr[dim], downtags[dim], recv_request2[dim]);
+
 #ifndef GPU_DIRECT
     memcpy(pageable_fwd_nbr_spinor_sendbuf[dim], 
 	   fwd_nbr_spinor_sendbuf[dim], nbytes[dim]);
