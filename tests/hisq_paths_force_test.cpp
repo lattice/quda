@@ -13,6 +13,11 @@
 #include "hw_quda.h"
 #include <sys/time.h>
 
+#define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
+
+
+
+#include "fermion_force_reference.h"
 using namespace hisq::fermion_force;
 
 extern void usage(char** argv);
@@ -34,7 +39,8 @@ static void* hw; // the array of half_wilson_vector
 
 cpuGaugeField *cpuOprod = NULL;
 cudaGaugeField *cudaOprod = NULL;
-
+cpuGaugeField *cpuLongLinkOprod = NULL;
+cudaGaugeField *cudaLongLinkOprod = NULL;
 
 int verify_results = 0;
 int ODD_BIT = 1;
@@ -157,12 +163,15 @@ hisq_force_init()
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.precision = gaugeParam.cpu_prec;
   cpuOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec);
+  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, 1);
+
+  cpuLongLinkOprod = new cpuGaugeField(gParam);
+  computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod->Gauge_p(), hw_prec, 3);
+
 
   gParam.precision = hw_prec;
   cudaOprod = new cudaGaugeField(gParam);
-
-
+  cudaLongLinkOprod = new cudaGaugeField(gParam);
 
   printf("%d %d %d %d\n", cpuMom->Reconstruct(), cudaMom->Reconstruct(), cpuGauge->Reconstruct(), cudaGauge->Reconstruct());
   return;
@@ -176,6 +185,7 @@ hisq_force_end()
   delete cudaForce;
   delete cudaGauge;
   delete cudaOprod;
+  delete cudaLongLinkOprod;
   freeHwQuda(cudaHw);
 
   delete cpuGauge;
@@ -183,6 +193,7 @@ hisq_force_end()
   delete cpuMom;
   delete refMom;
   delete cpuOprod;  
+  delete cpuLongLinkOprod;
   free(hw);
 
   endQuda();
@@ -196,7 +207,7 @@ hisq_force_test()
   hisq_force_init();
 
   initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
-  hisq_force_init_cuda(&gaugeParam);
+  hisqForceInitCuda(&gaugeParam);
 
 
    
@@ -204,8 +215,7 @@ hisq_force_test()
   float act_path_coeff[6];
 
   act_path_coeff[0] = 0.625000;
-  // act_path_coeff[1] = -0.058479;
-  act_path_coeff[1] = 0.0; // set Naik term to zero, temporarily
+  act_path_coeff[1] = -0.058479;
   act_path_coeff[2] = -0.087719;
   act_path_coeff[3] = 0.030778;
   act_path_coeff[4] = -0.007200;
@@ -224,38 +234,48 @@ hisq_force_test()
 
   // copy the momentum field to the GPU
   cudaMom->loadCPUField(*refMom, QUDA_CPU_FIELD_LOCATION);
-
   // copy the gauge field to the GPU
   cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
-
   // copy the outer product field to the GPU
   cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  // load the three-link outer product to the GPU
+  cudaLongLinkOprod->loadCPUField(*cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
 
   loadHwToGPU(cudaHw, hw, cpu_hw_prec);
 
-
+  struct timeval ht0, ht1;
+  gettimeofday(&ht0, NULL);
   if (verify_results){
     if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
       const float eps = 0.5;
-      halfwilson_hisq_force_reference(eps, weight, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
+      fermion_force_reference(eps, weight, 0, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
     }else if(cpu_hw_prec == QUDA_DOUBLE_PRECISION){
       const double eps = 0.5;
-      halfwilson_hisq_force_reference(eps, d_weight, d_act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
+      fermion_force_reference(eps, d_weight, 0, d_act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
     }
   }
+  gettimeofday(&ht1, NULL);
 
-  struct timeval t0, t1;
-  bool shouldCompute = true;
+  struct timeval t0, t1, t2, t3, t4, t5;
+
   gettimeofday(&t0, NULL);
-  
-  hisq_staples_force_cuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
-
+  hisqStaplesForceCuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+  cudaThreadSynchronize();
+  gettimeofday(&t1, NULL);
+  checkCudaError();
+ 
+  gettimeofday(&t2, NULL);
+  hisqLongLinkForceCuda(d_act_path_coeff[1], gaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
+  cudaThreadSynchronize();
+  gettimeofday(&t3, NULL);
+  checkCudaError();
+  gettimeofday(&t4, NULL);
+  hisqCompleteForceCuda(gaugeParam, *cudaForce, *cudaGauge, cudaMom);
   cudaThreadSynchronize();
   checkCudaError();
+  gettimeofday(&t5, NULL);
 
-  hisq_complete_force_cuda(gaugeParam, *cudaForce, *cudaGauge, cudaMom);
-  cudaThreadSynchronize();
-  checkCudaError();
+
 
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
 
@@ -264,7 +284,9 @@ hisq_force_test()
 
   strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
-  int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
+
+  printf("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t2,t3)*1000, TDIFF(t4,t5)*1000);
+  printf("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1)*1000);
 
   hisq_force_end();
 }

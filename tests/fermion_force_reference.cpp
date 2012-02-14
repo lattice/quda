@@ -538,6 +538,7 @@ do_fermion_force_reference(Real eps, Real weight1, Real weight2,
 #undef Pmumumu
 
 
+
 void
 fermion_force_reference(float eps, float weight1, float weight2,
 			void* act_path_coeff, void* temp_x, void* sitelink, void* mom)    
@@ -545,5 +546,17 @@ fermion_force_reference(float eps, float weight1, float weight2,
     do_fermion_force_reference((float)eps, (float)weight1, (float)weight2, 
 			       (fhalf_wilson_vector*) temp_x, (float*)act_path_coeff,
 			       (fsu3_matrix*)sitelink, (fanti_hermitmat*) mom);   
-    
 }
+
+
+
+void
+fermion_force_reference(double eps, double weight1, double weight2,
+			void* act_path_coeff, void* temp_x, void* sitelink, void* mom)    
+{
+    do_fermion_force_reference((double)eps, (double)weight1, (double)weight2, 
+			       (dhalf_wilson_vector*) temp_x, (double*)act_path_coeff,
+			       (dsu3_matrix*)sitelink, (danti_hermitmat*) mom);   
+}
+
+

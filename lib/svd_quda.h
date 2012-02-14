@@ -1,3 +1,6 @@
+#ifndef _SVD_QUDA_H_
+#define _SVD_QUDA_H_
+
 #include "quda_matrix.h"
 
 #include <iostream>
@@ -6,6 +9,9 @@
 #include <sstream>
 
 #define DEVICEHOST __device__ __host__
+#define SVDPREC 1e-10
+#define LOG2 0.69314718055994530942
+
 
 namespace hisq{
 
@@ -220,10 +226,7 @@ namespace hisq{
           sign = -1;	
           temp = beta + log(1.0 - exp(alpha-beta));
         }
-        temp -= log(2.0) + log(abs00) + log(abs01);
-        // Apparently, it has to be log(2.0), not log(2)
-        // log(2) should be kept in constant memory, maybe.
-        // log(abs00) = beta/2.0
+        temp -= LOG2 + log(abs00) + log(abs01);
         temp = sign*exp(temp);
 
         if( m(0,0) < 0.0 ){ temp *= -1.0; }
@@ -301,7 +304,6 @@ namespace hisq{
       Cmplx w, tau, z;
 
       if(norm1 == 0 && mat(0,0).y == 0){
-     //   setIdentity(&temp);
         p = mat;
       }else{
         Array<Cmplx,3> temp_vec;
@@ -331,9 +333,6 @@ namespace hisq{
 
       // Step 2: build the first right reflector
       typename RealTypeId<Cmplx>::Type norm2 = cabs(p(0,2));
-      // if(norm2 == 0 && p(0,1).y == 0) {
-      //  setIdentity(&temp);
-      // }else{
       if(norm2 != 0.0 || p(0,1).y != 0.0){
         norm1 = cabs(p(0,1));
         beta  = quadSum(norm1,norm2);
@@ -356,9 +355,6 @@ namespace hisq{
 
       // Step 3: build the second left reflector
       norm2 = cabs(p(2,1));
-      //if(norm2==0 && p(1,1).y==0){
-      //  setIdentity(&temp);
-      // }else{
       if(norm2 != 0.0 || p(1,1).y != 0.0){
         norm1 = cabs(p(1,1));
         beta  = quadSum(norm1,norm2);
@@ -413,8 +409,6 @@ namespace hisq{
     void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
     {
 
-      // SVDPREC should really be defined by the user
-      const Real SVDPREC = 0.000000001;
       Real c,s;
 
       // set u and v matrices equal to the identity
@@ -499,9 +493,6 @@ namespace hisq{
           }else{ // Else entering normal QR iteration
 
             Real lambda_max; 
-            // the variable lambda_max is only used in the next two lines. 
-            // In the final code, I could recycle the variable name to minimise 
-            // global memory usage.
             getLambdaMax(b, lambda_max); // defined above
 
             alpha = b(0,0)*b(0,0) - lambda_max;
@@ -605,7 +596,7 @@ namespace hisq{
           m_small(1,0) = b(1,0);
           m_small(1,1) = b(1,1);	
 
-          smallSVD(u_small, v_small, m_small); // need to write code for smallSVD
+          smallSVD(u_small, v_small, m_small); 
 
           b(0,0) = m_small(0,0);
           b(0,1) = m_small(0,1);
@@ -650,9 +641,7 @@ namespace hisq{
     {
         
       getRealBidiagMatrix<Cmplx>(m, u, v);
-
       Matrix<typename RealTypeId<Cmplx>::Type,3> bd, u_real, v_real;
-
       // Make real
       for(int i=0; i<3; ++i){
         for(int j=0; j<3; ++j){
@@ -661,12 +650,10 @@ namespace hisq{
       }
 
       bdSVD(u_real, v_real, bd, 40);
-       
       for(int i=0; i<3; ++i){
         singular_values[i] = bd(i,i);
       }
 
-      // Oops, I forgot to do this!
       u = u*u_real;
       v = v*v_real;
 
@@ -675,3 +662,5 @@ namespace hisq{
 
 } // end namespace hisq
 
+
+#endif // _SVD_QUDA_H

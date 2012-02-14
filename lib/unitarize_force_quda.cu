@@ -34,15 +34,11 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 namespace hisq{
   namespace fermion_force{
 
-     template<class Cmplx> 
-     __host__ __device__ 	
-     void printLink(Matrix<Cmplx,3>& link);
 
 
-
-      void set_unitarize_force_constants(double unitarize_eps, double hisq_force_filter, double max_det_error, 
-					bool allow_svd, bool svd_only,
-					double svd_rel_error, double svd_abs_error)
+      void setUnitarizeForceConstants(double unitarize_eps, double hisq_force_filter, double max_det_error, 
+				      bool allow_svd, bool svd_only,
+				      double svd_rel_error, double svd_abs_error)
       {
 
 	// not_set is only initialised once
@@ -505,7 +501,6 @@ namespace hisq{
 
 
 
-      // I don't need to swap between odd and even half lattices, do I
         template<class Cmplx>
           __global__ void getUnitarizeForceField(Cmplx* link_even, Cmplx* link_odd,
                                                  Cmplx* old_force_even, Cmplx* old_force_odd,
@@ -544,73 +539,7 @@ namespace hisq{
           } // getUnitarizeForceField
 
 
-/*
-        // template this! 
-        void copyArrayToLink(Matrix<float2,3>* link, float* array){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              (*link)(i,j).x = array[(i*3+j)*2];
-              (*link)(i,j).y = array[(i*3+j)*2 + 1];
-            }
-          }
-          return;
-        }
-	
-	template<class Cmplx, class Real>
-        void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              (*link)(i,j).x = array[(i*3+j)*2];
-              (*link)(i,j).y = array[(i*3+j)*2 + 1];
-            }
-          }
-          return;
-        }
-	
-        
-        // and this!
-        void copyLinkToArray(float* array, const Matrix<float2,3>& link){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              array[(i*3+j)*2] = link(i,j).x;
-              array[(i*3+j)*2 + 1] = link(i,j).y;
-            }
-          }
-          return;
-        }
-
-        // and this!
-	      template<class Cmplx, class Real>
-        void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              array[(i*3+j)*2] = link(i,j).x;
-              array[(i*3+j)*2 + 1] = link(i,j).y;
-            }
-          }
-          return;
-        }
-
-
-
-        // and this!
-	template<class Cmplx>
-	__host__ __device__
-        void printLink(Matrix<Cmplx,3>& link){
-          printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
-          printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
-          printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
-          printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
-          printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
-          printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
-          printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
-          printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
-          printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
-          printf("\n");
-        }
-
-*/
-	void unitarize_force_cpu(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
+	void unitarizeForceCPU(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
 	{
 
 		int num_failures = 0;	
@@ -634,7 +563,7 @@ namespace hisq{
 	} // unitarize_force_cpu
 
 
-        void unitarize_force_cuda(const QudaGaugeParam& param, cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce, int* unitarization_failed)
+        void unitarizeForceCuda(const QudaGaugeParam& param, cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce, int* unitarization_failed)
         {
 
           dim3 gridDim(cudaGauge.Volume()/BLOCK_DIM,1,1);
