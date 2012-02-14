@@ -242,7 +242,7 @@ void FaceBuffer::commsStart(int dir) {
 
 #ifdef QMP_COMMS  // Begin backward send
     // Prepost receive
-    QMP_start(mh_from_fwd[dim];
+    QMP_start(mh_from_fwd[dim]);
 #ifndef GPU_DIRECT
     memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
 #endif
