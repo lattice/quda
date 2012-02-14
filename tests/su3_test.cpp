@@ -14,6 +14,16 @@
 QudaGaugeParam param;
 void *gauge[4], *new_gauge[4];
 
+extern int device;
+extern int xdim;
+extern int ydim;
+extern int zdim;
+extern int tdim;
+extern int gridsize_from_cmdline[];
+extern QudaReconstructType link_recon;
+extern QudaPrecision prec;
+extern char latfile[];
+
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 void init() {
@@ -21,18 +31,18 @@ void init() {
   param = newQudaGaugeParam();
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  param.cuda_prec = QUDA_SINGLE_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_12;
-  param.cuda_prec_sloppy = param.cuda_prec;
-  param.reconstruct_sloppy = param.reconstruct;
+  param.cuda_prec = prec;
+  param.reconstruct = link_recon;
+  param.cuda_prec_sloppy = prec;
+  param.reconstruct_sloppy = link_recon;
   
   param.type = QUDA_WILSON_LINKS;
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
-  param.X[0] = 16;
-  param.X[1] = 16;
-  param.X[2] = 16;
-  param.X[3] = 64;
+  param.X[0] = xdim;
+  param.X[1] = ydim;
+  param.X[2] = zdim;
+  param.X[3] = tdim;
   setDims(param.X);
 
   param.anisotropy = 1.0;
@@ -57,8 +67,7 @@ void init() {
     new_gauge[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
   }
 
-  int dev = 0;
-  initQuda(dev);
+  initQuda(device);
 }
 
 void end() {
@@ -71,11 +80,21 @@ void end() {
   }
 }
 
+extern void usage(char**);
+
 void SU3Test(int argc, char **argv) {
+
+  for (int i =1;i < argc; i++){    
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }  
+    
+    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
 
   init();
 
-  char *latfile = "";//"16_64.lat";
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, param.cpu_prec, param.X, argc, argv);
     construct_gauge_field((void**)gauge, 2, param.cpu_prec, &param);
@@ -95,20 +114,11 @@ void SU3Test(int argc, char **argv) {
 
 int main(int argc, char **argv) {
 
-#ifdef QMP_COMMS
-  int ndim=4, dims[4];
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-  dims[0] = dims[1] = dims[2] = 1;
-  dims[3] = QMP_get_number_of_nodes();
-  QMP_declare_logical_topology(dims, ndim);
-#endif  
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
   SU3Test(argc, argv);
 
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#endif
+  endCommsQuda();
 
   return 0;
 }

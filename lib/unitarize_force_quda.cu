@@ -544,7 +544,7 @@ namespace hisq{
           } // getUnitarizeForceField
 
 
-
+/*
         // template this! 
         void copyArrayToLink(Matrix<float2,3>* link, float* array){
           for(int i=0; i<3; ++i){
@@ -609,7 +609,7 @@ namespace hisq{
           printf("\n");
         }
 
-
+*/
 	void unitarize_force_cpu(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
 	{
 
