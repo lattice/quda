@@ -18,13 +18,22 @@ __constant__ int DEV_MAX_ITER = 20;
 
 static int HOST_MAX_ITER = 20;
 
+/*
 __constant__ double DEV_HISQ_UNITARIZE_EPS = 1e-6;
 __constant__ double DEV_MAX_DET_ERROR = 1e-9;
 __constant__ bool DEV_REUNIT_ALLOW_SVD = true;
 __constant__ bool DEV_REUNIT_SVD_ONLY = false;
 __constant__ double DEV_REUNIT_SVD_REL_ERROR = 1e-6;
 __constant__ double DEV_REUNIT_SVD_ABS_ERROR = 1e-6;
+*/
 
+
+__constant__ double DEV_HISQ_UNITARIZE_EPS;
+__constant__ double DEV_MAX_DET_ERROR;
+__constant__ bool DEV_REUNIT_ALLOW_SVD;
+__constant__ bool DEV_REUNIT_SVD_ONLY;
+__constant__ double DEV_REUNIT_SVD_REL_ERROR;
+__constant__ double DEV_REUNIT_SVD_ABS_ERROR;
 
 static double HOST_HISQ_UNITARIZE_EPS;
 static double HOST_MAX_DET_ERROR;

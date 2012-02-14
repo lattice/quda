@@ -1577,7 +1577,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
  */
 #include <sys/time.h>
 
-static void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param)
+void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param)
 {
   int* X    = param->X;
   int Vsh_x = X[1]*X[2]*X[3]/2;
