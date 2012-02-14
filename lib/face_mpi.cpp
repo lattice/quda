@@ -187,10 +187,8 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity,
   stream = stream_p;
 
   if (dir%2==0){ // backwards send
-    memset(recv_request1[dim], 0, sizeof(MPI_Request));
     in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim + sendBackStrmIdx]);
   } else { // forwards send
-    memset(recv_request2[dim], 0, sizeof(MPI_Request));
     in.packGhost(dim, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim + sendFwdStrmIdx]);
   }
 }
@@ -222,7 +220,7 @@ void FaceBuffer::commsStart(int dir) {
     memcpy(pageable_back_nbr_spinor_sendbuf[dim], 
 	   back_nbr_spinor_sendbuf[dim], nbytes[dim]);
 #endif
-    comm_send_with_tag(pageable_back_nbr_spinor_sendbuf[dim], nbytes[dim], back_nbr[dim], downtags[dim], send_request2[dim]);
+    comm_send_with_tag(pageable_back_nbr_spinor_sendbuf[dim], nbytes[dim], back_nbr[dim], downtags[dim], send_request1[dim]);
   } else {
     int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
     int uptags[4] = {XUP, YUP, ZUP, TUP};
@@ -233,7 +231,7 @@ void FaceBuffer::commsStart(int dir) {
     memcpy(pageable_fwd_nbr_spinor_sendbuf[dim], 
 	   fwd_nbr_spinor_sendbuf[dim], nbytes[dim]);
 #endif
-    comm_send_with_tag(pageable_fwd_nbr_spinor_sendbuf[dim], nbytes[dim], fwd_nbr[dim], uptags[dim], send_request1[dim]);
+    comm_send_with_tag(pageable_fwd_nbr_spinor_sendbuf[dim], nbytes[dim], fwd_nbr[dim], uptags[dim], send_request2[dim]);
   }
 }
 
@@ -243,18 +241,18 @@ int FaceBuffer::commsQuery(int dir) {
   if(!commDimPartitioned(dim)) return 0;
 
   if(dir%2==0) {
-    if (comm_query(recv_request2[dim]) && 
-	comm_query(send_request2[dim])) {
+    if (comm_query(recv_request1[dim]) && 
+	comm_query(send_request1[dim])) {
 #ifndef GPU_DIRECT
-      memcpy(fwd_nbr_spinor[dim], pageable_fwd_nbr_spinor[dim], nbytes[dim]);
+      memcpy(back_nbr_spinor[dim], pageable_back_nbr_spinor[dim], nbytes[dim]);
 #endif
       return 1;
     }
   } else {
-    if (comm_query(recv_request1[dim]) &&
-	comm_query(send_request1[dim])) {
+    if (comm_query(recv_request2[dim]) &&
+	comm_query(send_request2[dim])) {
 #ifndef GPU_DIRECT
-      memcpy(back_nbr_spinor[dim], pageable_back_nbr_spinor[dim], nbytes[dim]);
+      memcpy(fwd_nbr_spinor[dim], pageable_fwd_nbr_spinor[dim], nbytes[dim]);
 #endif
       return 1;
     }
@@ -268,9 +266,9 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir) {
   if(!commDimPartitioned(dim)) return;
 
   if (dir%2 == 0) {
-    out.unpackGhost(fwd_nbr_spinor[dim], dim, QUDA_FORWARDS,  dagger, &stream[2*dim + recFwdStrmIdx]); CUERR;
-  } else {
     out.unpackGhost(back_nbr_spinor[dim], dim, QUDA_BACKWARDS,  dagger, &stream[2*dim + recBackStrmIdx]); CUERR;
+  } else {
+    out.unpackGhost(fwd_nbr_spinor[dim], dim, QUDA_FORWARDS,  dagger, &stream[2*dim + recFwdStrmIdx]); CUERR;
   }
 }
 
