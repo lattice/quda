@@ -9,17 +9,30 @@
 
 #pragma once
 
-__device__ void copyFloatN(float2 &a, const float2 &b) { a = make_float2(b.x, b.y); }
-__device__ void copyFloatN(double2 &a, const double2 &b) { a = make_double2(b.x, b.y); }
+template <typename type> int vecLength() { return 0; }
 
-__device__ void copyFloatN(float4 &a, const float4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
-__device__ void copyFloatN(double4 &a, const double4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
+template<> int vecLength<short>() { return 1; }
+template<> int vecLength<float>() { return 1; }
+template<> int vecLength<double>() { return 1; }
 
-__device__ void copyFloatN(float2 &a, const double2 &b) { a = make_float2(b.x, b.y); }
-__device__ void copyFloatN(double2 &a, const float2 &b) { a = make_double2(b.x, b.y); }
+template<> int vecLength<short2>() { return 2; }
+template<> int vecLength<float2>() { return 2; }
+template<> int vecLength<double2>() { return 2; }
 
-__device__ void copyFloatN(float4 &a, const double4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
-__device__ void copyFloatN(double4 &a, const float4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
+template<> int vecLength<short4>() { return 4; }
+template<> int vecLength<float4>() { return 4; }
+template<> int vecLength<double4>() { return 4; }
+
+__device__ inline void copyFloatN(float2 &a, const float2 &b) { a = b; }
+__device__ inline void copyFloatN(double2 &a, const double2 &b) { a = make_double2(b.x, b.y); }
+
+__device__ inline void copyFloatN(float4 &a, const float4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
+__device__ inline void copyFloatN(double4 &a, const double4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
+
+__device__ inline void copyFloatN(float2 &a, const double2 &b) { a = make_float2(b.x, b.y); }
+__device__ inline void copyFloatN(double2 &a, const float2 &b) { a = make_double2(b.x, b.y); }
+__device__ inline void copyFloatN(float4 &a, const double4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
+__device__ inline void copyFloatN(double4 &a, const float4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
 
 /**
  Convert a vector of type InputType to type OutputType.
@@ -41,7 +54,7 @@ __device__ inline void convert(OutputType x[], InputType y[], const int N) {
 
 template<> __device__ inline void convert<float2,short2>(float2 x[], short2 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j++) x[j] = make_float2(y[2*j].x, y[2*j].y);
+  for (int j=0; j<N; j++) x[j] = make_float2(y[j].x, y[j].y);
 }
 
 template<> __device__ inline void convert<float4,short4>(float4 x[], short4 y[], const int N) {
@@ -58,7 +71,7 @@ template<> __device__ inline void convert<double4,double2>(double4 x[], double2 
 
 template<> __device__ inline void convert<double2,double4>(double2 x[], double4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_double2(y[j].x, y[j].y);
     x[2*j+1] = make_double2(y[j].z, y[j].w);
   }
@@ -71,7 +84,7 @@ template<> __device__ inline void convert<float4,float2>(float4 x[], float2 y[],
 
 template<> __device__ inline void convert<float2,float4>(float2 x[], float4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_float2(y[j].x, y[j].y);
     x[2*j+1] = make_float2(y[j].z, y[j].w);
   }
@@ -84,7 +97,7 @@ template<> __device__ inline void convert<short4,float2>(short4 x[], float2 y[],
 
 template<> __device__ inline void convert<float2,short4>(float2 x[], short4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_float2(y[j].x, y[j].y);
     x[2*j+1] = make_float2(y[j].z, y[j].w);
   }
@@ -97,7 +110,7 @@ template<> __device__ inline void convert<float4,short2>(float4 x[], short2 y[],
 
 template<> __device__ inline void convert<short2,float4>(short2 x[], float4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_short2(y[j].x, y[j].y);
     x[2*j+1] = make_short2(y[j].z, y[j].w);
   }
@@ -110,7 +123,7 @@ template<> __device__ inline void convert<short4,double2>(short4 x[], double2 y[
 
 template<> __device__ inline void convert<double2,short4>(double2 x[], short4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_double2(y[j].x, y[j].y);
     x[2*j+1] = make_double2(y[j].z, y[j].w);
   }
@@ -123,7 +136,7 @@ template<> __device__ inline void convert<double4,short2>(double4 x[], short2 y[
 
 template<> __device__ inline void convert<short2,double4>(short2 x[], double4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_short2(y[j].x, y[j].y);
     x[2*j+1] = make_short2(y[j].z, y[j].w);
   }
@@ -136,7 +149,7 @@ template<> __device__ inline void convert<float4,double2>(float4 x[], double2 y[
 
 template<> __device__ inline void convert<double2,float4>(double2 x[], float4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_double2(y[j].x, y[j].y);
     x[2*j+1] = make_double2(y[j].z, y[j].w);
   }
@@ -149,10 +162,8 @@ template<> __device__ inline void convert<double4,float2>(double4 x[], float2 y[
 
 template<> __device__ inline void convert<float2,double4>(float2 x[], double4 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j+=2) {
+  for (int j=0; j<N/2; j++) {
     x[2*j] = make_float2(y[j].x, y[j].y);
     x[2*j+1] = make_float2(y[j].z, y[j].w);
   }
 }
-
-

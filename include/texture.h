@@ -125,6 +125,17 @@ template<> inline void Texture<double2,double2,3>::bind(const double2 *ptr, size
 template<> inline void Texture<double2,double2,4>::bind(const double2 *ptr, size_t bytes) 
 { cudaBindTexture(0,tex_int4_4, ptr, bytes); }
 
+template<> inline void Texture<float2,double2,0>::bind(const double2 *ptr, size_t bytes) 
+{ cudaBindTexture(0,tex_int4_0, ptr, bytes); }
+template<> inline void Texture<float2,double2,1>::bind(const double2 *ptr, size_t bytes) 
+{ cudaBindTexture(0,tex_int4_1, ptr, bytes); }
+template<> inline void Texture<float2,double2,2>::bind(const double2 *ptr, size_t bytes) 
+{ cudaBindTexture(0,tex_int4_2, ptr, bytes); }
+template<> inline void Texture<float2,double2,3>::bind(const double2 *ptr, size_t bytes) 
+{ cudaBindTexture(0,tex_int4_3, ptr, bytes); }
+template<> inline void Texture<float2,double2,4>::bind(const double2 *ptr, size_t bytes) 
+{ cudaBindTexture(0,tex_int4_4, ptr, bytes); }
+
 template<> inline void Texture<float2,short2,0>::unbind() { cudaUnbindTexture(tex_short2_0); }
 template<> inline void Texture<float2,short2,1>::unbind() { cudaUnbindTexture(tex_short2_1); }
 template<> inline void Texture<float2,short2,2>::unbind() { cudaUnbindTexture(tex_short2_2); }
@@ -160,6 +171,12 @@ template<> inline void Texture<double2,double2,1>::unbind() { cudaUnbindTexture(
 template<> inline void Texture<double2,double2,2>::unbind() { cudaUnbindTexture(tex_int4_2); }
 template<> inline void Texture<double2,double2,3>::unbind() { cudaUnbindTexture(tex_int4_3); }
 template<> inline void Texture<double2,double2,4>::unbind() { cudaUnbindTexture(tex_int4_4); }
+
+template<> inline void Texture<float2,double2,0>::unbind() { cudaUnbindTexture(tex_int4_0); }
+template<> inline void Texture<float2,double2,1>::unbind() { cudaUnbindTexture(tex_int4_1); }
+template<> inline void Texture<float2,double2,2>::unbind() { cudaUnbindTexture(tex_int4_2); }
+template<> inline void Texture<float2,double2,3>::unbind() { cudaUnbindTexture(tex_int4_3); }
+template<> inline void Texture<float2,double2,4>::unbind() { cudaUnbindTexture(tex_int4_4); }
 
 // short2
 template<> __device__ inline float2 Texture<float2,short2,0>::fetch(unsigned int idx) 
@@ -237,6 +254,49 @@ template<> __device__ inline double2 Texture<double2,double2,3>::fetch(unsigned 
 template<> __device__ inline double2 Texture<double2,double2,4>::fetch(unsigned int idx) 
 { return fetch_double2(tex_int4_4,idx); }
 
+template<> __device__ inline float2 Texture<float2,double2,0>::fetch(unsigned int idx) 
+{ double2 x = fetch_double2(tex_int4_0,idx); return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,1>::fetch(unsigned int idx) 
+{ double2 x = fetch_double2(tex_int4_1,idx); return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,2>::fetch(unsigned int idx) 
+{ double2 x = fetch_double2(tex_int4_2,idx); return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,3>::fetch(unsigned int idx) 
+{ double2 x = fetch_double2(tex_int4_3,idx); return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,4>::fetch(unsigned int idx) 
+{ double2 x = fetch_double2(tex_int4_4,idx); return make_float2(x.x, x.y); }
+
+/**
+   Checks that the types are set correctly.  The precision used in the
+   RegType must match that of the InterType, and the ordering of the
+   InterType must match that of the StoreType.  The only exception is
+   when half precision is used, in which case, RegType can be a double
+   and InterType can be single (with StoreType short).
+
+  @param RegType Register type used in kernel
+  @param InterType Intermediate format - RegType precision with StoreType ordering
+  @param StoreType Type used to store field in memory
+ */
+template <typename RegType, typename InterType, typename StoreType>
+void checkTypes() {
+
+  const size_t reg_size = sizeof(((RegType*)0)->x);
+  const size_t inter_size = sizeof(((InterType*)0)->x);
+  const size_t store_size = sizeof(((StoreType*)0)->x);
+
+  if (reg_size != inter_size  && store_size != 2 && inter_size != 4)
+    errorQuda("Precision of register (%lu) and intermediate (%lu) types must match\n",
+	      reg_size, inter_size);
+  
+  if (vecLength<InterType>() != vecLength<StoreType>()) {
+    errorQuda("Vector lengths intermediate and register types must match\n");
+  }
+
+  if (vecLength<RegType>() == 0) errorQuda("Vector type not supported\n");
+  if (vecLength<InterType>() == 0) errorQuda("Vector type not supported\n");
+  if (vecLength<StoreType>() == 0) errorQuda("Vector type not supported\n");
+
+}
+
 /**
   @param RegType Register type used in kernel
   @param InterType Intermediate format - RegType precision with StoreType ordering
@@ -255,7 +315,7 @@ class SpinorTexture {
  public:
   SpinorTexture(const cudaColorSpinorField &x) :
   spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm(), x.NormBytes()), 
-   stride(x.Stride()) { ; }
+    stride(x.Stride()) { checkTypes<RegType,InterType,StoreType>(); }
   ~SpinorTexture() {;}
 
   __device__ inline void load(RegType x[], const int i) {
@@ -299,7 +359,7 @@ class Spinor {
 
  public:
   Spinor(cudaColorSpinorField &x) : spinor((StoreType*)x.V()), norm((float*)x.Norm()), 
-    stride(x.Stride()) {;} 
+    stride(x.Stride()) { checkTypes<RegType,InterType,StoreType>(); } 
   Spinor(const cudaColorSpinorField &x) : spinor((StoreType*)x.V()), norm((float*)x.Norm()), 
     stride(x.Stride()) {;} 
   ~Spinor() {;}
@@ -310,7 +370,7 @@ class Spinor {
     const int M = (N * sizeof(RegType)) / sizeof(InterType);
     InterType y[M];
 #pragma unroll
-    for (int j=0; j<M; j++) copyFloatN(y[j], spinor[i + j*stride]);
+    for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*stride]);
 
     convert<RegType, InterType>(x, y, N);
   }
@@ -321,7 +381,7 @@ class Spinor {
     InterType y[M];
     convert<InterType, RegType>(y, x, M);
 #pragma unroll
-    for (int j=0; j<M; j++) copyFloatN(spinor[i + j*stride], y[j]);
+    for (int j=0; j<M; j++) copyFloatN(spinor[i+j*stride], y[j]);
   }
 };
 
