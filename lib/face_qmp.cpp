@@ -211,18 +211,10 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity,
   stream = stream_p;
 
   if (dir%2==0) { // sending backwards
-#ifdef QMP_COMMS
-    // Prepost receive
-    QMP_start(mh_from_fwd[dim]);
-#endif
     // gather for backwards send
     in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendBackStrmIdx]);  
   } else { // sending forwards
 
-#ifdef QMP_COMMS
-    // Prepost receive
-    QMP_start(mh_from_back[dim]);
-#endif
     // gather for forwards send
     in.packGhost(dim, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendFwdStrmIdx]);
   }
@@ -249,6 +241,8 @@ void FaceBuffer::commsStart(int dir) {
   if (dir%2 == 0) { // sending backwards
 
 #ifdef QMP_COMMS  // Begin backward send
+    // Prepost receive
+    QMP_start(mh_from_fwd[dim];
 #ifndef GPU_DIRECT
     memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
 #endif
@@ -258,6 +252,8 @@ void FaceBuffer::commsStart(int dir) {
   } else { //sending forwards
     
 #ifdef QMP_COMMS
+  // Prepost receive
+    QMP_start(mh_from_back[dim]);
     // Begin forward send
 #ifndef GPU_DIRECT
     memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
