@@ -1680,7 +1680,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 {
 #define TDIFF_MS(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))*1000
 
-  struct timeval t0, t1, t2, t3,t4, t5, t6;
+  struct timeval t0;
   struct timeval t7, t8, t9, t10, t11;
 
   gettimeofday(&t0, NULL);
@@ -1707,9 +1707,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   qudaGaugeParam_ex->site_ga_pad  = qudaGaugeParam->site_ga_pad;
   
   GaugeFieldParam gParam(0, *qudaGaugeParam);
-
-
-  gettimeofday(&t1, NULL);
 
   // create the host fatlink
   if(cpuFatLink == NULL){
@@ -1755,10 +1752,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     cpuSiteLink->setGauge(sitelink);
   }
   
-  gettimeofday(&t2, NULL);
-  gettimeofday(&t3, NULL);
-  gettimeofday(&t4, NULL);
-
   if(cudaSiteLink == NULL){
     gParam.pad         = qudaGaugeParam->site_ga_pad;
     gParam.create      = QUDA_NULL_FIELD_CREATE;
@@ -1766,9 +1759,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     gParam.reconstruct = qudaGaugeParam->reconstruct;      
     cudaSiteLink = new cudaGaugeField(gParam);
   }
-  
-  gettimeofday(&t5, NULL);
-  gettimeofday(&t6, NULL);
   
   initCommonConstants(*cudaFatLink);
   
@@ -1810,9 +1800,10 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, cudaFatLink, time_array);
  
 
- 
   gettimeofday(&t9, NULL);
+
   storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
+  
   gettimeofday(&t10, NULL);
   
   if (!(flag & QUDA_FAT_PRESERVE_CPU_GAUGE) ){
@@ -1825,12 +1816,13 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   }
   
   gettimeofday(&t11, NULL);
-  /*
+#ifdef DSLASH_PROFILING 
   printfQuda("total time: %f ms, init(cuda/cpu gauge field creation,etc)=%f ms,"
 	     " sitelink cpu->gpu=%f ms, computation in gpu =%f ms, fatlink gpu->cpu=%f ms\n",
 	     TDIFF_MS(t0, t11), TDIFF_MS(t0, t7) + TDIFF_MS(time_array[0],time_array[1]), TDIFF_MS(t7, t8), TDIFF_MS(time_array[1], time_array[2]), TDIFF_MS(t9,t10));
   printfQuda("finally cleanup =%f ms\n", TDIFF_MS(t10, t11) + TDIFF_MS(time_array[2],time_array[3]));
-  */	     
+#endif
+
   return 0;
 }
 
