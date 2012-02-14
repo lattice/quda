@@ -42,9 +42,14 @@ texture<int4,1> tex_int4_4;
 
 template<typename OutputType, typename InputType, int tex_id=0>
 class Texture {
+ private: 
+ size_t bytes;
+
  public:
- Texture(const InputType *x, size_t bytes) { bind(x, bytes); }
- ~Texture() { unbind(); }
+ Texture(const InputType *x, size_t bytes) : bytes(bytes) { 
+   if (bytes) bind(x, bytes); // only bind if bytes > 0
+ }
+ ~Texture() { if (bytes) unbind(); }
 
  inline void bind(const InputType*, size_t bytes){ errorQuda("Texture id is out of range"); }
  inline void unbind() { errorQuda("Texture id is out of range"); }
