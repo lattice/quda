@@ -405,14 +405,43 @@ computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix* dest)
   return;
 }
 
+
+template <typename half_wilson_vector, typename su3_matrix>
+static void
+computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix* dest, size_t nhops)
+{
+  int dx[4];
+  for(int i=0; i<V; ++i){
+    for(int dir=0; dir<4; ++dir){
+      dx[3]=dx[2]=dx[1]=dx[0]=0;
+      dx[dir] = nhops;
+      int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
+      half_wilson_vector* hw = src + nbr_idx;
+      su3_projector( &(hw->h[0]), &src[i].h[0], &dest[i*4 + dir]);
+    } // dir
+  } // i
+  return;
+}
+
+
+
+
 void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision)
 {
   if(precision == QUDA_SINGLE_PRECISION){
-    printf("Working in single precision\n");
     computeLinkOrderedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dst);
   }else{
-    printf("Working in double precision\n");
     computeLinkOrderedOuterProduct((dhalf_wilson_vector*)src,(dsu3_matrix*)dst);
+  }
+  return;
+}
+
+void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, size_t nhops)
+{
+  if(precision == QUDA_SINGLE_PRECISION){
+    computeLinkOrderedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dst, nhops);
+  }else{
+    computeLinkOrderedOuterProduct((dhalf_wilson_vector*)src,(dsu3_matrix*)dst, nhops);
   }
   return;
 }
@@ -679,25 +708,26 @@ void do_color_matrix_hisq_force_reference(Real eps, Real weight,
   int i;
   int mu, nu, rho, sig;
   Real coeff;
-  Real OneLink, Lepage, Naik, FiveSt, ThreeSt, SevenSt;
-  Real mNaik, mLepage, mFiveSt, mThreeSt, mSevenSt;    
+  Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
+//  Real Naik;
+  Real mLepage, mFiveSt, mThreeSt, mSevenSt;    
 
   su3_matrix* tempmat[9];
   int sites_on_node = V;
-  int DirectLinks[8] ;
+  //int DirectLinks[8] ;
  
   Real ferm_epsilon;
   ferm_epsilon = 2.0*weight*eps;
   OneLink = act_path_coeff[0]*ferm_epsilon ; 
-  Naik    = act_path_coeff[1]*ferm_epsilon ; mNaik    = -Naik;
+//  Naik    = act_path_coeff[1]*ferm_epsilon ; mNaik    = -Naik;
   ThreeSt = act_path_coeff[2]*ferm_epsilon ; mThreeSt = -ThreeSt;
   FiveSt  = act_path_coeff[3]*ferm_epsilon ; mFiveSt  = -FiveSt;
   SevenSt = act_path_coeff[4]*ferm_epsilon ; mSevenSt = -SevenSt;
   Lepage  = act_path_coeff[5]*ferm_epsilon ; mLepage  = -Lepage;
 
-  for(mu=0;mu<8;mu++){
-    DirectLinks[mu] = 0 ;
-  }
+//  for(mu=0;mu<8;mu++){
+//    DirectLinks[mu] = 0 ;
+//  }
 
   for(mu=0; mu<9; mu++){	
     tempmat[mu] = (su3_matrix *)malloc( sites_on_node*sizeof(su3_matrix) );  
@@ -706,11 +736,11 @@ void do_color_matrix_hisq_force_reference(Real eps, Real weight,
 
   su3_matrix* id;
   id = (su3_matrix *)malloc(sites_on_node*sizeof(su3_matrix) ); 
-  su3_matrix* id4;
-  id4 = (su3_matrix *)malloc(sites_on_node*4*sizeof(su3_matrix) ); 
+  //su3_matrix* id4;
+  //id4 = (su3_matrix *)malloc(sites_on_node*4*sizeof(su3_matrix) ); 
 
-  su3_matrix* temp_mat;
-  temp_mat = (su3_matrix *)malloc(sites_on_node*sizeof(su3_matrix) ); 
+ // su3_matrix* temp_mat;
+//  temp_mat = (su3_matrix *)malloc(sites_on_node*sizeof(su3_matrix) ); 
 
 
   //  su3_matrix* temp_xx;
@@ -857,25 +887,27 @@ void do_halfwilson_hisq_force_reference(Real eps, Real weight,
   int i;
   int mu, nu, rho, sig;
   Real coeff;
-  Real OneLink, Lepage, Naik, FiveSt, ThreeSt, SevenSt;
-  Real mNaik, mLepage, mFiveSt, mThreeSt, mSevenSt;    
+  Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
+  //Real Naik;
+  Real mLepage, mFiveSt, mThreeSt, mSevenSt;    
 
   su3_matrix* tempmat[9];
   int sites_on_node = V;
-  int DirectLinks[8] ;
+//  int DirectLinks[8] ;
  
   Real ferm_epsilon;
   ferm_epsilon = 2.0*weight*eps;
   OneLink = act_path_coeff[0]*ferm_epsilon ; 
-  Naik    = act_path_coeff[1]*ferm_epsilon ; mNaik    = -Naik;
+//  Naik    = act_path_coeff[1]*ferm_epsilon ; 
   ThreeSt = act_path_coeff[2]*ferm_epsilon ; mThreeSt = -ThreeSt;
   FiveSt  = act_path_coeff[3]*ferm_epsilon ; mFiveSt  = -FiveSt;
   SevenSt = act_path_coeff[4]*ferm_epsilon ; mSevenSt = -SevenSt;
   Lepage  = act_path_coeff[5]*ferm_epsilon ; mLepage  = -Lepage;
-    
-  for(mu=0;mu<8;mu++){
-    DirectLinks[mu] = 0 ;
-  }
+   
+ 
+//  for(mu=0;mu<8;mu++){
+//    DirectLinks[mu] = 0 ;
+//  }
 
   for(mu=0; mu<9; mu++){	
     tempmat[mu] = (su3_matrix *)malloc( sites_on_node*sizeof(su3_matrix) );  
@@ -1045,215 +1077,6 @@ void do_halfwilson_hisq_force_reference(Real eps, Real weight,
 
 
 
-
-#define Pmu          tempvec[0] 
-#define Pnumu        tempvec[1]
-#define Prhonumu     tempvec[2]
-#define P7           tempvec[3]
-#define P7rho        tempvec[4]              
-#define P7rhonu      tempvec[5]
-#define P5           tempvec[6]
-#define P3           tempvec[7]
-#define P5nu         tempvec[3]
-#define P3mu         tempvec[3]
-#define Popmu        tempvec[4]
-#define Pmumumu      tempvec[4]
-
-
-template <typename Real, typename half_wilson_vector, typename anti_hermitmat, 
-	  typename su3_matrix>
-static void
-do_fermion_force_reference(Real eps, Real weight1, Real weight2,
-			   half_wilson_vector* temp_x, Real* act_path_coeff, 
-			   su3_matrix* sitelink, anti_hermitmat* mom)    
-{
-    int i;
-    int mu, nu, rho, sig;
-    Real coeff[2];
-    Real OneLink[2], Lepage[2], Naik[2], FiveSt[2], ThreeSt[2], SevenSt[2] ;
-    Real mNaik[2], mLepage[2], mFiveSt[2], mThreeSt[2], mSevenSt[2];    
-    half_wilson_vector *tempvec[8] ;
-    int sites_on_node = V;
-    int DirectLinks[8] ;
- 
-    Real ferm_epsilon;
-    ferm_epsilon = 2.0*weight1*eps;
-    OneLink[0] = act_path_coeff[0]*ferm_epsilon ; 
-    Naik[0]    = act_path_coeff[1]*ferm_epsilon ; mNaik[0]    = -Naik[0];
-    ThreeSt[0] = act_path_coeff[2]*ferm_epsilon ; mThreeSt[0] = -ThreeSt[0];
-    FiveSt[0]  = act_path_coeff[3]*ferm_epsilon ; mFiveSt[0]  = -FiveSt[0];
-    SevenSt[0] = act_path_coeff[4]*ferm_epsilon ; mSevenSt[0] = -SevenSt[0];
-    Lepage[0]  = act_path_coeff[5]*ferm_epsilon ; mLepage[0]  = -Lepage[0];
-    
-    ferm_epsilon = 2.0*weight2*eps;
-    OneLink[1] = act_path_coeff[0]*ferm_epsilon ; 
-    Naik[1]    = act_path_coeff[1]*ferm_epsilon ; mNaik[1]    = -Naik[1];
-    ThreeSt[1] = act_path_coeff[2]*ferm_epsilon ; mThreeSt[1] = -ThreeSt[1];
-    FiveSt[1]  = act_path_coeff[3]*ferm_epsilon ; mFiveSt[1]  = -FiveSt[1];
-    SevenSt[1] = act_path_coeff[4]*ferm_epsilon ; mSevenSt[1] = -SevenSt[1];
-    Lepage[1]  = act_path_coeff[5]*ferm_epsilon ; mLepage[1]  = -Lepage[1];
-    
-    for(mu=0;mu<8;mu++){
-	DirectLinks[mu] = 0 ;
-    }
-
-
-    
-    for(mu=0;mu<8;mu++){
-	tempvec[mu] = (half_wilson_vector *)malloc( sites_on_node*sizeof(half_wilson_vector) );  
-    }
-
-
-/*
-    float c[2] = {1,1};
-
-    su3_matrix* temp_mat;
-    temp_mat = (su3_matrix*)malloc(sites_on_node*sizeof(su3_matrix));	
-    su3_matrix* id;
-    id = (su3_matrix*)malloc(sites_on_node*sizeof(su3_matrix));	
-    set_identity(id,1);
-    su3_matrix* id4;
-    id4 = (su3_matrix*)malloc(sites_on_node*4*sizeof(su3_matrix));	
-    set_identity(id4,4);
-    sig=2;	
-    mu=3;
-    u_shift_hw(temp_x, Pmu, OPP_DIR(mu), sitelink);
-    u_shift_hw(Pmu, P3, sig, sitelink);
-    add_3f_force_to_mom(P3, Pmu, sig, c, mom);
-
-*/
-
-
-/*
-    shifted_outer_prod(temp_x, temp_mat, OPP_DIR(mu));
-    add_force_to_momentum(temp_mat,id,sig,c[0],mom);	
-
-    sig=2;
-    u_shift_hw(temp_x, P3, OPP_DIR(sig), sitelink);
-    add_3f_force_to_mom(temp_x, P3, sig, c, mom); // Forms the outer product of the fields and make anti-hermitian
-*/						     // The result should be zero
-    printf("Calling standard routine\n");
- 
-    for(sig=0; sig < 8; sig++){
-	for(mu = 0; mu < 8; mu++){
-	    if ( (mu == sig) || (mu == OPP_DIR(sig))){
-		continue;
-	    }
-
-	    // 3 link path 
-	    u_shift_hw(temp_x, Pmu, OPP_DIR(mu), sitelink);
-	    u_shift_hw(Pmu, P3, sig, sitelink);
-	    if (GOES_FORWARDS(sig)){
-		add_3f_force_to_mom(P3, Pmu, sig, mThreeSt, mom);
-	    }	   
-
-	    for(nu=0; nu < 8; nu++){
-		if (nu == sig || nu == OPP_DIR(sig)
-		    || nu == mu || nu == OPP_DIR(mu)){
-		    continue;
-		}
-		
-		// 5 link path
-		u_shift_hw(Pmu, Pnumu, OPP_DIR(nu), sitelink);
-		u_shift_hw(Pnumu, P5, sig, sitelink);
-		if (GOES_FORWARDS(sig)){
-		    add_3f_force_to_mom(P5, Pnumu, sig, FiveSt, mom);
-		}
-
-		for(rho =0; rho < 8; rho++){
-		    if (rho == sig || rho == OPP_DIR(sig)
-			|| rho == mu || rho == OPP_DIR(mu)
-			|| rho == nu || rho == OPP_DIR(nu)){
-			continue;
-		    }
-		    
-		    //7 link path
-		    u_shift_hw(Pnumu, Prhonumu, OPP_DIR(rho), sitelink);
-		    u_shift_hw(Prhonumu, P7,sig, sitelink);
-		    if(GOES_FORWARDS(sig)){
-			add_3f_force_to_mom(P7, Prhonumu, sig, mSevenSt, mom) ;	
-		    }
-		    u_shift_hw(P7, P7rho, rho, sitelink);
-		    side_link_3f_force(rho,sig,SevenSt, Pnumu, P7, Prhonumu, P7rho, mom);		    
-		    if(FiveSt[0] != 0)coeff[0] = SevenSt[0]/FiveSt[0] ; else coeff[0] = 0;
-		    if(FiveSt[1] != 0)coeff[1] = SevenSt[1]/FiveSt[1] ; else coeff[1] = 0;		    
-		    for(i=0;i < V; i++){
-			scalar_mult_add_su3_vector(&(P5[i].h[0]),&(P7rho[i].h[0]), coeff[0],
-						   &(P5[i].h[0]));
-			scalar_mult_add_su3_vector(&(P5[i].h[1]),&(P7rho[i].h[1]), coeff[1],
-						   &(P5[i].h[1]));
-		    }		    
-		}//rho	
-
-		u_shift_hw(P5,P5nu, nu, sitelink);
-		side_link_3f_force(nu,sig,mFiveSt,Pmu,P5, Pnumu,P5nu, mom);
-		if(ThreeSt[0] != 0)coeff[0] = FiveSt[0]/ThreeSt[0] ; else coeff[0] = 0;
-		if(ThreeSt[1] != 0)coeff[1] = FiveSt[1]/ThreeSt[1] ; else coeff[1] = 0;
-		for(i=0; i < V; i++){
-		    scalar_mult_add_su3_vector(&(P3[i].h[0]),&(P5nu[i].h[0]),coeff[0],&(P3[i].h[0]));
-		    scalar_mult_add_su3_vector(&(P3[i].h[1]),&(P5nu[i].h[1]),coeff[1],&(P3[i].h[1]));
-		}
-	    }//nu
-
-	    //Lepage term
-	    u_shift_hw(Pmu, Pnumu, OPP_DIR(mu), sitelink);
-	    u_shift_hw(Pnumu, P5, sig, sitelink);
-	    if(GOES_FORWARDS(sig)){
-		add_3f_force_to_mom(P5, Pnumu, sig, Lepage, mom);
-	    }
-	    
-	    u_shift_hw(P5,P5nu, mu, sitelink);
-	    side_link_3f_force(mu, sig, mLepage, Pmu, P5, Pnumu, P5nu, mom);
-	    if(ThreeSt[0] != 0) coeff[0] = Lepage[0]/ThreeSt[0] ; else coeff[0] = 0;
-	    if(ThreeSt[1] != 0) coeff[1] = Lepage[1]/ThreeSt[1] ; else coeff[1] = 0;
-
-	    for(i=0;i < V;i++){
-		scalar_mult_add_su3_vector(&(P3[i].h[0]),&(P5nu[i].h[0]),coeff[0],&(P3[i].h[0]));
-		scalar_mult_add_su3_vector(&(P3[i].h[1]),&(P5nu[i].h[1]),coeff[1],&(P3[i].h[1]));
-	    }
-	    
-	    if(GOES_FORWARDS(mu)) {
-		u_shift_hw(P3,P3mu, mu, sitelink);
-	    }
-	    side_link_3f_force(mu, sig, ThreeSt, temp_x, P3, Pmu, P3mu, mom);   
-	    
-	    //One link term and Naik term
-	    if( (!DirectLinks[mu]) ){
-		DirectLinks[mu]=1 ;
-		if(GOES_BACKWARDS(mu)){
-		    //one link term
-		    add_3f_force_to_mom(Pmu, temp_x, OPP_DIR(mu), OneLink, mom);
-//  		    // the remaining lines of code relate to the 3-link term 
-//                  // in the Naik operator:  
-//		    u_shift_hw(temp_x, Popmu, mu, sitelink);
-//		    add_3f_force_to_mom(Pnumu, Popmu, OPP_DIR(mu), mNaik, mom);
-//		    u_shift_hw(Pnumu, Pmumumu, OPP_DIR(mu), sitelink);
-//		    add_3f_force_to_mom(Pmumumu, temp_x, OPP_DIR(mu), Naik, mom);
-		}else{
-//		    u_shift_hw(temp_x, Popmu, mu, sitelink);
-//		    add_3f_force_to_mom(Popmu, Pnumu, mu, Naik, mom);
-		}		
-	    }//if
-
-	}//mu
-    }//sig
-    
-}
-
-#undef Pmu
-#undef Pnumu
-#undef Prhonumu
-#undef P7
-#undef P7rho
-#undef P7rhonu
-#undef P5
-#undef P3
-#undef P5nu
-#undef P3mu
-#undef Popmu
-#undef Pmumumu
-
-
 static
 void set_identity(fsu3_matrix *sitelink){
   int tot = V*4;
@@ -1297,15 +1120,12 @@ void halfwilson_hisq_force_reference(double eps, double weight,
 
 
 
-
 void color_matrix_hisq_force_reference(float eps, float weight, 
 			  void* act_path_coeff, void* temp_xx,
 			  void* sitelink, void* mom)
 {
-/*
  do_color_matrix_hisq_force_reference((float)eps, (float)weight,
 			  (fsu3_matrix*) temp_xx, (float*)act_path_coeff,
 			  (fsu3_matrix*)sitelink, (fanti_hermitmat*)mom);
-*/
   return;
 }

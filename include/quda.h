@@ -167,7 +167,10 @@ extern "C" {
   // these are temporary additions until we objectify the gauge field
   void set_dim(int *);
   void pack_ghost(void **cpuLink, void **cpuGhost, int nFace, QudaPrecision precision);
-  
+ 
+
+  void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param);
+ 
   int computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff, 
 			 QudaGaugeParam* param, 
 			 QudaComputeFatMethod method);

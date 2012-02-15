@@ -782,4 +782,4 @@ namespace hisq{
         }
 
 } // end namespace hisq
-#endif
+#endif // _QUDA_MATRIX_H_

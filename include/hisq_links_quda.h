@@ -22,6 +22,8 @@ void unitarizeLinksCPU(const QudaGaugeParam& param,
 		       cpuGaugeField& infield,
 		       cpuGaugeField* outfield);
 
+bool isUnitary(const QudaGaugeParam& param, cpuGaugeField& field, double max_error);
+
 } // namespace hisq
 
 

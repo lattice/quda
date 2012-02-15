@@ -185,7 +185,7 @@ hisq_force_test()
   hisq_force_init();
 
   initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
-  hisq_force_init_cuda(&gaugeParam);
+  hisqForceInitCuda(&gaugeParam);
 
   float act_path_coeff[6];
   act_path_coeff[0] = 0.625000;
@@ -219,15 +219,14 @@ hisq_force_test()
   const double svd_rel_err = 1e-8;
   const double svd_abs_err = 1e-8;
 
-  set_unitarize_force_constants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
-  struct timeval t0, t1;
-  bool shouldCompute = true;
-  gettimeofday(&t0, NULL);
+  setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
   
   // First of all we fatten the links on the GPU
-  hisq_staples_force_cuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+  hisqStaplesForceCuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
 
   cudaThreadSynchronize();
+
+
   checkCudaError();
   cudaForce->saveCPUField(*cpuForce, QUDA_CPU_FIELD_LOCATION);
 
@@ -235,9 +234,9 @@ hisq_force_test()
   int* unitarization_failed_dev; 
   cudaMalloc((void**)&unitarization_failed_dev, sizeof(int));
 
-  unitarize_force_cuda(gaugeParam, *cudaForce, *cudaGauge, cudaOprod, unitarization_failed_dev); // output is written to cudaOprod.
+  unitarizeForceCuda(gaugeParam, *cudaForce, *cudaGauge, cudaOprod, unitarization_failed_dev); // output is written to cudaOprod.
   if(verify_results){
-    unitarize_force_cpu(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
+    unitarizeForceCPU(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
   }
   cudaThreadSynchronize();
   checkCudaError();
@@ -248,9 +247,7 @@ hisq_force_test()
   int res;
   res = compare_floats(cpuOprod->Gauge_p(), cpuOprod->Gauge_p(), 4*cpuReference->Volume()*gaugeSiteSize, 1e-5, gaugeParam.cpu_prec);
 
-  //strong_check_mom(cpuReference->Gauge_p(), cpuOprod->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
-  int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
 
   hisq_force_end();
 }
