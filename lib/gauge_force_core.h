@@ -419,8 +419,8 @@
   printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21_im, mul##22_re, mul##22_im);
 
 
-//for now we only consider 12-reconstruct and single precision
 //FloatN can be float2/float4/double2
+//Float2 can be float2/double2
 template<int oddBit, typename Float2, typename FloatN, typename Float>
   __global__ void
   GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd,

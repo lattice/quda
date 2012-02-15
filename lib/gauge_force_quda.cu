@@ -11,11 +11,11 @@ __constant__ int path_max_length;
 
 //single precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
@@ -33,11 +33,11 @@ __constant__ int path_max_length;
 
 //double precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
@@ -55,11 +55,11 @@ __constant__ int path_max_length;
 
 //single precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
@@ -77,11 +77,11 @@ __constant__ int path_max_length;
 
 //double precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, Vh)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, Vh)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
@@ -111,9 +111,16 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
     }
     gauge_force_init_cuda_flag=1;
 
+    int* X = param->X;
+    int Vh = X[0]*X[1]*X[2]*X[3]/2;
+
     init_kernel_cuda(param);
     
     cudaMemcpyToSymbol("path_max_length", &path_max_length, sizeof(int));
+    
+    int site_ga_stride = param->site_ga_pad + Vh;
+    cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));
+    
 
 }
 
@@ -151,12 +158,7 @@ gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& 
     cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice); checkCudaError();
     
     //path_coeff
-    int gsize;
-    if (param->cuda_prec == QUDA_DOUBLE_PRECISION){
-	gsize = sizeof(double);
-    }else{
-	gsize= sizeof(float);
-    }     
+    int gsize = param->cuda_prec;
     void* path_coeff_d;
     cudaMalloc((void**)&path_coeff_d, num_paths*gsize); checkCudaError();
     cudaMemcpy(path_coeff_d, path_coeff, num_paths*gsize, cudaMemcpyHostToDevice); checkCudaError();

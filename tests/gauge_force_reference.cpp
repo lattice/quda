@@ -255,7 +255,7 @@ compute_path_product(su3_matrix* staple, su3_matrix* sitelink, int* path, int le
 	    if (GOES_FORWARDS(path[j])){
 		dx[path[j]] +=1;
 	    }else{		
-		//dx[OPP_DIR(path[j])] -=1;
+	      //we already substract one in the code above
 	    }	    
 
 	    
@@ -309,12 +309,7 @@ gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPre
     int i;
     
     void* staple;
-    int gSize;    
-    if (prec == QUDA_DOUBLE_PRECISION){
-	gSize= sizeof(double);
-    }else{
-	gSize= sizeof(float);
-    }
+    int gSize =  prec;    
 
     staple = malloc(V* gaugeSiteSize* gSize);
     if (staple == NULL){
@@ -337,7 +332,7 @@ gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPre
     if (prec == QUDA_DOUBLE_PRECISION){
       update_mom((danti_hermitmat*) refMom, dir, (dsu3_matrix*)sitelink, (dsu3_matrix*)staple, (double)eb3);
     }else{
-	update_mom((fanti_hermitmat*)refMom, dir, (fsu3_matrix*)sitelink, (fsu3_matrix*)staple, (float)eb3);
+      update_mom((fanti_hermitmat*)refMom, dir, (fsu3_matrix*)sitelink, (fsu3_matrix*)staple, (float)eb3);
     }
     
     free(staple);
