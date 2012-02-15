@@ -1237,7 +1237,7 @@ void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y)
   quda::blas_bytes += 3*x.RealLength()*x.Precision();
   quda::blas_flops += 2*x.RealLength();
 
-  if (!blasTuning) checkCudaError();
+  if (!blasTuning) checkCudaError();  // blas_quda may require new blas_param from blas_test
 }
 
 template <typename Float, typename Float2>
