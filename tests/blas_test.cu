@@ -9,14 +9,15 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 8;
-const int LY = 8;
-const int LZ = 8;
-const int LT = 8;
-const int Nspin = 4;
+const int LX = 16;
+const int LY = 16;
+const int LZ = 16;
+const int LT = 16;
+const int Nspin = 1;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
-const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+//const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+const int Niter = 1;// * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
 const int Nkernels = 30;
 const int ThreadMin = 32;
@@ -670,7 +671,7 @@ int main(int argc, char** argv)
   // turn off error checking in blas kernels for tuning
   quda::setBlasTuning(QUDA_TUNE_YES);
 
-  for (int prec = 0; prec < 1/*Nprec*/; prec++) {
+  for (int prec = 0; prec < Nprec; prec++) {
 
     printf("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
     initFields(prec);
@@ -759,7 +760,7 @@ int main(int argc, char** argv)
   quda::setBlasTuning(QUDA_TUNE_NO);
 
   // lastly check for correctness
-  for (int prec = 0; prec < 1; prec++) {
+  for (int prec = 0; prec < Nprec; prec++) {
     printf("\nTesting %s precision...\n\n", prec_str[prec]);
     initFields(prec);
     
