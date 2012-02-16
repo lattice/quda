@@ -653,6 +653,7 @@ BUILD_MULTI_GPU
 BUILD_HISQ_FORCE
 BUILD_FERMION_FORCE
 BUILD_GAUGE_FORCE
+BUILD_HISQLINK
 BUILD_FATLINK
 BUILD_TWISTED_MASS_DIRAC
 BUILD_STAGGERED_DIRAC
@@ -739,6 +740,7 @@ enable_domain_wall_dirac
 enable_staggered_dirac
 enable_twisted_mass_dirac
 enable_staggered_fatlink
+enable_hisq_fatlink
 enable_gauge_force
 enable_staggered_force
 enable_hisq_force
@@ -1404,6 +1406,7 @@ Optional Features:
                           Build Twisted Mass Dirac Op (default=enabled)
   --enable-staggered-fatlink
                           Build Staggered Fat Link Code (default=disabled)
+  --enable-hisq-fatlink   Build Hisq Fat Link Code (default=disabled)
   --enable-gauge-force    Build 1 loop Symanzik gauge force (default=disabled)
   --enable-staggered-force
                           Build Staggered Force Term (default=disabled)
@@ -3911,6 +3914,15 @@ else
 fi
 
 
+# Check whether --enable-hisq-fatlink was given.
+if test "${enable_hisq_fatlink+set}" = set; then
+  enableval=$enable_hisq_fatlink;  build_hisq_fatlink=${enableval}
+else
+   build_hisq_fatlink="no"
+
+fi
+
+
 # Check whether --enable-gauge-force was given.
 if test "${enable_gauge_force+set}" = set; then
   enableval=$enable_gauge_force;  build_gauge_force=${enableval}
@@ -4114,6 +4126,15 @@ $as_echo "$as_me: error:  invalid value for --enable-staggered-fatlink " >&2;}
   ;;
 esac
 
+case ${build_hisq_fatlink} in
+yes|no);;
+*)
+  { { $as_echo "$as_me:$LINENO: error:  invalid value for --enable-hisq-fatlink " >&5
+$as_echo "$as_me: error:  invalid value for --enable-hisq-fatlink " >&2;}
+   { (exit 1); exit 1; }; }
+  ;;
+esac
+
 case ${build_gauge_force} in
 yes|no);;
 *)
@@ -4132,6 +4153,14 @@ $as_echo "$as_me: error:  invalid value for --enable-staggered-force " >&2;}
   ;;
 esac
 
+case ${build_hisq_force} in
+yes|no);;
+*)
+  { { $as_echo "$as_me:$LINENO: error:  invalid value for --enable-hisq-force " >&5
+$as_echo "$as_me: error:  invalid value for --enable-hisq-force " >&2;}
+   { (exit 1); exit 1; }; }
+  ;;
+esac
 
 case ${multi_gpu} in
 yes|no);;
@@ -4287,6 +4316,11 @@ BUILD_TWISTED_MASS_DIRAC=${build_twm_dirac}
 { $as_echo "$as_me:$LINENO: Setting BUILD_FATLINK = ${build_staggered_fatlink}  " >&5
 $as_echo "$as_me: Setting BUILD_FATLINK = ${build_staggered_fatlink}  " >&6;}
 BUILD_FATLINK=${build_staggered_fatlink}
+
+
+{ $as_echo "$as_me:$LINENO: Setting BUILD_HISQLINK = ${build_hisq_fatlink}  " >&5
+$as_echo "$as_me: Setting BUILD_HISQLINK = ${build_hisq_fatlink}  " >&6;}
+BUILD_HISQLINK=${build_hisq_fatlink}
 
 
 { $as_echo "$as_me:$LINENO: Setting BUILD_GAUGE_FORCE = ${build_gauge_force}  " >&5
