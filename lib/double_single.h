@@ -1,61 +1,37 @@
-#if (__COMPUTE_CAPABILITY__ < 130)
-// Computes c = a + b in "double single" precision.
-__device__ void dsadd(volatile QudaSumFloat &c0, volatile QudaSumFloat &c1, const volatile QudaSumFloat &a0, 
-		      const volatile QudaSumFloat &a1, const float b0, const float b1) {
-  // Compute dsa + dsb using Knuth's trick.
-  QudaSumFloat t1 = a0 + b0;
-  QudaSumFloat e = t1 - a0;
-  QudaSumFloat t2 = ((b0 - e) + (a0 - (t1 - e))) + a1 + b1;
+#if (__COMPUTE_CAPACITY__ < 130)
+
+__device__ inline void dsadd(volatile float2 &c, const volatile float2 &a, const volatile float2 &b) {
+  float t1 = a.x + b.x;
+  float e = t1 - a.x;
+  float t2 = ((b.x - e) + (a.x - (t1 - e))) + a.y + b.y;
   // The result is t1 + t2, after normalization.
-  c0 = e = t1 + t2;
-  c1 = t2 - (e - t1);
+  c.x = e = t1 + t2;
+  c.y = t2 - (e - t1);
 }
 
-// Computes c = a + b in "double single" precision (complex version)
-__device__ void zcadd(volatile QudaSumComplex &c0, volatile QudaSumComplex &c1, const volatile QudaSumComplex &a0, 
-		      const volatile QudaSumComplex &a1, const volatile QudaSumComplex &b0, const volatile QudaSumComplex &b1) {
-  // Compute dsa + dsb using Knuth's trick.
-  QudaSumFloat t1 = a0.x + b0.x;
-  QudaSumFloat e = t1 - a0.x;
-  QudaSumFloat t2 = ((b0.x - e) + (a0.x - (t1 - e))) + a1.x + b1.x;
-  // The result is t1 + t2, after normalization.
-  c0.x = e = t1 + t2;
-  c1.x = t2 - (e - t1);
-  
-  // Compute dsa + dsb using Knuth's trick.
-  t1 = a0.y + b0.y;
-  e = t1 - a0.y;
-  t2 = ((b0.y - e) + (a0.y - (t1 - e))) + a1.y + b1.y;
-  // The result is t1 + t2, after normalization.
-  c0.y = e = t1 + t2;
-  c1.y = t2 - (e - t1);
-}
+struct doublesingle {
+  float2 a;
+  __device__ inline doublesingle() : a(make_float2(0.0f,0.0f)) { ; } 
+  __device__ inline doublesingle(const volatile doublesingle &b) : a(make_float2(b.a.x, b.a.y)) { ; } 
+  __device__ inline doublesingle(const float a) : a(make_float2(a, 0.0)) { ; }
 
-// Computes c = a + b in "double single" precision (float3 version)
-__device__ void dsadd3(volatile QudaSumFloat3 &c0, volatile QudaSumFloat3 &c1, const volatile QudaSumFloat3 &a0, 
-		       const volatile QudaSumFloat3 &a1, const volatile QudaSumFloat3 &b0, const volatile QudaSumFloat3 &b1) {
-  // Compute dsa + dsb using Knuth's trick.
-  QudaSumFloat t1 = a0.x + b0.x;
-  QudaSumFloat e = t1 - a0.x;
-  QudaSumFloat t2 = ((b0.x - e) + (a0.x - (t1 - e))) + a1.x + b1.x;
-  // The result is t1 + t2, after normalization.
-  c0.x = e = t1 + t2;
-  c1.x = t2 - (e - t1);
+  __device__ inline void operator+=(const doublesingle &b) { dsadd(this->a, this->a, b.a); }
+  __device__ inline void operator+=(const float &b) { 
+    float2 b2 = make_float2(b, 0.0); 
+    dsadd(this->a, this->a, b2); }
   
-  // Compute dsa + dsb using Knuth's trick.
-  t1 = a0.y + b0.y;
-  e = t1 - a0.y;
-  t2 = ((b0.y - e) + (a0.y - (t1 - e))) + a1.y + b1.y;
-  // The result is t1 + t2, after normalization.
-  c0.y = e = t1 + t2;
-  c1.y = t2 - (e - t1);
-  
-  // Compute dsa + dsb using Knuth's trick.
-  t1 = a0.z + b0.z;
-  e = t1 - a0.z;
-  t2 = ((b0.z - e) + (a0.z - (t1 - e))) + a1.z + b1.z;
-  // The result is t1 + t2, after normalization.
-  c0.z = e = t1 + t2;
-  c1.z = t2 - (e - t1);
-}
+  __device__ inline doublesingle& operator=(const doublesingle &b)
+    { a.x = b.a.x; a.y = b.a.y; return *this; }
+    
+  __device__ inline doublesingle& operator=(const float &b) 
+  { a.x = b; a.y = 0.0f; return *this; }
+};
+
+__device__ inline volatile doublesingle operator+=(volatile doublesingle& a, const volatile doublesingle &b) 
+{ dsadd(a.a, a.a, b.a); return a; }
+__host__ double operator+=(double& a, doublesingle &b) { a = b.a.x; a += b.a.y; return a; }
+
+struct doublesingle2 { doublesingle x; doublesingle y; };
+struct doublesingle3 { doublesingle x; doublesingle y; doublesingle z; };
+
 #endif
