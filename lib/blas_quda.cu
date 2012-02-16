@@ -700,21 +700,6 @@ __device__ void caxpbypz_(const float2 &a, float2 &x, const float2 &b, float2 &y
   z.y += a.y*x.x + a.x*x.y + b.y*y.x + b.x*y.y;  
 }
 
-#define CXPAYPBZ_FLOAT4(X, a, Y, b, Z)				       \
-  {float2 z;							       \
-  z.x = X.x + a.x*Y.x; z.x -= a.y*Y.y; z.x += b.x*Z.x; z.x -= b.y*Z.y; \
-  z.y = X.y + a.y*Y.x; z.y += a.x*Y.y; z.y += b.y*Z.x; z.y += b.x*Z.y; \
-  Z.x = z.x; Z.y = z.y;						       \
-  z.x = X.z + a.x*Y.z; z.x -= a.y*Y.w; z.x += b.x*Z.z; z.x -= b.y*Z.w; \
-  z.y = X.w + a.y*Y.z; z.y += a.x*Y.w; z.y += b.y*Z.z; z.y += b.x*Z.w; \
-  Z.z = z.x; Z.w = z.y;}
-
-#define CXPAYPBZ_FLOAT2(X, a, Y, b, Z)				       \
-  {float2 z;							       \
-  z.x = X.x + a.x*Y.x; z.x -= a.y*Y.y; z.x += b.x*Z.x; z.x -= b.y*Z.y; \
-  z.y = X.y + a.y*Y.x; z.y += a.x*Y.y; z.y += b.y*Z.x; z.y += b.x*Z.y; \
-  Z.x = z.x; Z.y = z.y;}
-
 #if (__COMPUTE_CAPABILITY__ < 200)
 #define CAXPBYPZ_FLOAT4(a, X, b, Y, Z)		  \
   Z.x += a.x*X.x - a.y*X.y + b.x*Y.x - b.y*Y.y;   \
@@ -1194,10 +1179,10 @@ void blasCuda(const int kernel, const double2 &a, cudaColorSpinorField &x,
       Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y));
       blasKernel<float2, 3> <<<blasGrid, blasBlock>>>(xTex, yTex, f, yStore, y.Volume());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    quda::blas_bytes += 3*x.Volume()*sizeof(float);
+    quda::blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
   }
-  quda::blas_bytes += 3*x.RealLength()*x.Precision();
-  quda::blas_flops += 3*x.RealLength();
+  quda::blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
+  quda::blas_flops += Functor<double2,double2>::flops()*x.RealLength();
 
   if (!blasTuning) checkCudaError();
 }
@@ -1211,6 +1196,8 @@ struct axpby {
   const Float2 b;
   axpby(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { y = a.x*x + b.x*y; }
+  static int streams() { return 3; } //! total number of input and output streams
+  static int flops() { return 3; } //! flops per element
 };
 
 void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y) {
@@ -1222,6 +1209,8 @@ template <typename Float2, typename FloatN>
 struct xpy {
   xpy(const Float2 &a, const Float2 &b) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { y += x ; }
+  static int streams() { return 3; } //! total number of input and output streams
+  static int flops() { return 1; } //! flops per element
 };
 
 void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
@@ -1234,6 +1223,8 @@ struct axpy {
   const Float2 a;
   axpy(const Float2 &a, const Float2 &b) : a(a) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { y = a.x*x + y; }
+  static int streams() { return 3; } //! total number of input and output streams
+  static int flops() { return 2; } //! flops per element
 };
 
 void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
@@ -1246,17 +1237,21 @@ struct xpay {
   const Float2 a;
   xpay(const Float2 &a, const Float2 &b) : a(a) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { y = x + a.x*y; }
+  static int streams() { return 3; } //! total number of input and output streams
+  static int flops() { return 2; } //! flops per element
 };
 
 void xpayCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y) {
   const int kernel = 5;
-  blasCuda<xpay>(kernel, make_double2(1.0,0.0), x, make_double2(a, 0.0), y);
+  blasCuda<xpay>(kernel, make_double2(a,0.0), x, make_double2(0.0, 0.0), y);
 }
 
 template <typename Float2, typename FloatN>
 struct mxpy {
   mxpy(const Float2 &a, const Float2 &b) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { y -= x; }
+  static int streams() { return 3; } //! total number of input and output streams
+  static int flops() { return 1; } //! flops per element
 };
 
 void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
@@ -1269,11 +1264,13 @@ struct ax {
   const Float2 a;
   ax(const Float2 &a, const Float2 &b) : a(a) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { y *= a.x; }
+  static int streams() { return 2; } //! total number of input and output streams
+  static int flops() { return 1; } //! flops per element
 };
 
 void axCuda(const double &a, cudaColorSpinorField &x) {
   const int kernel = 7;
-  blasCuda<ax>(kernel, make_double2(1.0, 0.0), x, make_double2(a, 0.0), x);
+  blasCuda<ax>(kernel, make_double2(a, 0.0), x, make_double2(0.0, 0.0), x);
 }
 
 template <typename Float2, typename FloatN>
@@ -1281,6 +1278,8 @@ struct caxpy {
   const Float2 a;
   caxpy(const Float2 &a, const Float2 &b) : a(a) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { caxpy_(a, x, y); }
+  static int streams() { return 3; } //! total number of input and output streams
+  static int flops() { return 4; } //! flops per element
 };
 
 void caxpyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
@@ -1294,6 +1293,8 @@ struct caxpby {
   const Float2 b;
   caxpby(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y) { caxpby_(a, x, b, y); }
+  static int streams() { return 3; } //! total number of input and output streams
+  static int flops() { return 7; } //! flops per element
 };
 
 void caxpbyCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, cudaColorSpinorField &y) {
@@ -1314,7 +1315,7 @@ __global__ void blasKernel(InputX X, InputY Y, InputZ Z, Functor f, OutputY YY, 
     FloatN x[M], y[M], z[M];
     X.load(x, i);
     Y.load(y, i);
-    Z.load(y, i);
+    Z.load(z, i);
 
 #pragma unroll
     for (int j=0; j<M; j++) f(x[j], y[j], z[j]);
@@ -1358,7 +1359,7 @@ void blasCuda(const int kernel, const double2 &a, cudaColorSpinorField &x,
     if (x.Nspin() == 4){ //wilson
       SpinorTexture<float4,float4,short4,6,0> xTex(x);
       SpinorTexture<float4,float4,short4,6,1> yTex(y);
-      SpinorTexture<float4,float4,short4,6,2> zTex(y);
+      SpinorTexture<float4,float4,short4,6,2> zTex(z);
       Spinor<float4,float4,short4,6> yStore(y);
       Spinor<float4,float4,short4,6> zStore(z);
       Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
@@ -1372,10 +1373,10 @@ void blasCuda(const int kernel, const double2 &a, cudaColorSpinorField &x,
       Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
       blasKernel<float2, 3> <<<blasGrid, blasBlock>>>(xTex, yTex, zTex, f, yStore, zStore, y.Volume());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    quda::blas_bytes += 3*x.Volume()*sizeof(float);
+    quda::blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
   }
-  quda::blas_bytes += 5*x.RealLength()*x.Precision();
-  quda::blas_flops += 5*x.RealLength();
+  quda::blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
+  quda::blas_flops += Functor<double2,double2>::flops()*x.RealLength();
 
   if (!blasTuning) checkCudaError();
 }
@@ -1390,6 +1391,8 @@ struct cxpaypbz {
   const Float2 c;
   cxpaypbz(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
   __device__ void operator()(const FloatN &x, const FloatN &y, FloatN &z) { cxpaypbz_(x, a, y, b, z); }
+  static int streams() { return 4; } //! total number of input and output streams
+  static int flops() { return 8; } //! flops per element
 };
 
 void cxpaypbzCuda(cudaColorSpinorField &x, const quda::Complex &a, cudaColorSpinorField &y, 
@@ -1410,6 +1413,8 @@ struct axpyBzpcx {
   axpyBzpcx(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
   __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z)
   { y += a.x*z; z = b.x*x + c.x*z; }
+  static int streams() { return 5; } //! total number of input and output streams
+  static int flops() { return 10; } //! flops per element
 };
 
 void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, 
@@ -1419,97 +1424,25 @@ void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorFiel
   blasCuda<axpyBzpcx>(kernel, make_double2(a,0.0), z, make_double2(b,0.0), y, make_double2(c,0.0), x);
 }
 
+/**
+   Performs the operations: {y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]}
+*/
+template <typename Float2, typename FloatN>
+struct axpyZpbx {
+  const Float2 a;
+  const Float2 b;
+  axpyZpbx(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z)
+  { y += a.x*z; z = x + b.x*z; }
+  static int streams() { return 5; } //! total number of input and output streams
+  static int flops() { return 8; } //! flops per element
+};
 
-template <typename Float, typename Float2>
-__global__ void axpyZpbxDKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float b, int len) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 x_i = READ_DOUBLE2_TEXTURE(x, i);
-    Float2 z_i = READ_DOUBLE2_TEXTURE(z, i);
-    y[i].x += a*x_i.x;
-    y[i].y += a*x_i.y;
-    x[i].x = z_i.x + b*x_i.x;
-    x[i].y = z_i.y + b*x_i.y;
-    i += gridSize;
-  }
-}
-
-template <typename Float, typename Float2>
-__global__ void axpyZpbxSKernel(Float a, Float2 *x, Float2 *y, Float2 *z, Float b, int len) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 x_i = read_Float2(x, i);
-    Float2 z_i = read_Float2(z, i);
-    y[i].x += a*x_i.x;
-    y[i].y += a*x_i.y;
-    x[i].x = z_i.x + b*x_i.x;
-    x[i].y = z_i.y + b*x_i.y;
-    i += gridSize;
-  }
-}
-
-template <typename floatN, typename shortN, int M>
-__global__ void axpyZpbxKernel(float a, float b, shortN *xH, float *xN, shortN *yH, float *yN, int stride, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    floatN x[M], y[M], z[M];
-    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
-    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
-    loadSpinor<floatN, shortN, M, 3>(z, i, stride);
-
-#pragma unroll
-    for (int j=0; j<M; j++)  {
-      y[j] += a*x[j];
-      x[j] = z[j] + b*x[j];
-    }
-
-    saveSpinor<floatN, shortN, M>(yH, yN, y, i, stride);
-    saveSpinor<floatN, shortN, M>(xH, xN, x, i, stride);
-    i += gridSize;
-  }
-}
-
-// performs the operations: {y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]}
-void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, 
-		  cudaColorSpinorField &z, const double &b) {
-  checkSpinor(x,y);
-  checkSpinor(x,z);
-  setBlock(12, x.Length(), x.Precision());
-
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    axpyZpbxCuda(a, x.Even(), y.Even(), z.Even(), b);
-    axpyZpbxCuda(a, x.Odd(), y.Odd(), z.Odd(), b);
-    return;
-  }
-
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    bindTexture(&x, 0, &z);
-    axpyZpbxDKernel<<<blasGrid, blasBlock>>>
-      (a, (double2*)x.V(), (double2*)y.V(), (double2*)z.V(), b, x.Length()/2);
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    axpyZpbxSKernel<<<blasGrid, blasBlock>>>
-      ((float)a, (float2*)x.V(), (float2*)y.V(), (float2*)z.V(), (float)b, x.Length()/2);
-  } else {
-    bindTexture(&x, &y, &z);
-    int spinor_bytes = x.Length()*sizeof(short);
-    if (x.Nspin() ==4){ //wilson 
-      axpyZpbxKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((float)a, (float)b, (short4*)x.V(), (float*)x.Norm(),
-								 (short4*)y.V(), (float*)y.Norm(), z.Stride(), z.Volume());
-    }else if (x.Nspin() == 1){ //staggered
-      axpyZpbxKernel<float2, short2, 3><<<blasGrid, blasBlock>>>((float)a, (float)b, (short2*)x.V(), (float*)x.Norm(),
-								 (short2*)y.V(), (float*)y.Norm(), z.Stride(), z.Volume());
-    }else{
-      errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());           
-    }
-    quda::blas_bytes += 5*x.Volume()*sizeof(float);
-  }
-  quda::blas_bytes += 5*x.RealLength()*x.Precision();
-  quda::blas_flops += 8*x.RealLength();
-
-  if (!blasTuning) checkCudaError();
+void axpyZpbxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y,
+		  cudaColorSpinorField& z, const double &b) {
+  const int kernel = 12;
+  // swap arguments around 
+  blasCuda<axpyZpbx>(kernel, make_double2(a,0.0), z, make_double2(b,0.0), y, make_double2(0.0,0.0), x);
 }
 
 template <typename Float2>
@@ -1639,6 +1572,314 @@ void caxpbypzYmbwCuda(const quda::Complex &a, cudaColorSpinorField &x, const qud
   if (!blasTuning) checkCudaError();
 }
 
+
+template <typename Float, typename Float2>
+__global__ void cabxpyAxKernel(Float a, Float2 b, Float2 *x, Float2 *y, int len) {
+  
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    x[i].x *= a;
+    x[i].y *= a;
+    y[i].x += b.x*x[i].x - b.y*x[i].y;
+    y[i].y += b.y*x[i].x + b.x*x[i].y;
+    i += gridSize;
+  } 
+  
+}
+
+template <typename floatN, typename shortN, int M>
+__global__ void cabxpyAxKernel(float a, float2 b, shortN *xH, float *xN, 
+			       shortN *yH, float *yN, int stride, int length) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    floatN x[M], y[M];
+    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
+    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
+
+#pragma unroll
+    for (int j=0; j<M; j++)  {
+      x[j] *= a;
+      caxpy_(b, x[j], y[j]);
+    }
+
+    saveSpinor<floatN, shortN, M>(xH, xN, x, i, stride);
+    saveSpinor<floatN, shortN, M>(yH, yN, y, i, stride);
+    i += gridSize;
+  }
+}
+
+// performs the operation y[i] += a*b*x[i], x[i] *= a
+void cabxpyAxCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  checkSpinor(x,y);
+  int length = x.Length()/2;
+  setBlock(14, length, x.Precision());
+  quda::blas_bytes += 4*x.RealLength()*x.Precision();
+  quda::blas_flops += 5*x.RealLength();
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    double2 b2 = make_double2(real(b), imag(b));
+    cabxpyAxKernel<<<blasGrid, blasBlock>>>((double)a, b2, (double2*)x.V(), (double2*)y.V(), length);
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    float2 b2 = make_float2(real(b), imag(b));
+    cabxpyAxKernel<<<blasGrid, blasBlock>>>((float)a, b2, (float2*)x.V(), (float2*)y.V(), length);
+  } else {
+    if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+      caxpyCuda(a, x.Even(), y.Even());
+      caxpyCuda(a, x.Odd(), y.Odd());
+      return;
+    }
+    bindTexture(&x, &y);
+    float2 b2 = make_float2(real(b), imag(b));
+    if (x.Nspin() == 4){ //wilson
+      cabxpyAxKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((float)a, b2, (short4*)x.V(), (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+    } else if (x.Nspin() == 1){ //staggered
+      cabxpyAxKernel<float2, short2, 3><<<blasGrid, blasBlock>>>((float)a, b2, (short2*)x.V(), (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
+    }else{
+      errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());     
+    }
+    quda::blas_bytes += 4*x.Volume()*sizeof(float);
+  }
+
+  if (!blasTuning) checkCudaError();
+}
+
+
+
+
+template <typename Float2>
+__global__ void caxpbypzDKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, int len) {
+
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 X = READ_DOUBLE2_TEXTURE(x, i);
+    Float2 Z = read_Float2(z, i);
+
+    Z.x += a.x*X.x - a.y*X.y;
+    Z.y += a.y*X.x + a.x*X.y;
+
+    Float2 Y = READ_DOUBLE2_TEXTURE(y, i);
+    Z.x += b.x*Y.x - b.y*Y.y;
+    Z.y += b.y*Y.x + b.x*Y.y;
+    z[i] = make_Float2(Z);
+
+    i += gridSize;
+  } 
+}
+
+template <typename Float2>
+__global__ void caxpbypzSKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, int len) {
+
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 X = read_Float2(x, i);
+    Float2 Z = read_Float2(z, i);
+
+    Z.x += a.x*X.x - a.y*X.y;
+    Z.y += a.y*X.x + a.x*X.y;
+
+    Float2 Y = read_Float2(y, i);
+    Z.x += b.x*Y.x - b.y*Y.y;
+    Z.y += b.y*Y.x + b.x*Y.y;
+    z[i] = make_Float2(Z);
+
+    i += gridSize;
+  } 
+}
+
+template <typename floatN, typename shortN, int M>
+__global__ void caxpbypzKernel(float2 a, float2 b, float *xN, shortN *yH, float *yN, 
+			       shortN *zH, float *zN, int stride, int length) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    floatN x[M], y[M], z[M];
+    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
+    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
+    loadSpinor<floatN, shortN, M, 3>(z, i, stride);
+
+#pragma unroll
+    for (int j=0; j<M; j++)  {
+      caxpbypz_(a, x[j], b, y[j], z[j]);
+    }
+
+    saveSpinor<floatN, shortN, M>(zH, zN, z, i, stride);
+    i += gridSize;
+  }
+}
+
+// performs the operation z[i] = a*x[i] + b*y[i] + z[i]
+void caxpbypzCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, 
+		  cudaColorSpinorField &y, cudaColorSpinorField &z) {
+  checkSpinor(x,y);
+  checkSpinor(x,z);
+  int length = x.Length()/2;
+  setBlock(15, length, x.Precision());
+
+  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+    caxpbypzCuda(a, x.Even(), b, y.Even(), z.Even());
+    caxpbypzCuda(a, x.Odd(), b, y.Odd(), z.Odd());
+    return;
+  }
+
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    double2 a2 = make_double2(real(a), imag(a));
+    double2 b2 = make_double2(real(b), imag(b));
+    bindTexture(&x, &y, &z);
+    caxpbypzDKernel<<<blasGrid, blasBlock>>>(a2, (double2*)x.V(), b2, (double2*)y.V(), (double2*)z.V(), length); 
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    float2 a2 = make_float2(real(a), imag(a));
+    float2 b2 = make_float2(real(b), imag(b));
+    caxpbypzSKernel<<<blasGrid, blasBlock>>>(a2, (float2*)x.V(), b2, (float2*)y.V(), (float2*)z.V(), length); 
+  } else {
+    bindTexture(&x, &y, &z);
+    quda::blas_bytes += 4*x.Volume()*sizeof(float);
+    float2 a2 = make_float2(real(a), imag(a));
+    float2 b2 = make_float2(real(b), imag(b));
+    if (x.Nspin() == 4){ //wilson
+      caxpbypzKernel<float4, short4, 6><<<blasGrid, blasBlock>>>(a2, b2, (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(),
+								 (short4*)z.V(), (float*)z.Norm(), z.Stride(), z.Volume());
+    } else if (x.Nspin() == 1){ //staggered
+      caxpbypzKernel<float2, short2, 3><<<blasGrid, blasBlock>>>(a2, b2, (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(),
+					       (short2*)z.V(), (float*)z.Norm(), z.Stride(), z.Volume());
+    }else{
+     errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());                 
+    }
+  }
+  quda::blas_bytes += 4*x.RealLength()*x.Precision();
+  quda::blas_flops += 8*x.RealLength();
+
+  if (!blasTuning) checkCudaError();
+}
+
+
+template <typename Float2>
+__global__ void caxpbypczpwDKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, 
+				   Float2 c, Float2 *z, Float2 *w, int len) {
+
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 W = read_Float2(w, i);
+
+    Float2 X = READ_DOUBLE2_TEXTURE(x, i);
+    CAXPY_DOUBLE2(a, X, W);
+
+    Float2 Y = READ_DOUBLE2_TEXTURE(y, i);
+    CAXPY_DOUBLE2(b, Y, W);
+
+    Float2 Z = READ_DOUBLE2_TEXTURE(z, i);
+    CAXPY_DOUBLE2(c, Z, W);
+
+    w[i] = make_Float2(W);
+
+    i += gridSize;
+  } 
+}
+
+template <typename Float2>
+__global__ void caxpbypczpwSKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, 
+				   Float2 c, Float2 *z, Float2 *w, int len) {
+
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < len) {
+    Float2 W = read_Float2(w, i);
+
+    Float2 X = read_Float2(x, i);
+    CAXPY_FLOAT2(a, X, W);
+
+    Float2 Y = read_Float2(y, i);
+    CAXPY_FLOAT2(b, Y, W);
+
+    Float2 Z = read_Float2(z, i);
+    CAXPY_FLOAT2(c, Z, W);
+
+    w[i] = make_Float2(W);
+
+    i += gridSize;
+  } 
+}
+
+template <typename floatN, typename shortN, int M>
+__global__ void caxpbypczpwKernel(float2 a, float2 b, float2 c, float *xN, shortN *yH, float *yN, 
+				  shortN *zH, float *zN, shortN *wH, float *wN, 
+				  int stride, int length) {
+  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int gridSize = gridDim.x*blockDim.x;
+  while (i < length) {
+    floatN x[M], y[M], z[M], w[M];
+    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
+    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
+    loadSpinor<floatN, shortN, M, 3>(z, i, stride);
+    loadSpinor<floatN, shortN, M, 4>(w, i, stride);
+
+#pragma unroll
+    for (int j=0; j<M; j++)  {
+      caxpy_(a, x[j], w[j]);
+      caxpy_(b, y[j], w[j]);
+      caxpy_(c, z[j], w[j]);
+    }
+
+    saveSpinor<floatN, shortN, M>(wH, wN, w, i, stride);
+    i += gridSize;
+  }
+}
+
+// performs the operation z[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
+void caxpbypczpwCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, cudaColorSpinorField &y, 
+		  const quda::Complex &c, cudaColorSpinorField &z, cudaColorSpinorField &w) {
+  checkSpinor(x,y);
+  checkSpinor(x,z);
+  checkSpinor(x,w);
+  int length = x.Length()/2;
+  setBlock(16, length, x.Precision());
+
+  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+    caxpbypczpwCuda(a, x.Even(), b, y.Even(), c, z.Even(), w.Even());
+    caxpbypczpwCuda(a, x.Odd(), b, y.Odd(), c, z.Odd(), w.Odd());
+    return;
+  }
+
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    double2 a2 = make_double2(real(a), imag(a));
+    double2 b2 = make_double2(real(b), imag(b));
+    double2 c2 = make_double2(real(c), imag(c));
+    bindTexture(&x, &y, &z, &w);
+    caxpbypczpwDKernel<<<blasGrid, blasBlock>>>(a2, (double2*)x.V(), b2, (double2*)y.V(), 
+						c2, (double2*)z.V(), (double2*)w.V(), length); 
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    float2 a2 = make_float2(real(a), imag(a));
+    float2 b2 = make_float2(real(b), imag(b));
+    float2 c2 = make_float2(real(c), imag(c));
+    caxpbypczpwSKernel<<<blasGrid, blasBlock>>>(a2, (float2*)x.V(), b2, (float2*)y.V(), 
+						c2, (float2*)z.V(), (float2*)w.V(), length); 
+  } else {
+    bindTexture(&x, &y, &z, &w);
+    quda::blas_bytes += 6*x.Volume()*sizeof(float);
+    float2 a2 = make_float2(real(a), imag(a));
+    float2 b2 = make_float2(real(b), imag(b));
+    float2 c2 = make_float2(real(c), imag(c));
+    if (x.Nspin() == 4){ //wilson
+      caxpbypczpwKernel<float4, short4, 6><<<blasGrid, blasBlock>>>(a2, b2, c2, (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(),
+						  (short4*)z.V(), (float*)z.Norm(), (short4*)w.V(), (float*)w.Norm(), 
+						  z.Stride(), z.Volume());
+    } else if (x.Nspin() == 1){ //staggered
+      caxpbypczpwKernel<float2, short2, 3><<<blasGrid, blasBlock>>>(a2, b2, c2, (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(),
+						  (short2*)z.V(), (float*)z.Norm(), (short2*)w.V(), (float*)w.Norm(), 
+						  z.Stride(), z.Volume());
+    }else{
+     errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());                 
+    }
+  }
+  quda::blas_bytes += 5*x.RealLength()*x.Precision();
+  quda::blas_flops += 12*x.RealLength();
+
+  if (!blasTuning) checkCudaError();
+}
+
 #include <double_single.h>
 
 __device__ double norm2(double a) { return a*a; }
@@ -1702,7 +1943,7 @@ template <unsigned int reduce_threads, typename Float>
 
 double normCuda(const cudaColorSpinorField &a) {
   if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET) return normCuda(a.Even()) + normCuda(a.Odd());
-  const int id = 14;
+  const int id = 17;
   quda::blas_flops += 2*a.RealLength();
   quda::blas_bytes += a.RealLength()*a.Precision();
   if (a.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -1791,7 +2032,7 @@ double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b) {
   if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     return reDotProductCuda(a.Even(), b.Even()) + reDotProductCuda(a.Odd(), b.Odd());
   }
-  const int id = 15;
+  const int id = 18;
   quda::blas_flops += 2*a.RealLength();
   checkSpinor(a, b);
   quda::blas_bytes += 2*a.RealLength()*a.Precision();
@@ -1890,7 +2131,7 @@ double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorFie
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
     return axpyNormCuda(a, x.Even(), y.Even()) + axpyNormCuda(a, x.Odd(), y.Odd());
 
-  const int id = 16;
+  const int id = 19;
   quda::blas_flops += 4*x.RealLength();
   checkSpinor(x,y);
   quda::blas_bytes += 3*x.RealLength()*x.Precision();
@@ -1991,7 +2232,7 @@ double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
     return xmyNormCuda(x.Even(), y.Even()) + xmyNormCuda(x.Odd(), y.Odd());
 
-  const int id = 17;
+  const int id = 20;
   quda::blas_flops += 3*x.RealLength();
   checkSpinor(x,y);
   quda::blas_bytes += 3*x.RealLength()*x.Precision();
@@ -2013,6 +2254,357 @@ double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   }
 
   exit(-1);
+}
+
+//
+// double caxpyNormCuda(float a, float *x, float *y, n){}
+//
+// First performs the operation y[i] = a*x[i] + y[i]
+// Second returns the norm of y
+//
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) caxpyNormF##suffix
+#define REDUCE_TYPES Float a, Float *x, Float *y
+#define REDUCE_PARAMS a, x, y
+#define REDUCE_AUXILIARY(i)					\
+  y[i].x += a.x*x[i].x - a.y*x[i].y;				\
+  y[i].y += a.y*x[i].x + a.x*x[i].y
+#define REDUCE_OPERATION(i) (y[i].x*y[i].x + y[i].y*y[i].y)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) caxpyNormH##suffix
+#define REDUCE_TYPES Float a, short4 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  CAXPY_FLOAT4(a, x0, y0);						\
+  REAL_DOT_FLOAT4(norm0, y0, y0);					\
+  CAXPY_FLOAT4(a, x1, y1);						\
+  REAL_DOT_FLOAT4(norm1, y1, y1);					\
+  CAXPY_FLOAT4(a, x2, y2);						\
+  REAL_DOT_FLOAT4(norm2, y2, y2);					\
+  CAXPY_FLOAT4(a, x3, y3);						\
+  REAL_DOT_FLOAT4(norm3, y3, y3);					\
+  CAXPY_FLOAT4(a, x4, y4);						\
+  REAL_DOT_FLOAT4(norm4, y4, y4);					\
+  CAXPY_FLOAT4(a, x5, y5);						\
+  REAL_DOT_FLOAT4(norm5, y5, y5);					\
+  norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2; norm0 += norm4; \
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) caxpyNormH##suffix
+#define REDUCE_TYPES Float a, short2 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
+  CAXPY_FLOAT2(a, x0, y0);						\
+  REAL_DOT_FLOAT2(norm0, y0, y0);					\
+  CAXPY_FLOAT2(a, x1, y1);						\
+  REAL_DOT_FLOAT2(norm1, y1, y1);					\
+  CAXPY_FLOAT2(a, x2, y2);						\
+  REAL_DOT_FLOAT2(norm2, y2, y2);					\
+  norm0 += norm1; norm0 += norm2;					\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+double caxpyNormCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
+    return caxpyNormCuda(a, x.Even(), y.Even()) + caxpyNormCuda(a, x.Odd(), y.Odd());
+
+  const int id = 21;
+  quda::blas_flops += 6*x.RealLength();
+  checkSpinor(x,y);
+  quda::blas_bytes += 3*x.RealLength()*x.Precision();
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    double2 a2 = make_double2(real(a), imag(a));
+    return caxpyNormFCuda(a2, (double2*)x.V(), (double2*)y.V(), x.Length()/2, id, x.Precision());
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    float2 a2 = make_float2(real(a), imag(a));
+    return caxpyNormFCuda(a2, (float2*)x.V(), (float2*)y.V(), x.Length()/2, id, x.Precision());
+  } else {
+    bindTexture(&x, &y);
+    quda::blas_bytes += 3*x.Volume()*sizeof(float);
+    
+    float2 a2 = make_float2(real(a), imag(a));
+    if (x.Nspin() == 4){ //wilson
+      return caxpyNormHCuda(a2, (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else if (x.Nspin() == 1){ //staggered
+      return caxpyNormHCuda(a2, (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else{
+      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
+      return 0;
+    }
+  }
+
+}
+
+//
+// double caxpyXmayNormCuda(float a, float *x, float *y, n){}
+//
+// First performs the operation y[i] = a*x[i] + y[i]
+// Second performs the operator x[i] -= a*z[i]
+// Third returns the norm of x
+//
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) caxpyXmazNormXF##suffix
+#define REDUCE_TYPES Float a, Float *x, Float *y, Float *z
+#define REDUCE_PARAMS a, x, y, z
+#define REDUCE_AUXILIARY(i)					\
+  y[i].x += a.x*x[i].x - a.y*x[i].y;				\
+  y[i].y += a.y*x[i].x + a.x*x[i].y;				\
+  x[i].x += a.y*z[i].y - a.x*z[i].x;				\
+  x[i].y -= (a.x*z[i].y + a.y*z[i].x);
+#define REDUCE_OPERATION(i) (x[i].x*x[i].x + x[i].y*x[i].y)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) caxpyXmazNormXH##suffix
+#define REDUCE_TYPES Float a, short4 *xH, float *xN, short4 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, xH, xN, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  RECONSTRUCT_HALF_SPINOR(z, texHalf3, texNorm3, stride);		\
+  CAXPY_FLOAT4(a, x0, y0);						\
+  CMAXPY_FLOAT4(a, z0, x0);						\
+  REAL_DOT_FLOAT4(norm0, x0, x0);					\
+  CAXPY_FLOAT4(a, x1, y1);						\
+  CMAXPY_FLOAT4(a, z1, x1);						\
+  REAL_DOT_FLOAT4(norm1, x1, x1);					\
+  CAXPY_FLOAT4(a, x2, y2);						\
+  CMAXPY_FLOAT4(a, z2, x2);						\
+  REAL_DOT_FLOAT4(norm2, x2, x2);					\
+  CAXPY_FLOAT4(a, x3, y3);						\
+  CMAXPY_FLOAT4(a, z3, x3);						\
+  REAL_DOT_FLOAT4(norm3, x3, x3);					\
+  CAXPY_FLOAT4(a, x4, y4);						\
+  CMAXPY_FLOAT4(a, z4, x4);						\
+  REAL_DOT_FLOAT4(norm4, x4, x4);					\
+  CAXPY_FLOAT4(a, x5, y5);						\
+  CMAXPY_FLOAT4(a, z5, x5);						\
+  REAL_DOT_FLOAT4(norm5, x5, x5);					\
+  norm0 += norm1; norm2 += norm3;					\
+  norm4 += norm5; norm0 += norm2; norm0 += norm4;			\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);			\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(xH, xN, x, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) caxpyXmazNormXH##suffix
+#define REDUCE_TYPES Float a, short2 *xH, float *xN, short2 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, xH, xN, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
+  RECONSTRUCT_HALF_SPINOR_ST(z, texHalfSt3, texNorm3, stride);		\
+  CAXPY_FLOAT2(a, x0, y0);						\
+  CMAXPY_FLOAT2(a, z0, x0);						\
+  REAL_DOT_FLOAT2(norm0, x0, x0);					\
+  CAXPY_FLOAT2(a, x1, y1);						\
+  CMAXPY_FLOAT2(a, z1, x1);						\
+  REAL_DOT_FLOAT2(norm1, x1, x1);					\
+  CAXPY_FLOAT2(a, x2, y2);						\
+  CMAXPY_FLOAT2(a, z2, x2);						\
+  REAL_DOT_FLOAT2(norm2, x2, x2);					\
+  norm0 += norm1; norm0 += norm2;					\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);		\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(xH, xN, x, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+double caxpyXmazNormXCuda(const quda::Complex &a, cudaColorSpinorField &x, 
+			  cudaColorSpinorField &y, cudaColorSpinorField &z) {
+  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
+    return caxpyXmazNormXCuda(a, x.Even(), y.Even(), z.Even()) + 
+      caxpyXmazNormXCuda(a, x.Odd(), y.Odd(), z.Odd());
+
+  const int id = 22;
+  quda::blas_flops += 10*x.RealLength();
+  checkSpinor(x,y);
+  quda::blas_bytes += 5*x.RealLength()*x.Precision();
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    double2 a2 = make_double2(real(a), imag(a));
+    return caxpyXmazNormXFCuda(a2, (double2*)x.V(), (double2*)y.V(), (double2*)z.V(), x.Length()/2, id, x.Precision());
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    float2 a2 = make_float2(real(a), imag(a));
+    return caxpyXmazNormXFCuda(a2, (float2*)x.V(), (float2*)y.V(), (float2*)z.V(), x.Length()/2, id, x.Precision());
+  } else {
+    bindTexture(&x, &y, &z);
+    quda::blas_bytes += 3*x.Volume()*sizeof(float);
+    
+    float2 a2 = make_float2(real(a), imag(a));
+    if (x.Nspin() == 4){ //wilson
+      return caxpyXmazNormXHCuda(a2, (short4*)x.V(), (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else if (x.Nspin() == 1){ //staggered
+      return caxpyXmazNormXHCuda(a2, (short2*)x.V(), (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else{
+      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
+      return 0;
+    }
+  }
+
+}
+
+
+//
+// double cabxpyAxNormCuda(float a, float *x, float *y, n){}
+//
+// First performs the operation y[i] = a*x[i] + y[i]
+// Second returns the norm of y
+//
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormF##suffix
+#define REDUCE_TYPES Float a, Float b, Float *x, Float *y
+#define REDUCE_PARAMS a, b, x, y
+#define REDUCE_AUXILIARY(i)						\
+  x[i].x *= a.x;							\
+  x[i].y *= a.x;							\
+  y[i].x += b.x*x[i].x - b.y*x[i].y;					\
+  y[i].y += b.y*x[i].x + b.x*x[i].y;
+#define REDUCE_OPERATION(i) (y[i].x*y[i].x + y[i].y*y[i].y)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormH##suffix
+#define REDUCE_TYPES Float a, Float b, short4 *xH, float *xN, short4 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, b, xH, xN, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  AX_FLOAT4(a.x, x0);							\
+  AX_FLOAT4(a.x, x1);							\
+  AX_FLOAT4(a.x, x2);							\
+  AX_FLOAT4(a.x, x3);							\
+  AX_FLOAT4(a.x, x4);							\
+  AX_FLOAT4(a.x, x5);							\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(xH, xN, x, stride);			\
+  CAXPY_FLOAT4(b, x0, y0);						\
+  REAL_DOT_FLOAT4(norm0, y0, y0);					\
+  CAXPY_FLOAT4(b, x1, y1);						\
+  REAL_DOT_FLOAT4(norm1, y1, y1);					\
+  CAXPY_FLOAT4(b, x2, y2);						\
+  REAL_DOT_FLOAT4(norm2, y2, y2);					\
+  CAXPY_FLOAT4(b, x3, y3);						\
+  REAL_DOT_FLOAT4(norm3, y3, y3);					\
+  CAXPY_FLOAT4(b, x4, y4);						\
+  REAL_DOT_FLOAT4(norm4, y4, y4);					\
+  CAXPY_FLOAT4(b, x5, y5);						\
+  REAL_DOT_FLOAT4(norm5, y5, y5);					\
+  norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2; norm0 += norm4; \
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+template <unsigned int reduce_threads, typename Float>
+#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormH##suffix
+#define REDUCE_TYPES Float a, Float b, short2 *xH, float *xN, short2 *yH, float *yN, int stride
+#define REDUCE_PARAMS a, b, xH, xN, yH, yN, stride
+#define REDUCE_AUXILIARY(i)						\
+  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
+  AX_FLOAT2(a.x, x0);							\
+  AX_FLOAT2(a.x, x1);							\
+  AX_FLOAT2(a.x, x2);							\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(xH, xN, x, stride);		\
+  CAXPY_FLOAT2(b, x0, y0);						\
+  REAL_DOT_FLOAT2(norm0, y0, y0);					\
+  CAXPY_FLOAT2(b, x1, y1);						\
+  REAL_DOT_FLOAT2(norm1, y1, y1);					\
+  CAXPY_FLOAT2(b, x2, y2);						\
+  REAL_DOT_FLOAT2(norm2, y2, y2);					\
+  norm0 += norm1; norm0 += norm2;					\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);
+#define REDUCE_OPERATION(i) (norm0)
+#include "reduce_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_AUXILIARY
+#undef REDUCE_OPERATION
+
+double cabxpyAxNormCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
+    return cabxpyAxNormCuda(a, b, x.Even(), y.Even()) + cabxpyAxNormCuda(a, b, x.Odd(), y.Odd());
+
+  const int id = 23;
+  quda::blas_flops += 7*x.RealLength();
+  checkSpinor(x,y);
+  quda::blas_bytes += 4*x.RealLength()*x.Precision();
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    double2 a2 = make_double2(a, 0);
+    double2 b2 = make_double2(real(b), imag(b));
+    return cabxpyAxNormFCuda(a2, b2, (double2*)x.V(), (double2*)y.V(), x.Length()/2, id, x.Precision());
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    float2 a2 = make_float2(a, 0);
+    float2 b2 = make_float2(real(b), imag(b));
+    return cabxpyAxNormFCuda(a2, b2, (float2*)x.V(), (float2*)y.V(), x.Length()/2, id, x.Precision());
+  } else {
+    bindTexture(&x, &y);
+    quda::blas_bytes += 3*x.Volume()*sizeof(float);
+    
+    float2 a2 = make_float2(a, 0);
+    float2 b2 = make_float2(real(b), imag(b));
+    if (x.Nspin() == 4){ //wilson
+      return cabxpyAxNormHCuda(a2, b2, (short4*)x.V(), (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else if (x.Nspin() == 1){ //staggered
+      return cabxpyAxNormHCuda(a2, b2, (short2*)x.V(), (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else{
+      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
+      return 0;
+    }
+  }
+
 }
 
 
@@ -2117,7 +2709,7 @@ quda::Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) 
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
     return cDotProductCuda(x.Even(), y.Even()) + cDotProductCuda(x.Odd(), y.Odd());
 
-  const int id = 18;
+  const int id = 24;
   quda::blas_flops += 4*x.RealLength();
   checkSpinor(x,y);
   int length = x.Length()/2;
@@ -2270,7 +2862,7 @@ quda::Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColor
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
     return xpaycDotzyCuda(x.Even(), a, y.Even(), z.Even()) + xpaycDotzyCuda(x.Odd(), a, y.Odd(), z.Odd());
 
-  const int id = 19;
+  const int id = 25;
   quda::blas_flops += 6*x.RealLength();
   checkSpinor(x,y);
   checkSpinor(x,z);
@@ -2293,6 +2885,141 @@ quda::Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColor
       errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
     }
   }
+  return quda::Complex(dot.x, dot.y);
+}
+
+
+
+//
+// double caxpyDotzyCuda(float a, float *x, float *y, float *z, n){}
+//
+// First performs the operation y[i] = a*x[i] + y[i]
+// Second returns the dot product (z,y)
+//
+
+template <unsigned int reduce_threads, typename Float, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) caxpyDotzyF##suffix
+#define REDUCE_TYPES Float2 a, Float2 *x, Float2 *y, Float2 *z, Float c
+#define REDUCE_PARAMS a, x, y, z, c
+#define REDUCE_REAL_AUXILIARY(i) y[i].x += a.x*x[i].x - a.y*x[i].y;
+#define REDUCE_IMAG_AUXILIARY(i) y[i].y += a.y*x[i].x + a.x*x[i].y;
+#define REDUCE_REAL_OPERATION(i) (z[i].x*y[i].x + z[i].y*y[i].y)
+#define REDUCE_IMAG_OPERATION(i) (z[i].x*y[i].y - z[i].y*y[i].x)
+#include "reduce_complex_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_REAL_AUXILIARY
+#undef REDUCE_IMAG_AUXILIARY
+#undef REDUCE_REAL_OPERATION
+#undef REDUCE_IMAG_OPERATION
+
+template <unsigned int reduce_threads, typename Float, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) caxpyDotzyH##suffix
+#define REDUCE_TYPES Float2 a, short4 *yH, Float *yN, int stride
+#define REDUCE_PARAMS a, yH, yN, stride
+#define REDUCE_REAL_AUXILIARY(i)					\
+  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
+  RECONSTRUCT_HALF_SPINOR(z, texHalf3, texNorm3, stride);		\
+  CAXPY_FLOAT4(a, x0, y0);						\
+  CAXPY_FLOAT4(a, x1, y1);						\
+  CAXPY_FLOAT4(a, x2, y2);						\
+  CAXPY_FLOAT4(a, x3, y3);						\
+  CAXPY_FLOAT4(a, x4, y4);						\
+  CAXPY_FLOAT4(a, x5, y5);						\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);			
+#define REDUCE_IMAG_AUXILIARY(i)					\
+  REAL_DOT_FLOAT4(rdot0, z0, y0);					\
+  REAL_DOT_FLOAT4(rdot1, z1, y1);					\
+  REAL_DOT_FLOAT4(rdot2, z2, y2);					\
+  REAL_DOT_FLOAT4(rdot3, z3, y3);					\
+  REAL_DOT_FLOAT4(rdot4, z4, y4);					\
+  REAL_DOT_FLOAT4(rdot5, z5, y5);					\
+  IMAG_DOT_FLOAT4(idot0, z0, y0);					\
+  IMAG_DOT_FLOAT4(idot1, z1, y1);					\
+  IMAG_DOT_FLOAT4(idot2, z2, y2);					\
+  IMAG_DOT_FLOAT4(idot3, z3, y3);					\
+  IMAG_DOT_FLOAT4(idot4, z4, y4);					\
+  IMAG_DOT_FLOAT4(idot5, z5, y5);					\
+  rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4; \
+  idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;
+#define REDUCE_REAL_OPERATION(i) (rdot0)
+#define REDUCE_IMAG_OPERATION(i) (idot0)
+#include "reduce_complex_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_REAL_AUXILIARY
+#undef REDUCE_IMAG_AUXILIARY
+#undef REDUCE_REAL_OPERATION
+#undef REDUCE_IMAG_OPERATION
+
+template <unsigned int reduce_threads, typename Float, typename Float2>
+#define REDUCE_FUNC_NAME(suffix) caxpyDotzyH##suffix
+#define REDUCE_TYPES Float2 a, short2 *yH, Float *yN, int stride
+#define REDUCE_PARAMS a, yH, yN, stride
+#define REDUCE_REAL_AUXILIARY(i)					\
+  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
+  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
+  RECONSTRUCT_HALF_SPINOR_ST(z, texHalfSt3, texNorm3, stride);		\
+  CAXPY_FLOAT2(a, x0, y0);						\
+  CAXPY_FLOAT2(a, x1, y1);						\
+  CAXPY_FLOAT2(a, x2, y2);						\
+  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);		
+#define REDUCE_IMAG_AUXILIARY(i)					\
+  REAL_DOT_FLOAT2(rdot0, z0, y0);					\
+  REAL_DOT_FLOAT2(rdot1, z1, y1);					\
+  REAL_DOT_FLOAT2(rdot2, z2, y2);					\
+  IMAG_DOT_FLOAT2(idot0, z0, y0);					\
+  IMAG_DOT_FLOAT2(idot1, z1, y1);					\
+  IMAG_DOT_FLOAT2(idot2, z2, y2);					\
+  rdot0 += rdot1; rdot0 += rdot2;					\
+  idot0 += idot1; idot0 += idot2; 
+#define REDUCE_REAL_OPERATION(i) (rdot0)
+#define REDUCE_IMAG_OPERATION(i) (idot0)	
+#include "reduce_complex_core.h"
+#undef REDUCE_FUNC_NAME
+#undef REDUCE_TYPES
+#undef REDUCE_PARAMS
+#undef REDUCE_REAL_AUXILIARY
+#undef REDUCE_IMAG_AUXILIARY
+#undef REDUCE_REAL_OPERATION
+#undef REDUCE_IMAG_OPERATION
+
+quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
+		       cudaColorSpinorField &z) {
+  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
+    return caxpyDotzyCuda(a, x.Even(), y.Even(), z.Even()) + 
+      caxpyDotzyCuda(a, x.Odd(), y.Odd(), z.Odd());
+
+  const int id = 26;
+  quda::blas_flops += 8*x.RealLength();
+  checkSpinor(x,y);
+  quda::blas_bytes += 4*x.RealLength()*x.Precision();
+  double2 dot;
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    char c = 0;
+    double2 a2 = make_double2(real(a), imag(a));
+    dot = caxpyDotzyFCuda(a2, (double2*)x.V(), (double2*)y.V(), (double2*)z.V(), c, x.Length()/2, id, x.Precision());
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    char c = 0;
+    float2 a2 = make_float2(real(a), imag(a));
+    dot = caxpyDotzyFCuda(a2, (float2*)x.V(), (float2*)y.V(), (float2*)z.V(), c, x.Length()/2, id, x.Precision());
+  } else {
+    bindTexture(&x, &y, &z);
+    quda::blas_bytes += 3*x.Volume()*sizeof(float);
+    float2 a2 = make_float2(real(a), imag(a));
+    
+    if (x.Nspin() == 4){ //wilson
+      dot = caxpyDotzyHCuda(a2, (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else if (x.Nspin() == 1){ //staggered
+      dot = caxpyDotzyHCuda(a2, (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
+    }else{
+      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
+    }
+  }
+
   return quda::Complex(dot.x, dot.y);
 }
 
@@ -2425,7 +3152,7 @@ double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
     return cDotProductNormACuda(x.Even(), y.Even()) + cDotProductNormACuda(x.Odd(), y.Odd());
 
-  const int id = 20;
+  const int id = 27;
   quda::blas_flops += 6*x.RealLength();
   checkSpinor(x,y);
   int length = x.Length()/2;
@@ -2578,7 +3305,7 @@ double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
     return cDotProductNormBCuda(x.Even(), y.Even()) + cDotProductNormBCuda(x.Odd(), y.Odd());
 
-  const int id = 21;
+  const int id = 28;
   quda::blas_flops += 6*x.RealLength();
   checkSpinor(x,y);
   int length = x.Length()/2;
@@ -2799,7 +3526,7 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpin
     return caxpbypzYmbwcDotProductUYNormYCuda(a, x.Even(), b, y.Even(), z.Even(), w.Even(), u.Even()) + 
       caxpbypzYmbwcDotProductUYNormYCuda(a, x.Odd(), b, y.Odd(), z.Odd(), w.Odd(), u.Odd());
 
-  const int id = 22;
+  const int id = 29;
   quda::blas_flops += 18*x.RealLength();
   checkSpinor(x,y);
   checkSpinor(x,z);
@@ -2847,795 +3574,3 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpin
 }
 
 
-
-
-template <typename Float, typename Float2>
-__global__ void cabxpyAxKernel(Float a, Float2 b, Float2 *x, Float2 *y, int len) {
-  
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    x[i].x *= a;
-    x[i].y *= a;
-    y[i].x += b.x*x[i].x - b.y*x[i].y;
-    y[i].y += b.y*x[i].x + b.x*x[i].y;
-    i += gridSize;
-  } 
-  
-}
-
-template <typename floatN, typename shortN, int M>
-__global__ void cabxpyAxKernel(float a, float2 b, shortN *xH, float *xN, 
-			       shortN *yH, float *yN, int stride, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    floatN x[M], y[M];
-    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
-    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
-
-#pragma unroll
-    for (int j=0; j<M; j++)  {
-      x[j] *= a;
-      caxpy_(b, x[j], y[j]);
-    }
-
-    saveSpinor<floatN, shortN, M>(xH, xN, x, i, stride);
-    saveSpinor<floatN, shortN, M>(yH, yN, y, i, stride);
-    i += gridSize;
-  }
-}
-
-// performs the operation y[i] += a*b*x[i], x[i] *= a
-void cabxpyAxCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  checkSpinor(x,y);
-  int length = x.Length()/2;
-  setBlock(23, length, x.Precision());
-  quda::blas_bytes += 4*x.RealLength()*x.Precision();
-  quda::blas_flops += 5*x.RealLength();
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    double2 b2 = make_double2(real(b), imag(b));
-    cabxpyAxKernel<<<blasGrid, blasBlock>>>((double)a, b2, (double2*)x.V(), (double2*)y.V(), length);
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    float2 b2 = make_float2(real(b), imag(b));
-    cabxpyAxKernel<<<blasGrid, blasBlock>>>((float)a, b2, (float2*)x.V(), (float2*)y.V(), length);
-  } else {
-    if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-      caxpyCuda(a, x.Even(), y.Even());
-      caxpyCuda(a, x.Odd(), y.Odd());
-      return;
-    }
-    bindTexture(&x, &y);
-    float2 b2 = make_float2(real(b), imag(b));
-    if (x.Nspin() == 4){ //wilson
-      cabxpyAxKernel<float4, short4, 6><<<blasGrid, blasBlock>>>((float)a, b2, (short4*)x.V(), (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
-    } else if (x.Nspin() == 1){ //staggered
-      cabxpyAxKernel<float2, short2, 3><<<blasGrid, blasBlock>>>((float)a, b2, (short2*)x.V(), (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(), y.Stride(), y.Volume());
-    }else{
-      errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());     
-    }
-    quda::blas_bytes += 4*x.Volume()*sizeof(float);
-  }
-
-  if (!blasTuning) checkCudaError();
-}
-
-//
-// double caxpyNormCuda(float a, float *x, float *y, n){}
-//
-// First performs the operation y[i] = a*x[i] + y[i]
-// Second returns the norm of y
-//
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpyNormF##suffix
-#define REDUCE_TYPES Float a, Float *x, Float *y
-#define REDUCE_PARAMS a, x, y
-#define REDUCE_AUXILIARY(i)					\
-  y[i].x += a.x*x[i].x - a.y*x[i].y;				\
-  y[i].y += a.y*x[i].x + a.x*x[i].y
-#define REDUCE_OPERATION(i) (y[i].x*y[i].x + y[i].y*y[i].y)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpyNormH##suffix
-#define REDUCE_TYPES Float a, short4 *yH, float *yN, int stride
-#define REDUCE_PARAMS a, yH, yN, stride
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
-  CAXPY_FLOAT4(a, x0, y0);						\
-  REAL_DOT_FLOAT4(norm0, y0, y0);					\
-  CAXPY_FLOAT4(a, x1, y1);						\
-  REAL_DOT_FLOAT4(norm1, y1, y1);					\
-  CAXPY_FLOAT4(a, x2, y2);						\
-  REAL_DOT_FLOAT4(norm2, y2, y2);					\
-  CAXPY_FLOAT4(a, x3, y3);						\
-  REAL_DOT_FLOAT4(norm3, y3, y3);					\
-  CAXPY_FLOAT4(a, x4, y4);						\
-  REAL_DOT_FLOAT4(norm4, y4, y4);					\
-  CAXPY_FLOAT4(a, x5, y5);						\
-  REAL_DOT_FLOAT4(norm5, y5, y5);					\
-  norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2; norm0 += norm4; \
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
-#define REDUCE_OPERATION(i) (norm0)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpyNormH##suffix
-#define REDUCE_TYPES Float a, short2 *yH, float *yN, int stride
-#define REDUCE_PARAMS a, yH, yN, stride
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
-  CAXPY_FLOAT2(a, x0, y0);						\
-  REAL_DOT_FLOAT2(norm0, y0, y0);					\
-  CAXPY_FLOAT2(a, x1, y1);						\
-  REAL_DOT_FLOAT2(norm1, y1, y1);					\
-  CAXPY_FLOAT2(a, x2, y2);						\
-  REAL_DOT_FLOAT2(norm2, y2, y2);					\
-  norm0 += norm1; norm0 += norm2;					\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);
-#define REDUCE_OPERATION(i) (norm0)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-double caxpyNormCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
-    return caxpyNormCuda(a, x.Even(), y.Even()) + caxpyNormCuda(a, x.Odd(), y.Odd());
-
-  const int id = 24;
-  quda::blas_flops += 6*x.RealLength();
-  checkSpinor(x,y);
-  quda::blas_bytes += 3*x.RealLength()*x.Precision();
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    double2 a2 = make_double2(real(a), imag(a));
-    return caxpyNormFCuda(a2, (double2*)x.V(), (double2*)y.V(), x.Length()/2, id, x.Precision());
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    float2 a2 = make_float2(real(a), imag(a));
-    return caxpyNormFCuda(a2, (float2*)x.V(), (float2*)y.V(), x.Length()/2, id, x.Precision());
-  } else {
-    bindTexture(&x, &y);
-    quda::blas_bytes += 3*x.Volume()*sizeof(float);
-    
-    float2 a2 = make_float2(real(a), imag(a));
-    if (x.Nspin() == 4){ //wilson
-      return caxpyNormHCuda(a2, (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else if (x.Nspin() == 1){ //staggered
-      return caxpyNormHCuda(a2, (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else{
-      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
-      return 0;
-    }
-  }
-
-}
-
-//
-// double caxpyXmayNormCuda(float a, float *x, float *y, n){}
-//
-// First performs the operation y[i] = a*x[i] + y[i]
-// Second performs the operator x[i] -= a*z[i]
-// Third returns the norm of x
-//
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpyXmazNormXF##suffix
-#define REDUCE_TYPES Float a, Float *x, Float *y, Float *z
-#define REDUCE_PARAMS a, x, y, z
-#define REDUCE_AUXILIARY(i)					\
-  y[i].x += a.x*x[i].x - a.y*x[i].y;				\
-  y[i].y += a.y*x[i].x + a.x*x[i].y;				\
-  x[i].x += a.y*z[i].y - a.x*z[i].x;				\
-  x[i].y -= (a.x*z[i].y + a.y*z[i].x);
-#define REDUCE_OPERATION(i) (x[i].x*x[i].x + x[i].y*x[i].y)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpyXmazNormXH##suffix
-#define REDUCE_TYPES Float a, short4 *xH, float *xN, short4 *yH, float *yN, int stride
-#define REDUCE_PARAMS a, xH, xN, yH, yN, stride
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
-  RECONSTRUCT_HALF_SPINOR(z, texHalf3, texNorm3, stride);		\
-  CAXPY_FLOAT4(a, x0, y0);						\
-  CMAXPY_FLOAT4(a, z0, x0);						\
-  REAL_DOT_FLOAT4(norm0, x0, x0);					\
-  CAXPY_FLOAT4(a, x1, y1);						\
-  CMAXPY_FLOAT4(a, z1, x1);						\
-  REAL_DOT_FLOAT4(norm1, x1, x1);					\
-  CAXPY_FLOAT4(a, x2, y2);						\
-  CMAXPY_FLOAT4(a, z2, x2);						\
-  REAL_DOT_FLOAT4(norm2, x2, x2);					\
-  CAXPY_FLOAT4(a, x3, y3);						\
-  CMAXPY_FLOAT4(a, z3, x3);						\
-  REAL_DOT_FLOAT4(norm3, x3, x3);					\
-  CAXPY_FLOAT4(a, x4, y4);						\
-  CMAXPY_FLOAT4(a, z4, x4);						\
-  REAL_DOT_FLOAT4(norm4, x4, x4);					\
-  CAXPY_FLOAT4(a, x5, y5);						\
-  CMAXPY_FLOAT4(a, z5, x5);						\
-  REAL_DOT_FLOAT4(norm5, x5, x5);					\
-  norm0 += norm1; norm2 += norm3;					\
-  norm4 += norm5; norm0 += norm2; norm0 += norm4;			\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);			\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(xH, xN, x, stride);
-#define REDUCE_OPERATION(i) (norm0)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpyXmazNormXH##suffix
-#define REDUCE_TYPES Float a, short2 *xH, float *xN, short2 *yH, float *yN, int stride
-#define REDUCE_PARAMS a, xH, xN, yH, yN, stride
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(z, texHalfSt3, texNorm3, stride);		\
-  CAXPY_FLOAT2(a, x0, y0);						\
-  CMAXPY_FLOAT2(a, z0, x0);						\
-  REAL_DOT_FLOAT2(norm0, x0, x0);					\
-  CAXPY_FLOAT2(a, x1, y1);						\
-  CMAXPY_FLOAT2(a, z1, x1);						\
-  REAL_DOT_FLOAT2(norm1, x1, x1);					\
-  CAXPY_FLOAT2(a, x2, y2);						\
-  CMAXPY_FLOAT2(a, z2, x2);						\
-  REAL_DOT_FLOAT2(norm2, x2, x2);					\
-  norm0 += norm1; norm0 += norm2;					\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);		\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(xH, xN, x, stride);
-#define REDUCE_OPERATION(i) (norm0)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-double caxpyXmazNormXCuda(const quda::Complex &a, cudaColorSpinorField &x, 
-			  cudaColorSpinorField &y, cudaColorSpinorField &z) {
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
-    return caxpyXmazNormXCuda(a, x.Even(), y.Even(), z.Even()) + 
-      caxpyXmazNormXCuda(a, x.Odd(), y.Odd(), z.Odd());
-
-  const int id = 25;
-  quda::blas_flops += 10*x.RealLength();
-  checkSpinor(x,y);
-  quda::blas_bytes += 5*x.RealLength()*x.Precision();
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    double2 a2 = make_double2(real(a), imag(a));
-    return caxpyXmazNormXFCuda(a2, (double2*)x.V(), (double2*)y.V(), (double2*)z.V(), x.Length()/2, id, x.Precision());
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    float2 a2 = make_float2(real(a), imag(a));
-    return caxpyXmazNormXFCuda(a2, (float2*)x.V(), (float2*)y.V(), (float2*)z.V(), x.Length()/2, id, x.Precision());
-  } else {
-    bindTexture(&x, &y, &z);
-    quda::blas_bytes += 3*x.Volume()*sizeof(float);
-    
-    float2 a2 = make_float2(real(a), imag(a));
-    if (x.Nspin() == 4){ //wilson
-      return caxpyXmazNormXHCuda(a2, (short4*)x.V(), (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else if (x.Nspin() == 1){ //staggered
-      return caxpyXmazNormXHCuda(a2, (short2*)x.V(), (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else{
-      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
-      return 0;
-    }
-  }
-
-}
-
-
-//
-// double cabxpyAxNormCuda(float a, float *x, float *y, n){}
-//
-// First performs the operation y[i] = a*x[i] + y[i]
-// Second returns the norm of y
-//
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormF##suffix
-#define REDUCE_TYPES Float a, Float b, Float *x, Float *y
-#define REDUCE_PARAMS a, b, x, y
-#define REDUCE_AUXILIARY(i)						\
-  x[i].x *= a.x;							\
-  x[i].y *= a.x;							\
-  y[i].x += b.x*x[i].x - b.y*x[i].y;					\
-  y[i].y += b.y*x[i].x + b.x*x[i].y;
-#define REDUCE_OPERATION(i) (y[i].x*y[i].x + y[i].y*y[i].y)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormH##suffix
-#define REDUCE_TYPES Float a, Float b, short4 *xH, float *xN, short4 *yH, float *yN, int stride
-#define REDUCE_PARAMS a, b, xH, xN, yH, yN, stride
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
-  AX_FLOAT4(a.x, x0);							\
-  AX_FLOAT4(a.x, x1);							\
-  AX_FLOAT4(a.x, x2);							\
-  AX_FLOAT4(a.x, x3);							\
-  AX_FLOAT4(a.x, x4);							\
-  AX_FLOAT4(a.x, x5);							\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(xH, xN, x, stride);			\
-  CAXPY_FLOAT4(b, x0, y0);						\
-  REAL_DOT_FLOAT4(norm0, y0, y0);					\
-  CAXPY_FLOAT4(b, x1, y1);						\
-  REAL_DOT_FLOAT4(norm1, y1, y1);					\
-  CAXPY_FLOAT4(b, x2, y2);						\
-  REAL_DOT_FLOAT4(norm2, y2, y2);					\
-  CAXPY_FLOAT4(b, x3, y3);						\
-  REAL_DOT_FLOAT4(norm3, y3, y3);					\
-  CAXPY_FLOAT4(b, x4, y4);						\
-  REAL_DOT_FLOAT4(norm4, y4, y4);					\
-  CAXPY_FLOAT4(b, x5, y5);						\
-  REAL_DOT_FLOAT4(norm5, y5, y5);					\
-  norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2; norm0 += norm4; \
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);
-#define REDUCE_OPERATION(i) (norm0)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-template <unsigned int reduce_threads, typename Float>
-#define REDUCE_FUNC_NAME(suffix) cabxpyAxNormH##suffix
-#define REDUCE_TYPES Float a, Float b, short2 *xH, float *xN, short2 *yH, float *yN, int stride
-#define REDUCE_PARAMS a, b, xH, xN, yH, yN, stride
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
-  AX_FLOAT2(a.x, x0);							\
-  AX_FLOAT2(a.x, x1);							\
-  AX_FLOAT2(a.x, x2);							\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(xH, xN, x, stride);		\
-  CAXPY_FLOAT2(b, x0, y0);						\
-  REAL_DOT_FLOAT2(norm0, y0, y0);					\
-  CAXPY_FLOAT2(b, x1, y1);						\
-  REAL_DOT_FLOAT2(norm1, y1, y1);					\
-  CAXPY_FLOAT2(b, x2, y2);						\
-  REAL_DOT_FLOAT2(norm2, y2, y2);					\
-  norm0 += norm1; norm0 += norm2;					\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);
-#define REDUCE_OPERATION(i) (norm0)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-double cabxpyAxNormCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
-    return cabxpyAxNormCuda(a, b, x.Even(), y.Even()) + cabxpyAxNormCuda(a, b, x.Odd(), y.Odd());
-
-  const int id = 26;
-  quda::blas_flops += 7*x.RealLength();
-  checkSpinor(x,y);
-  quda::blas_bytes += 4*x.RealLength()*x.Precision();
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    double2 a2 = make_double2(a, 0);
-    double2 b2 = make_double2(real(b), imag(b));
-    return cabxpyAxNormFCuda(a2, b2, (double2*)x.V(), (double2*)y.V(), x.Length()/2, id, x.Precision());
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    float2 a2 = make_float2(a, 0);
-    float2 b2 = make_float2(real(b), imag(b));
-    return cabxpyAxNormFCuda(a2, b2, (float2*)x.V(), (float2*)y.V(), x.Length()/2, id, x.Precision());
-  } else {
-    bindTexture(&x, &y);
-    quda::blas_bytes += 3*x.Volume()*sizeof(float);
-    
-    float2 a2 = make_float2(a, 0);
-    float2 b2 = make_float2(real(b), imag(b));
-    if (x.Nspin() == 4){ //wilson
-      return cabxpyAxNormHCuda(a2, b2, (short4*)x.V(), (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else if (x.Nspin() == 1){ //staggered
-      return cabxpyAxNormHCuda(a2, b2, (short2*)x.V(), (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else{
-      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
-      return 0;
-    }
-  }
-
-}
-
-
-
-
-template <typename Float2>
-__global__ void caxpbypzDKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, int len) {
-
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 X = READ_DOUBLE2_TEXTURE(x, i);
-    Float2 Z = read_Float2(z, i);
-
-    Z.x += a.x*X.x - a.y*X.y;
-    Z.y += a.y*X.x + a.x*X.y;
-
-    Float2 Y = READ_DOUBLE2_TEXTURE(y, i);
-    Z.x += b.x*Y.x - b.y*Y.y;
-    Z.y += b.y*Y.x + b.x*Y.y;
-    z[i] = make_Float2(Z);
-
-    i += gridSize;
-  } 
-}
-
-template <typename Float2>
-__global__ void caxpbypzSKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, int len) {
-
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 X = read_Float2(x, i);
-    Float2 Z = read_Float2(z, i);
-
-    Z.x += a.x*X.x - a.y*X.y;
-    Z.y += a.y*X.x + a.x*X.y;
-
-    Float2 Y = read_Float2(y, i);
-    Z.x += b.x*Y.x - b.y*Y.y;
-    Z.y += b.y*Y.x + b.x*Y.y;
-    z[i] = make_Float2(Z);
-
-    i += gridSize;
-  } 
-}
-
-template <typename floatN, typename shortN, int M>
-__global__ void caxpbypzKernel(float2 a, float2 b, float *xN, shortN *yH, float *yN, 
-			       shortN *zH, float *zN, int stride, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    floatN x[M], y[M], z[M];
-    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
-    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
-    loadSpinor<floatN, shortN, M, 3>(z, i, stride);
-
-#pragma unroll
-    for (int j=0; j<M; j++)  {
-      caxpbypz_(a, x[j], b, y[j], z[j]);
-    }
-
-    saveSpinor<floatN, shortN, M>(zH, zN, z, i, stride);
-    i += gridSize;
-  }
-}
-
-// performs the operation z[i] = a*x[i] + b*y[i] + z[i]
-void caxpbypzCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, 
-		  cudaColorSpinorField &y, cudaColorSpinorField &z) {
-  checkSpinor(x,y);
-  checkSpinor(x,z);
-  int length = x.Length()/2;
-  setBlock(27, length, x.Precision());
-
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    caxpbypzCuda(a, x.Even(), b, y.Even(), z.Even());
-    caxpbypzCuda(a, x.Odd(), b, y.Odd(), z.Odd());
-    return;
-  }
-
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    double2 a2 = make_double2(real(a), imag(a));
-    double2 b2 = make_double2(real(b), imag(b));
-    bindTexture(&x, &y, &z);
-    caxpbypzDKernel<<<blasGrid, blasBlock>>>(a2, (double2*)x.V(), b2, (double2*)y.V(), (double2*)z.V(), length); 
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    float2 a2 = make_float2(real(a), imag(a));
-    float2 b2 = make_float2(real(b), imag(b));
-    caxpbypzSKernel<<<blasGrid, blasBlock>>>(a2, (float2*)x.V(), b2, (float2*)y.V(), (float2*)z.V(), length); 
-  } else {
-    bindTexture(&x, &y, &z);
-    quda::blas_bytes += 4*x.Volume()*sizeof(float);
-    float2 a2 = make_float2(real(a), imag(a));
-    float2 b2 = make_float2(real(b), imag(b));
-    if (x.Nspin() == 4){ //wilson
-      caxpbypzKernel<float4, short4, 6><<<blasGrid, blasBlock>>>(a2, b2, (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(),
-								 (short4*)z.V(), (float*)z.Norm(), z.Stride(), z.Volume());
-    } else if (x.Nspin() == 1){ //staggered
-      caxpbypzKernel<float2, short2, 3><<<blasGrid, blasBlock>>>(a2, b2, (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(),
-					       (short2*)z.V(), (float*)z.Norm(), z.Stride(), z.Volume());
-    }else{
-     errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());                 
-    }
-  }
-  quda::blas_bytes += 4*x.RealLength()*x.Precision();
-  quda::blas_flops += 8*x.RealLength();
-
-  if (!blasTuning) checkCudaError();
-}
-
-
-template <typename Float2>
-__global__ void caxpbypczpwDKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, 
-				   Float2 c, Float2 *z, Float2 *w, int len) {
-
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 W = read_Float2(w, i);
-
-    Float2 X = READ_DOUBLE2_TEXTURE(x, i);
-    CAXPY_DOUBLE2(a, X, W);
-
-    Float2 Y = READ_DOUBLE2_TEXTURE(y, i);
-    CAXPY_DOUBLE2(b, Y, W);
-
-    Float2 Z = READ_DOUBLE2_TEXTURE(z, i);
-    CAXPY_DOUBLE2(c, Z, W);
-
-    w[i] = make_Float2(W);
-
-    i += gridSize;
-  } 
-}
-
-template <typename Float2>
-__global__ void caxpbypczpwSKernel(Float2 a, Float2 *x, Float2 b, Float2 *y, 
-				   Float2 c, Float2 *z, Float2 *w, int len) {
-
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < len) {
-    Float2 W = read_Float2(w, i);
-
-    Float2 X = read_Float2(x, i);
-    CAXPY_FLOAT2(a, X, W);
-
-    Float2 Y = read_Float2(y, i);
-    CAXPY_FLOAT2(b, Y, W);
-
-    Float2 Z = read_Float2(z, i);
-    CAXPY_FLOAT2(c, Z, W);
-
-    w[i] = make_Float2(W);
-
-    i += gridSize;
-  } 
-}
-
-template <typename floatN, typename shortN, int M>
-__global__ void caxpbypczpwKernel(float2 a, float2 b, float2 c, float *xN, shortN *yH, float *yN, 
-				  shortN *zH, float *zN, shortN *wH, float *wN, 
-				  int stride, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    floatN x[M], y[M], z[M], w[M];
-    loadSpinor<floatN, shortN, M, 1>(x, i, stride);
-    loadSpinor<floatN, shortN, M, 2>(y, i, stride);
-    loadSpinor<floatN, shortN, M, 3>(z, i, stride);
-    loadSpinor<floatN, shortN, M, 4>(w, i, stride);
-
-#pragma unroll
-    for (int j=0; j<M; j++)  {
-      caxpy_(a, x[j], w[j]);
-      caxpy_(b, y[j], w[j]);
-      caxpy_(c, z[j], w[j]);
-    }
-
-    saveSpinor<floatN, shortN, M>(wH, wN, w, i, stride);
-    i += gridSize;
-  }
-}
-
-// performs the operation z[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
-void caxpbypczpwCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, cudaColorSpinorField &y, 
-		  const quda::Complex &c, cudaColorSpinorField &z, cudaColorSpinorField &w) {
-  checkSpinor(x,y);
-  checkSpinor(x,z);
-  checkSpinor(x,w);
-  int length = x.Length()/2;
-  setBlock(28, length, x.Precision());
-
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    caxpbypczpwCuda(a, x.Even(), b, y.Even(), c, z.Even(), w.Even());
-    caxpbypczpwCuda(a, x.Odd(), b, y.Odd(), c, z.Odd(), w.Odd());
-    return;
-  }
-
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    double2 a2 = make_double2(real(a), imag(a));
-    double2 b2 = make_double2(real(b), imag(b));
-    double2 c2 = make_double2(real(c), imag(c));
-    bindTexture(&x, &y, &z, &w);
-    caxpbypczpwDKernel<<<blasGrid, blasBlock>>>(a2, (double2*)x.V(), b2, (double2*)y.V(), 
-						c2, (double2*)z.V(), (double2*)w.V(), length); 
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    float2 a2 = make_float2(real(a), imag(a));
-    float2 b2 = make_float2(real(b), imag(b));
-    float2 c2 = make_float2(real(c), imag(c));
-    caxpbypczpwSKernel<<<blasGrid, blasBlock>>>(a2, (float2*)x.V(), b2, (float2*)y.V(), 
-						c2, (float2*)z.V(), (float2*)w.V(), length); 
-  } else {
-    bindTexture(&x, &y, &z, &w);
-    quda::blas_bytes += 6*x.Volume()*sizeof(float);
-    float2 a2 = make_float2(real(a), imag(a));
-    float2 b2 = make_float2(real(b), imag(b));
-    float2 c2 = make_float2(real(c), imag(c));
-    if (x.Nspin() == 4){ //wilson
-      caxpbypczpwKernel<float4, short4, 6><<<blasGrid, blasBlock>>>(a2, b2, c2, (float*)x.Norm(), (short4*)y.V(), (float*)y.Norm(),
-						  (short4*)z.V(), (float*)z.Norm(), (short4*)w.V(), (float*)w.Norm(), 
-						  z.Stride(), z.Volume());
-    } else if (x.Nspin() == 1){ //staggered
-      caxpbypczpwKernel<float2, short2, 3><<<blasGrid, blasBlock>>>(a2, b2, c2, (float*)x.Norm(), (short2*)y.V(), (float*)y.Norm(),
-						  (short2*)z.V(), (float*)z.Norm(), (short2*)w.V(), (float*)w.Norm(), 
-						  z.Stride(), z.Volume());
-    }else{
-     errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());                 
-    }
-  }
-  quda::blas_bytes += 5*x.RealLength()*x.Precision();
-  quda::blas_flops += 12*x.RealLength();
-
-  if (!blasTuning) checkCudaError();
-}
-
-//
-// double caxpyDotzyCuda(float a, float *x, float *y, float *z, n){}
-//
-// First performs the operation y[i] = a*x[i] + y[i]
-// Second returns the dot product (z,y)
-//
-
-template <unsigned int reduce_threads, typename Float, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) caxpyDotzyF##suffix
-#define REDUCE_TYPES Float2 a, Float2 *x, Float2 *y, Float2 *z, Float c
-#define REDUCE_PARAMS a, x, y, z, c
-#define REDUCE_REAL_AUXILIARY(i) y[i].x += a.x*x[i].x - a.y*x[i].y;
-#define REDUCE_IMAG_AUXILIARY(i) y[i].y += a.y*x[i].x + a.x*x[i].y;
-#define REDUCE_REAL_OPERATION(i) (z[i].x*y[i].x + z[i].y*y[i].y)
-#define REDUCE_IMAG_OPERATION(i) (z[i].x*y[i].y - z[i].y*y[i].x)
-#include "reduce_complex_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_REAL_AUXILIARY
-#undef REDUCE_IMAG_AUXILIARY
-#undef REDUCE_REAL_OPERATION
-#undef REDUCE_IMAG_OPERATION
-
-template <unsigned int reduce_threads, typename Float, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) caxpyDotzyH##suffix
-#define REDUCE_TYPES Float2 a, short4 *yH, Float *yN, int stride
-#define REDUCE_PARAMS a, yH, yN, stride
-#define REDUCE_REAL_AUXILIARY(i)					\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
-  RECONSTRUCT_HALF_SPINOR(z, texHalf3, texNorm3, stride);		\
-  CAXPY_FLOAT4(a, x0, y0);						\
-  CAXPY_FLOAT4(a, x1, y1);						\
-  CAXPY_FLOAT4(a, x2, y2);						\
-  CAXPY_FLOAT4(a, x3, y3);						\
-  CAXPY_FLOAT4(a, x4, y4);						\
-  CAXPY_FLOAT4(a, x5, y5);						\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);			
-#define REDUCE_IMAG_AUXILIARY(i)					\
-  REAL_DOT_FLOAT4(rdot0, z0, y0);					\
-  REAL_DOT_FLOAT4(rdot1, z1, y1);					\
-  REAL_DOT_FLOAT4(rdot2, z2, y2);					\
-  REAL_DOT_FLOAT4(rdot3, z3, y3);					\
-  REAL_DOT_FLOAT4(rdot4, z4, y4);					\
-  REAL_DOT_FLOAT4(rdot5, z5, y5);					\
-  IMAG_DOT_FLOAT4(idot0, z0, y0);					\
-  IMAG_DOT_FLOAT4(idot1, z1, y1);					\
-  IMAG_DOT_FLOAT4(idot2, z2, y2);					\
-  IMAG_DOT_FLOAT4(idot3, z3, y3);					\
-  IMAG_DOT_FLOAT4(idot4, z4, y4);					\
-  IMAG_DOT_FLOAT4(idot5, z5, y5);					\
-  rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4; \
-  idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;
-#define REDUCE_REAL_OPERATION(i) (rdot0)
-#define REDUCE_IMAG_OPERATION(i) (idot0)
-#include "reduce_complex_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_REAL_AUXILIARY
-#undef REDUCE_IMAG_AUXILIARY
-#undef REDUCE_REAL_OPERATION
-#undef REDUCE_IMAG_OPERATION
-
-template <unsigned int reduce_threads, typename Float, typename Float2>
-#define REDUCE_FUNC_NAME(suffix) caxpyDotzyH##suffix
-#define REDUCE_TYPES Float2 a, short2 *yH, Float *yN, int stride
-#define REDUCE_PARAMS a, yH, yN, stride
-#define REDUCE_REAL_AUXILIARY(i)					\
-  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(z, texHalfSt3, texNorm3, stride);		\
-  CAXPY_FLOAT2(a, x0, y0);						\
-  CAXPY_FLOAT2(a, x1, y1);						\
-  CAXPY_FLOAT2(a, x2, y2);						\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);		
-#define REDUCE_IMAG_AUXILIARY(i)					\
-  REAL_DOT_FLOAT2(rdot0, z0, y0);					\
-  REAL_DOT_FLOAT2(rdot1, z1, y1);					\
-  REAL_DOT_FLOAT2(rdot2, z2, y2);					\
-  IMAG_DOT_FLOAT2(idot0, z0, y0);					\
-  IMAG_DOT_FLOAT2(idot1, z1, y1);					\
-  IMAG_DOT_FLOAT2(idot2, z2, y2);					\
-  rdot0 += rdot1; rdot0 += rdot2;					\
-  idot0 += idot1; idot0 += idot2; 
-#define REDUCE_REAL_OPERATION(i) (rdot0)
-#define REDUCE_IMAG_OPERATION(i) (idot0)	
-#include "reduce_complex_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_REAL_AUXILIARY
-#undef REDUCE_IMAG_AUXILIARY
-#undef REDUCE_REAL_OPERATION
-#undef REDUCE_IMAG_OPERATION
-
-quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
-		       cudaColorSpinorField &z) {
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
-    return caxpyDotzyCuda(a, x.Even(), y.Even(), z.Even()) + 
-      caxpyDotzyCuda(a, x.Odd(), y.Odd(), z.Odd());
-
-  const int id = 29;
-  quda::blas_flops += 8*x.RealLength();
-  checkSpinor(x,y);
-  quda::blas_bytes += 4*x.RealLength()*x.Precision();
-  double2 dot;
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    char c = 0;
-    double2 a2 = make_double2(real(a), imag(a));
-    dot = caxpyDotzyFCuda(a2, (double2*)x.V(), (double2*)y.V(), (double2*)z.V(), c, x.Length()/2, id, x.Precision());
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    char c = 0;
-    float2 a2 = make_float2(real(a), imag(a));
-    dot = caxpyDotzyFCuda(a2, (float2*)x.V(), (float2*)y.V(), (float2*)z.V(), c, x.Length()/2, id, x.Precision());
-  } else {
-    bindTexture(&x, &y, &z);
-    quda::blas_bytes += 3*x.Volume()*sizeof(float);
-    float2 a2 = make_float2(real(a), imag(a));
-    
-    if (x.Nspin() == 4){ //wilson
-      dot = caxpyDotzyHCuda(a2, (short4*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else if (x.Nspin() == 1){ //staggered
-      dot = caxpyDotzyHCuda(a2, (short2*)y.V(), (float*)y.Norm(), x.Stride(), x.Volume(), id, x.Precision());
-    }else{
-      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
-    }
-  }
-
-  return quda::Complex(dot.x, dot.y);
-}
