@@ -18,6 +18,7 @@ extern "C" {
     const char* get_gauge_order_str(QudaGaugeFieldOrder order);
     const char* get_recon_str(QudaReconstructType recon);
     const char* get_test_type(int t);
+    const char* get_unitarization_str(bool svd_only);
     void quda_set_verbose(int );
     QudaDslashType get_dslash_type(char* s);
     const char* get_dslash_type_str(QudaDslashType type);

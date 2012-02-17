@@ -130,6 +130,7 @@ hisq_force_init()
   cudaForce = new cudaGaugeField(gParam); 
   cudaMemset((void**)(cudaForce->Gauge_p()), 0, cudaForce->Bytes());
 
+  cudaForce->loadCPUField(*cpuForce, QUDA_CPU_FIELD_LOCATION);
   
 
 

@@ -674,6 +674,19 @@ get_prec_str(QudaPrecision prec)
 
 
 const char* 
+get_unitarization_str(bool svd_only)
+{
+  const char* ret;
+ 
+  if(svd_only){
+    ret = "SVD";
+  }else{
+    ret = "Cayley-Hamilton/SVD";
+  }
+  return ret;
+}
+
+const char* 
 get_gauge_order_str(QudaGaugeFieldOrder order)
 {
   const char* ret;
