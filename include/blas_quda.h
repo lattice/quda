@@ -31,7 +31,7 @@ void zeroCuda(cudaColorSpinorField &a);
 void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src);
 
 double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-double normCuda(cudaColorSpinorField &b);
+double normCuda(const cudaColorSpinorField &b);
 double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 

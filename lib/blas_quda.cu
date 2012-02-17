@@ -880,9 +880,10 @@ __device__ void add(volatile double *s, int i, int j) { s[i] += s[j]; }
  */
 template <int reduce_threads, typename ReduceType, typename ReduceSimpleType, 
 	  typename FloatN, int M, int writeX, int writeY, int writeZ,
-	  typename InputX, typename InputY, typename InputZ, typename InputW,
+	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
 	  typename OutputX, typename OutputY, typename OutputZ, typename Reducer>
-__global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, Reducer r, ReduceType *reduce, 
+__global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
+			     ReduceType *reduce, 
 			     OutputX XX, OutputY YY, OutputZ ZZ, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
@@ -890,13 +891,14 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, Reducer r, 
   ReduceType sum;
   zero(sum); 
   while (i < length) {
-    FloatN x[M], y[M], z[M], w[M];
+    FloatN x[M], y[M], z[M], w[M], v[M];
     X.load(x, i);
     Y.load(y, i);
     Z.load(z, i);
     W.load(w, i);
+    V.load(v, i);
 #pragma unroll
-    for (int j=0; j<M; j++) r(sum, x[j], y[j], z[j], w[j]);
+    for (int j=0; j<M; j++) r(sum, x[j], y[j], z[j], w[j], v[j]);
     i += gridSize;
 
     if (writeX) XX.save(x, i);
@@ -938,9 +940,9 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, Reducer r, 
 */
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
 	  int M, int writeX, int writeY, int writeZ, 
-	  typename InputX, typename InputY, typename InputZ, typename InputW, 
+	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
 	  typename Reducer, typename OutputX, typename OutputY, typename OutputZ>
-doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, Reducer r, 
+doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
 		     OutputX XX, OutputY YY, OutputZ ZZ, int length) {
   // when there is only one warp per block, we need to allocate two warps 
   // worth of shared memory so that we don't index shared memory out of bounds
@@ -950,22 +952,22 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, Reducer r,
   ReduceType *reduce = (ReduceType*)d_reduce;
   if (blasBlock.x == 32) {
     reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, r, reduce, XX, YY, ZZ, length);
+      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
   } else if (blasBlock.x == 64) {
     reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, r, reduce, XX, YY, ZZ, length);
+      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
   } else if (blasBlock.x == 128) {
     reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, r, reduce, XX, YY, ZZ, length);
+      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
   } else if (blasBlock.x == 256) {
     reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, r, reduce, XX, YY, ZZ, length);
+      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
   } else if (blasBlock.x == 512) {
     reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, r, reduce, XX, YY, ZZ, length);
+      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
   } else if (blasBlock.x == 1024) {
     reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, r, reduce, XX, YY, ZZ, length);
+      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
   } else {
     errorQuda("Reduction not implemented for %d threads", blasBlock.x);
   }
@@ -990,19 +992,23 @@ template <typename doubleN, typename ReduceType, typename ReduceSimpleType,
 	  template <typename ReduceType, typename Float, typename FloatN> class Reducer,
 	  int writeX, int writeY, int writeZ>
 doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaColorSpinorField &x, 
-		   cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w) {
+		   cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w,
+		   cudaColorSpinorField &v) {
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     doubleN even =
       reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,writeY,writeZ>
-      (kernel, a, b, x.Even(), y.Even(), z.Even(), w.Even());
+      (kernel, a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even());
     doubleN odd = 
       reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,writeY,writeZ>
-      (kernel, a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd());
+      (kernel, a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd());
     return even + odd;
   }
 
   setBlock(kernel, x.Length(), x.Precision());
   checkSpinor(x, y);
+  checkSpinor(x, z);
+  checkSpinor(x, w);
+  checkSpinor(x, v);
 
   if (blasGrid.x > REDUCE_MAX_BLOCKS) {
     errorQuda("reduce_core: grid size %d must be smaller than %d", blasGrid.x, REDUCE_MAX_BLOCKS);
@@ -1014,40 +1020,44 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
     Spinor<double2,double2,double2,1> Y(y);
     Spinor<double2,double2,double2,1> Z(z);
     Spinor<double2,double2,double2,1> W(w);
+    Spinor<double2,double2,double2,1> V(v);
     Reducer<ReduceType, double2, double2> r(a,b);
     value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,double2,1,writeX,writeY,writeZ>
-      (X, Y, Z, W, r, X, Y, Z, x.Length()/2);
+      (X, Y, Z, W, V, r, X, Y, Z, x.Length()/2);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     Spinor<float4,float4,float4,1> X(x);
     Spinor<float4,float4,float4,1> Y(y);
     Spinor<float4,float4,float4,1> Z(z);
     Spinor<float4,float4,float4,1> W(w);
+    Spinor<float4,float4,float4,1> V(v);
     Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
     value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,1,writeX,writeY,writeZ>
-      (X, Y, Z, W, r, X, Y, Z, x.Length()/4);
+      (X, Y, Z, W, V, r, X, Y, Z, x.Length()/4);
   } else {
     if (x.Nspin() == 4){ //wilson
       SpinorTexture<float4,float4,short4,6,0> xTex(x);
       SpinorTexture<float4,float4,short4,6,1> yTex(y);
       SpinorTexture<float4,float4,short4,6,2> zTex(z);
       SpinorTexture<float4,float4,short4,6,3> wTex(w);
+      SpinorTexture<float4,float4,short4,6,4> vTex(v);
       Spinor<float4,float4,short4,6> xOut(x);
       Spinor<float4,float4,short4,6> yOut(y);
       Spinor<float4,float4,short4,6> zOut(z);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
       value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ>
-	(xTex,yTex,zTex,wTex,r,xOut,yOut,zOut,y.Volume());
+	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
       SpinorTexture<float2,float2,short2,3,1> yTex(y);
       SpinorTexture<float2,float2,short2,3,2> zTex(z);
       SpinorTexture<float2,float2,short2,3,3> wTex(w);
+      SpinorTexture<float2,float2,short2,3,4> vTex(v);
       Spinor<float2,float2,short2,3> xOut(x);
       Spinor<float2,float2,short2,3> yOut(y);
       Spinor<float2,float2,short2,3> zOut(z);
       Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
       value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float2,3,writeX,writeY,writeZ>
-	(xTex,yTex,zTex,wTex,r,xOut,yOut,zOut,y.Volume());
+	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     quda::blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.Volume()*sizeof(float);
   }
@@ -1066,15 +1076,16 @@ __device__ float norm2_(const float4 &a) { return a.x*a.x + a.y*a.y + a.z*a.z + 
 template <typename ReduceType, typename Float2, typename FloatN>
 struct Norm2 {
   Norm2(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { sum += norm2_(x); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += norm2_(x); }
   static int streams() { return 1; } //! total number of input and output streams
   static int flops() { return 2; } //! flops per element
 };
 
-double normCuda(cudaColorSpinorField &x) {
+double normCuda(const cudaColorSpinorField &x) {
   const int kernel = 17;
+  cudaColorSpinorField &y = (cudaColorSpinorField&)x; // FIXME
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, x, x, x);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
 }
 
 __device__ double dot_(const double &a, const double &b) { return a*b; }
@@ -1084,7 +1095,7 @@ __device__ float dot_(const float4 &a, const float4 &b) { return a.x*b.x + a.y*b
 template <typename ReduceType, typename Float2, typename FloatN>
 struct Dot {
   Dot(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { sum += dot_(x); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += dot_(x); }
   static int streams() { return 2; } //! total number of input and output streams
   static int flops() { return 2; } //! flops per element
 };
@@ -1092,14 +1103,14 @@ struct Dot {
 double reDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 18;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
 }
 
 template <typename ReduceType, typename Float2, typename FloatN>
 struct axpyNorm2 {
   Float2 a;
   axpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { 
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
     y += a.x*x; sum += norm2_(y); }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 4; } //! flops per element
@@ -1108,7 +1119,7 @@ struct axpyNorm2 {
 double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 19;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0>
-    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, y, y);
+    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
 }
 
 /**
@@ -1118,7 +1129,7 @@ double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorFie
 template <typename ReduceType, typename Float2, typename FloatN>
 struct xmyNorm2 {
   xmyNorm2(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { 
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
     y = x - y; sum += norm2_(y); }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 3; } //! flops per element
@@ -1127,7 +1138,7 @@ struct xmyNorm2 {
 double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 20;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,xmyNorm2,0,1,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
 }
 
 /**
@@ -1138,7 +1149,7 @@ template <typename ReduceType, typename Float2, typename FloatN>
 struct caxpyNorm2 {
   Float2 a;
   caxpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { 
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
     caxpy_(a, x, y); sum += norm2_(y); }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 6; } //! flops per element
@@ -1147,7 +1158,7 @@ struct caxpyNorm2 {
 double caxpyNormCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 21;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyNorm2,0,1,0>
-    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, x, x);
+    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, x, x, x);
 }
 
 /**
@@ -1161,7 +1172,7 @@ template <typename ReduceType, typename Float2, typename FloatN>
 struct caxpyxmaznormx {
   Float2 a;
   caxpyxmaznormx(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { caxpy_(a, x, y); x-= a.x*z; sum += norm2_(x); }
+  __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, y); x-= a.x*z; sum += norm2_(x); }
   static int streams() { return 5; } //! total number of input and output streams
   static int flops() { return 10; } //! flops per element
 };
@@ -1170,7 +1181,7 @@ double caxpyXmazNormXCuda(const quda::Complex &a, cudaColorSpinorField &x,
 			  cudaColorSpinorField &y, cudaColorSpinorField &z) {
   const int kernel = 22;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyxmaznormx,1,1,0>
-    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x);
+    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
 }
 
 /**
@@ -1185,7 +1196,7 @@ struct cabxpyaxnorm {
   Float2 a;
   Float2 b;
   cabxpyaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-  __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { x *= a.x; caxpy_(b, x, y); sum += norm2_(y); }
+  __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { x *= a.x; caxpy_(b, x, y); sum += norm2_(y); }
   static int streams() { return 5; } //! total number of input and output streams
   static int flops() { return 10; } //! flops per element
 };
@@ -1194,7 +1205,7 @@ double cabxpyAxNormCuda(const double &a, const quda::Complex &b,
 			cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 23;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,cabxpyaxnorm,1,1,0>
-    (kernel, make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x);
+    (kernel, make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x, x);
 }
 
 __device__ double2 cdot_(const double2 &a, const double2 &b) 
@@ -1207,7 +1218,7 @@ __device__ double2 cdot_(const float4 &a, const float4 &b)
 template <typename ReduceType, typename Float2, typename FloatN>
 struct Cdot {
   Cdot(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { sum += cdot_(x,y); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += cdot_(x,y); }
   static int streams() { return 2; } //! total number of input and output streams
   static int flops() { return 4; } //! flops per element
 };
@@ -1215,7 +1226,7 @@ struct Cdot {
 quda::Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 24;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
   return quda::Complex(cdot.x, cdot.y);
 }
 
@@ -1229,7 +1240,7 @@ template <typename ReduceType, typename Float2, typename FloatN>
 struct xpaycdotzy {
   Float2 a;
   xpaycdotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y = x + a.x*y; sum += cdot_(z,y); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { y = x + a.x*y; sum += cdot_(z,y); }
   static int streams() { return 4; } //! total number of input and output streams
   static int flops() { return 6; } //! flops per element
 };
@@ -1237,7 +1248,7 @@ struct xpaycdotzy {
 quda::Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z) {
   const int kernel = 25;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,xpaycdotzy,0,1,0>
-    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, y);
+    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, y, y);
   return quda::Complex(cdot.x, cdot.y);
 }
 
@@ -1251,7 +1262,7 @@ template <typename ReduceType, typename Float2, typename FloatN>
 struct caxpydotzy {
   Float2 a;
    caxpydotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { caxpy_(a, x, y); sum += cdot_(z,y); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, y); sum += cdot_(z,y); }
   static int streams() { return 4; } //! total number of input and output streams
   static int flops() { return 8; } //! flops per element
 };
@@ -1260,7 +1271,7 @@ quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cu
 		       cudaColorSpinorField &z) {
   const int kernel = 26;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0>
-    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, y);
+    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, y, y);
   return quda::Complex(cdot.x, cdot.y);
 }
 
@@ -1275,7 +1286,7 @@ __device__ double3 cdotNormA_(const float4 &a, const float4 &b)
 template <typename ReduceType, typename Float2, typename FloatN>
 struct CdotNormA {
   CdotNormA(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { sum += cdotNormA_(x,y); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += cdotNormA_(x,y); }
   static int streams() { return 2; } //! total number of input and output streams
   static int flops() { return 6; } //! flops per element
 };
@@ -1283,7 +1294,7 @@ struct CdotNormA {
 double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 27;
   return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormA,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
 }
 
 __device__ double3 cdotNormB_(const double2 &a, const double2 &b) 
@@ -1297,7 +1308,7 @@ __device__ double3 cdotNormB_(const float4 &a, const float4 &b)
 template <typename ReduceType, typename Float2, typename FloatN>
 struct CdotNormB {
   CdotNormB(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { sum += cdotNormB_(x,y); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += cdotNormB_(x,y); }
   static int streams() { return 2; } //! total number of input and output streams
   static int flops() { return 6; } //! flops per element
 };
@@ -1305,227 +1316,28 @@ struct CdotNormB {
 double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 28;
   return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormB,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
 }
 
-/*//
-// double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
-// float2 *z, float2 *w, float2 *u, int len)
-//
-template <unsigned int reduce_threads, typename Float2, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductUYNormYD##suffix
-#define REDUCE_TYPES Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, Float2 *u, Float dummy
-#define REDUCE_PARAMS a, x, b, y, z, w, u, dummy
-#define REDUCE_AUXILIARY(i)				\
-  Float2 X = READ_DOUBLE2_TEXTURE(x, i);		\
-  Float2 Y = READ_DOUBLE2_TEXTURE(y, i);		\
-  Float2 W = READ_DOUBLE2_TEXTURE(w, i);		\
-  Float2 Z = read_Float2(z, i);				\
-  Z.x += a.x*X.x - a.y*X.y;				\
-  Z.y += a.y*X.x + a.x*X.y;				\
-  Z.x += b.x*Y.x - b.y*Y.y;				\
-  Z.y += b.y*Y.x + b.x*Y.y;				\
-  Y.x -= b.x*W.x - b.y*W.y;				\
-  Y.y -= b.y*W.x + b.x*W.y;				\
-  z[i] = make_Float2(Z);				\
-  y[i] = make_Float2(Y);	      
-#define REDUCE_OPERATION(i) Float3(u[i].x*y[i].x + u[i].y*y[i].y, u[i].x*y[i].y - u[i].y*y[i].x, \
-				   y[i].x*y[i].x + y[i].y*y[i].y)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
+/**
+   This convoluted kernel does the following: 
+   z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
+ */
+template <typename ReduceType, typename Float2, typename FloatN>
+struct caxpbypzYmbwcDotProductUYNormY {
+  Float2 a;
+  Float2 b;
+  caxpbypzYmbwcDotProductUYNormY(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, z); caxpy_(b, y, z); caxpy_(-b, v, y); sum += cdotNormB_(v,y); }
+  static int streams() { return 7; } //! total number of input and output streams
+  static int flops() { return 18; } //! flops per element
+};
 
-template <unsigned int reduce_threads, typename Float2, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductUYNormYS##suffix
-#define REDUCE_TYPES Float2 a, Float2 *x, Float2 b, Float2 *y, Float2 *z, Float2 *w, Float2 *u, Float dummy
-#define REDUCE_PARAMS a, x, b, y, z, w, u, dummy
-#define REDUCE_AUXILIARY(i)			\
-  Float2 X = read_Float2(x, i);			\
-  Float2 Y = read_Float2(y, i);			\
-  Float2 W = read_Float2(w, i);			\
-  Float2 Z = read_Float2(z, i);			\
-  Z.x += a.x*X.x - a.y*X.y;			\
-  Z.y += a.y*X.x + a.x*X.y;			\
-  Z.x += b.x*Y.x - b.y*Y.y;			\
-  Z.y += b.y*Y.x + b.x*Y.y;			\
-  Y.x -= b.x*W.x - b.y*W.y;			\
-  Y.y -= b.y*W.x + b.x*W.y;			\
-  z[i] = make_Float2(Z);			\
-  y[i] = make_Float2(Y);	      
-#define REDUCE_OPERATION(i) Float3(u[i].x*y[i].x + u[i].y*y[i].y, u[i].x*y[i].y - u[i].y*y[i].x, \
-				   y[i].x*y[i].x + y[i].y*y[i].y)
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-//
-// double3 caxpbypzYmbwcDotProductWYNormYCuda(float2 a, float2 *x, float2 b, float2 *y, 
-// float2 *z, float2 *w, float2 *u, int len)
-//
-template <unsigned int reduce_threads, typename Float2, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductUYNormYH##suffix
-#define REDUCE_TYPES Float2 a, Float2 b, short4 *yH, float *yN, short4 *zH, float *zN, float *wN, float *uN, int stride, Float dummy
-#define REDUCE_PARAMS a, b, yH, yN, zH, zN, wN, uN, stride, dummy
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR(x, texHalf1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR(y, texHalf2, texNorm2, stride);		\
-  RECONSTRUCT_HALF_SPINOR(z, texHalf3, texNorm3, stride);		\
-  CAXPBYPZ_FLOAT4(a, x0, b, y0, z0);					\
-  CAXPBYPZ_FLOAT4(a, x1, b, y1, z1);					\
-  CAXPBYPZ_FLOAT4(a, x2, b, y2, z2);					\
-  CAXPBYPZ_FLOAT4(a, x3, b, y3, z3);					\
-  CAXPBYPZ_FLOAT4(a, x4, b, y4, z4);					\
-  CAXPBYPZ_FLOAT4(a, x5, b, y5, z5);					\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(zH, zN, z, stride);			\
-  READ_HALF_SPINOR(w, texHalf4, stride);				\
-  float2 bwc = -wc*b;							\
-  CAXPY_FLOAT4(bwc, w0, y0);						\
-  CAXPY_FLOAT4(bwc, w1, y1);						\
-  CAXPY_FLOAT4(bwc, w2, y2);						\
-  CAXPY_FLOAT4(bwc, w3, y3);						\
-  CAXPY_FLOAT4(bwc, w4, y4);						\
-  CAXPY_FLOAT4(bwc, w5, y5);						\
-  REAL_DOT_FLOAT4(norm0, y0, y0);					\
-  REAL_DOT_FLOAT4(norm1, y1, y1);					\
-  REAL_DOT_FLOAT4(norm2, y2, y2);					\
-  REAL_DOT_FLOAT4(norm3, y3, y3);					\
-  REAL_DOT_FLOAT4(norm4, y4, y4);					\
-  REAL_DOT_FLOAT4(norm5, y5, y5);					\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE(yH, yN, y, stride);			\
-  READ_HALF_SPINOR(u, texHalf5, stride);				\
-  REAL_DOT_FLOAT4(rdot0, u0, y0);					\
-  REAL_DOT_FLOAT4(rdot1, u1, y1);					\
-  REAL_DOT_FLOAT4(rdot2, u2, y2);					\
-  REAL_DOT_FLOAT4(rdot3, u3, y3);					\
-  REAL_DOT_FLOAT4(rdot4, u4, y4);					\
-  REAL_DOT_FLOAT4(rdot5, u5, y5);					\
-  IMAG_DOT_FLOAT4(idot0, u0, y0);					\
-  IMAG_DOT_FLOAT4(idot1, u1, y1);					\
-  IMAG_DOT_FLOAT4(idot2, u2, y2);					\
-  IMAG_DOT_FLOAT4(idot3, u3, y3);					\
-  IMAG_DOT_FLOAT4(idot4, u4, y4);					\
-  IMAG_DOT_FLOAT4(idot5, u5, y5);					\
-  norm0 += norm1; norm2 += norm3; norm4 += norm5; norm0 += norm2, norm0 += norm4; \
-  rdot0 += rdot1; rdot2 += rdot3; rdot4 += rdot5; rdot0 += rdot2; rdot0 += rdot4; \
-  idot0 += idot1; idot2 += idot3; idot4 += idot5; idot0 += idot2; idot0 += idot4;
-
-#define REDUCE_OPERATION(i) Float3(uc*rdot0, uc*idot0, norm0)
-
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-template <unsigned int reduce_threads, typename Float2, typename Float>
-#define REDUCE_FUNC_NAME(suffix) caxpbypzYmbwcDotProductUYNormYH##suffix
-#define REDUCE_TYPES Float2 a, Float2 b, short2 *yH, float *yN, short2 *zH, float *zN, float *wN, float *uN, int stride, Float dummy
-#define REDUCE_PARAMS a, b, yH, yN, zH, zN, wN, uN, stride, dummy
-#define REDUCE_AUXILIARY(i)						\
-  RECONSTRUCT_HALF_SPINOR_ST(x, texHalfSt1, texNorm1, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(y, texHalfSt2, texNorm2, stride);		\
-  RECONSTRUCT_HALF_SPINOR_ST(z, texHalfSt3, texNorm3, stride);		\
-  CAXPBYPZ_FLOAT2(a, x0, b, y0, z0);					\
-  CAXPBYPZ_FLOAT2(a, x1, b, y1, z1);					\
-  CAXPBYPZ_FLOAT2(a, x2, b, y2, z2);					\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(zH, zN, z, stride);		\
-  READ_HALF_SPINOR_ST(w, texHalfSt4, stride);				\
-  float2 bwc = -wc*b;							\
-  CAXPY_FLOAT2(bwc, w0, y0);						\
-  CAXPY_FLOAT2(bwc, w1, y1);						\
-  CAXPY_FLOAT2(bwc, w2, y2);						\
-  REAL_DOT_FLOAT2(norm0, y0, y0);					\
-  REAL_DOT_FLOAT2(norm1, y1, y1);					\
-  REAL_DOT_FLOAT2(norm2, y2, y2);					\
-  CONSTRUCT_HALF_SPINOR_FROM_SINGLE_ST(yH, yN, y, stride);		\
-  READ_HALF_SPINOR_ST(u, texHalfSt5, stride);				\
-  REAL_DOT_FLOAT2(rdot0, u0, y0);					\
-  REAL_DOT_FLOAT2(rdot1, u1, y1);					\
-  REAL_DOT_FLOAT2(rdot2, u2, y2);					\
-  IMAG_DOT_FLOAT2(idot0, u0, y0);					\
-  IMAG_DOT_FLOAT2(idot1, u1, y1);					\
-  IMAG_DOT_FLOAT2(idot2, u2, y2);					\
-  norm0 += norm1; norm0 += norm2;					\
-  rdot0 += rdot1; rdot0 += rdot2;					\
-  idot0 += idot1; idot0 += idot2; 
-
-#define REDUCE_OPERATION(i) Float3(uc*rdot0, uc*idot0, norm0)
-
-#include "reduce_core.h"
-#undef REDUCE_FUNC_NAME
-#undef REDUCE_TYPES
-#undef REDUCE_PARAMS
-#undef REDUCE_AUXILIARY
-#undef REDUCE_OPERATION
-
-// This convoluted kernel does the following: z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
 double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpinorField &x, 
 					   const quda::Complex &b, cudaColorSpinorField &y,
 					   cudaColorSpinorField &z, cudaColorSpinorField &w,
 					   cudaColorSpinorField &u) {
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) 
-    return caxpbypzYmbwcDotProductUYNormYCuda(a, x.Even(), b, y.Even(), z.Even(), w.Even(), u.Even()) + 
-      caxpbypzYmbwcDotProductUYNormYCuda(a, x.Odd(), b, y.Odd(), z.Odd(), w.Odd(), u.Odd());
-
-  const int id = 29;
-  quda::blas_flops += 18*x.RealLength();
-  checkSpinor(x,y);
-  checkSpinor(x,z);
-  checkSpinor(x,w);
-  checkSpinor(x,u);
-  int length = x.Length()/2;
-  quda::blas_bytes += 7*x.RealLength()*x.Precision();
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    double2 a2 = make_double2(real(a), imag(a));
-    double2 b2 = make_double2(real(b), imag(b));
-    bindTexture(&x, &y, &z, &w, &u);
-    return caxpbypzYmbwcDotProductUYNormYDCuda<double3>(a2, (double2*)x.V(), b2, (double2*)y.V(), (double2*)z.V(), 
-							(double2*)w.V(), (double2*)u.V(), (char)0, length, id, x.Precision());
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    float2 a2 = make_float2(real(a), imag(a));
-    float2 b2 = make_float2(real(b), imag(b));
-    return caxpbypzYmbwcDotProductUYNormYSCuda<double3>(a2, (float2*)x.V(), b2, (float2*)y.V(), (float2*)z.V(),
-							(float2*)w.V(), (float2*)u.V(), (char)0, length, id, x.Precision());
-  } else {
-    // fused nSpin=4 kernel is slow on Fermi
-    // N.B. this introduces an extra half truncation so will affect convergence (for the better?)
-    if (!blasTuning && (__COMPUTE_CAPABILITY__ >= 200) && x.Nspin() == 4) {
-      caxpbypzYmbwCuda(a, x, b, y, z, w);
-      return cDotProductNormBCuda(u, y);
-    }
-     
-    bindTexture(&x, &y, &z, &w, &u);
-    quda::blas_bytes += 7*x.Volume()*sizeof(float);
-    float2 a2 = make_float2(real(a), imag(a));
-    float2 b2 = make_float2(real(b), imag(b));
-    if (x.Nspin() == 4) { // wilson
-      return caxpbypzYmbwcDotProductUYNormYHCuda<double3>(a2, b2, (short4*)y.V(), (float*)y.Norm(), 
-						 (short4*)z.V(), (float*)z.Norm(), (float*)w.Norm(), 
-						 (float*)u.Norm(), y.Stride(), (char)0, y.Volume(), id, x.Precision());
-    } else if (x.Nspin() == 1){ // staggered
-      return caxpbypzYmbwcDotProductUYNormYHCuda<double3>(a2, b2, (short2*)y.V(), (float*)y.Norm(), 
-						 (short2*)z.V(), (float*)z.Norm(), (float*)w.Norm(), 
-						 (float*)u.Norm(), y.Stride(), (char)0, y.Volume(), id, x.Precision());
-    } else {
-      errorQuda("%s: nSpin(%d) is not supported\n", __FUNCTION__, x.Nspin());            
-    }
-  }
-
-  exit(-1);
+  const int kernel = 29;
+  return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,0,0>
+    (kernel, make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
 }
-
-#undef ZERO
-#undef SET_SUM
-#undef ADD_SUM
-#undef WRITE_REDUCTION
-#undef QudaSumType
-#undef QudaSumFloat
-#undef NREDUCE
-*/
