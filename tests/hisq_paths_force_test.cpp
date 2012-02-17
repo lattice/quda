@@ -98,6 +98,7 @@ hisq_force_init()
 
   setDims(gaugeParam.X);
 
+
   gaugeParam.cpu_prec = link_prec;
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
@@ -337,6 +338,7 @@ main(int argc, char **argv)
 
  // link_prec = prec;
 
+  link_recon = QUDA_RECONSTRUCT_NO;
   setPrecision(prec);
 
   display_test_info();
