@@ -9,10 +9,10 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 16;
-const int LY = 16;
-const int LZ = 16;
-const int LT = 16;
+const int LX = 4;
+const int LY = 4;
+const int LZ = 4;
+const int LT = 4;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision

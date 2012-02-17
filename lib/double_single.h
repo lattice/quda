@@ -31,7 +31,12 @@ __device__ inline volatile doublesingle operator+=(volatile doublesingle& a, con
 { dsadd(a.a, a.a, b.a); return a; }
 __host__ double operator+=(double& a, doublesingle &b) { a = b.a.x; a += b.a.y; return a; }
 
-struct doublesingle2 { doublesingle x; doublesingle y; };
+struct doublesingle2 { 
+  doublesingle x; 
+  doublesingle y; 
+  __device__ inline doublesingle2& operator=(const double &a) 
+  { x = a; y = a; return *this; }
+};
 struct doublesingle3 { doublesingle x; doublesingle y; doublesingle z; };
 
 #endif
