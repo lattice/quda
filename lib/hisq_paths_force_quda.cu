@@ -265,8 +265,10 @@ namespace hisq {
       };
   
 
-
-    __device__ void reconstructSign(int* const sign, int dir, int i[4]){
+    // reconstructSign doesn't do anything right now, 
+    // but it will, soon.
+    __device__ void reconstructSign(int* const sign, int dir, const int i[4]){
+/*
       *sign=1;
       switch(dir){
         case XUP:
@@ -285,6 +287,8 @@ namespace hisq {
           if(i[3] == X4m1) *sign=-1; 
           break;
       }
+*/
+      return;
     }
 
 
