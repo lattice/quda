@@ -33,6 +33,11 @@
 #endif
 #endif
 
+#ifdef GPU_GAUGE_FORCE
+#include <gauge_force_quda.h>
+#endif
+
+
 #include "mpicomm.h"
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
@@ -1825,9 +1830,69 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 
   return 0;
 }
+#endif
 
+#ifdef GPU_GAUGE_FORCE
+int
+computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
+                      void* loop_coeff, int num_paths, int max_length, double eb3,
+                      QudaGaugeParam* qudaGaugeParam)
+{
+  int* X = qudaGaugeParam->X;
+  
+  GaugeFieldParam gParam(0, *qudaGaugeParam);
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge = sitelink;
+  gParam.pad = 0;
+  cpuGaugeField* cpuSiteLink = new cpuGaugeField(gParam);
+  
+  gParam.precision = qudaGaugeParam->cpu_prec;
+  gParam.create =QUDA_REFERENCE_FIELD_CREATE;
+  gParam.reconstruct =QUDA_RECONSTRUCT_10;
+  
+  gParam.gauge=mom;
+  cpuGaugeField* cpuMom = new cpuGaugeField(gParam);            
+  
+  gParam.create =QUDA_NULL_FIELD_CREATE;
+  gParam.pad = X[2]*X[1]*X[0]/2;
+  gParam.precision = qudaGaugeParam->cuda_prec;
+  gParam.reconstruct = qudaGaugeParam->reconstruct;
+  cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParam);
+  
+  qudaGaugeParam->site_ga_pad = gParam.pad;//need to record this value
+  
+  gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.precision = qudaGaugeParam->cuda_prec;
+  cudaGaugeField* cudaMom = new cudaGaugeField(gParam);
+  
+  
+  initCommonConstants(*cudaSiteLink);
+  gauge_force_init_cuda(qudaGaugeParam, max_length); 
+    
+  // download the momentum field to the GPU
+  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  
+  // download the gauge field to the GPU
+  cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
+  
+  //The number comes from CPU implementation in MILC, gauge_force_imp.c
+  gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  cudaThreadSynchronize();
+  
+  // copy the new momentum back on the CPU
+  cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  
+  delete cpuSiteLink;
+  delete cpuMom;
+  
+  delete cudaSiteLink;
+  delete cudaMom;
+   
+  return 0;  
+}
 
 #endif
+
 
 void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
 
