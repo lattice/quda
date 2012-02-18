@@ -78,14 +78,17 @@ function complete_gauge_force_check {
     prog="./gauge_force_test"
     precs="double single"
     recons="18 12"
+    gauge_orders="milc qdp"
     for prec in $precs; do
         for recon in $recons; do
-                cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon  --verify"
+            for gauge_order in $gauge_orders; do
+                cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon  --gauge-order $gauge_order --verify"
                 echo -ne  $cmd  "\t"..."\t"
                 echo "----------------------------------------------------------" >>$OUTFILE
                 echo $cmd >> $OUTFILE
                 $cmd >> $OUTFILE 2>&1|| (echo -e "FAIL\n$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
                 echo "OK"
+	    done
         done
     done
 

@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include "fat_force_quda.h"
 
+#define GPU_DIRECT
 extern void initCommonConstants(const LatticeField &lat);
 
 extern int device;
@@ -395,7 +396,11 @@ gauge_force_test(void)
   // then copied to 1d array in "MILC" format
   void* sitelink_2d[4];
   for(int i=0;i < 4;i++){
+#ifdef GPU_DIRECT
+    cudaMallocHost(&sitelink_2d[i], V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
+#else
     sitelink_2d[i] = malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
+#endif
   }
   
   // fills the gauge field with random numbers
@@ -500,7 +505,11 @@ gauge_force_test(void)
   
   free(sitelink_1d);
   for(int dir=0;dir < 4;dir++){
+#ifdef GPU_DIRECT
+    cudaFreeHost(sitelink_2d[dir]);
+#else
     free(sitelink_2d[dir]);
+#endif
   }
   
   free(mom);

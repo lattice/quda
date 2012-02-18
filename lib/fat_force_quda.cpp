@@ -705,7 +705,8 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 #ifdef MULTI_GPU
   int* Z = param->X;
 #endif
-  int pad = param->ga_pad;
+  //int pad = param->ga_pad;
+  int pad = cudaGauge->Pad();
   int Vsh_x = param->X[1]*param->X[2]*param->X[3]/2;
   int Vsh_y = param->X[0]*param->X[2]*param->X[3]/2;
   int Vsh_z = param->X[0]*param->X[1]*param->X[3]/2;
