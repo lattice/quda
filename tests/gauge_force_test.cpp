@@ -472,6 +472,7 @@ gauge_force_test(void)
   gettimeofday(&t1, NULL);
   
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
+  //The number comes from CPU implementation in MILC, gauge_force_imp.c
   int flops=153004;
     
   if (verify_results){	

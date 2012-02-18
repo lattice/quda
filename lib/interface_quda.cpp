@@ -1838,6 +1838,15 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
                       void* loop_coeff, int num_paths, int max_length, double eb3,
                       QudaGaugeParam* qudaGaugeParam)
 {
+
+#ifdef MULT_GPU
+  //for multi-gpu code, we only support QDP order so far
+  if(qudaGaugeParam->gauge_orde == QUDA_MILC_GAUGE_ORDER){
+    errorQuda("ERROR: QUDA_MILC_GAUGE_ORDER is not supported for multi-gpu yet!\n");
+  }
+  
+#endif
+
   int* X = qudaGaugeParam->X;
   
   GaugeFieldParam gParam(0, *qudaGaugeParam);
@@ -1870,17 +1879,12 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   initCommonConstants(*cudaSiteLink);
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
     
-  // download the momentum field to the GPU
-  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
-  
-  // download the gauge field to the GPU
   cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
   
-  //The number comes from CPU implementation in MILC, gauge_force_imp.c
-  gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, path_length, loop_coeff, num_paths, max_length);
-  cudaThreadSynchronize();
+  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   
-  // copy the new momentum back on the CPU
+  gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, path_length, loop_coeff, num_paths, max_length);
+
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   
   delete cpuSiteLink;
