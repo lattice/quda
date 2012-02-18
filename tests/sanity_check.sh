@@ -73,6 +73,25 @@ function complete_fatlink_check {
 
 }
 
+function complete_gauge_force_check {
+    echo "Performing complete gauge force test:"    
+    prog="./gauge_force_test"
+    precs="double single"
+    recons="18 12"
+    for prec in $precs; do
+        for recon in $recons; do
+                cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon  --verify"
+                echo -ne  $cmd  "\t"..."\t"
+                echo "----------------------------------------------------------" >>$OUTFILE
+                echo $cmd >> $OUTFILE
+                $cmd >> $OUTFILE 2>&1|| (echo -e "FAIL\n$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
+                echo "OK"
+        done
+    done
+
+}
+
+
 function complete_dslash_check {
     echo "Performing complete dslash test:"
     prog="./staggered_dslash_test"
@@ -140,11 +159,14 @@ case $action in
         complete_dslash_check ;;
     invert )
 	complete_invert_check;;
+    gf )
+	complete_gauge_force_check ;;
     all )
 	basic_sanity_check
 	complete_fatlink_check
 	complete_dslash_check
 	complete_invert_check
+	complete_gauge_force_check 
 	;;
 esac
 

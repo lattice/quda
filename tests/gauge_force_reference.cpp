@@ -303,8 +303,8 @@ update_mom(anti_hermitmat* momentum, int dir, su3_matrix* sitelink,
  */
 
 void
-gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPrecision prec, 
-		      int **path_dir, int* length, void* loop_coeff, int num_paths)
+gauge_force_reference_dir(void* refMom, int dir, double eb3, void* sitelink, QudaPrecision prec, 
+			  int **path_dir, int* length, void* loop_coeff, int num_paths)
 {
     int i;
     
@@ -339,3 +339,14 @@ gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPre
 }
 
 
+void
+gauge_force_reference(void* refMom, double eb3, void* sitelink, QudaPrecision prec, 
+		      int ***path_dir, int* length, void* loop_coeff, int num_paths)
+{
+  for(int dir =0; dir < 4; dir++){
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, prec, path_dir[dir],
+			      length, loop_coeff, num_paths);
+    
+  }
+  
+}

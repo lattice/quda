@@ -126,11 +126,11 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
 
 
 void
-gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& cudaSiteLink,
-                 QudaGaugeParam* param, int** input_path, 
-		 int* length, void* path_coeff, int num_paths, int max_length)
+gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& cudaSiteLink,
+		     QudaGaugeParam* param, int** input_path, 
+		     int* length, void* path_coeff, int num_paths, int max_length)
 {
-    int i, j;
+  int i, j;
     //input_path
     int bytes = num_paths*max_length* sizeof(int);
     int* input_path_d;
@@ -274,3 +274,15 @@ gauge_force_cuda(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& 
 }
 
 
+void
+gauge_force_cuda(cudaGaugeField&  cudaMom, double eb3, cudaGaugeField& cudaSiteLink,
+		 QudaGaugeParam* param, int*** input_path, 
+		 int* length, void* path_coeff, int num_paths, int max_length)
+{
+  
+  for(int dir=0; dir < 4; dir++){
+    gauge_force_cuda_dir(cudaMom, dir, eb3, cudaSiteLink, param, input_path[dir], 
+			 length, path_coeff, num_paths, max_length);
+  }
+  
+}
