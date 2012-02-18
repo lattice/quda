@@ -16,7 +16,7 @@ extern void initCommonConstants(const LatticeField &lat);
 extern int device;
 
 static QudaGaugeParam qudaGaugeParam;
-
+QudaGaugeFieldOrder gauge_order =  QUDA_MILC_GAUGE_ORDER;
 static int verify_results = 0;
 extern int tdim;
 extern QudaPrecision prec;
@@ -380,42 +380,41 @@ gauge_force_test(void)
   
   qudaGaugeParam.type = QUDA_WILSON_LINKS; // in this context, just means these are site links   
   
-  qudaGaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.gauge_order = gauge_order;
   
   int gSize = qudaGaugeParam.cpu_prec;
-  void* sitelink = malloc(4*V*gaugeSiteSize*gSize);
-  if(sitelink == NULL){
-    printf("ERROR: malloc failed for sitelink\n");
+    
+  void* sitelink;
+  void* sitelink_1d= malloc(4*V*gaugeSiteSize*gSize);
+  if(sitelink_1d == NULL){
+    printf("ERROR: malloc failed for sitelink_1d\n");
     exit(1);
   }
   
   // this is a hack to have site link generated in 2d 
   // then copied to 1d array in "MILC" format
-  void* siteLink_2d[4];
+  void* sitelink_2d[4];
   for(int i=0;i < 4;i++){
-    siteLink_2d[i] = malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
+    sitelink_2d[i] = malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
   }
   
   // fills the gauge field with random numbers
-  createSiteLinkCPU(siteLink_2d, qudaGaugeParam.cpu_prec, 0);
+  createSiteLinkCPU(sitelink_2d, qudaGaugeParam.cpu_prec, 0);
   
   //copy the 2d sitelink to 1d milc format 
-
+  
   for(int dir = 0; dir < 4; dir++){
     for(int i=0; i < V; i++){
-      char* src =  ((char*)siteLink_2d[dir]) + i * gaugeSiteSize* qudaGaugeParam.cpu_prec;
-      char* dst =  ((char*)sitelink) + (4*i+dir)*gaugeSiteSize*qudaGaugeParam.cpu_prec ;
-      memcpy(dst, src, gaugeSiteSize*qudaGaugeParam.cpu_prec);
+      char* src =  ((char*)sitelink_2d[dir]) + i * gaugeSiteSize* qudaGaugeParam.cpu_prec;
+      char* dst =  ((char*)sitelink_1d) + (4*i+dir)*gaugeSiteSize*qudaGaugeParam.cpu_prec ;
+	memcpy(dst, src, gaugeSiteSize*qudaGaugeParam.cpu_prec);
     }
-  }
-  
-  for(int i=0;i < 4;i++){
-    free(siteLink_2d[i]);
-  }
-#if 0
-  site_link_sanity_check(cpuSiteLink, V, qudaGaugeParam.cpu_prec, &qudaGaugeParam);
-#endif
-  
+    }
+  if (qudaGaugeParam.gauge_order ==  QUDA_MILC_GAUGE_ORDER){ 
+    sitelink =  sitelink_1d;    
+  }else{ //QUDA_QDP_GAUGE_ORDER
+    sitelink = (void**)sitelink_2d;
+  }  
   
   void* mom = malloc(4*V*momSiteSize*gSize);
   void* refmom = malloc(4*V*momSiteSize*gSize);
@@ -476,7 +475,7 @@ gauge_force_test(void)
   int flops=153004;
     
   if (verify_results){	
-    gauge_force_reference(refmom, eb3, sitelink, qudaGaugeParam.cpu_prec, input_path_buf, length, loop_coeff, num_paths);
+    gauge_force_reference(refmom, eb3, sitelink_1d, qudaGaugeParam.cpu_prec, input_path_buf, length, loop_coeff, num_paths);
   }
   
   int res;
@@ -496,10 +495,15 @@ gauge_force_test(void)
     }
     free(input_path_buf[dir]);
   }
+ 
+  
+  free(sitelink_1d);
+  for(int dir=0;dir < 4;dir++){
+    free(sitelink_2d[dir]);
+  }
   
   free(mom);
   free(refmom);
-  
   endQuda();
   
   if (res == 0){//failed
@@ -518,11 +522,12 @@ display_test_info()
 {
     printf("running the following test:\n");
     
-    printf("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension\n");
-    printf("%s                       %s                         %d/%d/%d                       %d\n", 
+    printf("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order\n");
+    printf("%s                       %s                         %d/%d/%d                       %d                  %s\n", 
 	   get_prec_str(link_prec),
 	   get_recon_str(link_recon), 
-	   xdim,ydim,zdim, tdim);
+	   xdim,ydim,zdim, tdim, 
+	   get_gauge_order_str(gauge_order));
     return ;
     
 }
@@ -531,6 +536,7 @@ void
 usage_extra(char** argv )
 {
   printf("Extra options:\n");
+  printf("    --gauge-order  <qdp/milc>                 # Gauge storing order in CPU\n");
   printf("    --verify                                  # Verify the GPU results using CPU results\n");
   return ;
 }
@@ -542,6 +548,23 @@ main(int argc, char **argv)
     for (i =1;i < argc; i++){
 	
       if(process_command_line_option(argc, argv, &i) == 0){
+	continue;
+      }
+
+      if( strcmp(argv[i], "--gauge-order") == 0){
+	if(i+1 >= argc){
+	  usage(argv);
+	}
+	
+	if(strcmp(argv[i+1], "milc") == 0){
+	  gauge_order = QUDA_MILC_GAUGE_ORDER;
+	}else if(strcmp(argv[i+1], "qdp") == 0){
+	  gauge_order = QUDA_QDP_GAUGE_ORDER;
+	}else{
+	  fprintf(stderr, "Error: unsupported gauge-field order\n");
+	  exit(1);
+	}
+	i++;
 	continue;
       }
       

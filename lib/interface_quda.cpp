@@ -1846,6 +1846,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParam.pad = 0;
   cpuGaugeField* cpuSiteLink = new cpuGaugeField(gParam);
   
+  gParam.order =QUDA_MILC_GAUGE_ORDER;
   gParam.precision = qudaGaugeParam->cpu_prec;
   gParam.create =QUDA_REFERENCE_FIELD_CREATE;
   gParam.reconstruct =QUDA_RECONSTRUCT_10;
