@@ -4,11 +4,7 @@
 #include <hisq_force_quda.h>
 #include <hw_quda.h>
 #include <hisq_force_macros.h>
-
 #include<utility>
-
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
-#define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var)
 
 
 // Disable texture read for now. Need to revisit this.
@@ -260,19 +256,19 @@ namespace hisq {
       struct ArrayLength
       {
         static const int result=9;
-        static const bool compressed=false;
       };
 
     template<>
       struct ArrayLength<float4>
       {
         static const int result=5;
-        static const bool compressed=true;
       };
   
 
-
-    __device__ void reconstructSign(int* const sign, int dir, int i[4]){
+    // reconstructSign doesn't do anything right now, 
+    // but it will, soon.
+    __device__ void reconstructSign(int* const sign, int dir, const int i[4]){
+/*
       *sign=1;
       switch(dir){
         case XUP:
@@ -291,6 +287,8 @@ namespace hisq {
           if(i[3] == X4m1) *sign=-1; 
           break;
       }
+*/
+      return;
     }
 
 
@@ -338,9 +336,6 @@ namespace hisq {
 
         loadMatrixFromField(linkEven, sig, sid, LINK_W);
         reconstructSign(&link_sign, sig, x);	
-        if(ArrayLength<RealB>::compressed){
-          RECONSTRUCT_LINK_12(sig, sid, link_sign, LINK_W);
-        }
 
         loadMatrixFromField(oprodEven, sig, sid, COLOR_MAT_X);
         MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
@@ -673,9 +668,6 @@ namespace hisq {
         }else{
           loadMatrixFromField(linkOdd, mysig, ab_link_nbr_idx, LINK_W);
         }
-        if(ArrayLength<RealB>::compressed){
-          RECONSTRUCT_LINK_12(mysig, ab_link_nbr_idx, ab_link_sign, LINK_W);
-        }
 
         // load the link variable connecting b and c 
         // Store in LINK_X
@@ -683,9 +675,6 @@ namespace hisq {
           loadMatrixFromField(linkEven, mymu, bc_link_nbr_idx, LINK_X);
         }else{ 
           loadMatrixFromField(linkOdd, mymu, bc_link_nbr_idx, LINK_X);
-        }
-        if(ArrayLength<RealB>::compressed){
-          RECONSTRUCT_LINK_12(mymu, bc_link_nbr_idx, bc_link_sign, LINK_X);
         }
 
 
@@ -714,14 +703,8 @@ namespace hisq {
 
         if(mu_positive){
           loadMatrixFromField(linkOdd, mymu, ad_link_nbr_idx, LINK_Y);
-          if(ArrayLength<RealB>::compressed){
-            RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, LINK_Y);
-          }
         }else{
           loadMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_X);
-          if(ArrayLength<RealB>::compressed){
-            RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, LINK_X);
-          }
           ADJ_MAT(LINK_X, LINK_Y);
         }
 
@@ -1013,9 +996,6 @@ namespace hisq {
         }else{
           loadMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_W);
         }
-        if(ArrayLength<RealB>::compressed){
-          RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, LINK_W);	
-        }
 
 
         // Should all be inside if (shortPOdd)
@@ -1300,9 +1280,6 @@ namespace hisq {
         }else{
           loadMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_Y);
         }
-        if(ArrayLength<RealB>::compressed){
-          RECONSTRUCT_LINK_12(mymu, ad_link_nbr_idx, ad_link_sign, LINK_Y);
-        }
 
         if(sig_positive){
           if (mu_positive){
@@ -1320,9 +1297,6 @@ namespace hisq {
         }else{
           loadMatrixFromField(linkOdd, mymu, bc_link_nbr_idx, LINK_W);
         }
-        if(ArrayLength<RealB>::compressed){
-          RECONSTRUCT_LINK_12(mymu, bc_link_nbr_idx, bc_link_sign, LINK_W);
-        }
 
 
         MATRIX_PRODUCT(LINK_X, LINK_W, COLOR_MAT_Y, !mu_positive);
@@ -1333,9 +1307,6 @@ namespace hisq {
           loadMatrixFromField(linkEven, mysig, ab_link_nbr_idx, LINK_W);
         }else{
           loadMatrixFromField(linkOdd, mysig, ab_link_nbr_idx, LINK_W);
-        }
-        if(ArrayLength<RealB>::compressed){
-          RECONSTRUCT_LINK_12(mysig, ab_link_nbr_idx, ab_link_sign, LINK_W);
         }
 
 

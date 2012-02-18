@@ -123,13 +123,15 @@ llfat_cuda(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 
 	//start of one call
         kparam.kernel_type = LLFAT_INTERIOR_KERNEL;
-	computeGenStapleFieldParityKernel((void*)NULL, (void*)NULL,
-					  (void*)cudaSiteLink.Even_p(), (void*)cudaSiteLink.Odd_p(),
-					  (void*)cudaFatLink.Even_p(), (void*)cudaFatLink.Odd_p(), 
-					  (void*)cudaStaple.Even_p(), (void*)cudaStaple.Odd_p(),
-					  dir, nu, 0,
-					  act_path_coeff[5],
-					  recon, prec,  halfGridDim, kparam, &stream[nStream-1]);
+	if(act_path_coeff[5] != 0.0){
+	  computeGenStapleFieldParityKernel((void*)NULL, (void*)NULL,
+					    (void*)cudaSiteLink.Even_p(), (void*)cudaSiteLink.Odd_p(),
+					    (void*)cudaFatLink.Even_p(), (void*)cudaFatLink.Odd_p(), 
+					    (void*)cudaStaple.Even_p(), (void*)cudaStaple.Odd_p(),
+					    dir, nu, 0,
+					    act_path_coeff[5],
+					    recon, prec,  halfGridDim, kparam, &stream[nStream-1]);
+	}
 	//end
 	for(int rho = 0; rho < 4; rho++){
 	  if (rho != dir && rho != nu){
@@ -326,13 +328,15 @@ llfat_cuda_ex(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 					    act_path_coeff[2],
 					    recon, prec, kparam_1g); 
 
-	computeGenStapleFieldParityKernel_ex((void*)NULL, (void*)NULL,
-					     (void*)cudaSiteLink.Even_p(), (void*)cudaSiteLink.Odd_p(),
-					     (void*)cudaFatLink.Even_p(), (void*)cudaFatLink.Odd_p(), 
-					     (void*)cudaStaple.Even_p(), (void*)cudaStaple.Odd_p(),
-					     dir, nu, 0,
-					     act_path_coeff[5],
-					     recon, prec, kparam);
+        if(act_path_coeff[5] != 0.0){
+	  computeGenStapleFieldParityKernel_ex((void*)NULL, (void*)NULL,
+					       (void*)cudaSiteLink.Even_p(), (void*)cudaSiteLink.Odd_p(),
+					       (void*)cudaFatLink.Even_p(), (void*)cudaFatLink.Odd_p(), 
+					       (void*)cudaStaple.Even_p(), (void*)cudaStaple.Odd_p(),
+					       dir, nu, 0,
+					       act_path_coeff[5],
+					       recon, prec, kparam);
+	} 
 
 	for(int rho = 0; rho < 4; rho++){
 	  if (rho != dir && rho != nu){

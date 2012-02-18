@@ -111,6 +111,12 @@ AC_ARG_ENABLE(staggered-fatlink,
   [ build_staggered_fatlink="no" ]
 )
 
+AC_ARG_ENABLE(hisq-fatlink,
+  AC_HELP_STRING([--enable-hisq-fatlink], [ Build Hisq Fat Link Code (default=disabled) ]),
+  [ build_hisq_fatlink=${enableval} ], 
+  [ build_hisq_fatlink="no" ]
+)
+
 AC_ARG_ENABLE(gauge-force,
   AC_HELP_STRING([--enable-gauge-force], [ Build 1 loop Symanzik gauge force (default=disabled) ]),
   [ build_gauge_force=${enableval} ], 
@@ -276,6 +282,14 @@ yes|no);;
   ;;
 esac
 
+dnl Build Hisq fatlink
+case ${build_hisq_fatlink} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-hisq-fatlink ])
+  ;;
+esac
+
 dnl Build Gauge Force
 case ${build_gauge_force} in
 yes|no);;
@@ -292,6 +306,13 @@ yes|no);;
   ;;
 esac
 
+dnl Build Hisq force
+case ${build_hisq_force} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-hisq-force ])
+  ;;
+esac
 
 dnl Multi GPU
 case ${multi_gpu} in
@@ -415,6 +436,9 @@ AC_SUBST( BUILD_TWISTED_MASS_DIRAC, [${build_twm_dirac}])
 
 AC_MSG_NOTICE([Setting BUILD_FATLINK = ${build_staggered_fatlink} ] )
 AC_SUBST( BUILD_FATLINK, [${build_staggered_fatlink}])
+
+AC_MSG_NOTICE([Setting BUILD_HISQLINK = ${build_hisq_fatlink} ] )
+AC_SUBST( BUILD_HISQLINK, [${build_hisq_fatlink}])
 
 AC_MSG_NOTICE([Setting BUILD_GAUGE_FORCE = ${build_gauge_force} ] )
 AC_SUBST( BUILD_GAUGE_FORCE, [${build_gauge_force}])

@@ -326,15 +326,13 @@ namespace hisq{
 	//
 	// Compare the product of the eigenvalues computed thus far to the 
 	// absolute value of the determinant. 
-	// If the error is greater than some predefined value 
+	// If the determinant is very small or the relative error is greater than some predefined value 
 	// then recompute the eigenvalues using a singular-value decomposition.
-	// We can compare either the absolute or relative error on the determinant. 
-	// and the choice of error is a run-time parameter.
 	// Note that this particular calculation contains multiple branches, 
 	// so it doesn't appear to be particularly well-suited to the GPU 
 	// programming model. However, the analytic calculation of the 
 	// unitarization is extremely fast, and if the SVD routine is not called 
-	// too often, we expect reasonable performance.
+	// too often, we expect pretty good performance.
 	//
 
 #ifdef __CUDA_ARCH__
@@ -357,6 +355,7 @@ namespace hisq{
 		}	
 
 		if(perform_svd){	
+			printf("Performing SVD in force\n");
 			Matrix<Cmplx,3> tmp2;
 			// compute the eigenvalues using the singular value decomposition
 			computeSVD<Cmplx>(q,tempq,tmp2,g);
@@ -392,8 +391,6 @@ namespace hisq{
 #else
 #define HISQ_FORCE_FILTER HOST_HISQ_FORCE_FILTER
 #endif	
-
-
 	typename RealTypeId<Cmplx>::Type delta = getAbsMin(g,3);
 	if(delta < HISQ_FORCE_FILTER){
 		for(int i=0; i<3; ++i){ 

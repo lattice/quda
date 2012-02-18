@@ -799,7 +799,7 @@ void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
       d->Tune(a, b, c);
     }
 
-    { // tune slopppy Dirac operator
+    { // tune sloppy Dirac operator
       ColorSpinorParam CSparam(x);
       CSparam.precision = param.cuda_prec_sloppy;
       CSparam.create = QUDA_NULL_FIELD_CREATE;

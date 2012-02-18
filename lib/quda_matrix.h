@@ -768,7 +768,7 @@ namespace hisq{
         // and this!
 	template<class Cmplx>
 	__host__ __device__
-        void printLink(Matrix<Cmplx,3>& link){
+        void printLink(const Matrix<Cmplx,3>& link){
           printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
           printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
           printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
