@@ -171,6 +171,12 @@ case $action in
 	complete_invert_check
 	complete_gauge_force_check 
 	;;
+    * )
+	echo "ERROR: invalid option ($action)!"
+	echo "Valid options: "
+	echo "              basic/fat/dslash/gf/all"
+	;;
+
 esac
 
 

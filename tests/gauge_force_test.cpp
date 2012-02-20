@@ -581,7 +581,14 @@ gauge_force_test(void)
     free(sitelink_2d[dir]);
 #endif
   }
-  
+
+#ifdef MULTI_GPU  
+  for(int dir=0; dir < 4; dir++){
+    cudaFreeHost(sitelink_ex_2d[dir]);
+  }
+#endif
+
+
   free(mom);
   free(refmom);
   endQuda();
