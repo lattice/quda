@@ -1839,20 +1839,20 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
                       QudaGaugeParam* qudaGaugeParam)
 {
 
-#ifdef MULT_GPU
+#ifdef MULTI_GPU
   //for multi-gpu code, we only support QDP order so far
-  if(qudaGaugeParam->gauge_orde == QUDA_MILC_GAUGE_ORDER){
+  if(qudaGaugeParam->gauge_order == QUDA_MILC_GAUGE_ORDER){
     errorQuda("ERROR: QUDA_MILC_GAUGE_ORDER is not supported for multi-gpu yet!\n");
   }
   
   int E[4];
-  QudaGaugeParam qudaGaugeParamEx_buf;
-  QudaGaugeParam* qudaGaugeParamEx=&qudaGaugeParamEx_buf;
-  memcpy(qudaGaugeParamEx, qudaGaugeParam, sizeof(QudaGaugeParam));
-  E[0] = qudaGaugeParamEx->X[0] = qudaGaugeParam->X[0] + 4;
-  E[1] = qudaGaugeParamEx->X[1] = qudaGaugeParam->X[1] + 4;
-  E[2] = qudaGaugeParamEx->X[2] = qudaGaugeParam->X[2] + 4;
-  E[3] = qudaGaugeParamEx->X[3] = qudaGaugeParam->X[3] + 4;
+  QudaGaugeParam qudaGaugeParam_ex_buf;
+  QudaGaugeParam* qudaGaugeParam_ex=&qudaGaugeParam_ex_buf;
+  memcpy(qudaGaugeParam_ex, qudaGaugeParam, sizeof(QudaGaugeParam));
+  E[0] = qudaGaugeParam_ex->X[0] = qudaGaugeParam->X[0] + 4;
+  E[1] = qudaGaugeParam_ex->X[1] = qudaGaugeParam->X[1] + 4;
+  E[2] = qudaGaugeParam_ex->X[2] = qudaGaugeParam->X[2] + 4;
+  E[3] = qudaGaugeParam_ex->X[3] = qudaGaugeParam->X[3] + 4;
 #endif
 
   int* X = qudaGaugeParam->X;

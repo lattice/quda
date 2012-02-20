@@ -31,6 +31,12 @@ int Z[4];
 int V;
 int Vh;
 
+static int V_ex;
+static int Vh_ex;
+
+static int X1, X1h, X2, X3, X4;
+static int E1, E1h, E2, E3, E4;
+
 extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
 
@@ -355,6 +361,18 @@ setDims(int *X) {
     Z[d] = X[d];
   }
   Vh = V/2;
+
+  V_ex = 1;
+  for (int d=0; d< 4; d++) {
+    V_ex *= X[d]+4;
+  }
+  Vh_ex = V_ex/2;
+  
+  X1=X[0]; X2 = X[1]; X3=X[2]; X4=X[3];
+  X1h=X1/2;
+  E1=X1+4; E2=X2+4; E3=X3+4; E4=X4+4;
+  E1h=E1/2;
+  
 }
 
 
