@@ -1886,6 +1886,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamMom.create =QUDA_REFERENCE_FIELD_CREATE;
   gParamMom.reconstruct =QUDA_RECONSTRUCT_10;  
   gParamMom.gauge=mom;
+  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
 
 
@@ -1893,6 +1894,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamMom.create =QUDA_NULL_FIELD_CREATE;  
   gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
   gParamMom.precision = qudaGaugeParam->cuda_prec;
+  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   

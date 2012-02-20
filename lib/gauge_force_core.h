@@ -487,6 +487,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   int x1 = 2*x1h + x1odd;  
 
 #ifdef MULTI_GPU
+  x4 += 2; x3 += 2; x2 += 2; x1 += 2;
   int X = x4*E3E2E1 + x3*E2E1 + x2*E1 + x1;
 #else
   int X = 2*sid + x1odd;  

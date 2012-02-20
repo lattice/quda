@@ -393,10 +393,10 @@ gauge_force_test(void)
   
   setDims(qudaGaugeParam.X);
   
+  qudaGaugeParam.anisotropy = 1.0;
   qudaGaugeParam.cpu_prec = link_prec;
   qudaGaugeParam.cuda_prec = link_prec;
-  qudaGaugeParam.reconstruct = link_recon;
-  
+  qudaGaugeParam.reconstruct = link_recon;  
   qudaGaugeParam.type = QUDA_WILSON_LINKS; // in this context, just means these are site links   
   
   qudaGaugeParam.gauge_order = gauge_order;
@@ -509,8 +509,9 @@ gauge_force_test(void)
     printf("ERROR: malloc failed for mom/refmom\n");
     exit(1);
   }    
+  memset(mom, 0, 4*V*momSiteSize*gSize);
   //initiaze some data in cpuMom
-  createMomCPU(mom,  qudaGaugeParam.cpu_prec);    
+  createMomCPU(mom,  qudaGaugeParam.cpu_prec);      
   memcpy(refmom, mom, 4*V*momSiteSize*qudaGaugeParam.cpu_prec);
   
   

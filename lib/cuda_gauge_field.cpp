@@ -103,11 +103,13 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
   }
 
 #ifdef MULTI_GPU
-  // pack into the padded regions
-  packQDPGaugeField(packedEven, (Float**)cpuGhost, 0, reconstruct, volumeCB,
-		    surfaceCB, pad, volumeCB, nFace, type);
-  packQDPGaugeField(packedOdd,  (Float**)cpuGhost, 1, reconstruct, volumeCB, 
-  		    surfaceCB, pad, volumeCB, nFace, type);
+  if(type != QUDA_ASQTAD_MOM_LINKS){
+    // pack into the padded regions
+    packQDPGaugeField(packedEven, (Float**)cpuGhost, 0, reconstruct, volumeCB,
+		      surfaceCB, pad, volumeCB, nFace, type);
+    packQDPGaugeField(packedOdd,  (Float**)cpuGhost, 1, reconstruct, volumeCB, 
+		      surfaceCB, pad, volumeCB, nFace, type);
+  }
 #endif
 
   cudaMemcpy(even, packed, bytes, cudaMemcpyHostToDevice);
@@ -147,7 +149,10 @@ void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocat
     t_boundary_ = t_boundary;
     
 #ifdef MULTI_GPU
-    cpu.exchangeGhost();
+    //FIXME: if this is MOM field, we don't need exchange data
+    if(link_type != QUDA_ASQTAD_MOM_LINKS){ 
+      cpu.exchangeGhost();
+    }
 #endif
     
     if (reconstruct != QUDA_RECONSTRUCT_10) { // gauge field

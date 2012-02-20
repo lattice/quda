@@ -194,15 +194,15 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
     
     
     if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
-      cudaBindTexture(0, siteLink0TexDouble, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
-      cudaBindTexture(0, siteLink1TexDouble, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());			      
+      cudaBindTexture(0, siteLink0TexDouble, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
+      cudaBindTexture(0, siteLink1TexDouble, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);			      
     }else{ //QUDA_SINGLE_PRECISION
       if(param->reconstruct == QUDA_RECONSTRUCT_NO){
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());		
+	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
+	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);		
       }else{//QUDA_RECONSTRUCT_12
-	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes());
-	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes());	
+	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
+	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);	
       }
     }
     
