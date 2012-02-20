@@ -18,7 +18,7 @@ __constant__ int path_max_length;
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
-#define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
+#define RECONSTRUCT_MATRIX(sign, var) RECONSTRUCT_LINK_12(sign,var)
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4
 #define N_IN_FLOATN 4
 #define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_sp12
@@ -40,7 +40,7 @@ __constant__ int path_max_length;
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
-#define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
+#define RECONSTRUCT_MATRIX(sign, var) RECONSTRUCT_LINK_12(sign,var)
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
 #define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_dp12
@@ -62,7 +62,7 @@ __constant__ int path_max_length;
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var,mom_ga_stride)
-#define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
+#define RECONSTRUCT_MATRIX(sign, var) 
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
 #define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_sp18
@@ -84,7 +84,7 @@ __constant__ int path_max_length;
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
-#define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
+#define RECONSTRUCT_MATRIX(sign, var) 
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
 #define GAUGE_FORCE_KERN_NAME parity_compute_gauge_force_kernel_dp18

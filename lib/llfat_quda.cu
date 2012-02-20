@@ -334,7 +334,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #endif
 #define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_12_SINGLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
 
-#define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  RECONSTRUCT_LINK_12(dir, idx, sign, var);
+#define RECONSTRUCT_SITE_LINK(sign, var)  RECONSTRUCT_LINK_12(sign, var);
 #define FloatN float2
 #define FloatM float2
 #define RECONSTRUCT 12
@@ -363,7 +363,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
-#define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  
+#define RECONSTRUCT_SITE_LINK(sign, var)  
 #define FloatN float2
 #define FloatM float2
 #define RECONSTRUCT 18
@@ -421,7 +421,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
-#define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  
+#define RECONSTRUCT_SITE_LINK(sign, var)  
 #define FloatN double2
 #define FloatM double2
 #define RECONSTRUCT 18
@@ -452,7 +452,7 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_DECLARE(sitelink_odd, dir, idx, var, site_ga_stride)
 #endif
 #define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_12_DOUBLE_DECLARE(sitelink, dir, idx, var, site_ga_stride)
-#define RECONSTRUCT_SITE_LINK(dir, idx, sign, var)  RECONSTRUCT_LINK_12(dir, idx, sign, var);
+#define RECONSTRUCT_SITE_LINK(sign, var)  RECONSTRUCT_LINK_12(sign, var);
 #define FloatN double2
 #define FloatM double2
 #define RECONSTRUCT 12

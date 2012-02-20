@@ -537,7 +537,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
     }else{
       LOAD_EVEN_MATRIX( lnkdir, nbr_idx, LINKB);
     }
-    RECONSTRUCT_MATRIX(lnkdir, nbr_idx, 1, linkb);
+    RECONSTRUCT_MATRIX(1, linkb);
     
     if (GOES_FORWARDS(path0)){
       COPY_SU3_MATRIX(linkb, linka);
@@ -566,7 +566,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
       }else{
 	LOAD_EVEN_MATRIX(lnkdir, nbr_idx, LINKB);
       }
-      RECONSTRUCT_MATRIX(lnkdir, nbr_idx, 1, linkb);
+      RECONSTRUCT_MATRIX(1, linkb);
       if (GOES_FORWARDS(pathj)){
 	MULT_SU3_NN_TEST(linka, linkb);
 		
@@ -589,7 +589,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   }else{
     LOAD_EVEN_MATRIX(dir, (X>>1), LINKA);
   }
-  RECONSTRUCT_MATRIX(dir, (X>>1), 1, linka);
+  RECONSTRUCT_MATRIX(1, linka);
   MULT_SU3_NN_TEST(linka, staple);
   LOAD_ANTI_HERMITIAN(mymom, dir, sid, AH);
   UNCOMPRESS_ANTI_HERMITIAN(ah, linkb);

@@ -639,7 +639,7 @@
   a##_im -= b##_im * c##_re
 
 
-#define RECONSTRUCT_LINK_12(dir, idx, sign, var)			\
+#define RECONSTRUCT_LINK_12(sign, var)					\
     ACC_CONJ_PROD_ASSIGN(var##20, +var##01, +var##12);			\
     ACC_CONJ_PROD(var##20, -var##02, +var##11);				\
     ACC_CONJ_PROD_ASSIGN(var##21, +var##02, +var##10);			\
