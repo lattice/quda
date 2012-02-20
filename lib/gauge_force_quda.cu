@@ -123,6 +123,28 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
     int mom_ga_stride = param->mom_ga_pad + Vh;
     cudaMemcpyToSymbol("mom_ga_stride", &mom_ga_stride, sizeof(int));
 
+
+#ifdef MULTI_GPU
+    int E1 = param->X[0] + 4;
+    int E1h = E1/2;
+    int E2 = param->X[1] + 4;
+    int E3 = param->X[2] + 4;
+    int E4 = param->X[3] + 4;
+    int E2E1 =E2*E1;
+    int E3E2E1=E3*E2*E1;
+    int Vh_ex = E1*E2*E3*E4/2;
+    
+    cudaMemcpyToSymbol("E1", &E1, sizeof(int));
+    cudaMemcpyToSymbol("E1h", &E1h, sizeof(int));
+    cudaMemcpyToSymbol("E2", &E2, sizeof(int));
+    cudaMemcpyToSymbol("E3", &E3, sizeof(int));
+    cudaMemcpyToSymbol("E4", &E4, sizeof(int));
+    cudaMemcpyToSymbol("E2E1", &E2E1, sizeof(int));
+    cudaMemcpyToSymbol("E3E2E1", &E3E2E1, sizeof(int));
+    
+    cudaMemcpyToSymbol("Vh_ex", &Vh_ex, sizeof(int));
+#endif    
+    
 }
 
 

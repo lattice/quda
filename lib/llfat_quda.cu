@@ -173,15 +173,6 @@ __constant__ int dir1_array[16];
 __constant__ int dir2_array[16];
 __constant__ int last_proc_in_tdim;
 __constant__ int first_proc_in_tdim;
-__constant__ int E1, E2, E3, E4, E1h;
-__constant__ int Vh_ex;
-__constant__ int E2E1;
-__constant__ int E3E1;
-__constant__ int E3E2;
-__constant__ int E3E2E1;
-__constant__ int E4E2E1;
-__constant__ int E4E3E1;
-__constant__ int E4E3E2;
 
 unsigned long staple_bytes=0;
 
