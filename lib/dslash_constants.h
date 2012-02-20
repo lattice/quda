@@ -93,7 +93,7 @@ __constant__ float tProjScale_f;
 __constant__ int site_ga_stride;
 __constant__ int staple_stride;
 __constant__ int llfat_ga_stride;
-
+__constant__ int mom_ga_stride;
 
 int initDslash = 0;
 int initClover = 0;

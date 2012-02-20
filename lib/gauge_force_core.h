@@ -546,7 +546,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   SCALAR_MULT_SUB_SU3_MATRIX(linkb, linka, eb3, linka);
   MAKE_ANTI_HERMITIAN(linka, ah);
     
-  WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH);
+  WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH, mom_ga_stride);
 
   return;
 }

@@ -6,7 +6,7 @@
 #include <force_common.h>
 #include <hw_quda.h>
 
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, Vh)
 
 #define LOAD_HW_SINGLE(hw, idx, var)	do{	\
     var##0 = hw[idx + 0*Vh];			\
@@ -296,7 +296,7 @@
     SU3_PROJECTOR(hw1##1, hw2##1, linkb);				\
     SCALAR_MULT_ADD_SU3_MATRIX(linka, linkb, tmp_coeff.y, linka);	\
     MAKE_ANTI_HERMITIAN(linka, ah);					\
-    WRITE_ANTI_HERMITIAN(mom, mydir, idx, AH);				\
+    WRITE_ANTI_HERMITIAN(mom, mydir, idx, AH, Vh);			\
   }while(0)
 
 #define FF_COMPUTE_RECONSTRUCT_SIGN(sign, dir, i1,i2,i3,i4) do {        \

@@ -1845,35 +1845,56 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
     errorQuda("ERROR: QUDA_MILC_GAUGE_ORDER is not supported for multi-gpu yet!\n");
   }
   
+  int E[4];
+  QudaGaugeParam qudaGaugeParamEx_buf;
+  QudaGaugeParam* qudaGaugeParamEx=&qudaGaugeParamEx_buf;
+  memcpy(qudaGaugeParamEx, qudaGaugeParam, sizeof(QudaGaugeParam));
+  E[0] = qudaGaugeParamEx->X[0] = qudaGaugeParam->X[0] + 4;
+  E[1] = qudaGaugeParamEx->X[1] = qudaGaugeParam->X[1] + 4;
+  E[2] = qudaGaugeParamEx->X[2] = qudaGaugeParam->X[2] + 4;
+  E[3] = qudaGaugeParamEx->X[3] = qudaGaugeParam->X[3] + 4;
 #endif
 
   int* X = qudaGaugeParam->X;
-  
   GaugeFieldParam gParam(0, *qudaGaugeParam);
-  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge = sitelink;
-  gParam.pad = 0;
-  cpuGaugeField* cpuSiteLink = new cpuGaugeField(gParam);
+#ifdef MULTI_GPU
+  GaugeFieldParam gParam_ex(0, *qudaGaugeParam_ex);
+  GaugeFieldParam& gParamSL = gParam_ex;  
+  int pad = E[2]*E[1]*E[0]/2;
+#else
+  GaugeFieldParam& gParamSL = gParam;
+  int pad = X[2]*X[1]*X[0]/2;
+#endif
   
-  gParam.order =QUDA_MILC_GAUGE_ORDER;
-  gParam.precision = qudaGaugeParam->cpu_prec;
-  gParam.create =QUDA_REFERENCE_FIELD_CREATE;
-  gParam.reconstruct =QUDA_RECONSTRUCT_10;
+  GaugeFieldParam& gParamMom = gParam;
   
-  gParam.gauge=mom;
-  cpuGaugeField* cpuMom = new cpuGaugeField(gParam);            
+  gParamSL.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParamSL.gauge = sitelink;
+  gParamSL.pad = 0;
+  cpuGaugeField* cpuSiteLink = new cpuGaugeField(gParamSL);
   
-  gParam.create =QUDA_NULL_FIELD_CREATE;
-  gParam.pad = X[2]*X[1]*X[0]/2;
-  gParam.precision = qudaGaugeParam->cuda_prec;
-  gParam.reconstruct = qudaGaugeParam->reconstruct;
-  cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParam);
-  
-  qudaGaugeParam->site_ga_pad = gParam.pad;//need to record this value
-  
-  gParam.reconstruct = QUDA_RECONSTRUCT_10;
-  gParam.precision = qudaGaugeParam->cuda_prec;
-  cudaGaugeField* cudaMom = new cudaGaugeField(gParam);
+  gParamSL.create =QUDA_NULL_FIELD_CREATE;
+  gParamSL.pad = pad;
+  gParamSL.precision = qudaGaugeParam->cuda_prec;
+  gParamSL.reconstruct = qudaGaugeParam->reconstruct;
+  cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParamSL);  
+  qudaGaugeParam->site_ga_pad = gParamSL.pad;//need to record this value
+
+  gParamMom.pad = 0;
+  gParamMom.order =QUDA_MILC_GAUGE_ORDER;
+  gParamMom.precision = qudaGaugeParam->cpu_prec;
+  gParamMom.create =QUDA_REFERENCE_FIELD_CREATE;
+  gParamMom.reconstruct =QUDA_RECONSTRUCT_10;  
+  gParamMom.gauge=mom;
+  cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
+
+
+  gParamMom.pad = pad;
+  gParamMom.create =QUDA_NULL_FIELD_CREATE;  
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.precision = qudaGaugeParam->cuda_prec;
+  cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
+  qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   
   
   initCommonConstants(*cudaSiteLink);

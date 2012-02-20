@@ -412,15 +412,79 @@ gauge_force_test(void)
     for(int i=0; i < V; i++){
       char* src =  ((char*)sitelink_2d[dir]) + i * gaugeSiteSize* qudaGaugeParam.cpu_prec;
       char* dst =  ((char*)sitelink_1d) + (4*i+dir)*gaugeSiteSize*qudaGaugeParam.cpu_prec ;
-	memcpy(dst, src, gaugeSiteSize*qudaGaugeParam.cpu_prec);
+      memcpy(dst, src, gaugeSiteSize*qudaGaugeParam.cpu_prec);
     }
-    }
+  }
   if (qudaGaugeParam.gauge_order ==  QUDA_MILC_GAUGE_ORDER){ 
     sitelink =  sitelink_1d;    
   }else{ //QUDA_QDP_GAUGE_ORDER
     sitelink = (void**)sitelink_2d;
   }  
   
+#ifdef MULTI_GPU
+  void* sitelink_ex;
+  void* sitelink_ex_2d[4];
+  for(int i=0;i < 4;i++){
+    cudaMallocHost((void**)&sitelink_ex_2d[i], V_ex*gaugeSiteSize*gSize);
+    if(sitelink_ex_2d[i] == NULL){
+      errorQuda("ERROR; allocate sitelink_ex[%d] failed\n", i);
+    }
+  }
+
+  for(int i=0; i < V_ex; i++){
+    int sid = i;
+    int oddBit=0;
+    if(i >= Vh_ex){
+      sid = i - Vh_ex;
+      oddBit = 1;
+    }
+    
+    int za = sid/E1h;
+    int x1h = sid - za*E1h;
+    int zb = za/E2;
+    int x2 = za - zb*E2;
+    int x4 = zb/E3;
+    int x3 = zb - x4*E3;
+    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+    int x1 = 2*x1h + x1odd;
+
+
+    if( x1< 2 || x1 >= X1 +2
+        || x2< 2 || x2 >= X2 +2
+        || x3< 2 || x3 >= X3 +2
+        || x4< 2 || x4 >= X4 +2){
+      continue;
+    }
+
+
+    
+    x1 = (x1 - 2 + X1) % X1;
+    x2 = (x2 - 2 + X2) % X2;
+    x3 = (x3 - 2 + X3) % X3;
+    x4 = (x4 - 2 + X4) % X4;
+    
+    int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
+    if(oddBit){
+      idx += Vh;
+    }
+    for(int dir= 0; dir < 4; dir++){
+      char* src = (char*)sitelink_2d[dir];
+      char* dst = (char*)sitelink_ex_2d[dir];
+      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+    }//dir
+  }//i
+  
+
+  if(qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER){
+    sitelink_ex = sitelink_ex_2d;
+  }else{
+    errorQuda("ERROR: multi-gpu for milc order is not supported yet\n");
+  }
+
+#endif
+  
+
+
   void* mom = malloc(4*V*momSiteSize*gSize);
   void* refmom = malloc(4*V*momSiteSize*gSize);
   if(mom == NULL || refmom == NULL){
@@ -470,10 +534,16 @@ gauge_force_test(void)
   
   struct timeval t0, t1;
   gettimeofday(&t0, NULL);
+#ifdef MULTI_GPU
+  computeGaugeForceQuda(mom, sitelink_ex,  input_path_buf, length,
+			loop_coeff, num_paths, max_length, eb3,
+			&qudaGaugeParam);
+
+#else
   computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
 			loop_coeff, num_paths, max_length, eb3,
 			&qudaGaugeParam);
-  
+#endif  
   gettimeofday(&t1, NULL);
   
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);

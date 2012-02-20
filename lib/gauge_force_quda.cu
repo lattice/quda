@@ -17,7 +17,7 @@ __constant__ int path_max_length;
 #define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4
 #define N_IN_FLOATN 4
@@ -39,7 +39,7 @@ __constant__ int path_max_length;
 #define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) RECONSTRUCT_LINK_12(dir,idx,sign,var)
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
@@ -61,7 +61,7 @@ __constant__ int path_max_length;
 #define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var,mom_ga_stride)
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
@@ -83,7 +83,7 @@ __constant__ int path_max_length;
 #define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, site_ga_stride)
 #define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN LOAD_ANTI_HERMITIAN_DIRECT
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
 #define RECONSTRUCT_MATRIX(dir, idx, sign, var) 
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
@@ -120,7 +120,8 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
     
     int site_ga_stride = param->site_ga_pad + Vh;
     cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));
-    
+    int mom_ga_stride = param->mom_ga_pad + Vh;
+    cudaMemcpyToSymbol("mom_ga_stride", &mom_ga_stride, sizeof(int));
 
 }
 
