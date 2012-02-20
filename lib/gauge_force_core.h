@@ -81,7 +81,51 @@
 #endif
 
 
+#ifdef MULTI_GPU
 
+#define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
+    switch(mydir){							\
+    case 0:								\
+      new_mem_idx = idx+1;						\
+      new_x1 +=1;							\
+      break;								\
+    case 1:								\
+      new_mem_idx = idx+E1;						\
+      new_x2 +=1;							\
+      break;								\
+    case 2:								\
+      new_mem_idx = idx+E2E1;						\
+      new_x3 +=1;							\
+      break;								\
+    case 3:								\
+      new_mem_idx = idx+E3E2E1;						\
+      new_x4 +=1;							\
+      break;								\
+    }									\
+  }while(0)
+
+#define COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx) do {		\
+    switch(mydir){							\
+    case 0:								\
+      new_mem_idx = idx -1;						\
+      new_x1 -= 1;							\
+      break;								\
+    case 1:								\
+      new_mem_idx = idx - E1;						\
+      new_x2 -= 1;							\
+      break;								\
+    case 2:								\
+      new_mem_idx = idx - E2E1;						\
+      new_x3 -= 1;							\
+      break;								\
+    case 3:								\
+      new_mem_idx = idx - E3E2E1;					\
+      new_x4 -= 1;							\
+      break;								\
+    }									\
+  }while(0)
+
+#else
 #define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
         switch(mydir){                                                  \
         case 0:                                                         \
@@ -124,6 +168,7 @@
         }                                                               \
     }while(0)
 
+#endif
 
 
 #define MULT_SU3_NN_TEST(ma, mb) do{				\
@@ -440,7 +485,12 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   int x3 = z2 - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   int x1 = 2*x1h + x1odd;  
-  int X = 2*sid + x1odd;
+
+#ifdef MULTI_GPU
+  int X = x4*E3E2E1 + x3*E2E1 + x2*E1 + x1;
+#else
+  int X = 2*sid + x1odd;  
+#endif
     
   Float2* mymom=momEven;
   if (oddBit){
@@ -535,11 +585,11 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
 
   //update mom 
   if (oddBit){
-    LOAD_ODD_MATRIX(dir, sid, LINKA);
+    LOAD_ODD_MATRIX(dir, (X>>1), LINKA);
   }else{
-    LOAD_EVEN_MATRIX(dir, sid, LINKA);
+    LOAD_EVEN_MATRIX(dir, (X>>1), LINKA);
   }
-  RECONSTRUCT_MATRIX(dir, sid, 1, linka);
+  RECONSTRUCT_MATRIX(dir, (X>>1), 1, linka);
   MULT_SU3_NN_TEST(linka, staple);
   LOAD_ANTI_HERMITIAN(mymom, dir, sid, AH);
   UNCOMPRESS_ANTI_HERMITIAN(ah, linkb);

@@ -453,7 +453,7 @@ gauge_force_test(void)
         || x2< 2 || x2 >= X2 +2
         || x3< 2 || x3 >= X3 +2
         || x4< 2 || x4 >= X4 +2){
-      continue;
+      //continue;
     }
 
 
