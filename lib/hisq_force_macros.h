@@ -397,18 +397,6 @@
 
 
 
-#define LOAD_MATRIX_18_SINGLE(gauge, idx, var)                  \
-  var[0] = gauge[idx];                                          \
-  var[1] = gauge[idx + Vh];                                     \
-  var[2] = gauge[idx + Vhx2];                                   \
-  var[3] = gauge[idx + Vhx3];                                   \
-  var[4] = gauge[idx + Vhx4];                                   \
-  var[5] = gauge[idx + Vhx5];                                   \
-  var[6] = gauge[idx + Vhx6];                                   \
-  var[7] = gauge[idx + Vhx7];                                   \
-  var[8] = gauge[idx + Vhx8];
-
-
 #define WRITE_MATRIX_18_SINGLE(mat, idx, var) do{ \
     mat[idx + 0*Vh] = var[0];  \
     mat[idx + 1*Vh] = var[1];  \

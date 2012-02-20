@@ -112,6 +112,27 @@ namespace hisq {
       }
 
 
+
+    template<class T>
+      inline __device__
+      void loadAdjointMatrixFromField(const T* const field, int dir, int idx, T* const mat)
+      {
+#define CONJ_INDEX(i,j) j*3 + i
+        mat[CONJ_INDEX(0,0)] = conj(field[idx + dir*Vhx9]);
+        mat[CONJ_INDEX(0,1)] = conj(field[idx + dir*Vhx9 + Vh]);
+        mat[CONJ_INDEX(0,2)] = conj(field[idx + dir*Vhx9 + Vhx2]);
+        mat[CONJ_INDEX(1,0)] = conj(field[idx + dir*Vhx9 + Vhx3]);
+        mat[CONJ_INDEX(1,1)] = conj(field[idx + dir*Vhx9 + Vhx4]);
+        mat[CONJ_INDEX(1,2)] = conj(field[idx + dir*Vhx9 + Vhx5]);
+        mat[CONJ_INDEX(2,0)] = conj(field[idx + dir*Vhx9 + Vhx6]);
+        mat[CONJ_INDEX(2,1)] = conj(field[idx + dir*Vhx9 + Vhx7]);
+        mat[CONJ_INDEX(2,2)] = conj(field[idx + dir*Vhx9 + Vhx8]);
+#undef CONJ_INDEX
+        return;
+      }
+
+
+
     inline __device__
       void loadMatrixFromField(const float4* const field, int dir, int idx, float4* const mat)
       {
@@ -195,6 +216,22 @@ namespace hisq {
         return;
       }
 
+    template<class T>
+    inline __device__
+      void storeMatrixToField(const T* const mat, int idx, T* const field)
+      {
+        field[idx]          = mat[0];
+        field[idx + Vh]     = mat[1];
+        field[idx + Vhx2]   = mat[2];
+        field[idx + Vhx3]   = mat[3];
+        field[idx + Vhx4]   = mat[4];
+        field[idx + Vhx5]   = mat[5];
+        field[idx + Vhx6]   = mat[6];
+        field[idx + Vhx7]   = mat[7];
+        field[idx + Vhx8]   = mat[8];
+
+        return;
+      }
 
      template<class T, class U> 
      inline __device__
@@ -263,7 +300,10 @@ namespace hisq {
       {
         static const int result=5;
       };
-  
+ 
+
+
+     
 
     // reconstructSign doesn't do anything right now, 
     // but it will, soon.
@@ -338,9 +378,9 @@ namespace hisq {
         reconstructSign(&link_sign, sig, x);	
 
         loadMatrixFromField(oprodEven, sig, sid, COLOR_MAT_X);
-        MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
-   
+
 	typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
+        MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
 	
 	storeMatrixToMomentumField(COLOR_MAT_W, sig, sid, coeff, forceEven); 
         return;
@@ -587,8 +627,6 @@ namespace hisq {
         RealA COLOR_MAT_W[ArrayLength<RealA>::result];
         RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
         RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_Z[ArrayLength<RealA>::result];
-
 
         //        A________B
         //    mu   |      |
@@ -678,14 +716,11 @@ namespace hisq {
         }
 
 
-
-
         if(QprevOdd == NULL){
           if(sig_positive){
             loadMatrixFromField(oprodOdd, sig, point_d, COLOR_MAT_Y);
           }else{
-            loadMatrixFromField(oprodEven, OPP_DIR(sig), point_c, COLOR_MAT_Z);
-            ADJ_MAT(COLOR_MAT_Z, COLOR_MAT_Y);
+	    loadAdjointMatrixFromField(oprodEven, OPP_DIR(sig), point_c, COLOR_MAT_Y);
           }
         }else{ // QprevOdd != NULL
           loadMatrixFromField(oprodEven, point_c, COLOR_MAT_Y);
@@ -694,18 +729,16 @@ namespace hisq {
 
         MATRIX_PRODUCT(COLOR_MAT_W, LINK_X, COLOR_MAT_Y, !mu_positive);
         if(PmuOdd){
-          WRITE_MATRIX_18_SINGLE(PmuOdd, point_b, COLOR_MAT_W);
+	  storeMatrixToField(COLOR_MAT_W, point_b, PmuOdd);
         }
-
         MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, COLOR_MAT_W, sig_positive);
-        WRITE_MATRIX_18_SINGLE(P3Even, sid, COLOR_MAT_Y);
+	storeMatrixToField(COLOR_MAT_Y, sid, P3Even);
 
 
         if(mu_positive){
           loadMatrixFromField(linkOdd, mymu, ad_link_nbr_idx, LINK_Y);
         }else{
-          loadMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_X);
-          ADJ_MAT(LINK_X, LINK_Y);
+          loadAdjointMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_Y);
         }
 
 
@@ -715,13 +748,13 @@ namespace hisq {
           }
           if(QmuEven){
             ASSIGN_MAT(LINK_Y, COLOR_MAT_X); 
-            WRITE_MATRIX_18_SINGLE(QmuEven, sid, COLOR_MAT_X);
+	    storeMatrixToField(COLOR_MAT_X, sid, QmuEven);
           }
         }else{ 
           loadMatrixFromField(QprevOdd, point_d, COLOR_MAT_Y);
           MAT_MUL_MAT(COLOR_MAT_Y, LINK_Y, COLOR_MAT_X);
           if(QmuEven){
-            WRITE_MATRIX_18_SINGLE(QmuEven, sid, COLOR_MAT_X);
+	    storeMatrixToField(COLOR_MAT_X, sid, QmuEven);
           }
           if(sig_positive){
             MAT_MUL_MAT(COLOR_MAT_W, COLOR_MAT_X, COLOR_MAT_Y);
@@ -1308,8 +1341,6 @@ namespace hisq {
         }else{
           loadMatrixFromField(linkOdd, mysig, ab_link_nbr_idx, LINK_W);
         }
-
-
         MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, LINK_X, sig_positive);
 
         const typename RealTypeId<RealA>::Type & mycoeff = CoeffSign<sig_positive,oddBit>::result*coeff;
