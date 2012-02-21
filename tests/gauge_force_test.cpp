@@ -11,6 +11,10 @@
 #include <sys/time.h>
 #include "fat_force_quda.h"
 
+#ifdef MULTI_GPU
+#include <face_quda.h>
+#endif
+
 #define GPU_DIRECT
 extern void initCommonConstants(const LatticeField &lat);
 
@@ -31,11 +35,13 @@ int Z[4];
 int V;
 int Vh;
 
-static int V_ex;
-static int Vh_ex;
+int V_ex;
+int Vh_ex;
 
 static int X1, X1h, X2, X3, X4;
 static int E1, E1h, E2, E3, E4;
+
+int E[4];
 
 extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
@@ -373,6 +379,10 @@ setDims(int *X) {
   E1=X1+4; E2=X2+4; E3=X3+4; E4=X4+4;
   E1h=E1/2;
   
+  E[0] = E1;
+  E[1] = E2;
+  E[2] = E3;
+  E[3] = E4;
 }
 
 
@@ -570,7 +580,18 @@ gauge_force_test(void)
   int flops=153004;
     
   if (verify_results){	
-    gauge_force_reference(refmom, eb3, sitelink_1d, qudaGaugeParam.cpu_prec, input_path_buf, length, loop_coeff, num_paths);
+#ifdef MULTI_GPU
+    //last arg=0 means no optimization for communication, i.e. exchange data in all directions 
+    //even they are not partitioned
+    exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex_2d,
+                             qudaGaugeParam.cpu_prec, 0);    
+    gauge_force_reference(refmom, eb3, sitelink_2d, sitelink_ex_2d, qudaGaugeParam.cpu_prec,
+			  input_path_buf, length, loop_coeff, num_paths);
+#else
+    gauge_force_reference(refmom, eb3, sitelink_2d, NULL, qudaGaugeParam.cpu_prec,
+			  input_path_buf, length, loop_coeff, num_paths);
+#endif
+
   }
   
   int res;
