@@ -21,7 +21,7 @@ extern void initCommonConstants(const LatticeField &lat);
 extern int device;
 
 static QudaGaugeParam qudaGaugeParam;
-QudaGaugeFieldOrder gauge_order =  QUDA_MILC_GAUGE_ORDER;
+QudaGaugeFieldOrder gauge_order =  QUDA_QDP_GAUGE_ORDER;
 static int verify_results = 0;
 extern int tdim;
 extern QudaPrecision prec;
