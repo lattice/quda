@@ -6,8 +6,6 @@
 #include <color_spinor_field.h>
 #include <face_quda.h> // this is where the MPI / QMP depdendent code is
 
-#include <cuComplex.h>
-
 #define REDUCE_MAX_BLOCKS 65536
 
 #if (__COMPUTE_CAPABILITY__ >= 130)
@@ -16,11 +14,10 @@
 #define QudaSumFloat3 double3
 #else
 #define QudaSumFloat doublesingle
-#define QudaSumFloat doublesingle2
-#define QudaSumFloat doublesingle3
-#endif
-
+#define QudaSumFloat2 doublesingle2
+#define QudaSumFloat3 doublesingle3
 #include <double_single.h>
+#endif
 
 // These are used for reduction kernels
 static QudaSumFloat *d_reduce=0;
@@ -38,6 +35,7 @@ static dim3 blasGrid;
 #include <blas_param.h>
 
 #include <float_vector.h>
+#include <texture.h>
 
 void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 
@@ -111,7 +109,6 @@ void setBlock(int kernel, int length, QudaPrecision precision)
     break;
   }
 
-  //printf("threads %d %d %d\n", kernel, precision, blas_threads[kernel][prec]);
   blasBlock.x = min(MAX_BLOCK, blas_threads[kernel][prec]);
   blasBlock.y = 1;
   blasBlock.z = 1;
@@ -121,185 +118,6 @@ void setBlock(int kernel, int length, QudaPrecision precision)
   blasGrid.x = grid;
   blasGrid.y = 1;
   blasGrid.z = 1;
-
-  //printf("Setting block = (%d, %d, %d), grid = (%d, %d, %d)\n", blasBlock.x,
-  //	 blasBlock.y, blasBlock.z, blasGrid.x, blasGrid.y, blasGrid.z);
-}
-
-#if (__COMPUTE_CAPABILITY__ >= 130)
-__inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
-{
-  int4 v = tex1Dfetch(t,i);
-  return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
-}
-#else
-__inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
-{
-  // do nothing
-  return make_double2(0.0, 0.0);
-}
-#endif
-
-#include <texture.h>
-
-
-
-float2 __device__ read_Float2(float2 *x, int i) {
-  return make_float2(x[i].x, x[i].y);
-}
-
-double2 __device__ read_Float2(double2 *x, int i) {
-  return make_double2(x[i].x, x[i].y);
-}
-
-#if FERMI_NO_DBLE_TEX
-#define READ_DOUBLE2_TEXTURE(x, i) \
-  read_Float2(x, i)
-#else
-#define READ_DOUBLE2_TEXTURE(x, i) \
-  fetch_double2(x##TexDouble2, i)
-#endif
-
-#define READ_FLOAT2_TEXTURE(x, i) \
-  tex1Dfetch(x##TexSingle2, i)
-
-float2 __device__ make_Float2(float2 x) {
-  return make_float2(x.x, x.y);
-}
-
-double2 __device__ make_Float2(double2 x) {
-  return make_double2(x.x, x.y);
-}
-
-__device__ void caxpy_(const float2 &a, const float4 &x, float4 &y) {
-  y.x += a.x*x.x; y.x -= a.y*x.y;
-  y.y += a.y*x.x; y.y += a.x*x.y;
-  y.z += a.x*x.z; y.z -= a.y*x.w;
-  y.w += a.y*x.z; y.w += a.x*x.w;
-}
-
-__device__ void caxpy_(const float2 &a, const float2 &x, float2 &y) {
-  y.x += a.x*x.x; y.x -= a.y*x.y;
-  y.y += a.y*x.x; y.y += a.x*x.y;
-}
-
-__device__ void caxpy_(const double2 &a, const double2 &x, double2 &y) {
-  y.x += a.x*x.x; y.x -= a.y*x.y;
-  y.y += a.y*x.x; y.y += a.x*x.y;
-}
-
-__device__ void caxpby_(const float2 &a, const float4 &x, const float2 &b, float4 &y)					
-  { float4 yy;								
-  yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
-  yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
-  yy.z = a.x*x.z; yy.z -= a.y*x.w; yy.z += b.x*y.z; yy.z -= b.y*y.w;	
-  yy.w = a.y*x.z; yy.w += a.x*x.w; yy.w += b.y*y.z; yy.w += b.x*y.w;	
-  y = yy; }
-
-__device__ void caxpby_(const float2 &a, const float2 &x, const float2 &b, float2 &y)
-  { float2 yy;								
-  yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
-  yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
-  y = yy; }
-
-__device__ void caxpby_(const double2 &a, const double2 &x, const double2 &b, double2 &y)				 
-  { double2 yy;								
-  yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
-  yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
-  y = yy; }
-
-__device__ void cxpaypbz_(const float4 &x, const float2 &a, const float4 &y, const float2 &b, float4 &z) {
-  float4 zz;
-  zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
-  zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
-  zz.z = x.z + a.x*y.z; zz.z -= a.y*y.w; zz.z += b.x*z.z; zz.z -= b.y*z.w;
-  zz.w = x.w + a.y*y.z; zz.w += a.x*y.w; zz.w += b.y*z.z; zz.w += b.x*z.w;
-  z = zz;
-}
-
-
-__device__ void cxpaypbz_(const float2 &x, const float2 &a, const float2 &y, const float2 &b, float2 &z) {
-  float2 zz;
-  zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
-  zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
-  z = zz;
-}
-
-__device__ void cxpaypbz_(const double2 &x, const double2 &a, const double2 &y, const double2 &b, double2 &z) {
-  double2 zz;
-  zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
-  zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
-  z = zz;
-}
-
-__device__ void caxpbypz_(const float2 &a, const float4 &x, const float2 &b, const float4 &y, float4 &z) {
-  z.x += a.x*x.x - a.y*x.y + b.x*y.x - b.y*y.y;   
-  z.y += a.y*x.x + a.x*x.y + b.y*y.x + b.x*y.y;  
-  z.z += a.x*x.z - a.y*x.w + b.x*y.z - b.y*y.w;  
-  z.w += a.y*x.z + a.x*x.w + b.y*y.z + b.x*y.w;
-}
-
-__device__ void caxpbypz_(const float2 &a, const float2 &x, const float2 &b, const float2 &y, float2 &z) {
-  z.x += a.x*x.x - a.y*x.y + b.x*y.x - b.y*y.y;   
-  z.y += a.y*x.x + a.x*x.y + b.y*y.x + b.x*y.y;  
-}
-
-__device__ void caxpbypz_(const double2 &a, const double2 &x, const double2 &b, const double2 &y, double2 &z) {
-  z.x += a.x*x.x - a.y*x.y + b.x*y.x - b.y*y.y;   
-  z.y += a.y*x.x + a.x*x.y + b.y*y.x + b.x*y.y;  
-}
-
-
-__forceinline__ __device__ float max_fabs(const float4 &c) {
-  float a = fmaxf(fabsf(c.x), fabsf(c.y));
-  float b = fmaxf(fabsf(c.z), fabsf(c.w));
-  return fmaxf(a, b);
-};
-
-__forceinline__ __device__ float max_fabs(const float2 &b) {
-  return fmaxf(fabsf(b.x), fabsf(b.y));
-};
-
-__forceinline__ __device__ float2 make_FloatN(const double2 &a) {
-  return make_float2(a.x, a.y);
-}
-
-__forceinline__ __device__ float4 make_FloatN(const double4 &a) {
-  return make_float4(a.x, a.y, a.z, a.w);
-}
-
-__forceinline__ __device__ double2 make_FloatN(const float2 &a) {
-  return make_double2(a.x, a.y);
-}
-
-__forceinline__ __device__ double4 make_FloatN(const float4 &a) {
-  return make_double4(a.x, a.y, a.z, a.w);
-}
-
-__forceinline__ __device__ short4 make_shortN(const float4 &a) {
-  return make_short4(a.x, a.y, a.z, a.w);
-}
-
-__forceinline__ __device__ short2 make_shortN(const float2 &a) {
-  return make_short2(a.x, a.y);
-}
-
-__forceinline__ __device__ double max_fabs(const double4 &c) {
-  double a = fmaxf(fabsf(c.x), fabsf(c.y));
-  double b = fmaxf(fabsf(c.z), fabsf(c.w));
-  return fmaxf(a, b);
-};
-
-__forceinline__ __device__ double max_fabs(const double2 &b) {
-  return fmaxf(fabsf(b.x), fabsf(b.y));
-};
-
-__forceinline__ __device__ short4 make_shortN(const double4 &a) {
-  return make_short4(a.x, a.y, a.z, a.w);
-}
-
-__forceinline__ __device__ short2 make_shortN(const double2 &a) {
-  return make_short2(a.x, a.y);
 }
 
 #define checkSpinor(a, b)						\
@@ -436,63 +254,93 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 }
 
 /**
-   Generic blas kernel with two loads and one store.
+   Generic blas kernel with four loads and up to four stores.
  */
-template <typename FloatN, int M, typename InputX, typename InputY, typename OutputY, typename Functor>
-__global__ void blasKernel(InputX X, InputY Y, Functor f, OutputY YY, int length) {
+template <typename FloatN, int M, int writeX, int writeY, int writeZ, int writeW, 
+	  typename InputX, typename InputY, typename InputZ, typename InputW, 
+	  typename OutputX, typename OutputY, typename OutputZ, typename OutputW, typename Functor>
+__global__ void blasKernel(InputX X, InputY Y, InputZ Z, InputW W, Functor f, 
+			   OutputX XX, OutputY YY, OutputZ ZZ, OutputW WW, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
   while (i < length) {
-    FloatN x[M], y[M];
+    FloatN x[M], y[M], z[M], w[M];
     X.load(x, i);
     Y.load(y, i);
+    Z.load(z, i);
+    W.load(w, i);
 
 #pragma unroll
-    for (int j=0; j<M; j++) f(x[j], y[j]);
+    for (int j=0; j<M; j++) f(x[j], y[j], z[j], w[j]);
 
-    YY.save(y, i);
+    if (writeX) XX.save(x, i);
+    if (writeY) YY.save(y, i);
+    if (writeZ) ZZ.save(z, i);
+    if (writeW) WW.save(w, i);
     i += gridSize;
   }
 }
 
 /**
-   Driver for generic blas routine with two loads and one store.
+   Driver for generic blas routine with four loads and two store.
  */
-template <template <typename Float, typename FloatN> class Functor>
-void blasCuda(const int kernel, const double2 &a, cudaColorSpinorField &x, 
-	      const double2 &b, cudaColorSpinorField &y) {
+template <template <typename Float, typename FloatN> class Functor,
+	  int writeX, int writeY, int writeZ, int writeW>
+void blasCuda(const int kernel, const double2 &a, const double2 &b, const double2 &c,
+	      cudaColorSpinorField &x, cudaColorSpinorField &y, 
+	      cudaColorSpinorField &z, cudaColorSpinorField &w) {
   setBlock(kernel, x.Length(), x.Precision());
   checkSpinor(x, y);
+  checkSpinor(x, z);
+  checkSpinor(x, w);
 
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    blasCuda<Functor>(kernel, a, x.Even(), b, y.Even());
-    blasCuda<Functor>(kernel, a, x.Odd(), b, y.Odd());
+    blasCuda<Functor,writeX,writeY,writeZ,writeW>(kernel, a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
+    blasCuda<Functor,writeX,writeY,writeZ,writeW>(kernel, a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Even());
     return;
   }
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     Spinor<double2,double2,double2,1> X(x);
     Spinor<double2,double2,double2,1> Y(y);
-    Functor<double2, double2> f(a,b);
-    blasKernel<double2,1><<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/2);
+    Spinor<double2,double2,double2,1> Z(z);
+    Spinor<double2,double2,double2,1> W(w);
+    Functor<double2, double2> f(a,b,c);
+    blasKernel<double2,1,writeX,writeY,writeZ,writeW><<<blasGrid, blasBlock>>>
+      (X, Y, Z, W, f, X, Y, Z, W, x.Length()/2);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     Spinor<float4,float4,float4,1> X(x);
     Spinor<float4,float4,float4,1> Y(y);
-    Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y));
-    blasKernel<float4,1><<<blasGrid, blasBlock>>>(X, Y, f, Y, x.Length()/4);
+    Spinor<float4,float4,float4,1> Z(z);
+    Spinor<float4,float4,float4,1> W(w);
+    Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+    blasKernel<float4,1,writeX,writeY,writeZ,writeW><<<blasGrid, blasBlock>>>
+      (X, Y, Z, W, f, X, Y, Z, W, x.Length()/4);
   } else {
     if (x.Nspin() == 4){ //wilson
       SpinorTexture<float4,float4,short4,6,0> xTex(x);
       SpinorTexture<float4,float4,short4,6,1> yTex(y);
+      SpinorTexture<float4,float4,short4,6,2> zTex(z);
+      SpinorTexture<float4,float4,short4,6,3> wTex(w);
+      Spinor<float4,float4,short4,6> xStore(x);
       Spinor<float4,float4,short4,6> yStore(y);
-      Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      blasKernel<float4, 6> <<<blasGrid, blasBlock>>> (xTex, yTex, f, yStore, y.Volume());
+      Spinor<float4,float4,short4,6> zStore(z);
+      Spinor<float4,float4,short4,6> wStore(w);
+      Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+      blasKernel<float4, 6, writeX, writeY, writeZ, writeW> <<<blasGrid, blasBlock>>> 
+	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
       SpinorTexture<float2,float2,short2,3,1> yTex(y);
+      SpinorTexture<float2,float2,short2,3,2> zTex(z);
+      SpinorTexture<float2,float2,short2,3,3> wTex(w);
+      Spinor<float2,float2,short2,3> xStore(x);
       Spinor<float2,float2,short2,3> yStore(y);
-      Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      blasKernel<float2, 3> <<<blasGrid, blasBlock>>>(xTex, yTex, f, yStore, y.Volume());
+      Spinor<float2,float2,short2,3> zStore(z);
+      Spinor<float2,float2,short2,3> wStore(w);
+      Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+      blasKernel<float2, 3,writeX,writeY,writeZ,writeW> <<<blasGrid, blasBlock>>>
+	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     quda::blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
   }
@@ -509,209 +357,214 @@ template <typename Float2, typename FloatN>
 struct axpby {
   const Float2 a;
   const Float2 b;
-  axpby(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { y = a.x*x + b.x*y; }
+  axpby(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y = a.x*x + b.x*y; }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 3; } //! flops per element
 };
 
 void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y) {
   const int kernel = 2;
-  blasCuda<axpby>(kernel, make_double2(a, 0.0), x, make_double2(b, 0.0), y);
+  blasCuda<axpby,0,1,0,0>(kernel, make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
+		  x, y, x, x);
 }
 
+/**
+   Functor to perform the operation y += x
+*/
 template <typename Float2, typename FloatN>
 struct xpy {
-  xpy(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { y += x ; }
+  xpy(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y += x ; }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 1; } //! flops per element
 };
 
 void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 3;
-  blasCuda<xpy>(kernel, make_double2(1.0, 0.0), x, make_double2(1.0, 0.0), y);
+  blasCuda<xpy,0,1,0,0>(kernel, make_double2(1.0, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
+		x, y, x, x);
 }
 
+/**
+   Functor to perform the operation y += a*x
+*/
 template <typename Float2, typename FloatN>
 struct axpy {
   const Float2 a;
-  axpy(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { y = a.x*x + y; }
+  axpy(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y = a.x*x + y; }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 2; } //! flops per element
 };
 
 void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 4;
-  blasCuda<axpy>(kernel, make_double2(a, 0.0), x, make_double2(1.0, 0.0), y);
+  blasCuda<axpy,0,1,0,0>(kernel, make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
+		 x, y, x, x);
 }
 
+/**
+   Functor to perform the operation y = x + a*y
+*/
 template <typename Float2, typename FloatN>
 struct xpay {
   const Float2 a;
-  xpay(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { y = x + a.x*y; }
+  xpay(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y = x + a.x*y; }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 2; } //! flops per element
 };
 
 void xpayCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y) {
   const int kernel = 5;
-  blasCuda<xpay>(kernel, make_double2(a,0.0), x, make_double2(0.0, 0.0), y);
+  blasCuda<xpay,0,1,0,0>(kernel, make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0),
+			 x, y, x, x);
 }
 
+/**
+   Functor to perform the operation y -= x;
+*/
 template <typename Float2, typename FloatN>
 struct mxpy {
-  mxpy(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { y -= x; }
+  mxpy(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y -= x; }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 1; } //! flops per element
 };
 
 void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 6;
-  blasCuda<mxpy>(kernel, make_double2(1.0, 0.0), x, make_double2(1.0, 0.0), y);
+  blasCuda<mxpy,0,1,0,0>(kernel, make_double2(1.0, 0.0), make_double2(1.0, 0.0), 
+			 make_double2(0.0, 0.0), x, y, x, x);
 }
 
+/**
+   Functor to perform the operation x *= a
+*/
 template <typename Float2, typename FloatN>
 struct ax {
   const Float2 a;
-  ax(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { y *= a.x; }
+  ax(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+  __device__ void operator()(FloatN &x, const FloatN &y, const FloatN &z, const FloatN &w) { x *= a.x; }
   static int streams() { return 2; } //! total number of input and output streams
   static int flops() { return 1; } //! flops per element
 };
 
 void axCuda(const double &a, cudaColorSpinorField &x) {
   const int kernel = 7;
-  blasCuda<ax>(kernel, make_double2(a, 0.0), x, make_double2(0.0, 0.0), x);
+  blasCuda<ax,1,0,0,0>(kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), 
+		       make_double2(0.0, 0.0), x, x, x, x);
+}
+
+/**
+   Functor to perform the operation y += a * x  (complex-valued)
+*/
+
+__device__ void caxpy_(const float2 &a, const float4 &x, float4 &y) {
+  y.x += a.x*x.x; y.x -= a.y*x.y;
+  y.y += a.y*x.x; y.y += a.x*x.y;
+  y.z += a.x*x.z; y.z -= a.y*x.w;
+  y.w += a.y*x.z; y.w += a.x*x.w;
+}
+
+__device__ void caxpy_(const float2 &a, const float2 &x, float2 &y) {
+  y.x += a.x*x.x; y.x -= a.y*x.y;
+  y.y += a.y*x.x; y.y += a.x*x.y;
+}
+
+__device__ void caxpy_(const double2 &a, const double2 &x, double2 &y) {
+  y.x += a.x*x.x; y.x -= a.y*x.y;
+  y.y += a.y*x.x; y.y += a.x*x.y;
 }
 
 template <typename Float2, typename FloatN>
 struct caxpy {
   const Float2 a;
-  caxpy(const Float2 &a, const Float2 &b) : a(a) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { caxpy_(a, x, y); }
+  caxpy(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { caxpy_(a, x, y); }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 4; } //! flops per element
 };
 
 void caxpyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 8;
-  blasCuda<caxpy>(kernel, make_double2(real(a),imag(a)), x, make_double2(0.0, 0.0), y);
+  blasCuda<caxpy,0,1,0,0>(kernel, make_double2(real(a),imag(a)), make_double2(0.0, 0.0), 
+			  make_double2(0.0, 0.0), x, y, x, x);
 }
+
+/**
+   Functor to perform the operation y = a*x + b*y  (complex-valued)
+*/
+
+__device__ void caxpby_(const float2 &a, const float4 &x, const float2 &b, float4 &y)					
+  { float4 yy;								
+  yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
+  yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
+  yy.z = a.x*x.z; yy.z -= a.y*x.w; yy.z += b.x*y.z; yy.z -= b.y*y.w;	
+  yy.w = a.y*x.z; yy.w += a.x*x.w; yy.w += b.y*y.z; yy.w += b.x*y.w;	
+  y = yy; }
+
+__device__ void caxpby_(const float2 &a, const float2 &x, const float2 &b, float2 &y)
+  { float2 yy;								
+  yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
+  yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
+  y = yy; }
+
+__device__ void caxpby_(const double2 &a, const double2 &x, const double2 &b, double2 &y)				 
+  { double2 yy;								
+  yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
+  yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
+  y = yy; }
 
 template <typename Float2, typename FloatN>
 struct caxpby {
   const Float2 a;
   const Float2 b;
-  caxpby(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y) { caxpby_(a, x, b, y); }
+  caxpby(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+  __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { caxpby_(a, x, b, y); }
   static int streams() { return 3; } //! total number of input and output streams
   static int flops() { return 7; } //! flops per element
 };
 
 void caxpbyCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, cudaColorSpinorField &y) {
   const int kernel = 9;
-  blasCuda<caxpby>(kernel, make_double2(a.real(),a.imag()), x, make_double2(b.real(), b.imag()), y);
-}
-
-
-/**
-   Generic blas kernel with three loads and two stores.
- */
-template <typename FloatN, int M, typename InputX, typename InputY, typename InputZ, 
-	  typename InputW, typename OutputY, typename OutputZ, typename Functor>
-__global__ void blasKernel(InputX X, InputY Y, InputZ Z, InputW W, Functor f, 
-			   OutputY YY, OutputZ ZZ, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    FloatN x[M], y[M], z[M], w[M];
-    X.load(x, i);
-    Y.load(y, i);
-    Z.load(z, i);
-    W.load(w, i);
-
-#pragma unroll
-    for (int j=0; j<M; j++) f(x[j], y[j], z[j], w[j]);
-
-    YY.save(y, i);
-    ZZ.save(z, i);
-    i += gridSize;
-  }
+  blasCuda<caxpby,0,1,0,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+			   make_double2(0.0, 0.0), x, y, x, x);
 }
 
 /**
-   Driver for generic blas routine with four loads and two store.
- */
-template <template <typename Float, typename FloatN> class Functor>
-void blasCuda(const int kernel, const double2 &a, const double2 &b, const double2 &c,
-	      cudaColorSpinorField &x, cudaColorSpinorField &y, 
-	      cudaColorSpinorField &z, cudaColorSpinorField &w) {
-  setBlock(kernel, x.Length(), x.Precision());
-  checkSpinor(x, y);
-  checkSpinor(x, z);
-  checkSpinor(x, w);
-
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    blasCuda<Functor>(kernel, a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
-    blasCuda<Functor>(kernel, a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Even());
-    return;
-  }
-
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    Spinor<double2,double2,double2,1> X(x);
-    Spinor<double2,double2,double2,1> Y(y);
-    Spinor<double2,double2,double2,1> Z(z);
-    Spinor<double2,double2,double2,1> W(w);
-    Functor<double2, double2> f(a,b,c);
-    blasKernel<double2,1><<<blasGrid, blasBlock>>>(X, Y, Z, W, f, Y, Z, x.Length()/2);
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    Spinor<float4,float4,float4,1> X(x);
-    Spinor<float4,float4,float4,1> Y(y);
-    Spinor<float4,float4,float4,1> Z(z);
-    Spinor<float4,float4,float4,1> W(w);
-    Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-    blasKernel<float4,1><<<blasGrid, blasBlock>>>(X, Y, Z, W, f, Y, Z, x.Length()/4);
-  } else {
-    if (x.Nspin() == 4){ //wilson
-      SpinorTexture<float4,float4,short4,6,0> xTex(x);
-      SpinorTexture<float4,float4,short4,6,1> yTex(y);
-      SpinorTexture<float4,float4,short4,6,2> zTex(z);
-      SpinorTexture<float4,float4,short4,6,2> wTex(w);
-      Spinor<float4,float4,short4,6> yStore(y);
-      Spinor<float4,float4,short4,6> zStore(z);
-      Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blasKernel<float4, 6> <<<blasGrid, blasBlock>>> (xTex, yTex, zTex, wTex, f, yStore, zStore, y.Volume());
-    } else if (x.Nspin() == 1) {//staggered
-      SpinorTexture<float2,float2,short2,3,0> xTex(x);
-      SpinorTexture<float2,float2,short2,3,1> yTex(y);
-      SpinorTexture<float2,float2,short2,3,2> zTex(z);
-      SpinorTexture<float2,float2,short2,3,2> wTex(w);
-      Spinor<float2,float2,short2,3> yStore(y);
-      Spinor<float2,float2,short2,3> zStore(z);
-      Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blasKernel<float2, 3> <<<blasGrid, blasBlock>>>(xTex, yTex, zTex, wTex, f, yStore, zStore, y.Volume());
-    } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    quda::blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
-  }
-  quda::blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
-  quda::blas_flops += Functor<double2,double2>::flops()*x.RealLength();
-
-  if (!blasTuning) checkCudaError();
-}
-
-/**
-   Performs the operation z[i] = x[i] + a*y[i] + b*z[i]
+   Functor to performs the operation z[i] = x[i] + a*y[i] + b*z[i]
 */
+
+__device__ void cxpaypbz_(const float4 &x, const float2 &a, const float4 &y, const float2 &b, float4 &z) {
+  float4 zz;
+  zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
+  zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
+  zz.z = x.z + a.x*y.z; zz.z -= a.y*y.w; zz.z += b.x*z.z; zz.z -= b.y*z.w;
+  zz.w = x.w + a.y*y.z; zz.w += a.x*y.w; zz.w += b.y*z.z; zz.w += b.x*z.w;
+  z = zz;
+}
+
+__device__ void cxpaypbz_(const float2 &x, const float2 &a, const float2 &y, const float2 &b, float2 &z) {
+  float2 zz;
+  zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
+  zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
+  z = zz;
+}
+
+__device__ void cxpaypbz_(const double2 &x, const double2 &a, const double2 &y, const double2 &b, double2 &z) {
+  double2 zz;
+  zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
+  zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
+  z = zz;
+}
+
 template <typename Float2, typename FloatN>
 struct cxpaypbz {
   const Float2 a;
   const Float2 b;
-  const Float2 c;
-  cxpaypbz(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
+  cxpaypbz(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
   __device__ void operator()(const FloatN &x, const FloatN &y, FloatN &z, FloatN &w) 
   { cxpaypbz_(x, a, y, b, z); }
   static int streams() { return 4; } //! total number of input and output streams
@@ -721,12 +574,12 @@ struct cxpaypbz {
 void cxpaypbzCuda(cudaColorSpinorField &x, const quda::Complex &a, cudaColorSpinorField &y, 
 		  const quda::Complex &b, cudaColorSpinorField &z) {
   const int kernel = 10;
-  blasCuda<cxpaypbz>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
-		     make_double2(0.0, 0.0), x, y, z, z);
+  blasCuda<cxpaypbz,0,0,1,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+			     make_double2(0.0, 0.0), x, y, z, z);
 }
 
 /**
-   Performs the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
+   Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
 */
 template <typename Float2, typename FloatN>
 struct axpyBzpcx {
@@ -734,8 +587,8 @@ struct axpyBzpcx {
   const Float2 b;
   const Float2 c;
   axpyBzpcx(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-  { y += a.x*z; z = b.x*x + c.x*z; }
+  __device__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w)
+  { y += a.x*x; x = b.x*z + c.x*x; }
   static int streams() { return 5; } //! total number of input and output streams
   static int flops() { return 10; } //! flops per element
 };
@@ -743,21 +596,20 @@ struct axpyBzpcx {
 void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, 
 		   cudaColorSpinorField& z, const double &c) {
   const int kernel = 11;
-  // swap arguments around 
-  blasCuda<axpyBzpcx>(kernel, make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0), 
-		      z, y, x, x);
+  blasCuda<axpyBzpcx,1,1,0,0>(kernel, make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0), 
+			      x, y, z, x);
 }
 
 /**
-   Performs the operations: {y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]}
+   Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]
 */
 template <typename Float2, typename FloatN>
 struct axpyZpbx {
   const Float2 a;
   const Float2 b;
   axpyZpbx(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-  { y += a.x*z; z = x + b.x*z; }
+  __device__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w)
+  { y += a.x*x; x = z + b.x*x; }
   static int streams() { return 5; } //! total number of input and output streams
   static int flops() { return 8; } //! flops per element
 };
@@ -766,20 +618,20 @@ void axpyZpbxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField
 		  cudaColorSpinorField& z, const double &b) {
   const int kernel = 12;
   // swap arguments around 
-  blasCuda<axpyZpbx>(kernel, make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
-		     z, y, x, x);
+  blasCuda<axpyZpbx,1,1,0,0>(kernel, make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+			     x, y, z, x);
 }
 
 /**
-   Performs the operation z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
+   Functor performing the operations z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
 */
 template <typename Float2, typename FloatN>
 struct caxpbypzYmbw {
   const Float2 a;
   const Float2 b;
   caxpbypzYmbw(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-  { caxpbypz_(a, x, b, y, z); caxpy_(-b, w, y); }
+  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, const FloatN &w)
+  { caxpy_(a, x, z); caxpy_(b, y, z); caxpy_(-b, w, y); }
 
   static int streams() { return 6; } //! total number of input and output streams
   static int flops() { return 12; } //! flops per element
@@ -788,21 +640,20 @@ struct caxpbypzYmbw {
 void caxpbypzYmbwCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, 
 		      cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w) {
   const int kernel = 12;
-  // swap arguments around 
-  blasCuda<caxpbypzYmbw>(kernel, make_double2(a.real(),a.imag()), make_double2(a.real(), b.imag()), 
-			 make_double2(0.0,0.0), x, y, z, w);
+  blasCuda<caxpbypzYmbw,0,1,1,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+				 make_double2(0.0,0.0), x, y, z, w);
 }
 
 /**
-   Performs the operation y[i] += a*b*x[i], x[i] *= a
+   Functor performing the operation y[i] += a*b*x[i], x[i] *= a
 */
 template <typename Float2, typename FloatN>
 struct cabxpyAx {
   const Float2 a;
   const Float2 b;
   cabxpyAx(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w) 
-  { z *= a.x; caxpy_(b, z, y); }
+  __device__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+  { x *= a.x; caxpy_(b, x, y); }
   static int streams() { return 4; } //! total number of input and output streams
   static int flops() { return 5; } //! flops per element
 };
@@ -811,20 +662,20 @@ void cabxpyAxCuda(const double &a, const quda::Complex &b,
 		  cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 14;
   // swap arguments around 
-  blasCuda<cabxpyAx>(kernel, make_double2(a,0.0), make_double2(b.real(),b.imag()), 
-		     make_double2(0.0,0.0), x, y, x, x);
+  blasCuda<cabxpyAx,1,1,0,0>(kernel, make_double2(a,0.0), make_double2(b.real(),b.imag()), 
+			     make_double2(0.0,0.0), x, y, x, x);
 }
 
 /**
-   Performs the operation z[i] = a*x[i] + b*y[i] + z[i]
+   Functor performing the operation z[i] = a*x[i] + b*y[i] + z[i]
 */
 template <typename Float2, typename FloatN>
 struct caxpbypz {
   const Float2 a;
   const Float2 b;
   caxpbypz(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w) 
-  { caxpbypz_(a, x, b, y, z); }
+  __device__ void operator()(const FloatN &x, const FloatN &y, FloatN &z, const FloatN &w) 
+  { caxpy_(a, x, z); caxpy_(b, y, z); }
   static int streams() { return 4; } //! total number of input and output streams
   static int flops() { return 5; } //! flops per element
 };
@@ -832,12 +683,12 @@ struct caxpbypz {
 void caxpbypzCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda::Complex &b, 
 		  cudaColorSpinorField &y, cudaColorSpinorField &z) {
   const int kernel = 15;
-  blasCuda<caxpbypz>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
-		     make_double2(0.0,0.0), x, y, z, z);
+  blasCuda<caxpbypz,0,0,1,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
+			     make_double2(0.0,0.0), x, y, z, z);
 }
 
 /**
-   Performs the operation z[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
+   Functor Performing the operation w[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
 */
 template <typename Float2, typename FloatN>
 struct caxpbypczpw {
@@ -845,7 +696,7 @@ struct caxpbypczpw {
   const Float2 b;
   const Float2 c;
   caxpbypczpw(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-  __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w) 
+  __device__ void operator()(const FloatN &x, const FloatN &y, const FloatN &z, FloatN &w) 
   { caxpy_(a, x, w); caxpy_(b, y, w); caxpy_(c, z, w); }
 
   static int streams() { return 4; } //! total number of input and output streams
@@ -856,25 +707,59 @@ void caxpbypczpwCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda
 		     cudaColorSpinorField &y, const quda::Complex &c, cudaColorSpinorField &z, 
 		     cudaColorSpinorField &w) {
   const int kernel = 16;
-  // swap arguments around 
-  blasCuda<caxpbypczpw>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
-			make_double2(c.real(), c.imag()), x, y, z, w);
+  blasCuda<caxpbypczpw,0,0,0,1>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
+				make_double2(c.real(), c.imag()), x, y, z, w);
 }
 
 __host__ __device__ void zero(double &x) { x = 0.0; }
 __host__ __device__ void zero(double2 &x) { x.x = 0.0; x.y = 0.0; }
 __host__ __device__ void zero(double3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(double *s, int i, double x, int block) { s[i] = x; }
-__device__ void copytoshared(double *s, int i, double2 x, int block) { s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(double *s, int i, double3 x, int block) 
+__device__ void copytoshared(double *s, const int i, const double x, const int block) { s[i] = x; }
+__device__ void copytoshared(double *s, const int i, const double2 x, const int block) 
+{ s[i] = x.x; s[i+block] = x.y; }
+__device__ void copytoshared(double *s, const int i, const double3 x, const int block) 
 { s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copyfromshared(double &x, double *s, int i, int block) { x = s[i]; }
-__device__ void copyfromshared(double2 &x, double *s, int i, int block) { x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(double3 &x, double *s, int i, int block) 
+__device__ void copyfromshared(double &x, const double *s, const int i, const int block) { x = s[i]; }
+__device__ void copyfromshared(double2 &x, const double *s, const int i, const int block) 
+{ x.x = s[i]; x.y = s[i+block]; }
+__device__ void copyfromshared(double3 &x, const double *s, const int i, const int block) 
 { x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
 
-__device__ void add(double *s, int i, int j) { s[i] += s[j]; }
-__device__ void add(volatile double *s, int i, int j) { s[i] += s[j]; }
+#if (__COMPUTE_CAPABILITY__ < 130)
+__host__ __device__ void zero(doublesingle &x) { x = 0.0; }
+__host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
+__host__ __device__ void zero(doublesingle3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
+__device__ void copytoshared(doublesingle *s, const int i, const doublesingle x, const int block) { s[i] = x; }
+__device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x, const int block) 
+{ s[i] = x.x; s[i+block] = x.y; }
+__device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
+{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
+__device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
+__device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
+{ x.x = s[i]; x.y = s[i+block]; }
+__device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
+{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
+#endif
+
+template<typename ReduceType, typename ReduceSimpleType> 
+__device__ void add(ReduceSimpleType *s, const int i, const int j, const int block) { }
+template<typename ReduceType, typename ReduceSimpleType> 
+__device__ void add(volatile ReduceSimpleType *s, const int i, const int j, const int block) { }
+
+template<> __device__ void add<double,double>(double *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; }
+template<> __device__ void add<double,double>(volatile double *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; }
+
+template<> __device__ void add<double2,double>(double *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block];}
+template<> __device__ void add<double2,double>(volatile double *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block];}
+
+template<> __device__ void add<double3,double>(double *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
+template<> __device__ void add<double3,double>(volatile double *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
 
 /**
    Generic reduction kernel with up to four loads and three saves.
@@ -915,23 +800,23 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
   __syncthreads();
   
   // do reduction in shared mem
-  if (reduce_threads >= 1024) { if (tid < 512) { add(s, 0, 512); } __syncthreads(); }
-  if (reduce_threads >= 512) { if (tid < 256) { add(s, 0, 256); } __syncthreads(); }
-  if (reduce_threads >= 256) { if (tid < 128) { add(s, 0, 128); } __syncthreads(); }
-  if (reduce_threads >= 128) { if (tid <  64) { add(s, 0, 64); } __syncthreads(); }
+  if (reduce_threads >= 1024) { if (tid < 512) { add<ReduceType>(s, 0, 512, reduce_threads); } __syncthreads(); }
+  if (reduce_threads >= 512) { if (tid < 256) { add<ReduceType>(s, 0, 256, reduce_threads); } __syncthreads(); }
+  if (reduce_threads >= 256) { if (tid < 128) { add<ReduceType>(s, 0, 128, reduce_threads); } __syncthreads(); }
+  if (reduce_threads >= 128) { if (tid <  64) { add<ReduceType>(s, 0, 64, reduce_threads); } __syncthreads(); }
   
   if (tid < 32) {
     volatile ReduceSimpleType *sv = s;
-    if (reduce_threads >=  64) { add(sv, 0, 32); }
-    if (reduce_threads >=  32) { add(sv, 0, 16); }
-    if (reduce_threads >=  16) { add(sv, 0, 8); }
-    if (reduce_threads >=  8)  { add(sv, 0, 4); }
-    if (reduce_threads >=  4)  { add(sv, 0, 2); }
-    if (reduce_threads >=  2)  { add(sv, 0, 1); }
+    if (reduce_threads >=  64) { add<ReduceType>(sv, 0, 32, reduce_threads); }
+    if (reduce_threads >=  32) { add<ReduceType>(sv, 0, 16, reduce_threads); }
+    if (reduce_threads >=  16) { add<ReduceType>(sv, 0, 8, reduce_threads); }
+    if (reduce_threads >=  8)  { add<ReduceType>(sv, 0, 4, reduce_threads); }
+    if (reduce_threads >=  4)  { add<ReduceType>(sv, 0, 2, reduce_threads); }
+    if (reduce_threads >=  2)  { add<ReduceType>(sv, 0, 1, reduce_threads); }
   }
   
   // write result for this block to global mem 
-  if (i == 0) {
+  if (tid == 0) {    
     ReduceType tmp;
     copyfromshared(tmp, s, 0, reduce_threads);
     reduce[blockIdx.x] = tmp;
@@ -939,7 +824,7 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
 }
 
 /**
-   Kernel launcher
+   Generic reduction Kernel launcher
 */
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
 	  int M, int writeX, int writeY, int writeZ, 
@@ -992,7 +877,6 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
 
 /**
    Driver for generic reduction routine with two loads.
-
    @param ReduceType 
  */
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType,
@@ -1051,10 +935,8 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
       Spinor<float4,float4,short4,6> yOut(y);
       Spinor<float4,float4,short4,6> zOut(z);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      checkCudaError();
       value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ>
 	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
-      checkCudaError();
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
       SpinorTexture<float2,float2,short2,3,1> yTex(y);
@@ -1078,6 +960,9 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
   return value;
 }
 
+/**
+   Return the L2 norm of x
+*/
 __device__ double norm2_(const double2 &a) { return a.x*a.x + a.y*a.y; }
 __device__ float norm2_(const float2 &a) { return a.x*a.x + a.y*a.y; }
 __device__ float norm2_(const float4 &a) { return a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w; }
@@ -1097,24 +982,32 @@ double normCuda(const cudaColorSpinorField &x) {
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
 }
 
-__device__ double dot_(const double &a, const double &b) { return a*b; }
+/**
+   Return the real dot product of x and y
+*/
+__device__ double dot_(const double2 &a, const double2 &b) { return a.x*b.x + a.y*b.y; }
 __device__ float dot_(const float2 &a, const float2 &b) { return a.x*b.x + a.y*b.y; }
 __device__ float dot_(const float4 &a, const float4 &b) { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w; }
 
 template <typename ReduceType, typename Float2, typename FloatN>
 struct Dot {
   Dot(const Float2 &a, const Float2 &b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += dot_(x); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, const FloatN &y, const FloatN &z, 
+			     const FloatN &w, const FloatN &v) { sum += dot_(x,y); }
   static int streams() { return 2; } //! total number of input and output streams
   static int flops() { return 2; } //! flops per element
 };
 
 double reDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 18;
-  return reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0>
+  return reduceCuda<double,QudaSumFloat,QudaSumFloat,Dot,0,0,0>
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
 }
 
+/**
+   First performs the operation y[i] = a*x[i]
+   Return the norm of y
+*/
 template <typename ReduceType, typename Float2, typename FloatN>
 struct axpyNorm2 {
   Float2 a;
@@ -1151,7 +1044,7 @@ double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
 }
 
 /**
-  First performs the operation y[i] = a*x[i] + y[i]
+  First performs the operation y[i] = a*x[i] + y[i] (complex-valued)
   Second returns the norm of y
 */
 template <typename ReduceType, typename Float2, typename FloatN>
@@ -1196,8 +1089,8 @@ double caxpyXmazNormXCuda(const quda::Complex &a, cudaColorSpinorField &x,
 /**
    double cabxpyAxNormCuda(float a, complex b, float *x, float *y, n){}
    
-   First performs the operation y[i] = a*x[i] + y[i]
-   Second performs the operator x[i] -= a*z[i]
+   First performs the operation y[i] += a*b*x[i]
+   Second performs x[i] *= a
    Third returns the norm of x
 */
 template <typename ReduceType, typename Float2, typename FloatN>
@@ -1206,7 +1099,7 @@ struct cabxpyaxnorm {
   Float2 b;
   cabxpyaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
   __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { x *= a.x; caxpy_(b, x, y); sum += norm2_(y); }
-  static int streams() { return 5; } //! total number of input and output streams
+  static int streams() { return 4; } //! total number of input and output streams
   static int flops() { return 10; } //! flops per element
 };
 
@@ -1217,6 +1110,9 @@ double cabxpyAxNormCuda(const double &a, const quda::Complex &b,
     (kernel, make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x, x);
 }
 
+/**
+   Returns complex-valued dot product of x and y
+*/
 __device__ double2 cdot_(const double2 &a, const double2 &b) 
 { return make_double2(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x); }
 __device__ double2 cdot_(const float2 &a, const float2 &b) 
@@ -1284,6 +1180,10 @@ quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cu
   return quda::Complex(cdot.x, cdot.y);
 }
 
+/**
+   First returns the dot product (x,y)
+   Returns the norm of x
+*/
 __device__ double3 cdotNormA_(const double2 &a, const double2 &b) 
 { return make_double3(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x, a.x*a.x + a.y*a.y); }
 __device__ double3 cdotNormA_(const float2 &a, const float2 &b) 
@@ -1307,6 +1207,10 @@ double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
 }
 
+/**
+   First returns the dot product (x,y)
+   Returns the norm of y
+*/
 __device__ double3 cdotNormB_(const double2 &a, const double2 &b) 
 { return make_double3(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x, b.x*b.x + b.y*b.y); }
 __device__ double3 cdotNormB_(const float2 &a, const float2 &b) 
@@ -1338,7 +1242,7 @@ struct caxpbypzYmbwcDotProductUYNormY {
   Float2 a;
   Float2 b;
   caxpbypzYmbwcDotProductUYNormY(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, z); caxpy_(b, y, z); caxpy_(-b, v, y); sum += cdotNormB_(v,y); }
+  __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, z); caxpy_(b, y, z); caxpy_(-b, w, y); sum += cdotNormB_(v,y); }
   static int streams() { return 7; } //! total number of input and output streams
   static int flops() { return 18; } //! flops per element
 };
@@ -1348,6 +1252,6 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpin
 					   cudaColorSpinorField &z, cudaColorSpinorField &w,
 					   cudaColorSpinorField &u) {
   const int kernel = 29;
-  return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,0,0>
+  return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1>
     (kernel, make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
 }

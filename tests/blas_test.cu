@@ -9,10 +9,10 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 4;
-const int LY = 4;
-const int LZ = 4;
-const int LT = 4;
+const int LX = 16;
+const int LY = 16;
+const int LZ = 16;
+const int LT = 16;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
@@ -85,13 +85,13 @@ void initFields(int prec)
   hH = new cpuColorSpinorField(param);
   lH = new cpuColorSpinorField(param);
 
-  vH->Source(QUDA_RANDOM_SOURCE);
-  wH->Source(QUDA_RANDOM_SOURCE);
-  xH->Source(QUDA_RANDOM_SOURCE);
-  yH->Source(QUDA_RANDOM_SOURCE);
-  zH->Source(QUDA_RANDOM_SOURCE);
-  hH->Source(QUDA_RANDOM_SOURCE);
-  lH->Source(QUDA_RANDOM_SOURCE);
+  vH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  wH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  xH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  yH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  zH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  hH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  lH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
 
   // Now set the parameters for the cuda fields
   param.pad = 0; //LX*LY*LZ/2;
@@ -698,6 +698,7 @@ int main(int argc, char** argv)
 	  
 	  // first do warmup run and check for error
 	  benchmark(kernel, 1);
+
 	  cudaThreadSynchronize();
 
 	  error = cudaGetLastError();

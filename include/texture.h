@@ -2,7 +2,19 @@
 
 #pragma once
 
-#define MAX_ELEMENTS (1<<27)
+#if (__COMPUTE_CAPABILITY__ >= 130)
+__inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
+{
+  int4 v = tex1Dfetch(t,i);
+  return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
+}
+#else
+__inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
+{
+  // do nothing
+  return make_double2(0.0, 0.0);
+}
+#endif
 
 texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_0;
 texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_1;
@@ -43,10 +55,11 @@ texture<int4,1> tex_int4_4;
 template<typename OutputType, typename InputType, int tex_id=0>
 class Texture {
  private: 
+ const InputType *spinor; // used when textures are disabled
  size_t bytes;
 
  public:
- Texture(const InputType *x, size_t bytes) : bytes(bytes) { 
+ Texture(const InputType *x, size_t bytes) : spinor(x), bytes(bytes) { 
    if (bytes) bind(x, bytes); // only bind if bytes > 0
  }
  ~Texture() { if (bytes) unbind(); }
@@ -238,11 +251,8 @@ template<> __device__ inline float4 Texture<float4,float4,3>::fetch(unsigned int
 template<> __device__ inline float4 Texture<float4,float4,4>::fetch(unsigned int idx) 
 { return tex1Dfetch(tex_float4_4,idx); }
 
-#if (__COMPUTE_CAPABILITY__ < 130) // double precision not supported
-__device__ double __hiloint2double(int hi, int lo) { return 0.0; }
-#endif
-
 // double2
+#ifndef FERMI_NO_DBLE_TEX
 template<> __device__ inline double2 Texture<double2,double2,0>::fetch(unsigned int idx) 
 { return fetch_double2(tex_int4_0,idx); }
 template<> __device__ inline double2 Texture<double2,double2,1>::fetch(unsigned int idx) 
@@ -264,6 +274,32 @@ template<> __device__ inline float2 Texture<float2,double2,3>::fetch(unsigned in
 { double2 x = fetch_double2(tex_int4_3,idx); return make_float2(x.x, x.y); }
 template<> __device__ inline float2 Texture<float2,double2,4>::fetch(unsigned int idx) 
 { double2 x = fetch_double2(tex_int4_4,idx); return make_float2(x.x, x.y); }
+
+#else
+
+template<> __device__ inline double2 Texture<double2,double2,0>::fetch(unsigned int idx) 
+{ return spinor[idx]; }
+template<> __device__ inline double2 Texture<double2,double2,1>::fetch(unsigned int idx) 
+{ return spinor[idx]; }
+template<> __device__ inline double2 Texture<double2,double2,2>::fetch(unsigned int idx) 
+{ return spinor[idx]; }
+template<> __device__ inline double2 Texture<double2,double2,3>::fetch(unsigned int idx) 
+{ return spinor[idx]; }
+template<> __device__ inline double2 Texture<double2,double2,4>::fetch(unsigned int idx) 
+{ return spinor[idx]; }
+
+template<> __device__ inline float2 Texture<float2,double2,0>::fetch(unsigned int idx) 
+{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,1>::fetch(unsigned int idx) 
+{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,2>::fetch(unsigned int idx) 
+{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,3>::fetch(unsigned int idx) 
+{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
+template<> __device__ inline float2 Texture<float2,double2,4>::fetch(unsigned int idx) 
+{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
+
+#endif //  FERMI_NO_DBLE_TEX
 
 /**
    Checks that the types are set correctly.  The precision used in the

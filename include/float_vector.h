@@ -161,3 +161,64 @@ __device__ double2 operator-(const double2 &x) {
   return make_double2(-x.x, -x.y);
 }
 
+
+/*
+  Operations to return the maximium absolute value of a FloatN vector
+ */
+
+__forceinline__ __device__ float max_fabs(const float4 &c) {
+  float a = fmaxf(fabsf(c.x), fabsf(c.y));
+  float b = fmaxf(fabsf(c.z), fabsf(c.w));
+  return fmaxf(a, b);
+};
+
+__forceinline__ __device__ float max_fabs(const float2 &b) {
+  return fmaxf(fabsf(b.x), fabsf(b.y));
+};
+
+__forceinline__ __device__ double max_fabs(const double4 &c) {
+  double a = fmaxf(fabsf(c.x), fabsf(c.y));
+  double b = fmaxf(fabsf(c.z), fabsf(c.w));
+  return fmaxf(a, b);
+};
+
+__forceinline__ __device__ double max_fabs(const double2 &b) {
+  return fmaxf(fabsf(b.x), fabsf(b.y));
+};
+
+/*
+  Precision conversion routines for vector types
+ */
+
+__forceinline__ __device__ float2 make_FloatN(const double2 &a) {
+  return make_float2(a.x, a.y);
+}
+
+__forceinline__ __device__ float4 make_FloatN(const double4 &a) {
+  return make_float4(a.x, a.y, a.z, a.w);
+}
+
+__forceinline__ __device__ double2 make_FloatN(const float2 &a) {
+  return make_double2(a.x, a.y);
+}
+
+__forceinline__ __device__ double4 make_FloatN(const float4 &a) {
+  return make_double4(a.x, a.y, a.z, a.w);
+}
+
+__forceinline__ __device__ short4 make_shortN(const float4 &a) {
+  return make_short4(a.x, a.y, a.z, a.w);
+}
+
+__forceinline__ __device__ short2 make_shortN(const float2 &a) {
+  return make_short2(a.x, a.y);
+}
+
+__forceinline__ __device__ short4 make_shortN(const double4 &a) {
+  return make_short4(a.x, a.y, a.z, a.w);
+}
+
+__forceinline__ __device__ short2 make_shortN(const double2 &a) {
+  return make_short2(a.x, a.y);
+}
+
