@@ -496,6 +496,13 @@ main(int argc, char **argv)
     usage(argv);
   }
 
+#ifdef MULTI_GPU
+  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
+    errorQuda("ERROR: milc format for multi-gpu is not supported yet!\n");
+  }
+#endif
+
+
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
 

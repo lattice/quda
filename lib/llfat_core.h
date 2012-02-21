@@ -32,7 +32,66 @@
 
 #endif
 
+#if (PRECISION == 1 && RECONSTRUCT == 12)
 
+#define a00_re A0.x
+#define a00_im A0.y
+#define a01_re A0.z
+#define a01_im A0.w
+#define a02_re A1.x
+#define a02_im A1.y
+#define a10_re A1.z
+#define a10_im A1.w
+#define a11_re A2.x
+#define a11_im A2.y
+#define a12_re A2.z
+#define a12_im A2.w
+#define a20_re A3.x
+#define a20_im A3.y
+#define a21_re A3.z
+#define a21_im A3.w
+#define a22_re A4.x
+#define a22_im A4.y
+
+#define b00_re B0.x
+#define b00_im B0.y
+#define b01_re B0.z
+#define b01_im B0.w
+#define b02_re B1.x
+#define b02_im B1.y
+#define b10_re B1.z
+#define b10_im B1.w
+#define b11_re B2.x
+#define b11_im B2.y
+#define b12_re B2.z
+#define b12_im B2.w
+#define b20_re B3.x
+#define b20_im B3.y
+#define b21_re B3.z
+#define b21_im B3.w
+#define b22_re B4.x
+#define b22_im B4.y
+
+#define c00_re C0.x
+#define c00_im C0.y
+#define c01_re C0.z
+#define c01_im C0.w
+#define c02_re C1.x
+#define c02_im C1.y
+#define c10_re C1.z
+#define c10_im C1.w
+#define c11_re C2.x
+#define c11_im C2.y
+#define c12_re C2.z
+#define c12_im C2.w
+#define c20_re C3.x
+#define c20_im C3.y
+#define c21_re C3.z
+#define c21_im C3.w
+#define c22_re C4.x
+#define c22_im C4.y
+
+#else
 #define a00_re A0.x
 #define a00_im A0.y
 #define a01_re A1.x
@@ -90,6 +149,8 @@
 #define c21_im C7.y
 #define c22_re C8.x
 #define c22_im C8.y
+
+#endif
 
 #define bb00_re BB0.x
 #define bb00_im BB0.y

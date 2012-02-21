@@ -132,6 +132,46 @@ do_link_format_cpu_to_gpu(FloatN* dst, Float* src,
   }//dir
 }
 
+//special versionf for single precision, reconstruct=12
+//load the data to shared memory using float2
+//write the data to gpu memory using float4 format
+__global__ void
+do_link_format_cpu_to_gpu_sp_recon(float4* dst, float* src,
+				   int reconstruct,
+				   int Vh, int pad, int ghostV, size_t threads)
+{
+  int tid = blockIdx.x * blockDim.x +  threadIdx.x;
+  int thread0_tid = blockIdx.x * blockDim.x;
+  __shared__ float2 buf[6*BLOCKSIZE];
+  int dir;
+  int j;
+  
+  for(dir = 0; dir < 4; dir++){
+#ifdef MULTI_GPU
+    float2* src_start = (float2*)( src + dir*gaugeSiteSize*(Vh+ghostV) + thread0_tid*gaugeSiteSize);   
+#else
+    float2* src_start = (float2*)( src + dir*gaugeSiteSize*(Vh) + thread0_tid*gaugeSiteSize);   
+#endif
+    for(j=0; j < 9; j++){
+      if(j*blockDim.x+threadIdx.x < 9*threads){
+	int idx = j*blockDim.x + threadIdx.x;
+	int modval = idx%9;
+	int divval = idx/9;
+	if(modval < 6){
+	  buf[divval*6+modval] = src_start[idx];
+	}	  	
+      }
+    }
+    __syncthreads();
+    if(tid < threads){
+      float4* dst_start = (float4*)(dst+dir*3*(Vh+pad));
+      for(j=0; j < 3; j++){
+	dst_start[tid + j*(Vh+pad)] = ((float4*)&buf)[3*threadIdx.x + j];
+      }
+    }
+    __syncthreads();
+  }//dir
+}
 
 
 void 
@@ -180,7 +220,7 @@ link_format_cpu_to_gpu(void* dst, void* src,
 	do_link_format_cpu_to_gpu<2, 18><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float*)src, reconstruct,  Vh, pad, ghostV, threads);   
 	break;
       case QUDA_RECONSTRUCT_12:
-	do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, Vh, pad, ghostV, threads);   
+	do_link_format_cpu_to_gpu_sp_recon<<<gridDim, blockDim>>>((float4*)dst, (float*)src, reconstruct, Vh, pad, ghostV, threads);   
 	break;
       default:
 	errorQuda("reconstruct type not supported\n");      
