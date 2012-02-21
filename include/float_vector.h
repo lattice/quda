@@ -92,13 +92,13 @@ __device__ float2 operator+=(float2 &x, const float2 y) {
   return x;
 }
 
-__device__ double2 operator+=(double2 &x, const double2 y) {
+__host__ __device__ double2 operator+=(double2 &x, const double2 y) {
   x.x += y.x;
   x.y += y.y;
   return x;
 }
 
-__device__ double3 operator+=(double3 &x, const double3 y) {
+__host__ __device__ double3 operator+=(double3 &x, const double3 y) {
   x.x += y.x;
   x.y += y.y;
   x.z += y.z;
