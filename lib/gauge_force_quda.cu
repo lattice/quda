@@ -106,18 +106,8 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
     return;
   }
   gauge_force_init_cuda_flag=1;
-  
-  int* X = param->X;
-  int Vh = X[0]*X[1]*X[2]*X[3]/2;
-  
-  cudaMemcpyToSymbol("path_max_length", &path_max_length, sizeof(int));
-  
-  int site_ga_stride = param->site_ga_pad + Vh;
-  cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));
-  int mom_ga_stride = param->mom_ga_pad + Vh;
-  cudaMemcpyToSymbol("mom_ga_stride", &mom_ga_stride, sizeof(int));
-  
-  
+
+
 #ifdef MULTI_GPU
   int E1 = param->X[0] + 4;
   int E1h = E1/2;
@@ -138,7 +128,21 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
   
   cudaMemcpyToSymbol("Vh_ex", &Vh_ex, sizeof(int));
 #endif    
+
+  int* X = param->X;
+  int Vh = X[0]*X[1]*X[2]*X[3]/2;
+  cudaMemcpyToSymbol("path_max_length", &path_max_length, sizeof(int));
   
+#ifdef MULTI_GPU
+  int site_ga_stride = param->site_ga_pad + Vh_ex;
+#else  
+  int site_ga_stride = param->site_ga_pad + Vh;
+#endif
+
+  cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));
+  int mom_ga_stride = param->mom_ga_pad + Vh;
+  cudaMemcpyToSymbol("mom_ga_stride", &mom_ga_stride, sizeof(int));
+     
 }
 
 

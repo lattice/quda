@@ -902,8 +902,9 @@ loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugePa
   QudaPrecision prec= param_ex->cpu_prec;
 
   int* E = param_ex->X;
-  int pad = param_ex->ga_pad;
-
+  //int pad = param_ex->ga_pad;
+  int pad = cudaGauge->Pad();
+  
    if (prec == QUDA_DOUBLE_PRECISION) {
      do_loadLinkToGPU_ex(E, (double2*)(cudaGauge->Even_p()), (double2*)(cudaGauge->Odd_p()), (double**)cpuGauge->Gauge_p(),
                          cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,

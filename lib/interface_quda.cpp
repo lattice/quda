@@ -1899,7 +1899,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   
   
-  initCommonConstants(*cudaSiteLink);
+  initCommonConstants(*cudaMom);
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
 #ifdef MULTI_GPU
