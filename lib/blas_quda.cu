@@ -55,6 +55,7 @@ void initBlas(void)
   }
 
   if (!h_reduce) {
+    printf("Host reduce size %lu\n", 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat));
     if (cudaMallocHost((void**) &h_reduce, 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating host reduction array");
     }
@@ -885,6 +886,7 @@ template <int reduce_threads, typename ReduceType, typename ReduceSimpleType,
 __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
 			     ReduceType *reduce, 
 			     OutputX XX, OutputY YY, OutputZ ZZ, int length) {
+  unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
 
@@ -899,25 +901,26 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
     V.load(v, i);
 #pragma unroll
     for (int j=0; j<M; j++) r(sum, x[j], y[j], z[j], w[j], v[j]);
-    i += gridSize;
 
     if (writeX) XX.save(x, i);
     if (writeY) YY.save(y, i);
     if (writeZ) ZZ.save(z, i);
+
+    i += gridSize;
   }
 
   extern __shared__ ReduceSimpleType sdata[];
-  ReduceSimpleType *s = sdata + i;  
+  ReduceSimpleType *s = sdata + tid;  
   copytoshared(s, 0, sum, reduce_threads);
   __syncthreads();
   
   // do reduction in shared mem
-  if (reduce_threads >= 1024) { if (i < 512) { add(s, 0, 512); } __syncthreads(); }
-  if (reduce_threads >= 512) { if (i < 256) { add(s, 0, 256); } __syncthreads(); }
-  if (reduce_threads >= 256) { if (i < 128) { add(s, 0, 128); } __syncthreads(); }
-  if (reduce_threads >= 128) { if (i <  64) { add(s, 0, 64); } __syncthreads(); }
+  if (reduce_threads >= 1024) { if (tid < 512) { add(s, 0, 512); } __syncthreads(); }
+  if (reduce_threads >= 512) { if (tid < 256) { add(s, 0, 256); } __syncthreads(); }
+  if (reduce_threads >= 256) { if (tid < 128) { add(s, 0, 128); } __syncthreads(); }
+  if (reduce_threads >= 128) { if (tid <  64) { add(s, 0, 64); } __syncthreads(); }
   
-  if (i < 32) {
+  if (tid < 32) {
     volatile ReduceSimpleType *sv = s;
     if (reduce_threads >=  64) { add(sv, 0, 32); }
     if (reduce_threads >=  32) { add(sv, 0, 16); }
@@ -977,9 +980,13 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
 
   doubleN cpu_sum;
   zero(cpu_sum);
+  for (unsigned int i = 0; i < blasGrid.x; i++) {
+    cpu_sum += ((ReduceType*)h_reduce)[i];
+  }
+
   const int Nreduce = sizeof(doubleN) / sizeof(double);
-  for (unsigned int i = 0; i < blasGrid.x; i++) cpu_sum += ((ReduceType*)h_reduce)[i];
   reduceDoubleArray((double*)&cpu_sum, Nreduce);
+
   return cpu_sum;
 }
 
@@ -1044,8 +1051,10 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
       Spinor<float4,float4,short4,6> yOut(y);
       Spinor<float4,float4,short4,6> zOut(z);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
+      checkCudaError();
       value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ>
 	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+      checkCudaError();
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
       SpinorTexture<float2,float2,short2,3,1> yTex(y);
@@ -1280,7 +1289,8 @@ __device__ double3 cdotNormA_(const double2 &a, const double2 &b)
 __device__ double3 cdotNormA_(const float2 &a, const float2 &b) 
 { return make_double3(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x, a.x*a.x + a.y*a.y); }
 __device__ double3 cdotNormA_(const float4 &a, const float4 &b) 
-{ return make_double3(a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z,
+{ return make_double3(a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, 
+		      a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z,
 		      a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w); }
 
 template <typename ReduceType, typename Float2, typename FloatN>
