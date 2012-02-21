@@ -528,10 +528,9 @@ void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFw
   - no support for half precision
  */
 
-template<typename FloatN, typename Float>
 static void 
-do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** ghost_cpuGauge,
-		 Float** ghost_cpuGauge_diag, 
+do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpuGauge,
+		 void** ghost_cpuGauge_diag, 
 		 QudaReconstructType reconstruct, int bytes, int Vh, int pad, 
 		 int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t,
 		 QudaPrecision prec, QudaGaugeFieldOrder cpu_order) 
@@ -550,14 +549,14 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
   int i;
   char* tmp_even;
   char* tmp_odd;
-  int len = Vh*gaugeSiteSize*sizeof(Float);
+  int len = Vh*gaugeSiteSize*prec;
 
 #ifdef MULTI_GPU    
   int glen[4] = {
-    Vsh_x*gaugeSiteSize*sizeof(Float),
-    Vsh_y*gaugeSiteSize*sizeof(Float),
-    Vsh_z*gaugeSiteSize*sizeof(Float),
-    Vsh_t*gaugeSiteSize*sizeof(Float)
+    Vsh_x*gaugeSiteSize*prec,
+    Vsh_y*gaugeSiteSize*prec,
+    Vsh_z*gaugeSiteSize*prec,
+    Vsh_t*gaugeSiteSize*prec
   };
   
   int ghostV = 2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t)+4*Vh_2d_max;
@@ -565,7 +564,7 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
   int ghostV = 0;
 #endif  
 
-  int glen_sum = ghostV*gaugeSiteSize*sizeof(Float);
+  int glen_sum = ghostV*gaugeSiteSize*prec;
   cudaMalloc(&tmp_even, 4*(len+glen_sum)); CUERR;
   cudaMalloc(&tmp_odd, 4*(len+glen_sum)); CUERR;
   
@@ -609,11 +608,11 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
 	}
       }
 #ifdef GPU_DIRECT 
-      cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu], 
-		      X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice, streams[0]);	
+      cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu], 
+		      X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice, streams[0]);	
 #else	
-      cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu], 
-		 X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice);	
+      cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu], 
+		 X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice);	
 #endif
       
     }
@@ -626,9 +625,9 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
   //odd links
   for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), cpuGauge[i] + Vh*gaugeSiteSize, len, cudaMemcpyHostToDevice, streams[1]);CUERR;
+    cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);CUERR;
 #else
-    cudaMemcpy(tmp_odd + i*(len+glen_sum), cpuGauge[i] + Vh*gaugeSiteSize, len, cudaMemcpyHostToDevice);CUERR;
+    cudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);CUERR;
 #endif
 
 #ifdef MULTI_GPU  
@@ -665,11 +664,11 @@ do_loadLinkToGPU(int* X, FloatN *even, FloatN *odd, Float **cpuGauge, Float** gh
 	  }
 	}
 #ifdef GPU_DIRECT 
-	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize, 
-			X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice, streams[1]);	
+	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize, 
+			X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice, streams[1]);	
 #else
-	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*sizeof(Float),ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize, 
-		   X[dir1]*X[dir2]/2*gaugeSiteSize*sizeof(Float), cudaMemcpyHostToDevice );		
+	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize, 
+		   X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice );		
 #endif
       }
       
@@ -783,23 +782,12 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
   
 #endif
   
-  if (prec == QUDA_DOUBLE_PRECISION) {
-    do_loadLinkToGPU(param->X, (double2*)(cudaGauge->Even_p()), (double2*)(cudaGauge->Odd_p()), (double**)cpuGauge->Gauge_p(), 
-		     (double**)ghost_cpuGauge, (double**)ghost_cpuGauge_diag, 
+  do_loadLinkToGPU(param->X, cudaGauge->Even_p(), cudaGauge->Odd_p(), (void**)cpuGauge->Gauge_p(), 
+		   ghost_cpuGauge, ghost_cpuGauge_diag, 
 		     cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad, 
-		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
-		     prec, cpuGauge->Order());
-  } else if (prec == QUDA_SINGLE_PRECISION) {
-    do_loadLinkToGPU(param->X, (float2*)(cudaGauge->Even_p()), (float2*)(cudaGauge->Odd_p()), (float**)cpuGauge->Gauge_p(), 
-		     (float**)ghost_cpuGauge, (float**)ghost_cpuGauge_diag, 
-		     cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad, 
-		     Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
-		     prec, cpuGauge->Order());    
-  }else{
-    printf("ERROR: half precision not supported in this funciton %s\n", __FUNCTION__);
-    exit(1);
-  }
-   
+		   Vsh_x, Vsh_y, Vsh_z, Vsh_t, 
+		   prec, cpuGauge->Order());
+  
 #ifdef MULTI_GPU
   if(!(param->flag & QUDA_FAT_PRESERVE_COMM_MEM)){
     
@@ -829,9 +817,8 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
   
 }
 
-template<typename FloatN, typename Float>
 static void
-do_loadLinkToGPU_ex(int* X, FloatN *even, FloatN *odd, Float **cpuGauge,
+do_loadLinkToGPU_ex(int* X, void *even, void *odd, void**cpuGauge,
                     QudaReconstructType reconstruct, int bytes, int Vh_ex, int pad,
                     QudaPrecision prec, QudaGaugeFieldOrder cpu_order)
 {
@@ -845,7 +832,7 @@ do_loadLinkToGPU_ex(int* X, FloatN *even, FloatN *odd, Float **cpuGauge,
   int i;
   char* tmp_even = NULL;
   char* tmp_odd = NULL;
-  int len = Vh_ex*gaugeSiteSize*sizeof(Float);
+  int len = Vh_ex*gaugeSiteSize*prec;
 
   cudaMalloc(&tmp_even, 8*len);
   if(tmp_even == NULL){
@@ -868,7 +855,7 @@ do_loadLinkToGPU_ex(int* X, FloatN *even, FloatN *odd, Float **cpuGauge,
   //odd links
   for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_odd + i*len, cpuGauge[i] + Vh_ex*gaugeSiteSize, len, cudaMemcpyHostToDevice, streams[1]);
+    cudaMemcpyAsync(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize, len, cudaMemcpyHostToDevice, streams[1]);
 #else
     cudaMemcpy(tmp_odd + i*len, cpuGauge[i] + Vh_ex*gaugeSiteSize, len, cudaMemcpyHostToDevice);
 #endif
@@ -899,24 +886,14 @@ loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugePa
     printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
     exit(1);
   }
-  QudaPrecision prec= param_ex->cpu_prec;
-
+  QudaPrecision prec= param_ex->cpu_prec;  
   int* E = param_ex->X;
-  //int pad = param_ex->ga_pad;
   int pad = cudaGauge->Pad();
   
-   if (prec == QUDA_DOUBLE_PRECISION) {
-     do_loadLinkToGPU_ex(E, (double2*)(cudaGauge->Even_p()), (double2*)(cudaGauge->Odd_p()), (double**)cpuGauge->Gauge_p(),
-                         cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
-                         prec, cpuGauge->Order());
-   } else if (prec == QUDA_SINGLE_PRECISION) {
-     do_loadLinkToGPU_ex(E, (float2*)(cudaGauge->Even_p()), (float2*)(cudaGauge->Odd_p()), (float**)cpuGauge->Gauge_p(),
-                         cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
-                         prec, cpuGauge->Order());
-   }else{
-     printf("ERROR: half precision not supported in this funciton %s\n", __FUNCTION__);
-     exit(1);
-   }
+  do_loadLinkToGPU_ex(E, cudaGauge->Even_p(), cudaGauge->Odd_p(), (void**)cpuGauge->Gauge_p(),
+		      cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
+		      prec, cpuGauge->Order());
+  
 
 }
 
