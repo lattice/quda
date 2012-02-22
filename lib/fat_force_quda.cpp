@@ -569,13 +569,28 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
   cudaMalloc(&tmp_odd, 4*(len+glen_sum)); CUERR;
   
   //even links
-  for(i=0;i < 4; i++){
+  if(cpu_order == QUDA_QDP_GAUGE_ORDER){
+    for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT
-    cudaMemcpyAsync(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]); 
+      cudaMemcpyAsync(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]); 
 #else
-    cudaMemcpy(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice); 
+      cudaMemcpy(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice); 
 #endif
-  
+    }
+  }else{ //QUDA_MILC_GAUGE_ORDER
+    
+#ifdef MULTI_GPU
+    errorQuda("MULTI-GPU for milc format in this functino is not supported yet\n");
+#endif    
+#ifdef GPU_DIRECT
+    cudaMemcpyAsync(tmp_even, ((char*)cpuGauge), 4*len, cudaMemcpyHostToDevice, streams[0]);
+#else
+    cudaMemcpy(tmp_even, ((char*)cpuGauge), 4*len, cudaMemcpyHostToDevice);
+#endif
+  }
+
+
+  for(i=0;i < 4;i++){
 #ifdef MULTI_GPU 
     //dir: the source direction
     char* dest = tmp_even + i*(len+glen_sum)+len;
@@ -623,13 +638,24 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
   link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, Vh, pad, ghostV, prec, cpu_order, streams[0]); CUERR;
 
   //odd links
-  for(i=0;i < 4; i++){
+  if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
+    for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);CUERR;
+      cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);CUERR;
 #else
     cudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);CUERR;
 #endif
+    }
+  }else{  //QUDA_MILC_GAUGE_ORDER
+#ifdef GPU_DIRECT 
+    cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[1]);CUERR;
+#else
+    cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*GaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);CUERR;
+#endif    
+  }
+  
 
+  for(i=0;i < 4; i++){
 #ifdef MULTI_GPU  
       char* dest = tmp_odd + i*(len+glen_sum)+len;
       for(int dir = 0; dir < 4; dir++){

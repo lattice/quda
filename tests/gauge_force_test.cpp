@@ -413,8 +413,14 @@ gauge_force_test(void)
   
   int gSize = qudaGaugeParam.cpu_prec;
     
-  void* sitelink;
-  void* sitelink_1d= malloc(4*V*gaugeSiteSize*gSize);
+  void* sitelink;  
+  void* sitelink_1d;
+  
+#ifdef GPU_DIRECT
+  cudaMallocHost(&sitelink_1d, 4*V*gaugeSiteSize*gSize);
+#else
+  sitelink_1d= malloc(4*V*gaugeSiteSize*gSize);
+#endif
   if(sitelink_1d == NULL){
     printf("ERROR: malloc failed for sitelink_1d\n");
     exit(1);
@@ -611,9 +617,12 @@ gauge_force_test(void)
     }
     free(input_path_buf[dir]);
   }
- 
   
+#ifdef GPU_DIRECT  
+  cudaFreeHost(sitelink_1d);
+#else
   free(sitelink_1d);
+#endif
   for(int dir=0;dir < 4;dir++){
 #ifdef GPU_DIRECT
     cudaFreeHost(sitelink_2d[dir]);
@@ -621,7 +630,7 @@ gauge_force_test(void)
     free(sitelink_2d[dir]);
 #endif
   }
-
+  
 #ifdef MULTI_GPU  
   for(int dir=0; dir < 4; dir++){
     cudaFreeHost(sitelink_ex_2d[dir]);

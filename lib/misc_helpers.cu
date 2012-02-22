@@ -41,9 +41,10 @@
  *    12 for 12-reconstruct
  *    18 for no-reconstruct
  */
-template<int N, int M, typename FloatN>
+
+template<typename FloatN>
 __global__ void
-do_link_format_cpu_to_gpu_milc(FloatN* dst, FloatN* src,
+do_link_format_cpu_to_gpu_milc2(FloatN* dst, FloatN* src,
 				  int reconstruct, int stride)
 {
   __shared__ FloatN buf[gaugeSiteSize/2*BLOCKSIZE];
@@ -65,6 +66,7 @@ do_link_format_cpu_to_gpu_milc(FloatN* dst, FloatN* src,
   } 
   
 }
+
 
 /* This function converts format in CPU form 
  * into forms in GPU so as to enable coalesce access
@@ -174,6 +176,56 @@ do_link_format_cpu_to_gpu_sp_recon(float4* dst, float* src,
 }
 
 
+ /*
+  * FloatN: float2/double2
+  * Float: float/double
+  *
+  * This is the reverse process for the function do_link_format_gpu_to_cpu()
+  *
+  */
+
+template<int N, typename FloatN, typename Float2>
+  __global__ void
+  do_link_format_cpu_to_gpu_milc(FloatN* dst, Float2* src,
+				 int reconstruct,
+				 int Vh, int pad, int ghostV, size_t threads)
+{
+  
+  __shared__ FloatN buf[N*BLOCKSIZE];
+  int block_idx = blockIdx.x*blockDim.x/4;
+  int local_idx = 16*(threadIdx.x/64) + threadIdx.x%16;
+  int pos_idx = blockIdx.x * blockDim.x/4 + 16*(threadIdx.x/64) + threadIdx.x%16;
+  int mydir = (threadIdx.x >> 4)% 4;
+  int j;
+  int stride = Vh+pad;
+  
+  for(j=0; j < 9; j++){
+    if(block_idx*9*4 + j*blockDim.x+threadIdx.x >= 9*threads) break;
+    if(N == 9){
+      ((Float2*)buf)[j*blockDim.x + threadIdx.x] = src[block_idx*9*4 + j*blockDim.x + threadIdx.x]; 
+    }else{ 
+      int idx = j*blockDim.x + threadIdx.x;
+      int modval = idx % 9;
+      int divval = idx / 9;
+      if(modval < 6){
+	((Float2*)buf)[divval*6+modval] = src[block_idx*9*4 + idx];
+      }
+    }
+  }  
+  
+  __syncthreads();
+  
+  if(pos_idx >= threads/4) return;
+  
+  for(j=0; j < N; j++){
+    if(N == 9){
+      dst[pos_idx + mydir*N*stride + j*stride] = buf[local_idx*4*9+mydir*9+j];
+    }else{
+      dst[pos_idx + mydir*N*stride + j*stride] = buf[local_idx*4*N+mydir*N+j];      
+    }
+  }      
+}
+
 void 
 link_format_cpu_to_gpu(void* dst, void* src, 
 		       int reconstruct, int Vh, int pad, 
@@ -182,24 +234,24 @@ link_format_cpu_to_gpu(void* dst, void* src,
 		       cudaStream_t stream)
 {
   dim3 blockDim(BLOCKSIZE);
-#ifdef MULTI_GPU  
-  size_t threads=Vh+ghostV;
-#else
-  size_t threads=Vh;
-#endif
-  
-  dim3 gridDim ((threads + BLOCKSIZE -1)/BLOCKSIZE);
+
 
   //(Vh+ghostV) must be multipl of BLOCKSIZE or the kernel does not work
   /*
-  if ((Vh+ghostV) % blockDim.x != 0){
+    if ((Vh+ghostV) % blockDim.x != 0){
     errorQuda("ERROR: Vh+ghostV(%d+%d) is not multiple of blocksize(%d), exitting\n", Vh, ghostV, blockDim.x);
-  }
+    }
   */
   
-  int stride = Vh+pad;
-  
+  int stride = Vh+pad;  
   if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
+#ifdef MULTI_GPU  
+    size_t threads=Vh+ghostV;
+#else
+    size_t threads=Vh;
+#endif    
+    dim3 gridDim ((threads + BLOCKSIZE -1)/BLOCKSIZE);
+
     switch (prec){
     case QUDA_DOUBLE_PRECISION:
       switch( reconstruct){
@@ -231,22 +283,21 @@ link_format_cpu_to_gpu(void* dst, void* src,
       errorQuda("ERROR: half precision not support in %s\n", __FUNCTION__);
     }
   }else if (cpu_order == QUDA_MILC_GAUGE_ORDER){    
+#ifdef MULTI_GPU  
+    int threads=4*(Vh+ghostV);
+#else
+    int threads=4*Vh;
+#endif  
+  dim3 gridDim ((threads + BLOCKSIZE -1)/BLOCKSIZE);
 
-    errorQuda("QUDA_MILC_GAUGE_ORDER is disabled");
-
-    if ((Vh+ghostV) % blockDim.x != 0){
-      errorQuda("ERROR: Vh+ghostV(%d+%d) is not multiple of blocksize(%d), exitting\n", Vh, ghostV, blockDim.x);
-    }
-    
     switch (prec){
     case QUDA_DOUBLE_PRECISION:
       switch( reconstruct){
       case QUDA_RECONSTRUCT_NO:
-	do_link_format_cpu_to_gpu_milc<2, 18><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, reconstruct, stride);
+	do_link_format_cpu_to_gpu_milc<9><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, reconstruct, Vh, pad, ghostV, threads);
 	break;
       case QUDA_RECONSTRUCT_12:
-	//do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double*)src, reconstruct, stride);
-	printf("12-reconstruct not supported yet\n");
+	do_link_format_cpu_to_gpu_milc<6><<<gridDim, blockDim, 0, stream>>>((double2*)dst, (double2*)src, reconstruct, Vh, pad, ghostV, threads);
 	break;
       default:
 	errorQuda("reconstruct type not supported\n");
@@ -256,11 +307,10 @@ link_format_cpu_to_gpu(void* dst, void* src,
     case QUDA_SINGLE_PRECISION:
       switch( reconstruct){
       case QUDA_RECONSTRUCT_NO:
-	do_link_format_cpu_to_gpu_milc<2, 18><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float2*)src, reconstruct,  stride);
+	do_link_format_cpu_to_gpu_milc<9><<<gridDim, blockDim, 0, stream>>>((float2*)dst, (float2*)src, reconstruct, Vh, pad, ghostV, threads);
 	break;
       case QUDA_RECONSTRUCT_12:
-	//do_link_format_cpu_to_gpu<2, 12><<<gridDim, blockDim>>>((float2*)dst, (float*)src, reconstruct, stride);
-	printf("12-reconstruct not supported yet\n");	
+	do_link_format_cpu_to_gpu_milc<3><<<gridDim, blockDim, 0, stream>>>((float4*)dst, (float2*)src, reconstruct, Vh, pad, ghostV, threads);
 	break;
       default:
 	errorQuda("reconstruct type not supported\n");      
@@ -385,6 +435,8 @@ do_link_format_gpu_to_cpu(FloatN* dst, FloatN* src,
   }  
   
 }
+
+
 
 void 
 link_format_gpu_to_cpu(void* dst, void* src, 
