@@ -11,7 +11,7 @@ DEVICE = @DEVICE@         # CUDA device to use for 'make tune'
 
 # compilation options
 HOST_DEBUG = @HOST_DEBUG@      # compile host debug code
-DEVICE_DEBUG = @DEVICE_DEBUG@  # compile deivce debug code for cuda-gdb 
+DEVICE_DEBUG = @DEVICE_DEBUG@  # compile device debug code for cuda-gdb 
 VERBOSE = @VERBOSE@            # display kernel register useage
 DSLASH_PROFILING = @DSLASH_PROFILING@ # multi-gpu dslash profiling
 

@@ -52,17 +52,20 @@ texture<int4,1> tex_int4_2;
 texture<int4,1> tex_int4_3;
 texture<int4,1> tex_int4_4;
 
+#define MAX_TEXELS (1<<27)
+
 template<typename OutputType, typename InputType, int tex_id=0>
 class Texture {
  private: 
  const InputType *spinor; // used when textures are disabled
- size_t bytes;
+ //size_t bytes;
 
  public:
- Texture(const InputType *x, size_t bytes) : spinor(x), bytes(bytes) { 
-   if (bytes) bind(x, bytes); // only bind if bytes > 0
+ Texture(const InputType *x, size_t bytes) : spinor(x)/*, bytes(bytes)*/ { 
+   if (bytes) bind(x, MAX_TEXELS*sizeof(InputType)); // only bind if bytes > 0
+   //if (bytes) bind(x, bytes); // only bind if bytes > 0
  }
- ~Texture() { if (bytes) unbind(); }
+ ~Texture() { /*if (bytes) */ unbind(); }
 
  inline void bind(const InputType*, size_t bytes){ errorQuda("Texture id is out of range"); }
  inline void unbind() { errorQuda("Texture id is out of range"); }

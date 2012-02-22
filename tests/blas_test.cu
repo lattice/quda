@@ -118,9 +118,9 @@ void initFields(int prec)
     break;
   }
 
-  vD = new cudaColorSpinorField(param);
   checkCudaError();
 
+  vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
   xD = new cudaColorSpinorField(param);
   yD = new cudaColorSpinorField(param);
@@ -725,7 +725,7 @@ int main(int argc, char** argv)
 	  }
 	}
       }
-
+    
       if (threads_max == 0) {
 	errorQuda("Autotuning failed for %s kernel: %s", names[kernel], cudaGetErrorString(error));
       } else {

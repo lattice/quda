@@ -16,6 +16,7 @@ struct doublesingle {
   __device__ inline doublesingle(const float a) : a(make_float2(a, 0.0)) { ; }
 
   __device__ inline void operator+=(const doublesingle &b) { dsadd(this->a, this->a, b.a); }
+  __device__ inline void operator+=(const volatile doublesingle &b) { dsadd(this->a, this->a, b.a); }
   __device__ inline void operator+=(const float &b) { 
     float2 b2 = make_float2(b, 0.0); 
     dsadd(this->a, this->a, b2); }
@@ -27,8 +28,8 @@ struct doublesingle {
   { a.x = b; a.y = 0.0f; return *this; }
 };
 
-__device__ inline volatile doublesingle operator+=(volatile doublesingle& a, const volatile doublesingle &b) 
-{ dsadd(a.a, a.a, b.a); return a; }
+__device__ inline volatile doublesingle operator+=(volatile doublesingle &a, const volatile doublesingle &b) 
+{ dsadd(a.a, a.a, b.a); return a;}
 
 __host__ double operator+=(double& a, doublesingle &b) { a += b.a.x; a += b.a.y; return a; }
 
@@ -47,7 +48,7 @@ struct doublesingle3 {
   doublesingle x; 
   doublesingle y; 
   doublesingle z; 
-  __device__ inline void operator+=(const double3&b) {x += b.x; y += b.y; z += b.y;}
+  __device__ inline void operator+=(const double3 &b) {x += b.x; y += b.y; z += b.z;}
 };
 
 __host__ double3 operator+=(double3& a, doublesingle3 &b)

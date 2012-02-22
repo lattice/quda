@@ -53,7 +53,6 @@ void initBlas(void)
   }
 
   if (!h_reduce) {
-    printf("Host reduce size %lu\n", 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat));
     if (cudaMallocHost((void**) &h_reduce, 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating host reduction array");
     }
@@ -725,22 +724,6 @@ __device__ void copyfromshared(double2 &x, const double *s, const int i, const i
 __device__ void copyfromshared(double3 &x, const double *s, const int i, const int block) 
 { x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
 
-#if (__COMPUTE_CAPABILITY__ < 130)
-__host__ __device__ void zero(doublesingle &x) { x = 0.0; }
-__host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
-__host__ __device__ void zero(doublesingle3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle x, const int block) { s[i] = x; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
-__device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
-#endif
-
 template<typename ReduceType, typename ReduceSimpleType> 
 __device__ void add(ReduceSimpleType *s, const int i, const int j, const int block) { }
 template<typename ReduceType, typename ReduceSimpleType> 
@@ -760,6 +743,37 @@ template<> __device__ void add<double3,double>(double *s, const int i, const int
 { s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
 template<> __device__ void add<double3,double>(volatile double *s, const int i, const int j, const int block) 
 { s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
+
+#if (__COMPUTE_CAPABILITY__ < 130)
+__host__ __device__ void zero(doublesingle &x) { x = 0.0; }
+__host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
+__host__ __device__ void zero(doublesingle3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
+__device__ void copytoshared(doublesingle *s, const int i, const doublesingle x, const int block) { s[i] = x; }
+__device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x, const int block) 
+{ s[i] = x.x; s[i+block] = x.y; }
+__device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
+{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
+__device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
+__device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
+{ x.x = s[i]; x.y = s[i+block]; }
+__device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
+{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
+
+template<> __device__ void add<doublesingle,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; }
+template<> __device__ void add<doublesingle,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; }
+
+template<> __device__ void add<doublesingle2,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block];}
+template<> __device__ void add<doublesingle2,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block];}
+
+template<> __device__ void add<doublesingle3,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
+template<> __device__ void add<doublesingle3,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
+{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
+#endif
 
 /**
    Generic reduction kernel with up to four loads and three saves.
@@ -868,7 +882,6 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
   for (unsigned int i = 0; i < blasGrid.x; i++) {
     cpu_sum += ((ReduceType*)h_reduce)[i];
   }
-
   const int Nreduce = sizeof(doubleN) / sizeof(double);
   reduceDoubleArray((double*)&cpu_sum, Nreduce);
 
