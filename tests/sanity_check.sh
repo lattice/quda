@@ -111,15 +111,23 @@ function complete_dslash_check {
     precs="double single half"
     recons="18 12"
     tests="0 1"
+    partitions="0 8 12 14 15"
+    $prog --version |grep single >& /dev/null
+    if [ "$?" == "0" ]; then
+        partitions="0" #single GPU version
+    fi
+  	
     for prec in $precs; do
         for recon in $recons; do
             for tst in $tests; do
-                cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon --test $tst"
-                echo -ne  $cmd  "\t"..."\t"
-                echo "----------------------------------------------------------" >>$OUTFILE
-                echo $cmd >> $OUTFILE
-                $cmd >> $OUTFILE 2>&1|| (echo -e "FAIL\n$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
-                echo "OK"
+ 		for partition in $partitions; do
+                  cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon --test $tst --partition $partition"
+                  echo -ne  $cmd  "\t"..."\t"
+                  echo "----------------------------------------------------------" >>$OUTFILE
+                  echo $cmd >> $OUTFILE
+                  $cmd >> $OUTFILE 2>&1|| (echo -e "FAIL\n$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
+                  echo "OK"
+		done
             done
         done
     done
@@ -168,8 +176,8 @@ if [ $# == "0" ]; then
 	exit
 fi 
 
-action=$1
-case $action in
+for action in $*; do 
+  case $action in
     basic )
 	basic_sanity_check ;;
     fat )
@@ -191,9 +199,11 @@ case $action in
 	echo "ERROR: invalid option ($action)!"
 	echo "Valid options: "
 	echo "              basic/fat/dslash/gf/all"
+	exit
 	;;
 
-esac
+  esac
+done
 
 
 
