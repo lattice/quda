@@ -1358,6 +1358,12 @@ void usage(char** argv )
 
 int process_command_line_option(int argc, char** argv, int* idx)
 {
+#ifdef MULTI_GPU
+  char msg[]="multi";
+#else
+  char msg[]="single";
+#endif
+
   int ret = -1;
   
   int i = *idx;
@@ -1625,6 +1631,13 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--version") == 0){
+    printf("This program is linked with QUDA library, version %s,", 
+	   get_quda_ver_str());
+    printf(" %s GPU build\n", msg);
+    exit(0);
+  }
+
  out:
   *idx = i;
   return ret ;
