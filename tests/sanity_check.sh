@@ -122,7 +122,13 @@ function complete_invert_check {
     precs="double single half"
     recons="18 12"
     tests="0 1 3 4 6"
-    partitions="0 8"
+    partitions="0 8 12 14 15"
+
+   $prog --version |grep single >& /dev/null
+   if [ "$?" == "0" ]; then
+	partitions="0"
+   fi
+
     for prec in $precs; do
         for recon in $recons; do
             for tst in $tests; do
