@@ -827,3 +827,20 @@ get_dslash_type_str(QudaDslashType type)
   return ret;
     
 }
+
+const char* 
+get_quda_ver_str()
+{
+  static char vstr[32];
+  int ver = QUDA_VERSION;
+  int major_num = ver/4096;
+  int minor_num = ver/64 - major_num*64;
+  int ext_num = ver - minor_num*64-major_num*4096;
+  sprintf(vstr, "%1d.%1d.%1d", 
+	  major_num,
+	  minor_num,
+	  ext_num);
+  
+  return vstr;
+}
+

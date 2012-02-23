@@ -22,7 +22,7 @@ extern "C" {
     void quda_set_verbose(int );
     QudaDslashType get_dslash_type(char* s);
     const char* get_dslash_type_str(QudaDslashType type);
-
+  const char* get_quda_ver_str();
 #ifdef __cplusplus
 }
 #endif
