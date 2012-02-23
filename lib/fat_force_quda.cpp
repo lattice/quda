@@ -867,28 +867,44 @@ do_loadLinkToGPU_ex(int* X, void *even, void *odd, void**cpuGauge,
   tmp_odd = tmp_even + 4*len;
 
   //even links
-  for(i=0;i < 4; i++){
+  if(cpu_order == QUDA_QDP_GAUGE_ORDER){
+    for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]);
+      cudaMemcpyAsync(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]);
 #else
-    cudaMemcpy(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
+      cudaMemcpy(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
 #endif
-
+      
+    }
+  }else{ //QUDA_MILC_GAUGE_ORDER
+#ifdef GPU_DIRECT 
+    cudaMemcpyAsync(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice, streams[0]);
+#else
+    cudaMemcpy(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
+#endif
   }
-
+  
   link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, Vh_ex, pad, 0, prec, cpu_order, streams[0]);
-
+  
   //odd links
-  for(i=0;i < 4; i++){
+  if(cpu_order == QUDA_QDP_GAUGE_ORDER){
+    for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);
+      cudaMemcpyAsync(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);
 #else
-    cudaMemcpy(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
+      cudaMemcpy(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
+    }
+  }else{//QUDA_MILC_GAUGE_ORDER
+#ifdef GPU_DIRECT 
+    cudaMemcpyAsync(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[1]);
+#else
+    cudaMemcpy(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
+#endif    
   }
   link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh_ex, pad, 0, prec, cpu_order, streams[1]);
-
-
+  
+  
   for(int i=0;i < 2;i++){
     cudaStreamSynchronize(streams[i]);
   }

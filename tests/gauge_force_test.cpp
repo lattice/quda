@@ -590,7 +590,7 @@ gauge_force_test(void)
     //last arg=0 means no optimization for communication, i.e. exchange data in all directions 
     //even they are not partitioned
     exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex_2d,
-                             qudaGaugeParam.cpu_prec, 0);    
+                             gauge_order, qudaGaugeParam.cpu_prec, 0);    
     gauge_force_reference(refmom, eb3, sitelink_2d, sitelink_ex_2d, qudaGaugeParam.cpu_prec,
 			  input_path_buf, length, loop_coeff, num_paths);
 #else
