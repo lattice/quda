@@ -8,7 +8,7 @@
 
 namespace quda {
   // creates and destroys reduction buffers  
-  void initBlas(void); 
+  void initBlas(); 
   void endBlas(void);
 
   void setBlasTuning(QudaTune tune);

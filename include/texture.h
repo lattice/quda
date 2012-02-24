@@ -61,11 +61,18 @@ class Texture {
  //size_t bytes;
 
  public:
+ Texture() { ; }
  Texture(const InputType *x, size_t bytes) : spinor(x)/*, bytes(bytes)*/ { 
+
    if (bytes) bind(x, MAX_TEXELS*sizeof(InputType)); // only bind if bytes > 0
    //if (bytes) bind(x, bytes); // only bind if bytes > 0
  }
- ~Texture() { /*if (bytes) */ unbind(); }
+ ~Texture() { /*if (bytes) */ /*unbind()*/; } // unbinding is unnecessary and costly
+
+ Texture& operator=(const Texture &tex) {
+   spinor = tex.spinor;
+   return *this;
+ }
 
  inline void bind(const InputType*, size_t bytes){ errorQuda("Texture id is out of range"); }
  inline void unbind() { errorQuda("Texture id is out of range"); }
@@ -347,15 +354,29 @@ template <typename RegType, typename InterType, typename StoreType, int N, int t
 class SpinorTexture {
 
  private:
+  int regLength; // vector length of the register
   Texture<InterType, StoreType, tex_id> spinor;
-  Texture<float, float, tex_id> norm;
-  const int stride;
+  //Texture<float, float, tex_id> norm;
+  float *norm;
+  int stride;
 
  public:
-  SpinorTexture(const cudaColorSpinorField &x) :
-  spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm(), x.NormBytes()), 
-    stride(x.Stride()) { checkTypes<RegType,InterType,StoreType>(); }
+  SpinorTexture() : regLength(0), spinor((StoreType*)0, 0), norm(0/*, 0*/), stride(0) {;} // default constructor
+ SpinorTexture(const cudaColorSpinorField &x) : regLength(sizeof(RegType) / sizeof(((RegType*)0)->x)),
+  spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()/*, x.NormBytes()*/),
+    stride(x.Length()/(N*regLength)) { checkTypes<RegType,InterType,StoreType>(); }
+
   ~SpinorTexture() {;}
+
+  SpinorTexture& operator=(const SpinorTexture &src) {
+    if (&src != this) {
+      spinor = src.spinor;
+      norm = src.norm;
+      stride = src.stride;
+    }
+    return *this;
+  }
+
 
   __device__ inline void load(RegType x[], const int i) {
     // load data into registers first using the storage order
@@ -392,15 +413,19 @@ template <typename RegType, typename InterType, typename StoreType, int N>
 class Spinor {
 
  private:
+  int regLength; // vector length of the register
   StoreType *spinor;
   float *norm;
   const int stride;
 
  public:
-  Spinor(cudaColorSpinorField &x) : spinor((StoreType*)x.V()), norm((float*)x.Norm()), 
-    stride(x.Stride()) { checkTypes<RegType,InterType,StoreType>(); } 
-  Spinor(const cudaColorSpinorField &x) : spinor((StoreType*)x.V()), norm((float*)x.Norm()), 
-    stride(x.Stride()) {;} 
+ Spinor(cudaColorSpinorField &x) : regLength(sizeof(RegType) / sizeof(((RegType*)0)->x)),
+    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*regLength)) 
+    { checkTypes<RegType,InterType,StoreType>(); } 
+
+ Spinor(const cudaColorSpinorField &x) : regLength(sizeof(RegType) / sizeof(((RegType*)0)->x)),
+    spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*regLength))
+    { checkTypes<RegType,InterType,StoreType>(); } 
   ~Spinor() {;}
 
   // default load used for simple fields

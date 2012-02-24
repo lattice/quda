@@ -9,21 +9,21 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 16;
+const int LX = 48;
 const int LY = 16;
-const int LZ = 16;
-const int LT = 16;
+const int LZ = 12;
+const int LT = 32;
 const int Nspin = 4;
 
 // corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
-//const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
-const int Niter = 1;// * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+//const int Niter = 1;// * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
 const int Nkernels = 30;
 const int ThreadMin = 32;
-const int ThreadMax = 1024;
+const int ThreadMax = 512;
 const int GridMin = 1;
-const int GridMax = 65536;
+const int GridMax = 128;
 
 cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
@@ -41,14 +41,6 @@ void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
     param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
   }
 }
-
-
-// returns true if the specified kernel performs a reduction
-bool isReduction(int kernel)
-{
-  return (kernel >= 17);
-}
-
 
 void initFields(int prec)
 {
@@ -625,8 +617,8 @@ int main(int argc, char** argv)
   initQuda(dev);
 
   char *names[] = {
-    "copy (high source precision)",
-    "copy (low source precision)",
+    "copyLH",
+    "copyHL",
     "axpby",
     "xpy",
     "axpy",
@@ -690,10 +682,11 @@ int main(int argc, char** argv)
 
       for (unsigned int thread = ThreadMin; thread <= ThreadMax; thread+=32) {
 
-	// for reduction kernels, the number of threads must be a power of two
-	if (isReduction(kernel) && (thread & (thread-1))) continue;
+	for (unsigned int grid = GridMin; grid <= GridMax; grid++) {
 
-	for (unsigned int grid = GridMin; grid <= GridMax; grid *= 2) {
+	  int length = (prec == 0 || kernel < 2) ? xD->Stride() : xD->Length();
+	  if (grid >= 2*max(length/thread, 1)) continue; // no need to test pointless parameters
+
 	  quda::setBlasParam(kernel, prec, thread, grid);
 	  
 	  // first do warmup run and check for error

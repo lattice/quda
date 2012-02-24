@@ -22,6 +22,8 @@
 // These are used for reduction kernels
 static QudaSumFloat *d_reduce=0;
 static QudaSumFloat *h_reduce=0;
+static QudaSumFloat *hd_reduce=0;
+static cudaEvent_t reduceEnd;
 
 namespace quda {
   unsigned long long blas_flops;
@@ -39,25 +41,70 @@ static dim3 blasGrid;
 
 void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 
+#define checkSpinor(a, b)						\
+  {									\
+    if (a.Precision() != b.Precision())					\
+      errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision()); \
+    if (a.Length() != b.Length())					\
+      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+    if (a.Stride() != b.Stride())					\
+      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
+  }
+
+// For kernels with precision conversion built in
+#define checkSpinorLength(a, b)						\
+  {									\
+    if (a.Length() != b.Length()) {					\
+      errorQuda("engths do not match: %d %d", a.Length(), b.Length());	\
+    }									
+
+
 // blasTuning = 1 turns off error checking
 static QudaTune blasTuning = QUDA_TUNE_NO;
 
+static cudaStream_t *blasStream;
+
 namespace quda {
 
-void initBlas(void)
-{  
+void initBlas()
+{ 
+  // reduction buffer size
+  size_t bytes = 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat);
+
   if (!d_reduce) {
-    if (cudaMalloc((void**) &d_reduce, 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
+    if (cudaMalloc((void**) &d_reduce, bytes) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating device reduction array");
     }
   }
 
-  if (!h_reduce) {
-    if (cudaMallocHost((void**) &h_reduce, 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat)) == cudaErrorMemoryAllocation) {
-      errorQuda("Error allocating host reduction array");
+  // these arrays are acutally oversized currently (only needs to be QudaSumFloat3)
+
+  // if the device supports host-mapped memory then use a host-mapped array for the reduction
+  if(deviceProp.canMapHostMemory) {
+    if (!h_reduce) {
+      if (cudaHostAlloc((void**) &h_reduce, bytes, cudaHostAllocMapped) == cudaErrorMemoryAllocation) {
+	errorQuda("Error allocating host reduction array");
+      }
+      
+      // set the matching device pointer
+      cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0);
     }
+
+  } else {
+
+    if (!h_reduce) {
+      if (cudaMallocHost((void**) &h_reduce, bytes) == cudaErrorMemoryAllocation) {
+	errorQuda("Error allocating host reduction array");
+      }
+    }
+
+    hd_reduce = d_reduce;
   }
 
+  blasStream = &streams[Nstream-1];
+  cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
+
+  checkCudaError();
 }
 
 
@@ -67,10 +114,15 @@ void endBlas(void)
     cudaFree(d_reduce);
     d_reduce = 0;
   }
+
   if (h_reduce) {
     cudaFreeHost(h_reduce);
     h_reduce = 0;
   }
+
+  hd_reduce = 0;
+
+  cudaEventDestroy(reduceEnd);
 }
 
 void setBlasTuning(QudaTune tune)
@@ -119,24 +171,6 @@ void setBlock(int kernel, int length, QudaPrecision precision)
   blasGrid.z = 1;
 }
 
-#define checkSpinor(a, b)						\
-  {									\
-    if (a.Precision() != b.Precision())					\
-      errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision()); \
-    if (a.Length() != b.Length())					\
-      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
-    if (a.Stride() != b.Stride())					\
-      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
-  }
-
-// For kernels with precision conversion built in
-#define checkSpinorLength(a, b)						\
-  {									\
-    if (a.Length() != b.Length()) {					\
-      errorQuda("engths do not match: %d %d", a.Length(), b.Length());	\
-    }									
-
-
 template <typename FloatN, int N, typename Output, typename Input>
 __global__ void copyKernel(Output Y, Input X, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
@@ -180,66 +214,66 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     if (src.Nspin() == 4){
       SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
       Spinor<float4, float2, double2, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     } else { //src.Nspin() == 1
       SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
       Spinor<float2, float2, double2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     }
 
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
     if (src.Nspin() == 4){
       SpinorTexture<float4, float2, double2, 6, 0> src_tex(src);
       Spinor<float4, float4, float4, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     } else { //src.Nspin() ==1
       Spinor<float2, float2, double2, 3> src_tex(src);
       Spinor<float2, float2, float2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     }
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
     quda::blas_bytes += src.Volume()*sizeof(float);
     if (src.Nspin() == 4){      
       SpinorTexture<float4, float4, short4, 6, 0> src_tex(src);
       Spinor<float4, float4, float4, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     } else { //nSpin== 1;
       SpinorTexture<float2, float2, short2, 3, 0> src_tex(src);
       Spinor<float2, float2, float2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
     quda::blas_bytes += dst.Volume()*sizeof(float);
     if (src.Nspin() == 4){
       SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
       Spinor<float4, float4, short4, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     } else { //nSpin == 1
       SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
       Spinor<float2, float2, short2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     }
   } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
     quda::blas_bytes += src.Volume()*sizeof(float);
     if (src.Nspin() == 4){
       SpinorTexture<double2, float4, short4, 12, 0> src_tex(src);
       Spinor<double2, double2, double2, 12> dst_spinor(dst);
-      copyKernel<double2, 12><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 12><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     } else { //nSpin == 1
       SpinorTexture<double2, float2, short2, 3, 0> src_tex(src);
       Spinor<double2, double2, double2, 3> dst_spinor(dst);
-      copyKernel<double2, 3><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
     quda::blas_bytes += dst.Volume()*sizeof(float);
     if (src.Nspin() == 4){
       SpinorTexture<double2, double2, double2, 12, 0> src_tex(src);
       Spinor<double2, double4, short4, 12> dst_spinor(dst);
-      copyKernel<double2, 12><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 12><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     } else { //nSpin == 1
       SpinorTexture<double2, double2, double2, 3, 0> src_tex(src);
       Spinor<double2, double2, short2, 3> dst_spinor(dst);
-      copyKernel<double2, 3><<<blasGrid, blasBlock>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     }
   } else {
     cudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
@@ -252,102 +286,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
   if (!blasTuning) checkCudaError();
 }
 
-/**
-   Generic blas kernel with four loads and up to four stores.
- */
-template <typename FloatN, int M, int writeX, int writeY, int writeZ, int writeW, 
-	  typename InputX, typename InputY, typename InputZ, typename InputW, 
-	  typename OutputX, typename OutputY, typename OutputZ, typename OutputW, typename Functor>
-__global__ void blasKernel(InputX X, InputY Y, InputZ Z, InputW W, Functor f, 
-			   OutputX XX, OutputY YY, OutputZ ZZ, OutputW WW, int length) {
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  while (i < length) {
-    FloatN x[M], y[M], z[M], w[M];
-    X.load(x, i);
-    Y.load(y, i);
-    Z.load(z, i);
-    W.load(w, i);
-
-#pragma unroll
-    for (int j=0; j<M; j++) f(x[j], y[j], z[j], w[j]);
-
-    if (writeX) XX.save(x, i);
-    if (writeY) YY.save(y, i);
-    if (writeZ) ZZ.save(z, i);
-    if (writeW) WW.save(w, i);
-    i += gridSize;
-  }
-}
-
-/**
-   Driver for generic blas routine with four loads and two store.
- */
-template <template <typename Float, typename FloatN> class Functor,
-	  int writeX, int writeY, int writeZ, int writeW>
-void blasCuda(const int kernel, const double2 &a, const double2 &b, const double2 &c,
-	      cudaColorSpinorField &x, cudaColorSpinorField &y, 
-	      cudaColorSpinorField &z, cudaColorSpinorField &w) {
-  setBlock(kernel, x.Length(), x.Precision());
-  checkSpinor(x, y);
-  checkSpinor(x, z);
-  checkSpinor(x, w);
-
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    blasCuda<Functor,writeX,writeY,writeZ,writeW>(kernel, a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
-    blasCuda<Functor,writeX,writeY,writeZ,writeW>(kernel, a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Even());
-    return;
-  }
-
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    Spinor<double2,double2,double2,1> X(x);
-    Spinor<double2,double2,double2,1> Y(y);
-    Spinor<double2,double2,double2,1> Z(z);
-    Spinor<double2,double2,double2,1> W(w);
-    Functor<double2, double2> f(a,b,c);
-    blasKernel<double2,1,writeX,writeY,writeZ,writeW><<<blasGrid, blasBlock>>>
-      (X, Y, Z, W, f, X, Y, Z, W, x.Length()/2);
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    Spinor<float4,float4,float4,1> X(x);
-    Spinor<float4,float4,float4,1> Y(y);
-    Spinor<float4,float4,float4,1> Z(z);
-    Spinor<float4,float4,float4,1> W(w);
-    Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-    blasKernel<float4,1,writeX,writeY,writeZ,writeW><<<blasGrid, blasBlock>>>
-      (X, Y, Z, W, f, X, Y, Z, W, x.Length()/4);
-  } else {
-    if (x.Nspin() == 4){ //wilson
-      SpinorTexture<float4,float4,short4,6,0> xTex(x);
-      SpinorTexture<float4,float4,short4,6,1> yTex(y);
-      SpinorTexture<float4,float4,short4,6,2> zTex(z);
-      SpinorTexture<float4,float4,short4,6,3> wTex(w);
-      Spinor<float4,float4,short4,6> xStore(x);
-      Spinor<float4,float4,short4,6> yStore(y);
-      Spinor<float4,float4,short4,6> zStore(z);
-      Spinor<float4,float4,short4,6> wStore(w);
-      Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blasKernel<float4, 6, writeX, writeY, writeZ, writeW> <<<blasGrid, blasBlock>>> 
-	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
-    } else if (x.Nspin() == 1) {//staggered
-      SpinorTexture<float2,float2,short2,3,0> xTex(x);
-      SpinorTexture<float2,float2,short2,3,1> yTex(y);
-      SpinorTexture<float2,float2,short2,3,2> zTex(z);
-      SpinorTexture<float2,float2,short2,3,3> wTex(w);
-      Spinor<float2,float2,short2,3> xStore(x);
-      Spinor<float2,float2,short2,3> yStore(y);
-      Spinor<float2,float2,short2,3> zStore(z);
-      Spinor<float2,float2,short2,3> wStore(w);
-      Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blasKernel<float2, 3,writeX,writeY,writeZ,writeW> <<<blasGrid, blasBlock>>>
-	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
-    } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    quda::blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
-  }
-  quda::blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
-  quda::blas_flops += Functor<double2,double2>::flops()*x.RealLength();
-
-  if (!blasTuning) checkCudaError();
-}
+#include <blas_core.h>
 
 /**
    Functor to perform the operation y = a*x + b*y
@@ -710,269 +649,6 @@ void caxpbypczpwCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda
 				make_double2(c.real(), c.imag()), x, y, z, w);
 }
 
-__host__ __device__ void zero(double &x) { x = 0.0; }
-__host__ __device__ void zero(double2 &x) { x.x = 0.0; x.y = 0.0; }
-__host__ __device__ void zero(double3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(double *s, const int i, const double x, const int block) { s[i] = x; }
-__device__ void copytoshared(double *s, const int i, const double2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(double *s, const int i, const double3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copyfromshared(double &x, const double *s, const int i, const int block) { x = s[i]; }
-__device__ void copyfromshared(double2 &x, const double *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(double3 &x, const double *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
-
-template<typename ReduceType, typename ReduceSimpleType> 
-__device__ void add(ReduceSimpleType *s, const int i, const int j, const int block) { }
-template<typename ReduceType, typename ReduceSimpleType> 
-__device__ void add(volatile ReduceSimpleType *s, const int i, const int j, const int block) { }
-
-template<> __device__ void add<double,double>(double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-template<> __device__ void add<double,double>(volatile double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-
-template<> __device__ void add<double2,double>(double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-template<> __device__ void add<double2,double>(volatile double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-
-template<> __device__ void add<double3,double>(double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-template<> __device__ void add<double3,double>(volatile double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-
-#if (__COMPUTE_CAPABILITY__ < 130)
-__host__ __device__ void zero(doublesingle &x) { x = 0.0; }
-__host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
-__host__ __device__ void zero(doublesingle3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle x, const int block) { s[i] = x; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
-__device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
-
-template<> __device__ void add<doublesingle,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-template<> __device__ void add<doublesingle,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-
-template<> __device__ void add<doublesingle2,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-template<> __device__ void add<doublesingle2,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-
-template<> __device__ void add<doublesingle3,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-template<> __device__ void add<doublesingle3,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-#endif
-
-/**
-   Generic reduction kernel with up to four loads and three saves.
- */
-template <int reduce_threads, typename ReduceType, typename ReduceSimpleType, 
-	  typename FloatN, int M, int writeX, int writeY, int writeZ,
-	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
-	  typename OutputX, typename OutputY, typename OutputZ, typename Reducer>
-__global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
-			     ReduceType *reduce, 
-			     OutputX XX, OutputY YY, OutputZ ZZ, int length) {
-  unsigned int tid = threadIdx.x;
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSize = gridDim.x*blockDim.x;
-
-  ReduceType sum;
-  zero(sum); 
-  while (i < length) {
-    FloatN x[M], y[M], z[M], w[M], v[M];
-    X.load(x, i);
-    Y.load(y, i);
-    Z.load(z, i);
-    W.load(w, i);
-    V.load(v, i);
-#pragma unroll
-    for (int j=0; j<M; j++) r(sum, x[j], y[j], z[j], w[j], v[j]);
-
-    if (writeX) XX.save(x, i);
-    if (writeY) YY.save(y, i);
-    if (writeZ) ZZ.save(z, i);
-
-    i += gridSize;
-  }
-
-  extern __shared__ ReduceSimpleType sdata[];
-  ReduceSimpleType *s = sdata + tid;  
-  copytoshared(s, 0, sum, reduce_threads);
-  __syncthreads();
-  
-  // do reduction in shared mem
-  if (reduce_threads >= 1024) { if (tid < 512) { add<ReduceType>(s, 0, 512, reduce_threads); } __syncthreads(); }
-  if (reduce_threads >= 512) { if (tid < 256) { add<ReduceType>(s, 0, 256, reduce_threads); } __syncthreads(); }
-  if (reduce_threads >= 256) { if (tid < 128) { add<ReduceType>(s, 0, 128, reduce_threads); } __syncthreads(); }
-  if (reduce_threads >= 128) { if (tid <  64) { add<ReduceType>(s, 0, 64, reduce_threads); } __syncthreads(); }
-  
-  if (tid < 32) {
-    volatile ReduceSimpleType *sv = s;
-    if (reduce_threads >=  64) { add<ReduceType>(sv, 0, 32, reduce_threads); }
-    if (reduce_threads >=  32) { add<ReduceType>(sv, 0, 16, reduce_threads); }
-    if (reduce_threads >=  16) { add<ReduceType>(sv, 0, 8, reduce_threads); }
-    if (reduce_threads >=  8)  { add<ReduceType>(sv, 0, 4, reduce_threads); }
-    if (reduce_threads >=  4)  { add<ReduceType>(sv, 0, 2, reduce_threads); }
-    if (reduce_threads >=  2)  { add<ReduceType>(sv, 0, 1, reduce_threads); }
-  }
-  
-  // write result for this block to global mem 
-  if (tid == 0) {    
-    ReduceType tmp;
-    copyfromshared(tmp, s, 0, reduce_threads);
-    reduce[blockIdx.x] = tmp;
-  }
-}
-
-/**
-   Generic reduction Kernel launcher
-*/
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
-	  int M, int writeX, int writeY, int writeZ, 
-	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
-	  typename Reducer, typename OutputX, typename OutputY, typename OutputZ>
-doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
-		     OutputX XX, OutputY YY, OutputZ ZZ, int length) {
-  // when there is only one warp per block, we need to allocate two warps 
-  // worth of shared memory so that we don't index shared memory out of bounds
-  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 2 * sizeof(ReduceType) : 
-    blasBlock.x * sizeof(ReduceType);
-
-  ReduceType *reduce = (ReduceType*)d_reduce;
-  if (blasBlock.x == 32) {
-    reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 64) {
-    reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 128) {
-    reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 256) {
-    reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 512) {
-    reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 1024) {
-    reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize >>>(X, Y, Z, W, V, r, reduce, XX, YY, ZZ, length);
-  } else {
-    errorQuda("Reduction not implemented for %d threads", blasBlock.x);
-  }
-
-  // copy result from device to host, and perform final reduction on CPU
-  cudaMemcpy(h_reduce, d_reduce, blasGrid.x*sizeof(ReduceType), cudaMemcpyDeviceToHost);
-
-  doubleN cpu_sum;
-  zero(cpu_sum);
-  for (unsigned int i = 0; i < blasGrid.x; i++) {
-    cpu_sum += ((ReduceType*)h_reduce)[i];
-  }
-  const int Nreduce = sizeof(doubleN) / sizeof(double);
-  reduceDoubleArray((double*)&cpu_sum, Nreduce);
-
-  return cpu_sum;
-}
-
-/**
-   Driver for generic reduction routine with two loads.
-   @param ReduceType 
- */
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType,
-	  template <typename ReduceType, typename Float, typename FloatN> class Reducer,
-	  int writeX, int writeY, int writeZ>
-doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaColorSpinorField &x, 
-		   cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w,
-		   cudaColorSpinorField &v) {
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    doubleN even =
-      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,writeY,writeZ>
-      (kernel, a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even());
-    doubleN odd = 
-      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,writeY,writeZ>
-      (kernel, a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd());
-    return even + odd;
-  }
-
-  setBlock(kernel, x.Length(), x.Precision());
-  checkSpinor(x, y);
-  checkSpinor(x, z);
-  checkSpinor(x, w);
-  checkSpinor(x, v);
-
-  if (blasGrid.x > REDUCE_MAX_BLOCKS) {
-    errorQuda("reduce_core: grid size %d must be smaller than %d", blasGrid.x, REDUCE_MAX_BLOCKS);
-  }
-
-  doubleN value;
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    Spinor<double2,double2,double2,1> X(x);
-    Spinor<double2,double2,double2,1> Y(y);
-    Spinor<double2,double2,double2,1> Z(z);
-    Spinor<double2,double2,double2,1> W(w);
-    Spinor<double2,double2,double2,1> V(v);
-    Reducer<ReduceType, double2, double2> r(a,b);
-    value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,double2,1,writeX,writeY,writeZ>
-      (X, Y, Z, W, V, r, X, Y, Z, x.Length()/2);
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    Spinor<float4,float4,float4,1> X(x);
-    Spinor<float4,float4,float4,1> Y(y);
-    Spinor<float4,float4,float4,1> Z(z);
-    Spinor<float4,float4,float4,1> W(w);
-    Spinor<float4,float4,float4,1> V(v);
-    Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-    value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,1,writeX,writeY,writeZ>
-      (X, Y, Z, W, V, r, X, Y, Z, x.Length()/4);
-  } else {
-    if (x.Nspin() == 4){ //wilson
-      SpinorTexture<float4,float4,short4,6,0> xTex(x);
-      SpinorTexture<float4,float4,short4,6,1> yTex(y);
-      SpinorTexture<float4,float4,short4,6,2> zTex(z);
-      SpinorTexture<float4,float4,short4,6,3> wTex(w);
-      SpinorTexture<float4,float4,short4,6,4> vTex(v);
-      Spinor<float4,float4,short4,6> xOut(x);
-      Spinor<float4,float4,short4,6> yOut(y);
-      Spinor<float4,float4,short4,6> zOut(z);
-      Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ>
-	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
-    } else if (x.Nspin() == 1) {//staggered
-      SpinorTexture<float2,float2,short2,3,0> xTex(x);
-      SpinorTexture<float2,float2,short2,3,1> yTex(y);
-      SpinorTexture<float2,float2,short2,3,2> zTex(z);
-      SpinorTexture<float2,float2,short2,3,3> wTex(w);
-      SpinorTexture<float2,float2,short2,3,4> vTex(v);
-      Spinor<float2,float2,short2,3> xOut(x);
-      Spinor<float2,float2,short2,3> yOut(y);
-      Spinor<float2,float2,short2,3> zOut(z);
-      Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float2,3,writeX,writeY,writeZ>
-	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
-    } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    quda::blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.Volume()*sizeof(float);
-  }
-  quda::blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.RealLength()*x.Precision();
-  quda::blas_flops += Reducer<ReduceType,double2,double2>::flops()*x.RealLength();
-
-  if (!blasTuning) checkCudaError();
-
-  return value;
-}
-
 /**
    Return the L2 norm of x
 */
@@ -987,6 +663,8 @@ struct Norm2 {
   static int streams() { return 1; } //! total number of input and output streams
   static int flops() { return 2; } //! flops per element
 };
+
+#include <reduce_core.h>
 
 double normCuda(const cudaColorSpinorField &x) {
   const int kernel = 17;
@@ -1014,7 +692,7 @@ struct Dot {
 double reDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 18;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,Dot,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
 
 /**
@@ -1034,7 +712,7 @@ struct axpyNorm2 {
 double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 19;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0>
-    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
+    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
 
 /**
@@ -1053,7 +731,7 @@ struct xmyNorm2 {
 double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 20;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,xmyNorm2,0,1,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
 
 /**
@@ -1144,7 +822,7 @@ struct Cdot {
 quda::Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 24;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   return quda::Complex(cdot.x, cdot.y);
 }
 
@@ -1166,7 +844,7 @@ struct xpaycdotzy {
 quda::Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z) {
   const int kernel = 25;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,xpaycdotzy,0,1,0>
-    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, y, y);
+    (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
   return quda::Complex(cdot.x, cdot.y);
 }
 
@@ -1189,7 +867,7 @@ quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cu
 		       cudaColorSpinorField &z) {
   const int kernel = 26;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0>
-    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, y, y);
+    (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
   return quda::Complex(cdot.x, cdot.y);
 }
 
@@ -1217,7 +895,7 @@ struct CdotNormA {
 double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 27;
   return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormA,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
 
 /**
@@ -1243,7 +921,7 @@ struct CdotNormB {
 double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
   const int kernel = 28;
   return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormB,0,0,0>
-    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, y, y);
+    (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
 
 /**

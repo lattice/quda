@@ -39,6 +39,7 @@ struct doublesingle2 {
   __device__ inline doublesingle2& operator=(const double &a) 
   { x = a; y = a; return *this; } 
   __device__ inline void operator+=(const double2 &b) {x += b.x; y += b.y;}
+  __device__ inline void operator+=(const doublesingle2 &b) {x += b.x; y += b.y;}
 };
 
 __host__ double2 operator+=(double2& a, doublesingle2 &b) 
@@ -49,6 +50,7 @@ struct doublesingle3 {
   doublesingle y; 
   doublesingle z; 
   __device__ inline void operator+=(const double3 &b) {x += b.x; y += b.y; z += b.z;}
+  __device__ inline void operator+=(const doublesingle3 &b) {x += b.x; y += b.y; z+= b.z;}
 };
 
 __host__ double3 operator+=(double3& a, doublesingle3 &b)
