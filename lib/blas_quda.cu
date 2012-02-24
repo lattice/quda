@@ -227,7 +227,7 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
       Spinor<float4, float4, float4, 6> dst_spinor(dst);
       copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     } else { //src.Nspin() ==1
-      Spinor<float2, float2, double2, 3> src_tex(src);
+      SpinorTexture<float2, float2, double2, 3, 0> src_tex(src);
       Spinor<float2, float2, float2, 3> dst_spinor(dst);
       copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
     }
