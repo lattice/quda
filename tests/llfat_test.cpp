@@ -497,8 +497,8 @@ main(int argc, char **argv)
   }
 
 #ifdef MULTI_GPU
-  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
-    errorQuda("ERROR: milc format for multi-gpu is not supported yet!\n");
+  if(gauge_order == QUDA_MILC_GAUGE_ORDER && test == 0){
+    errorQuda("ERROR: milc format for multi-gpu with test0 is not supported yet!\n");
   }
 #endif
 

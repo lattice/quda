@@ -1773,15 +1773,13 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     qudaGaugeParam->ga_pad = qudaGaugeParam->site_ga_pad;
     gettimeofday(&t7, NULL);
     
-    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){
-      loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
-    }else{
 #ifdef MULTI_GPU
+    if(qudaGaugeParam->gauge_order == QUDA_MILC_GAUGE_ORDER){
       errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
-#else
-      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
-#endif
     }
+#endif
+    loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
+    
     gettimeofday(&t8, NULL);
   }else{
     llfat_init_cuda_ex(qudaGaugeParam_ex);
@@ -1791,11 +1789,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 #endif
     qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
     gettimeofday(&t7, NULL);
-    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){ 
-      loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
-    }else{
-      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
-    }
+    loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
     gettimeofday(&t8, NULL);
   }
 

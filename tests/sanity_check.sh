@@ -58,24 +58,34 @@ function complete_fatlink_check {
     precs="double single"
     recons="18 12"
     tests="0 1" 
+    gauge_orders="qdp milc"
     partitions="0 8 12 14 15"
 	
+    multi_gpu="1"
     $prog --version |grep single >& /dev/null
     if [ "$?" == "0" ]; then
         partitions="0" #single GPU version
+	multi_gpu="0"
     fi
 
     for prec in $precs; do 
 	for recon in $recons; do 
 	    for tst in $tests; do
+            for gauge_order in $gauge_orders; do
+              #FIXME:
+              if [ "$multi_gpu" == "1" ] && [ "$tst" == "0" ] && [ "$gauge_order" ==  "milc" ]; then
+                      echo "multi-gpu for milc format in test0 is not supported yet, test skipped."
+		      continue
+              fi 
               for partition in $partitions; do
-		cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon --test $tst --partition $partition --verify "
+		cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon --test $tst --gauge-order $gauge_order --partition $partition --verify "
 		echo -ne  $cmd  "\t"..."\t"
 		echo "----------------------------------------------------------" >>$OUTFILE
 		echo $cmd >> $OUTFILE
 		$cmd >> $OUTFILE 2>&1|| (echo -e "FAIL\n$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
 		echo "OK"
               done
+	    done
 	    done
 	done
     done
