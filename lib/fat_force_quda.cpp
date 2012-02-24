@@ -721,16 +721,15 @@ void
 loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam* param)
 {
 
-  if (param->cpu_prec  != param->cuda_prec){
+  if (cudaGauge->Precision() != cpuGauge->Precision()){
     printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
     exit(1);
   }
-  QudaPrecision prec= param->cpu_prec;
+  QudaPrecision prec= cudaGauge->Precision();
 
 #ifdef MULTI_GPU
-  int* Z = param->X;
+  const int* Z = cudaGauge->X();
 #endif
-  //int pad = param->ga_pad;
   int pad = cudaGauge->Pad();
   int Vsh_x = param->X[1]*param->X[2]*param->X[3]/2;
   int Vsh_y = param->X[0]*param->X[2]*param->X[3]/2;
@@ -844,7 +843,7 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 }
 
 static void
-do_loadLinkToGPU_ex(int* X, void *even, void *odd, void**cpuGauge,
+do_loadLinkToGPU_ex(const int* X, void *even, void *odd, void**cpuGauge,
                     QudaReconstructType reconstruct, int bytes, int Vh_ex, int pad,
                     QudaPrecision prec, QudaGaugeFieldOrder cpu_order)
 {
@@ -921,15 +920,15 @@ do_loadLinkToGPU_ex(int* X, void *even, void *odd, void**cpuGauge,
 
 
 void
-loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam* param_ex)
+loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge)
 {
 
-  if (param_ex->cpu_prec  != param_ex->cuda_prec){
+  if (cudaGauge->Precision()  != cpuGauge->Precision()){
     printf("ERROR: cpu precision and cuda precision must be the same in this function %s\n", __FUNCTION__);
     exit(1);
   }
-  QudaPrecision prec= param_ex->cpu_prec;  
-  int* E = param_ex->X;
+  QudaPrecision prec= cudaGauge->Precision();
+  const int* E = cudaGauge->X();
   int pad = cudaGauge->Pad();
   
   do_loadLinkToGPU_ex(E, cudaGauge->Even_p(), cudaGauge->Odd_p(), (void**)cpuGauge->Gauge_p(),

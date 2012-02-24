@@ -209,9 +209,9 @@ for action in $*; do
 	complete_gauge_force_check ;;
     all )
 	basic_sanity_check
-	complete_fatlink_check
 	complete_dslash_check
 	complete_invert_check
+	complete_fatlink_check
 	complete_gauge_force_check 
 	;;
     * )

@@ -1770,7 +1770,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   
   if(method == QUDA_COMPUTE_FAT_STANDARD){
     llfat_init_cuda(qudaGaugeParam);
-    qudaGaugeParam->ga_pad = qudaGaugeParam->site_ga_pad;
     gettimeofday(&t7, NULL);
     
 #ifdef MULTI_GPU
@@ -1787,9 +1786,8 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
 			     cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 1);
 #endif
-    qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
     gettimeofday(&t7, NULL);
-    loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
+    loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
     gettimeofday(&t8, NULL);
   }
 
@@ -1895,8 +1893,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #ifdef MULTI_GPU
   exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
 			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
-  qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
-  loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
+  loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
 #else  
   loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
 #endif
