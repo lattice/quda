@@ -13,10 +13,10 @@ const int LX = 48;
 const int LY = 16;
 const int LZ = 12;
 const int LT = 32;
-const int Nspin = 4;
+const int Nspin = 1;
 
-// corresponds to 10 iterations for V=24^4, Nspin = 4, at half precision
-const int Niter = 10 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+// corresponds to 1 iterations for V=24^4, Nspin = 4, at half precision
+const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 //const int Niter = 1;// * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
 
 const int Nkernels = 30;
@@ -617,8 +617,8 @@ int main(int argc, char** argv)
   initQuda(dev);
 
   char *names[] = {
-    "copyLH",
-    "copyHL",
+    "copyHS",
+    "copyLS",
     "axpby",
     "xpy",
     "axpy",
@@ -728,7 +728,7 @@ int main(int argc, char** argv)
 	quda::blas_flops = 0;
 	quda::blas_bytes = 0;
 	
-	double secs = benchmark(kernel, 100*niter);
+	double secs = benchmark(kernel, 500*niter);
 	
 	gflops_max = (quda::blas_flops*1e-9)/(secs);
 	gbytes_max = quda::blas_bytes/(secs*1e9);
