@@ -59,12 +59,7 @@ DslashParam dslashParam;
 
 // these are set in initDslashConst
 int Vspatial;
-#ifdef MULTI_GPU
-static const int Nstream = 9;
-#else
-static const int Nstream = 1;
-#endif
-static cudaStream_t streams[Nstream];
+
 static cudaEvent_t dslashEnd;
 static cudaEvent_t gatherStart[Nstream];
 static cudaEvent_t gatherEnd[Nstream];

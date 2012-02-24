@@ -284,9 +284,9 @@ def prolog():
 
     prolog_str+= (
 """
-#if (CUDA_VERSION >= 4010)
+#if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
 #define VOLATILE
-#else
+#else // Open64 compiler
 #define VOLATILE volatile
 #endif
 """)

@@ -249,7 +249,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
 
     TwistInv(*tmp1, in);
     DiracWilson::Dslash(out, *tmp1, parity);
-    xpayCuda(x, k, out);
+    xpayCuda((cudaColorSpinorField&)x, k, out);
     flops += 96*in.Volume();
 
     // if the pointers alias, undo the twist

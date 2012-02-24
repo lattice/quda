@@ -8,7 +8,7 @@
 
 namespace quda {
   // creates and destroys reduction buffers  
-  void initBlas(void); 
+  void initBlas(); 
   void endBlas(void);
 
   void setBlasTuning(QudaTune tune);
@@ -39,7 +39,7 @@ void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaCo
 void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
 void axCuda(const double &a, cudaColorSpinorField &x);
 void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
-void xpayCuda(const cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y);
+void xpayCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y);
 void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
 
 void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z, const double &b);

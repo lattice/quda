@@ -250,6 +250,7 @@ void cpuColorSpinorField::Source(const QudaSourceType sourceType, const int x,
     break;
 
   case QUDA_POINT_SOURCE:
+    zero();
     if (precision == QUDA_DOUBLE_PRECISION) point(*order_double, x, s, c);
     else if (precision == QUDA_SINGLE_PRECISION) point(*order_single, x, s, c);
     else errorQuda("Precision not supported");
