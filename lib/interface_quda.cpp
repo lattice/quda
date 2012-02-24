@@ -1841,11 +1841,6 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 {
 
 #ifdef MULTI_GPU
-  //for multi-gpu code, we only support QDP order so far
-  if(qudaGaugeParam->gauge_order == QUDA_MILC_GAUGE_ORDER){
-    errorQuda("ERROR: QUDA_MILC_GAUGE_ORDER is not supported for multi-gpu yet!\n");
-  }
-  
   int E[4];
   QudaGaugeParam qudaGaugeParam_ex_buf;
   QudaGaugeParam* qudaGaugeParam_ex=&qudaGaugeParam_ex_buf;
@@ -1902,21 +1897,16 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   
   initCommonConstants(*cudaMom);
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
-
+  
 #ifdef MULTI_GPU
-  if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){
-    exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
-			     cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
-    qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
-    loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
-  }else{
-    //cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
-    errorQuda("ERROR: MILC ordr for multi-gpu not supported!\n");
-  }
+  exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
+			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
+  qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
+  loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
 #else  
   loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
 #endif
-
+  
   cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   
   gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, path_length, loop_coeff, num_paths, max_length);

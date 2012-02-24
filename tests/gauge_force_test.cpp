@@ -458,6 +458,9 @@ gauge_force_test(void)
 #ifdef MULTI_GPU
   void* sitelink_ex;
   void* sitelink_ex_2d[4];
+  void* sitelink_ex_1d;
+
+  cudaMallocHost((void**)&sitelink_ex_1d, 4*V_ex*gaugeSiteSize*gSize);  
   for(int i=0;i < 4;i++){
     cudaMallocHost((void**)&sitelink_ex_2d[i], V_ex*gaugeSiteSize*gSize);
     if(sitelink_ex_2d[i] == NULL){
@@ -487,7 +490,7 @@ gauge_force_test(void)
         || x2< 2 || x2 >= X2 +2
         || x3< 2 || x3 >= X3 +2
         || x4< 2 || x4 >= X4 +2){
-      //continue;
+      continue;
     }
 
 
@@ -508,11 +511,19 @@ gauge_force_test(void)
     }//dir
   }//i
   
-
+  
+  for(int dir = 0; dir < 4; dir++){
+    for(int i=0; i < V_ex; i++){
+      char* src =  ((char*)sitelink_ex_2d[dir]) + i * gaugeSiteSize* qudaGaugeParam.cpu_prec;
+      char* dst =  ((char*)sitelink_ex_1d) + (4*i+dir)*gaugeSiteSize*qudaGaugeParam.cpu_prec ;
+      memcpy(dst, src, gaugeSiteSize*qudaGaugeParam.cpu_prec);
+    }
+  }
+  
   if(qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER){
     sitelink_ex = sitelink_ex_2d;
   }else{
-    errorQuda("ERROR: multi-gpu for milc order is not supported yet\n");
+    sitelink_ex = sitelink_ex_1d;
   }
 
 #endif
@@ -590,7 +601,7 @@ gauge_force_test(void)
     //last arg=0 means no optimization for communication, i.e. exchange data in all directions 
     //even they are not partitioned
     exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex_2d,
-                             gauge_order, qudaGaugeParam.cpu_prec, 0);    
+			     QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0);    
     gauge_force_reference(refmom, eb3, sitelink_2d, sitelink_ex_2d, qudaGaugeParam.cpu_prec,
 			  input_path_buf, length, loop_coeff, num_paths);
 #else
@@ -632,6 +643,7 @@ gauge_force_test(void)
   }
   
 #ifdef MULTI_GPU  
+  cudaFreeHost(sitelink_ex_1d);
   for(int dir=0; dir < 4; dir++){
     cudaFreeHost(sitelink_ex_2d[dir]);
   }
