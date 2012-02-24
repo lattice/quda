@@ -771,14 +771,6 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		  dst_oddness = 1-oddness;
 		}
-		/*
-		if(src_oddness){
-		  src_idx += Vh_ex;
-		}
-		if(dst_oddness){
-		  dst_idx += nslices*slice_3d[dir]/2;
-		}
-		*/
 
 #define MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_buf, dst_idx, sitelink, src_idx, num, dir) \
 		if(src_oddness){					\
@@ -798,13 +790,6 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		  char* dst = ((char*)ghost_buf[dir]) + 4*(dst_idx)*gaugebytes; \
 		  memcpy(dst, src, 4*gaugebytes*(num));		\
 		}							\
-		/*
-		for(int linkdir=0; linkdir<4;linkdir++){
-		  char* src = (char*)sitelink[linkdir];
-		  char* dst = ((char*)(ghost_sitelink_back_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;		
-		  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-		}//linkdir
-		*/
 
 		MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, 1, dir);		
 
@@ -822,22 +807,6 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		  if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		    dst_oddness = 1-oddness;
 		  }
-		  /*
-		  if(src_oddness){
-		    src_idx += Vh_ex;
-		  }
-		  if(dst_oddness){
-		    dst_idx += nslices*slice_3d[dir]/2;
-		  }
-		  */
-		  /*
-		  for(int linkdir=0; linkdir<4;linkdir++){
-		    char* src = (char*)sitelink[linkdir];
-		    char* dst = ((char*)(ghost_sitelink_back_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;		
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes *((endc[dir] - c + 1)/2));
-		  }//linkdir
-		  */
-
 		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, (endc[dir] -c +1)/2, dir);	
 
 		}//if c
@@ -861,23 +830,7 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 	      if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		dst_oddness = 1-oddness;
 	      }
-	      /*
-	      if(src_oddness){
-		src_idx += Vh_ex;
-	      }
-	      
-	      if(dst_oddness){
-		dst_idx += nslices*slice_3d[dir]/2;
-	      }
-	      */
 
-	      /*
-	      for(int linkdir=0; linkdir<4;linkdir++){
-		char* src = (char*)sitelink[linkdir];
-		char* dst = ((char*)(ghost_sitelink_fwd_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-	      }//linkdir	
-	      */
 	      MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, 1,dir);
 	    }//c
 	    }else{
@@ -893,22 +846,6 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		  if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		    dst_oddness = 1-oddness;
 		  }
-		  /*
-		  if(src_oddness){
-		    src_idx += Vh_ex;
-		  }
-		  
-		  if(dst_oddness){
-		    dst_idx += nslices*slice_3d[dir]/2;
-		  }
-		  */
-		  /*
-		  for(int linkdir=0; linkdir<4;linkdir++){
-		    char* src = (char*)sitelink[linkdir];
-		    char* dst = ((char*)(ghost_sitelink_fwd_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes*((endc[dir]-c+1)/2));
-		  }//linkdir		  
-		  */
 		  
 		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, (endc[dir] -c +1)/2,dir);	
 
@@ -982,23 +919,9 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		    src = ((char*)sitelink)+ 4*(src_idx)*gaugebytes;	\
 		  }							\
 		  char* dst = ((char*)sitelink) + 4*(dst_idx)*gaugebytes; \
-		  /*printf("ghost_buf[dir]=%p, dst_idx=%d, src_idx=%d, dir=%d, src=%p, dst=%p, len=%d\n", */ \
-		  /*ghost_buf[dir], dst_idx, src_idx, dir, src, dst, 4*gaugebytes*(num));*/ \
 		  memcpy(dst, src, 4*gaugebytes*(num));			\
 		}
-		
-		/*
-		for(int linkdir=0; linkdir < 4; linkdir ++){
-		  char* dst = (char*)sitelink[linkdir];
-		  char* src;
-		  if(commDimPartitioned(dir)){
-		    src= ((char*)(ghost_sitelink_back[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		  }else{
-		    src = (char*)sitelink[linkdir];
-		  }
-		  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-		}//linkdir
-		*/
+
 		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, 1, dir);
 		
 	      }//c    
@@ -1017,28 +940,7 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		  }else{
 		    src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d+X[dir])*f_main[dir][3])>> 1;
 		  }
-		  /*
-		  if(oddness){
-		    if(commDimPartitioned(dir)){
-		      src_idx += nslices*slice_3d[dir]/2;
-		    }else{
-		      src_idx += Vh_ex;
-		    }
-		    dst_idx += Vh_ex;
-		  }
-		  */
-		  /*
-		  for(int linkdir=0; linkdir < 4; linkdir ++){
-		    char* dst = (char*)sitelink[linkdir];
-		    char* src;
-		    if(commDimPartitioned(dir)){
-		      src= ((char*)(ghost_sitelink_back[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		    }else{
-		      src = (char*)sitelink[linkdir];
-		    }
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes*((endc[dir]-c+1)/2) );
-		  }//linkdir
-		  */
+
 		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, (endc[dir]-c+1)/2, dir);
 
 		}//if c  		
@@ -1125,28 +1027,7 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		}else{
 		  src_idx =  ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d-X[dir])*f_main[dir][3])>> 1;
 		}
-		/*
-		if(oddness){
-		  if(commDimPartitioned(dir)){
-		    src_idx += nslices*slice_3d[dir]/2;
-		  }else{
-		    src_idx += Vh_ex;
-		  }
-		  dst_idx += Vh_ex;
-		}
-		*/
-		/*
-		for(int linkdir=0; linkdir < 4; linkdir++){
-		  char* dst = (char*)sitelink[linkdir];
-		  char* src;
-		  if(commDimPartitioned(dir)){
-		    src = ((char*)(ghost_sitelink_fwd[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		  }else{
-		    src = (char*)sitelink[linkdir];
-		  }
-		  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-		}//linkdir
-		*/
+
 		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, 1, dir);
 
 	      }//c
@@ -1163,28 +1044,7 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
 		  }else{
 		    src_idx =  ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d-X[dir])*f_main[dir][3])>> 1;
 		  }
-		  /*
-		  if(oddness){
-		    if(commDimPartitioned(dir)){
-		      src_idx += nslices*slice_3d[dir]/2;
-		    }else{
-		      src_idx += Vh_ex;
-		    }
-		    dst_idx += Vh_ex;
-		  }
-		  */
-		  /*
-		  for(int linkdir=0; linkdir < 4; linkdir++){
-		    char* dst = (char*)sitelink[linkdir];
-		    char* src;
-		    if(commDimPartitioned(dir)){
-		      src = ((char*)(ghost_sitelink_fwd[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		    }else{
-		      src = (char*)sitelink[linkdir];
-		    }
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes* ((endc[dir]-c+1)/2) );
-		  }//linkdir
-		  */
+
 		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, (endc[dir]-c+1)/2, dir);
 		}//if
 		
