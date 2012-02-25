@@ -23,6 +23,8 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+// Wilson, clover-improved Wilson, and twisted mass are supported.
+extern QudaDslashType dslash_type;
 extern bool tune;
 extern int device;
 extern int xdim;
@@ -118,10 +120,12 @@ int main(int argc, char **argv)
 
   int multi_shift = 0; // whether to test multi-shift or standard solver
 
-  // Wilson, clover-improved Wilson, and twisted mass are supported.
-  QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
-  //QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-  //QudaDslashType dslash_type = QUDA_TWISTED_MASS_DSLASH;
+  if (dslash_type != QUDA_WILSON_DSLASH &&
+      dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
+      dslash_type != QUDA_TWISTED_MASS_DSLASH) {
+    printf("dslash_type %d not supported\n", dslash_type);
+    exit(0);
+  }
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = prec;
@@ -216,9 +220,6 @@ int main(int argc, char **argv)
 
   inv_param.verbosity = QUDA_VERBOSE;
 
-  //set the T dimension partitioning flag
-  commDimPartitionedSet(3);
-
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 
@@ -228,7 +229,7 @@ int main(int argc, char **argv)
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-  void *gauge[4], *clover_inv, *clover;
+  void *gauge[4], *clover_inv=0, *clover=0;
 
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);

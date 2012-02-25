@@ -9,11 +9,11 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 48;
-const int LY = 16;
-const int LZ = 12;
-const int LT = 32;
-const int Nspin = 1;
+const int LX = 24;
+const int LY = 24;
+const int LZ = 24;
+const int LT = 24;
+const int Nspin = 4;
 
 // corresponds to 1 iterations for V=24^4, Nspin = 4, at half precision
 const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);

@@ -55,7 +55,7 @@ struct GaugeFieldParam : public LatticeFieldParam {
     nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
     order(param.gauge_order), fixed(param.gauge_fix), link_type(param.type), 
     t_boundary(param.t_boundary), anisotropy(param.anisotropy), tadpole(param.tadpole_coeff),
-    gauge(h_gauge), create(QUDA_REFERENCE_FIELD_CREATE), is_staple(0) {
+    gauge(h_gauge), create(QUDA_REFERENCE_FIELD_CREATE), is_staple(0), pinned(0) {
 
     if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
     else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
