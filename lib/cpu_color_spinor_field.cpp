@@ -269,7 +269,7 @@ int compareSpinor(const U &u, const V &v, const int tol) {
   int *fail = new int[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
-  int N = u.Nspin()*u.Ncolor();
+  int N = 2*u.Nspin()*u.Ncolor();
   int *iter = new int[N];
   for (int i=0; i<N; i++) iter[i] = 0;
 
