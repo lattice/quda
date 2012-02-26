@@ -494,8 +494,11 @@ void endQuda(void)
 
   quda::endBlas();
 
-  for (int i=0; i<Nstream; i++)  cudaStreamDestroy(streams[i]);
-  delete []streams;
+  if (streams) {
+    for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
+    delete []streams;
+    streams = 0;
+  }
 }
 
 

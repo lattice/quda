@@ -110,7 +110,9 @@ static inline __device__ float short2float(short a) {
 }
 
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
-  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
+  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
+  defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
+
 static inline __device__ short float2short(float c, float a) {
   //return (short)(a*MAX_SHORT);
   short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
