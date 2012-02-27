@@ -4,10 +4,8 @@
 #include <string.h>
 
 cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
-  GaugeField(param, QUDA_CPU_FIELD_LOCATION) {
+  GaugeField(param, QUDA_CPU_FIELD_LOCATION), pinned(param.pinned) {
 
-  pinned = param.pinned ;
-  
   if (reconstruct != QUDA_RECONSTRUCT_NO && 
       reconstruct != QUDA_RECONSTRUCT_10)
     errorQuda("Reconstruction type %d not supported", reconstruct);

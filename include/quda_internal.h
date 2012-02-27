@@ -34,38 +34,6 @@ extern "C" {
   
   typedef void *ParityGauge;
 
-  typedef struct {
-    size_t bytes;
-    QudaPrecision precision;
-    int length; // total length
-    int real_length; // physical length (excluding padding)
-    int volumeCB; // geometric volume (single parity)
-    int pad; // padding from end of array to start of next
-    int stride; // geometric stride between volume lengthed arrays
-    int X[QUDA_MAX_DIM]; // the geometric lengths
-    int Nc; // number of colors
-    QudaReconstructType reconstruct;
-    QudaGaugeFixed gauge_fixed;
-    QudaTboundary t_boundary;
-    ParityGauge odd;
-    ParityGauge even;
-    double anisotropy;
-    double tadpole_coeff;
-  } FullGauge;
-
-  
-  /*  typedef struct {
-    size_t bytes;
-    QudaPrecision precision;
-    int length; // total length
-    int volume; // geometric volume (single parity)
-    int X[QUDA_MAX_DIM]; // the geometric lengths (single parity)
-    int Nc; // number of colors
-    ParityGauge odd;
-    ParityGauge even;
-    double anisotropy;
-    } FullMom;*/
-      
   // replace below with ColorSpinorField
   typedef struct {
     size_t bytes;
@@ -84,10 +52,17 @@ extern "C" {
     ParityHw even;
   } FullHw;
 
-  extern cudaDeviceProp deviceProp;
+  extern cudaDeviceProp deviceProp;  
+  extern cudaStream_t *streams;
   
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef MULTI_GPU
+  const int Nstream = 9;
+#else
+  const int Nstream = 1;
 #endif
 
 class TuneParam {

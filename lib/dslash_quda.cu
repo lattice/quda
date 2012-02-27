@@ -59,12 +59,7 @@ DslashParam dslashParam;
 
 // these are set in initDslashConst
 int Vspatial;
-#ifdef MULTI_GPU
-static const int Nstream = 9;
-#else
-static const int Nstream = 1;
-#endif
-static cudaStream_t streams[Nstream];
+
 static cudaEvent_t dslashEnd;
 static cudaEvent_t gatherStart[Nstream];
 static cudaEvent_t gatherEnd[Nstream];
@@ -115,7 +110,9 @@ static inline __device__ float short2float(short a) {
 }
 
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
-  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
+  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
+  defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
+
 static inline __device__ short float2short(float c, float a) {
   //return (short)(a*MAX_SHORT);
   short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);

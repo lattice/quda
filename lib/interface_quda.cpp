@@ -93,6 +93,7 @@ bool diracCreation = false;
 bool diracTune = false;
 
 cudaDeviceProp deviceProp;
+cudaStream_t *streams;
 
 static int gpu_affinity[MAX_GPU_NUM_PER_NODE]; 
 static int numa_config_set = 0;
@@ -257,9 +258,18 @@ void initQuda(int dev)
 
   }
 #endif
+  
+  // if the device supports host-mapped memory, then enable this
+  if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
 
   initCache();
   cudaGetDeviceProperties(&deviceProp, dev);
+
+  streams = new cudaStream_t[Nstream];
+  for (int i=0; i<Nstream; i++) {
+    cudaStreamCreate(&streams[i]);
+  }
+
   quda::initBlas();
 }
 
@@ -488,6 +498,12 @@ void endQuda(void)
   freeCloverQuda();
 
   quda::endBlas();
+
+  if (streams) {
+    for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
+    delete []streams;
+    streams = 0;
+  }
 }
 
 

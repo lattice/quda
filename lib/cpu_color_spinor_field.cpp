@@ -250,6 +250,7 @@ void cpuColorSpinorField::Source(const QudaSourceType sourceType, const int x,
     break;
 
   case QUDA_POINT_SOURCE:
+    zero();
     if (precision == QUDA_DOUBLE_PRECISION) point(*order_double, x, s, c);
     else if (precision == QUDA_SINGLE_PRECISION) point(*order_single, x, s, c);
     else errorQuda("Precision not supported");
@@ -268,7 +269,7 @@ int compareSpinor(const U &u, const V &v, const int tol) {
   int *fail = new int[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
-  int N = u.Nspin()*u.Ncolor();
+  int N = 2*u.Nspin()*u.Ncolor();
   int *iter = new int[N];
   for (int i=0; i<N; i++) iter[i] = 0;
 
