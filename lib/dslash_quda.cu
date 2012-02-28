@@ -564,7 +564,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.kernel_type = INTERIOR_KERNEL;
   dslashParam.threads = volume;
 
-  cudaStreamWaitEvent(0, dslashEnd, 0);
+  //cudaStreamWaitEvent(0, dslashEnd, 0);
+  cudaStreamSynchronize(streams[Nstream-1]);
   CUDA_EVENT_RECORD(dslashStart, 0);
   gettimeofday(&dslashStart_h, NULL);
 
