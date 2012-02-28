@@ -232,7 +232,6 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
       SpinorTexture<float2, float2, double2, 3, 0> src_tex(src);
       Spinor<float2, float2, float2, 3> dst_spinor(dst);
       copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
-      printf("copy test %e %e\n", norm2(dst), norm2(src));
     }
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
     quda::blas_bytes += src.Volume()*sizeof(float);
