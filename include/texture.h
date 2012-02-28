@@ -358,6 +358,8 @@ class SpinorTexture {
 
  private:
   Texture<InterType, StoreType, tex_id> spinor;
+  /* It's faster to always use direct reads for the norm, but leave
+     this option in there for the future.*/
 #if (__COMPUTE_CAPABILITY__ >= 000)
   float *norm;
 #else

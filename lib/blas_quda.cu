@@ -54,10 +54,11 @@ void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 // For kernels with precision conversion built in
 #define checkSpinorLength(a, b)						\
   {									\
-    if (a.Length() != b.Length()) {					\
-      errorQuda("engths do not match: %d %d", a.Length(), b.Length());	\
-    }									
-
+    if (a.Length() != b.Length())					\
+      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+    if (a.Stride() != b.Stride())					\
+      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
+  }
 
 // blasTuning = 1 turns off error checking
 static QudaTune blasTuning = QUDA_TUNE_NO;
@@ -186,7 +187,6 @@ __global__ void copyKernel(Output Y, Input X, int length) {
 
 
 void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
-
   if (&src == &dst) return; // aliasing fields
   if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n", src.Nspin());
 
@@ -195,6 +195,8 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     copyCuda(dst.Odd(), src.Odd());
     return;
   }
+
+  checkSpinorLength(dst, src);
 
   // For a given dst precision, there are two non-trivial possibilities for the
   // src precision.  The higher one corresponds to kernel index 0 (in the table
