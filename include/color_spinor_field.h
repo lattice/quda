@@ -298,6 +298,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   static void freeBuffer();
 
   void zero();
+
+  friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
 };
 
 // Forward declaration of accessor functors

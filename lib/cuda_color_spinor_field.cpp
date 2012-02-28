@@ -626,3 +626,12 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 
   CUERR;
 }
+
+std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
+  out << (const ColorSpinorField)a;
+  out << "v = " << a.v << std::endl;
+  out << "norm = " << a.norm << std::endl;
+  out << "alloc = " << a.alloc << std::endl;
+  out << "init = " << a.init << std::endl;
+  return out;
+}
