@@ -232,7 +232,6 @@ void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorFie
   } else {
     errorQuda("Invalid matpcType(%d) in function\n", matpcType);    
   }
-  
   Dslash(*tmp1, in, other_parity);  
   DslashXpay(out, *tmp1, parity, in, 4*mass*mass);
 
