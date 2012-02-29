@@ -20,11 +20,15 @@
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
+//#define DIRECT_ACCESS_INTER
+//#define DIRECT_ACCESS_PACK
 #else
 #define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 //#define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
+//#define DIRECT_ACCESS_INTER
+//#define DIRECT_ACCESS_PACK
 #endif
 
 #include <quda_internal.h>
@@ -60,7 +64,7 @@ DslashParam dslashParam;
 // these are set in initDslashConst
 int Vspatial;
 
-static cudaEvent_t dslashEnd;
+static cudaEvent_t packEnd[Nstream];
 static cudaEvent_t gatherStart[Nstream];
 static cudaEvent_t gatherEnd[Nstream];
 static cudaEvent_t scatterStart[Nstream];
@@ -77,8 +81,8 @@ static struct timeval commsEnd[Nstream];
 #define DSLASH_TIME_PROFILE() dslashTimeProfile()
 
 static cudaEvent_t dslashStart;
+static cudaEvent_t dslashEnd;
 static cudaEvent_t packStart[Nstream];
-static cudaEvent_t packEnd[Nstream];
 static cudaEvent_t kernelStart[Nstream];
 static cudaEvent_t kernelEnd[Nstream];
 
@@ -101,23 +105,21 @@ cudaColorSpinorField *inSpinor;
 #include <dslash_textures.h>
 #include <dslash_constants.h>
 
-#define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) * 0.5f) // 32767.5
-#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1)) // 1.5259021897e-5
-
 static inline __device__ float short2float(short a) {
-  return (float)a/SCALE_FLOAT - SHIFT_FLOAT;
+  return (float)a/MAX_SHORT;
+}
+
+static inline __device__ short float2short(float c, float a) {
+  return (short)(a*c*MAX_SHORT);
+}
+
+static inline __device__ short2 float22short2(float c, float2 a) {
+  return make_short2((short)(a.x*c*MAX_SHORT), (short)(a.y*c*MAX_SHORT));
 }
 
 #if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
   defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
   defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
-
-static inline __device__ short float2short(float c, float a) {
-  //return (short)(a*MAX_SHORT);
-  short rtn = (short)((a+SHIFT_FLOAT)*SCALE_FLOAT*c);
-  return rtn;
-}
 
 static inline __device__ short4 float42short4(float c, float4 a) {
   return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));
@@ -564,8 +566,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.kernel_type = INTERIOR_KERNEL;
   dslashParam.threads = volume;
 
-  //cudaStreamWaitEvent(0, dslashEnd, 0);
-  cudaStreamSynchronize(streams[Nstream-1]);
   CUDA_EVENT_RECORD(dslashStart, 0);
   gettimeofday(&dslashStart_h, NULL);
 
@@ -573,22 +573,24 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   for(int i = 3; i >=0; i--){
     if (!dslashParam.commDim[i]) continue;
 
-    for (int dir=1; dir>=0; dir--) {
-      // Record the start of the packing
-      CUDA_EVENT_RECORD(packStart[2*i+dir], streams[2*i+dir]);
+    // Record the start of the packing
+    CUDA_EVENT_RECORD(packStart[2*i+0], streams[Nstream-1]);
+    CUDA_EVENT_RECORD(packStart[2*i+1], streams[Nstream-1]);
 
-      // Initialize pack from source spinor
-      face->pack(*inSpinor, 1-parity, dagger, 2*i+dir, streams);
-
-      // Record the end of the packing
-      CUDA_EVENT_RECORD(packEnd[2*i+dir], streams[2*i+dir]);
-    }
+    // Initialize pack from source spinor
+    face->pack(*inSpinor, 1-parity, dagger, i, streams);
+    
+    // Record the end of the packing
+    cudaEventRecord(packEnd[2*i+0], streams[Nstream-1]);
+    cudaEventRecord(packEnd[2*i+1], streams[Nstream-1]);
   }
 
   for(int i = 3; i >=0; i--){
     if (!dslashParam.commDim[i]) continue;
 
     for (int dir=1; dir>=0; dir--) {
+      cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i+dir], 0);
+
       // Record the start of the gathering
       CUDA_EVENT_RECORD(gatherStart[2*i+dir], streams[2*i+dir]);
 
@@ -694,7 +696,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     }
   }
 
-  cudaEventRecord(dslashEnd, 0);
+  CUDA_EVENT_RECORD(dslashEnd, 0);
   if (!dslashTuning) DSLASH_TIME_PROFILE();
 
 #endif // MULTI_GPU

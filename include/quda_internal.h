@@ -8,7 +8,7 @@
 #include <qmp.h>
 #endif
 
-#define MAX_SHORT 32767
+#define MAX_SHORT 32767.0f
 
 // The "Quda" prefix is added to avoid collisions with other libraries.
 

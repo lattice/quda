@@ -1122,13 +1122,13 @@ o02_im = -o02_im + a*accum2.y;
 #ifdef MULTI_GPU
 //if (kernel_type == EXTERIOR_KERNEL_T){
 if (kernel_type != INTERIOR_KERNEL){
-  READ_AND_SUM_SPINOR();
+  READ_AND_SUM_SPINOR(INTERTEX);
  }
 #endif
 
 
 // write spinor field back to device memory
-WRITE_SPINOR();
+WRITE_SPINOR(out);
 
 
 // undefine to prevent warning when precision is changed

@@ -201,23 +201,14 @@ FaceBuffer::~FaceBuffer()
   }
 }
 
-void FaceBuffer::pack(cudaColorSpinorField &in, int parity,
-		      int dagger, int dir, cudaStream_t *stream_p)
+void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream_p)
 {
-  int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
   in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated
   stream = stream_p;
 
-  if (dir%2==0) { // sending backwards
-    // gather for backwards send
-    in.packGhost(dim, QUDA_BACKWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendBackStrmIdx]);  
-  } else { // sending forwards
-
-    // gather for forwards send
-    in.packGhost(dim, QUDA_FORWARDS, (QudaParity)parity, dagger, &stream[2*dim+sendFwdStrmIdx]);
-  }
+  in.packGhost(dim, (QudaParity)parity, dagger, &stream[Nstream-1]);  
 }
 
 void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)

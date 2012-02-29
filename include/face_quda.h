@@ -63,7 +63,7 @@ class FaceBuffer {
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void pack(cudaColorSpinorField &in, int parity, int dagger, int dir, cudaStream_t *stream);
+  void pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream);
   void gather(cudaColorSpinorField &in, int dagger, int dir);
   void commsStart(int dir);
   int  commsQuery(int dir);
@@ -134,7 +134,7 @@ class FaceBuffer {
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void pack(cudaColorSpinorField &in, int parity, int dagger, int dir, cudaStream_t *stream);
+  void pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream);
   void gather(cudaColorSpinorField &in, int dagger, int dir);
   void commsStart(int dir);
   int  commsQuery(int dir);
