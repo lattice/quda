@@ -661,7 +661,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 	    // Record the end of the scattering
 	    CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
 	    
-	    cudaStreamSynchronize(streams[2*i+dir]);
 	    // Scatter into the end zone
 	    face->scatter(*inSpinor, dagger, 2*i+dir);
 	    
