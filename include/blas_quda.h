@@ -60,6 +60,8 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpin
 
 void cabxpyAxCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
 double caxpyNormCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+void caxpyXmazCuda(const quda::Complex &a, cudaColorSpinorField &x,
+		   cudaColorSpinorField &y, cudaColorSpinorField &z);
 double caxpyXmazNormXCuda(const quda::Complex &a, cudaColorSpinorField &x, 
 			  cudaColorSpinorField &y, cudaColorSpinorField &z);
 double cabxpyAxNormCuda(const double &a, const quda::Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
@@ -108,6 +110,8 @@ void cabxpyAxCpu(const double &a, const quda::Complex &b, cpuColorSpinorField &x
 
 double caxpyNormCpu(const quda::Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y);
 
+void caxpyXmazCpu(const quda::Complex &a, cpuColorSpinorField &x,
+		  cpuColorSpinorField &y, cpuColorSpinorField &z);
 double caxpyXmazNormXCpu(const quda::Complex &a, cpuColorSpinorField &x, 
 			 cpuColorSpinorField &y, cpuColorSpinorField &z);
 double cabxpyAxNormCpu(const double &a, const quda::Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
