@@ -207,7 +207,7 @@
 #define GAUGE_DOUBLE
 
 // spinor fields
-#define DD_PARAM_OUT double2* g_out, float *null1
+#define DD_PARAM_OUT double2* out, float *null1
 #define DD_PARAM_IN const double2* in, const float *null4
 #if (defined DIRECT_ACCESS_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define SPINORTEX in
@@ -218,7 +218,13 @@
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE_TEX
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE_TEX
 #endif
+#if (defined DIRECT_ACCESS_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
+#define INTERTEX out
+#else
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_DOUBLE_TEX
+#define INTERTEX interTexDouble
+#endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
 #if (DD_AXPY==1)
@@ -259,7 +265,7 @@
 #endif
 
 // spinor fields
-#define DD_PARAM_OUT float2* g_out, float *null1
+#define DD_PARAM_OUT float2* out, float *null1
 #define DD_PARAM_IN const float2* in, const float *null4
 #ifndef DIRECT_ACCESS_SPINOR
 #define SPINORTEX spinorTexSingle2
@@ -270,10 +276,16 @@
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_SINGLE
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_SINGLE
 #endif
+#if (defined DIRECT_ACCESS_INTER)
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR
+#define INTERTEX out
+#else
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_SINGLE_TEX
+#define INTERTEX interTexSingle2
+#endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_FLOAT2
 #if (DD_AXPY==1)
-#if (defined DIRECT_ACCESS_ACCUM) || (defined FERMI_NO_DBLE_TEX)
+#if (defined DIRECT_ACCESS_ACCUM)
 #define ACCUMTEX x
 #define READ_ACCUM READ_ST_ACCUM_SINGLE
 #else
@@ -302,9 +314,15 @@
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_HALF_TEX
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_HALF_TEX
 #define SPINORTEX spinorTexHalf2
-#define DD_PARAM_OUT short2* g_out, float *outNorm
+#define DD_PARAM_OUT short2* out, float *outNorm
 #define DD_PARAM_IN const short2* in, const float *inNorm
-#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF // FIXME: this not done through tex
+#if (defined DIRECT_ACCESS_INTER)
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF
+#define INTERTEX out
+#else
+#define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF_TEX
+#define INTERTEX interTexHalf2
+#endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_SHORT2
 #if (DD_AXPY==1)
 #define ACCUMTEX accumTexHalf2
@@ -355,6 +373,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #undef SPINORTEX
 #undef WRITE_SPINOR
 #undef READ_AND_SUM_SPINOR
+#undef INTERTEX
 #undef ACCUMTEX
 #undef READ_ACCUM
 #undef CLOVERTEX

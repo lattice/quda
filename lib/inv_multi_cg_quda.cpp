@@ -206,8 +206,9 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
   
   // Calculate the true residual of the system with the smallest shift
   mat(*r, *x[0]); 
-  axpyCuda(offset[0],*x[0], *r); // Offset it.
-
+  if (invParam.dslash_type != QUDA_ASQTAD_DSLASH){
+    axpyCuda(offset[0],*x[0], *r); // Offset it.
+  }
   double true_res = xmyNormCuda(b, *r);
   if (invParam.verbosity >= QUDA_SUMMARIZE){
     printfQuda("MultiShift CG: Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
@@ -218,7 +219,11 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
     printfQuda(" shift=0 resid_rel=%e\n", sqrt(true_res/b2));
     for(int i=1; i < num_offset; i++) { 
       mat(*r, *x[i]); 
-      axpyCuda(offset[i],*x[i], *r); // Offset it.
+      if (invParam.dslash_type != QUDA_ASQTAD_DSLASH){
+         axpyCuda(offset[i],*x[i], *r); // Offset it.
+      }else{
+         axpyCuda(offset[i]-offset[0],*x[i], *r); // Offset it.
+      }
       true_res = xmyNormCuda(b, *r);
       printfQuda(" shift=%d resid_rel=%e\n",i, sqrt(true_res/b2));
     }

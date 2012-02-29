@@ -343,6 +343,9 @@ void checkTypes() {
 
 }
 
+// the number of elements per virtual register
+#define REG_LENGTH (sizeof(RegType) / sizeof(((RegType*)0)->x))
+
 /**
   @param RegType Register type used in kernel
   @param InterType Intermediate format - RegType precision with StoreType ordering
@@ -354,17 +357,33 @@ template <typename RegType, typename InterType, typename StoreType, int N, int t
 class SpinorTexture {
 
  private:
-  int regLength; // vector length of the register
   Texture<InterType, StoreType, tex_id> spinor;
-  //Texture<float, float, tex_id> norm;
+  /* It's faster to always use direct reads for the norm, but leave
+     this option in there for the future.*/
+#if (__COMPUTE_CAPABILITY__ >= 000)
   float *norm;
+#else
+  Texture<float, float, tex_id> norm;
+#endif
   int stride;
 
  public:
-  SpinorTexture() : regLength(0), spinor((StoreType*)0, 0), norm(0/*, 0*/), stride(0) {;} // default constructor
- SpinorTexture(const cudaColorSpinorField &x) : regLength(sizeof(RegType) / sizeof(((RegType*)0)->x)),
-  spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()/*, x.NormBytes()*/),
-    stride(x.Length()/(N*regLength)) { checkTypes<RegType,InterType,StoreType>(); }
+
+#if (__COMPUTE_CAPABILITY__ >= 000)
+ SpinorTexture() 
+   : spinor((StoreType*)0, 0), norm(0), stride(0) {;} // default constructor
+
+ SpinorTexture(const cudaColorSpinorField &x) 
+   : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()),
+    stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+#else
+ SpinorTexture()
+  : spinor((StoreType*)0, 0), norm(0, 0), stride(0) {;} // default constructor
+
+ SpinorTexture(const cudaColorSpinorField &x) 
+   : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm(), x.NormBytes()),
+    stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+#endif
 
   ~SpinorTexture() {;}
 
@@ -413,18 +432,17 @@ template <typename RegType, typename InterType, typename StoreType, int N>
 class Spinor {
 
  private:
-  int regLength; // vector length of the register
   StoreType *spinor;
   float *norm;
   const int stride;
 
  public:
- Spinor(cudaColorSpinorField &x) : regLength(sizeof(RegType) / sizeof(((RegType*)0)->x)),
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*regLength)) 
+ Spinor(cudaColorSpinorField &x) : 
+    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH)) 
     { checkTypes<RegType,InterType,StoreType>(); } 
 
- Spinor(const cudaColorSpinorField &x) : regLength(sizeof(RegType) / sizeof(((RegType*)0)->x)),
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*regLength))
+ Spinor(const cudaColorSpinorField &x) :
+    spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
     { checkTypes<RegType,InterType,StoreType>(); } 
   ~Spinor() {;}
 

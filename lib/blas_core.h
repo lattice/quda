@@ -2,8 +2,8 @@
    Generic blas kernel with four loads and up to four stores.
  */
 template <typename FloatN, int M, int writeX, int writeY, int writeZ, int writeW, 
-	  typename InputX, typename InputY, typename InputZ, typename InputW, 
-	  typename OutputX, typename OutputY, typename OutputZ, typename OutputW, typename Functor>
+  typename InputX, typename InputY, typename InputZ, typename InputW, 
+  typename OutputX, typename OutputY, typename OutputZ, typename OutputW, typename Functor>
 __global__ void blasKernel(InputX X, InputY Y, InputZ Z, InputW W, Functor f, 
 			   OutputX XX, OutputY YY, OutputZ ZZ, OutputW WW, int length) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;

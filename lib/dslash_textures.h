@@ -100,6 +100,7 @@ texture<float2, 1, cudaReadModeElementType> interTexSingle2;
 texture<short4, 1, cudaReadModeNormalizedFloat> interTexHalf;
 texture<short2, 1, cudaReadModeNormalizedFloat> interTexHalf2;
 texture<float, 1, cudaReadModeElementType> interTexHalfNorm;
+texture<float, 1, cudaReadModeElementType> interTexHalf2Norm;
 
 void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, 
 			 void **gauge0, void **gauge1)
@@ -293,7 +294,7 @@ int bindSpinorTex(const size_t spinor_bytes, const size_t norm_bytes, const spin
     cudaBindTexture(0, spinorTexHalf2, in, spinor_bytes); 
     if (inNorm) cudaBindTexture(0, spinorTexHalfNorm, inNorm, norm_bytes); 
     if (out) cudaBindTexture(0, interTexHalf2, out, spinor_bytes); 
-    if (outNorm) cudaBindTexture(0, interTexHalfNorm, outNorm, norm_bytes); 
+    if (outNorm) cudaBindTexture(0, interTexHalf2Norm, outNorm, norm_bytes); 
     if (x) cudaBindTexture(0, accumTexHalf2, x, spinor_bytes); 
     if (xNorm) cudaBindTexture(0, accumTexHalfNorm, xNorm, norm_bytes); 
     size = sizeof(float);
@@ -331,7 +332,7 @@ void unbindSpinorTex(const spinorFloat *in, const float *inNorm, const spinorFlo
     cudaUnbindTexture(spinorTexHalf2); 
     if (inNorm) cudaUnbindTexture(spinorTexHalfNorm);
     if (out) cudaUnbindTexture(interTexHalf2); 
-    if (outNorm) cudaUnbindTexture(interTexHalfNorm);
+    if (outNorm) cudaUnbindTexture(interTexHalf2Norm);
     if (x) cudaUnbindTexture(accumTexHalf2); 
     if (xNorm) cudaUnbindTexture(accumTexHalfNorm);
   } else {

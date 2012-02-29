@@ -66,7 +66,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double src_norm = norm2(b);
   double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver
 
-  double alpha, beta;
+  double alpha=0.0, beta=0.0;
   double pAp;
 
   double rNorm = sqrt(r2);
@@ -75,7 +75,14 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double maxrr = rNorm;
   double delta = invParam.reliable_delta;
 
-  if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+  if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
+    double x2 = norm2(x);
+    double p2 = norm2(p);
+    printf("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
+	   k, r2, x2, p2, alpha, beta);
+  } else if (invParam.verbosity >= QUDA_VERBOSE) {
+    printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+  }
 
   quda::blas_flops = 0;
 
@@ -120,8 +127,14 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     }
 
     k++;
-    if (invParam.verbosity >= QUDA_VERBOSE)
+    if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
+      double x2 = norm2(x);
+      double p2 = norm2(p);
+      printf("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
+	     k, r2, x2, p2, alpha, beta);
+    } else if (invParam.verbosity >= QUDA_VERBOSE) {
       printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+    }
   }
 
   if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);

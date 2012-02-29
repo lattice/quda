@@ -485,11 +485,13 @@ void cudaColorSpinorField::allocateGhostBuffer(void) {
       if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostFace[i]*sizeof(float);
       
       if (this->initGhostFaceBuffer) { // only free-ed if precision is higher than previous allocation
-	cudaFree(this->fwdGhostFaceBuffer[i]); this->fwdGhostFaceBuffer[i] = NULL;
+	//cudaFree(this->fwdGhostFaceBuffer[i]); 
 	cudaFree(this->backGhostFaceBuffer[i]); this->backGhostFaceBuffer[i] = NULL;
+	this->fwdGhostFaceBuffer[i] = NULL;
       }
-      cudaMalloc((void**)&this->fwdGhostFaceBuffer[i], faceBytes);
-      cudaMalloc((void**)&this->backGhostFaceBuffer[i], faceBytes);
+      //cudaMalloc((void**)&this->fwdGhostFaceBuffer[i], faceBytes);
+      cudaMalloc((void**)&this->backGhostFaceBuffer[i], 2*faceBytes);
+      fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
     }   
     CUERR;
     
@@ -505,24 +507,21 @@ void cudaColorSpinorField::freeGhostBuffer(void) {
     if(!commDimPartitioned(i)){
       continue;
     }
-    cudaFree(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
+    //cudaFree(fwdGhostFaceBuffer[i]); 
     cudaFree(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+    fwdGhostFaceBuffer[i] = NULL;
   } 
 
   initGhostFaceBuffer = 0;  
 }
 
 // pack the ghost zone into a contiguous buffer for communications
-void cudaColorSpinorField::packGhost(const int dim, const QudaDirection dir,
-				     const QudaParity parity, const int dagger, cudaStream_t *stream) 
+void cudaColorSpinorField::packGhost(const int dim, const QudaParity parity, const int dagger, cudaStream_t *stream) 
 {
-
 #ifdef MULTI_GPU
   if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
-    void* gpu_buf = 
-      (dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
-    
-    packFace(gpu_buf, *this, dim, dir, dagger, parity, *stream); 
+    void* gpu_buf = this->backGhostFaceBuffer[dim];
+    packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
   }
 #else
   errorQuda("packGhost not built on single-GPU build");
@@ -625,4 +624,13 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
   }
 
   CUERR;
+}
+
+std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
+  out << (const ColorSpinorField)a;
+  out << "v = " << a.v << std::endl;
+  out << "norm = " << a.norm << std::endl;
+  out << "alloc = " << a.alloc << std::endl;
+  out << "init = " << a.init << std::endl;
+  return out;
 }

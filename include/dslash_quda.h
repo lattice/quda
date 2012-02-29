@@ -77,7 +77,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const QudaTwistGamma5Type, const TuneParam &);
 
 // face packing routines
-void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const QudaDirection dir, const int dagger, 
+void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 	      const int parity, const cudaStream_t &stream);
 
 #endif // _DSLASH_QUDA_H

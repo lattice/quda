@@ -54,10 +54,11 @@ void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 // For kernels with precision conversion built in
 #define checkSpinorLength(a, b)						\
   {									\
-    if (a.Length() != b.Length()) {					\
-      errorQuda("engths do not match: %d %d", a.Length(), b.Length());	\
-    }									
-
+    if (a.Length() != b.Length())					\
+      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+    if (a.Stride() != b.Stride())					\
+      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
+  }
 
 // blasTuning = 1 turns off error checking
 static QudaTune blasTuning = QUDA_TUNE_NO;
@@ -186,7 +187,6 @@ __global__ void copyKernel(Output Y, Input X, int length) {
 
 
 void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
-
   if (&src == &dst) return; // aliasing fields
   if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n", src.Nspin());
 
@@ -195,6 +195,8 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     copyCuda(dst.Odd(), src.Odd());
     return;
   }
+
+  checkSpinorLength(dst, src);
 
   // For a given dst precision, there are two non-trivial possibilities for the
   // src precision.  The higher one corresponds to kernel index 0 (in the table
@@ -214,66 +216,66 @@ void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
     if (src.Nspin() == 4){
       SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
       Spinor<float4, float2, double2, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     } else { //src.Nspin() == 1
       SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
       Spinor<float2, float2, double2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     }
 
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
     if (src.Nspin() == 4){
       SpinorTexture<float4, float2, double2, 6, 0> src_tex(src);
       Spinor<float4, float4, float4, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     } else { //src.Nspin() ==1
       SpinorTexture<float2, float2, double2, 3, 0> src_tex(src);
       Spinor<float2, float2, float2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     }
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
     quda::blas_bytes += src.Volume()*sizeof(float);
     if (src.Nspin() == 4){      
       SpinorTexture<float4, float4, short4, 6, 0> src_tex(src);
       Spinor<float4, float4, float4, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     } else { //nSpin== 1;
       SpinorTexture<float2, float2, short2, 3, 0> src_tex(src);
       Spinor<float2, float2, float2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
     quda::blas_bytes += dst.Volume()*sizeof(float);
     if (src.Nspin() == 4){
       SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
       Spinor<float4, float4, short4, 6> dst_spinor(dst);
-      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float4, 6><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     } else { //nSpin == 1
       SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
       Spinor<float2, float2, short2, 3> dst_spinor(dst);
-      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<float2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     }
   } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
     quda::blas_bytes += src.Volume()*sizeof(float);
     if (src.Nspin() == 4){
       SpinorTexture<double2, float4, short4, 12, 0> src_tex(src);
       Spinor<double2, double2, double2, 12> dst_spinor(dst);
-      copyKernel<double2, 12><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 12><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     } else { //nSpin == 1
       SpinorTexture<double2, float2, short2, 3, 0> src_tex(src);
       Spinor<double2, double2, double2, 3> dst_spinor(dst);
-      copyKernel<double2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
     quda::blas_bytes += dst.Volume()*sizeof(float);
     if (src.Nspin() == 4){
       SpinorTexture<double2, double2, double2, 12, 0> src_tex(src);
       Spinor<double2, double4, short4, 12> dst_spinor(dst);
-      copyKernel<double2, 12><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 12><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     } else { //nSpin == 1
       SpinorTexture<double2, double2, double2, 3, 0> src_tex(src);
       Spinor<double2, double2, short2, 3> dst_spinor(dst);
-      copyKernel<double2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Volume());
+      copyKernel<double2, 3><<<blasGrid, blasBlock, 0, *blasStream>>>(dst_spinor, src_tex, src.Stride());
     }
   } else {
     cudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);

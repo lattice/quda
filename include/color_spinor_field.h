@@ -280,8 +280,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   void allocateGhostBuffer(void);
   static void freeGhostBuffer(void);
 
-  void packGhost(const int dim, const QudaDirection dir, const QudaParity parity, 
-		 const int dagger, cudaStream_t* stream);
+  void packGhost(const int dim, const QudaParity parity, const int dagger, cudaStream_t* stream);
   void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
 		 const int dagger, cudaStream_t *stream);
   void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
@@ -298,6 +297,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   static void freeBuffer();
 
   void zero();
+
+  friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
 };
 
 // Forward declaration of accessor functors
