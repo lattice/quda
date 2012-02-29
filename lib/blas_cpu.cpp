@@ -272,6 +272,12 @@ double caxpyXmazNormXCpu(const quda::Complex &a, cpuColorSpinorField &x,
   return norm2(x);
 }
 
+void caxpyXmazCpu(const quda::Complex &a, cpuColorSpinorField &x, 
+		    cpuColorSpinorField &y, cpuColorSpinorField &z) {
+  caxpyCpu(a, x, y);
+  caxpyCpu(-a, z, x);
+}
+
 double cabxpyAxNormCpu(const double &a, const quda::Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y) {
   axCpu(a, x);
   caxpyCpu(b, x, y);
