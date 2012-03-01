@@ -498,6 +498,18 @@ void cudaColorSpinorField::allocateGhostBuffer(void) {
     this->facePrecision = precision;
     this->initGhostFaceBuffer = 1;
   }
+
+  for (int i=0; i<4; i++) {
+    if(!commDimPartitioned(i)){
+      continue;
+    }
+    size_t faceBytes = nFace*ghostFace[i]*Nint*precision;
+    // add extra space for the norms for half precision
+    if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostFace[i]*sizeof(float);
+    fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
+  }
+
+
 }
 
 void cudaColorSpinorField::freeGhostBuffer(void) {
