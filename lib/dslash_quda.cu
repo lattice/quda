@@ -721,7 +721,8 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (in->Precision() != gauge.Precision())
-    errorQuda("Mixing gauge and spinor precision not supported");
+    errorQuda("Mixing gauge %d and spinor %d precision not supported", 
+	      gauge.Precision(), in->Precision());
 
   const void *xv = (x ? x->V() : 0);
   const void *xn = (x ? x->Norm() : 0);
