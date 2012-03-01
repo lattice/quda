@@ -34,6 +34,9 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy;
     QudaReconstructType reconstruct_sloppy;
 
+    QudaPrecision cuda_prec_precondition;
+    QudaReconstructType reconstruct_precondition;
+
     QudaGaugeFixed gauge_fix;
 
     int ga_pad;
@@ -81,6 +84,7 @@ extern "C" {
     QudaPrecision cpu_prec;
     QudaPrecision cuda_prec;
     QudaPrecision cuda_prec_sloppy;
+    QudaPrecision cuda_prec_precondition;
 
     QudaDiracFieldOrder dirac_order;
     QudaGammaBasis gamma_basis; // the gamma basis of the input and output cpu fields 
@@ -88,6 +92,7 @@ extern "C" {
     QudaPrecision clover_cpu_prec;
     QudaPrecision clover_cuda_prec;
     QudaPrecision clover_cuda_prec_sloppy;
+    QudaPrecision clover_cuda_prec_precondition;
 
     QudaCloverFieldOrder clover_order;
     QudaUseInitGuess use_init_guess;

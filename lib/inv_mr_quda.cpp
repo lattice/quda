@@ -69,7 +69,12 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double omega = 1.0;
 
   int k = 0;
-  if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
+  if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
+    double x2 = norm2(x);
+    double3 Ar3 = cDotProductNormBCuda(Ar, r);
+    printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e, %e), x2 = %e\n", 
+	       k, Ar3.x, Ar3.y, Ar3.z, x2);
+  }
 
   while (r2 > stop && k < invParam.maxiter) {
     
@@ -79,20 +84,27 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     quda::Complex alpha = quda::Complex(Ar3.x, Ar3.y) / Ar3.z;
 
     // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = norm2(r)
-    r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
-
-    k++;
+    //r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
+    caxpyXmazCuda(omega*alpha, r, x, Ar);
 
     if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
       double x2 = norm2(x);
       double r2 = norm2(r);
-      double Ar2 = norm2(Ar);
-      printfQuda("MR: %d iterations, r2 = %e, Ar2 = %e, x2 = %e\n", k, r2, Ar2, x2);
+      printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e,%e) x2 = %e\n", 
+		 k+1, r2, Ar3.x, Ar3.y, x2);
     } else if (invParam.verbosity >= QUDA_VERBOSE) {
-      printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
+      printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, Ar3.x, Ar3.y);
     }
+
+    k++;
   }
   
+  if (invParam.verbosity >= QUDA_VERBOSE) {
+    mat(Ar, r, tmp);    
+    quda::Complex Ar2 = cDotProductCuda(Ar, r);
+    printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
+  }
+
   // Obtain global solution by rescaling
   if (b2 > 0.0) axCuda(sqrt(b2), x);
 
@@ -110,6 +122,7 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     
     if (invParam.verbosity >= QUDA_SUMMARIZE) {
       // Calculate the true residual
+      r2 = norm2(r);
       mat(r, x);
       double true_res = xmyNormCuda(b, r);
       
