@@ -65,13 +65,23 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(reconstruct, QUDA_RECONSTRUCT_INVALID);
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
   P(reconstruct_sloppy, QUDA_RECONSTRUCT_INVALID);
+#if defined INIT_PARAM
+  P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
+  P(reconstruct_precondition, QUDA_RECONSTRUCT_INVALID);
+#else
+  if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
+    param->cuda_prec_precondition = param->cuda_prec_sloppy;
+  if (param->reconstruct_precondition == QUDA_RECONSTRUCT_INVALID)
+    param->reconstruct_precondition = param->reconstruct_sloppy;
+#endif
+
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
   P(ga_pad, INVALID_INT);
   
 #if defined INIT_PARAM
   P(packed_size, 0);
   P(gaugeGiB, 0.0);
-#elif defined PRINT_PARAM
+#else
   P(packed_size, INVALID_INT);
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
@@ -139,6 +149,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cpu_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
+
+#if defined INIT_PARAM
+  P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
+#else
+  if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
+    param->cuda_prec_precondition = param->cuda_prec_sloppy;
+#endif
+
   P(gamma_basis, QUDA_INVALID_GAMMA_BASIS);
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
   P(sp_pad, INVALID_INT);
@@ -190,6 +208,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(clover_cpu_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
+#if defined INIT_PARAM
+    P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
+#else
+  if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
+    param->cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+#endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
 #ifndef INIT_PARAM

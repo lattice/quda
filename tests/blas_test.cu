@@ -9,21 +9,20 @@
 
 
 // volume per GPU (full lattice dimensions)
-const int LX = 24;
-const int LY = 24;
-const int LZ = 24;
-const int LT = 24;
+const int LX = 16;
+const int LY = 16;
+const int LZ = 32;
+const int LT = 32;
 const int Nspin = 4;
 
-// corresponds to 1 iterations for V=24^4, Nspin = 4, at half precision
-const int Niter = 1 * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
-//const int Niter = 1;// * (24*24*24*24*4) / (LX * LY * LZ * LT * Nspin);
+// corresponds to 1 iterations for V=16^4, Nspin = 4, at half precision
+const int Niter = max(1, 1 * (16*16*16*16*4) / (LX * LY * LZ * LT * Nspin));
 
-const int Nkernels = 30;
+const int Nkernels = 31;
 const int ThreadMin = 32;
-const int ThreadMax = 512;
+const int ThreadMax = 256;
 const int GridMin = 1;
-const int GridMax = 128;
+const int GridMax = 256;
 
 cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
@@ -242,58 +241,62 @@ double benchmark(int kernel, const int niter) {
       caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
       break;
 
-      // double
     case 17:
+      caxpyXmazCuda(a2, *xD, *yD, *zD);
+      break;
+
+      // double
+    case 18:
       normCuda(*xD);
       break;
 
-    case 18:
+    case 19:
       reDotProductCuda(*xD, *yD);
       break;
 
-    case 19:
+    case 20:
       axpyNormCuda(a, *xD, *yD);
       break;
 
-    case 20:
+    case 21:
       xmyNormCuda(*xD, *yD);
       break;
       
-    case 21:
+    case 22:
       caxpyNormCuda(a2, *xD, *yD);
       break;
 
-    case 22:
+    case 23:
       caxpyXmazNormXCuda(a2, *xD, *yD, *zD);
       break;
 
-    case 23:
+    case 24:
       cabxpyAxNormCuda(a, b2, *xD, *yD);
       break;
 
     // double2
-    case 24:
+    case 25:
       cDotProductCuda(*xD, *yD);
       break;
 
-    case 25:
+    case 26:
       xpaycDotzyCuda(*xD, a, *yD, *zD);
       break;
       
-    case 26:
+    case 27:
       caxpyDotzyCuda(a2, *xD, *yD, *zD);
       break;
 
     // double3
-    case 27:
+    case 28:
       cDotProductNormACuda(*xD, *yD);
       break;
 
-    case 28:
+    case 29:
       cDotProductNormBCuda(*xD, *yD);
       break;
 
-    case 29:
+    case 30:
       caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
@@ -464,19 +467,28 @@ double test(int kernel) {
       error = ERROR(w); }
     break;
 
-    // double
   case 17:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {caxpyXmazCuda(a, *xD, *yD, *zD);
+     caxpyXmazCpu(a, *xH, *yH, *zH);
+     error = ERROR(y) + ERROR(x);}
+    break;
+
+    // double
+  case 18:
     *xD = *xH;
     error = fabs(normCuda(*xD) - normCpu(*xH)) / normCpu(*xH);
     break;
     
-  case 18:
+  case 19:
     *xD = *xH;
     *yD = *yH;
     error = fabs(reDotProductCuda(*xD, *yD) - reDotProductCpu(*xH, *yH)) / fabs(reDotProductCpu(*xH, *yH));
     break;
 
-  case 19:
+  case 20:
     *xD = *xH;
     *yD = *yH;
     {double d = axpyNormCuda(a, *xD, *yD);
@@ -484,7 +496,7 @@ double test(int kernel) {
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
-  case 20:
+  case 21:
     *xD = *xH;
     *yD = *yH;
     {double d = xmyNormCuda(*xD, *yD);
@@ -492,7 +504,7 @@ double test(int kernel) {
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
     
-  case 21:
+  case 22:
     *xD = *xH;
     *yD = *yH;
     {double d = caxpyNormCuda(a, *xD, *yD);
@@ -500,7 +512,7 @@ double test(int kernel) {
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
-  case 22:
+  case 23:
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
@@ -509,7 +521,7 @@ double test(int kernel) {
       error = ERROR(y) + ERROR(x) + fabs(d-h)/fabs(h);}
     break;
 
-  case 23:
+  case 24:
     *xD = *xH;
     *yD = *yH;
     {double d = cabxpyAxNormCuda(a, b2, *xD, *yD);
@@ -518,13 +530,13 @@ double test(int kernel) {
     break;
 
     // double2
-  case 24:
+  case 25:
     *xD = *xH;
     *yD = *yH;
     error = abs(cDotProductCuda(*xD, *yD) - cDotProductCpu(*xH, *yH)) / abs(cDotProductCpu(*xH, *yH));
     break;
     
-  case 25:
+  case 26:
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
@@ -534,7 +546,7 @@ double test(int kernel) {
     }
     break;
     
-  case 26:
+  case 27:
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
@@ -544,7 +556,7 @@ double test(int kernel) {
     break;
 
     // double3
-  case 27:
+  case 28:
     *xD = *xH;
     *yD = *yH;
     { double3 d = cDotProductNormACuda(*xD, *yD);
@@ -552,7 +564,7 @@ double test(int kernel) {
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
     
-  case 28:
+  case 29:
     *xD = *xH;
     *yD = *yH;
     { double3 d = cDotProductNormBCuda(*xD, *yD);
@@ -560,7 +572,7 @@ double test(int kernel) {
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
     
-  case 29:
+  case 30:
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
@@ -634,6 +646,7 @@ int main(int argc, char** argv)
     "cabxpyAx",
     "caxpbypz",
     "caxpbypczpw",
+    "caxpyXmaz",
     "norm",
     "reDotProduct",
     "axpyNorm",

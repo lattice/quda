@@ -661,7 +661,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 	    // Record the end of the scattering
 	    CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
 	    
-	    cudaStreamSynchronize(streams[2*i+dir]);
 	    // Scatter into the end zone
 	    face->scatter(*inSpinor, dagger, 2*i+dir);
 	    
@@ -722,7 +721,8 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
   if (in->Precision() != gauge.Precision())
-    errorQuda("Mixing gauge and spinor precision not supported");
+    errorQuda("Mixing gauge %d and spinor %d precision not supported", 
+	      gauge.Precision(), in->Precision());
 
   const void *xv = (x ? x->V() : 0);
   const void *xn = (x ? x->Norm() : 0);

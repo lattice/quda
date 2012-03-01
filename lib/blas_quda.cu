@@ -652,6 +652,30 @@ void caxpbypczpwCuda(const quda::Complex &a, cudaColorSpinorField &x, const quda
 }
 
 /**
+   double caxpyXmazCuda(c a, V x, V y, V z){}
+   
+   First performs the operation y[i] = a*x[i] + y[i]
+   Second performs the operator x[i] -= a*z[i]
+*/
+template <typename Float2, typename FloatN>
+struct caxpyxmaz {
+  Float2 a;
+  caxpyxmaz(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+  __device__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+  { caxpy_(a, x, y); x-= a.x*z; }
+  static int streams() { return 5; } //! total number of input and output streams
+  static int flops() { return 8; } //! flops per element
+};
+
+void caxpyXmazCuda(const quda::Complex &a, cudaColorSpinorField &x, 
+			  cudaColorSpinorField &y, cudaColorSpinorField &z) {
+  const int kernel = 17;
+  blasCuda<caxpyxmaz,1,1,0,0>(kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), 
+			      make_double2(0.0, 0.0), x, y, z, x);
+}
+
+
+/**
    Return the L2 norm of x
 */
 __device__ double norm2_(const double2 &a) { return a.x*a.x + a.y*a.y; }
@@ -669,7 +693,7 @@ struct Norm2 {
 #include <reduce_core.h>
 
 double normCuda(const cudaColorSpinorField &x) {
-  const int kernel = 17;
+  const int kernel = 18;
   cudaColorSpinorField &y = (cudaColorSpinorField&)x; // FIXME
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0>
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
@@ -692,7 +716,7 @@ struct Dot {
 };
 
 double reDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 18;
+  const int kernel = 19;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,Dot,0,0,0>
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
@@ -712,7 +736,7 @@ struct axpyNorm2 {
 };
 
 double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 19;
+  const int kernel = 20;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0>
     (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
@@ -731,7 +755,7 @@ struct xmyNorm2 {
 };
 
 double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 20;
+  const int kernel = 21;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,xmyNorm2,0,1,0>
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
@@ -751,7 +775,7 @@ struct caxpyNorm2 {
 };
 
 double caxpyNormCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 21;
+  const int kernel = 22;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyNorm2,0,1,0>
     (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, x, x, x);
 }
@@ -774,7 +798,7 @@ struct caxpyxmaznormx {
 
 double caxpyXmazNormXCuda(const quda::Complex &a, cudaColorSpinorField &x, 
 			  cudaColorSpinorField &y, cudaColorSpinorField &z) {
-  const int kernel = 22;
+  const int kernel = 23;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyxmaznormx,1,1,0>
     (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
 }
@@ -798,7 +822,7 @@ struct cabxpyaxnorm {
 
 double cabxpyAxNormCuda(const double &a, const quda::Complex &b, 
 			cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 23;
+  const int kernel = 24;
   return reduceCuda<double,QudaSumFloat,QudaSumFloat,cabxpyaxnorm,1,1,0>
     (kernel, make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x, x);
 }
@@ -822,7 +846,7 @@ struct Cdot {
 };
 
 quda::Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 24;
+  const int kernel = 25;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0>
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   return quda::Complex(cdot.x, cdot.y);
@@ -844,7 +868,7 @@ struct xpaycdotzy {
 };
 
 quda::Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z) {
-  const int kernel = 25;
+  const int kernel = 26;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,xpaycdotzy,0,1,0>
     (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
   return quda::Complex(cdot.x, cdot.y);
@@ -867,7 +891,7 @@ struct caxpydotzy {
 
 quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 		       cudaColorSpinorField &z) {
-  const int kernel = 26;
+  const int kernel = 27;
   double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0>
     (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
   return quda::Complex(cdot.x, cdot.y);
@@ -895,7 +919,7 @@ struct CdotNormA {
 };
 
 double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 27;
+  const int kernel = 28;
   return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormA,0,0,0>
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
@@ -921,7 +945,7 @@ struct CdotNormB {
 };
 
 double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-  const int kernel = 28;
+  const int kernel = 29;
   return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormB,0,0,0>
     (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
 }
@@ -944,7 +968,7 @@ double3 caxpbypzYmbwcDotProductUYNormYCuda(const quda::Complex &a, cudaColorSpin
 					   const quda::Complex &b, cudaColorSpinorField &y,
 					   cudaColorSpinorField &z, cudaColorSpinorField &w,
 					   cudaColorSpinorField &u) {
-  const int kernel = 29;
+  const int kernel = 30;
   return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1>
     (kernel, make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
 }

@@ -130,6 +130,7 @@ int main(int argc, char **argv)
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
+  QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
 
   // offsets used only by multi-shift solver
   int num_offsets = 4;
@@ -153,11 +154,13 @@ int main(int argc, char **argv)
   gauge_param.reconstruct = link_recon;
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.cuda_prec_precondition = cuda_prec_precondition;
+  gauge_param.reconstruct_precondition = link_recon_sloppy;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.4180;
+  double mass = -0.2180;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -171,19 +174,19 @@ int main(int argc, char **argv)
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+  inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.gcrNkrylov = 30;
   inv_param.tol = 5e-7;
-  inv_param.maxiter = 2000;
+  inv_param.maxiter = 30;
   inv_param.reliable_delta = 1e-1; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
   inv_param.verbosity_precondition = QUDA_SILENT;
-  inv_param.prec_precondition = cuda_prec_sloppy;
-  inv_param.omega = 0.7;
+  inv_param.prec_precondition = cuda_prec_precondition;
+  inv_param.omega = 1.0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -215,6 +218,7 @@ int main(int argc, char **argv)
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
 
