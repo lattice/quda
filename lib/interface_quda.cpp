@@ -1288,16 +1288,19 @@ do_create_precise_cuda_gauge(void)
 {
   QudaPrecision prec = gauge_param->cuda_prec;
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;
-
+  QudaPrecision prec_precondition = gauge_param->cuda_prec_precondition;
+  
   //the sloppy gauge field will be filled, and needs to backup
   cudaGaugeField *tmp_fat = gaugeFatSloppy;
   cudaGaugeField *tmp_long= gaugeLongSloppy;
+  cudaGaugeField *tmp_fat_precondition = gaugeFatPrecondition;
+  cudaGaugeField *tmp_long_precondition = gaugeLongPrecondition;
 
-  gaugeFatPrecise = gaugeFatSloppy = NULL;
-  gaugeLongPrecise = gaugeLongSloppy = NULL;
+  gaugeFatPrecise = gaugeFatSloppy = gaugeFatPrecondition = NULL;
+  gaugeLongPrecise = gaugeLongSloppy = gaugeLongPrecondition = NULL;
   
   //create precise links
-  gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec;
+  gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = gauge_param->cuda_prec_precondition = prec;
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
   gauge_param->ga_pad = fatlink_pad;
   gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
@@ -1313,10 +1316,14 @@ do_create_precise_cuda_gauge(void)
   //set prec/prec_sloppy it back
   gauge_param->cuda_prec = prec;
   gauge_param->cuda_prec_sloppy =prec_sloppy;
-  
+  gauge_param->cuda_prec_precondition = prec_precondition;
+
   //set the sloopy gauge filed back
   gaugeFatSloppy = tmp_fat;
   gaugeLongSloppy = tmp_long;
+  
+  gaugeFatPrecondition = tmp_fat_precondition;
+  gaugeLongPrecondition = tmp_long_precondition;
   return;
 }
 
@@ -1326,17 +1333,20 @@ do_create_sloppy_cuda_gauge(void)
 
   QudaPrecision prec = gauge_param->cuda_prec;
   QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;  
+  QudaPrecision prec_precondition = gauge_param->cuda_prec_precondition;
 
   //the precise gauge field will be filled, and needs to backup
   cudaGaugeField *tmp_fat = gaugeFatPrecise;
   cudaGaugeField *tmp_long = gaugeLongPrecise;
+  cudaGaugeField *tmp_fat_precondition = gaugeFatPrecondition;
+  cudaGaugeField *tmp_long_precondition = gaugeLongPrecondition;
   
-
-  gaugeFatPrecise = gaugeFatSloppy = NULL;
-  gaugeLongPrecise = gaugeLongSloppy = NULL;
+  gaugeFatPrecise = gaugeFatSloppy = gaugeFatPrecondition = NULL;
+  gaugeLongPrecise = gaugeLongSloppy = gaugeLongPrecondition= NULL;
 
   //create sloppy links
-  gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = prec_sloppy; 
+  gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = 
+    gauge_param->cuda_prec_precondition = prec_sloppy; 
   gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
   gauge_param->ga_pad = fatlink_pad;
   gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
@@ -1351,10 +1361,15 @@ do_create_sloppy_cuda_gauge(void)
   //set prec/prec_sloppy it back
   gauge_param->cuda_prec = prec;
   gauge_param->cuda_prec_sloppy =prec_sloppy;
+  gauge_param->cuda_prec_precondition = prec_precondition;
   
   //set the sloopy gauge filed back
   gaugeFatPrecise = tmp_fat;
   gaugeLongPrecise = tmp_long;  
+  
+  gaugeFatPrecondition = tmp_fat_precondition;
+  gaugeLongPrecondition = tmp_long_precondition;
+
   return;
 }
 
@@ -1467,10 +1482,10 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // At this moment, the precise fat gauge is not created (NULL)
   // but we set it to be the same as sloppy to avoid segfault 
   // in creating the dirac since it is needed 
-  gaugeFatPrecise = gaugeFatSloppy;
+  gaugeFatPrecondition = gaugeFatPrecise = gaugeFatSloppy;
   createDirac(diracParam, *param, pc_solve);
   // resetting to NULL
-  gaugeFatPrecise = NULL;
+  gaugeFatPrecise = NULL; gaugeFatPrecondition = NULL;
 
   Dirac &diracSloppy = *dSloppy;
 
@@ -1551,7 +1566,10 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   b = new cudaColorSpinorField(cudaParam);
   *b = *h_b;
   
+  /*FIXME: to avoid setfault*/
+  gaugeFatPrecondition =gaugeFatSloppy;
   createDirac(diracParam, *param, pc_solve);
+  gaugeFatPrecondition = NULL;
   {
     Dirac& dirac2 = *d;
     Dirac& diracSloppy2 = *dSloppy;
