@@ -244,8 +244,9 @@ void cudaColorSpinorField::zero() {
 
 void cudaColorSpinorField::zeroPad() {
   size_t pad_bytes = (stride - volume) * precision * fieldOrder;
-  for (int i=0; i<length / stride; i++) {
-    cudaMemset((char*)v + (volume + i*stride)*fieldOrder*precision, 0, pad_bytes);      
+  int Npad = nColor * nSpin * 2 / fieldOrder;
+  for (int i=0; i<Npad; i++) {
+    if (pad_bytes) cudaMemset((char*)v + (volume + i*stride)*fieldOrder*precision, 0, pad_bytes);      
   }
 }
 
