@@ -1,9 +1,11 @@
+
+
 #ifndef _QUDA_H
 #define _QUDA_H
 
 #include <enum_quda.h>
 
-#define QUDA_VERSION 000399 // version 0.3.2
+#define QUDA_VERSION 000330 // version 0.3.3 - internal developement only
 
 #ifdef __cplusplus
 extern "C" {
