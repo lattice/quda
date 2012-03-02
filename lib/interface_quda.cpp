@@ -452,7 +452,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   // create the mirror preconditioner clover field
-  if (inv_param->clover_cuda_prec_sloppy != inv_param->clover_cuda_prec_precondition) {
+  if (inv_param->clover_cuda_prec_sloppy != inv_param->clover_cuda_prec_precondition &&
+      inv_param->clover_cuda_prec_precondition != QUDA_INVALID_PRECISION) {
     clover_param.precision = inv_param->clover_cuda_prec_precondition;
     cloverPrecondition = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
 					     inv_param->clover_order, clover_param); 
