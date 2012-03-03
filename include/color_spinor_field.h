@@ -263,6 +263,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   void destroy();
   void copy(const cudaColorSpinorField &);
 
+  void zeroPad();
+
  public:
   //cudaColorSpinorField();
   cudaColorSpinorField(const cudaColorSpinorField&);
