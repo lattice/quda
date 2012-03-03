@@ -832,15 +832,13 @@ const char*
 get_quda_ver_str()
 {
   static char vstr[32];
-  int ver = QUDA_VERSION;
-  int major_num = ver/4096;
-  int minor_num = ver/64 - major_num*64;
-  int ext_num = ver - minor_num*64-major_num*4096;
+  int major_num = QUDA_MAJOR_NUMBER;
+  int minor_num = QUDA_MINOR_NUMBER;
+  int ext_num = QUDA_EXTENSION_NUMBER;
   sprintf(vstr, "%1d.%1d.%1d", 
 	  major_num,
 	  minor_num,
 	  ext_num);
-  
   return vstr;
 }
 
