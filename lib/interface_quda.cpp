@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <sys/time.h>
 
 #ifdef HAVE_NUMA
 #include <numa.h>
@@ -41,6 +42,7 @@
 #include "mpicomm.h"
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
+#define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
 
 #define spinorSiteSize 24 // real numbers per spinor
@@ -1883,8 +1885,12 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 int
 computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
                       void* loop_coeff, int num_paths, int max_length, double eb3,
-                      QudaGaugeParam* qudaGaugeParam)
+                      QudaGaugeParam* qudaGaugeParam, double* timeinfo)
 {
+  
+  struct timeval t0, t1, t2, t3, t4;
+  
+  gettimeofday(&t0,NULL);
 
 #ifdef MULTI_GPU
   int E[4];
@@ -1953,8 +1959,13 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif
   
   cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+
+  gettimeofday(&t1,NULL);  
   
-  gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, 
+		   path_length, loop_coeff, num_paths, max_length);
+
+  gettimeofday(&t2,NULL);
 
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   
@@ -1963,7 +1974,15 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   
   delete cudaSiteLink;
   delete cudaMom;
-   
+  
+  gettimeofday(&t3,NULL); 
+
+  if(timeinfo){
+    timeinfo[0] = TDIFF(t0, t1);
+    timeinfo[1] = TDIFF(t1, t2);
+    timeinfo[2] = TDIFF(t2, t3);
+  }
+
   return 0;  
 }
 

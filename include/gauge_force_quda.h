@@ -11,7 +11,7 @@ extern "C"{
 			void* path_coeff, int num_paths, int max_length);
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 			    void* loop_coeff, int num_paths, int max_length, double eb3,
-			    QudaGaugeParam* qudaGaugeParam);
+			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
 #ifdef __cplusplus
 }
 #endif

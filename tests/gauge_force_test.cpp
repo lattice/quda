@@ -30,6 +30,7 @@ extern int ydim;
 extern int zdim;
 extern int tdim;
 extern void usage(char** argv);
+int attempts = 1;
 
 int Z[4];
 int V;
@@ -579,36 +580,41 @@ gauge_force_test(void)
   
   
   struct timeval t0, t1;
-  gettimeofday(&t0, NULL);
+  double timeinfo[3];
+  /* Multiple execution to exclude warmup time in the first run*/
+  for (int i =0;i < attempts; i++){
+    gettimeofday(&t0, NULL);
 #ifdef MULTI_GPU
-  computeGaugeForceQuda(mom, sitelink_ex,  input_path_buf, length,
-			loop_coeff, num_paths, max_length, eb3,
-			&qudaGaugeParam);
-
+    computeGaugeForceQuda(mom, sitelink_ex,  input_path_buf, length,
+			  loop_coeff, num_paths, max_length, eb3,
+			  &qudaGaugeParam, timeinfo);
+    
 #else
-  computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
-			loop_coeff, num_paths, max_length, eb3,
-			&qudaGaugeParam);
+    computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
+			  loop_coeff, num_paths, max_length, eb3,
+			&qudaGaugeParam, timeinfo);
 #endif  
-  gettimeofday(&t1, NULL);
+    gettimeofday(&t1, NULL);
+  }
   
-  double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
+  double total_time = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
   //The number comes from CPU implementation in MILC, gauge_force_imp.c
   int flops=153004;
     
   if (verify_results){	
+    for(int i = 0;i < attempts;i++){
 #ifdef MULTI_GPU
-    //last arg=0 means no optimization for communication, i.e. exchange data in all directions 
-    //even they are not partitioned
-    exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex_2d,
-			     QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0);    
-    gauge_force_reference(refmom, eb3, sitelink_2d, sitelink_ex_2d, qudaGaugeParam.cpu_prec,
-			  input_path_buf, length, loop_coeff, num_paths);
+      //last arg=0 means no optimization for communication, i.e. exchange data in all directions 
+      //even they are not partitioned
+      exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex_2d,
+			       QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0);    
+      gauge_force_reference(refmom, eb3, sitelink_2d, sitelink_ex_2d, qudaGaugeParam.cpu_prec,
+			    input_path_buf, length, loop_coeff, num_paths);
 #else
-    gauge_force_reference(refmom, eb3, sitelink_2d, NULL, qudaGaugeParam.cpu_prec,
-			  input_path_buf, length, loop_coeff, num_paths);
+      gauge_force_reference(refmom, eb3, sitelink_2d, NULL, qudaGaugeParam.cpu_prec,
+			    input_path_buf, length, loop_coeff, num_paths);
 #endif
-
+    }
   }
   
   int res;
@@ -619,8 +625,11 @@ gauge_force_test(void)
   
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
   
-  double perf = 1.0* flops*V/(secs*1e+9);
-  printf("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
+  double perf = 1.0* flops*V/(total_time*1e+9);
+  double kernel_perf = 1.0*flops*V/(timeinfo[1]*1e+9);
+  printf("init and cpu->gpu time: %.2f ms, kernel time: %.2f ms, gpu->cpu and cleanup time: %.2f  total time =%.2f ms\n", 
+	 timeinfo[0]*1e+3, timeinfo[1]*1e+3, timeinfo[2]*1e+3, total_time*1e+3);
+  printf("kernel performance: %.2f GFLOPS, overall performance : %.2f GFOPS\n", kernel_perf, perf);
   
   for(int dir = 0; dir < 4; dir++){
     for(int i=0;i < num_paths; i++){
@@ -670,12 +679,13 @@ display_test_info()
 {
     printf("running the following test:\n");
     
-    printf("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order\n");
-    printf("%s                       %s                         %d/%d/%d                       %d                  %s\n", 
+    printf("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order    Attempts\n");
+    printf("%s                       %s                         %d/%d/%d                       %d                  %s           %d\n",  
 	   get_prec_str(link_prec),
 	   get_recon_str(link_recon), 
 	   xdim,ydim,zdim, tdim, 
-	   get_gauge_order_str(gauge_order));
+	   get_gauge_order_str(gauge_order),
+	   attempts);
     return ;
     
 }
@@ -685,6 +695,7 @@ usage_extra(char** argv )
 {
   printf("Extra options:\n");
   printf("    --gauge-order  <qdp/milc>                 # Gauge storing order in CPU\n");
+  printf("    --attempts  <n>                           # Number of tests\n");
   printf("    --verify                                  # Verify the GPU results using CPU results\n");
   return ;
 }
@@ -715,7 +726,19 @@ main(int argc, char **argv)
 	i++;
 	continue;
       }
-      
+      if( strcmp(argv[i], "--attempts") == 0){
+	if(i+1 >= argc){
+	  usage(argv);
+	}
+	
+	attempts = atoi(argv[i+1]);
+	if(attempts <= 0){
+	  printf("ERROR: invalid number of attempts(%d)\n", attempts);
+	}
+	i++;
+	continue;
+      }
+     
       if( strcmp(argv[i], "--verify") == 0){
 	verify_results=1;
 	continue;	    
