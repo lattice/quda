@@ -2,7 +2,9 @@
 #include <gauge_field.h>
 
 #include "gauge_force_quda.h"
-
+#ifdef MULTI_GPU
+#include "face_quda.h"
+#endif
 
 
 __constant__ int path_max_length;
@@ -196,7 +198,15 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
     void* linkEven = (void*)cudaSiteLink.Even_p();
     void* linkOdd = (void*)cudaSiteLink.Odd_p();        
     
-    
+    kernel_param_t kparam;
+#ifdef MULTI_GPU
+    for(int i =0;i < 4;i++){
+      kparam.ghostDim[i] = commDimPartitioned(i);
+    }
+#endif
+
+    kparam.threads  = volume/2;
+
     if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
       cudaBindTexture(0, siteLink0TexDouble, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
       cudaBindTexture(0, siteLink1TexDouble, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);			      
@@ -216,24 +226,24 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
 									dir, eb3,
 									(double2*)linkEven, (double2*)linkOdd, 
 									input_path_d, length_d, (double*)path_coeff_d,
-									num_paths);   
+									     num_paths, kparam);   
 	parity_compute_gauge_force_kernel_dp18<1><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
 									dir, eb3,
 									(double2*)linkEven, (double2*)linkOdd, 
 									input_path_d, length_d, (double*)path_coeff_d,
-									num_paths);  
+									     num_paths, kparam);  
 		
       }else{ //QUDA_RECONSTRUCT_12
    	parity_compute_gauge_force_kernel_dp12<0><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
 									     dir, eb3,
 									     (double2*)linkEven, (double2*)linkOdd, 
 									     input_path_d, length_d, (double*)path_coeff_d,
-									     num_paths);   
+									     num_paths, kparam);   
 	parity_compute_gauge_force_kernel_dp12<1><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
 									     dir, eb3,
 									     (double2*)linkEven, (double2*)linkOdd, 
 									     input_path_d, length_d, (double*)path_coeff_d,
-									     num_paths);    
+									     num_paths, kparam);    
       }
     }else{ //QUDA_SINGLE_PRECISION
       if(param->reconstruct == QUDA_RECONSTRUCT_NO){
@@ -242,19 +252,19 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
 									     dir, eb3,
 									     (float2*)linkEven, (float2*)linkOdd, 
 									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths);   
+									     num_paths, kparam);   
 	parity_compute_gauge_force_kernel_sp18<1><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
 									     dir, eb3,
 									     (float2*)linkEven, (float2*)linkOdd, 
 									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths); 
+									     num_paths, kparam); 
 	
       }else{ //QUDA_RECONSTRUCT_12
 	parity_compute_gauge_force_kernel_sp12<0><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
 									     dir, eb3,
 									     (float4*)linkEven, (float4*)linkOdd, 
 									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths);   
+									     num_paths, kparam);   
 	//odd
 	/* The reason we do not switch the even/odd function input paramemters and the texture binding
 	 * is that we use the oddbit to decided where to load, in the kernel function
@@ -263,7 +273,7 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
 									     dir, eb3,
 									     (float4*)linkEven, (float4*)linkOdd, 
 									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths);  
+									     num_paths, kparam);  
       }
       
     }

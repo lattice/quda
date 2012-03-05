@@ -747,7 +747,7 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_o
   int gaugebytes = gaugeSiteSize*gPrecision;
   int a, b, c,d;
   for(int dir =0;dir < 4;dir++){
-    //if( (!commDimPartitioned(dir)) && optflag) continue;
+    if( (!commDimPartitioned(dir)) && optflag) continue;
     if(commDimPartitioned(dir)){
       //fill the sendbuf here
       //back

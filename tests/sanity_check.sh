@@ -97,7 +97,7 @@ function complete_gauge_force_check {
     prog="./gauge_force_test"
     precs="double single"
     recons="18 12"
-    gauge_orders="milc qdp"
+    gauge_orders="qdp milc"
     partitions="0 8 12 14 15"
 
     $prog --version |grep single >& /dev/null

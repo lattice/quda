@@ -1840,7 +1840,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     llfat_init_cuda_ex(qudaGaugeParam_ex);
 #ifdef MULTI_GPU
     exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
-			     cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 1);
+			     cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0);
 #endif
     gettimeofday(&t7, NULL);
     loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);

@@ -1,4 +1,9 @@
 
+#define xcomm kparam.ghostDim[0]
+#define ycomm kparam.ghostDim[1]
+#define zcomm kparam.ghostDim[2]
+#define tcomm kparam.ghostDim[3]
+
 #if (N_IN_FLOATN == 4)
 #define linka00_re LINKA0.x
 #define linka00_im LINKA0.y
@@ -86,20 +91,20 @@
 #define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
     switch(mydir){							\
     case 0:								\
-      new_mem_idx = idx+1;						\
-      new_x1 +=1;							\
+      new_mem_idx = ((!xcomm) && (new_x1 == (X1+1)))?(idx - X1m1): idx+1; \
+      new_x1 = ((!xcomm)&& (new_x1 == (X1+1)))? (new_x1 - X1m1):(new_x1+1); \
       break;								\
     case 1:								\
-      new_mem_idx = idx+E1;						\
-      new_x2 +=1;							\
+      new_mem_idx = ((!ycomm) && (new_x2 == (X2+1)))?(idx - X2m1*E1): idx+E1; \
+      new_x2 = ((!ycomm)&& (new_x2 == (X2+1)))? (new_x2 - X2m1):(new_x2+1); \
       break;								\
     case 2:								\
-      new_mem_idx = idx+E2E1;						\
-      new_x3 +=1;							\
+      new_mem_idx = ((!zcomm) && (new_x3 == (X3+1)))?(idx - X3m1*E2E1): idx+E2E1; \
+      new_x3 = ((!zcomm)&& (new_x3 == (X3+1)))? (new_x3 - X3m1):(new_x3+1); \
       break;								\
     case 3:								\
-      new_mem_idx = idx+E3E2E1;						\
-      new_x4 +=1;							\
+      new_mem_idx = ((!tcomm) && (new_x4 == (X4+1)))?(idx - X4m1*E3E2E1): idx+E3E2E1; \
+      new_x4 = ((!tcomm)&& (new_x4 == (X4+1)))? (new_x4 - X4m1):(new_x4+1); \
       break;								\
     }									\
   }while(0)
@@ -107,20 +112,20 @@
 #define COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx) do {		\
     switch(mydir){							\
     case 0:								\
-      new_mem_idx = idx -1;						\
-      new_x1 -= 1;							\
+      new_mem_idx = ((!xcomm) && new_x1 == 2)?(idx+X1m1):(idx-1);	\
+      new_x1 = ((!xcomm) && new_x1 == 2)? (new_x1+X1m1): (new_x1-1);	\
       break;								\
     case 1:								\
-      new_mem_idx = idx - E1;						\
-      new_x2 -= 1;							\
+      new_mem_idx = ((!ycomm) && new_x2 == 2)?(idx+X2m1*E1):(idx-E1);	\
+      new_x2 = ((!ycomm) && new_x2 == 2)? (new_x2+X2m1): (new_x2-1);	\
       break;								\
     case 2:								\
-      new_mem_idx = idx - E2E1;						\
-      new_x3 -= 1;							\
+      new_mem_idx = ((!zcomm) && new_x3 == 2)?(idx+X3m1*E2E1):(idx-E2E1); \
+      new_x3 = ((!zcomm) && new_x3 == 2)? (new_x3+X3m1): (new_x3-1);	\
       break;								\
     case 3:								\
-      new_mem_idx = idx - E3E2E1;					\
-      new_x4 -= 1;							\
+      new_mem_idx = ((!tcomm) && new_x4 == 2)?(idx+X4m1*E3E2E1):(idx-E3E2E1); \
+      new_x4 = ((!tcomm) && new_x4 == 2)? (new_x4+X4m1): (new_x4-1);	\
       break;								\
     }									\
   }while(0)
@@ -472,7 +477,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
 			int dir, double eb3,
 			FloatN* linkEven, FloatN* linkOdd,
 			int* input_path, 
-			int* length, Float* path_coeff, int num_paths)
+			int* length, Float* path_coeff, int num_paths, kernel_param_t kparam)
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
