@@ -5,7 +5,10 @@
 
 #include <enum_quda.h>
 
-#define QUDA_VERSION 000330 // version 0.3.3 - internal developement only
+#define QUDA_VERSION_MAJOR       0
+#define QUDA_VERSION_MINOR       3
+#define QUDA_VERSION_SUBMINOR   3 
+#define QUDA_VERSION ((QUDA_VERSION_MAJOR<<16) | (QUDA_VERSION_MINOR<<8) | QUDA_VERSION_SUBMINOR)
 
 #ifdef __cplusplus
 extern "C" {
