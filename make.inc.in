@@ -38,10 +38,6 @@ OVERLAP_COMMS = @OVERLAP_COMMS@  # set to 'yes' to overlap comms and compute
 # Do we have qio support?
 BUILD_QIO = @BUILD_QIO@ # set to 'yes' to build QIO code for binary i/o
 
-# Do we compile the numa support
-#HAVE_NUMA = @HAVE_NUMA@
-HAVE_NUMA = no
-
 FECC = @FECC@ 	      # Front end CC
 FECXX = @FECXX@           # Front end CXX
 
@@ -200,12 +196,6 @@ ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   NVCCOPT += -DFERMI_NO_DBLE_TEX
   COPT += -DFERMI_NO_DBLE_TEX
 endif
-
-ifeq ($(strip $(HAVE_NUMA)), yes)
-  COPT += -DHAVE_NUMA
-  LIB += -lnuma
-endif
-
 
 CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
 CXXFLAGS = -Wall -O3 $(COPT) $(INC)

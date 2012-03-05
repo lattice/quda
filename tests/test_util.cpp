@@ -1611,16 +1611,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--numa") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    qudaSetNumaConfig(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
   if( strcmp(argv[i], "--load-gauge") == 0){
     if (i+1 >= argc){
       usage(argv);
