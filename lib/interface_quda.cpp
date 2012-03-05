@@ -16,7 +16,7 @@
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
-
+#include <numa_affinity.h>
 
 #include <cuda.h>
 #ifdef MULTI_GPU
@@ -63,7 +63,7 @@ extern bool qudaPtNm1;
 #include "face_quda.h"
 
 QudaVerbosity verbosity;
-int verbose = 0;
+int numa_affinity_enabled = 1;
 
 cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
@@ -90,6 +90,11 @@ bool diracTune = false;
 
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
+
+void disableNumaAffinityQuda(void)
+{
+  numa_affinity_enabled=0;
+}
 
 int getGpuCount()
 {
@@ -176,7 +181,9 @@ void initQuda(int dev)
   printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
 
   cudaSetDevice(dev);
-  
+  if(numa_affinity_enabled){
+    setNumaAffinity(dev);
+  }
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
 

@@ -8,14 +8,14 @@ QUDA_OBJS = inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o
 	lattice_field.o gauge_field.o cpu_gauge_field.o cuda_gauge_field.o \
 	dirac_clover.o dirac_wilson.o dirac_staggered.o dirac_domain_wall.o  \
 	dirac_twisted_mass.o tune.o fat_force_quda.o hisq_force_utils.o \
-	dslash_quda.o blas_quda.o ${FACE_COMMS} ${FATLINK_QUDA_ITF}
+	dslash_quda.o blas_quda.o numa_affinity.o ${FACE_COMMS} ${FATLINK_QUDA_ITF}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h dirac_quda.h	     \
 	dslash_quda.h enum_quda.h gauge_force_quda.h           \
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h        \
 	face_quda.h tune_quda.h mpicomm.h lattice_field.h gauge_field.h \
-	hisq_force_utils.h double_single.h texture.h
+	hisq_force_utils.h double_single.h texture.h numa_affinity.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_param.h blas_core.h reduce_core.h

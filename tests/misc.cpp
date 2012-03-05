@@ -766,14 +766,6 @@ get_test_type(int t)
     return ret;
 }
 
-void
-quda_set_verbose(int v)
-{
-    verbose = v;
-}
-
-
-
 QudaDslashType
 get_dslash_type(char* s)
 {
