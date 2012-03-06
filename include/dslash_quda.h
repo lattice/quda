@@ -2,6 +2,7 @@
 #define _DSLASH_QUDA_H
 
 #include <quda_internal.h>
+#include <tune_quda.h>
 #include <face_quda.h>
 #include <gauge_field.h>
 
@@ -42,39 +43,38 @@ void initGaugeFieldConstants(const cudaGaugeField &gauge);
 // plain Wilson Dslash  
 void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 		      const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-		      const double &k, const TuneParam *, const int *commDim);
+		      const double &k, const int *commDim);
 
 // clover Dslash
 void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 		      const FullClover cloverInv, const cudaColorSpinorField *in, 
 		      const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-		      const double &k, const TuneParam *, const int *commDim);
+		      const double &k, const int *commDim);
 
 // solo clover term
 void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
-		const cudaColorSpinorField *in, const int oddBit, const TuneParam &);
+		const cudaColorSpinorField *in, const int oddBit);
 
 // domain wall Dslash  
 void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
 			  const int parity, const int dagger, const cudaColorSpinorField *x, 
-			  const double &m_f, const double &k, const TuneParam *);
+			  const double &m_f, const double &k);
 
 // staggered Dslash    
 void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge,
 			 const cudaColorSpinorField *in, const int parity, const int dagger, 
-			 const cudaColorSpinorField *x, const double &k, const TuneParam *, 
+			 const cudaColorSpinorField *x, const double &k, 
 			 const int *commDim);
 
 // twisted mass Dslash  
 void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			   const int parity, const int dagger, const cudaColorSpinorField *x, 
-			   const double &kappa, const double &mu, const double &a, 
-			   const TuneParam *, const int *commDim);
+			   const double &kappa, const double &mu, const double &a, const int *commDim);
 
 // solo twist term
 void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const int dagger, const double &kappa, const double &mu,
-		     const QudaTwistGamma5Type, const TuneParam &);
+		     const QudaTwistGamma5Type);
 
 // face packing routines
 void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 

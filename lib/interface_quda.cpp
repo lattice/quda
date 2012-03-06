@@ -35,7 +35,7 @@
 
 #include "mpicomm.h"
 
-#define MAX(a,b) ((a)>(b)? (a):(b))
+#define MAX(a,b) ((a)>(b) ? (a):(b))
 
 
 #define spinorSiteSize 24 // real numbers per spinor
@@ -820,6 +820,7 @@ void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) 
   }
 }
 
+#if 0
 // tune the Dirac operators
 void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
   if (param.dirac_tune == QUDA_TUNE_YES && !diracTune) {
@@ -852,6 +853,7 @@ void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
     diracTune = true;
   }
 }
+#endif // 0
 
 cudaGaugeField* checkGauge(QudaInvertParam *param) {
   cudaGaugeField *cudaGauge = NULL;
@@ -940,7 +942,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
   }
 
-  tuneDirac(*param, pc_solution ? *x : x->Even());
+  //  tuneDirac(*param, pc_solution ? *x : x->Even());
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE) {
@@ -1171,7 +1173,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   // tune the Dirac Kernel
-  tuneDirac(*param, pc_solution ? *(x[0]) : (x[0])->Even());
+  //tuneDirac(*param, pc_solution ? *(x[0]) : (x[0])->Even());
   
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);

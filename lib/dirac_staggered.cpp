@@ -1,6 +1,5 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
-#include <tune_quda.h>
 
 DiracStaggered::DiracStaggered(const DiracParam &param) : 
   Dirac(param), fatGauge(param.fatGauge), longGauge(param.longGauge), 
@@ -11,14 +10,7 @@ DiracStaggered::DiracStaggered(const DiracParam &param) :
 }
 
 DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
-  fatGauge(dirac.fatGauge), longGauge(dirac.longGauge),
-  face(dirac.face)
-{
-  for (int i=0; i<5; i++) {
-    tuneDslash[i] = dirac.tuneDslash[i];
-    tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
-  }
-}
+  fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face) { }
 
 DiracStaggered::~DiracStaggered()
 {
@@ -29,40 +21,12 @@ DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac)
 {
   if (&dirac != this) {
     Dirac::operator=(dirac);
-    for (int i=0; i<5; i++) {
-      tuneDslash[i] = dirac.tuneDslash[i];
-      tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
-    }
     fatGauge = dirac.fatGauge;
     longGauge = dirac.longGauge;
     face = dirac.face;
   }
  
   return *this;
-}
-
-// Find the best block size parameters for the Dslash and DslashXpay kernels
-void DiracStaggered::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			  const cudaColorSpinorField &x) {
-  setDslashTuning(QUDA_TUNE_YES);
-
-  { // Tune Dslash
-    TuneDiracStaggeredDslash dslashTune(*this, out, in);
-    dslashTune.Benchmark(tuneDslash[0]);
-    for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) 
-	dslashTune.Benchmark(tuneDslash[i+1]);
-  }
-
-  { // Tune DslashXpay
-    TuneDiracStaggeredDslashXpay dslashXpayTune(*this, out, in, x);
-    dslashXpayTune.Benchmark(tuneDslashXpay[0]);
-    for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) 
-	dslashXpayTune.Benchmark(tuneDslashXpay[i+1]);
-  }
-
-  setDslashTuning(QUDA_TUNE_NO);
 }
 
 void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cudaColorSpinorField &out) const
@@ -97,7 +61,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
   checkParitySpinor(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, 0, 0, tuneDslash, commDim);
+  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, 0, 0, commDim);
   
   flops += 1146*in.Volume();
 }
@@ -113,8 +77,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
   checkParitySpinor(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, &x, k, 
-		      tuneDslashXpay, commDim);
+  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, &x, k, commDim);
   
   flops += (1146+12)*in.Volume();
 }

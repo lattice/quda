@@ -9,8 +9,6 @@
 
 #include <face_quda.h>
 
-class TuneParam;
-
 // Params for Dirac operator
 class DiracParam {
 
@@ -86,9 +84,6 @@ class Dirac {
   virtual ~Dirac();
   Dirac& operator=(const Dirac &dirac);
 
-  // Autotunes the block sizes for optimum performance
-  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &) = 0;
-
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   virtual void checkFullSpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   void checkSpinorAlias(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
@@ -119,10 +114,6 @@ class Dirac {
 // Full Wilson
 class DiracWilson : public Dirac {
 
- private:
-  TuneParam tuneDslash[5];
-  TuneParam tuneDslashXpay[5];
-
  protected:
   FaceBuffer face; // multi-gpu communication buffers
 
@@ -131,8 +122,6 @@ class DiracWilson : public Dirac {
   DiracWilson(const DiracWilson &dirac);
   virtual ~DiracWilson();
   DiracWilson& operator=(const DiracWilson &dirac);
-
-  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaParity parity) const;
@@ -174,7 +163,6 @@ class DiracClover : public DiracWilson {
 
  protected:
   cudaCloverField &clover;
-  TuneParam tuneClover;
   void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
 			 const cudaCloverField &) const;
 
@@ -183,8 +171,6 @@ class DiracClover : public DiracWilson {
   DiracClover(const DiracClover &dirac);
   virtual ~DiracClover();
   DiracClover& operator=(const DiracClover &dirac);
-
-  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
@@ -200,17 +186,11 @@ class DiracClover : public DiracWilson {
 // Even-odd preconditioned clover
 class DiracCloverPC : public DiracClover {
 
- private:
-  TuneParam tuneDslash[5];
-  TuneParam tuneDslashXpay[5];
-
  public:
   DiracCloverPC(const DiracParam &param);
   DiracCloverPC(const DiracCloverPC &dirac);
   virtual ~DiracCloverPC();
   DiracCloverPC& operator=(const DiracCloverPC &dirac);
-
-  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
   void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -233,10 +213,6 @@ class DiracCloverPC : public DiracClover {
 // Full domain wall 
 class DiracDomainWall : public DiracWilson {
 
- private:
-  TuneParam tuneDslash[5];
-  TuneParam tuneDslashXpay[5];
-
  protected:
   double m5;
   double kappa5;
@@ -246,8 +222,6 @@ class DiracDomainWall : public DiracWilson {
   DiracDomainWall(const DiracDomainWall &dirac);
   virtual ~DiracDomainWall();
   DiracDomainWall& operator=(const DiracDomainWall &dirac);
-
-  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 	      const QudaParity parity) const;
@@ -288,9 +262,6 @@ class DiracDomainWallPC : public DiracDomainWall {
 // Full twisted mass
 class DiracTwistedMass : public DiracWilson {
 
- private:
-  TuneParam tuneTwist;
-
  protected:
   double mu;
   void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -301,8 +272,6 @@ class DiracTwistedMass : public DiracWilson {
   DiracTwistedMass(const DiracTwistedMass &dirac);
   virtual ~DiracTwistedMass();
   DiracTwistedMass& operator=(const DiracTwistedMass &dirac);
-
-  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
 
@@ -319,17 +288,11 @@ class DiracTwistedMass : public DiracWilson {
 // Even-odd preconditioned twisted mass
 class DiracTwistedMassPC : public DiracTwistedMass {
 
- private:
-  TuneParam tuneDslash[5];
-  TuneParam tuneDslashXpay[5];
-
  public:
   DiracTwistedMassPC(const DiracParam &param);
   DiracTwistedMassPC(const DiracTwistedMassPC &dirac);
   virtual ~DiracTwistedMassPC();
   DiracTwistedMassPC& operator=(const DiracTwistedMassPC &dirac);
-
-  virtual void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   void TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
 
@@ -350,10 +313,6 @@ class DiracTwistedMassPC : public DiracTwistedMass {
 // Full staggered
 class DiracStaggered : public Dirac {
 
- private:
-  TuneParam tuneDslash[5];
-  TuneParam tuneDslashXpay[5];
-
  protected:
   cudaGaugeField *fatGauge;
   cudaGaugeField *longGauge;
@@ -364,8 +323,6 @@ class DiracStaggered : public Dirac {
   DiracStaggered(const DiracStaggered &dirac);
   virtual ~DiracStaggered();
   DiracStaggered& operator=(const DiracStaggered &dirac);
-
-  void Tune(cudaColorSpinorField &, const cudaColorSpinorField &, const cudaColorSpinorField &);
 
   virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
   
