@@ -60,7 +60,6 @@ extern char latfile[];
 
 void init(int argc, char **argv) {
 
-  //qudaSetNumaConfig("/usr/local/gpu_numa_config.txt");
 
   kernelPackT = false; // Set true for kernel T face packing
   cuda_prec= prec;

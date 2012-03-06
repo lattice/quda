@@ -766,14 +766,6 @@ get_test_type(int t)
     return ret;
 }
 
-void
-quda_set_verbose(int v)
-{
-    verbose = v;
-}
-
-
-
 QudaDslashType
 get_dslash_type(char* s)
 {
@@ -832,15 +824,13 @@ const char*
 get_quda_ver_str()
 {
   static char vstr[32];
-  int ver = QUDA_VERSION;
-  int major_num = ver/4096;
-  int minor_num = ver/64 - major_num*64;
-  int ext_num = ver - minor_num*64-major_num*4096;
+  int major_num = QUDA_VERSION_MAJOR;
+  int minor_num = QUDA_VERSION_MINOR;
+  int ext_num = QUDA_VERSION_SUBMINOR;
   sprintf(vstr, "%1d.%1d.%1d", 
 	  major_num,
 	  minor_num,
 	  ext_num);
-  
   return vstr;
 }
 
