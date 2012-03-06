@@ -97,7 +97,9 @@ class Tunable {
   virtual bool advanceSharedBytes(TuneParam &param) const
   {
     const int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
+    const int max_blocks_per_sm = 16; // FIXME: derive from deviceProp
     int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
+    if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
     param.shared_bytes = max_shared / blocks_per_sm + 1;
     if (param.shared_bytes > max_shared) {
       TuneParam next(param);
