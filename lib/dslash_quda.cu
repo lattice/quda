@@ -1267,25 +1267,65 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
 }
 
 
-template <typename spinorFloat, typename cloverFloat>
-void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
-		const float *cloverNorm, const spinorFloat *in, const float *inNorm, 
-		const size_t bytes, const size_t norm_bytes)
-{
-  dim3 blockDim(32,1,1); // FIXME: add tuning support
-  dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
+template <typename sFloat, typename cFloat>
+class CloverCuda : public Tunable {
+ private:
+  sFloat *out;
+  float *outNorm;
+  const cFloat *clover;
+  const float *cloverNorm;
+  const sFloat *in;
+  const float *inNorm;
 
-  int shared_bytes = blockDim.x*(CLOVER_SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm));
+ protected:
+  int sharedBytesPerThread() const
+  {
+    int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+    return CLOVER_SHARED_FLOATS_PER_THREAD * reg_size;
+  }
+  int sharedBytesPerBlock() const { return 0; }
+  bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
 
-  cloverKernel<<<gridDim, blockDim, shared_bytes>>>(out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
-  unbindSpinorTex(in, inNorm);
-}
+ public:
+  CloverCuda(sFloat *out, float *outNorm, const cFloat *clover, const float *cloverNorm, const sFloat *in,
+	     const float *inNorm, const size_t bytes, const size_t norm_bytes)
+    : out(out), outNorm(outNorm), clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm)
+  {
+    bindSpinorTex(bytes, norm_bytes, in, inNorm);
+  }
+  virtual ~CloverCuda() { unbindSpinorTex(in, inNorm); }
+  void apply(const cudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE); // FIXME: optional tuning & verbosity
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    cloverKernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>(out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
+  }
+  virtual TuneKey tuneKey() const
+  {
+    std::stringstream vol, aux;
+    vol << dslashConstants.x[0] << "x";
+    vol << dslashConstants.x[1] << "x";
+    vol << dslashConstants.x[2] << "x";
+    vol << dslashConstants.x[3];
+    return TuneKey(vol.str(), typeid(*this).name());
+  }
+  std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
+  {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+};
+
 
 void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
 		const cudaColorSpinorField *in, const int parity) {
 
   dslashParam.parity = parity;
   dslashParam.threads = in->Volume();
+
+  Tunable *clov = 0;
 
 #ifdef GPU_CLOVER_DIRAC
   void *cloverP, *cloverNormP;
@@ -1296,29 +1336,33 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-    cloverCuda((double2*)out->V(), (float*)out->Norm(), (double2*)cloverP, 
-	       (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(), 
-	       in->Bytes(), in->NormBytes());
+    clov = new CloverCuda<double2, double2>((double2*)out->V(), (float*)out->Norm(), (double2*)cloverP, 
+					    (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(), 
+					    in->Bytes(), in->NormBytes());
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    cloverCuda((float4*)out->V(), (float*)out->Norm(), (float4*)cloverP, 
-	       (float*)cloverNormP, (float4*)in->V(), (float*)in->Norm(),
-	       in->Bytes(), in->NormBytes());
+    clov = new CloverCuda<float4, float4>((float4*)out->V(), (float*)out->Norm(), (float4*)cloverP, 
+			  (float*)cloverNormP, (float4*)in->V(), (float*)in->Norm(),
+			  in->Bytes(), in->NormBytes());
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    cloverCuda((short4*)out->V(), (float*)out->Norm(), (short4*)cloverP, 
-	       (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
-	       in->Bytes(), in->NormBytes());
+    clov = new CloverCuda<short4, short4>((short4*)out->V(), (float*)out->Norm(), (short4*)cloverP, 
+			  (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
+			  in->Bytes(), in->NormBytes());
   }
-  unbindCloverTex(clover);
+  clov->apply(0);
 
+  unbindCloverTex(clover);
   if (!dslashTuning) checkCudaError();
+
+  delete clov;
 #else
   errorQuda("Clover dslash has not been built");
 #endif
-
 }
+
+
 // FIXME: twist kernel cannot be issued asynchronously because of texture unbinding
 template <typename spinorFloat>
 void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in, 

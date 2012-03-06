@@ -7,7 +7,7 @@ static std::map<TuneKey, TuneParam> tuneCache;
 
 TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
 {
-  static bool tuning = false;     // tuning in progress?
+  static bool tuning = false; // tuning in progress?
   static const Tunable *active_tunable; // for error checking
   static TuneParam param;
 
