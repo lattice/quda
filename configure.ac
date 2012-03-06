@@ -3,8 +3,6 @@ AC_INIT([quda],[0.4],[mikec@seas.harvard.edu])
 AC_PROG_CC(gcc cc)
 AC_PROG_CXX(g++ CC cxx)
 
-AC_CHECK_HEADER([numa.h])
-
 dnl Specify CUDA Location
 AC_ARG_WITH(cuda,
   AC_HELP_STRING([--with-cuda=CUDADIR], [ Specify CUDA installation directory ]),
@@ -478,9 +476,6 @@ AC_SUBST( QMP_HOME, [${qmp_home}] )
 
 AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
 AC_SUBST( QIO_HOME, [${qio_home}] )
-
-AC_MSG_NOTICE([Setting HAVE_NUMA=${ac_cv_header_numa_h}])
-AC_SUBST( HAVE_NUMA, [${ac_cv_header_numa_h}] )
 
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])

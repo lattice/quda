@@ -1344,6 +1344,7 @@ void usage(char** argv )
 	 "                                                  wilson/clover/twisted_mass/asqtad/domain_wall\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
+  printf("    --disable-numa-affinity                   # Disable the efforts to attach to the affinity CPU cores\n");     
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -1611,22 +1612,18 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--numa") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    qudaSetNumaConfig(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
   if( strcmp(argv[i], "--load-gauge") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
     strcpy(latfile, argv[i+1]);
     i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--disable-numa-affinity") == 0){
+    disableNumaAffinityQuda();
     ret = 0;
     goto out;
   }

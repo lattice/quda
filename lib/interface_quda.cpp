@@ -5,10 +5,6 @@
 #include <string.h>
 #include <sys/time.h>
 
-#ifdef HAVE_NUMA
-#include <numa.h>
-#endif
-
 #include <quda.h>
 #include <quda_internal.h>
 #include <blas_quda.h>
@@ -21,7 +17,7 @@
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
-
+#include <numa_affinity.h>
 
 #include <cuda.h>
 #ifdef MULTI_GPU
@@ -74,7 +70,7 @@ extern bool qudaPtNm1;
 #include "face_quda.h"
 
 QudaVerbosity verbosity;
-int verbose = 0;
+int numa_affinity_enabled = 1;
 
 cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
@@ -102,73 +98,11 @@ bool diracTune = false;
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 
-static int gpu_affinity[MAX_GPU_NUM_PER_NODE]; 
-static int numa_config_set = 0;
-void qudaSetNumaConfig(char* filename)
+void disableNumaAffinityQuda(void)
 {
-  static int already_set = 0;
-  if(already_set){
-	return;
-  }
-  already_set =1;
-
-  if(filename ==NULL){
-    errorQuda("numa config filename is NULL\n");
-  }
-  if(strlen(filename) >= 128){
-    errorQuda("numa config filename too long\n");
-  }
-  
-  FILE* fd = fopen(filename, "r");
-  if (fd == NULL){
-    warningQuda("opening numa config file(%s) failed",filename );
-    return;
-  }
-  
-  for(int i=0;i < MAX_GPU_NUM_PER_NODE; i++){
-    gpu_affinity[i] = -1;
-  }
-
-
-  char buf[1024];
-  while ( fgets(buf, 1024, fd) != NULL){
-    if (buf[0]== '\n' || buf[0] == '#'){
-      continue;
-    }
-    
-    char* token[4];
-    token[0] = (char*)strtok(buf, " \t\n");
-    token[1] = (char*)strtok(NULL, " \t\n");
-    token[2] = (char*)strtok(NULL, " \t\n");
-    token[3] = (char*)strtok(NULL, " \t\n");
-    
-    if(strcmp(token[0], "affinity") != 0){
-      warningQuda("Invalid format for the numa config file\n");
-      fclose(fd);
-      return ;
-    }
-
-    if (token[1] == NULL || token[2] == NULL){
-      warningQuda("invalid entry for affinity\n");
-      fclose(fd);
-      return;
-    }
-    int gpunum = atoi(token[1]);
-    int nodenum = atoi(token[2]);
-    if(gpunum < 0 ||nodenum < 0){
-      warningQuda("Invalid gpunum(%d) or nodenum(%d)\n", gpunum, nodenum);
-      fclose(fd);
-      return;
-    }
-    gpu_affinity[gpunum] = nodenum;
-  }
-  
-  fclose(fd);
-  
-  numa_config_set = 1;
-  
-  return;
+  numa_affinity_enabled=0;
 }
+
 int getGpuCount()
 {
   int count;
@@ -254,18 +188,9 @@ void initQuda(int dev)
   printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
 
   cudaSetDevice(dev);
-#ifdef HAVE_NUMA
-  if(numa_config_set){
-    if(gpu_affinity[dev] >=0){
-      printfQuda("Numa setting to cpu node %d\n", gpu_affinity[dev]);
-      if(numa_run_on_node(gpu_affinity[dev]) != 0){
-        printfQuda("Warning: Setting numa to cpu node %d failed\n", gpu_affinity[dev]);
-      }
-    }
-
+  if(numa_affinity_enabled){
+    setNumaAffinity(dev);
   }
-#endif
-  
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
 

@@ -136,7 +136,7 @@ extern "C" {
 
   // Interface functions, found in interface_quda.cpp
   void initQuda(int dev);
-  void qudaSetNumaConfig(char* filename);
+  void disableNumaAffinityQuda(void);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void freeGaugeQuda(void);
 
