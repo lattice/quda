@@ -1,9 +1,14 @@
+
+
 #ifndef _QUDA_H
 #define _QUDA_H
 
 #include <enum_quda.h>
 
-#define QUDA_VERSION 000302 // version 0.3.2
+#define QUDA_VERSION_MAJOR       0
+#define QUDA_VERSION_MINOR       3
+#define QUDA_VERSION_SUBMINOR   3 
+#define QUDA_VERSION ((QUDA_VERSION_MAJOR<<16) | (QUDA_VERSION_MINOR<<8) | QUDA_VERSION_SUBMINOR)
 
 #ifdef __cplusplus
 extern "C" {
@@ -130,7 +135,7 @@ extern "C" {
 
   // Interface functions, found in interface_quda.cpp
   void initQuda(int dev);
-  void qudaSetNumaConfig(char* filename);
+  void disableNumaAffinityQuda(void);
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
   void freeGaugeQuda(void);
 
