@@ -144,7 +144,7 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
   // open the cpulistaffinity file on the pci_bus for "my_gpu"
   pci_bus_info= fopen(pci_bus_info_path,"r");
   if (pci_bus_info == NULL){
-    printfQuda("Warning: opening file %s failed\n", pci_bus_info_path);
+    //printfQuda("Warning: opening file %s failed\n", pci_bus_info_path);
     free(my_line);
     fclose(nvidia_info);
     return -1;
