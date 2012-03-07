@@ -709,7 +709,7 @@ private:
     if (dslashParam.kernel_type < 5) { // exterior kernel
       saveOut = new char[bytes];
       cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
-      if (typeid(sFloat) == typeid(short4)) {
+      if (typeid(sFloat) == typeid(short2)) {
 	saveOutNorm = new char[norm_bytes];
 	cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
       }
@@ -721,7 +721,7 @@ private:
     if (dslashParam.kernel_type < 5) { // exterior kernel
       cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
       delete[] saveOut;
-      if (typeid(sFloat) == typeid(short4)) {
+      if (typeid(sFloat) == typeid(short2)) {
 	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
 	delete[] saveOutNorm;
       }
