@@ -22,7 +22,7 @@ DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
 void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			 const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
@@ -37,7 +37,7 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
 			     const QudaParity parity, const cudaColorSpinorField &x,
 			     const double &k) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 

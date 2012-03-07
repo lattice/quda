@@ -62,7 +62,7 @@ extern bool qudaPtNm1;
 
 #include "face_quda.h"
 
-QudaVerbosity verbosity;
+static QudaVerbosity verbosity;
 int numa_affinity_enabled = 1;
 
 cudaGaugeField *gaugePrecise = NULL;

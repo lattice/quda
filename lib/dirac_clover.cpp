@@ -36,7 +36,7 @@ void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaC
 // Public method to apply the clover term only
 void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
   if (!initClover) initCloverConstants(clover.Stride());
   checkParitySpinor(in, out, clover);
 
@@ -122,7 +122,7 @@ DiracCloverPC& DiracCloverPC::operator=(const DiracCloverPC &dirac)
 void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			      const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
   if (!initClover) initCloverConstants(clover.Stride());
   checkParitySpinor(in, out, clover);
 
@@ -141,7 +141,7 @@ void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorFi
 void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			   const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
   if (!initClover) initCloverConstants(clover.Stride());
   checkParitySpinor(in, out, clover);
   checkSpinorAlias(in, out);
@@ -161,7 +161,7 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
 			       const QudaParity parity, const cudaColorSpinorField &x,
 			       const double &k) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
+  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
   if (!initClover) initCloverConstants(clover.Stride());
   checkParitySpinor(in, out, clover);
   checkSpinorAlias(in, out);

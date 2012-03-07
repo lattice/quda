@@ -33,7 +33,7 @@ extern "C" {
 bool getDslashLaunch();
 
 void initCommonConstants(const LatticeField &lat);
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
+void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride, QudaVerbosity);
 void initCloverConstants(const int cl_stride);
 void initDomainWallConstants(const int Ls);
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);

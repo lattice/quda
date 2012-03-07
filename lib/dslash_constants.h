@@ -281,8 +281,10 @@ void initGaugeFieldConstants(const cudaGaugeField &gauge)
 
 
 
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride) 
+void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride, 
+			 QudaVerbosity Verbosity) 
 {
+  verbosity = Verbosity;
 
   initCommonConstants(gauge);
 

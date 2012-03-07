@@ -110,6 +110,16 @@ static struct {
   // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
 } dslashConstants;
 
+// dslashTuning = QUDA_TUNE_YES turns off error checking
+static QudaTune dslashTuning = QUDA_TUNE_NO;
+
+void setDslashTuning(QudaTune tune)
+{
+  dslashTuning = tune;
+}
+
+static QudaVerbosity verbosity;
+
 #include <dslash_textures.h>
 #include <dslash_constants.h>
 
@@ -141,14 +151,6 @@ static inline __device__ float2 short22float2(short2 a) {
   return make_float2(short2float(a.x), short2float(a.y));
 }
 #endif // DIRECT_ACCESS inclusions
-
-// dslashTuning = QUDA_TUNE_YES turns off error checking
-static QudaTune dslashTuning = QUDA_TUNE_NO;
-
-void setDslashTuning(QudaTune tune)
-{
-  dslashTuning = tune;
-}
 
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
@@ -362,7 +364,7 @@ class WilsonDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE); // FIXME: optional tuning & verbosity
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(dslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
@@ -443,7 +445,7 @@ class CloverDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE); // FIXME: optional tuning & verbosity
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(cloverDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
@@ -539,7 +541,7 @@ class TwistedDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE); // FIXME: optional tuning & verbosity
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(twistedMassDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
@@ -615,7 +617,7 @@ class DomainWallDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE); // FIXME: optional tuning & verbosity
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(domainWallDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
     	   out, outNorm, gauge0, gauge1, in, inNorm, mferm, x, xNorm, a);
@@ -695,7 +697,7 @@ private:
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE); // FIXME: optional tuning & verbosity
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		     out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
@@ -1316,7 +1318,7 @@ class CloverCuda : public Tunable {
   virtual ~CloverCuda() { unbindSpinorTex(in, inNorm); }
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE); // FIXME: optional tuning & verbosity
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     cloverKernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>(out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
   }
@@ -1345,9 +1347,8 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
   dslashParam.parity = parity;
   dslashParam.threads = in->Volume();
 
-  Tunable *clov = 0;
-
 #ifdef GPU_CLOVER_DIRAC
+  Tunable *clov = 0;
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
 
