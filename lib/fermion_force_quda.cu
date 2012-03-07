@@ -526,9 +526,6 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
   new_x3 = x3;
   new_x4 = x4;
     
-  short oddness_d = (1 - oddBit);
-  short oddness_c = oddBit;
-
   if(mu_positive){
     mymu =mu;
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, X, new_mem_idx);
@@ -582,12 +579,10 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
     FF_COMPUTE_RECONSTRUCT_SIGN(ab_link_sign, mysig, new_x1,new_x2,new_x3,new_x4);
   }
     
-  LOAD_HW2(tempxEven, tempxOdd, point_d, HWA, oddness_d );
+  LOAD_HW2(tempxEven, tempxOdd, point_d, HWA, 1-oddBit );
   if(mu_positive){
-    //FF_LOAD_MATRIX(linkOdd, mymu, ad_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, 1-oddBit);
   }else{
-    //FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, oddBit);
   }
 
@@ -599,12 +594,10 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
   }
   WRITE_HW2(PmuEven,PmuOdd, sid, HWD, oddBit);	
         
-  LOAD_HW2(tempxEven,tempxOdd, point_c, HWA, oddness_c);
+  LOAD_HW2(tempxEven,tempxOdd, point_c, HWA, oddBit);
   if(mu_positive){
-    //FF_LOAD_MATRIX(linkEven, mymu, bc_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, oddBit);
   }else{
-    //FF_LOAD_MATRIX(linkOdd, mymu, bc_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, 1-oddBit);
   }
     
@@ -615,10 +608,8 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
     MAT_MUL_HW(linka, hwa, hwb);
   }
   if(sig_positive){
-    //FF_LOAD_MATRIX(linkEven, mysig, ab_link_nbr_idx, LINKB);
     FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKB, oddBit);
   }else{
-    //FF_LOAD_MATRIX(linkOdd, mysig, ab_link_nbr_idx, LINKB);
     FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKB, 1-oddBit);
   }
     
@@ -630,10 +621,8 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
   }
   WRITE_HW2(P3Even, P3Odd, sid, HWC, oddBit);
     
-  if (sig_positive){
-	
-    //add the force to mom
-	
+  if (sig_positive){	
+    //add the force to mom	
     ADD_FORCE_TO_MOM2(hwc, hwd, sid, sig, coeff, oddBit);
   }
 }
@@ -774,11 +763,13 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
   }
 
     
-  LOAD_HW(P3Even, sid, HWA);
+  LOAD_HW2(P3Even, P3Odd, sid, HWA, oddBit);
   if(mu_positive){
-    FF_LOAD_MATRIX(linkOdd, mymu, ad_link_nbr_idx, LINKA);
+    //FF_LOAD_MATRIX(linkOdd, mymu, ad_link_nbr_idx, LINKA);
+    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, 1 - oddBit);
   }else{
-    FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKA);
+    //FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKA);
+    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, oddBit);
   }
 
   RECONSTRUCT_LINK_12(ad_link_sign, linka);	
@@ -791,31 +782,33 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
     
   //start to add side link force
   if (mu_positive){
-    LOAD_HW(TempxOdd, point_d, HWC);
+    LOAD_HW2(TempxEven, TempxOdd, point_d, HWC, 1-oddBit);
 	
     if (sig_positive){
-      ADD_FORCE_TO_MOM(hwb, hwc, momOdd, point_d, mu, coeff, 1-oddBit);
+      ADD_FORCE_TO_MOM2(hwb, hwc, point_d, mu, coeff, 1-oddBit);
     }else{
-      ADD_FORCE_TO_MOM(hwc, hwb, momOdd, point_d, OPP_DIR(mu), mcoeff, 1- oddBit);	    
+      ADD_FORCE_TO_MOM2(hwc, hwb, point_d, OPP_DIR(mu), mcoeff, 1- oddBit);	    
     }
   }else{
-    LOAD_HW(PmuEven, sid, HWC);
+    LOAD_HW2(PmuEven, PmuOdd, sid, HWC, oddBit);
     if (sig_positive){
-      ADD_FORCE_TO_MOM(hwa, hwc, momEven, sid, mu, mcoeff, oddBit);
+      ADD_FORCE_TO_MOM2(hwa, hwc, sid, mu, mcoeff, oddBit);
     }else{
-      ADD_FORCE_TO_MOM(hwc, hwa, momEven, sid, OPP_DIR(mu), coeff, oddBit);	    
+      ADD_FORCE_TO_MOM2(hwc, hwa, sid, OPP_DIR(mu), coeff, oddBit);	    
     }
 	
   }
     
   if (shortPOdd){
-    LOAD_HW(shortPOdd, point_d, HWA);
+    LOAD_HW2(shortPEven, shortPOdd, point_d, HWA, 1-oddBit);
     SCALAR_MULT_ADD_SU3_VECTOR(hwa0, hwb0, accumu_coeff.x, hwa0);
     SCALAR_MULT_ADD_SU3_VECTOR(hwa1, hwb1, accumu_coeff.y, hwa1);
-    WRITE_HW(shortPOdd, point_d, HWA);
+    WRITE_HW2(shortPEven, shortPOdd, point_d, HWA, 1-oddBit);
   }
 
 }
+
+
 
 static void
 side_link_kernel(float2* P3Even, float2* P3Odd, 
@@ -832,107 +825,37 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
     
   cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
   cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);   
-
+  
+#define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
+  do_side_link_kernel<sig_sign,mu_sign,0><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, \
+								      P3muEven,  P3muOdd, \
+								      TempxEven,  TempxOdd, \
+								      PmuEven,   PmuOdd, \
+								      shortPEven,   shortPOdd, \
+								      sig, mu, coeff, accumu_coeff, \
+								      linkEven, linkOdd, \
+								      momEven, momOdd); \
+  do_side_link_kernel<sig_sign,mu_sign,1><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, \
+								      P3muEven,  P3muOdd, \
+								      TempxEven,  TempxOdd, \
+								      PmuEven,   PmuOdd, \
+								      shortPEven,   shortPOdd, \
+								      sig, mu, coeff, accumu_coeff, \
+								      linkEven, linkOdd, \
+								      momEven, momOdd);    
+  
   if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
-    do_side_link_kernel<1,1,0><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, 
-							   P3muEven,  P3muOdd,
-							   TempxEven,  TempxOdd,
-							   PmuEven,   PmuOdd,
-							   shortPEven,   shortPOdd,
-							   sig, mu, coeff, accumu_coeff,
-							   linkEven, linkOdd,
-							   momEven, momOdd);
-    cudaUnbindTexture(siteLink0TexSingle_recon);
-    cudaUnbindTexture(siteLink1TexSingle_recon);
-
-    //opposive binding
-    cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);
-    cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
-
-    do_side_link_kernel<1,1,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
-							   P3muOdd,  P3muEven,
-							   TempxOdd,  TempxEven,
-							   PmuOdd,   PmuEven,
-							   shortPOdd,   shortPEven,
-							   sig, mu, coeff, accumu_coeff,
-							   linkOdd, linkEven,
-							   momOdd, momEven);
-	
+    CALL_SIDE_LINK_KERNEL(1,1);  	
   }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-    do_side_link_kernel<1,0,0><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, 
-							   P3muEven,  P3muOdd,
-							   TempxEven,  TempxOdd,
-							   PmuEven,   PmuOdd,
-							   shortPEven,   shortPOdd,
-							   sig, mu, coeff, accumu_coeff,
-							   linkEven,  linkOdd,
-							   momEven, momOdd);		
-    cudaUnbindTexture(siteLink0TexSingle_recon);
-    cudaUnbindTexture(siteLink1TexSingle_recon);
-
-    //opposive binding
-    cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);
-    cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
-
-    do_side_link_kernel<1,0,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
-							   P3muOdd,  P3muEven,
-							   TempxOdd,  TempxEven,
-							   PmuOdd,   PmuEven,
-							   shortPOdd,   shortPEven,
-							   sig, mu, coeff, accumu_coeff,
-							   linkOdd, linkEven,
-							   momOdd, momEven);		
+    CALL_SIDE_LINK_KERNEL(1,0);  			
   }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-    do_side_link_kernel<0,1,0><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, 
-							   P3muEven,  P3muOdd,
-							   TempxEven,  TempxOdd,
-							   PmuEven,   PmuOdd,
-							   shortPEven,   shortPOdd,
-							   sig, mu, coeff, accumu_coeff,
-							   linkEven,  linkOdd,
-							   momEven, momOdd);
-    cudaUnbindTexture(siteLink0TexSingle_recon);
-    cudaUnbindTexture(siteLink1TexSingle_recon);
-
-    //opposive binding
-    cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);
-    cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
-
-    do_side_link_kernel<0,1,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
-							   P3muOdd,  P3muEven,
-							   TempxOdd,  TempxEven,
-							   PmuOdd,   PmuEven,
-							   shortPOdd,   shortPEven,
-							   sig, mu, coeff, accumu_coeff,
-							   linkOdd, linkEven,
-							   momOdd, momEven);
-	
+    CALL_SIDE_LINK_KERNEL(0,1);  				
   }else{
-    do_side_link_kernel<0,0,0><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, 
-							   P3muEven,  P3muOdd,
-							   TempxEven,  TempxOdd,
-							   PmuEven,   PmuOdd,
-							   shortPEven,   shortPOdd,
-							   sig, mu, coeff, accumu_coeff,
-							   linkEven, linkOdd,
-							   momEven, momOdd);
-    cudaUnbindTexture(siteLink0TexSingle_recon);
-    cudaUnbindTexture(siteLink1TexSingle_recon);
-
-    //opposive binding
-    cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);
-    cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
-	
-    do_side_link_kernel<0,0,1><<<halfGridDim, blockDim>>>( P3Odd,  P3Even, 
-							   P3muOdd,  P3muEven,
-							   TempxOdd,  TempxEven,
-							   PmuOdd,   PmuEven,
-							   shortPOdd,   shortPEven,
-							   sig, mu, coeff, accumu_coeff,
-							   linkOdd, linkEven,
-							   momOdd, momEven);
+    CALL_SIDE_LINK_KERNEL(0,0);
   }
-    
+
+#undef CALL_SITE_LINK_KERNEL
+  
   cudaUnbindTexture(siteLink0TexSingle_recon);
   cudaUnbindTexture(siteLink1TexSingle_recon);    
 
