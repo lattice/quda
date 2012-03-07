@@ -815,6 +815,42 @@ void printDslashProfile() {
 }
 #endif
 
+int gatherCompleted[Nstream];
+int previousDir[Nstream];
+int commsCompleted[Nstream];
+int commDimTotal;
+
+/**
+   Initialize the arrays used for the dynamic scheduling.
+ */
+void initDslashCommsPattern() {
+  for (int i=0; i<Nstream-1; i++) {
+    gatherCompleted[i] = 0;
+    commsCompleted[i] = 0;
+  }
+  gatherCompleted[Nstream-1] = 1;
+  commsCompleted[Nstream-1] = 1;
+
+  //   We need to know which was the previous direction in which
+  //   communication was issued, since we only query a given event /
+  //   comms call after the previous the one has successfully
+  //   completed.
+  for (int i=3; i>=0; i--) {
+    if (dslashParam.commDim[i]) {
+      int prev = Nstream-1;
+      for (int j=3; j>i; j--) if (dslashParam.commDim[j]) prev = 2*j;
+      previousDir[2*i + 1] = prev;
+      previousDir[2*i + 0] = 2*i + 1; // always valid
+    }
+  }
+
+  // this tells us how many events / comms occurances there are in
+  // total.  Used for exiting the while loop
+  commDimTotal = 0;
+  for (int i=3; i>=0; i--) commDimTotal += dslashParam.commDim[i];
+  commDimTotal *= 4; // 2 from pipe length, 2 from direction
+}
+
 void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		const int volume, const int *faceVolumeCB) {
 
@@ -864,26 +900,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
 
 #ifdef MULTI_GPU
+  initDslashCommsPattern();
 
   int completeSum = 0;
-  int gatherCompleted[Nstream];
-  int commsCompleted[Nstream];
-  for (int i=0; i<Nstream; i++) {
-    gatherCompleted[i] = 0;
-    commsCompleted[i] = 0;
-  }
-
-  for (int i=3; i>=0; i--) 
-    if (dslashParam.commDim[i]) {
-      gatherCompleted[2*i+2] = 1;
-      commsCompleted[2*i+2] = 1;
-      break;
-    }
-  
-  int commDimTotal = 0;
-  for (int i=0; i<4; i++) commDimTotal += dslashParam.commDim[i];
-  commDimTotal *= 4; // 2 from pipe length, 2 from direction
-
   while (completeSum < commDimTotal) {
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
@@ -891,7 +910,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
       for (int dir=1; dir>=0; dir--) {
 	
 	// Query if gather has completed
-	if (!gatherCompleted[2*i+dir] && gatherCompleted[2*i+dir+1]) { 
+	if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
 	  if (cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])) {
 	    gatherCompleted[2*i+dir] = 1;
 	    completeSum++;
@@ -900,9 +919,10 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 	  }
 	}
 	
-	if (!commsCompleted[2*i+dir] && commsCompleted[2*i+dir+1] &&
+	// Query if comms has finished
+	if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
 	    gatherCompleted[2*i+dir]) {
-	  if (face->commsQuery(2*i+dir)) { // Query if comms has finished
+	  if (face->commsQuery(2*i+dir)) { 
 	    commsCompleted[2*i+dir] = 1;
 	    completeSum++;
 	    gettimeofday(&commsEnd[2*i+dir], NULL);
