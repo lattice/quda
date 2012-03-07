@@ -445,6 +445,7 @@ int main(int argc, char **argv)
 
     if (tune) { // warm-up run
       printfQuda("Tuning...\n");
+      setDslashTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...\n", loops);

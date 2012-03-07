@@ -86,7 +86,6 @@ Dirac *d = NULL;
 Dirac *dSloppy = NULL;
 Dirac *dPre = NULL; // the DD preconditioning operator
 bool diracCreation = false;
-bool diracTune = false;
 
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
@@ -746,41 +745,6 @@ void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) 
   }
 }
 
-#if 0
-// tune the Dirac operators
-void tuneDirac(QudaInvertParam &param, const cudaColorSpinorField &x) {
-  if (param.dirac_tune == QUDA_TUNE_YES && !diracTune) {
-    { // tune Dirac operator
-      cudaColorSpinorField a = x;
-      cudaColorSpinorField b = x;
-      cudaColorSpinorField c = x;
-      d->Tune(a, b, c);
-    }
-
-    { // tune sloppy Dirac operator
-      ColorSpinorParam CSparam(x);
-      CSparam.precision = param.cuda_prec_sloppy;
-      CSparam.create = QUDA_NULL_FIELD_CREATE;
-      cudaColorSpinorField a(x, CSparam);
-      cudaColorSpinorField b(x, CSparam);
-      cudaColorSpinorField c(x, CSparam);
-      dSloppy->Tune(a, b, c);
-    }
-
-    { // tune preconditioner Dirac operator
-      ColorSpinorParam CSparam(x);
-      CSparam.precision = param.prec_precondition;
-      CSparam.create = QUDA_NULL_FIELD_CREATE;
-      cudaColorSpinorField a(x, CSparam);
-      cudaColorSpinorField b(x, CSparam);
-      cudaColorSpinorField c(x, CSparam);
-      dPre->Tune(a, b, c);
-    }
-    diracTune = true;
-  }
-}
-#endif // 0
-
 cudaGaugeField* checkGauge(QudaInvertParam *param) {
   cudaGaugeField *cudaGauge = NULL;
   if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
@@ -868,7 +832,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
   }
 
-  //  tuneDirac(*param, pc_solution ? *x : x->Even());
+  setDslashTuning(param->dirac_tune);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE) {
@@ -939,7 +903,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     delete dSloppy;
     delete dPre;
     diracCreation = false;
-    diracTune = false;
   }  
 
   delete h_b;
@@ -1098,9 +1061,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
   }
 
-  // tune the Dirac Kernel
-  //tuneDirac(*param, pc_solution ? *(x[0]) : (x[0])->Even());
-  
+  setDslashTuning(param->dirac_tune);
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [param->num_offset];
@@ -1139,7 +1100,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     delete dSloppy; dSloppy = NULL;
     delete dPre; dPre = NULL;
     diracCreation = false;
-    diracTune = false;
   }  
 
   return;
@@ -1163,7 +1123,6 @@ void endInvertQuda() {
     }
 
     diracCreation = false;
-    diracTune = false;
   }
   checkCudaError();
 }
@@ -1461,6 +1420,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   // tune the Dirac Kernel
+  setDslashTuning(param->dirac_tune);
   // if set, tuning will happen in the first multishift call
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
@@ -1542,7 +1502,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     delete dSloppy; dSloppy = NULL;
     delete dPre; dPre = NULL;
     diracCreation = false;
-    diracTune = false;
   }  
 
 

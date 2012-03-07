@@ -110,7 +110,8 @@ static struct {
   // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
 } dslashConstants;
 
-// dslashTuning = QUDA_TUNE_YES turns off error checking
+// dslashTuning = QUDA_TUNE_YES enables autotuning when the dslash is
+// first launched
 static QudaTune dslashTuning = QUDA_TUNE_NO;
 
 void setDslashTuning(QudaTune tune)
@@ -118,7 +119,7 @@ void setDslashTuning(QudaTune tune)
   dslashTuning = tune;
 }
 
-static QudaVerbosity verbosity;
+static QudaVerbosity verbosity = QUDA_SILENT;
 
 #include <dslash_textures.h>
 #include <dslash_constants.h>
@@ -364,7 +365,7 @@ class WilsonDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(dslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
@@ -445,7 +446,7 @@ class CloverDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(cloverDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
@@ -541,7 +542,7 @@ class TwistedDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(twistedMassDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
@@ -617,7 +618,7 @@ class DomainWallDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     DSLASH(domainWallDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
     	   out, outNorm, gauge0, gauge1, in, inNorm, mferm, x, xNorm, a);
@@ -697,7 +698,7 @@ private:
 
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		     out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
@@ -961,7 +962,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 
   CUDA_EVENT_RECORD(dslashEnd, 0);
-  if (!dslashTuning) DSLASH_TIME_PROFILE();
+  DSLASH_TIME_PROFILE();
 
 #endif // MULTI_GPU
 }
@@ -1018,7 +1019,7 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   delete dslash;
   unbindGaugeTex(gauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Wilson dslash has not been built");
 #endif // GPU_WILSON_DIRAC
@@ -1086,7 +1087,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
   unbindGaugeTex(gauge);
   unbindCloverTex(cloverInv);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Clover dslash has not been built");
 #endif
@@ -1148,7 +1149,7 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gaug
   delete dslash;
   unbindGaugeTex(gauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Twisted mass dslash has not been built");
 #endif
@@ -1205,7 +1206,7 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge
   delete dslash;
   unbindGaugeTex(gauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Domain wall dslash has not been built");
 #endif
@@ -1281,7 +1282,7 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
   unbindGaugeTex(fatGauge);
   unbindGaugeTex(longGauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
   
 #else
   errorQuda("Staggered dslash has not been built");
@@ -1318,7 +1319,7 @@ class CloverCuda : public Tunable {
   virtual ~CloverCuda() { unbindSpinorTex(in, inNorm); }
   void apply(const cudaStream_t &stream)
   {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, verbosity); // FIXME: optional tuning 
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     cloverKernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>(out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
   }
@@ -1375,7 +1376,7 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
   clov->apply(0);
 
   unbindCloverTex(clover);
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 
   delete clov;
 #else
@@ -1429,7 +1430,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		    dagger, kappa, mu, in->Bytes(), 
 		    in->NormBytes(), twist);
   }
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Twisted mass dslash has not been built");
 #endif // GPU_TWISTED_MASS_DIRAC
