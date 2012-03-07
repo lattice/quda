@@ -1384,24 +1384,78 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
 #endif
 }
 
+template <typename sFloat>
+class TwistGamma5Cuda : public Tunable {
 
-// FIXME: twist kernel cannot be issued asynchronously because of texture unbinding
-template <typename spinorFloat>
-void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in, 
-		     const float *inNorm, const int dagger, const double &kappa, 
-		     const double &mu, const size_t bytes, const size_t norm_bytes, 
-		     const QudaTwistGamma5Type twist)
-{
-  dim3 blockDim(32,1,1); // FIXME: add tuning support
-  dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
+private:
+  sFloat *out;
+  float *outNorm;
+  sFloat *in;
+  float *inNorm;
+  double a;
+  double b;
+  size_t bytes;
+  size_t norm_bytes;
 
-  double a=0.0, b=0.0;
-  setTwistParam(a, b, kappa, mu, dagger, twist);
+  int sharedBytesPerThread() const { return 0; }
+  int sharedBytesPerBlock() const { return 0; }
 
-  bindSpinorTex(bytes, norm_bytes, in, inNorm);
-  twistGamma5Kernel<<<gridDim, blockDim, 0>>> (out, outNorm, a, b, in, inNorm, dslashParam);
-  unbindSpinorTex(in, inNorm);
-}
+  char *saveOut, *saveOutNorm;
+
+public:
+  TwistGamma5Cuda(sFloat *out, float *outNorm, sFloat *in, float *inNorm,
+		  double kappa, double mu, const int dagger, 
+		  QudaTwistGamma5Type twist, size_t bytes, size_t norm_bytes) :
+    out(out), outNorm(outNorm), in(in), inNorm(inNorm), 
+    bytes(bytes), norm_bytes(norm_bytes){
+    bindSpinorTex(bytes, norm_bytes, in, inNorm);
+    setTwistParam(a, b, kappa, mu, dagger, twist);
+  }
+  virtual ~TwistGamma5Cuda() {
+    unbindSpinorTex(in, inNorm);    
+  }
+
+  TuneKey tuneKey() const {
+    std::stringstream vol, aux;
+    vol << dslashConstants.x[0] << "x";
+    vol << dslashConstants.x[1] << "x";
+    vol << dslashConstants.x[2] << "x";
+    vol << dslashConstants.x[3];    
+    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+  }  
+
+  void apply(const cudaStream_t &stream) {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    twistGamma5Kernel<<<gridDim, tp.block, 0>>> 
+      (out, outNorm, a, b, in, inNorm, dslashParam);
+  }
+
+  void preTune() {
+    saveOut = new char[bytes];
+    cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+    if (typeid(sFloat) == typeid(short4)) {
+      saveOutNorm = new char[norm_bytes];
+      cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
+    }
+  }
+
+  void postTune() {
+    cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+    delete[] saveOut;
+    if (typeid(sFloat) == typeid(short4)) {
+      cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+      delete[] saveOutNorm;
+    }
+  }
+
+  std::string paramString(const TuneParam &param) const {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+};
 
 void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const int dagger, const double &kappa, const double &mu,
@@ -1409,28 +1463,31 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 {
   dslashParam.threads = in->Volume();
 
+  Tunable *twistGamma5 = 0;
+
 #ifdef GPU_TWISTED_MASS_DIRAC
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-    twistGamma5Cuda((double2*)out->V(), (float*)out->Norm(), 
-		    (double2*)in->V(), (float*)in->Norm(), 
-		    dagger, kappa, mu, in->Bytes(), 
-		    in->NormBytes(), twist);
+    twistGamma5 = new TwistGamma5Cuda<double2>
+      ((double2*)out->V(), (float*)out->Norm(), (double2*)in->V(), 
+       (float*)in->Norm(), kappa, mu, dagger, twist, in->Bytes(), in->NormBytes());
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    twistGamma5Cuda((float4*)out->V(), (float*)out->Norm(),
-		    (float4*)in->V(), (float*)in->Norm(), 
-		    dagger, kappa, mu, in->Bytes(), 
-		    in->NormBytes(), twist);
+    twistGamma5 = new TwistGamma5Cuda<float4>
+      ((float4*)out->V(), (float*)out->Norm(), (float4*)in->V(), 
+       (float*)in->Norm(), kappa, mu, dagger, twist, in->Bytes(), in->NormBytes());
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    twistGamma5Cuda((short4*)out->V(), (float*)out->Norm(),
-		    (short4*)in->V(), (float*)in->Norm(), 
-		    dagger, kappa, mu, in->Bytes(), 
-		    in->NormBytes(), twist);
+    twistGamma5 = new TwistGamma5Cuda<short4>
+      ((short4*)out->V(), (float*)out->Norm(), (short4*)in->V(), 
+       (float*)in->Norm(), kappa, mu, dagger, twist, in->Bytes(), in->NormBytes());
   }
+
+  twistGamma5->apply(streams[Nstream-1]);
   checkCudaError();
+
+  delete twistGamma5;
 #else
   errorQuda("Twisted mass dslash has not been built");
 #endif // GPU_TWISTED_MASS_DIRAC
