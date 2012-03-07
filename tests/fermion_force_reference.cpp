@@ -277,6 +277,7 @@ u_shift_hw(half_wilson_vector *src, half_wilson_vector *dest, int dir, su3_matri
     
 }
 
+
 template <typename half_wilson_vector,
 	  typename anti_hermitmat, typename Real>
 static void 
