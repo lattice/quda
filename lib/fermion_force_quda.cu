@@ -9,7 +9,7 @@
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, Vh)
 
 #define LOAD_HW_SINGLE(hw_even, hw_odd, idx, var, oddness)	do{	\
-    float2* hw = (oddness)?hw_odd:hw_even;				\
+    Float2* hw = (oddness)?hw_odd:hw_even;				\
     var##0 = hw[idx + 0*Vh];						\
     var##1 = hw[idx + 1*Vh];						\
     var##2 = hw[idx + 2*Vh];						\
@@ -19,7 +19,7 @@
   }while(0)
 
 #define WRITE_HW_SINGLE(hw_even, hw_odd, idx, var, oddness)	do{	\
-    float2* hw = (oddness)?hw_odd:hw_even;				\
+    Float2* hw = (oddness)?hw_odd:hw_even;				\
     hw[idx + 0*Vh] = var##0;						\
     hw[idx + 1*Vh] = var##1;						\
     hw[idx + 2*Vh] = var##2;						\
@@ -271,7 +271,7 @@
 
 //this macro require linka, linkb, and ah variables defined
 #define ADD_FORCE_TO_MOM(hw1, hw2, idx, dir, cf,oddness) do{		\
-    float2 my_coeff;							\
+    Float2 my_coeff;							\
     int mydir;								\
     if (GOES_BACKWARDS(dir)){						\
       mydir=OPP_DIR(dir);						\
@@ -282,14 +282,14 @@
       my_coeff.x = cf.x;						\
       my_coeff.y = cf.y;						\
     }									\
-    float2 tmp_coeff;							\
+    Float2 tmp_coeff;							\
     tmp_coeff.x = my_coeff.x;						\
     tmp_coeff.y = my_coeff.y;						\
     if(oddness){							\
       tmp_coeff.x = - my_coeff.x;					\
       tmp_coeff.y = - my_coeff.y;					\
     }									\
-    float2* mom = oddness?momOdd:momEven;				\
+    Float2* mom = oddness?momOdd:momEven;				\
     LOAD_ANTI_HERMITIAN(mom, mydir, idx, AH);				\
     UNCOMPRESS_ANTI_HERMITIAN(ah, linka);				\
     SU3_PROJECTOR(hw1##0, hw2##0, linkb);				\
@@ -418,14 +418,14 @@ void fermion_force_init_cuda(QudaGaugeParam* param)
  *
  */
 
-template<int sig_positive, int mu_positive, int oddBit> 
+template<int sig_positive, int mu_positive, int oddBit, typename Float2> 
 __global__ void
-do_middle_link_kernel(float2* tempxEven, float2* tempxOdd, 
-		      float2* PmuEven, float2* PmuOdd,
-		      float2* P3Even, float2* P3Odd,
-		      int sig, int mu, float2 coeff,
+do_middle_link_kernel(Float2* tempxEven, Float2* tempxOdd, 
+		      Float2* PmuEven, Float2* PmuOdd,
+		      Float2* P3Even, Float2* P3Odd,
+		      int sig, int mu, Float2 coeff,
 		      float4* linkEven, float4* linkOdd,
-		      float2* momEven, float2* momOdd)
+		      Float2* momEven, Float2* momOdd)
 {
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
     
@@ -445,13 +445,13 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
   int ab_link_sign=1;
   int bc_link_sign=1;
     
-  float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
-  float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
-  float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
-  float2 HWD0, HWD1, HWD2, HWD3, HWD4, HWD5;
+  Float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
+  Float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
+  Float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
+  Float2 HWD0, HWD1, HWD2, HWD3, HWD4, HWD5;
   float4 LINKA0, LINKA1, LINKA2, LINKA3, LINKA4;
   float4 LINKB0, LINKB1, LINKB2, LINKB3, LINKB4;
-  float2 AH0, AH1, AH2, AH3, AH4;
+  Float2 AH0, AH1, AH2, AH3, AH4;
   
   /*         sig
    *	          A________B
@@ -572,14 +572,14 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 }
 
 
-
+template<typename Float2>
 static void
-middle_link_kernel(float2* tempxEven, float2* tempxOdd, 
-		   float2* PmuEven, float2* PmuOdd,
-		   float2* P3Even, float2* P3Odd,
-		   int sig, int mu, float2 coeff,
+middle_link_kernel(Float2* tempxEven, Float2* tempxOdd, 
+		   Float2* PmuEven, Float2* PmuOdd,
+		   Float2* P3Even, Float2* P3Odd,
+		   int sig, int mu, Float2 coeff,
 		   float4* linkEven, float4* linkOdd, cudaGaugeField &siteLink,
-		   float2* momEven, float2* momOdd,
+		   Float2* momEven, Float2* momOdd,
 		   dim3 gridDim, dim3 BlockDim)
 {
   dim3 halfGridDim(gridDim.x/2, 1,1);
@@ -624,18 +624,18 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
  *
  */
 
-template<int sig_positive, int mu_positive, int oddBit>
+template<int sig_positive, int mu_positive, int oddBit, typename Float2>
 __global__ void
-do_side_link_kernel(float2* P3Even, float2* P3Odd, 
-		    float2* P3muEven, float2* P3muOdd,
-		    float2* TempxEven, float2* TempxOdd,
-		    float2* PmuEven,  float2* PmuOdd,
-		    float2* shortPEven,  float2* shortPOdd,
-		    int sig, int mu, float2 coeff, float2 accumu_coeff,
+do_side_link_kernel(Float2* P3Even, Float2* P3Odd, 
+		    Float2* P3muEven, Float2* P3muOdd,
+		    Float2* TempxEven, Float2* TempxOdd,
+		    Float2* PmuEven,  Float2* PmuOdd,
+		    Float2* shortPEven,  Float2* shortPOdd,
+		    int sig, int mu, Float2 coeff, Float2 accumu_coeff,
 		    float4* linkEven, float4* linkOdd,
-		    float2* momEven, float2* momOdd)
+		    Float2* momEven, Float2* momOdd)
 {
-  float2 mcoeff;
+  Float2 mcoeff;
   mcoeff.x = -coeff.x;
   mcoeff.y = -coeff.y;
     
@@ -652,12 +652,12 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
   int X = 2*sid + x1odd;
 
   int ad_link_sign = 1;
-  float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
-  float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
-  float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
+  Float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
+  Float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
+  Float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
   float4 LINKA0, LINKA1, LINKA2, LINKA3, LINKA4;
   float4 LINKB0, LINKB1, LINKB2, LINKB3, LINKB4;
-  float2 AH0, AH1, AH2, AH3, AH4;
+  Float2 AH0, AH1, AH2, AH3, AH4;
   
 
     
@@ -745,16 +745,16 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
 }
 
 
-
+template<typename Float2>
 static void
-side_link_kernel(float2* P3Even, float2* P3Odd, 
-		 float2* P3muEven, float2* P3muOdd,
-		 float2* TempxEven, float2* TempxOdd,
-		 float2* PmuEven,  float2* PmuOdd,
-		 float2* shortPEven,  float2* shortPOdd,
-		 int sig, int mu, float2 coeff, float2 accumu_coeff,
+side_link_kernel(Float2* P3Even, Float2* P3Odd, 
+		 Float2* P3muEven, Float2* P3muOdd,
+		 Float2* TempxEven, Float2* TempxOdd,
+		 Float2* PmuEven,  Float2* PmuOdd,
+		 Float2* shortPEven,  Float2* shortPOdd,
+		 int sig, int mu, Float2 coeff, Float2 accumu_coeff,
 		 float4* linkEven, float4* linkOdd, cudaGaugeField &siteLink,
-		 float2* momEven, float2* momOdd,
+		 Float2* momEven, Float2* momOdd,
 		 dim3 gridDim, dim3 blockDim)
 {
   dim3 halfGridDim(gridDim.x/2,1,1);
@@ -802,16 +802,16 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
  *
  */
 
-template<int sig_positive, int mu_positive, int oddBit>
+template<int sig_positive, int mu_positive, int oddBit, typename Float2>
 __global__ void
-do_all_link_kernel(float2* tempxEven, float2* tempxOdd, 
-		   float2* PmuEven, float2* PmuOdd,
-		   float2* P3Even, float2* P3Odd,
-		   float2* P3muEven, float2* P3muOdd,
-		   float2* shortPEven, float2* shortPOdd,
-		   int sig, int mu, float2 coeff, float2 mcoeff, float2 accumu_coeff,
+do_all_link_kernel(Float2* tempxEven, Float2* tempxOdd, 
+		   Float2* PmuEven, Float2* PmuOdd,
+		   Float2* P3Even, Float2* P3Odd,
+		   Float2* P3muEven, Float2* P3muOdd,
+		   Float2* shortPEven, Float2* shortPOdd,
+		   int sig, int mu, Float2 coeff, Float2 mcoeff, Float2 accumu_coeff,
 		   float4* linkEven, float4* linkOdd,
-		   float2* momEven, float2* momOdd)
+		   Float2* momEven, Float2* momOdd)
 {
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -830,15 +830,15 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
   int ab_link_sign=1;
   int bc_link_sign=1;   
     
-  float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
-  float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
-  float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
-  float2 HWD0, HWD1, HWD2, HWD3, HWD4, HWD5;
-  float2 HWE0, HWE1, HWE2, HWE3, HWE4, HWE5;
+  Float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
+  Float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
+  Float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
+  Float2 HWD0, HWD1, HWD2, HWD3, HWD4, HWD5;
+  Float2 HWE0, HWE1, HWE2, HWE3, HWE4, HWE5;
   float4 LINKA0, LINKA1, LINKA2, LINKA3, LINKA4;
   float4 LINKB0, LINKB1, LINKB2, LINKB3, LINKB4;
   float4 LINKC0, LINKC1, LINKC2, LINKC3, LINKC4;
-  float2 AH0, AH1, AH2, AH3, AH4;
+  Float2 AH0, AH1, AH2, AH3, AH4;
   
   
   /*              sig
@@ -1001,16 +1001,16 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
 
 
 
-
+template<typename Float2>
 static void
-all_link_kernel(float2* tempxEven, float2* tempxOdd, 
-		float2* PmuEven, float2* PmuOdd,
-		float2* P3Even, float2* P3Odd,
-		float2* P3muEven, float2* P3muOdd,
-		float2* shortPEven, float2* shortPOdd,
-		int sig, int mu, float2 coeff, float2 mcoeff, float2 accumu_coeff,
+all_link_kernel(Float2* tempxEven, Float2* tempxOdd, 
+		Float2* PmuEven, Float2* PmuOdd,
+		Float2* P3Even, Float2* P3Odd,
+		Float2* P3muEven, Float2* P3muOdd,
+		Float2* shortPEven, Float2* shortPOdd,
+		int sig, int mu, Float2 coeff, Float2 mcoeff, Float2 accumu_coeff,
 		float4* linkEven, float4* linkOdd, cudaGaugeField &siteLink,
-		float2* momEven, float2* momOdd,
+		Float2* momEven, Float2* momOdd,
 		dim3 gridDim, dim3 blockDim)
 		   
 {
@@ -1056,22 +1056,22 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
  * Pnumu:    IN
  *
  */
-template <int oddBit>
+template <int oddBit, typename Float2>
 __global__ void
-do_one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
-			     float2* PmuEven,   float2* PmuOdd, 
-			     float2* PnumuEven, float2* PnumuOdd,
-			     int mu, float2 OneLink, float2 Naik, float2 mNaik,
+do_one_and_naik_terms_kernel(Float2* TempxEven, Float2* TempxOdd,
+			     Float2* PmuEven,   Float2* PmuOdd, 
+			     Float2* PnumuEven, Float2* PnumuOdd,
+			     int mu, Float2 OneLink, Float2 Naik, Float2 mNaik,
 			     float4* linkEven, float4* linkOdd,
-			     float2* momEven, float2* momOdd)
+			     Float2* momEven, Float2* momOdd)
 {
-  float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
-  float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
-  float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
-  float2 HWD0, HWD1, HWD2, HWD3, HWD4, HWD5;
+  Float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
+  Float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
+  Float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
+  Float2 HWD0, HWD1, HWD2, HWD3, HWD4, HWD5;
   float4 LINKA0, LINKA1, LINKA2, LINKA3, LINKA4;
   float4 LINKB0, LINKB1, LINKB2, LINKB3, LINKB4;
-  float2 AH0, AH1, AH2, AH3, AH4;    
+  Float2 AH0, AH1, AH2, AH3, AH4;    
     
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   int z1 = sid / X1h;
@@ -1145,30 +1145,30 @@ do_one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
   }
 }
 
-
+template<typename Float2>
 static void
-one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
-			  float2* PmuEven,   float2* PmuOdd,
-			  float2* PnumuEven, float2* PnumuOdd,
-			  int mu, float2 OneLink, float2 Naik, float2 mNaik,
+one_and_naik_terms_kernel(Float2* TempxEven, Float2* TempxOdd,
+			  Float2* PmuEven,   Float2* PmuOdd,
+			  Float2* PnumuEven, Float2* PnumuOdd,
+			  int mu, Float2 OneLink, Float2 Naik, Float2 mNaik,
 			  float4* linkEven, float4* linkOdd,
-			  float2* momEven, float2* momOdd,
+			  Float2* momEven, Float2* momOdd,
 			  dim3 gridDim, dim3 blockDim)
 {  
   dim3 halfGridDim(gridDim.x/2, 1,1);
 
-  do_one_and_naik_terms_kernel<0><<<halfGridDim, blockDim>>>((float2*)TempxEven, (float2*)TempxOdd,
-							     (float2*)PmuEven, (float2*)PmuOdd,
-							     (float2*)PnumuEven, (float2*)PnumuOdd,
+  do_one_and_naik_terms_kernel<0><<<halfGridDim, blockDim>>>(TempxEven, TempxOdd,
+							     PmuEven, PmuOdd,
+							     PnumuEven, PnumuOdd,
 							     mu, OneLink, Naik, mNaik, 
-							     (float4*)linkEven, (float4*)linkOdd,
-							     (float2*)momEven, (float2*)momOdd);
-  do_one_and_naik_terms_kernel<1><<<halfGridDim, blockDim>>>((float2*)TempxEven, (float2*)TempxOdd,
-							     (float2*)PmuEven, (float2*)PmuOdd,
-							     (float2*)PnumuEven, (float2*)PnumuOdd,
+							     linkEven, linkOdd,
+							     momEven, momOdd);
+  do_one_and_naik_terms_kernel<1><<<halfGridDim, blockDim>>>(TempxEven, TempxOdd,
+							     PmuEven, PmuOdd,
+							     PnumuEven, PnumuOdd,
 							     mu, OneLink, Naik, mNaik, 
-							     (float4*)linkEven, (float4*)linkOdd,
-							     (float2*)momEven, (float2*)momOdd); 
+							     linkEven, linkOdd,
+							     momEven, momOdd); 
   return;
 }
 
