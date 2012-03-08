@@ -8,16 +8,7 @@
 
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, Vh)
 
-#define LOAD_HW_SINGLE(hw, idx, var)	do{	\
-    var##0 = hw[idx + 0*Vh];			\
-    var##1 = hw[idx + 1*Vh];			\
-    var##2 = hw[idx + 2*Vh];			\
-    var##3 = hw[idx + 3*Vh];			\
-    var##4 = hw[idx + 4*Vh];			\
-    var##5 = hw[idx + 5*Vh];			\
-  }while(0)
-
-#define LOAD_HW_SINGLE2(hw_even, hw_odd, idx, var, oddness)	do{	\
+#define LOAD_HW_SINGLE(hw_even, hw_odd, idx, var, oddness)	do{	\
     float2* hw = (oddness)?hw_odd:hw_even;				\
     var##0 = hw[idx + 0*Vh];						\
     var##1 = hw[idx + 1*Vh];						\
@@ -27,17 +18,7 @@
     var##5 = hw[idx + 5*Vh];						\
   }while(0)
 
-
-#define WRITE_HW_SINGLE(hw, idx, var)	do{	\
-    hw[idx + 0*Vh] = var##0;			\
-    hw[idx + 1*Vh] = var##1;			\
-    hw[idx + 2*Vh] = var##2;			\
-    hw[idx + 3*Vh] = var##3;			\
-    hw[idx + 4*Vh] = var##4;			\
-    hw[idx + 5*Vh] = var##5;			\
-  }while(0)
-
-#define WRITE_HW_SINGLE2(hw_even, hw_odd, idx, var, oddness)	do{	\
+#define WRITE_HW_SINGLE(hw_even, hw_odd, idx, var, oddness)	do{	\
     float2* hw = (oddness)?hw_odd:hw_even;				\
     hw[idx + 0*Vh] = var##0;						\
     hw[idx + 1*Vh] = var##1;						\
@@ -47,27 +28,19 @@
     hw[idx + 5*Vh] = var##5;						\
   }while(0)
 
-#define LOAD_HW(hw, idx, var) LOAD_HW_SINGLE(hw, idx, var)
-#define LOAD_HW2(hw_eve, hw_odd, idx, var, oddness) LOAD_HW_SINGLE2(hw_eve, hw_odd, idx, var, oddness)
-#define WRITE_HW(hw, idx, var) WRITE_HW_SINGLE(hw, idx, var)
-#define WRITE_HW2(hw_even, hw_odd, idx, var, oddness) WRITE_HW_SINGLE2(hw_even, hw_odd, idx, var, oddness)
+#define LOAD_HW(hw_eve, hw_odd, idx, var, oddness) LOAD_HW_SINGLE(hw_eve, hw_odd, idx, var, oddness)
+#define WRITE_HW(hw_even, hw_odd, idx, var, oddness) WRITE_HW_SINGLE(hw_even, hw_odd, idx, var, oddness)
 #define LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var, Vh)
-//#define LOAD_ANTI_HERMITIAN(mom, mydir, idx, AH);
 
 #define FF_SITE_MATRIX_LOAD_TEX 1
 
 #define linkEvenTex siteLink0TexSingle_recon
 #define linkOddTex siteLink1TexSingle_recon
-#if (FF_SITE_MATRIX_LOAD_TEX == 1)
-#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(src##Tex, dir, idx, var, Vh)
-#else
-#define FF_LOAD_MATRIX(src, dir, idx, var) LOAD_MATRIX_12_SINGLE(src, dir, idx, var, Vh)
-#endif
 
 #if (FF_SITE_MATRIX_LOAD_TEX == 1)
-#define FF_LOAD_MATRIX2(dir, idx, var, oddness) LOAD_MATRIX_12_SINGLE_TEX(((oddness)?linkOddTex:linkEvenTex), dir, idx, var, Vh)
+#define FF_LOAD_MATRIX(dir, idx, var, oddness) LOAD_MATRIX_12_SINGLE_TEX(((oddness)?linkOddTex:linkEvenTex), dir, idx, var, Vh)
 #else
-#define FF_LOAD_MATRIX2(dir, idx, var, oddness) LOAD_MATRIX_12_SINGLE(((oddness)?linkOdd:linkEven), dir, idx, var, Vh)
+#define FF_LOAD_MATRIX(dir, idx, var, oddness) LOAD_MATRIX_12_SINGLE(((oddness)?linkOdd:linkEven), dir, idx, var, Vh)
 #endif
 
 
@@ -297,36 +270,7 @@
   }while(0)
 
 //this macro require linka, linkb, and ah variables defined
-#define ADD_FORCE_TO_MOM(hw1, hw2, mom, idx, dir, cf,oddness) do{	\
-    float2 my_coeff;							\
-    int mydir;								\
-    if (GOES_BACKWARDS(dir)){						\
-      mydir=OPP_DIR(dir);						\
-      my_coeff.x = -cf.x;						\
-      my_coeff.y = -cf.y;						\
-    }else{								\
-      mydir=dir;							\
-      my_coeff.x = cf.x;						\
-      my_coeff.y = cf.y;						\
-    }									\
-    float2 tmp_coeff;							\
-    tmp_coeff.x = my_coeff.x;						\
-    tmp_coeff.y = my_coeff.y;						\
-    if(oddness){							\
-      tmp_coeff.x = - my_coeff.x;					\
-      tmp_coeff.y = - my_coeff.y;					\
-    }									\
-    LOAD_ANTI_HERMITIAN(mom, mydir, idx, AH);				\
-    UNCOMPRESS_ANTI_HERMITIAN(ah, linka);				\
-    SU3_PROJECTOR(hw1##0, hw2##0, linkb);				\
-    SCALAR_MULT_ADD_SU3_MATRIX(linka, linkb, tmp_coeff.x, linka);	\
-    SU3_PROJECTOR(hw1##1, hw2##1, linkb);				\
-    SCALAR_MULT_ADD_SU3_MATRIX(linka, linkb, tmp_coeff.y, linka);	\
-    MAKE_ANTI_HERMITIAN(linka, ah);					\
-    WRITE_ANTI_HERMITIAN(mom, mydir, idx, AH, Vh);			\
-  }while(0)
-
-#define ADD_FORCE_TO_MOM2(hw1, hw2, idx, dir, cf,oddness) do{		\
+#define ADD_FORCE_TO_MOM(hw1, hw2, idx, dir, cf,oddness) do{		\
     float2 my_coeff;							\
     int mydir;								\
     if (GOES_BACKWARDS(dir)){						\
@@ -579,11 +523,11 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
     FF_COMPUTE_RECONSTRUCT_SIGN(ab_link_sign, mysig, new_x1,new_x2,new_x3,new_x4);
   }
     
-  LOAD_HW2(tempxEven, tempxOdd, point_d, HWA, 1-oddBit );
+  LOAD_HW(tempxEven, tempxOdd, point_d, HWA, 1-oddBit );
   if(mu_positive){
-    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, 1-oddBit);
+    FF_LOAD_MATRIX(mymu, ad_link_nbr_idx, LINKA, 1-oddBit);
   }else{
-    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, oddBit);
+    FF_LOAD_MATRIX(mymu, ad_link_nbr_idx, LINKA, oddBit);
   }
 
   RECONSTRUCT_LINK_12(ad_link_sign, linka);	
@@ -592,13 +536,13 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
   }else{
     MAT_MUL_HW(linka, hwa, hwd);
   }
-  WRITE_HW2(PmuEven,PmuOdd, sid, HWD, oddBit);	
+  WRITE_HW(PmuEven,PmuOdd, sid, HWD, oddBit);	
         
-  LOAD_HW2(tempxEven,tempxOdd, point_c, HWA, oddBit);
+  LOAD_HW(tempxEven,tempxOdd, point_c, HWA, oddBit);
   if(mu_positive){
-    FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, oddBit);
+    FF_LOAD_MATRIX(mymu, bc_link_nbr_idx, LINKA, oddBit);
   }else{
-    FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, 1-oddBit);
+    FF_LOAD_MATRIX(mymu, bc_link_nbr_idx, LINKA, 1-oddBit);
   }
     
   RECONSTRUCT_LINK_12(bc_link_sign, linka);
@@ -608,9 +552,9 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
     MAT_MUL_HW(linka, hwa, hwb);
   }
   if(sig_positive){
-    FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKB, oddBit);
+    FF_LOAD_MATRIX(mysig, ab_link_nbr_idx, LINKB, oddBit);
   }else{
-    FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKB, 1-oddBit);
+    FF_LOAD_MATRIX(mysig, ab_link_nbr_idx, LINKB, 1-oddBit);
   }
     
   RECONSTRUCT_LINK_12(ab_link_sign, linkb);
@@ -619,11 +563,11 @@ do_middle_link_kernel(float2* tempxEven, float2* tempxOdd,
   }else{
     ADJ_MAT_MUL_HW(linkb, hwb, hwc);
   }
-  WRITE_HW2(P3Even, P3Odd, sid, HWC, oddBit);
+  WRITE_HW(P3Even, P3Odd, sid, HWC, oddBit);
     
   if (sig_positive){	
     //add the force to mom	
-    ADD_FORCE_TO_MOM2(hwc, hwd, sid, sig, coeff, oddBit);
+    ADD_FORCE_TO_MOM(hwc, hwd, sid, sig, coeff, oddBit);
   }
 }
 
@@ -757,11 +701,11 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
   }
 
     
-  LOAD_HW2(P3Even, P3Odd, sid, HWA, oddBit);
+  LOAD_HW(P3Even, P3Odd, sid, HWA, oddBit);
   if(mu_positive){
-    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, 1 - oddBit);
+    FF_LOAD_MATRIX(mymu, ad_link_nbr_idx, LINKA, 1 - oddBit);
   }else{
-    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, oddBit);
+    FF_LOAD_MATRIX(mymu, ad_link_nbr_idx, LINKA, oddBit);
   }
 
   RECONSTRUCT_LINK_12(ad_link_sign, linka);	
@@ -774,28 +718,28 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
     
   //start to add side link force
   if (mu_positive){
-    LOAD_HW2(TempxEven, TempxOdd, point_d, HWC, 1-oddBit);
+    LOAD_HW(TempxEven, TempxOdd, point_d, HWC, 1-oddBit);
 	
     if (sig_positive){
-      ADD_FORCE_TO_MOM2(hwb, hwc, point_d, mu, coeff, 1-oddBit);
+      ADD_FORCE_TO_MOM(hwb, hwc, point_d, mu, coeff, 1-oddBit);
     }else{
-      ADD_FORCE_TO_MOM2(hwc, hwb, point_d, OPP_DIR(mu), mcoeff, 1- oddBit);	    
+      ADD_FORCE_TO_MOM(hwc, hwb, point_d, OPP_DIR(mu), mcoeff, 1- oddBit);	    
     }
   }else{
-    LOAD_HW2(PmuEven, PmuOdd, sid, HWC, oddBit);
+    LOAD_HW(PmuEven, PmuOdd, sid, HWC, oddBit);
     if (sig_positive){
-      ADD_FORCE_TO_MOM2(hwa, hwc, sid, mu, mcoeff, oddBit);
+      ADD_FORCE_TO_MOM(hwa, hwc, sid, mu, mcoeff, oddBit);
     }else{
-      ADD_FORCE_TO_MOM2(hwc, hwa, sid, OPP_DIR(mu), coeff, oddBit);	    
+      ADD_FORCE_TO_MOM(hwc, hwa, sid, OPP_DIR(mu), coeff, oddBit);	    
     }
 	
   }
     
   if (shortPOdd){
-    LOAD_HW2(shortPEven, shortPOdd, point_d, HWA, 1-oddBit);
+    LOAD_HW(shortPEven, shortPOdd, point_d, HWA, 1-oddBit);
     SCALAR_MULT_ADD_SU3_VECTOR(hwa0, hwb0, accumu_coeff.x, hwa0);
     SCALAR_MULT_ADD_SU3_VECTOR(hwa1, hwb1, accumu_coeff.y, hwa1);
-    WRITE_HW2(shortPEven, shortPOdd, point_d, HWA, 1-oddBit);
+    WRITE_HW(shortPEven, shortPOdd, point_d, HWA, 1-oddBit);
   }
 
 }
@@ -969,11 +913,11 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
     FF_COMPUTE_RECONSTRUCT_SIGN(ab_link_sign, mysig, new_x1,new_x2,new_x3,new_x4);
   }
 
-  LOAD_HW2(tempxEven, tempxOdd, point_d, HWE, 1-oddBit);
+  LOAD_HW(tempxEven, tempxOdd, point_d, HWE, 1-oddBit);
   if (mu_positive){
-    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKC, 1-oddBit);
+    FF_LOAD_MATRIX(mymu, ad_link_nbr_idx, LINKC, 1-oddBit);
   }else{
-    FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKC, oddBit);
+    FF_LOAD_MATRIX(mymu, ad_link_nbr_idx, LINKC, oddBit);
   }
     
   RECONSTRUCT_LINK_12(ad_link_sign, linkc);	
@@ -985,11 +929,11 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
   //we do not need to write Pmu here
   //WRITE_HW(myPmu, sid, HWD);	
         
-  LOAD_HW2(tempxEven, tempxOdd, point_c, HWA, oddBit);
+  LOAD_HW(tempxEven, tempxOdd, point_c, HWA, oddBit);
   if (mu_positive){
-    FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, oddBit);
+    FF_LOAD_MATRIX(mymu, bc_link_nbr_idx, LINKA, oddBit);
   }else{
-    FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, 1-oddBit);	
+    FF_LOAD_MATRIX(mymu, bc_link_nbr_idx, LINKA, 1-oddBit);	
   }
 
   RECONSTRUCT_LINK_12(bc_link_sign, linka);
@@ -999,9 +943,9 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
     MAT_MUL_HW(linka, hwa, hwb);
   }
   if (sig_positive){
-    FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKA, oddBit);
+    FF_LOAD_MATRIX(mysig, ab_link_nbr_idx, LINKA, oddBit);
   }else{
-    FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKA, 1-oddBit);
+    FF_LOAD_MATRIX(mysig, ab_link_nbr_idx, LINKA, 1-oddBit);
   }
 
   RECONSTRUCT_LINK_12(ab_link_sign, linka);
@@ -1017,7 +961,7 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
   //The middle link contribution
   if (sig_positive){	
     //add the force to mom	
-    ADD_FORCE_TO_MOM2(hwc, hwd, sid, sig, mcoeff, oddBit);
+    ADD_FORCE_TO_MOM(hwc, hwd, sid, sig, mcoeff, oddBit);
   }
 
   //P3 is hwc
@@ -1030,24 +974,24 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
     
   //accumulate P7rho to P5
   //WRITE_HW(otherP3mu, point_d, HWA);	 
-  LOAD_HW2(shortPEven, shortPOdd, point_d, HWB, 1-oddBit);
+  LOAD_HW(shortPEven, shortPOdd, point_d, HWB, 1-oddBit);
   SCALAR_MULT_ADD_SU3_VECTOR(hwb0, hwa0, accumu_coeff.x, hwb0);
   SCALAR_MULT_ADD_SU3_VECTOR(hwb1, hwa1, accumu_coeff.y, hwb1);
-  WRITE_HW2(shortPEven, shortPOdd, point_d, HWB, 1-oddBit);
+  WRITE_HW(shortPEven, shortPOdd, point_d, HWB, 1-oddBit);
 
   //hwe holds tempx at point_d
   //hwd holds Pmu at point A(sid)
   if (mu_positive){
     if (sig_positive){
-      ADD_FORCE_TO_MOM2(hwa, hwe, point_d, mu, coeff, 1-oddBit);
+      ADD_FORCE_TO_MOM(hwa, hwe, point_d, mu, coeff, 1-oddBit);
     }else{
-      ADD_FORCE_TO_MOM2(hwe, hwa, point_d, OPP_DIR(mu), mcoeff, 1- oddBit);	    
+      ADD_FORCE_TO_MOM(hwe, hwa, point_d, OPP_DIR(mu), mcoeff, 1- oddBit);	    
     }
   }else{
     if (sig_positive){
-      ADD_FORCE_TO_MOM2(hwc, hwd, sid, mu, mcoeff, oddBit);
+      ADD_FORCE_TO_MOM(hwc, hwd, sid, mu, mcoeff, oddBit);
     }else{
-      ADD_FORCE_TO_MOM2(hwd, hwc, sid, OPP_DIR(mu), coeff, oddBit);	    
+      ADD_FORCE_TO_MOM(hwd, hwc, sid, OPP_DIR(mu), coeff, oddBit);	    
     }
 	
   }  
@@ -1146,9 +1090,9 @@ do_one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     
   if (GOES_BACKWARDS(mu)){
     //The one link
-    LOAD_HW2(PmuEven, PmuOdd, sid, HWA, oddBit);
-    LOAD_HW2(TempxEven, TempxOdd, sid, HWB, oddBit);
-    ADD_FORCE_TO_MOM2(hwa, hwb, sid, OPP_DIR(mu), OneLink, oddBit);
+    LOAD_HW(PmuEven, PmuOdd, sid, HWA, oddBit);
+    LOAD_HW(TempxEven, TempxOdd, sid, HWB, oddBit);
+    ADD_FORCE_TO_MOM(hwa, hwb, sid, OPP_DIR(mu), OneLink, oddBit);
 	
     //Naik term
     dx[3]=dx[2]=dx[1]=dx[0]=0;
@@ -1158,14 +1102,14 @@ do_one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     new_x3 = (x3 + dx[2] + X3)%X3;
     new_x4 = (x4 + dx[3] + X4)%X4;	
     new_idx = (new_x4*X3X2X1+new_x3*X2X1+new_x2*X1+new_x1) >> 1;
-    LOAD_HW2(TempxEven, TempxOdd, new_idx, HWA, 1-oddBit);
-    FF_LOAD_MATRIX2(OPP_DIR(mu), new_idx, LINKA, 1-oddBit);
+    LOAD_HW(TempxEven, TempxOdd, new_idx, HWA, 1-oddBit);
+    FF_LOAD_MATRIX(OPP_DIR(mu), new_idx, LINKA, 1-oddBit);
     FF_COMPUTE_RECONSTRUCT_SIGN(sign, OPP_DIR(mu), new_x1,new_x2,new_x3,new_x4);
     RECONSTRUCT_LINK_12(sign, linka);		
     ADJ_MAT_MUL_HW(linka, hwa, hwc); //Popmu
 	
-    LOAD_HW2(PnumuEven, PnumuOdd, sid, HWD, oddBit);
-    ADD_FORCE_TO_MOM2(hwd, hwc, sid, OPP_DIR(mu), mNaik, oddBit);
+    LOAD_HW(PnumuEven, PnumuOdd, sid, HWD, oddBit);
+    ADD_FORCE_TO_MOM(hwd, hwc, sid, OPP_DIR(mu), mNaik, oddBit);
 	
     dx[3]=dx[2]=dx[1]=dx[0]=0;
     dx[OPP_DIR(mu)] = 1;
@@ -1174,12 +1118,12 @@ do_one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     new_x3 = (x3 + dx[2] + X3)%X3;
     new_x4 = (x4 + dx[3] + X4)%X4;	
     new_idx = (new_x4*X3X2X1+new_x3*X2X1+new_x2*X1+new_x1) >> 1;
-    LOAD_HW2(PnumuEven, PnumuOdd, new_idx, HWA, 1-oddBit);
-    FF_LOAD_MATRIX2(OPP_DIR(mu), sid, LINKA, oddBit);
+    LOAD_HW(PnumuEven, PnumuOdd, new_idx, HWA, 1-oddBit);
+    FF_LOAD_MATRIX(OPP_DIR(mu), sid, LINKA, oddBit);
     FF_COMPUTE_RECONSTRUCT_SIGN(sign, OPP_DIR(mu), x1, x2, x3, x4);
     RECONSTRUCT_LINK_12(sign, linka);	
     MAT_MUL_HW(linka, hwa, hwc);
-    ADD_FORCE_TO_MOM2(hwc, hwb, sid, OPP_DIR(mu), Naik, oddBit);	
+    ADD_FORCE_TO_MOM(hwc, hwb, sid, OPP_DIR(mu), Naik, oddBit);	
   }else{
     dx[3]=dx[2]=dx[1]=dx[0]=0;
     dx[mu] = 1;
@@ -1188,14 +1132,14 @@ do_one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     new_x3 = (x3 + dx[2] + X3)%X3;
     new_x4 = (x4 + dx[3] + X4)%X4;	
     new_idx = (new_x4*X3X2X1+new_x3*X2X1+new_x2*X1+new_x1) >> 1;
-    LOAD_HW2(TempxEven, TempxOdd, new_idx, HWA, 1-oddBit);
-    FF_LOAD_MATRIX2(mu, sid, LINKA, oddBit);
+    LOAD_HW(TempxEven, TempxOdd, new_idx, HWA, 1-oddBit);
+    FF_LOAD_MATRIX(mu, sid, LINKA, oddBit);
     FF_COMPUTE_RECONSTRUCT_SIGN(sign, mu, x1, x2, x3, x4);
     RECONSTRUCT_LINK_12(sign, linka);
     MAT_MUL_HW(linka, hwa, hwb);
 	
-    LOAD_HW2(PnumuEven, PnumuOdd, sid, HWC, oddBit);
-    ADD_FORCE_TO_MOM2(hwb, hwc, sid, mu, Naik, oddBit);
+    LOAD_HW(PnumuEven, PnumuOdd, sid, HWC, oddBit);
+    ADD_FORCE_TO_MOM(hwb, hwc, sid, mu, Naik, oddBit);
 	
 
   }
