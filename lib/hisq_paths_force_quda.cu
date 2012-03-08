@@ -105,6 +105,24 @@ namespace hisq {
         return;
       }
 
+    template<class T>
+      inline __device__
+      void loadMatrixFromField2(const T* const field_even, const T* const field_odd,
+				int dir, int idx, T* const mat, int oddness)
+      {
+	const T* const field = (oddness)?field_odd:field_even;
+        mat[0] = field[idx + dir*Vhx9];
+        mat[1] = field[idx + dir*Vhx9 + Vh];
+        mat[2] = field[idx + dir*Vhx9 + Vhx2];
+        mat[3] = field[idx + dir*Vhx9 + Vhx3];
+        mat[4] = field[idx + dir*Vhx9 + Vhx4];
+        mat[5] = field[idx + dir*Vhx9 + Vhx5];
+        mat[6] = field[idx + dir*Vhx9 + Vhx6];
+        mat[7] = field[idx + dir*Vhx9 + Vhx7];
+        mat[8] = field[idx + dir*Vhx9 + Vhx8];
+
+        return;
+      }
 
 
     template<class T>
@@ -125,7 +143,24 @@ namespace hisq {
         return;
       }
 
-
+    template<class T>
+      inline __device__
+      void loadAdjointMatrixFromField2(const T* const field_even, const T* const field_odd, int dir, int idx, T* const mat, int oddness)
+      {
+	const T* const field = (oddness)?field_odd: field_even;
+#define CONJ_INDEX(i,j) j*3 + i
+        mat[CONJ_INDEX(0,0)] = conj(field[idx + dir*Vhx9]);
+        mat[CONJ_INDEX(0,1)] = conj(field[idx + dir*Vhx9 + Vh]);
+        mat[CONJ_INDEX(0,2)] = conj(field[idx + dir*Vhx9 + Vhx2]);
+        mat[CONJ_INDEX(1,0)] = conj(field[idx + dir*Vhx9 + Vhx3]);
+        mat[CONJ_INDEX(1,1)] = conj(field[idx + dir*Vhx9 + Vhx4]);
+        mat[CONJ_INDEX(1,2)] = conj(field[idx + dir*Vhx9 + Vhx5]);
+        mat[CONJ_INDEX(2,0)] = conj(field[idx + dir*Vhx9 + Vhx6]);
+        mat[CONJ_INDEX(2,1)] = conj(field[idx + dir*Vhx9 + Vhx7]);
+        mat[CONJ_INDEX(2,2)] = conj(field[idx + dir*Vhx9 + Vhx8]);
+#undef CONJ_INDEX
+        return;
+      }
 
     inline __device__
       void loadMatrixFromField(const float4* const field, int dir, int idx, float4* const mat)
@@ -154,7 +189,23 @@ namespace hisq {
 
         return;
       }
+    template<class T>
+      inline __device__
+      void loadMatrixFromField2(const T* const field_even, const T* const field_odd, int idx, T* const mat, int oddness)
+      {
+	const T* const field = (oddness)?field_odd:field_even;
+        mat[0] = field[idx];
+        mat[1] = field[idx + Vh];
+        mat[2] = field[idx + Vhx2];
+        mat[3] = field[idx + Vhx3];
+        mat[4] = field[idx + Vhx4];
+        mat[5] = field[idx + Vhx5];
+        mat[6] = field[idx + Vhx6];
+        mat[7] = field[idx + Vhx7];
+        mat[8] = field[idx + Vhx8];
 
+        return;
+      }
     
 
     // only works if Promote<T,U>::Type = T
@@ -175,6 +226,26 @@ namespace hisq {
         return;
       }
 
+    template<class T, class U>   
+    inline __device__
+      void addMatrixToField2(const T* const mat, int dir, int idx, U coeff, 
+			     T* const field_even, T* const field_odd, int oddness)
+      {
+	T* const field = (oddness)?field_odd: field_even;
+        field[idx + dir*Vhx9]          += coeff*mat[0];
+        field[idx + dir*Vhx9 + Vh]     += coeff*mat[1];
+        field[idx + dir*Vhx9 + Vhx2]   += coeff*mat[2];
+        field[idx + dir*Vhx9 + Vhx3]   += coeff*mat[3];
+        field[idx + dir*Vhx9 + Vhx4]   += coeff*mat[4];
+        field[idx + dir*Vhx9 + Vhx5]   += coeff*mat[5];
+        field[idx + dir*Vhx9 + Vhx6]   += coeff*mat[6];
+        field[idx + dir*Vhx9 + Vhx7]   += coeff*mat[7];
+        field[idx + dir*Vhx9 + Vhx8]   += coeff*mat[8];
+
+        return;
+      }
+
+
     template<class T, class U>
     inline __device__
       void addMatrixToField(const T* const mat, int idx, U coeff, T* const field)
@@ -192,6 +263,24 @@ namespace hisq {
         return;
       }
 
+    template<class T, class U>
+    inline __device__
+      void addMatrixToField2(const T* const mat, int idx, U coeff, T* const field_even,
+			     T* const field_odd, int oddness)
+      {
+	T* const field = (oddness)?field_odd: field_even;
+        field[idx ]         += coeff*mat[0];
+        field[idx + Vh]     += coeff*mat[1];
+        field[idx + Vhx2]   += coeff*mat[2];
+        field[idx + Vhx3]   += coeff*mat[3];
+        field[idx + Vhx4]   += coeff*mat[4];
+        field[idx + Vhx5]   += coeff*mat[5];
+        field[idx + Vhx6]   += coeff*mat[6];
+        field[idx + Vhx7]   += coeff*mat[7];
+        field[idx + Vhx8]   += coeff*mat[8];
+
+        return;
+      }
 
     template<class T>
     inline __device__
@@ -210,10 +299,47 @@ namespace hisq {
         return;
       }
 
+
+   template<class T>
+    inline __device__
+     void storeMatrixToField2(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness)
+      {
+	T* const field = (oddness)?field_odd: field_even;
+        field[idx + dir*Vhx9]          = mat[0];
+        field[idx + dir*Vhx9 + Vh]     = mat[1];
+        field[idx + dir*Vhx9 + Vhx2]   = mat[2];
+        field[idx + dir*Vhx9 + Vhx3]   = mat[3];
+        field[idx + dir*Vhx9 + Vhx4]   = mat[4];
+        field[idx + dir*Vhx9 + Vhx5]   = mat[5];
+        field[idx + dir*Vhx9 + Vhx6]   = mat[6];
+        field[idx + dir*Vhx9 + Vhx7]   = mat[7];
+        field[idx + dir*Vhx9 + Vhx8]   = mat[8];
+
+        return;
+      }
+
     template<class T>
     inline __device__
       void storeMatrixToField(const T* const mat, int idx, T* const field)
       {
+        field[idx]          = mat[0];
+        field[idx + Vh]     = mat[1];
+        field[idx + Vhx2]   = mat[2];
+        field[idx + Vhx3]   = mat[3];
+        field[idx + Vhx4]   = mat[4];
+        field[idx + Vhx5]   = mat[5];
+        field[idx + Vhx6]   = mat[6];
+        field[idx + Vhx7]   = mat[7];
+        field[idx + Vhx8]   = mat[8];
+
+        return;
+      }
+
+    template<class T>
+    inline __device__
+      void storeMatrixToField2(const T* const mat, int idx, T* const field_even, T* const field_odd, int oddness)
+      {
+	T* const field = (oddness)?field_odd: field_even;
         field[idx]          = mat[0];
         field[idx + Vh]     = mat[1];
         field[idx + Vhx2]   = mat[2];
@@ -316,7 +442,7 @@ namespace hisq {
     __device__ void reconstructSign(int* const sign, int dir, const int i[4]){
 
       *sign=1;
-/*
+ /*
       switch(dir){
         case XUP:
           if( (i[3]&1)==1) *sign=-1;
@@ -591,193 +717,6 @@ namespace hisq {
 
 
 
-    template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit> 
-      __global__ void
-      do_middle_link_kernel(
-          const RealA* const oprodEven, 
-          const RealA* const oprodOdd,
-          const RealA* const QprevOdd, 		
-          const RealB* const linkEven, 
-          const RealB* const linkOdd,
-          int sig, int mu, 
-          typename RealTypeId<RealA>::Type coeff,
-          RealA* const PmuOdd, 
-          RealA* const P3Even,
-          RealA* const QmuEven, 
-          RealA* const newOprodEven 
-          ) 
-      {		
-        int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-        int x[4];
-        int z1 = sid/X1h;
-        int x1h = sid - z1*X1h;
-        int z2 = z1/X2;
-        x[1] = z1 - z2*X2;
-        x[3] = z2/X3;
-        x[2] = z2 - x[3]*X3;
-        int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-        x[0] = 2*x1h + x1odd;
-        int X = 2*sid + x1odd;
-
-        int new_x[4];
-        int new_mem_idx;
-        int ad_link_sign=1;
-        int ab_link_sign=1;
-        int bc_link_sign=1;
-
-        RealB LINK_W[ArrayLength<RealB>::result];
-        RealB LINK_X[ArrayLength<RealB>::result];
-        RealB LINK_Y[ArrayLength<RealB>::result];
-
-
-        RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-
-        //        A________B
-        //    mu   |      |
-        // 	  D|      |C
-        //	  
-        //	  A is the current point (sid)
-        int point_b, point_c, point_d;
-        int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
-        int mymu;
-
-        new_x[0] = x[0];
-        new_x[1] = x[1];
-        new_x[2] = x[2];
-        new_x[3] = x[3];
-
-        if(mu_positive){
-          mymu = mu;
-          FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, X, new_mem_idx);
-        }else{
-          mymu = OPP_DIR(mu);
-          FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(OPP_DIR(mu), X, new_mem_idx);	
-        }
-        point_d = (new_mem_idx >> 1);
-        if (mu_positive){
-          ad_link_nbr_idx = point_d;
-          reconstructSign(&ad_link_sign, mymu, new_x);
-        }else{
-          ad_link_nbr_idx = sid;
-          reconstructSign(&ad_link_sign, mymu, x);	
-        }
-
-        int mysig; 
-        if(sig_positive){
-          mysig = sig;
-          FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
-        }else{
-          mysig = OPP_DIR(sig);
-          FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
-        }
-        point_c = (new_mem_idx >> 1);
-        if (mu_positive){
-          bc_link_nbr_idx = point_c;	
-          reconstructSign(&bc_link_sign, mymu, new_x);
-        }
-
-        new_x[0] = x[0];
-        new_x[1] = x[1];
-        new_x[2] = x[2];
-        new_x[3] = x[3];
-
-        if(sig_positive){
-          FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, X, new_mem_idx);
-        }else{
-          FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), X, new_mem_idx);	
-        }
-        point_b = (new_mem_idx >> 1); 
-
-        if (!mu_positive){
-          bc_link_nbr_idx = point_b;
-          reconstructSign(&bc_link_sign, mymu, new_x);
-        }   
-
-        if(sig_positive){
-          ab_link_nbr_idx = sid;
-          reconstructSign(&ab_link_sign, mysig, x);	
-        }else{	
-          ab_link_nbr_idx = point_b;
-          reconstructSign(&ab_link_sign, mysig, new_x);
-        }
-        // now we have ab_link_nbr_idx
-
-
-        // load the link variable connecting a and b 
-        // Store in LINK_W 
-        if(sig_positive){
-          loadMatrixFromField(linkEven, mysig, ab_link_nbr_idx, LINK_W);
-        }else{
-          loadMatrixFromField(linkOdd, mysig, ab_link_nbr_idx, LINK_W);
-        }
-
-        // load the link variable connecting b and c 
-        // Store in LINK_X
-        if(mu_positive){
-          loadMatrixFromField(linkEven, mymu, bc_link_nbr_idx, LINK_X);
-        }else{ 
-          loadMatrixFromField(linkOdd, mymu, bc_link_nbr_idx, LINK_X);
-        }
-
-
-        if(QprevOdd == NULL){
-          if(sig_positive){
-            loadMatrixFromField(oprodOdd, sig, point_d, COLOR_MAT_Y);
-          }else{
-	    loadAdjointMatrixFromField(oprodEven, OPP_DIR(sig), point_c, COLOR_MAT_Y);
-          }
-        }else{ // QprevOdd != NULL
-          loadMatrixFromField(oprodEven, point_c, COLOR_MAT_Y);
-        }
-       
-
-        MATRIX_PRODUCT(COLOR_MAT_W, LINK_X, COLOR_MAT_Y, !mu_positive);
-        if(PmuOdd){
-	  storeMatrixToField(COLOR_MAT_W, point_b, PmuOdd);
-        }
-        MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, COLOR_MAT_W, sig_positive);
-	storeMatrixToField(COLOR_MAT_Y, sid, P3Even);
-
-
-        if(mu_positive){
-          loadMatrixFromField(linkOdd, mymu, ad_link_nbr_idx, LINK_Y);
-        }else{
-          loadAdjointMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_Y);
-        }
-
-
-        if(QprevOdd == NULL){
-          if(sig_positive){
-            MAT_MUL_MAT(COLOR_MAT_W, LINK_Y, COLOR_MAT_Y);
-          }
-          if(QmuEven){
-            ASSIGN_MAT(LINK_Y, COLOR_MAT_X); 
-	    storeMatrixToField(COLOR_MAT_X, sid, QmuEven);
-          }
-        }else{ 
-          loadMatrixFromField(QprevOdd, point_d, COLOR_MAT_Y);
-          MAT_MUL_MAT(COLOR_MAT_Y, LINK_Y, COLOR_MAT_X);
-          if(QmuEven){
-	    storeMatrixToField(COLOR_MAT_X, sid, QmuEven);
-          }
-          if(sig_positive){
-            MAT_MUL_MAT(COLOR_MAT_W, COLOR_MAT_X, COLOR_MAT_Y);
-          }	
-        }
-
-
-        if(sig_positive){
-          addMatrixToField(COLOR_MAT_Y, sig, sid, coeff, newOprodEven);
-        }
-
-        return;
-      }
-
-
-
 
     template<class RealA, class RealB>
       static void 
@@ -818,244 +757,56 @@ namespace hisq {
         return;
       }
 
+    
+#include "hisq_paths_force_core.h"
 
 
     template<class RealA, class RealB>
       static void
       middle_link_kernel(
-          const RealA* const oprodEven, 
-          const RealA* const oprodOdd, 
-          const RealA* const QprevEven, 
-          const RealA* const QprevOdd,
-          const RealB* const linkEven, 
-          const RealB* const linkOdd, 
-          const cudaGaugeField &link,
-          int sig, int mu, 
+          const RealA* const oprodEven, const RealA* const oprodOdd, 
+          const RealA* const QprevEven, const RealA* const QprevOdd,
+          const RealB* const linkEven,  const RealB* const linkOdd, 
+          const cudaGaugeField &link, int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff,
           dim3 gridDim, dim3 BlockDim,
-          RealA* const PmuEven, // write only  
-          RealA* const PmuOdd, // write only
-          RealA* const P3Even, // write only   
-          RealA* const P3Odd,  // write only
-          RealA* const QmuEven,  // write only
-          RealA* const QmuOdd,   // write only
-          RealA* const newOprodEven, 
-          RealA* const newOprodOdd)
+          RealA* const PmuEven,  RealA* const PmuOdd, // write only
+          RealA* const P3Even,   RealA* const P3Odd,  // write only
+          RealA* const QmuEven,  RealA* const QmuOdd,   // write only
+          RealA* const newOprodEven,  RealA* const newOprodOdd)
       {
         dim3 halfGridDim(gridDim.x/2, 1,1);
 
-        cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
-        cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-
-        if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
-          do_middle_link_kernel<RealA, RealB, 1, 1, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
-              QprevOdd,
-              linkEven, linkOdd,
-              sig, mu, coeff,
-              PmuOdd,  P3Even,
-              QmuEven, 
-              newOprodEven);
-
-        }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-          do_middle_link_kernel<RealA, RealB, 1, 0, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
-              QprevOdd,
-              linkEven, linkOdd,
-              sig, mu, coeff,
-              PmuOdd,  P3Even,
-              QmuEven,
-              newOprodEven);
+#define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
+	do_middle_link_kernel<RealA, RealB, sig_sign, mu_sign, 0><<<halfGridDim, BlockDim>>>(oprodEven, oprodOdd, \
+											     QprevEven, QprevOdd, \
+											     linkEven, linkOdd, \
+											     sig, mu, coeff, \
+											     PmuEven, PmuOdd, \
+											     P3Even, P3Odd, \
+											     QmuEven, QmuOdd, \
+											     newOprodEven, newOprodOdd); \
+	do_middle_link_kernel<RealA, RealB, sig_sign, mu_sign, 1><<<halfGridDim, BlockDim>>>(oprodEven, oprodOdd, \
+											     QprevEven, QprevOdd, \
+											     linkEven, linkOdd, \
+											     sig, mu, coeff, \
+											     PmuEven, PmuOdd, \
+											     P3Even, P3Odd, \
+											     QmuEven, QmuOdd, \
+											     newOprodEven, newOprodOdd);
 	
-        }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-          do_middle_link_kernel<RealA, RealB, 0, 1, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
-              QprevOdd,
-              linkEven, linkOdd,
-              sig, mu, coeff,
-              PmuOdd,  P3Even,
-              QmuEven, 
-              newOprodEven);
-	
-        }else{
-          do_middle_link_kernel<RealA, RealB, 0, 0, 0><<<halfGridDim, BlockDim>>>( oprodEven, oprodOdd,
-              QprevOdd,
-              linkEven, linkOdd,
-              sig, mu, coeff,
-              PmuOdd, P3Even,
-              QmuEven, 
-              newOprodEven);		
-        }
-
-        cudaUnbindTexture(siteLink0TexSingle_recon);
-        cudaUnbindTexture(siteLink1TexSingle_recon);    
-        cudaBindTexture(0, siteLink0TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-        cudaBindTexture(0, siteLink1TexSingle_recon, link.Even_p(), link.Bytes()/2);
-
         if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
-          do_middle_link_kernel<RealA, RealB, 1, 1, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
-              QprevEven,
-              linkOdd, linkEven,
-              sig, mu, coeff,
-              PmuEven,  P3Odd,
-              QmuOdd, 
-              newOprodOdd);
-
+	  CALL_MIDDLE_LINK_KERNEL(1,1);
         }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-          do_middle_link_kernel<RealA, RealB, 1, 0, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
-              QprevEven,
-              linkOdd, linkEven,
-              sig, mu, coeff,
-              PmuEven,  P3Odd,
-              QmuOdd,  
-              newOprodOdd);
-
+	  CALL_MIDDLE_LINK_KERNEL(1,0);
         }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-          do_middle_link_kernel<RealA, RealB, 0, 1, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
-              QprevEven, 
-              linkOdd, linkEven,
-              sig, mu, coeff,
-              PmuEven,  P3Odd,
-              QmuOdd, 
-              newOprodOdd);
-
+	  CALL_MIDDLE_LINK_KERNEL(0,1);
         }else{
-          do_middle_link_kernel<RealA, RealB, 0, 0, 1><<<halfGridDim, BlockDim>>>( oprodOdd, oprodEven,
-              QprevEven,
-              linkOdd, linkEven,
-              sig, mu, coeff,
-              PmuEven,  P3Odd,
-              QmuOdd,  
-              newOprodOdd);		
+	  CALL_MIDDLE_LINK_KERNEL(0,0);
         }
-
-        cudaUnbindTexture(siteLink0TexSingle_recon);
-        cudaUnbindTexture(siteLink1TexSingle_recon);    
-
-
-        return;
-      }
-
-
-
-    template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
-      __global__ void
-      do_side_link_kernel(
-          const RealA* const P3Even, 
-          const RealA* const oprodEven, 
-          const RealA* const oprodOdd,
-          const RealB* const linkEven, 
-          const RealB* const linkOdd,
-          int sig, int mu, 
-          typename RealTypeId<RealA>::Type coeff, 
-          typename RealTypeId<RealA>::Type accumu_coeff,
-          RealA* const shortPOdd,
-          RealA* const newOprodEven, 
-          RealA* const newOprodOdd)
-      {
-
-        int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-        int x[4];
-        int z1 = sid/X1h;
-        int x1h = sid - z1*X1h;
-        int z2 = z1/X2;
-        x[1] = z1 - z2*X2;
-        x[3] = z2/X3;
-        x[2] = z2 - x[3]*X3;
-        int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-        x[0] = 2*x1h + x1odd;
-        int X = 2*sid + x1odd;
-
-        int ad_link_sign = 1;
-
-        RealB LINK_W[ArrayLength<RealB>::result];
-
-        RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_X[ArrayLength<RealA>::result]; 
-        RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
-        // The compiler probably knows to reorder so that loads are done early on
-        loadMatrixFromField(P3Even, sid, COLOR_MAT_Y);
-
-//      compute the side link contribution to the momentum
-//
-//             sig
-//          A________B
-//           |      |   mu
-//         D |      |C
-//
-//      A is the current point (sid)
-
-        typename RealTypeId<RealA>::Type mycoeff;
-        int point_d;
-        int ad_link_nbr_idx;
-        int mymu;
-        int new_mem_idx;
-
-        int new_x[4];
-        new_x[0] = x[0];
-        new_x[1] = x[1];
-        new_x[2] = x[2];
-        new_x[3] = x[3];
-
-        if(mu_positive){
-          mymu=mu;
-          FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mymu,X, new_mem_idx);
-        }else{
-          mymu = OPP_DIR(mu);
-          FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mymu, X, new_mem_idx);
-        }
-        point_d = (new_mem_idx >> 1);
-
-
-        if (mu_positive){
-          ad_link_nbr_idx = point_d;
-          reconstructSign(&ad_link_sign, mymu, new_x);
-        }else{
-          ad_link_nbr_idx = sid;
-          reconstructSign(&ad_link_sign, mymu, x);	
-        }
-
-
-        if(mu_positive){
-          loadMatrixFromField(linkOdd, mymu, ad_link_nbr_idx, LINK_W);
-        }else{
-          loadMatrixFromField(linkEven, mymu, ad_link_nbr_idx, LINK_W);
-        }
-
-
-        // Should all be inside if (shortPOdd)
-        if (shortPOdd){
-          MATRIX_PRODUCT(COLOR_MAT_W, LINK_W, COLOR_MAT_Y, mu_positive);
-          addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPOdd);
-        }
-
-
-        mycoeff = CoeffSign<sig_positive,oddBit>::result*coeff;
-
-        if(oprodOdd){
-          loadMatrixFromField(oprodOdd, point_d, COLOR_MAT_X);
-          if(mu_positive){
-            MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
-
-            // Added by J.F.
-            if(!oddBit){ mycoeff = -mycoeff; }
-            addMatrixToField(COLOR_MAT_W, mu, point_d, mycoeff, newOprodOdd);
-          }else{
-            ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);
-            if(oddBit){ mycoeff = -mycoeff; }
-            addMatrixToField(COLOR_MAT_W, OPP_DIR(mu), sid, mycoeff, newOprodEven);
-          } 
-        }
-
-        if(!oprodOdd){
-          if(mu_positive){
-            if(!oddBit){ mycoeff = -mycoeff;}
-            addMatrixToField(COLOR_MAT_Y, mu, point_d, mycoeff, newOprodOdd);
-          }else{
-            if(oddBit){ mycoeff = -mycoeff; }
-            ADJ_MAT(COLOR_MAT_Y, COLOR_MAT_W);
-            addMatrixToField(COLOR_MAT_W, OPP_DIR(mu), sid, mycoeff, newOprodEven);
-          }
-        }
-
+	
+#undef CALL_MIDDLE_LINK_KERNEL
+	
         return;
       }
 
@@ -1065,269 +816,50 @@ namespace hisq {
     template<class RealA, class RealB>
       static void
       side_link_kernel(
-          const RealA* const P3Even, 
-          const RealA* const P3Odd, 
-          const RealA* const oprodEven, 
-          const RealA* const oprodOdd,
-          const RealB* const linkEven, 
-          const RealB* const linkOdd, 
-          const cudaGaugeField &link,
-          int sig, int mu, 
+          const RealA* const P3Even, const RealA* const P3Odd, 
+          const RealA* const oprodEven, const RealA* const oprodOdd,
+          const RealB* const linkEven,  const RealB* const linkOdd, 
+          const cudaGaugeField &link, int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type accumu_coeff,
           dim3 gridDim, dim3 blockDim,
-          RealA* shortPEven,  
-          RealA* shortPOdd,
-          RealA* newOprodEven, 
-          RealA* newOprodOdd)
-      {
-        dim3 halfGridDim(gridDim.x/2,1,1);
-
-        cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
-        cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);   
-
-        if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
-          do_side_link_kernel<RealA, RealB, 1, 1, 0><<<halfGridDim, blockDim>>>( P3Even, 
-              oprodEven,  oprodOdd,
-              linkEven, linkOdd,
-              sig, mu, coeff, accumu_coeff,
-              shortPOdd,
-              newOprodEven, newOprodOdd);
-
-          cudaUnbindTexture(siteLink0TexSingle_recon);
-          cudaUnbindTexture(siteLink1TexSingle_recon);
-
-          //opposite binding
-          cudaBindTexture(0, siteLink0TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-          cudaBindTexture(0, siteLink1TexSingle_recon, link.Even_p(), link.Bytes()/2);
-
-          do_side_link_kernel<RealA, RealB, 1, 1, 1><<<halfGridDim, blockDim>>>( P3Odd, 
-              oprodOdd,  oprodEven,
-              linkOdd, linkEven,
-              sig, mu, coeff, accumu_coeff,
-              shortPEven,
-              newOprodOdd, newOprodEven);
-
-        }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-          do_side_link_kernel<RealA, RealB, 1, 0, 0><<<halfGridDim, blockDim>>>( P3Even, 
-              oprodEven,  oprodOdd,
-              linkEven,  linkOdd,
-              sig, mu, coeff, accumu_coeff,
-              shortPOdd,
-              newOprodEven, newOprodOdd);		
-
-          cudaUnbindTexture(siteLink0TexSingle_recon);
-          cudaUnbindTexture(siteLink1TexSingle_recon);
-
-          //opposite binding
-          cudaBindTexture(0, siteLink0TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-          cudaBindTexture(0, siteLink1TexSingle_recon, link.Even_p(), link.Bytes()/2);
-
-          do_side_link_kernel<RealA, RealB, 1, 0, 1><<<halfGridDim, blockDim>>>( P3Odd, 
-              oprodOdd,  oprodEven,
-              linkOdd, linkEven,
-              sig, mu, coeff, accumu_coeff,
-              shortPEven,
-              newOprodOdd, newOprodEven);		
-
-        }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-          do_side_link_kernel<RealA, RealB, 0, 1, 0><<<halfGridDim, blockDim>>>( P3Even,
-              oprodEven,  oprodOdd,
-              linkEven,  linkOdd,
-              sig, mu, coeff, accumu_coeff,
-              shortPOdd,
-              newOprodEven, newOprodOdd);
-          cudaUnbindTexture(siteLink0TexSingle_recon);
-          cudaUnbindTexture(siteLink1TexSingle_recon);
-
-          //opposite binding
-          cudaBindTexture(0, siteLink0TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-          cudaBindTexture(0, siteLink1TexSingle_recon, link.Even_p(), link.Bytes()/2);
-
-          do_side_link_kernel<RealA, RealB, 0, 1, 1><<<halfGridDim, blockDim>>>( P3Odd,
-              oprodOdd,  oprodEven,
-              linkOdd, linkEven,
-              sig, mu, coeff, accumu_coeff,
-              shortPEven,
-              newOprodOdd, newOprodEven);
-
-        }else{
-          do_side_link_kernel<RealA, RealB, 0, 0, 0><<<halfGridDim, blockDim>>>( P3Even,
-              oprodEven,  oprodOdd,
-              linkEven, linkOdd,
-              sig, mu, coeff, accumu_coeff,
-              shortPOdd,
-              newOprodEven, newOprodOdd);
-          cudaUnbindTexture(siteLink0TexSingle_recon);
-          cudaUnbindTexture(siteLink1TexSingle_recon);
-
-          //opposite binding
-          cudaBindTexture(0, siteLink0TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-          cudaBindTexture(0, siteLink1TexSingle_recon, link.Even_p(), link.Bytes()/2);
-
-          do_side_link_kernel<RealA, RealB, 0, 0, 1><<<halfGridDim, blockDim>>>( P3Odd, 
-              oprodOdd,  oprodEven,
-              linkOdd, linkEven,
-              sig, mu, coeff, accumu_coeff,
-              shortPEven,
-              newOprodOdd, newOprodEven);
-        }
-
-        cudaUnbindTexture(siteLink0TexSingle_recon);
-        cudaUnbindTexture(siteLink1TexSingle_recon);    
-
-        return;
+          RealA* shortPEven,  RealA* shortPOdd,
+          RealA* newOprodEven, RealA* newOprodOdd)
+    {
+      dim3 halfGridDim(gridDim.x/2,1,1);
+	
+#define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
+      do_side_link_kernel<RealA, RealB, sig_sign, mu_sign, 0><<<halfGridDim, blockDim>>>(P3Even, P3Odd, \
+											 oprodEven,  oprodOdd, \
+											 linkEven, linkOdd, \
+											 sig, mu, coeff, accumu_coeff, \
+											 shortPEven, shortPOdd, \
+											 newOprodEven, newOprodOdd); \
+      do_side_link_kernel<RealA, RealB, sig_sign, mu_sign, 1><<<halfGridDim, blockDim>>>(P3Even, P3Odd, \
+											 oprodEven,  oprodOdd, \
+											 linkEven, linkOdd, \
+											 sig, mu, coeff, accumu_coeff, \
+											 shortPEven, shortPOdd, \
+											 newOprodEven, newOprodOdd);
+	
+      
+      if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
+	CALL_SIDE_LINK_KERNEL(1,1);
+      }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	CALL_SIDE_LINK_KERNEL(1,0);
+	
+      }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	CALL_SIDE_LINK_KERNEL(0,1);
+      }else{
+	CALL_SIDE_LINK_KERNEL(0,0);
       }
+      
+#undef CALL_SIDE_LINK_KERNEL
+      
+      return;
+    }
 
-      template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
-      __global__ void
-      do_all_link_kernel(
-          const RealA* const oprodEven, 
-          const RealA* const QprevOdd,
-          const RealB* const linkEven, 
-          const RealB* const linkOdd,
-          int sig, int mu, 
-          typename RealTypeId<RealA>::Type coeff, 
-          typename RealTypeId<RealA>::Type accumu_coeff,
-          RealA* const shortPOdd,
-          RealA* const newOprodEven,
-          RealA* const newOprodOdd)
-      {
-        int sid = blockIdx.x * blockDim.x + threadIdx.x;
-        int x[4];
-        int z1 = sid/X1h;
-        int x1h = sid - z1*X1h;
-        int z2 = z1/X2;
-        x[1] = z1 - z2*X2;
-        x[3] = z2/X3;
-        x[2] = z2 - x[3]*X3;
-        int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-        x[0] = 2*x1h + x1odd;
-        int X = 2*sid + x1odd;
-
-        int new_x[4];
-
-        RealB LINK_W[ArrayLength<RealB>::result];
-        RealB LINK_X[ArrayLength<RealB>::result];
-        RealB LINK_Y[ArrayLength<RealB>::result];
-        RealA COLOR_MAT_W[ArrayLength<RealA>::result]; 
-        RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
-        RealA COLOR_MAT_X[ArrayLength<RealA>::result]; 
-
-        //            sig
-        //         A________B
-        //      mu  |      |
-        //        D |      |C
-        //
-        //   A is the current point (sid)
-        //
-
-        int point_b, point_c, point_d;
-        int ab_link_nbr_idx, bc_link_nbr_idx;
-        int mysig; 
-        int new_mem_idx;
-        new_x[0] = x[0];
-        new_x[1] = x[1];
-        new_x[2] = x[2];
-        new_x[3] = x[3];
-
-        if(sig_positive){
-          FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, X, new_mem_idx);
-        }else{
-          FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), X, new_mem_idx);	
-        }
-        point_b = (new_mem_idx >> 1);
-	ab_link_nbr_idx = (sig_positive) ? sid : point_b;
-        new_x[0] = x[0];
-        new_x[1] = x[1];
-        new_x[2] = x[2];
-        new_x[3] = x[3];
-
-
-      const typename RealTypeId<RealA>::Type & mycoeff = CoeffSign<sig_positive,oddBit>::result*coeff;
-      {
-        FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, X, new_mem_idx);
-        point_d = (new_mem_idx >> 1);
-        loadMatrixFromField(QprevOdd, point_d, COLOR_MAT_X);	   // COLOR_MAT_X
-        loadMatrixFromField(linkOdd, mu, point_d, LINK_Y); 	   // LINK_Y used!
-
-        if(sig_positive){
-          FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
-        }else{
-          FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
-        }
-        point_c = (new_mem_idx >> 1);
-        loadMatrixFromField(oprodEven, point_c, COLOR_MAT_Y);		// COLOR_MAT_Y
-        loadMatrixFromField(linkEven, mu, point_c, LINK_W);             // LINK_W
-
-
-        MATRIX_PRODUCT(LINK_X, LINK_W, COLOR_MAT_Y, 0); // COMPUTE_LINK_X
-        if (sig_positive)
-        {
-          MAT_MUL_MAT(COLOR_MAT_X, LINK_Y, COLOR_MAT_Y);
-          MAT_MUL_MAT(LINK_X, COLOR_MAT_Y, COLOR_MAT_W);
-	  addMatrixToField(COLOR_MAT_W, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven);
-        }
-
-	if (sig_positive){
-          loadMatrixFromField(linkEven, sig, ab_link_nbr_idx, LINK_W); // LINK_Z used
-        }else{
-          loadMatrixFromField(linkOdd, OPP_DIR(sig), ab_link_nbr_idx, LINK_W); // LINK_Z used!
-        }
-        MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, LINK_X, sig_positive); // COLOR_MAT_Y is assigned here
-
-        MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
-        addMatrixToField(COLOR_MAT_W, mu, point_d, -Sign<oddBit>::result*mycoeff, newOprodOdd);
-
-     	MAT_MUL_MAT(LINK_Y, COLOR_MAT_Y, COLOR_MAT_W);
-        addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPOdd);
-      } // positive mu
-      {
-	new_x[0] = x[0];
-	new_x[1] = x[1];
-	new_x[2] = x[2];
-	new_x[3] = x[3];
-        FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mu, X, new_mem_idx);	
-        point_d = (new_mem_idx >> 1);
-        loadMatrixFromField(QprevOdd, point_d, COLOR_MAT_X);         // COLOR_MAT_X used!
-        loadMatrixFromField(linkEven, mu, sid, LINK_Y);  	     // LINK_Y used
-
-        if(sig_positive){
-          FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
-        }else{
-          FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
-        }
-        point_c = (new_mem_idx >> 1);
-        loadMatrixFromField(oprodEven, point_c, COLOR_MAT_Y);	     // COLOR_MAT_Y used
-        loadMatrixFromField(linkOdd, mu, point_b, LINK_W);   // LINK_W used 
-								    
-        if(sig_positive){
-          MAT_MUL_ADJ_MAT(COLOR_MAT_X, LINK_Y, COLOR_MAT_W);
-        }
-        MAT_MUL_MAT(LINK_W, COLOR_MAT_Y, LINK_X);
-        if (sig_positive)
-        {	
-          MAT_MUL_MAT(LINK_X, COLOR_MAT_W, COLOR_MAT_Y);
-          addMatrixToField(COLOR_MAT_Y, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven);
-        }
-
-	if (sig_positive){
-          loadMatrixFromField(linkEven, sig, ab_link_nbr_idx, LINK_W);       // LINK_Z used
-        }else{
-          loadMatrixFromField(linkOdd, OPP_DIR(sig), ab_link_nbr_idx, LINK_W); // LINK_Z used!
-        }
-
-        MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, LINK_X, sig_positive);
-        ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);	
-	addMatrixToField(COLOR_MAT_W, mu, sid, Sign<oddBit>::result*mycoeff, newOprodEven);
-
-        MATRIX_PRODUCT(COLOR_MAT_W, LINK_Y, COLOR_MAT_Y, 0);
-        addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPOdd);
-	} // negative mu
-        return;
-      }
-
-
+   
 
     template<class RealA, class RealB>
       static void
@@ -1484,6 +1016,9 @@ namespace hisq {
         SevenSt = act_path_coeff.seven; 
         Lepage  = act_path_coeff.lepage; mLepage  = -Lepage;
 
+	cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
+	cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);   
+
 
         const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
         dim3 blockDim(BLOCK_DIM,1,1);
@@ -1631,6 +1166,10 @@ namespace hisq {
           } // GOES_FORWARDS(sig)
           checkCudaError();
         }
+
+        cudaUnbindTexture(siteLink0TexSingle_recon);
+        cudaUnbindTexture(siteLink1TexSingle_recon);   
+
 
         return; 
    } // do_hisq_staples_force_cuda
