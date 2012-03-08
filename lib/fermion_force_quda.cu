@@ -640,8 +640,6 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
 {
   dim3 halfGridDim(gridDim.x/2, 1,1);
 
-  cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
-  cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);
    
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
   do_middle_link_kernel<sig_sign, mu_sign,0><<<halfGridDim, BlockDim>>>( tempxEven,  tempxOdd, \
@@ -668,10 +666,6 @@ middle_link_kernel(float2* tempxEven, float2* tempxOdd,
     CALL_MIDDLE_LINK_KERNEL(0, 0);
   }
 #undef CALL_MIDDLE_LINK_KERNEL
-
-  
-  cudaUnbindTexture(siteLink0TexSingle_recon);
-  cudaUnbindTexture(siteLink1TexSingle_recon);    
 
 }
 
@@ -765,10 +759,8 @@ do_side_link_kernel(float2* P3Even, float2* P3Odd,
     
   LOAD_HW2(P3Even, P3Odd, sid, HWA, oddBit);
   if(mu_positive){
-    //FF_LOAD_MATRIX(linkOdd, mymu, ad_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, 1 - oddBit);
   }else{
-    //FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKA, oddBit);
   }
 
@@ -822,9 +814,6 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
 		 dim3 gridDim, dim3 blockDim)
 {
   dim3 halfGridDim(gridDim.x/2,1,1);
-    
-  cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
-  cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);   
   
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
   do_side_link_kernel<sig_sign,mu_sign,0><<<halfGridDim, blockDim>>>( P3Even,  P3Odd, \
@@ -855,9 +844,6 @@ side_link_kernel(float2* P3Even, float2* P3Odd,
   }
 
 #undef CALL_SITE_LINK_KERNEL
-  
-  cudaUnbindTexture(siteLink0TexSingle_recon);
-  cudaUnbindTexture(siteLink1TexSingle_recon);    
 
 }
 
@@ -985,10 +971,8 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
 
   LOAD_HW2(tempxEven, tempxOdd, point_d, HWE, 1-oddBit);
   if (mu_positive){
-    //FF_LOAD_MATRIX(linkOdd, mymu, ad_link_nbr_idx, LINKC);
     FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKC, 1-oddBit);
   }else{
-    //FF_LOAD_MATRIX(linkEven, mymu, ad_link_nbr_idx, LINKC);
     FF_LOAD_MATRIX2(mymu, ad_link_nbr_idx, LINKC, oddBit);
   }
     
@@ -1003,10 +987,8 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
         
   LOAD_HW2(tempxEven, tempxOdd, point_c, HWA, oddBit);
   if (mu_positive){
-    //FF_LOAD_MATRIX(linkEven, mymu, bc_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, oddBit);
   }else{
-    //FF_LOAD_MATRIX(linkOdd, mymu, bc_link_nbr_idx, LINKA);	
     FF_LOAD_MATRIX2(mymu, bc_link_nbr_idx, LINKA, 1-oddBit);	
   }
 
@@ -1017,10 +999,8 @@ do_all_link_kernel(float2* tempxEven, float2* tempxOdd,
     MAT_MUL_HW(linka, hwa, hwb);
   }
   if (sig_positive){
-    //FF_LOAD_MATRIX(linkEven, mysig, ab_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKA, oddBit);
   }else{
-    //FF_LOAD_MATRIX(linkOdd, mysig, ab_link_nbr_idx, LINKA);
     FF_LOAD_MATRIX2(mysig, ab_link_nbr_idx, LINKA, 1-oddBit);
   }
 
@@ -1092,9 +1072,6 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
 {
   dim3 halfGridDim(gridDim.x/2, 1,1);
 
-  cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
-  cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);
-
 #define CALL_ALL_LINK_KERNEL(sig_sign, mu_sign)				\
   do_all_link_kernel<sig_sign,mu_sign,0><<<halfGridDim, blockDim>>>(tempxEven,  tempxOdd, \
 								    PmuEven,  PmuOdd, \
@@ -1125,8 +1102,6 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
   }
 
 #undef CALL_ALL_LINK_KERNEL
-  cudaUnbindTexture(siteLink0TexSingle_recon);
-  cudaUnbindTexture(siteLink1TexSingle_recon);
     
 }
 
@@ -1137,25 +1112,15 @@ all_link_kernel(float2* tempxEven, float2* tempxOdd,
  * Pnumu:    IN
  *
  */
+template <int oddBit>
 __global__ void
-one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
-			  float2* PmuEven,   float2* PmuOdd, 
-			  float2* PnumuEven, float2* PnumuOdd,
-			  int mu, float2 OneLink, float2 Naik, float2 mNaik,
-			  float4* linkEven, float4* linkOdd,
-			  float2* momEven, float2* momOdd)
+do_one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
+			     float2* PmuEven,   float2* PmuOdd, 
+			     float2* PnumuEven, float2* PnumuOdd,
+			     int mu, float2 OneLink, float2 Naik, float2 mNaik,
+			     float4* linkEven, float4* linkOdd,
+			     float2* momEven, float2* momOdd)
 {
-  int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  int oddBit = 0;
-  float2* myTempx = TempxEven;
-  float2* myPmu = PmuEven;
-  float2* myPnumu = PnumuEven;
-  float2* myMom = momEven;
-  float4* myLink = linkEven;    
-  float2* otherTempx = TempxOdd;
-  float2* otherPnumu = PnumuOdd;
-  float4* otherLink = linkOdd;
-    
   float2 HWA0, HWA1, HWA2, HWA3, HWA4, HWA5;
   float2 HWB0, HWB1, HWB2, HWB3, HWB4, HWB5;
   float2 HWC0, HWC1, HWC2, HWC3, HWC4, HWC5;
@@ -1164,20 +1129,7 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
   float4 LINKB0, LINKB1, LINKB2, LINKB3, LINKB4;
   float2 AH0, AH1, AH2, AH3, AH4;    
     
-  if (sid >= Vh){
-    oddBit =1;
-    sid -= Vh;
-	
-    myTempx = TempxOdd;
-    myPmu = PmuOdd;
-    myPnumu = PnumuOdd;
-    myMom = momOdd;
-    myLink = linkOdd;  	
-    otherTempx = TempxEven;
-    otherPnumu = PnumuEven;
-    otherLink = linkEven;
-  }
-    
+  int sid = blockIdx.x * blockDim.x + threadIdx.x;
   int z1 = sid / X1h;
   int x1h = sid - z1*X1h;
   int z2 = z1 / X2;
@@ -1194,9 +1146,9 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     
   if (GOES_BACKWARDS(mu)){
     //The one link
-    LOAD_HW(myPmu, sid, HWA);
-    LOAD_HW(myTempx, sid, HWB);
-    ADD_FORCE_TO_MOM(hwa, hwb, myMom, sid, OPP_DIR(mu), OneLink, oddBit);
+    LOAD_HW2(PmuEven, PmuOdd, sid, HWA, oddBit);
+    LOAD_HW2(TempxEven, TempxOdd, sid, HWB, oddBit);
+    ADD_FORCE_TO_MOM2(hwa, hwb, sid, OPP_DIR(mu), OneLink, oddBit);
 	
     //Naik term
     dx[3]=dx[2]=dx[1]=dx[0]=0;
@@ -1206,14 +1158,14 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     new_x3 = (x3 + dx[2] + X3)%X3;
     new_x4 = (x4 + dx[3] + X4)%X4;	
     new_idx = (new_x4*X3X2X1+new_x3*X2X1+new_x2*X1+new_x1) >> 1;
-    LOAD_HW(otherTempx, new_idx, HWA);
-    LOAD_MATRIX(otherLink, OPP_DIR(mu), new_idx, LINKA);
+    LOAD_HW2(TempxEven, TempxOdd, new_idx, HWA, 1-oddBit);
+    FF_LOAD_MATRIX2(OPP_DIR(mu), new_idx, LINKA, 1-oddBit);
     FF_COMPUTE_RECONSTRUCT_SIGN(sign, OPP_DIR(mu), new_x1,new_x2,new_x3,new_x4);
     RECONSTRUCT_LINK_12(sign, linka);		
     ADJ_MAT_MUL_HW(linka, hwa, hwc); //Popmu
 	
-    LOAD_HW(myPnumu, sid, HWD);
-    ADD_FORCE_TO_MOM(hwd, hwc, myMom, sid, OPP_DIR(mu), mNaik, oddBit);
+    LOAD_HW2(PnumuEven, PnumuOdd, sid, HWD, oddBit);
+    ADD_FORCE_TO_MOM2(hwd, hwc, sid, OPP_DIR(mu), mNaik, oddBit);
 	
     dx[3]=dx[2]=dx[1]=dx[0]=0;
     dx[OPP_DIR(mu)] = 1;
@@ -1222,12 +1174,12 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     new_x3 = (x3 + dx[2] + X3)%X3;
     new_x4 = (x4 + dx[3] + X4)%X4;	
     new_idx = (new_x4*X3X2X1+new_x3*X2X1+new_x2*X1+new_x1) >> 1;
-    LOAD_HW(otherPnumu, new_idx, HWA);
-    LOAD_MATRIX(myLink, OPP_DIR(mu), sid, LINKA);
+    LOAD_HW2(PnumuEven, PnumuOdd, new_idx, HWA, 1-oddBit);
+    FF_LOAD_MATRIX2(OPP_DIR(mu), sid, LINKA, oddBit);
     FF_COMPUTE_RECONSTRUCT_SIGN(sign, OPP_DIR(mu), x1, x2, x3, x4);
     RECONSTRUCT_LINK_12(sign, linka);	
     MAT_MUL_HW(linka, hwa, hwc);
-    ADD_FORCE_TO_MOM(hwc, hwb, myMom, sid, OPP_DIR(mu), Naik, oddBit);	
+    ADD_FORCE_TO_MOM2(hwc, hwb, sid, OPP_DIR(mu), Naik, oddBit);	
   }else{
     dx[3]=dx[2]=dx[1]=dx[0]=0;
     dx[mu] = 1;
@@ -1236,18 +1188,46 @@ one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
     new_x3 = (x3 + dx[2] + X3)%X3;
     new_x4 = (x4 + dx[3] + X4)%X4;	
     new_idx = (new_x4*X3X2X1+new_x3*X2X1+new_x2*X1+new_x1) >> 1;
-    LOAD_HW(otherTempx, new_idx, HWA);
-    LOAD_MATRIX(myLink, mu, sid, LINKA);
+    LOAD_HW2(TempxEven, TempxOdd, new_idx, HWA, 1-oddBit);
+    FF_LOAD_MATRIX2(mu, sid, LINKA, oddBit);
     FF_COMPUTE_RECONSTRUCT_SIGN(sign, mu, x1, x2, x3, x4);
     RECONSTRUCT_LINK_12(sign, linka);
     MAT_MUL_HW(linka, hwa, hwb);
 	
-    LOAD_HW(myPnumu, sid, HWC);
-    ADD_FORCE_TO_MOM(hwb, hwc, myMom, sid, mu, Naik, oddBit);
+    LOAD_HW2(PnumuEven, PnumuOdd, sid, HWC, oddBit);
+    ADD_FORCE_TO_MOM2(hwb, hwc, sid, mu, Naik, oddBit);
 	
 
   }
 }
+
+
+static void
+one_and_naik_terms_kernel(float2* TempxEven, float2* TempxOdd,
+			  float2* PmuEven,   float2* PmuOdd,
+			  float2* PnumuEven, float2* PnumuOdd,
+			  int mu, float2 OneLink, float2 Naik, float2 mNaik,
+			  float4* linkEven, float4* linkOdd,
+			  float2* momEven, float2* momOdd,
+			  dim3 gridDim, dim3 blockDim)
+{  
+  dim3 halfGridDim(gridDim.x/2, 1,1);
+
+  do_one_and_naik_terms_kernel<0><<<halfGridDim, blockDim>>>((float2*)TempxEven, (float2*)TempxOdd,
+							     (float2*)PmuEven, (float2*)PmuOdd,
+							     (float2*)PnumuEven, (float2*)PnumuOdd,
+							     mu, OneLink, Naik, mNaik, 
+							     (float4*)linkEven, (float4*)linkOdd,
+							     (float2*)momEven, (float2*)momOdd);
+  do_one_and_naik_terms_kernel<1><<<halfGridDim, blockDim>>>((float2*)TempxEven, (float2*)TempxOdd,
+							     (float2*)PmuEven, (float2*)PmuOdd,
+							     (float2*)PnumuEven, (float2*)PnumuOdd,
+							     mu, OneLink, Naik, mNaik, 
+							     (float4*)linkEven, (float4*)linkOdd,
+							     (float2*)momEven, (float2*)momOdd); 
+  return;
+}
+
 
 
 #define Pmu          tempvec[0] 
@@ -1301,6 +1281,11 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
   int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
   dim3 blockDim(BLOCK_DIM,1,1);
   dim3 gridDim(volume/blockDim.x, 1, 1);
+
+
+  cudaBindTexture(0, siteLink0TexSingle_recon, siteLink.Even_p(), siteLink.Bytes()/2);
+  cudaBindTexture(0, siteLink1TexSingle_recon, siteLink.Odd_p(), siteLink.Bytes()/2);
+
     
   for(sig=0; sig < 8; sig++){
     for(mu = 0; mu < 8; mu++){
@@ -1417,20 +1402,24 @@ do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coef
       if (!DirectLinks[mu]){
 	DirectLinks[mu]=1;
 	//kernel Z	    
-	one_and_naik_terms_kernel<<<gridDim, blockDim>>>((float2*)cudaHw.even.data, (float2*)cudaHw.odd.data,
-							 (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
-							 (float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
-							 mu, OneLink, Naik, mNaik, 
-							 (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(),
-							 (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p());
+	one_and_naik_terms_kernel((float2*)cudaHw.even.data, (float2*)cudaHw.odd.data,
+				  (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
+				  (float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
+				  mu, OneLink, Naik, mNaik, 
+				  (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(),
+				  (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(),
+				  gridDim, blockDim);
+	
 	checkCudaError();		
       }
 	    
     }//mu
 
   }//sig
-    
-    
+        
+  cudaUnbindTexture(siteLink0TexSingle_recon);
+  cudaUnbindTexture(siteLink1TexSingle_recon);
+ 
 }
 
 #undef Pmu
@@ -1477,5 +1466,7 @@ fermion_force_cuda(double eps, double weight1, double weight2, void* act_path_co
   for(i=0;i < 8;i++){
     freeHwQuda(tempvec[i]);
   }
-    
+   
+
+
 }
