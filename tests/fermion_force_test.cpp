@@ -40,13 +40,6 @@ QudaPrecision mom_prec = QUDA_SINGLE_PRECISION;
 
 QudaPrecision cpu_hw_prec = QUDA_SINGLE_PRECISION;
 
-typedef struct {
-  double real;
-  double imag;
-} dcomplex;
-
-typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-
 int Z[4];
 int V;
 int Vh;
@@ -60,7 +53,7 @@ setDims(int *X) {
   Vh = V/2;
 }
 
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
+extern void initCommonConstants(const LatticeField &gauge);
 
 static void
 fermion_force_init()
@@ -169,7 +162,7 @@ fermion_force_test(void)
 {
  
   fermion_force_init();
-  initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
+  initCommonConstants(*cudaGauge);
   fermion_force_init_cuda(&gaugeParam);
 
     
@@ -207,8 +200,9 @@ fermion_force_test(void)
   int flops = 433968;
 
   struct timeval t0, t1;
+  cudaThreadSynchronize();    
+
   gettimeofday(&t0, NULL);
-    
   fermion_force_cuda(eps, weight1, weight2, act_path_coeff, cudaHw, *cudaGauge, *cudaMom, &gaugeParam);
   cudaThreadSynchronize();
   gettimeofday(&t1, NULL);
@@ -227,7 +221,7 @@ fermion_force_test(void)
     
   int volume = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3];
   double perf = 1.0* flops*volume/(secs*1024*1024*1024);
-  printf("gpu time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
+  printf("GPU runtime =%.2f ms, kernel performance= %.2f GFLOPS\n", secs*1000, perf);
     
   fermion_force_end();
 
