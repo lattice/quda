@@ -4,6 +4,10 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#ifdef USE_QDPJIT
+#include "quda_qdpjit.h"
+#endif
+
 #ifdef QMP_COMMS
 #include <qmp.h>
 #endif
