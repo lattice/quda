@@ -87,27 +87,9 @@ namespace hisq {
       };
 
 
-
     template<class T>
       inline __device__
-      void loadMatrixFromField(const T* const field, int dir, int idx, T* const mat)
-      {
-        mat[0] = field[idx + dir*Vhx9];
-        mat[1] = field[idx + dir*Vhx9 + Vh];
-        mat[2] = field[idx + dir*Vhx9 + Vhx2];
-        mat[3] = field[idx + dir*Vhx9 + Vhx3];
-        mat[4] = field[idx + dir*Vhx9 + Vhx4];
-        mat[5] = field[idx + dir*Vhx9 + Vhx5];
-        mat[6] = field[idx + dir*Vhx9 + Vhx6];
-        mat[7] = field[idx + dir*Vhx9 + Vhx7];
-        mat[8] = field[idx + dir*Vhx9 + Vhx8];
-
-        return;
-      }
-
-    template<class T>
-      inline __device__
-      void loadMatrixFromField2(const T* const field_even, const T* const field_odd,
+      void loadMatrixFromField(const T* const field_even, const T* const field_odd,
 				int dir, int idx, T* const mat, int oddness)
       {
 	const T* const field = (oddness)?field_odd:field_even;
@@ -125,27 +107,10 @@ namespace hisq {
       }
 
 
-    template<class T>
-      inline __device__
-      void loadAdjointMatrixFromField(const T* const field, int dir, int idx, T* const mat)
-      {
-#define CONJ_INDEX(i,j) j*3 + i
-        mat[CONJ_INDEX(0,0)] = conj(field[idx + dir*Vhx9]);
-        mat[CONJ_INDEX(0,1)] = conj(field[idx + dir*Vhx9 + Vh]);
-        mat[CONJ_INDEX(0,2)] = conj(field[idx + dir*Vhx9 + Vhx2]);
-        mat[CONJ_INDEX(1,0)] = conj(field[idx + dir*Vhx9 + Vhx3]);
-        mat[CONJ_INDEX(1,1)] = conj(field[idx + dir*Vhx9 + Vhx4]);
-        mat[CONJ_INDEX(1,2)] = conj(field[idx + dir*Vhx9 + Vhx5]);
-        mat[CONJ_INDEX(2,0)] = conj(field[idx + dir*Vhx9 + Vhx6]);
-        mat[CONJ_INDEX(2,1)] = conj(field[idx + dir*Vhx9 + Vhx7]);
-        mat[CONJ_INDEX(2,2)] = conj(field[idx + dir*Vhx9 + Vhx8]);
-#undef CONJ_INDEX
-        return;
-      }
 
     template<class T>
       inline __device__
-      void loadAdjointMatrixFromField2(const T* const field_even, const T* const field_odd, int dir, int idx, T* const mat, int oddness)
+      void loadAdjointMatrixFromField(const T* const field_even, const T* const field_odd, int dir, int idx, T* const mat, int oddness)
       {
 	const T* const field = (oddness)?field_odd: field_even;
 #define CONJ_INDEX(i,j) j*3 + i
@@ -171,27 +136,9 @@ namespace hisq {
         return;
       }
 
-
-
     template<class T>
       inline __device__
-      void loadMatrixFromField(const T* const field, int idx, T* const mat)
-      {
-        mat[0] = field[idx];
-        mat[1] = field[idx + Vh];
-        mat[2] = field[idx + Vhx2];
-        mat[3] = field[idx + Vhx3];
-        mat[4] = field[idx + Vhx4];
-        mat[5] = field[idx + Vhx5];
-        mat[6] = field[idx + Vhx6];
-        mat[7] = field[idx + Vhx7];
-        mat[8] = field[idx + Vhx8];
-
-        return;
-      }
-    template<class T>
-      inline __device__
-      void loadMatrixFromField2(const T* const field_even, const T* const field_odd, int idx, T* const mat, int oddness)
+      void loadMatrixFromField(const T* const field_even, const T* const field_odd, int idx, T* const mat, int oddness)
       {
 	const T* const field = (oddness)?field_odd:field_even;
         mat[0] = field[idx];
@@ -209,26 +156,10 @@ namespace hisq {
     
 
     // only works if Promote<T,U>::Type = T
-    template<class T, class U>   
-    inline __device__
-      void addMatrixToField(const T* const mat, int dir, int idx, U coeff, T* const field)
-      {
-        field[idx + dir*Vhx9]          += coeff*mat[0];
-        field[idx + dir*Vhx9 + Vh]     += coeff*mat[1];
-        field[idx + dir*Vhx9 + Vhx2]   += coeff*mat[2];
-        field[idx + dir*Vhx9 + Vhx3]   += coeff*mat[3];
-        field[idx + dir*Vhx9 + Vhx4]   += coeff*mat[4];
-        field[idx + dir*Vhx9 + Vhx5]   += coeff*mat[5];
-        field[idx + dir*Vhx9 + Vhx6]   += coeff*mat[6];
-        field[idx + dir*Vhx9 + Vhx7]   += coeff*mat[7];
-        field[idx + dir*Vhx9 + Vhx8]   += coeff*mat[8];
-
-        return;
-      }
 
     template<class T, class U>   
     inline __device__
-      void addMatrixToField2(const T* const mat, int dir, int idx, U coeff, 
+      void addMatrixToField(const T* const mat, int dir, int idx, U coeff, 
 			     T* const field_even, T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
@@ -248,24 +179,7 @@ namespace hisq {
 
     template<class T, class U>
     inline __device__
-      void addMatrixToField(const T* const mat, int idx, U coeff, T* const field)
-      {
-        field[idx ]         += coeff*mat[0];
-        field[idx + Vh]     += coeff*mat[1];
-        field[idx + Vhx2]   += coeff*mat[2];
-        field[idx + Vhx3]   += coeff*mat[3];
-        field[idx + Vhx4]   += coeff*mat[4];
-        field[idx + Vhx5]   += coeff*mat[5];
-        field[idx + Vhx6]   += coeff*mat[6];
-        field[idx + Vhx7]   += coeff*mat[7];
-        field[idx + Vhx8]   += coeff*mat[8];
-
-        return;
-      }
-
-    template<class T, class U>
-    inline __device__
-      void addMatrixToField2(const T* const mat, int idx, U coeff, T* const field_even,
+      void addMatrixToField(const T* const mat, int idx, U coeff, T* const field_even,
 			     T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
@@ -282,27 +196,10 @@ namespace hisq {
         return;
       }
 
-    template<class T>
-    inline __device__
-      void storeMatrixToField(const T* const mat, int dir, int idx, T* const field)
-      {
-        field[idx + dir*Vhx9]          = mat[0];
-        field[idx + dir*Vhx9 + Vh]     = mat[1];
-        field[idx + dir*Vhx9 + Vhx2]   = mat[2];
-        field[idx + dir*Vhx9 + Vhx3]   = mat[3];
-        field[idx + dir*Vhx9 + Vhx4]   = mat[4];
-        field[idx + dir*Vhx9 + Vhx5]   = mat[5];
-        field[idx + dir*Vhx9 + Vhx6]   = mat[6];
-        field[idx + dir*Vhx9 + Vhx7]   = mat[7];
-        field[idx + dir*Vhx9 + Vhx8]   = mat[8];
-
-        return;
-      }
-
 
    template<class T>
     inline __device__
-     void storeMatrixToField2(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness)
+     void storeMatrixToField(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
         field[idx + dir*Vhx9]          = mat[0];
@@ -318,26 +215,10 @@ namespace hisq {
         return;
       }
 
-    template<class T>
-    inline __device__
-      void storeMatrixToField(const T* const mat, int idx, T* const field)
-      {
-        field[idx]          = mat[0];
-        field[idx + Vh]     = mat[1];
-        field[idx + Vhx2]   = mat[2];
-        field[idx + Vhx3]   = mat[3];
-        field[idx + Vhx4]   = mat[4];
-        field[idx + Vhx5]   = mat[5];
-        field[idx + Vhx6]   = mat[6];
-        field[idx + Vhx7]   = mat[7];
-        field[idx + Vhx8]   = mat[8];
-
-        return;
-      }
 
     template<class T>
     inline __device__
-      void storeMatrixToField2(const T* const mat, int idx, T* const field_even, T* const field_odd, int oddness)
+      void storeMatrixToField(const T* const mat, int idx, T* const field_even, T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
         field[idx]          = mat[0];
@@ -353,10 +234,13 @@ namespace hisq {
         return;
       }
 
+
      template<class T, class U> 
      inline __device__
-	void storeMatrixToMomentumField(const T* const mat, int dir, int idx, U coeff, T* const mom_field)
+       void storeMatrixToMomentumField(const T* const mat, int dir, int idx, U coeff, 
+					T* const mom_even, T* const mom_odd, int oddness)
  	{
+	  T* const mom_field = (oddness)?mom_odd:mom_even;
 	  T temp2;
           temp2.x = (mat[1].x - mat[3].x)*0.5*coeff;
 	  temp2.y = (mat[1].y + mat[3].y)*0.5*coeff;
@@ -381,8 +265,6 @@ namespace hisq {
  
 	  return;
 	}
-
-
 
     // Struct to determine the coefficient sign at compile time
     template<int pos_dir, int odd_lattice>
@@ -441,8 +323,8 @@ namespace hisq {
     // but it will, soon.
     __device__ void reconstructSign(int* const sign, int dir, const int i[4]){
 
-      *sign=1;
  /*
+      *sign=1;
       switch(dir){
         case XUP:
           if( (i[3]&1)==1) *sign=-1;
@@ -478,226 +360,7 @@ namespace hisq {
         init_kernel_cuda(param);    
       }
 
-
-
-
-    template<class RealA, class RealB, int oddBit>
-      __global__ void 
-      do_complete_force_kernel(const RealB* const linkEven, 
-                                 const RealA* const oprodEven,      
-                                 int sig,
-                                 RealA* const forceEven)
-      {
-        int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-        int x[4];
-        int z1 = sid/X1h;
-        int x1h = sid - z1*X1h;
-        int z2 = z1/X2;
-        x[1] = z1 - z2*X2;
-        x[3] = z2/X3;
-        x[2] = z2 - x[3]*X3;
-        int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-        x[0] = 2*x1h + x1odd;
-
-        int link_sign;
-
-        RealB LINK_W[ArrayLength<RealB>::result];
-        RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-
-
-        loadMatrixFromField(linkEven, sig, sid, LINK_W);
-        reconstructSign(&link_sign, sig, x);	
-
-        loadMatrixFromField(oprodEven, sig, sid, COLOR_MAT_X);
-
-	typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
-        MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
-	
-	storeMatrixToMomentumField(COLOR_MAT_W, sig, sid, coeff, forceEven); 
-        return;
-      }
-
-
- 
-    template<class RealA, int oddBit>
-      __global__ void 
-      do_longlink_kernel(
-          const RealA* const linkEven,
-          const RealA* const linkOdd,
-          const RealA* const naikOprodEven,
-          const RealA* const naikOprodOdd,
-          int sig, typename RealTypeId<RealA>::Type coeff,
-	  RealA* const outputEven)
-      {
-       
-        int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-        int x[4];
-        int z1 = sid/X1h;
-        int x1h = sid - z1*X1h;
-        int z2 = z1/X2;
-        x[1] = z1 - z2*X2;
-        x[3] = z2/X3;
-        x[2] = z2 - x[3]*X3;
-        int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-        x[0] = 2*x1h + x1odd;
-
-        int new_x[4];
-        new_x[0] = x[0];
-        new_x[1] = x[1];
-        new_x[2] = x[2];
-        new_x[3] = x[3];
-
-
-        RealA LINK_W[ArrayLength<RealA>::result];
-        RealA LINK_X[ArrayLength<RealA>::result];
-        RealA LINK_Y[ArrayLength<RealA>::result];
-        RealA LINK_Z[ArrayLength<RealA>::result];
-
-        RealA COLOR_MAT_U[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_V[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_W[ArrayLength<RealA>::result]; // used as a temporary
-        RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
-        RealA COLOR_MAT_Z[ArrayLength<RealA>::result];
-
-
-        const int & point_c = sid;
-        int point_a, point_b, point_d, point_e;
-        // need to work these indices
-        int X[4];
-        X[0] = X1;
-        X[1] = X2;
-        X[2] = X3;
-        X[3] = X4;
-
-       // compute the force for forward long links
-        if(GOES_FORWARDS(sig))
-        {
-          new_x[sig] = (x[sig] + 1 + X[sig])%X[sig];
-          point_d = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-          new_x[sig] = (new_x[sig] + 1 + X[sig])%X[sig];
-          point_e = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-          new_x[sig] = (x[sig] - 1 + X[sig])%X[sig];
-          point_b = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-          new_x[sig] = (new_x[sig] - 1 + X[sig])%X[sig];
-          point_a = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-          loadMatrixFromField(linkEven, sig, point_a, LINK_W);
-          loadMatrixFromField(linkOdd, sig, point_b, LINK_X);
-          loadMatrixFromField(linkOdd, sig, point_d, LINK_Y);
-          loadMatrixFromField(linkEven, sig, point_e, LINK_Z);
-
-          loadMatrixFromField(naikOprodEven, sig, point_c, COLOR_MAT_Z);
-          loadMatrixFromField(naikOprodOdd, sig, point_b, COLOR_MAT_Y);
-          loadMatrixFromField(naikOprodEven, sig, point_a, COLOR_MAT_X);
-
-
-          MAT_MUL_MAT(LINK_Z, COLOR_MAT_Z, COLOR_MAT_W); // link(d)*link(e)*Naik(c)
-          MAT_MUL_MAT(LINK_Y, COLOR_MAT_W, COLOR_MAT_V);
-
-          MAT_MUL_MAT(LINK_Y, COLOR_MAT_Y, COLOR_MAT_W);  // link(d)*Naik(b)*link(b)
-          MAT_MUL_MAT(COLOR_MAT_W, LINK_X, COLOR_MAT_U);
-	  SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, -1, COLOR_MAT_V);
-
-          MAT_MUL_MAT(COLOR_MAT_X, LINK_W, COLOR_MAT_W); // Naik(a)*link(a)*link(b)
-          MAT_MUL_MAT(COLOR_MAT_W, LINK_X, COLOR_MAT_U);
-          SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, 1, COLOR_MAT_V);
-
-          addMatrixToField(COLOR_MAT_V, sig, sid,  coeff, outputEven);
-        }
-
-        return;
-      }
-
-
-
-
-    template<class RealA>
-      void longlink_terms(
-          const RealA* const linkEven,
-          const RealA* const linkOdd,
-          const RealA* const naikOprodEven,
-          const RealA* const naikOprodOdd,
-          int sig, typename RealTypeId<RealA>::Type naik_coeff,
-          dim3 gridDim, dim3 blockDim,
-	  RealA* const outputEven,
-	  RealA* const outputOdd)
-      {
-
-        dim3 halfGridDim(gridDim.x/2,1,1);
-
-
-
-        if(GOES_FORWARDS(sig)){
-          // Even half lattice
-          do_longlink_kernel<RealA,0><<<halfGridDim,blockDim>>>(linkEven,
-                                                               linkOdd,
-                                                               naikOprodEven,
-                                                               naikOprodOdd,
-                                                               sig, naik_coeff,
-							       outputEven);
-
-          // Odd half lattice
-          do_longlink_kernel<RealA,1><<<halfGridDim,blockDim>>>(linkOdd,
-                                                                linkEven,
-                                                                naikOprodOdd,
-                                                                naikOprodEven,
-                                                                sig, naik_coeff,
-								outputOdd);
-        }
-        else {
-          errorQuda("sig does not go forward\n");
-        }
-
-        return;
-      }      
-          
-
-    template<class RealA, class RealB>
-      static void 
-      complete_force_kernel(
-          const RealA* const oprodEven, 
-          const RealA* const oprodOdd,
-          const RealB* const linkEven, 
-          const RealB* const linkOdd, 
-          const cudaGaugeField &link,
-          int sig, dim3 gridDim, dim3 blockDim,
-          RealA* const momEven, 
-          RealA* const momOdd)
-      {
-        dim3 halfGridDim(gridDim.x/2, 1, 1);
-
-        cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
-        cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(),  link.Bytes()/2);
-
-        do_complete_force_kernel<RealA, RealB, 0><<<halfGridDim, blockDim>>>(linkEven,
-                                                                               oprodEven,
-                                                                               sig,
-                                                                               momEven);
-
-        cudaUnbindTexture(siteLink0TexSingle_recon);
-        cudaUnbindTexture(siteLink1TexSingle_recon);
-
-        cudaBindTexture(0, siteLink0TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-        cudaBindTexture(0, siteLink1TexSingle_recon, link.Even_p(), link.Bytes()/2);
-
-        do_complete_force_kernel<RealA, RealB, 1><<<halfGridDim, blockDim>>>(linkOdd,
-                                                                               oprodOdd,
-                                                                               sig,
-                                                                               momOdd);
-
-        cudaUnbindTexture(siteLink0TexSingle_recon);
-        cudaUnbindTexture(siteLink1TexSingle_recon);
-
-        return;
-      }
-
+  
     
 #include "hisq_paths_force_core.h"
 
@@ -876,6 +539,65 @@ namespace hisq {
 
         return;
       }
+
+    template<class RealA>
+      void longlink_terms(const RealA* const linkEven, const RealA* const linkOdd,
+			  const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
+			  int sig, typename RealTypeId<RealA>::Type naik_coeff,
+			  dim3 gridDim, dim3 blockDim,
+			  RealA* const outputEven, RealA* const outputOdd)
+      {
+	
+        dim3 halfGridDim(gridDim.x/2,1,1);
+	
+        if(GOES_FORWARDS(sig)){
+          do_longlink_kernel<RealA,0><<<halfGridDim,blockDim>>>(linkEven, linkOdd,
+								naikOprodEven, naikOprodOdd,
+								sig, naik_coeff,
+								outputEven, outputOdd);
+          do_longlink_kernel<RealA,1><<<halfGridDim,blockDim>>>(linkEven, linkOdd,
+								naikOprodEven, naikOprodOdd,
+								sig, naik_coeff,
+								outputEven, outputOdd);
+        }
+        else {
+          errorQuda("sig does not go forward\n");
+        }
+	
+        return;
+      }  
+
+
+          
+    template<class RealA, class RealB>
+      static void 
+      complete_force_kernel(const RealA* const oprodEven, 
+			    const RealA* const oprodOdd,
+			    const RealB* const linkEven, 
+			    const RealB* const linkOdd, 
+			    const cudaGaugeField &link,
+			    int sig, dim3 gridDim, dim3 blockDim,
+			    RealA* const momEven, 
+			    RealA* const momOdd)
+    {
+      dim3 halfGridDim(gridDim.x/2, 1, 1);
+      
+      cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
+      cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(),  link.Bytes()/2);
+      
+      do_complete_force_kernel<RealA, RealB, 0><<<halfGridDim, blockDim>>>(linkEven, linkOdd,
+									   oprodEven, oprodOdd,
+									   sig,
+									   momEven, momOdd);
+      do_complete_force_kernel<RealA, RealB, 1><<<halfGridDim, blockDim>>>(linkEven, linkOdd,
+									   oprodEven, oprodOdd,
+									   sig,
+									   momEven, momOdd);			
+      cudaUnbindTexture(siteLink0TexSingle_recon);
+      cudaUnbindTexture(siteLink1TexSingle_recon);
+      
+      return;
+    }
 
 
 
