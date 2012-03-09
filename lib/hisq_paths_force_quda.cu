@@ -519,24 +519,7 @@ namespace hisq {
         return;
       }
 
-    template<class RealA, int oddBit>
-      __global__ void 
-      do_one_link_term_kernel(
-          const RealA* const oprodEven, 
-          int sig, 
-          typename RealTypeId<RealA>::Type coeff,
-          RealA* const outputEven
-          )
-      {
-        int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
-        RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-        if(GOES_FORWARDS(sig)){
-          loadMatrixFromField(oprodEven, sig, sid, COLOR_MAT_W);
-          addMatrixToField(COLOR_MAT_W, sig, sid, coeff, outputEven);
-        }
-        return;
-      }
  
     template<class RealA, int oddBit>
       __global__ void 
@@ -675,48 +658,6 @@ namespace hisq {
         return;
       }      
           
-        
-
-
-
-
-
-    template<class RealA>
-      static void
-      one_link_term(
-          const RealA* const oprodEven, 
-          const RealA* const oprodOdd,
-          int sig, 
-          typename RealTypeId<RealA>::Type coeff, 
-          typename RealTypeId<RealA>::Type naik_coeff,
-          dim3 gridDim, dim3 blockDim,
-          RealA* const ForceMatrixEven,
-	  RealA* const ForceMatrixOdd)
-      {
-
-        dim3 halfGridDim(gridDim.x/2,1,1);
-
-        if(GOES_FORWARDS(sig)){
-
-          do_one_link_term_kernel<RealA,0><<<halfGridDim,blockDim>>>(
-              oprodEven,
-              sig, coeff,
-              ForceMatrixEven
-              );
-
-          do_one_link_term_kernel<RealA, 1><<<halfGridDim,blockDim>>>(
-              oprodOdd,
-              sig, coeff,
-              ForceMatrixOdd
-              );
-
-        } // GOES_FORWARDS(sig)
-
-        return;
-      }
-
-
-
 
     template<class RealA, class RealB>
       static void 
@@ -759,7 +700,6 @@ namespace hisq {
 
     
 #include "hisq_paths_force_core.h"
-
 
     template<class RealA, class RealB>
       static void
@@ -906,6 +846,36 @@ namespace hisq {
 	    
             return;
           }
+
+
+    template<class RealA>
+      static void
+      one_link_term(
+          const RealA* const oprodEven, 
+          const RealA* const oprodOdd,
+          int sig, 
+          typename RealTypeId<RealA>::Type coeff, 
+          typename RealTypeId<RealA>::Type naik_coeff,
+          dim3 gridDim, dim3 blockDim,
+          RealA* const ForceMatrixEven,
+	  RealA* const ForceMatrixOdd)
+      {
+
+        dim3 halfGridDim(gridDim.x/2,1,1);
+
+        if(GOES_FORWARDS(sig)){
+
+          do_one_link_term_kernel<RealA,0><<<halfGridDim,blockDim>>>(oprodEven, oprodOdd,
+								     sig, coeff,
+								     ForceMatrixEven, ForceMatrixOdd);
+          do_one_link_term_kernel<RealA,1><<<halfGridDim,blockDim>>>(oprodEven, oprodOdd,
+								     sig, coeff,
+								     ForceMatrixEven, ForceMatrixOdd);
+	  	  
+        } // GOES_FORWARDS(sig)
+
+        return;
+      }
 
 
 
@@ -1121,58 +1091,57 @@ namespace hisq {
 
 	   for(int sig=0; sig<4; sig++){
 		   if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-			   complete_force_kernel((double2*)oprod.Even_p(), (double2*)oprod.Odd_p(),
+		     complete_force_kernel((double2*)oprod.Even_p(), (double2*)oprod.Odd_p(),
 					   (double2*)link.Even_p(), (double2*)link.Odd_p(), 
 					   link,
 					   sig, gridDim, blockDim,
 					   (double2*)force->Even_p(), (double2*)force->Odd_p());
 		   }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-			   complete_force_kernel((float2*)oprod.Even_p(), (float2*)oprod.Odd_p(),
+		     complete_force_kernel((float2*)oprod.Even_p(), (float2*)oprod.Odd_p(),
 					   (float2*)link.Even_p(), (float2*)link.Odd_p(), 
 					   link,
 					   sig, gridDim, blockDim,
 					   (float2*)force->Even_p(), (float2*)force->Odd_p());
 		   }else{
-			   errorQuda("Unsupported precision");
+		     errorQuda("Unsupported precision");
 		   }
 	   } // loop over directions
 	   return;
    }
 
-
+   
 
 
 
    void hisqLongLinkForceCuda(double coeff,
-		   const QudaGaugeParam &param,
-		   const cudaGaugeField &oldOprod,
-		   const cudaGaugeField &link,
-		   cudaGaugeField  *newOprod)
+			      const QudaGaugeParam &param,
+			      const cudaGaugeField &oldOprod,
+			      const cudaGaugeField &link,
+			      cudaGaugeField  *newOprod)
    {
-	   const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
-	   dim3 blockDim(BLOCK_DIM,1,1);
-	   dim3 gridDim(volume/blockDim.x, 1, 1);
-
-	   for(int sig=0; sig<4; ++sig){
-		   if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-			   longlink_terms((double2*)link.Even_p(), (double2*)link.Odd_p(),
-					   (double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
-					   sig, coeff, 
-					   gridDim, blockDim,
-					   (double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p());
-		   }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-			   longlink_terms( 
-					   (float2*)link.Even_p(), (float2*)link.Odd_p(),
-					   (float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
-					   sig, static_cast<float>(coeff), 
-					   gridDim, blockDim,
-					   (float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p());
-		   }else{
-			   errorQuda("Unsupported precision");
-		   }
-	   } // loop over directions
-
-	   return;
+     const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
+     dim3 blockDim(BLOCK_DIM,1,1);
+     dim3 gridDim(volume/blockDim.x, 1, 1);
+     
+     for(int sig=0; sig<4; ++sig){
+       if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
+	 longlink_terms((double2*)link.Even_p(), (double2*)link.Odd_p(),
+			(double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
+			sig, coeff, 
+			gridDim, blockDim,
+			(double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p());
+       }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
+	 longlink_terms((float2*)link.Even_p(), (float2*)link.Odd_p(),
+			(float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
+			sig, static_cast<float>(coeff), 
+			gridDim, blockDim,
+			(float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p());
+       }else{
+	 errorQuda("Unsupported precision");
+       }
+     } // loop over directions
+     
+     return;
    }
 
 
@@ -1206,7 +1175,6 @@ namespace hisq {
           act_path_coeff.five   = path_coeff_array[3];
           act_path_coeff.seven  = path_coeff_array[4];
           act_path_coeff.lepage = path_coeff_array[5];
-
           do_hisq_staples_force_cuda<double,double2,double2>( act_path_coeff,
 							   param,
                                                            oprod,
@@ -1214,6 +1182,7 @@ namespace hisq {
 							   tempmat, 
 							   tempCompmat, 
 							   *newOprod);
+
         }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){	
           PathCoefficients<float> act_path_coeff;
           act_path_coeff.one    = path_coeff_array[0];
