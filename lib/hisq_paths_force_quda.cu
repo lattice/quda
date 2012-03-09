@@ -864,120 +864,46 @@ namespace hisq {
     template<class RealA, class RealB>
       static void
       all_link_kernel(
-          const RealA* const oprodEven, 
-          const RealA* const oprodOdd,
-          const RealA* const QprevEven, 
-          const RealA* const QprevOdd, 
-          const RealB* const linkEven, 
-          const RealB* const linkOdd, 
-          const cudaGaugeField &link,
-          int sig, int mu,
+          const RealA* const oprodEven, const RealA* const oprodOdd,
+          const RealA* const QprevEven, const RealA* const QprevOdd, 
+          const RealB* const linkEven,  const RealB* const linkOdd, 
+          const cudaGaugeField &link, int sig, int mu,
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type  accumu_coeff,
           dim3 gridDim, dim3 blockDim,
-          RealA* const shortPEven, 
-          RealA* const shortPOdd,
-          RealA* const newOprodEven, 
-          RealA* const newOprodOdd)
-          {
+          RealA* const shortPEven, RealA* const shortPOdd,
+          RealA* const newOprodEven, RealA* const newOprodOdd)
+    {
             dim3 halfGridDim(gridDim.x/2, 1,1);
-
-            cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
-            cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-
-            if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){		
-              do_all_link_kernel<RealA, RealB, 1, 1, 0><<<halfGridDim, blockDim>>>( 
-                  oprodEven,  
-                  QprevOdd, 
-                  linkEven, linkOdd,
-                  sig,  mu,
-                  coeff, accumu_coeff,
-                  shortPOdd,
-                  newOprodEven, newOprodOdd);
-
-            }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-              do_all_link_kernel<RealA, RealB, 1, 0, 0><<<halfGridDim, blockDim>>>( 
-                  oprodEven,   
-                  QprevOdd,
-                  linkEven, linkOdd,
-                  sig,  mu, 
-                  coeff, accumu_coeff,
-                  shortPOdd,
-                  newOprodEven, newOprodOdd);
-
-            }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-              do_all_link_kernel<RealA, RealB, 0, 1, 0><<<halfGridDim, blockDim>>>( 
-                  oprodEven,  
-                  QprevOdd, 
-                  linkEven, linkOdd,
-                  sig,  mu, 
-                  coeff, accumu_coeff,
-                  shortPOdd,
-                  newOprodEven, newOprodOdd);
-
-            }else{
-              do_all_link_kernel<RealA, RealB, 0, 0, 0><<<halfGridDim, blockDim>>>( 
-                  oprodEven, 
-                  QprevOdd, 
-                  linkEven, linkOdd,
-                  sig,  mu, 
-                  coeff, accumu_coeff,
-                  shortPOdd,
-                  newOprodEven, newOprodOdd);
-            }
-
-	    // opposite binding
-            cudaUnbindTexture(siteLink0TexSingle_recon);
-            cudaUnbindTexture(siteLink1TexSingle_recon);
 	    
-	    cudaBindTexture(0, siteLink0TexSingle_recon, link.Odd_p(), link.Bytes()/2);
-            cudaBindTexture(0, siteLink1TexSingle_recon, link.Even_p(), link.Bytes()/2);
-
-
-	    if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){		
-              do_all_link_kernel<RealA, RealB, 1, 1, 1><<<halfGridDim, blockDim>>>( 
-                  oprodOdd,  
-                  QprevEven,
-                  linkOdd, linkEven,
-                  sig,  mu,
-                  coeff, accumu_coeff,
-                  shortPEven,
-                  newOprodOdd, newOprodEven);
-
+#define CALL_ALL_LINK_KERNEL(sig_sign, mu_sign)				\
+            do_all_link_kernel<RealA, RealB, sig_sign, mu_sign, 0><<<halfGridDim, blockDim>>>(oprodEven, oprodOdd, \
+											      QprevEven, QprevOdd, \
+											      linkEven, linkOdd, \
+											      sig,  mu, \
+											      coeff, accumu_coeff, \
+											      shortPEven,shortPOdd, \
+											      newOprodEven, newOprodOdd); \
+	    do_all_link_kernel<RealA, RealB, sig_sign, mu_sign, 1><<<halfGridDim, blockDim>>>(oprodEven, oprodOdd, \
+											      QprevEven, QprevOdd, \
+											      linkEven, linkOdd, \
+											      sig,  mu, \
+											      coeff, accumu_coeff, \
+											      shortPEven,shortPOdd, \
+											      newOprodEven, newOprodOdd);
+	    
+            if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
+	      CALL_ALL_LINK_KERNEL(1, 1);
             }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-              do_all_link_kernel<RealA, RealB, 1, 0, 1><<<halfGridDim, blockDim>>>( 
-                  oprodOdd,  
-                  QprevEven, 
-                  linkOdd, linkEven,
-                  sig,  mu, 
-                  coeff, accumu_coeff,
-                  shortPEven,
-                  newOprodOdd, newOprodEven);
-
+	      CALL_ALL_LINK_KERNEL(1, 0);
             }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-              do_all_link_kernel<RealA, RealB, 0, 1, 1><<<halfGridDim, blockDim>>>( 
-                  oprodOdd,  
-                  QprevEven, 
-                  linkOdd, linkEven,
-                  sig,  mu, 
-                  coeff, accumu_coeff,
-                  shortPEven,
-                  newOprodOdd, newOprodEven);
-
+	      CALL_ALL_LINK_KERNEL(0, 1);
             }else{
-              do_all_link_kernel<RealA, RealB, 0, 0, 1><<<halfGridDim, blockDim>>>( 
-                  oprodOdd,  
-                  QprevEven, 
-                  linkOdd, linkEven,
-                  sig,  mu, 
-                  coeff, accumu_coeff,
-                  shortPEven,
-                  newOprodOdd, newOprodEven);
+	      CALL_ALL_LINK_KERNEL(0, 0);
             }
 
-            cudaUnbindTexture(siteLink0TexSingle_recon);
-            cudaUnbindTexture(siteLink1TexSingle_recon);
-
+#undef CALL_ALL_LINK_KERNEL	    
+	    
             return;
           }
 
