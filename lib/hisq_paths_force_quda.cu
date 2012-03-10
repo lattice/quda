@@ -687,7 +687,7 @@ namespace hisq {
 
               checkCudaError();
 
-              for(int rho = 0; rho < 4; rho++){
+              for(int rho = 0; rho < 8; rho++){
                 if (rho == sig || rho == OPP_DIR(sig)
                     || rho == mu || rho == OPP_DIR(mu)
                     || rho == nu || rho == OPP_DIR(nu)){
