@@ -80,6 +80,65 @@
 #define LINK_Z22_re LINK_Z[8].x
 #define LINK_Z22_im LINK_Z[8].y
 
+#define ab_link00_re ab_link[0].x
+#define ab_link00_im ab_link[0].y
+#define ab_link01_re ab_link[1].x
+#define ab_link01_im ab_link[1].y
+#define ab_link02_re ab_link[2].x
+#define ab_link02_im ab_link[2].y
+#define ab_link10_re ab_link[3].x
+#define ab_link10_im ab_link[3].y
+#define ab_link11_re ab_link[4].x
+#define ab_link11_im ab_link[4].y
+#define ab_link12_re ab_link[5].x
+#define ab_link12_im ab_link[5].y
+#define ab_link20_re ab_link[6].x
+#define ab_link20_im ab_link[6].y
+#define ab_link21_re ab_link[7].x
+#define ab_link21_im ab_link[7].y
+#define ab_link22_re ab_link[8].x
+#define ab_link22_im ab_link[8].y
+
+#define bc_link00_re bc_link[0].x
+#define bc_link00_im bc_link[0].y
+#define bc_link01_re bc_link[1].x
+#define bc_link01_im bc_link[1].y
+#define bc_link02_re bc_link[2].x
+#define bc_link02_im bc_link[2].y
+#define bc_link10_re bc_link[3].x
+#define bc_link10_im bc_link[3].y
+#define bc_link11_re bc_link[4].x
+#define bc_link11_im bc_link[4].y
+#define bc_link12_re bc_link[5].x
+#define bc_link12_im bc_link[5].y
+#define bc_link20_re bc_link[6].x
+#define bc_link20_im bc_link[6].y
+#define bc_link21_re bc_link[7].x
+#define bc_link21_im bc_link[7].y
+#define bc_link22_re bc_link[8].x
+#define bc_link22_im bc_link[8].y
+
+#define ad_link00_re ad_link[0].x
+#define ad_link00_im ad_link[0].y
+#define ad_link01_re ad_link[1].x
+#define ad_link01_im ad_link[1].y
+#define ad_link02_re ad_link[2].x
+#define ad_link02_im ad_link[2].y
+#define ad_link10_re ad_link[3].x
+#define ad_link10_im ad_link[3].y
+#define ad_link11_re ad_link[4].x
+#define ad_link11_im ad_link[4].y
+#define ad_link12_re ad_link[5].x
+#define ad_link12_im ad_link[5].y
+#define ad_link20_re ad_link[6].x
+#define ad_link20_im ad_link[6].y
+#define ad_link21_re ad_link[7].x
+#define ad_link21_im ad_link[7].y
+#define ad_link22_re ad_link[8].x
+#define ad_link22_im ad_link[8].y
+
+
+
 #else // HISQ_RECONSTRUCT_LINKS
 
 #define LINK_W00_re LINK_W[0].x
@@ -454,7 +513,7 @@
 
 
 
-#define MATRIX_PRODUCT(c, a, b, simple) do{ \
+#define MATRIX_PRODUCT(a, b, simple, c) do{ \
   if(simple){                               \
       c##00_re = a##00_re*b##00_re - a##00_im*b##00_im + a##01_re*b##10_re - a##01_im*b##10_im + a##02_re*b##20_re - a##02_im*b##20_im; \
       c##00_im = a##00_re*b##00_im + a##00_im*b##00_re + a##01_re*b##10_im + a##01_im*b##10_re + a##02_re*b##20_im + a##02_im*b##20_re; \
@@ -557,7 +616,7 @@
   c##22_re = a##02_re*b##02_re + a##02_im*b##02_im + a##12_re*b##12_re + a##12_im*b##12_im + a##22_re*b##22_re + a##22_im*b##22_im; \
   c##22_im = a##02_re*b##02_im - a##02_im*b##02_re + a##12_re*b##12_im - a##12_im*b##12_re + a##22_re*b##22_im - a##22_im*b##22_re; 
 
-#define ADJ_MAT_MUL_ADJ_MAT(a, b, c) \
+#define ADJ_MAT_MUL_ADJ_MAT(a, b, c)					\
       c##00_re =    a##00_re*b##00_re - a##00_im*b##00_im + a##10_re*b##01_re - a##10_im*b##01_im + a##20_re*b##02_re - a##20_im*b##02_im; \
   c##00_im =  - a##00_re*b##00_im - a##00_im*b##00_re - a##10_re*b##01_im - a##10_im*b##01_re - a##20_re*b##02_im - a##20_im*b##02_re; \
   c##01_re =    a##00_re*b##10_re - a##00_im*b##10_im + a##10_re*b##11_re - a##10_im*b##11_im + a##20_re*b##12_re - a##20_im*b##12_im; \

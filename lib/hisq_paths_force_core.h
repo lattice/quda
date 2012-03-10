@@ -1,4 +1,36 @@
-
+/**************************do_middle_link_kernel*****************************
+ *
+ *
+ * Generally we need
+ * READ
+ *    3 LINKS:         ab_link,     bc_link,    ad_link
+ *    3 COLOR MATRIX:  newOprod_at_A, oprod_at_C,  Qprod_at_D
+ * WRITE
+ *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pmu_at_B, Qmu_at_A
+ *
+ * Three call variations:
+ *   1. when Qprev == NULL:   Qprod_at_D does not exit and is not read in
+ *   2. full read/write
+ *   3. when Pmu/Qmu == NULL,   Pmu_at_B and Qmu_at_A are not written out
+ *
+ *   In all three above case, if the direction sig is negative, newOprod_at_A is 
+ *   not read in or written out.
+ *
+ * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
+ *   Call 1: 
+ *             if (sig is positive):    (3, 6) 
+ *             else               :     (3, 4) 
+ *   Call 2: 
+ *             if (sig is positive):    (3, 7) 
+ *             else               :     (3, 5)  
+ *   Call 3: 
+ *             if (sig is positive):    (3, 5) 
+ *             else               :     (3, 3)  
+ * 
+ * note: oprod_at_C could actually be read in from D when it is the fresh outer product
+ *       and we call it oprod_at_C to simply naming. This does not affect our data traffic analysis
+ *
+ ****************************************************************************/
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit> 
   __global__ void
@@ -31,10 +63,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   int ab_link_sign=1;
   int bc_link_sign=1;
 
-  RealB LINK_W[ArrayLength<RealB>::result];
-  RealB LINK_X[ArrayLength<RealB>::result];
-  RealB LINK_Y[ArrayLength<RealB>::result];
-
+  RealB ab_link[ArrayLength<RealB>::result];
+  RealB bc_link[ArrayLength<RealB>::result];
+  RealB ad_link[ArrayLength<RealB>::result];
 
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
@@ -115,19 +146,19 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
 
   // load the link variable connecting a and b 
-  // Store in LINK_W 
+  // Store in ab_link 
   if(sig_positive){
-    loadMatrixFromField(linkEven, linkOdd, mysig, ab_link_nbr_idx, LINK_W, oddBit);
+    loadMatrixFromField(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, oddBit);
   }else{
-    loadMatrixFromField(linkEven, linkOdd, mysig, ab_link_nbr_idx, LINK_W, 1-oddBit);
+    loadMatrixFromField(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, 1-oddBit);
   }
   
   // load the link variable connecting b and c 
-  // Store in LINK_X
+  // Store in bc_link
   if(mu_positive){
-    loadMatrixFromField(linkEven, linkOdd, mymu, bc_link_nbr_idx, LINK_X, oddBit);
+    loadMatrixFromField(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, oddBit);
   }else{ 
-    loadMatrixFromField(linkEven, linkOdd, mymu, bc_link_nbr_idx, LINK_X, 1-oddBit);
+    loadMatrixFromField(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, 1-oddBit);
   }
 
   
@@ -142,32 +173,32 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   }
   
   
-  MATRIX_PRODUCT(COLOR_MAT_W, LINK_X, COLOR_MAT_Y, !mu_positive);
+  MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, !mu_positive, COLOR_MAT_W);
   if(PmuOdd){
     storeMatrixToField(COLOR_MAT_W, point_b, PmuEven, PmuOdd, 1-oddBit);
   }
-  MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, COLOR_MAT_W, sig_positive);
+  MATRIX_PRODUCT(ab_link, COLOR_MAT_W, sig_positive,COLOR_MAT_Y);
   storeMatrixToField(COLOR_MAT_Y, sid, P3Even, P3Odd, oddBit);
   
   
   if(mu_positive){
-    loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, LINK_Y, 1-oddBit);
+    loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit);
   }else{
-    loadAdjointMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, LINK_Y, oddBit);
+    loadAdjointMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
   }
   
   
   if(QprevOdd == NULL){
     if(sig_positive){
-      MAT_MUL_MAT(COLOR_MAT_W, LINK_Y, COLOR_MAT_Y);
+      MAT_MUL_MAT(COLOR_MAT_W, ad_link, COLOR_MAT_Y);
     }
     if(QmuEven){
-      ASSIGN_MAT(LINK_Y, COLOR_MAT_X); 
+      ASSIGN_MAT(ad_link, COLOR_MAT_X); 
       storeMatrixToField(COLOR_MAT_X, sid, QmuEven, QmuOdd, oddBit);
     }
   }else{ 
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_Y, 1-oddBit);
-    MAT_MUL_MAT(COLOR_MAT_Y, LINK_Y, COLOR_MAT_X);
+    MAT_MUL_MAT(COLOR_MAT_Y, ad_link, COLOR_MAT_X);
     if(QmuEven){
       storeMatrixToField(COLOR_MAT_X, sid, QmuEven, QmuOdd, oddBit);
     }
@@ -183,10 +214,36 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   return;
 }
 
+/***********************************do_site_link_kernel***************************
+ *
+ * In general we need
+ * READ
+ *    1  LINK:          ad_link
+ *    4  COLOR MATRIX:  shortP_at_D, newOprod, P3_at_A, Qprod_at_D, 
+ * WRITE
+ *    2  COLOR MATRIX:  shortP_at_D, newOprod,
+ *
+ * Two call variations:
+ *   1. full read/write
+ *   2. when shortP == NULL && Qprod == NULL:  
+ *          no need to read ad_link/shortP_at_D or write shortP_at_D
+ *          Qprod_at_D does not exit and is not read in                                     
+ *
+ *
+ * Therefore the data traffic, in two-number pair (num_of_links, num_of_color_matrix)
+ *   Call 1:                (1, 6) 
+ *             
+ *   Call 2:                (0, 3)
+ *
+ * note: newOprod can be at point D or A, depending on if mu is postive or negative
+ *
+ *
+ *********************************************************************************/
+
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
   __global__ void
   do_side_link_kernel(const RealA* const P3Even, const RealA* const P3Odd,
-		      const RealA* const oprodEven, const RealA* const oprodOdd,
+		      const RealA* const QprodEven, const RealA* const QprodOdd,
 		      const RealB* const linkEven,  const RealB* const linkOdd,
 		      int sig, int mu, 
 		      typename RealTypeId<RealA>::Type coeff, 
@@ -210,7 +267,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
   int ad_link_sign = 1;
 
-  RealB LINK_W[ArrayLength<RealB>::result];
+  RealB ad_link[ArrayLength<RealB>::result];
 
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_X[ArrayLength<RealA>::result]; 
@@ -251,33 +308,32 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   point_d = (new_mem_idx >> 1);
 
 
-  if (mu_positive){
-    ad_link_nbr_idx = point_d;
-    reconstructSign(&ad_link_sign, mymu, new_x);
-  }else{
-    ad_link_nbr_idx = sid;
-    reconstructSign(&ad_link_sign, mymu, x);	
-  }
-
-
-  if(mu_positive){
-    loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, LINK_W, 1-oddBit);
-  }else{
-    loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, LINK_W, oddBit);
-  }
-
-
   // Should all be inside if (shortPOdd)
   if (shortPOdd){
-    MATRIX_PRODUCT(COLOR_MAT_W, LINK_W, COLOR_MAT_Y, mu_positive);
+    if (mu_positive){
+      ad_link_nbr_idx = point_d;
+      reconstructSign(&ad_link_sign, mymu, new_x);
+    }else{
+      ad_link_nbr_idx = sid;
+      reconstructSign(&ad_link_sign, mymu, x);	
+    }
+
+    
+    if(mu_positive){
+      loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit);
+    }else{
+      loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
+    }
+    
+    MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, mu_positive, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
   }
 
 
   mycoeff = CoeffSign<sig_positive,oddBit>::result*coeff;
 
-  if(oprodOdd){
-    loadMatrixFromField(oprodEven, oprodOdd, point_d, COLOR_MAT_X, 1-oddBit);
+  if(QprodOdd){
+    loadMatrixFromField(QprodEven, QprodOdd, point_d, COLOR_MAT_X, 1-oddBit);
     if(mu_positive){
       MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
 
@@ -291,7 +347,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     } 
   }
 
-  if(!oprodOdd){
+  if(!QprodOdd){
     if(mu_positive){
       if(!oddBit){ mycoeff = -mycoeff;}
       addMatrixToField(COLOR_MAT_Y, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
@@ -348,8 +404,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
    */
   
   int point_b, point_c, point_d;
-  int ab_link_nbr_idx, bc_link_nbr_idx;
-  int mysig; 
+  int ab_link_nbr_idx;
   int new_mem_idx;
   new_x[0] = x[0];
   new_x[1] = x[1];
@@ -386,7 +441,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     loadMatrixFromField(linkEven, linkOdd, mu, point_c, LINK_W, oddBit);             // LINK_W
 
 
-    MATRIX_PRODUCT(LINK_X, LINK_W, COLOR_MAT_Y, 0); // COMPUTE_LINK_X
+    MATRIX_PRODUCT(LINK_W, COLOR_MAT_Y, 0, LINK_X); // COMPUTE_LINK_X
     if (sig_positive)
       {
 	MAT_MUL_MAT(COLOR_MAT_X, LINK_Y, COLOR_MAT_Y);
@@ -399,7 +454,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }else{
       loadMatrixFromField(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, LINK_W, 1-oddBit); // LINK_Z used!
     }
-    MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, LINK_X, sig_positive); // COLOR_MAT_Y is assigned here
+    MATRIX_PRODUCT(LINK_W, LINK_X, sig_positive, COLOR_MAT_Y); // COLOR_MAT_Y is assigned here
 
     MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, mu, point_d, -Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
@@ -441,11 +496,11 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
       loadMatrixFromField(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, LINK_W, 1-oddBit); // LINK_Z used!
     }
 
-    MATRIX_PRODUCT(COLOR_MAT_Y, LINK_W, LINK_X, sig_positive);
+    MATRIX_PRODUCT(LINK_W, LINK_X, sig_positive, COLOR_MAT_Y);
     ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);	
     addMatrixToField(COLOR_MAT_W, mu, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
 
-    MATRIX_PRODUCT(COLOR_MAT_W, LINK_Y, COLOR_MAT_Y, 0);
+    MATRIX_PRODUCT(LINK_Y, COLOR_MAT_Y, 0, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
   } // negative mu
   return;
@@ -518,6 +573,17 @@ template<class RealA, int oddBit>
   X[1] = X2;
   X[2] = X3;
   X[3] = X4;
+
+  /*
+   * 
+   *    A   B    C    D    E    
+   *    ---- ---- ---- ----  
+   *
+   *   ---> sig direction
+   *
+   *   C is the current point (sid)
+   *
+   */
 
   // compute the force for forward long links
   if(GOES_FORWARDS(sig))
