@@ -34,15 +34,15 @@
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit> 
   __global__ void
-  do_middle_link_kernel(const RealA* const oprodEven, const RealA* const oprodOdd,
-			const RealA* const QprevEven, const RealA* const QprevOdd,  
-			const RealB* const linkEven,  const RealB* const linkOdd,
-			int sig, int mu, 
-			typename RealTypeId<RealA>::Type coeff,
-			RealA* const PmuEven, RealA* const PmuOdd, 
-			RealA* const P3Even, RealA* const P3Odd,
-			RealA* const QmuEven, RealA* const QmuOdd, 
-			RealA* const newOprodEven, RealA* const newOprodOdd) 
+  HISQ_KERNEL_NAME(do_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
+					const RealA* const QprevEven, const RealA* const QprevOdd,  
+					const RealB* const linkEven,  const RealB* const linkOdd,
+					int sig, int mu, 
+					typename RealTypeId<RealA>::Type coeff,
+					RealA* const PmuEven, RealA* const PmuOdd, 
+					RealA* const P3Even, RealA* const P3Odd,
+					RealA* const QmuEven, RealA* const QmuOdd, 
+					RealA* const newOprodEven, RealA* const newOprodOdd) 
 {		
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -148,17 +148,17 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   // load the link variable connecting a and b 
   // Store in ab_link 
   if(sig_positive){
-    loadMatrixFromField(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, oddBit);
   }else{
-    loadMatrixFromField(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, 1-oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, 1-oddBit);
   }
   
   // load the link variable connecting b and c 
   // Store in bc_link
   if(mu_positive){
-    loadMatrixFromField(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, oddBit);
   }else{ 
-    loadMatrixFromField(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, 1-oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, 1-oddBit);
   }
 
   
@@ -182,9 +182,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   
   
   if(mu_positive){
-    loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit);
   }else{
-    loadAdjointMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
+    //loadAdjointMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
+    HISQ_LOAD_ADJOINT_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
   }
   
   
@@ -242,14 +243,14 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
   __global__ void
-  do_side_link_kernel(const RealA* const P3Even, const RealA* const P3Odd,
-		      const RealA* const QprodEven, const RealA* const QprodOdd,
-		      const RealB* const linkEven,  const RealB* const linkOdd,
-		      int sig, int mu, 
-		      typename RealTypeId<RealA>::Type coeff, 
-		      typename RealTypeId<RealA>::Type accumu_coeff,
-		      RealA* const shortPEven, RealA* const shortPOdd,
-		      RealA* const newOprodEven, RealA* const newOprodOdd)
+  HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
+				      const RealA* const QprodEven, const RealA* const QprodOdd,
+				      const RealB* const linkEven,  const RealB* const linkOdd,
+				      int sig, int mu, 
+				      typename RealTypeId<RealA>::Type coeff, 
+				      typename RealTypeId<RealA>::Type accumu_coeff,
+				      RealA* const shortPEven, RealA* const shortPOdd,
+				      RealA* const newOprodEven, RealA* const newOprodOdd)
 {
 
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -320,9 +321,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
     
     if(mu_positive){
-      loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit);
     }else{
-      loadMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
     }
     
     MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, mu_positive, COLOR_MAT_W);
@@ -382,14 +383,14 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
   __global__ void
-  do_all_link_kernel(const RealA* const oprodEven, const RealA* const oprodOdd, 
-		     const RealA* const QprevEven, const RealA* const QprevOdd,
-		     const RealB* const linkEven, const RealB* const linkOdd,
-		     int sig, int mu, 
-		     typename RealTypeId<RealA>::Type coeff, 
-		     typename RealTypeId<RealA>::Type accumu_coeff,
-		     RealA* const shortPEven, RealA* const shortPOdd,
-		     RealA* const newOprodEven, RealA* const newOprodOdd)
+  HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd, 
+				     const RealA* const QprevEven, const RealA* const QprevOdd,
+				     const RealB* const linkEven, const RealB* const linkOdd,
+				     int sig, int mu, 
+				     typename RealTypeId<RealA>::Type coeff, 
+				     typename RealTypeId<RealA>::Type accumu_coeff,
+				     RealA* const shortPEven, RealA* const shortPOdd,
+				     RealA* const newOprodEven, RealA* const newOprodOdd)
 {
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   int x[4];
@@ -450,7 +451,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, X, new_mem_idx);
     point_d = (new_mem_idx >> 1);
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit);	   // COLOR_MAT_X
-    loadMatrixFromField(linkEven, linkOdd, mu, point_d, ad_link, 1-oddBit); 
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_d, ad_link, 1-oddBit); 
     
     if(sig_positive){
       FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
@@ -459,7 +460,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }
     point_c = (new_mem_idx >> 1);
     loadMatrixFromField(oprodEven,oprodOdd,  point_c, COLOR_MAT_Y, oddBit);		// COLOR_MAT_Y
-    loadMatrixFromField(linkEven, linkOdd, mu, point_c, bc_link, oddBit);   
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_c, bc_link, oddBit);   
 
     
     MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, 0, COLOR_MAT_Z); // COMPUTE_LINK_X
@@ -471,9 +472,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
       }
 
     if (sig_positive){
-      loadMatrixFromField(linkEven, linkOdd, sig, ab_link_nbr_idx, ab_link, oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, ab_link_nbr_idx, ab_link, oddBit);
     }else{
-      loadMatrixFromField(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, ab_link, 1-oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, ab_link, 1-oddBit);
     }
     MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y); // COLOR_MAT_Y is assigned here
 
@@ -492,7 +493,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mu, X, new_mem_idx);	
     point_d = (new_mem_idx >> 1);
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit);         // COLOR_MAT_X used!
-    loadMatrixFromField(linkEven, linkOdd, mu, sid, ad_link, oddBit);  
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, sid, ad_link, oddBit);  
     
     if(sig_positive){
       FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
@@ -501,7 +502,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }
     point_c = (new_mem_idx >> 1);
     loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit);	     // COLOR_MAT_Y used
-    loadMatrixFromField(linkEven, linkOdd, mu, point_b, bc_link, 1-oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_b, bc_link, 1-oddBit);
     
     if(sig_positive){
       MAT_MUL_ADJ_MAT(COLOR_MAT_X, ad_link, COLOR_MAT_W);
@@ -513,9 +514,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
       }
 
     if (sig_positive){
-      loadMatrixFromField(linkEven, linkOdd, sig, ab_link_nbr_idx, ab_link, oddBit); 
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, ab_link_nbr_idx, ab_link, oddBit); 
     }else{
-      loadMatrixFromField(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, ab_link, 1-oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, ab_link, 1-oddBit);
     }
 
     MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y);
@@ -529,162 +530,3 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   return;
 }
 
-template<class RealA, int oddBit>
-  __global__ void 
-  do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOdd,
-			  int sig, typename RealTypeId<RealA>::Type coeff,
-			  RealA* const outputEven, RealA* const outputOdd)
-{
-  int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  
-  RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-  if(GOES_FORWARDS(sig)){
-    loadMatrixFromField(oprodEven, oprodOdd, sig, sid, COLOR_MAT_W, oddBit);
-    addMatrixToField(COLOR_MAT_W, sig, sid, coeff, outputEven, outputOdd, oddBit);
-  }
-  return;
-}
-
-
-
-
-template<class RealA, int oddBit>
-  __global__ void 
-  do_longlink_kernel(const RealA* const linkEven, const RealA* const linkOdd,
-		     const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
-		     int sig, typename RealTypeId<RealA>::Type coeff,
-		     RealA* const outputEven, RealA* const outputOdd)
-{
-       
-  int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  int x[4];
-  int z1 = sid/X1h;
-  int x1h = sid - z1*X1h;
-  int z2 = z1/X2;
-  x[1] = z1 - z2*X2;
-  x[3] = z2/X3;
-  x[2] = z2 - x[3]*X3;
-  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-  x[0] = 2*x1h + x1odd;
-
-  int new_x[4];
-  new_x[0] = x[0];
-  new_x[1] = x[1];
-  new_x[2] = x[2];
-  new_x[3] = x[3];
-
-
-  RealA LINK_W[ArrayLength<RealA>::result];
-  RealA LINK_X[ArrayLength<RealA>::result];
-  RealA LINK_Y[ArrayLength<RealA>::result];
-  RealA LINK_Z[ArrayLength<RealA>::result];
-
-  RealA COLOR_MAT_U[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_V[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_W[ArrayLength<RealA>::result]; // used as a temporary
-  RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_Z[ArrayLength<RealA>::result];
-
-
-  const int & point_c = sid;
-  int point_a, point_b, point_d, point_e;
-  // need to work these indices
-  int X[4];
-  X[0] = X1;
-  X[1] = X2;
-  X[2] = X3;
-  X[3] = X4;
-
-  /*
-   * 
-   *    A   B    C    D    E    
-   *    ---- ---- ---- ----  
-   *
-   *   ---> sig direction
-   *
-   *   C is the current point (sid)
-   *
-   */
-
-  // compute the force for forward long links
-  if(GOES_FORWARDS(sig))
-    {
-      new_x[sig] = (x[sig] + 1 + X[sig])%X[sig];
-      point_d = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-	  
-      new_x[sig] = (new_x[sig] + 1 + X[sig])%X[sig];
-      point_e = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-	  
-      new_x[sig] = (x[sig] - 1 + X[sig])%X[sig];
-      point_b = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-      new_x[sig] = (new_x[sig] - 1 + X[sig])%X[sig];
-      point_a = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-      loadMatrixFromField(linkEven, linkOdd, sig, point_a, LINK_W, oddBit);
-      loadMatrixFromField(linkEven, linkOdd, sig, point_b, LINK_X, 1-oddBit);
-      loadMatrixFromField(linkEven, linkOdd, sig, point_d, LINK_Y, 1-oddBit);
-      loadMatrixFromField(linkEven, linkOdd, sig, point_e, LINK_Z, oddBit);
-
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, COLOR_MAT_Z, oddBit);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, COLOR_MAT_Y, 1-oddBit);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, COLOR_MAT_X, oddBit);
-
-      MAT_MUL_MAT(LINK_Z, COLOR_MAT_Z, COLOR_MAT_W); // link(d)*link(e)*Naik(c)
-      MAT_MUL_MAT(LINK_Y, COLOR_MAT_W, COLOR_MAT_V);
-
-      MAT_MUL_MAT(LINK_Y, COLOR_MAT_Y, COLOR_MAT_W);  // link(d)*Naik(b)*link(b)
-      MAT_MUL_MAT(COLOR_MAT_W, LINK_X, COLOR_MAT_U);
-      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, -1, COLOR_MAT_V);
-
-      MAT_MUL_MAT(COLOR_MAT_X, LINK_W, COLOR_MAT_W); // Naik(a)*link(a)*link(b)
-      MAT_MUL_MAT(COLOR_MAT_W, LINK_X, COLOR_MAT_U);
-      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, 1, COLOR_MAT_V);
-
-      addMatrixToField(COLOR_MAT_V, sig, sid,  coeff, outputEven, outputOdd, oddBit);
-    }
-
-  return;
-}
-
-
-
-template<class RealA, class RealB, int oddBit>
-  __global__ void 
-  do_complete_force_kernel(const RealB* const linkEven, const RealB* const linkOdd, 
-			   const RealA* const oprodEven, const RealA* const oprodOdd,
-			   int sig,
-			   RealA* const forceEven, RealA* const forceOdd)
-{
-  int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  int x[4];
-  int z1 = sid/X1h;
-  int x1h = sid - z1*X1h;
-  int z2 = z1/X2;
-  x[1] = z1 - z2*X2;
-  x[3] = z2/X3;
-  x[2] = z2 - x[3]*X3;
-  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-  x[0] = 2*x1h + x1odd;
-
-  int link_sign;
-
-  RealB LINK_W[ArrayLength<RealB>::result];
-  RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-
-
-  loadMatrixFromField(linkEven, linkOdd, sig, sid, LINK_W, oddBit);
-  reconstructSign(&link_sign, sig, x);	
-
-  loadMatrixFromField(oprodEven, oprodOdd, sig, sid, COLOR_MAT_X, oddBit);
-	
-  typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
-  MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
-	
-  storeMatrixToMomentumField(COLOR_MAT_W, sig, sid, coeff, forceEven, forceOdd, oddBit); 
-  return;
-}

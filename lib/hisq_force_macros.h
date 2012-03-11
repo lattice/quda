@@ -369,6 +369,29 @@
 #define COLOR_MAT_Z22_im COLOR_MAT_Z[8].y
 
 
+#define HISQ_LOAD_MATRIX_18_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    var[0] = tex1Dfetch(gauge, idx + dir*stride*9);			\
+    var[1] = tex1Dfetch(gauge, idx + dir*stride*9 + stride);            \
+    var[2] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*2);          \
+    var[3] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*3);          \
+    var[4] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*4);          \
+    var[5] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*5);          \
+    var[6] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*6);          \
+    var[7] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*7);          \
+    var[8] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*8);          \
+  }while(0)
+
+#define HISQ_LOAD_MATRIX_18_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
+    var[0] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9); \
+    var[1] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride); \
+    var[2] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*2); \
+    var[3] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*3); \
+    var[4] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*4); \
+    var[5] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*5); \
+    var[6] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*6); \
+    var[7] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*7); \
+    var[8] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*8); \
+  }while(0)
 
 
 #define FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx, new_idx) do {	\
