@@ -152,7 +152,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   }else{
     HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, 1-oddBit);
   }
-  
+  RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign)
+
   // load the link variable connecting b and c 
   // Store in bc_link
   if(mu_positive){
@@ -160,13 +161,14 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   }else{ 
     HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, 1-oddBit);
   }
-
+  RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign)
   
   if(QprevOdd == NULL){
     if(sig_positive){
       loadMatrixFromField(oprodEven, oprodOdd, sig, point_d, COLOR_MAT_Y, 1-oddBit);
     }else{
-      loadAdjointMatrixFromField(oprodEven, oprodOdd, OPP_DIR(sig), point_c, COLOR_MAT_Y, oddBit);
+      loadMatrixFromField(oprodEven, oprodOdd, OPP_DIR(sig), point_c, COLOR_MAT_Y, oddBit);
+      adjointMatrix(COLOR_MAT_Y);
     }
   }else{ // QprevOdd != NULL
     loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit);
@@ -183,9 +185,12 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   
   if(mu_positive){
     HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit);
+    RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)    
   }else{
-    //loadAdjointMatrixFromField(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
-    HISQ_LOAD_ADJOINT_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
+    RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
+    adjointMatrix(ad_link);
+    
   }
   
   
@@ -215,7 +220,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   return;
 }
 
-/***********************************do_site_link_kernel***************************
+/***********************************do_side_link_kernel***************************
  *
  * In general we need
  * READ
@@ -325,7 +330,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }else{
       HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit);
     }
-    
+    RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
+   
     MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, mu_positive, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
   }
@@ -404,6 +410,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   x[0] = 2*x1h + x1odd;
   int X = 2*sid + x1odd;
 
+  int ad_link_sign=1;
+  int ab_link_sign=1;
+  int bc_link_sign=1;
+
   int new_x[4];
 
   RealB ab_link[ArrayLength<RealB>::result];
@@ -440,6 +450,14 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   }
   point_b = (new_mem_idx >> 1);
   ab_link_nbr_idx = (sig_positive) ? sid : point_b;
+  if(sig_positive){
+    reconstructSign(&ab_link_sign, sig, x);
+  }else{
+    reconstructSign(&ab_link_sign, sig, new_x);    
+  }
+  if(!mu_positive){
+    reconstructSign(&bc_link_sign, OPP_DIR(mu),  new_x);
+  }
   new_x[0] = x[0];
   new_x[1] = x[1];
   new_x[2] = x[2];
@@ -452,6 +470,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     point_d = (new_mem_idx >> 1);
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit);	   // COLOR_MAT_X
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_d, ad_link, 1-oddBit); 
+    reconstructSign(&ad_link_sign, mu, new_x);   
+    RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
     
     if(sig_positive){
       FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
@@ -461,7 +481,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     point_c = (new_mem_idx >> 1);
     loadMatrixFromField(oprodEven,oprodOdd,  point_c, COLOR_MAT_Y, oddBit);		// COLOR_MAT_Y
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_c, bc_link, oddBit);   
-
+    reconstructSign(&bc_link_sign, mu, new_x);  
+    RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign)
     
     MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, 0, COLOR_MAT_Z); // COMPUTE_LINK_X
     if (sig_positive)
@@ -476,6 +497,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }else{
       HISQ_LOAD_LINK(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, ab_link, 1-oddBit);
     }
+    RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign)
+
     MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y); // COLOR_MAT_Y is assigned here
 
     MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
@@ -494,6 +517,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     point_d = (new_mem_idx >> 1);
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit);         // COLOR_MAT_X used!
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, sid, ad_link, oddBit);  
+    reconstructSign(&ad_link_sign, mu, x);
+    RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
     
     if(sig_positive){
       FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
@@ -502,15 +527,16 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }
     point_c = (new_mem_idx >> 1);
     loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit);	     // COLOR_MAT_Y used
-    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_b, bc_link, 1-oddBit);
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_b, bc_link, 1-oddBit);    
+    RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign)  //bc_link_sign is computed earlier in the function
     
     if(sig_positive){
       MAT_MUL_ADJ_MAT(COLOR_MAT_X, ad_link, COLOR_MAT_W);
     }
     MAT_MUL_MAT(bc_link, COLOR_MAT_Y, COLOR_MAT_Z);
     if (sig_positive){	
-	MAT_MUL_MAT(COLOR_MAT_Z, COLOR_MAT_W, COLOR_MAT_Y);
-	addMatrixToField(COLOR_MAT_Y, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+      MAT_MUL_MAT(COLOR_MAT_Z, COLOR_MAT_W, COLOR_MAT_Y);
+      addMatrixToField(COLOR_MAT_Y, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
       }
 
     if (sig_positive){
@@ -518,6 +544,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }else{
       HISQ_LOAD_LINK(linkEven, linkOdd, OPP_DIR(sig), ab_link_nbr_idx, ab_link, 1-oddBit);
     }
+    RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign)
 
     MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y);
     ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);	

@@ -8,11 +8,7 @@
 
 
 // Disable texture read for now. Need to revisit this.
-#define HISQ_SITE_MATRIX_LOAD_TEX 1
-
-
-
-
+#define HISQ_SITE_MATRIX_LOAD_TEX 0
 
 namespace hisq {
   namespace fermion_force {
@@ -21,7 +17,7 @@ namespace hisq {
     template<class Real>
       struct PathCoefficients
       {
-        Real one;
+        Real one; 
         Real three;
         Real five;
         Real seven;
@@ -85,43 +81,51 @@ namespace hisq {
 
     template<class T>
       inline __device__
-      void loadMatrixFromField(const T* const field_even, const T* const field_odd,
-				int dir, int idx, T* const mat, int oddness)
+      void adjointMatrix(T* mat)
       {
-	const T* const field = (oddness)?field_odd:field_even;
-        mat[0] = field[idx + dir*Vhx9];
-        mat[1] = field[idx + dir*Vhx9 + Vh];
-        mat[2] = field[idx + dir*Vhx9 + Vhx2];
-        mat[3] = field[idx + dir*Vhx9 + Vhx3];
-        mat[4] = field[idx + dir*Vhx9 + Vhx4];
-        mat[5] = field[idx + dir*Vhx9 + Vhx5];
-        mat[6] = field[idx + dir*Vhx9 + Vhx6];
-        mat[7] = field[idx + dir*Vhx9 + Vhx7];
-        mat[8] = field[idx + dir*Vhx9 + Vhx8];
-
-        return;
-      }
-
-
-
-    template<class T>
-      inline __device__
-      void loadAdjointMatrixFromField(const T* const field_even, const T* const field_odd, int dir, int idx, T* const mat, int oddness)
-      {
-	const T* const field = (oddness)?field_odd: field_even;
 #define CONJ_INDEX(i,j) j*3 + i
-        mat[CONJ_INDEX(0,0)] = conj(field[idx + dir*Vhx9]);
-        mat[CONJ_INDEX(0,1)] = conj(field[idx + dir*Vhx9 + Vh]);
-        mat[CONJ_INDEX(0,2)] = conj(field[idx + dir*Vhx9 + Vhx2]);
-        mat[CONJ_INDEX(1,0)] = conj(field[idx + dir*Vhx9 + Vhx3]);
-        mat[CONJ_INDEX(1,1)] = conj(field[idx + dir*Vhx9 + Vhx4]);
-        mat[CONJ_INDEX(1,2)] = conj(field[idx + dir*Vhx9 + Vhx5]);
-        mat[CONJ_INDEX(2,0)] = conj(field[idx + dir*Vhx9 + Vhx6]);
-        mat[CONJ_INDEX(2,1)] = conj(field[idx + dir*Vhx9 + Vhx7]);
-        mat[CONJ_INDEX(2,2)] = conj(field[idx + dir*Vhx9 + Vhx8]);
+
+	T tmp;
+        mat[CONJ_INDEX(0,0)] = conj(mat[0]);
+        mat[CONJ_INDEX(1,1)] = conj(mat[4]);
+        mat[CONJ_INDEX(2,2)] = conj(mat[8]);
+	tmp  = conj(mat[1]);
+	mat[CONJ_INDEX(1,0)] = conj(mat[3]);
+	mat[CONJ_INDEX(0,1)] = tmp;	
+	tmp = conj(mat[2]);
+	mat[CONJ_INDEX(2,0)] = conj(mat[6]);
+	mat[CONJ_INDEX(0,2)] = tmp;
+	tmp = conj(mat[5]);
+	mat[CONJ_INDEX(2,1)] = conj(mat[7]);
+	mat[CONJ_INDEX(1,2)] = tmp;
+
 #undef CONJ_INDEX
         return;
       }
+
+
+    template<int N, class T>
+      inline __device__
+      void loadMatrixFromField(const T* const field_even, const T* const field_odd,
+			       int dir, int idx, T* const mat, int oddness)
+    {
+      const T* const field = (oddness)?field_odd:field_even;
+      for(int i = 0;i < N ;i++){
+	  mat[i] = field[idx + dir*N*Vh + i*Vh];          
+      }
+      return;
+    }
+
+    template<class T>
+      inline __device__
+      void loadMatrixFromField(const T* const field_even, const T* const field_odd,
+			       int dir, int idx, T* const mat, int oddness)
+      {
+	loadMatrixFromField<9> (field_even, field_odd, dir, idx, mat, oddness);
+        return;
+      }
+    
+    
 
     inline __device__
       void loadMatrixFromField(const float4* const field, int dir, int idx, float4* const mat)
@@ -319,8 +323,9 @@ namespace hisq {
     // but it will, soon.
     __device__ void reconstructSign(int* const sign, int dir, const int i[4]){
 
- /*
+ 
       *sign=1;
+      /*
       switch(dir){
         case XUP:
           if( (i[3]&1)==1) *sign=-1;
@@ -338,7 +343,7 @@ namespace hisq {
           if(i[3] == X4m1) *sign=-1; 
           break;
       }
-*/
+      */
       return;
     }
 
@@ -435,7 +440,7 @@ template<class RealA, int oddBit>
       new_x[sig] = (new_x[sig] - 1 + X[sig])%X[sig];
       point_a = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
 
-      loadMatrixFromField(linkEven, linkOdd, sig, point_a, LINK_W, oddBit);
+      loadMatrixFromField(linkEven, linkOdd, sig, point_a, LINK_W, oddBit); 
       loadMatrixFromField(linkEven, linkOdd, sig, point_b, LINK_X, 1-oddBit);
       loadMatrixFromField(linkEven, linkOdd, sig, point_d, LINK_Y, 1-oddBit);
       loadMatrixFromField(linkEven, linkOdd, sig, point_e, LINK_Z, oddBit);
@@ -532,14 +537,13 @@ template<class RealA, int oddBit>
 #else
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
 #endif
-#define HISQ_LOAD_ADJOINT_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadAdjointMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#define RECONSTRUCT_SITE_LINK(var, sign)
 #include "hisq_paths_force_core.h"
 
 #undef PRECISION
 #undef EXT
 #undef HISQ_LOAD_LINK
-#undef HISQ_LOAD_ADJOINT_LINK
-
+#undef RECONSTRUCT_SITE_LINK
 
 //double precision, recon=18
 #define PRECISION 0
@@ -549,15 +553,28 @@ template<class RealA, int oddBit>
 #else
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
 #endif
-#define HISQ_LOAD_ADJOINT_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadAdjointMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#define RECONSTRUCT_SITE_LINK(var, sign)
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef EXT
 #undef HISQ_LOAD_LINK
-#undef HISQ_LOAD_ADJOINT_LINK
+#undef RECONSTRUCT_SITE_LINK
 
+//double precision, recon=12
 
-
+#define PRECISION 0
+#define EXT _dp_12_
+#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, Vh)        
+#else
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness)  
+#endif
+#define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
+#include "hisq_paths_force_core.h"
+#undef PRECISION
+#undef EXT
+#undef HISQ_LOAD_LINK
+#undef RECONSTRUCT_SITE_LINK 
       
 
     template<class RealA, class RealB>
@@ -574,6 +591,7 @@ template<class RealA, int oddBit>
           RealA* const QmuEven,  RealA* const QmuOdd,   // write only
           RealA* const newOprodEven,  RealA* const newOprodOdd)
       {
+	QudaReconstructType recon = link.Reconstruct();
         dim3 halfGridDim(gridDim.x/2, 1,1);
 	
 #define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, BlockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
@@ -587,11 +605,20 @@ template<class RealA, int oddBit>
 	
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
 	if(sizeof(RealA) == sizeof(float2)){				\
-	  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-	  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	  if(recon  == QUDA_RECONSTRUCT_NO){				\
+	    do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	    do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	  }else{							\
+	    errorQuda("sp_12 not supported yet\n");			\
+	  }								\
 	}else{								\
-	  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-	  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	  if(recon  == QUDA_RECONSTRUCT_NO){				\
+	    do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	    do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	  }else{							\
+	    do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	    do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	  }								\
 	}
 	
         if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
@@ -626,6 +653,8 @@ template<class RealA, int oddBit>
           RealA* shortPEven,  RealA* shortPOdd,
           RealA* newOprodEven, RealA* newOprodOdd)
     {
+      QudaReconstructType recon =link.Reconstruct();
+      
       dim3 halfGridDim(gridDim.x/2,1,1);
 
 #define CALL_ARGUMENTS(typeA, typeB) 	<<<halfGridDim, blockDim>>>((typeA*)P3Even, (typeA*)P3Odd, \
@@ -639,11 +668,20 @@ template<class RealA, int oddBit>
       
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
       if(sizeof(RealA) == sizeof(float2)){				\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
 	do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
 	do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  errorQuda("sp_12 is not supported yet!");			\
+	}								\
       }else{								\
-	do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-	do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
       }
       
       if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -677,6 +715,7 @@ template<class RealA, int oddBit>
           RealA* const shortPEven, RealA* const shortPOdd,
           RealA* const newOprodEven, RealA* const newOprodOdd)
     {
+      QudaReconstructType recon = link.Reconstruct();
       dim3 halfGridDim(gridDim.x/2, 1,1);
       
 #define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, blockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
@@ -690,11 +729,20 @@ template<class RealA, int oddBit>
 
 #define CALL_ALL_LINK_KERNEL(sig_sign, mu_sign)				\
       if(sizeof(RealA) == sizeof(float2)){				\
-	do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-	do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  errorQuda("sp_12 not supported yet!\n");			\
+	}								\
       }else{								\
-	do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-	do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
       }
       
       if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -859,7 +907,7 @@ unbind_tex_link(const cudaGaugeField& link)
                           	 cudaGaugeField &newOprod)
       {
 
-
+	QudaReconstructType recon = link.Reconstruct();
         Real coeff;
         Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
         Real mLepage, mFiveSt, mThreeSt;

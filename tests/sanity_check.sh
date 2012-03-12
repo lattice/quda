@@ -127,7 +127,7 @@ function complete_hisq_force_check {
     echo "Performing complete hisq force test:"    
     prog="./hisq_paths_force_test"
     precs="double single"
-    recons="18 12"
+    recons="18"
     partitions="0 8 12 14 15"
 
     $prog --version |grep single >& /dev/null
@@ -248,7 +248,7 @@ for action in $*; do
     * )
 	echo "ERROR: invalid option ($action)!"
 	echo "Valid options: "
-	echo "              basic/fat/dslash/gf/all"
+	echo "              [basic|fat|dslash|gf|all]"
 	exit
 	;;
 
