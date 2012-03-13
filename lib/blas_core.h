@@ -1,3 +1,6 @@
+#include <tune_quda.h>
+#include <typeinfo>
+
 /**
    Generic blas kernel with four loads and up to four stores.
  */
@@ -26,6 +29,83 @@ __global__ void blasKernel(InputX X, InputY Y, InputZ Z, InputW W, Functor f,
   }
 }
 
+static struct {
+  int x[QUDA_MAX_DIM];
+  int stride;
+} blasConstants;
+
+template <typename FloatN, int M, int writeX, int writeY, int writeZ, int writeW, 
+  typename InputX, typename InputY, typename InputZ, typename InputW, 
+  typename OutputX, typename OutputY, typename OutputZ, typename OutputW, typename Functor>
+class BlasCuda : public Tunable {
+
+private:
+  InputX &X;
+  InputY &Y;
+  InputZ &Z;
+  InputW &W;
+  OutputX &XX;
+  OutputY &YY;
+  OutputZ &ZZ;
+  OutputW &WW;
+  Functor &f;
+  const int length;
+
+  int sharedBytesPerThread() const { return 0; }
+  int sharedBytesPerBlock() const { return 0; }
+
+public:
+  BlasCuda(InputX &X, InputY &Y, InputZ &Z, InputW &W, Functor &f, 
+	   OutputX &XX, OutputY &YY, OutputZ &ZZ, OutputW &WW, int length) :
+  X(X), Y(Y), Z(Z), W(W), f(f), XX(XX), YY(YY), ZZ(ZZ), WW(WW), length(length)
+    { ; }
+  virtual ~BlasCuda() { }
+
+  TuneKey tuneKey() const {
+    std::stringstream vol, aux;
+    vol << blasConstants.x[0] << "x";
+    vol << blasConstants.x[1] << "x";
+    vol << blasConstants.x[2] << "x";
+    vol << blasConstants.x[3];    
+    aux << blasConstants.stride;
+    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+  }  
+
+  // for the blas tuning we typically favour small grids
+  virtual bool advanceGridDim(TuneParam &param) const
+  {
+    const unsigned int max_blocks = 256;
+    const int step = 1;
+    param.grid.x += step;
+    if (param.grid.x > max_blocks) {
+      param.grid.x = step;
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  void apply(const cudaStream_t &stream) {
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+    blasKernel<FloatN,M,writeX,writeY,writeZ,writeW><<<tp.grid, tp.block, 0, stream>>>
+      (X, Y, Z, W, f, XX, YY, ZZ, WW, length);
+  }
+
+  void preTune() { ; }  // FIXME - current tuning will be destructive
+  void postTune() { ; }  // FIXME - current tuning will be destructive
+
+  long long flops() const { return f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
+  long long bytes() const { return f.streams()*sizeof(FloatN)*length*M; } // FIXME for half precision
+
+  std::string paramString(const TuneParam &param) const {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+};
+
 /**
    Driver for generic blas routine with four loads and two store.
  */
@@ -40,6 +120,9 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
   checkSpinor(x, z);
   checkSpinor(x, w);
 
+  for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
+  blasConstants.stride = x.Stride();
+
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     blasCuda<Functor,writeX,writeY,writeZ,writeW>
       (kernel, a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
@@ -48,6 +131,7 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
     return;
   }
 
+  Tunable *blas = 0;
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     const int M = 1;
     SpinorTexture<double2,double2,double2,M,0> xTex(x);
@@ -62,7 +146,11 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
     Spinor<double2,double2,double2,M> Z(z);
     Spinor<double2,double2,double2,M> W(w);
     Functor<double2, double2> f(a,b,c);
-    blasKernel<double2,M,writeX,writeY,writeZ,writeW><<<blasGrid, blasBlock, 0, *blasStream>>>
+    blas = new BlasCuda<double2,M,writeX,writeY,writeZ,writeW,
+      SpinorTexture<double2,double2,double2,M,0>, SpinorTexture<double2,double2,double2,M,1>,
+      SpinorTexture<double2,double2,double2,M,2>, SpinorTexture<double2,double2,double2,M,3>,
+      Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, 
+      Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, Functor<double2, double2> >
       (xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(2*M));
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     const int M = 1;
@@ -78,7 +166,11 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
     Spinor<float4,float4,float4,M> Z(z);
     Spinor<float4,float4,float4,M> W(w);
     Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-    blasKernel<float4,M,writeX,writeY,writeZ,writeW><<<blasGrid, blasBlock, 0, *blasStream>>>
+    blas = new BlasCuda<float4,M,writeX,writeY,writeZ,writeW,
+      SpinorTexture<float4,float4,float4,M,0>, SpinorTexture<float4,float4,float4,M,1>, 
+      SpinorTexture<float4,float4,float4,M,2>, SpinorTexture<float4,float4,float4,M,3>, 
+      Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, 
+      Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, Functor<float2, float4> >
       (xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(4*M));
   } else {
     if (x.Nspin() == 4){ //wilson
@@ -94,7 +186,11 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
       Spinor<float4,float4,short4,6> zStore(z);
       Spinor<float4,float4,short4,6> wStore(w);
       Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blasKernel<float4, 6, writeX, writeY, writeZ, writeW> <<<blasGrid, blasBlock, 0, *blasStream>>> 
+      blas = new BlasCuda<float4, 6, writeX, writeY, writeZ, writeW, 
+	SpinorTexture<float4,float4,short4,6,0>, SpinorTexture<float4,float4,short4,6,1>, 
+	SpinorTexture<float4,float4,short4,6,2>, SpinorTexture<float4,float4,short4,6,3>, 
+	Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6>, 
+	Spinor<float4,float4,short4,6>,	Spinor<float4,float4,short4,6>, Functor<float2, float4> >
 	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
@@ -109,13 +205,20 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
       Spinor<float2,float2,short2,3> zStore(z);
       Spinor<float2,float2,short2,3> wStore(w);
       Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blasKernel<float2, 3,writeX,writeY,writeZ,writeW> <<<blasGrid, blasBlock, 0, *blasStream>>>
+      blas = new BlasCuda<float2, 3,writeX,writeY,writeZ,writeW,
+	SpinorTexture<float2,float2,short2,3,0>, SpinorTexture<float2,float2,short2,3,1>,
+	SpinorTexture<float2,float2,short2,3,2>, SpinorTexture<float2,float2,short2,3,3>,
+	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>,
+	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>, Functor<float2, float2> >
 	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     quda::blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
   }
   quda::blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
   quda::blas_flops += Functor<double2,double2>::flops()*x.RealLength();
+
+  blas->apply(*blasStream);
+  delete blas;
 
   if (!blasTuning) checkCudaError();
 }
