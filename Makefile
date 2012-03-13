@@ -1,7 +1,7 @@
 all: make.inc lib tests
 
 make.inc:
-	@echo 'Before building, please create make.inc from make.inc.example'
+	@echo 'Before run configure to create make.inc before building.'
 	@exit 1
 
 lib:
@@ -21,4 +21,5 @@ clean:
 	$(MAKE) -C lib/ clean
 	$(MAKE) -C tests/ clean
 	rm -rf ./config.log ./config.status ./autom4te.cache
+
 .PHONY: all lib tests tune gen clean
