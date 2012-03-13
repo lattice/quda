@@ -334,7 +334,7 @@ namespace hisq {
 
  
       *sign=1;
-      /*
+      
       switch(dir){
       case XUP:
 	if( (i[3]&1)==1) *sign=-1;
@@ -356,7 +356,7 @@ namespace hisq {
 	printf("Error: invalid dir\n");
 	break;
       }
-      */
+      
       return;
     }
 
@@ -521,7 +521,6 @@ template<class RealA, int oddBit>
 	
 #undef CALL_ARGUMENTS	
 #undef CALL_MIDDLE_LINK_KERNEL
-
         return;
       }
 

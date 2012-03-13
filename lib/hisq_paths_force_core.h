@@ -31,7 +31,6 @@
  *       and we call it oprod_at_C to simply naming. This does not affect our data traffic analysis
  *
  ****************************************************************************/
-
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit> 
   __global__ void
   HISQ_KERNEL_NAME(do_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
@@ -216,7 +215,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   if(sig_positive){
     addMatrixToField(COLOR_MAT_Y, sig, sid, coeff, newOprodEven, newOprodOdd, oddBit);
   }
-
+  
   return;
 }
 

@@ -112,12 +112,23 @@ hisq_force_init()
 
   // this is a hack to get the gauge field to appear as a void** rather than void*
   void* siteLink_2d[4];
-    for(int i=0;i < 4;i++){
-       siteLink_2d[i] = ((char*)cpuGauge->Gauge_p()) + i*cpuGauge->Volume()* gaugeSiteSize* gaugeParam.cpu_prec;
-     }
-
+  for(int i=0;i < 4;i++){
+    siteLink_2d[i] = malloc(V*gaugeSiteSize* gaugeParam.cpu_prec);
+    if(siteLink_2d[i] == NULL){
+      errorQuda("malloc failed for siteLink_2d\n");
+    }
+  }
+  
   // fills the gauge field with random numbers
-  createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
+  createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 1);
+  
+  for(int dir = 0; dir < 4; dir++){
+    for(int i = 0;i < V; i++){
+      char* src = (char*)siteLink_2d[dir];
+      char* dst = (char*)cpuGauge->Gauge_p();
+      memcpy(dst + (4*i+dir)*gaugeSiteSize*link_prec, src + i*gaugeSiteSize*link_prec, gaugeSiteSize*link_prec);   
+    }
+  }
 
   gParam.precision = gaugeParam.cuda_prec;
   gParam.reconstruct = link_recon;
@@ -174,6 +185,9 @@ hisq_force_init()
   cudaOprod = new cudaGaugeField(gParam);
   cudaLongLinkOprod = new cudaGaugeField(gParam);
 
+  for(int i = 0;i < 4; i++){
+    free(siteLink_2d[i]);
+  }
   return;
 }
 
