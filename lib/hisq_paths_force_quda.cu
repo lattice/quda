@@ -8,7 +8,7 @@
 
 
 // Disable texture read for now. Need to revisit this.
-#define HISQ_SITE_MATRIX_LOAD_TEX 0
+#define HISQ_SITE_MATRIX_LOAD_TEX 1
 
 namespace hisq {
   namespace fermion_force {
@@ -128,13 +128,22 @@ namespace hisq {
     
 
     inline __device__
-      void loadMatrixFromField(const float4* const field, int dir, int idx, float4* const mat)
-      {
-        mat[0] = field[idx + dir*Vhx3];
-        mat[1] = field[idx + dir*Vhx3 + Vh];
-        mat[2] = field[idx + dir*Vhx3 + Vhx2];
-        return;
-      }
+      void loadMatrixFromField(const float4* const field_even, const float4* const field_odd, 
+			       int dir, int idx, float2* const mat, int oddness)
+    {
+      const float4* const field = oddness?field_odd: field_even;
+      float4 tmp;
+      tmp = field[idx + dir*Vhx3];
+      mat[0] = make_float2(tmp.x, tmp.y);
+      mat[1] = make_float2(tmp.z, tmp.w);
+      tmp = field[idx + dir*Vhx3 + Vh];
+      mat[2] = make_float2(tmp.x, tmp.y);
+      mat[3] = make_float2(tmp.z, tmp.w);
+      tmp = field[idx + dir*Vhx3 + 2*Vh];
+      mat[4] = make_float2(tmp.x, tmp.y);
+      mat[5] = make_float2(tmp.z, tmp.w);
+      return;
+    }
 
     template<class T>
       inline __device__
@@ -325,28 +334,29 @@ namespace hisq {
 
  
       *sign=1;
-      
+      /*
       switch(dir){
-        case XUP:
-          //if( (i[3]&1)==1) *sign=-1;
-          break;
+      case XUP:
+	if( (i[3]&1)==1) *sign=-1;
+	break;	  
 
-        case YUP:
-          //if( ((i[3]+i[0])&1) == 1) *sign=-1; 
-          break;
-
-        case ZUP:
-          //if( ((i[3]+i[0]+i[1])&1) == 1) *sign=-1; 
-          break;
-
-        case TUP:
-          //if(i[3] == X4m1) *sign=-1; 
-          break;
+      case YUP:
+	if( ((i[3]+i[0])&1) == 1) *sign=-1; 
+	break;
+	
+      case ZUP:
+	if( ((i[3]+i[0]+i[1])&1) == 1) *sign=-1; 
+	break;
+	
+      case TUP:
+	if(i[3] == X4m1) *sign=-1; 
+	break;
+	
       default:
 	printf("Error: invalid dir\n");
 	break;
       }
-      
+      */
       return;
     }
 
@@ -439,6 +449,21 @@ template<class RealA, int oddBit>
 #undef RECONSTRUCT_SITE_LINK 
       
 
+//single precision, recon=12
+#define PRECISION 1
+#define EXT _sp_12_
+#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, Vh)        
+#else
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#endif
+#define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
+#include "hisq_paths_force_core.h"
+#undef PRECISION
+#undef EXT
+#undef HISQ_LOAD_LINK
+#undef RECONSTRUCT_SITE_LINK
+
     template<class RealA, class RealB>
       static void
       middle_link_kernel(
@@ -471,7 +496,8 @@ template<class RealA, int oddBit>
 	    do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
 	    do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
 	  }else{							\
-	    errorQuda("sp_12 not supported yet\n");			\
+	    do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	    do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
 	  }								\
 	}else{								\
 	  if(recon  == QUDA_RECONSTRUCT_NO){				\
@@ -531,10 +557,11 @@ template<class RealA, int oddBit>
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
       if(sizeof(RealA) == sizeof(float2)){				\
 	if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-	do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	  do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
 	}else{								\
-	  errorQuda("sp_12 is not supported yet!");			\
+	  do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
 	}								\
       }else{								\
 	if(recon  == QUDA_RECONSTRUCT_NO){				\
@@ -595,7 +622,8 @@ template<class RealA, int oddBit>
 	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
 	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
 	}else{								\
-	  errorQuda("sp_12 not supported yet!\n");			\
+	  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
 	}								\
       }else{								\
 	if(recon  == QUDA_RECONSTRUCT_NO){				\
@@ -679,7 +707,8 @@ template<class RealA, int oddBit>
 	    do_longlink_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
 	    do_longlink_sp_18_kernel<float2,float2, 1> CALL_ARGUMENTS(float2, float2);
 	  }else{
-	    errorQuda("sp_12 is not supported yet\n");
+	    do_longlink_sp_12_kernel<float2,float4, 0> CALL_ARGUMENTS(float2, float4);
+	    do_longlink_sp_12_kernel<float2,float4, 1> CALL_ARGUMENTS(float2, float4);
 	  }
 	}else{
 	  if(recon == QUDA_RECONSTRUCT_NO){
@@ -721,7 +750,8 @@ template<class RealA, int oddBit>
 	    do_complete_force_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
 	    do_complete_force_sp_18_kernel<float2,float2, 1> CALL_ARGUMENTS(float2, float2);
 	  }else{
-	    errorQuda("sp_12 is not supported yet\n");
+	    do_complete_force_sp_12_kernel<float2,float4, 0> CALL_ARGUMENTS(float2, float4);
+	    do_complete_force_sp_12_kernel<float2,float4, 1> CALL_ARGUMENTS(float2, float4);
 	  }
 	}else{
 	  if(recon == QUDA_RECONSTRUCT_NO){

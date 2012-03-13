@@ -127,7 +127,7 @@ function complete_hisq_force_check {
     echo "Performing complete hisq force test:"    
     prog="./hisq_paths_force_test"
     precs="double single"
-    recons="18"
+    recons="18 12"
     partitions="0 8 12 14 15"
 
     $prog --version |grep single >& /dev/null

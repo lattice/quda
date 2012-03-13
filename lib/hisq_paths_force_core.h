@@ -62,10 +62,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   int ad_link_sign;
   int ab_link_sign;
   int bc_link_sign;
-
-  RealB ab_link[ArrayLength<RealB>::result];
-  RealB bc_link[ArrayLength<RealB>::result];
-  RealB ad_link[ArrayLength<RealB>::result];
+  
+  RealA ab_link[ArrayLength<RealA>::result];
+  RealA bc_link[ArrayLength<RealA>::result];
+  RealA ad_link[ArrayLength<RealA>::result];
 
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
@@ -273,7 +273,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
   int ad_link_sign;
 
-  RealB ad_link[ArrayLength<RealB>::result];
+  RealA ad_link[ArrayLength<RealA>::result];
 
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_X[ArrayLength<RealA>::result]; 
@@ -416,9 +416,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
   int new_x[4];
 
-  RealB ab_link[ArrayLength<RealB>::result];
-  RealB bc_link[ArrayLength<RealB>::result];
-  RealB ad_link[ArrayLength<RealB>::result];
+  RealA ab_link[ArrayLength<RealA>::result];
+  RealA bc_link[ArrayLength<RealA>::result];
+  RealA ad_link[ArrayLength<RealA>::result];
 
   RealA COLOR_MAT_X[ArrayLength<RealA>::result];  
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
@@ -588,10 +588,10 @@ template<class RealA, class RealB,  int oddBit>
   new_x[3] = x[3];
 
 
-  RealB ab_link[ArrayLength<RealA>::result];
-  RealB bc_link[ArrayLength<RealA>::result];
-  RealB de_link[ArrayLength<RealA>::result];
-  RealB ef_link[ArrayLength<RealA>::result];
+  RealA ab_link[ArrayLength<RealA>::result];
+  RealA bc_link[ArrayLength<RealA>::result];
+  RealA de_link[ArrayLength<RealA>::result];
+  RealA ef_link[ArrayLength<RealA>::result];
   
   int ab_link_sign =1;
   int bc_link_sign =1;
@@ -698,7 +698,7 @@ template<class RealA, class RealB, int oddBit>
 
   int link_sign;
 
-  RealB LINK_W[ArrayLength<RealB>::result];
+  RealA LINK_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_X[ArrayLength<RealA>::result];
   

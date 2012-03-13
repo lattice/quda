@@ -429,6 +429,19 @@
     var[8] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*8);          \
   }while(0)
 
+#define HISQ_LOAD_MATRIX_12_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    float4 tmp;								\
+    tmp = tex1Dfetch(gauge, idx + dir*stride*3);			\
+    var[0] = make_float2(tmp.x, tmp.y);					\
+    var[1] = make_float2(tmp.z, tmp.w);					\
+    tmp = tex1Dfetch(gauge, idx + dir*stride*3 + stride);		\
+    var[2] = make_float2(tmp.x, tmp.y);					\
+    var[3] = make_float2(tmp.z, tmp.w);					\
+    tmp = tex1Dfetch(gauge, idx + dir*stride*3 + 2*stride);		\
+    var[4] = make_float2(tmp.x, tmp.y);					\
+    var[5] = make_float2(tmp.z, tmp.w);					\
+  }while(0)
+
 #define HISQ_LOAD_MATRIX_18_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
     var[0] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9); \
     var[1] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride); \
