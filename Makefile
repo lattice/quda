@@ -1,7 +1,7 @@
 all: make.inc lib tests
 
 make.inc:
-	@echo 'Before run configure to create make.inc before building.'
+	@echo 'Please run configure to create make.inc before building.'
 	@exit 1
 
 lib:
