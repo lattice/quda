@@ -436,13 +436,21 @@ class Spinor {
   float *norm;
   const int stride;
 
+  StoreType *spinor_h;
+  float *norm_h;
+
+  size_t bytes;
+  size_t norm_bytes;
+
  public:
  Spinor(cudaColorSpinorField &x) : 
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH)) 
+  spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH)), 
+    bytes(x.Bytes()), norm_bytes(x.NormBytes())
     { checkTypes<RegType,InterType,StoreType>(); } 
 
  Spinor(const cudaColorSpinorField &x) :
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+  spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH)),
+    bytes(x.Bytes()), norm_bytes(x.NormBytes())
     { checkTypes<RegType,InterType,StoreType>(); } 
   ~Spinor() {;}
 
@@ -464,6 +472,37 @@ class Spinor {
     convert<InterType, RegType>(y, x, M);
 #pragma unroll
     for (int j=0; j<M; j++) copyFloatN(spinor[i+j*stride], y[j]);
+  }
+
+  // used to backup the field to the host
+  void save() {
+    spinor_h = (StoreType*)(new char[bytes]);
+    cudaMemcpy(spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
+    if (norm_bytes > 0) {
+      norm_h = (float*)(new char[norm_bytes]);
+      cudaMemcpy(norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+    checkCudaError();
+  }
+
+  // restore the field from the host
+  void load() {
+    cudaMemcpy(spinor, spinor_h, bytes, cudaMemcpyHostToDevice);
+    if (norm_bytes > 0) {
+      cudaMemcpy(norm, norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      delete(norm_h);
+    }
+    delete(spinor_h);
+    checkCudaError();
+  }
+
+  void* V() { return (void*)spinor; }
+  float* Norm() { return norm; }
+  QudaPrecision Precision() { 
+    if (sizeof(((StoreType*)0)->x) == sizeof(double)) return QUDA_DOUBLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(float)) return QUDA_SINGLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(short)) return QUDA_HALF_PRECISION;
+    else errorQuda("Unknown precision type\n");
   }
 };
 

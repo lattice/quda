@@ -91,8 +91,19 @@ public:
       (X, Y, Z, W, f, XX, YY, ZZ, WW, length);
   }
 
-  void preTune() { ; }  // FIXME - current tuning will be destructive
-  void postTune() { ; }  // FIXME - current tuning will be destructive
+  void preTune() { 
+    XX.save();
+    YY.save();
+    ZZ.save();
+    WW.save();
+  }
+
+  void postTune() {
+    XX.load(); 
+    YY.load(); 
+    ZZ.load(); 
+    WW.load(); 
+  }
 
   long long flops() const { return f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
   long long bytes() const { return f.streams()*sizeof(FloatN)*length*M; } // FIXME for half precision
