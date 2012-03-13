@@ -6,11 +6,25 @@ __device__ void copytoshared(double *s, const int i, const double2 x, const int 
 { s[i] = x.x; s[i+block] = x.y; }
 __device__ void copytoshared(double *s, const int i, const double3 x, const int block) 
 { s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
+__device__ void copytoshared(volatile double *s, const int i, const double x, const int block) { s[i] = x; }
+__device__ void copytoshared(volatile double *s, const int i, const double2 x, const int block) 
+{ s[i] = x.x; s[i+block] = x.y; }
+__device__ void copytoshared(volatile double *s, const int i, const double3 x, const int block) 
+{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
 __device__ void copyfromshared(double &x, const double *s, const int i, const int block) { x = s[i]; }
 __device__ void copyfromshared(double2 &x, const double *s, const int i, const int block) 
 { x.x = s[i]; x.y = s[i+block]; }
 __device__ void copyfromshared(double3 &x, const double *s, const int i, const int block) 
 { x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
+
+template<typename ReduceType, typename ReduceSimpleType> 
+__device__ void add(ReduceType &sum, ReduceSimpleType *s, const int i, const int block) { }
+template<> __device__ void add<double,double>(double &sum, double *s, const int i, const int block) 
+{ sum += s[i]; }
+template<> __device__ void add<double2,double>(double2 &sum, double *s, const int i, const int block) 
+{ sum.x += s[i]; sum.y += s[i+block]; }
+template<> __device__ void add<double3,double>(double3 &sum, double *s, const int i, const int block) 
+{ sum.x += s[i]; sum.y += s[i+block]; sum.z += s[i+2*block]; }
 
 template<typename ReduceType, typename ReduceSimpleType> 
 __device__ void add(ReduceSimpleType *s, const int i, const int j, const int block) { }
@@ -46,6 +60,15 @@ __device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const in
 { x.x = s[i]; x.y = s[i+block]; }
 __device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
 { x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
+
+template<typename ReduceType, typename ReduceSimpleType> 
+__device__ void add(ReduceType &sum, ReduceSimpleType *s, const int i, const int block) { }
+template<> __device__ void add<doublesingle,doublesingle>(double &sum, double *s, const int i, const int block) 
+{ sum += s[i]; }
+template<> __device__ void add<doublesingle2,doublesingle>(double2 &sum, double *s, const int i, const int block) 
+{ sum.x += s[i]; sum.y += s[i+block]; }
+template<> __device__ void add<doublesingle3,doublesingle>(double3 &sum, double *s, const int i, const int block) 
+{ sum.x += s[i]; sum.y += s[i+block]; sum.z += s[i+2*block]; }
 
 template<> __device__ void add<doublesingle,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
 { s[i] += s[j]; }
@@ -101,67 +124,35 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
 
   extern __shared__ ReduceSimpleType sdata[];
   ReduceSimpleType *s = sdata + tid;  
-  copytoshared(s, 0, sum, block_size);
+  if (tid >= warpSize) copytoshared(s, 0, sum, block_size);
   __syncthreads();
   
-  // do reduction in shared mem
-  if (block_size >= 1024){ if (tid < 512) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 992) { if (tid < 480) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 960) { if (tid < 448) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 928) { if (tid < 416) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 896) { if (tid < 384) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 864) { if (tid < 352) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 832) { if (tid < 320) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 800) { if (tid < 288) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 768) { if (tid < 256) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 736) { if (tid < 224) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 704) { if (tid < 192) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 672) { if (tid < 160) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 640) { if (tid < 128) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 608) { if (tid <  96) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 576) { if (tid <  64) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-  if (block_size == 544) { if (tid <  32) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
+  // now reduce using the first warp only
+  if (tid<warpSize) {
+    // Warp raking
+#pragma unroll
+    for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
 
-  if (block_size >= 512) { if (tid < 256) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-  if (block_size == 480) { if (tid < 224) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-  if (block_size == 448) { if (tid < 192) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-  if (block_size == 416) { if (tid < 160) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-  if (block_size == 384) { if (tid < 128) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-  if (block_size == 352) { if (tid <  96) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-  if (block_size == 320) { if (tid <  64) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-  if (block_size == 288) { if (tid <  32) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-
-  if (block_size >= 256) { if (tid < 128) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-  if (block_size == 224) { if (tid <  96) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-  if (block_size == 192) { if (tid <  64) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-  if (block_size == 160) { if (tid <  32) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-
-  if (block_size >= 128) { if (tid <  64) { add<ReduceType>(s, 0, 64, block_size); } __syncthreads(); }
-  
-  if (tid < 32) {
+    // Intra-warp reduction
     volatile ReduceSimpleType *sv = s;
-    if (block_size ==  96)  { add<ReduceType>(sv, 0, 64, block_size); }
-    if (block_size >=  64) { add<ReduceType>(sv, 0, 32, block_size); }
-    if (block_size >=  32) { add<ReduceType>(sv, 0, 16, block_size); }
-    if (block_size >=  16) { add<ReduceType>(sv, 0, 8, block_size); }
-    if (block_size >=  8)  { add<ReduceType>(sv, 0, 4, block_size); }
-    if (block_size >=  4)  { add<ReduceType>(sv, 0, 2, block_size); }
-    if (block_size >=  2)  { add<ReduceType>(sv, 0, 1, block_size); }
-  }
-  
-  // write result for this block to global mem 
-  if (tid == 0) {    
-    ReduceType tmp;
-    copyfromshared(tmp, s, 0, block_size);
-    partial[blockIdx.x] = tmp;
+    copytoshared(sv, 0, sum, block_size);
+#pragma unroll
+    for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); }
 
-    __threadfence(); // flush result
-
-    // increment global block counter
-    unsigned int value = atomicInc(&count, gridDim.x);
-
-    // Determine if this block is the last block to be done
-    isLastBlockDone = (value == (gridDim.x-1));
+    // write result for this block to global mem 
+    if (tid == 0) {    
+      ReduceType tmp;
+      copyfromshared(tmp, s, 0, block_size);
+      partial[blockIdx.x] = tmp;
+      
+      __threadfence(); // flush result
+      
+      // increment global block counter
+      unsigned int value = atomicInc(&count, gridDim.x);
+      
+      // Determine if this block is the last block to be done
+      isLastBlockDone = (value == (gridDim.x-1));
+    }
   }
 
   __syncthreads();
@@ -169,6 +160,7 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
   // Finish the reduction if last block
   if (isLastBlockDone) {
     unsigned int i = threadIdx.x;
+
     ReduceType sum;
     zero(sum); 
     while (i < gridDim.x) {
@@ -178,61 +170,28 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
     
     extern __shared__ ReduceSimpleType sdata[];
     ReduceSimpleType *s = sdata + tid;  
-    copytoshared(s, 0, sum, block_size);
+    if (tid >= warpSize) copytoshared(s, 0, sum, block_size);
     __syncthreads();
-    
-    // do reduction in shared mem
-    if (block_size >= 1024){ if (tid < 512) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 992) { if (tid < 480) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 960) { if (tid < 448) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 928) { if (tid < 416) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 896) { if (tid < 384) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 864) { if (tid < 352) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 832) { if (tid < 320) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 800) { if (tid < 288) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 768) { if (tid < 256) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 736) { if (tid < 224) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 704) { if (tid < 192) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 672) { if (tid < 160) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 640) { if (tid < 128) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 608) { if (tid <  96) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 576) { if (tid <  64) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-    if (block_size == 544) { if (tid <  32) { add<ReduceType>(s, 0, 512, block_size); } __syncthreads(); }
-
-    if (block_size >= 512) { if (tid < 256) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size >= 512) { if (tid < 256) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size == 480) { if (tid < 224) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size == 448) { if (tid < 192) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size == 416) { if (tid < 160) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size == 384) { if (tid < 128) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size == 352) { if (tid <  96) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size == 320) { if (tid <  64) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-    if (block_size == 288) { if (tid <  32) { add<ReduceType>(s, 0, 256, block_size); } __syncthreads(); }
-
-    if (block_size >= 256) { if (tid < 128) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-    if (block_size == 224) { if (tid <  96) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-    if (block_size == 192) { if (tid <  64) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-    if (block_size == 160) { if (tid <  32) { add<ReduceType>(s, 0, 128, block_size); } __syncthreads(); }
-
-    if (block_size >= 128) { if (tid <  64) { add<ReduceType>(s, 0, 64, block_size); } __syncthreads(); }
-    
-    if (tid < 32) {
-      volatile ReduceSimpleType *sv = s;
-      if (block_size ==  96)  { add<ReduceType>(sv, 0, 64, block_size); }
-      if (block_size >=  64) { add<ReduceType>(sv, 0, 32, block_size); }
-      if (block_size >=  32) { add<ReduceType>(sv, 0, 16, block_size); }
-      if (block_size >=  16) { add<ReduceType>(sv, 0, 8, block_size); }
-      if (block_size >=  8)  { add<ReduceType>(sv, 0, 4, block_size); }
-      if (block_size >=  4)  { add<ReduceType>(sv, 0, 2, block_size); }
-      if (block_size >=  2)  { add<ReduceType>(sv, 0, 1, block_size); }
-    }
    
-    // write out the final reduced value
-    if (threadIdx.x == 0) {
-      ReduceType tmp;
-      copyfromshared(tmp, s, 0, block_size);
-      complete[0] = tmp;
-      count = 0;
+    // now reduce using the first warp only
+    if (tid<warpSize) {
+      // Warp raking
+#pragma unroll
+      for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
+      
+      // Intra-warp reduction
+      volatile ReduceSimpleType *sv = s;
+      copytoshared(sv, 0, sum, block_size);
+#pragma unroll
+      for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); }
+ 
+      // write out the final reduced value
+      if (threadIdx.x == 0) {
+	ReduceType tmp;
+	copyfromshared(tmp, s, 0, block_size);
+	complete[0] = tmp;
+	count = 0;
+      }
     }
  
   }
