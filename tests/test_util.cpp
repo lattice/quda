@@ -990,7 +990,6 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  exit(1);
 	}
 	    
-	    
 	if (precision == QUDA_DOUBLE_PRECISION){
 	  //double* mylink = (double*)link;
 	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;

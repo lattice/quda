@@ -137,6 +137,43 @@
 #define ad_link22_re ad_link[8].x
 #define ad_link22_im ad_link[8].y
 
+#define de_link00_re de_link[0].x
+#define de_link00_im de_link[0].y
+#define de_link01_re de_link[1].x
+#define de_link01_im de_link[1].y
+#define de_link02_re de_link[2].x
+#define de_link02_im de_link[2].y
+#define de_link10_re de_link[3].x
+#define de_link10_im de_link[3].y
+#define de_link11_re de_link[4].x
+#define de_link11_im de_link[4].y
+#define de_link12_re de_link[5].x
+#define de_link12_im de_link[5].y
+#define de_link20_re de_link[6].x
+#define de_link20_im de_link[6].y
+#define de_link21_re de_link[7].x
+#define de_link21_im de_link[7].y
+#define de_link22_re de_link[8].x
+#define de_link22_im de_link[8].y
+
+#define ef_link00_re ef_link[0].x
+#define ef_link00_im ef_link[0].y
+#define ef_link01_re ef_link[1].x
+#define ef_link01_im ef_link[1].y
+#define ef_link02_re ef_link[2].x
+#define ef_link02_im ef_link[2].y
+#define ef_link10_re ef_link[3].x
+#define ef_link10_im ef_link[3].y
+#define ef_link11_re ef_link[4].x
+#define ef_link11_im ef_link[4].y
+#define ef_link12_re ef_link[5].x
+#define ef_link12_im ef_link[5].y
+#define ef_link20_re ef_link[6].x
+#define ef_link20_im ef_link[6].y
+#define ef_link21_re ef_link[7].x
+#define ef_link21_im ef_link[7].y
+#define ef_link22_re ef_link[8].x
+#define ef_link22_im ef_link[8].y
 
 
 #else // HISQ_RECONSTRUCT_LINKS
@@ -414,86 +451,47 @@
   }while(0)
 
 #define FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx, new_idx) do {	\
-  switch(mydir){                                                        \
+    switch(mydir){							\
     case 0:                                                             \
       new_idx = ( (new_x[0]==X1m1)?idx-X1m1:idx+1);			\
       new_x[0] = (new_x[0]==X1m1)?0:new_x[0]+1;                         \
-    break;                                                              \
+      break;								\
     case 1:                                                             \
       new_idx = ( (new_x[1]==X2m1)?idx-X2X1mX1:idx+X1);		        \
       new_x[1] = (new_x[1]==X2m1)?0:new_x[1]+1;                         \
-    break;                                                              \
-    case 2:                                                             \
+      break;								\
+    case 2:								\
       new_idx = ( (new_x[2]==X3m1)?idx-X3X2X1mX2X1:idx+X2X1);	        \
       new_x[2] = (new_x[2]==X3m1)?0:new_x[2]+1;                         \
-    break;                                                              \
+      break;								\
     case 3:                                                             \
       new_idx = ( (new_x[3]==X4m1)?idx-X4X3X2X1mX3X2X1:idx+X3X2X1);     \
       new_x[3] = (new_x[3]==X4m1)?0:new_x[3]+1;                         \
-    break;                                                              \
-  }                                                                     \
-}while(0)
+      break;								\
+    }									\
+  }while(0)
 
 
 #define FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx, new_idx) do {	\
-  switch(mydir){                                                        \
+    switch(mydir){							\
     case 0:                                                             \
       new_idx = ( (new_x[0]==0)?idx+X1m1:idx-1);			\
       new_x[0] = (new_x[0]==0)?X1m1:new_x[0] - 1;                       \
-    break;                                                              \
+      break;								\
     case 1:                                                             \
       new_idx = ( (new_x[1]==0)?idx+X2X1mX1:idx-X1);		        \
       new_x[1] = (new_x[1]==0)?X2m1:new_x[1] - 1;                       \
-    break;                                                              \
+      break;								\
     case 2:                                                             \
       new_idx = ( (new_x[2]==0)?idx+X3X2X1mX2X1:idx-X2X1);		\
       new_x[2] = (new_x[2]==0)?X3m1:new_x[2] - 1;                       \
-    break;                                                              \
+      break;								\
     case 3:                                                             \
       new_idx = ( (new_x[3]==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1);	\
       new_x[3] = (new_x[3]==0)?X4m1:new_x[3] - 1;                       \
-    break;                                                              \
-  }                                                                     \
-}while(0)
-
-
-
-#define FF_COMPUTE_NEW_FULL_IDX_PLUS(old_x1, old_x2, old_x3, old_x4, idx, mydir, new_idx) do { \
-  switch(mydir){                                                                               \
-    case 0:                                                                                    \
-      new_idx = ( (old_x1==X1m1)?idx-X1m1:idx+1);			                       \
-    break;                                                                                     \
-    case 1:                                                                                    \
-      new_idx = ( (old_x2==X2m1)?idx-X2X1mX1:idx+X1);		                               \
-    break;                                                                                     \
-    case 2:                                                                                    \
-      new_idx = ( (old_x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1);	                               \
-    break;                                                                                     \
-    case 3:                                                                                    \
-      new_idx = ( (old_x4==X4m1)?idx-X4X3X2X1mX3X2X1:idx+X3X2X1);                              \
-    break;                                                                                     \
-  }                                                                                            \
-}while(0)
-
-
-
-#define FF_COMPUTE_NEW_FULL_IDX_MINUS(old_x1, old_x2, old_x3, old_x4, idx, mydir, new_idx) do { \
-  switch(mydir){                                                                                \
-    case 0:                                                                                     \
-      new_idx = ( (old_x1==0)?idx+X1m1:idx-1);			                                \
-    break;                                                                                      \
-    case 1:                                                                                     \
-      new_idx = ( (old_x2==0)?idx+X2X1mX1:idx-X1);		                                \
-    break;                                                                                      \
-    case 2:                                                                                     \
-      new_idx = ( (old_x3==0)?idx+X3X2X1mX2X1:idx-X2X1);		                        \
-    break;                                                                                      \
-    case 3:                                                                                     \
-      new_idx = ( (old_x4==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1);	                                \
-    break;                                                                                      \
-  }                                                                                             \
-}while(0)
-
+      break;								\
+    }									\
+  }while(0)
 
 
 

@@ -325,25 +325,28 @@ namespace hisq {
 
  
       *sign=1;
-      /*
+      
       switch(dir){
         case XUP:
-          if( (i[3]&1)==1) *sign=-1;
+          //if( (i[3]&1)==1) *sign=-1;
           break;
 
         case YUP:
-          if( ((i[3]+i[0])&1) == 1) *sign=-1; 
+          //if( ((i[3]+i[0])&1) == 1) *sign=-1; 
           break;
 
         case ZUP:
-          if( ((i[3]+i[0]+i[1])&1) == 1) *sign=-1; 
+          //if( ((i[3]+i[0]+i[1])&1) == 1) *sign=-1; 
           break;
 
         case TUP:
-          if(i[3] == X4m1) *sign=-1; 
+          //if(i[3] == X4m1) *sign=-1; 
           break;
+      default:
+	printf("Error: invalid dir\n");
+	break;
       }
-      */
+      
       return;
     }
 
@@ -364,147 +367,6 @@ namespace hisq {
 
 
 
-
-template<class RealA, int oddBit>
-  __global__ void 
-  do_longlink_kernel(const RealA* const linkEven, const RealA* const linkOdd,
-		     const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
-		     int sig, typename RealTypeId<RealA>::Type coeff,
-		     RealA* const outputEven, RealA* const outputOdd)
-{
-       
-  int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  int x[4];
-  int z1 = sid/X1h;
-  int x1h = sid - z1*X1h;
-  int z2 = z1/X2;
-  x[1] = z1 - z2*X2;
-  x[3] = z2/X3;
-  x[2] = z2 - x[3]*X3;
-  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-  x[0] = 2*x1h + x1odd;
-
-  int new_x[4];
-  new_x[0] = x[0];
-  new_x[1] = x[1];
-  new_x[2] = x[2];
-  new_x[3] = x[3];
-
-
-  RealA LINK_W[ArrayLength<RealA>::result];
-  RealA LINK_X[ArrayLength<RealA>::result];
-  RealA LINK_Y[ArrayLength<RealA>::result];
-  RealA LINK_Z[ArrayLength<RealA>::result];
-
-  RealA COLOR_MAT_U[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_V[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_W[ArrayLength<RealA>::result]; // used as a temporary
-  RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_Z[ArrayLength<RealA>::result];
-
-
-  const int & point_c = sid;
-  int point_a, point_b, point_d, point_e;
-  // need to work these indices
-  int X[4];
-  X[0] = X1;
-  X[1] = X2;
-  X[2] = X3;
-  X[3] = X4;
-
-  /*
-   * 
-   *    A   B    C    D    E    
-   *    ---- ---- ---- ----  
-   *
-   *   ---> sig direction
-   *
-   *   C is the current point (sid)
-   *
-   */
-
-  // compute the force for forward long links
-  if(GOES_FORWARDS(sig))
-    {
-      new_x[sig] = (x[sig] + 1 + X[sig])%X[sig];
-      point_d = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-	  
-      new_x[sig] = (new_x[sig] + 1 + X[sig])%X[sig];
-      point_e = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-	  
-      new_x[sig] = (x[sig] - 1 + X[sig])%X[sig];
-      point_b = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-      new_x[sig] = (new_x[sig] - 1 + X[sig])%X[sig];
-      point_a = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-
-      loadMatrixFromField(linkEven, linkOdd, sig, point_a, LINK_W, oddBit); 
-      loadMatrixFromField(linkEven, linkOdd, sig, point_b, LINK_X, 1-oddBit);
-      loadMatrixFromField(linkEven, linkOdd, sig, point_d, LINK_Y, 1-oddBit);
-      loadMatrixFromField(linkEven, linkOdd, sig, point_e, LINK_Z, oddBit);
-
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, COLOR_MAT_Z, oddBit);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, COLOR_MAT_Y, 1-oddBit);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, COLOR_MAT_X, oddBit);
-
-      MAT_MUL_MAT(LINK_Z, COLOR_MAT_Z, COLOR_MAT_W); // link(d)*link(e)*Naik(c)
-      MAT_MUL_MAT(LINK_Y, COLOR_MAT_W, COLOR_MAT_V);
-
-      MAT_MUL_MAT(LINK_Y, COLOR_MAT_Y, COLOR_MAT_W);  // link(d)*Naik(b)*link(b)
-      MAT_MUL_MAT(COLOR_MAT_W, LINK_X, COLOR_MAT_U);
-      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, -1, COLOR_MAT_V);
-
-      MAT_MUL_MAT(COLOR_MAT_X, LINK_W, COLOR_MAT_W); // Naik(a)*link(a)*link(b)
-      MAT_MUL_MAT(COLOR_MAT_W, LINK_X, COLOR_MAT_U);
-      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, 1, COLOR_MAT_V);
-
-      addMatrixToField(COLOR_MAT_V, sig, sid,  coeff, outputEven, outputOdd, oddBit);
-    }
-
-  return;
-}
-
-
-
-template<class RealA, class RealB, int oddBit>
-  __global__ void 
-  do_complete_force_kernel(const RealB* const linkEven, const RealB* const linkOdd, 
-			   const RealA* const oprodEven, const RealA* const oprodOdd,
-			   int sig,
-			   RealA* const forceEven, RealA* const forceOdd)
-{
-  int sid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  int x[4];
-  int z1 = sid/X1h;
-  int x1h = sid - z1*X1h;
-  int z2 = z1/X2;
-  x[1] = z1 - z2*X2;
-  x[3] = z2/X3;
-  x[2] = z2 - x[3]*X3;
-  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-  x[0] = 2*x1h + x1odd;
-
-  int link_sign;
-
-  RealB LINK_W[ArrayLength<RealB>::result];
-  RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-
-
-  loadMatrixFromField(linkEven, linkOdd, sig, sid, LINK_W, oddBit);
-  reconstructSign(&link_sign, sig, x);	
-
-  loadMatrixFromField(oprodEven, oprodOdd, sig, sid, COLOR_MAT_X, oddBit);
-	
-  typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
-  MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
-	
-  storeMatrixToMomentumField(COLOR_MAT_W, sig, sid, coeff, forceEven, forceOdd, oddBit); 
-  return;
-}
 
 
 template<class RealA, int oddBit>
@@ -791,32 +653,47 @@ template<class RealA, int oddBit>
         return;
       }
 
-    template<class RealA>
-      void longlink_terms(const RealA* const linkEven, const RealA* const linkOdd,
+      template<class RealA,class RealB>
+      void longlink_terms(const RealB* const linkEven, const RealB* const linkOdd,
 			  const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
 			  int sig, typename RealTypeId<RealA>::Type naik_coeff,
-			  dim3 gridDim, dim3 blockDim,
+			  dim3 gridDim, dim3 blockDim, const cudaGaugeField& link, 
 			  RealA* const outputEven, RealA* const outputOdd)
       {
 	
         dim3 halfGridDim(gridDim.x/2,1,1);
 	
-        if(GOES_FORWARDS(sig)){
-          do_longlink_kernel<RealA,0><<<halfGridDim,blockDim>>>(linkEven, linkOdd,
-								naikOprodEven, naikOprodOdd,
-								sig, naik_coeff,
-								outputEven, outputOdd);
-          do_longlink_kernel<RealA,1><<<halfGridDim,blockDim>>>(linkEven, linkOdd,
-								naikOprodEven, naikOprodOdd,
-								sig, naik_coeff,
-								outputEven, outputOdd);
-        }
-        else {
-          errorQuda("sig does not go forward\n");
-        }
+	QudaReconstructType recon = link.Reconstruct();;
 	
+#define CALL_ARGUMENTS(typeA, typeB)	<<<halfGridDim,blockDim>>>((typeB*)linkEven, (typeB*)linkOdd, \
+								   (typeA*)naikOprodEven,  (typeA*)naikOprodOdd, \
+								   sig, naik_coeff, \
+								   (typeA*)outputEven, (typeA*)outputOdd); \
+	
+	
+        if(GOES_BACKWARDS(sig)){
+          errorQuda("sig does not go forward\n");
+	}
+	if(sizeof(RealA) == sizeof(float2)){
+	  if(recon == QUDA_RECONSTRUCT_NO){
+	    do_longlink_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
+	    do_longlink_sp_18_kernel<float2,float2, 1> CALL_ARGUMENTS(float2, float2);
+	  }else{
+	    errorQuda("sp_12 is not supported yet\n");
+	  }
+	}else{
+	  if(recon == QUDA_RECONSTRUCT_NO){
+	    do_longlink_dp_18_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
+	    do_longlink_dp_18_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);
+	  }else{
+	    do_longlink_dp_12_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
+	    do_longlink_dp_12_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);	    
+	  }
+	}
+#undef CALL_ARGUMENTS	
         return;
-      }  
+      }
+
 
 
           
@@ -832,21 +709,32 @@ template<class RealA, int oddBit>
 			    RealA* const momOdd)
     {
       dim3 halfGridDim(gridDim.x/2, 1, 1);
+#define CALL_ARGUMENTS(typeA, typeB)  <<<halfGridDim, blockDim>>>((typeB*)linkEven, (typeB*)linkOdd, \
+								  (typeA*)oprodEven, (typeA*)oprodOdd, \
+								  sig,	\
+								  (typeA*)momEven, (typeA*)momOdd); 
+
+      QudaReconstructType recon = link.Reconstruct();
       
-      cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
-      cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(),  link.Bytes()/2);
+	if(sizeof(RealA) == sizeof(float2)){
+	  if(recon == QUDA_RECONSTRUCT_NO){
+	    do_complete_force_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
+	    do_complete_force_sp_18_kernel<float2,float2, 1> CALL_ARGUMENTS(float2, float2);
+	  }else{
+	    errorQuda("sp_12 is not supported yet\n");
+	  }
+	}else{
+	  if(recon == QUDA_RECONSTRUCT_NO){
+	    do_complete_force_dp_18_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
+	    do_complete_force_dp_18_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);
+	  }else{
+	    do_complete_force_dp_12_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
+	    do_complete_force_dp_12_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);	    
+	  }
+	}
+	
       
-      do_complete_force_kernel<RealA, RealB, 0><<<halfGridDim, blockDim>>>(linkEven, linkOdd,
-									   oprodEven, oprodOdd,
-									   sig,
-									   momEven, momOdd);
-      do_complete_force_kernel<RealA, RealB, 1><<<halfGridDim, blockDim>>>(linkEven, linkOdd,
-									   oprodEven, oprodOdd,
-									   sig,
-									   momEven, momOdd);			
-      cudaUnbindTexture(siteLink0TexSingle_recon);
-      cudaUnbindTexture(siteLink1TexSingle_recon);
-      
+#undef CALL_ARGUMENTS   
       return;
     }
 
@@ -921,8 +809,6 @@ unbind_tex_link(const cudaGaugeField& link)
         Lepage  = act_path_coeff.lepage; mLepage  = -Lepage;
 	
 	
-	bind_tex_link(link);
-
         const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
         dim3 blockDim(BLOCK_DIM,1,1);
         dim3 gridDim(volume/blockDim.x, 1, 1);
@@ -1069,8 +955,6 @@ unbind_tex_link(const cudaGaugeField& link)
           } // GOES_FORWARDS(sig)
           checkCudaError();
         }
-
-	unbind_tex_link(link);
       
         return; 
    } // do_hisq_staples_force_cuda
@@ -1094,6 +978,7 @@ unbind_tex_link(const cudaGaugeField& link)
 	   dim3 blockDim(BLOCK_DIM,1,1);
 	   dim3 gridDim(volume/blockDim.x, 1, 1);
 
+	   bind_tex_link(link);
 	   for(int sig=0; sig<4; sig++){
 		   if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
 		     complete_force_kernel((double2*)oprod.Even_p(), (double2*)oprod.Odd_p(),
@@ -1111,6 +996,8 @@ unbind_tex_link(const cudaGaugeField& link)
 		     errorQuda("Unsupported precision");
 		   }
 	   } // loop over directions
+
+	   unbind_tex_link(link);
 	   return;
    }
 
@@ -1127,25 +1014,28 @@ unbind_tex_link(const cudaGaugeField& link)
      const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
      dim3 blockDim(BLOCK_DIM,1,1);
      dim3 gridDim(volume/blockDim.x, 1, 1);
+
+     bind_tex_link(link);
      
      for(int sig=0; sig<4; ++sig){
        if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
 	 longlink_terms((double2*)link.Even_p(), (double2*)link.Odd_p(),
 			(double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
 			sig, coeff, 
-			gridDim, blockDim,
+			gridDim, blockDim, link, 
 			(double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p());
        }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
 	 longlink_terms((float2*)link.Even_p(), (float2*)link.Odd_p(),
 			(float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
 			sig, static_cast<float>(coeff), 
-			gridDim, blockDim,
+			gridDim, blockDim, link,
 			(float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p());
        }else{
 	 errorQuda("Unsupported precision");
        }
      } // loop over directions
      
+     unbind_tex_link(link);
      return;
    }
 
@@ -1171,6 +1061,7 @@ unbind_tex_link(const cudaGaugeField& link)
           tempCompmat[i] = createMatQuda(param.X, param.cuda_prec);
         }	
 
+	bind_tex_link(link);
 
         if (param.cuda_prec == QUDA_DOUBLE_PRECISION){
 	  
@@ -1209,6 +1100,9 @@ unbind_tex_link(const cudaGaugeField& link)
         }else{
 	  errorQuda("Unsupported precision");
 	}
+
+
+	unbind_tex_link(link);
 
         for(int i=0; i<4; i++){
           freeMatQuda(tempmat[i]);

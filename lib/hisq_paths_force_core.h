@@ -59,9 +59,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
   int new_x[4];
   int new_mem_idx;
-  int ad_link_sign=1;
-  int ab_link_sign=1;
-  int bc_link_sign=1;
+  int ad_link_sign;
+  int ab_link_sign;
+  int bc_link_sign;
 
   RealB ab_link[ArrayLength<RealB>::result];
   RealB bc_link[ArrayLength<RealB>::result];
@@ -271,7 +271,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   x[0] = 2*x1h + x1odd;
   int X = 2*sid + x1odd;
 
-  int ad_link_sign = 1;
+  int ad_link_sign;
 
   RealB ad_link[ArrayLength<RealB>::result];
 
@@ -410,9 +410,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   x[0] = 2*x1h + x1odd;
   int X = 2*sid + x1odd;
 
-  int ad_link_sign=1;
-  int ab_link_sign=1;
-  int bc_link_sign=1;
+  int ad_link_sign;
+  int ab_link_sign;
+  int bc_link_sign;
 
   int new_x[4];
 
@@ -453,7 +453,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   if(sig_positive){
     reconstructSign(&ab_link_sign, sig, x);
   }else{
-    reconstructSign(&ab_link_sign, sig, new_x);    
+    reconstructSign(&ab_link_sign, OPP_DIR(sig), new_x);    
   }
   if(!mu_positive){
     reconstructSign(&bc_link_sign, OPP_DIR(mu),  new_x);
@@ -557,3 +557,161 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   return;
 }
 
+
+
+
+
+template<class RealA, class RealB,  int oddBit>
+  __global__ void 
+  HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* const linkOdd,
+					    const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
+					    int sig, typename RealTypeId<RealA>::Type coeff,
+					    RealA* const outputEven, RealA* const outputOdd)
+{
+       
+  int sid = blockIdx.x * blockDim.x + threadIdx.x;
+
+  int x[4];
+  int z1 = sid/X1h;
+  int x1h = sid - z1*X1h;
+  int z2 = z1/X2;
+  x[1] = z1 - z2*X2;
+  x[3] = z2/X3;
+  x[2] = z2 - x[3]*X3;
+  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  x[0] = 2*x1h + x1odd;
+
+  int new_x[4];
+  new_x[0] = x[0];
+  new_x[1] = x[1];
+  new_x[2] = x[2];
+  new_x[3] = x[3];
+
+
+  RealB ab_link[ArrayLength<RealA>::result];
+  RealB bc_link[ArrayLength<RealA>::result];
+  RealB de_link[ArrayLength<RealA>::result];
+  RealB ef_link[ArrayLength<RealA>::result];
+  
+  int ab_link_sign =1;
+  int bc_link_sign =1;
+  int de_link_sign =1;
+  int ef_link_sign =1;
+  
+  RealA COLOR_MAT_U[ArrayLength<RealA>::result];
+  RealA COLOR_MAT_V[ArrayLength<RealA>::result];
+  RealA COLOR_MAT_W[ArrayLength<RealA>::result]; // used as a temporary
+  RealA COLOR_MAT_X[ArrayLength<RealA>::result];
+  RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
+  RealA COLOR_MAT_Z[ArrayLength<RealA>::result];
+
+
+  const int & point_c = sid;
+  int point_a, point_b, point_d, point_e;
+  // need to work these indices
+  int X[4];
+  X[0] = X1;
+  X[1] = X2;
+  X[2] = X3;
+  X[3] = X4;
+
+  /*
+   * 
+   *    A   B    C    D    E    
+   *    ---- ---- ---- ----  
+   *
+   *   ---> sig direction
+   *
+   *   C is the current point (sid)
+   *
+   */
+
+  // compute the force for forward long links
+  if(GOES_FORWARDS(sig))
+    {
+      new_x[sig] = (x[sig] + 1 + X[sig])%X[sig];
+      point_d = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
+      reconstructSign(&de_link_sign, sig, new_x);
+
+      new_x[sig] = (new_x[sig] + 1 + X[sig])%X[sig];
+      point_e = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
+      reconstructSign(&ef_link_sign, sig, new_x);
+	  
+      new_x[sig] = (x[sig] - 1 + X[sig])%X[sig];
+      point_b = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
+      reconstructSign(&bc_link_sign, sig, new_x);
+      
+      new_x[sig] = (new_x[sig] - 1 + X[sig])%X[sig];
+      point_a = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
+      reconstructSign(&ab_link_sign, sig, new_x);
+      
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_a, ab_link, oddBit); 
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_b, bc_link, 1-oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_d, de_link, 1-oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_e, ef_link, oddBit);
+      
+      RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign);
+      RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign);
+      RECONSTRUCT_SITE_LINK(de_link, de_link_sign);
+      RECONSTRUCT_SITE_LINK(ef_link, ef_link_sign);
+
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, COLOR_MAT_Z, oddBit);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, COLOR_MAT_Y, 1-oddBit);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, COLOR_MAT_X, oddBit);
+      
+      MAT_MUL_MAT(ef_link, COLOR_MAT_Z, COLOR_MAT_W); // link(d)*link(e)*Naik(c)
+      MAT_MUL_MAT(de_link, COLOR_MAT_W, COLOR_MAT_V);
+
+      MAT_MUL_MAT(de_link, COLOR_MAT_Y, COLOR_MAT_W);  // link(d)*Naik(b)*link(b)
+      MAT_MUL_MAT(COLOR_MAT_W, bc_link, COLOR_MAT_U);
+      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, -1, COLOR_MAT_V);
+
+      MAT_MUL_MAT(COLOR_MAT_X, ab_link, COLOR_MAT_W); // Naik(a)*link(a)*link(b)
+      MAT_MUL_MAT(COLOR_MAT_W, bc_link, COLOR_MAT_U);
+      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, 1, COLOR_MAT_V);
+
+      addMatrixToField(COLOR_MAT_V, sig, sid,  coeff, outputEven, outputOdd, oddBit);
+    }
+
+  return;
+}
+
+
+template<class RealA, class RealB, int oddBit>
+  __global__ void 
+  HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const RealB* const linkOdd, 
+					   const RealA* const oprodEven, const RealA* const oprodOdd,
+					   int sig,
+					   RealA* const forceEven, RealA* const forceOdd)
+{
+  int sid = blockIdx.x * blockDim.x + threadIdx.x;
+
+  int x[4];
+  int z1 = sid/X1h;
+  int x1h = sid - z1*X1h;
+  int z2 = z1/X2;
+  x[1] = z1 - z2*X2;
+  x[3] = z2/X3;
+  x[2] = z2 - x[3]*X3;
+  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  x[0] = 2*x1h + x1odd;
+
+  int link_sign;
+
+  RealB LINK_W[ArrayLength<RealB>::result];
+  RealA COLOR_MAT_W[ArrayLength<RealA>::result];
+  RealA COLOR_MAT_X[ArrayLength<RealA>::result];
+  
+
+  HISQ_LOAD_LINK(linkEven, linkOdd, sig, sid, LINK_W, oddBit);  
+  reconstructSign(&link_sign, sig, x);	
+  RECONSTRUCT_SITE_LINK(LINK_W, link_sign);
+  
+  loadMatrixFromField(oprodEven, oprodOdd, sig, sid, COLOR_MAT_X, oddBit);
+  
+  typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
+  MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
+	
+  storeMatrixToMomentumField(COLOR_MAT_W, sig, sid, coeff, forceEven, forceOdd, oddBit); 
+  return;
+}
