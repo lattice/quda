@@ -378,7 +378,7 @@ class WilsonDslashCuda : public DslashCuda {
       cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
       if (typeid(sFloat) == typeid(short4)) {
 	saveOutNorm = new char[norm_bytes];
-	cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
       }
     }
   }
@@ -459,7 +459,7 @@ class CloverDslashCuda : public DslashCuda {
       cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
       if (typeid(sFloat) == typeid(short4)) {
 	saveOutNorm = new char[norm_bytes];
-	cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
       }
     }
   }
@@ -555,7 +555,7 @@ class TwistedDslashCuda : public DslashCuda {
       cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
       if (typeid(sFloat) == typeid(short4)) {
 	saveOutNorm = new char[norm_bytes];
-	cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
       }
     }
   }
@@ -631,7 +631,7 @@ class DomainWallDslashCuda : public DslashCuda {
       cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
       if (typeid(sFloat) == typeid(short4)) {
 	saveOutNorm = new char[norm_bytes];
-	cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
       }
     }
   }
@@ -711,7 +711,7 @@ private:
       cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
       if (typeid(sFloat) == typeid(short2)) {
 	saveOutNorm = new char[norm_bytes];
-	cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
       }
     }
   }
@@ -1436,7 +1436,7 @@ public:
     cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
     if (typeid(sFloat) == typeid(short4)) {
       saveOutNorm = new char[norm_bytes];
-      cudaMemcpy(saveOutNorm, outNorm, bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
     }
   }
 
