@@ -499,10 +499,12 @@ class Spinor {
   void* V() { return (void*)spinor; }
   float* Norm() { return norm; }
   QudaPrecision Precision() { 
-    if (sizeof(((StoreType*)0)->x) == sizeof(double)) return QUDA_DOUBLE_PRECISION;
-    else if (sizeof(((StoreType*)0)->x) == sizeof(float)) return QUDA_SINGLE_PRECISION;
-    else if (sizeof(((StoreType*)0)->x) == sizeof(short)) return QUDA_HALF_PRECISION;
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
+    if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(short)) precision = QUDA_HALF_PRECISION;
     else errorQuda("Unknown precision type\n");
+    return precision;
   }
 };
 

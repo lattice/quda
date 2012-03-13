@@ -67,12 +67,12 @@ public:
     vol << blasConstants.x[1] << "x";
     vol << blasConstants.x[2] << "x";
     vol << blasConstants.x[3];    
-    aux << blasConstants.stride;
-    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+    aux << blasConstants.stride << XX.Precision();
+    return TuneKey(vol.str(), typeid(f).name(), aux.str());
   }  
 
   // for the blas tuning we typically favour small grids
-  virtual bool advanceGridDim(TuneParam &param) const
+  bool advanceGridDim(TuneParam &param) const
   {
     const unsigned int max_blocks = 256;
     const int step = 1;
@@ -106,7 +106,10 @@ public:
   }
 
   long long flops() const { return f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
-  long long bytes() const { return f.streams()*sizeof(FloatN)*length*M; } // FIXME for half precision
+  long long bytes() const { 
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    if (XX.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
+    return f.streams()*bytes*length; }
 
   std::string paramString(const TuneParam &param) const {
     std::stringstream ps;

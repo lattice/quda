@@ -11,18 +11,18 @@
 // volume per GPU (full lattice dimensions)
 const int LX = 16;
 const int LY = 16;
-const int LZ = 32;
-const int LT = 32;
+const int LZ = 16;
+const int LT = 16;
 const int Nspin = 4;
 
 // corresponds to 1 iterations for V=16^4, Nspin = 4, at half precision
 const int Niter = max(1, 1 * (16*16*16*16*4) / (LX * LY * LZ * LT * Nspin));
 
-const int Nkernels = 31;
+const int Nkernels = 17;
 const int ThreadMin = 32;
-const int ThreadMax = 256;
+const int ThreadMax = 32;
 const int GridMin = 1;
-const int GridMax = 256;
+const int GridMax = 1;
 
 cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
