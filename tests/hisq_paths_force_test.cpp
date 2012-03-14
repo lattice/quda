@@ -81,8 +81,8 @@ setDims(int *X){
 }
 
 
-float
-total_staple_io_data(QudaPrecision prec, QudaReconstructType recon)
+void
+total_staple_io_data(QudaPrecision prec, QudaReconstructType recon, double* io, double* flops)
 {
   //total IO counting for the middle/side/all link kernels
   //Explanation about these numbers can be founed in the corresnponding kernel functions in
@@ -90,6 +90,9 @@ total_staple_io_data(QudaPrecision prec, QudaReconstructType recon)
   int linksize = prec*recon;
   int cmsize = prec*18;
   
+  int matrix_mul_flops = 198;
+  int matrix_add_flops = 18;
+
   int num_calls_middle_link[6] = {24, 24, 96, 96, 24, 24};
   int middle_link_data_io[6][2] = {
     {3,6},
@@ -97,21 +100,42 @@ total_staple_io_data(QudaPrecision prec, QudaReconstructType recon)
     {3,7},
     {3,5},
     {3,5},
-    {3,3}
+    {3,2}
   };
-  
+  int middle_link_data_flops[6][2] = {
+    {3,1},
+    {2,0},
+    {4,1},
+    {3,0},
+    {4,1},
+    {2,0}
+  };
+
+
   int num_calls_side_link[2]= {192, 48};
   int side_link_data_io[2][2] = {
     {1, 6},
     {0, 3}
   };
+  int side_link_data_flops[2][2] = {
+    {2, 2},
+    {0, 1}
+  };
+
+
+
   int num_calls_all_link[2] ={192, 192};
   int all_link_data_io[2][2] = {
     {3, 8},
     {3, 6}
   };
+  int all_link_data_flops[2][2] = {
+    {6, 3},
+    {4, 2}
+  };
+
   
-  double total_io = 1.0;
+  double total_io = 0;
   for(int i = 0;i < 6; i++){
     total_io += num_calls_middle_link[i]
       *(middle_link_data_io[i][0]*linksize + middle_link_data_io[i][1]*cmsize);
@@ -126,7 +150,29 @@ total_staple_io_data(QudaPrecision prec, QudaReconstructType recon)
       *(all_link_data_io[i][0]*linksize + all_link_data_io[i][1]*cmsize);
   }	
   total_io *= V;
-  return total_io;  
+
+
+  double total_flops = 0;
+  for(int i = 0;i < 6; i++){
+    total_flops += num_calls_middle_link[i]
+      *(middle_link_data_flops[i][0]*matrix_mul_flops + middle_link_data_flops[i][1]*matrix_add_flops);
+  }
+  
+  for(int i = 0;i < 2; i++){
+    total_flops += num_calls_side_link[i]
+      *(side_link_data_flops[i][0]*matrix_mul_flops + side_link_data_flops[i][1]*matrix_add_flops);
+  }
+  for(int i = 0;i < 2; i++){
+    total_flops += num_calls_all_link[i]
+      *(all_link_data_flops[i][0]*matrix_mul_flops + all_link_data_flops[i][1]*matrix_add_flops);
+  }	
+  total_flops *= V;
+
+  *io=total_io;
+  *flops = total_flops;
+
+  printfQuda("flop/byte =%.1f\n", total_flops/total_io);
+  return ;  
 }
 
 
@@ -348,9 +394,13 @@ hisq_force_test(void)
   int accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
 
-  float total_io = total_staple_io_data(link_prec, link_recon);
+  double total_io;
+  double total_flops;
+  total_staple_io_data(link_prec, link_recon, &total_io, &total_flops);
+  
+  float perf_flops = total_flops / (TDIFF(t0, t1)) *1e-9;
   float perf = total_io / (TDIFF(t0, t1)) *1e-9;
-  printf("Staples time: %.2f ms, perf =%.2f GB/s\n", TDIFF(t0,t1)*1000, perf);
+  printf("Staples time: %.2f ms, perf =%.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", TDIFF(t0,t1)*1000, perf_flops, perf);
   printf("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t2,t3)*1000, TDIFF(t4,t5)*1000);
   printf("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1)*1000);
 

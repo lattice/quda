@@ -25,10 +25,18 @@
  *             else               :     (3, 5)  
  *   Call 3:  (called 48 times, half positive sig, half negative sig)
  *             if (sig is positive):    (3, 5) 
- *             else               :     (3, 3)  
+ *             else               :     (3, 2) no need to loadQprod_at_D in this case  
  * 
  * note: oprod_at_C could actually be read in from D when it is the fresh outer product
  *       and we call it oprod_at_C to simply naming. This does not affect our data traffic analysis
+ * 
+ * Flop count, in two-number pair (matrix_multi, matrix_add)
+ *   call 1:     if (sig is positive)  (3, 1)
+ *               else                  (2, 0)
+ *   call 2:     if (sig is positive)  (4, 1) 
+ *               else                  (3, 0)
+ *   call 3:     if (sig is positive)  (4, 1) 
+ *               else                  (2, 0) 
  *
  ****************************************************************************/
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit> 
@@ -202,8 +210,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
       storeMatrixToField(COLOR_MAT_X, sid, QmuEven, QmuOdd, oddBit);
     }
   }else{ 
-    loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_Y, 1-oddBit);
-    MAT_MUL_MAT(COLOR_MAT_Y, ad_link, COLOR_MAT_X);
+    if(QmuEven || sig_positive){
+      loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_Y, 1-oddBit);
+      MAT_MUL_MAT(COLOR_MAT_Y, ad_link, COLOR_MAT_X);
+    }
     if(QmuEven){
       storeMatrixToField(COLOR_MAT_X, sid, QmuEven, QmuOdd, oddBit);
     }
@@ -244,6 +254,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
  *
  * note: newOprod can be at point D or A, depending on if mu is postive or negative
  *
+ * Flop count, in two-number pair (matrix_multi, matrix_add)
+ *   call 1:       (2, 2)
+ *   call 2:       (0, 1) 
  *
  *********************************************************************************/
 
@@ -386,6 +399,11 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 *             else               :     (3, 6) 
 *
 * This function is called 384 times, half positive sig, half negative sig
+*
+* Flop count, in two-number pair (matrix_multi, matrix_add)
+*             if(sig is positive)      (6,3)
+*             else                     (4,2)
+*
 ************************************************************************************************/
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
