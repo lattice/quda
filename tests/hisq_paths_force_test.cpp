@@ -81,6 +81,55 @@ setDims(int *X){
 }
 
 
+float
+total_staple_io_data(QudaPrecision prec, QudaReconstructType recon)
+{
+  //total IO counting for the middle/side/all link kernels
+  //Explanation about these numbers can be founed in the corresnponding kernel functions in
+  //the hisq kernel core file
+  int linksize = prec*recon;
+  int cmsize = prec*18;
+  
+  int num_calls_middle_link[6] = {24, 24, 96, 96, 24, 24};
+  int middle_link_data_io[6][2] = {
+    {3,6},
+    {3,4},
+    {3,7},
+    {3,5},
+    {3,5},
+    {3,3}
+  };
+  
+  int num_calls_side_link[2]= {192, 48};
+  int side_link_data_io[2][2] = {
+    {1, 6},
+    {0, 3}
+  };
+  int num_calls_all_link[2] ={192, 192};
+  int all_link_data_io[2][2] = {
+    {3, 8},
+    {3, 6}
+  };
+  
+  double total_io = 1.0;
+  for(int i = 0;i < 6; i++){
+    total_io += num_calls_middle_link[i]
+      *(middle_link_data_io[i][0]*linksize + middle_link_data_io[i][1]*cmsize);
+  }
+  
+  for(int i = 0;i < 2; i++){
+    total_io += num_calls_side_link[i]
+      *(side_link_data_io[i][0]*linksize + side_link_data_io[i][1]*cmsize);
+  }
+  for(int i = 0;i < 2; i++){
+    total_io += num_calls_all_link[i]
+      *(all_link_data_io[i][0]*linksize + all_link_data_io[i][1]*cmsize);
+  }	
+  total_io *= V;
+  return total_io;  
+}
+
+
 void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
 
 
@@ -299,6 +348,9 @@ hisq_force_test(void)
   int accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
 
+  float total_io = total_staple_io_data(link_prec, link_recon);
+  float perf = total_io / (TDIFF(t0, t1)) *1e-9;
+  printf("Staples time: %.2f ms, perf =%.2f GB/s\n", TDIFF(t0,t1)*1000, perf);
   printf("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t2,t3)*1000, TDIFF(t4,t5)*1000);
   printf("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1)*1000);
 

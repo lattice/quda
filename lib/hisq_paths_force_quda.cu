@@ -1092,6 +1092,16 @@ unbind_tex_link(const cudaGaugeField& link)
 
 	bind_tex_link(link);
 
+
+	
+
+
+	cudaEvent_t start, end;
+	
+	cudaEventCreate(&start);
+	cudaEventCreate(&end);
+	
+	cudaEventRecord(start);
         if (param.cuda_prec == QUDA_DOUBLE_PRECISION){
 	  
 	  PathCoefficients<double> act_path_coeff;
@@ -1129,7 +1139,14 @@ unbind_tex_link(const cudaGaugeField& link)
         }else{
 	  errorQuda("Unsupported precision");
 	}
-
+	
+	
+	cudaEventRecord(end);
+	cudaEventSynchronize(end);
+	float runtime;
+	cudaEventElapsedTime(&runtime, start, end);
+	
+	//printfQuda("hisq staple time=%.2f ms\n", runtime);
 
 	unbind_tex_link(link);
 

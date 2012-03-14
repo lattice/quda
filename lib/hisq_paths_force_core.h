@@ -17,13 +17,13 @@
  *   not read in or written out.
  *
  * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
- *   Call 1: 
+ *   Call 1:  (called 48 times, half positive sig, half negative sig)
  *             if (sig is positive):    (3, 6) 
  *             else               :     (3, 4) 
- *   Call 2: 
+ *   Call 2:  (called 192 time, half positive sig, half negative sig) 
  *             if (sig is positive):    (3, 7) 
  *             else               :     (3, 5)  
- *   Call 3: 
+ *   Call 3:  (called 48 times, half positive sig, half negative sig)
  *             if (sig is positive):    (3, 5) 
  *             else               :     (3, 3)  
  * 
@@ -229,16 +229,18 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
  *    2  COLOR MATRIX:  shortP_at_D, newOprod,
  *
  * Two call variations:
- *   1. full read/write
+ *   1. full read/write 
  *   2. when shortP == NULL && Qprod == NULL:  
  *          no need to read ad_link/shortP_at_D or write shortP_at_D
  *          Qprod_at_D does not exit and is not read in                                     
  *
  *
  * Therefore the data traffic, in two-number pair (num_of_links, num_of_color_matrix)
- *   Call 1:                (1, 6) 
+ *   Call 1:   (called 192 times)        
+ *                           (1, 6) 
  *             
- *   Call 2:                (0, 3)
+ *   Call 2:   (called 48 times)             
+ *                           (0, 3)
  *
  * note: newOprod can be at point D or A, depending on if mu is postive or negative
  *
@@ -383,7 +385,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 *             if (sig is positive):    (3, 8) 
 *             else               :     (3, 6) 
 *
-*
+* This function is called 384 times, half positive sig, half negative sig
 ************************************************************************************************/
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
