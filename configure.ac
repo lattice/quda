@@ -167,6 +167,42 @@ AC_ARG_WITH(qio,
  [ qio_home="" ; build_qio="no" ]
 )
 
+AC_ARG_ENABLE(qdp-jit,
+  AC_HELP_STRING([--enable-qdp-jit], [ QDP-JIT support, requires --with-qdp (default=disabled) ]),
+  [ build_qdpjit=${enableval} ], 
+  [ build_qdpjit="no" ]
+)
+
+AC_ARG_WITH(qdp,
+  AC_HELP_STRING([--with-qdp=QDPDIR], [ Specify QDP++ installation directory ]),
+  [ qdp_home=${withval} ],
+  [ qdp_home="" ]
+)
+
+if test "X${build_qdpjit}X" = "XyesX" ; then
+  if test "X${qdp_home}X" = "XX" ; then
+    AC_PATH_PROG(QDPXX_CONFIG, [qdp++-config], [])
+  else
+    AC_PATH_PROG(QDPXX_CONFIG, [qdp++-config], [], [${qdp_home}/bin:${PATH}])
+  fi
+
+  if test "X${QDPXX_CONFIG}X" = "XX" ; then
+    AC_MSG_ERROR([QDP++ configuration program qdp++-config not found.])
+  fi
+
+  dnl AC_MSG_NOTICE([Found QDP++ configuration program ${QDPXX_CONFIG}])
+  dnl AC_SUBST(CXX, "`${QDPXX_CONFIG} --cxx`")
+  dnl AC_MSG_NOTICE([QDP++ compiler: ${CXX}])
+  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags`")
+  AC_MSG_NOTICE([QDP++ compile flags: ${QDPXX_CXXFLAGS}])
+  AC_SUBST(QDPXX_LDFLAGS,  "`${QDPXX_CONFIG} --ldflags`")
+  AC_MSG_NOTICE([QDP++ linking flags: ${QDPXX_LDFLAGS}])
+  AC_SUBST(QDPXX_LIBS,     "`${QDPXX_CONFIG} --libs`")
+  AC_MSG_NOTICE([QDP++ libraries flags: ${QDPXX_LIBS}])
+fi
+
+
+
 AC_ARG_ENABLE(fermi-double-tex,
  AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default is no) ]),
  [ fermi_double_tex=${enableval}],
@@ -328,6 +364,14 @@ yes|no);;
   ;;
 esac
 
+dnl QDP-JIT support
+case ${build_qdpjit} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-qdp-jit : ${build_qdpjit} ])
+  ;;
+esac
+
 
 dnl Configuration phase
 dnl ===================
@@ -479,6 +523,12 @@ AC_SUBST( QIO_HOME, [${qio_home}] )
 
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
+
+AC_MSG_NOTICE([Setting USE_QDPJIT = ${build_qdpjit} ])
+AC_SUBST( USE_QDPJIT, [${build_qdpjit}])
+
+AC_MSG_NOTICE([Setting QDP_INSTALL_PATH = ${qdp_home} ])
+AC_SUBST( QDP_INSTALL_PATH, [${qdp_home} ])
 
 AC_CONFIG_FILES(make.inc)
 AC_OUTPUT

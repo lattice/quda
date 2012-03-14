@@ -80,6 +80,102 @@
 #define LINK_Z22_re LINK_Z[8].x
 #define LINK_Z22_im LINK_Z[8].y
 
+#define ab_link00_re ab_link[0].x
+#define ab_link00_im ab_link[0].y
+#define ab_link01_re ab_link[1].x
+#define ab_link01_im ab_link[1].y
+#define ab_link02_re ab_link[2].x
+#define ab_link02_im ab_link[2].y
+#define ab_link10_re ab_link[3].x
+#define ab_link10_im ab_link[3].y
+#define ab_link11_re ab_link[4].x
+#define ab_link11_im ab_link[4].y
+#define ab_link12_re ab_link[5].x
+#define ab_link12_im ab_link[5].y
+#define ab_link20_re ab_link[6].x
+#define ab_link20_im ab_link[6].y
+#define ab_link21_re ab_link[7].x
+#define ab_link21_im ab_link[7].y
+#define ab_link22_re ab_link[8].x
+#define ab_link22_im ab_link[8].y
+
+#define bc_link00_re bc_link[0].x
+#define bc_link00_im bc_link[0].y
+#define bc_link01_re bc_link[1].x
+#define bc_link01_im bc_link[1].y
+#define bc_link02_re bc_link[2].x
+#define bc_link02_im bc_link[2].y
+#define bc_link10_re bc_link[3].x
+#define bc_link10_im bc_link[3].y
+#define bc_link11_re bc_link[4].x
+#define bc_link11_im bc_link[4].y
+#define bc_link12_re bc_link[5].x
+#define bc_link12_im bc_link[5].y
+#define bc_link20_re bc_link[6].x
+#define bc_link20_im bc_link[6].y
+#define bc_link21_re bc_link[7].x
+#define bc_link21_im bc_link[7].y
+#define bc_link22_re bc_link[8].x
+#define bc_link22_im bc_link[8].y
+
+#define ad_link00_re ad_link[0].x
+#define ad_link00_im ad_link[0].y
+#define ad_link01_re ad_link[1].x
+#define ad_link01_im ad_link[1].y
+#define ad_link02_re ad_link[2].x
+#define ad_link02_im ad_link[2].y
+#define ad_link10_re ad_link[3].x
+#define ad_link10_im ad_link[3].y
+#define ad_link11_re ad_link[4].x
+#define ad_link11_im ad_link[4].y
+#define ad_link12_re ad_link[5].x
+#define ad_link12_im ad_link[5].y
+#define ad_link20_re ad_link[6].x
+#define ad_link20_im ad_link[6].y
+#define ad_link21_re ad_link[7].x
+#define ad_link21_im ad_link[7].y
+#define ad_link22_re ad_link[8].x
+#define ad_link22_im ad_link[8].y
+
+#define de_link00_re de_link[0].x
+#define de_link00_im de_link[0].y
+#define de_link01_re de_link[1].x
+#define de_link01_im de_link[1].y
+#define de_link02_re de_link[2].x
+#define de_link02_im de_link[2].y
+#define de_link10_re de_link[3].x
+#define de_link10_im de_link[3].y
+#define de_link11_re de_link[4].x
+#define de_link11_im de_link[4].y
+#define de_link12_re de_link[5].x
+#define de_link12_im de_link[5].y
+#define de_link20_re de_link[6].x
+#define de_link20_im de_link[6].y
+#define de_link21_re de_link[7].x
+#define de_link21_im de_link[7].y
+#define de_link22_re de_link[8].x
+#define de_link22_im de_link[8].y
+
+#define ef_link00_re ef_link[0].x
+#define ef_link00_im ef_link[0].y
+#define ef_link01_re ef_link[1].x
+#define ef_link01_im ef_link[1].y
+#define ef_link02_re ef_link[2].x
+#define ef_link02_im ef_link[2].y
+#define ef_link10_re ef_link[3].x
+#define ef_link10_im ef_link[3].y
+#define ef_link11_re ef_link[4].x
+#define ef_link11_im ef_link[4].y
+#define ef_link12_re ef_link[5].x
+#define ef_link12_im ef_link[5].y
+#define ef_link20_re ef_link[6].x
+#define ef_link20_im ef_link[6].y
+#define ef_link21_re ef_link[7].x
+#define ef_link21_im ef_link[7].y
+#define ef_link22_re ef_link[8].x
+#define ef_link22_im ef_link[8].y
+
+
 #else // HISQ_RECONSTRUCT_LINKS
 
 #define LINK_W00_re LINK_W[0].x
@@ -309,90 +405,106 @@
 #define COLOR_MAT_Z22_re COLOR_MAT_Z[8].x
 #define COLOR_MAT_Z22_im COLOR_MAT_Z[8].y
 
+#define FF_RECONSTRUCT_LINK_12(var, sign)				\
+  ACC_CONJ_PROD_ASSIGN(var##20, +var##01, +var##12);			\
+  ACC_CONJ_PROD(var##20, -var##02, +var##11);				\
+  ACC_CONJ_PROD_ASSIGN(var##21, +var##02, +var##10);			\
+  ACC_CONJ_PROD(var##21, -var##00, +var##12);				\
+  ACC_CONJ_PROD_ASSIGN(var##22, +var##00, +var##11);			\
+  ACC_CONJ_PROD(var##22, -var##01, +var##10);				\
+  var##20_re *=sign;var##20_im *=sign; var##21_re *=sign; var##21_im *=sign; \
+  var##22_re *=sign;var##22_im *=sign;
 
 
+
+#define HISQ_LOAD_MATRIX_18_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    var[0] = tex1Dfetch(gauge, idx + dir*stride*9);			\
+    var[1] = tex1Dfetch(gauge, idx + dir*stride*9 + stride);            \
+    var[2] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*2);          \
+    var[3] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*3);          \
+    var[4] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*4);          \
+    var[5] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*5);          \
+    var[6] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*6);          \
+    var[7] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*7);          \
+    var[8] = tex1Dfetch(gauge, idx + dir*stride*9 + stride*8);          \
+  }while(0)
+
+#define HISQ_LOAD_MATRIX_12_SINGLE_TEX(gauge, dir, idx, var, stride)do{	\
+    float4 tmp;								\
+    tmp = tex1Dfetch(gauge, idx + dir*stride*3);			\
+    var[0] = make_float2(tmp.x, tmp.y);					\
+    var[1] = make_float2(tmp.z, tmp.w);					\
+    tmp = tex1Dfetch(gauge, idx + dir*stride*3 + stride);		\
+    var[2] = make_float2(tmp.x, tmp.y);					\
+    var[3] = make_float2(tmp.z, tmp.w);					\
+    tmp = tex1Dfetch(gauge, idx + dir*stride*3 + 2*stride);		\
+    var[4] = make_float2(tmp.x, tmp.y);					\
+    var[5] = make_float2(tmp.z, tmp.w);					\
+  }while(0)
+
+#define HISQ_LOAD_MATRIX_18_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
+    var[0] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9); \
+    var[1] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride); \
+    var[2] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*2); \
+    var[3] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*3); \
+    var[4] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*4); \
+    var[5] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*5); \
+    var[6] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*6); \
+    var[7] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*7); \
+    var[8] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*9 + stride*8); \
+  }while(0)
+
+#define HISQ_LOAD_MATRIX_12_DOUBLE_TEX(gauge_tex, gauge, dir, idx, var, stride)do{ \
+    var[0] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6); \
+    var[1] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride); \
+    var[2] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*2); \
+    var[3] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*3); \
+    var[4] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*4); \
+    var[5] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*5); \
+  }while(0)
 
 #define FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx, new_idx) do {	\
-  switch(mydir){                                                        \
+    switch(mydir){							\
     case 0:                                                             \
       new_idx = ( (new_x[0]==X1m1)?idx-X1m1:idx+1);			\
       new_x[0] = (new_x[0]==X1m1)?0:new_x[0]+1;                         \
-    break;                                                              \
+      break;								\
     case 1:                                                             \
       new_idx = ( (new_x[1]==X2m1)?idx-X2X1mX1:idx+X1);		        \
       new_x[1] = (new_x[1]==X2m1)?0:new_x[1]+1;                         \
-    break;                                                              \
-    case 2:                                                             \
+      break;								\
+    case 2:								\
       new_idx = ( (new_x[2]==X3m1)?idx-X3X2X1mX2X1:idx+X2X1);	        \
       new_x[2] = (new_x[2]==X3m1)?0:new_x[2]+1;                         \
-    break;                                                              \
+      break;								\
     case 3:                                                             \
       new_idx = ( (new_x[3]==X4m1)?idx-X4X3X2X1mX3X2X1:idx+X3X2X1);     \
       new_x[3] = (new_x[3]==X4m1)?0:new_x[3]+1;                         \
-    break;                                                              \
-  }                                                                     \
-}while(0)
+      break;								\
+    }									\
+  }while(0)
 
 
 #define FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx, new_idx) do {	\
-  switch(mydir){                                                        \
+    switch(mydir){							\
     case 0:                                                             \
       new_idx = ( (new_x[0]==0)?idx+X1m1:idx-1);			\
       new_x[0] = (new_x[0]==0)?X1m1:new_x[0] - 1;                       \
-    break;                                                              \
+      break;								\
     case 1:                                                             \
       new_idx = ( (new_x[1]==0)?idx+X2X1mX1:idx-X1);		        \
       new_x[1] = (new_x[1]==0)?X2m1:new_x[1] - 1;                       \
-    break;                                                              \
+      break;								\
     case 2:                                                             \
       new_idx = ( (new_x[2]==0)?idx+X3X2X1mX2X1:idx-X2X1);		\
       new_x[2] = (new_x[2]==0)?X3m1:new_x[2] - 1;                       \
-    break;                                                              \
+      break;								\
     case 3:                                                             \
       new_idx = ( (new_x[3]==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1);	\
       new_x[3] = (new_x[3]==0)?X4m1:new_x[3] - 1;                       \
-    break;                                                              \
-  }                                                                     \
-}while(0)
-
-
-
-#define FF_COMPUTE_NEW_FULL_IDX_PLUS(old_x1, old_x2, old_x3, old_x4, idx, mydir, new_idx) do { \
-  switch(mydir){                                                                               \
-    case 0:                                                                                    \
-      new_idx = ( (old_x1==X1m1)?idx-X1m1:idx+1);			                       \
-    break;                                                                                     \
-    case 1:                                                                                    \
-      new_idx = ( (old_x2==X2m1)?idx-X2X1mX1:idx+X1);		                               \
-    break;                                                                                     \
-    case 2:                                                                                    \
-      new_idx = ( (old_x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1);	                               \
-    break;                                                                                     \
-    case 3:                                                                                    \
-      new_idx = ( (old_x4==X4m1)?idx-X4X3X2X1mX3X2X1:idx+X3X2X1);                              \
-    break;                                                                                     \
-  }                                                                                            \
-}while(0)
-
-
-
-#define FF_COMPUTE_NEW_FULL_IDX_MINUS(old_x1, old_x2, old_x3, old_x4, idx, mydir, new_idx) do { \
-  switch(mydir){                                                                                \
-    case 0:                                                                                     \
-      new_idx = ( (old_x1==0)?idx+X1m1:idx-1);			                                \
-    break;                                                                                      \
-    case 1:                                                                                     \
-      new_idx = ( (old_x2==0)?idx+X2X1mX1:idx-X1);		                                \
-    break;                                                                                      \
-    case 2:                                                                                     \
-      new_idx = ( (old_x3==0)?idx+X3X2X1mX2X1:idx-X2X1);		                        \
-    break;                                                                                      \
-    case 3:                                                                                     \
-      new_idx = ( (old_x4==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1);	                                \
-    break;                                                                                      \
-  }                                                                                             \
-}while(0)
-
+      break;								\
+    }									\
+  }while(0)
 
 
 
@@ -454,7 +566,7 @@
 
 
 
-#define MATRIX_PRODUCT(c, a, b, simple) do{ \
+#define MATRIX_PRODUCT(a, b, simple, c) do{ \
   if(simple){                               \
       c##00_re = a##00_re*b##00_re - a##00_im*b##00_im + a##01_re*b##10_re - a##01_im*b##10_im + a##02_re*b##20_re - a##02_im*b##20_im; \
       c##00_im = a##00_re*b##00_im + a##00_im*b##00_re + a##01_re*b##10_im + a##01_im*b##10_re + a##02_re*b##20_im + a##02_im*b##20_re; \
@@ -557,7 +669,7 @@
   c##22_re = a##02_re*b##02_re + a##02_im*b##02_im + a##12_re*b##12_re + a##12_im*b##12_im + a##22_re*b##22_re + a##22_im*b##22_im; \
   c##22_im = a##02_re*b##02_im - a##02_im*b##02_re + a##12_re*b##12_im - a##12_im*b##12_re + a##22_re*b##22_im - a##22_im*b##22_re; 
 
-#define ADJ_MAT_MUL_ADJ_MAT(a, b, c) \
+#define ADJ_MAT_MUL_ADJ_MAT(a, b, c)					\
       c##00_re =    a##00_re*b##00_re - a##00_im*b##00_im + a##10_re*b##01_re - a##10_im*b##01_im + a##20_re*b##02_re - a##20_im*b##02_im; \
   c##00_im =  - a##00_re*b##00_im - a##00_im*b##00_re - a##10_re*b##01_im - a##10_im*b##01_re - a##20_re*b##02_im - a##20_im*b##02_re; \
   c##01_re =    a##00_re*b##10_re - a##00_im*b##10_im + a##10_re*b##11_re - a##10_im*b##11_im + a##20_re*b##12_re - a##20_im*b##12_im; \

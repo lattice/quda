@@ -123,6 +123,34 @@ function complete_gauge_force_check {
 
 }
 
+function complete_hisq_force_check {
+    echo "Performing complete hisq force test:"    
+    prog="./hisq_paths_force_test"
+    precs="double single"
+    recons="18 12"
+    partitions="0 8 12 14 15"
+
+    $prog --version |grep single >& /dev/null
+    if [ "$?" == "0" ]; then
+        partitions="0" #single GPU version
+    fi
+
+    for prec in $precs; do
+        for recon in $recons; do
+                for partition in $partitions; do
+                  cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon  --partition $partition --verify"
+                  echo -ne  $cmd  "\t"..."\t"
+                  echo "----------------------------------------------------------" >>$OUTFILE
+                  echo $cmd >> $OUTFILE
+                  $cmd >> $OUTFILE 2>&1|| (echo -e "FAIL\n$prog failed, check $OUTFILE for detail"; echo $fail_msg; exit 1) || exit 1
+                  echo "OK"
+                done
+        done
+    done
+
+}
+
+
 
 function complete_dslash_check {
     echo "Performing complete dslash test:"
@@ -207,20 +235,22 @@ for action in $*; do
 	complete_invert_check;;
     gf )
 	complete_gauge_force_check ;;
+    hisq )
+	complete_hisq_force_check ;;
     all )
 	basic_sanity_check
 	complete_dslash_check
 	complete_invert_check
 	complete_fatlink_check
 	complete_gauge_force_check 
+	complete_hisq_force_check
 	;;
     * )
 	echo "ERROR: invalid option ($action)!"
 	echo "Valid options: "
-	echo "              basic/fat/dslash/gf/all"
+	echo "              basic/fat/dslash/gf/hisq/all"
 	exit
 	;;
-
   esac
 done
 

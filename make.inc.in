@@ -1,6 +1,10 @@
 ###### Local configuration:
 
 CUDA_INSTALL_PATH = @CUDA_INSTALL_PATH@
+QDP_INSTALL_PATH = @QDP_INSTALL_PATH@
+QDPXX_CXXFLAGS = @QDPXX_CXXFLAGS@
+QDPXX_LDFLAGS = @QDPXX_LDFLAGS@
+QDPXX_LIBS = @QDPXX_LIBS@
 
 CPU_ARCH = @CPU_ARCH@  	  # x86 or x86_64
 GPU_ARCH = @GPU_ARCH@	  # sm_10, sm_11, sm_12, sm_13, sm_20 or sm_21
@@ -37,6 +41,8 @@ OVERLAP_COMMS = @OVERLAP_COMMS@  # set to 'yes' to overlap comms and compute
 
 # Do we have qio support?
 BUILD_QIO = @BUILD_QIO@ # set to 'yes' to build QIO code for binary i/o
+
+USE_QDPJIT = @USE_QDPJIT@         # build QDP-JIT support?
 
 FECC = @FECC@ 	      # Front end CC
 FECXX = @FECXX@           # Front end CXX
@@ -197,8 +203,28 @@ ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   COPT += -DFERMI_NO_DBLE_TEX
 endif
 
-CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
-CXXFLAGS = -Wall -O3 $(COPT) $(INC)
-NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
-LDFLAGS = -fPIC $(LIB)
+### Next conditional is necessary.
+### QDPXX_CXXFLAGS contains "-O3".
+### We must make sure its not given
+### twice to nvcc. It would complain.
+
+ifeq ($(strip $(USE_QDPJIT)), yes)
+  NVCCOPT += -DUSE_QDPJIT
+  COPT += -DUSE_QDPJIT
+  LIB += $(QDPXX_LDFLAGS) $(QDPXX_LIBS)
+  INC += $(QDPXX_CXXFLAGS)
+
+  CFLAGS = -Wall -std=c99 $(COPT) $(INC)
+  CXXFLAGS = -Wall $(COPT) $(INC)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
+  NVCCFLAGS = $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  LDFLAGS = -fPIC $(LIB)
+else
+  CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
+  CXXFLAGS = -Wall -O3 $(COPT) $(INC)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
+  NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  LDFLAGS = -fPIC $(LIB)
+
+endif
+
