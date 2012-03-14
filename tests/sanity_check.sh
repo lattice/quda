@@ -8,7 +8,7 @@ fail_msg="*****************************Sanity check for quda failed!************
 function basic_sanity_check {
 
     echo "Performing basic sanity test:"
-    progs="staggered_dslash_test staggered_invert_test llfat_test llfat_test gauge_force_test fermion_force_test"
+    progs="staggered_dslash_test staggered_invert_test llfat_test llfat_test gauge_force_test fermion_force_test hisq_paths_force_test"
     precs="double"
     recons="18"
     whichtest="1"
@@ -19,7 +19,7 @@ function basic_sanity_check {
 	    continue
         fi
 
-        if [ "$prog" = "llfat_test" -o "$prog" = "gauge_force_test" -o "$prog" = "fermion_force_test" ]; then
+        if [ "$prog" = "llfat_test" -o "$prog" = "gauge_force_test" -o "$prog" = "fermion_force_test" -o "$prog"  = "hisq_paths_force_test" ]; then
 	    extra_args="--verify"
         else
 	    extra_args=""

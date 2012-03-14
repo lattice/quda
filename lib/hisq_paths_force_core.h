@@ -1,3 +1,28 @@
+
+//macro KERNEL_ENABLED is used to control compile time, debug purpose only
+#if (PRECISION == 0 && RECON == 18)
+#define EXT _dp_18_
+#ifdef  COMPILE_HISQ_DP_18
+#define KERNEL_ENABLED
+#endif
+#elif (PRECISION == 0 && RECON == 12)
+#define EXT _dp_12_
+#ifdef  COMPILE_HISQ_DP_12
+#define KERNEL_ENABLED
+#endif
+#elif (PRECISION == 1 && RECON == 18)
+#define EXT _sp_18_
+#ifdef  COMPILE_HISQ_SP_18
+#define KERNEL_ENABLED
+#endif
+#else 
+#define EXT _sp_12_
+#ifdef  COMPILE_HISQ_SP_12
+#define KERNEL_ENABLED
+#endif
+#endif
+
+
 /**************************do_middle_link_kernel*****************************
  *
  *
@@ -50,7 +75,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 					RealA* const P3Even, RealA* const P3Odd,
 					RealA* const QmuEven, RealA* const QmuOdd, 
 					RealA* const newOprodEven, RealA* const newOprodOdd) 
-{		
+{
+#ifdef KERNEL_ENABLED		
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
   int x[4];
@@ -66,9 +92,11 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
   int new_x[4];
   int new_mem_idx;
+#if(RECON == 12)
   int ad_link_sign;
   int ab_link_sign;
   int bc_link_sign;
+#endif
   
   RealA ab_link[ArrayLength<RealA>::result];
   RealA bc_link[ArrayLength<RealA>::result];
@@ -105,10 +133,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   point_d = (new_mem_idx >> 1);
   if (mu_positive){
     ad_link_nbr_idx = point_d;
-    reconstructSign(&ad_link_sign, mymu, new_x);
+    COMPUTE_LINK_SIGN(&ad_link_sign, mymu, new_x);
   }else{
     ad_link_nbr_idx = sid;
-    reconstructSign(&ad_link_sign, mymu, x);	
+    COMPUTE_LINK_SIGN(&ad_link_sign, mymu, x);	
   }
 
   int mysig; 
@@ -122,7 +150,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   point_c = (new_mem_idx >> 1);
   if (mu_positive){
     bc_link_nbr_idx = point_c;	
-    reconstructSign(&bc_link_sign, mymu, new_x);
+    COMPUTE_LINK_SIGN(&bc_link_sign, mymu, new_x);
   }
 
   new_x[0] = x[0];
@@ -139,15 +167,15 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 
   if (!mu_positive){
     bc_link_nbr_idx = point_b;
-    reconstructSign(&bc_link_sign, mymu, new_x);
+    COMPUTE_LINK_SIGN(&bc_link_sign, mymu, new_x);
   }   
 
   if(sig_positive){
     ab_link_nbr_idx = sid;
-    reconstructSign(&ab_link_sign, mysig, x);	
+    COMPUTE_LINK_SIGN(&ab_link_sign, mysig, x);	
   }else{	
     ab_link_nbr_idx = point_b;
-    reconstructSign(&ab_link_sign, mysig, new_x);
+    COMPUTE_LINK_SIGN(&ab_link_sign, mysig, new_x);
   }
   // now we have ab_link_nbr_idx
 
@@ -225,7 +253,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   if(sig_positive){
     addMatrixToField(COLOR_MAT_Y, sig, sid, coeff, newOprodEven, newOprodOdd, oddBit);
   }
-  
+#endif  
   return;
 }
 
@@ -271,6 +299,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 				      RealA* const shortPEven, RealA* const shortPOdd,
 				      RealA* const newOprodEven, RealA* const newOprodOdd)
 {
+#ifdef KERNEL_ENABLED		
 
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -285,7 +314,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   x[0] = 2*x1h + x1odd;
   int X = 2*sid + x1odd;
 
+#if(RECON == 12)
   int ad_link_sign;
+#endif
+
 
   RealA ad_link[ArrayLength<RealA>::result];
 
@@ -332,10 +364,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   if (shortPOdd){
     if (mu_positive){
       ad_link_nbr_idx = point_d;
-      reconstructSign(&ad_link_sign, mymu, new_x);
+      COMPUTE_LINK_SIGN(&ad_link_sign, mymu, new_x);
     }else{
       ad_link_nbr_idx = sid;
-      reconstructSign(&ad_link_sign, mymu, x);	
+      COMPUTE_LINK_SIGN(&ad_link_sign, mymu, x);	
     }
 
     
@@ -378,7 +410,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
       addMatrixToField(COLOR_MAT_W, OPP_DIR(mu), sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
     }
   }
-
+#endif
   return;
 }
 
@@ -406,34 +438,37 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 *
 ************************************************************************************************/
 
-template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
+template<class RealA, class RealB, short sig_positive, short mu_positive, short oddBit>
   __global__ void
   HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd, 
 				     const RealA* const QprevEven, const RealA* const QprevOdd,
 				     const RealB* const linkEven, const RealB* const linkOdd,
-				     int sig, int mu, 
+				     short sig, short mu, 
 				     typename RealTypeId<RealA>::Type coeff, 
 				     typename RealTypeId<RealA>::Type accumu_coeff,
 				     RealA* const shortPEven, RealA* const shortPOdd,
 				     RealA* const newOprodEven, RealA* const newOprodOdd)
 {
+#ifdef KERNEL_ENABLED		
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  int x[4];
+  short x[4];
   int z1 = sid/X1h;
-  int x1h = sid - z1*X1h;
+  short x1h = sid - z1*X1h;
   int z2 = z1/X2;
   x[1] = z1 - z2*X2;
   x[3] = z2/X3;
   x[2] = z2 - x[3]*X3;
-  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  short x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
   int X = 2*sid + x1odd;
 
+#if(RECON == 12)
   int ad_link_sign;
   int ab_link_sign;
   int bc_link_sign;
-
-  int new_x[4];
+#endif
+  
+  short new_x[4];
 
   RealA ab_link[ArrayLength<RealA>::result];
   RealA bc_link[ArrayLength<RealA>::result];
@@ -470,12 +505,12 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   point_b = (new_mem_idx >> 1);
   ab_link_nbr_idx = (sig_positive) ? sid : point_b;
   if(sig_positive){
-    reconstructSign(&ab_link_sign, sig, x);
+    COMPUTE_LINK_SIGN(&ab_link_sign, sig, x);
   }else{
-    reconstructSign(&ab_link_sign, OPP_DIR(sig), new_x);    
+    COMPUTE_LINK_SIGN(&ab_link_sign, OPP_DIR(sig), new_x);    
   }
   if(!mu_positive){
-    reconstructSign(&bc_link_sign, OPP_DIR(mu),  new_x);
+    COMPUTE_LINK_SIGN(&bc_link_sign, OPP_DIR(mu),  new_x);
   }
   new_x[0] = x[0];
   new_x[1] = x[1];
@@ -488,8 +523,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, X, new_mem_idx);
     point_d = (new_mem_idx >> 1);
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit);	   // COLOR_MAT_X
+    COMPUTE_LINK_SIGN(&ad_link_sign, mu, new_x);   
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_d, ad_link, 1-oddBit); 
-    reconstructSign(&ad_link_sign, mu, new_x);   
     RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
     
     if(sig_positive){
@@ -500,10 +535,12 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     point_c = (new_mem_idx >> 1);
     loadMatrixFromField(oprodEven,oprodOdd,  point_c, COLOR_MAT_Y, oddBit);		// COLOR_MAT_Y
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_c, bc_link, oddBit);   
-    reconstructSign(&bc_link_sign, mu, new_x);  
+    COMPUTE_LINK_SIGN(&bc_link_sign, mu, new_x);  
     RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign)
     
     MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, 0, COLOR_MAT_Z); // COMPUTE_LINK_X
+
+    
     if (sig_positive)
       {
 	MAT_MUL_MAT(COLOR_MAT_X, ad_link, COLOR_MAT_Y);
@@ -536,7 +573,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     point_d = (new_mem_idx >> 1);
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit);         // COLOR_MAT_X used!
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, sid, ad_link, oddBit);  
-    reconstructSign(&ad_link_sign, mu, x);
+    COMPUTE_LINK_SIGN(&ad_link_sign, mu, x);
     RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
     
     if(sig_positive){
@@ -572,7 +609,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, 0, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
   } 
-
+#endif
   return;
 }
 
@@ -587,7 +624,7 @@ template<class RealA, class RealB,  int oddBit>
 					    int sig, typename RealTypeId<RealA>::Type coeff,
 					    RealA* const outputEven, RealA* const outputOdd)
 {
-       
+#ifdef KERNEL_ENABLED		       
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
   int x[4];
@@ -611,11 +648,13 @@ template<class RealA, class RealB,  int oddBit>
   RealA bc_link[ArrayLength<RealA>::result];
   RealA de_link[ArrayLength<RealA>::result];
   RealA ef_link[ArrayLength<RealA>::result];
-  
+
+#if(RECON == 12)  
   int ab_link_sign =1;
   int bc_link_sign =1;
   int de_link_sign =1;
   int ef_link_sign =1;
+#endif
   
   RealA COLOR_MAT_U[ArrayLength<RealA>::result];
   RealA COLOR_MAT_V[ArrayLength<RealA>::result];
@@ -650,19 +689,19 @@ template<class RealA, class RealB,  int oddBit>
     {
       new_x[sig] = (x[sig] + 1 + X[sig])%X[sig];
       point_d = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-      reconstructSign(&de_link_sign, sig, new_x);
+      COMPUTE_LINK_SIGN(&de_link_sign, sig, new_x);
 
       new_x[sig] = (new_x[sig] + 1 + X[sig])%X[sig];
       point_e = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-      reconstructSign(&ef_link_sign, sig, new_x);
+      COMPUTE_LINK_SIGN(&ef_link_sign, sig, new_x);
 	  
       new_x[sig] = (x[sig] - 1 + X[sig])%X[sig];
       point_b = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-      reconstructSign(&bc_link_sign, sig, new_x);
+      COMPUTE_LINK_SIGN(&bc_link_sign, sig, new_x);
       
       new_x[sig] = (new_x[sig] - 1 + X[sig])%X[sig];
       point_a = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-      reconstructSign(&ab_link_sign, sig, new_x);
+      COMPUTE_LINK_SIGN(&ab_link_sign, sig, new_x);
       
       HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_a, ab_link, oddBit); 
       HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_b, bc_link, 1-oddBit);
@@ -691,7 +730,7 @@ template<class RealA, class RealB,  int oddBit>
 
       addMatrixToField(COLOR_MAT_V, sig, sid,  coeff, outputEven, outputOdd, oddBit);
     }
-
+#endif
   return;
 }
 
@@ -703,6 +742,7 @@ template<class RealA, class RealB, int oddBit>
 					   int sig,
 					   RealA* const forceEven, RealA* const forceOdd)
 {
+#ifdef KERNEL_ENABLED		
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
   int x[4];
@@ -715,7 +755,9 @@ template<class RealA, class RealB, int oddBit>
   int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
 
+#if(RECON == 12)
   int link_sign;
+#endif
 
   RealA LINK_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
@@ -723,7 +765,7 @@ template<class RealA, class RealB, int oddBit>
   
 
   HISQ_LOAD_LINK(linkEven, linkOdd, sig, sid, LINK_W, oddBit);  
-  reconstructSign(&link_sign, sig, x);	
+  COMPUTE_LINK_SIGN(&link_sign, sig, x);	
   RECONSTRUCT_SITE_LINK(LINK_W, link_sign);
   
   loadMatrixFromField(oprodEven, oprodOdd, sig, sid, COLOR_MAT_X, oddBit);
@@ -732,5 +774,9 @@ template<class RealA, class RealB, int oddBit>
   MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);
 	
   storeMatrixToMomentumField(COLOR_MAT_W, sig, sid, coeff, forceEven, forceOdd, oddBit); 
+#endif
   return;
 }
+
+#undef EXT
+#undef KERNEL_ENABLED

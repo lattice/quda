@@ -82,7 +82,7 @@ setDims(int *X){
 
 
 void
-total_staple_io_data(QudaPrecision prec, QudaReconstructType recon, double* io, double* flops)
+total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io, double* flops)
 {
   //total IO counting for the middle/side/all link kernels
   //Explanation about these numbers can be founed in the corresnponding kernel functions in
@@ -396,7 +396,7 @@ hisq_force_test(void)
 
   double total_io;
   double total_flops;
-  total_staple_io_data(link_prec, link_recon, &total_io, &total_flops);
+  total_staple_io_flops(link_prec, link_recon, &total_io, &total_flops);
   
   float perf_flops = total_flops / (TDIFF(t0, t1)) *1e-9;
   float perf = total_io / (TDIFF(t0, t1)) *1e-9;

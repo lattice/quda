@@ -7,6 +7,12 @@
 #include<utility>
 
 
+//DEBUG : control conpile 
+#define COMPILE_HISQ_DP_18 
+//#define COMPILE_HISQ_DP_12 
+//#define COMPILE_HISQ_SP_18 
+//#define COMPILE_HISQ_SP_12
+
 // Disable texture read for now. Need to revisit this.
 #define HISQ_SITE_MATRIX_LOAD_TEX 1
 
@@ -330,7 +336,8 @@ namespace hisq {
 
     // reconstructSign doesn't do anything right now, 
     // but it will, soon.
-    __device__ void reconstructSign(int* const sign, int dir, const int i[4]){
+    template<typename T>
+      __device__ void reconstructSign(int* const sign, int dir, const T i[4]){
 
  
       *sign=1;
@@ -400,68 +407,74 @@ template<class RealA, int oddBit>
 
 #define HISQ_KERNEL_NAME(a,b) DD_CONCAT(a,b)
 //precision: 0 is for double, 1 is for single
-      
+
 //single precision, recon=18  
 #define PRECISION 1
-#define EXT _sp_18_
+#define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, Vh)        
 #else
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
 #endif
+#define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
 #include "hisq_paths_force_core.h"
-
 #undef PRECISION
-#undef EXT
+#undef RECON
 #undef HISQ_LOAD_LINK
+#undef COMPUTE_LINK_SIGN
 #undef RECONSTRUCT_SITE_LINK
 
 //double precision, recon=18
 #define PRECISION 0
-#define EXT _dp_18_
+#define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, Vh)        
 #else
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
 #endif
+#define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
 #include "hisq_paths_force_core.h"
 #undef PRECISION
-#undef EXT
+#undef RECON
 #undef HISQ_LOAD_LINK
+#undef COMPUTE_LINK_SIGN
 #undef RECONSTRUCT_SITE_LINK
 
 //double precision, recon=12
-
 #define PRECISION 0
-#define EXT _dp_12_
+#define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, Vh)        
 #else
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness)  
 #endif
+#define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
 #include "hisq_paths_force_core.h"
 #undef PRECISION
-#undef EXT
+#undef RECON
 #undef HISQ_LOAD_LINK
+#undef COMPUTE_LINK_SIGN
 #undef RECONSTRUCT_SITE_LINK 
       
 
 //single precision, recon=12
 #define PRECISION 1
-#define EXT _sp_12_
+#define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, Vh)        
 #else
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
 #endif
+#define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
 #include "hisq_paths_force_core.h"
 #undef PRECISION
-#undef EXT
+#undef RECON
 #undef HISQ_LOAD_LINK
+#undef COMPUTE_LINK_SIGN
 #undef RECONSTRUCT_SITE_LINK
 
     template<class RealA, class RealB>
