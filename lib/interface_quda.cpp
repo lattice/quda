@@ -17,7 +17,10 @@
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
+
+#ifdef QUDA_NUMA_SUPPORT
 #include <numa_affinity.h>
+#endif
 
 #include <cuda.h>
 #ifdef MULTI_GPU
@@ -188,9 +191,12 @@ void initQuda(int dev)
   printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
 
   cudaSetDevice(dev);
+
+#ifdef QUDA_NUMA_SUPPORT
   if(numa_affinity_enabled){
     setNumaAffinity(dev);
   }
+#endif
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
 
