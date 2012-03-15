@@ -448,7 +448,7 @@ class Spinor {
   float *norm;
   const int stride;
 
-#if (__COMPUTE_CAPABILITY >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
   StoreType *spinor_h;
   float *norm_h;
 
@@ -459,14 +459,14 @@ class Spinor {
  public:
  Spinor(cudaColorSpinorField &x) : 
   spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH))
-#if (__COMPUTE_CAPABILITY >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
     ,bytes(x.Bytes()), norm_bytes(x.NormBytes())
 #endif
     { checkTypes<RegType,InterType,StoreType>(); } 
 
  Spinor(const cudaColorSpinorField &x) :
   spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
-#if (__COMPUTE_CAPABILITY >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
     ,bytes(x.Bytes()), norm_bytes(x.NormBytes())
 #endif
     { checkTypes<RegType,InterType,StoreType>(); } 
@@ -494,7 +494,7 @@ class Spinor {
 
   // used to backup the field to the host
   void save() {
-#if (__COMPUTE_CAPABILITY >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
     spinor_h = (StoreType*)(new char[bytes]);
     cudaMemcpy(spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
     if (norm_bytes > 0) {
@@ -509,7 +509,7 @@ class Spinor {
 
   // restore the field from the host
   void load() {
-#if (__COMPUTE_CAPABILITY >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200)
     cudaMemcpy(spinor, spinor_h, bytes, cudaMemcpyHostToDevice);
     if (norm_bytes > 0) {
       cudaMemcpy(norm, norm_h, norm_bytes, cudaMemcpyHostToDevice);
