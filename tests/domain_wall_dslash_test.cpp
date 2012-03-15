@@ -305,7 +305,7 @@ int main(int argc, char **argv)
     
     if (tune) { // warm-up run
       printfQuda("Tuning...\n");
-      setDslashTuning(QUDA_TUNE_YES);      
+      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);      
       dslashCUDA(1);
     }
 

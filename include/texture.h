@@ -448,21 +448,27 @@ class Spinor {
   float *norm;
   const int stride;
 
+#if (__COMPUTE_CAPABILITY >= 200)
   StoreType *spinor_h;
   float *norm_h;
 
   size_t bytes;
   size_t norm_bytes;
+#endif
 
  public:
  Spinor(cudaColorSpinorField &x) : 
-  spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH)), 
-    bytes(x.Bytes()), norm_bytes(x.NormBytes())
+  spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH))
+#if (__COMPUTE_CAPABILITY >= 200)
+    ,bytes(x.Bytes()), norm_bytes(x.NormBytes())
+#endif
     { checkTypes<RegType,InterType,StoreType>(); } 
 
  Spinor(const cudaColorSpinorField &x) :
-  spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH)),
-    bytes(x.Bytes()), norm_bytes(x.NormBytes())
+  spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+#if (__COMPUTE_CAPABILITY >= 200)
+    ,bytes(x.Bytes()), norm_bytes(x.NormBytes())
+#endif
     { checkTypes<RegType,InterType,StoreType>(); } 
   ~Spinor() {;}
 
@@ -488,6 +494,7 @@ class Spinor {
 
   // used to backup the field to the host
   void save() {
+#if (__COMPUTE_CAPABILITY >= 200)
     spinor_h = (StoreType*)(new char[bytes]);
     cudaMemcpy(spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
     if (norm_bytes > 0) {
@@ -495,10 +502,14 @@ class Spinor {
       cudaMemcpy(norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
     }
     checkCudaError();
+#else
+    errorQuda("Sorry, blas tuning isn't supported on pre-Fermi yet");
+#endif
   }
 
   // restore the field from the host
   void load() {
+#if (__COMPUTE_CAPABILITY >= 200)
     cudaMemcpy(spinor, spinor_h, bytes, cudaMemcpyHostToDevice);
     if (norm_bytes > 0) {
       cudaMemcpy(norm, norm_h, norm_bytes, cudaMemcpyHostToDevice);
@@ -506,6 +517,9 @@ class Spinor {
     }
     delete(spinor_h);
     checkCudaError();
+#else
+    errorQuda("Sorry, blas tuning isn't supported on pre-Fermi yet");
+#endif
   }
 
   void* V() { return (void*)spinor; }

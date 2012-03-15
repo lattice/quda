@@ -423,7 +423,7 @@ static int dslashTest()
 
     if (tune) { // warm-up run
       printfQuda("Tuning...\n");
-      setDslashTuning(QUDA_TUNE_YES);      
+      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);      
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...", loops);	
