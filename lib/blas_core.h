@@ -74,7 +74,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+    TuneParam tp = tuneLaunch(*this, blasTuning, QUDA_VERBOSE);
     blasKernel<FloatN,M,writeX,writeY,writeZ,writeW>
       <<<tp.grid, tp.block, tp.shared_bytes, stream>>>
       (X, Y, Z, W, f, XX, YY, ZZ, WW, length);
@@ -117,8 +117,6 @@ template <template <typename Float, typename FloatN> class Functor,
 void blasCuda(const int kernel, const double2 &a, const double2 &b, const double2 &c,
 	      cudaColorSpinorField &x, cudaColorSpinorField &y, 
 	      cudaColorSpinorField &z, cudaColorSpinorField &w) {
-  int block_length = (x.Precision() == QUDA_HALF_PRECISION) ? x.Stride() : x.Length();
-  setBlock(kernel, block_length, x.Precision());
   checkSpinor(x, y);
   checkSpinor(x, z);
   checkSpinor(x, w);

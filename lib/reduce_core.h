@@ -55,19 +55,23 @@ __device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x
 { s[i] = x.x; s[i+block] = x.y; }
 __device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
 { s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
+__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle x, const int block) { s[i].a.x = x.a.x; s[i].a.y = x.a.y; }
+__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle2 x, const int block) 
+{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; }
+__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle3 x, const int block) 
+{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; 
+  s[i+2*block].a.x = x.z.a.x; s[i+2*block].a.y = x.z.a.y; }
 __device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
 __device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
 { x.x = s[i]; x.y = s[i+block]; }
 __device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
 { x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
 
-template<typename ReduceType, typename ReduceSimpleType> 
-__device__ void add(ReduceType &sum, ReduceSimpleType *s, const int i, const int block) { }
-template<> __device__ void add<doublesingle,doublesingle>(double &sum, double *s, const int i, const int block) 
+template<> __device__ void add<doublesingle,doublesingle>(doublesingle &sum, doublesingle *s, const int i, const int block) 
 { sum += s[i]; }
-template<> __device__ void add<doublesingle2,doublesingle>(double2 &sum, double *s, const int i, const int block) 
+template<> __device__ void add<doublesingle2,doublesingle>(doublesingle2 &sum, doublesingle *s, const int i, const int block) 
 { sum.x += s[i]; sum.y += s[i+block]; }
-template<> __device__ void add<doublesingle3,doublesingle>(double3 &sum, double *s, const int i, const int block) 
+template<> __device__ void add<doublesingle3,doublesingle>(doublesingle3 &sum, doublesingle *s, const int i, const int block) 
 { sum.x += s[i]; sum.y += s[i+block]; sum.z += s[i+2*block]; }
 
 template<> __device__ void add<doublesingle,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
@@ -136,23 +140,31 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
     // Intra-warp reduction
     volatile ReduceSimpleType *sv = s;
     copytoshared(sv, 0, sum, block_size);
-#pragma unroll
-    for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); }
 
-    // write result for this block to global mem 
-    if (tid == 0) {    
-      ReduceType tmp;
-      copyfromshared(tmp, s, 0, block_size);
-      partial[blockIdx.x] = tmp;
-      
-      __threadfence(); // flush result
-      
-      // increment global block counter
-      unsigned int value = atomicInc(&count, gridDim.x);
-      
-      // Determine if this block is the last block to be done
-      isLastBlockDone = (value == (gridDim.x-1));
-    }
+    if (block_size >= 32) { add<ReduceType>(sv, 0, 16, block_size); } 
+    if (block_size >= 16) { add<ReduceType>(sv, 0, 8, block_size); } 
+    if (block_size >= 8) { add<ReduceType>(sv, 0, 4, block_size); } 
+    if (block_size >= 4) { add<ReduceType>(sv, 0, 2, block_size); } 
+    if (block_size >= 2) { add<ReduceType>(sv, 0, 1, block_size); } 
+
+    // warpSize generic warp reduction - open64 can't handle it, only nvvm
+    //#pragma unroll
+    //for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); }
+  }
+
+  // write result for this block to global mem 
+  if (tid == 0) {    
+    ReduceType tmp;
+    copyfromshared(tmp, s, 0, block_size);
+    partial[blockIdx.x] = tmp;
+    
+    __threadfence(); // flush result
+    
+    // increment global block counter
+    unsigned int value = atomicInc(&count, gridDim.x);
+    
+    // Determine if this block is the last block to be done
+    isLastBlockDone = (value == (gridDim.x-1));
   }
 
   __syncthreads();
@@ -182,18 +194,24 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
       // Intra-warp reduction
       volatile ReduceSimpleType *sv = s;
       copytoshared(sv, 0, sum, block_size);
-#pragma unroll
-      for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); }
- 
-      // write out the final reduced value
-      if (threadIdx.x == 0) {
-	ReduceType tmp;
-	copyfromshared(tmp, s, 0, block_size);
-	complete[0] = tmp;
-	count = 0;
-      }
+
+      if (block_size >= 32) { add<ReduceType>(sv, 0, 16, block_size); } 
+      if (block_size >= 16) { add<ReduceType>(sv, 0, 8, block_size); } 
+      if (block_size >= 8) { add<ReduceType>(sv, 0, 4, block_size); } 
+      if (block_size >= 4) { add<ReduceType>(sv, 0, 2, block_size); } 
+      if (block_size >= 2) { add<ReduceType>(sv, 0, 1, block_size); } 
+
+      //#pragma unroll
+      //for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); } 
     }
  
+    // write out the final reduced value
+    if (threadIdx.x == 0) {
+      ReduceType tmp;
+      copyfromshared(tmp, s, 0, block_size);
+      complete[0] = tmp;
+      count = 0;
+    }
   }
 
 }
@@ -384,7 +402,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+    TuneParam tp = tuneLaunch(*this, blasTuning, QUDA_VERBOSE);
     result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
       (X, Y, Z, W, V, r, XX, YY, ZZ, length, tp, stream);
   }
@@ -438,8 +456,6 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
     return even + odd;
   }
 
-  int block_length = (x.Precision() == QUDA_HALF_PRECISION) ? x.Stride() : x.Length();
-  setBlock(kernel, block_length, x.Precision());
   checkSpinor(x, y);
   checkSpinor(x, z);
   checkSpinor(x, w);

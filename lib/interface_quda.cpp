@@ -833,6 +833,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   setDslashTuning(param->dirac_tune);
+  quda::setBlasTuning(param->dirac_tune);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE) {
