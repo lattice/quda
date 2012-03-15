@@ -103,11 +103,13 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
   }
 
 #ifdef MULTI_GPU
-  // pack into the padded regions
-  packQDPGaugeField(packedEven, (Float**)cpuGhost, 0, reconstruct, volumeCB,
-		    surfaceCB, pad, volumeCB, nFace, type);
-  packQDPGaugeField(packedOdd,  (Float**)cpuGhost, 1, reconstruct, volumeCB, 
-  		    surfaceCB, pad, volumeCB, nFace, type);
+  if(type != QUDA_ASQTAD_MOM_LINKS){
+    // pack into the padded regions
+    packQDPGaugeField(packedEven, (Float**)cpuGhost, 0, reconstruct, volumeCB,
+		      surfaceCB, pad, volumeCB, nFace, type);
+    packQDPGaugeField(packedOdd,  (Float**)cpuGhost, 1, reconstruct, volumeCB, 
+		      surfaceCB, pad, volumeCB, nFace, type);
+  }
 #endif
 
   cudaMemcpy(even, packed, bytes, cudaMemcpyHostToDevice);
@@ -117,14 +119,14 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
 }
 
 template <typename Float, typename Float2>
-void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh) 
+void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh, int pad) 
 {  
   Float2 *packedEven, *packedOdd;
   cudaMallocHost(&packedEven, bytes/2); 
   cudaMallocHost(&packedOdd, bytes/2); 
     
-  packMomField(packedEven, (Float*)mom, 0, Vh);
-  packMomField(packedOdd,  (Float*)mom, 1, Vh);
+  packMomField(packedEven, (Float*)mom, 0, Vh, pad);
+  packMomField(packedOdd,  (Float*)mom, 1, Vh, pad);
     
   cudaMemcpy(even, packedEven, bytes/2, cudaMemcpyHostToDevice);
   cudaMemcpy(odd,  packedOdd, bytes/2, cudaMemcpyHostToDevice); 
@@ -147,7 +149,10 @@ void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocat
     t_boundary_ = t_boundary;
     
 #ifdef MULTI_GPU
-    cpu.exchangeGhost();
+    //FIXME: if this is MOM field, we don't need exchange data
+    if(link_type != QUDA_ASQTAD_MOM_LINKS){ 
+      cpu.exchangeGhost();
+    }
 #endif
     
     if (reconstruct != QUDA_RECONSTRUCT_10) { // gauge field
@@ -204,15 +209,15 @@ void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocat
     } else { // momentum field
       if  (precision == QUDA_DOUBLE_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  loadMomField((double2*)(even), (double2*)(odd), (double*)cpu.gauge, bytes, volumeCB);
+	  loadMomField((double2*)(even), (double2*)(odd), (double*)cpu.gauge, bytes, volumeCB, pad);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  loadMomField((double2*)(even), (double2*)(odd), (float*)cpu.gauge, bytes, volumeCB);
+	  loadMomField((double2*)(even), (double2*)(odd), (float*)cpu.gauge, bytes, volumeCB, pad);
 	} 
       } else {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  loadMomField((float2*)(even), (float2*)(odd), (double*)cpu.gauge, bytes, volumeCB);
+	  loadMomField((float2*)(even), (float2*)(odd), (double*)cpu.gauge, bytes, volumeCB, pad);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  loadMomField((float2*)(even), (float2*)(odd), (float*)cpu.gauge, bytes, volumeCB);
+	  loadMomField((float2*)(even), (float2*)(odd), (float*)cpu.gauge, bytes, volumeCB, pad);
 	} 
       }      
     } // gauge or momentum
@@ -306,7 +311,7 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
 template <typename Float, typename Float2>
 void 
 storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd, 
-		   int bytes, int V) 
+		   int bytes, int V, int pad) 
 {    
   Float2 *packedEven, *packedOdd;   
   cudaMallocHost(&packedEven, bytes/2); 
@@ -314,8 +319,8 @@ storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd,
   cudaMemcpy(packedEven, even, bytes/2, cudaMemcpyDeviceToHost); 
   cudaMemcpy(packedOdd, odd, bytes/2, cudaMemcpyDeviceToHost);  
   
-  unpackMomField((Float*)mom, packedEven,0, V/2);
-  unpackMomField((Float*)mom, packedOdd, 1, V/2);
+  unpackMomField((Float*)mom, packedEven,0, V/2, pad);
+  unpackMomField((Float*)mom, packedOdd, 1, V/2, pad);
   
   cudaFreeHost(packedEven); 
   cudaFreeHost(packedOdd); 
@@ -419,9 +424,9 @@ void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &p
 	errorQuda("Only MILC gauge order supported in momentum unpack, not %d", cpu.order);
 
       if (precision == QUDA_DOUBLE_PRECISION) {
-	storeMomToCPUArray( (double*)cpu.gauge, (double2*)even, (double2*)odd, bytes, volume);	
+	storeMomToCPUArray( (double*)cpu.gauge, (double2*)even, (double2*)odd, bytes, volume, pad);	
       }else { //SINGLE PRECISIONS
-	storeMomToCPUArray( (float*)cpu.gauge, (float2*)even, (float2*)odd, bytes, volume);	
+	storeMomToCPUArray( (float*)cpu.gauge, (float2*)even, (float2*)odd, bytes, volume, pad);	
       }
     } // reconstruct 10
   } else {

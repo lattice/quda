@@ -990,7 +990,6 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  exit(1);
 	}
 	    
-	    
 	if (precision == QUDA_DOUBLE_PRECISION){
 	  //double* mylink = (double*)link;
 	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
@@ -1232,7 +1231,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   int accuracy_level = 0;
   for(int f =0; f < fail_check; f++){
     if(fail[f] == 0){
-      accuracy_level =f;
+      accuracy_level =f+1;
     }
   }
 

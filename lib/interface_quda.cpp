@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -16,7 +17,10 @@
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
+
+#ifdef QUDA_NUMA_SUPPORT
 #include <numa_affinity.h>
+#endif
 
 #include <cuda.h>
 #ifdef MULTI_GPU
@@ -29,10 +33,15 @@
 #endif
 #endif
 
+#ifdef GPU_GAUGE_FORCE
+#include <gauge_force_quda.h>
+#endif
+
+
 #include "mpicomm.h"
 
-#define MAX(a,b) ((a)>(b) ? (a):(b))
-
+#define MAX(a,b) ((a)>(b)? (a):(b))
+#define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
 #define spinorSiteSize 24 // real numbers per spinor
 
@@ -180,9 +189,12 @@ void initQuda(int dev)
   printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
 
   cudaSetDevice(dev);
+
+#ifdef QUDA_NUMA_SUPPORT
   if(numa_affinity_enabled){
     setNumaAffinity(dev);
   }
+#endif
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
 
@@ -1706,31 +1718,24 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   
   if(method == QUDA_COMPUTE_FAT_STANDARD){
     llfat_init_cuda(qudaGaugeParam);
-    qudaGaugeParam->ga_pad = qudaGaugeParam->site_ga_pad;
     gettimeofday(&t7, NULL);
     
-    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){
-      loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
-    }else{
 #ifdef MULTI_GPU
+    if(qudaGaugeParam->gauge_order == QUDA_MILC_GAUGE_ORDER){
       errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
-#else
-      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
-#endif
     }
+#endif
+    loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
+    
     gettimeofday(&t8, NULL);
   }else{
     llfat_init_cuda_ex(qudaGaugeParam_ex);
 #ifdef MULTI_GPU
-    exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), qudaGaugeParam->cpu_prec, 1);
+    exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
+			     cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0);
 #endif
-    qudaGaugeParam_ex->ga_pad = qudaGaugeParam_ex->site_ga_pad;
     gettimeofday(&t7, NULL);
-    if(qudaGaugeParam->gauge_order == QUDA_QDP_GAUGE_ORDER){ 
-      loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink, qudaGaugeParam_ex);
-    }else{
-      cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
-    }
+    loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
     gettimeofday(&t8, NULL);
   }
 
@@ -1766,9 +1771,115 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 
   return 0;
 }
+#endif
 
+#ifdef GPU_GAUGE_FORCE
+int
+computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
+                      void* loop_coeff, int num_paths, int max_length, double eb3,
+                      QudaGaugeParam* qudaGaugeParam, double* timeinfo)
+{
+  
+  struct timeval t0, t1, t2, t3, t4;
+  
+  gettimeofday(&t0,NULL);
+
+#ifdef MULTI_GPU
+  int E[4];
+  QudaGaugeParam qudaGaugeParam_ex_buf;
+  QudaGaugeParam* qudaGaugeParam_ex=&qudaGaugeParam_ex_buf;
+  memcpy(qudaGaugeParam_ex, qudaGaugeParam, sizeof(QudaGaugeParam));
+  E[0] = qudaGaugeParam_ex->X[0] = qudaGaugeParam->X[0] + 4;
+  E[1] = qudaGaugeParam_ex->X[1] = qudaGaugeParam->X[1] + 4;
+  E[2] = qudaGaugeParam_ex->X[2] = qudaGaugeParam->X[2] + 4;
+  E[3] = qudaGaugeParam_ex->X[3] = qudaGaugeParam->X[3] + 4;
+#endif
+
+  int* X = qudaGaugeParam->X;
+  GaugeFieldParam gParam(0, *qudaGaugeParam);
+#ifdef MULTI_GPU
+  GaugeFieldParam gParam_ex(0, *qudaGaugeParam_ex);
+  GaugeFieldParam& gParamSL = gParam_ex;  
+  int pad = E[2]*E[1]*E[0]/2;
+#else
+  GaugeFieldParam& gParamSL = gParam;
+  int pad = X[2]*X[1]*X[0]/2;
+#endif
+  
+  GaugeFieldParam& gParamMom = gParam;
+  
+  gParamSL.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParamSL.gauge = sitelink;
+  gParamSL.pad = 0;
+  cpuGaugeField* cpuSiteLink = new cpuGaugeField(gParamSL);
+  
+  gParamSL.create =QUDA_NULL_FIELD_CREATE;
+  gParamSL.pad = pad;
+  gParamSL.precision = qudaGaugeParam->cuda_prec;
+  gParamSL.reconstruct = qudaGaugeParam->reconstruct;
+  cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParamSL);  
+  qudaGaugeParam->site_ga_pad = gParamSL.pad;//need to record this value
+
+  gParamMom.pad = 0;
+  gParamMom.order =QUDA_MILC_GAUGE_ORDER;
+  gParamMom.precision = qudaGaugeParam->cpu_prec;
+  gParamMom.create =QUDA_REFERENCE_FIELD_CREATE;
+  gParamMom.reconstruct =QUDA_RECONSTRUCT_10;  
+  gParamMom.gauge=mom;
+  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+  cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
+
+
+  gParamMom.pad = pad;
+  gParamMom.create =QUDA_NULL_FIELD_CREATE;  
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.precision = qudaGaugeParam->cuda_prec;
+  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+  cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
+  qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
+  
+  
+  initCommonConstants(*cudaMom);
+  gauge_force_init_cuda(qudaGaugeParam, max_length); 
+  
+#ifdef MULTI_GPU
+  exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
+			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
+  loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
+#else  
+  loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
+#endif
+  
+  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+
+  gettimeofday(&t1,NULL);  
+  
+  gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, 
+		   path_length, loop_coeff, num_paths, max_length);
+
+  gettimeofday(&t2,NULL);
+
+  cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  
+  delete cpuSiteLink;
+  delete cpuMom;
+  
+  delete cudaSiteLink;
+  delete cudaMom;
+  
+  gettimeofday(&t3,NULL); 
+
+  if(timeinfo){
+    timeinfo[0] = TDIFF(t0, t1);
+    timeinfo[1] = TDIFF(t1, t2);
+    timeinfo[2] = TDIFF(t2, t3);
+  }
+
+  return 0;  
+}
 
 #endif
+
 
 void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
 

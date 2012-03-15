@@ -16,6 +16,7 @@ extern "C" {
     QUDA_WILSON_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS,
     QUDA_ASQTAD_LONG_LINKS,
+    QUDA_ASQTAD_MOM_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
 
