@@ -209,7 +209,11 @@ AC_ARG_ENABLE(fermi-double-tex,
  [ fermi_double_tex="no" ]
 )
 
-
+AC_ARG_ENABLE(quda-numa-support,
+ AC_HELP_STRING([--enable-quda-numa-support], [ Enable numa support for quda (default is yes) ]),
+ [ quda_numa_support=${enableval}],
+ [ quda_numa_support="yes" ]
+)
 dnl Input validation
 
 dnl CPU Arch
@@ -430,6 +434,13 @@ yes|no);;
   ;;
 esac
 
+case ${quda_numa_support} in
+yes|no);;
+*)
+  AC_MSG_ERROR([ invalid value for --enable-quda-numa-support ])
+  ;;
+esac
+
 dnl Output Substitutions
 AC_MSG_NOTICE([Setting CUDA_INSTALL_PATH = ${cuda_home} ])
 AC_SUBST( CUDA_INSTALL_PATH, [${cuda_home} ])
@@ -523,6 +534,9 @@ AC_SUBST( QIO_HOME, [${qio_home}] )
 
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
+
+AC_MSG_NOTICE([Setting QUDA_NUMA_SUPPORT= ${quda_numa_support}])
+AC_SUBST( QUDA_NUMA_SUPPORT, [${quda_numa_support}])
 
 AC_MSG_NOTICE([Setting USE_QDPJIT = ${build_qdpjit} ])
 AC_SUBST( USE_QDPJIT, [${build_qdpjit}])
