@@ -120,7 +120,7 @@ hisq_force_init()
   createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
 
   gParam.precision = gaugeParam.cuda_prec;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.reconstruct = link_recon;
   cudaGauge = new cudaGaugeField(gParam);
 
   // create the force matrix
@@ -174,7 +174,6 @@ hisq_force_init()
   cudaOprod = new cudaGaugeField(gParam);
   cudaLongLinkOprod = new cudaGaugeField(gParam);
 
-  printf("%d %d %d %d\n", cpuMom->Reconstruct(), cudaMom->Reconstruct(), cpuGauge->Reconstruct(), cudaGauge->Reconstruct());
   return;
 }
 
@@ -202,8 +201,8 @@ hisq_force_end()
   return;
 }
 
-static void 
-hisq_force_test()
+static int 
+hisq_force_test(void)
 {
   hisq_force_init();
 
@@ -283,13 +282,15 @@ hisq_force_test()
   int res;
   res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize, 1e-5, gaugeParam.cpu_prec);
 
-  strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
+  int accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), gaugeParam.cpu_prec);
   printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
 
   printf("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t2,t3)*1000, TDIFF(t4,t5)*1000);
   printf("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1)*1000);
 
   hisq_force_end();
+
+  return accuracy_level;
 }
 
 
@@ -336,21 +337,23 @@ main(int argc, char **argv)
     initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 #endif
 
- // link_prec = prec;
-
-  link_recon = QUDA_RECONSTRUCT_NO;
   setPrecision(prec);
 
   display_test_info();
     
-  hisq_force_test();
+  int accuracy_level = hisq_force_test();
 
 
 #ifdef MULTI_GPU
-    endCommsQuda();
+  endCommsQuda();
 #endif
-    
-    
-  return EXIT_SUCCESS;
+
+  if(accuracy_level >=3 ){
+    return EXIT_SUCCESS;
+  }else{
+    return -1;
+  }
+  
 }
+
 

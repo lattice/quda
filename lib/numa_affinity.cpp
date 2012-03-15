@@ -168,7 +168,6 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
   return(0);
 }
 
-
 int 
 setNumaAffinity(int devid)
 {
@@ -179,19 +178,24 @@ setNumaAffinity(int devid)
     printfQuda("Warning: quda getting affinity for device %d failed\n", devid);
     return 1;
   }
-  printfQuda("GPU: %d, Setting to affinity cpu cores: ", devid);
+  int which = devid % ncores;
+  printfQuda("GPU: %d, Setting to affinity cpu cores:  %d\n", devid, cpu_cores[which]);
+/*
   for(int i=0;i < ncores;i++){
+   if (i != which ) continue;
     printfQuda("%d", cpu_cores[i]);
     if((i+1) < ncores){
       printfQuda(",");
     }
   }
   printfQuda("\n");
-  
+  */
+
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
   
   for(int i=0;i < ncores;i++){
+    if( i != which) continue;
     CPU_SET(cpu_cores[i], &cpu_set);
   }
   
@@ -204,3 +208,4 @@ setNumaAffinity(int devid)
   
   return 0;
 }
+
