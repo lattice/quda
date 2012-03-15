@@ -671,10 +671,9 @@ void exchange_cpu_sitelink(int* X,
  * @sitelink: this is stored according to dimension size (X1+4) (X2+4) (X3+4) (X4+4)
  */
 
-void exchange_cpu_sitelink_ex(int* X, void** sitelink, 
+void exchange_cpu_sitelink_ex(int* X, void** sitelink, QudaGaugeFieldOrder cpu_order,
 			      QudaPrecision gPrecision, int optflag)
 {
-  
   int X1,X2,X3,X4;
   int E1,E2,E3,E4;  
   X1 = X[0]; X2 = X[1]; X3 = X[2]; X4 = X[3]; 
@@ -748,6 +747,7 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
   int gaugebytes = gaugeSiteSize*gPrecision;
   int a, b, c,d;
   for(int dir =0;dir < 4;dir++){
+    if( (!commDimPartitioned(dir)) && optflag) continue;
     if(commDimPartitioned(dir)){
       //fill the sendbuf here
       //back
@@ -766,18 +766,28 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		  dst_oddness = 1-oddness;
 		}
-		if(src_oddness){
-		  src_idx += Vh_ex;
-		}
-		if(dst_oddness){
-		  dst_idx += nslices*slice_3d[dir]/2;
-		}
-		
-		for(int linkdir=0; linkdir<4;linkdir++){
-		  char* src = (char*)sitelink[linkdir];
-		  char* dst = ((char*)(ghost_sitelink_back_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;		
-		  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-		}//linkdir
+
+#define MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_buf, dst_idx, sitelink, src_idx, num, dir) \
+		if(src_oddness){					\
+		  src_idx += Vh_ex;					\
+		}							\
+		if(dst_oddness){					\
+		  dst_idx += nslices*slice_3d[dir]/2;			\
+		}							\
+		if(cpu_order == QUDA_QDP_GAUGE_ORDER){			\
+		  for(int linkdir=0; linkdir < 4; linkdir++){		\
+		    char* src = (char*) sitelink[linkdir] + (src_idx)*gaugebytes; \
+		    char* dst = ((char*)ghost_buf[dir])+ linkdir*nslices*slice_3d[dir]*gaugebytes + (dst_idx)*gaugebytes; \
+		    memcpy(dst, src, gaugebytes*(num));			\
+		  }							\
+		}else{	/*QUDA_MILC_GAUGE_ORDER*/			\
+		  char* src = ((char*)sitelink)+ 4*(src_idx)*gaugebytes; \
+		  char* dst = ((char*)ghost_buf[dir]) + 4*(dst_idx)*gaugebytes; \
+		  memcpy(dst, src, 4*gaugebytes*(num));		\
+		}							\
+
+		MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, 1, dir);		
+
 	      }//c
 	    }else{
 	      for(int loop=0; loop < 2; loop++){
@@ -792,18 +802,8 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		  if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		    dst_oddness = 1-oddness;
 		  }
-		  if(src_oddness){
-		    src_idx += Vh_ex;
-		  }
-		  if(dst_oddness){
-		    dst_idx += nslices*slice_3d[dir]/2;
-		  }
-		  
-		  for(int linkdir=0; linkdir<4;linkdir++){
-		    char* src = (char*)sitelink[linkdir];
-		    char* dst = ((char*)(ghost_sitelink_back_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;		
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes *((endc[dir] - c + 1)/2));
-		  }//linkdir
+		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, (endc[dir] -c +1)/2, dir);	
+
 		}//if c
 	      }//for loop
 	    }//if
@@ -825,20 +825,8 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 	      if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		dst_oddness = 1-oddness;
 	      }
-	      
-	      if(src_oddness){
-		src_idx += Vh_ex;
-	      }
-	      
-	      if(dst_oddness){
-		dst_idx += nslices*slice_3d[dir]/2;
-	      }
 
-	      for(int linkdir=0; linkdir<4;linkdir++){
-		char* src = (char*)sitelink[linkdir];
-		char* dst = ((char*)(ghost_sitelink_fwd_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-	      }//linkdir	
+	      MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, 1,dir);
 	    }//c
 	    }else{
 	      for(int loop=0; loop < 2; loop++){
@@ -854,19 +842,9 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		    dst_oddness = 1-oddness;
 		  }
 		  
-		  if(src_oddness){
-		    src_idx += Vh_ex;
-		  }
-		  
-		  if(dst_oddness){
-		    dst_idx += nslices*slice_3d[dir]/2;
-		  }
-		  
-		  for(int linkdir=0; linkdir<4;linkdir++){
-		    char* src = (char*)sitelink[linkdir];
-		    char* dst = ((char*)(ghost_sitelink_fwd_sendbuf[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes*((endc[dir]-c+1)/2));
-		  }//linkdir		  
+		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, (endc[dir] -c +1)/2,dir);	
+
+
 		}
 	      }//for loop
 	    }//if
@@ -898,6 +876,7 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		}else{
 		  src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d+X[dir])*f_main[dir][3])>> 1;
 		}
+		/*
 		if(oddness){
 		  if(commDimPartitioned(dir)){
 		    src_idx += nslices*slice_3d[dir]/2;
@@ -906,16 +885,40 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		  }
 		  dst_idx += Vh_ex;
 		}
-		for(int linkdir=0; linkdir < 4; linkdir ++){
-		  char* dst = (char*)sitelink[linkdir];
-		  char* src;
-		  if(commDimPartitioned(dir)){
-		    src= ((char*)(ghost_sitelink_back[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		  }else{
-		    src = (char*)sitelink[linkdir];
-		  }
-		  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-		}//linkdir
+		*/
+#define MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_buf, src_idx, num, dir) \
+		if(oddness){						\
+		  if(commDimPartitioned(dir)){				\
+		    src_idx += nslices*slice_3d[dir]/2;			\
+		  }else{						\
+		    src_idx += Vh_ex;					\
+		  }							\
+		  dst_idx += Vh_ex;					\
+		}							\
+		if(cpu_order == QUDA_QDP_GAUGE_ORDER){			\
+		  for(int linkdir=0; linkdir < 4; linkdir++){		\
+		    char* src;						\
+		    if(commDimPartitioned(dir)){			\
+		      src = ((char*)ghost_buf[dir])+ linkdir*nslices*slice_3d[dir]*gaugebytes + (src_idx)*gaugebytes; \
+		    }else{						\
+		      src = ((char*)sitelink[linkdir])+ (src_idx)*gaugebytes; \
+		    }							\
+		    char* dst = (char*) sitelink[linkdir] + (dst_idx)*gaugebytes; \
+		    memcpy(dst, src, gaugebytes*(num));			\
+		  }							\
+		}else{/*QUDA_MILC_GAUGE_FIELD*/				\
+		  char* src;						\
+		  if(commDimPartitioned(dir)){				\
+		    src=((char*)ghost_buf[dir]) + 4*(src_idx)*gaugebytes; \
+		  }else{						\
+		    src = ((char*)sitelink)+ 4*(src_idx)*gaugebytes;	\
+		  }							\
+		  char* dst = ((char*)sitelink) + 4*(dst_idx)*gaugebytes; \
+		  memcpy(dst, src, 4*gaugebytes*(num));			\
+		}
+
+		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, 1, dir);
+		
 	      }//c    
 	    }else{
 	      //optimized copy
@@ -932,58 +935,58 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		  }else{
 		    src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d+X[dir])*f_main[dir][3])>> 1;
 		  }
-		  if(oddness){
-		    if(commDimPartitioned(dir)){
-		      src_idx += nslices*slice_3d[dir]/2;
-		    }else{
-		      src_idx += Vh_ex;
-		    }
-		    dst_idx += Vh_ex;
-		  }
-		  for(int linkdir=0; linkdir < 4; linkdir ++){
-		    char* dst = (char*)sitelink[linkdir];
-		    char* src;
-		    if(commDimPartitioned(dir)){
-		      src= ((char*)(ghost_sitelink_back[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		    }else{
-		      src = (char*)sitelink[linkdir];
-		    }
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes*((endc[dir]-c+1)/2) );
-		  }//linkdir
+
+		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, (endc[dir]-c+1)/2, dir);
+
 		}//if c  		
 	      }//for loop	      
 
 	    }//if
     }else{
       //when dir == 3 (T direction), the data layout format in sitelink and the message is the same, we can do large copys
-      for(int linkdir=0; linkdir < 4; linkdir ++){
-	  char* dst = (char*)sitelink[linkdir];
-	  char* src;
-	  if(commDimPartitioned(dir)){
-	    src = ((char*)(ghost_sitelink_back[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;	
-	  }else{
-	    src = (char*)sitelink[linkdir];
-	  }
-	  //even
-	  int dst_idx = 0;
-	  int src_idx;
-	  if(commDimPartitioned(dir)){	  
-	    src_idx = 0;
-	  }else{
-	    src_idx = (X[dir]*f_main[dir][3])>> 1;
-	  }
-	  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, nslices*slice_3d[dir]*gaugebytes/2);
+      
+#define MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_buf, dst_face, src_face, dir) \
+	/*even*/							\
+	int even_dst_idx = (dst_face*E3E2E1)/2;				\
+	int even_src_idx;						\
+	if(commDimPartitioned(dir)){					\
+	  even_src_idx = 0;						\
+	}else{								\
+	  even_src_idx = (src_face*E3E2E1)/2;				\
+	}								\
+ 	/*odd*/								\
+	int odd_dst_idx = even_dst_idx+Vh_ex;				\
+	int odd_src_idx;						\
+	if(commDimPartitioned(dir)){					\
+	  odd_src_idx = nslices*slice_3d[dir]/2;			\
+	}else{								\
+	  odd_src_idx = even_src_idx+Vh_ex;				\
+	}								\
+	if(cpu_order == QUDA_QDP_GAUGE_ORDER){								\
+	  for(int linkdir=0; linkdir < 4; linkdir ++){			\
+	    char* dst = (char*)sitelink[linkdir];			\
+	    char* src;							\
+	    if(commDimPartitioned(dir)){				\
+	      src = ((char*)ghost_buf[dir]) + linkdir*nslices*slice_3d[dir]*gaugebytes; \
+	    }else{							\
+	      src = (char*)sitelink[linkdir];				\
+	    }								\
+	    memcpy(dst + even_dst_idx * gaugebytes, src + even_src_idx*gaugebytes, nslices*slice_3d[dir]*gaugebytes/2); \
+	    memcpy(dst + odd_dst_idx * gaugebytes, src + odd_src_idx*gaugebytes, nslices*slice_3d[dir]*gaugebytes/2); \
+	  }								\
+	}else{/*QUDA_MILC_GAUGE_ORDER*/					\
+	  char* dst = (char*)sitelink;					\
+	  char* src;							\
+	  if(commDimPartitioned(dir)){					\
+	    src = (char*)ghost_buf[dir];				\
+	  }else{							\
+	    src = (char*)sitelink;					\
+	  }								\
+	  memcpy(dst+4*even_dst_idx*gaugebytes, src+4*even_src_idx*gaugebytes, 4*nslices*slice_3d[dir]*gaugebytes/2); \
+	  memcpy(dst+4*odd_dst_idx*gaugebytes, src+4*odd_src_idx*gaugebytes, 4*nslices*slice_3d[dir]*gaugebytes/2); \
+	}      
 
-	  //odd
-	  dst_idx = Vh_ex;
-	  if(commDimPartitioned(dir)){	  
-	    src_idx = nslices*slice_3d[dir]/2;
-	  }else{
-	    src_idx = (X[dir]*f_main[dir][3])/2 + Vh_ex;
-	  }
-	  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, nslices*slice_3d[dir]*gaugebytes/2);
-      }      
-
+      MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_sitelink_back, 0, X4, dir)
     }//if
     
     //fwd
@@ -1002,24 +1005,9 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		}else{
 		  src_idx =  ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d-X[dir])*f_main[dir][3])>> 1;
 		}
-		if(oddness){
-		  if(commDimPartitioned(dir)){
-		    src_idx += nslices*slice_3d[dir]/2;
-		  }else{
-		    src_idx += Vh_ex;
-		  }
-		  dst_idx += Vh_ex;
-		}
-		for(int linkdir=0; linkdir < 4; linkdir++){
-		  char* dst = (char*)sitelink[linkdir];
-		  char* src;
-		  if(commDimPartitioned(dir)){
-		    src = ((char*)(ghost_sitelink_fwd[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		  }else{
-		    src = (char*)sitelink[linkdir];
-		  }
-		  memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes);
-		}//linkdir
+
+		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, 1, dir);
+
 	      }//c
 	    }else{
 	      for(int loop =0; loop < 2; loop++){
@@ -1034,24 +1022,8 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 		  }else{
 		    src_idx =  ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d-X[dir])*f_main[dir][3])>> 1;
 		  }
-		  if(oddness){
-		    if(commDimPartitioned(dir)){
-		      src_idx += nslices*slice_3d[dir]/2;
-		    }else{
-		      src_idx += Vh_ex;
-		    }
-		    dst_idx += Vh_ex;
-		  }
-		  for(int linkdir=0; linkdir < 4; linkdir++){
-		    char* dst = (char*)sitelink[linkdir];
-		    char* src;
-		    if(commDimPartitioned(dir)){
-		      src = ((char*)(ghost_sitelink_fwd[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;
-		    }else{
-		      src = (char*)sitelink[linkdir];
-		    }
-		    memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, gaugebytes* ((endc[dir]-c+1)/2) );
-		  }//linkdir
+
+		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, (endc[dir]-c+1)/2, dir);
 		}//if
 		
 	      }//for loop
@@ -1061,34 +1033,8 @@ void exchange_cpu_sitelink_ex(int* X, void** sitelink,
 
     }else{
       //when dir == 3 (T direction), the data layout format in sitelink and the message is the same, we can do large copys
-      for(int linkdir=0; linkdir < 4; linkdir ++){
-	char* dst = (char*)sitelink[linkdir];
-	char* src;
-	if(commDimPartitioned(dir)){
-	  src = ((char*)(ghost_sitelink_fwd[dir])) + linkdir*nslices*slice_3d[dir]*gaugebytes;	
-	}else{
-	  src = (char*)sitelink[linkdir];
-	}
-	//even
-	int dst_idx = ((X[dir]+2)*f_main[dir][3]) >> 1;
-	int src_idx;
-	if(commDimPartitioned(dir)){
-	  src_idx = 0;
-	}else{
-	  src_idx = (2*f_main[dir][3]) >> 1;
-	}
-	memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, nslices*slice_3d[dir]*gaugebytes/2);
-	
-	//odd
-	dst_idx = Vh_ex + (((X[dir]+2)*f_main[dir][3]) >> 1);
-	if(commDimPartitioned(dir)){
-	  src_idx = nslices*slice_3d[dir]/2;
-	}else{
-	  src_idx = (2*f_main[dir][3])/2 + Vh_ex;
-	}
-	memcpy(dst + dst_idx * gaugebytes, src+src_idx*gaugebytes, nslices*slice_3d[dir]*gaugebytes/2);
-      }
-      
+      MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_sitelink_fwd, (X4+2), 2, dir)
+
     }//if    
 
   }//dir for loop

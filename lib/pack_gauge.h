@@ -684,22 +684,23 @@ static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
  */
 
 template <typename Float, typename Float2>
-inline void pack10(Float2 *res, Float *m, int dir, int Vh) 
+  inline void pack10(Float2 *res, Float *m, int dir, int Vh, int pad) 
 {
-  Float2 *r = res + dir*5*Vh;
+  int stride = Vh + pad;
+  Float2 *r = res + dir*5*stride;
   for (int j=0; j<5; j++) {
-    r[j*Vh].x = m[j*2+0]; 
-    r[j*Vh].y = m[j*2+1]; 
+    r[j*stride].x = m[j*2+0]; 
+    r[j*stride].y = m[j*2+1]; 
   }
 }
 
 template <typename Float, typename Float2>
-void packMomField(Float2 *res, Float *mom, int oddBit, int Vh) 
+  void packMomField(Float2 *res, Float *mom, int oddBit, int Vh, int pad) 
 {    
   for (int dir = 0; dir < 4; dir++) {
     Float *g = mom + (oddBit*Vh*4 + dir)*10;
     for (int i = 0; i < Vh; i++) {
-      pack10(res+i, g + 4*i*10, dir, Vh);
+      pack10(res+i, g + 4*i*10, dir, Vh, pad);
     }
   }      
 }
@@ -707,17 +708,18 @@ void packMomField(Float2 *res, Float *mom, int oddBit, int Vh)
 
 
 template <typename Float, typename Float2>
-inline void unpack10(Float* m, Float2 *res, int dir, int Vh) 
+  inline void unpack10(Float* m, Float2 *res, int dir, int Vh, int pad) 
 {
-  Float2 *r = res + dir*5*Vh;
+  int stride = Vh + pad;
+  Float2 *r = res + dir*5*stride;
   for (int j=0; j<5; j++) {
-    m[j*2+0] = r[j*Vh].x;
-    m[j*2+1] = r[j*Vh].y;
+    m[j*2+0] = r[j*stride].x;
+    m[j*2+1] = r[j*stride].y;
   }    
 }
 
 template <typename Float, typename Float2>
-void unpackMomField(Float* mom, Float2 *res, int oddBit, int Vh) 
+  void unpackMomField(Float* mom, Float2 *res, int oddBit, int Vh, int pad) 
 {
   int dir, i;
   Float *m = mom + oddBit*Vh*10*4;
@@ -725,7 +727,7 @@ void unpackMomField(Float* mom, Float2 *res, int oddBit, int Vh)
   for (i = 0; i < Vh; i++) {
     for (dir = 0; dir < 4; dir++) {	
       Float* thismom = m + (4*i+dir)*10;
-      unpack10(thismom, res+i, dir, Vh);
+      unpack10(thismom, res+i, dir, Vh, pad);
     }
   }
 }

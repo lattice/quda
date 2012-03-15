@@ -59,6 +59,9 @@ FERMI_DBLE_TEX=@FERMI_DBLE_TEX@
 
 DSLASH_SHARED_FLOATS=0
 
+#enabled numa
+QUDA_NUMA_SUPPORT=@QUDA_NUMA_SUPPORT@
+
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include
@@ -202,6 +205,13 @@ ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   NVCCOPT += -DFERMI_NO_DBLE_TEX
   COPT += -DFERMI_NO_DBLE_TEX
 endif
+
+ifeq ($(strip $(QUDA_NUMA_SUPPORT)), yes)
+  NVCCOPT += -DQUDA_NUMA_SUPPORT
+  COPT += -DQUDA_NUMA_SUPPORT
+  NUMA_AFFINITY=numa_affinity.o
+endif
+
 
 ### Next conditional is necessary.
 ### QDPXX_CXXFLAGS contains "-O3".

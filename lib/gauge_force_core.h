@@ -1,4 +1,9 @@
 
+#define xcomm kparam.ghostDim[0]
+#define ycomm kparam.ghostDim[1]
+#define zcomm kparam.ghostDim[2]
+#define tcomm kparam.ghostDim[3]
+
 #if (N_IN_FLOATN == 4)
 #define linka00_re LINKA0.x
 #define linka00_im LINKA0.y
@@ -81,7 +86,51 @@
 #endif
 
 
+#ifdef MULTI_GPU
 
+#define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
+    switch(mydir){							\
+    case 0:								\
+      new_mem_idx = ((!xcomm) && (new_x1 == (X1+1)))?(idx - X1m1): idx+1; \
+      new_x1 = ((!xcomm)&& (new_x1 == (X1+1)))? (new_x1 - X1m1):(new_x1+1); \
+      break;								\
+    case 1:								\
+      new_mem_idx = ((!ycomm) && (new_x2 == (X2+1)))?(idx - X2m1*E1): idx+E1; \
+      new_x2 = ((!ycomm)&& (new_x2 == (X2+1)))? (new_x2 - X2m1):(new_x2+1); \
+      break;								\
+    case 2:								\
+      new_mem_idx = ((!zcomm) && (new_x3 == (X3+1)))?(idx - X3m1*E2E1): idx+E2E1; \
+      new_x3 = ((!zcomm)&& (new_x3 == (X3+1)))? (new_x3 - X3m1):(new_x3+1); \
+      break;								\
+    case 3:								\
+      new_mem_idx = ((!tcomm) && (new_x4 == (X4+1)))?(idx - X4m1*E3E2E1): idx+E3E2E1; \
+      new_x4 = ((!tcomm)&& (new_x4 == (X4+1)))? (new_x4 - X4m1):(new_x4+1); \
+      break;								\
+    }									\
+  }while(0)
+
+#define COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx) do {		\
+    switch(mydir){							\
+    case 0:								\
+      new_mem_idx = ((!xcomm) && new_x1 == 2)?(idx+X1m1):(idx-1);	\
+      new_x1 = ((!xcomm) && new_x1 == 2)? (new_x1+X1m1): (new_x1-1);	\
+      break;								\
+    case 1:								\
+      new_mem_idx = ((!ycomm) && new_x2 == 2)?(idx+X2m1*E1):(idx-E1);	\
+      new_x2 = ((!ycomm) && new_x2 == 2)? (new_x2+X2m1): (new_x2-1);	\
+      break;								\
+    case 2:								\
+      new_mem_idx = ((!zcomm) && new_x3 == 2)?(idx+X3m1*E2E1):(idx-E2E1); \
+      new_x3 = ((!zcomm) && new_x3 == 2)? (new_x3+X3m1): (new_x3-1);	\
+      break;								\
+    case 3:								\
+      new_mem_idx = ((!tcomm) && new_x4 == 2)?(idx+X4m1*E3E2E1):(idx-E3E2E1); \
+      new_x4 = ((!tcomm) && new_x4 == 2)? (new_x4+X4m1): (new_x4-1);	\
+      break;								\
+    }									\
+  }while(0)
+
+#else
 #define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
         switch(mydir){                                                  \
         case 0:                                                         \
@@ -124,6 +173,7 @@
         }                                                               \
     }while(0)
 
+#endif
 
 
 #define MULT_SU3_NN_TEST(ma, mb) do{				\
@@ -419,15 +469,15 @@
   printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21_im, mul##22_re, mul##22_im);
 
 
-//for now we only consider 12-reconstruct and single precision
 //FloatN can be float2/float4/double2
+//Float2 can be float2/double2
 template<int oddBit, typename Float2, typename FloatN, typename Float>
   __global__ void
   GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd,
 			int dir, double eb3,
 			FloatN* linkEven, FloatN* linkOdd,
 			int* input_path, 
-			int* length, Float* path_coeff, int num_paths)
+			int* length, Float* path_coeff, int num_paths, kernel_param_t kparam)
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -440,7 +490,13 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   int x3 = z2 - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   int x1 = 2*x1h + x1odd;  
-  int X = 2*sid + x1odd;
+
+#ifdef MULTI_GPU
+  x4 += 2; x3 += 2; x2 += 2; x1 += 2;
+  int X = x4*E3E2E1 + x3*E2E1 + x2*E1 + x1;
+#else
+  int X = 2*sid + x1odd;  
+#endif
     
   Float2* mymom=momEven;
   if (oddBit){
@@ -487,7 +543,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
     }else{
       LOAD_EVEN_MATRIX( lnkdir, nbr_idx, LINKB);
     }
-    RECONSTRUCT_MATRIX(lnkdir, nbr_idx, 1, linkb);
+    RECONSTRUCT_MATRIX(1, linkb);
     
     if (GOES_FORWARDS(path0)){
       COPY_SU3_MATRIX(linkb, linka);
@@ -516,7 +572,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
       }else{
 	LOAD_EVEN_MATRIX(lnkdir, nbr_idx, LINKB);
       }
-      RECONSTRUCT_MATRIX(lnkdir, nbr_idx, 1, linkb);
+      RECONSTRUCT_MATRIX(1, linkb);
       if (GOES_FORWARDS(pathj)){
 	MULT_SU3_NN_TEST(linka, linkb);
 		
@@ -535,18 +591,18 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
 
   //update mom 
   if (oddBit){
-    LOAD_ODD_MATRIX(dir, sid, LINKA);
+    LOAD_ODD_MATRIX(dir, (X>>1), LINKA);
   }else{
-    LOAD_EVEN_MATRIX(dir, sid, LINKA);
+    LOAD_EVEN_MATRIX(dir, (X>>1), LINKA);
   }
-  RECONSTRUCT_MATRIX(dir, sid, 1, linka);
+  RECONSTRUCT_MATRIX(1, linka);
   MULT_SU3_NN_TEST(linka, staple);
   LOAD_ANTI_HERMITIAN(mymom, dir, sid, AH);
   UNCOMPRESS_ANTI_HERMITIAN(ah, linkb);
   SCALAR_MULT_SUB_SU3_MATRIX(linkb, linka, eb3, linka);
   MAKE_ANTI_HERMITIAN(linka, ah);
     
-  WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH);
+  WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH, mom_ga_stride);
 
   return;
 }

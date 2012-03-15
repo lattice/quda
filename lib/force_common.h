@@ -544,31 +544,31 @@
     }while(0)						
 
 
-#define LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var) do{			\
-	int start_pos = idx + dir*Vh*5;					\
-	var##0 = src[start_pos];					\
-	var##1 = src[start_pos + Vh];					\
-	var##2 = src[start_pos + Vh*2];					\
-	var##3 = src[start_pos + Vh*3];					\
-	var##4 = src[start_pos + Vh*4];					\
-    }while(0)
+#define LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, stride) do{	\
+    int start_pos = idx + dir*stride*5;					\
+    var##0 = src[start_pos];						\
+    var##1 = src[start_pos + stride];					\
+    var##2 = src[start_pos + stride*2];					\
+    var##3 = src[start_pos + stride*3];					\
+    var##4 = src[start_pos + stride*4];					\
+  }while(0)
 
 #define LOAD_ANTI_HERMITIAN_SINGLE_TEX(src, dir, idx, var) do{		\
-	int start_pos = idx + dir*Vh*5;					\
-	var##0 = tex1Dfetch(src, start_pos);				\
-	var##1 = tex1Dfetch(src, start_pos + Vh);			\
-	var##2 = tex1Dfetch(src, start_pos + Vh*2);			\
-	var##3 = tex1Dfetch(src, start_pos + Vh*3);			\
-	var##4 = tex1Dfetch(src, start_pos + Vh*4);			\
-    }while(0)
+    int start_pos = idx + dir*Vh*5;					\
+    var##0 = tex1Dfetch(src, start_pos);				\
+    var##1 = tex1Dfetch(src, start_pos + Vh);				\
+    var##2 = tex1Dfetch(src, start_pos + Vh*2);				\
+    var##3 = tex1Dfetch(src, start_pos + Vh*3);				\
+    var##4 = tex1Dfetch(src, start_pos + Vh*4);				\
+  }while(0)
 
-#define WRITE_ANTI_HERMITIAN(mem, dir, idx, var) do{		\
-    int start_ps = idx + dir*Vh*5;				\
-    mem[start_ps] = var##0;					\
-    mem[start_ps + Vh] = var##1;				\
-    mem[start_ps + Vh*2] = var##2;				\
-    mem[start_ps + Vh*3] = var##3;				\
-    mem[start_ps + Vh*4] = var##4;				\
+#define WRITE_ANTI_HERMITIAN(mem, dir, idx, var, stride) do{		\
+    int start_ps = idx + dir*stride*5;					\
+    mem[start_ps] = var##0;						\
+    mem[start_ps + stride] = var##1;					\
+    mem[start_ps + stride*2] = var##2;					\
+    mem[start_ps + stride*3] = var##3;					\
+    mem[start_ps + stride*4] = var##4;					\
   }while(0)
 
 #define COPY_SU3_MATRIX(a, b)		\
@@ -639,7 +639,7 @@
   a##_im -= b##_im * c##_re
 
 
-#define RECONSTRUCT_LINK_12(dir, idx, sign, var)			\
+#define RECONSTRUCT_LINK_12(sign, var)					\
     ACC_CONJ_PROD_ASSIGN(var##20, +var##01, +var##12);			\
     ACC_CONJ_PROD(var##20, -var##02, +var##11);				\
     ACC_CONJ_PROD_ASSIGN(var##21, +var##02, +var##10);			\

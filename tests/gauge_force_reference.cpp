@@ -11,7 +11,8 @@
 extern int Z[4];
 extern int V;
 extern int Vh;
-
+extern int Vh_ex;
+extern int E[4];
 
 
 #define CADD(a,b,c) { (c).real = (a).real + (b).real;	\
@@ -212,12 +213,71 @@ print_su3_matrix(su3_matrix *a)
 }
 
 
+int
+gf_neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) 
+{
+  int oddBit = 0;
+  int half_idx = i;
+  if (i >= Vh){
+    oddBit =1;
+    half_idx = i - Vh;
+  }
+  int X1 = Z[0];  
+  int X2 = Z[1];
+  int X3 = Z[2];
+  //int X4 = Z[3];
+  int X1h =X1/2;
+
+  int za = half_idx/X1h;
+  int x1h = half_idx - za*X1h;
+  int zb = za/X2;
+  int x2 = za - zb*X2;
+  int x4 = zb/X3;
+  int x3 = zb - x4*X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+
+#ifdef MULTI_GPU
+  x4 = x4+dx4;
+  x3 = x3+dx3;
+  x2 = x2+dx2;
+  x1 = x1+dx1;
+  
+  int nbr_half_idx = ( (x4+2)*(E[2]*E[1]*E[0]) + (x3+2)*(E[1]*E[0]) + (x2+2)*(E[0]) + (x1+2)) / 2;
+#else
+  x4 = (x4+dx4+Z[3]) % Z[3];
+  x3 = (x3+dx3+Z[2]) % Z[2];
+  x2 = (x2+dx2+Z[1]) % Z[1];
+  x1 = (x1+dx1+Z[0]) % Z[0];
+ 
+  int nbr_half_idx = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+#endif
+
+  int oddBitChanged = (dx4+dx3+dx2+dx1)%2;
+  if (oddBitChanged){
+    oddBit = 1 - oddBit;
+  }
+  int ret = nbr_half_idx;
+  if (oddBit){
+#ifdef MULTI_GPU
+    ret = Vh_ex + nbr_half_idx;    
+#else
+    ret = Vh + nbr_half_idx;
+#endif
+  }
+    
+  return ret;
+}
+
+
+
 //this functon compute one path for all lattice sites
 template<typename su3_matrix, typename Float>
 static void
-compute_path_product(su3_matrix* staple, su3_matrix* sitelink, int* path, int len, Float loop_coeff, int dir)
+compute_path_product(su3_matrix* staple, su3_matrix** sitelink, su3_matrix** sitelink_ex_2d,
+		     int* path, int len, Float loop_coeff, int dir)
 {
-    int i, j;
+  int i, j;
 
     su3_matrix prev_matrix, curr_matrix, tmat;
     int dx[4];
@@ -243,9 +303,12 @@ compute_path_product(su3_matrix* staple, su3_matrix* sitelink, int* path, int le
 		lnkdir=OPP_DIR(path[j]);
 	    }
 	    
-	    int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-	    
-	    su3_matrix* lnk = sitelink + nbr_idx*4 + lnkdir;
+	    int nbr_idx = gf_neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
+#ifdef MULTI_GPU
+	    su3_matrix* lnk = sitelink_ex_2d[lnkdir] + nbr_idx;
+#else	    
+	    su3_matrix* lnk = sitelink[lnkdir]+ nbr_idx;
+#endif
 	    if (GOES_FORWARDS(path[j])){
 		mult_su3_nn(&prev_matrix, lnk, &curr_matrix);		
 	    }else{
@@ -255,7 +318,7 @@ compute_path_product(su3_matrix* staple, su3_matrix* sitelink, int* path, int le
 	    if (GOES_FORWARDS(path[j])){
 		dx[path[j]] +=1;
 	    }else{		
-		//dx[OPP_DIR(path[j])] -=1;
+	      //we already substract one in the code above
 	    }	    
 
 	    
@@ -273,7 +336,7 @@ compute_path_product(su3_matrix* staple, su3_matrix* sitelink, int* path, int le
 
 template <typename su3_matrix, typename anti_hermitmat, typename Float>
 static void
-update_mom(anti_hermitmat* momentum, int dir, su3_matrix* sitelink,
+update_mom(anti_hermitmat* momentum, int dir, su3_matrix** sitelink,
 	   su3_matrix* staple, Float eb3)
 {
     int i;
@@ -282,7 +345,7 @@ update_mom(anti_hermitmat* momentum, int dir, su3_matrix* sitelink,
 	su3_matrix tmat2;
 	su3_matrix tmat3;
 
-	su3_matrix* lnk = sitelink + 4*i+dir;
+	su3_matrix* lnk = sitelink[dir] + i;
 	su3_matrix* stp = staple + i;
 	anti_hermitmat* mom = momentum + 4*i+dir;
 	
@@ -303,18 +366,13 @@ update_mom(anti_hermitmat* momentum, int dir, su3_matrix* sitelink,
  */
 
 void
-gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPrecision prec, 
-		      int **path_dir, int* length, void* loop_coeff, int num_paths)
+gauge_force_reference_dir(void* refMom, int dir, double eb3, void** sitelink, void** sitelink_ex_2d, QudaPrecision prec, 
+			  int **path_dir, int* length, void* loop_coeff, int num_paths)
 {
     int i;
     
     void* staple;
-    int gSize;    
-    if (prec == QUDA_DOUBLE_PRECISION){
-	gSize= sizeof(double);
-    }else{
-	gSize= sizeof(float);
-    }
+    int gSize =  prec;    
 
     staple = malloc(V* gaugeSiteSize* gSize);
     if (staple == NULL){
@@ -327,20 +385,33 @@ gauge_force_reference(void* refMom, int dir, double eb3, void* sitelink, QudaPre
     for(i=0;i < num_paths; i++){	
 	if (prec == QUDA_DOUBLE_PRECISION){
 	    double* my_loop_coeff = (double*)loop_coeff;
-	    compute_path_product((dsu3_matrix*)staple, (dsu3_matrix*)sitelink, path_dir[i], length[i], my_loop_coeff[i], dir);
+	    compute_path_product((dsu3_matrix*)staple, (dsu3_matrix**)sitelink, (dsu3_matrix**)sitelink_ex_2d, 
+				 path_dir[i], length[i], my_loop_coeff[i], dir);
 	}else{
 	    float* my_loop_coeff = (float*)loop_coeff;
-	    compute_path_product((fsu3_matrix*)staple, (fsu3_matrix*)sitelink, path_dir[i], length[i], my_loop_coeff[i], dir);
+	    compute_path_product((fsu3_matrix*)staple, (fsu3_matrix**)sitelink, (fsu3_matrix**)sitelink_ex_2d, 
+				 path_dir[i], length[i], my_loop_coeff[i], dir);
 	}	
     }        
     
     if (prec == QUDA_DOUBLE_PRECISION){
-      update_mom((danti_hermitmat*) refMom, dir, (dsu3_matrix*)sitelink, (dsu3_matrix*)staple, (double)eb3);
+      update_mom((danti_hermitmat*) refMom, dir, (dsu3_matrix**)sitelink, (dsu3_matrix*)staple, (double)eb3);
     }else{
-	update_mom((fanti_hermitmat*)refMom, dir, (fsu3_matrix*)sitelink, (fsu3_matrix*)staple, (float)eb3);
+      update_mom((fanti_hermitmat*)refMom, dir, (fsu3_matrix**)sitelink, (fsu3_matrix*)staple, (float)eb3);
     }
     
     free(staple);
 }
 
 
+void
+gauge_force_reference(void* refMom, double eb3, void** sitelink, void** sitelink_ex_2d, QudaPrecision prec, 
+		      int ***path_dir, int* length, void* loop_coeff, int num_paths)
+{
+  for(int dir =0; dir < 4; dir++){
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, sitelink_ex_2d, prec, path_dir[dir],
+			      length, loop_coeff, num_paths);
+    
+  }
+  
+}
