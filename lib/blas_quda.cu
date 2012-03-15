@@ -59,6 +59,7 @@ void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 
 // blasTuning = 1 turns off error checking
 static QudaTune blasTuning = QUDA_TUNE_NO;
+static QudaVerbosity verbosity = QUDA_SILENT;
 
 static cudaStream_t *blasStream;
 
@@ -128,9 +129,10 @@ void endBlas(void)
   cudaEventDestroy(reduceEnd);
 }
 
-void setBlasTuning(QudaTune tune)
+void setBlasTuning(QudaTune tune, QudaVerbosity verbose)
 {
   blasTuning = tune;
+  verbosity = verbose;
 }
 
 } // namespace quda
@@ -192,7 +194,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, blasTuning, QUDA_VERBOSE);
+    TuneParam tp = tuneLaunch(*this, blasTuning, verbosity);
     copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
   }
 

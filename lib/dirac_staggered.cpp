@@ -55,7 +55,7 @@ void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFiel
 			 const QudaParity parity) const
 {
   if (!initDslash) {
-    initDslashConstants(*fatGauge, in.Stride(), verbose);
+    initDslashConstants(*fatGauge, in.Stride());
     initStaggeredConstants(*fatGauge, *longGauge);
   }
   checkParitySpinor(in, out);
@@ -71,7 +71,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 				const double &k) const
 {    
   if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride(), verbose);
+    initDslashConstants(*fatGauge, in.Stride());
     initStaggeredConstants(*fatGauge, *longGauge);
   }
   checkParitySpinor(in, out);
@@ -86,7 +86,7 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride(), verbose);
+    initDslashConstants(*fatGauge, in.Stride());
     initStaggeredConstants(*fatGauge, *longGauge);
   }
 
@@ -102,7 +102,7 @@ void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField
 {
 
   if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride(), verbose);
+    initDslashConstants(*fatGauge, in.Stride());
     initStaggeredConstants(*fatGauge, *longGauge);
   }
   
@@ -178,7 +178,7 @@ void DiracStaggeredPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &
 void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride(), verbose);
+    initDslashConstants(*fatGauge, in.Stride());
     initStaggeredConstants(*fatGauge, *longGauge);
   }
   

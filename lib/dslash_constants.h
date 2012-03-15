@@ -285,11 +285,8 @@ void initGaugeFieldConstants(const cudaGaugeField &gauge)
 
 
 
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride, 
-			 QudaVerbosity Verbosity) 
+void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride) 
 {
-  verbosity = Verbosity;
-
   initCommonConstants(gauge);
 
   cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));  

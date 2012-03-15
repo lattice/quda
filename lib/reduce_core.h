@@ -228,6 +228,9 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
   ReduceType *partial = (ReduceType*)d_reduce;
   ReduceType *complete = (ReduceType*)hd_reduce;
 
+  if (tp.grid.x > REDUCE_MAX_BLOCKS) 
+    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
+
   if (tp.block.x == 32) {
     reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
@@ -402,7 +405,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, blasTuning, QUDA_VERBOSE);
+    TuneParam tp = tuneLaunch(*this, blasTuning, verbosity);
     result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
       (X, Y, Z, W, V, r, XX, YY, ZZ, length, tp, stream);
   }

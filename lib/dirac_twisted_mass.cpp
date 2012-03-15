@@ -22,7 +22,7 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 {
   checkParitySpinor(out, in);
   
-  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
 
   if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
@@ -128,7 +128,7 @@ void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpin
 void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 				const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
@@ -163,7 +163,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
 				    const QudaParity parity, const cudaColorSpinorField &x,
 				    const double &k) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride(), verbose);
+  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 

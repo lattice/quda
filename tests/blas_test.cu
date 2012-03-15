@@ -639,7 +639,7 @@ int main(int argc, char** argv)
   int niter = Niter;
 
   // enable the tuning
-  quda::setBlasTuning(QUDA_TUNE_YES);
+  quda::setBlasTuning(QUDA_TUNE_YES, QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
 

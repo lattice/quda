@@ -113,13 +113,13 @@ static struct {
 // dslashTuning = QUDA_TUNE_YES enables autotuning when the dslash is
 // first launched
 static QudaTune dslashTuning = QUDA_TUNE_NO;
+static QudaVerbosity verbosity = QUDA_SILENT;
 
-void setDslashTuning(QudaTune tune)
+void setDslashTuning(QudaTune tune, QudaVerbosity verbose)
 {
   dslashTuning = tune;
+  verbosity = verbose;
 }
-
-static QudaVerbosity verbosity = QUDA_SILENT;
 
 #include <dslash_textures.h>
 #include <dslash_constants.h>

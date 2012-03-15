@@ -20,7 +20,7 @@ extern "C" {
   extern bool qudaPt0;
   extern bool qudaPtNm1;
 
-  void setDslashTuning(QudaTune tune);
+  void setDslashTuning(QudaTune tune, QudaVerbosity verbose);
 
 #ifdef DSLASH_PROFILING
   void printDslashProfile();
@@ -33,7 +33,7 @@ extern "C" {
 bool getDslashLaunch();
 
 void initCommonConstants(const LatticeField &lat);
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride, QudaVerbosity);
+void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
 void initCloverConstants(const int cl_stride);
 void initDomainWallConstants(const int Ls);
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);

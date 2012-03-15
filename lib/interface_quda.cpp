@@ -844,8 +844,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
   }
 
-  setDslashTuning(param->dirac_tune);
-  quda::setBlasTuning(param->dirac_tune);
+  // FIXME: need to rename "dirac_tune" parameter
+  setDslashTuning(param->dirac_tune, param->verbosity);
+  quda::setBlasTuning(param->dirac_tune, param->verbosity);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE) {
@@ -1074,7 +1075,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
   }
 
-  setDslashTuning(param->dirac_tune);
+  setDslashTuning(param->dirac_tune, param->verbosity);
+  quda::setBlasTuning(param->dirac_tune, param->verbosity);
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [param->num_offset];
@@ -1433,7 +1435,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   // tune the Dirac Kernel
-  setDslashTuning(param->dirac_tune);
+  setDslashTuning(param->dirac_tune, param->verbosity);
+  quda::setBlasTuning(param->dirac_tune, param->verbosity);
   // if set, tuning will happen in the first multishift call
   
   massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
