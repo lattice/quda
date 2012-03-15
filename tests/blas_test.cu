@@ -18,7 +18,7 @@ const int Nspin = 4;
 // corresponds to 1 iterations for V=16^4, Nspin = 4, at half precision
 const int Niter = max(1, 1 * (16*16*16*16*4) / (LX * LY * LZ * LT * Nspin));
 
-const int Nkernels = 17;
+const int Nkernels = 31;
 const int ThreadMin = 32;
 const int ThreadMax = 32;
 const int GridMin = 1;

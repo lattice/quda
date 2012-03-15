@@ -197,126 +197,121 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
   }
 
 }
-
 /**
-   Generic reduction Kernel launcher
+   Generic reduction kernel launcher
 */
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
 	  int M, int writeX, int writeY, int writeZ, 
 	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
 	  typename Reducer, typename OutputX, typename OutputY, typename OutputZ>
 doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
-		     OutputX XX, OutputY YY, OutputZ ZZ, int length) {
-  // when there is only one warp per block, we need to allocate two warps 
-  // worth of shared memory so that we don't index shared memory out of bounds
-  size_t smemSize = (blasBlock.x <= 32) ? blasBlock.x * 2 * sizeof(ReduceType) : 
-    blasBlock.x * sizeof(ReduceType);
-
+		     OutputX XX, OutputY YY, OutputZ ZZ, int length, const TuneParam &tp,
+		     const cudaStream_t &stream) {
   ReduceType *partial = (ReduceType*)d_reduce;
   ReduceType *complete = (ReduceType*)hd_reduce;
 
-  if (blasBlock.x == 32) {
+  if (tp.block.x == 32) {
     reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 64) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 64) {
     reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 96) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 96) {
     reduceKernel<96,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 128) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 128) {
     reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 160) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 160) {
     reduceKernel<160,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 192) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 192) {
     reduceKernel<192,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 224) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 224) {
     reduceKernel<224,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 256) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 256) {
     reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 288) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 288) {
     reduceKernel<288,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 320) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 320) {
     reduceKernel<320,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 352) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 352) {
     reduceKernel<352,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 384) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 384) {
     reduceKernel<384,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 416) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 416) {
     reduceKernel<416,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 448) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 448) {
     reduceKernel<448,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 480) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 480) {
     reduceKernel<480,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 512) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 512) {
     reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } /*else if (blasBlock.x == 544) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } /*else if (tp.block.x == 544) {
     reduceKernel<544,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 576) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 576) {
     reduceKernel<576,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 608) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 608) {
     reduceKernel<608,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 640) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 640) {
     reduceKernel<640,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 672) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 672) {
     reduceKernel<672,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 704) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 704) {
     reduceKernel<704,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 736) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 736) {
     reduceKernel<736,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 768) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 768) {
     reduceKernel<768,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 800) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 800) {
     reduceKernel<800,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 832) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 832) {
     reduceKernel<832,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 864) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 864) {
     reduceKernel<864,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 896) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 896) {
     reduceKernel<896,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 928) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 928) {
     reduceKernel<928,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 960) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 960) {
     reduceKernel<960,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 992) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 992) {
     reduceKernel<992,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } else if (blasBlock.x == 1024) {
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+  } else if (tp.block.x == 1024) {
     reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< blasGrid, blasBlock, smemSize, *blasStream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
       } */ else {
-    errorQuda("Reduction not implemented for %d threads", blasBlock.x);
+    errorQuda("Reduction not implemented for %d threads", tp.block.x);
   }
 
   if(deviceProp.canMapHostMemory) {
-    cudaEventRecord(reduceEnd, *blasStream);
+    cudaEventRecord(reduceEnd, stream);
     while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
   } else {
     cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost);
@@ -331,6 +326,97 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
 
   return cpu_sum;
 }
+
+
+template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
+	  int M, int writeX, int writeY, int writeZ, 
+	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
+	  typename Reducer, typename OutputX, typename OutputY, typename OutputZ>
+class ReduceCuda : public Tunable {
+
+private:
+  InputX &X;
+  InputY &Y;
+  InputZ &Z;
+  InputW &W;
+  InputV &V;
+  OutputX &XX;
+  OutputY &YY;
+  OutputZ &ZZ;
+  Reducer &r;
+  const int length;
+  doubleN &result;
+
+  int sharedBytesPerThread() const { return sizeof(ReduceType); }
+
+  // when there is only one warp per block, we need to allocate two warps 
+  // worth of shared memory so that we don't index shared memory out of bounds
+  int sharedBytesPerBlock() const { 
+    int warpSize = 32; // FIXME - use device property query
+    return 2*warpSize*sizeof(ReduceType); 
+  }
+
+  virtual bool advanceSharedBytes(TuneParam &param) const
+  {
+    TuneParam next(param);
+    advanceBlockDim(next); // to get next blockDim
+    int nthreads = next.block.x * next.block.y * next.block.z;
+    param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock() ?
+      sharedBytesPerThread()*nthreads : sharedBytesPerBlock();
+    return false;
+  }
+
+public:
+  ReduceCuda(doubleN &result, InputX &X, InputY &Y, InputZ &Z, InputW &W, InputV &V, Reducer &r, 
+	     OutputX &XX, OutputY &YY, OutputZ &ZZ, int length) :
+  result(result), X(X), Y(Y), Z(Z), W(W), V(V), r(r), XX(XX), YY(YY), ZZ(ZZ), length(length)
+    { ; }
+  virtual ~ReduceCuda() { }
+
+  TuneKey tuneKey() const {
+    std::stringstream vol, aux;
+    vol << blasConstants.x[0] << "x";
+    vol << blasConstants.x[1] << "x";
+    vol << blasConstants.x[2] << "x";
+    vol << blasConstants.x[3];    
+    aux << blasConstants.stride << XX.Precision();
+    return TuneKey(vol.str(), typeid(r).name(), aux.str());
+  }  
+
+  void apply(const cudaStream_t &stream) {
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
+      (X, Y, Z, W, V, r, XX, YY, ZZ, length, tp, stream);
+  }
+
+  void preTune() { 
+    if (writeX) XX.save();
+    if (writeY) YY.save();
+    if (writeZ) ZZ.save();
+  }
+
+  void postTune() {
+    if (writeX) XX.load(); 
+    if (writeY) YY.load(); 
+    if (writeZ) ZZ.load(); 
+  }
+
+  long long flops() const { return r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
+  long long bytes() const { 
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    if (XX.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
+    return r.streams()*bytes*length; }
+
+  std::string paramString(const TuneParam &param) const {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+};
+
+
 
 /**
    Driver for generic reduction routine with two loads.
@@ -359,11 +445,12 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
   checkSpinor(x, w);
   checkSpinor(x, v);
 
-  if (blasGrid.x > REDUCE_MAX_BLOCKS) {
-    errorQuda("reduce_core: grid size %d must be smaller than %d", blasGrid.x, REDUCE_MAX_BLOCKS);
-  }
+  for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
+  blasConstants.stride = x.Stride();
 
   doubleN value;
+
+  Tunable *reduce = 0;
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     const int M = 1; // determines how much work per thread to do
     SpinorTexture<double2,double2,double2,M,0> xTex(x);
@@ -377,8 +464,12 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
     Spinor<double2,double2,double2,M> W(w);
     Spinor<double2,double2,double2,M> V(v);
     Reducer<ReduceType, double2, double2> r(a,b);
-    value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ>
-      (xTex, yTex, zTex, W, V, r, X, Y, Z, x.Length()/(2*M));
+    reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ,
+      SpinorTexture<double2,double2,double2,M,0>, SpinorTexture<double2,double2,double2,M,1>,
+      SpinorTexture<double2,double2,double2,M,2>, Spinor<double2,double2,double2,M>,
+      Spinor<double2,double2,double2,M>, Reducer<ReduceType, double2, double2>, 
+      Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M> >
+      (value, xTex, yTex, zTex, W, V, r, X, Y, Z, x.Length()/(2*M));
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     const int M = 1;
     SpinorTexture<float4,float4,float4,M,0> xTex(x);
@@ -396,8 +487,12 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
     Spinor<float4,float4,float4,M> W(w);
     Spinor<float4,float4,float4,M> V(v);
     Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-    value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,M,writeX,writeY,writeZ>
-      (xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, x.Length()/(4*M));
+    reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,M,writeX,writeY,writeZ,
+      SpinorTexture<float4,float4,float4,M,0>,  SpinorTexture<float4,float4,float4,M,1>,
+      SpinorTexture<float4,float4,float4,M,2>,  SpinorTexture<float4,float4,float4,M,3>,
+      SpinorTexture<float4,float4,float4,M,4>, Reducer<ReduceType, float2, float4>,
+      Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M> >
+      (value, xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, x.Length()/(4*M));
   } else {
     if (x.Nspin() == 4){ //wilson
       SpinorTexture<float4,float4,short4,6,0> xTex(x);
@@ -413,8 +508,12 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
       Spinor<float4,float4,short4,6> yOut(y);
       Spinor<float4,float4,short4,6> zOut(z);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ>
-	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ,
+	SpinorTexture<float4,float4,short4,6,0>, SpinorTexture<float4,float4,short4,6,1>,
+	SpinorTexture<float4,float4,short4,6,2>, SpinorTexture<float4,float4,short4,6,3>,
+	SpinorTexture<float4,float4,short4,6,4>, Reducer<ReduceType, float2, float4>,
+	Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6> >
+	(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
       SpinorTexture<float2,float2,short2,3,1> yTex;
@@ -429,15 +528,22 @@ doubleN reduceCuda(const int kernel, const double2 &a, const double2 &b, cudaCol
       Spinor<float2,float2,short2,3> yOut(y);
       Spinor<float2,float2,short2,3> zOut(z);
       Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      value = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,float2,3,writeX,writeY,writeZ>
-	(xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,writeX,writeY,writeZ,
+	SpinorTexture<float2,float2,short2,3,0>, SpinorTexture<float2,float2,short2,3,1>,
+	SpinorTexture<float2,float2,short2,3,2>, SpinorTexture<float2,float2,short2,3,3>,
+	SpinorTexture<float2,float2,short2,3,4>, Reducer<ReduceType, float2, float2>,
+	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3> >
+	(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     quda::blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.Volume()*sizeof(float);
   }
   quda::blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.RealLength()*x.Precision();
   quda::blas_flops += Reducer<ReduceType,double2,double2>::flops()*x.RealLength();
 
-  if (!blasTuning) checkCudaError();
+  reduce->apply(*blasStream);
+  delete reduce;
+
+  checkCudaError();
 
   return value;
 }

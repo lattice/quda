@@ -343,6 +343,9 @@ void checkTypes() {
 
 }
 
+// FIXME: Can we merge the Spinor and SpinorTexture objects so that
+// reading from texture is simply a constructor option?
+
 // the number of elements per virtual register
 #define REG_LENGTH (sizeof(RegType) / sizeof(((RegType*)0)->x))
 
@@ -420,6 +423,15 @@ class SpinorTexture {
   }
 
   // no save method for Textures
+
+  QudaPrecision Precision() { 
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
+    if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(short)) precision = QUDA_HALF_PRECISION;
+    else errorQuda("Unknown precision type\n");
+    return precision;
+  }
 };
 
 /**

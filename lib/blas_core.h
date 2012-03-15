@@ -1,6 +1,3 @@
-#include <tune_quda.h>
-#include <typeinfo>
-
 /**
    Generic blas kernel with four loads and up to four stores.
  */
@@ -29,11 +26,6 @@ __global__ void blasKernel(InputX X, InputY Y, InputZ Z, InputW W, Functor f,
   }
 }
 
-static struct {
-  int x[QUDA_MAX_DIM];
-  int stride;
-} blasConstants;
-
 template <typename FloatN, int M, int writeX, int writeY, int writeZ, int writeW, 
   typename InputX, typename InputY, typename InputZ, typename InputW, 
   typename OutputX, typename OutputY, typename OutputZ, typename OutputW, typename Functor>
@@ -54,6 +46,16 @@ private:
   int sharedBytesPerThread() const { return 0; }
   int sharedBytesPerBlock() const { return 0; }
 
+  virtual bool advanceSharedBytes(TuneParam &param) const
+  {
+    TuneParam next(param);
+    advanceBlockDim(next); // to get next blockDim
+    int nthreads = next.block.x * next.block.y * next.block.z;
+    param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock() ?
+      sharedBytesPerThread()*nthreads : sharedBytesPerBlock();
+    return false;
+  }
+
 public:
   BlasCuda(InputX &X, InputY &Y, InputZ &Z, InputW &W, Functor &f, 
 	   OutputX &XX, OutputY &YY, OutputZ &ZZ, OutputW &WW, int length) :
@@ -71,38 +73,25 @@ public:
     return TuneKey(vol.str(), typeid(f).name(), aux.str());
   }  
 
-  // for the blas tuning we typically favour small grids
-  bool advanceGridDim(TuneParam &param) const
-  {
-    const unsigned int max_blocks = 256;
-    const int step = 1;
-    param.grid.x += step;
-    if (param.grid.x > max_blocks) {
-      param.grid.x = step;
-      return false;
-    } else {
-      return true;
-    }
-  }
-
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
-    blasKernel<FloatN,M,writeX,writeY,writeZ,writeW><<<tp.grid, tp.block, 0, stream>>>
+    blasKernel<FloatN,M,writeX,writeY,writeZ,writeW>
+      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>
       (X, Y, Z, W, f, XX, YY, ZZ, WW, length);
   }
 
   void preTune() { 
-    XX.save();
-    YY.save();
-    ZZ.save();
-    WW.save();
+    if (writeX) XX.save();
+    if (writeY) YY.save();
+    if (writeZ) ZZ.save();
+    if (writeW) WW.save();
   }
 
   void postTune() {
-    XX.load(); 
-    YY.load(); 
-    ZZ.load(); 
-    WW.load(); 
+    if (writeX) XX.load(); 
+    if (writeY) YY.load(); 
+    if (writeZ) ZZ.load(); 
+    if (writeW) WW.load(); 
   }
 
   long long flops() const { return f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
@@ -234,6 +223,6 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
   blas->apply(*blasStream);
   delete blas;
 
-  if (!blasTuning) checkCudaError();
+  checkCudaError();
 }
 

@@ -65,12 +65,24 @@ class Tunable {
  protected:
   virtual long long flops() const { return 1e9; } // FIXME: make pure virtual
   virtual long long bytes() const { return 1e9; } // FIXME
+
+  // the minimum number of shared bytes per thread
   virtual int sharedBytesPerThread() const = 0;
+
+  // the minimum number of shared bytes per thread block
   virtual int sharedBytesPerBlock() const = 0;
 
   virtual bool advanceGridDim(TuneParam &param) const
   {
-    return false; // FIXME: generalize for blas
+    const unsigned int max_blocks = 256; // FIXME: set a reasonable value for blas currently
+    const int step = 1;
+    param.grid.x += step;
+    if (param.grid.x > max_blocks) {
+      param.grid.x = step;
+      return false;
+    } else {
+      return true;
+    }
   }
 
   virtual bool advanceBlockDim(TuneParam &param) const
@@ -105,7 +117,8 @@ class Tunable {
       TuneParam next(param);
       advanceBlockDim(next); // to get next blockDim
       int nthreads = next.block.x * next.block.y * next.block.z;
-      param.shared_bytes = sharedBytesPerThread()*nthreads + sharedBytesPerBlock();
+      param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock() ?
+	sharedBytesPerThread()*nthreads : sharedBytesPerBlock();
       return false;
     } else {
       return true;
@@ -142,9 +155,11 @@ class Tunable {
 
   virtual void initTuneParam(TuneParam &param) const
   {
-    param.block = dim3(32,1,1);
+    int min_block_size = 32;
+    param.block = dim3(min_block_size,1,1);
     param.grid = dim3(1,1,1);
-    param.shared_bytes = sharedBytesPerThread()*32 + sharedBytesPerBlock();
+    param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock() ?
+      sharedBytesPerThread()*min_block_size : sharedBytesPerBlock();
   }
 
   virtual bool advanceTuneParam(TuneParam &param) const

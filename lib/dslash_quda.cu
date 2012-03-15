@@ -286,7 +286,6 @@ class DslashCuda : public Tunable {
 TuneKey DslashCuda::tuneKey() const
 {
   std::stringstream vol, aux;
-  char comm[5], ghost[5];
   
   vol << dslashConstants.x[0] << "x";
   vol << dslashConstants.x[1] << "x";
@@ -295,6 +294,7 @@ TuneKey DslashCuda::tuneKey() const
 
   aux << "type=";
 #ifdef MULTI_GPU
+  char comm[5], ghost[5];
   switch (dslashParam.kernel_type) {
   case INTERIOR_KERNEL: aux << "interior"; break;
   case EXTERIOR_KERNEL_X: aux << "exterior_x"; break;
@@ -1399,6 +1399,7 @@ private:
 
   int sharedBytesPerThread() const { return 0; }
   int sharedBytesPerBlock() const { return 0; }
+  bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
 
   char *saveOut, *saveOutNorm;
 
@@ -1427,7 +1428,7 @@ public:
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-    twistGamma5Kernel<<<gridDim, tp.block, 0>>> 
+    twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>> 
       (out, outNorm, a, b, in, inNorm, dslashParam);
   }
 
@@ -1463,9 +1464,9 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 {
   dslashParam.threads = in->Volume();
 
+#ifdef GPU_TWISTED_MASS_DIRAC
   Tunable *twistGamma5 = 0;
 
-#ifdef GPU_TWISTED_MASS_DIRAC
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
     twistGamma5 = new TwistGamma5Cuda<double2>
