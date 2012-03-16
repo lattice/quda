@@ -155,11 +155,18 @@ class Tunable {
 
   virtual void initTuneParam(TuneParam &param) const
   {
-    int min_block_size = 32;
+    const int min_block_size = 32;
     param.block = dim3(min_block_size,1,1);
     param.grid = dim3(1,1,1);
     param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock() ?
       sharedBytesPerThread()*min_block_size : sharedBytesPerBlock();
+  }
+
+  /** sets default values for when tuning is disabled */
+  virtual void setDefaultTuneParam(TuneParam &param) const
+  {
+    initTuneParam(param);
+    param.grid = dim3(128,1,1);
   }
 
   virtual bool advanceTuneParam(TuneParam &param) const

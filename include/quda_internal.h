@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 
 #ifdef USE_QDPJIT
-#include "quda_qdpjit.h"
+#include "qdp_quda.h"
 #endif
 
 #ifdef QMP_COMMS

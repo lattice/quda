@@ -19,7 +19,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
   const TuneKey key = tunable.tuneKey();
 
   if (enabled == QUDA_TUNE_NO) {
-    tunable.initTuneParam(param);
+    tunable.setDefaultTuneParam(param);
   } else if (tuneCache.count(key)) {
     param = tuneCache[key];
   } else if (!tuning) {
