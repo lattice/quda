@@ -44,9 +44,6 @@ BiCGstab::~BiCGstab() {
 
 void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
 {
-  if (invParam.cuda_prec_sloppy != invParam.prec_precondition)
-    errorQuda("BiCGstab does not yet support different sloppy and preconditioner precisions");
-
   if (!init) {
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
