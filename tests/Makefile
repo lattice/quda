@@ -77,4 +77,4 @@ clean:
 %.o: %.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-.PHONY: all tune clean
+.PHONY: all clean

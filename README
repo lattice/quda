@@ -108,7 +108,7 @@ Known Issues:
   re-enable double-precision texture reads on Fermi-based Tesla and
   Quadro cards, pass the --enable-fermi-double-tex flag to configure.
   This flag has no effect when the library is build for GPU
-  architectures other than Fermi.
+  architectures other than Fermi (sm_20).
 
 
 Getting Help:
@@ -162,3 +162,4 @@ OCI-1060067.  Any opinions, findings, and conclusions or
 recommendations expressed in this material are those of the authors
 and do not necessarily reflect the views of the Department of Energy
 or the National Science Foundation.
+
