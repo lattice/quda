@@ -69,7 +69,7 @@ public:
     vol << blasConstants.x[1] << "x";
     vol << blasConstants.x[2] << "x";
     vol << blasConstants.x[3];    
-    aux << blasConstants.stride << XX.Precision();
+    aux << "stride=" << blasConstants.stride << ",prec=" << XX.Precision();
     return TuneKey(vol.str(), typeid(f).name(), aux.str());
   }  
 
@@ -99,14 +99,6 @@ public:
     size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
     if (XX.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
     return f.streams()*bytes*length; }
-
-  std::string paramString(const TuneParam &param) const {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
 };
 
 /**

@@ -88,7 +88,7 @@ class Tunable {
   virtual bool advanceBlockDim(TuneParam &param) const
   {
     const unsigned int max_threads = 512; // FIXME: use deviceProp.maxThreadsDim[0];
-    const int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
+    const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
     const int step = 32; // FIXME: use deviceProp.warpSize;
     param.block.x += step;
     if (param.block.x > max_threads || sharedBytesPerThread()*param.block.x > max_shared) {
@@ -137,11 +137,11 @@ class Tunable {
 
   virtual std::string paramString(const TuneParam &param) const
   {
-    std::stringstream ss;
-    ss << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ss << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    ss << "shared=" << param.shared_bytes;
-    return ss.str();
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
   }
 
   virtual std::string perfString(float time) const
@@ -164,7 +164,7 @@ class Tunable {
   }
 
   /** sets default values for when tuning is disabled */
-  virtual void setDefaultTuneParam(TuneParam &param) const
+  virtual void defaultTuneParam(TuneParam &param) const
   {
     initTuneParam(param);
     param.grid = dim3(128,1,1);

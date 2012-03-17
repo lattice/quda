@@ -1,12 +1,15 @@
 
-Release Notes for QUDA v0.4.0                         XX February 2011
+Release Notes for QUDA v0.4.0                            XX March 2012
 -----------------------------
+
+*** This is a pre-release version of QUDA.  The interface may change
+    in 0.4.0 final.
 
 Overview:
 
 QUDA is a library for performing calculations in lattice QCD on
 graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
-This release includes optimized kernels for applying several different
+This release includes optimized kernels for applying a variety of
 Dirac operators (Wilson, clover-improved Wilson, twisted mass,
 improved staggered, and domain wall), kernels for performing various
 BLAS-like operations, and full inverters built on these kernels.
@@ -15,15 +18,14 @@ with support for double, single, and half (16-bit fixed-point)
 precision.  The staggered implementation additionally includes support
 for asqtad link fattening, force terms for the asqtad fermion action
 and one-loop improved Symanzik gauge action, and a multi-shift CG
-solver.  Initial support for multiple GPUs is enabled in this release;
-however, this is currently limited to Wilson, clover, and twisted mass
-Dirac operators.
+solver.  Use of multiple GPUs in parallel is supported for all actions
+except domain wall.
 
 
 Software Compatibility:
 
-The library has been tested under Linux (CentOS 5.5 and Ubuntu 10.04)
-using release 3.2 of the CUDA toolkit.  CUDA 2.x and earlier are no
+The library has been tested under Linux (CentOS 5.7 and Ubuntu 10.04)
+using release 4.1 of the CUDA toolkit.  CUDA 3.x and earlier are no
 longer supported.  The library also seems to work under Mac OS X
 10.6.5 ("Snow Leopard") on recent 64-bit Intel-based Macs.
 
@@ -34,59 +36,51 @@ Hardware Compatibility:
 
 For a list of supported devices, see
 
-http://www.nvidia.com/object/cuda_learn_products.html
+http://developer.nvidia.com/cuda-gpus
 
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
-running the deviceQuery example in the CUDA SDK, and set GPU_ARCH in
-make.inc appropriately.  Setting GPU_ARCH to 'sm_13' or 'sm_20' will
-enable double precision support.
+running the deviceQuery example in the CUDA SDK, and pass the
+appropriate value to QUDA's configure script.  For example, the Tesla
+C1060 is listed on the above website as having compute capability 1.3,
+and so to configure the library for this card, you'd run "configure
+--enable-gpu-arch=sm_13 [other options]" before typing "make".
 
 
 Installation:
 
-In the source directory, copy 'make.inc.example' to 'make.inc', and
-edit the first few lines to specify the CUDA install path, the
-platform (x86 or x86_64), and the GPU architecture (see "Hardware
-Compatibility" above).  Then type 'make' to build the library.
+Installing the library involves running "configure" followed by
+"make".  See "./configure --help" for a list of configure options.
+At a minimum, you'll probably want to set the GPU architecture; see
+"Hardware Compatibility" above.
 
-Optionally you can now generate a 'make.inc' using the Autoconf
-./configure script. See ./configure --help for the options available.
-The ./configure script allows you to sed most User configurable features
-(hardware capability, multi-gpu build, QMP and MPI location) with the
-usual barrage of --enable-feature and --with-package options.
-Once ./configure has created your make.inc, you can run 'make' to build
-the library
+Enabling multi-GPU support requires passing the --with-mpi=<path> and
+optionally the --with-qmp=<path> flags to configure.  If only the
+former is given, QUDA will use MPI directly for communications.  If
+both are given, QUDA will use QMP.  In some environments, it may also
+be necessary to specify the MPI-enabled compilers on the configure
+line as follows: ./configure <configure options> CC=mpicc CXX=mpicxx
+These compilers should be in your path.  Finally, on some systems,
+executables compiled against MPI will not run without "mpirun".  This
+has the side-effect of causing the configure script to believe that
+the compiler is failing to produce a valid executable.  To skip these
+checks, one can trick configure into thinking that it's
+cross-compiling by setting the --build=none and --host=<host> flags.
+For the latter, "--host=x86_64-linux-gnu" should work on a 64-bit
+linux system.
 
-As an optional step, 'make tune' will invoke tests/blas_test to
-perform autotuning of the various BLAS-like functions needed by the
-inverters.  This involves testing many combinations of launch
-parameters (corresponding to different numbers of CUDA threads per
-block and blocks per grid for each kernel) and writing the optimal
-values to lib/blas_param.h.  The new values will take effect the next
-time the library is built.  Ideally, the autotuning should be
-performed on the machine where the library is to be used, since the
-optimal parameters will depend on the CUDA device and host hardware.
-They will also depend slightly on the lattice volume; if desired, the
-volume used in the autotuning can be changed by editing
-tests/blas_test.cu.
-
-In summary, for an optimized install, run
-
-    make && make tune && make
-
-(after optionally editing blas_test.cu).  By default, the autotuning
-is performed using CUDA device 0.  To select a different device
-number, set DEVICE in make.inc appropriately.
-
-Building the multiple GPU library requires the enabling of the
-appropriate flags in the make.inc file.  Specifically, the
-BUILD_MULTI_GPU and BUILD_QMP flags must be set to 'yes'.
-Additionally, optimum performance will generally be obtained if the
-OVERLAP_COMMS option is enabled to overlap kernel computation and
-inter-GPU communication.  Multiple GPUs are controlled using QMP, and
-so QMP and MPI must be installed on the host systems, and the QMP_HOME
-and MPI_HOME paths must be set.
+Throughout the library, auto-tuning is used to select optimal launch
+parameters for most performance-critical kernels.  This tuning
+process takes some time and will generally slow things down the first
+time a given kernel is called during a run.  To avoid this one-time
+overhead in subsequent runs (using the same action, solver, lattice
+volume, etc.), the optimal parameters are cached to disk.  For this
+to work, the QUDA_RESOURCE_PATH environment variable must be set,
+pointing to a writeable directory.  Note that since the tuned parameters
+are hardware-specific, this "resource directory" should not be shared
+between jobs running on different systems (e.g., two clusters
+with different GPUs installed).  Attempting to use parameters tuned
+for one card on a different card may lead to unexpected errors.
 
 
 Using the Library:
@@ -100,19 +94,6 @@ enumerated in include/enum_quda.h.
 
 Known Issues:
 
-* When the library is compiled with version 3.0 of the CUDA toolkit
-  and run on Fermi (GPU architecture sm_20), the RECONSTRUCT_8 option
-  (which enables reconstructing gauge matrices from 8 real numbers)
-  gives wrong results in double precision.  This appears to be a bug
-  in CUDA 3.0, since CUDA 3.1 has no such issue.  Note that this
-  problem isn't likely to matter in practice, since RECONSTRUCT_8
-  generally performs worse in double precision than RECONSTRUCT_12.
-
-* Compiling in emulation mode with CUDA 3.0 does not with work when
-  the GPU architecture is set to sm_10, sm_11, or sm_12.  One should
-  compile for sm_13 instead.  Note that NVIDIA has eliminated
-  emulation mode completely from CUDA 3.1 and later.
-
 * For compatibility with CUDA, on 32-bit platforms the library is
   compiled with the GCC option -malign-double.  This differs from the
   GCC default and may affect the alignment of various structures,
@@ -120,43 +101,48 @@ Known Issues:
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
 
-* Fermi GeForce cards have hanging issues when accessing
-  double-precision textures.  This can lead to hanging and will put
-  the GPU in an error state only recoverable with a soft reset.  By
-  default QUDA will perform all double-precision loads directly on
-  Fermi, as the cost of some performance.  Configuring with the flag
-  --enable-fermi-double-tex will enable double precision textures for
-  use on Fermi Tesla / Quadro cards.  Pre-Fermi cards are unaffected
-  by this flag.
+* With current drivers, Fermi-based GeForce cards suffer from
+  occasional hangs when reading from double-precision textures,
+  recoverable only with a soft reset.  Such texture reads are thus
+  disabled by default, at the expense of some performance.  To
+  re-enable double-precision texture reads on Fermi-based Tesla and
+  Quadro cards, pass the --enable-fermi-double-tex flag to configure.
+  This flag has no effect when the library is build for GPU
+  architectures other than Fermi.
+
 
 Getting Help:
 
-Please visit http://lattice.bu.edu/quda for contact information.
+Please visit http://lattice.github.com/quda for contact information.
 Bug reports are especially welcome.
 
 
 Acknowledging QUDA:
 
-If you find this code useful in your work, please cite:
+If you find this software useful in your work, please cite:
 
 M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
 Lattice QCD systems of equations using mixed precision solvers on GPUs,"
 Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
 
-Additionally, if you use the multiple GPU version, please additionally cite:
+When taking advantage of multi-GPU support, please also cite:
 
-R. Babich, M. A. Clark and B. Joo, "Parallelizing the QUDA Library for
-Multi-GPU Calculations in Lattice Quantum Chromodynamics,"
-International Conference for High Performance Computing, Networking,
-Storage and Analysis (SC), 2010 [arXiv:1011.0024[ hep-lat]].
+R. Babich, M. A. Clark, B. Joo, G. Shi, R. C. Brower, and S. Gottlieb,
+"Scaling lattice QCD beyond 100 GPUs," International Conference for
+High Performance Computing, Networking, Storage and Analysis (SC),
+2011 [arXiv:1109.2935 [hep-lat]].
+
+Several other papers that might be of interest are listed at
+http://lattice.github.com/quda .
 
 
 Authors:
 
-Ronald Babich (Boston University)
+Ronald Babich (NVIDIA)
 Kipton Barros (Los Alamos National Laboratory)
 Richard Brower (Boston University)
-Michael Clark (Harvard University)
+Michael Clark (NVIDIA)
+Justin Foley (University of Utah)
 Joel Giedt (Rensselaer Polytechnic Institute)
 Steven Gottlieb (Indiana University)
 Balint Joo (Jefferson Laboratory)
@@ -168,3 +154,11 @@ Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications
 http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html
 
+Development was supported in part by the U.S. Department of Energy
+under grants DE-FC02-06ER41440, DE-FC02-06ER41449, and
+DE-AC05-06OR23177, as well as by the National Science Foundation under
+grants DGE-0221680, PHY-0427646, PHY-0835713, OCI-0946441, and
+OCI-1060067.  Any opinions, findings, and conclusions or
+recommendations expressed in this material are those of the authors
+and do not necessarily reflect the views of the Department of Energy
+or the National Science Foundation.
