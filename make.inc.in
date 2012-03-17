@@ -48,8 +48,6 @@ FECC = @FECC@ 	      # Front end CC
 FECXX = @FECXX@           # Front end CXX
 
 MPI_HOME=@MPI_HOME@
-MPICC = $(MPI_HOME)/bin/mpicc
-MPICXX = $(MPI_HOME)/bin/mpicxx
 
 QMP_HOME=@QMP_HOME@
 
@@ -90,14 +88,10 @@ ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
   NVCCOPT += -DMULTI_GPU
 endif
 
-RUN =
 CC  = $(FECC)
 CXX = $(FECXX)
 
 ifeq ($(strip $(BUILD_QMP)), yes)
-  RUN = $(MPI_HOME)/bin/mpirun -np 1
-  CC = $(MPICC)
-  CXX = $(MPICXX)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
@@ -107,9 +101,6 @@ ifeq ($(strip $(BUILD_QMP)), yes)
 endif 
 
 ifeq ($(strip $(BUILD_MPI)), yes)
-  RUN = $(MPI_HOME)/bin/mpirun -np 1
-  CC = $(MPICC)
-  CXX = $(MPICXX)
   MPI_CFLAGS =
   MPI_LDFLAGS =
   MPI_LIBS =
