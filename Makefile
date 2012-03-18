@@ -11,9 +11,8 @@ tests:
 	$(MAKE) -C tests/
 
 tune:
-	$(MAKE) -C tests/ tune
-	@echo "Autotuning completed successfully. " \
-	      "Please type 'make' to rebuild library."
+	@echo "Manual tuning is no longer required.  Please see README file."
+
 gen:
 	$(MAKE) -C lib/ gen
 

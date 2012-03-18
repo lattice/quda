@@ -253,6 +253,12 @@ void initCommonConstants(const LatticeField &lat) {
   cudaMemcpyToSymbol("PtNm1", &(qudaPtNm1), sizeof(bool)); 
 
   checkCudaError();
+
+  // copy a few of the constants needed by tuneLaunch()
+  dslashConstants.x[0] = X1;
+  dslashConstants.x[1] = X2;
+  dslashConstants.x[2] = X3;
+  dslashConstants.x[3] = X4;
 }
 
 void initGaugeFieldConstants(const cudaGaugeField &gauge) 
@@ -281,7 +287,6 @@ void initGaugeFieldConstants(const cudaGaugeField &gauge)
 
 void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride) 
 {
-
   initCommonConstants(gauge);
 
   cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));  
@@ -383,6 +388,7 @@ void initCloverConstants (const int cl_stride) {
 
 void initDomainWallConstants(const int Ls) {
   cudaMemcpyToSymbol("Ls", &Ls, sizeof(int));  
+  dslashConstants.Ls = Ls; // needed by tuneLaunch()
 
   initDomainWall = 1;
 }

@@ -18,7 +18,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h dirac_quda.h	     \
 	hisq_force_utils.h double_single.h texture.h numa_affinity.h
 
 # These are only inlined into blas_quda.cu
-BLAS_INLN = blas_param.h blas_core.h reduce_core.h
+BLAS_INLN = blas_core.h reduce_core.h
 
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/

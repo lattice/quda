@@ -211,11 +211,6 @@ double dslashCUDA() {
   printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);
 
-  if (test_type < 2)
-    dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp);
-  else
-    dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp);
-
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
@@ -308,6 +303,12 @@ int main(int argc, char **argv)
 
   for (int i=0; i<attempts; i++) {
     
+    if (tune) { // warm-up run
+      printfQuda("Tuning...\n");
+      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);      
+      dslashCUDA(1);
+    }
+
     double secs = dslashCUDA();
 
     if (!transfer) *spinorOut = *cudaSpinorOut;

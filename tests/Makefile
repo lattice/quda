@@ -60,9 +60,6 @@ hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o fermion_fo
 hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-tune: blas_test
-	$(RUN) ./blas_test $(DEVICE) && cp -f blas_param.h ../lib/
-
 clean:
 	-rm -f *.o staggered_dslash_test staggered_invert_test		\
 	wilson_dslash_test wilson_invert_test domain_wall_dslash_test	\
@@ -80,4 +77,4 @@ clean:
 %.o: %.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-.PHONY: all tune clean
+.PHONY: all clean

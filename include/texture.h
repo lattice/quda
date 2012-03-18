@@ -343,6 +343,9 @@ void checkTypes() {
 
 }
 
+// FIXME: Can we merge the Spinor and SpinorTexture objects so that
+// reading from texture is simply a constructor option?
+
 // the number of elements per virtual register
 #define REG_LENGTH (sizeof(RegType) / sizeof(((RegType*)0)->x))
 
@@ -420,6 +423,15 @@ class SpinorTexture {
   }
 
   // no save method for Textures
+
+  QudaPrecision Precision() { 
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
+    if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(short)) precision = QUDA_HALF_PRECISION;
+    else errorQuda("Unknown precision type\n");
+    return precision;
+  }
 };
 
 /**
@@ -436,13 +448,27 @@ class Spinor {
   float *norm;
   const int stride;
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
+  StoreType *spinor_h;
+  float *norm_h;
+
+  size_t bytes;
+  size_t norm_bytes;
+#endif
+
  public:
  Spinor(cudaColorSpinorField &x) : 
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH)) 
+  spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH))
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    ,bytes(x.Bytes()), norm_bytes(x.NormBytes())
+#endif
     { checkTypes<RegType,InterType,StoreType>(); } 
 
  Spinor(const cudaColorSpinorField &x) :
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+  spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    ,bytes(x.Bytes()), norm_bytes(x.NormBytes())
+#endif
     { checkTypes<RegType,InterType,StoreType>(); } 
   ~Spinor() {;}
 
@@ -464,6 +490,47 @@ class Spinor {
     convert<InterType, RegType>(y, x, M);
 #pragma unroll
     for (int j=0; j<M; j++) copyFloatN(spinor[i+j*stride], y[j]);
+  }
+
+  // used to backup the field to the host
+  void save() {
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    spinor_h = (StoreType*)(new char[bytes]);
+    cudaMemcpy(spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
+    if (norm_bytes > 0) {
+      norm_h = (float*)(new char[norm_bytes]);
+      cudaMemcpy(norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+    checkCudaError();
+#else
+    errorQuda("Sorry, blas tuning isn't supported on pre-Fermi yet");
+#endif
+  }
+
+  // restore the field from the host
+  void load() {
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    cudaMemcpy(spinor, spinor_h, bytes, cudaMemcpyHostToDevice);
+    if (norm_bytes > 0) {
+      cudaMemcpy(norm, norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      delete(norm_h);
+    }
+    delete(spinor_h);
+    checkCudaError();
+#else
+    errorQuda("Sorry, blas tuning isn't supported on pre-Fermi yet");
+#endif
+  }
+
+  void* V() { return (void*)spinor; }
+  float* Norm() { return norm; }
+  QudaPrecision Precision() { 
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
+    if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
+    else if (sizeof(((StoreType*)0)->x) == sizeof(short)) precision = QUDA_HALF_PRECISION;
+    else errorQuda("Unknown precision type\n");
+    return precision;
   }
 };
 

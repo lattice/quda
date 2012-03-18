@@ -293,25 +293,14 @@ void end() {
 }
 
 // execute kernel
-double dslashCUDA() {
-
-  if (!transfer && tune) {
-    if (test_type < 2) {
-      dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp1);
-    } else {
-      dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp1);
-    }
-  }
-
-  printfQuda("Executing %d kernel loops...\n", loops);
-  fflush(stdout);
+double dslashCUDA(int niter) {
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);
 
-  for (int i = 0; i < loops; i++) {
+  for (int i = 0; i < niter; i++) {
     switch (test_type) {
     case 0:
       if (transfer) {
@@ -344,12 +333,6 @@ double dslashCUDA() {
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
-
-  printfQuda("done.\n\n");
-
-#ifdef DSLASH_PROFILING
-  printDslashProfile();
-#endif
 
   return secs;
 }
@@ -459,7 +442,19 @@ int main(int argc, char **argv)
   int attempts = 1;
   dslashRef();
   for (int i=0; i<attempts; i++) {
-    double secs = dslashCUDA();
+
+    if (tune) { // warm-up run
+      printfQuda("Tuning...\n");
+      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+      dslashCUDA(1);
+    }
+    printfQuda("Executing %d kernel loops...\n", loops);
+    double secs = dslashCUDA(loops);
+    printfQuda("done.\n\n");
+
+#ifdef DSLASH_PROFILING
+    printDslashProfile();
+#endif
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 

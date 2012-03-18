@@ -1,8 +1,8 @@
 #include <dirac_quda.h>
 #include <dslash_quda.h>
 #include <blas_quda.h>
+
 #include <iostream>
-#include <tune_quda.h>
 
 Dirac::Dirac(const DiracParam &param) 
   : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 

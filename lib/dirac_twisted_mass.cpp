@@ -1,49 +1,19 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
-#include <tune_quda.h>
 
-DiracTwistedMass::DiracTwistedMass(const DiracParam &param)
-  : DiracWilson(param), mu(param.mu)
-{
+DiracTwistedMass::DiracTwistedMass(const DiracParam &param) : DiracWilson(param), mu(param.mu) { }
 
-}
+DiracTwistedMass::DiracTwistedMass(const DiracTwistedMass &dirac) : DiracWilson(dirac), mu(dirac.mu) { }
 
-DiracTwistedMass::DiracTwistedMass(const DiracTwistedMass &dirac) 
-  : DiracWilson(dirac), mu(dirac.mu)
-{
-
-}
-
-DiracTwistedMass::~DiracTwistedMass()
-{
-
-}
+DiracTwistedMass::~DiracTwistedMass() { }
 
 DiracTwistedMass& DiracTwistedMass::operator=(const DiracTwistedMass &dirac)
 {
   if (&dirac != this) {
     DiracWilson::operator=(dirac);
-
-    tuneTwist = dirac.tuneTwist;
   }
   return *this;
-}
-
-// Find the best block size parameters for the Dslash and DslashXpay kernels
-void DiracTwistedMass::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			    const cudaColorSpinorField &x) {
-
-  DiracWilson::Tune(out, in, x);
-
-  setDslashTuning(QUDA_TUNE_YES);
-
-  { // Tune twist application
-    TuneDiracTwistedMass twistTune(*this, out, in);
-    twistTune.Benchmark(tuneTwist);
-  }
-
-  setDslashTuning(QUDA_TUNE_NO);
 }
 
 // Protected method for applying twist
@@ -59,7 +29,7 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 
   double flavor_mu = in.TwistFlavor() * mu;
   
-  twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType, tuneTwist);
+  twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType);
 
   flops += 24*in.Volume();
 }
@@ -132,13 +102,7 @@ DiracTwistedMassPC::DiracTwistedMassPC(const DiracParam &param) : DiracTwistedMa
 
 }
 
-DiracTwistedMassPC::DiracTwistedMassPC(const DiracTwistedMassPC &dirac) : DiracTwistedMass(dirac)
-{
-  for (int i=0; i<5; i++) {
-    tuneDslash[i] = dirac.tuneDslash[i];
-    tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
-  }
-}
+DiracTwistedMassPC::DiracTwistedMassPC(const DiracTwistedMassPC &dirac) : DiracTwistedMass(dirac) { }
 
 DiracTwistedMassPC::~DiracTwistedMassPC()
 {
@@ -149,37 +113,8 @@ DiracTwistedMassPC& DiracTwistedMassPC::operator=(const DiracTwistedMassPC &dira
 {
   if (&dirac != this) {
     DiracTwistedMass::operator=(dirac);
-    for (int i=0; i<5; i++) {
-      tuneDslash[i] = dirac.tuneDslash[i];
-      tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
-    }
   }
   return *this;
-}
-
-// Find the best block size parameters for the Dslash and DslashXpay kernels
-void DiracTwistedMassPC::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			      const cudaColorSpinorField &x) {
-  DiracTwistedMass::Tune(out, in, x);
-
-  setDslashTuning(QUDA_TUNE_YES);
-
-  { // Tune Dslash
-    TuneDiracTwistedMassDslash dslashTune(*this, out, in);
-    dslashTune.Benchmark(tuneDslash[0]);
-    for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) dslashTune.Benchmark(tuneDslash[i+1]);
-  }
-
-  { // Tune DslashXpay
-    TuneDiracTwistedMassDslashXpay dslashXpayTune(*this, out, in, x);
-    dslashXpayTune.Benchmark(tuneDslashXpay[0]);
-    for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) 
-	dslashXpayTune.Benchmark(tuneDslashXpay[i+1]);
-  }
-
-  setDslashTuning(QUDA_TUNE_NO);
 }
 
 // Public method to apply the inverse twist
@@ -205,8 +140,7 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-    twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, 
-			  flavor_mu, 0.0, tuneDslash, commDim);
+    twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, flavor_mu, 0.0, commDim);
     flops += (1320+72)*in.Volume();
   } else { // safe to use tmp2 here which may alias in
     bool reset = newTmp(&tmp2, in);
@@ -242,7 +176,7 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
     double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, 
-			  flavor_mu, k, tuneDslashXpay, commDim);
+			  flavor_mu, k, commDim);
     flops += (1320+96)*in.Volume();
   } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
     bool reset = newTmp(&tmp1, in);

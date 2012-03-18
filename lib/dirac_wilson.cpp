@@ -2,36 +2,18 @@
 #include <blas_quda.h>
 #include <iostream>
 
-#include <tune_quda.h>
-
 DiracWilson::DiracWilson(const DiracParam &param) : 
-  Dirac(param), face(param.gauge->X(), 4, 12, 1, param.gauge->Precision())
-{
-
-}
+  Dirac(param), face(param.gauge->X(), 4, 12, 1, param.gauge->Precision()) { }
 
 DiracWilson::DiracWilson(const DiracWilson &dirac) : 
-  Dirac(dirac), face(dirac.face)
-{
-  for (int i=0; i<5; i++) {
-    tuneDslash[i] = dirac.tuneDslash[i];
-    tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
-  }
-}
+  Dirac(dirac), face(dirac.face) { }
 
-DiracWilson::~DiracWilson()
-{
-
-}
+DiracWilson::~DiracWilson() { }
 
 DiracWilson& DiracWilson::operator=(const DiracWilson &dirac)
 {
   if (&dirac != this) {
     Dirac::operator=(dirac);
-    for (int i=0; i<5; i++) {
-      tuneDslash[i] = dirac.tuneDslash[i];
-      tuneDslashXpay[i] = dirac.tuneDslashXpay[i];
-    }
     face = dirac.face;
   }
   return *this;
@@ -46,7 +28,7 @@ void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-  wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, tuneDslash, commDim);
+  wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim);
 
   flops += 1320ll*in.Volume();
 }
@@ -61,7 +43,7 @@ void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorFie
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-  wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, tuneDslashXpay, commDim);
+  wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim);
 
   flops += 1368ll*in.Volume();
 }
@@ -102,31 +84,6 @@ void DiracWilson::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorFiel
 			      const QudaSolutionType solType) const
 {
   // do nothing
-}
-
-// Find the best block size parameters for the Dslash and DslashXpay kernels
-void DiracWilson::Tune(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		       const cudaColorSpinorField &x) {
-  setDslashTuning(QUDA_TUNE_YES);
-
-  { // Tune Dslash
-    TuneDiracWilsonDslash dslashTune(*this, out, in);
-    dslashTune.Benchmark(tuneDslash[0]);
-    for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) 
-	dslashTune.Benchmark(tuneDslash[i+1]);
-  }
-
-  { // Tune DslashXpay
-    TuneDiracWilsonDslashXpay dslashXpayTune(*this, out, in, x);
-    dslashXpayTune.Benchmark(tuneDslashXpay[0]);
-    for (int i=0; i<4; i++) 
-      if (commDimPartitioned(i)) 
-	dslashXpayTune.Benchmark(tuneDslashXpay[i+1]);
-  }
-
-  setDslashTuning(QUDA_TUNE_NO);
-
 }
 
 DiracWilsonPC::DiracWilsonPC(const DiracParam &param)

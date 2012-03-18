@@ -14,10 +14,11 @@ PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
 DEVICE = @DEVICE@         # CUDA device to use for 'make tune'
 
 # compilation options
-HOST_DEBUG = @HOST_DEBUG@      # compile host debug code
-DEVICE_DEBUG = @DEVICE_DEBUG@  # compile device debug code for cuda-gdb 
-VERBOSE = @VERBOSE@            # display kernel register useage
-DSLASH_PROFILING = @DSLASH_PROFILING@ # multi-gpu dslash profiling
+HOST_DEBUG = @HOST_DEBUG@              # compile host debug code
+DEVICE_DEBUG = @DEVICE_DEBUG@          # compile device debug code for cuda-gdb 
+VERBOSE = @VERBOSE@                    # display kernel register useage
+DSLASH_PROFILING = @DSLASH_PROFILING@  # multi-gpu dslash profiling
+FERMI_DBLE_TEX=@FERMI_DBLE_TEX@        # enable double-precision texture reads on Fermi?
 
 BUILD_WILSON_DIRAC = @BUILD_WILSON_DIRAC@       	# build Wilson Dirac operators?
 BUILD_CLOVER_DIRAC = @BUILD_CLOVER_DIRAC@       	# build clover Dirac operators?
@@ -30,37 +31,26 @@ BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@         	# build code for (1-loop Symanz
 BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@	      	# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@			# build code for hisq fermion force?
 
+# Multi-GPU options
+BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
+BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
+BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
+OVERLAP_COMMS = @OVERLAP_COMMS@      # set to 'yes' to overlap comms and compute
 
+BUILD_QIO = @BUILD_QIO@    # set to 'yes' to build QIO code for binary I/O
 
+USE_QDPJIT = @USE_QDPJIT@  # build QDP-JIT support?
 
-# Multiple GPU options
-BUILD_MULTI_GPU = @BUILD_MULTI_GPU@ # set to 'yes' to build the multi-GPU code
-BUILD_QMP = @BUILD_QMP@     # set to 'yes' to build the QMP multi-GPU code
-BUILD_MPI = @BUILD_MPI@        # set to 'yes' to build the MPI multi-GPU code
-OVERLAP_COMMS = @OVERLAP_COMMS@  # set to 'yes' to overlap comms and compute
-
-# Do we have qio support?
-BUILD_QIO = @BUILD_QIO@ # set to 'yes' to build QIO code for binary i/o
-
-USE_QDPJIT = @USE_QDPJIT@         # build QDP-JIT support?
-
-FECC = @FECC@ 	      # Front end CC
-FECXX = @FECXX@           # Front end CXX
+FECC = @FECC@ 	           # front-end CC
+FECXX = @FECXX@            # front-end CXX
 
 MPI_HOME=@MPI_HOME@
-MPICC = $(MPI_HOME)/bin/mpicc
-MPICXX = $(MPI_HOME)/bin/mpicxx
-
 QMP_HOME=@QMP_HOME@
-
 QIO_HOME=@QIO_HOME@
-
-FERMI_DBLE_TEX=@FERMI_DBLE_TEX@
 
 DSLASH_SHARED_FLOATS=0
 
-#enabled numa
-QUDA_NUMA_SUPPORT=@QUDA_NUMA_SUPPORT@
+QUDA_NUMA_SUPPORT=@QUDA_NUMA_SUPPORT@   # enable NUMA affinity?
 
 ######
 
@@ -90,14 +80,10 @@ ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
   NVCCOPT += -DMULTI_GPU
 endif
 
-RUN =
 CC  = $(FECC)
 CXX = $(FECXX)
 
 ifeq ($(strip $(BUILD_QMP)), yes)
-  RUN = $(MPI_HOME)/bin/mpirun -np 1
-  CC = $(MPICC)
-  CXX = $(MPICXX)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
@@ -107,9 +93,6 @@ ifeq ($(strip $(BUILD_QMP)), yes)
 endif 
 
 ifeq ($(strip $(BUILD_MPI)), yes)
-  RUN = $(MPI_HOME)/bin/mpirun -np 1
-  CC = $(MPICC)
-  CXX = $(MPICXX)
   MPI_CFLAGS =
   MPI_LDFLAGS =
   MPI_LIBS =
@@ -235,6 +218,5 @@ else
   NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
   NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
-
 endif
 

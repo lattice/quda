@@ -1,5 +1,7 @@
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstdio>
+#include <string>
+#include <iostream>
 
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -56,8 +58,6 @@ struct DslashParam {
 // determines whether the temporal ghost zones are packed with a gather kernel,
 // as opposed to multiple calls to cudaMemcpy()
 bool kernelPackT = false;
-bool dslash_launch = true;
-bool getDslashLaunch() { return dslash_launch; }
 
 DslashParam dslashParam;
 
@@ -102,6 +102,25 @@ float dslashTime;
 FaceBuffer *face;
 cudaColorSpinorField *inSpinor;
 
+// For tuneLaunch() to uniquely identify a suitable set of launch parameters, we need copies of a few of
+// the constants set by initDslashConstants().
+static struct {
+  int x[4];
+  int Ls;
+  // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
+} dslashConstants;
+
+// dslashTuning = QUDA_TUNE_YES enables autotuning when the dslash is
+// first launched
+static QudaTune dslashTuning = QUDA_TUNE_NO;
+static QudaVerbosity verbosity = QUDA_SILENT;
+
+void setDslashTuning(QudaTune tune, QudaVerbosity verbose)
+{
+  dslashTuning = tune;
+  verbosity = verbose;
+}
+
 #include <dslash_textures.h>
 #include <dslash_constants.h>
 
@@ -133,14 +152,6 @@ static inline __device__ float2 short22float2(short2 a) {
   return make_float2(short2float(a.x), short2float(a.y));
 }
 #endif // DIRECT_ACCESS inclusions
-
-// dslashTuning = QUDA_TUNE_YES turns off error checking
-static QudaTune dslashTuning = QUDA_TUNE_NO;
-
-void setDslashTuning(QudaTune tune)
-{
-  dslashTuning = tune;
-}
 
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
@@ -254,22 +265,67 @@ void setFace(const FaceBuffer &Face) {
 // Use an abstract class interface to drive the different CUDA dslash
 // kernels.  All parameters are curried into the derived classes to
 // allow a simple interface.
-class DslashCuda {
-public:
-  DslashCuda() { ; }
-  virtual ~DslashCuda() { ; }
-  virtual void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) = 0;
-  virtual int SharedPerThread() = 0;
+class DslashCuda : public Tunable {
+ protected:
+  int sharedBytesPerBlock() const { return 0; }
+  bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+ public:
+  DslashCuda() { }
+  virtual ~DslashCuda() { }
+  virtual TuneKey tuneKey() const;
+  std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
+  {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
   virtual int Nface() { return 2; }
 };
+
+TuneKey DslashCuda::tuneKey() const
+{
+  std::stringstream vol, aux;
+  
+  vol << dslashConstants.x[0] << "x";
+  vol << dslashConstants.x[1] << "x";
+  vol << dslashConstants.x[2] << "x";
+  vol << dslashConstants.x[3];
+
+  aux << "type=";
+#ifdef MULTI_GPU
+  char comm[5], ghost[5];
+  switch (dslashParam.kernel_type) {
+  case INTERIOR_KERNEL: aux << "interior"; break;
+  case EXTERIOR_KERNEL_X: aux << "exterior_x"; break;
+  case EXTERIOR_KERNEL_Y: aux << "exterior_y"; break;
+  case EXTERIOR_KERNEL_Z: aux << "exterior_z"; break;
+  case EXTERIOR_KERNEL_T: aux << "exterior_t"; break;
+  }
+  for (int i=0; i<4; i++) {
+    comm[i] = (dslashParam.commDim[i] ? '1' : '0');
+    ghost[i] = (dslashParam.ghostDim[i] ? '1' : '0');
+  }
+  comm[4] = '\0'; ghost[4] = '\0';
+  aux << ",comm=" << comm;
+  if (dslashParam.kernel_type == INTERIOR_KERNEL) {
+    aux << ",ghost=" << ghost;
+  }
+#else
+  aux << "single-GPU";
+#endif // MULTI_GPU
+  return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+}
 
 
 template <typename sFloat, typename gFloat>
 class WilsonDslashCuda : public DslashCuda {
 
-private:
+ private:
+  const size_t bytes, norm_bytes;
   sFloat *out;
   float *outNorm;
+  char *saveOut, *saveOutNorm;
   const sFloat *in, *x;
   const float *inNorm, *xNorm;
   const gFloat *gauge0, *gauge1;
@@ -277,33 +333,78 @@ private:
   const int dagger;
   const double a;
 
-public:
+ protected:
+  int sharedBytesPerThread() const
+  {
+    int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+    return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+  }
+
+ public:
   WilsonDslashCuda(sFloat *out, float *outNorm, const gFloat *gauge0, const gFloat *gauge1, 
 		   const QudaReconstructType reconstruct, const sFloat *in, const float *inNorm,
 		   const sFloat *x, const float *xNorm, const double a,
-		   const int dagger, const size_t bytes, const size_t norm_bytes) :
-    DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
-    inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
+		   const int dagger, const size_t bytes, const size_t norm_bytes)
+    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
+    inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
+  { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
   }
 
   virtual ~WilsonDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
-  void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
-    dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(dslash, gridDim, blockDim, shared_bytes, stream, dslashParam,
+  TuneKey tuneKey() const
+  {
+    TuneKey key = DslashCuda::tuneKey();
+    std::stringstream recon;
+    recon << reconstruct;
+    key.aux += ",reconstruct=" + recon.str();
+    if (x) key.aux += ",Xpay";
+    return key;
+  }
+
+  void apply(const cudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    DSLASH(dslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
   }
 
-  int SharedPerThread() { return DSLASH_SHARED_FLOATS_PER_THREAD; };
+  void preTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short4)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  void postTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short4)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
+
 };
 
 template <typename sFloat, typename gFloat, typename cFloat>
 class CloverDslashCuda : public DslashCuda {
 
-private:
+ private:
+  const size_t bytes, norm_bytes;
   sFloat *out;
   float *outNorm;
+  char *saveOut, *saveOutNorm;
   const sFloat *in, *x;
   const float *inNorm, *xNorm;
   const gFloat *gauge0, *gauge1;
@@ -313,26 +414,68 @@ private:
   const int dagger;
   const double a;
 
-public:
+ protected:
+  int sharedBytesPerThread() const
+  {
+    int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+    return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+  }
+
+ public:
   CloverDslashCuda(sFloat *out, float *outNorm, const gFloat *gauge0, const gFloat *gauge1, 
 		   const QudaReconstructType reconstruct, const cFloat *clover, 
 		   const float *cloverNorm, const sFloat *in, const float *inNorm,
 		   const sFloat *x, const float *xNorm, const double a,
-		   const int dagger, const size_t bytes, const size_t norm_bytes) :
-    DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), 
-    clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm), 
-    reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
+		   const int dagger, const size_t bytes, const size_t norm_bytes)
+    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), clover(clover),
+    cloverNorm(cloverNorm), in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
+  { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
   }
   virtual ~CloverDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
-  void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
-    dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(cloverDslash, gridDim, blockDim, shared_bytes, stream, dslashParam,
+  TuneKey tuneKey() const
+  {
+    TuneKey key = DslashCuda::tuneKey();
+    std::stringstream recon;
+    recon << reconstruct;
+    key.aux += ",reconstruct=" + recon.str();
+    if (x) key.aux += ",Xpay";
+    return key;
+  }
+
+  void apply(const cudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    DSLASH(cloverDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
   }
 
-  int SharedPerThread() { return DSLASH_SHARED_FLOATS_PER_THREAD; };
+  void preTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short4)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  void postTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short4)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
+
 };
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
@@ -353,9 +496,11 @@ void setTwistParam(double &a, double &b, const double &kappa, const double &mu,
 template <typename sFloat, typename gFloat>
 class TwistedDslashCuda : public DslashCuda {
 
-private:
+ private:
+  const size_t bytes, norm_bytes;
   sFloat *out;
   float *outNorm;
+  char *saveOut, *saveOutNorm;
   const sFloat *in, *x;
   const float *inNorm, *xNorm;
   const gFloat *gauge0, *gauge1;
@@ -364,34 +509,78 @@ private:
   double a;
   double b;
 
-public:
+ protected:
+  int sharedBytesPerThread() const
+  {
+    int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+    return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+  }
+
+ public:
   TwistedDslashCuda(sFloat *out, float *outNorm, const gFloat *gauge0, const gFloat *gauge1, 
 		    const QudaReconstructType reconstruct, const sFloat *in, const float *inNorm,
 		    const sFloat *x, const float *xNorm, const double kappa, const double mu,
-		    const double k, const int dagger, const size_t bytes, const size_t norm_bytes) :
-    DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), 
-    in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm) { 
+		    const double k, const int dagger, const size_t bytes, const size_t norm_bytes)
+    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in),
+    inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm)
+  { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
     setTwistParam(a, b, kappa, mu, dagger, QUDA_TWIST_GAMMA5_INVERSE);
     if (x) b *= k;
   }
   virtual ~TwistedDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
-  void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
-    dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(twistedMassDslash, gridDim, blockDim, shared_bytes, stream, dslashParam,
+  TuneKey tuneKey() const
+  {
+    TuneKey key = DslashCuda::tuneKey();
+    std::stringstream recon;
+    recon << reconstruct;
+    key.aux += ",reconstruct=" + recon.str();
+    if (x) key.aux += ",Xpay";
+    return key;
+  }
+
+  void apply(const cudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    DSLASH(twistedMassDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
   }
 
-  int SharedPerThread() { return DSLASH_SHARED_FLOATS_PER_THREAD; };
+  void preTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short4)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  void postTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short4)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
 };
 
 template <typename sFloat, typename gFloat>
 class DomainWallDslashCuda : public DslashCuda {
 
-private:
+ private:
+  const size_t bytes, norm_bytes;
   sFloat *out;
   float *outNorm;
+  char *saveOut, *saveOutNorm;
   const sFloat *in, *x;
   const float *inNorm, *xNorm;
   const gFloat *gauge0, *gauge1;
@@ -400,32 +589,74 @@ private:
   const double mferm;
   const double a;
 
-public:
+ protected:
+  int sharedBytesPerThread() const { return 0; }
+
+ public:
   DomainWallDslashCuda(sFloat *out, float *outNorm, const gFloat *gauge0, const gFloat *gauge1, 
 		       const QudaReconstructType reconstruct, const sFloat *in, 
 		       const float *inNorm, const sFloat *x, const float *xNorm, const double mferm, 
-		       const double a, const int dagger, const size_t bytes, const size_t norm_bytes) :
-    DslashCuda(), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), 
-    in(in), inNorm(inNorm), mferm(mferm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
+		       const double a, const int dagger, const size_t bytes, const size_t norm_bytes)
+    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), 
+    in(in), inNorm(inNorm), mferm(mferm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
+  { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
   }
   virtual ~DomainWallDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
-  void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
-    dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    DSLASH(domainWallDslash, gridDim, blockDim, shared_bytes, stream, dslashParam,
+  TuneKey tuneKey() const
+  {
+    TuneKey key = DslashCuda::tuneKey();
+    std::stringstream ls, recon;
+    ls << dslashConstants.Ls;
+    recon << reconstruct;
+    key.volume += "x" + ls.str();
+    key.aux += ",reconstruct=" + recon.str();
+    if (x) key.aux += ",Xpay";
+    return key;
+  }
+
+  void apply(const cudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    DSLASH(domainWallDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
     	   out, outNorm, gauge0, gauge1, in, inNorm, mferm, x, xNorm, a);
   }
 
-  int SharedPerThread() { return 0; };
+  void preTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short4)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  void postTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short4)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
 };
 
 template <typename sFloat, typename fatGFloat, typename longGFloat>
 class StaggeredDslashCuda : public DslashCuda {
 
 private:
+  const size_t bytes, norm_bytes;
   sFloat *out;
   float *outNorm;
+  char *saveOut, *saveOutNorm;
   const sFloat *in, *x;
   const float *inNorm, *xNorm;
   const fatGFloat *fat0, *fat1;
@@ -434,26 +665,69 @@ private:
   const int dagger;
   const double a;
 
-public:
+ protected:
+  int sharedBytesPerThread() const
+  {
+    int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+    return 6 * reg_size;
+  }
+
+ public:
   StaggeredDslashCuda(sFloat *out, float *outNorm, const fatGFloat *fat0, const fatGFloat *fat1,
 		      const longGFloat *long0, const longGFloat *long1,
 		      const QudaReconstructType reconstruct, const sFloat *in, 
 		      const float *inNorm, const sFloat *x, const float *xNorm, const double a,
-		      const int dagger, const size_t bytes, const size_t norm_bytes) :
-    DslashCuda(), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
-    in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a) { 
+		      const int dagger, const size_t bytes, const size_t norm_bytes)
+    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
+    in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
+  { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
   }
 
   virtual ~StaggeredDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
-  void apply(const dim3 &blockDim, const int shared_bytes, const cudaStream_t &stream) {
-    dim3 gridDim((dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-    STAGGERED_DSLASH(gridDim, blockDim, shared_bytes, stream, dslashParam,
+  TuneKey tuneKey() const
+  {
+    TuneKey key = DslashCuda::tuneKey();
+    std::stringstream recon;
+    recon << reconstruct;
+    key.aux += ",reconstruct=" + recon.str();
+    if (x) key.aux += ",Axpy";
+    return key;
+  }
+
+  void apply(const cudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		     out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
   }
 
-  int SharedPerThread() { return 6; }
+  void preTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short2)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  void postTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short2)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
+
   int Nface() { return 6; }
 };
 
@@ -544,21 +818,6 @@ void printDslashProfile() {
 }
 #endif
 
-bool checkLaunchParam(const int shared_bytes) {
-
-  bool launch;
-
-  // only launch if not over-allocating shared memory
-  // hard code for the moment until we have more robust cache setting mechanism
-  if (shared_bytes > 16384 /*deviceProp.sharedMemPerBlock*/) {
-    launch = false;
-  } else {
-    launch = true;
-  }
-
-  return launch;
-}
-
 int gatherCompleted[Nstream];
 int previousDir[Nstream];
 int commsCompleted[Nstream];
@@ -596,7 +855,7 @@ void initDslashCommsPattern() {
 }
 
 void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
-		const int volume, const int *faceVolumeCB, const TuneParam *tune) {
+		const int volume, const int *faceVolumeCB) {
 
   dslashParam.parity = parity;
   dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -639,16 +898,9 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   }
 #endif
 
-  int shared_bytes = tune[0].block.x*dslash.SharedPerThread()*regSize;
-  shared_bytes = tune[0].shared_bytes > shared_bytes ? tune[0].shared_bytes : shared_bytes;
-  dslash_launch = true;
-  if (checkLaunchParam(shared_bytes)) {
-    CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
-    dslash.apply(tune[0].block, shared_bytes, streams[Nstream-1]);
-    CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
-  } else {
-    dslash_launch = false;
-  }
+  CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
+  dslash.apply(streams[Nstream-1]);
+  CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
 
 #ifdef MULTI_GPU
   initDslashCommsPattern();
@@ -704,28 +956,21 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
     cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
     cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+1], 0);
 
-    int shared_bytes = tune[i+1].block.x*dslash.SharedPerThread()*regSize;
-    shared_bytes = tune[i+1].shared_bytes > shared_bytes ? tune[i+1].shared_bytes : shared_bytes;
-    if (checkLaunchParam(shared_bytes)) {    
-      CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
-      dslash.apply(tune[i+1].block, shared_bytes, streams[Nstream-1]); // all faces use this stream
-      CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);
-    } else {
-      dslash_launch = false;
-    }
+    CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
+    dslash.apply(streams[Nstream-1]); // all faces use this stream
+    CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);
   }
 
   CUDA_EVENT_RECORD(dslashEnd, 0);
-  if (!dslashTuning) DSLASH_TIME_PROFILE();
+  DSLASH_TIME_PROFILE();
 
 #endif // MULTI_GPU
 }
 
 // Wilson wrappers
-void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-		      const int parity, const int dagger, const cudaColorSpinorField *x,
-		      const double &k, const TuneParam *tune, const int *commOverride) {
-
+void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, const int parity,
+		      const int dagger, const cudaColorSpinorField *x, const double &k, const int *commOverride)
+{
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_WILSON_DIRAC
@@ -769,12 +1014,12 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 						  gauge.Reconstruct(), (short4*)in->V(), (float*)in->Norm(),
 						  (short4*)xv, (float*)xn, k, dagger, in->Bytes(), in->NormBytes());
   }
-  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), tune);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
 
   delete dslash;
   unbindGaugeTex(gauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Wilson dslash has not been built");
 #endif // GPU_WILSON_DIRAC
@@ -783,9 +1028,8 @@ void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 
 void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
 		      const cudaColorSpinorField *in, const int parity, const int dagger, 
-		      const cudaColorSpinorField *x, const double &a,
-		      const TuneParam *tune, const int *commOverride) {
-
+		      const cudaColorSpinorField *x, const double &a, const int *commOverride)
+{
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_CLOVER_DIRAC
@@ -837,13 +1081,13 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 							  (short4*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
   }
 
-  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), tune);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
 
   delete dslash;
   unbindGaugeTex(gauge);
   unbindCloverTex(cloverInv);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Clover dslash has not been built");
 #endif
@@ -854,8 +1098,8 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, const int dagger, 
 			   const cudaColorSpinorField *x, const double &kappa, const double &mu, 
-			   const double &a, const TuneParam *tune, const int *commOverride) {
-
+			   const double &a, const int *commOverride)
+{
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_TWISTED_MASS_DIRAC
@@ -900,12 +1144,12 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gaug
     
   }
 
-  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), tune);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
 
   delete dslash;
   unbindGaugeTex(gauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Twisted mass dslash has not been built");
 #endif
@@ -914,9 +1158,8 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gaug
 
 void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			  const cudaColorSpinorField *in, const int parity, const int dagger, 
-			  const cudaColorSpinorField *x, const double &m_f, const double &k2,
-			  const TuneParam *tune) {
-
+			  const cudaColorSpinorField *x, const double &m_f, const double &k2)
+{
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef MULTI_GPU
@@ -958,12 +1201,12 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge
 						     (float*)xn, m_f, k2, dagger, in->Bytes(), in->NormBytes());
   }
 
-  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), tune);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
 
   delete dslash;
   unbindGaugeTex(gauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
 #else
   errorQuda("Domain wall dslash has not been built");
 #endif
@@ -973,9 +1216,8 @@ void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge
 void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 			 const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 			 const int parity, const int dagger, const cudaColorSpinorField *x,
-			 const double &k, const TuneParam *tune, const int *commOverride)
+			 const double &k, const int *commOverride)
 {
-  
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_STAGGERED_DIRAC
@@ -1034,13 +1276,13 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
 							     k, dagger,  in->Bytes(), in->NormBytes());
   }
 
-  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), tune);
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
 
   delete dslash;
   unbindGaugeTex(fatGauge);
   unbindGaugeTex(longGauge);
 
-  if (!dslashTuning) checkCudaError();
+  checkCudaError();
   
 #else
   errorQuda("Staggered dslash has not been built");
@@ -1048,30 +1290,66 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
 }
 
 
-template <typename spinorFloat, typename cloverFloat>
-void cloverCuda(spinorFloat *out, float *outNorm, const cloverFloat *clover,
-		const float *cloverNorm, const spinorFloat *in, const float *inNorm, 
-		const size_t bytes, const size_t norm_bytes, const TuneParam &tune)
-{
-  dim3 gridDim( (dslashParam.threads+tune.block.x-1) / tune.block.x, 1, 1);
+template <typename sFloat, typename cFloat>
+class CloverCuda : public Tunable {
+ private:
+  sFloat *out;
+  float *outNorm;
+  const cFloat *clover;
+  const float *cloverNorm;
+  const sFloat *in;
+  const float *inNorm;
 
-  int shared_bytes = 
-    tune.block.x*(CLOVER_SHARED_FLOATS_PER_THREAD*bindSpinorTex(bytes, norm_bytes, in, inNorm));
-  shared_bytes = tune.shared_bytes > shared_bytes ? tune.shared_bytes : shared_bytes;
-  if (!(dslash_launch = checkLaunchParam(shared_bytes))) return;
+ protected:
+  int sharedBytesPerThread() const
+  {
+    int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+    return CLOVER_SHARED_FLOATS_PER_THREAD * reg_size;
+  }
+  int sharedBytesPerBlock() const { return 0; }
+  bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
 
-  cloverKernel<<<gridDim, tune.block, shared_bytes>>> 
-    (out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
-  unbindSpinorTex(in, inNorm);
-}
+ public:
+  CloverCuda(sFloat *out, float *outNorm, const cFloat *clover, const float *cloverNorm, const sFloat *in,
+	     const float *inNorm, const size_t bytes, const size_t norm_bytes)
+    : out(out), outNorm(outNorm), clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm)
+  {
+    bindSpinorTex(bytes, norm_bytes, in, inNorm);
+  }
+  virtual ~CloverCuda() { unbindSpinorTex(in, inNorm); }
+  void apply(const cudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    cloverKernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>(out, outNorm, clover, cloverNorm, in, inNorm, dslashParam);
+  }
+  virtual TuneKey tuneKey() const
+  {
+    std::stringstream vol, aux;
+    vol << dslashConstants.x[0] << "x";
+    vol << dslashConstants.x[1] << "x";
+    vol << dslashConstants.x[2] << "x";
+    vol << dslashConstants.x[3];
+    return TuneKey(vol.str(), typeid(*this).name());
+  }
+  std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
+  {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+};
+
 
 void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
-		const cudaColorSpinorField *in, const int parity, const TuneParam &tune) {
+		const cudaColorSpinorField *in, const int parity) {
 
   dslashParam.parity = parity;
   dslashParam.threads = in->Volume();
 
 #ifdef GPU_CLOVER_DIRAC
+  Tunable *clov = 0;
   void *cloverP, *cloverNormP;
   QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
 
@@ -1080,74 +1358,137 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-    cloverCuda((double2*)out->V(), (float*)out->Norm(), (double2*)cloverP, 
-	       (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(), 
-	       in->Bytes(), in->NormBytes(), tune);
+    clov = new CloverCuda<double2, double2>((double2*)out->V(), (float*)out->Norm(), (double2*)cloverP, 
+					    (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(), 
+					    in->Bytes(), in->NormBytes());
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    cloverCuda((float4*)out->V(), (float*)out->Norm(), (float4*)cloverP, 
-	       (float*)cloverNormP, (float4*)in->V(), (float*)in->Norm(),
-	       in->Bytes(), in->NormBytes(), tune);
+    clov = new CloverCuda<float4, float4>((float4*)out->V(), (float*)out->Norm(), (float4*)cloverP, 
+			  (float*)cloverNormP, (float4*)in->V(), (float*)in->Norm(),
+			  in->Bytes(), in->NormBytes());
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    cloverCuda((short4*)out->V(), (float*)out->Norm(), (short4*)cloverP, 
-	       (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
-	       in->Bytes(), in->NormBytes(), tune);
+    clov = new CloverCuda<short4, short4>((short4*)out->V(), (float*)out->Norm(), (short4*)cloverP, 
+			  (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
+			  in->Bytes(), in->NormBytes());
   }
-  unbindCloverTex(clover);
+  clov->apply(0);
 
-  if (!dslashTuning) checkCudaError();
+  unbindCloverTex(clover);
+  checkCudaError();
+
+  delete clov;
 #else
   errorQuda("Clover dslash has not been built");
 #endif
-
 }
-// FIXME: twist kernel cannot be issued asynchronously because of texture unbinding
-template <typename spinorFloat>
-void twistGamma5Cuda(spinorFloat *out, float *outNorm, const spinorFloat *in, 
-		     const float *inNorm, const int dagger, const double &kappa, 
-		     const double &mu, const size_t bytes, const size_t norm_bytes, 
-		     const QudaTwistGamma5Type twist, const TuneParam &tune)
-{
-  dim3 gridDim( (dslashParam.threads+tune.block.x-1) / tune.block.x, 1, 1);
 
-  double a=0.0, b=0.0;
-  setTwistParam(a, b, kappa, mu, dagger, twist);
+template <typename sFloat>
+class TwistGamma5Cuda : public Tunable {
 
-  bindSpinorTex(bytes, norm_bytes, in, inNorm);
-  twistGamma5Kernel<<<gridDim, tune.block, tune.shared_bytes>>> (out, outNorm, a, b, in, inNorm, dslashParam);
-  unbindSpinorTex(in, inNorm);
-}
+private:
+  sFloat *out;
+  float *outNorm;
+  sFloat *in;
+  float *inNorm;
+  double a;
+  double b;
+  size_t bytes;
+  size_t norm_bytes;
+
+  int sharedBytesPerThread() const { return 0; }
+  int sharedBytesPerBlock() const { return 0; }
+  bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+
+  char *saveOut, *saveOutNorm;
+
+public:
+  TwistGamma5Cuda(sFloat *out, float *outNorm, sFloat *in, float *inNorm,
+		  double kappa, double mu, const int dagger, 
+		  QudaTwistGamma5Type twist, size_t bytes, size_t norm_bytes) :
+    out(out), outNorm(outNorm), in(in), inNorm(inNorm), 
+    bytes(bytes), norm_bytes(norm_bytes){
+    bindSpinorTex(bytes, norm_bytes, in, inNorm);
+    setTwistParam(a, b, kappa, mu, dagger, twist);
+  }
+  virtual ~TwistGamma5Cuda() {
+    unbindSpinorTex(in, inNorm);    
+  }
+
+  TuneKey tuneKey() const {
+    std::stringstream vol, aux;
+    vol << dslashConstants.x[0] << "x";
+    vol << dslashConstants.x[1] << "x";
+    vol << dslashConstants.x[2] << "x";
+    vol << dslashConstants.x[3];    
+    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+  }  
+
+  void apply(const cudaStream_t &stream) {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+    twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>> 
+      (out, outNorm, a, b, in, inNorm, dslashParam);
+  }
+
+  void preTune() {
+    saveOut = new char[bytes];
+    cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+    if (typeid(sFloat) == typeid(short4)) {
+      saveOutNorm = new char[norm_bytes];
+      cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+  }
+
+  void postTune() {
+    cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+    delete[] saveOut;
+    if (typeid(sFloat) == typeid(short4)) {
+      cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+      delete[] saveOutNorm;
+    }
+  }
+
+  std::string paramString(const TuneParam &param) const {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+};
 
 void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 		     const int dagger, const double &kappa, const double &mu,
-		     const QudaTwistGamma5Type twist, const TuneParam &tune) {
-
+		     const QudaTwistGamma5Type twist)
+{
   dslashParam.threads = in->Volume();
 
 #ifdef GPU_TWISTED_MASS_DIRAC
+  Tunable *twistGamma5 = 0;
+
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-    twistGamma5Cuda((double2*)out->V(), (float*)out->Norm(), 
-		    (double2*)in->V(), (float*)in->Norm(), 
-		    dagger, kappa, mu, in->Bytes(), 
-		    in->NormBytes(), twist, tune);
+    twistGamma5 = new TwistGamma5Cuda<double2>
+      ((double2*)out->V(), (float*)out->Norm(), (double2*)in->V(), 
+       (float*)in->Norm(), kappa, mu, dagger, twist, in->Bytes(), in->NormBytes());
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    twistGamma5Cuda((float4*)out->V(), (float*)out->Norm(),
-		    (float4*)in->V(), (float*)in->Norm(), 
-		    dagger, kappa, mu, in->Bytes(), 
-		    in->NormBytes(), twist, tune);
+    twistGamma5 = new TwistGamma5Cuda<float4>
+      ((float4*)out->V(), (float*)out->Norm(), (float4*)in->V(), 
+       (float*)in->Norm(), kappa, mu, dagger, twist, in->Bytes(), in->NormBytes());
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    twistGamma5Cuda((short4*)out->V(), (float*)out->Norm(),
-		    (short4*)in->V(), (float*)in->Norm(), 
-		    dagger, kappa, mu, in->Bytes(), 
-		    in->NormBytes(), twist, tune);
+    twistGamma5 = new TwistGamma5Cuda<short4>
+      ((short4*)out->V(), (float*)out->Norm(), (short4*)in->V(), 
+       (float*)in->Norm(), kappa, mu, dagger, twist, in->Bytes(), in->NormBytes());
   }
-  if (!dslashTuning) checkCudaError();
+
+  twistGamma5->apply(streams[Nstream-1]);
+  checkCudaError();
+
+  delete twistGamma5;
 #else
   errorQuda("Twisted mass dslash has not been built");
 #endif // GPU_TWISTED_MASS_DIRAC
