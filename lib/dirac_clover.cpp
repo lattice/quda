@@ -185,23 +185,27 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
   bool reset = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    bool reset = newTmp(&tmp2, in);
+    // DiracCloverPC::Dslash applies A^{-1}Dslash
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
-    Clover(out, in, QUDA_EVEN_PARITY);
-#ifdef MULTI_GPU // not safe to alias because of partial updates
-    cudaColorSpinorField tmp3(in);
-#else // safe since out is not read after writing
-    cudaColorSpinorField &tmp3 = out; 
-#endif
-    DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, tmp3, kappa2); 
+    Clover(*tmp2, in, QUDA_EVEN_PARITY);
+
+    // DiracWilson::Dslash applies only Dslash
+    DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, *tmp2, kappa2); 
+
   } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+
+    // FIXME: It would be nice if I could do something like: cudaColorSpinorField tmp3( in.param() );
+    // to save copying the data from 'in'
+    bool reset = newTmp(&tmp2, in);
+
+    // DiracCloverPC::Dslash applies A^{-1}Dslash
     Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-    Clover(out, in, QUDA_ODD_PARITY);
-#ifdef MULTI_GPU // not safe to alias because of partial updates
-    cudaColorSpinorField tmp3(in);
-#else // safe since out is not read after writing
-    cudaColorSpinorField &tmp3 = out; 
-#endif
-    DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, tmp3, kappa2);
+    Clover(*tmp2, in, QUDA_ODD_PARITY);
+
+    // DiracWilson::Dslash applies only Dslash
+    DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, *tmp2, kappa2);
+
   } else if (!dagger) { // symmetric preconditioning
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
