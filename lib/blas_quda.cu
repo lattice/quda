@@ -183,14 +183,13 @@ public:
   virtual ~CopyCuda() { ; }
 
   TuneKey tuneKey() const {
-    std::stringstream vol, name, aux;
+    std::stringstream vol, aux;
     vol << blasConstants.x[0] << "x";
     vol << blasConstants.x[1] << "x";
     vol << blasConstants.x[2] << "x";
-    vol << blasConstants.x[3];    
-    name << "copyKernel";
-    aux << blasConstants.stride << Y.Precision() << X.Precision();
-    return TuneKey(vol.str(), name.str(), aux.str());
+    vol << blasConstants.x[3];
+    aux << "stride=" << blasConstants.stride << ",out_prec=" << Y.Precision() << ",in_prec=" << X.Precision();
+    return TuneKey(vol.str(), "copyKernel", aux.str());
   }  
 
   void apply(const cudaStream_t &stream) {
@@ -208,14 +207,6 @@ public:
     if (X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
     if (Y.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
     return bytes*length; 
-  }
-
-  std::string paramString(const TuneParam &param) const {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
   }
 };
 

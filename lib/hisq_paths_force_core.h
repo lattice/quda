@@ -251,7 +251,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   }
     
   if(sig_positive){
-    addMatrixToField(COLOR_MAT_Y, sig, sid, coeff, newOprodEven, newOprodOdd, oddBit);
+    //addMatrixToField(COLOR_MAT_Y, sig, sid, coeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(COLOR_MAT_Y, sig, sid, coeff, newOprodEven, newOprodOdd, oddBit);
   }
 #endif  
   return;
@@ -403,11 +404,13 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   if(!QprodOdd){
     if(mu_positive){
       if(!oddBit){ mycoeff = -mycoeff;}
-      addMatrixToField(COLOR_MAT_Y, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+      //addMatrixToField(COLOR_MAT_Y, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+      addMatrixToNewOprod(COLOR_MAT_Y, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
     }else{
       if(oddBit){ mycoeff = -mycoeff; }
       ADJ_MAT(COLOR_MAT_Y, COLOR_MAT_W);
-      addMatrixToField(COLOR_MAT_W, OPP_DIR(mu), sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
+      //addMatrixToField(COLOR_MAT_W, OPP_DIR(mu), sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
+      addMatrixToNewOprod(COLOR_MAT_W, OPP_DIR(mu), sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
     }
   }
 #endif
@@ -545,7 +548,8 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
       {
 	MAT_MUL_MAT(COLOR_MAT_X, ad_link, COLOR_MAT_Y);
 	MAT_MUL_MAT(COLOR_MAT_Z, COLOR_MAT_Y, COLOR_MAT_W);
-	addMatrixToField(COLOR_MAT_W, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+	//addMatrixToField(COLOR_MAT_W, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+	addMatrixToNewOprod(COLOR_MAT_W, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
       }
 
     if (sig_positive){
@@ -558,7 +562,8 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
     MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y); // COLOR_MAT_Y is assigned here
 
     MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
-    addMatrixToField(COLOR_MAT_W, mu, point_d, -Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    //addMatrixToField(COLOR_MAT_W, mu, point_d, -Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    addMatrixToNewOprod(COLOR_MAT_W, mu, point_d, -Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
 
     MAT_MUL_MAT(ad_link, COLOR_MAT_Y, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
@@ -592,7 +597,8 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
     MAT_MUL_MAT(bc_link, COLOR_MAT_Y, COLOR_MAT_Z);
     if (sig_positive){	
       MAT_MUL_MAT(COLOR_MAT_Z, COLOR_MAT_W, COLOR_MAT_Y);
-      addMatrixToField(COLOR_MAT_Y, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+      //addMatrixToField(COLOR_MAT_Y, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+      addMatrixToNewOprod(COLOR_MAT_Y, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
       }
 
     if (sig_positive){
@@ -604,7 +610,8 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
 
     MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y);
     ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);	
-    addMatrixToField(COLOR_MAT_W, mu, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+    //addMatrixToField(COLOR_MAT_W, mu, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(COLOR_MAT_W, mu, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
 
     MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, 0, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);

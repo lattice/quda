@@ -9,15 +9,38 @@
 
 //DEBUG : control conpile 
 #define COMPILE_HISQ_DP_18 
-//#define COMPILE_HISQ_DP_12 
-//#define COMPILE_HISQ_SP_18 
-//#define COMPILE_HISQ_SP_12
+#define COMPILE_HISQ_DP_12 
+#define COMPILE_HISQ_SP_18 
+#define COMPILE_HISQ_SP_12
 
 // Disable texture read for now. Need to revisit this.
 #define HISQ_SITE_MATRIX_LOAD_TEX 1
+#define HISQ_NEW_OPROD_LOAD_TEX 1
 
 namespace hisq {
   namespace fermion_force {
+
+
+
+    texture<int4, 1> newOprod0TexDouble;
+    texture<int4, 1> newOprod1TexDouble;
+    texture<float2, 1, cudaReadModeElementType>  newOprod0TexSingle;
+    texture<float2, 1, cudaReadModeElementType> newOprod1TexSingle;
+    
+    void hisqForceInitCuda(QudaGaugeParam* param)
+    {
+      static int hisq_force_init_cuda_flag = 0; 
+      
+        if (hisq_force_init_cuda_flag){
+          return;
+        }
+        hisq_force_init_cuda_flag=1;
+        init_kernel_cuda(param);    
+    }
+    
+
+
+
 
     // struct for holding the fattening path coefficients
     template<class Real>
@@ -169,6 +192,31 @@ namespace hisq {
         return;
       }
     
+
+#define  addMatrixToNewOprod(mat,  dir, idx, coeff, field_even, field_odd, oddness)     do { \
+      RealA* const field = (oddness)?field_odd: field_even;		\
+      RealA value[9];							\
+      value[0] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9); \
+      value[1] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + Vh);	\
+      value[2] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 2*Vh); \
+      value[3] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 3*Vh); \
+      value[4] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 4*Vh); \
+      value[5] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 5*Vh); \
+      value[6] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 6*Vh); \
+      value[7] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 7*Vh); \
+      value[8] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 8*Vh); \
+      field[idx + dir*Vhx9]          = value[0] + coeff*mat[0];		\
+      field[idx + dir*Vhx9 + Vh]     = value[1] + coeff*mat[1];		\
+      field[idx + dir*Vhx9 + Vhx2]   = value[2] + coeff*mat[2];		\
+      field[idx + dir*Vhx9 + Vhx3]   = value[3] + coeff*mat[3];		\
+      field[idx + dir*Vhx9 + Vhx4]   = value[4] + coeff*mat[4];		\
+      field[idx + dir*Vhx9 + Vhx5]   = value[5] + coeff*mat[5];		\
+      field[idx + dir*Vhx9 + Vhx6]   = value[6] + coeff*mat[6];		\
+      field[idx + dir*Vhx9 + Vhx7]   = value[7] + coeff*mat[7];		\
+      field[idx + dir*Vhx9 + Vhx8]   = value[8] + coeff*mat[8];		\
+  }while(0)					
+     
+
 
     // only works if Promote<T,U>::Type = T
 
@@ -369,20 +417,6 @@ namespace hisq {
 
 
 
-      void
-      hisqForceInitCuda(QudaGaugeParam* param)
-      {
-        static int hisq_force_init_cuda_flag = 0; 
-
-        if (hisq_force_init_cuda_flag){
-          return;
-        }
-        hisq_force_init_cuda_flag=1;
-        init_kernel_cuda(param);    
-      }
-
-
-
 
 
 
@@ -408,22 +442,13 @@ template<class RealA, int oddBit>
 #define HISQ_KERNEL_NAME(a,b) DD_CONCAT(a,b)
 //precision: 0 is for double, 1 is for single
 
-//single precision, recon=18  
-#define PRECISION 1
-#define RECON 18
-#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, Vh)        
+#define NEWOPROD_EVEN_TEX newOprod0TexDouble
+#define NEWOPROD_ODD_TEX newOprod1TexDouble
+#ifdef HISQ_NEW_OPROD_LOAD_TEX
+#define LOAD_TEX_ENTRY(tex, field, idx)  READ_DOUBLE2_TEXTURE(tex, field, idx)
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
 #endif
-#define COMPUTE_LINK_SIGN(sign, dir, x) 
-#define RECONSTRUCT_SITE_LINK(var, sign)
-#include "hisq_paths_force_core.h"
-#undef PRECISION
-#undef RECON
-#undef HISQ_LOAD_LINK
-#undef COMPUTE_LINK_SIGN
-#undef RECONSTRUCT_SITE_LINK
 
 //double precision, recon=18
 #define PRECISION 0
@@ -457,8 +482,37 @@ template<class RealA, int oddBit>
 #undef RECON
 #undef HISQ_LOAD_LINK
 #undef COMPUTE_LINK_SIGN
-#undef RECONSTRUCT_SITE_LINK 
-      
+#undef RECONSTRUCT_SITE_LINK       
+#undef NEWOPROD_EVEN_TEX 
+#undef NEWOPROD_ODD_TEX 
+#undef LOAD_TEX_ENTRY
+
+
+#define NEWOPROD_EVEN_TEX newOprod0TexSingle
+#define NEWOPROD_ODD_TEX newOprod1TexSingle
+
+#ifdef HISQ_NEW_OPROD_LOAD_TEX
+#define LOAD_TEX_ENTRY(tex, field, idx)  tex1Dfetch(tex,idx)
+#else
+#define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
+#endif
+
+//single precision, recon=18  
+#define PRECISION 1
+#define RECON 18
+#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, Vh)        
+#else
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#endif
+#define COMPUTE_LINK_SIGN(sign, dir, x) 
+#define RECONSTRUCT_SITE_LINK(var, sign)
+#include "hisq_paths_force_core.h"
+#undef PRECISION
+#undef RECON
+#undef HISQ_LOAD_LINK
+#undef COMPUTE_LINK_SIGN
+#undef RECONSTRUCT_SITE_LINK
 
 //single precision, recon=12
 #define PRECISION 1
@@ -476,6 +530,9 @@ template<class RealA, int oddBit>
 #undef HISQ_LOAD_LINK
 #undef COMPUTE_LINK_SIGN
 #undef RECONSTRUCT_SITE_LINK
+#undef NEWOPROD_EVEN_TEX 
+#undef NEWOPROD_ODD_TEX 
+#undef LOAD_TEX_ENTRY
 
     template<class RealA, class RealB>
       static void
@@ -781,12 +838,16 @@ template<class RealA, int oddBit>
     }
 
 
+    
 static void 
-bind_tex_link(const cudaGaugeField& link)
+  bind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
 {
   if(link.Precision() == QUDA_DOUBLE_PRECISION){
     cudaBindTexture(0, siteLink0TexDouble, link.Even_p(), link.Bytes()/2);
     cudaBindTexture(0, siteLink1TexDouble, link.Odd_p(), link.Bytes()/2);
+    
+    cudaBindTexture(0, newOprod0TexDouble, newOprod.Even_p(), newOprod.Bytes()/2);
+    cudaBindTexture(0, newOprod1TexDouble, newOprod.Odd_p(), newOprod.Bytes()/2);
   }else{
     if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
       cudaBindTexture(0, siteLink0TexSingle, link.Even_p(), link.Bytes()/2);      
@@ -795,15 +856,20 @@ bind_tex_link(const cudaGaugeField& link)
       cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);      
       cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);            
     }
+    cudaBindTexture(0, newOprod0TexSingle, newOprod.Even_p(), newOprod.Bytes()/2);
+    cudaBindTexture(0, newOprod1TexSingle, newOprod.Odd_p(), newOprod.Bytes()/2);
+    
   }
 }
 
 static void 
-unbind_tex_link(const cudaGaugeField& link)
+unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
 {
   if(link.Precision() == QUDA_DOUBLE_PRECISION){
     cudaUnbindTexture(siteLink0TexDouble);
     cudaUnbindTexture(siteLink1TexDouble);
+    cudaUnbindTexture(newOprod0TexDouble);
+    cudaUnbindTexture(newOprod1TexDouble);
   }else{
     if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
       cudaUnbindTexture(siteLink0TexSingle);
@@ -812,6 +878,8 @@ unbind_tex_link(const cudaGaugeField& link)
       cudaUnbindTexture(siteLink0TexSingle_recon);
       cudaUnbindTexture(siteLink1TexSingle_recon);      
     }
+    cudaUnbindTexture(newOprod0TexSingle);
+    cudaUnbindTexture(newOprod1TexSingle);
   }
 }
 
@@ -1020,7 +1088,7 @@ unbind_tex_link(const cudaGaugeField& link)
 	   dim3 blockDim(BLOCK_DIM,1,1);
 	   dim3 gridDim(volume/blockDim.x, 1, 1);
 
-	   bind_tex_link(link);
+	   bind_tex_link(link, oprod);
 	   for(int sig=0; sig<4; sig++){
 		   if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
 		     complete_force_kernel((double2*)oprod.Even_p(), (double2*)oprod.Odd_p(),
@@ -1039,7 +1107,7 @@ unbind_tex_link(const cudaGaugeField& link)
 		   }
 	   } // loop over directions
 
-	   unbind_tex_link(link);
+	   unbind_tex_link(link, oprod);
 	   return;
    }
 
@@ -1057,7 +1125,7 @@ unbind_tex_link(const cudaGaugeField& link)
      dim3 blockDim(BLOCK_DIM,1,1);
      dim3 gridDim(volume/blockDim.x, 1, 1);
 
-     bind_tex_link(link);
+     bind_tex_link(link, *newOprod);
      
      for(int sig=0; sig<4; ++sig){
        if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
@@ -1077,7 +1145,7 @@ unbind_tex_link(const cudaGaugeField& link)
        }
      } // loop over directions
      
-     unbind_tex_link(link);
+     unbind_tex_link(link, *newOprod);
      return;
    }
 
@@ -1103,9 +1171,7 @@ unbind_tex_link(const cudaGaugeField& link)
           tempCompmat[i] = createMatQuda(param.X, param.cuda_prec);
         }	
 
-	bind_tex_link(link);
-
-
+	bind_tex_link(link, *newOprod);
 	
 
 
@@ -1161,7 +1227,7 @@ unbind_tex_link(const cudaGaugeField& link)
 	
 	//printfQuda("hisq staple time=%.2f ms\n", runtime);
 
-	unbind_tex_link(link);
+	unbind_tex_link(link, *newOprod);
 
         for(int i=0; i<4; i++){
           freeMatQuda(tempmat[i]);

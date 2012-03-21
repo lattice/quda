@@ -1,56 +1,43 @@
-AC_INIT([quda],[0.4],[mikec@seas.harvard.edu])
+AC_INIT([quda],[0.4],[quda-developers@googlegroups.com])
 
 AC_PROG_CC(gcc cc)
 AC_PROG_CXX(g++ CC cxx)
 
 dnl Specify CUDA Location
 AC_ARG_WITH(cuda,
-  AC_HELP_STRING([--with-cuda=CUDADIR], [ Specify CUDA installation directory ]),
+  AC_HELP_STRING([--with-cuda=CUDADIR], [ Specify CUDA installation directory (default: /usr/local/cuda)]),
   [ cuda_home=${withval} ],
   [ cuda_home=/usr/local/cuda ]
 )
 
 dnl Specify CPU Arch
 AC_ARG_ENABLE(cpu-arch,
- AC_HELP_STRING([--enable-cpu-arch=arch],  [ Set CPU arch: x86 or x86_64 (default: x86_64)] ),
+ AC_HELP_STRING([--enable-cpu-arch=arch], [ Set CPU arch: x86 or x86_64 (default: x86_64)]),
  [ cpu_arch=${enableval} ],
  [ cpu_arch="x86_64" ]
 )
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch],  [ Set GPU arch=sm_10, sm_12, sm_13, sm_20, sm_21 (default: sm_20)] ),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_10, sm_12, sm_13, sm_20, sm_21 (default: sm_20)]),
  [ gpu_arch=${enableval} ],
  [ gpu_arch="sm_20" ]
 )
 
-dnl Enable GPU Emulation (CUDA 3.0 only)
-AC_ARG_ENABLE(gpu-emulation,
- AC_HELP_STRING([--enable-gpu-emulation], [ Enable GPU emulation (CUDA v3.0). (default is 'no' )]),
- [ gpu_emu=${enableval} ], 
- [ gpu_emu="no" ]
-)
-
 AC_ARG_ENABLE(os, 
-  AC_HELP_STRING([--enable-os=os], [ Set OS Build style: linux, osx (default is linux)]),
+  AC_HELP_STRING([--enable-os=os], [ Set operating system: linux, osx (default: linux)]),
   [ quda_os=${enableval} ], 
   [ quda_os="linux" ]
 )
 
 AC_ARG_WITH(python, 
-  AC_HELP_STRING([--with-python=path ], [ Set Python to use for make gen]),
+  AC_HELP_STRING([--with-python=path ], [ Set python executable used for 'make gen']),
   [ quda_python=${withval} ],
   [ quda_python="python" ]
 )
 
-AC_ARG_ENABLE(tune-device, 
-  AC_HELP_STRING([--enable-tune-device=device], [ Set Device to use for make tune ]),
-  [ tune_device=${enableval} ], 
-  [ tune_device=0 ]
-)
-
 AC_ARG_ENABLE(host-debug, 
-  AC_HELP_STRING([--enable-host-debug], [ Enable debugging of host code ]),
+  AC_HELP_STRING([--enable-host-debug], [ Enable debugging of host code]),
   [ quda_host_debug=${enableval} ], 
   [ quda_host_debug="no" ]
 )
@@ -62,73 +49,73 @@ AC_ARG_ENABLE(device-debug,
 )
 
 AC_ARG_ENABLE(verbose-build, 
-   AC_HELP_STRING([--enable-verbose-build], [ Display Kernel Register Usage ]),
+   AC_HELP_STRING([--enable-verbose-build], [ Display kernel register usage]),
    [ quda_verbose_build=${enableval} ], 
    [ quda_verbose_build="no" ]
 )
 
 AC_ARG_ENABLE(dslash-profiling, 
-  AC_HELP_STRING([--enable-dslash-profiling], [ Enable profiling of multi-GPU dslash ]),
+  AC_HELP_STRING([--enable-dslash-profiling], [ Enable profiling of multi-GPU Dslash]),
   [ quda_dslash_profiling=${enableval} ], 
   [ quda_dslash_profiling="no" ]
 )
 
 AC_ARG_ENABLE(wilson-dirac,
-  AC_HELP_STRING([--enable-wilson-dirac], [ Build Wilson Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-wilson-dirac], [ Build Wilson Dirac operator (default: enabled)]),
   [ build_wilson_dirac=${enableval} ], 
   [ build_wilson_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(clover-dirac,
-  AC_HELP_STRING([--enable-clover-dirac], [ Build Clover Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-clover-dirac], [ Build Wilson-clover Dirac operator (default: enabled)]),
   [ build_clover_dirac=${enableval} ], 
   [ build_clover_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(domain-wall-dirac,
-  AC_HELP_STRING([--enable-domain-wall-dirac], [ Build Domain Wall Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-domain-wall-dirac], [ Build domain wall Dirac operator (default: enabled)]),
   [ build_dwf_dirac=${enableval} ], 
   [ build_dwf_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(staggered-dirac,
-  AC_HELP_STRING([--enable-staggered-dirac], [ Build Staggered Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-staggered-dirac], [ Build staggered Dirac operator (default: enabled)]),
   [ build_staggered_dirac=${enableval} ], 
   [ build_staggered_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(twisted-mass-dirac,
-  AC_HELP_STRING([--enable-twisted-mass-dirac], [ Build Twisted Mass Dirac Op  (default=enabled) ]),
+  AC_HELP_STRING([--enable-twisted-mass-dirac], [ Build twisted mass Dirac operator (default: enabled)]),
   [ build_twm_dirac=${enableval} ], 
   [ build_twm_dirac="yes" ]
 )
 
 AC_ARG_ENABLE(staggered-fatlink,
-  AC_HELP_STRING([--enable-staggered-fatlink], [ Build Staggered Fat Link Code (default=disabled) ]),
+  AC_HELP_STRING([--enable-staggered-fatlink], [ Build asqtad link-fattening routines (default: disabled)]),
   [ build_staggered_fatlink=${enableval} ], 
   [ build_staggered_fatlink="no" ]
 )
 
 AC_ARG_ENABLE(hisq-fatlink,
-  AC_HELP_STRING([--enable-hisq-fatlink], [ Build Hisq Fat Link Code (default=disabled) ]),
+  AC_HELP_STRING([--enable-hisq-fatlink], [ Build HISQ link-fattening routines (default: disabled)]),
   [ build_hisq_fatlink=${enableval} ], 
   [ build_hisq_fatlink="no" ]
 )
 
 AC_ARG_ENABLE(gauge-force,
-  AC_HELP_STRING([--enable-gauge-force], [ Build 1 loop Symanzik gauge force (default=disabled) ]),
+  AC_HELP_STRING([--enable-gauge-force], [ Build 1-loop Symanzik gauge force (default: disabled)]),
   [ build_gauge_force=${enableval} ], 
   [ build_gauge_force="no" ]
 )
 
 AC_ARG_ENABLE(staggered-force,
-  AC_HELP_STRING([--enable-staggered-force], [ Build Staggered Force Term (default=disabled) ]),
+  AC_HELP_STRING([--enable-staggered-force], [ Build asqtad fermion force (default: disabled)]),
   [ build_staggered_force=${enableval} ], 
   [ build_staggered_force="no" ]
 )
 
 AC_ARG_ENABLE(hisq-force,
-  AC_HELP_STRING([--enable-hisq-force], [ Build Hisq Force Term (default=disabled) ]),
+  AC_HELP_STRING([--enable-hisq-force], [ Build HISQ fermion force (default: disabled)]),
   [ build_hisq_force=${enableval} ],
   [ build_hisq_force="no" ]
 )
@@ -137,44 +124,44 @@ dnl ==================
 
 dnl enable multi-gpu mode
 AC_ARG_ENABLE(multi-gpu, 
-  AC_HELP_STRING([--enable-multi-gpu], [ Enable Multi-GPU mode (default is no)]),
+  AC_HELP_STRING([--enable-multi-gpu], [ Enable Multi-GPU support (default: disabled)]),
   [ multi_gpu=${enableval} ],
   [ multi_gpu="no" ]
 )
 
 dnl enable comms compute/overlap
 AC_ARG_ENABLE(overlap-comms,
-  AC_HELP_STRING([--enable-overlap-comms], [ Enable comms/compute overlap (default is yes)]),
+  AC_HELP_STRING([--enable-overlap-comms], [ Enable comms/compute overlap (default: enabled)]),
   [ overlap_comms=${enableval}],
   [ overlap_comms="yes" ]
 )
 
 AC_ARG_WITH(mpi,
- AC_HELP_STRING([--with-mpi= MPIDIR], [ Specify installation directory for MPI ]),
+ AC_HELP_STRING([--with-mpi=MPIDIR], [ Specify MPI installation directory]),
  [ mpi_home=${withval}; build_mpi="yes" ],
  [ mpi_home=""; build_mpi="no" ]
 ) 
 
 AC_ARG_WITH(qmp,
- AC_HELP_STRING([--with-qmp=QMPDIR], [ Specify QMP installation directory ]),
+ AC_HELP_STRING([--with-qmp=QMPDIR], [ Specify QMP installation directory]),
  [ qmp_home=${withval} ; build_qmp="yes" ],
  [ qmp_home="" ; build_qmp="no" ]
 )
 
 AC_ARG_WITH(qio,
- AC_HELP_STRING([--with-qio=QIODIR], [ Specify QIO installation directory ]),
+ AC_HELP_STRING([--with-qio=QIODIR], [ Specify QIO installation directory]),
  [ qio_home=${withval} ; build_qio="yes" ],
  [ qio_home="" ; build_qio="no" ]
 )
 
 AC_ARG_ENABLE(qdp-jit,
-  AC_HELP_STRING([--enable-qdp-jit], [ QDP-JIT support, requires --with-qdp (default=disabled) ]),
+  AC_HELP_STRING([--enable-qdp-jit], [ Enable QDP-JIT support, requires --with-qdp (default: disabled)]),
   [ build_qdpjit=${enableval} ], 
   [ build_qdpjit="no" ]
 )
 
 AC_ARG_WITH(qdp,
-  AC_HELP_STRING([--with-qdp=QDPDIR], [ Specify QDP++ installation directory ]),
+  AC_HELP_STRING([--with-qdp=QDPDIR], [ Specify QDP++ installation directory]),
   [ qdp_home=${withval} ],
   [ qdp_home="" ]
 )
@@ -204,13 +191,13 @@ fi
 
 
 AC_ARG_ENABLE(fermi-double-tex,
- AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default is no) ]),
+ AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: disabled)]),
  [ fermi_double_tex=${enableval}],
  [ fermi_double_tex="no" ]
 )
 
 AC_ARG_ENABLE(quda-numa-support,
- AC_HELP_STRING([--enable-quda-numa-support], [ Enable numa support for quda (default is yes) ]),
+ AC_HELP_STRING([--enable-quda-numa-support], [ Enable NUMA affinity support (default: enabled)]),
  [ quda_numa_support=${enableval}],
  [ quda_numa_support="yes" ]
 )
@@ -220,7 +207,7 @@ dnl CPU Arch
 case ${cpu_arch} in
 x86 | x86_64 ) ;;
 *) 
-  AC_MSG_ERROR([ cpu arch must be either x86_64 or x86 ])
+  AC_MSG_ERROR([ CPU arch must be either x86_64 or x86 ])
   ;;
 esac
 
@@ -228,7 +215,7 @@ dnl CPU Arch
 case ${gpu_arch} in
 sm_10 | sm_11 | sm_12 | sm_13 | sm_20 | sm_21 ) ;;
 *) 
-  AC_MSG_ERROR([ cpu arch must be either x86_64 or x86 ])
+  AC_MSG_ERROR([ GPU arch must be one of: sm_10, sm_11, sm_12, sm_13, sm_20, or sm_21 ])
   ;;
 esac
 
@@ -396,19 +383,19 @@ if test "X${multi_gpu}X" = "XyesX";
 then 
   AC_MSG_NOTICE([Enabling Multi-GPU])
   
-  AC_MSG_NOTICE([Multi-GPU doesnt support Domain-Wall Dirac Op  yet: disabling ])
+  AC_MSG_NOTICE([Domain wall doesn't support multi-GPU yet: disabling ])
   build_dwf_dirac="no";
 
-  AC_MSG_NOTICE([Multi-GPU doesnt support Gauge Force yet: disabling ])
+  AC_MSG_NOTICE([Gauge force doesn't support multi-GPU yet: disabling ])
   build_gauge_force="no"
 
-  AC_MSG_NOTICE([Multi-GPU doesnt support Staggered Force yet:disabling ])
+  AC_MSG_NOTICE([Asqtad fermion force doesn't support multi-GPU yet: disabling ])
   build_staggered_force="no"
 
 
   if test "X${qmp_home}X" = "XX"; then
     if test "X${mpi_home}X" = "XX"; then
-        AC_MSG_WARN([ Multi-GPU build without QMP or MPI. Will build single node code with copies ])
+        AC_MSG_WARN([ Multi-GPU build without QMP or MPI.  Will build single node code with copies ])
     fi
   else
  
@@ -456,9 +443,6 @@ AC_SUBST( QUDA_OS,  [${quda_os}]  )
 
 AC_MSG_NOTICE([Setting QUDA_PYTHON = ${quda_python} ])
 AC_SUBST( QUDA_PYTHON,   [${quda_python}] )
-
-AC_MSG_NOTICE([Setting DEVICE = ${tune_device} ])
-AC_SUBST( DEVICE,[${tune_device}] )
 
 AC_MSG_NOTICE([Setting HOST_DEBUG = ${quda_host_debug} ])
 AC_SUBST( HOST_DEBUG,    [${quda_host_debug}] )

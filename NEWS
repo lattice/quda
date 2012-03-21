@@ -1,7 +1,8 @@
 
 Version 0.4.0
 
-- Fermi-GeForce stability improvements.
+- Improved stability on Fermi-based GeForce cards by disabling
+  double precision texture reads.
 
 - Enabled arbitrary volumes for all Dirac operators.
 
@@ -18,6 +19,8 @@ Version 0.4.0
 
 - Added support for using multiple GPUs in parallel via MPI or QMP.
   [TODO: details]
+
+- Emulation mode is no longer supported.
 
 
 Version 0.3.2 - 18 January 2011
