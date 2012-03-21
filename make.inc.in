@@ -11,7 +11,6 @@ GPU_ARCH = @GPU_ARCH@	  # sm_10, sm_11, sm_12, sm_13, sm_20 or sm_21
 OS       = @QUDA_OS@	  # linux or osx
 
 PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
-DEVICE = @DEVICE@         # CUDA device to use for 'make tune'
 
 # compilation options
 HOST_DEBUG = @HOST_DEBUG@              # compile host debug code
