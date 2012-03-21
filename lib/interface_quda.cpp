@@ -1067,7 +1067,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   // Grab the dimension array of the input gauge field.
   const int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ? 
-    gaugeFatPrecise->X() : gaugeFatPrecise->X();
+    gaugeFatPrecise->X() : gaugePrecise->X();
 
   // Wrap CPU host side pointers
   // 
@@ -1108,10 +1108,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   quda::setBlasTuning(param->dirac_tune, param->verbosity);
   
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
-  double *rescaled_shifts = new double [param->num_offset];
+  double *unscaled_shifts = new double [param->num_offset];
   for(int i=0; i < param->num_offset; i++){ 
-    rescaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
+    unscaled_shifts[i] = param->offset[i];
+    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, param->offset[i]);
   }
 
   {
@@ -1120,7 +1120,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     cg_m(x, *b);  
   }
 
-  delete [] rescaled_shifts;
+  // restore shifts -- avoid side effects
+  for(int i=0; i < param->num_offset; i++) { 
+    param->offset[i] = unscaled_shifts[i];
+  }
+
+  delete [] unscaled_shifts;
 
   for(int i=0; i < param->num_offset; i++) { 
     x[i]->saveCPUSpinorField(*h_x[i]);
