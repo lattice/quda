@@ -538,7 +538,14 @@ void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const 
 
 static void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
 			QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
-{    
+{   
+ if (verbosity >= QUDA_VERBOSE) {
+    printfQuda("Mass rescale: Kappa is: %f\n", kappa);
+    printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
+    double nin = norm2(b);
+    printfQuda("Mass rescale: norm of source in = %f\n", nin);
+  }
+ 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     if (mass_normalization != QUDA_MASS_NORMALIZATION) {
       errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
@@ -579,6 +586,13 @@ static void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionT
   }
 
   if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
+ if (verbosity >= QUDA_VERBOSE) {
+    printfQuda("Mass rescale: Kappa is: %f\n", kappa);
+    printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
+    double nin = norm2(b);
+    printfQuda("Mass rescale: norm of source out = %f\n", nin);
+  }
+
 }
 
 static void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
@@ -745,16 +759,23 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
 }
 
-void createDirac(DiracParam &diracParam, QudaInvertParam &param, bool pc_solve) {
+void createDirac(QudaInvertParam &param, const bool pc_solve) {
+
   if (!diracCreation) {
+    DiracParam diracParam;
+    DiracParam diracSloppyParam;
+    DiracParam diracPreParam;
+
     setDiracParam(diracParam, &param, pc_solve);
-    d = Dirac::create(diracParam); // create the Dirac operator    
-    setDiracSloppyParam(diracParam, &param, pc_solve);
-    dSloppy = Dirac::create(diracParam);
-    setDiracPreParam(diracParam, &param, pc_solve);
-    dPre = Dirac::create(diracParam);
+    setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
+    setDiracPreParam(diracPreParam, &param, pc_solve);
+    
+    d = Dirac::create(diracParam); // create the Dirac operator   
+    dSloppy = Dirac::create(diracSloppyParam);
+    dPre = Dirac::create(diracPreParam);
     diracCreation = true;
-  }
+  } 
+
 }
 
 cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -805,8 +826,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   param->iter = 0;
 
   // create the dirac operator
-  DiracParam diracParam;
-  createDirac(diracParam, *param, pc_solve);
+  createDirac( *param, pc_solve);
+
+    
+  
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
@@ -854,7 +877,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source = %f\n", nin);   
   }
 
-  massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *in);
+  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
+
+  if (param->verbosity >= QUDA_VERBOSE) {
+    double nin = norm2(*in);
+    printfQuda("Prepared source post mass rescale = %f\n", nin);   
+  }
+  
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
@@ -1023,11 +1052,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   //
   // Balint: Isn't there a  nice construction pattern we could use here? This is 
   // expedient but yucky.
-  DiracParam diracParam; 
+  //  DiracParam diracParam; 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
     param->mass = sqrt(param->offset[0]/4);  
   }
-  createDirac(diracParam, *param, pc_solve);
+  createDirac(*param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
 
@@ -1078,11 +1107,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   setDslashTuning(param->dirac_tune, param->verbosity);
   quda::setBlasTuning(param->dirac_tune, param->verbosity);
   
-  massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
+  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [param->num_offset];
   for(int i=0; i < param->num_offset; i++){ 
     rescaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
+    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
   }
 
   {
@@ -1376,7 +1405,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   //
   // Balint: Isn't there a  nice construction pattern we could use here? This is 
   // expedient but yucky.
-  DiracParam diracParam; 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
     param->mass = sqrt(param->offset[0]/4);  
   }
@@ -1385,7 +1413,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // but we set it to be the same as sloppy to avoid segfault 
   // in creating the dirac since it is needed 
   gaugeFatPrecondition = gaugeFatPrecise = gaugeFatSloppy;
-  createDirac(diracParam, *param, pc_solve);
+  createDirac(*param, pc_solve);
   // resetting to NULL
   gaugeFatPrecise = NULL; gaugeFatPrecondition = NULL;
 
@@ -1439,11 +1467,11 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   quda::setBlasTuning(param->dirac_tune, param->verbosity);
   // if set, tuning will happen in the first multishift call
   
-  massRescale(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, *b);
+  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
   double *rescaled_shifts = new double [param->num_offset];
   for(int i=0; i < param->num_offset; i++){ 
     rescaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, diracParam.kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
+    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
   }
 
   {
@@ -1472,7 +1500,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   /*FIXME: to avoid setfault*/
   gaugeFatPrecondition =gaugeFatSloppy;
-  createDirac(diracParam, *param, pc_solve);
+  createDirac(*param, pc_solve);
   gaugeFatPrecondition = NULL;
   {
     Dirac& dirac2 = *d;
