@@ -325,11 +325,33 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
      (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
+
+#if (__COMPUTE_CAPABILITY__ >= 200) // Fermi optimal code
+
 #if DD_DAG
-#include "tm_dslash_dagger_core.h"
+#include "tm_dslash_dagger_fermi_core.h"
 #else
-#include "tm_dslash_core.h"
+#include "tm_dslash_fermi_core.h"
 #endif
+
+#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+
+#if DD_DAG
+#include "tm_dslash_dagger_gt200_core.h"
+#else
+#include "tm_dslash_gt200_core.h"
+#endif
+
+#else  // fall-back is original G80 
+
+#if DD_DAG
+#include "tm_dslash_dagger_g80_core.h"
+#else
+#include "tm_dslash_g80_core.h"
+#endif
+
+#endif
+
 #endif
 
 }

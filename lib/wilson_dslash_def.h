@@ -387,11 +387,34 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
   // build Wilson or clover as appropriate
 #if ((DD_CLOVER==0 && BUILD_WILSON) || (DD_CLOVER==1 && BUILD_CLOVER))
+
+#if (__COMPUTE_CAPABILITY__ >= 200) // Fermi optimal code
+
 #if DD_DAG
-#include "wilson_dslash_dagger_core.h"
+#include "wilson_dslash_dagger_fermi_core.h"
 #else
-#include "wilson_dslash_core.h"
+#include "wilson_dslash_fermi_core.h"
 #endif
+
+#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+
+#if DD_DAG
+#include "wilson_dslash_dagger_gt200_core.h"
+#else
+#include "wilson_dslash_gt200_core.h"
+#endif
+
+#else  // fall-back is original G80 
+
+#if DD_DAG
+#include "wilson_dslash_dagger_g80_core.h"
+#else
+#include "wilson_dslash_g80_core.h"
+#endif
+
+#endif
+
+
 #endif
 
 }

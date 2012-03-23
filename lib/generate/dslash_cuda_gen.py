@@ -138,6 +138,8 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
+    if sharedDslash: str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2\n"
+
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -145,6 +147,7 @@ def def_input_spinor():
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
+    if sharedDslash: str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -255,15 +258,17 @@ def def_clover():
 
 
 def def_output_spinor():
+# sharedDslash = True: input spinors stored in shared memory
+# sharedDslash = False: output spinors stored in shared memory
     str = "// output spinor\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if 2*i < sharedFloats:
+            if 2*i < sharedFloats and not sharedDslash:
                 str += "#define "+out_re(s,c)+" s["+`(2*i+0)`+"*SHARED_STRIDE]\n"
             else:
                 str += "VOLATILE spinorFloat "+out_re(s,c)+";\n"
-            if 2*i+1 < sharedFloats:
+            if 2*i+1 < sharedFloats and not sharedDslash:
                 str += "#define "+out_im(s,c)+" s["+`(2*i+1)`+"*SHARED_STRIDE]\n"
             else:
                 str += "VOLATILE spinorFloat "+out_im(s,c)+";\n"
@@ -313,7 +318,8 @@ def prolog():
 #endif
 """)
 
-    if sharedFloats > 0:
+    # set the pointer if using shared memory for pseudo registers
+    if sharedFloats > 0 and not sharedDslash: 
         prolog_str += (
 """
 extern __shared__ char s_data[];
@@ -347,13 +353,48 @@ int X;
 int sp_norm_idx;
 #endif // MULTI_GPU half precision
 
-int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if (sid >= param.threads) return;
+int sid;
+""")
 
+        if sharedDslash:
+            prolog_str += (
+"""
 #ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
+
+  // Inline by hand for the moment and assume even dimensions
+  //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
+  int xt = blockIdx.x*blockDim.x + threadIdx.x;
+  int aux = xt+xt;
+  if (aux >= X1*X4) return;
+
+  x4 = aux / X1;
+  x1 = aux - x4*X1;
+
+  x2 = blockIdx.y*blockDim.y + threadIdx.y;
+  if (x2 >= X2) return;
+
+  x3 = blockIdx.z*blockDim.z + threadIdx.z;
+  if (x3 >= X3) return;
+
+  x1 += (param.parity + x4 + x3 + x2) &1;
+  X = ((x4*X3 + x3)*X2 + x2)*X1 + x1;
+  sid = X >> 1; 
+
+""")
+        else:
+            prolog_str += (
+"""
+#ifdef MULTI_GPU
+int face_idx;
+if (kernel_type == INTERIOR_KERNEL) {
+#endif
+
+  sid = blockIdx.x*blockDim.x + threadIdx.x;
+  if (sid >= param.threads) return;
 
   // Inline by hand for the moment and assume even dimensions
   //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -381,6 +422,9 @@ if (kernel_type == INTERIOR_KERNEL) {
 """
 #ifdef MULTI_GPU
 } else { // exterior kernel
+
+  sid = blockIdx.x*blockDim.x + threadIdx.x;
+  if (sid >= param.threads) return;
 
   const int dim = static_cast<int>(kernel_type);
   const int face_volume = (param.threads >> 1);           // volume of one face
@@ -420,7 +464,6 @@ if (sid >= param.threads) return;
 
 // read spinor from device memory
 READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
-
 """)            
     return prolog_str
 # end def prolog
@@ -562,6 +605,71 @@ def gen(dir, pack_only=False):
             project += h1_re(h,c)+" = "+strRe+";\n"
             project += h1_im(h,c)+" = "+strIm+";\n"
 
+    write_shared = (
+"""// store spinor into shared memory
+extern __shared__ char s_data[];
+spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+  ((threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z))/SHARED_STRIDE) + 
+  ((threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+WRITE_SPINOR_SHARED(s, i);\n
+""")
+
+    load_shared_1 = (
+"""// load spinor from shared memory
+int tx = (threadIdx.x > 0) ? threadIdx.x-1 : blockDim.x-1;
+extern __shared__ char s_data[];
+spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+  ((tx+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
+  ((tx+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+__syncthreads();
+READ_SPINOR_SHARED(s);\n
+""")
+
+    load_shared_2 = (
+"""// load spinor from shared memory
+int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+int ty = (threadIdx.y < blockDim.y - 1) ? threadIdx.y + 1 : 0;
+extern __shared__ char s_data[];
+spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+ ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
+ ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+READ_SPINOR_SHARED(s);\n
+""")
+
+    load_shared_3 = (
+"""// load spinor from shared memory
+int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+int ty = (threadIdx.y > 0) ? threadIdx.y - 1 : blockDim.y - 1;
+extern __shared__ char s_data[];
+spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+ ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
+ ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+READ_SPINOR_SHARED(s);\n
+""")
+
+    load_shared_4 = (
+"""// load spinor from shared memory
+int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+int tz = (threadIdx.z < blockDim.z - 1) ? threadIdx.z + 1 : 0;
+extern __shared__ char s_data[];
+spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) / SHARED_STRIDE) + 
+  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) % SHARED_STRIDE);
+READ_SPINOR_SHARED(s);\n
+""")
+
+    load_shared_5 = (
+"""// load spinor from shared memory
+int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+int tz = (threadIdx.z > 0) ? threadIdx.z - 1 : blockDim.z - 1;
+extern __shared__ char s_data[];
+spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) / SHARED_STRIDE) + 
+  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) % SHARED_STRIDE);
+READ_SPINOR_SHARED(s);\n
+""")
+
+
     copy_half = ""
     for h in range(0, 2):
         for c in range(0, 3):
@@ -574,8 +682,54 @@ def gen(dir, pack_only=False):
     prep_half += "if (kernel_type == INTERIOR_KERNEL) {\n"
     prep_half += "#endif\n"
     prep_half += "\n"
-    prep_half += indent(load_spinor)
-    prep_half += indent(project)
+
+    if sharedDslash:
+        if dir == 0:
+            prep_half += indent(load_spinor)
+            prep_half += indent(write_shared)            
+            prep_half += indent(project)
+        elif dir == 1:
+            prep_half += indent(load_shared_1)
+            prep_half += indent(project)
+        elif dir == 2:
+            prep_half += indent("if (threadIdx.y == blockDim.y-1 && blockDim.y < X2 ) {\n")
+            prep_half += indent(load_spinor)
+            prep_half += indent(project)            
+            prep_half += indent("} else {")
+            prep_half += indent(load_shared_2)
+            prep_half += indent(project)
+            prep_half += indent("}")
+        elif dir == 3:
+            prep_half += indent("if (threadIdx.y == 0 && blockDim.y < X2) {\n")
+            prep_half += indent(load_spinor)
+            prep_half += indent(project)            
+            prep_half += indent("} else {")
+            prep_half += indent(load_shared_3)
+            prep_half += indent(project)
+            prep_half += indent("}")
+        elif dir == 4:
+            prep_half += indent("if (threadIdx.z == blockDim.z-1 && blockDim.z < X3) {\n")
+            prep_half += indent(load_spinor)
+            prep_half += indent(project)            
+            prep_half += indent("} else {")
+            prep_half += indent(load_shared_4)
+            prep_half += indent(project)
+            prep_half += indent("}")
+        elif dir == 5:
+            prep_half += indent("if (threadIdx.z == 0 && blockDim.z < X3) {\n")
+            prep_half += indent(load_spinor)
+            prep_half += indent(project)            
+            prep_half += indent("} else {")
+            prep_half += indent(load_shared_5)
+            prep_half += indent(project)
+            prep_half += indent("}")
+        else:
+            prep_half += indent(load_spinor)
+            prep_half += indent(project)
+    else:
+        prep_half += indent(load_spinor)
+        prep_half += indent(project)
+
     prep_half += "\n"
     prep_half += "#ifdef MULTI_GPU\n"
     prep_half += "} else {\n"
@@ -875,6 +1029,7 @@ case EXTERIOR_KERNEL_Y:
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"
+    if sharedDslash: str += "#undef READ_SPINOR_SHARED\n"
     str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:
@@ -972,47 +1127,90 @@ def generate_dslash():
 def generate_clover():
     return prolog() + epilog()
 
-
-# To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
-
-sharedFloats = 0
-cloverSharedFloats = 0
-if(len(sys.argv) > 1):
-    if (sys.argv[1] == '--shared'):
-        sharedFloats = int(sys.argv[2])
-print "Shared floats set to " + str(sharedFloats);
-
 # generate Wilson-like Dslash kernels
-dslash = True
+def generate_dslash_kernels(arch):
+    print "Generating dslash kernel for sm" + str(arch/10)
 
+    global sharedFloats
+    global sharedDslash
+    global dslash
+    global dagger
+    global clover
+    global twist
+
+    sharedFloats = 0
+    if arch >= 200:
+        sharedFloats = 24
+        sharedDslash = True    
+        name = "fermi"
+    elif arch >= 120:
+        sharedFloats = 0
+        sharedDslash = False
+        name = "gt200"
+    else:
+        sharedFloats = 19
+        sharedDslash = False
+        name = "g80"
+
+    print "Shared floats set to " + str(sharedFloats)
+
+    dslash = True
+    twist = False
+    clover = True
+    dagger = False
+
+    filename = 'dslash_core/wilson_dslash_' + name + '_core.h'
+    print sys.argv[0] + ": generating " + filename;
+    f = open(filename, 'w')
+    f.write(generate_dslash())
+    f.close()
+
+    dagger = True
+    filename = 'dslash_core/wilson_dslash_dagger_' + name + '_core.h'
+    print sys.argv[0] + ": generating " + filename;
+    f = open(filename, 'w')
+    f.write(generate_dslash())
+    f.close()
+
+    twist = True
+    clover = False
+    dagger = False
+    filename = 'dslash_core/tm_dslash_' + name + '_core.h'
+    print sys.argv[0] + ": generating " + filename;
+    f = open(filename, 'w')
+    f.write(generate_dslash())
+    f.close()
+
+    dagger = True
+    filename = 'dslash_core/tm_dslash_dagger_' + name + '_core.h'
+    print sys.argv[0] + ": generating " + filename + "\n";
+    f = open(filename, 'w')
+    f.write(generate_dslash())
+    f.close()
+
+    dslash = False
+
+
+
+dslash = False
+dagger = False
 twist = False
-clover = True
-dagger = False
-print sys.argv[0] + ": generating wilson_dslash_core.h";
-f = open('dslash_core/wilson_dslash_core.h', 'w')
-f.write(generate_dslash())
-f.close()
-
-dagger = True
-print sys.argv[0] + ": generating wilson_dslash_dagger_core.h";
-f = open('dslash_core/wilson_dslash_dagger_core.h', 'w')
-f.write(generate_dslash())
-f.close()
-
-twist = True
 clover = False
-dagger = False
-print sys.argv[0] + ": generating tm_dslash_core.h";
-f = open('dslash_core/tm_dslash_core.h', 'w')
-f.write(generate_dslash())
-f.close()
+sharedFloats = 0
+sharedDslash = False
 
-dagger = True
-print sys.argv[0] + ": generating tm_dslash_dagger_core.h";
-f = open('dslash_core/tm_dslash_dagger_core.h', 'w')
-f.write(generate_dslash())
-f.close()
+# generate dslash kernels
+arch = 200
+generate_dslash_kernels(arch)
 
+arch = 130
+generate_dslash_kernels(arch)
+
+arch = 100
+generate_dslash_kernels(arch)
+
+# generate packing kernels
+dslash = True
 sharedFloats = 0
 twist = False
 clover = False
@@ -1027,11 +1225,14 @@ print sys.argv[0] + ": generating wilson_pack_face_dagger_core.h";
 f = open('dslash_core/wilson_pack_face_dagger_core.h', 'w')
 f.write(generate_pack())
 f.close()
+dslash = False
 
 # generate clover solo term
-dslash = False
 clover = True
+cloverSharedFloats = 0
 sharedFloats = cloverSharedFloats
+# for the clover term, only makes sense to use shared memory as pseudo registers
+sharedDslash = False 
 print sys.argv[0] + ": generating clover_core.h";
 f = open('dslash_core/clover_core.h', 'w')
 f.write(generate_clover())

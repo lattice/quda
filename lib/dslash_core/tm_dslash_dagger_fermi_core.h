@@ -1,6 +1,6 @@
 // *** CUDA DSLASH DAGGER ***
 
-#define DSLASH_SHARED_FLOATS_PER_THREAD 0
+#define DSLASH_SHARED_FLOATS_PER_THREAD 24
 
 
 #if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
@@ -11,6 +11,7 @@
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
+#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -37,6 +38,7 @@
 #define i32_im I11.y
 #else
 #define spinorFloat float
+#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -183,8 +185,7 @@ int X;
 int sp_norm_idx;
 #endif // MULTI_GPU half precision
 
-int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if (sid >= param.threads) return;
+int sid;
 
 #ifdef MULTI_GPU
 int face_idx;
@@ -194,16 +195,22 @@ if (kernel_type == INTERIOR_KERNEL) {
   // Inline by hand for the moment and assume even dimensions
   //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
 
-  X = 2*sid;
-  int aux1 = X / X1;
-  x1 = X - aux1 * X1;
-  int aux2 = aux1 / X2;
-  x2 = aux1 - aux2 * X2;
-  x4 = aux2 / X3;
-  x3 = aux2 - x4 * X3;
-  aux1 = (param.parity + x4 + x3 + x2) & 1;
-  x1 += aux1;
-  X += aux1;
+  int xt = blockIdx.x*blockDim.x + threadIdx.x;
+  int aux = xt+xt;
+  if (aux >= X1*X4) return;
+
+  x4 = aux / X1;
+  x1 = aux - x4*X1;
+
+  x2 = blockIdx.y*blockDim.y + threadIdx.y;
+  if (x2 >= X2) return;
+
+  x3 = blockIdx.z*blockDim.z + threadIdx.z;
+  if (x3 >= X3) return;
+
+  x1 += (param.parity + x4 + x3 + x2) &1;
+  X = ((x4*X3 + x3)*X2 + x2)*X1 + x1;
+  sid = X >> 1; 
 
   o00_re = 0;  o00_im = 0;
   o01_re = 0;  o01_im = 0;
@@ -220,6 +227,9 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 #ifdef MULTI_GPU
 } else { // exterior kernel
+
+  sid = blockIdx.x*blockDim.x + threadIdx.x;
+  if (sid >= param.threads) return;
 
   const int dim = static_cast<int>(kernel_type);
   const int face_volume = (param.threads >> 1);           // volume of one face
@@ -290,6 +300,13 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    
+    // store spinor into shared memory
+    extern __shared__ char s_data[];
+    spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+      ((threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z))/SHARED_STRIDE) + 
+      ((threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+    WRITE_SPINOR_SHARED(s, i);
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_im;
@@ -483,8 +500,14 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
-    // read spinor from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    // load spinor from shared memory
+    int tx = (threadIdx.x > 0) ? threadIdx.x-1 : blockDim.x-1;
+    extern __shared__ char s_data[];
+    spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+      ((tx+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
+      ((tx+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+    __syncthreads();
+    READ_SPINOR_SHARED(s);
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_im;
@@ -674,6 +697,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.y == blockDim.y-1 && blockDim.y < X2 ) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -690,6 +714,30 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
     b1_im = +i11_im-i21_im;
     b2_re = +i12_re-i22_re;
     b2_im = +i12_im-i22_im;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+    int ty = (threadIdx.y < blockDim.y - 1) ? threadIdx.y + 1 : 0;
+    extern __shared__ char s_data[];
+    spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+     ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
+     ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+    READ_SPINOR_SHARED(s);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re+i30_re;
+    a0_im = +i00_im+i30_im;
+    a1_re = +i01_re+i31_re;
+    a1_im = +i01_im+i31_im;
+    a2_re = +i02_re+i32_re;
+    a2_im = +i02_im+i32_im;
+    b0_re = +i10_re-i20_re;
+    b0_im = +i10_im-i20_im;
+    b1_re = +i11_re-i21_re;
+    b1_im = +i11_im-i21_im;
+    b2_re = +i12_re-i22_re;
+    b2_im = +i12_im-i22_im;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -869,6 +917,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.y == 0 && blockDim.y < X2) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -885,6 +934,30 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
     b1_im = +i11_im+i21_im;
     b2_re = +i12_re+i22_re;
     b2_im = +i12_im+i22_im;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+    int ty = (threadIdx.y > 0) ? threadIdx.y - 1 : blockDim.y - 1;
+    extern __shared__ char s_data[];
+    spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+     ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
+     ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
+    READ_SPINOR_SHARED(s);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re-i30_re;
+    a0_im = +i00_im-i30_im;
+    a1_re = +i01_re-i31_re;
+    a1_im = +i01_im-i31_im;
+    a2_re = +i02_re-i32_re;
+    a2_im = +i02_im-i32_im;
+    b0_re = +i10_re+i20_re;
+    b0_im = +i10_im+i20_im;
+    b1_re = +i11_re+i21_re;
+    b1_im = +i11_im+i21_im;
+    b2_re = +i12_re+i22_re;
+    b2_im = +i12_im+i22_im;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -1060,6 +1133,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.z == blockDim.z-1 && blockDim.z < X3) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -1076,6 +1150,30 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
     b1_im = +i11_im-i31_re;
     b2_re = +i12_re+i32_im;
     b2_im = +i12_im-i32_re;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+    int tz = (threadIdx.z < blockDim.z - 1) ? threadIdx.z + 1 : 0;
+    extern __shared__ char s_data[];
+    spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+      ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) / SHARED_STRIDE) + 
+      ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) % SHARED_STRIDE);
+    READ_SPINOR_SHARED(s);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re-i20_im;
+    a0_im = +i00_im+i20_re;
+    a1_re = +i01_re-i21_im;
+    a1_im = +i01_im+i21_re;
+    a2_re = +i02_re-i22_im;
+    a2_im = +i02_im+i22_re;
+    b0_re = +i10_re+i30_im;
+    b0_im = +i10_im-i30_re;
+    b1_re = +i11_re+i31_im;
+    b1_im = +i11_im-i31_re;
+    b2_re = +i12_re+i32_im;
+    b2_im = +i12_im-i32_re;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -1255,6 +1353,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.z == 0 && blockDim.z < X3) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
@@ -1271,6 +1370,30 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
     b1_im = +i11_im+i31_re;
     b2_re = +i12_re-i32_im;
     b2_im = +i12_im+i32_re;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+    int tz = (threadIdx.z > 0) ? threadIdx.z - 1 : blockDim.z - 1;
+    extern __shared__ char s_data[];
+    spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
+      ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) / SHARED_STRIDE) + 
+      ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) % SHARED_STRIDE);
+    READ_SPINOR_SHARED(s);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re+i20_im;
+    a0_im = +i00_im-i20_re;
+    a1_re = +i01_re+i21_im;
+    a1_im = +i01_im-i21_re;
+    a2_re = +i02_re+i22_im;
+    a2_im = +i02_im-i22_re;
+    b0_re = +i10_re-i30_im;
+    b0_im = +i10_im+i30_re;
+    b1_re = +i11_re-i31_im;
+    b1_im = +i11_im+i31_re;
+    b2_re = +i12_re-i32_im;
+    b2_im = +i12_im+i32_re;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -2092,6 +2215,7 @@ WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
+#undef READ_SPINOR_SHARED
 #undef SHARED_STRIDE
 
 #undef A_re
@@ -2142,5 +2266,29 @@ WRITE_SPINOR(sp_stride);
 #undef i32_im
 
 
+#undef o00_re
+#undef o00_im
+#undef o01_re
+#undef o01_im
+#undef o02_re
+#undef o02_im
+#undef o10_re
+#undef o10_im
+#undef o11_re
+#undef o11_im
+#undef o12_re
+#undef o12_im
+#undef o20_re
+#undef o20_im
+#undef o21_re
+#undef o21_im
+#undef o22_re
+#undef o22_im
+#undef o30_re
+#undef o30_im
+#undef o31_re
+#undef o31_im
+#undef o32_re
+#undef o32_im
 
 #undef VOLATILE

@@ -54,8 +54,12 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
 	best_time = elapsed_time;
 	best_param = param;
       }
-      if ((verbosity >= QUDA_DEBUG_VERBOSE) && (error == cudaSuccess)) {
-	printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), tunable.perfString(elapsed_time).c_str());
+      if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
+	if (error == cudaSuccess)
+	  printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), 
+		     tunable.perfString(elapsed_time).c_str());
+	else 
+	  printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
       }
       tuning = tunable.advanceTuneParam(param);
     }

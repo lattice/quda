@@ -287,7 +287,6 @@ if (sid >= param.threads) return;
 
 // read spinor from device memory
 READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
-
 {
   
   // change to chiral basis

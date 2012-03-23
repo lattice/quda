@@ -269,6 +269,72 @@ class DslashCuda : public Tunable {
  protected:
   int sharedBytesPerBlock() const { return 0; }
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+  bool advanceSharedBytes(TuneParam &param) const { return false; }
+
+  int sharedBytes(const dim3 &block) const { 
+    int warpSize = 32; // FIXME - query from device properties
+    int block_xy = block.x*block.y*block.z;
+    if (block_xy % warpSize != 0) block_xy = ((block_xy / warpSize) + 1)*warpSize;
+    return block_xy*block.z*sharedBytesPerThread();
+  }
+
+  bool advanceBlockDim(TuneParam &param) const {
+    const unsigned int min_threads = 2;
+    const unsigned int max_threads = 512; // FIXME: use deviceProp.maxThreadsDim[0];
+    const unsigned int max_shared = 16384*3; // FIXME: use deviceProp.sharedMemPerBlock;
+    
+    // set the x-block dimension equal to the entire x dimension
+    bool set = false;
+    dim3 blockInit = param.block;
+    blockInit.z++;
+    for (unsigned bx=blockInit.x; bx<=dslashConstants.x[0]/2; bx++) {
+      //unsigned int gx = (dslashConstants.x[0]*dslashConstants.x[3] + bx - 1) / bx;
+      for (unsigned by=blockInit.y; by<=dslashConstants.x[1]; by++) {
+	unsigned int gy = (dslashConstants.x[1] + by - 1 ) / by;	
+	
+	if (by > 1 && (by%2) != 0) continue; // can't handle odd blocks yet except by=1
+	
+	for (unsigned bz=blockInit.z; bz<=dslashConstants.x[2]; bz++) {
+	  unsigned int gz = (dslashConstants.x[2] + bz - 1) / bz;
+	  
+	  if (bz > 1 && (bz%2) != 0) continue; // can't handle odd blocks yet except bz=1
+	  if (bx*by*bz > max_threads) continue;
+	  if (bx*by*bz < min_threads) continue;
+	  // can't yet handle the last block properly in shared memory addressing
+	  if (by*gy != dslashConstants.x[1]) continue;
+	  if (bz*gz != dslashConstants.x[2]) continue;
+	  if (sharedBytes(dim3(bx, by, bz)) > max_shared) continue;
+
+	  param.block = dim3(bx, by, bz);	  
+	  set = true; break;
+	}
+	if (set) break;
+	blockInit.z = 1;
+      }
+      if (set) break;
+      blockInit.y = 1;
+    }
+
+    if (param.block.x > dslashConstants.x[0]/2 &&	param.block.y > dslashConstants.x[1] &&
+	param.block.z > dslashConstants.x[2] || !set) {
+      //||sharedBytesPerThread()*param.block.x > max_shared) {
+      param.block = dim3(dslashConstants.x[0]/2, 1, 1);
+      return false;
+    } else { 
+      param.grid = createGrid(param.block);
+      param.shared_bytes = sharedBytes(param.block);
+      return true; 
+    }
+    
+  }
+
+  dim3 createGrid(const dim3 &block) const {
+    unsigned int gx = ((dslashConstants.x[0]/2)*dslashConstants.x[3] + block.x - 1) / block.x;
+    unsigned int gy = (dslashConstants.x[1] + block.y - 1 ) / block.y;	
+    unsigned int gz = (dslashConstants.x[2] + block.z - 1) / block.z;
+    return dim3(gx, gy, gz);
+  }
+
  public:
   DslashCuda() { }
   virtual ~DslashCuda() { }
@@ -277,10 +343,29 @@ class DslashCuda : public Tunable {
   {
     std::stringstream ps;
     ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
     ps << "shared=" << param.shared_bytes;
     return ps.str();
   }
   virtual int Nface() { return 2; }
+
+  virtual void initTuneParam(TuneParam &param) const
+  {
+    param.block = dim3(dslashConstants.x[0]/2, 1, 1);
+    param.grid = createGrid(param.block);
+
+    int warpSize = 32; // FIXME - query from device properties
+    int block_xy = param.block.x*param.block.y*param.block.z;
+    if (block_xy % warpSize != 0) block_xy = ((block_xy / warpSize) + 1)*warpSize;
+    int block = block_xy*param.block.z;    
+    printf("block = %d\n", block);
+    param.shared_bytes = block*sharedBytesPerThread();
+
+    /*unsigned int min_block_size = param.block.x*param.block.y*param.block.z;
+    param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock() ?
+    sharedBytesPerThread()*min_block_size : sharedBytesPerBlock();*/
+  }
+
 };
 
 TuneKey DslashCuda::tuneKey() const
@@ -366,8 +451,7 @@ class WilsonDslashCuda : public DslashCuda {
   void apply(const cudaStream_t &stream)
   {
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-    DSLASH(dslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+    DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
   }
 
@@ -447,8 +531,7 @@ class CloverDslashCuda : public DslashCuda {
   void apply(const cudaStream_t &stream)
   {
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-    DSLASH(cloverDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+    DSLASH(cloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
   }
 
@@ -543,8 +626,7 @@ class TwistedDslashCuda : public DslashCuda {
   void apply(const cudaStream_t &stream)
   {
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-    dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-    DSLASH(twistedMassDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+    DSLASH(twistedMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
   }
 
@@ -592,6 +674,10 @@ class DomainWallDslashCuda : public DslashCuda {
  protected:
   int sharedBytesPerThread() const { return 0; }
 
+  bool advanceBlockDim(TuneParam &param) const {
+    return Tunable::advanceBlockDim(param); // no support for 3-d block tuning (yet)
+  }
+  
  public:
   DomainWallDslashCuda(sFloat *out, float *outNorm, const gFloat *gauge0, const gFloat *gauge1, 
 		       const QudaReconstructType reconstruct, const sFloat *in, 
@@ -670,6 +756,10 @@ private:
   {
     int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
     return 6 * reg_size;
+  }
+
+  bool advanceBlockDim(TuneParam &param) const {
+    return Tunable::advanceBlockDim(param); // no support for 3-d block tuning (yet)
   }
 
  public:

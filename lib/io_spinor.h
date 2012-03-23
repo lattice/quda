@@ -318,6 +318,72 @@
   out[sid+4*(stride)] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
   out[sid+5*(stride)] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
+#define WRITE_SPINOR_DOUBLE2_STR(stride) \
+store_streaming_double2(&g_out[0*sp_stride+sid], o00_re, o00_im); \
+store_streaming_double2(&g_out[1*sp_stride+sid], o01_re, o01_im); \
+store_streaming_double2(&g_out[2*sp_stride+sid], o02_re, o02_im); \
+store_streaming_double2(&g_out[3*sp_stride+sid], o10_re, o10_im); \
+store_streaming_double2(&g_out[4*sp_stride+sid], o11_re, o11_im); \
+store_streaming_double2(&g_out[5*sp_stride+sid], o12_re, o12_im); \
+store_streaming_double2(&g_out[6*sp_stride+sid], o20_re, o20_im); \
+store_streaming_double2(&g_out[7*sp_stride+sid], o21_re, o21_im); \
+store_streaming_double2(&g_out[8*sp_stride+sid], o22_re, o22_im); \
+store_streaming_double2(&g_out[9*sp_stride+sid], o30_re, o30_im); \
+store_streaming_double2(&g_out[10*sp_stride+sid], o31_re, o31_im); \
+store_streaming_double2(&g_out[11*sp_stride+sid], o32_re, o32_im);
+
+#define WRITE_SPINOR_FLOAT4_STR(stride) \
+store_streaming_float4(&out[0*(stride)+sid], o00_re, o00_im, o01_re, o01_im); \
+store_streaming_float4(&out[1*(stride)+sid], o02_re, o02_im, o10_re, o10_im); \
+store_streaming_float4(&out[2*(stride)+sid], o11_re, o11_im, o12_re, o12_im); \
+store_streaming_float4(&out[3*(stride)+sid], o20_re, o20_im, o21_re, o21_im); \
+store_streaming_float4(&out[4*(stride)+sid], o22_re, o22_im, o30_re, o30_im); \
+store_streaming_float4(&out[5*(stride)+sid], o31_re, o31_im, o32_re, o32_im);
+
+#define WRITE_SPINOR_SHORT4_STR(stride) \
+float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im)); \
+float c1 = fmaxf(fabsf(o01_re), fabsf(o02_im)); \
+float c2 = fmaxf(fabsf(o02_re), fabsf(o01_im)); \
+float c3 = fmaxf(fabsf(o10_re), fabsf(o10_im)); \
+float c4 = fmaxf(fabsf(o11_re), fabsf(o11_im)); \
+float c5 = fmaxf(fabsf(o12_re), fabsf(o12_im)); \
+float c6 = fmaxf(fabsf(o20_re), fabsf(o20_im)); \
+float c7 = fmaxf(fabsf(o21_re), fabsf(o21_im)); \
+float c8 = fmaxf(fabsf(o22_re), fabsf(o22_im)); \
+float c9 = fmaxf(fabsf(o30_re), fabsf(o30_im)); \
+float c10 = fmaxf(fabsf(o31_re), fabsf(o31_im)); \
+float c11 = fmaxf(fabsf(o32_re), fabsf(o32_im)); \
+c0 = fmaxf(c0, c1); \
+c1 = fmaxf(c2, c3); \
+c2 = fmaxf(c4, c5); \
+c3 = fmaxf(c6, c7); \
+c4 = fmaxf(c8, c9); \
+c5 = fmaxf(c10, c11); \
+c0 = fmaxf(c0, c1); \
+c1 = fmaxf(c2, c3); \
+c2 = fmaxf(c4, c5); \
+c0 = fmaxf(c0, c1); \
+c0 = fmaxf(c0, c2); \
+outNorm[sid] = c0; \
+float scale = __fdividef(MAX_SHORT, c0); \
+o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale; \
+o02_re *= scale; o02_im *= scale; o10_re *= scale; o10_im *= scale; \
+o11_re *= scale; o11_im *= scale; o12_re *= scale; o12_im *= scale; \
+o20_re *= scale; o20_im *= scale; o21_re *= scale; o21_im *= scale; \
+o22_re *= scale; o22_im *= scale; o30_re *= scale; o30_im *= scale; \
+o31_re *= scale; o31_im *= scale; o32_re *= scale; o32_im *= scale; \
+store_streaming_short4(&out[0*(stride)+sid], (short)o00_re, (short)o00_im, (short)o01_re, (short)o01_im); \
+store_streaming_short4(&out[1*(stride)+sid], (short)o02_re, (short)o02_im, (short)o10_re, (short)o10_im); \
+store_streaming_short4(&out[2*(stride)+sid], (short)o11_re, (short)o11_im, (short)o12_re, (short)o12_im); \
+store_streaming_short4(&out[3*(stride)+sid], (short)o20_re, (short)o20_im, (short)o21_re, (short)o21_im); \
+store_streaming_short4(&out[4*(stride)+sid], (short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
+store_streaming_short4(&out[5*(stride)+sid], (short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
+#else
+#define WRITE_SPINOR_DOUBLE2_STR(stride) WRITE_SPINOR_DOUBLE2(stride)
+#define WRITE_SPINOR_FLOAT4_STR(stride) WRITE_SPINOR_FLOAT4(stride)
+#define WRITE_SPINOR_SHORT4_STR(stride) WRITE_SPINOR_SHORT4(stride)
+#endif
 
 // macros used for exterior Wilson Dslash kernels and face packing
 
@@ -469,6 +535,40 @@
   out[sid+1*sp_stride] = make_short2((short)o01_re, (short)o01_im);	\
   out[sid+2*sp_stride] = make_short2((short)o02_re, (short)o02_im);
 
+// Non-cache writes to minimize cache polution
+#if (__COMPUTE_CAPABILITY__ >= 200)
+
+#define WRITE_ST_SPINOR_DOUBLE2_STR(out) \
+  store_streaming_double2(&out[0*sp_stride+sid], o00_re, o00_im);	\
+  store_streaming_double2(&out[1*sp_stride+sid], o01_re, o01_im);	\
+  store_streaming_double2(&out[2*sp_stride+sid], o02_re, o02_im);
+
+#define WRITE_ST_SPINOR_FLOAT2_STR(out)			       \
+  store_streaming_float2(&out[0*sp_stride+sid], o00_re, o00_im);	\
+  store_streaming_float2(&out[1*sp_stride+sid], o01_re, o01_im);	\
+  store_streaming_float2(&out[2*sp_stride+sid], o02_re, o02_im);
+
+#define WRITE_ST_SPINOR_SHORT2_STR(out) \
+  float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));	\
+  float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im));	\
+  float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im));	\
+  c0 = fmaxf(c0, c1);					\
+  c0 = fmaxf(c0, c2);					\
+  out ## Norm[sid] = c0;				\
+  float scale = __fdividef(MAX_SHORT, c0);			    \
+  o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
+  o02_re *= scale; o02_im *= scale;					\
+  store_streaming_short2(&g_out[0*sp_stride+sid], (short)o00_re, (short)o00_im); \
+  store_streaming_short2(&g_out[1*sp_stride+sid], (short)o01_re, (short)o01_im); \
+  store_streaming_short2(&g_out[2*sp_stride+sid], (short)o02_re, (short)o02_im);
+#else
+
+#define WRITE_ST_SPINOR_DOUBLE2_STR() WRITE_ST_SPINOR_DOUBLE2()
+#define WRITE_ST_SPINOR_FLOAT4_STR() WRITE_ST_SPINOR_FLOAT4()
+#define WRITE_ST_SPINOR_SHORT4_STR() WRITE_ST_SPINOR_SHORT4()
+
+#endif
+
 #define READ_AND_SUM_ST_SPINOR_DOUBLE_TEX(spinor) {			\
   double2 tmp0 = fetch_double2((spinor), sid + 0*(sp_stride));		\
   double2 tmp1 = fetch_double2((spinor), sid + 1*(sp_stride));		\
@@ -554,4 +654,53 @@
     accum1.x =C*short2float(S1.x); accum1.y =C*short2float(S1.y);	\
     accum2.x =C*short2float(S2.x); accum2.y =C*short2float(S2.y);	\
   }
+
+#define WRITE_SPINOR_SHARED(sh, reg)		\
+  sh[0*SHARED_STRIDE] = reg##00_re;		\
+  sh[1*SHARED_STRIDE] = reg##00_im;		\
+  sh[2*SHARED_STRIDE] = reg##01_re;		\
+  sh[3*SHARED_STRIDE] = reg##01_im;		\
+  sh[4*SHARED_STRIDE] = reg##02_re;		\
+  sh[5*SHARED_STRIDE] = reg##02_im;		\
+  sh[6*SHARED_STRIDE] = reg##10_re;		\
+  sh[7*SHARED_STRIDE] = reg##10_im;		\
+  sh[8*SHARED_STRIDE] = reg##11_re;		\
+  sh[9*SHARED_STRIDE] = reg##11_im;		\
+  sh[10*SHARED_STRIDE] = reg##12_re;		\
+  sh[11*SHARED_STRIDE] = reg##12_im;		\
+  sh[12*SHARED_STRIDE] = reg##20_re;		\
+  sh[13*SHARED_STRIDE] = reg##20_im;		\
+  sh[14*SHARED_STRIDE] = reg##21_re;		\
+  sh[15*SHARED_STRIDE] = reg##21_im;		\
+  sh[16*SHARED_STRIDE] = reg##22_re;		\
+  sh[17*SHARED_STRIDE] = reg##22_im;		\
+  sh[18*SHARED_STRIDE] = reg##30_re;		\
+  sh[19*SHARED_STRIDE] = reg##30_im;		\
+  sh[20*SHARED_STRIDE] = reg##31_re;		\
+  sh[21*SHARED_STRIDE] = reg##31_im;		\
+  sh[22*SHARED_STRIDE] = reg##32_re;		\
+  sh[23*SHARED_STRIDE] = reg##32_im;
+
+#define READ_SPINOR_SHARED_DOUBLE2(sh)					\
+  double2 I0 = make_double2(sh[0*SHARED_STRIDE], sh[1*SHARED_STRIDE]);	\
+  double2 I1 = make_double2(sh[2*SHARED_STRIDE], sh[3*SHARED_STRIDE]);	\
+  double2 I2 = make_double2(sh[4*SHARED_STRIDE], sh[5*SHARED_STRIDE]);	\
+  double2 I3 = make_double2(sh[6*SHARED_STRIDE], sh[7*SHARED_STRIDE]);	\
+  double2 I4 = make_double2(sh[8*SHARED_STRIDE], sh[9*SHARED_STRIDE]);	\
+  double2 I5 = make_double2(sh[10*SHARED_STRIDE], sh[11*SHARED_STRIDE]); \
+  double2 I6 = make_double2(sh[12*SHARED_STRIDE], sh[13*SHARED_STRIDE]); \
+  double2 I7 = make_double2(sh[14*SHARED_STRIDE], sh[15*SHARED_STRIDE]); \
+  double2 I8 = make_double2(sh[16*SHARED_STRIDE], sh[17*SHARED_STRIDE]); \
+  double2 I9 = make_double2(sh[18*SHARED_STRIDE], sh[19*SHARED_STRIDE]); \
+  double2 I10 = make_double2(sh[20*SHARED_STRIDE], sh[21*SHARED_STRIDE]); \
+  double2 I11 = make_double2(sh[22*SHARED_STRIDE], sh[23*SHARED_STRIDE]);
+
+#define READ_SPINOR_SHARED_FLOAT4(sh)					\
+  float4 I0 = make_float4(sh[0*SHARED_STRIDE], sh[1*SHARED_STRIDE], sh[2*SHARED_STRIDE], sh[3*SHARED_STRIDE]); \
+  float4 I1 = make_float4(sh[4*SHARED_STRIDE], sh[5*SHARED_STRIDE], sh[6*SHARED_STRIDE], sh[7*SHARED_STRIDE]); \
+  float4 I2 = make_float4(sh[8*SHARED_STRIDE], sh[9*SHARED_STRIDE], sh[10*SHARED_STRIDE], sh[11*SHARED_STRIDE]); \
+  float4 I3 = make_float4(sh[12*SHARED_STRIDE], sh[13*SHARED_STRIDE], sh[14*SHARED_STRIDE], sh[15*SHARED_STRIDE]); \
+  float4 I4 = make_float4(sh[16*SHARED_STRIDE], sh[17*SHARED_STRIDE], sh[18*SHARED_STRIDE], sh[19*SHARED_STRIDE]); \
+  float4 I5 = make_float4(sh[20*SHARED_STRIDE], sh[21*SHARED_STRIDE], sh[22*SHARED_STRIDE], sh[23*SHARED_STRIDE]);
+
 
