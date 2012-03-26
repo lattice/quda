@@ -136,7 +136,7 @@ AC_ARG_ENABLE(overlap-comms,
 
 AC_ARG_WITH(mpi,
  AC_HELP_STRING([--with-mpi=MPIDIR], [ Specify MPI installation directory]),
- [ mpi_home=${withval}; build_mpi="yes";],
+ [ mpi_home=${withval}; build_mpi="yes"],
  [ mpi_home=""; build_mpi="no" ]
 )
 
