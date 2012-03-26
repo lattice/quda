@@ -159,17 +159,9 @@ VOLATILE spinorFloat o32_re;
 VOLATILE spinorFloat o32_im;
 
 #ifdef SPINOR_DOUBLE
-#if (__COMPUTE_CAPABILITY__ >= 200)
-#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
-#else
 #define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
-#endif
-#else
-#if (__COMPUTE_CAPABILITY__ >= 200)
-#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
 #else
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
-#endif
 #endif
 
 extern __shared__ char s_data[];
