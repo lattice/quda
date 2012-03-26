@@ -7,6 +7,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <tune_quda.h>
 #include <blas_quda.h>
 #include <gauge_field.h>
 #include <dirac_quda.h>
@@ -184,7 +185,6 @@ void initQuda(int dev)
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
-
   
   printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
 
@@ -207,6 +207,8 @@ void initQuda(int dev)
   }
 
   quda::initBlas();
+
+  loadTuneCache(QUDA_VERBOSE);
 }
 
 
@@ -456,6 +458,8 @@ void endQuda(void)
     delete []streams;
     streams = NULL;
   }
+
+  saveTuneCache(QUDA_VERBOSE);
 }
 
 

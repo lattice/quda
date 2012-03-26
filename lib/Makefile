@@ -43,6 +43,12 @@ HDRS += $(QUDA_INLN)
 
 CORE = $(QUDA_CORE:%=dslash_core/%)
 
+# various parameters that characterize this build, used by the
+# routines in tune.cpp to check basic compatibility of an existing
+# tunecache.  In the future, we might consider including actual hashes
+# of certain source files.
+HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH))\"
+
 # limit maximum number of registers in BLAS routines to increase occupancy
 ifeq ($(strip $(GPU_ARCH)), sm_20)
   MAXREG =
@@ -60,11 +66,15 @@ gen:
 clean:
 	-rm -f *.o $(QUDA)
 
-%.o: %.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) $< -c -o $@
+tune.o: tune.cpp ../include/tune_quda.h
+	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@ -Xptxas -abi=no
+
+%.o: %.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
 %.o: %.cu $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
