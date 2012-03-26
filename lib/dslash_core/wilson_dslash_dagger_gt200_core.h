@@ -334,12 +334,6 @@ VOLATILE spinorFloat o31_im;
 VOLATILE spinorFloat o32_re;
 VOLATILE spinorFloat o32_im;
 
-#ifdef SPINOR_DOUBLE
-#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
-#else
-#define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
-#endif
-
 #include "read_gauge.h"
 #include "read_clover.h"
 #include "io_spinor.h"
@@ -2599,8 +2593,6 @@ WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
-#undef SHARED_STRIDE
-
 #undef A_re
 #undef A_im
 
