@@ -420,8 +420,8 @@ class SharedDslashCuda : public DslashCuda {
   }
 
  public:
-  SharedDslashCuda() : DslashCuda() { }
-  virtual ~SharedDslashCuda() { }
+  SharedDslashCuda() : DslashCuda() { ; }
+  virtual ~SharedDslashCuda() { ; }
   std::string paramString(const TuneParam &param) const // override and print out grid as well
   {
     std::stringstream ps;
@@ -512,6 +512,8 @@ class WilsonDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+    if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+      errorQuda("Shared dslash does not yet support X-dimension partitioning");
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
@@ -601,6 +603,8 @@ class CloverDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+    if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+      errorQuda("Shared dslash does not yet support X-dimension partitioning");
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(cloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
@@ -705,6 +709,8 @@ class TwistedDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+    if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+      errorQuda("Shared dslash does not yet support X-dimension partitioning");
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(twistedMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
@@ -1256,7 +1262,6 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 
 }
 
-
 void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, const int dagger, 
 			   const cudaColorSpinorField *x, const double &kappa, const double &mu, 
@@ -1455,8 +1460,10 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
 template <typename sFloat, typename cFloat>
 class CloverCuda : public Tunable {
  private:
+  const size_t bytes, norm_bytes;
   sFloat *out;
   float *outNorm;
+  char *saveOut, *saveOutNorm;
   const cFloat *clover;
   const float *cloverNorm;
   const sFloat *in;
@@ -1474,7 +1481,8 @@ class CloverCuda : public Tunable {
  public:
   CloverCuda(sFloat *out, float *outNorm, const cFloat *clover, const float *cloverNorm, const sFloat *in,
 	     const float *inNorm, const size_t bytes, const size_t norm_bytes)
-    : out(out), outNorm(outNorm), clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm)
+    : out(out), outNorm(outNorm), clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm),
+      bytes(bytes), norm_bytes(norm_bytes)
   {
     bindSpinorTex(bytes, norm_bytes, in, inNorm);
   }
@@ -1494,6 +1502,31 @@ class CloverCuda : public Tunable {
     vol << dslashConstants.x[3];
     return TuneKey(vol.str(), typeid(*this).name());
   }
+
+  // Need to save the out field if it aliases the in field
+  void preTune() {
+    if (in == out) {
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short4)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  // Restore if the in and out fields alias
+  void postTune() {
+    if (in == out) {
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short4)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
+
   std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
   {
     std::stringstream ps;
@@ -1501,6 +1534,7 @@ class CloverCuda : public Tunable {
     ps << "shared=" << param.shared_bytes;
     return ps.str();
   }
+
 };
 
 

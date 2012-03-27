@@ -147,7 +147,7 @@ void init(int argc, char **argv) {
 
   }
 
-  //inv_param.verbosity = QUDA_DEBUG_VERBOSE;
+  //inv_param.verbosity = QUDA_VERBOSE;
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
@@ -449,6 +449,7 @@ int main(int argc, char **argv)
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...\n", loops);
+    dirac->Flops();
     double secs = dslashCUDA(loops);
     printfQuda("done.\n\n");
 

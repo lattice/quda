@@ -146,7 +146,6 @@ link_format_cpu_to_gpu(void* dst, void* src,
 		       cudaStream_t stream)
 {
   dim3 blockDim(BLOCKSIZE);
-  int stride = Vh+pad;  
   if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
 #ifdef MULTI_GPU  
     size_t threads=Vh+ghostV;
