@@ -54,20 +54,25 @@ Installing the library involves running "configure" followed by
 At a minimum, you'll probably want to set the GPU architecture; see
 "Hardware Compatibility" above.
 
-Enabling multi-GPU support requires passing the --with-mpi=<path> and
-optionally the --with-qmp=<path> flags to configure.  If only the
-former is given, QUDA will use MPI directly for communications.  If
-both are given, QUDA will use QMP.  In some environments, it may also
-be necessary to specify the MPI-enabled compilers on the configure
-line as follows: ./configure <configure options> CC=mpicc CXX=mpicxx
-These compilers should be in your path.  Finally, on some systems,
-executables compiled against MPI will not run without "mpirun".  This
-has the side-effect of causing the configure script to believe that
-the compiler is failing to produce a valid executable.  To skip these
-checks, one can trick configure into thinking that it's
-cross-compiling by setting the --build=none and --host=<host> flags.
-For the latter, "--host=x86_64-linux-gnu" should work on a 64-bit
-linux system.
+Enabling multi-GPU support requires passing the --enable-multi-gpu
+flag to configure, as well as --with-mpi=<PATH> and optionally
+--with-qmp=<PATH>.  If the latter is given, QUDA will use QMP for
+communications; otherwise, MPI will be called directly.  By default,
+it is assumed that the MPI compiler wrappers are <MPI_PATH>/bin/mpicc
+and <MPI_PATH>/bin/mpicxx for C and C++, respectively.  These choices
+may be overriden by setting the CC and CXX variables on the command
+line as follows:
+
+./configure --enable-multi-gpu --with-mpi=<MPI_PATH> \
+[--with-qmp=<QMP_PATH>] [OTHER_OPTIONS] CC=my_mpicc CXX=my_mpicxx
+
+Finally, with some MPI implementations, executables compiled against
+MPI will not run without "mpirun".  This has the side effect of
+causing the configure script to believe that the compiler is failing
+to produce a valid executable.  To skip these checks, one can trick
+configure into thinking that it's cross-compiling by setting the
+--build=none and --host=<HOST> flags.  For the latter,
+"--host=x86_64-linux-gnu" should work on a 64-bit linux system.
 
 Throughout the library, auto-tuning is used to select optimal launch
 parameters for most performance-critical kernels.  This tuning
