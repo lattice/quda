@@ -219,7 +219,7 @@ void saveTuneCache(QudaVerbosity verbosity)
 
     // Release lock.
     close(lock_handle);
-    //remove(lock_path.c_str());
+    remove(lock_path.c_str());
 
 #ifdef MULTI_GPU
   }
