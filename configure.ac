@@ -1,7 +1,5 @@
 AC_INIT([quda],[0.4],[quda-developers@googlegroups.com])
 
-AC_PROG_CC(gcc cc)
-AC_PROG_CXX(g++ CC cxx)
 
 dnl Specify CUDA Location
 AC_ARG_WITH(cuda,
@@ -138,9 +136,15 @@ AC_ARG_ENABLE(overlap-comms,
 
 AC_ARG_WITH(mpi,
  AC_HELP_STRING([--with-mpi=MPIDIR], [ Specify MPI installation directory]),
- [ mpi_home=${withval}; build_mpi="yes" ],
+ [ mpi_home=${withval}; build_mpi="yes"],
  [ mpi_home=""; build_mpi="no" ]
-) 
+)
+
+
+AS_CASE([$build_mpi],
+	[yes], [AC_PROG_CC($mpi_home/bin/mpicc mpicc), AC_PROG_CXX($mpi_home/bin/mpicxx mpicxx CC)],
+	[no], [AC_PROG_CC(gcc cc), AC_PROG_CXX(g++ CC cxx)])
+
 
 AC_ARG_WITH(qmp,
  AC_HELP_STRING([--with-qmp=QMPDIR], [ Specify QMP installation directory]),
