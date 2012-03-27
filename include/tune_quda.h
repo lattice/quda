@@ -15,6 +15,7 @@ class TuneKey {
   std::string name;
   std::string aux;
 
+  TuneKey() { }
   TuneKey(std::string v, std::string n, std::string a=std::string())
     : volume(v), name(n), aux(a) { }  
   TuneKey(const TuneKey &key)
@@ -44,15 +45,17 @@ class TuneParam {
   dim3 block;
   dim3 grid;
   int shared_bytes;
+  std::string comment;
 
   TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0) { }
   TuneParam(const TuneParam &param)
-    : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes) { }
+    : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), comment(param.comment) { }
   TuneParam& operator=(const TuneParam &param) {
     if (&param != this) {
       block = param.block;
       grid = param.grid;
       shared_bytes = param.shared_bytes;
+      comment = param.comment;
     }
     return *this;
   }
@@ -177,7 +180,8 @@ class Tunable {
 
 };
 
-
+void loadTuneCache(QudaVerbosity verbosity);
+void saveTuneCache(QudaVerbosity verbosity);
 TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
 #endif // _TUNE_QUDA_H

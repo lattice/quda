@@ -591,6 +591,13 @@ comm_allreduce_max(double* data)
   return;
 } 
 
+// broadcast from rank 0
+void
+comm_broadcast(void *data, size_t nbytes)
+{
+  MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_WORLD);
+}
+
 void
 comm_barrier(void)
 {
@@ -608,4 +615,3 @@ comm_exit(int ret)
   MPI_Finalize();
   exit(ret);
 }
-

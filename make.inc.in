@@ -85,15 +85,6 @@ endif
 CC  = $(FECC)
 CXX = $(FECXX)
 
-ifeq ($(strip $(BUILD_QMP)), yes)
-  QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
-  QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
-  QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
-  INC += -DQMP_COMMS $(QMP_CFLAGS)
-  LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
-  FACE_COMMS=face_qmp.o
-endif 
-
 ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_CFLAGS =
   MPI_LDFLAGS =
@@ -104,6 +95,15 @@ ifeq ($(strip $(BUILD_MPI)), yes)
 else
   FACE_COMMS=face_qmp.o
 endif
+
+ifeq ($(strip $(BUILD_QMP)), yes)
+  QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
+  QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
+  QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
+  INC += -DQMP_COMMS $(QMP_CFLAGS)
+  LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
+  FACE_COMMS=face_qmp.o qmpcomm.o
+endif 
 
 ifeq ($(strip $(OVERLAP_COMMS)), yes)
   COPT += -DOVERLAP_COMMS

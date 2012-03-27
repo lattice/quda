@@ -17,7 +17,7 @@
 
 #define errorQuda(...) do {		    \
   printf("QUDA error: " __VA_ARGS__);	\
-  printf(" (node %d, " __FILE__ ":%d in %s)\n",   \
+  printf(" (node %d, " __FILE__ ":%d in %s())\n",   \
          QMP_get_node_number(), __LINE__, __FUNCTION__);			\
   QMP_abort(1);				    \
 } while (0)
@@ -34,7 +34,7 @@
 extern char hostname[];
 #define errorQuda(...) do {		    \
   printf("QUDA error: " __VA_ARGS__);	\
-  printf(" (node %d, " __FILE__ ":%d in %s, hostname=%s)\n",   \
+  printf(" (node %d, " __FILE__ ":%d in %s(), hostname=%s)\n",   \
          comm_rank(), __LINE__, __FUNCTION__, hostname);	       \
   comm_exit(1);						 \
 } while (0)
@@ -48,7 +48,7 @@ extern char hostname[];
 
 #define errorQuda(...) do {		     \
   printf("QUDA error: " __VA_ARGS__);	\
-  printf(" (" __FILE__ ":%d in %s)\n", __LINE__, __FUNCTION__);	\
+  printf(" (" __FILE__ ":%d in %s())\n", __LINE__, __FUNCTION__);	\
   exit(1);				     \
 } while (0)
 
