@@ -1,6 +1,7 @@
 /*
-Inline ptx instruction for doing stores avoiding L1 cache and
-minimal impact on L2 (streaming through L2).
+  Inline ptx instructions for low-level control of code generation.
+  Primarily these are for doing stores avoiding L1 cache and minimal
+  impact on L2 (streaming through L2).
 */
 
 #if (__COMPUTE_CAPABILITY__ >= 200)

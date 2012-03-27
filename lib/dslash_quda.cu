@@ -36,6 +36,7 @@
 #include <quda_internal.h>
 #include <dslash_quda.h>
 #include <sys/time.h>
+#include <inline_ptx.h>
 
 enum KernelType {
   INTERIOR_KERNEL = 5,
@@ -263,76 +264,16 @@ void setFace(const FaceBuffer &Face) {
 
 
 // Use an abstract class interface to drive the different CUDA dslash
-// kernels.  All parameters are curried into the derived classes to
+// kernels. All parameters are curried into the derived classes to
 // allow a simple interface.
 class DslashCuda : public Tunable {
  protected:
   int sharedBytesPerBlock() const { return 0; }
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
-  bool advanceSharedBytes(TuneParam &param) const { return false; }
-
-  int sharedBytes(const dim3 &block) const { 
-    int warpSize = 32; // FIXME - query from device properties
-    int block_xy = block.x*block.y*block.z;
-    if (block_xy % warpSize != 0) block_xy = ((block_xy / warpSize) + 1)*warpSize;
-    return block_xy*block.z*sharedBytesPerThread();
-  }
-
   bool advanceBlockDim(TuneParam &param) const {
-    const unsigned int min_threads = 2;
-    const unsigned int max_threads = 512; // FIXME: use deviceProp.maxThreadsDim[0];
-    const unsigned int max_shared = 16384*3; // FIXME: use deviceProp.sharedMemPerBlock;
-    
-    // set the x-block dimension equal to the entire x dimension
-    bool set = false;
-    dim3 blockInit = param.block;
-    blockInit.z++;
-    for (unsigned bx=blockInit.x; bx<=dslashConstants.x[0]/2; bx++) {
-      //unsigned int gx = (dslashConstants.x[0]*dslashConstants.x[3] + bx - 1) / bx;
-      for (unsigned by=blockInit.y; by<=dslashConstants.x[1]; by++) {
-	unsigned int gy = (dslashConstants.x[1] + by - 1 ) / by;	
-	
-	if (by > 1 && (by%2) != 0) continue; // can't handle odd blocks yet except by=1
-	
-	for (unsigned bz=blockInit.z; bz<=dslashConstants.x[2]; bz++) {
-	  unsigned int gz = (dslashConstants.x[2] + bz - 1) / bz;
-	  
-	  if (bz > 1 && (bz%2) != 0) continue; // can't handle odd blocks yet except bz=1
-	  if (bx*by*bz > max_threads) continue;
-	  if (bx*by*bz < min_threads) continue;
-	  // can't yet handle the last block properly in shared memory addressing
-	  if (by*gy != dslashConstants.x[1]) continue;
-	  if (bz*gz != dslashConstants.x[2]) continue;
-	  if (sharedBytes(dim3(bx, by, bz)) > max_shared) continue;
-
-	  param.block = dim3(bx, by, bz);	  
-	  set = true; break;
-	}
-	if (set) break;
-	blockInit.z = 1;
-      }
-      if (set) break;
-      blockInit.y = 1;
-    }
-
-    if (param.block.x > dslashConstants.x[0]/2 &&	param.block.y > dslashConstants.x[1] &&
-	param.block.z > dslashConstants.x[2] || !set) {
-      //||sharedBytesPerThread()*param.block.x > max_shared) {
-      param.block = dim3(dslashConstants.x[0]/2, 1, 1);
-      return false;
-    } else { 
-      param.grid = createGrid(param.block);
-      param.shared_bytes = sharedBytes(param.block);
-      return true; 
-    }
-    
-  }
-
-  dim3 createGrid(const dim3 &block) const {
-    unsigned int gx = ((dslashConstants.x[0]/2)*dslashConstants.x[3] + block.x - 1) / block.x;
-    unsigned int gy = (dslashConstants.x[1] + block.y - 1 ) / block.y;	
-    unsigned int gz = (dslashConstants.x[2] + block.z - 1) / block.z;
-    return dim3(gx, gy, gz);
+    bool advance = Tunable::advanceBlockDim(param);
+    if (advance) param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
+    return advance;
   }
 
  public:
@@ -343,7 +284,6 @@ class DslashCuda : public Tunable {
   {
     std::stringstream ps;
     ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
     ps << "shared=" << param.shared_bytes;
     return ps.str();
   }
@@ -351,20 +291,17 @@ class DslashCuda : public Tunable {
 
   virtual void initTuneParam(TuneParam &param) const
   {
-    param.block = dim3(dslashConstants.x[0]/2, 1, 1);
-    param.grid = createGrid(param.block);
-
-    int warpSize = 32; // FIXME - query from device properties
-    int block_xy = param.block.x*param.block.y*param.block.z;
-    if (block_xy % warpSize != 0) block_xy = ((block_xy / warpSize) + 1)*warpSize;
-    int block = block_xy*param.block.z;    
-    printf("block = %d\n", block);
-    param.shared_bytes = block*sharedBytesPerThread();
-
-    /*unsigned int min_block_size = param.block.x*param.block.y*param.block.z;
-    param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock() ?
-    sharedBytesPerThread()*min_block_size : sharedBytesPerBlock();*/
+    Tunable::initTuneParam(param);
+    param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
   }
+
+  /** sets default values for when tuning is disabled */
+  virtual void defaultTuneParam(TuneParam &param) const
+  {
+    Tunable::defaultTuneParam(param);
+    param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
+  }
+
 
 };
 
@@ -402,9 +339,125 @@ TuneKey DslashCuda::tuneKey() const
   return TuneKey(vol.str(), typeid(*this).name(), aux.str());
 }
 
+/** This derived class is specifically for driving the Dslash kernels
+    that use shared memory blocking.  This only applies on Fermi and
+    upwards, and only for the interior kernels. */
+#if (__COMPUTE_CAPABILITY__ >= 200) 
+class SharedDslashCuda : public DslashCuda {
+ protected:
+  int sharedBytesPerBlock() const { return 0; } // FIXME: this isn't quite true, but works
+  bool advanceSharedBytes(TuneParam &param) const { 
+    if (dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::advanceSharedBytes(param);
+    else return false;
+  } // FIXME - shared memory tuning only supported on exterior kernels
+
+  /** Helper function to set the shared memory size from the 3-d block size */
+  int sharedBytes(const dim3 &block) const { 
+    int warpSize = 32; // FIXME - query from device properties
+    int block_xy = block.x*block.y;
+    if (block_xy % warpSize != 0) block_xy = ((block_xy / warpSize) + 1)*warpSize;
+    return block_xy*block.z*sharedBytesPerThread();
+  }
+
+  /** Helper function to set the 3-d grid size from the 3-d block size */
+  dim3 createGrid(const dim3 &block) const {
+    unsigned int gx = ((dslashConstants.x[0]/2)*dslashConstants.x[3] + block.x - 1) / block.x;
+    unsigned int gy = (dslashConstants.x[1] + block.y - 1 ) / block.y;	
+    unsigned int gz = (dslashConstants.x[2] + block.z - 1) / block.z;
+    return dim3(gx, gy, gz);
+  }
+
+  /** Advance the 3-d block size. */
+  bool advanceBlockDim(TuneParam &param) const {
+    if (dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::advanceBlockDim(param);
+    const unsigned int min_threads = 2;
+    const unsigned int max_threads = 512; // FIXME: use deviceProp.maxThreadsDim[0];
+    const unsigned int max_shared = 16384*3; // FIXME: use deviceProp.sharedMemPerBlock;
+    
+    // set the x-block dimension equal to the entire x dimension
+    bool set = false;
+    dim3 blockInit = param.block;
+    blockInit.z++;
+    for (unsigned bx=blockInit.x; bx<=dslashConstants.x[0]/2; bx++) {
+      //unsigned int gx = (dslashConstants.x[0]*dslashConstants.x[3] + bx - 1) / bx;
+      for (unsigned by=blockInit.y; by<=dslashConstants.x[1]; by++) {
+	unsigned int gy = (dslashConstants.x[1] + by - 1 ) / by;	
+	
+	if (by > 1 && (by%2) != 0) continue; // can't handle odd blocks yet except by=1
+	
+	for (unsigned bz=blockInit.z; bz<=dslashConstants.x[2]; bz++) {
+	  unsigned int gz = (dslashConstants.x[2] + bz - 1) / bz;
+	  
+	  if (bz > 1 && (bz%2) != 0) continue; // can't handle odd blocks yet except bz=1
+	  if (bx*by*bz > max_threads) continue;
+	  if (bx*by*bz < min_threads) continue;
+	  // can't yet handle the last block properly in shared memory addressing
+	  if (by*gy != dslashConstants.x[1]) continue;
+	  if (bz*gz != dslashConstants.x[2]) continue;
+	  if (sharedBytes(dim3(bx, by, bz)) > max_shared) continue;
+
+	  param.block = dim3(bx, by, bz);	  
+	  set = true; break;
+	}
+	if (set) break;
+	blockInit.z = 1;
+      }
+      if (set) break;
+      blockInit.y = 1;
+    }
+
+    if (param.block.x > dslashConstants.x[0]/2 && param.block.y > dslashConstants.x[1] &&
+	param.block.z > dslashConstants.x[2] || !set) {
+      //||sharedBytesPerThread()*param.block.x > max_shared) {
+      param.block = dim3(dslashConstants.x[0]/2, 1, 1);
+      return false;
+    } else { 
+      param.grid = createGrid(param.block);
+      param.shared_bytes = sharedBytes(param.block);
+      return true; 
+    }
+    
+  }
+
+ public:
+  SharedDslashCuda() : DslashCuda() { ; }
+  virtual ~SharedDslashCuda() { ; }
+  std::string paramString(const TuneParam &param) const // override and print out grid as well
+  {
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+
+  virtual void initTuneParam(TuneParam &param) const
+  {
+    if (dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::initTuneParam(param);
+
+    param.block = dim3(dslashConstants.x[0]/2, 1, 1);
+    param.grid = createGrid(param.block);
+    param.shared_bytes = sharedBytes(param.block);
+  }
+
+  /** Sets default values for when tuning is disabled - this is guaranteed to work, but will be slow */
+  virtual void defaultTuneParam(TuneParam &param) const
+  {
+    if (dslashParam.kernel_type != INTERIOR_KERNEL) DslashCuda::defaultTuneParam(param);
+    else initTuneParam(param);
+  }
+};
+#else /** For pre-Fermi architectures */
+class SharedDslashCuda : public DslashCuda {
+ public:
+  SharedDslashCuda() : DslashCuda() { }
+  virtual ~SharedDslashCuda() { }
+};
+#endif
+
 
 template <typename sFloat, typename gFloat>
-class WilsonDslashCuda : public DslashCuda {
+class WilsonDslashCuda : public SharedDslashCuda {
 
  private:
   const size_t bytes, norm_bytes;
@@ -421,8 +474,17 @@ class WilsonDslashCuda : public DslashCuda {
  protected:
   int sharedBytesPerThread() const
   {
+#if (__COMPUTE_CAPABILITY__ >= 200) // Fermi uses shared memory for common input
+    if (dslashParam.kernel_type == INTERIOR_KERNEL) { // Interior kernels use shared memory for common iunput
+      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+    } else { // Exterior kernels use no shared memory
+      return 0;
+    }
+#else // Pre-Fermi uses shared memory only for pseudo-registers
     int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
     return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+#endif
   }
 
  public:
@@ -430,7 +492,7 @@ class WilsonDslashCuda : public DslashCuda {
 		   const QudaReconstructType reconstruct, const sFloat *in, const float *inNorm,
 		   const sFloat *x, const float *xNorm, const double a,
 		   const int dagger, const size_t bytes, const size_t norm_bytes)
-    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
+    : SharedDslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in), 
     inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
   { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
@@ -450,6 +512,8 @@ class WilsonDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+    if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+      errorQuda("Shared dslash does not yet support X-dimension partitioning");
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
@@ -482,7 +546,7 @@ class WilsonDslashCuda : public DslashCuda {
 };
 
 template <typename sFloat, typename gFloat, typename cFloat>
-class CloverDslashCuda : public DslashCuda {
+class CloverDslashCuda : public SharedDslashCuda {
 
  private:
   const size_t bytes, norm_bytes;
@@ -501,8 +565,17 @@ class CloverDslashCuda : public DslashCuda {
  protected:
   int sharedBytesPerThread() const
   {
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    if (dslashParam.kernel_type == INTERIOR_KERNEL) {
+      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+    } else {
+      return 0;
+    }
+#else
     int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
     return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+#endif
   }
 
  public:
@@ -511,7 +584,7 @@ class CloverDslashCuda : public DslashCuda {
 		   const float *cloverNorm, const sFloat *in, const float *inNorm,
 		   const sFloat *x, const float *xNorm, const double a,
 		   const int dagger, const size_t bytes, const size_t norm_bytes)
-    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), clover(clover),
+    : SharedDslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), clover(clover),
     cloverNorm(cloverNorm), in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
   { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
@@ -530,6 +603,8 @@ class CloverDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+    if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+      errorQuda("Shared dslash does not yet support X-dimension partitioning");
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(cloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
@@ -577,7 +652,7 @@ void setTwistParam(double &a, double &b, const double &kappa, const double &mu,
 }
 
 template <typename sFloat, typename gFloat>
-class TwistedDslashCuda : public DslashCuda {
+class TwistedDslashCuda : public SharedDslashCuda {
 
  private:
   const size_t bytes, norm_bytes;
@@ -595,8 +670,17 @@ class TwistedDslashCuda : public DslashCuda {
  protected:
   int sharedBytesPerThread() const
   {
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    if (dslashParam.kernel_type == INTERIOR_KERNEL) {
+      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+    } else {
+      return 0;
+    }
+#else
     int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
     return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+#endif
   }
 
  public:
@@ -604,7 +688,7 @@ class TwistedDslashCuda : public DslashCuda {
 		    const QudaReconstructType reconstruct, const sFloat *in, const float *inNorm,
 		    const sFloat *x, const float *xNorm, const double kappa, const double mu,
 		    const double k, const int dagger, const size_t bytes, const size_t norm_bytes)
-    : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in),
+    : SharedDslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), in(in),
     inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm)
   { 
     bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
@@ -625,6 +709,8 @@ class TwistedDslashCuda : public DslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+    if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+      errorQuda("Shared dslash does not yet support X-dimension partitioning");
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(twistedMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
@@ -673,10 +759,6 @@ class DomainWallDslashCuda : public DslashCuda {
 
  protected:
   int sharedBytesPerThread() const { return 0; }
-
-  bool advanceBlockDim(TuneParam &param) const {
-    return Tunable::advanceBlockDim(param); // no support for 3-d block tuning (yet)
-  }
   
  public:
   DomainWallDslashCuda(sFloat *out, float *outNorm, const gFloat *gauge0, const gFloat *gauge1, 
@@ -756,10 +838,6 @@ private:
   {
     int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
     return 6 * reg_size;
-  }
-
-  bool advanceBlockDim(TuneParam &param) const {
-    return Tunable::advanceBlockDim(param); // no support for 3-d block tuning (yet)
   }
 
  public:
@@ -1184,7 +1262,6 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 
 }
 
-
 void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, const int dagger, 
 			   const cudaColorSpinorField *x, const double &kappa, const double &mu, 
@@ -1383,8 +1460,10 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
 template <typename sFloat, typename cFloat>
 class CloverCuda : public Tunable {
  private:
+  const size_t bytes, norm_bytes;
   sFloat *out;
   float *outNorm;
+  char *saveOut, *saveOutNorm;
   const cFloat *clover;
   const float *cloverNorm;
   const sFloat *in;
@@ -1402,7 +1481,8 @@ class CloverCuda : public Tunable {
  public:
   CloverCuda(sFloat *out, float *outNorm, const cFloat *clover, const float *cloverNorm, const sFloat *in,
 	     const float *inNorm, const size_t bytes, const size_t norm_bytes)
-    : out(out), outNorm(outNorm), clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm)
+    : out(out), outNorm(outNorm), clover(clover), cloverNorm(cloverNorm), in(in), inNorm(inNorm),
+      bytes(bytes), norm_bytes(norm_bytes)
   {
     bindSpinorTex(bytes, norm_bytes, in, inNorm);
   }
@@ -1422,6 +1502,31 @@ class CloverCuda : public Tunable {
     vol << dslashConstants.x[3];
     return TuneKey(vol.str(), typeid(*this).name());
   }
+
+  // Need to save the out field if it aliases the in field
+  void preTune() {
+    if (in == out) {
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short4)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  // Restore if the in and out fields alias
+  void postTune() {
+    if (in == out) {
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short4)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
+
   std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
   {
     std::stringstream ps;
@@ -1429,6 +1534,7 @@ class CloverCuda : public Tunable {
     ps << "shared=" << param.shared_bytes;
     return ps.str();
   }
+
 };
 
 

@@ -277,6 +277,8 @@ def def_output_spinor():
 
 
 def prolog():
+    global arch
+
     if dslash:
         prolog_str= ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
         prolog_str+= "#define DSLASH_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
@@ -301,22 +303,26 @@ def prolog():
     if clover == True: prolog_str+= def_clover()
     prolog_str+= def_output_spinor()
 
-    prolog_str+= (
+    if (sharedFloats > 0):
+        if (arch >= 200):
+            prolog_str+= (
 """
 #ifdef SPINOR_DOUBLE
-#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
 #else
-#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
-#endif
-#else
-#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
+#endif
+""")
+        else:
+            prolog_str+= (
+"""
+#ifdef SPINOR_DOUBLE
+#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
 #else
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
 #endif
-#endif
 """)
+
 
     # set the pointer if using shared memory for pseudo registers
     if sharedFloats > 0 and not sharedDslash: 
@@ -1030,7 +1036,7 @@ case EXTERIOR_KERNEL_Y:
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"
     if sharedDslash: str += "#undef READ_SPINOR_SHARED\n"
-    str += "#undef SHARED_STRIDE\n\n"
+    if sharedFloats > 0: str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:
         str += "#undef A_re\n"
