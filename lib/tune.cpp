@@ -129,34 +129,34 @@ void loadTuneCache(QudaVerbosity verbosity)
     cache_path += "/tunecache.tsv";
     cache_file.open(cache_path.c_str());
 
-    if (!cache_file) {
+    if (cache_file) {
+
+      if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+      getline(cache_file, line);
+      ls.str(line);
+      ls >> token;
+      if (token.compare("tunecache")) errorQuda("Bad format in %s", cache_path.c_str());
+      ls >> token;
+      if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version", cache_path.c_str());
+      ls >> token;
+      if (token.compare(quda_hash)) warningQuda("Cache file %s does not match current QUDA build", cache_path.c_str());
+      
+      if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+      getline(cache_file, line); // eat the blank line
+      
+      if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+      getline(cache_file, line); // eat the description line
+      
+      deserializeTuneCache(cache_file);
+      cache_file.close();      
+      initial_cache_size = tunecache.size();
+
+      if (verbosity >= QUDA_SUMMARIZE) {
+	printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size), cache_path.c_str());
+      }
+      
+    } else {
       warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).");
-      return;
-    }
-
-    if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-    getline(cache_file, line);
-    ls.str(line);
-    ls >> token;
-    if (token.compare("tunecache")) errorQuda("Bad format in %s", cache_path.c_str());
-    ls >> token;
-    if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version", cache_path.c_str());
-    ls >> token;
-    if (token.compare(quda_hash)) warningQuda("Cache file %s does not match current QUDA build", cache_path.c_str());
-
-    if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-    getline(cache_file, line); // eat the blank line
-    
-    if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-    getline(cache_file, line); // eat the description line
-    
-    deserializeTuneCache(cache_file);
-
-    cache_file.close();
-
-    initial_cache_size = tunecache.size();
-    if (verbosity >= QUDA_SUMMARIZE) {
-      printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size), cache_path.c_str());
     }
 
 #ifdef MULTI_GPU
