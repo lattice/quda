@@ -1,6 +1,8 @@
 #include <tune_quda.h>
+#include <mpicomm.h>
 #include <quda.h> // for QUDA_VERSION_STRING
 #include <sys/stat.h> // for stat()
+#include <fcntl.h>
 #include <cfloat> // for FLT_MAX
 #include <ctime>
 #include <fstream>
@@ -19,6 +21,85 @@ static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VER
 #undef STR_
 
 
+/**
+ * Deserialize tunecache from an istream, useful for reading a file or receiving from other nodes.
+ */
+static void deserializeTuneCache(std::istream &in)
+{
+  std::string line;
+  std::stringstream ls;
+  TuneKey key;
+  TuneParam param;
+
+  while (in.good()) {
+    getline(in, line);
+    if (!line.length()) continue; // skip blank lines (e.g., at end of file)
+    ls.clear();
+    ls.str(line);
+    ls >> key.volume >> key.name >> key.aux >> param.block.x >> param.block.y >> param.block.z;
+    ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes;
+    ls.ignore(1); // throw away tab before comment
+    getline(ls, param.comment); // assume anything remaining on the line is a comment
+    param.comment += "\n"; // our convention is to include the newline, since ctime() likes to do this
+    tunecache[key] = param;
+  }
+}
+
+
+/**
+ * Serialize tunecache to an ostream, useful for writing to a file or sending to other nodes.
+ */
+static void serializeTuneCache(std::ostream &out)
+{
+  std::map<TuneKey, TuneParam>::iterator entry;
+
+  for (entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+    TuneKey key = entry->first;
+    TuneParam param = entry->second;
+
+    out << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
+    out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
+    out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
+    out << param.shared_bytes << "\t" << param.comment; // param.comment ends with a newline
+  }
+}
+
+
+/**
+ * Distribute the tunecache from node 0 to all other nodes.
+ */
+static void broadcastTuneCache()
+{
+#ifdef MULTI_GPU
+
+  std::stringstream serialized;
+  size_t size;
+
+  if (comm_rank() == 0) {
+    serializeTuneCache(serialized);
+    size = serialized.str().length();
+  }
+  comm_broadcast(&size, sizeof(size_t));
+
+  if (size > 0) {
+    if (comm_rank() == 0) {
+      comm_broadcast(const_cast<char *>(serialized.str().c_str()), size);
+    } else {
+      char *serstr = new char[size+1];
+      comm_broadcast(serstr, size);
+      serstr[size] ='\0'; // null-terminate
+      serialized.str(serstr);
+      deserializeTuneCache(serialized);
+      delete[] serstr;
+    }
+  }
+#endif
+}
+
+
+/*
+ * Read tunecache from disk.
+ */
 void loadTuneCache(QudaVerbosity verbosity)
 {
   char *path;
@@ -26,8 +107,6 @@ void loadTuneCache(QudaVerbosity verbosity)
   std::string cache_path, line, token;
   std::ifstream cache_file;
   std::stringstream ls;
-
-  //FIXME: Protect the following from running on nodes other than node 0.
 
   path = getenv("QUDA_RESOURCE_PATH");
   if (!path) {
@@ -42,100 +121,116 @@ void loadTuneCache(QudaVerbosity verbosity)
     resource_path = path;
   }
 
-  cache_path = resource_path;
-  cache_path += "/tunecache.tsv";
-  cache_file.open(cache_path.c_str());
+#ifdef MULTI_GPU
+  if (comm_rank() == 0) {
+#endif
 
-  if (!cache_file) warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).\n");
+    cache_path = resource_path;
+    cache_path += "/tunecache.tsv";
+    cache_file.open(cache_path.c_str());
 
-  if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-  getline(cache_file, line);
-  ls.str(line);
-  ls >> token;
-  if (token.compare("tunecache")) errorQuda("Bad format in %s", cache_path.c_str());
-  ls >> token;
-  if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version", cache_path.c_str());
-  ls >> token;
-  if (token.compare(quda_hash)) warningQuda("Cache file %s does not match current QUDA build", cache_path.c_str());
+    if (!cache_file) {
+      warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).");
+      return;
+    }
 
-  if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-  getline(cache_file, line); // eat the blank line
-
-  if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-  getline(cache_file, line); // eat the description line
-
-  while (cache_file.good()) {
-    TuneKey key;
-    TuneParam param;
-
+    if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
     getline(cache_file, line);
-    if (!line.length()) continue; // skip blank lines (e.g., at end of file)
-    ls.clear();
     ls.str(line);
-    ls >> key.volume >> key.name >> key.aux >> param.block.x >> param.block.y >> param.block.z;
-    ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes;
-    ls.ignore(1); // throw away tab before comment
-    getline(ls, param.comment); // assume anything remaining on the line is a comment
-    param.comment += "\n"; // our convention is to include the newline, since ctime() likes to do this
-    tunecache[key] = param;
-  }
-  cache_file.close();
+    ls >> token;
+    if (token.compare("tunecache")) errorQuda("Bad format in %s", cache_path.c_str());
+    ls >> token;
+    if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version", cache_path.c_str());
+    ls >> token;
+    if (token.compare(quda_hash)) warningQuda("Cache file %s does not match current QUDA build", cache_path.c_str());
 
-  initial_cache_size = tunecache.size();
-  if (verbosity >= QUDA_SUMMARIZE) {
-    printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size), cache_path.c_str());
-  }
+    if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+    getline(cache_file, line); // eat the blank line
+    
+    if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+    getline(cache_file, line); // eat the description line
+    
+    deserializeTuneCache(cache_file);
+
+    cache_file.close();
+
+    initial_cache_size = tunecache.size();
+    if (verbosity >= QUDA_SUMMARIZE) {
+      printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size), cache_path.c_str());
+    }
 
 #ifdef MULTI_GPU
-  //FIXME: Distribute the tuned parameters to all nodes.
+  }
 #endif
+
+  broadcastTuneCache();
 }
 
 
+/**
+ * Write tunecache to disk.
+ */
 void saveTuneCache(QudaVerbosity verbosity)
 {
   time_t now;
-  std::string cache_path;
+  int lock_handle;
+  std::string lock_path, cache_path;
   std::ofstream cache_file;
-  std::map<TuneKey, TuneParam>::iterator entry;
 
   if (resource_path.empty()) return;
 
+  //FIXME: We should really check to see if any nodes have tuned a kernel that was not also tuned on node 0, since as things
+  //       stand, the corresponding launch parameters would never get cached to disk in this situation.  This will come up if we
+  //       ever support different subvolumes per GPU (as might be convenient for lattice volumes that don't divide evenly).
+
 #ifdef MULTI_GPU
-  //FIXME: Collect the tuned parameters from all nodes.
+  if (comm_rank() == 0) {
 #endif
 
-  //FIXME: Protect the following from running on nodes other than node 0.
+    if (tunecache.size() == initial_cache_size) return;
 
-  if (tunecache.size() == initial_cache_size) return;
+    // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
+    // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
+    lock_path = resource_path + "/tunecache.lock";
+    lock_handle = open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
+    if (lock_handle == -1) {
+      warningQuda("Unable to lock cache file.  Tuned launch parameters will not be cached to disk.  "
+                  "If you are certain that no other instances of QUDA are accessing this filesystem, "
+                  "please manually remove %s", lock_path.c_str());
+      return;
+    }
+    char msg[] = "If no instances of applications using QUDA are running,\n"
+                 "this lock file shouldn't be here and is safe to delete.";
+    int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
+    if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
-  cache_path = resource_path;
-  cache_path += "/tunecache.tsv";
-  cache_file.open(cache_path.c_str());
+    cache_path = resource_path + "/tunecache.tsv";
+    cache_file.open(cache_path.c_str());
+    
+    if (verbosity >= QUDA_SUMMARIZE) {
+      printfQuda("Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), cache_path.c_str());
+    }
+    
+    time(&now);
+    cache_file << "tunecache\t" << quda_version << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
+    cache_file << "volume\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tcomment" << std::endl;
+    serializeTuneCache(cache_file);
+    cache_file.close();
 
-  if (verbosity >= QUDA_SUMMARIZE) {
-    printfQuda("Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), cache_path.c_str());
+    // Release lock.
+    close(lock_handle);
+    //remove(lock_path.c_str());
+
+#ifdef MULTI_GPU
   }
-
-  time(&now);
-  cache_file << "tunecache\t" << quda_version << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
-  cache_file << "volume\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tcomment" << std::endl;
-
-  for (entry = tunecache.begin(); entry != tunecache.end(); entry++) {
-    TuneKey key = entry->first;
-    TuneParam param = entry->second;
-
-    cache_file << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
-    cache_file << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
-    cache_file << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
-    cache_file << param.shared_bytes << "\t" << param.comment; // param.comment ends with a newline
-  }
-  cache_file.close();
-
-  //FIXME: Add a lock file and implement file rotation.
+#endif
 }
 
 
+/**
+ * Return the optimal launch parameters for a given kernel, either by retrieving them from tunecache or autotuning
+ * on the spot.
+ */
 TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
 {
   static bool tuning = false; // tuning in progress?

@@ -1,5 +1,5 @@
 #ifndef __MPICOMM_H__
-#define __MPICOMM_H_
+#define __MPICOMM_H__
 
 #define BACK_NBR 1
 #define FWD_NBR 2
@@ -17,12 +17,13 @@ extern "C" {
 #define Z_FWD_NBR  7
 #define T_FWD_NBR  8
 
+/* The following routines are implemented over MPI only. */
+
 void            comm_set_gridsize(int x, int y, int z, int t);
-  int           comm_dim_partitioned(int dir);
-  /*testing/debugging use only */
-  void          comm_dim_partitioned_set(int dir);
+int             comm_dim_partitioned(int dir);
+/*testing/debugging use only */
+void            comm_dim_partitioned_set(int dir);
 void		comm_init(void);
-int		comm_rank(void);
 int		comm_size(void);
 int             comm_dim(int);
 int             comm_coords(int);
@@ -43,6 +44,11 @@ void		comm_exit(int);
 void		comm_cleanup(void);
 int		comm_gpuid();
 int		comm_get_neighbor_rank(int dx, int dy, int dz, int dt);
+
+/* implemented over both MPI and QMP */
+
+int		comm_rank(void);
+void            comm_broadcast(void *data, size_t nbytes);
   
 #ifdef __cplusplus
 }
