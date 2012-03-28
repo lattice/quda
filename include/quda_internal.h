@@ -69,4 +69,8 @@ extern "C" {
   const int Nstream = 1;
 #endif
 
+#define CUERR checkCudaError()
+
+extern int verbose;
+  
 #endif // _QUDA_INTERNAL_H

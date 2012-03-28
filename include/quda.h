@@ -186,32 +186,6 @@ extern "C" {
 			 QudaComputeFatMethod method);
   
   
-#ifdef HOST_DEBUG
-#define CUERR  do{ cudaError_t cuda_err;                                \
-    if ((cuda_err = cudaGetLastError()) != cudaSuccess) {               \
-      fprintf(stderr, "ERROR: CUDA error: %s, line %d, function %s, file %s\n", \
-              cudaGetErrorString(cuda_err),  __LINE__, __FUNCTION__, __FILE__); \
-      exit(cuda_err);}}while(0)
-#else
-#define CUERR
-#endif
-
-extern int verbose;
-  
-#ifdef MULTI_GPU
-#define PRINTF(fmt,...) do{						\
-    if (verbose){							\
-      printf("[%d]"fmt, comm_rank(), ##__VA_ARGS__);			\
-    }else{								\
-      if (comm_rank()==0){						\
-	printf("[%d]"fmt, comm_rank(), ##__VA_ARGS__);			\
-      }									\
-    }									\
-  }while(0)	
-#else
-#define PRINTF printf
-#endif
-
   // Initializes a communications world
   void initCommsQuda(int argc, char **argv, const int *X, const int nDim);
   // Ends a communications world
