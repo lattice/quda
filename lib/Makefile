@@ -14,7 +14,7 @@ QUDA_OBJS = inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h dirac_quda.h	     \
 	dslash_quda.h enum_quda.h gauge_force_quda.h           \
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h        \
-	face_quda.h tune_quda.h mpicomm.h lattice_field.h gauge_field.h \
+	face_quda.h tune_quda.h comm_quda.h lattice_field.h gauge_field.h \
 	hisq_force_utils.h double_single.h texture.h numa_affinity.h
 
 # These are only inlined into blas_quda.cu

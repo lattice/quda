@@ -1,7 +1,7 @@
 #include <blas_reference.h>
 #include <stdio.h>
 #ifdef MPI_COMMS
-#include "mpicomm.h"
+#include <comm_quda.h>
 #elif QMP_COMMS
 #include <qmp.h>
 #endif

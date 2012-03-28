@@ -1,5 +1,5 @@
 #include <qmp.h>
-#include <mpicomm.h>
+#include <comm_quda.h>
 
 int comm_rank()
 {

@@ -7,6 +7,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <comm_quda.h>
 #include <tune_quda.h>
 #include <blas_quda.h>
 #include <gauge_field.h>
@@ -37,9 +38,6 @@
 #ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
 #endif
-
-
-#include "mpicomm.h"
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))

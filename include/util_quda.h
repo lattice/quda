@@ -23,7 +23,9 @@
 } while (0)
 
 #elif defined(MPI_COMMS)
-#include "mpicomm.h"
+
+#include <comm_quda.h>
+
 #define printfQuda(...) do {			\
     if (comm_rank() == 0) {			\
       printf(__VA_ARGS__);			\

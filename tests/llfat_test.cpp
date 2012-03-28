@@ -13,7 +13,7 @@
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
-#include "mpicomm.h"
+#include "comm_quda.h"
 #endif
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))

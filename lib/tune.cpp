@@ -1,5 +1,5 @@
 #include <tune_quda.h>
-#include <mpicomm.h>
+#include <comm_quda.h>
 #include <quda.h> // for QUDA_VERSION_STRING
 #include <sys/stat.h> // for stat()
 #include <fcntl.h>

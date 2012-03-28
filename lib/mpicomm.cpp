@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <mpi.h>
-#include "mpicomm.h"
+#include <comm_quda.h>
 
 char hostname[128];
 static int fwd_nbr=-1;

@@ -1,11 +1,11 @@
 #include <quda_internal.h>
 #include <face_quda.h>
+#include <comm_quda.h>
 #include <cstdio>
 #include <cstdlib>
 #include <quda.h>
 #include <string.h>
 #include <sys/time.h>
-#include <mpicomm.h>
 #include <mpi.h>
 #include <cuda.h>
 

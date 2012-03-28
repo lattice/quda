@@ -1,5 +1,5 @@
-#ifndef __MPICOMM_H__
-#define __MPICOMM_H__
+#ifndef _COMM_QUDA_H
+#define _COMM_QUDA_H
 
 #define BACK_NBR 1
 #define FWD_NBR 2
@@ -54,8 +54,4 @@ void            comm_broadcast(void *data, size_t nbytes);
 }
 #endif
 
-
-
-#endif
-   
-
+#endif /* _COMM_QUDA_H */
