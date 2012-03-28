@@ -368,6 +368,11 @@ private:
   const int length;
   doubleN &result;
 
+  // host pointers used for backing up fields when tuning
+  // these can't be curried into the Spinors because of Tesla argument length restriction
+  char *X_h, *Y_h, *Z_h;
+  char *Xnorm_h, *Ynorm_h, *Znorm_h;
+
   int sharedBytesPerThread() const { return sizeof(ReduceType); }
 
   // when there is only one warp per block, we need to allocate two warps 
@@ -411,15 +416,19 @@ public:
   }
 
   void preTune() { 
-    if (writeX) XX.save();
-    if (writeY) YY.save();
-    if (writeZ) ZZ.save();
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*length;
+    size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
+    if (writeX) XX.save(&X_h, &Xnorm_h, bytes, norm_bytes);
+    if (writeY) YY.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    if (writeZ) ZZ.save(&Z_h, &Znorm_h, bytes, norm_bytes);
   }
 
   void postTune() {
-    if (writeX) XX.load(); 
-    if (writeY) YY.load(); 
-    if (writeZ) ZZ.load(); 
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*length;
+    size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
+    if (writeX) XX.load(&X_h, &Xnorm_h, bytes, norm_bytes);
+    if (writeY) YY.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    if (writeZ) ZZ.load(&Z_h, &Znorm_h, bytes, norm_bytes);
   }
 
   long long flops() const { return r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }

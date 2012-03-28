@@ -40,6 +40,12 @@ private:
   OutputY &YY;
   OutputZ &ZZ;
   OutputW &WW;
+
+  // host pointers used for backing up fields when tuning
+  // these can't be curried into the Spinors because of Tesla argument length restriction
+  char *X_h, *Y_h, *Z_h, *W_h;
+  char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h;
+
   Functor &f;
   const int length;
 
@@ -80,18 +86,22 @@ public:
       (X, Y, Z, W, f, XX, YY, ZZ, WW, length);
   }
 
-  void preTune() { 
-    if (writeX) XX.save();
-    if (writeY) YY.save();
-    if (writeZ) ZZ.save();
-    if (writeW) WW.save();
+  void preTune() {
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*length;
+    size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
+    if (writeX) XX.save(&X_h, &Xnorm_h, bytes, norm_bytes);
+    if (writeY) YY.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    if (writeZ) ZZ.save(&Z_h, &Znorm_h, bytes, norm_bytes);
+    if (writeW) WW.save(&W_h, &Wnorm_h, bytes, norm_bytes);
   }
 
   void postTune() {
-    if (writeX) XX.load(); 
-    if (writeY) YY.load(); 
-    if (writeZ) ZZ.load(); 
-    if (writeW) WW.load(); 
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*length;
+    size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
+    if (writeX) XX.load(&X_h, &Xnorm_h, bytes, norm_bytes);
+    if (writeY) YY.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    if (writeZ) ZZ.load(&Z_h, &Znorm_h, bytes, norm_bytes);
+    if (writeW) WW.load(&W_h, &Wnorm_h, bytes, norm_bytes);
   }
 
   long long flops() const { return f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
