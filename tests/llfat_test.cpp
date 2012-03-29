@@ -372,6 +372,7 @@ llfat_test(int test)
     }
     
 #ifdef MULTI_GPU
+  if (verify_results){
     int i;
     for(i=0;i < 4;i++){
       free(ghost_sitelink[i]);
@@ -384,6 +385,7 @@ llfat_test(int test)
 	free(ghost_sitelink_diag[i*4+j]);
       }
     }
+   }
 #endif
     
     for(int i=0;i < 4; i++){
