@@ -115,6 +115,11 @@ Known Issues:
   This flag has no effect when the library is build for GPU
   architectures other than Fermi (sm_20).
 
+* The auto-tuner reports "0 Gflop/s" and "0 GB/s" for several of the
+  Dslash kernels (visible if the verbosity is set to at least
+  QUDA_SUMMARIZE), rather than the correct values.  This does not
+  affect the tuning process or actual performance.
+
 
 Getting Help:
 
