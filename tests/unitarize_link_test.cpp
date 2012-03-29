@@ -195,7 +195,9 @@ unitarize_link_test()
   hisq::setUnitarizeLinksPadding(0,0);
 
   int* num_failures_dev;
-  cudaMalloc(&num_failures_dev, sizeof(int));
+  if(cudaMalloc(&num_failures_dev, sizeof(int)) != cudaSuccess){
+	errorQuda("cudaMallo failed for num_failures_dev\n");
+  }
   cudaMemset(num_failures_dev, 0, sizeof(int));
 
   struct timeval t0, t1;

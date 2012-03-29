@@ -535,10 +535,6 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 		 int Vsh_x, int Vsh_y, int Vsh_z, int Vsh_t,
 		 QudaPrecision prec, QudaGaugeFieldOrder cpu_order) 
 {
-  cudaStream_t streams[2];
-  for(int i=0;i < 2; i++){
-    cudaStreamCreate(&streams[i]);
-  }
 
   int Vh_2d_max = MAX(X[0]*X[1]/2, X[0]*X[2]/2);
   Vh_2d_max = MAX(Vh_2d_max, X[0]*X[3]/2);
@@ -565,9 +561,11 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 #endif  
 
   int glen_sum = ghostV*gaugeSiteSize*prec;
-  cudaMalloc(&tmp_even, 4*(len+glen_sum)); 
-  cudaMalloc(&tmp_odd, 4*(len+glen_sum)); 
-  
+  if(cudaMalloc(&tmp_even, 4*(len+glen_sum)) != cudaSuccess){
+    errorQuda("cudaMalloc() failed for tmp_even\n");
+  }
+  tmp_odd = tmp_even; 
+
   //even links
   if(cpu_order == QUDA_QDP_GAUGE_ORDER){
     for(i=0;i < 4; i++){
@@ -641,14 +639,14 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
   if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
     for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-      cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);
+      cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[0]);
 #else
     cudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
     }
   }else{  //QUDA_MILC_GAUGE_ORDER
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[1]);
+    cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[0]);
 #else
     cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*GaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
@@ -660,9 +658,9 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
       char* dest = tmp_odd + i*(len+glen_sum)+len;
       for(int dir = 0; dir < 4; dir++){
 #ifdef GPU_DIRECT 
-	cudaMemcpyAsync(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[1]); 
+	cudaMemcpyAsync(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[0]); 
 	cudaMemcpyAsync(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], 
-			cudaMemcpyHostToDevice, streams[1]); 
+			cudaMemcpyHostToDevice, streams[0]); 
 #else
 	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
 	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
@@ -691,7 +689,7 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 	}
 #ifdef GPU_DIRECT 
 	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
-			X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice, streams[1]);	
+			X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice, streams[0]);	
 #else
 	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
 		   X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice );		
@@ -701,19 +699,12 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 
 #endif
   }
-  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh, pad, ghostV, prec, cpu_order, streams[1]); 
+  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh, pad, ghostV, prec, cpu_order, streams[0]); 
   
-  for(int i=0;i < 2;i++){
-    cudaStreamSynchronize(streams[i]);
-  }
+  cudaStreamSynchronize(streams[0]);
 
   cudaFree(tmp_even);
-  cudaFree(tmp_odd);
 
-  for(int i=0;i < 2;i++){
-    cudaStreamDestroy(streams[i]);
-  }
-  
 }
 
 
@@ -858,10 +849,9 @@ do_loadLinkToGPU_ex(const int* X, void *even, void *odd, void**cpuGauge,
   char* tmp_even = NULL;
   char* tmp_odd = NULL;
   int len = Vh_ex*gaugeSiteSize*prec;
-
-  cudaMalloc(&tmp_even, 8*len);
-  if(tmp_even == NULL){
-    errorQuda("Error: cudaMalloc failed\n");
+  
+  if(cudaMalloc(&tmp_even, 8*len) != cudaSuccess){
+    errorQuda("Error: cudaMalloc failed for tmp_even\n");
   }
   tmp_odd = tmp_even + 4*len;
 
@@ -944,23 +934,16 @@ static void
 do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd, 
 		  int bytes, int Vh, int stride, QudaPrecision prec) 
 {  
-  cudaStream_t streams[2];
-  for(int i=0;i < 2; i++){
-    cudaStreamCreate(&streams[i]);
-  }
-  
-  cudaThreadSynchronize(); checkCudaError();
   
   double* unpackedDataEven;
   double* unpackedDataOdd;
   int datalen = 4*Vh*gaugeSiteSize*sizeof(Float);
-  cudaMalloc(&unpackedDataEven, datalen); 
-  cudaMalloc(&unpackedDataOdd, datalen); 
-  
+  if(cudaMalloc(&unpackedDataEven, datalen) != cudaSuccess){
+    errorQuda("cudaMalloc failed for unpackedDataEven\n");
+  }
+  unpackedDataOdd = unpackedDataEven;
   //unpack even data kernel
   link_format_gpu_to_cpu((void*)unpackedDataEven, (void*)even, Vh, stride, prec, streams[0]);
-
-  cudaThreadSynchronize(); checkCudaError();
 
 #ifdef GPU_DIRECT 
   cudaMemcpyAsync(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost, streams[0]);
@@ -969,25 +952,14 @@ do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd,
 #endif
   
   //unpack odd data kernel
-  link_format_gpu_to_cpu((void*)unpackedDataOdd, (void*)odd, Vh, stride, prec, streams[1]);
+  link_format_gpu_to_cpu((void*)unpackedDataOdd, (void*)odd, Vh, stride, prec, streams[0]);
 #ifdef GPU_DIRECT 
-  cudaMemcpyAsync(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost, streams[1]);  
-  for(int i=0;i < 2; i++){
-    cudaStreamSynchronize(streams[i]);
-  }
+  cudaMemcpyAsync(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost, streams[0]);  
 #else
   cudaMemcpy(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost);  
 #endif
   
   cudaFree(unpackedDataEven);
-  cudaFree(unpackedDataOdd);
-  
-  for(int i=0;i < 2;i++){
-    cudaStreamDestroy(streams[i]);
-  }
-
-
-  
 }
 void 
 storeLinkToCPU(cpuGaugeField* cpuGauge, cudaGaugeField *cudaGauge, QudaGaugeParam* param)

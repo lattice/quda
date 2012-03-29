@@ -435,8 +435,12 @@ exchange_llfat_init(QudaPrecision prec)
   
 
   for(int i=0;i < 4; i++){
-    cudaMalloc((void**)&fwd_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec);
-    cudaMalloc((void**)&back_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec);
+    if(cudaMalloc((void**)&fwd_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec) != cudaSuccess){
+      errorQuda("cudaMalloc() failed for fwd_nbr_staple_gpu\n");
+    }
+    if(cudaMalloc((void**)&back_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec) != cudaSuccess){
+      errorQuda("cudaMalloc() failed for back_nbr_staple_gpu\n");
+    }
 
     cudaMallocHost((void**)&fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);
     cudaMallocHost((void**)&back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);

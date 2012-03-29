@@ -157,7 +157,9 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
     //input_path
     int bytes = num_paths*max_length* sizeof(int);
     int* input_path_d;
-    cudaMalloc((void**)&input_path_d, bytes); checkCudaError();    
+    if(cudaMalloc((void**)&input_path_d, bytes); checkCudaError() != cudaSuccess){
+      errorQuda("cudaMalloc failed for input_path_d\n");
+    }
     cudaMemset(input_path_d, 0, bytes);checkCudaError();
 
     int* input_path_h = (int*)malloc(bytes);
@@ -173,18 +175,22 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
 	}
     }
 
-    cudaMemcpy(input_path_d, input_path_h, bytes, cudaMemcpyHostToDevice); checkCudaError();
+    cudaMemcpy(input_path_d, input_path_h, bytes, cudaMemcpyHostToDevice); 
     
     //length
     int* length_d;
-    cudaMalloc((void**)&length_d, num_paths*sizeof(int)); checkCudaError();
-    cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice); checkCudaError();
+    if(cudaMalloc((void**)&length_d, num_paths*sizeof(int)) != cudaSuccess){
+      errorQuda("cudaMalloc failed for length_d\n");
+    }
+    cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice);
     
     //path_coeff
     int gsize = param->cuda_prec;
     void* path_coeff_d;
-    cudaMalloc((void**)&path_coeff_d, num_paths*gsize); checkCudaError();
-    cudaMemcpy(path_coeff_d, path_coeff, num_paths*gsize, cudaMemcpyHostToDevice); checkCudaError();
+    if(cudaMalloc((void**)&path_coeff_d, num_paths*gsize) != cudaSuccess){
+      errorQuda("cudaMalloc failed for path_coeff_d\n");
+    }
+    cudaMemcpy(path_coeff_d, path_coeff, num_paths*gsize, cudaMemcpyHostToDevice); 
 
     //compute the gauge forces
     int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];

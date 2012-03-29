@@ -506,7 +506,9 @@ void cudaColorSpinorField::allocateGhostBuffer(void) {
 	this->fwdGhostFaceBuffer[i] = NULL;
       }
       //cudaMalloc((void**)&this->fwdGhostFaceBuffer[i], faceBytes);
-      cudaMalloc((void**)&this->backGhostFaceBuffer[i], 2*faceBytes);
+      if (cudaMalloc((void**)&this->backGhostFaceBuffer[i], 2*faceBytes) == cudaErrorMemoryAllocation){
+	errorQuda("cudaMalloc() failed for backGhostFaceBuffer\n");
+      }
       fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
     }   
     

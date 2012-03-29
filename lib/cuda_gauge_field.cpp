@@ -281,8 +281,10 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
   FloatN *odd = (FloatN*)((char*)gauge + bytes/2);
 
   int datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
-  void *unpacked;
-  cudaMalloc(&unpacked, datalen); 
+  void *unpacked;  
+  if(cudaMalloc(&unpacked, datalen) != cudaSuccess){
+    errorQuda("cudaMalloc() failed for unpacked\n");
+  }
   void *unpackedEven = unpacked;
   void *unpackedOdd = (char*)unpacked + datalen/2;
   
