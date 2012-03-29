@@ -111,10 +111,12 @@ llfat_test(int test)
   qudaGaugeParam.gauge_order = gauge_order;
   qudaGaugeParam.type=QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
+  /*
   qudaGaugeParam.flag = QUDA_FAT_PRESERVE_CPU_GAUGE
     | QUDA_FAT_PRESERVE_GPU_GAUGE
     | QUDA_FAT_PRESERVE_COMM_MEM;
-  
+  */
+  qudaGaugeParam.flag =0;
   void* fatlink;
   cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize);
   if(fatlink == NULL){
