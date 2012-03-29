@@ -630,7 +630,6 @@ collectGhostStaple(int* X, void* even, void* odd, int volume, QudaPrecision prec
     exit(1);
   }
 
-  CUERR;
 }
 
 

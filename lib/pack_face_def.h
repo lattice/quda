@@ -547,7 +547,6 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 		   dim, dagger, parity, gridDim, blockDim, stream);
     break;
   }  
-  if (dslashTuning) CUERR;
 }
 
 #if (defined DIRECT_ACCESS_PACK) || (defined FERMI_NO_DBLE_TEX)
@@ -685,7 +684,6 @@ void packFaceAsqtad(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 		   dim, parity, gridDim, blockDim, stream);
     break;
   }  
-  if (dslashTuning) CUERR;
 
 }
 

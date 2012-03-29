@@ -509,7 +509,6 @@ void cudaColorSpinorField::allocateGhostBuffer(void) {
       cudaMalloc((void**)&this->backGhostFaceBuffer[i], 2*faceBytes);
       fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
     }   
-    CUERR;
     
     this->facePrecision = precision;
     this->initGhostFaceBuffer = 1;
@@ -555,7 +554,6 @@ void cudaColorSpinorField::packGhost(const int dim, const QudaParity parity, con
   errorQuda("packGhost not built on single-GPU build");
 #endif
 
-  CUERR;
 }
  
 // send the ghost zone to the host
@@ -622,7 +620,6 @@ void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const Qu
   errorQuda("sendGhost not built on single-GPU build");
 #endif
 
-  CUERR;
 }
 
 void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
@@ -651,7 +648,6 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
     CUDAMEMCPY(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
   }
 
-  CUERR;
 }
 
 std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {

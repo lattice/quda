@@ -269,25 +269,25 @@ packGhostStaple(int* X, void* even, void* odd, int volume, QudaPrecision prec,
       for(i=0;i < 9; i++){
 	void* dst = ((char*)back_nbr_buf[3]) + i*len ; 
 	void* src = ((char*)even) + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
       //back, odd
       for(i=0;i < 9; i++){
 	void* dst = ((char*)back_nbr_buf[3]) + 9*len + i*len ; 
 	void* src = ((char*)odd) + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
       //fwd,even
       for(i=0;i < 9; i++){
 	void* dst = ((char*)fwd_nbr_buf[3]) + i*len ; 
 	void* src = ((char*)even) + (Vh-Vsh)*sizeOfFloatN + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
       //fwd, odd
       for(i=0;i < 9; i++){
 	void* dst = ((char*)fwd_nbr_buf[3]) + 9*len + i*len ; 
 	void* src = ((char*)odd) + (Vh-Vsh)*sizeOfFloatN + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
     }else{
       //reverse even and odd position
@@ -295,25 +295,25 @@ packGhostStaple(int* X, void* even, void* odd, int volume, QudaPrecision prec,
       for(i=0;i < 9; i++){
 	void* dst = ((char*)back_nbr_buf[3]) + i*len ; 
 	void* src = ((char*)odd) + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
       //back, even
       for(i=0;i < 9; i++){
 	void* dst = ((char*)back_nbr_buf[3]) + 9*len + i*len ; 
 	void* src = ((char*)even) + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
       //fwd,odd
       for(i=0;i < 9; i++){
 	void* dst = ((char*)fwd_nbr_buf[3]) + i*len ; 
 	void* src = ((char*)odd) + (Vh-Vsh)*sizeOfFloatN + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
       //fwd, even
       for(i=0;i < 9; i++){
 	void* dst = ((char*)fwd_nbr_buf[3]) + 9*len + i*len ; 
 	void* src = ((char*)even) + (Vh-Vsh)*sizeOfFloatN + i*stride*sizeOfFloatN;
-	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); CUERR;
+	cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
       }
       
     } 
@@ -361,26 +361,26 @@ unpackGhostStaple(int* X, void* _even, void* _odd, int volume, QudaPrecision pre
     for(int i=0;i < 9; i++){
       void* dst = even + i*stride*sizeOfFloatN;
       void* src = ((char*)back_nbr_buf[dir]) + i*len[dir] ; 
-      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
+      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); 
     }
     //back, odd
     for(int i=0;i < 9; i++){
       void* dst = odd + i*stride*sizeOfFloatN;
       void* src = ((char*)back_nbr_buf[dir]) + 9*len[dir] + i*len[dir] ; 
-      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
+      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); 
     }
   }else { //QUDA_FORWARDS
     //fwd,even
     for(int i=0;i < 9; i++){
       void* dst = even + Vsh[dir]*sizeOfFloatN + i*stride*sizeOfFloatN;
       void* src = ((char*)fwd_nbr_buf[dir]) + i*len[dir] ; 
-      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
+      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); 
     }
     //fwd, odd
     for(int i=0;i < 9; i++){
       void* dst = odd + Vsh[dir]*sizeOfFloatN + i*stride*sizeOfFloatN;
       void* src = ((char*)fwd_nbr_buf[dir]) + 9*len[dir] + i*len[dir] ; 
-      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); CUERR;
+      cudaMemcpyAsync(dst, src, len[dir], cudaMemcpyHostToDevice, *stream); 
     }
   }
 }
@@ -565,8 +565,8 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 #endif  
 
   int glen_sum = ghostV*gaugeSiteSize*prec;
-  cudaMalloc(&tmp_even, 4*(len+glen_sum)); CUERR;
-  cudaMalloc(&tmp_odd, 4*(len+glen_sum)); CUERR;
+  cudaMalloc(&tmp_even, 4*(len+glen_sum)); 
+  cudaMalloc(&tmp_odd, 4*(len+glen_sum)); 
   
   //even links
   if(cpu_order == QUDA_QDP_GAUGE_ORDER){
@@ -635,22 +635,22 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 #endif
   }    
   
-  link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, Vh, pad, ghostV, prec, cpu_order, streams[0]); CUERR;
+  link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, Vh, pad, ghostV, prec, cpu_order, streams[0]); 
 
   //odd links
   if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
     for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-      cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);CUERR;
+      cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);
 #else
-    cudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);CUERR;
+    cudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
     }
   }else{  //QUDA_MILC_GAUGE_ORDER
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[1]);CUERR;
+    cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[1]);
 #else
-    cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*GaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);CUERR;
+    cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*GaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
   }
   
@@ -660,12 +660,12 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
       char* dest = tmp_odd + i*(len+glen_sum)+len;
       for(int dir = 0; dir < 4; dir++){
 #ifdef GPU_DIRECT 
-	cudaMemcpyAsync(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[1]); CUERR;
+	cudaMemcpyAsync(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[1]); 
 	cudaMemcpyAsync(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], 
-			cudaMemcpyHostToDevice, streams[1]); CUERR;
+			cudaMemcpyHostToDevice, streams[1]); 
 #else
-	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
-	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); CUERR;
+	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
 
 #endif
 
@@ -701,7 +701,7 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 
 #endif
   }
-  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh, pad, ghostV, prec, cpu_order, streams[1]); CUERR;
+  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh, pad, ghostV, prec, cpu_order, streams[1]); 
   
   for(int i=0;i < 2;i++){
     cudaStreamSynchronize(streams[i]);
@@ -713,7 +713,7 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
   for(int i=0;i < 2;i++){
     cudaStreamDestroy(streams[i]);
   }
-  CUERR;
+  
 }
 
 
@@ -913,7 +913,7 @@ do_loadLinkToGPU_ex(const int* X, void *even, void *odd, void**cpuGauge,
   for(int i=0;i < 2;i++){
     cudaStreamDestroy(streams[i]);
   }
-  CUERR;
+  
 }
 
 
@@ -954,8 +954,8 @@ do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd,
   double* unpackedDataEven;
   double* unpackedDataOdd;
   int datalen = 4*Vh*gaugeSiteSize*sizeof(Float);
-  cudaMalloc(&unpackedDataEven, datalen); CUERR;
-  cudaMalloc(&unpackedDataOdd, datalen); CUERR;
+  cudaMalloc(&unpackedDataEven, datalen); 
+  cudaMalloc(&unpackedDataOdd, datalen); 
   
   //unpack even data kernel
   link_format_gpu_to_cpu((void*)unpackedDataEven, (void*)even, Vh, stride, prec, streams[0]);
@@ -987,7 +987,7 @@ do_storeLinkToCPU(Float* cpuGauge, FloatN *even, FloatN *odd,
   }
 
 
-  CUERR;
+  
 }
 void 
 storeLinkToCPU(cpuGaugeField* cpuGauge, cudaGaugeField *cudaGauge, QudaGaugeParam* param)

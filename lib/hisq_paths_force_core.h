@@ -76,6 +76,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
 					RealA* const QmuEven, RealA* const QmuOdd, 
 					RealA* const newOprodEven, RealA* const newOprodOdd) 
 {
+
 #ifdef KERNEL_ENABLED		
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -254,6 +255,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     //addMatrixToField(COLOR_MAT_Y, sig, sid, coeff, newOprodEven, newOprodOdd, oddBit);
     addMatrixToNewOprod(COLOR_MAT_Y, sig, sid, coeff, newOprodEven, newOprodOdd, oddBit);
   }
+
 #endif  
   return;
 }

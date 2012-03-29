@@ -58,14 +58,14 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
     if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
     
-    cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf[dir], nbytes[dir]); CUERR;
-    cudaMallocHost((void**)&back_nbr_spinor_sendbuf[dir], nbytes[dir]); CUERR;
+    cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf[dir], nbytes[dir]); 
+    cudaMallocHost((void**)&back_nbr_spinor_sendbuf[dir], nbytes[dir]);
     
     if (fwd_nbr_spinor_sendbuf[dir] == NULL || back_nbr_spinor_sendbuf[dir] == NULL)
       errorQuda("dir =%d, malloc failed for fwd_nbr_spinor_sendbuf/back_nbr_spinor_sendbuf", dir); 
     
-    cudaMallocHost((void**)&fwd_nbr_spinor[dir], nbytes[dir]); CUERR;
-    cudaMallocHost((void**)&back_nbr_spinor[dir], nbytes[dir]); CUERR;
+    cudaMallocHost((void**)&fwd_nbr_spinor[dir], nbytes[dir]); 
+    cudaMallocHost((void**)&back_nbr_spinor[dir], nbytes[dir]); 
     
     if (fwd_nbr_spinor[dir] == NULL || back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
@@ -259,9 +259,9 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir) {
   if(!commDimPartitioned(dim)) return;
 
   if (dir%2 == 0) {
-    out.unpackGhost(fwd_nbr_spinor[dim], dim, QUDA_FORWARDS,  dagger, &stream[2*dim + recFwdStrmIdx]); CUERR;
+    out.unpackGhost(fwd_nbr_spinor[dim], dim, QUDA_FORWARDS,  dagger, &stream[2*dim + recFwdStrmIdx]); 
   } else {
-    out.unpackGhost(back_nbr_spinor[dim], dim, QUDA_BACKWARDS,  dagger, &stream[2*dim + recBackStrmIdx]); CUERR;
+    out.unpackGhost(back_nbr_spinor[dim], dim, QUDA_BACKWARDS,  dagger, &stream[2*dim + recBackStrmIdx]);
   }
 }
 
@@ -446,7 +446,6 @@ exchange_llfat_init(QudaPrecision prec)
   }
 
   
-  CUERR;
 
 #ifdef GPU_DIRECT
   for(int i=0;i < 4; i++){

@@ -282,7 +282,7 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
 
   int datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
   void *unpacked;
-  cudaMalloc(&unpacked, datalen); CUERR;
+  cudaMalloc(&unpacked, datalen); 
   void *unpackedEven = unpacked;
   void *unpackedOdd = (char*)unpacked + datalen/2;
   
@@ -305,7 +305,6 @@ static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volum
   
   cudaFree(unpacked);
   for(int i=0; i<2; i++) cudaStreamDestroy(streams[i]);
-  CUERR;
 }
 
 template <typename Float, typename Float2>
