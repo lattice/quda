@@ -688,10 +688,10 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 	  }
 	}
 #ifdef GPU_DIRECT 
-	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
+	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,((char*)ghost_cpuGauge_diag[nu*4+mu])+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
 			X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice, streams[0]);	
 #else
-	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu]+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
+	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,((char*)ghost_cpuGauge_diag[nu*4+mu])+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
 		   X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice );		
 #endif
       }
