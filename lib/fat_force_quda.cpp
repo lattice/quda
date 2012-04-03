@@ -15,10 +15,6 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define ALIGNMENT 4096 
 
-#if (CUDA_VERSION >=4000)
-#define GPU_DIRECT
-#endif
-
 #ifdef MPI_COMMS
 #include "face_quda.h"
 #endif

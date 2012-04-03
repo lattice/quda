@@ -3,10 +3,6 @@
 #include <typeinfo>
 #include <misc_helpers.h>
 
-#if (CUDA_VERSION >=4000)
-#define GPU_DIRECT
-#endif
-
 cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
   GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0)
 {

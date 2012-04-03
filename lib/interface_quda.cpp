@@ -118,7 +118,7 @@ void initQuda(int dev)
   }
   initialized = 1;
 
-#if (CUDA_VERSION == 4000) && defined(MULTI_GPU)
+#if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
   // not needed for CUDA >= 4.1
   char* cni_str = getenv("CUDA_NIC_INTEROP");
