@@ -1621,12 +1621,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--disable-numa-affinity") == 0){
-    disableNumaAffinityQuda();
-    ret = 0;
-    goto out;
-  }
-
   if( strcmp(argv[i], "--version") == 0){
     printf("This program is linked with QUDA library, version %s,", 
 	   get_quda_ver_str());

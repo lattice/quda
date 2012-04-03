@@ -92,11 +92,6 @@ cudaCloverField *cloverPrecondition = NULL;
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 
-void disableNumaAffinityQuda(void)
-{
-  numa_affinity_enabled=0;
-}
-
 int getGpuCount()
 {
   int count;
