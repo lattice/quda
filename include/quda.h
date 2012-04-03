@@ -153,8 +153,6 @@ extern "C" {
 				 double* offsets, int num_offsets, double* residue_sq);
     
 
-  void endInvertQuda(); // frees the Dirac operator
-  
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity parity);
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);

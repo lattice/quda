@@ -89,12 +89,6 @@ cudaCloverField *cloverPrecise = NULL;
 cudaCloverField *cloverSloppy = NULL;
 cudaCloverField *cloverPrecondition = NULL;
 
-
-Dirac *d = NULL;
-Dirac *dSloppy = NULL;
-Dirac *dPre = NULL; // the DD preconditioning operator
-bool diracCreation = false;
-
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 
@@ -293,7 +287,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
-  endInvertQuda(); // need to delete any persistant dirac operators
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
@@ -398,7 +391,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     cloverPrecondition = cloverSloppy;
   }
 
-  endInvertQuda(); // need to delete any persistant dirac operators
 }
 
 void freeGaugeQuda(void) 
@@ -441,8 +433,6 @@ void freeCloverQuda(void)
 
 void endQuda(void)
 {
-  endInvertQuda();
-
   cudaColorSpinorField::freeBuffer();
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
@@ -761,23 +751,19 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
 }
 
-void createDirac(QudaInvertParam &param, const bool pc_solve) {
+void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
+{
+  DiracParam diracParam;
+  DiracParam diracSloppyParam;
+  DiracParam diracPreParam;
 
-  if (!diracCreation) {
-    DiracParam diracParam;
-    DiracParam diracSloppyParam;
-    DiracParam diracPreParam;
-
-    setDiracParam(diracParam, &param, pc_solve);
-    setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    setDiracPreParam(diracPreParam, &param, pc_solve);
+  setDiracParam(diracParam, &param, pc_solve);
+  setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
+  setDiracPreParam(diracPreParam, &param, pc_solve);
     
-    d = Dirac::create(diracParam); // create the Dirac operator   
-    dSloppy = Dirac::create(diracSloppyParam);
-    dPre = Dirac::create(diracPreParam);
-    diracCreation = true;
-  } 
-
+  d = Dirac::create(diracParam); // create the Dirac operator   
+  dSloppy = Dirac::create(diracSloppyParam);
+  dPre = Dirac::create(diracPreParam);
 }
 
 cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -827,11 +813,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   param->gflops = 0;
   param->iter = 0;
 
-  // create the dirac operator
-  createDirac( *param, pc_solve);
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
 
-    
-  
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
@@ -943,13 +931,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Reconstructed: CUDA solution = %f, CPU copy = %f\n", nx, nh_x);
   }
   
-  if (!param->preserve_dirac) {
-    delete d;
-    delete dSloppy;
-    delete dPre;
-    diracCreation = false;
-  }  
-
   delete h_b;
   delete h_x;
   delete b;
@@ -1058,7 +1039,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
     param->mass = sqrt(param->offset[0]/4);  
   }
-  createDirac(*param, pc_solve);
+
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
 
@@ -1146,38 +1133,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   delete [] hp_x;
 
-  if (!param->preserve_dirac) {
-    delete d; d =NULL;
-    delete dSloppy; dSloppy = NULL;
-    delete dPre; dPre = NULL;
-    diracCreation = false;
-  }  
-
   return;
 }
-
-void endInvertQuda() {
-  if (diracCreation) {
-    if (d){
-      delete d;
-      d = NULL;
-    }
-    
-    if (dSloppy){
-      delete dSloppy;
-      dSloppy = NULL;
-    }
-
-    if (dPre){
-      delete dPre;
-      dPre = NULL;
-    }
-
-    diracCreation = false;
-  }
-  checkCudaError();
-}
-
 
 /************************************** Ugly Mixed precision multishift CG solver ****************************/
 
@@ -1420,7 +1377,13 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // but we set it to be the same as sloppy to avoid segfault 
   // in creating the dirac since it is needed 
   gaugeFatPrecondition = gaugeFatPrecise = gaugeFatSloppy;
-  createDirac(*param, pc_solve);
+
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
   // resetting to NULL
   gaugeFatPrecise = NULL; gaugeFatPrecondition = NULL;
 
@@ -1507,7 +1470,14 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   /*FIXME: to avoid setfault*/
   gaugeFatPrecondition =gaugeFatSloppy;
-  createDirac(*param, pc_solve);
+
+  if (dPre && dPre != dSloppy) delete dPre;
+  if (dSloppy && dSloppy != d) delete dSloppy;
+  if (d) delete d;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+
   gaugeFatPrecondition = NULL;
   {
     Dirac& dirac2 = *d;
@@ -1547,14 +1517,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   delete [] x;
 
   delete [] hp_x;
-
-  if (!param->preserve_dirac) {
-    delete d; d = NULL;
-    delete dSloppy; dSloppy = NULL;
-    delete dPre; dPre = NULL;
-    diracCreation = false;
-  }  
-
 
   return;
 }
