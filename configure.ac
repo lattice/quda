@@ -134,6 +134,13 @@ AC_ARG_ENABLE(overlap-comms,
   [ overlap_comms="yes" ]
 )
 
+dnl enable cuda / nic interop buffer
+AC_ARG_ENABLE(gpu-direct,
+  AC_HELP_STRING([--enable-gpu-direct], [ Enable CUDA/NIC interop pinned memory (default: enabled)]),
+  [ gpu_direct=${enableval}],
+  [ gpu_direct="yes" ]
+)
+
 AC_ARG_WITH(mpi,
  AC_HELP_STRING([--with-mpi=MPIDIR], [ Specify MPI installation directory]),
  [ mpi_home=${withval}; build_mpi="yes"],
@@ -359,6 +366,14 @@ yes|no);;
   ;;
 esac
 
+dnl Enables CUDA/NIC buffer interop
+case ${gpu_direct} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --gpu-direct ])
+  ;;
+esac
+
 dnl QDP-JIT support
 case ${build_qdpjit} in
 yes|no);;
@@ -417,7 +432,7 @@ if test "X${build_qio}X" = "XyesX"; then
   fi	
 fi
  
-dnl Enables overlapping comms
+dnl Enables textures on Fermi
 case ${fermi_double_tex} in
 yes|no);;
 *) 
@@ -501,6 +516,9 @@ AC_SUBST( BUILD_MPI, [${build_mpi}])
 
 AC_MSG_NOTICE([Setting OVERLAP_COMMS= ${overlap_comms}])
 AC_SUBST( OVERLAP_COMMS, [${overlap_comms}])
+
+AC_MSG_NOTICE([Setting GPU_DIRECTS= ${gpu_direct}])
+AC_SUBST( GPU_DIRECT, [${gpu_direct}])
 
 AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
 AC_SUBST( BUILD_QIO, [${build_qio}])

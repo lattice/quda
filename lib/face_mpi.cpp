@@ -13,10 +13,6 @@
 
 using namespace std;
 
-#if (CUDA_VERSION >=4000)
-#define GPU_DIRECT
-#endif
-
 #ifdef DSLASH_PROFILING
   void printDslashProfile();
 #define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)

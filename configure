@@ -568,6 +568,7 @@ MPI_HOME
 FECXX
 FECC
 BUILD_QIO
+GPU_DIRECT
 OVERLAP_COMMS
 BUILD_MPI
 BUILD_QMP
@@ -667,6 +668,7 @@ enable_staggered_force
 enable_hisq_force
 enable_multi_gpu
 enable_overlap_comms
+enable_gpu_direct
 with_mpi
 with_qmp
 with_qio
@@ -1327,6 +1329,8 @@ Optional Features:
   --enable-hisq-force     Build HISQ fermion force (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-overlap-comms  Enable comms/compute overlap (default: enabled)
+  --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
+                          enabled)
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
                           (default: disabled)
   --enable-fermi-double-tex
@@ -2053,6 +2057,15 @@ if test "${enable_overlap_comms+set}" = set; then :
   enableval=$enable_overlap_comms;  overlap_comms=${enableval}
 else
    overlap_comms="yes"
+
+fi
+
+
+# Check whether --enable-gpu-direct was given.
+if test "${enable_gpu_direct+set}" = set; then :
+  enableval=$enable_gpu_direct;  gpu_direct=${enableval}
+else
+   gpu_direct="yes"
 
 fi
 
@@ -3830,6 +3843,13 @@ yes|no);;
   ;;
 esac
 
+case ${gpu_direct} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --gpu-direct " "$LINENO" 5
+  ;;
+esac
+
 case ${build_qdpjit} in
 yes|no);;
 *)
@@ -4011,6 +4031,11 @@ BUILD_MPI=${build_mpi}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting OVERLAP_COMMS= ${overlap_comms}" >&5
 $as_echo "$as_me: Setting OVERLAP_COMMS= ${overlap_comms}" >&6;}
 OVERLAP_COMMS=${overlap_comms}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECTS= ${gpu_direct}" >&5
+$as_echo "$as_me: Setting GPU_DIRECTS= ${gpu_direct}" >&6;}
+GPU_DIRECT=${gpu_direct}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QIO = ${build_qio} " >&5

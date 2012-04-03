@@ -36,6 +36,9 @@ BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU c
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 OVERLAP_COMMS = @OVERLAP_COMMS@      # set to 'yes' to overlap comms and compute
 
+# GPUdirect options
+GPU_DIRECT = @GPU_DIRECT@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
+
 BUILD_QIO = @BUILD_QIO@    # set to 'yes' to build QIO code for binary I/O
 
 USE_QDPJIT = @USE_QDPJIT@  # build QDP-JIT support?
@@ -187,6 +190,11 @@ endif
 ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   NVCCOPT += -DFERMI_NO_DBLE_TEX
   COPT += -DFERMI_NO_DBLE_TEX
+endif
+
+ifeq ($(strip $(GPU_DIRECT)), yes)
+  NVCCOPT += -DGPU_DIRECT
+  COPT += -DGPU_DIRECT
 endif
 
 ifeq ($(strip $(OS)), osx)

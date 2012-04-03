@@ -11,10 +11,6 @@
 #include <qmp.h>
 #endif
 
-#if (CUDA_VERSION >= 4000)
-#define GPU_DIRECT
-#endif
-
 /*
   Multi-GPU TODOs
   - test qmp code
