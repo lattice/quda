@@ -22,8 +22,7 @@ DiracClover& DiracClover::operator=(const DiracClover &dirac)
   return *this;
 }
 
-void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in,
-				    const cudaCloverField &clover) const
+void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   Dirac::checkParitySpinor(out, in);
 
@@ -38,7 +37,7 @@ void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &
 {
   if (!initDslash) initDslashConstants(gauge, in.Stride());
   if (!initClover) initCloverConstants(clover.Stride());
-  checkParitySpinor(in, out, clover);
+  checkParitySpinor(in, out);
 
   // regular clover term
   FullClover cs;
@@ -124,7 +123,7 @@ void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorFi
 {
   if (!initDslash) initDslashConstants(gauge, in.Stride());
   if (!initClover) initCloverConstants(clover.Stride());
-  checkParitySpinor(in, out, clover);
+  checkParitySpinor(in, out);
 
   // needs to be cloverinv
   FullClover cs;
@@ -143,7 +142,7 @@ void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField
 {
   if (!initDslash) initDslashConstants(gauge, in.Stride());
   if (!initClover) initCloverConstants(clover.Stride());
-  checkParitySpinor(in, out, clover);
+  checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
@@ -163,7 +162,7 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
 {
   if (!initDslash) initDslashConstants(gauge, in.Stride());
   if (!initClover) initCloverConstants(clover.Stride());
-  checkParitySpinor(in, out, clover);
+  checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
@@ -182,10 +181,10 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
   double kappa2 = -kappa*kappa;
 
   // FIXME: For asymmetric, a "DslashCxpay" kernel would improve performance.
-  bool reset = newTmp(&tmp1, in);
+  bool reset1 = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-    bool reset = newTmp(&tmp2, in);
+    bool reset2 = newTmp(&tmp2, in);
     // DiracCloverPC::Dslash applies A^{-1}Dslash
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
     Clover(*tmp2, in, QUDA_EVEN_PARITY);
@@ -193,11 +192,12 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
     // DiracWilson::Dslash applies only Dslash
     DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, *tmp2, kappa2); 
 
+    deleteTmp(&tmp2, reset2);
   } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 
     // FIXME: It would be nice if I could do something like: cudaColorSpinorField tmp3( in.param() );
     // to save copying the data from 'in'
-    bool reset = newTmp(&tmp2, in);
+    bool reset2 = newTmp(&tmp2, in);
 
     // DiracCloverPC::Dslash applies A^{-1}Dslash
     Dslash(*tmp1, in, QUDA_EVEN_PARITY);
@@ -206,6 +206,7 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
     // DiracWilson::Dslash applies only Dslash
     DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, *tmp2, kappa2);
 
+    deleteTmp(&tmp2, reset2);
   } else if (!dagger) { // symmetric preconditioning
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
@@ -230,7 +231,7 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
     }
   }
   
-  deleteTmp(&tmp1, reset);
+  deleteTmp(&tmp1, reset1);
 }
 
 void DiracCloverPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
