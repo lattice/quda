@@ -154,6 +154,9 @@ static inline __device__ float2 short22float2(short2 a) {
 }
 #endif // DIRECT_ACCESS inclusions
 
+// Enable shared memory dslash for Fermi architecture
+//#define SHARED_WILSON_DSLASH
+
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
@@ -342,7 +345,7 @@ TuneKey DslashCuda::tuneKey() const
 /** This derived class is specifically for driving the Dslash kernels
     that use shared memory blocking.  This only applies on Fermi and
     upwards, and only for the interior kernels. */
-#if (__COMPUTE_CAPABILITY__ >= 200) 
+#if (__COMPUTE_CAPABILITY__ >= 200 && SHARED_WILSON_DSLASH) 
 class SharedDslashCuda : public DslashCuda {
  protected:
   int sharedBytesPerBlock() const { return 0; } // FIXME: this isn't quite true, but works
