@@ -1372,21 +1372,24 @@ int process_command_line_option(int argc, char** argv, int* idx)
     usage(argv);
   }
 
-#ifndef MULTI_GPU
   if( strcmp(argv[i], "--device") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
-    device= atoi(argv[i+1]);
+#ifdef MULTI_GPU
+    printf("Warning: Ignoring --device argument since this is a multi-GPU build.\n");
+    device = -1;
+#else
+    device = atoi(argv[i+1]);
     if (device < 0 || device > 16){
-      printf("ERROR: invalid CUDA device number (%d)\n", device);
+      printf("Error: Invalid CUDA device number (%d)\n", device);
       usage(argv);
     }
+#endif
     i++;
     ret = 0;
     goto out;
   }
-#endif
 
   if( strcmp(argv[i], "--prec") == 0){
     if (i+1 >= argc){
