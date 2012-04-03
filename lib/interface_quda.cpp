@@ -92,11 +92,6 @@ cudaCloverField *cloverPrecondition = NULL;
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 
-void disableNumaAffinityQuda(void)
-{
-  numa_affinity_enabled=0;
-}
-
 int getGpuCount()
 {
   int count;
@@ -153,17 +148,18 @@ void initQuda(int dev)
   num_QMP=QMP_get_number_of_nodes();
   rank_QMP=QMP_get_node_number();
   
-  dev += rank_QMP % deviceCount;
+  if (dev < 0) {
+    dev = rank_QMP % deviceCount;
+  }
   ndim = QMP_get_logical_number_of_dimensions();
   dim = QMP_get_logical_dimensions();
-
 #elif defined(MPI_COMMS)
-
   comm_init();
-  dev=comm_gpuid();
-
+  if (dev < 0) {
+    dev=comm_gpuid();
+  }
 #else
-  if (dev < 0) dev = deviceCount - 1;
+  if (dev < 0) errorQuda("Invalid device number");
 #endif
   
   // Used for applying the gauge field boundary condition
@@ -1921,4 +1917,3 @@ void endCommsQuda() {
 
 #endif
 }
-

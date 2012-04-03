@@ -87,9 +87,9 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(flag, 0);
+  P(preserve_gauge, 0);
 #else
-  P(flag, INVALID_INT);
+  P(preserve_gauge, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

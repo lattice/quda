@@ -13,7 +13,7 @@ static int size = -1;
 extern int verbose;
 static int num_nodes;
 extern int getGpuCount();
-static int which_gpu =-1;
+static int which_gpu = -1;
 
 static int x_fwd_nbr=-1;
 static int y_fwd_nbr=-1;
