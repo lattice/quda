@@ -47,7 +47,7 @@ MPI_HOME=@MPI_HOME@
 QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
 
-QUDA_NUMA_SUPPORT=@QUDA_NUMA_SUPPORT@   # enable NUMA affinity?
+NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
 
 ######
 
@@ -89,9 +89,9 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_LIBS =
   INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
-  FACE_COMMS=face_mpi.o comm_mpi.o
+  FACE_COMMS_OBJS=face_mpi.o comm_mpi.o
 else
-  FACE_COMMS=face_qmp.o
+  FACE_COMMS_OBJS=face_qmp.o
 endif
 
 ifeq ($(strip $(BUILD_QMP)), yes)
@@ -100,7 +100,7 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
-  FACE_COMMS=face_qmp.o comm_qmp.o
+  FACE_COMMS_OBJS=face_qmp.o comm_qmp.o
 endif 
 
 ifeq ($(strip $(OVERLAP_COMMS)), yes)
@@ -141,14 +141,14 @@ ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK
   FATLINK_TEST=llfat_test
   COPT += -DGPU_FATLINK
-  FATLINK_QUDA_ITF=llfat_quda_itf.o
+  FATLINK_ITF_OBJS=llfat_quda_itf.o
 endif
 ifeq ($(strip $(BUILD_HISQLINK)), yes)
   ifneq ($(strip $(BUILD_FATLINK)), yes) 
     NVCCOPT += -DGPU_FATLINK
     COPT    += -DGPU_FATLINK
     FATLINK_TEST=llfat_test
-    FATLINK_QUDA_ITF=llfat_quda_itf.o
+    FATLINK_ITF_OBJS=llfat_quda_itf.o
   endif
   NVCCOPT += -DGPU_UNITARIZE
   COPT    += -DGPU_UNITARIZE
@@ -189,10 +189,14 @@ ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   COPT += -DFERMI_NO_DBLE_TEX
 endif
 
-ifeq ($(strip $(QUDA_NUMA_SUPPORT)), yes)
-  NVCCOPT += -DQUDA_NUMA_SUPPORT
-  COPT += -DQUDA_NUMA_SUPPORT
-  NUMA_AFFINITY=numa_affinity.o
+ifeq ($(strip $(OS)), osx)
+  NUMA_AFFINITY = no
+endif
+
+ifeq ($(strip $(NUMA_AFFINITY)), yes)
+  NVCCOPT += -DNUMA_AFFINITY
+  COPT += -DNUMA_AFFINITY
+  NUMA_AFFINITY_OBJS=numa_affinity.o
 endif
 
 

@@ -200,10 +200,10 @@ AC_ARG_ENABLE(fermi-double-tex,
  [ fermi_double_tex="no" ]
 )
 
-AC_ARG_ENABLE(quda-numa-support,
- AC_HELP_STRING([--enable-quda-numa-support], [ Enable NUMA affinity support (default: enabled)]),
- [ quda_numa_support=${enableval}],
- [ quda_numa_support="yes" ]
+AC_ARG_ENABLE(numa-affinity,
+ AC_HELP_STRING([--enable-numa-affinity], [ Enable NUMA affinity support (default: enabled, always disabled on osx target)]),
+ [ numa_affinity=${enableval}],
+ [ numa_affinity="yes" ]
 )
 dnl Input validation
 
@@ -425,10 +425,10 @@ yes|no);;
   ;;
 esac
 
-case ${quda_numa_support} in
+case ${numa_affinity} in
 yes|no);;
 *)
-  AC_MSG_ERROR([ invalid value for --enable-quda-numa-support ])
+  AC_MSG_ERROR([ invalid value for --enable-numa-affinity ])
   ;;
 esac
 
@@ -523,8 +523,8 @@ AC_SUBST( QIO_HOME, [${qio_home}] )
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
 
-AC_MSG_NOTICE([Setting QUDA_NUMA_SUPPORT= ${quda_numa_support}])
-AC_SUBST( QUDA_NUMA_SUPPORT, [${quda_numa_support}])
+AC_MSG_NOTICE([Setting NUMA_AFFINITY= ${numa_affinity}])
+AC_SUBST( NUMA_AFFINITY, [${numa_affinity}])
 
 AC_MSG_NOTICE([Setting USE_QDPJIT = ${build_qdpjit} ])
 AC_SUBST( USE_QDPJIT, [${build_qdpjit}])
