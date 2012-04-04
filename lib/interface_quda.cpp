@@ -187,6 +187,7 @@ void initQuda(int dev)
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
 
   initCache();
+  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
 
   streams = new cudaStream_t[Nstream];

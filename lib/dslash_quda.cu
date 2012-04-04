@@ -156,6 +156,7 @@ static inline __device__ float2 short22float2(short2 a) {
 
 // Enable shared memory dslash for Fermi architecture
 //#define SHARED_WILSON_DSLASH
+//#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
@@ -515,8 +516,10 @@ class WilsonDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+#ifdef SHARED_WILSON_DSLASH
     if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
+#endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
@@ -606,8 +609,10 @@ class CloverDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+#ifdef SHARED_WILSON_DSLASH
     if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
+#endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(cloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
@@ -712,8 +717,10 @@ class TwistedDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+#ifdef SHARED_WILSON_DSLASH
     if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
+#endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(twistedMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);

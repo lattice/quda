@@ -138,7 +138,9 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
-    if sharedDslash: str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2\n"
+    if sharedDslash: 
+        str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_DOUBLE2\n"
+        str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2\n"
 
     for s in range(0,4):
         for c in range(0,3):
@@ -147,7 +149,9 @@ def def_input_spinor():
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
-    if sharedDslash: str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4\n"
+    if sharedDslash: 
+        str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_FLOAT4\n"
+        str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -613,66 +617,42 @@ def gen(dir, pack_only=False):
 
     write_shared = (
 """// store spinor into shared memory
-extern __shared__ char s_data[];
-spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
-  ((threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z))/SHARED_STRIDE) + 
-  ((threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
-WRITE_SPINOR_SHARED(s, i);\n
+WRITE_SPINOR_SHARED(threadIdx.x, threadIdx.y, threadIdx.z, i);\n
 """)
 
     load_shared_1 = (
 """// load spinor from shared memory
 int tx = (threadIdx.x > 0) ? threadIdx.x-1 : blockDim.x-1;
-extern __shared__ char s_data[];
-spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
-  ((tx+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
-  ((tx+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
 __syncthreads();
-READ_SPINOR_SHARED(s);\n
+READ_SPINOR_SHARED(tx, threadIdx.y, threadIdx.z);\n
 """)
 
     load_shared_2 = (
 """// load spinor from shared memory
 int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
 int ty = (threadIdx.y < blockDim.y - 1) ? threadIdx.y + 1 : 0;
-extern __shared__ char s_data[];
-spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
- ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
- ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
-READ_SPINOR_SHARED(s);\n
+READ_SPINOR_SHARED(tx, ty, threadIdx.z);\n
 """)
 
     load_shared_3 = (
 """// load spinor from shared memory
 int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
 int ty = (threadIdx.y > 0) ? threadIdx.y - 1 : blockDim.y - 1;
-extern __shared__ char s_data[];
-spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
- ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) / SHARED_STRIDE) + 
- ((tx+blockDim.x*(ty+blockDim.y*threadIdx.z)) % SHARED_STRIDE);
-READ_SPINOR_SHARED(s);\n
+READ_SPINOR_SHARED(tx, ty, threadIdx.z);\n
 """)
 
     load_shared_4 = (
 """// load spinor from shared memory
 int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
 int tz = (threadIdx.z < blockDim.z - 1) ? threadIdx.z + 1 : 0;
-extern __shared__ char s_data[];
-spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
-  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) / SHARED_STRIDE) + 
-  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) % SHARED_STRIDE);
-READ_SPINOR_SHARED(s);\n
+READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 """)
 
     load_shared_5 = (
 """// load spinor from shared memory
 int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
 int tz = (threadIdx.z > 0) ? threadIdx.z - 1 : blockDim.z - 1;
-extern __shared__ char s_data[];
-spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*
-  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) / SHARED_STRIDE) + 
-  ((tx+blockDim.x*(threadIdx.y+blockDim.y*tz)) % SHARED_STRIDE);
-READ_SPINOR_SHARED(s);\n
+READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 """)
 
 
@@ -796,9 +776,9 @@ READ_SPINOR_SHARED(s);\n
         str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
         str += block(decl_half + prep_half + ident + reconstruct)
         str += " else "
-        str += block(load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct)
+        str += block(decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct)
     else:
-        str += load_gauge + decl_half + prep_half + reconstruct_gauge + mult + reconstruct
+        str += decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct
     
     if pack_only:
         out = load_spinor + decl_half + project
@@ -1035,7 +1015,9 @@ case EXTERIOR_KERNEL_Y:
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"
-    if sharedDslash: str += "#undef READ_SPINOR_SHARED\n"
+    if sharedDslash: 
+        str += "#undef WRITE_SPINOR_SHARED\n"
+        str += "#undef READ_SPINOR_SHARED\n"
     if sharedFloats > 0: str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:

@@ -655,7 +655,10 @@
     accum2.x =C*short2float(S2.x); accum2.y =C*short2float(S2.y);	\
   }
 
-#define WRITE_SPINOR_SHARED(sh, reg)		\
+#define WRITE_SPINOR_SHARED_REAL(tx, ty, tz, reg)			\
+  extern __shared__ char s_data[];					\
+  spinorFloat *sh = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE* \
+    ((tx+blockDim.x*(ty+blockDim.y*tz))/SHARED_STRIDE) + ((tx+blockDim.x*(ty+blockDim.y*tz)) % SHARED_STRIDE); \
   sh[0*SHARED_STRIDE] = reg##00_re;		\
   sh[1*SHARED_STRIDE] = reg##00_im;		\
   sh[2*SHARED_STRIDE] = reg##01_re;		\
@@ -681,7 +684,12 @@
   sh[22*SHARED_STRIDE] = reg##32_re;		\
   sh[23*SHARED_STRIDE] = reg##32_im;
 
-#define READ_SPINOR_SHARED_DOUBLE2(sh)					\
+#define WRITE_SPINOR_SHARED_DOUBLE2 WRITE_SPINOR_SHARED_REAL
+
+#define READ_SPINOR_SHARED_DOUBLE2(tx, ty, tz)				\
+  extern __shared__ char s_data[];					\
+  double *sh = (double*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE* \
+    ((tx+blockDim.x*(ty+blockDim.y*tz)) / SHARED_STRIDE) + ((tx+blockDim.x*(ty+blockDim.y*tz)) % SHARED_STRIDE); \
   double2 I0 = make_double2(sh[0*SHARED_STRIDE], sh[1*SHARED_STRIDE]);	\
   double2 I1 = make_double2(sh[2*SHARED_STRIDE], sh[3*SHARED_STRIDE]);	\
   double2 I2 = make_double2(sh[4*SHARED_STRIDE], sh[5*SHARED_STRIDE]);	\
@@ -695,7 +703,14 @@
   double2 I10 = make_double2(sh[20*SHARED_STRIDE], sh[21*SHARED_STRIDE]); \
   double2 I11 = make_double2(sh[22*SHARED_STRIDE], sh[23*SHARED_STRIDE]);
 
-#define READ_SPINOR_SHARED_FLOAT4(sh)					\
+#ifndef SHARED_8_BYTE_WORD_SIZE // 4-byte shared memory access
+
+#define WRITE_SPINOR_SHARED_FLOAT4 WRITE_SPINOR_SHARED_REAL
+
+#define READ_SPINOR_SHARED_FLOAT4(tx, ty, tz)				\
+  extern __shared__ char s_data[];					\
+  float *sh = (float*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD*SHARED_STRIDE* \
+    ((tx+blockDim.x*(ty+blockDim.y*tz)) / SHARED_STRIDE) + ((tx+blockDim.x*(ty+blockDim.y*tz)) % SHARED_STRIDE); \
   float4 I0 = make_float4(sh[0*SHARED_STRIDE], sh[1*SHARED_STRIDE], sh[2*SHARED_STRIDE], sh[3*SHARED_STRIDE]); \
   float4 I1 = make_float4(sh[4*SHARED_STRIDE], sh[5*SHARED_STRIDE], sh[6*SHARED_STRIDE], sh[7*SHARED_STRIDE]); \
   float4 I2 = make_float4(sh[8*SHARED_STRIDE], sh[9*SHARED_STRIDE], sh[10*SHARED_STRIDE], sh[11*SHARED_STRIDE]); \
@@ -703,4 +718,35 @@
   float4 I4 = make_float4(sh[16*SHARED_STRIDE], sh[17*SHARED_STRIDE], sh[18*SHARED_STRIDE], sh[19*SHARED_STRIDE]); \
   float4 I5 = make_float4(sh[20*SHARED_STRIDE], sh[21*SHARED_STRIDE], sh[22*SHARED_STRIDE], sh[23*SHARED_STRIDE]);
 
+#else // 8-byte shared memory words
 
+#define WRITE_SPINOR_SHARED_FLOAT4(tx, ty, tz, reg)			\
+  extern __shared__ char s_data[];					\
+  float2 *sh = (float2*)s_data + (DSLASH_SHARED_FLOATS_PER_THREAD/2)*SHARED_STRIDE* \
+    ((tx+blockDim.x*(ty+blockDim.y*tz)) / SHARED_STRIDE) + ((tx+blockDim.x*(ty+blockDim.y*tz)) % SHARED_STRIDE); \
+  sh[0*SHARED_STRIDE] = make_float2(reg##00_re, reg##00_im);		\
+  sh[1*SHARED_STRIDE] = make_float2(reg##01_re, reg##01_im);		\
+  sh[2*SHARED_STRIDE] = make_float2(reg##02_re, reg##02_im);		\
+  sh[3*SHARED_STRIDE] = make_float2(reg##10_re, reg##10_im);		\
+  sh[4*SHARED_STRIDE] = make_float2(reg##11_re, reg##11_im);		\
+  sh[5*SHARED_STRIDE] = make_float2(reg##12_re, reg##12_im);		\
+  sh[6*SHARED_STRIDE] = make_float2(reg##20_re, reg##20_im);		\
+  sh[7*SHARED_STRIDE] = make_float2(reg##21_re, reg##21_im);		\
+  sh[8*SHARED_STRIDE] = make_float2(reg##22_re, reg##22_im);		\
+  sh[9*SHARED_STRIDE] = make_float2(reg##30_re, reg##30_im);		\
+  sh[10*SHARED_STRIDE] = make_float2(reg##31_re, reg##31_im);		\
+  sh[11*SHARED_STRIDE] = make_float2(reg##32_re, reg##32_im);
+
+#define READ_SPINOR_SHARED_FLOAT4(tx, ty, tz)				\
+  extern __shared__ char s_data[];					\
+  float2 *sh = (float2*)s_data + (DSLASH_SHARED_FLOATS_PER_THREAD/2)*SHARED_STRIDE* \
+    ((tx+blockDim.x*(ty+blockDim.y*tz)) / SHARED_STRIDE) + ((tx+blockDim.x*(ty+blockDim.y*tz)) % SHARED_STRIDE); \
+  float2 tmp1, tmp2;							\
+  tmp1 = sh[0*SHARED_STRIDE]; tmp2 = sh[1*SHARED_STRIDE]; float4 I0 = make_float4(tmp1.x, tmp1.y, tmp2.x, tmp2.y); \
+  tmp1 = sh[2*SHARED_STRIDE]; tmp2 = sh[3*SHARED_STRIDE]; float4 I1 = make_float4(tmp1.x, tmp1.y, tmp2.x, tmp2.y); \
+  tmp1 = sh[4*SHARED_STRIDE]; tmp2 = sh[5*SHARED_STRIDE]; float4 I2 = make_float4(tmp1.x, tmp1.y, tmp2.x, tmp2.y); \
+  tmp1 = sh[6*SHARED_STRIDE]; tmp2 = sh[7*SHARED_STRIDE]; float4 I3 = make_float4(tmp1.x, tmp1.y, tmp2.x, tmp2.y); \
+  tmp1 = sh[8*SHARED_STRIDE]; tmp2 = sh[9*SHARED_STRIDE]; float4 I4 = make_float4(tmp1.x, tmp1.y, tmp2.x, tmp2.y); \
+  tmp1 = sh[10*SHARED_STRIDE]; tmp2 = sh[11*SHARED_STRIDE]; float4 I5 = make_float4(tmp1.x, tmp1.y, tmp2.x, tmp2.y); 
+
+#endif
