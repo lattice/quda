@@ -1348,7 +1348,6 @@ void usage(char** argv )
 	 "                                                  wilson/clover/twisted_mass/asqtad/domain_wall\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
-  printf("    --disable-numa-affinity                   # Disable the efforts to attach to the affinity CPU cores\n");     
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
 #ifdef MULTI_GPU

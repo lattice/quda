@@ -12,8 +12,8 @@
 #include <enum_quda.h>
 
 #define QUDA_VERSION_MAJOR     0
-#define QUDA_VERSION_MINOR     3
-#define QUDA_VERSION_SUBMINOR  3 
+#define QUDA_VERSION_MINOR     4
+#define QUDA_VERSION_SUBMINOR  0 
 
 /**
  * @def   QUDA_VERSION

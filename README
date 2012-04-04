@@ -1,9 +1,6 @@
 
-Release Notes for QUDA v0.4.0                            XX March 2012
+Release Notes for QUDA v0.4.0                             4 April 2012
 -----------------------------
-
-*** This is a pre-release version of QUDA.  The interface may change
-    in 0.4.0 final.
 
 Overview:
 
@@ -27,7 +24,8 @@ Software Compatibility:
 The library has been tested under Linux (CentOS 5.7 and Ubuntu 10.04)
 using release 4.1 of the CUDA toolkit.  CUDA 3.x and earlier are no
 longer supported.  The library also seems to work under Mac OS X
-10.6.5 ("Snow Leopard") on recent 64-bit Intel-based Macs.
+10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
+Intel-based Macs.
 
 See also "Known Issues" below.
 
@@ -109,7 +107,7 @@ Known Issues:
 * With current drivers, Fermi-based GeForce cards suffer from
   occasional hangs when reading from double-precision textures,
   recoverable only with a soft reset.  Such texture reads are thus
-  disabled by default, at the expense of some performance.  To
+  disabled by default at the expense of some performance.  To
   re-enable double-precision texture reads on Fermi-based Tesla and
   Quadro cards, pass the --enable-fermi-double-tex flag to configure.
   This flag has no effect when the library is build for GPU

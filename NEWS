@@ -1,5 +1,5 @@
 
-Version 0.4.0
+Version 0.4.0 - 4 April 2012
 
 - CUDA 4.0 or later is now required to build the library.
 
@@ -34,6 +34,9 @@ Version 0.4.0
   precision texture reads.  These may be re-enabled on Fermi-based
   Tesla cards for improved performance, as described in the README
   file.
+
+- Added command-line options for most of the tests.  See, e.g.,
+  "wilson_dslash_test --help"
 
 - Added CPU reference implementations of all BLAS routines, which allows
   tests/blas_test to check for correctness.
