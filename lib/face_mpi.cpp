@@ -653,7 +653,7 @@ void exchange_cpu_sitelink(int* X,
 		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf, optflag);
   }
   
-  if(!(param->flag & QUDA_FAT_PRESERVE_COMM_MEM)){
+  if(!(param->preserve_gauge & QUDA_FAT_PRESERVE_COMM_MEM)){
     for(int i=0;i < 4;i++){
       free(sitelink_fwd_sendbuf[i]);
       free(sitelink_back_sendbuf[i]);

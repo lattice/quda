@@ -1581,7 +1581,7 @@ void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
  
   gettimeofday(&time_array[0], NULL);
   
-  const int flag = qudaGaugeParam->flag;
+  const int flag = qudaGaugeParam->preserve_gauge;
   GaugeFieldParam gParam(0,*qudaGaugeParam);
 
   if(method == QUDA_COMPUTE_FAT_STANDARD){
@@ -1636,7 +1636,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 
   static cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL;
   static cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL;
-  int flag = qudaGaugeParam->flag;
+  int flag = qudaGaugeParam->preserve_gauge;
 
   QudaGaugeParam qudaGaugeParam_ex_buf;
   QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;

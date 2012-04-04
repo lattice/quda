@@ -116,7 +116,7 @@ llfat_test(int test)
     | QUDA_FAT_PRESERVE_GPU_GAUGE
     | QUDA_FAT_PRESERVE_COMM_MEM;
   */
-  qudaGaugeParam.flag =0;
+  qudaGaugeParam.preserve_gauge =0;
   void* fatlink;
   cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize);
   if(fatlink == NULL){
