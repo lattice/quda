@@ -388,7 +388,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   // build Wilson or clover as appropriate
 #if ((DD_CLOVER==0 && BUILD_WILSON) || (DD_CLOVER==1 && BUILD_CLOVER))
 
-#if (__COMPUTE_CAPABILITY__ >= 200) // Fermi optimal code
+#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
 
 #if DD_DAG
 #include "wilson_dslash_dagger_fermi_core.h"

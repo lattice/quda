@@ -163,8 +163,7 @@ class DiracClover : public DiracWilson {
 
  protected:
   cudaCloverField &clover;
-  void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
-			 const cudaCloverField &) const;
+  void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
 
  public:
   DiracClover(const DiracParam &param);
