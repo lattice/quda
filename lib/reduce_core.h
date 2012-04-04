@@ -416,7 +416,7 @@ public:
   }
 
   void preTune() { 
-    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*length;
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*XX.Stride();
     size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
     if (writeX) XX.save(&X_h, &Xnorm_h, bytes, norm_bytes);
     if (writeY) YY.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
@@ -424,7 +424,7 @@ public:
   }
 
   void postTune() {
-    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*length;
+    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*XX.Stride();
     size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
     if (writeX) XX.load(&X_h, &Xnorm_h, bytes, norm_bytes);
     if (writeY) YY.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
