@@ -42,6 +42,8 @@ double kP = 0.5;
 double kU = 1.0;
 #endif
 
+
+
 // SPACE_SPIN_COLOR -> FLOAT1, FLOAT2 or FLOAT4 (no "internal re-ordering")
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
 inline void packSpinorField(FloatN* a, Float *b, int V) {
@@ -103,18 +105,144 @@ inline void packNonRelQLASpinorField(FloatN* a, Float *b, int V) {
 
 }
 
-// Standard spinor packing, colour inside spin
+
+
+template <typename Float, typename N, typename Ns, typename Nc>
+class FloatNOrder {
+ private:
+  Float *field;
+  int volume;
+  int stride;
+ public:
+  FloatNOrder(Float *field, int volume, int stride)
+    : field(field), volume(volume), stride(stride) { ; }
+  virtual ~FloatNOrder() { ; }
+
+  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+    int internal_idx = (s*Nc + c)*2 + z;
+    int pad_idx = internal_idx / N;
+    return v[pad_idx * stride + x*N + internal_idx % N]; 
+  }
+  
+  __device__ __host__ Float& operator()(int x, int s, int c, int z) { 
+    int internal_idx = (s*Nc + c)*2 + z;
+    return v[pad_idx * stride + x*N + internal_idx % N]; 
+  };
+};
+
+template <typename Float, typename Ns, typename Nc>
+class SpaceColorSpinorOrder {
+ private:
+  Float *field;
+  int volume;
+  int stride;
+ public:
+  SpaceColorSpinorOrder(Float *field, int volume, int stride) 
+    : field(field), volume(volume), stride(stride) 
+  { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
+  virtual ~SpaceColorSpinorOrder() { ; }
+
+  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const 
+  { return v[((x*Nc + c)*Ns + s)*2 + z]; }
+  
+  __device__ __host__ Float& operator()(int x, int s, int c, int z) 
+  { return v[((x*Nc + c)*Ns + s)*2 + z]; }
+};
+
+template <typename Float, typename Ns, typename Nc>
+class SpaceSpinorColorOrder {
+ private:
+  Float *field;
+  int volume;
+  int stride;
+ public:
+ SpaceSpinorColorOrder(Float *field, int volume, int stride) 
+   : field(field), volume(volume), stride(stride)
+  { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
+  virtual ~SpaceSpinorColorOrder() { ; }
+
+  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const 
+  { return v[((x*Ns + s)*Nc + c)*2 + z]; }
+  
+  __device__ __host__ Float& operator()(int x, int s, int c, int z)
+  { return v[((x*Ns + s)*Nc + c)*2 + z]; }
+};
+
+/** Straight copy with no basis change */
+template <typename Output, typename Input, int Ns, int Nc>
+class PreserveBasis {
+ public:
+  __device__ __host__ void operator()(Output &out, const Input &in, int x) {
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  out(x, s, c, z) = in(x, s, c, z);
+	}
+      }
+    }
+  }
+};
+
+/** Transform from relativistic into non-relavisitic basis */
+template <typename Output, typename Input, int Ns, int Nc>
+class NonRelBasis {
+ public:
+  __device__ __host__ void operator()(Output &out, const Input &in, int x) {
+    int s1[4] = {1, 2, 3, 0};
+    int s2[4] = {3, 0, 1, 2};
+    Float K1[4] = {kP, -kP, -kP, -kP};
+    Float K2[4] = {kP, -kP, kP, kP};
+
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  out(x, s, c, z) = K1[s]*in(x, s1[s], c, z) + K2[s]*in(x, s2[s], c, z);
+	}
+      }
+    }
+  }
+};
+
+/** Transform from non-relativistic into relavisitic basis */
+template <typename Output, typename Input, int Ns, int Nc>
+class RelBasis {
+ public:
+  __device__ __host__ void operator()(Output &out, const Input &in, int x) {
+    int s1[4] = {1, 2, 3, 0};
+    int s2[4] = {3, 0, 1, 2};
+    Float K1[4] = {-kU, kU,  kU,  kU};
+    Float K2[4] = {-kU, kU, -kU, -kU};
+
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  out(x, s, c, z) = K1[s]*in(x, s1[s], c, z) + K2[s]*in(x, s2[s], c, z);
+	}
+      }
+    }
+  }
+};
+
+/** Standard spinor packing, colour inside spin */
 template <int Nc, int Ns, int N, typename Float, typename FloatN>
 void packParitySpinor(FloatN *dest, Float *src, int Vh, int pad, 
 		      QudaGammaBasis destBasis, QudaGammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      packSpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
+      SpaceSpinColorOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //packSpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
     if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
-      packNonRelSpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
+      SpaceSpinColorOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      NonRelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //packNonRelSpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change not supported");
@@ -127,12 +255,20 @@ void packQLAParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
 			 QudaGammaBasis destBasis, QudaGammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      packQLASpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
+      SpaceColorSpinOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //packQLASpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
     if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
-      packNonRelQLASpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
+      SpaceColorSpinOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      NonRelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //packNonRelQLASpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change not supported");
@@ -296,12 +432,20 @@ void unpackParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
 		      QudaGammaBasis destBasis, QudaGammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      unpackSpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
+      SpaceSpinColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //unpackSpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && destBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
     if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
-      unpackNonRelSpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
+      SpaceSpinColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      RelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //unpackNonRelSpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change from %d to %d not supported", srcBasis, destBasis);
@@ -314,12 +458,20 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
 			 QudaGammaBasis destBasis, QudaGammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      unpackQLASpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
+      SpaceColorSpinOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //unpackQLASpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && destBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
     if (Ns != 4) errorQuda("Can only change basus with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
-      unpackNonRelQLASpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
+      FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
+      SpaceColorSpinOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      RelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      basis(outOrder, inOrder, i);
+      //unpackNonRelQLASpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
   } else {
     errorQuda("Basis change from %d to %d not supported", srcBasis, destBasis);
