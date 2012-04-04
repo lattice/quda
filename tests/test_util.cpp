@@ -1298,7 +1298,12 @@ int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
  *
  */
 
+#ifdef MULTI_GPU
+int device = -1;
+#else
 int device = 0;
+#endif
+
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
@@ -1378,7 +1383,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }
 #ifdef MULTI_GPU
     printf("Warning: Ignoring --device argument since this is a multi-GPU build.\n");
-    device = -1;
 #else
     device = atoi(argv[i+1]);
     if (device < 0 || device > 16){
