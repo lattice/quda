@@ -345,7 +345,7 @@ TuneKey DslashCuda::tuneKey() const
 /** This derived class is specifically for driving the Dslash kernels
     that use shared memory blocking.  This only applies on Fermi and
     upwards, and only for the interior kernels. */
-#if (__COMPUTE_CAPABILITY__ >= 200 && SHARED_WILSON_DSLASH) 
+#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) 
 class SharedDslashCuda : public DslashCuda {
  protected:
   int sharedBytesPerBlock() const { return 0; } // FIXME: this isn't quite true, but works

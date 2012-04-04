@@ -644,7 +644,7 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 #ifdef GPU_DIRECT 
     cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[0]);
 #else
-    cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*GaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
+    cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
   }
   
@@ -801,7 +801,7 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 		   prec, cpuGauge->Order());
   
 #ifdef MULTI_GPU
-  if(!(param->flag & QUDA_FAT_PRESERVE_COMM_MEM)){
+  if(!(param->preserve_gauge & QUDA_FAT_PRESERVE_COMM_MEM)){
     
     for(int i=0;i < 4;i++){
 #ifdef GPU_DIRECT 
