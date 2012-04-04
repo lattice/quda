@@ -151,11 +151,8 @@ extern "C" {
     double gflops;
     double secs;
 
-    /**
-     * Enable auto-tuning or not.  Despite the name, this applies to
-     * more than just just the solvers.
-     */
-    QudaTune dirac_tune;
+    /** Enable auto-tuning? */
+    QudaTune tune;
 
     /** Free the Dirac operator or keep it resident? */
     QudaPreserveDirac preserve_dirac;

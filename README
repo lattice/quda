@@ -120,6 +120,10 @@ Known Issues:
   QUDA_SUMMARIZE), rather than the correct values.  This does not
   affect the tuning process or actual performance.
 
+* At present, using MPI directly for communications (as opposed to
+  QMP) requires calling some initialization routines that are not
+  exposed in quda.h.  This will be corrected in the next release.
+
 
 Getting Help:
 

@@ -66,8 +66,7 @@ int main(int argc, char **argv)
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  inv_param.dirac_tune = QUDA_TUNE_YES;
-  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_YES;
+  inv_param.tune = QUDA_TUNE_YES;
 
   gauge_param.ga_pad = 0; // 24*24*24;
   inv_param.sp_pad = 0;   // 24*24*24;
