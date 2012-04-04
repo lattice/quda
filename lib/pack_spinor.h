@@ -107,7 +107,7 @@ inline void packNonRelQLASpinorField(FloatN* a, Float *b, int V) {
 
 
 
-template <typename Float, typename N, typename Ns, typename Nc>
+template <typename Float, int N, int Ns, int Nc>
 class FloatNOrder {
  private:
   Float *field;
@@ -121,16 +121,17 @@ class FloatNOrder {
   __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
     int internal_idx = (s*Nc + c)*2 + z;
     int pad_idx = internal_idx / N;
-    return v[pad_idx * stride + x*N + internal_idx % N]; 
+    return field[(pad_idx * stride + x)*N + internal_idx % N]; 
   }
   
   __device__ __host__ Float& operator()(int x, int s, int c, int z) { 
     int internal_idx = (s*Nc + c)*2 + z;
-    return v[pad_idx * stride + x*N + internal_idx % N]; 
+    int pad_idx = internal_idx / N;
+    return field[(pad_idx * stride + x)*N + internal_idx % N]; 
   };
 };
 
-template <typename Float, typename Ns, typename Nc>
+template <typename Float, int Ns, int Nc>
 class SpaceColorSpinorOrder {
  private:
   Float *field;
@@ -143,13 +144,13 @@ class SpaceColorSpinorOrder {
   virtual ~SpaceColorSpinorOrder() { ; }
 
   __device__ __host__ const Float& operator()(int x, int s, int c, int z) const 
-  { return v[((x*Nc + c)*Ns + s)*2 + z]; }
+  { return field[((x*Nc + c)*Ns + s)*2 + z]; }
   
   __device__ __host__ Float& operator()(int x, int s, int c, int z) 
-  { return v[((x*Nc + c)*Ns + s)*2 + z]; }
+  { return field[((x*Nc + c)*Ns + s)*2 + z]; }
 };
 
-template <typename Float, typename Ns, typename Nc>
+template <typename Float, int Ns, int Nc>
 class SpaceSpinorColorOrder {
  private:
   Float *field;
@@ -162,10 +163,10 @@ class SpaceSpinorColorOrder {
   virtual ~SpaceSpinorColorOrder() { ; }
 
   __device__ __host__ const Float& operator()(int x, int s, int c, int z) const 
-  { return v[((x*Ns + s)*Nc + c)*2 + z]; }
+  { return field[((x*Ns + s)*Nc + c)*2 + z]; }
   
   __device__ __host__ Float& operator()(int x, int s, int c, int z)
-  { return v[((x*Ns + s)*Nc + c)*2 + z]; }
+  { return field[((x*Ns + s)*Nc + c)*2 + z]; }
 };
 
 /** Straight copy with no basis change */
@@ -184,7 +185,7 @@ class PreserveBasis {
 };
 
 /** Transform from relativistic into non-relavisitic basis */
-template <typename Output, typename Input, int Ns, int Nc>
+template <typename Output, typename Input, typename Float, int Ns, int Nc>
 class NonRelBasis {
  public:
   __device__ __host__ void operator()(Output &out, const Input &in, int x) {
@@ -204,7 +205,7 @@ class NonRelBasis {
 };
 
 /** Transform from non-relativistic into relavisitic basis */
-template <typename Output, typename Input, int Ns, int Nc>
+template <typename Output, typename Input, typename Float, int Ns, int Nc>
 class RelBasis {
  public:
   __device__ __host__ void operator()(Output &out, const Input &in, int x) {
@@ -229,18 +230,18 @@ void packParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
 		      QudaGammaBasis destBasis, QudaGammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      SpaceSpinColorOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinorColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //packSpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
     if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
-      SpaceSpinColorOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      NonRelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      NonRelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinorColorOrder<Float, Ns, Nc>, Float, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //packNonRelSpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
@@ -255,18 +256,18 @@ void packQLAParitySpinor(FloatN *dest, Float *src, int Vh, int pad,
 			 QudaGammaBasis destBasis, QudaGammaBasis srcBasis) {
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
-      SpaceColorSpinOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinorOrder<Float, Ns, Nc>, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //packQLASpinorField<Nc, Ns, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
   } else if (destBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
     if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
-      SpaceColorSpinOrder<Float, Ns, Nc> inOrder(src, dest, Vh, Vh+pad);
+      SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      NonRelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      NonRelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinorOrder<Float, Ns, Nc>, Float, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //packNonRelQLASpinorField<Nc, N>(dest+N*i, src+2*Nc*Ns*i, Vh+pad);
     }
@@ -433,8 +434,8 @@ void unpackParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
-      SpaceSpinColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      PreserveBasis<SpaceSpinorColorOrder<Float, Ns, Nc>, FloatNOrder<FloatN, N, Ns, Nc>, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //unpackSpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
@@ -442,8 +443,8 @@ void unpackParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
     if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
-      SpaceSpinColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      RelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceSpinColorOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      RelBasis<SpaceSpinorColorOrder<Float, Ns, Nc>, FloatNOrder<FloatN, N, Ns, Nc>, Float, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //unpackNonRelSpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
@@ -459,8 +460,8 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
   if (destBasis==srcBasis) {
     for (int i = 0; i < Vh; i++) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
-      SpaceColorSpinOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      PreserveBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      PreserveBasis<SpaceColorSpinorOrder<Float, Ns, Nc>, FloatNOrder<FloatN, N, Ns, Nc>, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //unpackQLASpinorField<Nc, Ns, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
@@ -468,8 +469,8 @@ void unpackQLAParitySpinor(Float *dest, FloatN *src, int Vh, int pad,
     if (Ns != 4) errorQuda("Can only change basus with Nspin = 4, not Nspin = %d", Ns);
     for (int i = 0; i < Vh; i++) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
-      SpaceColorSpinOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-      RelBasis<FloatNOrder<FloatN, N, Ns, Nc>, SpaceColorSpinOrder<Float, Ns, Nc>, Ns, Nc> basis;
+      SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+      RelBasis<SpaceColorSpinorOrder<Float, Ns, Nc>, FloatNOrder<FloatN, N, Ns, Nc>, Float, Ns, Nc> basis;
       basis(outOrder, inOrder, i);
       //unpackNonRelQLASpinorField<Nc, N>(dest+2*Nc*Ns*i, src+N*i, Vh+pad);
     }
