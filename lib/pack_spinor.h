@@ -62,6 +62,8 @@ struct FloatNOrder {
     int pad_idx = internal_idx / N;
     return field[(pad_idx * stride + x)*N + internal_idx % N]; 
   };
+
+  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
 template <typename Float, int Ns, int Nc>
@@ -79,6 +81,8 @@ struct SpaceColorSpinorOrder {
   
   __device__ __host__ Float& operator()(int x, int s, int c, int z) 
   { return field[((x*Nc + c)*Ns + s)*2 + z]; }
+
+  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
 template <typename Float, int Ns, int Nc>
@@ -96,6 +100,8 @@ struct SpaceSpinorColorOrder {
   
   __device__ __host__ Float& operator()(int x, int s, int c, int z)
   { return field[((x*Ns + s)*Nc + c)*2 + z]; }
+
+  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
 /** Straight copy with no basis change */
@@ -159,7 +165,7 @@ void packSpinor(OutOrder &out, const InOrder &in, Basis basis, int volume) {
 template <typename OutOrder, typename InOrder, typename Basis>
 __global__ void packSpinorKernel(OutOrder out, const InOrder in, Basis basis, int volume) {  
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  if (sid < volume) return;
+  if (sid >= volume) return;
   basis(out, in, sid);
 }
 
@@ -173,6 +179,7 @@ class PackSpinor : Tunable {
  private:
   int sharedBytesPerThread() const { return 0; }
   int sharedBytesPerBlock() const { return 0; }
+  bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
   bool advanceBlockDim(TuneParam &param) const {
     bool advance = Tunable::advanceBlockDim(param);
@@ -181,12 +188,12 @@ class PackSpinor : Tunable {
   }
 
  public:
- PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, int volume) 
+  PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, int volume) 
    : out(out), in(in), basis(basis), volume(volume) { ; }
   virtual ~PackSpinor() { ; }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE);
     packSpinorKernel<OutOrder, InOrder, Basis> <<<tp.grid, tp.block, tp.shared_bytes, stream>>> 
       (out, in, basis, volume);
   }
@@ -194,7 +201,7 @@ class PackSpinor : Tunable {
   TuneKey tuneKey() const {
     std::stringstream vol, aux;
     vol << in.volume; 
-    aux << "out stride=" << out.stride << " in stride=" << in.stride;
+    aux << "out_stride=" << out.stride << ",in_stride=" << in.stride;
     return TuneKey(vol.str(), typeid(*this).name(), aux.str());
   }
 
@@ -215,6 +222,8 @@ class PackSpinor : Tunable {
     Tunable::defaultTuneParam(param);
     param.grid = dim3( (volume+param.block.x-1) / param.block.x, 1, 1);
   }
+
+  long long bytes() const { return in.Bytes() + out.Bytes(); } 
 };
 
 
@@ -258,8 +267,6 @@ template <int Nc, int Ns, int N, typename Float, typename FloatN>
 void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int destLength, 
 		int srcLength, QudaSiteSubset srcSubset, QudaSiteOrder siteOrder, 
 		QudaGammaBasis destBasis, QudaGammaBasis srcBasis, QudaFieldOrder srcOrder, QudaFieldLocation location) {
-
-  //  printf("%d %d %d %d %d %d %d %d %d %d %d\n", Nc, Ns, N, V, pad, length, srcSubset, subsetOrder, destBasis, srcBasis, srcOrder);
 
   if (srcSubset == QUDA_FULL_SITE_SUBSET) {
     if (siteOrder == QUDA_LEXICOGRAPHIC_SITE_ORDER) {

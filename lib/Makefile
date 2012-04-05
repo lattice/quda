@@ -20,10 +20,13 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h dirac_quda.h	     \
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h reduce_core.h
 
+# These are only inlined into cuda_color_spinor_field.cu
+CSF_INLN = pack_spinor.h
+
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/
 QUDA_INLN = check_params.h clover_def.h dslash_constants.h dslash_textures.h \
-	force_common.h io_spinor.h pack_spinor.h pack_gauge.h read_clover.h  \
+	force_common.h io_spinor.h pack_gauge.h read_clover.h  \
 	read_gauge.h staggered_dslash_def.h wilson_dslash_def.h              \
 	dw_dslash_def.h tm_dslash_def.h pack_face_def.h
 
@@ -75,6 +78,9 @@ tune.o: tune.cpp ../include/tune_quda.h
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@ -Xptxas -abi=no
+
+cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@
