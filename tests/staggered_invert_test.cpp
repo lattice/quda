@@ -384,7 +384,7 @@ invert_test(void)
     }else{      
       invertMultiShiftQuda(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);	
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     printfQuda("Final residue squred =%g\n", residue_sq);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;

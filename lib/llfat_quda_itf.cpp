@@ -214,7 +214,7 @@ llfat_cuda(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
   }//dir
   
   
-  cudaThreadSynchronize(); 
+  cudaDeviceSynchronize(); 
   checkCudaError();
   
   for(int i=0;i < nStream; i++){
@@ -369,7 +369,7 @@ llfat_cuda_ex(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
   }//dir
   
   
-  cudaThreadSynchronize(); 
+  cudaDeviceSynchronize(); 
   checkCudaError();
   
   return;

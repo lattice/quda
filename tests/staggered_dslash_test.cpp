@@ -259,7 +259,7 @@ void init()
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
 	
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     checkCudaError();
 	
     double spinor_norm2 = norm2(*spinor);
