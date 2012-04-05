@@ -18,7 +18,7 @@
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
 #endif
 
-void* cudaColorSpinorField::buffer = 0;
+void* cudaColorSpinorField::buffer_h = 0;
 void* cudaColorSpinorField::buffer_d = 0;
 bool cudaColorSpinorField::bufferInit = false;
 size_t cudaColorSpinorField::bufferBytes = 0;
@@ -168,27 +168,21 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
 
   // Check if buffer isn't big enough
   if (bytes > bufferBytes && bufferInit) {
-    //if (LOCATION == QUDA_CPU_FIELD_LOCATION) cudaFreeHost(buffer);
-    //else cudaFree(buffer);
-    cudaFreeHost(buffer);
-    if (buffer_d) buffer_d = NULL;
+    cudaFreeHost(buffer_h);
+    buffer_h = NULL;
+    if (LOCATION == QUDA_CUDA_FIELD_LOCATION) {
+      cudaFree(buffer_d);
+      buffer_d = NULL;
+    }
     bufferInit = false;
   }
 
   if (!bufferInit) {
     bufferBytes = bytes;
 
-    if(deviceProp.canMapHostMemory) {
-      if (cudaHostAlloc((void**) &buffer, bufferBytes, cudaHostAllocMapped) == cudaErrorMemoryAllocation) {
-	errorQuda("Error allocating host reduction array");
-      }
-      // set the matching device pointer
-      cudaHostGetDevicePointer(&buffer_d, buffer, 0);
-    } else {
-      cudaHostAlloc(&buffer, bufferBytes, 0);
-    }
-    //if (LOCATION == QUDA_CPU_FIELD_LOCATION) cudaMallocHost(&buffer, bufferBytes);    
-    //else cudaMalloc(&buffer, bufferBytes);    
+    cudaHostAlloc(&buffer_h, bufferBytes, 0);
+    if (LOCATION == QUDA_CUDA_FIELD_LOCATION) cudaMalloc(&buffer_d, bufferBytes);
+
     bufferInit = true;
   }
 
@@ -220,11 +214,14 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
 }
 void cudaColorSpinorField::freeBuffer() {
   if (bufferInit) {
-    cudaFreeHost(buffer);
-    if (buffer_d) buffer_d = NULL;
+    cudaFreeHost(buffer_h);
+    buffer_h = NULL;
+    if (LOCATION == QUDA_CUDA_FIELD_LOCATION) {
+      cudaFree(buffer_d);
+      buffer_d = NULL;
+    }
+    bufferInit = false;
   }
-  // if (LOCATION == QUDA_CPU_FIELD_LOCATION) cudaFreeHost(buffer);
-  //  else cudaFree(buffer);
 }
 
 void cudaColorSpinorField::destroy() {
@@ -372,28 +369,32 @@ void cudaColorSpinorField::loadCPUSpinorField(const cpuColorSpinorField &src) {
 
   if (LOCATION == QUDA_CPU_FIELD_LOCATION) {
     // (temporary?) bug fix for padding
-    memset(buffer, 0, bufferBytes);
+    memset(buffer_h, 0, bufferBytes);
   
     switch(nSpin){
     case 1:
-      LOAD_SPINOR_CPU_TO_GPU(buffer, src.v, 1, QUDA_CPU_FIELD_LOCATION);
+      LOAD_SPINOR_CPU_TO_GPU(buffer_h, src.v, 1, QUDA_CPU_FIELD_LOCATION);
       break;
     case 4:
-      LOAD_SPINOR_CPU_TO_GPU(buffer, src.v, 4, QUDA_CPU_FIELD_LOCATION);
+      LOAD_SPINOR_CPU_TO_GPU(buffer_h, src.v, 4, QUDA_CPU_FIELD_LOCATION);
       break;
     default:
       errorQuda("invalid number of spinors");
     }  
-    cudaMemcpy(v, buffer, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(v, buffer_h, bytes, cudaMemcpyHostToDevice);
   } else {
+    // (temporary?) bug fix for padding
+    cudaMemset(v, 0, bufferBytes);
 
-    if (src.Bytes() > bytes) {
-      errorQuda("Barf");
-      //cudaFree(buffer);
-      //cudaMalloc(&buffer,src.Bytes());
+    if (src.Bytes() > bufferBytes) {
+      cudaFree(buffer_d);
+      cudaFreeHost(buffer_h);
+      cudaMalloc(&buffer_d,src.Bytes());
+      cudaHostAlloc(&buffer_d,src.Bytes(), 0);
     }
     
-    memcpy(buffer, src.v, src.Bytes());
+    cudaMemcpy(buffer_d, src.v, src.Bytes(), cudaMemcpyHostToDevice);
+
     switch(nSpin){
     case 1:
       LOAD_SPINOR_CPU_TO_GPU(v, buffer_d, 1, QUDA_CUDA_FIELD_LOCATION);
@@ -508,26 +509,24 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
   }
 
   if (LOCATION == QUDA_CPU_FIELD_LOCATION) {
-    // (temporary?) bug fix for padding
-    memset(buffer, 0, bufferBytes);
-
-    cudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(buffer_h, v, bytes, cudaMemcpyDeviceToHost);
     
     switch(nSpin){
     case 1:
-      SAVE_SPINOR_GPU_TO_CPU(dest.v, buffer, 1, QUDA_CPU_FIELD_LOCATION);
+      SAVE_SPINOR_GPU_TO_CPU(dest.v, buffer_h, 1, QUDA_CPU_FIELD_LOCATION);
       break;
     case 4:
-      SAVE_SPINOR_GPU_TO_CPU(dest.v, buffer, 4, QUDA_CPU_FIELD_LOCATION);
+      SAVE_SPINOR_GPU_TO_CPU(dest.v, buffer_h, 4, QUDA_CPU_FIELD_LOCATION);
       break;
     default:
       errorQuda("invalid number of spinors in function");
     }
   } else {
-    if (dest.Bytes() > bytes) {
-      errorQuda("Barf");
-      //cudaFree(buffer);
-      //cudaMalloc(&buffer, dest.Bytes());
+    if (dest.Bytes() > bufferBytes) {
+      cudaFree(buffer_d);
+      cudaFreeHost(buffer_h);
+      cudaMalloc(&buffer_d,dest.Bytes());
+      cudaHostAlloc(&buffer_d,dest.Bytes(), 0);
     }
     
     switch(nSpin){
@@ -541,10 +540,7 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
       errorQuda("invalid number of spinors in function");
     }
 
-    cudaDeviceSynchronize();
-
-    memcpy(dest.v, buffer, dest.Bytes());
-    //cudaMemcpy(dest.v, buffer, dest.Bytes(), cudaMemcpyDeviceToHost);
+    cudaMemcpy(dest.v, buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
   }
 
   return;

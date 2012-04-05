@@ -250,7 +250,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   bool alloc; // whether we allocated memory
   bool init;
 
-  static void *buffer;// pinned memory
+  static void *buffer_h;// pinned memory
   static void *buffer_d;// device_mapped pointer to buffer
   static bool bufferInit;
   static size_t bufferBytes;

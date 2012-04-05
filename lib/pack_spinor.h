@@ -51,13 +51,13 @@ struct FloatNOrder {
     : field(field), volume(volume), stride(stride) { ; }
   virtual ~FloatNOrder() { ; }
 
-  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+  __device__ __host__ inline const Float& operator()(int x, int s, int c, int z) const {
     int internal_idx = (s*Nc + c)*2 + z;
     int pad_idx = internal_idx / N;
     return field[(pad_idx * stride + x)*N + internal_idx % N]; 
   }
   
-  __device__ __host__ Float& operator()(int x, int s, int c, int z) { 
+  __device__ __host__ inline Float& operator()(int x, int s, int c, int z) { 
     int internal_idx = (s*Nc + c)*2 + z;
     int pad_idx = internal_idx / N;
     return field[(pad_idx * stride + x)*N + internal_idx % N]; 
@@ -76,10 +76,10 @@ struct SpaceColorSpinorOrder {
   { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceColorSpinorOrder() { ; }
 
-  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const 
+  __device__ __host__ inline const Float& operator()(int x, int s, int c, int z) const 
   { return field[((x*Nc + c)*Ns + s)*2 + z]; }
   
-  __device__ __host__ Float& operator()(int x, int s, int c, int z) 
+  __device__ __host__ inline Float& operator()(int x, int s, int c, int z) 
   { return field[((x*Nc + c)*Ns + s)*2 + z]; }
 
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
@@ -95,10 +95,10 @@ struct SpaceSpinorColorOrder {
   { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceSpinorColorOrder() { ; }
 
-  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const 
+  __device__ __host__ inline const Float& operator()(int x, int s, int c, int z) const 
   { return field[((x*Ns + s)*Nc + c)*2 + z]; }
   
-  __device__ __host__ Float& operator()(int x, int s, int c, int z)
+  __device__ __host__ inline Float& operator()(int x, int s, int c, int z)
   { return field[((x*Ns + s)*Nc + c)*2 + z]; }
 
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
@@ -108,9 +108,12 @@ struct SpaceSpinorColorOrder {
 template <typename Output, typename Input, int Ns, int Nc>
 class PreserveBasis {
  public:
-  __device__ __host__ void operator()(Output &out, const Input &in, int x) {
+  __device__ __host__ inline void operator()(Output &out, const Input &in, int x) {
+#pragma unroll
     for (int s=0; s<Ns; s++) {
+#pragma unroll
       for (int c=0; c<Nc; c++) {
+#pragma unroll
 	for (int z=0; z<2; z++) {
 	  out(x, s, c, z) = in(x, s, c, z);
 	}
@@ -122,14 +125,17 @@ class PreserveBasis {
 /** Transform from relativistic into non-relavisitic basis */
 template <typename Output, typename Input, typename Float, int Ns, int Nc>
 struct NonRelBasis {
-  __device__ __host__ void operator()(Output &out, const Input &in, int x) {
+  __device__ __host__ inline void operator()(Output &out, const Input &in, int x) {
     int s1[4] = {1, 2, 3, 0};
     int s2[4] = {3, 0, 1, 2};
     Float K1[4] = {kP, -kP, -kP, -kP};
     Float K2[4] = {kP, -kP, kP, kP};
 
+#pragma unroll
     for (int s=0; s<Ns; s++) {
+#pragma unroll
       for (int c=0; c<Nc; c++) {
+#pragma unroll
 	for (int z=0; z<2; z++) {
 	  out(x, s, c, z) = K1[s]*in(x, s1[s], c, z) + K2[s]*in(x, s2[s], c, z);
 	}
@@ -141,14 +147,17 @@ struct NonRelBasis {
 /** Transform from non-relativistic into relavisitic basis */
 template <typename Output, typename Input, typename Float, int Ns, int Nc>
 struct RelBasis {
-  __device__ __host__ void operator()(Output &out, const Input &in, int x) {
+  __device__ __host__ inline void operator()(Output &out, const Input &in, int x) {
     int s1[4] = {1, 2, 3, 0};
     int s2[4] = {3, 0, 1, 2};
     Float K1[4] = {-kU, kU,  kU,  kU};
     Float K2[4] = {-kU, kU, -kU, -kU};
 
+#pragma unroll
     for (int s=0; s<Ns; s++) {
+#pragma unroll
       for (int c=0; c<Nc; c++) {
+#pragma unroll
 	for (int z=0; z<2; z++) {
 	  out(x, s, c, z) = K1[s]*in(x, s1[s], c, z) + K2[s]*in(x, s2[s], c, z);
 	}
@@ -294,12 +303,12 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
 
       int Vh = V;
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
+	SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh);
 	FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
 	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
 	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-	SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
+	SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh);
 	FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
 	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
 	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
@@ -310,11 +319,11 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
   } else {
     // src is defined on a single parity only
     if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, V, V+pad);
+      SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, V, V);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, V, V+pad);
       packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis, location);
     } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-      SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, V, V+pad);
+      SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, V, V);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, V, V+pad);
       packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis, location);
     } else {
@@ -356,12 +365,12 @@ void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int d
       int Vh = V/2;
       if (destOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
-	SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+	SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh);
 	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
 	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
       } else if (destOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
 	FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
-	SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+	SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh);
 	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
 	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
       } else {
@@ -372,11 +381,11 @@ void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int d
     // dest is defined on a single parity only
     if (destOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, V, V+pad);
-      SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, V, V+pad);
+      SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, V, V);
       packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis, location);
     } else if (destOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, V, V+pad);
-      SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, V, V+pad);
+      SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, V, V);
       packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis, location);
     } else {
       errorQuda("Destination field order not supported");
