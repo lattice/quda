@@ -10,6 +10,8 @@
 
 //namespace hisq{
 
+extern int gauge_order;
+
   static int OPP_DIR(int dir){ return 7-dir; }
   static bool GOES_FORWARDS(int dir){ return (dir<=3); }
   static bool GOES_BACKWARDS(int dir){ return (dir>3); }
@@ -369,11 +371,33 @@ void MATRIX_PRODUCT(const Matrix<3,std::complex<Real> >& a,
       void addMatrixToField(const Matrix<3, std::complex<Real> >& mat, int oddBit, int dir, int half_lattice_index, Real coeff, Real* const) const;
       
      void storeMatrixToMomentumField(const Matrix<3, std::complex<Real> >& mat, int oddBit, int dir, int half_lattice_index, Real coeff, Real* const) const;
-  
+    Real getData(const Real* const field, int idx, int dir, int oddBit, int offset) const;
+    void addData(Real* const field, int idx, int dir, int oddBit, int offset, Real) const;
+
  };
 
+template<class Real>
+Real LoadStore<Real>::getData(const Real* const field, int idx, int dir, int oddBit, int offset) const
+{
+  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
+    return  field[(4*half_volume*oddBit +4*idx + dir)*18+offset];
+  }else{ //QDP format
+    return  ((Real**)field)[dir][(half_volume*oddBit+idx)*18 +offset];
+  }
+}
+template<class Real>
+void LoadStore<Real>::addData(Real* const field, int idx, int dir, int oddBit, int offset, Real v) const
+{
+  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
+    field[(4*half_volume*oddBit +4*idx + dir)*18+offset] += v;
+  }else{ //QDP format
+    ((Real**)field)[dir][(half_volume*oddBit+idx)*18 +offset] += v;
+  }
+}
 
-  template<class Real>
+
+
+template<class Real>
   void LoadStore<Real>::loadMatrixFromField(const Real* const field, 
 					    int oddBit,
 			   		    int half_lattice_index, 
@@ -400,8 +424,10 @@ void MATRIX_PRODUCT(const Matrix<3,std::complex<Real> >& a,
     int offset = 0;
     for(int i=0; i<3; ++i){
       for(int j=0; j<3; ++j){
-        (*mat)(i,j).real(local_field[offset++]);
-        (*mat)(i,j).imag(local_field[offset++]);
+        //(*mat)(i,j).real(local_field[offset++]);
+	(*mat)(i,j).real(getData(field, half_lattice_index, dir, oddBit, offset++));
+        //(*mat)(i,j).imag(local_field[offset++]);
+	(*mat)(i,j).imag(getData(field, half_lattice_index, dir, oddBit, offset++));
       }
     }
     return;
@@ -456,8 +482,11 @@ void MATRIX_PRODUCT(const Matrix<3,std::complex<Real> >& a,
     int offset = 0;
     for(int i=0; i<3; ++i){
       for(int j=0; j<3; ++j){
-        local_field[offset++] += coeff*mat(i,j).real();
-        local_field[offset++] += coeff*mat(i,j).imag();
+        //local_field[offset++] += coeff*mat(i,j).real();
+	addData(field, half_lattice_index, dir, oddBit, offset++, coeff*mat(i,j).real());
+
+        //local_field[offset++] += coeff*mat(i,j).imag();
+	addData(field, half_lattice_index, dir, oddBit, offset++, coeff*mat(i,j).imag());
       }
     }
     return;

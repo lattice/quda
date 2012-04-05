@@ -40,7 +40,7 @@ static QudaGaugeParam qudaGaugeParam;
 static QudaGaugeParam qudaGaugeParam_ex;
 static void* hw; // the array of half_wilson_vector
 
-static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
+QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
 cpuGaugeField *cpuOprod = NULL;
 cudaGaugeField *cudaOprod = NULL;
