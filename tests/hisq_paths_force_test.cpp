@@ -287,7 +287,7 @@ hisq_force_init()
   
   
   // fills the gauge field with random numbers
-  createSiteLinkCPU(siteLink_2d, qudaGaugeParam.cpu_prec, 0);
+  createSiteLinkCPU(siteLink_2d, qudaGaugeParam.cpu_prec, 1);
   for(int i=0; i < V_ex; i++){
     int sid = i;
     int oddBit=0;
@@ -614,7 +614,7 @@ hisq_force_test(void)
   struct timeval ht0, ht1;
   gettimeofday(&ht0, NULL);
   if (verify_results){
-#if 1    
+#if 0    
     if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
       const float eps = 0.5;
       fermion_force_reference(eps, weight, 0, act_path_coeff, hw, siteLink_1d, refMom->Gauge_p());
@@ -622,6 +622,29 @@ hisq_force_test(void)
       const double eps = 0.5;
       fermion_force_reference(eps, d_weight, 0, d_act_path_coeff, hw, siteLink_1d, refMom->Gauge_p());
     }
+#else
+    
+    void* coeff;
+    void* naik_coeff;
+    if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
+      coeff = act_path_coeff;
+      naik_coeff = &act_path_coeff[1];
+    }else{
+      coeff = d_act_path_coeff;
+      naik_coeff = &d_act_path_coeff[1];
+    }
+    
+    //#define TEST_ONLY
+#ifdef TEST_ONLY
+    printfQuda("Testing only .................................................\n");
+#else
+    printfQuda("Not Testing only .................................................\n");
+    hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod, *cpuGauge, cpuForce);
+    hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod, *cpuGauge, cpuForce);
+    hisqCompleteForceCPU(qudaGaugeParam, *cpuForce, *cpuGauge, refMom);
+#endif
+    
+    
 #endif
   }
   gettimeofday(&ht1, NULL);
