@@ -1,12 +1,12 @@
 
-Release Notes for QUDA v0.3.2                          18 January 2011
+Release Notes for QUDA v0.4.0                             4 April 2012
 -----------------------------
 
 Overview:
 
 QUDA is a library for performing calculations in lattice QCD on
 graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
-This release includes optimized kernels for applying several different
+This release includes optimized kernels for applying a variety of
 Dirac operators (Wilson, clover-improved Wilson, twisted mass,
 improved staggered, and domain wall), kernels for performing various
 BLAS-like operations, and full inverters built on these kernels.
@@ -15,15 +15,17 @@ with support for double, single, and half (16-bit fixed-point)
 precision.  The staggered implementation additionally includes support
 for asqtad link fattening, force terms for the asqtad fermion action
 and one-loop improved Symanzik gauge action, and a multi-shift CG
-solver.
+solver.  Use of multiple GPUs in parallel is supported for all actions
+except domain wall.
 
 
 Software Compatibility:
 
-The library has been tested under Linux (CentOS 5.5 and Ubuntu 10.04)
-using release 3.2 of the CUDA toolkit.  CUDA 2.x and earlier are no
+The library has been tested under Linux (CentOS 5.7 and Ubuntu 10.04)
+using release 4.1 of the CUDA toolkit.  CUDA 3.x and earlier are no
 longer supported.  The library also seems to work under Mac OS X
-10.6.5 ("Snow Leopard") on recent 64-bit Intel-based Macs.
+10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
+Intel-based Macs.
 
 See also "Known Issues" below.
 
@@ -32,42 +34,56 @@ Hardware Compatibility:
 
 For a list of supported devices, see
 
-http://www.nvidia.com/object/cuda_learn_products.html
+http://developer.nvidia.com/cuda-gpus
 
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
-running the deviceQuery example in the CUDA SDK, and set GPU_ARCH in
-make.inc appropriately.  Setting GPU_ARCH to 'sm_13' or 'sm_20' will
-enable double precision support.
+running the deviceQuery example in the CUDA SDK, and pass the
+appropriate value to QUDA's configure script.  For example, the Tesla
+C1060 is listed on the above website as having compute capability 1.3,
+and so to configure the library for this card, you'd run "configure
+--enable-gpu-arch=sm_13 [other options]" before typing "make".
 
 
 Installation:
 
-In the source directory, copy 'make.inc.example' to 'make.inc', and
-edit the first few lines to specify the CUDA install path, the
-platform (x86 or x86_64), and the GPU architecture (see "Hardware
-Compatibility" above).  Then type 'make' to build the library.
+Installing the library involves running "configure" followed by
+"make".  See "./configure --help" for a list of configure options.
+At a minimum, you'll probably want to set the GPU architecture; see
+"Hardware Compatibility" above.
 
-As an optional step, 'make tune' will invoke tests/blas_test to
-perform autotuning of the various BLAS-like functions needed by the
-inverters.  This involves testing many combinations of launch
-parameters (corresponding to different numbers of CUDA threads per
-block and blocks per grid for each kernel) and writing the optimal
-values to lib/blas_param.h.  The new values will take effect the next
-time the library is built.  Ideally, the autotuning should be
-performed on the machine where the library is to be used, since the
-optimal parameters will depend on the CUDA device and host hardware.
-They will also depend slightly on the lattice volume; if desired, the
-volume used in the autotuning can be changed by editing
-tests/blas_test.cu.
+Enabling multi-GPU support requires passing the --enable-multi-gpu
+flag to configure, as well as --with-mpi=<PATH> and optionally
+--with-qmp=<PATH>.  If the latter is given, QUDA will use QMP for
+communications; otherwise, MPI will be called directly.  By default,
+it is assumed that the MPI compiler wrappers are <MPI_PATH>/bin/mpicc
+and <MPI_PATH>/bin/mpicxx for C and C++, respectively.  These choices
+may be overriden by setting the CC and CXX variables on the command
+line as follows:
 
-In summary, for an optimized install, run
+./configure --enable-multi-gpu --with-mpi=<MPI_PATH> \
+[--with-qmp=<QMP_PATH>] [OTHER_OPTIONS] CC=my_mpicc CXX=my_mpicxx
 
-    make && make tune && make
+Finally, with some MPI implementations, executables compiled against
+MPI will not run without "mpirun".  This has the side effect of
+causing the configure script to believe that the compiler is failing
+to produce a valid executable.  To skip these checks, one can trick
+configure into thinking that it's cross-compiling by setting the
+--build=none and --host=<HOST> flags.  For the latter,
+"--host=x86_64-linux-gnu" should work on a 64-bit linux system.
 
-(after optionally editing blas_test.cu).  By default, the autotuning
-is performed using CUDA device 0.  To select a different device
-number, set DEVICE in make.inc appropriately.
+Throughout the library, auto-tuning is used to select optimal launch
+parameters for most performance-critical kernels.  This tuning
+process takes some time and will generally slow things down the first
+time a given kernel is called during a run.  To avoid this one-time
+overhead in subsequent runs (using the same action, solver, lattice
+volume, etc.), the optimal parameters are cached to disk.  For this
+to work, the QUDA_RESOURCE_PATH environment variable must be set,
+pointing to a writeable directory.  Note that since the tuned parameters
+are hardware-specific, this "resource directory" should not be shared
+between jobs running on different systems (e.g., two clusters
+with different GPUs installed).  Attempting to use parameters tuned
+for one card on a different card may lead to unexpected errors.
 
 
 Using the Library:
@@ -81,19 +97,6 @@ enumerated in include/enum_quda.h.
 
 Known Issues:
 
-* When the library is compiled with version 3.0 of the CUDA toolkit
-  and run on Fermi (GPU architecture sm_20), the RECONSTRUCT_8 option
-  (which enables reconstructing gauge matrices from 8 real numbers)
-  gives wrong results in double precision.  This appears to be a bug
-  in CUDA 3.0, since CUDA 3.1 has no such issue.  Note that this
-  problem isn't likely to matter in practice, since RECONSTRUCT_8
-  generally performs worse in double precision than RECONSTRUCT_12.
-
-* Compiling in emulation mode with CUDA 3.0 does not with work when
-  the GPU architecture is set to sm_10, sm_11, or sm_12.  One should
-  compile for sm_13 instead.  Note that NVIDIA has eliminated
-  emulation mode completely from CUDA 3.1 and later.
-
 * For compatibility with CUDA, on 32-bit platforms the library is
   compiled with the GCC option -malign-double.  This differs from the
   GCC default and may affect the alignment of various structures,
@@ -101,34 +104,57 @@ Known Issues:
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
 
-* At present, combining RECONSTRUCT_NO with half precision will give
-  wrong results unless all elements of the gauge field matrices have
-  magnitude bounded by 1.  In particular, half precision should
-  not be used with asqtad or HISQ fermions, since the "fat links" do
-  not satisfy this condition in general.
+* With current drivers, Fermi-based GeForce cards suffer from
+  occasional hangs when reading from double-precision textures,
+  recoverable only with a soft reset.  Such texture reads are thus
+  disabled by default at the expense of some performance.  To
+  re-enable double-precision texture reads on Fermi-based Tesla and
+  Quadro cards, pass the --enable-fermi-double-tex flag to configure.
+  This flag has no effect when the library is build for GPU
+  architectures other than Fermi (sm_20).
+
+* The auto-tuner reports "0 Gflop/s" and "0 GB/s" for several of the
+  Dslash kernels (visible if the verbosity is set to at least
+  QUDA_SUMMARIZE), rather than the correct values.  This does not
+  affect the tuning process or actual performance.
+
+* At present, using MPI directly for communications (as opposed to
+  QMP) requires calling some initialization routines that are not
+  exposed in quda.h.  This will be corrected in the next release.
 
 
 Getting Help:
 
-Please visit http://lattice.bu.edu/quda for contact information.
+Please visit http://lattice.github.com/quda for contact information.
 Bug reports are especially welcome.
 
 
 Acknowledging QUDA:
 
-If you find this code useful in your work, please cite:
+If you find this software useful in your work, please cite:
 
 M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
 Lattice QCD systems of equations using mixed precision solvers on GPUs,"
 Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
 
+When taking advantage of multi-GPU support, please also cite:
+
+R. Babich, M. A. Clark, B. Joo, G. Shi, R. C. Brower, and S. Gottlieb,
+"Scaling lattice QCD beyond 100 GPUs," International Conference for
+High Performance Computing, Networking, Storage and Analysis (SC),
+2011 [arXiv:1109.2935 [hep-lat]].
+
+Several other papers that might be of interest are listed at
+http://lattice.github.com/quda .
+
 
 Authors:
 
-Ronald Babich (Boston University)
+Ronald Babich (NVIDIA)
 Kipton Barros (Los Alamos National Laboratory)
 Richard Brower (Boston University)
-Michael Clark (Harvard University)
+Michael Clark (NVIDIA)
+Justin Foley (University of Utah)
 Joel Giedt (Rensselaer Polytechnic Institute)
 Steven Gottlieb (Indiana University)
 Balint Joo (Jefferson Laboratory)
@@ -139,4 +165,13 @@ Alexei Strelchenko (Cyprus Institute)
 Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications
 http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html
+
+Development was supported in part by the U.S. Department of Energy
+under grants DE-FC02-06ER41440, DE-FC02-06ER41449, and
+DE-AC05-06OR23177, as well as by the National Science Foundation under
+grants DGE-0221680, PHY-0427646, PHY-0835713, OCI-0946441, and
+OCI-1060067.  Any opinions, findings, and conclusions or
+recommendations expressed in this material are those of the authors
+and do not necessarily reflect the views of the Department of Energy
+or the National Science Foundation.
 
