@@ -43,6 +43,7 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
     zero();
   } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
     v = param.v;
+    reference = true;
   } else {
     errorQuda("Creation type %d not supported", param.create);
   }
@@ -81,22 +82,26 @@ cpuColorSpinorField::~cpuColorSpinorField() {
 
 cpuColorSpinorField& cpuColorSpinorField::operator=(const cpuColorSpinorField &src) {
   if (&src != this) {
-    destroy();
-    // keep current attributes unless unset
-    if (!ColorSpinorField::init) ColorSpinorField::operator=(src);
-    fieldLocation = QUDA_CPU_FIELD_LOCATION;
-    create(QUDA_COPY_FIELD_CREATE);
+    if (!reference) {
+      destroy();
+      // keep current attributes unless unset
+      if (!ColorSpinorField::init) ColorSpinorField::operator=(src);
+      fieldLocation = QUDA_CPU_FIELD_LOCATION;
+      create(QUDA_COPY_FIELD_CREATE);
+    }
     copy(src);
   }
   return *this;
 }
 
 cpuColorSpinorField& cpuColorSpinorField::operator=(const cudaColorSpinorField &src) {
-  destroy();
-  // keep current attributes unless unset
-  if (!ColorSpinorField::init) ColorSpinorField::operator=(src);
-  fieldLocation = QUDA_CPU_FIELD_LOCATION;
-  create(QUDA_COPY_FIELD_CREATE);
+  if (!reference) { // if the field is a reference, then we must maintain the current state
+    destroy();
+    // keep current attributes unless unset
+    if (!ColorSpinorField::init) ColorSpinorField::operator=(src);
+    fieldLocation = QUDA_CPU_FIELD_LOCATION;
+    create(QUDA_COPY_FIELD_CREATE);
+  }
   src.saveCPUSpinorField(*this);
   return *this;
 }
@@ -124,8 +129,8 @@ void cpuColorSpinorField::create(const QudaFieldCreate create) {
       for (int i=0; i<Ls; i++) ((void**)v)[i] = (void*)malloc(bytes / Ls);
     } else {
       v = (void*)malloc(bytes);
-      init = true;
     }
+    init = true;
   }
  
   createOrder(); // need to do this for references?

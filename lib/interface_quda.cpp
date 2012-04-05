@@ -661,7 +661,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
-  out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
+  hOut = out;
+  //out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
 }
 
 

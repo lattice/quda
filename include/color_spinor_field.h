@@ -277,8 +277,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   cudaColorSpinorField& operator=(const cudaColorSpinorField&);
   cudaColorSpinorField& operator=(const cpuColorSpinorField&);
 
-  void loadCPUSpinorField(const cpuColorSpinorField &src);
-  void saveCPUSpinorField (cpuColorSpinorField &src) const;
+  void loadCPUSpinorField(const ColorSpinorField &src);
+  void saveCPUSpinorField (ColorSpinorField &src) const;
 
   void allocateGhostBuffer(void);
   static void freeGhostBuffer(void);
@@ -330,7 +330,8 @@ class cpuColorSpinorField : public ColorSpinorField {
   void *v; // the field elements
   void *norm; // the normalization field
   bool init;
-  
+  bool reference; // whether the field is a reference or not
+
   void create(const QudaFieldCreate);
   void destroy();
 
