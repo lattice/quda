@@ -217,6 +217,7 @@ class ColorSpinorField {
   int X(int d) const { return x[d]; }
   int RealLength() const { return real_length; }
   int Length() const { return length; }
+  int TotalLength() const { return total_length; }
   int Stride() const { return stride; }
   int Volume() const { return volume; }
   size_t Bytes() const { return bytes; }
@@ -266,6 +267,9 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   void zeroPad();
 
+  void loadSpinorField(const ColorSpinorField &src);
+  void saveSpinorField (ColorSpinorField &src) const;
+
  public:
   //cudaColorSpinorField();
   cudaColorSpinorField(const cudaColorSpinorField&);
@@ -276,9 +280,6 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   cudaColorSpinorField& operator=(const cudaColorSpinorField&);
   cudaColorSpinorField& operator=(const cpuColorSpinorField&);
-
-  void loadCPUSpinorField(const ColorSpinorField &src);
-  void saveCPUSpinorField (ColorSpinorField &src) const;
 
   void allocateGhostBuffer(void);
   static void freeGhostBuffer(void);

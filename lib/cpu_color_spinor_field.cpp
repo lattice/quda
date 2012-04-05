@@ -67,7 +67,7 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) :
   if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
     memcpy(v, dynamic_cast<const cpuColorSpinorField&>(src).v, bytes);
   } else if (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
-    dynamic_cast<const cudaColorSpinorField&>(src).saveCPUSpinorField(*this);
+    dynamic_cast<const cudaColorSpinorField&>(src).saveSpinorField(*this);
   } else {
     errorQuda("FieldType not supported");
   }
@@ -102,7 +102,7 @@ cpuColorSpinorField& cpuColorSpinorField::operator=(const cudaColorSpinorField &
     fieldLocation = QUDA_CPU_FIELD_LOCATION;
     create(QUDA_COPY_FIELD_CREATE);
   }
-  src.saveCPUSpinorField(*this);
+  src.saveSpinorField(*this);
   return *this;
 }
 

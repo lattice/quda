@@ -84,7 +84,7 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
     if (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
       copy(dynamic_cast<const cudaColorSpinorField&>(src));    
     } else if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
-      loadCPUSpinorField(src);
+      loadSpinorField(src);
     } else {
       errorQuda("FieldLocation %d not supported", src.FieldLocation());
     }
@@ -108,7 +108,7 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src)
   if (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
     copy(dynamic_cast<const cudaColorSpinorField&>(src));
   } else if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
-    loadCPUSpinorField(src);
+    loadSpinorField(src);
   } else {
     errorQuda("FieldLocation not supported");
   }
@@ -132,7 +132,7 @@ cudaColorSpinorField& cudaColorSpinorField::operator=(const cpuColorSpinorField 
   if (!ColorSpinorField::init) ColorSpinorField::operator=(src);
   fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   create(QUDA_COPY_FIELD_CREATE);
-  loadCPUSpinorField(src);
+  loadSpinorField(src);
   return *this;
 }
 
@@ -278,15 +278,14 @@ void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
 
 #include <pack_spinor.h>
 
-void cudaColorSpinorField::loadCPUSpinorField(const ColorSpinorField &src) {
+void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
-  
   if (nDim != src.Ndim()) {
     errorQuda("Number of dimensions %d %d don't match", nDim, src.Ndim());
   }
 
-  if (volume != src.volume) {
-    errorQuda("Volumes %d %d don't match", volume, src.volume);
+  if (volume != src.Volume()) {
+    errorQuda("Volumes %d %d don't match", volume, src.Volume());
   }
 
   if (SiteOrder() != src.SiteOrder()) {
@@ -297,8 +296,8 @@ void cudaColorSpinorField::loadCPUSpinorField(const ColorSpinorField &src) {
     errorQuda("Nc != 3 not yet supported");
   }
 
-  if (siteSubset != src.siteSubset) {
-    errorQuda("Subset types do not match %d %d", siteSubset, src.siteSubset);
+  if (siteSubset != src.SiteSubset()) {
+    errorQuda("Subset types do not match %d %d", siteSubset, src.SiteSubset());
   }
   if (precision == QUDA_HALF_PRECISION) {
     ColorSpinorParam param(*this); // acquire all attributes of this
@@ -316,67 +315,67 @@ void cudaColorSpinorField::loadCPUSpinorField(const ColorSpinorField &src) {
     param.create = QUDA_NULL_FIELD_CREATE;
     cpuColorSpinorField tmp(param);
     tmp.copy(src);
-    loadCPUSpinorField(tmp);
+    loadSpinorField(tmp);
     return;
   }
 
 #define LOAD_SPINOR_CPU_TO_GPU(DST, SRC, myNs, loc)			\
   if (precision == QUDA_DOUBLE_PRECISION) {				\
-    if (src.precision == QUDA_DOUBLE_PRECISION) {			\
+    if (src.Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (double*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,1>((double*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (double*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,2>((double*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
 	errorQuda("double4 not supported");				\
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (float*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,1>((double*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (float*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,2>((double*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) { errorQuda("double4 not supported"); }	\
     }									\
   } else {								\
-    if (src.precision == QUDA_DOUBLE_PRECISION) {			\
+    if (src.Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,1>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,2>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,4>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,1>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,2>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.total_length, \
+	packSpinor<3,myNs,4>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
 			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
       }									\
     }									\
   }
 
-  if (LOCATION == QUDA_CPU_FIELD_LOCATION && src.Location() != QUDA_CUDA_FIELD_LOCATION) {
+  if (LOCATION == QUDA_CPU_FIELD_LOCATION && src.FieldLocation() != QUDA_CUDA_FIELD_LOCATION) {
     // (temporary?) bug fix for padding
     memset(buffer_h, 0, bufferBytes);
   
     switch(nSpin){
     case 1:
-      LOAD_SPINOR_CPU_TO_GPU(buffer_h, src.v, 1, QUDA_CPU_FIELD_LOCATION);
+      LOAD_SPINOR_CPU_TO_GPU(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 1, QUDA_CPU_FIELD_LOCATION);
       break;
     case 4:
-      LOAD_SPINOR_CPU_TO_GPU(buffer_h, src.v, 4, QUDA_CPU_FIELD_LOCATION);
+      LOAD_SPINOR_CPU_TO_GPU(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 4, QUDA_CPU_FIELD_LOCATION);
       break;
     default:
       errorQuda("invalid number of spinors");
@@ -386,18 +385,19 @@ void cudaColorSpinorField::loadCPUSpinorField(const ColorSpinorField &src) {
     // (temporary?) bug fix for padding
     cudaMemset(v, 0, bufferBytes);
 
-    if (src.Location() == QUDA_CPU_FIELD_LOCATION) {
+    if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
       if (src.Bytes() > bufferBytes) {
 	cudaFree(buffer_d);
 	cudaFreeHost(buffer_h);
 	cudaMalloc(&buffer_d,src.Bytes());
-	cudaHostAlloc(&buffer_d,src.Bytes(), 0);
+	cudaHostAlloc(&buffer_h,src.Bytes(), 0);
       }
     
-      cudaMemcpy(buffer_d, src.v, src.Bytes(), cudaMemcpyHostToDevice);
+      cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).v, src.Bytes(), cudaMemcpyHostToDevice);
     }
 
-    void *source = (src.Location() == QUDA_CUDA_FIELD_LOCATION) ? src.v : buffer_d;
+    const void *source = (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) ? 
+      dynamic_cast<const cudaColorSpinorField&>(src).V() : buffer_d;
     switch(nSpin){
     case 1:
       LOAD_SPINOR_CPU_TO_GPU(v, source, 1, QUDA_CUDA_FIELD_LOCATION);
@@ -411,6 +411,7 @@ void cudaColorSpinorField::loadCPUSpinorField(const ColorSpinorField &src) {
 
   }
 
+  checkCudaError();
 
   return;
 
@@ -419,14 +420,14 @@ void cudaColorSpinorField::loadCPUSpinorField(const ColorSpinorField &src) {
 }
 
 
-void cudaColorSpinorField::saveCPUSpinorField(ColorSpinorField &dest) const {
+void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
   if (nDim != dest.Ndim()) {
     errorQuda("Number of dimensions %d %d don't match", nDim, dest.Ndim());
   }
 
-  if (volume != dest.volume) {
-    errorQuda("Volumes %d %d don't match", volume, dest.volume);
+  if (volume != dest.Volume()) {
+    errorQuda("Volumes %d %d don't match", volume, dest.Volume());
   }
 
   if (SiteOrder() != dest.SiteOrder()) {
@@ -438,8 +439,8 @@ void cudaColorSpinorField::saveCPUSpinorField(ColorSpinorField &dest) const {
   }
 
 
-  if (siteSubset != dest.siteSubset) {
-    errorQuda("Subset types do not match %d %d", siteSubset, dest.siteSubset);
+  if (siteSubset != dest.SiteSubset()) {
+    errorQuda("Subset types do not match %d %d", siteSubset, dest.SiteSubset());
   }
 
   if (precision == QUDA_HALF_PRECISION) {
@@ -447,95 +448,102 @@ void cudaColorSpinorField::saveCPUSpinorField(ColorSpinorField &dest) const {
     param.precision = QUDA_SINGLE_PRECISION; // change precision
     param.create = QUDA_COPY_FIELD_CREATE; 
     cudaColorSpinorField tmp(*this, param);
-    tmp.saveCPUSpinorField(dest);
+    tmp.saveSpinorField(dest);
     return;
   }
 
   // no native support for this yet - copy to a native supported order
   if (dest.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+    if (dest.FieldLocation() != QUDA_CPU_FIELD_LOCATION) errorQuda("Must use a cpuColorSpinorField here");
     ColorSpinorParam param(dest); // acquire all attributes of this
     param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.create = QUDA_NULL_FIELD_CREATE;
     cpuColorSpinorField tmp(param);
-    saveCPUSpinorField(tmp);
-    dest.copy(tmp);
+    saveSpinorField(tmp);
+    dynamic_cast<cpuColorSpinorField&>(dest).copy(tmp);
     return;
   }
 
 #define SAVE_SPINOR_GPU_TO_CPU(dst, src, myNs, loc)			\
   if (precision == QUDA_DOUBLE_PRECISION) {				\
-      if (dest.precision == QUDA_DOUBLE_PRECISION) {			\
+    if (dest.Precision() == QUDA_DOUBLE_PRECISION) {			\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((double*)dst, (double*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,1>((double*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((double*)dst, (double*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,2>((double*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
 	      errorQuda("double4 not supported");			\
 	  }								\
       } else {								\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((float*)dst, (double*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,1>((float*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((float*)dst, (double*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,2>((float*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
 	      errorQuda("double4 not supported");			\
 	  }								\
       }									\
   } else {								\
-      if (dest.precision == QUDA_DOUBLE_PRECISION) {			\
+    if (dest.Precision() == QUDA_DOUBLE_PRECISION) {			\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((double*)dst, (float*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,1>((double*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((double*)dst, (float*)src, volume, pad, x, dest.total_length, total_length,	\
+	    unpackSpinor<3,myNs,2>((double*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,4>((double*)dst, (float*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,4>((double*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  }								\
       } else {								\
 	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	      unpackSpinor<3,myNs,1>((float*)dst, (float*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,1>((float*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,2>((float*)dst, (float*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,2>((float*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      unpackSpinor<3,myNs,4>((float*)dst, (float*)src, volume, pad, x, dest.total_length, total_length, \
+	    unpackSpinor<3,myNs,4>((float*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
 				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
 	  }								\
       }									\
   }
 
-  if (LOCATION == QUDA_CPU_FIELD_LOCATION && dest.Location() != QUDA_CUDA_FIELD_LOCATION) {
+  if (LOCATION == QUDA_CPU_FIELD_LOCATION && dest.FieldLocation() != QUDA_CUDA_FIELD_LOCATION) {
     cudaMemcpy(buffer_h, v, bytes, cudaMemcpyDeviceToHost);
     
     switch(nSpin){
     case 1:
-      SAVE_SPINOR_GPU_TO_CPU(dest.v, buffer_h, 1, QUDA_CPU_FIELD_LOCATION);
+      SAVE_SPINOR_GPU_TO_CPU(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 1, QUDA_CPU_FIELD_LOCATION);
       break;
     case 4:
-      SAVE_SPINOR_GPU_TO_CPU(dest.v, buffer_h, 4, QUDA_CPU_FIELD_LOCATION);
+      SAVE_SPINOR_GPU_TO_CPU(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 4, QUDA_CPU_FIELD_LOCATION);
       break;
     default:
       errorQuda("invalid number of spinors in function");
     }
   } else {
 
-    if (dest.Location() == QUDA_CPU_FIELD_LOCATION) {
+    checkCudaError();
+
+    if (dest.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
       if (dest.Bytes() > bufferBytes) {
 	cudaFree(buffer_d);
 	cudaFreeHost(buffer_h);
 	cudaMalloc(&buffer_d,dest.Bytes());
-	cudaHostAlloc(&buffer_d,dest.Bytes(), 0);
+	cudaHostAlloc(&buffer_h,dest.Bytes(), 0);
       }
     }    
 
-    void *dst = (dest.Location() == QUDA_CUDA_FIELD_LOCATION) ? dst.v : buffer_d;
+    checkCudaError();
+
+    void *dst = (dest.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) ? dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
+
+    checkCudaError();
 
     switch(nSpin){
     case 1:
@@ -548,8 +556,13 @@ void cudaColorSpinorField::saveCPUSpinorField(ColorSpinorField &dest) const {
       errorQuda("invalid number of spinors in function");
     }
 
-    cudaMemcpy(dest.v, buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
+    checkCudaError();
+
+    if (dest.FieldLocation() == QUDA_CPU_FIELD_LOCATION)
+      cudaMemcpy(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
   }
+
+  checkCudaError();
 
   return;
 

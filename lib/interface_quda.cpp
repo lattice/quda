@@ -662,7 +662,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
   hOut = out;
-  //out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
 }
 
 
@@ -703,7 +702,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
-  out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
+  hOut = out;
 }
 
 
@@ -746,7 +745,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   cpuParam.v = h_out;
   cpuColorSpinorField hOut(cpuParam);
-  out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
+  hOut = out;
 }
 
 void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
@@ -920,7 +919,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
-  x->saveCPUSpinorField(*h_x); // since this is a reference, this won't work: h_x = x;
+  *h_x = *x;
   
   if (param->verbosity >= QUDA_VERBOSE){
     double nx = norm2(*x);
@@ -1114,7 +1113,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   delete [] unscaled_shifts;
 
   for(int i=0; i < param->num_offset; i++) { 
-    x[i]->saveCPUSpinorField(*h_x[i]);
+    *h_x[i] = *x[i];
   }
 
   for(int i=0; i < param->num_offset; i++){ 
@@ -1494,7 +1493,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
       total_iters += param->iter;
       total_secs  += param->secs;
       total_gflops += param->gflops;      
-      high_x->saveCPUSpinorField(*h_x[i]);      
+      *h_x[i] = *high_x;
     }
     
     param->iter = total_iters;
