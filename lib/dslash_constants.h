@@ -98,6 +98,8 @@ __constant__ int E1, E2, E3, E4, E1h;
 __constant__ int Vh_ex;
 __constant__ int E2E1;
 __constant__ int E3E2E1;
+__constant__ int last_proc_in_tdim;
+__constant__ int first_proc_in_tdim;
 
 int initDslash = 0;
 int initClover = 0;

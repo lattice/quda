@@ -12,12 +12,9 @@
 
     void computeHisqOuterProduct(void* src, void* dst, QudaPrecision precision);		
 
-    void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision);
+void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision, int gauge_order);
     
-    void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision, size_t separation);
-
-
-
+void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision, size_t separation, int gauge_order);
 
 
 #endif

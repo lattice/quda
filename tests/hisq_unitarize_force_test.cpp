@@ -36,6 +36,7 @@ cudaGaugeField *cudaOprod = NULL;
 int verify_results = 0;
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
+extern int gridsize_from_cmdline[];
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
@@ -150,7 +151,7 @@ hisq_force_init()
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.precision = gaugeParam.cpu_prec;
   cpuOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec);
+  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, QUDA_MILC_GAUGE_ORDER);
 
 
   gParam.precision = hw_prec;

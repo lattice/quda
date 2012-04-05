@@ -989,7 +989,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  printf("ERROR: wrong dir(%d)\n", dir);
 	  exit(1);
 	}
-	    
+	
 	if (precision == QUDA_DOUBLE_PRECISION){
 	  //double* mylink = (double*)link;
 	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
@@ -1235,10 +1235,10 @@ int compare_mom(Float *momA, Float *momB, int len) {
     }
   }
 
-  for (int i=0; i<momSiteSize; i++) printf("%d fails = %d\n", i, iter[i]);
+  for (int i=0; i<momSiteSize; i++) printfQuda("%d fails = %d\n", i, iter[i]);
   
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*momSiteSize, fail[f] / (double)(len*6));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*momSiteSize, fail[f] / (double)(len*6));
   }
   
   return accuracy_level;
@@ -1250,34 +1250,34 @@ printMomElement(void *mom, int X, QudaPrecision precision)
   if (precision == QUDA_DOUBLE_PRECISION){
     double* thismom = ((double*)mom)+ X*momSiteSize;
     printVector(thismom);
-    printf("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
+    printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }else{
     float* thismom = ((float*)mom)+ X*momSiteSize;
     printVector(thismom);
-    printf("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);	
+    printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);	
   }
 }
 int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec) 
 {    
-  printf("mom:\n");
+  printfQuda("mom:\n");
   printMomElement(momA, 0, prec); 
-  printf("\n");
+  printfQuda("\n");
   printMomElement(momA, 1, prec); 
-  printf("\n");
+  printfQuda("\n");
   printMomElement(momA, 2, prec); 
-  printf("\n");
+  printfQuda("\n");
   printMomElement(momA, 3, prec); 
-  printf("...\n");
+  printfQuda("...\n");
   
-  printf("\nreference mom:\n");
+  printfQuda("\nreference mom:\n");
   printMomElement(momB, 0, prec); 
-  printf("\n");
+  printfQuda("\n");
   printMomElement(momB, 1, prec); 
-  printf("\n");
+  printfQuda("\n");
   printMomElement(momB, 2, prec); 
-  printf("\n");
+  printfQuda("\n");
   printMomElement(momB, 3, prec); 
-  printf("\n");
+  printfQuda("\n");
   
   int ret;
   if (prec == QUDA_DOUBLE_PRECISION){

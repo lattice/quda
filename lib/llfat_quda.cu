@@ -183,8 +183,6 @@
 
 __constant__ int dir1_array[16];
 __constant__ int dir2_array[16];
-__constant__ int last_proc_in_tdim;
-__constant__ int first_proc_in_tdim;
 
 unsigned long staple_bytes=0;
 

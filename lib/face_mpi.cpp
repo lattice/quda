@@ -358,7 +358,7 @@ void commBarrier() { comm_barrier(); }
  * Staple exchange routine
  * used in fat link computation
  ***************************************************************/
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE)
 
 #define gaugeSiteSize 18
 

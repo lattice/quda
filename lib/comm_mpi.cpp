@@ -252,7 +252,8 @@ comm_init()
     comm_exit(1);
   }
   
-  srand(rank*999);
+  //srand(rank*999);
+  srand(0);
   
   free(hostname_recv_buf);
   return;
