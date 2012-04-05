@@ -11,6 +11,8 @@
 //namespace hisq{
 
 extern int gauge_order;
+extern int Vh;
+extern int Vh_ex;
 
   static int OPP_DIR(int dir){ return 7-dir; }
   static bool GOES_FORWARDS(int dir){ return (dir<=3); }
@@ -355,14 +357,13 @@ void MATRIX_PRODUCT(const Matrix<3,std::complex<Real> >& a,
   class LoadStore{
     private: 
      const int volume;
-     const int half_volume;
-
+    const int half_volume;
     public:
-      LoadStore(int vol) : volume(vol), half_volume(vol/2) {}
+    LoadStore(int vol) : volume(vol), half_volume(vol/2) {}
 
-      void loadMatrixFromField(const Real* const field, int oddBit, int half_lattice_index, Matrix<3, std::complex<Real> >* const mat) const;
+    void loadMatrixFromField(const Real* const field, int oddBit, int half_lattice_index, Matrix<3, std::complex<Real> >* const mat) const;
      
-      void loadMatrixFromField(const Real* const field, int oddBit, int dir, int half_lattice_index, Matrix<3, std::complex<Real> >* const mat) const;
+    void loadMatrixFromField(const Real* const field, int oddBit, int dir, int half_lattice_index, Matrix<3, std::complex<Real> >* const mat) const;
 
       void storeMatrixToField(const Matrix<3, std::complex<Real> >& mat, int oddBit, int half_lattice_index, Real* const field) const;
       
@@ -371,27 +372,89 @@ void MATRIX_PRODUCT(const Matrix<3,std::complex<Real> >& a,
       void addMatrixToField(const Matrix<3, std::complex<Real> >& mat, int oddBit, int dir, int half_lattice_index, Real coeff, Real* const) const;
       
      void storeMatrixToMomentumField(const Matrix<3, std::complex<Real> >& mat, int oddBit, int dir, int half_lattice_index, Real coeff, Real* const) const;
-    Real getData(const Real* const field, int idx, int dir, int oddBit, int offset) const;
-    void addData(Real* const field, int idx, int dir, int oddBit, int offset, Real) const;
-
+    Real getData(const Real* const field, int idx, int dir, int oddBit, int offset, int hfv) const;
+    void addData(Real* const field, int idx, int dir, int oddBit, int offset, Real, int hfv) const;
+    int half_idx_conversion_ex2normal(int half_lattice_index, const int* dim, int oddBit) const ;
+    int half_idx_conversion_normal2ex(int half_lattice_index, const int* dim, int oddBit) const ;
  };
 
 template<class Real>
-Real LoadStore<Real>::getData(const Real* const field, int idx, int dir, int oddBit, int offset) const
+int LoadStore<Real>::half_idx_conversion_ex2normal(int half_lattice_index_ex, const int* dim, int oddBit) const
+{
+  int X1=dim[0];
+  int X2=dim[1];
+  int X3=dim[2];
+  //int X4=dim[3];
+  int X1h=X1/2;
+  
+  int E1=dim[0]+4;
+  int E2=dim[1]+4;
+  int E3=dim[2]+4;
+  //int E4=dim[3]+4;
+  int E1h=E1/2;
+
+  int sid = half_lattice_index_ex;
+
+  int za = sid/E1h;
+  int x1h = sid - za*E1h;
+  int zb = za/E2;
+  int x2 = za - zb*E2;
+  int x4 = zb/E3;
+  int x3 = zb - x4*E3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+
+  int idx = ((x4-2)*X3*X2*X1 + (x3-2)*X2*X1+(x2-2)*X1+(x1-2))/2;
+  return idx;
+}
+
+template<class Real>
+int LoadStore<Real>::half_idx_conversion_normal2ex(int half_lattice_index, const int* dim, int oddBit) const
+{
+  int X1=dim[0];
+  int X2=dim[1];
+  int X3=dim[2];
+  //int X4=dim[3];
+  int X1h=X1/2;
+
+  int E1=dim[0]+4;
+  int E2=dim[1]+4;
+  int E3=dim[2]+4;
+  //int E4=dim[3]+4;
+  //int E1h=E1/2;
+
+  int sid = half_lattice_index;
+
+  int za = sid/X1h;
+  int x1h = sid - za*X1h;
+  int zb = za/X2;
+  int x2 = za - zb*X2;
+  int x4 = zb/X3;
+  int x3 = zb - x4*X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2*x1h + x1odd;
+
+  int idx = ((x4+2)*E3*E2*E1 + (x3+2)*E2*E1+(x2+2)*E1+(x1+2))/2;    
+  
+  return idx;
+}
+
+template<class Real>
+Real LoadStore<Real>::getData(const Real* const field, int idx, int dir, int oddBit, int offset, int hfv) const
 {
   if(gauge_order == QUDA_MILC_GAUGE_ORDER){
-    return  field[(4*half_volume*oddBit +4*idx + dir)*18+offset];
+    return  field[(4*hfv*oddBit +4*idx + dir)*18+offset];
   }else{ //QDP format
-    return  ((Real**)field)[dir][(half_volume*oddBit+idx)*18 +offset];
+    return  ((Real**)field)[dir][(hfv*oddBit+idx)*18 +offset];
   }
 }
 template<class Real>
-void LoadStore<Real>::addData(Real* const field, int idx, int dir, int oddBit, int offset, Real v) const
+void LoadStore<Real>::addData(Real* const field, int idx, int dir, int oddBit, int offset, Real v, int hfv) const
 {
   if(gauge_order == QUDA_MILC_GAUGE_ORDER){
-    field[(4*half_volume*oddBit +4*idx + dir)*18+offset] += v;
+    field[(4*hfv*oddBit +4*idx + dir)*18+offset] += v;
   }else{ //QDP format
-    ((Real**)field)[dir][(half_volume*oddBit+idx)*18 +offset] += v;
+    ((Real**)field)[dir][(hfv*oddBit+idx)*18 +offset] += v;
   }
 }
 
@@ -401,13 +464,20 @@ template<class Real>
   void LoadStore<Real>::loadMatrixFromField(const Real* const field, 
 					    int oddBit,
 			   		    int half_lattice_index, 
-			   		    Matrix<3, std::complex<Real> >* const mat) const
-  { 
+			   		    Matrix<3, std::complex<Real> >* const mat
+					    ) const
+{ 
+#ifdef MULTI_GPU
+  int hfv = Vh_ex;
+#else
+  int hfv = Vh;
+#endif
+
    int offset = 0;
    for(int i=0; i<3; ++i){
      for(int j=0; j<3; ++j){
-       (*mat)(i,j).real(*(field + (oddBit*half_volume + half_lattice_index)*18 + offset++));
-       (*mat)(i,j).imag(*(field + (oddBit*half_volume + half_lattice_index)*18 + offset++));
+       (*mat)(i,j).real(*(field + (oddBit*hfv + half_lattice_index)*18 + offset++));
+       (*mat)(i,j).imag(*(field + (oddBit*hfv + half_lattice_index)*18 + offset++));
      }
    }
     return;
@@ -418,16 +488,23 @@ template<class Real>
 					    int oddBit,
 					    int dir,
 			   		    int half_lattice_index, 
-			   		    Matrix<3, std::complex<Real> >* const mat) const
+			   		    Matrix<3, std::complex<Real> >* const mat
+					    ) const
   {
-    const Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
+#ifdef MULTI_GPU
+    int hfv = Vh_ex;
+#else
+    int hfv = Vh;
+#endif
+
+    //const Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
     int offset = 0;
     for(int i=0; i<3; ++i){
       for(int j=0; j<3; ++j){
         //(*mat)(i,j).real(local_field[offset++]);
-	(*mat)(i,j).real(getData(field, half_lattice_index, dir, oddBit, offset++));
+	(*mat)(i,j).real(getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
         //(*mat)(i,j).imag(local_field[offset++]);
-	(*mat)(i,j).imag(getData(field, half_lattice_index, dir, oddBit, offset++));
+	(*mat)(i,j).imag(getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
       }
     }
     return;
@@ -439,11 +516,17 @@ template<class Real>
 					    int half_lattice_index, 
 					    Real* const field) const
   {
+#ifdef MULTI_GPU
+    int hfv = Vh_ex;
+#else
+    int hfv = Vh;
+#endif
+
     int offset = 0;
     for(int i=0; i<3; ++i){
       for(int j=0; j<3; ++j){
-        *(field + (oddBit*half_volume + half_lattice_index)*18 + offset++) = (mat)(i,j).real();
-        *(field + (oddBit*half_volume + half_lattice_index)*18 + offset++) = (mat)(i,j).imag();
+        *(field + (oddBit*hfv + half_lattice_index)*18 + offset++) = (mat)(i,j).real();
+        *(field + (oddBit*hfv + half_lattice_index)*18 + offset++) = (mat)(i,j).imag();
       }
     }
     return;
@@ -456,7 +539,12 @@ template<class Real>
 					    Real coeff,
 					    Real* const field) const
   {
-    Real* const local_field = field + (oddBit*half_volume + half_lattice_index)*18;
+#ifdef MULTI_GPU
+    int hfv = Vh_ex;
+#else
+    int hfv = Vh;
+#endif
+    Real* const local_field = field + (oddBit*hfv + half_lattice_index)*18;
 
     
     int offset = 0;
@@ -478,15 +566,22 @@ template<class Real>
 					    Real coeff,
 					    Real* const field) const
   {
-    Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
+    
+#ifdef MULTI_GPU
+    int hfv = Vh_ex;
+#else
+    int hfv = Vh;
+#endif
+
+    //Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
     int offset = 0;
     for(int i=0; i<3; ++i){
       for(int j=0; j<3; ++j){
         //local_field[offset++] += coeff*mat(i,j).real();
-	addData(field, half_lattice_index, dir, oddBit, offset++, coeff*mat(i,j).real());
+	addData(field, half_lattice_index, dir, oddBit, offset++, coeff*mat(i,j).real(), hfv);
 
         //local_field[offset++] += coeff*mat(i,j).imag();
-	addData(field, half_lattice_index, dir, oddBit, offset++, coeff*mat(i,j).imag());
+	addData(field, half_lattice_index, dir, oddBit, offset++, coeff*mat(i,j).imag(), hfv);
       }
     }
     return;
@@ -539,7 +634,7 @@ template<class Real>
      public:
 	Locator(const int dim[4]); 
 	int getFullFromHalfIndex(int half_lattice_index);
-        int getNeighborFromFullIndex(int full_lattice_index, int dir);
+    int getNeighborFromFullIndex(int full_lattice_index, int dir, int* err=NULL);
  };
 
   template<int oddBit>
@@ -556,6 +651,22 @@ template<class Real>
   template<int oddBit>
   void Locator<oddBit>::getCoordsFromHalfIndex(int half_lattice_index, int coord[4])
   {
+#ifdef MULTI_GPU
+    int E1 = local_dim[0]+4;
+    int E2 = local_dim[1]+4;
+    int E3 = local_dim[2]+4;
+    //int E4 = local_dim[3]+4;
+    int E1h = E1/2;
+    
+    int z1    = half_lattice_index/E1h;
+    int x1h   = half_lattice_index - z1*E1h;
+    int z2    = z1/E2;
+    coord[1]      = z1 - z2*E2;
+    coord[3]      = z2/E3;
+    coord[2]      = z2 - coord[3]*E3;
+    int x1odd = (coord[1] + coord[2] + coord[3] + oddBit) & 1;
+    coord[0]  = 2*x1h + x1odd;
+#else
     int half_dim_0 = local_dim[0]/2;
     int z1    = half_lattice_index/half_dim_0;
     int x1h   = half_lattice_index - z1*half_dim_0;
@@ -565,17 +676,33 @@ template<class Real>
     coord[2]      = z2 - coord[3]*local_dim[2];
     int x1odd = (coord[1] + coord[2] + coord[3] + oddBit) & 1;
     coord[0]  = 2*x1h + x1odd;
+#endif
+
   }
 
   template<int oddBit>
   void Locator<oddBit>::getCoordsFromFullIndex(int full_lattice_index, int coord[4])
   {
-    int z1        = full_lattice_index/local_dim[0];
-    coord[0]      = full_lattice_index - z1*local_dim[0];
-    int z2        = z1/local_dim[1];
-    coord[1]      = z1 - z2*local_dim[1];
-    coord[3]      = z2/local_dim[2];
-    coord[2]      = z2 - coord[3]*local_dim[2];
+#ifdef MULTI_GPU
+    int D1=local_dim[0]+4;
+    int D2=local_dim[1]+4;
+    int D3=local_dim[2]+4;
+    //int D4=local_dim[3]+4;
+    //int D1h=D1/2;
+#else
+    int D1=local_dim[0];
+    int D2=local_dim[1];
+    int D3=local_dim[2];
+    //int D4=local_dim[3];
+    //int D1h=D1/2;
+#endif    
+
+    int z1        = full_lattice_index/D1;
+    coord[0]      = full_lattice_index - z1*D1;
+    int z2        = z1/D2;
+    coord[1]      = z1 - z2*D2;
+    coord[3]      = z2/D3;
+    coord[2]      = z2 - coord[3]*D3;
   }
 
 
@@ -599,15 +726,58 @@ template<class Real>
     return full_index;
   }
 
-
   // From full index return the neighbouring full index
   template<int oddBit> 
-  int Locator<oddBit>::getNeighborFromFullIndex(int full_lattice_index, int dir)
+  int Locator<oddBit>::getNeighborFromFullIndex(int full_lattice_index, int dir, int* err)
   {
      int coord[4];
      int neighbor_index;
      getCoordsFromFullIndex(full_lattice_index, coord);
-
+#ifdef MULTI_GPU
+     int E1 = local_dim[0] + 4;
+     int E2 = local_dim[1] + 4;
+     int E3 = local_dim[2] + 4;
+     int E4 = local_dim[3] + 4;
+     switch(dir){
+     case 0:  //+X
+       neighbor_index =  full_lattice_index + 1;
+       if(err && (coord[0] == E1-1) ) *err = 1;
+       break; 
+     case 1:  //+Y
+       neighbor_index =  full_lattice_index + E1;
+       if(err && (coord[1] == E2-1) ) *err = 1;
+       break;
+     case 2:  //+Z
+       neighbor_index =  full_lattice_index + E2*E1;
+       if(err && (coord[2] == E3-1) ) *err = 1;
+       break;
+     case 3:  //+T
+       neighbor_index = full_lattice_index + E3*E2*E1;
+       if(err && (coord[3] == E4-1) ) *err = 1;
+       break;
+     case 7:  //-X
+       neighbor_index = full_lattice_index - 1;
+       if(err && (coord[0] == 0) ) *err = 1;
+       break;
+     case 6:  //-Y
+       neighbor_index = full_lattice_index - E1;
+       if(err && (coord[1] == 0) ) *err = 1;
+       break;
+     case 5:  //-Z
+       neighbor_index = full_lattice_index - E2*E1;
+       if(err && (coord[2] == 0) ) *err = 1;
+       break;
+     case 4:  //-T
+       neighbor_index = full_lattice_index - E3*E2*E1;
+       if(err && (coord[3] == 0) ) *err = 1;
+       break;
+     default:
+       errorQuda("Neighbor index could not be determined\n");
+       exit(1);
+       break;
+     } // switch(dir)
+     
+#else
      switch(dir){
 	case 0:
 	  neighbor_index = (coord[0] == local_dim[0]-1) ? full_lattice_index + 1 - local_dim[0] : full_lattice_index + 1;
@@ -638,6 +808,8 @@ template<class Real>
 	  exit(1);
 	  break;
      } // switch(dir)
+     if(err) *err = 0;
+#endif
      return neighbor_index;
   }
 
@@ -996,8 +1168,8 @@ struct ColorMatrix
      Real mycoeff = ( (sig_positive && oddBit) || (!sig_positive && !oddBit) ) ? coeff : -coeff;
 
      if(mu_positive){ 
-	ls.loadMatrixFromField(Qprev, 1-oddBit, point_d, &colorMatX);
-	ls.loadMatrixFromField(link, 1-oddBit, mu, point_d, &ad_link);
+       ls.loadMatrixFromField(Qprev, 1-oddBit, point_d, &colorMatX);
+       ls.loadMatrixFromField(link, 1-oddBit, mu, point_d, &ad_link);
 	// compute point_c
 	ls.loadMatrixFromField(oprod, oddBit, point_c, &colorMatY);
 	ls.loadMatrixFromField(link, oddBit, mu, point_c, &bc_link);
@@ -1086,61 +1258,6 @@ struct ColorMatrix
 				   shortP, newOprod);
     }
 
-    return;
-  }
-
-  template<class Real, int oddBit>
-    void completeForceSite(int half_lattice_index,
-			   const int dim[4],
-			   const Real* const oprod, 
-			   const Real* const link,
-			   int sig, 
-			   const LoadStore<Real>& ls,	
-			   Real* const mom)
-  {
-
-   
-    typename ColorMatrix<Real>::Type colorMatX, colorMatY, linkW;
-    ls.loadMatrixFromField(link, oddBit, sig, half_lattice_index, &linkW);
-    ls.loadMatrixFromField(oprod, oddBit, sig, half_lattice_index, &colorMatX);
-
-    const Real coeff = (oddBit) ? -1 : 1;
-    colorMatY = linkW*colorMatX;
- 
-    ls.storeMatrixToMomentumField(colorMatY, oddBit, sig, half_lattice_index, coeff, mom);	
-    return;
-  }
-
- template<class Real> 
-   void completeForceField(const int dim[4],
-			  const Real* const oprod, 
-			  const Real* const link,
-	                  int sig,
-			  Real* const mom)
-  {
-    int volume = 1;
-    for(int dir=0; dir<4; ++dir) volume *= dim[dir];
-    const int half_volume = volume/2;
-    LoadStore<Real> ls(volume);
-
-
-    for(int site=0; site<half_volume; ++site){
-	completeForceSite<Real,0>(site, 
-				  dim,
-			          oprod, link,
-			          sig, 
-				  ls,
-			          mom);
-	
-  }
-    for(int site=0; site<half_volume; ++site){
-	completeForceSite<Real,1>(site,
-				  dim,
-			          oprod, link,
-			          sig,
-				  ls, 
-			          mom);	
-    }
     return;
   }
 
@@ -1331,9 +1448,14 @@ struct ColorMatrix
        typename ColorMatrix<Real>::Type colorMatU, colorMatV, colorMatW, colorMatX, colorMatY, colorMatZ;
 
        int point_a, point_b, point_c, point_d, point_e;	
+#ifdef MULTI_GPU
+       int idx = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
+#else
+       int idx = half_lattice_index;
+#endif
 
-       int X = locator.getFullFromHalfIndex(half_lattice_index);
-       point_c = half_lattice_index;
+       int X = locator.getFullFromHalfIndex(idx);
+       point_c = idx;
 
        int new_mem_idx = locator.getNeighborFromFullIndex(X,sig);
        point_d = new_mem_idx >> 1;
@@ -1360,7 +1482,7 @@ struct ColorMatrix
 		  - de_link*colorMatY*bc_link
 		  + colorMatX*ab_link*bc_link;
 
-       ls.addMatrixToField(colorMatV, oddBit, sig, half_lattice_index, coeff, output);
+       ls.addMatrixToField(colorMatV, oddBit, sig, point_c, coeff, output);
      } 
      return;
    }
@@ -1375,9 +1497,10 @@ struct ColorMatrix
      int volume = 1;
      for(int dir=0; dir<4; ++dir) volume *= dim[dir];
      const int half_volume = volume/2;
+     
      LoadStore<Real> ls(volume);
      for(int site=0; site<half_volume; ++site){
-	computeLongLinkSite<Real,0>(site, 
+       computeLongLinkSite<Real,0>(site, 
 			   dim,
 			   oprod,
 		           link, 
@@ -1425,6 +1548,65 @@ struct ColorMatrix
   }
 
 
+template<class Real, int oddBit>
+void completeForceSite(int half_lattice_index,
+		       const int dim[4],
+		       const Real* const oprod,
+		       const Real* const link,
+		       int sig,
+		       const LoadStore<Real>& ls,
+		       Real* const mom)
+{
+
+  typename ColorMatrix<Real>::Type colorMatX, colorMatY, linkW;
+
+#ifdef MULTI_GPU
+  int half_lattice_index_ex = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
+  int idx = half_lattice_index_ex;  
+#else
+  int idx = half_lattice_index;
+#endif  
+  ls.loadMatrixFromField(link, oddBit, sig, idx, &linkW);
+  ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatX);
+
+  const Real coeff = (oddBit) ? -1 : 1;
+  colorMatY = linkW*colorMatX;
+
+  ls.storeMatrixToMomentumField(colorMatY, oddBit, sig, half_lattice_index, coeff, mom);
+  return;
+}
+
+template <class Real>
+void completeForceField(const int dim[4],
+			const Real* const oprod,
+			const Real* const link,
+			int sig,
+			Real* const mom)
+{
+  int volume = dim[0]*dim[1]*dim[2]*dim[3];
+  const int half_volume = volume/2;
+  LoadStore<Real> ls(volume);
+
+
+  for(int site=0; site<half_volume; ++site){
+    completeForceSite<Real,0>(site,
+			      dim,
+			      oprod, link,
+			      sig,
+			      ls,
+			      mom);
+
+  }
+  for(int site=0; site<half_volume; ++site){
+    completeForceSite<Real,1>(site,
+			      dim,
+			      oprod, link,
+			      sig,
+			      ls,
+			      mom);
+  }
+  return;
+}
 
 
   void hisqCompleteForceCPU(const QudaGaugeParam &param, 
@@ -1434,7 +1616,7 @@ struct ColorMatrix
   {
     for(int sig=0; sig<4; ++sig){
        if(param.cpu_prec == QUDA_SINGLE_PRECISION){
-	  completeForceField<float>(param.X, 
+	 completeForceField<float>(param.X, 
 				   (float*)oprod.Gauge_p(), 
 			           (float*)link.Gauge_p(), 
 				   sig, 

@@ -634,18 +634,25 @@ hisq_force_test(void)
       naik_coeff = &d_act_path_coeff[1];
     }
     
-    //#define TEST_ONLY
+#define TEST_ONLY
 #ifdef TEST_ONLY
     printfQuda("Testing only .................................................\n");
+#ifdef MULTI_GPU
+    hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+    hisqCompleteForceCPU(qudaGaugeParam, *cpuForce_ex, *cpuGauge_ex, refMom);
+    //hisqCompleteForceCPU(qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, refMom);
+#else
+    hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod, *cpuGauge, cpuForce);
+    hisqCompleteForceCPU(qudaGaugeParam, *cpuForce, *cpuGauge, refMom);
+#endif
+
 #else
     printfQuda("Not Testing only .................................................\n");
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod, *cpuGauge, cpuForce);
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod, *cpuGauge, cpuForce);
     hisqCompleteForceCPU(qudaGaugeParam, *cpuForce, *cpuGauge, refMom);
-#endif
-    
-    
-#endif
+#endif //TEST_ONLY
+#endif //0 or 1
   }
   gettimeofday(&ht1, NULL);
 
@@ -653,10 +660,11 @@ hisq_force_test(void)
 #ifdef TEST_ONLY
 
 #ifdef MULTI_GPU
-  hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
+  hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);
   hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);
+  //hisqCompleteForceCuda(qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaMom);
 #else
-  hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+  hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
   hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
 #endif
 
