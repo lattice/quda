@@ -541,6 +541,8 @@ void cudaColorSpinorField::saveCPUSpinorField(cpuColorSpinorField &dest) const {
       errorQuda("invalid number of spinors in function");
     }
 
+    cudaDeviceSynchronize();
+
     memcpy(dest.v, buffer, dest.Bytes());
     //cudaMemcpy(dest.v, buffer, dest.Bytes(), cudaMemcpyDeviceToHost);
   }
