@@ -165,7 +165,7 @@ void packSpinor(OutOrder &out, const InOrder &in, Basis basis, int Vh) {
 }
 
 /** Decide whether we are changing basis or not */
-template <int Nc, int Ns, int N, typename Float, typename FloatN>
+template <int Nc, int Ns, int N, typename OutOrder, typename InOrder, typename Float, typename FloatN>
 void packParitySpinor(FloatN *dest, Float *src, OutOrder &outOrder, const InOrder &inOrder, int Vh, int pad, 
 		      QudaGammaBasis destBasis, QudaGammaBasis srcBasis) {
   if (destBasis==srcBasis) {
@@ -177,7 +177,7 @@ void packParitySpinor(FloatN *dest, Float *src, OutOrder &outOrder, const InOrde
     packSpinor(outOrder, inOrder, basis, Vh);
   } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && destBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
     if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
-    RelBasis<SpaceSpinorColorOrder<Float, Ns, Nc>, FloatNOrder<FloatN, N, Ns, Nc>, Float, Ns, Nc> basis;
+    RelBasis<OutOrder, InOrder, Float, Ns, Nc> basis;
     packSpinor(outOrder, inOrder, basis, Vh);    
     } else {
     errorQuda("Basis change not supported");
@@ -220,13 +220,13 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
 	FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, out, in, Vh, pad, destBasis, srcBasis);
-	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, out, in, Vh, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
 	SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh+pad);
 	FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, out, in, Vh, pad, destBasis, srcBasis);
-	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, out, in, Vh, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
 	}
@@ -236,11 +236,11 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
     if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, V, V+pad);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, V, V+pad);
-      packParitySpinor<Nc,Ns,N>(dest, src, out, in, V, pad, destBasis, srcBasis);
+      packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis);
     } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, V, V+pad);
       FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, V, V+pad);
-      packParitySpinor<Nc,Ns,N>(dest, src, out, in, V, pad, destBasis, srcBasis);
+      packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis);
     } else {
       errorQuda("Source field order not supported");
     }
@@ -277,16 +277,17 @@ void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int d
 	evenOff = srcLength/2;
       }
 
+      int Vh = V/2;
       if (destOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, V/2, V/2+pad);
-	SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, Vh, V/2+pad);
-	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, out, in, V/2, pad, destBasis, srcBasis);
-	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, out, in, V/2, pad, destBasis, srcBasis);
+	FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
+	SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
       } else if (destOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-	FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, V/2, V/2+pad);
-	SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, Vh, V/2+pad);
-	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, out, in, V/2, pad, destBasis, srcBasis);
-	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, out, in, V/2, pad, destBasis, srcBasis);
+	FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, Vh, Vh+pad);
+	SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+	packParitySpinor<Nc,Ns,N>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
+	packParitySpinor<Nc,Ns,N>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis);
       } else {
 	errorQuda("Source field order not supported");
       }
@@ -296,11 +297,11 @@ void unpackSpinor(Float *dest, FloatN *src, int V, int pad, const int x[], int d
     if (destOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, V, V+pad);
       SpaceSpinorColorOrder<Float, Ns, Nc> outOrder(dest, V, V+pad);
-      packParitySpinor<Nc,Ns,N>(dest, src, out, in, V, pad, destBasis, srcBasis);
+      packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis);
     } else if (destOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       FloatNOrder<FloatN, N, Ns, Nc> inOrder(src, V, V+pad);
-      SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(dest, V, V+pad);
-      packParitySpinor<Nc,Ns,N>(dest, src, out, in, V, pad, destBasis, srcBasis);
+      SpaceColorSpinorOrder<Float, Ns, Nc> outOrder(dest, V, V+pad);
+      packParitySpinor<Nc,Ns,N>(dest, src, outOrder, inOrder, V, pad, destBasis, srcBasis);
     } else {
       errorQuda("Destination field order not supported");
     }
