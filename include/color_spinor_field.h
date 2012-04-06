@@ -51,22 +51,25 @@ class ColorSpinorParam {
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
     create(QUDA_INVALID_FIELD_CREATE), verbose(QUDA_SILENT)
     { 
-      for(int d=0; d<QUDA_MAX_DIM; d++) {
-	x[d] = 0; 
-      }
+      for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0; 
     }
   
   // used to create cpu params
  ColorSpinorParam(void *V, QudaFieldLocation location, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
    : fieldLocation(location), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
-    precision(inv_param.cpu_prec), pad(0), twistFlavor(inv_param.twist_flavor), 
-    siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
+    pad(0), twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
     create(QUDA_REFERENCE_FIELD_CREATE), v(V), verbose(inv_param.verbosity)
   { 
 
     if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
     for (int d=0; d<nDim; d++) x[d] = X[d];
+
+    if (location == QUDA_CPU_FIELD_LOCATION) {
+      precision = inv_param.cpu_prec;
+    } else {
+      precision = inv_param.cuda_prec;
+    }
 
     if (!pc_solution) {
       siteSubset = QUDA_FULL_SITE_SUBSET;;
@@ -209,7 +212,7 @@ class ColorSpinorField {
 
   virtual ~ColorSpinorField();
 
-  ColorSpinorField& operator=(const ColorSpinorField &);
+  virtual ColorSpinorField& operator=(const ColorSpinorField &);
 
   QudaPrecision Precision() const { return precision; }
   int Ncolor() const { return nColor; } 
@@ -253,6 +256,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   void *norm; // the normalization field
   bool alloc; // whether we allocated memory
   bool init;
+  bool reference; // whether the field is a reference or not
 
   static void *buffer_h;// pinned memory
   static void *buffer_d;// device_mapped pointer to buffer
@@ -281,6 +285,7 @@ class cudaColorSpinorField : public ColorSpinorField {
   cudaColorSpinorField(const ColorSpinorParam&);
   virtual ~cudaColorSpinorField();
 
+  ColorSpinorField& operator=(const ColorSpinorField &);
   cudaColorSpinorField& operator=(const cudaColorSpinorField&);
   cudaColorSpinorField& operator=(const cpuColorSpinorField&);
 
@@ -350,6 +355,7 @@ class cpuColorSpinorField : public ColorSpinorField {
   cpuColorSpinorField(const ColorSpinorParam&);
   virtual ~cpuColorSpinorField();
 
+  ColorSpinorField& operator=(const ColorSpinorField &);
   cpuColorSpinorField& operator=(const cpuColorSpinorField&);
   cpuColorSpinorField& operator=(const cudaColorSpinorField&);
 

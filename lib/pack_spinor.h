@@ -202,7 +202,7 @@ class PackSpinor : Tunable {
   virtual ~PackSpinor() { ; }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE);
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
     packSpinorKernel<OutOrder, InOrder, Basis> <<<tp.grid, tp.block, tp.shared_bytes, stream>>> 
       (out, in, basis, volume);
   }

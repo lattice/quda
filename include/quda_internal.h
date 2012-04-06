@@ -56,6 +56,10 @@ extern "C" {
     ParityHw even;
   } FullHw;
 
+  struct QUDA_DiracField{
+    void *field; /**< Pointer to a ColorSpinorField */
+  };
+
   extern cudaDeviceProp deviceProp;  
   extern cudaStream_t *streams;
   

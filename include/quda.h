@@ -85,7 +85,7 @@ extern "C" {
   } QudaGaugeParam;
 
 
-  /*
+  /**
    * Parameters relating to the solver and the choice of Dirac operator.
    */
   typedef struct QudaInvertParam_s {
@@ -325,5 +325,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
+#include <quda_new_interface.h>
 
 #endif /* _QUDA_H */

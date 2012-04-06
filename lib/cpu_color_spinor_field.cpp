@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
+#include <typeinfo>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 
@@ -35,7 +36,7 @@ void* cpuColorSpinorField::fwdGhostFaceSendBuffer[QUDA_MAX_DIM];
 void* cpuColorSpinorField::backGhostFaceSendBuffer[QUDA_MAX_DIM];
 
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
-  ColorSpinorField(param), init(false), order_double(NULL), order_single(NULL) {
+  ColorSpinorField(param), init(false), reference(false), order_double(NULL), order_single(NULL) {
   create(param.create);
   if (param.create == QUDA_NULL_FIELD_CREATE) {
     // do nothing
@@ -53,7 +54,7 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) : 
-  ColorSpinorField(src), init(false), order_double(NULL), order_single(NULL) {
+  ColorSpinorField(src), init(false), reference(false), order_double(NULL), order_single(NULL) {
   create(QUDA_COPY_FIELD_CREATE);
   memcpy(v,src.v,bytes);
 
@@ -62,7 +63,7 @@ cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) :
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) : 
-  ColorSpinorField(src), init(false), order_double(NULL), order_single(NULL) {
+  ColorSpinorField(src), init(false), reference(false), order_double(NULL), order_single(NULL) {
   create(QUDA_COPY_FIELD_CREATE);
   if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
     memcpy(v, dynamic_cast<const cpuColorSpinorField&>(src).v, bytes);
@@ -78,6 +79,17 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) :
 
 cpuColorSpinorField::~cpuColorSpinorField() {
   destroy();
+}
+
+ColorSpinorField& cpuColorSpinorField::operator=(const ColorSpinorField &src) {
+  if (typeid(src) == typeid(cudaColorSpinorField)) {
+   *this = (dynamic_cast<const cudaColorSpinorField&>(src));
+  } else if (typeid(src) == typeid(cpuColorSpinorField)) {
+   *this = (dynamic_cast<const cpuColorSpinorField&>(src));
+  } else {
+    errorQuda("FieldLocation not supported");
+  }
+ return *this;
 }
 
 cpuColorSpinorField& cpuColorSpinorField::operator=(const cpuColorSpinorField &src) {

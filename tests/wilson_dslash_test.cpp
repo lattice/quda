@@ -25,7 +25,7 @@ const int test_type = 0;
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int loops = 100;
+const int loops = 1;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec;
@@ -101,6 +101,9 @@ void init(int argc, char **argv) {
     errorQuda("Gauge and spinor cpu precisions must match");
 
   inv_param.cuda_prec = cuda_prec;
+
+  inv_param.src_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.sol_location = QUDA_CPU_FIELD_LOCATION;
 
 #ifndef MULTI_GPU // free parameter for single GPU
   gauge_param.ga_pad = 0;
@@ -300,13 +303,18 @@ double dslashCUDA(int niter) {
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);
 
+  printf("\n\n\n\n");
+
   for (int i = 0; i < niter; i++) {
     switch (test_type) {
     case 0:
       if (transfer) {
 	dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
       } else {
-	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+	inv_param.src_location = QUDA_CUDA_FIELD_LOCATION;
+	inv_param.sol_location = QUDA_CUDA_FIELD_LOCATION;
+	dslashQuda(cudaSpinorOut->V(), cudaSpinor->V(), &inv_param, parity);
+	//dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;
     case 1:
@@ -320,6 +328,7 @@ double dslashCUDA(int niter) {
     }
   }
     
+  printf("\n\n\n\n");
   cudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
@@ -449,7 +458,7 @@ int main(int argc, char **argv)
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...\n", loops);
-    dirac->Flops();
+    if (!transfer) dirac->Flops();
     double secs = dslashCUDA(loops);
     printfQuda("done.\n\n");
 

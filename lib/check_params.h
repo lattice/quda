@@ -150,6 +150,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cuda_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
 
+  P(src_location, QUDA_INVALID_FIELD_LOCATION);
+  P(sol_location, QUDA_INVALID_FIELD_LOCATION);
+
 #if defined INIT_PARAM
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
 #else

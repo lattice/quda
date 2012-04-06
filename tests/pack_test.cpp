@@ -32,15 +32,15 @@ const QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION;
 void init() {
 
   param.cpu_prec = QUDA_SINGLE_PRECISION;
-  param.cuda_prec = QUDA_HALF_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_8;
+  param.cuda_prec = QUDA_SINGLE_PRECISION;
+  param.reconstruct = QUDA_RECONSTRUCT_12;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] = 4;
-  param.X[1] = 4;
-  param.X[2] = 4;
-  param.X[3] = 4;
+  param.X[0] =32;
+  param.X[1] =32;
+  param.X[2] =32;
+  param.X[3] =32;
   param.ga_pad = 0;
   setDims(param.X);
 
@@ -64,7 +64,7 @@ void init() {
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   csParam.create = QUDA_NULL_FIELD_CREATE;
 
   spinor = new cpuColorSpinorField(csParam);
@@ -77,8 +77,8 @@ void init() {
   csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  csParam.pad = 0;
-  csParam.precision = QUDA_HALF_PRECISION;
+  csParam.pad = param.X[0] * param.X[1] * param.X[2];
+  csParam.precision = QUDA_SINGLE_PRECISION;
 
   cudaSpinor = new cudaColorSpinorField(csParam);
 }
@@ -153,6 +153,21 @@ void packTest() {
   }
 
   stopwatchStart();
+
+#if (CUDA_VERSION >= 4010)
+  /*cudaError_t error = cudaHostRegister(spinor->V(), spinor->Bytes(), 0);
+  if (error != cudaSuccess) {
+    printfQuda("Error in registering memory: %s\n", cudaGetErrorString(error));
+    exit(0);
+    }*/
+  /*cudaError_t error2 = cudaHostRegister(spinor2->V(), spinor2->Bytes(), 0);
+  if (error2 != cudaSuccess) {
+    printfQuda("Error in registering memory: %s\n", cudaGetErrorString(error2));
+    exit(0);
+    }*/
+#endif
+
+  printf("%d %d\n", cudaSpinor->Stride(), spinor->Stride());
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
   printf("Spinor send time = %e seconds\n", sSendTime);
@@ -162,9 +177,19 @@ void packTest() {
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime);
   
-  std::cout << "Norm check: CPU = " << norm2(*spinor) << 
-    ", CUDA = " << norm2(*cudaSpinor) << 
-    ", CPU =  " << norm2(*spinor2) << std::endl;
+#if (CUDA_VERSION >= 4010)
+  //cudaHostUnregister(spinor->V());
+  //checkCudaError();
+  //cudaHostUnregister(spinor2->V());
+  //checkCudaError();
+#endif
+
+  double spinor_norm = norm2(*spinor);
+  double cuda_spinor_norm = norm2(*cudaSpinor);
+  double spinor2_norm = norm2(*spinor2);
+
+  printf("Norm check: CPU = %e, CUDA = %e, CPU = %e\n",
+	 spinor_norm, cuda_spinor_norm, spinor2_norm);
 
   cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
 
