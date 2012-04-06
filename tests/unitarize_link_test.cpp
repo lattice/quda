@@ -204,7 +204,7 @@ unitarize_link_test()
 
   gettimeofday(&t0,NULL);
   hisq::unitarizeLinksCuda(qudaGaugeParam,*cudaFatLink, cudaULink, num_failures_dev);
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
   int num_failures=0;

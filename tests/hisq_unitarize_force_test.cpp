@@ -226,7 +226,7 @@ hisq_force_test()
   // First of all we fatten the links on the GPU
   hisqStaplesForceCuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
 
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
 
 
   checkCudaError();
@@ -240,7 +240,7 @@ hisq_force_test()
   if(verify_results){
     unitarizeForceCPU(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
   }
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   checkCudaError();
   cudaFree(unitarization_failed_dev);
 

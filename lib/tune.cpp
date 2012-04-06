@@ -265,7 +265,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
 
     tunable.initTuneParam(param);
     while (tuning) {
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
       cudaGetLastError(); // clear error counter
       cudaEventRecord(start, 0);
       for (int i=0; i<tunable.tuningIter(); i++) {
@@ -274,7 +274,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
       cudaEventRecord(end, 0);
       cudaEventSynchronize(end);
       cudaEventElapsedTime(&elapsed_time, start, end);
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
       error = cudaGetLastError();
       elapsed_time /= (1e3 * tunable.tuningIter());
       if ((elapsed_time < best_time) && (error == cudaSuccess)) {

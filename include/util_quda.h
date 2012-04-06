@@ -64,7 +64,7 @@ extern char hostname[];
 #ifdef HOST_DEBUG
 
 #define checkCudaError() do {                           \
-    cudaThreadSynchronize();				\
+    cudaDeviceSynchronize();				\
   cudaError_t error = cudaGetLastError();               \
   if (error != cudaSuccess)                             \
     errorQuda("(CUDA) %s", cudaGetErrorString(error));  \

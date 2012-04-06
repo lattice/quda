@@ -1418,7 +1418,11 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* siteli
   return;
 }
 
-
+#undef D1
+#undef D2
+#undef D3
+#undef D4
+#undef D1h
 
 #undef DECLARE_VAR_SIGN 
 #undef DECLARE_NEW_X 

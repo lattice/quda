@@ -22,6 +22,11 @@
 #endif
 #endif
 
+#undef D1
+#undef D1h
+#undef D2
+#undef D3
+#undef D4
 #define D1 kparam.D1
 #define D1h kparam.D1h
 #define D2 kparam.D2
