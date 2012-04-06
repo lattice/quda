@@ -8,10 +8,10 @@
 
 
 //DEBUG : control compile 
-//#define COMPILE_HISQ_DP_18 
-//#define COMPILE_HISQ_DP_12 
+#define COMPILE_HISQ_DP_18 
+#define COMPILE_HISQ_DP_12 
 #define COMPILE_HISQ_SP_18 
-//#define COMPILE_HISQ_SP_12
+#define COMPILE_HISQ_SP_12
 
 // Disable texture read for now. Need to revisit this.
 #define HISQ_SITE_MATRIX_LOAD_TEX 1
@@ -1033,6 +1033,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
           } // GOES_FORWARDS(sig)
           checkCudaError();
         }
+
 	
         hisq_kernel_param_t kparam_1g, kparam_2g;
 	

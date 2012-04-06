@@ -9,6 +9,7 @@
 
 
 //namespace hisq{
+#define RETURN_IF_ERR if(err) return;
 
 extern int gauge_order;
 extern int Vh;
@@ -730,6 +731,8 @@ template<class Real>
   template<int oddBit> 
   int Locator<oddBit>::getNeighborFromFullIndex(int full_lattice_index, int dir, int* err)
   {
+    if(err) *err = 0;
+    
      int coord[4];
      int neighbor_index;
      getCoordsFromFullIndex(full_lattice_index, coord);
@@ -821,7 +824,8 @@ struct ColorMatrix
 };
 
   template<class Real, int oddBit> 
-   void computeOneLinkSite(int half_lattice_index, 		
+  void computeOneLinkSite(const int dim[4], 
+			  int half_lattice_index, 		
 			   const Real* const oprod,
 		           int sig, Real coeff,	
 			   const LoadStore<Real>& ls,
@@ -829,8 +833,13 @@ struct ColorMatrix
    {
      if( GOES_FORWARDS(sig) ){
        typename ColorMatrix<Real>::Type colorMatW;
-       ls.loadMatrixFromField(oprod, oddBit, sig, half_lattice_index, &colorMatW);
-       ls.addMatrixToField(colorMatW, oddBit, sig, half_lattice_index, coeff, output);
+#ifdef MULTI_GPU
+       int idx = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
+#else
+       int idx = half_lattice_index;
+#endif
+       ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatW);
+       ls.addMatrixToField(colorMatW, oddBit, sig, idx, coeff, output);
      } 
      return;
    }
@@ -846,7 +855,7 @@ struct ColorMatrix
      const int half_volume = volume/2;
      LoadStore<Real> ls(volume);
      for(int site=0; site<half_volume; ++site){
-	computeOneLinkSite<Real,0>(site, 
+       computeOneLinkSite<Real,0>(dim, site, 
 			   oprod, 
 			   sig, coeff, ls,
 			   output);
@@ -854,7 +863,7 @@ struct ColorMatrix
      }
      // Loop over odd lattice sites
      for(int site=0; site<half_volume; ++site){
-	computeOneLinkSite<Real,1>(site, 
+       computeOneLinkSite<Real,1>(dim, site, 
 			   oprod, 
 			   sig, coeff, ls,
 			   output);
@@ -886,7 +895,6 @@ struct ColorMatrix
 			     Real* const newOprod
 		           )
   {
-
     const bool mu_positive  = (GOES_FORWARDS(mu)) ? true : false;
     const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
 
@@ -895,16 +903,17 @@ struct ColorMatrix
     int point_b, point_c, point_d;
     int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
     int X = locator.getFullFromHalfIndex(half_lattice_index);
-  
-    int new_mem_idx = locator.getNeighborFromFullIndex(X,OPP_DIR(mu));
+
+    int err;
+    int new_mem_idx = locator.getNeighborFromFullIndex(X,OPP_DIR(mu), &err); RETURN_IF_ERR;
     point_d = new_mem_idx >> 1;
     // getNeighborFromFullIndex will work on any site on the lattice, odd or even
-    new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx,sig);
+    new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx,sig, &err); RETURN_IF_ERR;
     point_c = new_mem_idx >> 1;
 
-    new_mem_idx = locator.getNeighborFromFullIndex(X,sig);
+    new_mem_idx = locator.getNeighborFromFullIndex(X,sig); RETURN_IF_ERR;
     point_b = new_mem_idx >> 1; 
-    
+
     ad_link_nbr_idx = (mu_positive) ? point_d : half_lattice_index;
     bc_link_nbr_idx = (mu_positive) ? point_c : point_b;
     ab_link_nbr_idx = (sig_positive) ? half_lattice_index : point_b;
@@ -984,22 +993,27 @@ struct ColorMatrix
 			     Real* const newOprod
 		           )
   {
+
     int volume = 1;
     for(int dir=0; dir<4; ++dir) volume *= dim[dir];
-    const int half_volume = volume/2;
+#ifdef MULTI_GPU
+    const int loop_count = Vh_ex;
+#else
+    const int loop_count = volume/2;
+#endif
    // loop over the lattice volume	
    // To keep the code as close to the GPU code as possible, we'll 
    // loop over the even sites first and then the odd sites
    LoadStore<Real> ls(volume);
-   for(int site=0; site<half_volume; ++site){
-       computeMiddleLinkSite<Real, 0>(site, dim,
+   for(int site=0; site<loop_count; ++site){
+     computeMiddleLinkSite<Real, 0>(site, dim,
 				      oprod, Qprev, link,
 				      sig, mu, coeff,
 				      ls, 
 				      Pmu, P3, Qmu, newOprod);
    }
    // Loop over odd lattice sites
-   for(int site=0; site<half_volume; ++site){
+   for(int site=0; site<loop_count; ++site){
      computeMiddleLinkSite<Real,1>(site, dim,
 				   oprod, Qprev, link,
 				   sig, mu, coeff,
@@ -1033,8 +1047,9 @@ struct ColorMatrix
     int point_d;
     int ad_link_nbr_idx;
     int X = locator.getFullFromHalfIndex(half_lattice_index);
-     
-    int new_mem_idx = locator.getNeighborFromFullIndex(X,OPP_DIR(mu));
+
+    int err;
+    int new_mem_idx = locator.getNeighborFromFullIndex(X,OPP_DIR(mu), &err); RETURN_IF_ERR;
     point_d = new_mem_idx >> 1;
     ad_link_nbr_idx = (mu_positive) ? point_d : half_lattice_index;
 
@@ -1102,10 +1117,14 @@ struct ColorMatrix
     // Need some way of setting half_volume
     int volume = 1;
     for(int dir=0; dir<4; ++dir) volume *= dim[dir];
-    const int half_volume = volume/2;   
+#ifdef MULTI_GPU
+    const int loop_count = Vh_ex;
+#else
+    const int loop_count = volume/2;   
+#endif
     LoadStore<Real> ls(volume);
 
-    for(int site=0; site<half_volume; ++site){
+    for(int site=0; site<loop_count; ++site){
       computeSideLinkSite<Real,0>(site, dim,
 			  	  P3, Qprod, link, 
 			  	  sig, mu, 
@@ -1113,7 +1132,7 @@ struct ColorMatrix
 			  	  ls, shortP, newOprod);
     }
 
-    for(int site=0; site<half_volume; ++site){
+    for(int site=0; site<loop_count; ++site){
       computeSideLinkSite<Real,1>(site, dim,
 			  	  P3, Qprod, link, 
 			  	  sig, mu, 
@@ -1152,14 +1171,15 @@ struct ColorMatrix
 
      Locator<oddBit> locator(dim);
      int X = locator.getFullFromHalfIndex(half_lattice_index);
-  
-     int new_mem_idx = locator.getNeighborFromFullIndex(X,OPP_DIR(mu));
+
+     int err;
+     int new_mem_idx = locator.getNeighborFromFullIndex(X,OPP_DIR(mu), &err); RETURN_IF_ERR;
      point_d = new_mem_idx >> 1;
 
-     new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx,sig);
+     new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx,sig, &err); RETURN_IF_ERR;
      point_c = new_mem_idx >> 1;
 
-     new_mem_idx = locator.getNeighborFromFullIndex(X,sig);
+     new_mem_idx = locator.getNeighborFromFullIndex(X,sig, &err);  RETURN_IF_ERR;
      point_b = new_mem_idx >> 1; 
      ab_link_nbr_idx = (sig_positive) ? half_lattice_index : point_b;
 
@@ -1236,12 +1256,16 @@ struct ColorMatrix
   {
     int volume = 1;
     for(int dir=0; dir<4; ++dir) volume *= dim[dir];
-    const int half_volume = volume/2;
+#ifdef MULTI_GPU
+    const int loop_count = Vh_ex;
+#else
+    const int loop_count = volume/2;
+#endif
 
     LoadStore<Real> ls(volume);
-    for(int site=0; site<half_volume; ++site){
+    for(int site=0; site<loop_count; ++site){
 
-       computeAllLinkSite<Real,0>(site, dim,
+      computeAllLinkSite<Real,0>(site, dim,
 				  oprod, Qprev, link,
 				  sig, mu, 
 				  coeff, accumu_coeff,
@@ -1249,7 +1273,7 @@ struct ColorMatrix
 				  shortP, newOprod);
     }
     
-    for(int site=0; site<half_volume; ++site){
+    for(int site=0; site<loop_count; ++site){
        computeAllLinkSite<Real, 1>(site, dim,
 				   oprod, Qprev, link,
 				   sig, mu, 
@@ -1295,6 +1319,15 @@ struct ColorMatrix
     FiveSt  = staple_coeff.five;
     SevenSt = staple_coeff.seven;
     Lepage  = staple_coeff.lepage;
+
+    for(int sig=0; sig<4; ++sig){
+      computeOneLinkField(dim,
+			  oprod,
+			  sig, OneLink,
+			  newOprod);
+    }
+
+
     // sig labels the net displacement of the staple
     for(int sig=0; sig<8; ++sig){
       for(int mu=0; mu<8; ++mu){
@@ -1315,6 +1348,7 @@ struct ColorMatrix
 				 sig, nu, staple_coeff.five,
 				 Pnumu, P5, Qnumu,
 				 newOprod);	
+
 
           for(int rho=0; rho<8; ++rho){
 	    if(   rho == sig || rho == OPP_DIR(sig)
@@ -1361,11 +1395,6 @@ struct ColorMatrix
       } // mu	
     }  // sig
     
-    for(int sig=0; sig<4; ++sig)
-	computeOneLinkField(dim, 
-			    oprod, 
-			    sig, OneLink,
-			    newOprod);
     // Need also to compute the one-link contribution 
   return;
   }
@@ -1386,12 +1415,18 @@ struct ColorMatrix
   {
     int volume = 1;
     for(int dir=0; dir<4; ++dir) volume *= param.X[dir];
+
+#ifdef MULTI_GPU
+    int len = Vh_ex*2;
+#else
+    int len = volume;
+#endif    
     // allocate memory for temporary fields
     void* tempmat[6]; 
     if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
-      for(int i=0; i<6; ++i) tempmat[i] = malloc(volume*18*sizeof(double));
+      for(int i=0; i<6; ++i) tempmat[i] = malloc(len*18*sizeof(double));
     }else{
-      for(int i=0; i<6; ++i) tempmat[i] = malloc(volume*18*sizeof(float));
+      for(int i=0; i<6; ++i) tempmat[i] = malloc(len*18*sizeof(float));
     }
 
     PathCoefficients<double> act_path_coeff;
