@@ -90,6 +90,9 @@ extern "C" {
    */
   typedef struct QudaInvertParam_s {
 
+    QudaFieldLocation sol_location; /**< The location of the solution field */
+    QudaFieldLocation src_location; /**< The location of the source field */
+
     QudaDslashType dslash_type;
     QudaInverterType inv_type;
 

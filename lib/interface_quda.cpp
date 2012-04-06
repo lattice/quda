@@ -632,12 +632,13 @@ static void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolu
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1);
+  ColorSpinorParam cpuParam(h_in, inv_param->src_location, *inv_param, gaugePrecise->X(), 1);
+
+  ColorSpinorField *in_h = (inv_param->src_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
-
-  cpuColorSpinorField hIn(cpuParam);
-
-  cudaColorSpinorField in(hIn, cudaParam);
+  cudaColorSpinorField in(*in_h, cudaParam);
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaColorSpinorField out(in, cudaParam);
@@ -660,8 +661,11 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   delete dirac; // clean up
 
   cpuParam.v = h_out;
-  cpuColorSpinorField hOut(cpuParam);
-  hOut = out;
+  cpuParam.fieldLocation = inv_param->sol_location;
+
+  ColorSpinorField *out_h = (inv_param->sol_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  *out_h = out;
 }
 
 
@@ -670,7 +674,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc);
+  ColorSpinorParam cpuParam(h_in, QUDA_CPU_FIELD_LOCATION, *inv_param, gaugePrecise->X(), pc);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
@@ -711,7 +715,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc);
+  ColorSpinorParam cpuParam(h_in, QUDA_CPU_FIELD_LOCATION, *inv_param, gaugePrecise->X(), pc);
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
 
   cpuColorSpinorField hIn(cpuParam);
@@ -831,7 +835,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   const int *X = cudaGauge->X();
 
   // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
+  ColorSpinorParam cpuParam(hp_b, QUDA_CPU_FIELD_LOCATION, *param, X, pc_solution);
   h_b = new cpuColorSpinorField(cpuParam);
   cpuParam.v = hp_x;
   h_x = new cpuColorSpinorField(cpuParam);
@@ -1060,7 +1064,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // the definitions in param, the dimensions X, and whether the solution is on 
   // a checkerboard instruction or not. These can then be used as 'instructions' 
   // to create the actual colorSpinorField
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
+  ColorSpinorParam cpuParam(hp_b, QUDA_CPU_FIELD_LOCATION, *param, X, pc_solution);
   h_b = new cpuColorSpinorField(cpuParam);
 
   h_x = new cpuColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
@@ -1399,7 +1403,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // the definitions in param, the dimensions X, and whether the solution is on 
   // a checkerboard instruction or not. These can then be used as 'instructions' 
   // to create the actual colorSpinorField
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
+  ColorSpinorParam cpuParam(hp_b, QUDA_CPU_FIELD_LOCATION, *param, X, pc_solution);
   h_b = new cpuColorSpinorField(cpuParam);
 
   h_x = new cpuColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION

@@ -57,9 +57,8 @@ class ColorSpinorParam {
     }
   
   // used to create cpu params
- ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
-   : fieldLocation(QUDA_CPU_FIELD_LOCATION), nColor(3), 
-    nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
+ ColorSpinorParam(void *V, QudaFieldLocation location, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
+   : fieldLocation(location), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
     precision(inv_param.cpu_prec), pad(0), twistFlavor(inv_param.twist_flavor), 
     siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
     fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
@@ -81,7 +80,11 @@ class ColorSpinorParam {
       x[4] = inv_param.Ls;
     }
 
-    if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
+      fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
+	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
+      siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    } else if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       siteOrder = QUDA_ODD_EVEN_SITE_ORDER;
     } else if (inv_param.dirac_order == QUDA_QDP_DIRAC_ORDER) {

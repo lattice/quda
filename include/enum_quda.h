@@ -133,6 +133,7 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaDiracFieldOrder_s {
+    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used by QUDA, varies depending on precision and dslash type
     QUDA_DIRAC_ORDER,            // even-odd, color inside spin
     QUDA_QDP_DIRAC_ORDER,        // even-odd, spin inside color
     QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
