@@ -106,9 +106,6 @@ int initClover = 0;
 int initDomainWall = 0;
 int initStaggered = 0;
 
-bool qudaPt0 = true;   // Single core versions always to Boundary
-bool qudaPtNm1 = true;
-
 void initCommonConstants(const LatticeField &lat) {
   int Vh = lat.VolumeCB();
   cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
@@ -251,8 +248,16 @@ void initCommonConstants(const LatticeField &lat) {
   Vh_2d_max = MAX(Vh_2d_max, X3*X4/2);
   cudaMemcpyToSymbol("Vh_2d_max", &Vh_2d_max, sizeof(int));
 
-  cudaMemcpyToSymbol("Pt0", &(qudaPt0), sizeof(bool)); 
-  cudaMemcpyToSymbol("PtNm1", &(qudaPtNm1), sizeof(bool)); 
+#ifdef MULTI_GPU
+  bool first_node_in_t = (commCoords(3) == 0);
+  bool last_node_in_t = (commCoords(3) == commDim(3)-1);
+#else
+  bool first_node_in_t = true;
+  bool last_node_in_t = true;
+#endif
+
+  cudaMemcpyToSymbol("Pt0", &(first_node_in_t), sizeof(bool)); 
+  cudaMemcpyToSymbol("PtNm1", &(last_node_in_t), sizeof(bool)); 
 
   checkCudaError();
 

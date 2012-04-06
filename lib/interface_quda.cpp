@@ -64,8 +64,6 @@
 #ifdef QMP_COMMS
 int rank_QMP;
 int num_QMP;
-extern bool qudaPt0;
-extern bool qudaPtNm1;
 #endif
 
 #include "face_quda.h"
@@ -162,13 +160,6 @@ void initQuda(int dev)
   if (dev < 0) errorQuda("Invalid device number");
 #endif
   
-  // Used for applying the gauge field boundary condition
-  if( commCoords(3) == 0 ) qudaPt0=true;
-  else qudaPt0=false;
-
-  if( commCoords(3) == commDim(3)-1 ) qudaPtNm1=true;
-  else qudaPtNm1=false;
-
   cudaGetDeviceProperties(&deviceProp, dev);
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
