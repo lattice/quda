@@ -306,53 +306,6 @@ extern int Vh_ex;
   }
 
 
-template<class Real>
-void MATRIX_PRODUCT(const Matrix<3,std::complex<Real> >& a, 
-		    const Matrix<3,std::complex<Real> >&b, 
-		    int simple, 
-		    Matrix<3,std::complex<Real> >& c)
-{
-  if(simple){                               
-      c(0,0).real( a(0,0).real()*b(0,0).real() - a(0,0).imag()*b(0,0).imag() + a(0,1).real()*b(1,0).real() - a(0,1).imag()*b(1,0).imag() + a(0,2).real()*b(2,0).real() - a(0,2).imag()*b(2,0).imag()); 
-      c(0,0).imag(  a(0,0).real()*b(0,0).imag() + a(0,0).imag()*b(0,0).real() + a(0,1).real()*b(1,0).imag() + a(0,1).imag()*b(1,0).real() + a(0,2).real()*b(2,0).imag() + a(0,2).imag()*b(2,0).real()); 
-      c(0,1).real( a(0,0).real()*b(0,1).real() - a(0,0).imag()*b(0,1).imag() + a(0,1).real()*b(1,1).real() - a(0,1).imag()*b(1,1).imag() + a(0,2).real()*b(2,1).real() - a(0,2).imag()*b(2,1).imag()); 
-      c(0,1).imag(  a(0,0).real()*b(0,1).imag() + a(0,0).imag()*b(0,1).real() + a(0,1).real()*b(1,1).imag() + a(0,1).imag()*b(1,1).real() + a(0,2).real()*b(2,1).imag() + a(0,2).imag()*b(2,1).real()); 
-      c(0,2).real( a(0,0).real()*b(0,2).real() - a(0,0).imag()*b(0,2).imag() + a(0,1).real()*b(1,2).real() - a(0,1).imag()*b(1,2).imag() + a(0,2).real()*b(2,2).real() - a(0,2).imag()*b(2,2).imag()); 
-      c(0,2).imag(  a(0,0).real()*b(0,2).imag() + a(0,0).imag()*b(0,2).real() + a(0,1).real()*b(1,2).imag() + a(0,1).imag()*b(1,2).real() + a(0,2).real()*b(2,2).imag() + a(0,2).imag()*b(2,2).real()); 
-      c(1,0).real( a(1,0).real()*b(0,0).real() - a(1,0).imag()*b(0,0).imag() + a(1,1).real()*b(1,0).real() - a(1,1).imag()*b(1,0).imag() + a(1,2).real()*b(2,0).real() - a(1,2).imag()*b(2,0).imag()); 
-      c(1,0).imag(  a(1,0).real()*b(0,0).imag() + a(1,0).imag()*b(0,0).real() + a(1,1).real()*b(1,0).imag() + a(1,1).imag()*b(1,0).real() + a(1,2).real()*b(2,0).imag() + a(1,2).imag()*b(2,0).real()); 
-      c(1,1).real( a(1,0).real()*b(0,1).real() - a(1,0).imag()*b(0,1).imag() + a(1,1).real()*b(1,1).real() - a(1,1).imag()*b(1,1).imag() + a(1,2).real()*b(2,1).real() - a(1,2).imag()*b(2,1).imag()); 
-      c(1,1).imag(  a(1,0).real()*b(0,1).imag() + a(1,0).imag()*b(0,1).real() + a(1,1).real()*b(1,1).imag() + a(1,1).imag()*b(1,1).real() + a(1,2).real()*b(2,1).imag() + a(1,2).imag()*b(2,1).real()); 
-      c(1,2).real( a(1,0).real()*b(0,2).real() - a(1,0).imag()*b(0,2).imag() + a(1,1).real()*b(1,2).real() - a(1,1).imag()*b(1,2).imag() + a(1,2).real()*b(2,2).real() - a(1,2).imag()*b(2,2).imag()); 
-      c(1,2).imag(  a(1,0).real()*b(0,2).imag() + a(1,0).imag()*b(0,2).real() + a(1,1).real()*b(1,2).imag() + a(1,1).imag()*b(1,2).real() + a(1,2).real()*b(2,2).imag() + a(1,2).imag()*b(2,2).real()); 
-      c(2,0).real( a(2,0).real()*b(0,0).real() - a(2,0).imag()*b(0,0).imag() + a(2,1).real()*b(1,0).real() - a(2,1).imag()*b(1,0).imag() + a(2,2).real()*b(2,0).real() - a(2,2).imag()*b(2,0).imag()); 
-      c(2,0).imag(  a(2,0).real()*b(0,0).imag() + a(2,0).imag()*b(0,0).real() + a(2,1).real()*b(1,0).imag() + a(2,1).imag()*b(1,0).real() + a(2,2).real()*b(2,0).imag() + a(2,2).imag()*b(2,0).real()); 
-      c(2,1).real( a(2,0).real()*b(0,1).real() - a(2,0).imag()*b(0,1).imag() + a(2,1).real()*b(1,1).real() - a(2,1).imag()*b(1,1).imag() + a(2,2).real()*b(2,1).real() - a(2,2).imag()*b(2,1).imag()); 
-      c(2,1).imag(  a(2,0).real()*b(0,1).imag() + a(2,0).imag()*b(0,1).real() + a(2,1).real()*b(1,1).imag() + a(2,1).imag()*b(1,1).real() + a(2,2).real()*b(2,1).imag() + a(2,2).imag()*b(2,1).real()); 
-      c(2,2).real( a(2,0).real()*b(0,2).real() - a(2,0).imag()*b(0,2).imag() + a(2,1).real()*b(1,2).real() - a(2,1).imag()*b(1,2).imag() + a(2,2).real()*b(2,2).real() - a(2,2).imag()*b(2,2).imag()); 
-      c(2,2).imag(  a(2,0).real()*b(0,2).imag() + a(2,0).imag()*b(0,2).real() + a(2,1).real()*b(1,2).imag() + a(2,1).imag()*b(1,2).real() + a(2,2).real()*b(2,2).imag() + a(2,2).imag()*b(2,2).real()); 
-  }else{                                      
-      c(0,0).real( a(0,0).real()*b(0,0).real() + a(0,0).imag()*b(0,0).imag() + a(1,0).real()*b(1,0).real() + a(1,0).imag()*b(1,0).imag() + a(2,0).real()*b(2,0).real() + a(2,0).imag()*b(2,0).imag()); 
-      c(0,0).imag(  a(0,0).real()*b(0,0).imag() - a(0,0).imag()*b(0,0).real() + a(1,0).real()*b(1,0).imag() - a(1,0).imag()*b(1,0).real() + a(2,0).real()*b(2,0).imag() - a(2,0).imag()*b(2,0).real());
-      c(0,1).real( a(0,0).real()*b(0,1).real() + a(0,0).imag()*b(0,1).imag() + a(1,0).real()*b(1,1).real() + a(1,0).imag()*b(1,1).imag() + a(2,0).real()*b(2,1).real() + a(2,0).imag()*b(2,1).imag()); 
-      c(0,1).imag(  a(0,0).real()*b(0,1).imag() - a(0,0).imag()*b(0,1).real() + a(1,0).real()*b(1,1).imag() - a(1,0).imag()*b(1,1).real() + a(2,0).real()*b(2,1).imag() - a(2,0).imag()*b(2,1).real()); 
-      c(0,2).real( a(0,0).real()*b(0,2).real() + a(0,0).imag()*b(0,2).imag() + a(1,0).real()*b(1,2).real() + a(1,0).imag()*b(1,2).imag() + a(2,0).real()*b(2,2).real() + a(2,0).imag()*b(2,2).imag()); 
-      c(0,2).imag(  a(0,0).real()*b(0,2).imag() - a(0,0).imag()*b(0,2).real() + a(1,0).real()*b(1,2).imag() - a(1,0).imag()*b(1,2).real() + a(2,0).real()*b(2,2).imag() - a(2,0).imag()*b(2,2).real()); 
-      c(1,0).real( a(0,1).real()*b(0,0).real() + a(0,1).imag()*b(0,0).imag() + a(1,1).real()*b(1,0).real() + a(1,1).imag()*b(1,0).imag() + a(2,1).real()*b(2,0).real() + a(2,1).imag()*b(2,0).imag()); 
-      c(1,0).imag(  a(0,1).real()*b(0,0).imag() - a(0,1).imag()*b(0,0).real() + a(1,1).real()*b(1,0).imag() - a(1,1).imag()*b(1,0).real() + a(2,1).real()*b(2,0).imag() - a(2,1).imag()*b(2,0).real()); 
-      c(1,1).real( a(0,1).real()*b(0,1).real() + a(0,1).imag()*b(0,1).imag() + a(1,1).real()*b(1,1).real() + a(1,1).imag()*b(1,1).imag() + a(2,1).real()*b(2,1).real() + a(2,1).imag()*b(2,1).imag()); 
-      c(1,1).imag(  a(0,1).real()*b(0,1).imag() - a(0,1).imag()*b(0,1).real() + a(1,1).real()*b(1,1).imag() - a(1,1).imag()*b(1,1).real() + a(2,1).real()*b(2,1).imag() - a(2,1).imag()*b(2,1).real()); 
-      c(1,2).real( a(0,1).real()*b(0,2).real() + a(0,1).imag()*b(0,2).imag() + a(1,1).real()*b(1,2).real() + a(1,1).imag()*b(1,2).imag() + a(2,1).real()*b(2,2).real() + a(2,1).imag()*b(2,2).imag()); 
-      c(1,2).imag(  a(0,1).real()*b(0,2).imag() - a(0,1).imag()*b(0,2).real() + a(1,1).real()*b(1,2).imag() - a(1,1).imag()*b(1,2).real() + a(2,1).real()*b(2,2).imag() - a(2,1).imag()*b(2,2).real()); 
-      c(2,0).real( a(0,2).real()*b(0,0).real() + a(0,2).imag()*b(0,0).imag() + a(1,2).real()*b(1,0).real() + a(1,2).imag()*b(1,0).imag() + a(2,2).real()*b(2,0).real() + a(2,2).imag()*b(2,0).imag()); 
-      c(2,0).imag(  a(0,2).real()*b(0,0).imag() - a(0,2).imag()*b(0,0).real() + a(1,2).real()*b(1,0).imag() - a(1,2).imag()*b(1,0).real() + a(2,2).real()*b(2,0).imag() - a(2,2).imag()*b(2,0).real()); 
-      c(2,1).real( a(0,2).real()*b(0,1).real() + a(0,2).imag()*b(0,1).imag() + a(1,2).real()*b(1,1).real() + a(1,2).imag()*b(1,1).imag() + a(2,2).real()*b(2,1).real() + a(2,2).imag()*b(2,1).imag()); 
-      c(2,1).imag(  a(0,2).real()*b(0,1).imag() - a(0,2).imag()*b(0,1).real() + a(1,2).real()*b(1,1).imag() - a(1,2).imag()*b(1,1).real() + a(2,2).real()*b(2,1).imag() - a(2,2).imag()*b(2,1).real()); 
-      c(2,2).real( a(0,2).real()*b(0,2).real() + a(0,2).imag()*b(0,2).imag() + a(1,2).real()*b(1,2).real() + a(1,2).imag()*b(1,2).imag() + a(2,2).real()*b(2,2).real() + a(2,2).imag()*b(2,2).imag()); 
-      c(2,2).imag(  a(0,2).real()*b(0,2).imag() - a(0,2).imag()*b(0,2).real() + a(1,2).real()*b(1,2).imag() - a(1,2).imag()*b(1,2).real() + a(2,2).real()*b(2,2).imag() - a(2,2).imag()*b(2,2).real()); 
-  }
-  return;    
-}
 
   template<class Real>
   class LoadStore{
@@ -477,8 +430,8 @@ template<class Real>
    int offset = 0;
    for(int i=0; i<3; ++i){
      for(int j=0; j<3; ++j){
-       (*mat)(i,j).real(*(field + (oddBit*hfv + half_lattice_index)*18 + offset++));
-       (*mat)(i,j).imag(*(field + (oddBit*hfv + half_lattice_index)*18 + offset++));
+       (*mat)(i,j) = (*(field + (oddBit*hfv + half_lattice_index)*18 + offset++));
+       (*mat)(i,j) += std::complex<Real>(0, *(field + (oddBit*hfv + half_lattice_index)*18 + offset++));
      }
    }
     return;
@@ -502,10 +455,8 @@ template<class Real>
     int offset = 0;
     for(int i=0; i<3; ++i){
       for(int j=0; j<3; ++j){
-        //(*mat)(i,j).real(local_field[offset++]);
-	(*mat)(i,j).real(getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
-        //(*mat)(i,j).imag(local_field[offset++]);
-	(*mat)(i,j).imag(getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
+	(*mat)(i,j) = (getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
+	(*mat)(i,j) += std::complex<Real>(0, getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
       }
     }
     return;
