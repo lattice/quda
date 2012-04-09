@@ -25,15 +25,15 @@
 #endif
 
 #include <cuda.h>
+
 #ifdef MULTI_GPU
 #ifdef MPI_COMMS
 #include <mpi.h>
 #endif
-
 #ifdef QMP_COMMS
 #include <qmp.h>
 #endif
-#endif
+#endif // MULTI_GPU
 
 #ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
@@ -75,9 +75,10 @@ cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
 
-cudaGaugeField *gaugeFatPrecise = NULL;
-cudaGaugeField *gaugeFatSloppy = NULL;
-cudaGaugeField *gaugeFatPrecondition = NULL;
+// It's important that these alias the above so that constants are set correctly in Dirac::Dirac()
+cudaGaugeField *&gaugeFatPrecise = gaugePrecise;
+cudaGaugeField *&gaugeFatSloppy = gaugeSloppy;
+cudaGaugeField *&gaugeFatPrecondition = gaugePrecondition;
 
 cudaGaugeField *gaugeLongPrecise = NULL;
 cudaGaugeField *gaugeLongSloppy = NULL;
@@ -185,12 +186,12 @@ void initQuda(int dev)
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
   }
+  createDslashEvents();
 
   quda::initBlas();
 
   loadTuneCache(QUDA_VERBOSE);
 }
-
 
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
@@ -408,6 +409,7 @@ void freeGaugeQuda(void)
   gaugeFatPrecise = NULL;
 }
 
+
 void freeCloverQuda(void)
 {
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
@@ -418,6 +420,7 @@ void freeCloverQuda(void)
   cloverSloppy = NULL;
   cloverPrecise = NULL;
 }
+
 
 void endQuda(void)
 {
@@ -434,6 +437,7 @@ void endQuda(void)
     delete []streams;
     streams = NULL;
   }
+  destroyDslashEvents();
 
   saveTuneCache(QUDA_VERBOSE);
 }
@@ -1700,8 +1704,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     cudaSiteLink = new cudaGaugeField(gParam);
   }
   
-  initCommonConstants(*cudaFatLink);
-  
+  initLatticeConstants(*cudaFatLink);  
   
   if(method == QUDA_COMPUTE_FAT_STANDARD){
     llfat_init_cuda(qudaGaugeParam);
@@ -1826,7 +1829,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   
   
-  initCommonConstants(*cudaMom);
+  initLatticeConstants(*cudaMom);
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
   
 #ifdef MULTI_GPU

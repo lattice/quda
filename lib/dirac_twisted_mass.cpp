@@ -22,13 +22,12 @@ void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSp
 {
   checkParitySpinor(out, in);
   
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
-
   if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
     errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
   double flavor_mu = in.TwistFlavor() * mu;
   
+  initSpinorConstants(in);
   twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType);
 
   flops += 24*in.Volume();
@@ -128,7 +127,6 @@ void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpin
 void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 				const QudaParity parity) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
@@ -140,11 +138,13 @@ void DiracTwistedMassPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinor
   if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+    initSpinorConstants(in);
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, flavor_mu, 0.0, commDim);
     flops += (1320+72)*in.Volume();
   } else { // safe to use tmp2 here which may alias in
     bool reset = newTmp(&tmp2, in);
 
+    initSpinorConstants(in);
     TwistInv(*tmp2, in);
     DiracWilson::Dslash(out, *tmp2, parity);
 
@@ -163,7 +163,6 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
 				    const QudaParity parity, const cudaColorSpinorField &x,
 				    const double &k) const
 {
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
@@ -175,12 +174,13 @@ void DiracTwistedMassPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSp
   if (!dagger) {
     double flavor_mu = in.TwistFlavor() * mu;
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+    initSpinorConstants(in);
     twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, 
 			  flavor_mu, k, commDim);
     flops += (1320+96)*in.Volume();
   } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
     bool reset = newTmp(&tmp1, in);
-
+    initSpinorConstants(in);
     TwistInv(*tmp1, in);
     DiracWilson::Dslash(out, *tmp1, parity);
     xpayCuda((cudaColorSpinorField&)x, k, out);

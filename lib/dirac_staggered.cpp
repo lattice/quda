@@ -2,20 +2,20 @@
 #include <blas_quda.h>
 
 DiracStaggered::DiracStaggered(const DiracParam &param) : 
-  Dirac(param), fatGauge(param.fatGauge), longGauge(param.longGauge), 
+  Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
   face(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
   //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
 {
-
+  initStaggeredConstants(fatGauge, longGauge);
 }
 
 DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
-  fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face) { }
-
-DiracStaggered::~DiracStaggered()
+  fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face)
 {
-
+  initStaggeredConstants(fatGauge, longGauge);
 }
+
+DiracStaggered::~DiracStaggered() { }
 
 DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac)
 {
@@ -25,7 +25,6 @@ DiracStaggered& DiracStaggered::operator=(const DiracStaggered &dirac)
     longGauge = dirac.longGauge;
     face = dirac.face;
   }
- 
   return *this;
 }
 
@@ -44,9 +43,9 @@ void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cud
 	      in.SiteSubset(), out.SiteSubset());
   }
 
-  if ((out.Volume() != 2*fatGauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-      (out.Volume() != fatGauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-    errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge->VolumeCB());
+  if ((out.Volume() != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+      (out.Volume() != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+    errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge.VolumeCB());
   }
 }
 
@@ -54,14 +53,11 @@ void DiracStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cud
 void DiracStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			 const QudaParity parity) const
 {
-  if (!initDslash) {
-    initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants(*fatGauge, *longGauge);
-  }
   checkParitySpinor(in, out);
 
+  initSpinorConstants(in);
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, 0, 0, commDim);
+  staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim);
   
   flops += 1146*in.Volume();
 }
@@ -70,14 +66,11 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 				const QudaParity parity, const cudaColorSpinorField &x,
 				const double &k) const
 {    
-  if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants(*fatGauge, *longGauge);
-  }
   checkParitySpinor(in, out);
 
+  initSpinorConstants(in);
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-  staggeredDslashCuda(&out, *fatGauge, *longGauge, &in, parity, dagger, &x, k, commDim);
+  staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim);
   
   flops += (1146+12)*in.Volume();
 }
@@ -85,11 +78,6 @@ void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinor
 // Full staggered operator
 void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-  if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants(*fatGauge, *longGauge);
-  }
-
   bool reset = newTmp(&tmp1, in.Even());
 
   DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp1, 2*mass);  
@@ -100,12 +88,6 @@ void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in
 
 void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-
-  if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants(*fatGauge, *longGauge);
-  }
-  
   bool reset = newTmp(&tmp1, in);
   
   cudaColorSpinorField* mytmp = dynamic_cast<cudaColorSpinorField*>(&(tmp1->Even()));
@@ -177,11 +159,6 @@ void DiracStaggeredPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &
 
 void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
-  if (!initDslash){
-    initDslashConstants(*fatGauge, in.Stride());
-    initStaggeredConstants(*fatGauge, *longGauge);
-  }
-  
   bool reset = newTmp(&tmp1, in);
   
   QudaParity parity = QUDA_INVALID_PARITY;
@@ -214,7 +191,3 @@ void DiracStaggeredPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpino
 {
   // do nothing
 }
-
-
-
-
