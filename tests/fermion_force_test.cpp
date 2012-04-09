@@ -53,7 +53,7 @@ setDims(int *X) {
   Vh = V/2;
 }
 
-extern void initCommonConstants(const LatticeField &gauge);
+extern void initLatticeConstants(const LatticeField &gauge);
 
 static void
 fermion_force_init()
@@ -162,7 +162,7 @@ fermion_force_test(void)
 {
  
   fermion_force_init();
-  initCommonConstants(*cudaGauge);
+  initLatticeConstants(*cudaGauge);
   fermion_force_init_cuda(&gaugeParam);
 
     

@@ -73,7 +73,8 @@ setDims(int *X){
 }
 
 
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
+void initLatticeConstants(const LatticeField &lat);
+void initGaugeConstants(const cudaGaugeField &gauge);
 
 
 // allocate memory
@@ -186,7 +187,8 @@ hisq_force_test()
 {
   hisq_force_init();
 
-  initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
+  initLatticeConstants(*cudaGauge);
+  initGaugeConstants(*cudaGauge);
   hisqForceInitCuda(&gaugeParam);
 
   float act_path_coeff[6];

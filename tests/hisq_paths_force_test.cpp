@@ -218,8 +218,8 @@ total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io,
   return ;  
 }
 
-
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
+void initLatticeConstants(const LatticeField &lat);
+void initGaugeConstants(const cudaGaugeField &gauge);
 
 
 // allocate memory
@@ -555,7 +555,8 @@ hisq_force_test(void)
 {
   hisq_force_init();
 
-  initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
+  initLatticeConstants(*cudaGauge);
+  initGaugeConstants(*cudaGauge);
   hisqForceInitCuda(&qudaGaugeParam);
 
 

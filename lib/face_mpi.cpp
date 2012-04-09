@@ -13,14 +13,6 @@
 
 using namespace std;
 
-#ifdef DSLASH_PROFILING
-  void printDslashProfile();
-#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
-#else
-#define CUDA_EVENT_RECORD(a,b)
-#define DSLASH_TIME_PROFILE()
-#endif
-
 cudaStream_t *stream;
 
 bool globalReduce = true;
@@ -349,9 +341,6 @@ int commCoords(int dir) { return comm_coords(dir); }
 int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
 void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
-
-void commBarrier() { comm_barrier(); }
-
 
 
 /**************************************************************
