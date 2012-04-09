@@ -196,8 +196,9 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 
 		typename RealTypeId<Cmplx>::Type cosTheta; 
 		if(fabs(s) >= FL_UNITARIZE_EPS){
+		  const typename RealTypeId<Cmplx>::Type sqrt_s = sqrt(s);
 		  r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
-		  cosTheta = r/sqrt(s*s*s);
+		  cosTheta = r/(sqrt_s*sqrt_s*sqrt_s);
 		  if(fabs(cosTheta) >= 1.0){
 		    if( r > 0 ){ 
 			theta = 0.0;
@@ -207,9 +208,9 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 		  }else{ 
 			theta = acos(cosTheta);
 		  }
-		  g[0] = c[0]/3 + 2*sqrt(s)*cos( theta/3 );
-		  g[1] = c[0]/3 + 2*sqrt(s)*cos( theta/3 + FL_UNITARIZE_PI23 );
- 		  g[2] = c[0]/3 + 2*sqrt(s)*cos( theta/3 + 2*FL_UNITARIZE_PI23 );
+		  g[0] = c[0]/3 + 2*sqrt_s*cos( theta/3 );
+		  g[1] = c[0]/3 + 2*sqrt_s*cos( theta/3 + FL_UNITARIZE_PI23 );
+ 		  g[2] = c[0]/3 + 2*sqrt_s*cos( theta/3 + 2*FL_UNITARIZE_PI23 );
 		}
                 
 		// Check the eigenvalues, if the determinant does not match the product of the eigenvalues
@@ -298,7 +299,8 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 	if(isUnitary(*result,FL_MAX_ERROR)==false)
 	{
 #if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
-          printf("ERROR: Unitarized link is not consistent with incoming link\n");
+          printf("ERROR: Link unitarity test failed\n");
+          printf("TOLERANCE: %g\n, FL_MAX_ERROR");
 #endif
 	  return false;
 	}
