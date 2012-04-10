@@ -100,8 +100,8 @@ float dslashTime;
 #define DSLASH_TIME_PROFILE()
 #endif
 
-FaceBuffer *face;
-cudaColorSpinorField *inSpinor;
+static FaceBuffer *face;
+static cudaColorSpinorField *inSpinor;
 
 // For tuneLaunch() to uniquely identify a suitable set of launch parameters, we need copies of a few of
 // the constants set by initDslashConstants().
@@ -155,6 +155,10 @@ static inline __device__ float2 short22float2(short2 a) {
 }
 #endif // DIRECT_ACCESS inclusions
 
+// Enable shared memory dslash for Fermi architecture
+//#define SHARED_WILSON_DSLASH
+//#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
+
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
@@ -194,9 +198,81 @@ void initCache() {
 
 }
 
+
 void setFace(const FaceBuffer &Face) {
   face = (FaceBuffer*)&Face; // nasty
 }
+
+
+void createDslashEvents()
+{
+ #ifndef DSLASH_PROFILING
+  // add cudaEventDisableTiming for lower sync overhead
+  for (int i=0; i<Nstream; i++) {
+    cudaEventCreate(&packEnd[i], cudaEventDisableTiming);
+    cudaEventCreate(&gatherStart[i], cudaEventDisableTiming);
+    cudaEventCreate(&gatherEnd[i], cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+  }
+#else
+  cudaEventCreate(&dslashStart);
+  cudaEventCreate(&dslashEnd);
+  for (int i=0; i<Nstream; i++) {
+    cudaEventCreate(&packStart[i]);
+    cudaEventCreate(&packEnd[i]);
+
+    cudaEventCreate(&gatherStart[i]);
+    cudaEventCreate(&gatherEnd[i]);
+
+    cudaEventCreate(&scatterStart[i]);
+    cudaEventCreate(&scatterEnd[i]);
+
+    cudaEventCreate(&kernelStart[i]);
+    cudaEventCreate(&kernelEnd[i]);
+
+    kernelTime[i][0] = 0.0;
+    kernelTime[i][1] = 0.0;
+
+    gatherTime[i][0] = 0.0;
+    gatherTime[i][1] = 0.0;
+
+    commsTime[i][0] = 0.0;
+    commsTime[i][1] = 0.0;
+
+    scatterTime[i][0] = 0.0;
+    scatterTime[i][1] = 0.0;
+  }
+#endif
+
+  checkCudaError();
+}
+
+
+void destroyDslashEvents()
+{
+  for (int i=0; i<Nstream; i++) {
+    cudaEventDestroy(packEnd[i]);
+    cudaEventDestroy(gatherStart[i]);
+    cudaEventDestroy(gatherEnd[i]);
+    cudaEventDestroy(scatterStart[i]);
+    cudaEventDestroy(scatterEnd[i]);
+  }
+
+#ifdef DSLASH_PROFILING
+  cudaEventDestroy(dslashStart);
+  cudaEventDestroy(dslashEnd);
+
+  for (int i=0; i<Nstream; i++) {
+    cudaEventDestroy(packStart[i]);
+    cudaEventDestroy(kernelStart[i]);
+    cudaEventDestroy(kernelEnd[i]);
+  }
+#endif
+
+  checkCudaError();
+}
+
 
 #define MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...)            \
   if (x==0) {                                                                                                     \
@@ -343,7 +419,7 @@ TuneKey DslashCuda::tuneKey() const
 /** This derived class is specifically for driving the Dslash kernels
     that use shared memory blocking.  This only applies on Fermi and
     upwards, and only for the interior kernels. */
-#if (__COMPUTE_CAPABILITY__ >= 200) 
+#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) 
 class SharedDslashCuda : public DslashCuda {
  protected:
   int sharedBytesPerBlock() const { return 0; } // FIXME: this isn't quite true, but works
@@ -513,8 +589,10 @@ class WilsonDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+#ifdef SHARED_WILSON_DSLASH
     if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
+#endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, x, xNorm, a);
@@ -605,8 +683,10 @@ class CloverDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+#ifdef SHARED_WILSON_DSLASH
     if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
+#endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(cloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
@@ -712,8 +792,10 @@ class TwistedDslashCuda : public SharedDslashCuda {
 
   void apply(const cudaStream_t &stream)
   {
+#ifdef SHARED_WILSON_DSLASH
     if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
+#endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(twistedMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, in, inNorm, a, b, x, xNorm);
@@ -1005,7 +1087,7 @@ int commsCompleted[Nstream];
 int commDimTotal;
 
 /**
-   Initialize the arrays used for the dynamic scheduling.
+ * Initialize the arrays used for the dynamic scheduling.
  */
 void initDslashCommsPattern() {
   for (int i=0; i<Nstream-1; i++) {

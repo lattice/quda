@@ -276,9 +276,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   
   const int ga_idx = sid;
   
-  // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride);
-  
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
   spinorFloat a2_re, a2_im;
@@ -324,6 +321,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
     
   }
 #endif // MULTI_GPU
+  
+  // read gauge matrix from device memory
+  READ_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(0);
@@ -471,9 +471,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   const int ga_idx = sp_idx;
 #endif
   
-  // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, ga_stride);
-  
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
   spinorFloat a2_re, a2_im;
@@ -519,6 +516,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
     
   }
 #endif // MULTI_GPU
+  
+  // read gauge matrix from device memory
+  READ_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, ga_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(1);
@@ -662,9 +662,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   
   const int ga_idx = sid;
   
-  // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride);
-  
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
   spinorFloat a2_re, a2_im;
@@ -710,6 +707,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
     
   }
 #endif // MULTI_GPU
+  
+  // read gauge matrix from device memory
+  READ_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(2);
@@ -857,9 +857,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   const int ga_idx = sp_idx;
 #endif
   
-  // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, ga_stride);
-  
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
   spinorFloat a2_re, a2_im;
@@ -905,6 +902,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
     
   }
 #endif // MULTI_GPU
+  
+  // read gauge matrix from device memory
+  READ_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, ga_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(3);
@@ -1048,9 +1048,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   
   const int ga_idx = sid;
   
-  // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride);
-  
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
   spinorFloat a2_re, a2_im;
@@ -1096,6 +1093,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
     
   }
 #endif // MULTI_GPU
+  
+  // read gauge matrix from device memory
+  READ_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(4);
@@ -1243,9 +1243,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   const int ga_idx = sp_idx;
 #endif
   
-  // read gauge matrix from device memory
-  READ_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, ga_stride);
-  
   spinorFloat a0_re, a0_im;
   spinorFloat a1_re, a1_im;
   spinorFloat a2_re, a2_im;
@@ -1291,6 +1288,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
     
   }
 #endif // MULTI_GPU
+  
+  // read gauge matrix from device memory
+  READ_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, ga_stride);
   
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(5);
@@ -1507,9 +1507,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
     o12_im += B2_im;
     
   } else {
-    // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
-    
     spinorFloat a0_re, a0_im;
     spinorFloat a1_re, a1_im;
     spinorFloat a2_re, a2_im;
@@ -1556,6 +1553,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
       
     }
 #endif // MULTI_GPU
+    
+    // read gauge matrix from device memory
+    READ_GAUGE_MATRIX(G, GAUGE0TEX, 6, ga_idx, ga_stride);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(6);
@@ -1765,9 +1765,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     o32_im += B2_im;
     
   } else {
-    // read gauge matrix from device memory
-    READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
-    
     spinorFloat a0_re, a0_im;
     spinorFloat a1_re, a1_im;
     spinorFloat a2_re, a2_im;
@@ -1814,6 +1811,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
       
     }
 #endif // MULTI_GPU
+    
+    // read gauge matrix from device memory
+    READ_GAUGE_MATRIX(G, GAUGE1TEX, 7, ga_idx, ga_stride);
     
     // reconstruct gauge matrix
     RECONSTRUCT_GAUGE_MATRIX(7);

@@ -54,7 +54,7 @@ fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o m
 unitarize_link_test: unitarize_link_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o fermion_force_reference.o test_util.o misc.o $(QUDA)
+hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force_reference2.o fermion_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)

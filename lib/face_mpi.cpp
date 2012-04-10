@@ -13,18 +13,6 @@
 
 using namespace std;
 
-#if (CUDA_VERSION >=4000)
-#define GPU_DIRECT
-#endif
-
-#ifdef DSLASH_PROFILING
-  void printDslashProfile();
-#define CUDA_EVENT_RECORD(a,b) cudaEventRecord(a,b)
-#else
-#define CUDA_EVENT_RECORD(a,b)
-#define DSLASH_TIME_PROFILE()
-#endif
-
 cudaStream_t *stream;
 
 bool globalReduce = true;
@@ -354,15 +342,12 @@ int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
 void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
 
-void commBarrier() { comm_barrier(); }
-
-
 
 /**************************************************************
  * Staple exchange routine
  * used in fat link computation
  ***************************************************************/
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE)
 
 #define gaugeSiteSize 18
 
@@ -657,7 +642,7 @@ void exchange_cpu_sitelink(int* X,
 		      (float**)sitelink_fwd_sendbuf, (float**)sitelink_back_sendbuf, optflag);
   }
   
-  if(!(param->flag & QUDA_FAT_PRESERVE_COMM_MEM)){
+  if(!(param->preserve_gauge & QUDA_FAT_PRESERVE_COMM_MEM)){
     for(int i=0;i < 4;i++){
       free(sitelink_fwd_sendbuf[i]);
       free(sitelink_back_sendbuf[i]);

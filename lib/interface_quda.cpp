@@ -25,15 +25,15 @@
 #endif
 
 #include <cuda.h>
+
 #ifdef MULTI_GPU
 #ifdef MPI_COMMS
 #include <mpi.h>
 #endif
-
 #ifdef QMP_COMMS
 #include <qmp.h>
 #endif
-#endif
+#endif // MULTI_GPU
 
 #ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
@@ -64,8 +64,6 @@
 #ifdef QMP_COMMS
 int rank_QMP;
 int num_QMP;
-extern bool qudaPt0;
-extern bool qudaPtNm1;
 #endif
 
 #include "face_quda.h"
@@ -77,9 +75,10 @@ cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
 
-cudaGaugeField *gaugeFatPrecise = NULL;
-cudaGaugeField *gaugeFatSloppy = NULL;
-cudaGaugeField *gaugeFatPrecondition = NULL;
+// It's important that these alias the above so that constants are set correctly in Dirac::Dirac()
+cudaGaugeField *&gaugeFatPrecise = gaugePrecise;
+cudaGaugeField *&gaugeFatSloppy = gaugeSloppy;
+cudaGaugeField *&gaugeFatPrecondition = gaugePrecondition;
 
 cudaGaugeField *gaugeLongPrecise = NULL;
 cudaGaugeField *gaugeLongSloppy = NULL;
@@ -89,19 +88,8 @@ cudaCloverField *cloverPrecise = NULL;
 cudaCloverField *cloverSloppy = NULL;
 cudaCloverField *cloverPrecondition = NULL;
 
-
-Dirac *d = NULL;
-Dirac *dSloppy = NULL;
-Dirac *dPre = NULL; // the DD preconditioning operator
-bool diracCreation = false;
-
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
-
-void disableNumaAffinityQuda(void)
-{
-  numa_affinity_enabled=0;
-}
 
 int getGpuCount()
 {
@@ -124,7 +112,7 @@ void initQuda(int dev)
   }
   initialized = 1;
 
-#if (CUDA_VERSION == 4000) && defined(MULTI_GPU)
+#if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
   // not needed for CUDA >= 4.1
   char* cni_str = getenv("CUDA_NIC_INTEROP");
@@ -159,26 +147,20 @@ void initQuda(int dev)
   num_QMP=QMP_get_number_of_nodes();
   rank_QMP=QMP_get_node_number();
   
-  dev += rank_QMP % deviceCount;
+  if (dev < 0) {
+    dev = rank_QMP % deviceCount;
+  }
   ndim = QMP_get_logical_number_of_dimensions();
   dim = QMP_get_logical_dimensions();
-
 #elif defined(MPI_COMMS)
-
   comm_init();
-  dev=comm_gpuid();
-
+  if (dev < 0) {
+    dev=comm_gpuid();
+  }
 #else
-  if (dev < 0) dev = deviceCount - 1;
+  if (dev < 0) errorQuda("Invalid device number");
 #endif
   
-  // Used for applying the gauge field boundary condition
-  if( commCoords(3) == 0 ) qudaPt0=true;
-  else qudaPt0=false;
-
-  if( commCoords(3) == commDim(3)-1 ) qudaPtNm1=true;
-  else qudaPtNm1=false;
-
   cudaGetDeviceProperties(&deviceProp, dev);
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
@@ -197,18 +179,19 @@ void initQuda(int dev)
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
 
   initCache();
+  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
 
   streams = new cudaStream_t[Nstream];
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
   }
+  createDslashEvents();
 
   quda::initBlas();
 
   loadTuneCache(QUDA_VERBOSE);
 }
-
 
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
@@ -293,7 +276,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
-  endInvertQuda(); // need to delete any persistant dirac operators
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
@@ -398,7 +380,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     cloverPrecondition = cloverSloppy;
   }
 
-  endInvertQuda(); // need to delete any persistant dirac operators
 }
 
 void freeGaugeQuda(void) 
@@ -428,6 +409,7 @@ void freeGaugeQuda(void)
   gaugeFatPrecise = NULL;
 }
 
+
 void freeCloverQuda(void)
 {
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
@@ -439,10 +421,9 @@ void freeCloverQuda(void)
   cloverPrecise = NULL;
 }
 
+
 void endQuda(void)
 {
-  endInvertQuda();
-
   cudaColorSpinorField::freeBuffer();
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
@@ -456,6 +437,7 @@ void endQuda(void)
     delete []streams;
     streams = NULL;
   }
+  destroyDslashEvents();
 
   saveTuneCache(QUDA_VERBOSE);
 }
@@ -761,23 +743,19 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   out.saveCPUSpinorField(hOut); // since this is a reference, this won't work: hOut = out;
 }
 
-void createDirac(QudaInvertParam &param, const bool pc_solve) {
+void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
+{
+  DiracParam diracParam;
+  DiracParam diracSloppyParam;
+  DiracParam diracPreParam;
 
-  if (!diracCreation) {
-    DiracParam diracParam;
-    DiracParam diracSloppyParam;
-    DiracParam diracPreParam;
-
-    setDiracParam(diracParam, &param, pc_solve);
-    setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    setDiracPreParam(diracPreParam, &param, pc_solve);
+  setDiracParam(diracParam, &param, pc_solve);
+  setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
+  setDiracPreParam(diracPreParam, &param, pc_solve);
     
-    d = Dirac::create(diracParam); // create the Dirac operator   
-    dSloppy = Dirac::create(diracSloppyParam);
-    dPre = Dirac::create(diracPreParam);
-    diracCreation = true;
-  } 
-
+  d = Dirac::create(diracParam); // create the Dirac operator   
+  dSloppy = Dirac::create(diracSloppyParam);
+  dPre = Dirac::create(diracPreParam);
 }
 
 cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -827,11 +805,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   param->gflops = 0;
   param->iter = 0;
 
-  // create the dirac operator
-  createDirac( *param, pc_solve);
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
 
-    
-  
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
@@ -869,9 +849,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
   }
 
-  // FIXME: need to rename "dirac_tune" parameter
-  setDslashTuning(param->dirac_tune, param->verbosity);
-  quda::setBlasTuning(param->dirac_tune, param->verbosity);
+  setDslashTuning(param->tune, param->verbosity);
+  quda::setBlasTuning(param->tune, param->verbosity);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE) {
@@ -943,13 +922,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Reconstructed: CUDA solution = %f, CPU copy = %f\n", nx, nh_x);
   }
   
-  if (!param->preserve_dirac) {
-    delete d;
-    delete dSloppy;
-    delete dPre;
-    diracCreation = false;
-  }  
-
   delete h_b;
   delete h_x;
   delete b;
@@ -1058,7 +1030,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   if (param->dslash_type == QUDA_ASQTAD_DSLASH){
     param->mass = sqrt(param->offset[0]/4);  
   }
-  createDirac(*param, pc_solve);
+
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
 
@@ -1106,8 +1084,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
   }
 
-  setDslashTuning(param->dirac_tune, param->verbosity);
-  quda::setBlasTuning(param->dirac_tune, param->verbosity);
+  setDslashTuning(param->tune, param->verbosity);
+  quda::setBlasTuning(param->tune, param->verbosity);
   
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];
@@ -1146,38 +1124,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   delete [] hp_x;
 
-  if (!param->preserve_dirac) {
-    delete d; d =NULL;
-    delete dSloppy; dSloppy = NULL;
-    delete dPre; dPre = NULL;
-    diracCreation = false;
-  }  
-
   return;
 }
-
-void endInvertQuda() {
-  if (diracCreation) {
-    if (d){
-      delete d;
-      d = NULL;
-    }
-    
-    if (dSloppy){
-      delete dSloppy;
-      dSloppy = NULL;
-    }
-
-    if (dPre){
-      delete dPre;
-      dPre = NULL;
-    }
-
-    diracCreation = false;
-  }
-  checkCudaError();
-}
-
 
 /************************************** Ugly Mixed precision multishift CG solver ****************************/
 
@@ -1420,7 +1368,13 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   // but we set it to be the same as sloppy to avoid segfault 
   // in creating the dirac since it is needed 
   gaugeFatPrecondition = gaugeFatPrecise = gaugeFatSloppy;
-  createDirac(*param, pc_solve);
+
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
   // resetting to NULL
   gaugeFatPrecise = NULL; gaugeFatPrecondition = NULL;
 
@@ -1470,8 +1424,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   }
 
   // tune the Dirac Kernel
-  setDslashTuning(param->dirac_tune, param->verbosity);
-  quda::setBlasTuning(param->dirac_tune, param->verbosity);
+  setDslashTuning(param->tune, param->verbosity);
+  quda::setBlasTuning(param->tune, param->verbosity);
   // if set, tuning will happen in the first multishift call
   
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
@@ -1507,7 +1461,14 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   /*FIXME: to avoid setfault*/
   gaugeFatPrecondition =gaugeFatSloppy;
-  createDirac(*param, pc_solve);
+
+  if (dPre && dPre != dSloppy) delete dPre;
+  if (dSloppy && dSloppy != d) delete dSloppy;
+  if (d) delete d;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+
   gaugeFatPrecondition = NULL;
   {
     Dirac& dirac2 = *d;
@@ -1547,14 +1508,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   delete [] x;
 
   delete [] hp_x;
-
-  if (!param->preserve_dirac) {
-    delete d; d = NULL;
-    delete dSloppy; dSloppy = NULL;
-    delete dPre; dPre = NULL;
-    diracCreation = false;
-  }  
-
 
   return;
 }
@@ -1623,7 +1576,7 @@ void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
  
   gettimeofday(&time_array[0], NULL);
   
-  const int flag = qudaGaugeParam->flag;
+  const int flag = qudaGaugeParam->preserve_gauge;
   GaugeFieldParam gParam(0,*qudaGaugeParam);
 
   if(method == QUDA_COMPUTE_FAT_STANDARD){
@@ -1678,7 +1631,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 
   static cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL;
   static cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL;
-  int flag = qudaGaugeParam->flag;
+  int flag = qudaGaugeParam->preserve_gauge;
 
   QudaGaugeParam qudaGaugeParam_ex_buf;
   QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;
@@ -1751,8 +1704,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     cudaSiteLink = new cudaGaugeField(gParam);
   }
   
-  initCommonConstants(*cudaFatLink);
-  
+  initLatticeConstants(*cudaFatLink);  
   
   if(method == QUDA_COMPUTE_FAT_STANDARD){
     llfat_init_cuda(qudaGaugeParam);
@@ -1877,7 +1829,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   
   
-  initCommonConstants(*cudaMom);
+  initLatticeConstants(*cudaMom);
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
   
 #ifdef MULTI_GPU
@@ -1959,4 +1911,3 @@ void endCommsQuda() {
 
 #endif
 }
-

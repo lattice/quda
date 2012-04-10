@@ -15,10 +15,6 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define ALIGNMENT 4096 
 
-#if (CUDA_VERSION >=4000)
-#define GPU_DIRECT
-#endif
-
 #ifdef MPI_COMMS
 #include "face_quda.h"
 #endif
@@ -37,7 +33,7 @@ static QudaTboundary t_boundary_;
 
 /********************** Staple code, used by link fattening **************/
 
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) ||defined(GPU_HISQ_FORCE)
 
 
 template <typename Float>
@@ -648,7 +644,7 @@ do_loadLinkToGPU(int* X, void *even, void*odd, void **cpuGauge, void** ghost_cpu
 #ifdef GPU_DIRECT 
     cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[0]);
 #else
-    cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*GaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
+    cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
   }
   
@@ -805,7 +801,7 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 		   prec, cpuGauge->Order());
   
 #ifdef MULTI_GPU
-  if(!(param->flag & QUDA_FAT_PRESERVE_COMM_MEM)){
+  if(!(param->preserve_gauge & QUDA_FAT_PRESERVE_COMM_MEM)){
     
     for(int i=0;i < 4;i++){
 #ifdef GPU_DIRECT 
@@ -920,7 +916,6 @@ loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge)
   QudaPrecision prec= cudaGauge->Precision();
   const int* E = cudaGauge->X();
   int pad = cudaGauge->Pad();
-  
   do_loadLinkToGPU_ex(E, cudaGauge->Even_p(), cudaGauge->Odd_p(), (void**)cpuGauge->Gauge_p(),
 		      cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
 		      prec, cpuGauge->Order());

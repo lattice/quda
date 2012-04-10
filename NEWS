@@ -1,26 +1,52 @@
 
-Version 0.4.0
+Version 0.4.0 - 4 April 2012
 
-- Improved stability on Fermi-based GeForce cards by disabling
-  double precision texture reads.
+- CUDA 4.0 or later is now required to build the library.
 
-- Enabled arbitrary volumes for all Dirac operators.
-
-- Added auto-tuning for the Dirac operators.  This is controlled with
-  a new InvertParam member, "dirac_tune".  For multiple inversions,
-  this tuning can be remembered between solves by setting
-  "preserve_dirac".
-
-- Added debug compile options to make.inc.example to allow for easier
-  debugging.
-
-- Added CPU versions of all blas functions and added unit tests for
-  each one to tests/blas_test.cu.
-
-- Added support for using multiple GPUs in parallel via MPI or QMP.
-  [TODO: details]
+- The "make.inc.example" template has been replaced by a configure script.
+  See the README file for build instructions and "configure --help" for
+  a list of configure options.
 
 - Emulation mode is no longer supported.
+
+- Added support for using multiple GPUs in parallel via MPI or QMP.
+  This is supported by all solvers for the Wilson, clover-improved
+  Wilson, twisted mass, and improved staggered fermion actions.
+  Multi-GPU support for domain wall will be forthcoming in a future
+  release.
+
+- Reworked auto-tuning so that BLAS kernels are tuned at runtime,
+  Dirac operators are also tuned, and tuned parameters may be cached
+  to disk between runs.  Tuning is enabled via the "tune" member of
+  QudaInvertParam and is essential for achieving optimal performance
+  in the solvers.  See the README file for details on enabling
+  caching, which avoids the overhead of tuning for all but the first
+  run at a given set of parameters (action, precision, lattice volume,
+  etc.).
+
+- Added NUMA affinity support.  Given a sufficiently recent linux
+  kernel and a system with dual I/O hubs (IOHs), QUDA will attempt to
+  associate each GPU with the "closest" socket.  This feature is
+  disabled by default under OS X and may be disabled under linux via
+  the "--disable-numa-affinity" configure flag.
+
+- Improved stability on Fermi-based GeForce cards by disabling double
+  precision texture reads.  These may be re-enabled on Fermi-based
+  Tesla cards for improved performance, as described in the README
+  file.
+
+- Added command-line options for most of the tests.  See, e.g.,
+  "wilson_dslash_test --help"
+
+- Added CPU reference implementations of all BLAS routines, which allows
+  tests/blas_test to check for correctness.
+
+- Implemented various structural and performance improvements
+  throughout the library.
+
+- Deprecated the QUDA_VERSION macro (which corresponds to an integer
+  in octal).  Please use QUDA_VERSION_MAJOR, QUDA_VERSION_MINOR, and
+  QUDA_VERSION_SUBMINOR instead.
 
 
 Version 0.3.2 - 18 January 2011

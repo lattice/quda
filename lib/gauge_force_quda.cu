@@ -157,9 +157,11 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
     //input_path
     int bytes = num_paths*max_length* sizeof(int);
     int* input_path_d;
-    if(cudaMalloc((void**)&input_path_d, bytes); checkCudaError() != cudaSuccess){
+   
+    if(cudaMalloc((void**)&input_path_d, bytes) != cudaSuccess){
       errorQuda("cudaMalloc failed for input_path_d\n");
     }
+
     cudaMemset(input_path_d, 0, bytes);checkCudaError();
 
     int* input_path_h = (int*)malloc(bytes);

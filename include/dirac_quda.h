@@ -60,7 +60,7 @@ class Dirac {
   friend class DiracMdagM;
   friend class DiracMdag;
 
-  protected:
+ protected:
   cudaGaugeField &gauge;
   double kappa;
   double mass;
@@ -163,8 +163,7 @@ class DiracClover : public DiracWilson {
 
  protected:
   cudaCloverField &clover;
-  void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &, 
-			 const cudaCloverField &) const;
+  void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
 
  public:
   DiracClover(const DiracParam &param);
@@ -314,8 +313,8 @@ class DiracTwistedMassPC : public DiracTwistedMass {
 class DiracStaggered : public Dirac {
 
  protected:
-  cudaGaugeField *fatGauge;
-  cudaGaugeField *longGauge;
+  cudaGaugeField &fatGauge;
+  cudaGaugeField &longGauge;
   FaceBuffer face; // multi-gpu communication buffers
 
  public:

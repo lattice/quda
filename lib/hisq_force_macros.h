@@ -463,6 +463,30 @@
     var[5] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*5); \
   }while(0)
 
+#ifdef MULTI_GPU
+#define FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx, new_idx) do { \
+    switch(mydir){						      \
+    case 0:							      \
+      new_idx = idx+1;						      \
+      new_x[0] = new_x[0]+1;					      \
+      break;							      \
+    case 1:							      \
+      new_idx = idx+E1;						      \
+      new_x[1] =new_x[1]+1;					      \
+      break;							      \
+    case 2:							      \
+      new_idx = idx+E2E1;					      \
+      new_x[2] = new_x[2]+1;					      \
+      break;							      \
+    case 3:							      \
+      new_idx = idx+E3E2E1;					      \
+      new_x[3] = new_x[3]+1;					      \
+      break;							      \
+    }								      \
+    if(new_x[mydir] >= E[mydir]) return;			      \
+  }while(0)
+
+#else
 #define FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx, new_idx) do {	\
     switch(mydir){							\
     case 0:                                                             \
@@ -483,8 +507,32 @@
       break;								\
     }									\
   }while(0)
+#endif
 
+#ifdef MULTI_GPU
+#define FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx, new_idx) do {  \
+    switch(mydir){                                                      \
+    case 0:                                                             \
+      new_idx = idx-1;							\
+      new_x[0] = new_x[0] - 1;						\
+      break;								\
+    case 1:                                                             \
+      new_idx = idx-E1;							\
+      new_x[1] = new_x[1] - 1;						\
+      break;                                                            \
+    case 2:                                                             \
+      new_idx = idx-E2E1;						\
+      new_x[2] = new_x[2] - 1;						\
+      break;                                                            \
+    case 3:                                                             \
+      new_idx = idx-E3E2E1;						\
+      new_x[3] = new_x[3] - 1;						\
+      break;                                                            \
+    }                                                                   \
+    if(new_x[mydir] < 0) return;					\
+  }while(0)
 
+#else
 #define FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx, new_idx) do {	\
     switch(mydir){							\
     case 0:                                                             \
@@ -505,7 +553,7 @@
       break;								\
     }									\
   }while(0)
-
+#endif
 
 
 

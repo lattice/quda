@@ -17,10 +17,9 @@ extern "C" {
     QUDA_ASQTAD_FAT_LINKS,
     QUDA_ASQTAD_LONG_LINKS,
     QUDA_ASQTAD_MOM_LINKS,
+    QUDA_ASQTAD_GENERAL_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
-
-  
 
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,

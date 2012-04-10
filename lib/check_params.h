@@ -87,9 +87,9 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(flag, 0);
+  P(preserve_gauge, 0);
 #else
-  P(flag, INVALID_INT);
+  P(preserve_gauge, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -161,8 +161,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
   P(sp_pad, INVALID_INT);
 
-  P(dirac_tune, QUDA_TUNE_INVALID);
-  P(preserve_dirac, QUDA_PRESERVE_DIRAC_INVALID);
+  P(tune, QUDA_TUNE_INVALID);
 
 #if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);

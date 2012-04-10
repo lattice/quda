@@ -432,6 +432,8 @@ class SpinorTexture {
     else errorQuda("Unknown precision type\n");
     return precision;
   }
+
+  int Stride() { return stride; }
 };
 
 /**
@@ -510,6 +512,8 @@ class Spinor {
     else errorQuda("Unknown precision type\n");
     return precision;
   }
+
+  int Stride() { return stride; }
 };
 
 template <typename OutputType, typename InputType, int M>
