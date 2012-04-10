@@ -231,7 +231,7 @@ extern "C" {
    *                per-process basis or set to -1 to enable a default
    *                allocation of devices to processes.
    */
-  void initQuda(const int device);
+  void initQuda(int device);
 
   /**
    * Finalize the library.
@@ -354,7 +354,7 @@ extern "C" {
    * The following routines are only used by the examples in tests/ .
    * They should not be called in a typical application.
    */  
-  void initCommsQuda(int argc, char **argv, const int *X, const int nDim);
+  void initCommsQuda(int argc, char **argv, const int *X, int nDim);
   void endCommsQuda();
 
 #ifdef __cplusplus

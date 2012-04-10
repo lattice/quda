@@ -1887,7 +1887,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif
 
 
-void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
+void initCommsQuda(int argc, char **argv, const int *X, int nDim) {
 
   if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
 
