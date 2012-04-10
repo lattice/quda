@@ -37,10 +37,10 @@ void init() {
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] =32;
-  param.X[1] =32;
-  param.X[2] =32;
-  param.X[3] =32;
+  param.X[0] =16;
+  param.X[1] =16;
+  param.X[2] =16;
+  param.X[3] =16;
   param.ga_pad = 0;
   setDims(param.X);
 
@@ -64,7 +64,7 @@ void init() {
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_NULL_FIELD_CREATE;
 
   spinor = new cpuColorSpinorField(csParam);

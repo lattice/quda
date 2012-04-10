@@ -629,9 +629,9 @@ static void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolu
   if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
 }
 
-void QUDA_DiracField(QUDA_DiracParam *param) {
+/*void QUDA_DiracField(QUDA_DiracParam *param) {
   
-}
+  }*/
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
