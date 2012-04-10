@@ -91,6 +91,7 @@ cudaCloverField *cloverPrecondition = NULL;
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 
+
 int getGpuCount()
 {
   int count;
@@ -99,18 +100,27 @@ int getGpuCount()
     errorQuda("No devices supporting CUDA");
   }
   if(count > MAX_GPU_NUM_PER_NODE){
-    errorQuda("gpu count(%d) is larger than limit\n", count);
+    errorQuda("GPU count (%d) is larger than limit\n", count);
   }
   return count;
 }
 
+
+void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
+{
+  setVerbosity(verbosity);
+  setOutputPrefix(prefix);
+  setOutputFile(outfile);
+}
+
+
 void initQuda(int dev)
 {
-  static int initialized = 0;
+  static bool initialized = false;
   if (initialized) {
     return;
   }
-  initialized = 1;
+  initialized = true;
 
 #if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
@@ -134,8 +144,14 @@ void initQuda(int dev)
   for(int i=0; i<deviceCount; i++) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
-    printfQuda("QUDA: Found device %d: %s\n", i, deviceProp.name);
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("Found device %d: %s\n", i, deviceProp.name);
+    }
   }
+
+#ifdef MULTI_GPU
+  comm_init();
+#endif
 
 #ifdef QMP_COMMS
   int ndim;
@@ -153,7 +169,6 @@ void initQuda(int dev)
   ndim = QMP_get_logical_number_of_dimensions();
   dim = QMP_get_logical_dimensions();
 #elif defined(MPI_COMMS)
-  comm_init();
   if (dev < 0) {
     dev=comm_gpuid();
   }
@@ -166,8 +181,9 @@ void initQuda(int dev)
     errorQuda("Device %d does not support CUDA", dev);
   }
   
-  printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
-
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+    printfQuda("Using device %d: %s\n", dev, deviceProp.name);
+  }
   cudaSetDevice(dev);
 
 #ifdef QUDA_NUMA_SUPPORT
@@ -190,7 +206,7 @@ void initQuda(int dev)
 
   quda::initBlas();
 
-  loadTuneCache(QUDA_VERBOSE);
+  loadTuneCache(getVerbosity());
 }
 
 
@@ -1871,7 +1887,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif
 
 
-void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
+void initCommsQuda(int argc, char **argv, const int *X, int nDim) {
 
   if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
 

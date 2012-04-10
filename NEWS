@@ -1,4 +1,19 @@
 
+Version 0.4.1
+
+- As of QUDA 0.4.0, support has been dropped for the very first
+  generation of CUDA-capable devices (implementing "compute
+  capability" 1.0).  These include the Tesla C870, the Quadro FX 5600
+  and 4600, and the GeForce 8800 GTX.
+
+- Fixed a typo that prevented domain_wall_dslash_test from compiling
+  (and thus subsequent tests unless domain wall was disabled).
+
+- Added a new interface function, setVerbosityQuda(), to allow for
+  finer-grained control of status reporting.  See the description in
+  include/quda.h for usage information.
+
+
 Version 0.4.0 - 4 April 2012
 
 - CUDA 4.0 or later is now required to build the library.

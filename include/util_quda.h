@@ -1,73 +1,84 @@
 #ifndef _UTIL_QUDA_H
 #define _UTIL_QUDA_H
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#ifdef QMP_COMMS
-
-#include <qmp.h>
-
-#define printfQuda(...) do {	     \
- if (QMP_get_node_number() == 0) {	\
-    printf(__VA_ARGS__);             \
-    fflush(stdout);                  \
-  }                                  \
-} while (0)
-
-#define errorQuda(...) do {		    \
-  printf("QUDA error: " __VA_ARGS__);	\
-  printf(" (node %d, " __FILE__ ":%d in %s())\n",   \
-         QMP_get_node_number(), __LINE__, __FUNCTION__);			\
-  QMP_abort(1);				    \
-} while (0)
-
-#elif defined(MPI_COMMS)
-
+#include <cstdio>
+#include <cstdlib>
+#include <enum_quda.h>
 #include <comm_quda.h>
 
-#define printfQuda(...) do {			\
-    if (comm_rank() == 0) {			\
-      printf(__VA_ARGS__);			\
-      fflush(stdout);				\
-    }						\
-  } while (0)
 
-extern char hostname[];
-#define errorQuda(...) do {		    \
-  printf("QUDA error: " __VA_ARGS__);	\
-  printf(" (node %d, " __FILE__ ":%d in %s(), hostname=%s)\n",   \
-         comm_rank(), __LINE__, __FUNCTION__, hostname);	       \
-  comm_exit(1);						 \
+QudaVerbosity getVerbosity();
+char *getOutputPrefix();
+FILE *getOutputFile();
+
+void setVerbosity(const QudaVerbosity &verbosity);
+void setOutputPrefix(const char *prefix);
+void setOutputFile(FILE *outfile);
+
+
+// Note that __func__ is part of C++11 and has long been supported by GCC.
+
+#ifdef MULTI_GPU
+
+#define printfQuda(...) do {                           \
+  if (comm_rank() == 0) {	                       \
+    fprintf(getOutputFile(), "%s", getOutputPrefix()); \
+    fprintf(getOutputFile(), __VA_ARGS__);             \
+    fflush(getOutputFile());                           \
+  }                                                    \
+} while (0)
+
+#define errorQuda(...) do {                                                  \
+  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                  \
+  fprintf(getOutputFile(), __VA_ARGS__);                                     \
+  fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n", \
+          comm_rank(), comm_hostname(), __LINE__, __func__);                 \
+  fflush(getOutputFile());                                                   \
+  comm_exit(1);                                                              \
+} while (0)
+
+#define warningQuda(...) do {                                   \
+  if (comm_rank() == 0) {                                       \
+    fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
+    fprintf(getOutputFile(), __VA_ARGS__);                      \
+    fprintf(getOutputFile(), "\n");                             \
+    fflush(getOutputFile());                                    \
+  }                                                             \
 } while (0)
 
 #else
 
-#define printfQuda(...) do {				\
-    printf(__VA_ARGS__);				\
-    fflush(stdout); } while (0)				
-
-
-#define errorQuda(...) do {		     \
-  printf("QUDA error: " __VA_ARGS__);	\
-  printf(" (" __FILE__ ":%d in %s())\n", __LINE__, __FUNCTION__);	\
-  exit(1);				     \
+#define printfQuda(...) do {                         \
+  fprintf(getOutputFile(), "%s", getOutputPrefix()); \
+  fprintf(getOutputFile(), __VA_ARGS__);             \
+  fflush(getOutputFile());                           \
 } while (0)
 
-#endif // USE_QMP
-
-#define warningQuda(...) do {                \
-  printfQuda("QUDA warning: " __VA_ARGS__);  \
-  printfQuda("\n");                          \
+#define errorQuda(...) do {                                 \
+  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix()); \
+  fprintf(getOutputFile(), __VA_ARGS__);                    \
+  fprintf(getOutputFile(), " (" __FILE__ ":%d in %s())\n",  \
+	  __LINE__, __func__);                              \
+  exit(1);                                                  \
 } while (0)
+
+#define warningQuda(...) do {                                 \
+  fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
+  fprintf(getOutputFile(), __VA_ARGS__);                      \
+  fprintf(getOutputFile(), "\n");                             \
+  fflush(getOutputFile());                                    \
+} while (0)
+
+#endif // MULTI_GPU
+
 
 #ifdef HOST_DEBUG
 
-#define checkCudaError() do {                           \
-    cudaDeviceSynchronize();				\
-  cudaError_t error = cudaGetLastError();               \
-  if (error != cudaSuccess)                             \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error));  \
+#define checkCudaError() do {                          \
+  cudaDeviceSynchronize();                             \
+  cudaError_t error = cudaGetLastError();              \
+  if (error != cudaSuccess)                            \
+    errorQuda("(CUDA) %s", cudaGetErrorString(error)); \
 } while (0)
 
 #else
@@ -78,7 +89,8 @@ extern char hostname[];
     errorQuda("(CUDA) %s", cudaGetErrorString(error));  \
 } while (0)
 
-#endif
+#endif // HOST_DEBUG
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,5 +102,6 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif // _UTIL_QUDA_H
