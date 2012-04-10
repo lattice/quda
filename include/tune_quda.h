@@ -66,7 +66,7 @@ class TuneParam {
 class Tunable {
 
  protected:
-  virtual long long flops() const { return 0; } // FIXME: make pure virtual
+  virtual long long flops() const = 0;
   virtual long long bytes() const { return 0; } // FIXME
 
   // the minimum number of shared bytes per thread

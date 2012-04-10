@@ -108,6 +108,7 @@ cudaColorSpinorField *inSpinor;
 static struct {
   int x[4];
   int Ls;
+  unsigned long long VolumeCB() { return x[0]*x[1]*x[2]*x[3]/2; }
   // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
 } dslashConstants;
 
@@ -543,6 +544,7 @@ class WilsonDslashCuda : public SharedDslashCuda {
     }
   }
 
+  long long flops() const { return (x ? 1368ll : 1320ll) * dslashConstants.VolumeCB(); }
 };
 
 template <typename sFloat, typename gFloat, typename cFloat>
@@ -634,6 +636,7 @@ class CloverDslashCuda : public SharedDslashCuda {
     }
   }
 
+  long long flops() const { return (x ? 1872ll : 1824ll) * dslashConstants.VolumeCB(); }
 };
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
@@ -739,6 +742,8 @@ class TwistedDslashCuda : public SharedDslashCuda {
       }
     }
   }
+
+  long long flops() const { return (x ? 1416ll : 1392ll) * dslashConstants.VolumeCB(); }
 };
 
 template <typename sFloat, typename gFloat>
@@ -814,6 +819,12 @@ class DomainWallDslashCuda : public DslashCuda {
 	delete[] saveOutNorm;
       }
     }
+  }
+
+  long long flops() const {
+    long long bulk = (dslashConstants.Ls-2)*(dslashConstants.VolumeCB()/dslashConstants.Ls);
+    long long wall = 2*dslashConstants.VolumeCB()/dslashConstants.Ls;
+    return (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB() + 96ll*bulk + 120ll*wall;
   }
 };
 
@@ -897,6 +908,8 @@ private:
   }
 
   int Nface() { return 6; }
+
+  long long flops() const { return (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); }
 };
 
 #ifdef DSLASH_PROFILING
@@ -1535,6 +1548,7 @@ class CloverCuda : public Tunable {
     return ps.str();
   }
 
+  long long flops() const { return 504ll * dslashConstants.VolumeCB(); }
 };
 
 
@@ -1652,6 +1666,8 @@ public:
     ps << "shared=" << param.shared_bytes;
     return ps.str();
   }
+
+  long long flops() const { return 24ll * dslashConstants.VolumeCB(); }
 };
 
 void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
