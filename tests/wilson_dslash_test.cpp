@@ -428,7 +428,6 @@ int main(int argc, char **argv)
     usage(argv);
   }
 
-
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
   display_test_info();
