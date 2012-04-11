@@ -1329,6 +1329,7 @@ int gridsize_from_cmdline[4]={1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 bool tune = true;
+int niter = 10;
 
 void __attribute__((weak)) usage_extra(char** argv){};
 
@@ -1358,6 +1359,7 @@ void usage(char** argv )
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted_mass/asqtad/domain_wall\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
+  printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
@@ -1642,6 +1644,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--niter") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    niter= atoi(argv[i+1]);
+    if (niter < 1 || niter > 1e6){
+      printf("ERROR: invalid number of iterations (%d)\n", niter);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--version") == 0){
     printf("This program is linked with QUDA library, version %s,", 
 	   get_quda_ver_str());

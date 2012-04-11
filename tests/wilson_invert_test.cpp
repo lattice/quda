@@ -39,6 +39,8 @@ extern QudaPrecision  prec_sloppy;
 
 extern char latfile[];
 
+extern void usage(char** );
+
 void
 display_test_info()
 {
@@ -61,47 +63,15 @@ display_test_info()
   
 }
 
-extern void usage(char** );
 int main(int argc, char **argv)
 {
-  /*
-  int ndim=4, dims[4] = {1, 1, 1, 1};
-  char dimchar[] = {'X', 'Y', 'Z', 'T'};
-  char *gridsizeopt[] = {"--xgridsize", "--ygridsize", "--zgridsize", "--tgridsize"};
-
-  for (int i=1; i<argc; i++) {
-    for (int d=0; d<ndim; d++) {
-      if (!strcmp(argv[i], gridsizeopt[d])) {
-	if (i+1 >= argc) {
-	  printf("Usage: %s <args>\n", argv[0]);
-	  printf("%s\t Set %c comms grid size (default = 1)\n", gridsizeopt[d], dimchar[d]); 
-	  exit(1);
-	}     
-	dims[d] = atoi(argv[i+1]);
-	if (dims[d] <= 0 ) {
-	  printf("Error: Invalid %c grid size\n", dimchar[d]);
-	  exit(1);
-	}
-	i++;
-	break;
-      }
-    }
-  }
-  */
-
-
-
   int i;
   for (i =1;i < argc; i++){
-
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     } 
-    
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
-    
-
   }
 
 

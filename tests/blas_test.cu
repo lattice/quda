@@ -6,22 +6,30 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <face_quda.h>
 
+// include the next two lines because of nasty globals used in the tests
+#define mySpinorSiteSize 24
+#include <dslash_util.h>
 
-// volume per GPU (full lattice dimensions)
-const int LX = 16;
-const int LY = 16;
-const int LZ = 16;
-const int LT = 16;
-const int Nspin = 4;
+// Wilson, clover-improved Wilson, and twisted mass are supported.
+extern QudaDslashType dslash_type;
+extern bool tune;
+extern int device;
+extern int xdim;
+extern int ydim;
+extern int zdim;
+extern int tdim;
+extern int gridsize_from_cmdline[];
+extern int niter;
 
-// corresponds to 1 iterations for V=16^4, Nspin = 4, at half precision
-const int Niter = max(1, 1 * (16*16*16*16*4) / (LX * LY * LZ * LT * Nspin));
+extern void usage(char** );
 
 const int Nkernels = 31;
 
 cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
+int Nspin;
 
 void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
 {
@@ -33,6 +41,24 @@ void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
   }
 }
 
+void
+display_test_info()
+{
+  printfQuda("running the following test:\n");
+    
+  printfQuda("S_dimension T_dimension Nspin\n");
+  printfQuda("%d/%d/%d        %d      %d\n", xdim, ydim, zdim, tdim, Nspin);     
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
+	     commDimPartitioned(0),
+	     commDimPartitioned(1),
+	     commDimPartitioned(2),
+	     commDimPartitioned(3)); 
+  
+  return;  
+}
+
 void initFields(int prec)
 {
   // precisions used for the source field in the copyCuda() benchmark
@@ -42,16 +68,18 @@ void initFields(int prec)
   ColorSpinorParam param;
   param.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   param.nColor = 3;
-  param.nSpin = Nspin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+  // set spin according to the type of dslash
+  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH) ? 1 : 4;
+  param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
 
   param.pad = 0; // padding must be zero for cpu fields
   param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) param.x[0] = LX/2;
-  else param.x[0] = LX;
-  param.x[1] = LY;
-  param.x[2] = LZ;
-  param.x[3] = LT;
+  if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) param.x[0] = xdim/2;
+  else param.x[0] = xdim;
+  param.x[1] = ydim;
+  param.x[2] = zdim;
+  param.x[3] = tdim;
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
@@ -585,13 +613,18 @@ double test(int kernel) {
 
 int main(int argc, char** argv)
 {
+  int i;
+  for (i =1;i < argc; i++){
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    } 
+    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
 
-  int ndim=4, dims[] = {1, 1, 1, 1};
-  initCommsQuda(argc, argv, dims, ndim);
-
-  int dev = 0;
-  if (argc == 2) dev = atoi(argv[1]);
-  initQuda(dev);
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  display_test_info();
+  initQuda(device);
 
   char *names[] = {
     "copyHS",
@@ -636,14 +669,12 @@ int main(int argc, char** argv)
   int Nprec = 2;
 #endif
 
-  int niter = Niter;
-
   // enable the tuning
   quda::setBlasTuning(QUDA_TUNE_YES, QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
 
-    printf("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
+    printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
     initFields(prec);
 
     for (int kernel = 0; kernel < Nkernels; kernel++) {
@@ -657,18 +688,14 @@ int main(int argc, char** argv)
       quda::blas_flops = 0;
       quda::blas_bytes = 0;
       
-      double secs = benchmark(kernel, 500*niter);
+      double secs = benchmark(kernel, niter);
       
       double gflops = (quda::blas_flops*1e-9)/(secs);
       double gbytes = quda::blas_bytes/(secs*1e9);
     
-      printf("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
+      printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
     }
     freeFields();
-
-    // halve the number of iterations for the next precision
-    niter /= 2; 
-    if (niter==0) niter = 1;
   }
 
   // clear the error state
@@ -676,7 +703,7 @@ int main(int argc, char** argv)
 
   // lastly check for correctness
   for (int prec = 0; prec < Nprec; prec++) {
-    printf("\nTesting %s precision...\n\n", prec_str[prec]);
+    printfQuda("\nTesting %s precision...\n\n", prec_str[prec]);
     initFields(prec);
     
     for (int kernel = 0; kernel < Nkernels; kernel++) {
