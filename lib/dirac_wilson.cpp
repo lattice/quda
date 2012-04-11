@@ -139,7 +139,7 @@ void DiracWilsonPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField 
   deleteTmp(&tmp2, reset);
 #else
   M(out, in);
-  Mdag(out, out;
+  Mdag(out, out);
 #endif
 }
 
