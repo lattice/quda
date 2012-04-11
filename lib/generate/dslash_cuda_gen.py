@@ -840,7 +840,7 @@ def from_chiral_basis(v_out,v_in,c): # note: factor of 1/2 is included in clover
 # end def from_chiral_basis
 
 
-def clover_mult(chi):
+def clover_mult(v_out, v_in, chi):
     str = "READ_CLOVER(CLOVERTEX, "+`chi`+")\n\n"
 
     for s in range (0,2):
@@ -852,20 +852,20 @@ def clover_mult(chi):
         for cm in range (0,3):
             for sn in range (0,2):
                 for cn in range (0,3):
-                    str += a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n"
+                    str += a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,0)+";\n"
                     if (sn != sm) or (cn != cm): 
-                        str += a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n"
+                        str += a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,1)+";\n"
                     #else: str += ";\n"
-                    str += a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n"
+                    str += a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,1)+";\n"
                     if (sn != sm) or (cn != cm): 
-                        str += a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n"
+                        str += a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,0)+";\n"
                     #else: str += ";\n"
             str += "\n"
 
     for s in range (0,2):
         for c in range (0,3):
-            str += out_re(2*chi+s,c)+" = "+a_re(chi,s,c)+";  "
-            str += out_im(2*chi+s,c)+" = "+a_im(chi,s,c)+";\n"
+            str += spinor(v_out,2*chi+s,c,0)+" = "+a_re(chi,s,c)+";  "
+            str += spinor(v_out,2*chi+s,c,1)+" = "+a_im(chi,s,c)+";\n"
     str += "\n"
 
     return block(str)+"\n\n"
@@ -881,9 +881,9 @@ def apply_clover():
     else:
         str += to_chiral_basis("o","i",0) + to_chiral_basis("o","i",1) + to_chiral_basis("o","i",2)
     str += "// apply first chiral block\n"
-    str += clover_mult(0)
+    str += clover_mult("o","o",0)
     str += "// apply second chiral block\n"
-    str += clover_mult(1)
+    str += clover_mult("o","o",1)
     str += "// change back from chiral basis\n"
     str += "// (note: required factor of 1/2 is included in clover term normalization)\n"
     str += from_chiral_basis("o","o",0) + from_chiral_basis("o","o",1) + from_chiral_basis("o","o",2)
