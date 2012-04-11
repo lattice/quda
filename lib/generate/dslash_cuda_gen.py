@@ -153,11 +153,12 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            str += "#define "+acc_re(s,c)+" accum"+nthFloat2(2*i+0)+"\n"
-            str += "#define "+acc_im(s,c)+" accum"+nthFloat2(2*i+1)+"\n"
+    if dslash:
+        for s in range(0,4):
+            for c in range(0,3):
+                i = 3*s+c
+                str += "#define "+acc_re(s,c)+" accum"+nthFloat2(2*i+0)+"\n"
+                str += "#define "+acc_im(s,c)+" accum"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
     if sharedDslash: 
@@ -168,11 +169,12 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            str += "#define "+acc_re(s,c)+" accum"+nthFloat4(2*i+0)+"\n"
-            str += "#define "+acc_im(s,c)+" accum"+nthFloat4(2*i+1)+"\n"
+    if dslash:
+        for s in range(0,4):
+            for c in range(0,3):
+                i = 3*s+c
+                str += "#define "+acc_re(s,c)+" accum"+nthFloat4(2*i+0)+"\n"
+                str += "#define "+acc_im(s,c)+" accum"+nthFloat4(2*i+1)+"\n"
     str += "#endif // SPINOR_DOUBLE\n\n"
     return str
 # end def def_input_spinor
@@ -1073,12 +1075,13 @@ case EXTERIOR_KERNEL_Y:
             str += "#undef "+in_im(s,c)+"\n"
     str += "\n"
 
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            str += "#undef "+acc_re(s,c)+"\n"
-            str += "#undef "+acc_im(s,c)+"\n"
-    str += "\n"
+    if dslash:
+        for s in range(0,4):
+            for c in range(0,3):
+                i = 3*s+c
+                str += "#undef "+acc_re(s,c)+"\n"
+                str += "#undef "+acc_im(s,c)+"\n"
+        str += "\n"
 
     if clover == True:
         for m in range(0,6):
@@ -1275,7 +1278,6 @@ f = open('dslash_core/wilson_pack_face_dagger_core.h', 'w')
 f.write(generate_pack())
 f.close()
 dslash = False
-
 # generate clover solo term
 clover = True
 cloverSharedFloats = 0

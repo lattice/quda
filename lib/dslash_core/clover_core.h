@@ -35,30 +35,6 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
-#define acc00_re accum0.x
-#define acc00_im accum0.y
-#define acc01_re accum1.x
-#define acc01_im accum1.y
-#define acc02_re accum2.x
-#define acc02_im accum2.y
-#define acc10_re accum3.x
-#define acc10_im accum3.y
-#define acc11_re accum4.x
-#define acc11_im accum4.y
-#define acc12_re accum5.x
-#define acc12_im accum5.y
-#define acc20_re accum6.x
-#define acc20_im accum6.y
-#define acc21_re accum7.x
-#define acc21_im accum7.y
-#define acc22_re accum8.x
-#define acc22_im accum8.y
-#define acc30_re accum9.x
-#define acc30_im accum9.y
-#define acc31_re accum10.x
-#define acc31_im accum10.y
-#define acc32_re accum11.x
-#define acc32_im accum11.y
 #else
 #define spinorFloat float
 #define i00_re I0.x
@@ -85,30 +61,6 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
-#define acc00_re accum0.x
-#define acc00_im accum0.y
-#define acc01_re accum0.z
-#define acc01_im accum0.w
-#define acc02_re accum1.x
-#define acc02_im accum1.y
-#define acc10_re accum1.z
-#define acc10_im accum1.w
-#define acc11_re accum2.x
-#define acc11_im accum2.y
-#define acc12_re accum2.z
-#define acc12_im accum2.w
-#define acc20_re accum3.x
-#define acc20_im accum3.y
-#define acc21_re accum3.z
-#define acc21_im accum3.w
-#define acc22_re accum4.x
-#define acc22_im accum4.y
-#define acc30_re accum4.z
-#define acc30_im accum4.w
-#define acc31_re accum5.x
-#define acc31_im accum5.y
-#define acc32_re accum5.z
-#define acc32_im accum5.w
 #endif // SPINOR_DOUBLE
 
 // first chiral block of inverted clover term
@@ -352,31 +304,6 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
-
-#undef acc00_re
-#undef acc00_im
-#undef acc01_re
-#undef acc01_im
-#undef acc02_re
-#undef acc02_im
-#undef acc10_re
-#undef acc10_im
-#undef acc11_re
-#undef acc11_im
-#undef acc12_re
-#undef acc12_im
-#undef acc20_re
-#undef acc20_im
-#undef acc21_re
-#undef acc21_im
-#undef acc22_re
-#undef acc22_im
-#undef acc30_re
-#undef acc30_im
-#undef acc31_re
-#undef acc31_im
-#undef acc32_re
-#undef acc32_im
 
 #undef c00_00_re
 #undef c01_01_re

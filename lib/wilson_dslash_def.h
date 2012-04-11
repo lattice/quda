@@ -40,7 +40,7 @@
 
 #if (DD_CLOVER==0) // no clover
 #define DD_NAME_F dslash
-#elif (DD_CLOVER=1)   // clover
+#elif (DD_CLOVER==1)   // clover
 #define DSLASH_CLOVER
 #define DD_NAME_F cloverDslash
 #else
@@ -394,7 +394,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
 
-#if DSLASH_CLOVER_XPAY
+#ifdef DSLASH_CLOVER_XPAY
 
 #if DD_DAG
 #include "asym_wilson_clover_dslash_dagger_fermi_core.h"
@@ -414,7 +414,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
 
-#if DSLASH_CLOVER_XPAY
+#ifdef DSLASH_CLOVER_XPAY
 
 #if DD_DAG
 #include "asym_wilson_clover_dslash_dagger_gt200_core.h"
@@ -434,7 +434,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #else  // fall-back is original G80 
 
-#if DSLASH_CLOVER_XPAY
+#ifdef DSLASH_CLOVER_XPAY
 
 #if DD_DAG
 #include "asym_wilson_clover_dslash_dagger_g80_core.h"
