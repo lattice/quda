@@ -274,14 +274,16 @@ void destroyDslashEvents()
 
 
 #define MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...)            \
-  if (x==0) {                                                                                                     \
+  if (x==0) {               
+#ifndef ASYM_CLOVER_DSLASH                                                                                      \
     if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                                     \
       FUNC ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param);     \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {                                                              \
       FUNC ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param);     \
     } else {                                                                                                      \
       FUNC ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param);       \
-    }                                                                                                             \
+    }                     
+#endif                                                                                        \
   } else {                                                                                                        \
     if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                                     \
       FUNC ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
@@ -687,6 +689,100 @@ class CloverDslashCuda : public SharedDslashCuda {
 #endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
     DSLASH(cloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
+	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
+  }
+
+  void preTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      saveOut = new char[bytes];
+      cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+      if (typeid(sFloat) == typeid(short4)) {
+	saveOutNorm = new char[norm_bytes];
+	cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  void postTune()
+  {
+    if (dslashParam.kernel_type < 5) { // exterior kernel
+      cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (typeid(sFloat) == typeid(short4)) {
+	cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+  }
+
+};
+
+template <typename sFloat, typename gFloat, typename cFloat>
+class AsymCloverDslashCuda : public SharedDslashCuda {
+
+ private:
+  const size_t bytes, norm_bytes;
+  sFloat *out;
+  float *outNorm;
+  char *saveOut, *saveOutNorm;
+  const sFloat *in, *x;
+  const float *inNorm, *xNorm;
+  const gFloat *gauge0, *gauge1;
+  const QudaReconstructType reconstruct;
+  const cFloat *clover;
+  const float *cloverNorm;
+  const int dagger;
+  const double a;
+
+ protected:
+  int sharedBytesPerThread() const
+  {
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    if (dslashParam.kernel_type == INTERIOR_KERNEL) {
+      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+    } else {
+      return 0;
+    }
+#else
+    int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
+    return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
+#endif
+  }
+
+ public:
+  AsymCloverDslashCuda(sFloat *out, float *outNorm, const gFloat *gauge0, const gFloat *gauge1, 
+		   const QudaReconstructType reconstruct, const cFloat *clover, 
+		   const float *cloverNorm, const sFloat *in, const float *inNorm,
+		   const sFloat *x, const float *xNorm, const double a,
+		   const int dagger, const size_t bytes, const size_t norm_bytes)
+    : SharedDslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), clover(clover),
+    cloverNorm(cloverNorm), in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
+  { 
+    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
+  }
+  virtual ~AsymCloverDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
+
+  TuneKey tuneKey() const
+  {
+    TuneKey key = DslashCuda::tuneKey();
+    std::stringstream recon;
+    recon << reconstruct;
+    key.aux += ",reconstruct=" + recon.str();
+    if (x) key.aux += ",Xpay";
+    return key;
+  }
+
+  void apply(const cudaStream_t &stream)
+  {
+    if (!x) errorQuda("Asymmetric clover dslash only defined for Xpay");
+#ifdef SHARED_WILSON_DSLASH
+    if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+      errorQuda("Shared dslash does not yet support X-dimension partitioning");
+#endif
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
   }
 
@@ -1329,6 +1425,74 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 							  (short4*)gauge1, gauge.Reconstruct(), (short4*)cloverP, 
 							  (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
 							  (short4*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
+  }
+
+  dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
+
+  delete dslash;
+  unbindGaugeTex(gauge);
+  unbindCloverTex(cloverInv);
+
+  checkCudaError();
+#else
+  errorQuda("Clover dslash has not been built");
+#endif
+
+}
+
+void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
+		      const cudaColorSpinorField *in, const int parity, const int dagger, 
+		      const cudaColorSpinorField *x, const double &a, const int *commOverride)
+{
+  inSpinor = (cudaColorSpinorField*)in; // EVIL
+
+#ifdef GPU_CLOVER_DIRAC
+  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
+  for(int i=0;i<4;i++){
+    dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+    dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
+    dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+    dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
+  }
+
+  void *cloverP, *cloverNormP;
+  QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
+
+  void *gauge0, *gauge1;
+  bindGaugeTex(gauge, parity, &gauge0, &gauge1);
+
+  if (in->Precision() != gauge.Precision())
+    errorQuda("Mixing gauge and spinor precision not supported");
+
+  if (in->Precision() != clover_prec)
+    errorQuda("Mixing clover and spinor precision not supported");
+
+  const void *xv = x ? x->V() : 0;
+  const void *xn = x ? x->Norm() : 0;
+
+  DslashCuda *dslash = 0;
+  size_t regSize = sizeof(float);
+
+  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
+#if (__COMPUTE_CAPABILITY__ >= 130)
+    dslash = new AsymCloverDslashCuda<double2, double2, double2>((double2*)out->V(), (float*)out->Norm(), (double2*)gauge0, 
+							     (double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, 
+							     (float*)cloverNormP, (double2*)in->V(), (float*)in->Norm(),
+							     (double2*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
+    regSize = sizeof(double);
+#else
+    errorQuda("Double precision not supported on this GPU");
+#endif
+  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+    dslash = new AsymCloverDslashCuda<float4, float4, float4>((float4*)out->V(), (float*)out->Norm(), (float4*)gauge0, 
+							      (float4*)gauge1, gauge.Reconstruct(), (float4*)cloverP, 
+							      (float*)cloverNormP, (float4*)in->V(), (float*)in->Norm(), 
+							      (float4*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
+  } else if (in->Precision() == QUDA_HALF_PRECISION) {
+    dslash = new AsymCloverDslashCuda<short4, short4, short4>((short4*)out->V(), (float*)out->Norm(), (short4*)gauge0, 
+							      (short4*)gauge1, gauge.Reconstruct(), (short4*)cloverP, 
+							      (float*)cloverNormP, (short4*)in->V(), (float*)in->Norm(), 
+							      (short4*)xv, (float*)xn, a, dagger, in->Bytes(), in->NormBytes());
   }
 
   dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());

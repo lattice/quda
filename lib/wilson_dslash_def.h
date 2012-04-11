@@ -55,6 +55,11 @@
 #define DD_DAG_F Dagger
 #endif
 
+// DSLASH_CLOVER_XPAY implies DD_XPAY=1
+#if (DD_XPAY==0) && defined(DSLASH_CLOVER_XPAY)
+#define DD_XPAY=1
+#endif
+
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
 #else            // xpay

@@ -1032,19 +1032,16 @@ case EXTERIOR_KERNEL_Y:
 """)    
         str += "if (!incomplete)\n"
         str += "#endif // MULTI_GPU\n"
+
+    print "check" + `dslash` + " " + `twist` + " " + `clover` + " " + `asymClover`;
     
-        str += "{\n"
-#    str += block( "\n" + (
-        if twist: str += twisted()
-        elif asymClover: str += clover_xpay()
-        elif dslash: str += apply_clover("o","o")
-        else: str += apply_clover("o","i")
-#        twisted() if twist
- #       else (apply_clover("o","o") if dslash else apply_clover("o","i"))
-        #) +
-        if not asymClover: str += xpay()
-        #)
-        str += "}\n"
+    str += "{\n"
+    if twist: str += twisted()
+    elif asymClover: str += clover_xpay()
+    elif dslash: str += apply_clover("o","o")
+    else: str += apply_clover("o","i")
+    if not asymClover: str += xpay()
+    str += "}\n"
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
@@ -1239,6 +1236,7 @@ def generate_dslash_kernels(arch):
     f.write(generate_dslash())
     f.close()
 
+    twist = False
     dslash = False
 
 
@@ -1278,6 +1276,7 @@ f = open('dslash_core/wilson_pack_face_dagger_core.h', 'w')
 f.write(generate_pack())
 f.close()
 dslash = False
+
 # generate clover solo term
 clover = True
 cloverSharedFloats = 0
