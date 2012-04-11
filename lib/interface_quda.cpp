@@ -1380,10 +1380,11 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     param->mass = sqrt(param->offset[0]/4);  
   }
   //FIXME: Dirty dirty hack
-  // At this moment, the precise fat gauge is not created (NULL)
+  // At this moment, the precise fat/long gauge is not created (NULL)
   // but we set it to be the same as sloppy to avoid segfault 
   // in creating the dirac since it is needed 
   gaugeFatPrecondition = gaugeFatPrecise = gaugeFatSloppy;
+  gaugeLongPrecondition = gaugeLongPrecise = gaugeLongSloppy;
 
   Dirac *d = NULL;
   Dirac *dSloppy = NULL;
@@ -1393,6 +1394,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   createDirac(d, dSloppy, dPre, *param, pc_solve);
   // resetting to NULL
   gaugeFatPrecise = NULL; gaugeFatPrecondition = NULL;
+  gaugeLongPrecise = NULL; gaugeLongPrecondition = NULL;
 
   Dirac &diracSloppy = *dSloppy;
 
@@ -1477,6 +1479,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   /*FIXME: to avoid setfault*/
   gaugeFatPrecondition =gaugeFatSloppy;
+  gaugeLongPrecondition =gaugeLongSloppy;
 
   if (dPre && dPre != dSloppy) delete dPre;
   if (dSloppy && dSloppy != d) delete dSloppy;
@@ -1486,6 +1489,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   createDirac(d, dSloppy, dPre, *param, pc_solve);
 
   gaugeFatPrecondition = NULL;
+  gaugeLongPrecondition = NULL;
   {
     Dirac& dirac2 = *d;
     Dirac& diracSloppy2 = *dSloppy;
