@@ -92,7 +92,7 @@ void init(int argc, char **argv) {
     inv_param.twist_flavor = QUDA_TWIST_MINUS;
   }
 
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   inv_param.dagger = dagger;
 
   inv_param.cpu_prec = cpu_prec;
@@ -211,7 +211,7 @@ void init(int argc, char **argv) {
     double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
-    if (test_type == 2) {
+    if (test_type == 2 || test_type == 4) {
       construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
     } else {
       construct_clover_field(hostCloverInv, norm, diag, inv_param.clover_cpu_prec);
@@ -298,8 +298,8 @@ void end() {
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    if (test_type == 2) free(hostClover);
-    else free(hostCloverInv);
+    if (hostClover != hostCloverInv && hostClover) free(hostClover);
+    free(hostCloverInv);
   }
   endQuda();
 
