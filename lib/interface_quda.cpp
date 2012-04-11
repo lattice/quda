@@ -20,7 +20,7 @@
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
 
-#ifdef QUDA_NUMA_SUPPORT
+#ifdef NUMA_AFFINITY
 #include <numa_affinity.h>
 #endif
 
@@ -186,7 +186,7 @@ void initQuda(int dev)
   }
   cudaSetDevice(dev);
 
-#ifdef QUDA_NUMA_SUPPORT
+#ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
     setNumaAffinity(dev);
   }
