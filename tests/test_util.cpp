@@ -1330,6 +1330,7 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 bool tune = true;
 int niter = 10;
+int test_type = 0;
 
 void __attribute__((weak)) usage_extra(char** argv){};
 
@@ -1361,6 +1362,7 @@ void usage(char** argv )
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
+  printf("    --test                                    # Test method (different for each test)\n");
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -1644,6 +1646,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--test") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    test_type = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;	    
+  }
+    
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);
