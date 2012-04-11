@@ -37,6 +37,30 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
+#define acc00_re accum0.x
+#define acc00_im accum0.y
+#define acc01_re accum1.x
+#define acc01_im accum1.y
+#define acc02_re accum2.x
+#define acc02_im accum2.y
+#define acc10_re accum3.x
+#define acc10_im accum3.y
+#define acc11_re accum4.x
+#define acc11_im accum4.y
+#define acc12_re accum5.x
+#define acc12_im accum5.y
+#define acc20_re accum6.x
+#define acc20_im accum6.y
+#define acc21_re accum7.x
+#define acc21_im accum7.y
+#define acc22_re accum8.x
+#define acc22_im accum8.y
+#define acc30_re accum9.x
+#define acc30_im accum9.y
+#define acc31_re accum10.x
+#define acc31_im accum10.y
+#define acc32_re accum11.x
+#define acc32_im accum11.y
 #else
 #define spinorFloat float
 #define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_FLOAT4
@@ -65,6 +89,30 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
+#define acc00_re accum0.x
+#define acc00_im accum0.y
+#define acc01_re accum0.z
+#define acc01_im accum0.w
+#define acc02_re accum1.x
+#define acc02_im accum1.y
+#define acc10_re accum1.z
+#define acc10_im accum1.w
+#define acc11_re accum2.x
+#define acc11_im accum2.y
+#define acc12_re accum2.z
+#define acc12_im accum2.w
+#define acc20_re accum3.x
+#define acc20_im accum3.y
+#define acc21_re accum3.z
+#define acc21_im accum3.w
+#define acc22_re accum4.x
+#define acc22_im accum4.y
+#define acc30_re accum4.z
+#define acc30_im accum4.w
+#define acc31_re accum5.x
+#define acc31_im accum5.y
+#define acc32_re accum5.z
+#define acc32_im accum5.w
 #endif // SPINOR_DOUBLE
 
 // gauge link
@@ -2035,150 +2083,122 @@ case EXTERIOR_KERNEL_Y:
 if (!incomplete)
 #endif // MULTI_GPU
 {
+{
+  // apply twisted mass rotation
+  VOLATILE spinorFloat tmp00_re = +o00_re-o20_im*a;
+  VOLATILE spinorFloat tmp00_im = +o00_im+o20_re*a;
+  VOLATILE spinorFloat tmp01_re = +o01_re-o21_im*a;
+  VOLATILE spinorFloat tmp01_im = +o01_im+o21_re*a;
+  VOLATILE spinorFloat tmp02_re = +o02_re-o22_im*a;
+  VOLATILE spinorFloat tmp02_im = +o02_im+o22_re*a;
   
-  {
-    // apply twisted mass rotation
-    VOLATILE spinorFloat tmp00_re = +o00_re-o20_im*a;
-    VOLATILE spinorFloat tmp00_im = +o00_im+o20_re*a;
-    VOLATILE spinorFloat tmp01_re = +o01_re-o21_im*a;
-    VOLATILE spinorFloat tmp01_im = +o01_im+o21_re*a;
-    VOLATILE spinorFloat tmp02_re = +o02_re-o22_im*a;
-    VOLATILE spinorFloat tmp02_im = +o02_im+o22_re*a;
-    
-    VOLATILE spinorFloat tmp10_re = +o10_re-o30_im*a;
-    VOLATILE spinorFloat tmp10_im = +o10_im+o30_re*a;
-    VOLATILE spinorFloat tmp11_re = +o11_re-o31_im*a;
-    VOLATILE spinorFloat tmp11_im = +o11_im+o31_re*a;
-    VOLATILE spinorFloat tmp12_re = +o12_re-o32_im*a;
-    VOLATILE spinorFloat tmp12_im = +o12_im+o32_re*a;
-    
-    VOLATILE spinorFloat tmp20_re = -o00_im*a+o20_re;
-    VOLATILE spinorFloat tmp20_im = +o00_re*a+o20_im;
-    VOLATILE spinorFloat tmp21_re = -o01_im*a+o21_re;
-    VOLATILE spinorFloat tmp21_im = +o01_re*a+o21_im;
-    VOLATILE spinorFloat tmp22_re = -o02_im*a+o22_re;
-    VOLATILE spinorFloat tmp22_im = +o02_re*a+o22_im;
-    
-    VOLATILE spinorFloat tmp30_re = -o10_im*a+o30_re;
-    VOLATILE spinorFloat tmp30_im = +o10_re*a+o30_im;
-    VOLATILE spinorFloat tmp31_re = -o11_im*a+o31_re;
-    VOLATILE spinorFloat tmp31_im = +o11_re*a+o31_im;
-    VOLATILE spinorFloat tmp32_re = -o12_im*a+o32_re;
-    VOLATILE spinorFloat tmp32_im = +o12_re*a+o32_im;
-    
-    
+  VOLATILE spinorFloat tmp10_re = +o10_re-o30_im*a;
+  VOLATILE spinorFloat tmp10_im = +o10_im+o30_re*a;
+  VOLATILE spinorFloat tmp11_re = +o11_re-o31_im*a;
+  VOLATILE spinorFloat tmp11_im = +o11_im+o31_re*a;
+  VOLATILE spinorFloat tmp12_re = +o12_re-o32_im*a;
+  VOLATILE spinorFloat tmp12_im = +o12_im+o32_re*a;
+  
+  VOLATILE spinorFloat tmp20_re = -o00_im*a+o20_re;
+  VOLATILE spinorFloat tmp20_im = +o00_re*a+o20_im;
+  VOLATILE spinorFloat tmp21_re = -o01_im*a+o21_re;
+  VOLATILE spinorFloat tmp21_im = +o01_re*a+o21_im;
+  VOLATILE spinorFloat tmp22_re = -o02_im*a+o22_re;
+  VOLATILE spinorFloat tmp22_im = +o02_re*a+o22_im;
+  
+  VOLATILE spinorFloat tmp30_re = -o10_im*a+o30_re;
+  VOLATILE spinorFloat tmp30_im = +o10_re*a+o30_im;
+  VOLATILE spinorFloat tmp31_re = -o11_im*a+o31_re;
+  VOLATILE spinorFloat tmp31_im = +o11_re*a+o31_im;
+  VOLATILE spinorFloat tmp32_re = -o12_im*a+o32_re;
+  VOLATILE spinorFloat tmp32_im = +o12_re*a+o32_im;
+  
+  
 #ifndef DSLASH_XPAY
-    //scale by b = 1/(1 + a*a) 
-    o00_re = b*tmp00_re;
-    o00_im = b*tmp00_im;
-    o01_re = b*tmp01_re;
-    o01_im = b*tmp01_im;
-    o02_re = b*tmp02_re;
-    o02_im = b*tmp02_im;
-    o10_re = b*tmp10_re;
-    o10_im = b*tmp10_im;
-    o11_re = b*tmp11_re;
-    o11_im = b*tmp11_im;
-    o12_re = b*tmp12_re;
-    o12_im = b*tmp12_im;
-    o20_re = b*tmp20_re;
-    o20_im = b*tmp20_im;
-    o21_re = b*tmp21_re;
-    o21_im = b*tmp21_im;
-    o22_re = b*tmp22_re;
-    o22_im = b*tmp22_im;
-    o30_re = b*tmp30_re;
-    o30_im = b*tmp30_im;
-    o31_re = b*tmp31_re;
-    o31_im = b*tmp31_im;
-    o32_re = b*tmp32_re;
-    o32_im = b*tmp32_im;
+  //scale by b = 1/(1 + a*a) 
+  o00_re = b*tmp00_re;
+  o00_im = b*tmp00_im;
+  o01_re = b*tmp01_re;
+  o01_im = b*tmp01_im;
+  o02_re = b*tmp02_re;
+  o02_im = b*tmp02_im;
+  o10_re = b*tmp10_re;
+  o10_im = b*tmp10_im;
+  o11_re = b*tmp11_re;
+  o11_im = b*tmp11_im;
+  o12_re = b*tmp12_re;
+  o12_im = b*tmp12_im;
+  o20_re = b*tmp20_re;
+  o20_im = b*tmp20_im;
+  o21_re = b*tmp21_re;
+  o21_im = b*tmp21_im;
+  o22_re = b*tmp22_re;
+  o22_im = b*tmp22_im;
+  o30_re = b*tmp30_re;
+  o30_im = b*tmp30_im;
+  o31_re = b*tmp31_re;
+  o31_im = b*tmp31_im;
+  o32_re = b*tmp32_re;
+  o32_im = b*tmp32_im;
 #else
-    o00_re = tmp00_re;
-    o00_im = tmp00_im;
-    o01_re = tmp01_re;
-    o01_im = tmp01_im;
-    o02_re = tmp02_re;
-    o02_im = tmp02_im;
-    o10_re = tmp10_re;
-    o10_im = tmp10_im;
-    o11_re = tmp11_re;
-    o11_im = tmp11_im;
-    o12_re = tmp12_re;
-    o12_im = tmp12_im;
-    o20_re = tmp20_re;
-    o20_im = tmp20_im;
-    o21_re = tmp21_re;
-    o21_im = tmp21_im;
-    o22_re = tmp22_re;
-    o22_im = tmp22_im;
-    o30_re = tmp30_re;
-    o30_im = tmp30_im;
-    o31_re = tmp31_re;
-    o31_im = tmp31_im;
-    o32_re = tmp32_re;
-    o32_im = tmp32_im;
+  o00_re = tmp00_re;
+  o00_im = tmp00_im;
+  o01_re = tmp01_re;
+  o01_im = tmp01_im;
+  o02_re = tmp02_re;
+  o02_im = tmp02_im;
+  o10_re = tmp10_re;
+  o10_im = tmp10_im;
+  o11_re = tmp11_re;
+  o11_im = tmp11_im;
+  o12_re = tmp12_re;
+  o12_im = tmp12_im;
+  o20_re = tmp20_re;
+  o20_im = tmp20_im;
+  o21_re = tmp21_re;
+  o21_im = tmp21_im;
+  o22_re = tmp22_re;
+  o22_im = tmp22_im;
+  o30_re = tmp30_re;
+  o30_im = tmp30_im;
+  o31_re = tmp31_re;
+  o31_im = tmp31_im;
+  o32_re = tmp32_re;
+  o32_im = tmp32_im;
 #endif // DSLASH_XPAY
-    
-  }
+  
+}
 #ifdef DSLASH_XPAY
-  
-  READ_ACCUM(ACCUMTEX, sp_stride)
-  
-#ifdef SPINOR_DOUBLE
-  o00_re = b*o00_re + accum0.x;
-  o00_im = b*o00_im + accum0.y;
-  o01_re = b*o01_re + accum1.x;
-  o01_im = b*o01_im + accum1.y;
-  o02_re = b*o02_re + accum2.x;
-  o02_im = b*o02_im + accum2.y;
-  o10_re = b*o10_re + accum3.x;
-  o10_im = b*o10_im + accum3.y;
-  o11_re = b*o11_re + accum4.x;
-  o11_im = b*o11_im + accum4.y;
-  o12_re = b*o12_re + accum5.x;
-  o12_im = b*o12_im + accum5.y;
-  o20_re = b*o20_re + accum6.x;
-  o20_im = b*o20_im + accum6.y;
-  o21_re = b*o21_re + accum7.x;
-  o21_im = b*o21_im + accum7.y;
-  o22_re = b*o22_re + accum8.x;
-  o22_im = b*o22_im + accum8.y;
-  o30_re = b*o30_re + accum9.x;
-  o30_im = b*o30_im + accum9.y;
-  o31_re = b*o31_re + accum10.x;
-  o31_im = b*o31_im + accum10.y;
-  o32_re = b*o32_re + accum11.x;
-  o32_im = b*o32_im + accum11.y;
-#else
-  o00_re = b*o00_re + accum0.x;
-  o00_im = b*o00_im + accum0.y;
-  o01_re = b*o01_re + accum0.z;
-  o01_im = b*o01_im + accum0.w;
-  o02_re = b*o02_re + accum1.x;
-  o02_im = b*o02_im + accum1.y;
-  o10_re = b*o10_re + accum1.z;
-  o10_im = b*o10_im + accum1.w;
-  o11_re = b*o11_re + accum2.x;
-  o11_im = b*o11_im + accum2.y;
-  o12_re = b*o12_re + accum2.z;
-  o12_im = b*o12_im + accum2.w;
-  o20_re = b*o20_re + accum3.x;
-  o20_im = b*o20_im + accum3.y;
-  o21_re = b*o21_re + accum3.z;
-  o21_im = b*o21_im + accum3.w;
-  o22_re = b*o22_re + accum4.x;
-  o22_im = b*o22_im + accum4.y;
-  o30_re = b*o30_re + accum4.z;
-  o30_im = b*o30_im + accum4.w;
-  o31_re = b*o31_re + accum5.x;
-  o31_im = b*o31_im + accum5.y;
-  o32_re = b*o32_re + accum5.z;
-  o32_im = b*o32_im + accum5.w;
-#endif // SPINOR_DOUBLE
-  
+
+READ_ACCUM(ACCUMTEX, sp_stride)
+
+o00_re = b*o00_re+acc00_re;
+o00_im = b*o00_im+acc00_im;
+o01_re = b*o01_re+acc01_re;
+o01_im = b*o01_im+acc01_im;
+o02_re = b*o02_re+acc02_re;
+o02_im = b*o02_im+acc02_im;
+o10_re = b*o10_re+acc10_re;
+o10_im = b*o10_im+acc10_im;
+o11_re = b*o11_re+acc11_re;
+o11_im = b*o11_im+acc11_im;
+o12_re = b*o12_re+acc12_re;
+o12_im = b*o12_im+acc12_im;
+o20_re = b*o20_re+acc20_re;
+o20_im = b*o20_im+acc20_im;
+o21_re = b*o21_re+acc21_re;
+o21_im = b*o21_im+acc21_im;
+o22_re = b*o22_re+acc22_re;
+o22_im = b*o22_im+acc22_im;
+o30_re = b*o30_re+acc30_re;
+o30_im = b*o30_im+acc30_im;
+o31_re = b*o31_re+acc31_re;
+o31_im = b*o31_im+acc31_im;
+o32_re = b*o32_re+acc32_re;
+o32_im = b*o32_im+acc32_im;
 #endif // DSLASH_XPAY
 }
+
 
 // write spinor field back to device memory
 WRITE_SPINOR(sp_stride);
@@ -2235,6 +2255,31 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
+
+#undef acc00_re
+#undef acc00_im
+#undef acc01_re
+#undef acc01_im
+#undef acc02_re
+#undef acc02_im
+#undef acc10_re
+#undef acc10_im
+#undef acc11_re
+#undef acc11_im
+#undef acc12_re
+#undef acc12_im
+#undef acc20_re
+#undef acc20_im
+#undef acc21_re
+#undef acc21_im
+#undef acc22_re
+#undef acc22_im
+#undef acc30_re
+#undef acc30_im
+#undef acc31_re
+#undef acc31_im
+#undef acc32_re
+#undef acc32_im
 
 
 #undef o00_re
