@@ -188,19 +188,17 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
 
     FullClover cs;
-    cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
+    cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
     cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
     asymCloverDslashCuda(&out, gauge, cs, tmp1, QUDA_EVEN_PARITY, dagger, &in, kappa2, commDim);
 
     /*
     bool reset2 = newTmp(&tmp2, in);
-
     Clover(*tmp2, in, QUDA_EVEN_PARITY);
-
     // DiracWilson::Dslash applies only Dslash
     DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, *tmp2, kappa2); 
-
     deleteTmp(&tmp2, reset2);*/
+
   } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 
     // FIXME: It would be nice if I could do something like: cudaColorSpinorField tmp3( in.param() );

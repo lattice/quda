@@ -1204,6 +1204,7 @@ def generate_dslash_kernels(arch):
 
     asymClover = True
 
+    dagger = False
     filename = 'dslash_core/asym_wilson_clover_dslash_' + name + '_core.h'
     print sys.argv[0] + ": generating " + filename;
     f = open(filename, 'w')
