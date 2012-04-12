@@ -445,6 +445,7 @@ if (kernel_type == INTERIOR_KERNEL) {
             for c in range(0,3):
                 out += out_re(s,c)+" = 0;  "+out_im(s,c)+" = 0;\n"
         prolog_str+= indent(out)
+        if asymClover: prolog_str += indent(clover_xpay())
 
         prolog_str+= (
 """
@@ -772,21 +773,33 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             h_out = h
             if row_cnt[0] == 0: # projector defined on lower half only
                 h_out = h+2
-            reconstruct += out_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
-            reconstruct += out_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
+            if not asymClover:
+                reconstruct += out_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
+                reconstruct += out_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
+            else:
+                reconstruct += out_re(h_out, m) + " += a*" + h2_re(h,m) + ";\n"
+                reconstruct += out_im(h_out, m) + " += a*" + h2_im(h,m) + ";\n"
     
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
             im = c.imag
-            if im == 0 and re == 0:
-                ()
-            elif im == 0:
-                reconstruct += out_re(s, m) + " " + sign(re) + "= " + h2_re(h,m) + ";\n"
-                reconstruct += out_im(s, m) + " " + sign(re) + "= " + h2_im(h,m) + ";\n"
-            elif re == 0:
-                reconstruct += out_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
-                reconstruct += out_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
+            if not asymClover:
+                if im == 0 and re == 0: ()
+                elif im == 0:
+                    reconstruct += out_re(s, m) + " " + sign(re) + "= " + h2_re(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(re) + "= " + h2_im(h,m) + ";\n"
+                elif re == 0:
+                    reconstruct += out_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
+            else:
+                if im == 0 and re == 0: ()
+                elif im == 0:
+                    reconstruct += out_re(s, m) + " " + sign(re) + "= a*" + h2_re(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(re) + "= a*" + h2_im(h,m) + ";\n"
+                elif re == 0:
+                    reconstruct += out_re(s, m) + " " + sign(-im) + "= a*" + h2_im(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(+im) + "= a*" + h2_re(h,m) + ";\n"
         
         reconstruct += "\n"
 
@@ -974,12 +987,8 @@ def clover_xpay():
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = a*"+out_re(s,c)+"+"+acc_re(s,c)+";\n"
-                str += out_im(s,c) +" = a*"+out_im(s,c)+"+"+acc_im(s,c)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+"+"+acc_re(s,c)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+"+"+acc_im(s,c)+";\n"
+            str += out_re(s,c) +" = "+acc_re(s,c)+";\n"
+            str += out_im(s,c) +" = "+acc_im(s,c)+";\n"
 
     str += "#endif // DSLASH_CLOVER_XPAY\n"
 
@@ -1009,7 +1018,7 @@ def xpay():
 
 def epilog():
     str = ""
-    if dslash:
+    if dslash and not asymClover:
         if twist:
             str += "#ifdef MULTI_GPU\n"
         else:
@@ -1033,14 +1042,15 @@ case EXTERIOR_KERNEL_Y:
         str += "if (!incomplete)\n"
         str += "#endif // MULTI_GPU\n"
 
-    block_str = ""
-    if twist: block_str += twisted()
-    elif asymClover: block_str += clover_xpay()
-    elif dslash: block_str += apply_clover("o","o")
-    else: block_str += apply_clover("o","i")
-    if not asymClover: block_str += xpay()
+    if not asymClover:
+        block_str = ""
+        if twist: block_str += twisted()
+        #elif asymClover: block_str += clover_xpay()
+        elif dslash: block_str += apply_clover("o","o")
+        else: block_str += apply_clover("o","i")
+        if not asymClover: block_str += xpay()
 
-    str += block( block_str )
+        str += block( block_str )
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
