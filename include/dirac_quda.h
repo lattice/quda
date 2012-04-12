@@ -9,6 +9,8 @@
 
 #include <face_quda.h>
 
+#include <typeinfo>
+
 // Params for Dirac operator
 class DiracParam {
 
@@ -27,7 +29,7 @@ class DiracParam {
   double mu; // used by twisted mass only
 
   cudaColorSpinorField *tmp1;
-  cudaColorSpinorField *tmp2; // used only by Clover and TM
+  cudaColorSpinorField *tmp2; // used by Wilson-like kernels only
 
   QudaVerbosity verbose;
 
@@ -380,6 +382,8 @@ class DiracMatrix {
 			  cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const = 0;
 
   unsigned long long flops() const { return dirac->Flops(); }
+
+  std::string Type() const { return typeid(*dirac).name(); }
 };
 
 inline DiracMatrix::~DiracMatrix()
