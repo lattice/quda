@@ -53,7 +53,6 @@ namespace hisq {
 #endif
 	
 	cudaMemcpyToSymbol("hf", &hf, sizeof(fat_force_const_t));
-        init_kernel_cuda(param);    
     }
     
 
@@ -346,24 +345,24 @@ namespace hisq {
 	  T temp2;
           temp2.x = (mat[1].x - mat[3].x)*0.5*coeff;
 	  temp2.y = (mat[1].y + mat[3].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5] = temp2;	
+	  mom_field[idx + dir*Vh*5] = temp2;	
 
 	  temp2.x = (mat[2].x - mat[6].x)*0.5*coeff;
 	  temp2.y = (mat[2].y + mat[6].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5 + Vh] = temp2;
+	  mom_field[idx + dir*Vh*5 + Vh] = temp2;
 
 	  temp2.x = (mat[5].x - mat[7].x)*0.5*coeff;
 	  temp2.y = (mat[5].y + mat[7].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5 + Vhx2] = temp2;
+	  mom_field[idx + dir*Vh*5 + Vh*2] = temp2;
 
 	  const typename RealTypeId<T>::Type temp = (mat[0].y + mat[4].y + mat[8].y)*0.3333333333333333333333333;
 	  temp2.x =  (mat[0].y-temp)*coeff; 
 	  temp2.y =  (mat[4].y-temp)*coeff;
-	  mom_field[idx + dir*Vhx5 + Vhx3] = temp2;
+	  mom_field[idx + dir*Vh*5 + Vh*3] = temp2;
 		  
 	  temp2.x = (mat[8].y - temp)*coeff;
 	  temp2.y = 0.0;
-	  mom_field[idx + dir*Vhx5 + Vhx4] = temp2;
+	  mom_field[idx + dir*Vh*5 + Vh*4] = temp2;
  
 	  return;
 	}

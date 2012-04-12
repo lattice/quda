@@ -1778,7 +1778,6 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 
 #if defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE) || defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)
 #include <force_common.h>
-#include "force_kernel_common.cu"
 #endif
 
 #ifdef GPU_FATLINK

@@ -199,7 +199,6 @@ llfat_init_cuda(QudaGaugeParam* param)
   
   llfat_init_cuda_flag = 1;
   
-  init_kernel_cuda(param);
   int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
 
   
@@ -248,7 +247,6 @@ llfat_init_cuda_ex(QudaGaugeParam* param_ex)
 
   llfat_init_cuda_flag = 1;
   
-  init_kernel_cuda(param_ex);
   int Vh_ex = param_ex->X[0]*param_ex->X[1]*param_ex->X[2]*param_ex->X[3]/2;
   int Vh = (param_ex->X[0]-4)*(param_ex->X[1]-4)*(param_ex->X[2]-4)*(param_ex->X[3]-4)/2;
   
