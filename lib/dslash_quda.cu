@@ -1272,6 +1272,7 @@ void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, co
 
 }
 
+//!NEW:added Multi-GPU stuff 
 void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, const int dagger, 
 			   const cudaColorSpinorField *x, const double &kappa, const double &mu, 
@@ -1335,18 +1336,27 @@ void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gaug
 
 void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			  const cudaColorSpinorField *in, const int parity, const int dagger, 
-			  const cudaColorSpinorField *x, const double &m_f, const double &k2)
+			  const cudaColorSpinorField *x, const double &m_f, const double &k2, const int *commOverride)
 {
   inSpinor = (cudaColorSpinorField*)in; // EVIL
-
-#ifdef MULTI_GPU
-  errorQuda("Multi-GPU domain wall not implemented\n");
-#endif
 
   dslashParam.parity = parity;
   dslashParam.threads = in->Volume();
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
+//BEGIN NEW
+  kernelPackT = true; 
+  //currently splitting in space-time is impelemented:
+  int dirs = 4;
+  int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
+  for(int i = 0;i < dirs; i++){
+    dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+    dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
+    dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+    dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
+  }  
+//END NEW
+
   void *gauge0, *gauge1;
   bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 

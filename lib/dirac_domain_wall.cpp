@@ -2,8 +2,9 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 
+//!NEW
 DiracDomainWall::DiracDomainWall(const DiracParam &param) : 
-  DiracWilson(param), m5(param.m5), kappa5(0.5/(5.0 + m5)) { }
+  DiracWilson(param, 5), m5(param.m5), kappa5(0.5/(5.0 + m5)) { }
 
 DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) : 
   DiracWilson(dirac), m5(dirac.m5), kappa5(0.5/(5.0 + m5)) { }
@@ -20,6 +21,7 @@ DiracDomainWall& DiracDomainWall::operator=(const DiracDomainWall &dirac)
   return *this;
 }
 
+//!NEW : added setFace(),   domainWallDslashCuda() got an extra argument  
 void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			     const QudaParity parity) const
 {
@@ -28,8 +30,9 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
   if (!initDomainWall) initDomainWallConstants(in.X(4));
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
-  
-  domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0);
+ 
+  setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
+  domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim);   
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -37,6 +40,7 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
   flops += 1320LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
 }
 
+//!NEW : added setFace(), domainWallDslashCuda() got an extra argument 
 void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 				 const QudaParity parity, const cudaColorSpinorField &x,
 				 const double &k) const
@@ -47,7 +51,8 @@ void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpino
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
-  domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k);
+  setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
+  domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim);
 
   long long Ls = in.X(4);
   long long bulk = (Ls-2)*(in.Volume()/Ls);
