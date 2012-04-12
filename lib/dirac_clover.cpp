@@ -35,6 +35,25 @@ void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaC
   }
 }
 
+/** Applies the operator (A + k D) */
+void DiracClover::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+			       const QudaParity parity, const cudaColorSpinorField &x,
+			       const double &k) const
+{
+  initSpinorConstants(in);
+  checkParitySpinor(in, out);
+  checkSpinorAlias(in, out);
+
+  setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+
+  FullClover cs;
+  cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
+  cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+  asymCloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim);
+
+  flops += (1320+504+48)*in.Volume();
+}
+
 // Public method to apply the clover term only
 void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
 {
@@ -50,23 +69,11 @@ void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &
   flops += 504*in.Volume();
 }
 
-// FIXME: create kernel to eliminate tmp
 void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   checkFullSpinor(out, in);
-  cudaColorSpinorField *tmp=0; // this hack allows for tmp2 to be full or parity field
-  if (tmp2) {
-    if (tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) tmp = &(tmp2->Even());
-    else tmp = tmp2;
-  }
-  bool reset = newTmp(&tmp, in.Even());
-
-  Clover(*tmp, in.Odd(), QUDA_ODD_PARITY);
-  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp, -kappa);
-  Clover(*tmp, in.Even(), QUDA_EVEN_PARITY);
-  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp, -kappa);
-
-  deleteTmp(&tmp, reset);
+  DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
+  DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
 }
 
 void DiracClover::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
@@ -178,41 +185,18 @@ void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorF
 void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   double kappa2 = -kappa*kappa;
-
-  // FIXME: For asymmetric, a "DslashCxpay" kernel would improve performance.
   bool reset1 = newTmp(&tmp1, in);
 
   if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-
     // DiracCloverPC::Dslash applies A^{-1}Dslash
     Dslash(*tmp1, in, QUDA_ODD_PARITY);
-
-    FullClover cs;
-    cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
-    asymCloverDslashCuda(&out, gauge, cs, tmp1, QUDA_EVEN_PARITY, dagger, &in, kappa2, commDim);
-
-    /*
-    bool reset2 = newTmp(&tmp2, in);
-    Clover(*tmp2, in, QUDA_EVEN_PARITY);
-    // DiracWilson::Dslash applies only Dslash
-    DiracWilson::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, *tmp2, kappa2); 
-    deleteTmp(&tmp2, reset2);*/
-
+    // DiracClover::DslashXpay applies (A - kappa^2 D)
+    DiracClover::DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2);
   } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-
-    // FIXME: It would be nice if I could do something like: cudaColorSpinorField tmp3( in.param() );
-    // to save copying the data from 'in'
-    bool reset2 = newTmp(&tmp2, in);
-
     // DiracCloverPC::Dslash applies A^{-1}Dslash
     Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-    Clover(*tmp2, in, QUDA_ODD_PARITY);
-
-    // DiracWilson::Dslash applies only Dslash
-    DiracWilson::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, *tmp2, kappa2);
-
-    deleteTmp(&tmp2, reset2);
+    // DiracClover::DslashXpay applies (A - kappa^2 D)
+    DiracClover::DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2);
   } else if (!dagger) { // symmetric preconditioning
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
@@ -243,11 +227,10 @@ void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in)
 void DiracCloverPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
 {
   // need extra temporary because of symmetric preconditioning dagger
+  // and for multi-gpu the input and output fields cannot alias
   bool reset = newTmp(&tmp2, in);
-
   M(*tmp2, in);
   Mdag(out, *tmp2);
-
   deleteTmp(&tmp2, reset);
 }
 
