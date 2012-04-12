@@ -228,10 +228,8 @@ void DiracTwistedMassPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorF
 {
   // need extra temporary because of symmetric preconditioning dagger
   bool reset = newTmp(&tmp2, in);
-
   M(*tmp2, in);
   Mdag(out, *tmp2);
-
   deleteTmp(&tmp2, reset);
 }
 

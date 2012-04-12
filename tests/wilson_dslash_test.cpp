@@ -360,15 +360,6 @@ double dslashCUDA(int niter) {
 
 void dslashRef() {
 
-  // FIXME: remove once reference clover is finished
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-    } else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
-    }
-  }
-
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
   fflush(stdout);

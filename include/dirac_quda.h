@@ -172,6 +172,8 @@ class DiracClover : public DiracWilson {
   DiracClover& operator=(const DiracClover &dirac);
 
   void Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
+  virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity,
+			  const cudaColorSpinorField &x, const double &k) const;
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
 
