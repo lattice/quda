@@ -94,6 +94,13 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
   cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, param);
   
   cudaColorSpinorField tmp1(*Ap, param);
+  cudaColorSpinorField *tmp2_p = &tmp1;
+  // tmp only needed for multi-gpu Wilson-like kernels
+  if (mat.Type() != typeid(DiracStaggeredPC).name() && 
+      mat.Type() != typeid(DiracStaggered).name()) {
+    tmp2_p = new cudaColorSpinorField(*Ap, param);
+  }
+  cudaColorSpinorField &tmp2 = *tmp2_p;
 
   double b2 = 0.0;
   b2 = normCuda(b);
@@ -110,7 +117,7 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
   while (r2 > stop &&  k < invParam.maxiter) {
     //dslashCuda_st(tmp_sloppy, fatlinkSloppy, longlinkSloppy, p[0], 1 - oddBit, 0);
     //dslashAxpyCuda(Ap, fatlinkSloppy, longlinkSloppy, tmp_sloppy, oddBit, 0, p[0], msq_x4);
-    matSloppy(*Ap, *p[0], tmp1);
+    matSloppy(*Ap, *p[0], tmp1, tmp2);
     if (invParam.dslash_type != QUDA_ASQTAD_DSLASH){
       axpyCuda(offset[0], *p[0], *Ap);
     }
@@ -231,6 +238,8 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
     }
   }      
   
+  if (&tmp2 != &tmp1) delete tmp2_p;
+
   delete r;
   for(i=0;i < num_offset; i++){
     delete p[i];

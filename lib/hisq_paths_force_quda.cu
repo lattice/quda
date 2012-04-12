@@ -41,19 +41,20 @@ namespace hisq {
         }
         hisq_force_init_cuda_flag=1;
 	
+	int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
+	
 	fat_force_const_t hf;
 #ifdef MULTI_GPU
 	int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
-	hf.site_ga_stride = Vh_ex;
+	hf.site_ga_stride = Vh_ex + param->site_ga_pad;;
 	hf.color_matrix_stride = Vh_ex;
 #else
-	int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
-	hf.site_ga_stride = Vh;
+	hf.site_ga_stride = Vh + param->site_ga_pad;
 	hf.color_matrix_stride = Vh;
 #endif
+	hf.mom_ga_stride = Vh + param->mom_ga_pad;
 	
 	cudaMemcpyToSymbol("hf", &hf, sizeof(fat_force_const_t));
-        init_kernel_cuda(param);    
     }
     
 
@@ -341,29 +342,29 @@ namespace hisq {
      inline __device__
        void storeMatrixToMomentumField(const T* const mat, int dir, int idx, U coeff, 
 					T* const mom_even, T* const mom_odd, int oddness)
- 	{
+     {
 	  T* const mom_field = (oddness)?mom_odd:mom_even;
 	  T temp2;
           temp2.x = (mat[1].x - mat[3].x)*0.5*coeff;
 	  temp2.y = (mat[1].y + mat[3].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5] = temp2;	
-
+	  mom_field[idx + dir*hf.mom_ga_stride*5] = temp2;	
+	  
 	  temp2.x = (mat[2].x - mat[6].x)*0.5*coeff;
 	  temp2.y = (mat[2].y + mat[6].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5 + Vh] = temp2;
-
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride] = temp2;
+	  
 	  temp2.x = (mat[5].x - mat[7].x)*0.5*coeff;
 	  temp2.y = (mat[5].y + mat[7].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5 + Vhx2] = temp2;
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*2] = temp2;
 
 	  const typename RealTypeId<T>::Type temp = (mat[0].y + mat[4].y + mat[8].y)*0.3333333333333333333333333;
 	  temp2.x =  (mat[0].y-temp)*coeff; 
 	  temp2.y =  (mat[4].y-temp)*coeff;
-	  mom_field[idx + dir*Vhx5 + Vhx3] = temp2;
-		  
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*3] = temp2;
+	  
 	  temp2.x = (mat[8].y - temp)*coeff;
 	  temp2.y = 0.0;
-	  mom_field[idx + dir*Vhx5 + Vhx4] = temp2;
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*4] = temp2;
  
 	  return;
 	}

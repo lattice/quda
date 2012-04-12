@@ -387,16 +387,22 @@ hisq_force_init()
 
   gParam.precision = qudaGaugeParam.cuda_prec;
   gParam.reconstruct = link_recon;
+  gParam.pad = X1*X2*X3/2;
   cudaGauge = new cudaGaugeField(gParam);
-
+  //record gauge pad size
+  qudaGaugeParam.site_ga_pad = gParam.pad;
+  
 #ifdef MULTI_GPU
   gParam_ex.precision = prec;
   gParam_ex.reconstruct = link_recon;
-  gParam_ex.pad = 0;
+  gParam_ex.pad = E1*E2*E3/2;
   cudaGauge_ex = new cudaGaugeField(gParam_ex);
+  qudaGaugeParam.site_ga_pad = gParam_ex.pad;
+  //record gauge pad size  
 #endif
-
+  
 #ifdef MULTI_GPU
+  gParam_ex.pad = 0;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.create = QUDA_ZERO_FIELD_CREATE;
   cpuForce_ex = new cpuGaugeField(gParam_ex); 
@@ -404,6 +410,7 @@ hisq_force_init()
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaForce_ex = new cudaGaugeField(gParam_ex); 
 #endif
+  gParam.pad = 0;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuForce = new cpuGaugeField(gParam); 
@@ -420,8 +427,11 @@ hisq_force_init()
   refMom = new cpuGaugeField(gParam);  
   
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.pad = X1*X2*X3/2;
   cudaMom = new cudaGaugeField(gParam); // Are the elements initialised to zero? - No!
-
+  //record the mom pad
+  qudaGaugeParam.mom_ga_pad = gParam.pad;
+  
   createMomCPU(cpuMom->Gauge_p(), mom_prec);
   hw = malloc(4*cpuGauge->Volume()*hwSiteSize*qudaGaugeParam.cpu_prec);
   if (hw == NULL){
@@ -435,6 +445,7 @@ hisq_force_init()
   gParam.link_type = QUDA_ASQTAD_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.order = gauge_order;
+  gParam.pad = 0;
   cpuOprod = new cpuGaugeField(gParam);
   computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, 1, gauge_order);
   cpuLongLinkOprod = new cpuGaugeField(gParam);

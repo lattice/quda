@@ -556,20 +556,6 @@
 #endif
 
 
-
-#define WRITE_MATRIX_18_SINGLE(mat, idx, var) do{ \
-    mat[idx + 0*Vh] = var[0];  \
-    mat[idx + 1*Vh] = var[1];  \
-    mat[idx + 2*Vh] = var[2];  \
-    mat[idx + 3*Vh] = var[3];  \
-    mat[idx + 4*Vh] = var[4];  \
-    mat[idx + 5*Vh] = var[5];  \
-    mat[idx + 6*Vh] = var[6];  \
-    mat[idx + 7*Vh] = var[7];  \
-    mat[idx + 8*Vh] = var[8];  \
-}while(0)
-
-
 // matrix macros:
 #define ADJ_MAT(a, b) \
   b##00_re =  a##00_re; \
