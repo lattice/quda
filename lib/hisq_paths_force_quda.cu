@@ -656,6 +656,63 @@ template<class RealA, int oddBit>
         return;
       }
 
+template<class RealA, class RealB>
+      static void
+      lepage_middle_link_kernel(
+          const RealA* const oprodEven, const RealA* const oprodOdd, 
+          const RealA* const QprevEven, const RealA* const QprevOdd,
+          const RealB* const linkEven,  const RealB* const linkOdd, 
+          const cudaGaugeField &link, int sig, int mu, 
+          typename RealTypeId<RealA>::Type coeff,
+          dim3 gridDim, dim3 BlockDim,
+          RealA* const P3Even,   RealA* const P3Odd,  // write only
+          RealA* const newOprodEven,  RealA* const newOprodOdd,
+	  hisq_kernel_param_t kparam)
+      {
+	QudaReconstructType recon = link.Reconstruct();
+        dim3 halfGridDim = gridDim;
+	
+#define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, BlockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
+								 (typeA*)QprevEven, (typeA*)QprevOdd, \
+								 (typeB*)linkEven, (typeB*)linkOdd, \
+								 sig, mu, (typename RealTypeId<typeA>::Type)coeff, \
+								 (typeA*)P3Even, (typeA*)P3Odd,	\
+								 (typeA*)newOprodEven, (typeA*)newOprodOdd,\
+								 kparam)
+	
+#define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
+	if(sizeof(RealA) == sizeof(float2)){				\
+	  if(recon  == QUDA_RECONSTRUCT_NO){				\
+	    do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	    do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	  }else{							\
+	    do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	    do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	  }								\
+	}else{								\
+	  if(recon  == QUDA_RECONSTRUCT_NO){				\
+	    do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	    do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	  }else{							\
+	    do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	    do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	  }								\
+	}
+	
+        if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
+	  CALL_MIDDLE_LINK_KERNEL(1,1);
+        }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(1,0);
+        }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(0,1);
+        }else{
+	  CALL_MIDDLE_LINK_KERNEL(0,0);
+        }
+	
+#undef CALL_ARGUMENTS	
+#undef CALL_MIDDLE_LINK_KERNEL
+        return;
+      }
 
 
 
@@ -733,7 +790,6 @@ template<class RealA, class RealB>
           const RealB* const linkEven,  const RealB* const linkOdd, 
           const cudaGaugeField &link, int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff, 
-          typename RealTypeId<RealA>::Type accumu_coeff,
           dim3 gridDim, dim3 blockDim,
           RealA* newOprodEven, RealA* newOprodOdd,
 	  hisq_kernel_param_t kparam)
@@ -746,7 +802,6 @@ template<class RealA, class RealB>
 								    (typeB*)linkEven, (typeB*)linkOdd, \
 								    sig, mu, \
 								    (typename RealTypeId<typeA>::Type) coeff, \
-								    (typename RealTypeId<typeA>::Type) accumu_coeff, \
 								    (typeA*)newOprodEven, (typeA*)newOprodOdd,\
 								    kparam)
       
@@ -1163,7 +1218,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                     (RealA*)P5.even.data, (RealA*)P5.odd.data, 
                     (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
 
-                checkCudaError();
+                    checkCudaError();
 		//return;
               }//rho  		
 
@@ -1178,22 +1233,21 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   gridDim_1g, blockDim,
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,    // write
                   (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
-              checkCudaError();
+                 
+ 	          checkCudaError();
 
             } //nu 
 
             //lepage
 	    if(Lepage != 0.){
-              middle_link_kernel( 
+              lepage_middle_link_kernel( 
                   (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,     // read only
                   (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,     // read only
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link, 
                   sig, mu, Lepage,
                   gridDim_2g, blockDim,
-                  (RealA*)NULL, (RealA*)NULL,                      // write only
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
-                  (RealA*)NULL, (RealA*)NULL,                      // write only
 		  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
 		  kparam_2g);
 
@@ -1219,12 +1273,12 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                 (RealA*)P3.even.data, (RealA*)P3.odd.data, // read only
                 (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                 link,
-                sig, mu, ThreeSt, coeff,
+                sig, mu, ThreeSt,
                 gridDim_1g, blockDim, 
 		(RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
 		kparam_1g);
 	    
-            checkCudaError();			    
+                checkCudaError();			    
 	    
           }//mu
         }//sig
