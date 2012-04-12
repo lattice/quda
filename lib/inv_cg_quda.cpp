@@ -44,7 +44,14 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   param.precision = invParam.cuda_prec_sloppy;
   cudaColorSpinorField Ap(x, param);
   cudaColorSpinorField tmp(x, param);
-  cudaColorSpinorField tmp2(x, param); // only needed for clover and twisted mass
+
+  cudaColorSpinorField *tmp2_p = &tmp;
+  // tmp only needed for multi-gpu Wilson-like kernels
+  if (mat.Type() != typeid(DiracStaggeredPC).name() && 
+      mat.Type() != typeid(DiracStaggered).name()) {
+    tmp2_p = new cudaColorSpinorField(x, param);
+  }
+  cudaColorSpinorField &tmp2 = *tmp2_p;
 
   cudaColorSpinorField *x_sloppy, *r_sloppy;
   if (invParam.cuda_prec_sloppy == x.Precision()) {
@@ -164,6 +171,8 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 	       k, sqrt(r2/src_norm), sqrt(true_res / src_norm));    
   }
+
+  if (&tmp2 != &tmp) delete tmp2_p;
 
   if (invParam.cuda_prec_sloppy != x.Precision()) {
     delete r_sloppy;
