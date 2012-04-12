@@ -484,6 +484,111 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   return;
 }
 
+
+
+
+template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit>
+  __global__ void
+  HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
+				            const RealB* const linkEven,  const RealB* const linkOdd,
+				            int sig, int mu, 
+				            typename RealTypeId<RealA>::Type coeff, 
+				            typename RealTypeId<RealA>::Type accumu_coeff,
+				            RealA* const newOprodEven, RealA* const newOprodOdd,
+				            hisq_kernel_param_t kparam)
+{
+#ifdef KERNEL_ENABLED		
+  int sid = blockIdx.x * blockDim.x + threadIdx.x;
+  if(sid >= kparam.threads) return;
+
+  int x[4];
+  int z1 = sid/D1h;
+  int x1h = sid - z1*D1h;
+  int z2 = z1/D2;
+  x[1] = z1 - z2*D2;
+  x[3] = z2/D3;
+  x[2] = z2 - x[3]*D3;
+  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  x[0] = 2*x1h + x1odd;
+
+#if(RECON == 12)
+  int ad_link_sign;
+#endif
+
+  int new_mem_idx;
+  int new_x[4];
+#ifdef MULTI_GPU
+  int E[4]= {E1,E2,E3,E4};
+  x[0] = x[0] + kparam.base_idx;
+  x[1] = x[1] + kparam.base_idx;
+  x[2] = x[2] + kparam.base_idx;
+  x[3] = x[3] + kparam.base_idx;
+
+  new_x[0] = x[0];
+  new_x[1] = x[1];
+  new_x[2] = x[2];
+  new_x[3] = x[3];
+
+  new_mem_idx = new_x[3]*E3E2E1 + new_x[2]*E2E1 + new_x[1]*E1 + new_x[0];
+  int new_sid=(new_mem_idx >> 1);
+#else
+  int X = 2*sid + x1odd;
+  new_x[0] = x[0];
+  new_x[1] = x[1];
+  new_x[2] = x[2];
+  new_x[3] = x[3];
+  new_mem_idx = X;
+  int new_sid = sid;
+#endif
+
+  /*      compute the side link contribution to the momentum
+   *
+   *             sig
+   *          A________B
+   *           |       |   mu
+   *         D |       |C
+   *
+   *      A is the current point (sid)
+   *
+   */
+
+  RealA COLOR_MAT_W[ArrayLength<RealA>::result];
+  RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
+  loadMatrixFromField(P3Even, P3Odd, new_sid, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
+
+  typename RealTypeId<RealA>::Type mycoeff;
+  int point_d;
+  int ad_link_nbr_idx;
+  int mymu;
+
+  if(mu_positive){
+    mymu=mu;
+    FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mymu,new_mem_idx, new_mem_idx);
+  }else{
+    mymu = OPP_DIR(mu);
+    FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mymu, new_mem_idx, new_mem_idx);
+  }
+  point_d = (new_mem_idx >> 1);
+  mycoeff = CoeffSign<sig_positive,oddBit>::result*coeff;
+
+
+  if(mu_positive){
+    if(!oddBit){ mycoeff = -mycoeff;} // need to change this to get away from oddBit
+    addMatrixToNewOprod(COLOR_MAT_Y, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+  }else{
+    if(oddBit){ mycoeff = -mycoeff; }
+    ADJ_MAT(COLOR_MAT_Y, COLOR_MAT_W);
+    addMatrixToNewOprod(COLOR_MAT_W, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
+  }
+#endif // KERNEL_ENABLED
+  return;
+}
+
+
+
+
+
+
 /********************************do_all_link_kernel*********************************************
 *
 * In this function we need
