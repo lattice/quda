@@ -35,7 +35,6 @@ cudaGaugeField *cudaMom = NULL;
 cpuGaugeField *cpuMom  = NULL;
 cpuGaugeField *refMom  = NULL;
 
-static FullHw cudaHw;
 static QudaGaugeParam qudaGaugeParam;
 static QudaGaugeParam qudaGaugeParam_ex;
 static void* hw; // the array of half_wilson_vector
@@ -431,7 +430,6 @@ hisq_force_init()
   }
 
   createHwCPU(hw, hw_prec);
-  cudaHw = createHwQuda(qudaGaugeParam.X, hw_prec);
 
 
   gParam.link_type = QUDA_ASQTAD_GENERAL_LINKS;
@@ -535,7 +533,12 @@ hisq_force_end()
   delete cudaGauge;
   delete cudaOprod;
   delete cudaLongLinkOprod;
-  freeHwQuda(cudaHw);
+#ifdef MULTI_GPU
+  delete cudaForce_ex;
+  delete cudaGauge_ex;
+  delete cudaOprod_ex;
+  delete cudaLongLinkOprod_ex;
+#endif  
   
   delete cpuGauge;
   delete cpuForce;
@@ -543,6 +546,14 @@ hisq_force_end()
   delete refMom;
   delete cpuOprod;  
   delete cpuLongLinkOprod;
+
+#ifdef MULTI_GPU
+  delete cpuGauge_ex;
+  delete cpuForce_ex;
+  delete cpuOprod_ex;  
+  delete cpuLongLinkOprod_ex;
+#endif
+
   free(hw);
 
   endQuda();
@@ -615,7 +626,7 @@ hisq_force_test(void)
   struct timeval ht0, ht1;
   gettimeofday(&ht0, NULL);
   if (verify_results){
-#if 0    
+    /*
     if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
       const float eps = 0.5;
       fermion_force_reference(eps, weight, 0, act_path_coeff, hw, siteLink_1d, refMom->Gauge_p());
@@ -623,7 +634,7 @@ hisq_force_test(void)
       const double eps = 0.5;
       fermion_force_reference(eps, d_weight, 0, d_act_path_coeff, hw, siteLink_1d, refMom->Gauge_p());
     }
-#else
+    */
     
     void* coeff;
     void* naik_coeff;
@@ -635,22 +646,6 @@ hisq_force_test(void)
       naik_coeff = &d_act_path_coeff[1];
     }
     
-    //#define TEST_ONLY
-#ifdef TEST_ONLY
-    printfQuda("Testing only .................................................\n");
-#ifdef MULTI_GPU
-    hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-    //hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
-    hisqCompleteForceCPU(qudaGaugeParam, *cpuForce_ex, *cpuGauge_ex, refMom);
-    //hisqCompleteForceCPU(qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, refMom);
-#else
-    hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod, *cpuGauge, cpuForce);
-    //hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod, *cpuGauge, cpuForce);
-    hisqCompleteForceCPU(qudaGaugeParam, *cpuForce, *cpuGauge, refMom);
-#endif
-
-#else
-    printfQuda("Not Testing only .................................................\n");
 #ifdef MULTI_GPU
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
@@ -660,38 +655,38 @@ hisq_force_test(void)
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod, *cpuGauge, cpuForce);
     hisqCompleteForceCPU(qudaGaugeParam, *cpuForce, *cpuGauge, refMom);
 #endif
-#endif //TEST_ONLY
-#endif //0 or 1
+
   }
   gettimeofday(&ht1, NULL);
 
-  struct timeval t0, t1, t2, t3, t4, t5;
-#ifdef TEST_ONLY
+  struct timeval t0, t1, t2, t3;
 
+  gettimeofday(&t0, NULL);
 #ifdef MULTI_GPU
   hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
-  //hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);
-  hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);
-  //hisqCompleteForceCuda(qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaMom);
-#else
-  hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
-  //hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
-  hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
-#endif
+  cudaDeviceSynchronize(); 
+  gettimeofday(&t1, NULL);
 
-#else
-#ifdef MULTI_GPU
-  hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
   hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);
+  cudaDeviceSynchronize(); 
+  gettimeofday(&t2, NULL);
+  
   hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);
 #else
   hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+  cudaDeviceSynchronize(); 
+  gettimeofday(&t1, NULL);
+
   hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
+  cudaDeviceSynchronize(); 
+  gettimeofday(&t2, NULL);
+  
   hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
 #endif
-#endif
+  cudaDeviceSynchronize();
 
-  cudaThreadSynchronize();
+  gettimeofday(&t3, NULL);
+
   checkCudaError();
 
 
@@ -711,7 +706,7 @@ hisq_force_test(void)
   float perf_flops = total_flops / (TDIFF(t0, t1)) *1e-9;
   float perf = total_io / (TDIFF(t0, t1)) *1e-9;
   printfQuda("Staples time: %.2f ms, perf =%.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", TDIFF(t0,t1)*1000, perf_flops, perf);
-  printfQuda("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t2,t3)*1000, TDIFF(t4,t5)*1000);
+  printfQuda("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t1,t2)*1000, TDIFF(t2,t3)*1000);
   printfQuda("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1)*1000);
 
   hisq_force_end();
