@@ -6,22 +6,15 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <comm_quda.h>
 #include <blas_reference.h>
+#include <face_quda.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
-
-#include <mpi.h>
-
-
-#include "face_quda.h"
-
-#define CONFIGFILE "/uf/ac/astrelch/data/dw_config.1200"
 
 #ifdef QMP_COMMS
 #include <qmp.h>
 #endif
-
-#define MAX_GPU_PER_NODE 2
 
 #include <gauge_qio.h>
 
@@ -70,7 +63,7 @@ extern void usage(char** );
 int main(int argc, char **argv)
 {
 //BEGIN NEW
-kernelPackT = true;
+  kernelPackT = true;
 //END NEW
 
   /*
@@ -109,10 +102,7 @@ kernelPackT = true;
     
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
-    
-
   }
-
 
   if (prec_sloppy == QUDA_INVALID_PRECISION){
     prec_sloppy = prec;
@@ -121,27 +111,15 @@ kernelPackT = true;
     link_recon_sloppy = link_recon;
   }
 
-
-
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
 
   // *** QUDA parameters begin here.
-  int mpi_rank = comm_rank();
-  
-  int device = mpi_rank % MAX_GPU_PER_NODE; // CUDA device number (not so good style)
 
-  int multi_shift = 0; // whether to test multi-shift or standard solver
-
-  // Domain wall dslash:
   QudaDslashType dslash_type = QUDA_DOMAIN_WALL_DSLASH;
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
-
-  // offsets used only by multi-shift solver
-  int num_offsets = 4;
-  double offsets[4] = {0.01, 0.02, 0.03, 0.04};
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -259,9 +237,11 @@ kernelPackT = true;
     construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
     if(gauge_param.cpu_prec != QUDA_DOUBLE_PRECISION) printf("\nHost gauge precision must be double!\n"), exit(-1);
 
-    double plaq = 0.0; 
+    //double plaq = 0.0; 
     //read_nersc_gauge_field((double**)gauge, (char*)CONFIGFILE, &plaq, &gauge_param, 1);
-    comm_barrier();
+    //#ifdef MULTI_GPU
+    //    comm_barrier();
+    //#endif
   }
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
@@ -270,16 +250,15 @@ kernelPackT = true;
   void *spinorOut = NULL;
   spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
-
-  // create a point source at 0
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = (comm_rank() == 0) ? 1.0 : 0.0;
-  else *((double*)spinorIn) = (comm_rank() == 0) ? 1.0 : 0.0;
+  // create a point source at 0 (in each subvolume...  FIXME)
+  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = 1.0;
+  else *((double*)spinorIn) = 1.0;
 
   // start the timer
   double time0 = -((double)clock());
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(-1);
 
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
@@ -299,7 +278,7 @@ kernelPackT = true;
 
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-      dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass, comm_size());
+      dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
 	ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
@@ -325,7 +304,7 @@ kernelPackT = true;
   // finalize the QUDA library
   endQuda();
 
-  // end if the communications layer
+  // finalize the communications layer
   endCommsQuda();
 
   return 0;

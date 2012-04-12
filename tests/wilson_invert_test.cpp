@@ -282,7 +282,7 @@ int main(int argc, char **argv)
     spinorOut = malloc(V*spinorSiteSize*sSize);
   }
 
-  // create a point source at 0
+  // create a point source at 0 (in each subvolume...  FIXME)
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = 1.0;
   else *((double*)spinorIn) = 1.0;
 

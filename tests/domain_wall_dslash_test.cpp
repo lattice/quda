@@ -13,7 +13,6 @@
 #include <test_util.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
-#include "mpi.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -308,9 +307,6 @@ double dslashCUDA() {
 
 void dslashRef() {
 
-  int mpi_size;
-  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-
   // FIXME: remove once reference clover is finished
   if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
@@ -323,17 +319,17 @@ void dslashRef() {
   fflush(stdout);
   switch (test_type) {
   case 0:
-    dw_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, mpi_size);	   
+    dw_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
     break;
   case 1:    
     matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   case 2:
-    dw_mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, mpi_size);
+    dw_mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
     break;
   case 3:
-    dw_matdagmat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, mpi_size);
+    dw_matdagmat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
     break; 
   default:
     printf("Test type not defined\n");
