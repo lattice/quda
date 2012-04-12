@@ -274,16 +274,14 @@ void destroyDslashEvents()
 
 
 #define MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...)            \
-  if (x==0) {               
-#ifndef ASYM_CLOVER_DSLASH                                                                                      \
-    if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                                     \
+  if (x==0) {								                                          \
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {				                                          \
       FUNC ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param);     \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {                                                              \
       FUNC ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param);     \
     } else {                                                                                                      \
       FUNC ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param);       \
-    }                     
-#endif                                                                                        \
+    }									                                          \
   } else {                                                                                                        \
     if (reconstruct == QUDA_RECONSTRUCT_NO) {                                                                     \
       FUNC ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
@@ -339,6 +337,58 @@ void destroyDslashEvents()
 // macro used for staggered dslash
 #define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param, ...)	\
     GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param, __VA_ARGS__)
+
+
+#define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...)     \
+  if (reconstruct == QUDA_RECONSTRUCT_NO) {				                                        \
+    FUNC ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+  } else if (reconstruct == QUDA_RECONSTRUCT_12) {			                                        \
+    FUNC ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+  } else if (reconstruct == QUDA_RECONSTRUCT_8) {			                                        \
+    FUNC ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+  }									
+
+#ifndef MULTI_GPU
+
+#define GENERIC_ASYM_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...)                          \
+  switch(param.kernel_type) {						                                      \
+  case INTERIOR_KERNEL:							                                      \
+    MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                      \
+  default:								                                      \
+    errorQuda("KernelType %d not defined for single GPU", param.kernel_type);                                 \
+  }
+
+#else
+
+#define GENERIC_ASYM_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...)                            \
+  switch(param.kernel_type) {						                                        \
+  case INTERIOR_KERNEL:							                                        \
+    MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL,   gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_X:							                                \
+    MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_X, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_Y:							                                \
+    MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Y, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_Z:							                                \
+    MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Z, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  case EXTERIOR_KERNEL_T:							                                \
+    MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								                                        \
+  }
+
+#endif
+
+// macro used for dslash types with dagger kernel defined (Wilson, domain wall, etc.)
+#define ASYM_DSLASH(FUNC, gridDim, blockDim, shared, stream, param, ...)	\
+  if (!dagger) {							\
+    GENERIC_ASYM_DSLASH(FUNC, , Xpay, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+  } else {								\
+    GENERIC_ASYM_DSLASH(FUNC, Dagger, Xpay, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+ }
 
 
 // Use an abstract class interface to drive the different CUDA dslash
@@ -782,8 +832,8 @@ class AsymCloverDslashCuda : public SharedDslashCuda {
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-    DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	   out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
+    ASYM_DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
+		out, outNorm, gauge0, gauge1, clover, cloverNorm, in, inNorm, x, xNorm, a);
   }
 
   void preTune()

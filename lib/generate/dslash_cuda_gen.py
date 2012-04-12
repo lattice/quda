@@ -153,7 +153,7 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
-    if dslash:
+    if dslash and not pack:
         for s in range(0,4):
             for c in range(0,3):
                 i = 3*s+c
@@ -169,7 +169,7 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
-    if dslash:
+    if dslash and not pack:
         for s in range(0,4):
             for c in range(0,3):
                 i = 3*s+c
@@ -1033,15 +1033,14 @@ case EXTERIOR_KERNEL_Y:
         str += "if (!incomplete)\n"
         str += "#endif // MULTI_GPU\n"
 
-    print "check" + `dslash` + " " + `twist` + " " + `clover` + " " + `asymClover`;
-    
-    str += "{\n"
-    if twist: str += twisted()
-    elif asymClover: str += clover_xpay()
-    elif dslash: str += apply_clover("o","o")
-    else: str += apply_clover("o","i")
-    if not asymClover: str += xpay()
-    str += "}\n"
+    block_str = ""
+    if twist: block_str += twisted()
+    elif asymClover: block_str += clover_xpay()
+    elif dslash: block_str += apply_clover("o","o")
+    else: block_str += apply_clover("o","i")
+    if not asymClover: block_str += xpay()
+
+    str += block( block_str )
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
@@ -1248,6 +1247,7 @@ clover = False
 asymClover = False
 sharedFloats = 0
 sharedDslash = False
+pack = False
 
 # generate dslash kernels
 arch = 200
@@ -1265,6 +1265,7 @@ sharedFloats = 0
 twist = False
 clover = False
 dagger = False
+pack = True
 print sys.argv[0] + ": generating wilson_pack_face_core.h";
 f = open('dslash_core/wilson_pack_face_core.h', 'w')
 f.write(generate_pack())
@@ -1276,6 +1277,7 @@ f = open('dslash_core/wilson_pack_face_dagger_core.h', 'w')
 f.write(generate_pack())
 f.close()
 dslash = False
+pack = False
 
 # generate clover solo term
 clover = True

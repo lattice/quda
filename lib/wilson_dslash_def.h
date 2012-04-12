@@ -57,7 +57,8 @@
 
 // DSLASH_CLOVER_XPAY implies DD_XPAY=1
 #if (DD_XPAY==0) && defined(DSLASH_CLOVER_XPAY)
-#define DD_XPAY=1
+#undef DD_XPAY
+#define DD_XPAY 1
 #endif
 
 #if (DD_XPAY==0) // no xpay 
@@ -410,9 +411,9 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #else
 
 #if DD_DAG
-#include "asym_wilson_clover_dslash_dagger_fermi_core.h"
+#include "wilson_dslash_dagger_fermi_core.h"
 #else
-#include "asym_wilson_clover_dslash_fermi_core.h"
+#include "wilson_dslash_fermi_core.h"
 #endif
 
 #endif
@@ -430,9 +431,9 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #else
 
 #if DD_DAG
-#include "asym_wilson_clover_dslash_dagger_gt200_core.h"
+#include "wilson_dslash_dagger_gt200_core.h"
 #else
-#include "asym_wilson_clover_dslash_gt200_core.h"
+#include "wilson_dslash_gt200_core.h"
 #endif
 
 #endif
@@ -450,9 +451,9 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #else
 
 #if DD_DAG
-#include "asym_wilson_clover_dslash_dagger_g80_core.h"
+#include "wilson_dslash_dagger_g80_core.h"
 #else
-#include "asym_wilson_clover_dslash_g80_core.h"
+#include "wilson_dslash_g80_core.h"
 #endif
 
 #endif // DSLASH_CLOVER_XPAY
