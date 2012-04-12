@@ -26,7 +26,7 @@
 
 extern void usage(char** argv );
 
-int test_type = 0;
+extern int test_type;
 
 extern bool tune;
 

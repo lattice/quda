@@ -17,7 +17,6 @@
 #define HISQ_SITE_MATRIX_LOAD_TEX 1
 #define HISQ_NEW_OPROD_LOAD_TEX 1
 
-__constant__ int color_matrix_stride;
 namespace hisq {
   namespace fermion_force {
 
@@ -27,7 +26,7 @@ namespace hisq {
       int base_idx;
     }hisq_kernel_param_t;
 
-
+    
     texture<int4, 1> newOprod0TexDouble;
     texture<int4, 1> newOprod1TexDouble;
     texture<float2, 1, cudaReadModeElementType>  newOprod0TexSingle;
@@ -41,51 +40,19 @@ namespace hisq {
           return;
         }
         hisq_force_init_cuda_flag=1;
-
-	int E1 = param->X[0]+4;
-	int E1h = E1/2;
-	int E2 = param->X[1]+4;
-	int E3 = param->X[2]+4;
-	int E4 = param->X[3]+4;
-	int E2E1 =E2*E1;
-	int E3E2E1=E3*E2*E1;
-	int Vh_ex = E1*E2*E3*E4/2;
 	
-	cudaMemcpyToSymbol("E1", &E1, sizeof(int));
-	cudaMemcpyToSymbol("E1h", &E1h, sizeof(int));
-	cudaMemcpyToSymbol("E2", &E2, sizeof(int));
-	cudaMemcpyToSymbol("E3", &E3, sizeof(int));
-	cudaMemcpyToSymbol("E4", &E4, sizeof(int));
-	cudaMemcpyToSymbol("E2E1", &E2E1, sizeof(int));
-	cudaMemcpyToSymbol("E3E2E1", &E3E2E1, sizeof(int));
-	cudaMemcpyToSymbol("Vh_ex", &Vh_ex, sizeof(int));
+	fat_force_const_t hf;
 #ifdef MULTI_GPU
-	int site_ga_stride = Vh_ex;
-	int color_matrix_stride = Vh_ex;
+	int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
+	hf.site_ga_stride = Vh_ex;
+	hf.color_matrix_stride = Vh_ex;
 #else
 	int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
-	int site_ga_stride = Vh;
-	int color_matrix_stride = Vh;
+	hf.site_ga_stride = Vh;
+	hf.color_matrix_stride = Vh;
 #endif
-	cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));
-	cudaMemcpyToSymbol("color_matrix_stride", &color_matrix_stride, sizeof(int));
-
-#ifdef MULTI_GPU
-	int first_proc_in_tdim = 0;
-	int last_proc_in_tdim = 0;
-	if(commCoords(3) == (commDim(3) -1)){
-	  last_proc_in_tdim =  1;
-	}
 	
-	if(commCoords(3) == 0){
-	  first_proc_in_tdim =  1;
-	}
-	
-	cudaMemcpyToSymbol("last_proc_in_tdim", &last_proc_in_tdim, sizeof(int));
-	cudaMemcpyToSymbol("first_proc_in_tdim", &first_proc_in_tdim, sizeof(int));
-#endif
-
-
+	cudaMemcpyToSymbol("hf", &hf, sizeof(fat_force_const_t));
         init_kernel_cuda(param);    
     }
     
@@ -247,24 +214,24 @@ namespace hisq {
 #define  addMatrixToNewOprod(mat,  dir, idx, coeff, field_even, field_odd, oddness)     do { \
       RealA* const field = (oddness)?field_odd: field_even;		\
       RealA value[9];							\
-      value[0] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9); \
-      value[1] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + color_matrix_stride);	\
-      value[2] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + 2*color_matrix_stride); \
-      value[3] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + 3*color_matrix_stride); \
-      value[4] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + 4*color_matrix_stride); \
-      value[5] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + 5*color_matrix_stride); \
-      value[6] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + 6*color_matrix_stride); \
-      value[7] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + 7*color_matrix_stride); \
-      value[8] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*color_matrix_stride*9 + 8*color_matrix_stride); \
-      field[idx + dir*color_matrix_stride*9]          = value[0] + coeff*mat[0];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride]     = value[1] + coeff*mat[1];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride*2]   = value[2] + coeff*mat[2];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride*3]   = value[3] + coeff*mat[3];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride*4]   = value[4] + coeff*mat[4];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride*5]   = value[5] + coeff*mat[5];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride*6]   = value[6] + coeff*mat[6];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride*7]   = value[7] + coeff*mat[7];		\
-      field[idx + dir*color_matrix_stride*9 + color_matrix_stride*8]   = value[8] + coeff*mat[8];		\
+      value[0] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9); \
+      value[1] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + hf.color_matrix_stride);	\
+      value[2] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 2*hf.color_matrix_stride); \
+      value[3] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 3*hf.color_matrix_stride); \
+      value[4] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 4*hf.color_matrix_stride); \
+      value[5] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 5*hf.color_matrix_stride); \
+      value[6] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 6*hf.color_matrix_stride); \
+      value[7] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 7*hf.color_matrix_stride); \
+      value[8] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 8*hf.color_matrix_stride); \
+      field[idx + dir*hf.color_matrix_stride*9]          = value[0] + coeff*mat[0];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     = value[1] + coeff*mat[1];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   = value[2] + coeff*mat[2];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   = value[3] + coeff*mat[3];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   = value[4] + coeff*mat[4];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   = value[5] + coeff*mat[5];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   = value[6] + coeff*mat[6];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   = value[7] + coeff*mat[7];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   = value[8] + coeff*mat[8];		\
   }while(0)					
      
 
@@ -277,15 +244,15 @@ namespace hisq {
 			     T* const field_even, T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
-        field[idx + dir*color_matrix_stride*9]          += coeff*mat[0];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride]     += coeff*mat[1];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*2]   += coeff*mat[2];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*3]   += coeff*mat[3];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*4]   += coeff*mat[4];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*5]   += coeff*mat[5];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*6]   += coeff*mat[6];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*7]   += coeff*mat[7];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*8]   += coeff*mat[8];
+        field[idx + dir*hf.color_matrix_stride*9]          += coeff*mat[0];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     += coeff*mat[1];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   += coeff*mat[2];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   += coeff*mat[3];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   += coeff*mat[4];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   += coeff*mat[5];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   += coeff*mat[6];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   += coeff*mat[7];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   += coeff*mat[8];
 
         return;
       }
@@ -298,14 +265,14 @@ namespace hisq {
       {
 	T* const field = (oddness)?field_odd: field_even;
         field[idx ]         += coeff*mat[0];
-        field[idx + color_matrix_stride]     += coeff*mat[1];
-        field[idx + color_matrix_stride*2]   += coeff*mat[2];
-        field[idx + color_matrix_stride*3]   += coeff*mat[3];
-        field[idx + color_matrix_stride*4]   += coeff*mat[4];
-        field[idx + color_matrix_stride*5]   += coeff*mat[5];
-        field[idx + color_matrix_stride*6]   += coeff*mat[6];
-        field[idx + color_matrix_stride*7]   += coeff*mat[7];
-        field[idx + color_matrix_stride*8]   += coeff*mat[8];
+        field[idx + hf.color_matrix_stride]     += coeff*mat[1];
+        field[idx + hf.color_matrix_stride*2]   += coeff*mat[2];
+        field[idx + hf.color_matrix_stride*3]   += coeff*mat[3];
+        field[idx + hf.color_matrix_stride*4]   += coeff*mat[4];
+        field[idx + hf.color_matrix_stride*5]   += coeff*mat[5];
+        field[idx + hf.color_matrix_stride*6]   += coeff*mat[6];
+        field[idx + hf.color_matrix_stride*7]   += coeff*mat[7];
+        field[idx + hf.color_matrix_stride*8]   += coeff*mat[8];
 
         return;
       }
@@ -318,14 +285,14 @@ namespace hisq {
       T* const field = (oddness)?field_odd: field_even;
       //T oldvalue=field[idx];
       field[idx ]         += coeff*mat[0];
-      field[idx + color_matrix_stride]     += coeff*mat[1];
-      field[idx + color_matrix_stride*2]   += coeff*mat[2];
-      field[idx + color_matrix_stride*3]   += coeff*mat[3];
-      field[idx + color_matrix_stride*4]   += coeff*mat[4];
-      field[idx + color_matrix_stride*5]   += coeff*mat[5];
-      field[idx + color_matrix_stride*6]   += coeff*mat[6];
-      field[idx + color_matrix_stride*7]   += coeff*mat[7];
-      field[idx + color_matrix_stride*8]   += coeff*mat[8];
+      field[idx + hf.color_matrix_stride]     += coeff*mat[1];
+      field[idx + hf.color_matrix_stride*2]   += coeff*mat[2];
+      field[idx + hf.color_matrix_stride*3]   += coeff*mat[3];
+      field[idx + hf.color_matrix_stride*4]   += coeff*mat[4];
+      field[idx + hf.color_matrix_stride*5]   += coeff*mat[5];
+      field[idx + hf.color_matrix_stride*6]   += coeff*mat[6];
+      field[idx + hf.color_matrix_stride*7]   += coeff*mat[7];
+      field[idx + hf.color_matrix_stride*8]   += coeff*mat[8];
 
       //printf("value is oldvalue(%f)+ coeff(%f) * mat[0].x(%f)=%f\n", oldvalue.x, coeff, mat[0].x, field[idx].x);
       printf("value is  coeff(%f) * mat[0].x(%f)=%f\n", coeff, mat[0].x, field[idx].x);
@@ -337,15 +304,15 @@ namespace hisq {
      void storeMatrixToField(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
-        field[idx + dir*color_matrix_stride*9]          = mat[0];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride]     = mat[1];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*2]   = mat[2];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*3]   = mat[3];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*4]   = mat[4];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*5]   = mat[5];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*6]   = mat[6];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*7]   = mat[7];
-        field[idx + dir*color_matrix_stride*9 + color_matrix_stride*8]   = mat[8];
+        field[idx + dir*hf.color_matrix_stride*9]          = mat[0];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     = mat[1];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   = mat[2];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   = mat[3];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   = mat[4];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   = mat[5];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   = mat[6];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   = mat[7];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   = mat[8];
 
         return;
       }
@@ -357,14 +324,14 @@ namespace hisq {
       {
 	T* const field = (oddness)?field_odd: field_even;
         field[idx]          = mat[0];
-        field[idx + color_matrix_stride]     = mat[1];
-        field[idx + color_matrix_stride*2]   = mat[2];
-        field[idx + color_matrix_stride*3]   = mat[3];
-        field[idx + color_matrix_stride*4]   = mat[4];
-        field[idx + color_matrix_stride*5]   = mat[5];
-        field[idx + color_matrix_stride*6]   = mat[6];
-        field[idx + color_matrix_stride*7]   = mat[7];
-        field[idx + color_matrix_stride*8]   = mat[8];
+        field[idx + hf.color_matrix_stride]     = mat[1];
+        field[idx + hf.color_matrix_stride*2]   = mat[2];
+        field[idx + hf.color_matrix_stride*3]   = mat[3];
+        field[idx + hf.color_matrix_stride*4]   = mat[4];
+        field[idx + hf.color_matrix_stride*5]   = mat[5];
+        field[idx + hf.color_matrix_stride*6]   = mat[6];
+        field[idx + hf.color_matrix_stride*7]   = mat[7];
+        field[idx + hf.color_matrix_stride*8]   = mat[8];
 
         return;
       }
@@ -477,8 +444,8 @@ namespace hisq {
 	
       case TUP:
 #ifdef MULTI_GPU	
-	if( (i[3] == X4+1 && last_proc_in_tdim)
-	    || (i[3] == 1 && first_proc_in_tdim)) {
+	if( (i[3] == X4+1 && PtNm1)
+	    || (i[3] == 1 && Pt0)) {
 	  *sign=-1; 
 	}
 #else
@@ -523,7 +490,7 @@ template<class RealA, int oddBit>
 #endif
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   if(GOES_FORWARDS(sig)){
-    loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, color_matrix_stride);
+    loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, hf.color_matrix_stride);
     addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit);
   }
   return;
@@ -547,9 +514,9 @@ template<class RealA, int oddBit>
 #define PRECISION 0
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -564,9 +531,9 @@ template<class RealA, int oddBit>
 #define PRECISION 0
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
@@ -594,9 +561,9 @@ template<class RealA, int oddBit>
 #define PRECISION 1
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -611,9 +578,9 @@ template<class RealA, int oddBit>
 #define PRECISION 1
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)

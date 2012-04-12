@@ -1,5 +1,14 @@
 #define MAX(a,b) ((a)>(b) ? (a):(b))
 
+typedef struct fat_force_stride_s{
+  int fat_ga_stride;
+  int site_ga_stride;
+  int staple_stride;
+  int mom_ga_stride;
+  int path_max_length;
+  int color_matrix_stride;
+}fat_force_const_t;
+
 __constant__ int X1h;
 __constant__ int X2h;
 __constant__ int X1;
@@ -91,16 +100,13 @@ __constant__ double tProjScale;
 __constant__ float tProjScale_f;
 
 //for link fattening/gauge force/fermion force code
-__constant__ int site_ga_stride;
-__constant__ int staple_stride;
-__constant__ int llfat_ga_stride;
-__constant__ int mom_ga_stride;
 __constant__ int E1, E2, E3, E4, E1h;
 __constant__ int Vh_ex;
 __constant__ int E2E1;
 __constant__ int E3E2E1;
-__constant__ int last_proc_in_tdim;
-__constant__ int first_proc_in_tdim;
+__constant__ fat_force_const_t fl; //fatlink
+__constant__ fat_force_const_t gf; //gauge force
+__constant__ fat_force_const_t hf; //hisq force
 
 
 void initLatticeConstants(const LatticeField &lat)
@@ -256,6 +262,25 @@ void initLatticeConstants(const LatticeField &lat)
 
   cudaMemcpyToSymbol("Pt0", &(first_node_in_t), sizeof(bool)); 
   cudaMemcpyToSymbol("PtNm1", &(last_node_in_t), sizeof(bool)); 
+
+  //constants used by fatlink/gauge force/hisq force code
+  int E1  = X1+4;
+  int E1h = E1/2;
+  int E2  = X2+4;
+  int E3  = X3+4;
+  int E4  = X4+4;
+  int E2E1   = E2*E1;
+  int E3E2E1 = E3*E2*E1;
+  int Vh_ex  = E1*E2*E3*E4/2;
+  
+  cudaMemcpyToSymbol("E1", &E1, sizeof(int));
+  cudaMemcpyToSymbol("E1h", &E1h, sizeof(int));
+  cudaMemcpyToSymbol("E2", &E2, sizeof(int));
+  cudaMemcpyToSymbol("E3", &E3, sizeof(int));
+  cudaMemcpyToSymbol("E4", &E4, sizeof(int));
+  cudaMemcpyToSymbol("E2E1", &E2E1, sizeof(int));
+  cudaMemcpyToSymbol("E3E2E1", &E3E2E1, sizeof(int));
+  cudaMemcpyToSymbol("Vh_ex", &Vh_ex, sizeof(int));  
 
   // copy a few of the constants needed by tuneLaunch()
   dslashConstants.x[0] = X1;

@@ -244,13 +244,13 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   
   if(QprevOdd == NULL){
     if(sig_positive){
-      loadMatrixFromField(oprodEven, oprodOdd, sig, point_d, COLOR_MAT_Y, 1-oddBit, color_matrix_stride);
+      loadMatrixFromField(oprodEven, oprodOdd, sig, point_d, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
     }else{
-      loadMatrixFromField(oprodEven, oprodOdd, OPP_DIR(sig), point_c, COLOR_MAT_Y, oddBit, color_matrix_stride);
+      loadMatrixFromField(oprodEven, oprodOdd, OPP_DIR(sig), point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
       adjointMatrix(COLOR_MAT_Y);
     }
   }else{ // QprevOdd != NULL
-    loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit, color_matrix_stride);
+    loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
   }
   
   
@@ -284,7 +284,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
     }
   }else{ 
     if(QmuEven || sig_positive){
-      loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_Y, 1-oddBit, color_matrix_stride);
+      loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
       MAT_MUL_MAT(COLOR_MAT_Y, ad_link, COLOR_MAT_X);
     }
     if(QmuEven){
@@ -398,7 +398,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   RealA COLOR_MAT_X[ArrayLength<RealA>::result]; 
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
   // The compiler probably knows to reorder so that loads are done early on
-  loadMatrixFromField(P3Even, P3Odd, new_sid, COLOR_MAT_Y, oddBit, color_matrix_stride);
+  loadMatrixFromField(P3Even, P3Odd, new_sid, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
 
   /*      compute the side link contribution to the momentum
    *
@@ -452,7 +452,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddBit
   mycoeff = CoeffSign<sig_positive,oddBit>::result*coeff;
 
   if(QprodOdd){
-    loadMatrixFromField(QprodEven, QprodOdd, point_d, COLOR_MAT_X, 1-oddBit, color_matrix_stride);
+    loadMatrixFromField(QprodEven, QprodOdd, point_d, COLOR_MAT_X, 1-oddBit, hf.color_matrix_stride);
     if(mu_positive){
       MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
 
@@ -633,11 +633,11 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
     }
     point_c = (new_mem_idx >> 1);
 
-    loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit, color_matrix_stride);	   // COLOR_MAT_X
+    loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit, hf.color_matrix_stride);	   // COLOR_MAT_X
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_d, ad_link, 1-oddBit); 
     RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
 
-    loadMatrixFromField(oprodEven,oprodOdd,  point_c, COLOR_MAT_Y, oddBit, color_matrix_stride);		// COLOR_MAT_Y
+    loadMatrixFromField(oprodEven,oprodOdd,  point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);		// COLOR_MAT_Y
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_c, bc_link, oddBit);   
     COMPUTE_LINK_SIGN(&bc_link_sign, mu, new_x);  
     RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign)
@@ -681,12 +681,12 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
     }
     point_c = (new_mem_idx >> 1);
 
-    loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit, color_matrix_stride);         // COLOR_MAT_X used!
+    loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit, hf.color_matrix_stride);         // COLOR_MAT_X used!
 
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, new_sid, ad_link, oddBit);  
     RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign);
 
-    loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit, color_matrix_stride);	     // COLOR_MAT_Y used
+    loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);	     // COLOR_MAT_Y used
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_b, bc_link, 1-oddBit);    
     RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign);  //bc_link_sign is computed earlier in the function
     
@@ -849,9 +849,9 @@ template<class RealA, class RealB,  int oddBit>
       RECONSTRUCT_SITE_LINK(de_link, de_link_sign);
       RECONSTRUCT_SITE_LINK(ef_link, ef_link_sign);
 
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, COLOR_MAT_Z, oddBit, color_matrix_stride);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, COLOR_MAT_Y, 1-oddBit, color_matrix_stride);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, COLOR_MAT_X, oddBit, color_matrix_stride);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, COLOR_MAT_Z, oddBit, hf.color_matrix_stride);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, COLOR_MAT_X, oddBit, hf.color_matrix_stride);
       
       MAT_MUL_MAT(ef_link, COLOR_MAT_Z, COLOR_MAT_W); // link(d)*link(e)*Naik(c)
       MAT_MUL_MAT(de_link, COLOR_MAT_W, COLOR_MAT_V);
@@ -914,7 +914,7 @@ template<class RealA, class RealB, int oddBit>
   COMPUTE_LINK_SIGN(&link_sign, sig, x);	
   RECONSTRUCT_SITE_LINK(LINK_W, link_sign);
   
-  loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_X, oddBit, color_matrix_stride);
+  loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_X, oddBit, hf.color_matrix_stride);
   
   typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
   MAT_MUL_MAT(LINK_W, COLOR_MAT_X, COLOR_MAT_W);

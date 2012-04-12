@@ -239,7 +239,7 @@ for action in $*; do
 	complete_invert_check;;
     gf )
 	complete_gauge_force_check ;;
-    hisq )
+    hf )
 	complete_hisq_force_check ;;
     all )
 	basic_sanity_check

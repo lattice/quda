@@ -458,9 +458,9 @@
       }								\
       break;							\
     case TUP:							\
-      if (i4 == X4m1 && last_proc_in_tdim){			\
+      if (i4 == X4m1 && PtNm1){					\
 	sign = -1;						\
-      }else if(i4 == -1 && first_proc_in_tdim){			\
+      }else if(i4 == -1 && Pt0){				\
 	sign = -1;						\
       }								\
       break;							\
