@@ -73,7 +73,7 @@ class Tunable {
   virtual int sharedBytesPerThread() const = 0;
 
   // the minimum number of shared bytes per thread block
-  virtual int sharedBytesPerBlock() const = 0;
+  virtual int sharedBytesPerBlock(const TuneParam &param) const = 0;
 
   virtual bool advanceGridDim(TuneParam &param) const
   {
@@ -121,8 +121,8 @@ class Tunable {
       TuneParam next(param);
       advanceBlockDim(next); // to get next blockDim
       int nthreads = next.block.x * next.block.y * next.block.z;
-      param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock() ?
-	sharedBytesPerThread()*nthreads : sharedBytesPerBlock();
+      param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+	sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
       return false;
     } else {
       return true;
@@ -162,8 +162,8 @@ class Tunable {
     const int min_block_size = 32;
     param.block = dim3(min_block_size,1,1);
     param.grid = dim3(1,1,1);
-    param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock() ?
-      sharedBytesPerThread()*min_block_size : sharedBytesPerBlock();
+    param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock(param) ?
+      sharedBytesPerThread()*min_block_size : sharedBytesPerBlock(param);
   }
 
   /** sets default values for when tuning is disabled */

@@ -51,7 +51,7 @@ struct FloatNOrder {
     : field(field), volume(volume), stride(stride) { ; }
   virtual ~FloatNOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -63,7 +63,7 @@ struct FloatNOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -79,7 +79,7 @@ struct FloatNOrder {
 };
 
 /**! float4 load specialization to obtain full coalescing. */
-template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24], int x) const {
+template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24], int x, int volume) const {
   //read4<4,3>(v, field, stride, x);
 #pragma unroll
   for (int i=0; i<4*3*2; i+=4) {
@@ -89,7 +89,7 @@ template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24],
 }
 
 /**! float4 save specialization to obtain full coalescing. */
-template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float v[24], int x) {
+template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float v[24], int x, int volume) {
 #pragma unroll
   for (int i=0; i<4*3*2; i+=4) {
     float4 tmp = make_float4(v[i], v[i+1], v[i+2], v[i+3]);
@@ -107,7 +107,7 @@ struct SpaceColorSpinorOrder {
   { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceColorSpinorOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -117,7 +117,7 @@ struct SpaceColorSpinorOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -131,18 +131,25 @@ struct SpaceColorSpinorOrder {
 };
 
 template <typename Float, int Ns, int Nc>
-  __device__ inline void load_shared(Float v[Ns*Nc*2], Float *field, int x) {
+  __device__ inline void load_shared(Float v[Ns*Nc*2], Float *field, int x, int volume) {
   const int tid = threadIdx.x;
   const int vec_length = Ns*Nc*2;
+
+  // the length of the block on the last grid site might not extend to all threads
+  const int block_dim = (blockIdx.x == gridDim.x-1) ? 
+    volume - (gridDim.x-1)*blockDim.x : blockDim.x;
 
   // use shared memory to perform transpose - ignore bank conflicts for now
   extern __shared__ Float s_data[];
 
   int x0 = x-tid;
   int i=tid;
-  while (i<vec_length*blockDim.x) {
-    s_data[i] = field[x0*vec_length + i];
-    i += blockDim.x;
+  while (i<vec_length*block_dim) {
+    int space_idx = i / vec_length;
+    int internal_idx = i - space_idx*vec_length;
+    int sh_idx = internal_idx*(blockDim.x+1) + space_idx;
+    s_data[sh_idx] = field[x0*vec_length + i];
+    i += block_dim;
   }
 
   __syncthreads();
@@ -152,15 +159,17 @@ template <typename Float, int Ns, int Nc>
 #pragma unroll
     for (int c=0; c<Nc; c++) 
 #pragma unroll
-      for (int z=0; z<2; z++) 
-	v[(s*Nc + c)*2 + z] = s_data[vec_length*tid + (c*Ns + s)*2 + z];
+      for (int z=0; z<2; z++) {
+	int sh_idx = ((c*Ns+s)*2+z)*(blockDim.x+1) + tid;
+	v[(s*Nc + c)*2 + z] = s_data[sh_idx];
+      }
 
 } 
 
 /**! float load specialization to obtain full coalescing. */
-template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x) const {
+template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x, int volume) const {
 #ifdef __CUDA_ARCH__
-  load_shared<float, 4, 3>(v, field, x);
+  load_shared<float, 4, 3>(v, field, x, volume);
 #else
   const int Ns=4;
   const int Nc=3;
@@ -224,7 +233,7 @@ struct SpaceSpinorColorOrder {
   { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceSpinorColorOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -234,7 +243,7 @@ struct SpaceSpinorColorOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -304,9 +313,9 @@ void packSpinor(OutOrder &outOrder, const InOrder &inOrder, Basis basis, int vol
   for (int x=0; x<volume; x++) {
     FloatIn in[Ns*Nc*2];
     FloatOut out[Ns*Nc*2];
-    inOrder.load(in, x);
+    inOrder.load(in, x, volume);
     basis(out, in);
-    outOrder.save(out, x);
+    outOrder.save(out, x, volume);
   }
 }
 
@@ -314,12 +323,14 @@ void packSpinor(OutOrder &outOrder, const InOrder &inOrder, Basis basis, int vol
 template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
 __global__ void packSpinorKernel(OutOrder outOrder, const InOrder inOrder, Basis basis, int volume) {  
   int x = blockIdx.x * blockDim.x + threadIdx.x;
-  if (x >= volume) return;
+
   FloatIn in[Ns*Nc*2];
   FloatOut out[Ns*Nc*2];
-  inOrder.load(in, x);
+  inOrder.load(in, x, volume);
+
+  if (x >= volume) return;
   basis(out, in);
-  outOrder.save(out, x);
+  outOrder.save(out, x, volume);
 }
 
 template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
@@ -334,13 +345,13 @@ class PackSpinor : Tunable {
     size_t regSize = sizeof(FloatOut) > sizeof(FloatIn) ? sizeof(FloatOut) : sizeof(FloatIn);
     return Ns*Nc*2*regSize;
   }
-  int sharedBytesPerBlock() const { return 0; }
+  int sharedBytesPerBlock(const TuneParam &param) const { return (param.block.x+1)*sharedBytesPerThread(); }
   bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
   bool advanceBlockDim(TuneParam &param) const {
     bool advance = Tunable::advanceBlockDim(param);
     if (advance) param.grid = dim3( (volume+param.block.x-1) / param.block.x, 1, 1);
-    param.shared_bytes = sharedBytesPerThread() * param.block.x;
+    param.shared_bytes = sharedBytesPerThread() * (param.block.x+1); // FIXME: use sharedBytesPerBlock
     return advance;
   }
 

@@ -377,7 +377,7 @@ private:
 
   // when there is only one warp per block, we need to allocate two warps 
   // worth of shared memory so that we don't index shared memory out of bounds
-  int sharedBytesPerBlock() const { 
+  int sharedBytesPerBlock(const TuneParam &param) const { 
     int warpSize = 32; // FIXME - use device property query
     return 2*warpSize*sizeof(ReduceType); 
   }
@@ -387,8 +387,8 @@ private:
     TuneParam next(param);
     advanceBlockDim(next); // to get next blockDim
     int nthreads = next.block.x * next.block.y * next.block.z;
-    param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock() ?
-      sharedBytesPerThread()*nthreads : sharedBytesPerBlock();
+    param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+      sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
     return false;
   }
 

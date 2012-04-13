@@ -272,7 +272,7 @@ void setFace(const FaceBuffer &Face) {
 // allow a simple interface.
 class DslashCuda : public Tunable {
  protected:
-  int sharedBytesPerBlock() const { return 0; }
+  int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
   bool advanceBlockDim(TuneParam &param) const {
     bool advance = Tunable::advanceBlockDim(param);
@@ -349,7 +349,7 @@ TuneKey DslashCuda::tuneKey() const
 #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) 
 class SharedDslashCuda : public DslashCuda {
  protected:
-  int sharedBytesPerBlock() const { return 0; } // FIXME: this isn't quite true, but works
+  int sharedBytesPerBlock(const TuneParam &param) const { return 0; } // FIXME: this isn't quite true, but works
   bool advanceSharedBytes(TuneParam &param) const { 
     if (dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::advanceSharedBytes(param);
     else return false;
@@ -1485,7 +1485,7 @@ class CloverCuda : public Tunable {
     int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
     return CLOVER_SHARED_FLOATS_PER_THREAD * reg_size;
   }
-  int sharedBytesPerBlock() const { return 0; }
+  int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
 
  public:
@@ -1604,7 +1604,7 @@ private:
   size_t norm_bytes;
 
   int sharedBytesPerThread() const { return 0; }
-  int sharedBytesPerBlock() const { return 0; }
+  int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
 
   char *saveOut, *saveOutNorm;
