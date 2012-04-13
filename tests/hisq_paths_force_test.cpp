@@ -628,11 +628,6 @@ hisq_force_test(void)
   loadLinkToGPU(cudaLongLinkOprod, cpuLongLinkOprod, &qudaGaugeParam);
 #endif
 
-#ifdef MULTI_GPU  
-#else
-  loadHwToGPU(cudaHw, hw, cpu_hw_prec);
-#endif
-
   
   struct timeval ht0, ht1;
   gettimeofday(&ht0, NULL);
