@@ -130,26 +130,22 @@ struct SpaceColorSpinorOrder {
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
-#ifdef __CUDA_VERSION__
-/**! float load specialization to obtain full coalescing. */
-template<> __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x) const {
+template <typename Float, int Ns, int Nc>
+  __device__ inline void load_shared(Float v[Ns*Nc*2], Float *field, int x) {
   const int tid = threadIdx.x;
-  const int Ns = 4;
-  const int Nc = 3;
   const int vec_length = Ns*Nc*2;
 
   // use shared memory to perform transpose - ignore bank conflicts for now
-  extern __shared__ float s_data[];
+  extern __shared__ Float s_data[];
 
+  int x0 = x-tid;
   int i=tid;
   while (i<vec_length*blockDim.x) {
-    s_data[i]  = field[x*vec_length + i];
+    s_data[i] = field[x0*vec_length + i];
     i += blockDim.x;
   }
 
   __syncthreads();
-
-  float *s = s_data + vec_length*tid;
 
 #pragma unroll
   for (int s=0; s<Ns; s++)
@@ -157,12 +153,30 @@ template<> __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float
     for (int c=0; c<Nc; c++) 
 #pragma unroll
       for (int z=0; z<2; z++) 
-	v[(s*Nc + c)*2 + z] = s[(c*Ns + s)*2 + z];
+	v[(s*Nc + c)*2 + z] = s_data[vec_length*tid + (c*Ns + s)*2 + z];
 
+} 
+
+/**! float load specialization to obtain full coalescing. */
+template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x) const {
+#ifdef __CUDA_ARCH__
+  load_shared<float, 4, 3>(v, field, x);
+#else
+  const int Ns=4;
+  const int Nc=3;
+  for (int s=0; s<Ns; s++) {
+    for (int c=0; c<Nc; c++) {
+      for (int z=0; z<2; z++) {
+	v[(s*Nc+c)*2+z] = field[((x*Nc + c)*Ns + s)*2 + z]; 
+      }
+    }
+  }
+#endif
 }
 
 /**! float save specialization to obtain full coalescing. */
-template<> __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x) {
+/*template<> __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x) {
+#ifdef __CUDA_ARCH__
   const int tid = threadIdx.x;
   const int Ns = 4;
   const int Nc = 3;
@@ -183,13 +197,23 @@ template<> __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const
   __syncthreads();
 
   int i=tid;
+  int x0 = blockDim.x*blockIdx.x;
   while (i<vec_length*blockDim.x) {
-    field[x*vec_length + i] = s_data[i];
+    field[x0*vec_length + i] = s_data[i];
     i += blockDim.x;
   }
-}
+#else
+  for (int s=0; s<Ns; s++) {
+    for (int c=0; c<Nc; c++) {
+      for (int z=0; z<2; z++) {
+	field[((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
+      }
+    }
+  }
 #endif
+}
 
+*/
 template <typename Float, int Ns, int Nc>
 struct SpaceSpinorColorOrder {
   Float *field;
@@ -222,59 +246,6 @@ struct SpaceSpinorColorOrder {
 
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
-
-#ifdef __CUDA_ARCH__
-
-/**! float load specialization to obtain full coalescing. */
-template<> __device__ inline void SpaceSpinorColorOrder<float, 4, 3>::load(float v[24], int x) const {
-  const int tid = threadIdx.x;
-  const int Ns = 4;
-  const int Nc = 3;
-  const int vec_length = Ns*Nc*2;
-
-  // use shared memory to perform transpose - ignore bank conflicts for now
-  extern __shared__ float s_data[];
-
-  int i=tid;
-  while (i<vec_length*blockDim.x) {
-    s_data[i]  = field[x*vec_length + i];
-    i += blockDim.x;
-  }
-
-  __syncthreads();
-
-  float *s = s_data + vec_length*tid;
-
-#pragma unroll
-  for (int i=0; i<vec_length; i++) v[i] = s[i];
-
-}
-
-/**! float save specialization to obtain full coalescing. */
-template<> __device__ inline void SpaceSpinorColorOrder<float, 4, 3>::save(const float v[24], int x) {
-  const int tid = threadIdx.x;
-  const int Ns = 4;
-  const int Nc = 3;
-  const int vec_length = Ns*Nc*2;
-
-  // use shared memory to perform transpose - ignore bank conflicts for now
-  extern __shared__ float s_data[];
-  float *s = s_data + vec_length*tid;
-  //float *s = s_data + Ns*Nc*2*SHARED_STRIDE* (tid / SHARED_STRIDE) + (tid % SHARED_STRIDE);
-
-#pragma unroll
-  for (int i=0; i<vec_length; i++) s[i] = v[i];
-
-  __syncthreads();
-
-  int i=tid;
-  while (i<vec_length*blockDim.x) {
-    field[x*vec_length + i] = s_data[i];
-    i += blockDim.x;
-  }
-}
-
-#endif
 
 /** Straight copy with no basis change */
 template <typename FloatOut, typename FloatIn, int Ns, int Nc>
@@ -369,6 +340,7 @@ class PackSpinor : Tunable {
   bool advanceBlockDim(TuneParam &param) const {
     bool advance = Tunable::advanceBlockDim(param);
     if (advance) param.grid = dim3( (volume+param.block.x-1) / param.block.x, 1, 1);
+    param.shared_bytes = sharedBytesPerThread() * param.block.x;
     return advance;
   }
 
@@ -378,7 +350,7 @@ class PackSpinor : Tunable {
   virtual ~PackSpinor() { ; }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+    TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE);
     packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis> 
       <<<tp.grid, tp.block, tp.shared_bytes, stream>>> 
       (out, in, basis, volume);
