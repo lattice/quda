@@ -295,8 +295,9 @@ namespace hisq {
       field[idx + hf.color_matrix_stride*7]   += coeff*mat[7];
       field[idx + hf.color_matrix_stride*8]   += coeff*mat[8];
 
-      //printf("value is oldvalue(%f)+ coeff(%f) * mat[0].x(%f)=%f\n", oldvalue.x, coeff, mat[0].x, field[idx].x);
+#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
       printf("value is  coeff(%f) * mat[0].x(%f)=%f\n", coeff, mat[0].x, field[idx].x);
+#endif
       return;
     }
 
@@ -455,7 +456,9 @@ namespace hisq {
 	break;
 	
       default:
+#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
 	printf("Error: invalid dir\n");
+#endif
 	break;
       }
       return;
@@ -1453,8 +1456,6 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
 	float runtime;
 	cudaEventElapsedTime(&runtime, start, end);
 	
-	//printfQuda("hisq staple time=%.2f ms\n", runtime);
-
 	unbind_tex_link(link, *newOprod);
 
         for(int i=0; i<4; i++){

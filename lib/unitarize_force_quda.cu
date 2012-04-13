@@ -361,7 +361,6 @@ namespace hisq{
 		}	
 
 		if(perform_svd){	
-			printf("Performing SVD in force\n");
 			Matrix<Cmplx,3> tmp2;
 			// compute the eigenvalues using the singular value decomposition
 			computeSVD<Cmplx>(q,tempq,tmp2,g);
