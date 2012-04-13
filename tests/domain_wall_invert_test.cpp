@@ -23,6 +23,9 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+extern QudaDslashType dslash_type;
+extern bool tune;
+extern int device;
 extern int xdim;
 extern int ydim;
 extern int zdim;
@@ -128,7 +131,7 @@ int main(int argc, char **argv)
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
-  inv_param.Ls = 16;
+  inv_param.Ls = 8;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -191,8 +194,8 @@ int main(int argc, char **argv)
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  //inv_param.dirac_tune = QUDA_TUNE_YES;
-  inv_param.preserve_dirac = QUDA_PRESERVE_DIRAC_YES;
+
+  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 
   gauge_param.ga_pad = 0; // 24*24*24/2;
   inv_param.sp_pad = 0; // 24*24*24/2;
@@ -258,7 +261,7 @@ int main(int argc, char **argv)
   double time0 = -((double)clock());
 
   // initialize the QUDA library
-  initQuda(-1);
+  initQuda(device);
 
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);

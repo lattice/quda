@@ -44,6 +44,12 @@ void *hostGauge[4];
 Dirac *dirac;
 
 //BEGIN NEW
+// Dirac operator type
+extern QudaDslashType dslash_type;
+
+extern bool tune;
+
+extern int device;
 extern int xdim;
 extern int ydim;
 extern int zdim;
@@ -248,11 +254,6 @@ double dslashCUDA() {
 
   printfQuda("Executing %d kernel loops...\n", loops);
   fflush(stdout);
-
-  //if (test_type < 2)
-    //dirac->Tune(*cudaSpinorOut, *cudaSpinor, *tmp);
-  //else
-    //dirac->Tune(cudaSpinorOut->Even(), cudaSpinor->Even(), *tmp);
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
