@@ -41,19 +41,20 @@ namespace hisq {
         }
         hisq_force_init_cuda_flag=1;
 	
+	int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
+	
 	fat_force_const_t hf;
 #ifdef MULTI_GPU
 	int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
-	hf.site_ga_stride = Vh_ex;
+	hf.site_ga_stride = Vh_ex + param->site_ga_pad;;
 	hf.color_matrix_stride = Vh_ex;
 #else
-	int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
-	hf.site_ga_stride = Vh;
+	hf.site_ga_stride = Vh + param->site_ga_pad;
 	hf.color_matrix_stride = Vh;
 #endif
+	hf.mom_ga_stride = Vh + param->mom_ga_pad;
 	
 	cudaMemcpyToSymbol("hf", &hf, sizeof(fat_force_const_t));
-        init_kernel_cuda(param);    
     }
     
 
@@ -341,29 +342,29 @@ namespace hisq {
      inline __device__
        void storeMatrixToMomentumField(const T* const mat, int dir, int idx, U coeff, 
 					T* const mom_even, T* const mom_odd, int oddness)
- 	{
+     {
 	  T* const mom_field = (oddness)?mom_odd:mom_even;
 	  T temp2;
           temp2.x = (mat[1].x - mat[3].x)*0.5*coeff;
 	  temp2.y = (mat[1].y + mat[3].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5] = temp2;	
-
+	  mom_field[idx + dir*hf.mom_ga_stride*5] = temp2;	
+	  
 	  temp2.x = (mat[2].x - mat[6].x)*0.5*coeff;
 	  temp2.y = (mat[2].y + mat[6].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5 + Vh] = temp2;
-
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride] = temp2;
+	  
 	  temp2.x = (mat[5].x - mat[7].x)*0.5*coeff;
 	  temp2.y = (mat[5].y + mat[7].y)*0.5*coeff;
-	  mom_field[idx + dir*Vhx5 + Vhx2] = temp2;
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*2] = temp2;
 
 	  const typename RealTypeId<T>::Type temp = (mat[0].y + mat[4].y + mat[8].y)*0.3333333333333333333333333;
 	  temp2.x =  (mat[0].y-temp)*coeff; 
 	  temp2.y =  (mat[4].y-temp)*coeff;
-	  mom_field[idx + dir*Vhx5 + Vhx3] = temp2;
-		  
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*3] = temp2;
+	  
 	  temp2.x = (mat[8].y - temp)*coeff;
 	  temp2.y = 0.0;
-	  mom_field[idx + dir*Vhx5 + Vhx4] = temp2;
+	  mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*4] = temp2;
  
 	  return;
 	}
@@ -602,7 +603,6 @@ template<class RealA, int oddBit>
           const RealB* const linkEven,  const RealB* const linkOdd, 
           const cudaGaugeField &link, int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff,
-          dim3 gridDim, dim3 BlockDim,
           RealA* const PmuEven,  RealA* const PmuOdd, // write only
           RealA* const P3Even,   RealA* const P3Odd,  // write only
           RealA* const QmuEven,  RealA* const QmuOdd,   // write only
@@ -610,9 +610,11 @@ template<class RealA, int oddBit>
 	  hisq_kernel_param_t kparam)
       {
 	QudaReconstructType recon = link.Reconstruct();
-        dim3 halfGridDim = gridDim;
-	
-#define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, BlockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
+        dim3 blockDim(BLOCK_DIM,1,1);
+        dim3 halfGridDim((kparam.threads+blockDim.x-1)/blockDim.x, 1, 1);
+		
+
+#define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, blockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
 								 (typeA*)QprevEven, (typeA*)QprevOdd, \
 								 (typeB*)linkEven, (typeB*)linkOdd, \
 								 sig, mu, (typename RealTypeId<typeA>::Type)coeff, \
@@ -656,6 +658,63 @@ template<class RealA, int oddBit>
         return;
       }
 
+template<class RealA, class RealB>
+      static void
+      lepage_middle_link_kernel(
+          const RealA* const oprodEven, const RealA* const oprodOdd, 
+          const RealA* const QprevEven, const RealA* const QprevOdd,
+          const RealB* const linkEven,  const RealB* const linkOdd, 
+          const cudaGaugeField &link, int sig, int mu, 
+          typename RealTypeId<RealA>::Type coeff,
+          RealA* const P3Even,   RealA* const P3Odd,  // write only
+          RealA* const newOprodEven,  RealA* const newOprodOdd,
+	  hisq_kernel_param_t kparam)
+      {
+	QudaReconstructType recon = link.Reconstruct();
+	dim3 blockDim(BLOCK_DIM,1,1);
+        dim3 halfGridDim((kparam.threads+blockDim.x-1)/blockDim.x, 1, 1);
+
+#define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, blockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
+								 (typeA*)QprevEven, (typeA*)QprevOdd, \
+								 (typeB*)linkEven, (typeB*)linkOdd, \
+								 sig, mu, (typename RealTypeId<typeA>::Type)coeff, \
+								 (typeA*)P3Even, (typeA*)P3Odd,	\
+								 (typeA*)newOprodEven, (typeA*)newOprodOdd,\
+								 kparam)
+	
+#define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
+	if(sizeof(RealA) == sizeof(float2)){				\
+	  if(recon  == QUDA_RECONSTRUCT_NO){				\
+	    do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	    do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	  }else{							\
+	    do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	    do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	  }								\
+	}else{								\
+	  if(recon  == QUDA_RECONSTRUCT_NO){				\
+	    do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	    do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	  }else{							\
+	    do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	    do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	  }								\
+	}
+	
+        if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
+	  CALL_MIDDLE_LINK_KERNEL(1,1);
+        }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(1,0);
+        }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(0,1);
+        }else{
+	  CALL_MIDDLE_LINK_KERNEL(0,0);
+        }
+	
+#undef CALL_ARGUMENTS	
+#undef CALL_MIDDLE_LINK_KERNEL
+        return;
+      }
 
 
 
@@ -668,15 +727,15 @@ template<class RealA, int oddBit>
           const cudaGaugeField &link, int sig, int mu, 
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type accumu_coeff,
-          dim3 gridDim, dim3 blockDim,
           RealA* shortPEven,  RealA* shortPOdd,
           RealA* newOprodEven, RealA* newOprodOdd,
 	  hisq_kernel_param_t kparam)
     {
       QudaReconstructType recon =link.Reconstruct();
       
-      dim3 halfGridDim=gridDim;
-
+      dim3 blockDim(BLOCK_DIM,1,1);
+      dim3 halfGridDim((kparam.threads+blockDim.x-1)/blockDim.x, 1, 1);
+      
 #define CALL_ARGUMENTS(typeA, typeB) 	<<<halfGridDim, blockDim>>>((typeA*)P3Even, (typeA*)P3Odd, \
 								    (typeA*)oprodEven,  (typeA*)oprodOdd, \
 								    (typeB*)linkEven, (typeB*)linkOdd, \
@@ -722,6 +781,68 @@ template<class RealA, int oddBit>
       return;
     }
 
+
+
+
+
+template<class RealA, class RealB>
+      static void
+      side_link_short_kernel(
+          const RealA* const P3Even, const RealA* const P3Odd, 
+          const RealB* const linkEven,  const RealB* const linkOdd, 
+          const cudaGaugeField &link, int sig, int mu, 
+          typename RealTypeId<RealA>::Type coeff, 
+          RealA* newOprodEven, RealA* newOprodOdd,
+	  hisq_kernel_param_t kparam)
+    {
+      QudaReconstructType recon =link.Reconstruct();
+      dim3 blockDim(BLOCK_DIM,1,1);
+      dim3 halfGridDim((kparam.threads+blockDim.x-1)/blockDim.x, 1, 1);      
+
+#define CALL_ARGUMENTS(typeA, typeB) 	<<<halfGridDim, blockDim>>>((typeA*)P3Even, (typeA*)P3Odd, \
+								    (typeB*)linkEven, (typeB*)linkOdd, \
+								    sig, mu, \
+								    (typename RealTypeId<typeA>::Type) coeff, \
+								    (typeA*)newOprodEven, (typeA*)newOprodOdd,\
+								    kparam)
+      
+#define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
+      if(sizeof(RealA) == sizeof(float2)){				\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      }else{								\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+      
+      if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
+	CALL_SIDE_LINK_KERNEL(1,1);
+      }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	CALL_SIDE_LINK_KERNEL(1,0);
+	
+      }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	CALL_SIDE_LINK_KERNEL(0,1);
+      }else{
+	CALL_SIDE_LINK_KERNEL(0,0);
+      }
+      
+#undef CALL_SIDE_LINK_KERNEL
+#undef CALL_ARGUMENTS      
+      return;
+    }
+
+
+
    
 
     template<class RealA, class RealB>
@@ -733,14 +854,14 @@ template<class RealA, int oddBit>
           const cudaGaugeField &link, int sig, int mu,
           typename RealTypeId<RealA>::Type coeff, 
           typename RealTypeId<RealA>::Type  accumu_coeff,
-          dim3 gridDim, dim3 blockDim,
           RealA* const shortPEven, RealA* const shortPOdd,
           RealA* const newOprodEven, RealA* const newOprodOdd,
 	  hisq_kernel_param_t kparam)
     {
       QudaReconstructType recon = link.Reconstruct();
-      dim3 halfGridDim=gridDim;
-      
+      dim3 blockDim(BLOCK_DIM,1,1);
+      dim3 halfGridDim((kparam.threads+blockDim.x-1)/blockDim.x, 1, 1);
+
 #define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, blockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
 								 (typeA*)QprevEven, (typeA*)QprevOdd, \
 								 (typeB*)linkEven, (typeB*)linkOdd, \
@@ -1049,7 +1170,6 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                 (RealB*)link.Even_p(), (RealB*)link.Odd_p(),	                          // read only 
                 link,  // read only
                 sig, mu, mThreeSt,
-                gridDim_2g, blockDim,
                 (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,                               // write only
                 (RealA*)P3.even.data, (RealA*)P3.odd.data,                                 // write only
                 (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,                               // write only
@@ -1071,7 +1191,6 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link, 
                   sig, nu, FiveSt,
-                  gridDim_1g, blockDim,
                   (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,  // write only
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,        // write only
                   (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,  // write only
@@ -1094,11 +1213,10 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                     (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                     link,
                     sig, rho, SevenSt, coeff,
-                    gridDim_1g, blockDim,
                     (RealA*)P5.even.data, (RealA*)P5.odd.data, 
                     (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
 
-                checkCudaError();
+                    checkCudaError();
 		//return;
               }//rho  		
 
@@ -1110,25 +1228,22 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link,
                   sig, nu, mFiveSt, coeff,
-                  gridDim_1g, blockDim,
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,    // write
                   (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
-              checkCudaError();
+                 
+ 	          checkCudaError();
 
             } //nu 
 
             //lepage
 	    if(Lepage != 0.){
-              middle_link_kernel( 
+              lepage_middle_link_kernel( 
                   (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,     // read only
                   (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,     // read only
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link, 
                   sig, mu, Lepage,
-                  gridDim_2g, blockDim,
-                  (RealA*)NULL, (RealA*)NULL,                      // write only
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
-                  (RealA*)NULL, (RealA*)NULL,                      // write only
 		  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
 		  kparam_2g);
 
@@ -1141,8 +1256,6 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link,
                   sig, mu, mLepage, coeff,
-		  //sig, mu, mLepage, 0,
-                  gridDim_2g, blockDim,
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,           // write only
                   (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
 		  kparam_2g);
@@ -1151,18 +1264,15 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
             } // Lepage != 0.0
 
             //3-link side link
-            side_link_kernel(
+            side_link_short_kernel(
                 (RealA*)P3.even.data, (RealA*)P3.odd.data, // read only
-                (RealA*)NULL, (RealA*)NULL,                // read only
                 (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                 link,
-                sig, mu, ThreeSt, coeff,
-                gridDim_1g, blockDim, 
-                (RealA*)NULL, (RealA*)NULL,                // write
+                sig, mu, ThreeSt,
 		(RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
 		kparam_1g);
 	    
-            checkCudaError();			    
+                checkCudaError();			    
 	    
           }//mu
         }//sig
