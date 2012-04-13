@@ -181,11 +181,17 @@ extern "C" {
   void reduceDouble(double &);
   void reduceDoubleArray(double *, const int len);
 
+#ifdef MULTI_GPU
   int commDim(int);
   int commCoords(int);
   int commDimPartitioned(int dir);
   void commDimPartitionedSet(int dir);
-  void commBarrier();
+#else
+  static inline int commDim(int dir) { return 1; }
+  static inline int commCoords(int dir) { return 0; }
+  static inline int commDimPartitioned(int dir) { return 0; }
+  static inline void commDimPartitionedSet(int dir) { }
+#endif
 
 #ifdef __cplusplus
 }

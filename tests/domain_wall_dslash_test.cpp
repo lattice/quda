@@ -22,6 +22,7 @@ const int test_type = 0;
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 ///const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
+const int tune = 1; // perform auto-tuning?
 
 const int loops = 1;
 
@@ -29,7 +30,7 @@ const int Ls = 2;
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
@@ -390,6 +391,12 @@ int main(int argc, char **argv)
 
   for (int i=0; i<attempts; i++) {
     
+    if (tune) { // warm-up run
+      printfQuda("Tuning...\n");
+      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);      
+      dslashCUDA();
+    }
+
     double secs = dslashCUDA();
 
     if (!transfer) *spinorOut = *cudaSpinorOut;

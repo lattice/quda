@@ -12,12 +12,29 @@
 
     void computeHisqOuterProduct(void* src, void* dst, QudaPrecision precision);		
 
-    void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision);
-    
-    void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision, size_t separation);
+void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision, int gauge_order);
+
+void computeLinkOrderedOuterProduct(void *src, void* dest, QudaPrecision precision, size_t separation, int gauge_order);
+
+class cpuGaugeField;
 
 
+void hisqStaplesForceCPU(const double* path_coeff,
+			 const QudaGaugeParam &param,
+			 cpuGaugeField  &oprod,
+			 cpuGaugeField  &link,
+			 cpuGaugeField* newOprod);
 
+void hisqCompleteForceCPU(const QudaGaugeParam &param,
+			  cpuGaugeField &oprod,
+			  cpuGaugeField &link,
+			  cpuGaugeField* mom);
+
+void hisqLongLinkForceCPU(double coeff,
+			  const QudaGaugeParam &param,
+			  cpuGaugeField &oprod,
+			  cpuGaugeField &link,
+			  cpuGaugeField *newOprod);
 
 
 #endif

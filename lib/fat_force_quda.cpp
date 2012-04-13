@@ -33,7 +33,7 @@ static QudaTboundary t_boundary_;
 
 /********************** Staple code, used by link fattening **************/
 
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) ||defined(GPU_HISQ_FORCE)
 
 
 template <typename Float>
@@ -916,7 +916,6 @@ loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge)
   QudaPrecision prec= cudaGauge->Precision();
   const int* E = cudaGauge->X();
   int pad = cudaGauge->Pad();
-  
   do_loadLinkToGPU_ex(E, cudaGauge->Even_p(), cudaGauge->Odd_p(), (void**)cpuGauge->Gauge_p(),
 		      cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
 		      prec, cpuGauge->Order());

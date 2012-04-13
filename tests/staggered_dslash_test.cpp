@@ -26,7 +26,7 @@
 
 extern void usage(char** argv );
 
-int test_type = 0;
+extern int test_type;
 
 extern bool tune;
 
@@ -259,7 +259,7 @@ void init()
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
 	
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     checkCudaError();
 	
     double spinor_norm2 = norm2(*spinor);

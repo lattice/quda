@@ -61,7 +61,7 @@ class Dirac {
   friend class DiracMdagM;
   friend class DiracMdag;
 
-  protected:
+ protected:
   cudaGaugeField &gauge;
   double kappa;
   double mass;
@@ -318,8 +318,8 @@ class DiracTwistedMassPC : public DiracTwistedMass {
 class DiracStaggered : public Dirac {
 
  protected:
-  cudaGaugeField *fatGauge;
-  cudaGaugeField *longGauge;
+  cudaGaugeField &fatGauge;
+  cudaGaugeField &longGauge;
   FaceBuffer face; // multi-gpu communication buffers
 
  public:

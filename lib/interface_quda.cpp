@@ -20,20 +20,20 @@
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
 
-#ifdef QUDA_NUMA_SUPPORT
+#ifdef NUMA_AFFINITY
 #include <numa_affinity.h>
 #endif
 
 #include <cuda.h>
+
 #ifdef MULTI_GPU
 #ifdef MPI_COMMS
 #include <mpi.h>
 #endif
-
 #ifdef QMP_COMMS
 #include <qmp.h>
 #endif
-#endif
+#endif // MULTI_GPU
 
 #ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
@@ -64,8 +64,6 @@
 #ifdef QMP_COMMS
 int rank_QMP;
 int num_QMP;
-extern bool qudaPt0;
-extern bool qudaPtNm1;
 #endif
 
 #include "face_quda.h"
@@ -77,9 +75,10 @@ cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
 
-cudaGaugeField *gaugeFatPrecise = NULL;
-cudaGaugeField *gaugeFatSloppy = NULL;
-cudaGaugeField *gaugeFatPrecondition = NULL;
+// It's important that these alias the above so that constants are set correctly in Dirac::Dirac()
+cudaGaugeField *&gaugeFatPrecise = gaugePrecise;
+cudaGaugeField *&gaugeFatSloppy = gaugeSloppy;
+cudaGaugeField *&gaugeFatPrecondition = gaugePrecondition;
 
 cudaGaugeField *gaugeLongPrecise = NULL;
 cudaGaugeField *gaugeLongSloppy = NULL;
@@ -92,6 +91,7 @@ cudaCloverField *cloverPrecondition = NULL;
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 
+
 int getGpuCount()
 {
   int count;
@@ -100,18 +100,27 @@ int getGpuCount()
     errorQuda("No devices supporting CUDA");
   }
   if(count > MAX_GPU_NUM_PER_NODE){
-    errorQuda("gpu count(%d) is larger than limit\n", count);
+    errorQuda("GPU count (%d) is larger than limit\n", count);
   }
   return count;
 }
 
+
+void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
+{
+  setVerbosity(verbosity);
+  setOutputPrefix(prefix);
+  setOutputFile(outfile);
+}
+
+
 void initQuda(int dev)
 {
-  static int initialized = 0;
+  static bool initialized = false;
   if (initialized) {
     return;
   }
-  initialized = 1;
+  initialized = true;
 
 #if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
@@ -135,8 +144,14 @@ void initQuda(int dev)
   for(int i=0; i<deviceCount; i++) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
-    printfQuda("QUDA: Found device %d: %s\n", i, deviceProp.name);
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("Found device %d: %s\n", i, deviceProp.name);
+    }
   }
+
+#ifdef MULTI_GPU
+  comm_init();
+#endif
 
 #ifdef QMP_COMMS
   int ndim;
@@ -154,7 +169,6 @@ void initQuda(int dev)
   ndim = QMP_get_logical_number_of_dimensions();
   dim = QMP_get_logical_dimensions();
 #elif defined(MPI_COMMS)
-  comm_init();
   if (dev < 0) {
     dev=comm_gpuid();
   }
@@ -162,23 +176,17 @@ void initQuda(int dev)
   if (dev < 0) errorQuda("Invalid device number");
 #endif
   
-  // Used for applying the gauge field boundary condition
-  if( commCoords(3) == 0 ) qudaPt0=true;
-  else qudaPt0=false;
-
-  if( commCoords(3) == commDim(3)-1 ) qudaPtNm1=true;
-  else qudaPtNm1=false;
-
   cudaGetDeviceProperties(&deviceProp, dev);
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
   
-  printfQuda("QUDA: Using device %d: %s\n", dev, deviceProp.name);
-
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+    printfQuda("Using device %d: %s\n", dev, deviceProp.name);
+  }
   cudaSetDevice(dev);
 
-#ifdef QUDA_NUMA_SUPPORT
+#ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
     setNumaAffinity(dev);
   }
@@ -194,12 +202,12 @@ void initQuda(int dev)
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
   }
+  createDslashEvents();
 
   quda::initBlas();
 
-  loadTuneCache(QUDA_VERBOSE);
+  loadTuneCache(getVerbosity());
 }
-
 
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
@@ -417,6 +425,7 @@ void freeGaugeQuda(void)
   gaugeFatPrecise = NULL;
 }
 
+
 void freeCloverQuda(void)
 {
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
@@ -427,6 +436,7 @@ void freeCloverQuda(void)
   cloverSloppy = NULL;
   cloverPrecise = NULL;
 }
+
 
 void endQuda(void)
 {
@@ -443,6 +453,7 @@ void endQuda(void)
     delete []streams;
     streams = NULL;
   }
+  destroyDslashEvents();
 
   saveTuneCache(QUDA_VERBOSE);
 }
@@ -1372,10 +1383,11 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     param->mass = sqrt(param->offset[0]/4);  
   }
   //FIXME: Dirty dirty hack
-  // At this moment, the precise fat gauge is not created (NULL)
+  // At this moment, the precise fat/long gauge is not created (NULL)
   // but we set it to be the same as sloppy to avoid segfault 
   // in creating the dirac since it is needed 
   gaugeFatPrecondition = gaugeFatPrecise = gaugeFatSloppy;
+  gaugeLongPrecondition = gaugeLongPrecise = gaugeLongSloppy;
 
   Dirac *d = NULL;
   Dirac *dSloppy = NULL;
@@ -1385,6 +1397,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   createDirac(d, dSloppy, dPre, *param, pc_solve);
   // resetting to NULL
   gaugeFatPrecise = NULL; gaugeFatPrecondition = NULL;
+  gaugeLongPrecise = NULL; gaugeLongPrecondition = NULL;
 
   Dirac &diracSloppy = *dSloppy;
 
@@ -1469,6 +1482,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   /*FIXME: to avoid setfault*/
   gaugeFatPrecondition =gaugeFatSloppy;
+  gaugeLongPrecondition =gaugeLongSloppy;
 
   if (dPre && dPre != dSloppy) delete dPre;
   if (dSloppy && dSloppy != d) delete dSloppy;
@@ -1478,6 +1492,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   createDirac(d, dSloppy, dPre, *param, pc_solve);
 
   gaugeFatPrecondition = NULL;
+  gaugeLongPrecondition = NULL;
   {
     Dirac& dirac2 = *d;
     Dirac& diracSloppy2 = *dSloppy;
@@ -1712,8 +1727,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     cudaSiteLink = new cudaGaugeField(gParam);
   }
   
-  initCommonConstants(*cudaFatLink);
-  
+  initLatticeConstants(*cudaFatLink);  
   
   if(method == QUDA_COMPUTE_FAT_STANDARD){
     llfat_init_cuda(qudaGaugeParam);
@@ -1838,7 +1852,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   
   
-  initCommonConstants(*cudaMom);
+  initLatticeConstants(*cudaMom);
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
   
 #ifdef MULTI_GPU
@@ -1880,7 +1894,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif
 
 
-void initCommsQuda(int argc, char **argv, const int *X, const int nDim) {
+void initCommsQuda(int argc, char **argv, const int *X, int nDim) {
 
   if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
 

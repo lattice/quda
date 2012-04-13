@@ -458,9 +458,9 @@
       }								\
       break;							\
     case TUP:							\
-      if (i4 == X4m1 && last_proc_in_tdim){			\
+      if (i4 == X4m1 && PtNm1){					\
 	sign = -1;						\
-      }else if(i4 == -1 && first_proc_in_tdim){			\
+      }else if(i4 == -1 && Pt0){				\
 	sign = -1;						\
       }								\
       break;							\
@@ -1418,7 +1418,11 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* siteli
   return;
 }
 
-
+#undef D1
+#undef D2
+#undef D3
+#undef D4
+#undef D1h
 
 #undef DECLARE_VAR_SIGN 
 #undef DECLARE_NEW_X 

@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.4.0                             4 April 2012
+Release Notes for QUDA v0.4.1 (PRE-RELEASE)                 XX April 2012
 -----------------------------
 
 Overview:
@@ -43,6 +43,9 @@ appropriate value to QUDA's configure script.  For example, the Tesla
 C1060 is listed on the above website as having compute capability 1.3,
 and so to configure the library for this card, you'd run "configure
 --enable-gpu-arch=sm_13 [other options]" before typing "make".
+
+As of QUDA 0.4.0, only devices of compute capability 1.1 or greater
+are supported.
 
 
 Installation:

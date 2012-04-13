@@ -7,7 +7,7 @@
 #include<utility>
 
 
-//DEBUG : control conpile 
+//DEBUG : control compile 
 #define COMPILE_HISQ_DP_18 
 #define COMPILE_HISQ_DP_12 
 #define COMPILE_HISQ_SP_18 
@@ -20,8 +20,13 @@
 namespace hisq {
   namespace fermion_force {
 
+    typedef struct hisq_kernel_param_s{
+      unsigned long threads;
+      int D1, D2,D3, D4, D1h;
+      int base_idx;
+    }hisq_kernel_param_t;
 
-
+    
     texture<int4, 1> newOprod0TexDouble;
     texture<int4, 1> newOprod1TexDouble;
     texture<float2, 1, cudaReadModeElementType>  newOprod0TexSingle;
@@ -35,6 +40,19 @@ namespace hisq {
           return;
         }
         hisq_force_init_cuda_flag=1;
+	
+	fat_force_const_t hf;
+#ifdef MULTI_GPU
+	int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
+	hf.site_ga_stride = Vh_ex;
+	hf.color_matrix_stride = Vh_ex;
+#else
+	int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
+	hf.site_ga_stride = Vh;
+	hf.color_matrix_stride = Vh;
+#endif
+	
+	cudaMemcpyToSymbol("hf", &hf, sizeof(fat_force_const_t));
         init_kernel_cuda(param);    
     }
     
@@ -136,11 +154,11 @@ namespace hisq {
     template<int N, class T>
       inline __device__
       void loadMatrixFromField(const T* const field_even, const T* const field_odd,
-			       int dir, int idx, T* const mat, int oddness)
+			       int dir, int idx, T* const mat, int oddness, int stride)
     {
       const T* const field = (oddness)?field_odd:field_even;
       for(int i = 0;i < N ;i++){
-	  mat[i] = field[idx + dir*N*Vh + i*Vh];          
+	  mat[i] = field[idx + dir*N*stride + i*stride];          
       }
       return;
     }
@@ -148,9 +166,9 @@ namespace hisq {
     template<class T>
       inline __device__
       void loadMatrixFromField(const T* const field_even, const T* const field_odd,
-			       int dir, int idx, T* const mat, int oddness)
+			       int dir, int idx, T* const mat, int oddness, int stride)
       {
-	loadMatrixFromField<9> (field_even, field_odd, dir, idx, mat, oddness);
+	loadMatrixFromField<9> (field_even, field_odd, dir, idx, mat, oddness, stride);
         return;
       }
     
@@ -158,17 +176,17 @@ namespace hisq {
 
     inline __device__
       void loadMatrixFromField(const float4* const field_even, const float4* const field_odd, 
-			       int dir, int idx, float2* const mat, int oddness)
+			       int dir, int idx, float2* const mat, int oddness, int stride)
     {
       const float4* const field = oddness?field_odd: field_even;
       float4 tmp;
-      tmp = field[idx + dir*Vhx3];
+      tmp = field[idx + dir*stride*3];
       mat[0] = make_float2(tmp.x, tmp.y);
       mat[1] = make_float2(tmp.z, tmp.w);
-      tmp = field[idx + dir*Vhx3 + Vh];
+      tmp = field[idx + dir*stride*3 + stride];
       mat[2] = make_float2(tmp.x, tmp.y);
       mat[3] = make_float2(tmp.z, tmp.w);
-      tmp = field[idx + dir*Vhx3 + 2*Vh];
+      tmp = field[idx + dir*stride*3 + 2*stride];
       mat[4] = make_float2(tmp.x, tmp.y);
       mat[5] = make_float2(tmp.z, tmp.w);
       return;
@@ -176,18 +194,18 @@ namespace hisq {
 
     template<class T>
       inline __device__
-      void loadMatrixFromField(const T* const field_even, const T* const field_odd, int idx, T* const mat, int oddness)
+      void loadMatrixFromField(const T* const field_even, const T* const field_odd, int idx, T* const mat, int oddness, int stride)
       {
 	const T* const field = (oddness)?field_odd:field_even;
         mat[0] = field[idx];
-        mat[1] = field[idx + Vh];
-        mat[2] = field[idx + Vhx2];
-        mat[3] = field[idx + Vhx3];
-        mat[4] = field[idx + Vhx4];
-        mat[5] = field[idx + Vhx5];
-        mat[6] = field[idx + Vhx6];
-        mat[7] = field[idx + Vhx7];
-        mat[8] = field[idx + Vhx8];
+        mat[1] = field[idx + stride];
+        mat[2] = field[idx + stride*2];
+        mat[3] = field[idx + stride*3];
+        mat[4] = field[idx + stride*4];
+        mat[5] = field[idx + stride*5];
+        mat[6] = field[idx + stride*6];
+        mat[7] = field[idx + stride*7];
+        mat[8] = field[idx + stride*8];
 
         return;
       }
@@ -196,24 +214,24 @@ namespace hisq {
 #define  addMatrixToNewOprod(mat,  dir, idx, coeff, field_even, field_odd, oddness)     do { \
       RealA* const field = (oddness)?field_odd: field_even;		\
       RealA value[9];							\
-      value[0] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9); \
-      value[1] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + Vh);	\
-      value[2] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 2*Vh); \
-      value[3] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 3*Vh); \
-      value[4] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 4*Vh); \
-      value[5] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 5*Vh); \
-      value[6] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 6*Vh); \
-      value[7] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 7*Vh); \
-      value[8] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*Vhx9 + 8*Vh); \
-      field[idx + dir*Vhx9]          = value[0] + coeff*mat[0];		\
-      field[idx + dir*Vhx9 + Vh]     = value[1] + coeff*mat[1];		\
-      field[idx + dir*Vhx9 + Vhx2]   = value[2] + coeff*mat[2];		\
-      field[idx + dir*Vhx9 + Vhx3]   = value[3] + coeff*mat[3];		\
-      field[idx + dir*Vhx9 + Vhx4]   = value[4] + coeff*mat[4];		\
-      field[idx + dir*Vhx9 + Vhx5]   = value[5] + coeff*mat[5];		\
-      field[idx + dir*Vhx9 + Vhx6]   = value[6] + coeff*mat[6];		\
-      field[idx + dir*Vhx9 + Vhx7]   = value[7] + coeff*mat[7];		\
-      field[idx + dir*Vhx9 + Vhx8]   = value[8] + coeff*mat[8];		\
+      value[0] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9); \
+      value[1] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + hf.color_matrix_stride);	\
+      value[2] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 2*hf.color_matrix_stride); \
+      value[3] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 3*hf.color_matrix_stride); \
+      value[4] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 4*hf.color_matrix_stride); \
+      value[5] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 5*hf.color_matrix_stride); \
+      value[6] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 6*hf.color_matrix_stride); \
+      value[7] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 7*hf.color_matrix_stride); \
+      value[8] = LOAD_TEX_ENTRY( ((oddness)?NEWOPROD_ODD_TEX:NEWOPROD_EVEN_TEX), field, idx+dir*hf.color_matrix_stride*9 + 8*hf.color_matrix_stride); \
+      field[idx + dir*hf.color_matrix_stride*9]          = value[0] + coeff*mat[0];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     = value[1] + coeff*mat[1];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   = value[2] + coeff*mat[2];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   = value[3] + coeff*mat[3];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   = value[4] + coeff*mat[4];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   = value[5] + coeff*mat[5];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   = value[6] + coeff*mat[6];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   = value[7] + coeff*mat[7];		\
+      field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   = value[8] + coeff*mat[8];		\
   }while(0)					
      
 
@@ -226,15 +244,15 @@ namespace hisq {
 			     T* const field_even, T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
-        field[idx + dir*Vhx9]          += coeff*mat[0];
-        field[idx + dir*Vhx9 + Vh]     += coeff*mat[1];
-        field[idx + dir*Vhx9 + Vhx2]   += coeff*mat[2];
-        field[idx + dir*Vhx9 + Vhx3]   += coeff*mat[3];
-        field[idx + dir*Vhx9 + Vhx4]   += coeff*mat[4];
-        field[idx + dir*Vhx9 + Vhx5]   += coeff*mat[5];
-        field[idx + dir*Vhx9 + Vhx6]   += coeff*mat[6];
-        field[idx + dir*Vhx9 + Vhx7]   += coeff*mat[7];
-        field[idx + dir*Vhx9 + Vhx8]   += coeff*mat[8];
+        field[idx + dir*hf.color_matrix_stride*9]          += coeff*mat[0];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     += coeff*mat[1];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   += coeff*mat[2];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   += coeff*mat[3];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   += coeff*mat[4];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   += coeff*mat[5];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   += coeff*mat[6];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   += coeff*mat[7];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   += coeff*mat[8];
 
         return;
       }
@@ -247,33 +265,54 @@ namespace hisq {
       {
 	T* const field = (oddness)?field_odd: field_even;
         field[idx ]         += coeff*mat[0];
-        field[idx + Vh]     += coeff*mat[1];
-        field[idx + Vhx2]   += coeff*mat[2];
-        field[idx + Vhx3]   += coeff*mat[3];
-        field[idx + Vhx4]   += coeff*mat[4];
-        field[idx + Vhx5]   += coeff*mat[5];
-        field[idx + Vhx6]   += coeff*mat[6];
-        field[idx + Vhx7]   += coeff*mat[7];
-        field[idx + Vhx8]   += coeff*mat[8];
+        field[idx + hf.color_matrix_stride]     += coeff*mat[1];
+        field[idx + hf.color_matrix_stride*2]   += coeff*mat[2];
+        field[idx + hf.color_matrix_stride*3]   += coeff*mat[3];
+        field[idx + hf.color_matrix_stride*4]   += coeff*mat[4];
+        field[idx + hf.color_matrix_stride*5]   += coeff*mat[5];
+        field[idx + hf.color_matrix_stride*6]   += coeff*mat[6];
+        field[idx + hf.color_matrix_stride*7]   += coeff*mat[7];
+        field[idx + hf.color_matrix_stride*8]   += coeff*mat[8];
 
         return;
       }
 
+    template<class T, class U>
+    inline __device__
+      void addMatrixToField_test(const T* const mat, int idx, U coeff, T* const field_even,
+			    T* const field_odd, int oddness)
+    {
+      T* const field = (oddness)?field_odd: field_even;
+      //T oldvalue=field[idx];
+      field[idx ]         += coeff*mat[0];
+      field[idx + hf.color_matrix_stride]     += coeff*mat[1];
+      field[idx + hf.color_matrix_stride*2]   += coeff*mat[2];
+      field[idx + hf.color_matrix_stride*3]   += coeff*mat[3];
+      field[idx + hf.color_matrix_stride*4]   += coeff*mat[4];
+      field[idx + hf.color_matrix_stride*5]   += coeff*mat[5];
+      field[idx + hf.color_matrix_stride*6]   += coeff*mat[6];
+      field[idx + hf.color_matrix_stride*7]   += coeff*mat[7];
+      field[idx + hf.color_matrix_stride*8]   += coeff*mat[8];
+
+      //printf("value is oldvalue(%f)+ coeff(%f) * mat[0].x(%f)=%f\n", oldvalue.x, coeff, mat[0].x, field[idx].x);
+      printf("value is  coeff(%f) * mat[0].x(%f)=%f\n", coeff, mat[0].x, field[idx].x);
+      return;
+    }
 
    template<class T>
     inline __device__
      void storeMatrixToField(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness)
       {
 	T* const field = (oddness)?field_odd: field_even;
-        field[idx + dir*Vhx9]          = mat[0];
-        field[idx + dir*Vhx9 + Vh]     = mat[1];
-        field[idx + dir*Vhx9 + Vhx2]   = mat[2];
-        field[idx + dir*Vhx9 + Vhx3]   = mat[3];
-        field[idx + dir*Vhx9 + Vhx4]   = mat[4];
-        field[idx + dir*Vhx9 + Vhx5]   = mat[5];
-        field[idx + dir*Vhx9 + Vhx6]   = mat[6];
-        field[idx + dir*Vhx9 + Vhx7]   = mat[7];
-        field[idx + dir*Vhx9 + Vhx8]   = mat[8];
+        field[idx + dir*hf.color_matrix_stride*9]          = mat[0];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     = mat[1];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   = mat[2];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   = mat[3];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   = mat[4];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   = mat[5];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   = mat[6];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   = mat[7];
+        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   = mat[8];
 
         return;
       }
@@ -285,14 +324,14 @@ namespace hisq {
       {
 	T* const field = (oddness)?field_odd: field_even;
         field[idx]          = mat[0];
-        field[idx + Vh]     = mat[1];
-        field[idx + Vhx2]   = mat[2];
-        field[idx + Vhx3]   = mat[3];
-        field[idx + Vhx4]   = mat[4];
-        field[idx + Vhx5]   = mat[5];
-        field[idx + Vhx6]   = mat[6];
-        field[idx + Vhx7]   = mat[7];
-        field[idx + Vhx8]   = mat[8];
+        field[idx + hf.color_matrix_stride]     = mat[1];
+        field[idx + hf.color_matrix_stride*2]   = mat[2];
+        field[idx + hf.color_matrix_stride*3]   = mat[3];
+        field[idx + hf.color_matrix_stride*4]   = mat[4];
+        field[idx + hf.color_matrix_stride*5]   = mat[5];
+        field[idx + hf.color_matrix_stride*6]   = mat[6];
+        field[idx + hf.color_matrix_stride*7]   = mat[7];
+        field[idx + hf.color_matrix_stride*8]   = mat[8];
 
         return;
       }
@@ -404,14 +443,20 @@ namespace hisq {
 	break;
 	
       case TUP:
+#ifdef MULTI_GPU	
+	if( (i[3] == X4+1 && PtNm1)
+	    || (i[3] == 1 && Pt0)) {
+	  *sign=-1; 
+	}
+#else
 	if(i[3] == X4m1) *sign=-1; 
+#endif
 	break;
 	
       default:
 	printf("Error: invalid dir\n");
 	break;
       }
-      
       return;
     }
 
@@ -427,11 +472,26 @@ template<class RealA, int oddBit>
 			  RealA* const outputEven, RealA* const outputOdd)
 {
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  
+#ifdef MULTI_GPU
+  int x[4];
+  int z1 = sid/X1h;
+  int x1h = sid - z1*X1h;
+  int z2 = z1/X2;
+  x[1] = z1 - z2*X2;
+  x[3] = z2/X3;
+  x[2] = z2 - x[3]*X3;
+  int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  x[0] = 2*x1h + x1odd;
+  //int X = 2*sid + x1odd;
+
+  int new_sid = ( (x[3]+2)*E3E2E1+(x[2]+2)*E2E1+(x[1]+2)*E1+(x[0]+2))>>1 ;
+#else
+  int new_sid = sid;
+#endif
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   if(GOES_FORWARDS(sig)){
-    loadMatrixFromField(oprodEven, oprodOdd, sig, sid, COLOR_MAT_W, oddBit);
-    addMatrixToField(COLOR_MAT_W, sig, sid, coeff, outputEven, outputOdd, oddBit);
+    loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, hf.color_matrix_stride);
+    addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit);
   }
   return;
 }
@@ -454,9 +514,9 @@ template<class RealA, int oddBit>
 #define PRECISION 0
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, Vh)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -471,9 +531,9 @@ template<class RealA, int oddBit>
 #define PRECISION 0
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, Vh)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
@@ -501,9 +561,9 @@ template<class RealA, int oddBit>
 #define PRECISION 1
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, Vh)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -518,9 +578,9 @@ template<class RealA, int oddBit>
 #define PRECISION 1
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, Vh)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, hf.site_ga_stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
@@ -546,10 +606,11 @@ template<class RealA, int oddBit>
           RealA* const PmuEven,  RealA* const PmuOdd, // write only
           RealA* const P3Even,   RealA* const P3Odd,  // write only
           RealA* const QmuEven,  RealA* const QmuOdd,   // write only
-          RealA* const newOprodEven,  RealA* const newOprodOdd)
+          RealA* const newOprodEven,  RealA* const newOprodOdd,
+	  hisq_kernel_param_t kparam)
       {
 	QudaReconstructType recon = link.Reconstruct();
-        dim3 halfGridDim(gridDim.x/2, 1,1);
+        dim3 halfGridDim = gridDim;
 	
 #define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, BlockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
 								 (typeA*)QprevEven, (typeA*)QprevOdd, \
@@ -558,7 +619,8 @@ template<class RealA, int oddBit>
 								 (typeA*)PmuEven, (typeA*)PmuOdd, \
 								 (typeA*)P3Even, (typeA*)P3Odd,	\
 								 (typeA*)QmuEven, (typeA*)QmuOdd, \
-								 (typeA*)newOprodEven, (typeA*)newOprodOdd)
+								 (typeA*)newOprodEven, (typeA*)newOprodOdd,\
+								 kparam)
 	
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
 	if(sizeof(RealA) == sizeof(float2)){				\
@@ -608,11 +670,12 @@ template<class RealA, int oddBit>
           typename RealTypeId<RealA>::Type accumu_coeff,
           dim3 gridDim, dim3 blockDim,
           RealA* shortPEven,  RealA* shortPOdd,
-          RealA* newOprodEven, RealA* newOprodOdd)
+          RealA* newOprodEven, RealA* newOprodOdd,
+	  hisq_kernel_param_t kparam)
     {
       QudaReconstructType recon =link.Reconstruct();
       
-      dim3 halfGridDim(gridDim.x/2,1,1);
+      dim3 halfGridDim=gridDim;
 
 #define CALL_ARGUMENTS(typeA, typeB) 	<<<halfGridDim, blockDim>>>((typeA*)P3Even, (typeA*)P3Odd, \
 								    (typeA*)oprodEven,  (typeA*)oprodOdd, \
@@ -621,7 +684,8 @@ template<class RealA, int oddBit>
 								    (typename RealTypeId<typeA>::Type) coeff, \
 								    (typename RealTypeId<typeA>::Type) accumu_coeff, \
 								    (typeA*)shortPEven, (typeA*)shortPOdd, \
-								    (typeA*)newOprodEven, (typeA*)newOprodOdd)
+								    (typeA*)newOprodEven, (typeA*)newOprodOdd,\
+								    kparam)
       
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
       if(sizeof(RealA) == sizeof(float2)){				\
@@ -671,10 +735,11 @@ template<class RealA, int oddBit>
           typename RealTypeId<RealA>::Type  accumu_coeff,
           dim3 gridDim, dim3 blockDim,
           RealA* const shortPEven, RealA* const shortPOdd,
-          RealA* const newOprodEven, RealA* const newOprodOdd)
+          RealA* const newOprodEven, RealA* const newOprodOdd,
+	  hisq_kernel_param_t kparam)
     {
       QudaReconstructType recon = link.Reconstruct();
-      dim3 halfGridDim(gridDim.x/2, 1,1);
+      dim3 halfGridDim=gridDim;
       
 #define CALL_ARGUMENTS(typeA, typeB) <<<halfGridDim, blockDim>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
 								 (typeA*)QprevEven, (typeA*)QprevOdd, \
@@ -683,7 +748,8 @@ template<class RealA, int oddBit>
 								 (typename RealTypeId<typeA>::Type)coeff, \
 								 (typename RealTypeId<typeA>::Type)accumu_coeff, \
 								 (typeA*)shortPEven,(typeA*)shortPOdd, \
-								 (typeA*)newOprodEven, (typeA*)newOprodOdd)
+								 (typeA*)newOprodEven, (typeA*)newOprodOdd, \
+								 kparam)
 
 #define CALL_ALL_LINK_KERNEL(sig_sign, mu_sign)				\
       if(sizeof(RealA) == sizeof(float2)){				\
@@ -922,7 +988,53 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
         const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
         dim3 blockDim(BLOCK_DIM,1,1);
         dim3 gridDim(volume/blockDim.x, 1, 1);
+	
 
+        for(int sig=0; sig<8; ++sig){
+          if(GOES_FORWARDS(sig)){
+            one_link_term(
+                (RealA*)oprod.Even_p(), (RealA*)oprod.Odd_p(),
+                sig, OneLink, 0.0,
+                gridDim, blockDim,
+                (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
+          } // GOES_FORWARDS(sig)
+          checkCudaError();
+        }
+
+	
+        hisq_kernel_param_t kparam_1g, kparam_2g;
+	
+
+#ifdef MULTI_GPU
+        kparam_1g.D1 = param.X[0]+2;
+        kparam_1g.D2 = param.X[1]+2;
+        kparam_1g.D3 = param.X[2]+2;
+        kparam_1g.D4 = param.X[3]+2;
+        kparam_1g.D1h = (param.X[0]+2)/2;
+	kparam_1g.base_idx=1;
+        kparam_1g.threads = (param.X[0]+2)*(param.X[1]+2)*(param.X[2]+2)*(param.X[3]+2)/2;
+
+        kparam_2g.D1 = param.X[0]+4;
+        kparam_2g.D2 = param.X[1]+4;
+        kparam_2g.D3 = param.X[2]+4;
+        kparam_2g.D4 = param.X[3]+4;
+        kparam_2g.D1h = (param.X[0]+4)/2;
+        kparam_2g.base_idx=0;
+        kparam_2g.threads = (param.X[0]+4)*(param.X[1]+4)*(param.X[2]+4)*(param.X[3]+4)/2;
+#else
+	hisq_kernel_param_t kparam;
+	kparam.D1 = param.X[0];
+        kparam.D2 = param.X[1];
+        kparam.D3 = param.X[2];
+        kparam.D4 = param.X[3];
+        kparam.D1h = param.X[0]/2;
+        kparam.threads=param.X[0]*param.X[1]*param.X[2]*param.X[3]/2;
+	kparam.base_idx=0;
+	kparam_2g = kparam_1g = kparam;
+#endif
+        dim3 gridDim_1g((kparam_1g.threads+blockDim.x-1)/blockDim.x, 1, 1);
+        dim3 gridDim_2g((kparam_2g.threads+blockDim.x-1)/blockDim.x, 1, 1);
+	
         for(int sig=0; sig<8; sig++){
           for(int mu=0; mu<8; mu++){
             if ( (mu == sig) || (mu == OPP_DIR(sig))){
@@ -931,21 +1043,20 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
             //3-link
             //Kernel A: middle link
 
-
             middle_link_kernel( 
                 (RealA*)oprod.Even_p(), (RealA*)oprod.Odd_p(),                            // read only
                 (RealA*)NULL,         (RealA*)NULL,                                       // read only
                 (RealB*)link.Even_p(), (RealB*)link.Odd_p(),	                          // read only 
                 link,  // read only
                 sig, mu, mThreeSt,
-                gridDim, blockDim,
+                gridDim_2g, blockDim,
                 (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,                               // write only
                 (RealA*)P3.even.data, (RealA*)P3.odd.data,                                 // write only
-                (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,                               // write only     
-                (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
+                (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,                               // write only
+                (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_2g);
+
 
             checkCudaError();
-
             for(int nu=0; nu < 8; nu++){
               if (nu == sig || nu == OPP_DIR(sig)
                   || nu == mu || nu == OPP_DIR(mu)){
@@ -960,13 +1071,14 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link, 
                   sig, nu, FiveSt,
-                  gridDim, blockDim,
+                  gridDim_1g, blockDim,
                   (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,  // write only
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,        // write only
                   (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,  // write only
-                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
+                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
 
               checkCudaError();
+
 
               for(int rho = 0; rho < 8; rho++){
                 if (rho == sig || rho == OPP_DIR(sig)
@@ -982,14 +1094,13 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                     (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                     link,
                     sig, rho, SevenSt, coeff,
-                    gridDim, blockDim,
+                    gridDim_1g, blockDim,
                     (RealA*)P5.even.data, (RealA*)P5.odd.data, 
-                    (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
+                    (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
 
                 checkCudaError();
-
+		//return;
               }//rho  		
-
 
               //5-link: side link
               if(ThreeSt != 0)coeff = FiveSt/ThreeSt; else coeff = 0;
@@ -999,9 +1110,9 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link,
                   sig, nu, mFiveSt, coeff,
-                  gridDim, blockDim,
+                  gridDim_1g, blockDim,
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,    // write
-                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
+                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
               checkCudaError();
 
             } //nu 
@@ -1014,57 +1125,48 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link, 
                   sig, mu, Lepage,
-                  gridDim, blockDim,
+                  gridDim_2g, blockDim,
                   (RealA*)NULL, (RealA*)NULL,                      // write only
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
                   (RealA*)NULL, (RealA*)NULL,                      // write only
-		  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
+		  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
+		  kparam_2g);
 
 
               if(ThreeSt != 0)coeff = Lepage/ThreeSt ; else coeff = 0;
 
               side_link_kernel(
-                  (RealA*)P5.even.data, (RealA*)P5.odd.data,           // read only
+		  (RealA*)P5.even.data, (RealA*)P5.odd.data,           // read only
                   (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,         // read only
                   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                   link,
                   sig, mu, mLepage, coeff,
-                  gridDim, blockDim,
+		  //sig, mu, mLepage, 0,
+                  gridDim_2g, blockDim,
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,           // write only
-                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
+                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
+		  kparam_2g);
 
                   checkCudaError();		
             } // Lepage != 0.0
 
-
             //3-link side link
-            coeff=0.;
             side_link_kernel(
                 (RealA*)P3.even.data, (RealA*)P3.odd.data, // read only
                 (RealA*)NULL, (RealA*)NULL,                // read only
                 (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
                 link,
                 sig, mu, ThreeSt, coeff,
-                gridDim, blockDim, 
+                gridDim_1g, blockDim, 
                 (RealA*)NULL, (RealA*)NULL,                // write
-		(RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
-
+		(RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
+		kparam_1g);
+	    
             checkCudaError();			    
-
+	    
           }//mu
         }//sig
 
-
-        for(int sig=0; sig<8; ++sig){
-          if(GOES_FORWARDS(sig)){
-            one_link_term(
-                (RealA*)oprod.Even_p(), (RealA*)oprod.Odd_p(),
-                sig, OneLink, 0.0,
-                gridDim, blockDim,
-                (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p());
-          } // GOES_FORWARDS(sig)
-          checkCudaError();
-        }
       
         return; 
    } // do_hisq_staples_force_cuda
@@ -1161,14 +1263,23 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                               cudaGaugeField* newOprod)
       {
 
+#ifdef MULTI_GPU
+	int X[4] = {
+	  param.X[0]+4,  param.X[1]+4,  param.X[2]+4,  param.X[3]+4
+	};
+#else
+	int X[4] = {
+          param.X[0],  param.X[1],  param.X[2],  param.X[3]
+        };
+#endif	
         FullMatrix tempmat[4];
         for(int i=0; i<4; i++){
-          tempmat[i]  = createMatQuda(param.X, param.cuda_prec);
+          tempmat[i]  = createMatQuda(X, param.cuda_prec);
         }
 
         FullMatrix tempCompmat[2];
         for(int i=0; i<2; i++){
-          tempCompmat[i] = createMatQuda(param.X, param.cuda_prec);
+          tempCompmat[i] = createMatQuda(X, param.cuda_prec);
         }	
 
 	bind_tex_link(link, *newOprod);
@@ -1191,12 +1302,12 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
           act_path_coeff.seven  = path_coeff_array[4];
           act_path_coeff.lepage = path_coeff_array[5];
           do_hisq_staples_force_cuda<double,double2,double2>( act_path_coeff,
-							   param,
-                                                           oprod,
-                                                           link, 
-							   tempmat, 
-							   tempCompmat, 
-							   *newOprod);
+							      param,
+							      oprod,
+							      link, 
+							      tempmat, 
+							      tempCompmat, 
+							      *newOprod);
 							   
 
         }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){	

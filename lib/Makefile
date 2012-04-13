@@ -70,7 +70,7 @@ gen:
 clean:
 	-rm -f *.o $(QUDA)
 
-tune.o: tune.cpp ../include/tune_quda.h
+tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)

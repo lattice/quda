@@ -30,6 +30,12 @@ static bool   HOST_REUNIT_SVD_ONLY;
 static double HOST_REUNIT_SVD_REL_ERROR;
 static double HOST_REUNIT_SVD_ABS_ERROR;
 
+
+#ifdef MULTI_GPU
+#define HALF_VOLUME Vh_ex
+#else // single gpu
+#define HALF_VOLUME Vh
+#endif
  
 namespace hisq{
   namespace fermion_force{
@@ -513,8 +519,8 @@ namespace hisq{
             force = force_even;
             link = link_even;
             old_force = old_force_even;
-            if(mem_idx >= Vh){
-              mem_idx = mem_idx - Vh;
+            if(mem_idx >= HALF_VOLUME){
+              mem_idx = mem_idx - HALF_VOLUME;
               force = force_odd;
               link = link_odd;
               old_force = old_force_odd;
@@ -525,12 +531,12 @@ namespace hisq{
             Matrix<double2,3> v, result, oprod;
            
             for(int dir=0; dir<4; ++dir){
-              loadLinkVariableFromArray(old_force, dir, mem_idx, Vh, &oprod);
-              loadLinkVariableFromArray(link, dir, mem_idx, Vh, &v);
+              loadLinkVariableFromArray(old_force, dir, mem_idx, HALF_VOLUME, &oprod);
+              loadLinkVariableFromArray(link, dir, mem_idx, HALF_VOLUME, &v);
 
               getUnitarizeForceSite<double2>(v, oprod, &result, unitarization_failed); 
 
-              writeLinkVariableToArray(result, dir, mem_idx, Vh, force); 
+              writeLinkVariableToArray(result, dir, mem_idx, HALF_VOLUME, force); 
             }
             return;
           } // getUnitarizeForceField

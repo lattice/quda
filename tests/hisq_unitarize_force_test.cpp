@@ -36,6 +36,7 @@ cudaGaugeField *cudaOprod = NULL;
 int verify_results = 0;
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
+extern int gridsize_from_cmdline[];
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
@@ -72,7 +73,8 @@ setDims(int *X){
 }
 
 
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
+void initLatticeConstants(const LatticeField &lat);
+void initGaugeConstants(const cudaGaugeField &gauge);
 
 
 // allocate memory
@@ -150,7 +152,7 @@ hisq_force_init()
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.precision = gaugeParam.cpu_prec;
   cpuOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec);
+  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, QUDA_MILC_GAUGE_ORDER);
 
 
   gParam.precision = hw_prec;
@@ -185,7 +187,8 @@ hisq_force_test()
 {
   hisq_force_init();
 
-  initDslashConstants(*cudaGauge, cudaGauge->VolumeCB());
+  initLatticeConstants(*cudaGauge);
+  initGaugeConstants(*cudaGauge);
   hisqForceInitCuda(&gaugeParam);
 
   float act_path_coeff[6];
@@ -225,7 +228,7 @@ hisq_force_test()
   // First of all we fatten the links on the GPU
   hisqStaplesForceCuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
 
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
 
 
   checkCudaError();
@@ -239,7 +242,7 @@ hisq_force_test()
   if(verify_results){
     unitarizeForceCPU(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
   }
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   checkCudaError();
   cudaFree(unitarization_failed_dev);
 

@@ -13,13 +13,6 @@ extern "C" {
 #endif
 
   void initCache();
-
-  extern int initDslash;
-  extern int initClover;
-  extern int initDomainWall;
-  extern bool qudaPt0;
-  extern bool qudaPtNm1;
-
   void setDslashTuning(QudaTune tune, QudaVerbosity verbose);
 
 #ifdef DSLASH_PROFILING
@@ -32,13 +25,15 @@ extern "C" {
 
 bool getDslashLaunch();
 
-void initCommonConstants(const LatticeField &lat);
-void initDslashConstants(const cudaGaugeField &gauge, const int sp_stride);
-void initCloverConstants(const int cl_stride);
-void initDomainWallConstants(const int Ls);
-void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
-void initGaugeFieldConstants(const cudaGaugeField &gauge);
+void createDslashEvents();
+void destroyDslashEvents();
 
+void initLatticeConstants(const LatticeField &lat);
+void initGaugeConstants(const cudaGaugeField &gauge);
+void initSpinorConstants(const cudaColorSpinorField &spinor);
+void initDslashConstants();
+void initCloverConstants (const cudaCloverField &clover);
+void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
 
 // plain Wilson Dslash  
 void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

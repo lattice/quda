@@ -100,8 +100,8 @@ float dslashTime;
 #define DSLASH_TIME_PROFILE()
 #endif
 
-FaceBuffer *face;
-cudaColorSpinorField *inSpinor;
+static FaceBuffer *face;
+static cudaColorSpinorField *inSpinor;
 
 // For tuneLaunch() to uniquely identify a suitable set of launch parameters, we need copies of a few of
 // the constants set by initDslashConstants().
@@ -197,9 +197,81 @@ void initCache() {
 
 }
 
+
 void setFace(const FaceBuffer &Face) {
   face = (FaceBuffer*)&Face; // nasty
 }
+
+
+void createDslashEvents()
+{
+ #ifndef DSLASH_PROFILING
+  // add cudaEventDisableTiming for lower sync overhead
+  for (int i=0; i<Nstream; i++) {
+    cudaEventCreate(&packEnd[i], cudaEventDisableTiming);
+    cudaEventCreate(&gatherStart[i], cudaEventDisableTiming);
+    cudaEventCreate(&gatherEnd[i], cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+  }
+#else
+  cudaEventCreate(&dslashStart);
+  cudaEventCreate(&dslashEnd);
+  for (int i=0; i<Nstream; i++) {
+    cudaEventCreate(&packStart[i]);
+    cudaEventCreate(&packEnd[i]);
+
+    cudaEventCreate(&gatherStart[i]);
+    cudaEventCreate(&gatherEnd[i]);
+
+    cudaEventCreate(&scatterStart[i]);
+    cudaEventCreate(&scatterEnd[i]);
+
+    cudaEventCreate(&kernelStart[i]);
+    cudaEventCreate(&kernelEnd[i]);
+
+    kernelTime[i][0] = 0.0;
+    kernelTime[i][1] = 0.0;
+
+    gatherTime[i][0] = 0.0;
+    gatherTime[i][1] = 0.0;
+
+    commsTime[i][0] = 0.0;
+    commsTime[i][1] = 0.0;
+
+    scatterTime[i][0] = 0.0;
+    scatterTime[i][1] = 0.0;
+  }
+#endif
+
+  checkCudaError();
+}
+
+
+void destroyDslashEvents()
+{
+  for (int i=0; i<Nstream; i++) {
+    cudaEventDestroy(packEnd[i]);
+    cudaEventDestroy(gatherStart[i]);
+    cudaEventDestroy(gatherEnd[i]);
+    cudaEventDestroy(scatterStart[i]);
+    cudaEventDestroy(scatterEnd[i]);
+  }
+
+#ifdef DSLASH_PROFILING
+  cudaEventDestroy(dslashStart);
+  cudaEventDestroy(dslashEnd);
+
+  for (int i=0; i<Nstream; i++) {
+    cudaEventDestroy(packStart[i]);
+    cudaEventDestroy(kernelStart[i]);
+    cudaEventDestroy(kernelEnd[i]);
+  }
+#endif
+
+  checkCudaError();
+}
+
 
 #define MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...)            \
   if (x==0) {                                                                                                     \
@@ -1002,7 +1074,7 @@ int commsCompleted[Nstream];
 int commDimTotal;
 
 /**
-   Initialize the arrays used for the dynamic scheduling.
+ * Initialize the arrays used for the dynamic scheduling.
  */
 void initDslashCommsPattern() {
   for (int i=0; i<Nstream-1; i++) {
@@ -1739,3 +1811,4 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 #include "hisq_paths_force_quda.cu"
 #include "unitarize_force_quda.cu"
 #endif
+

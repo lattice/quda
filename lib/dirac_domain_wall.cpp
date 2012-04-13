@@ -26,11 +26,10 @@ void DiracDomainWall::Dslash(cudaColorSpinorField &out, const cudaColorSpinorFie
 			     const QudaParity parity) const
 {
   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
-  if (!initDomainWall) initDomainWallConstants(in.X(4));
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
  
+  initSpinorConstants(in);
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
   domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim);   
 
@@ -46,11 +45,10 @@ void DiracDomainWall::DslashXpay(cudaColorSpinorField &out, const cudaColorSpino
 				 const double &k) const
 {
   if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-  if (!initDslash) initDslashConstants(gauge, in.Stride());
-  if (!initDomainWall) initDomainWallConstants(in.X(4));
   checkParitySpinor(in, out);
   checkSpinorAlias(in, out);
 
+  initSpinorConstants(in);
   setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
   domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim);
 
