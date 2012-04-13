@@ -36,7 +36,7 @@ static int Vh_ex;
 static int X1, X1h, X2, X3, X4;
 static int E1, E1h, E2, E3, E4;
 
-
+extern int test_type;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
@@ -462,17 +462,6 @@ main(int argc, char **argv)
       continue;
     }
 
-    
-    if( strcmp(argv[i], "--test") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      test = atoi(argv[i+1]);
-      i++;
-      continue;
-    }
-
-
     if( strcmp(argv[i], "--gauge-order") == 0){
       if(i+1 >= argc){
 	usage(argv);
@@ -499,6 +488,8 @@ main(int argc, char **argv)
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+
+  test = test_type;
 
 #ifdef MULTI_GPU
   if(gauge_order == QUDA_MILC_GAUGE_ORDER && test == 0){

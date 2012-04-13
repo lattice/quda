@@ -39,14 +39,14 @@ su3_test: su3_test.o test_util.o wilson_dslash_reference.o misc.o $(QIO_UTIL) $(
 pack_test: pack_test.o test_util.o wilson_dslash_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-blas_test: blas_test.o $(QUDA)
+blas_test: blas_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o $(QUDA)
-	$(CC) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
+	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)

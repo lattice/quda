@@ -35,6 +35,30 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
+#define acc00_re accum0.x
+#define acc00_im accum0.y
+#define acc01_re accum1.x
+#define acc01_im accum1.y
+#define acc02_re accum2.x
+#define acc02_im accum2.y
+#define acc10_re accum3.x
+#define acc10_im accum3.y
+#define acc11_re accum4.x
+#define acc11_im accum4.y
+#define acc12_re accum5.x
+#define acc12_im accum5.y
+#define acc20_re accum6.x
+#define acc20_im accum6.y
+#define acc21_re accum7.x
+#define acc21_im accum7.y
+#define acc22_re accum8.x
+#define acc22_im accum8.y
+#define acc30_re accum9.x
+#define acc30_im accum9.y
+#define acc31_re accum10.x
+#define acc31_im accum10.y
+#define acc32_re accum11.x
+#define acc32_im accum11.y
 #else
 #define spinorFloat float
 #define i00_re I0.x
@@ -61,6 +85,30 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
+#define acc00_re accum0.x
+#define acc00_im accum0.y
+#define acc01_re accum0.z
+#define acc01_im accum0.w
+#define acc02_re accum1.x
+#define acc02_im accum1.y
+#define acc10_re accum1.z
+#define acc10_im accum1.w
+#define acc11_re accum2.x
+#define acc11_im accum2.y
+#define acc12_re accum2.z
+#define acc12_im accum2.w
+#define acc20_re accum3.x
+#define acc20_im accum3.y
+#define acc21_re accum3.z
+#define acc21_im accum3.w
+#define acc22_re accum4.x
+#define acc22_im accum4.y
+#define acc30_re accum4.z
+#define acc30_im accum4.w
+#define acc31_re accum5.x
+#define acc31_im accum5.y
+#define acc32_re accum5.z
+#define acc32_im accum5.w
 #endif // SPINOR_DOUBLE
 
 // gauge link
@@ -2120,7 +2168,6 @@ case EXTERIOR_KERNEL_Y:
 if (!incomplete)
 #endif // MULTI_GPU
 {
-  
 #ifdef DSLASH_CLOVER
   
   // change to chiral basis
@@ -2544,58 +2591,30 @@ if (!incomplete)
   
   READ_ACCUM(ACCUMTEX, sp_stride)
   
-#ifdef SPINOR_DOUBLE
-  o00_re = a*o00_re + accum0.x;
-  o00_im = a*o00_im + accum0.y;
-  o01_re = a*o01_re + accum1.x;
-  o01_im = a*o01_im + accum1.y;
-  o02_re = a*o02_re + accum2.x;
-  o02_im = a*o02_im + accum2.y;
-  o10_re = a*o10_re + accum3.x;
-  o10_im = a*o10_im + accum3.y;
-  o11_re = a*o11_re + accum4.x;
-  o11_im = a*o11_im + accum4.y;
-  o12_re = a*o12_re + accum5.x;
-  o12_im = a*o12_im + accum5.y;
-  o20_re = a*o20_re + accum6.x;
-  o20_im = a*o20_im + accum6.y;
-  o21_re = a*o21_re + accum7.x;
-  o21_im = a*o21_im + accum7.y;
-  o22_re = a*o22_re + accum8.x;
-  o22_im = a*o22_im + accum8.y;
-  o30_re = a*o30_re + accum9.x;
-  o30_im = a*o30_im + accum9.y;
-  o31_re = a*o31_re + accum10.x;
-  o31_im = a*o31_im + accum10.y;
-  o32_re = a*o32_re + accum11.x;
-  o32_im = a*o32_im + accum11.y;
-#else
-  o00_re = a*o00_re + accum0.x;
-  o00_im = a*o00_im + accum0.y;
-  o01_re = a*o01_re + accum0.z;
-  o01_im = a*o01_im + accum0.w;
-  o02_re = a*o02_re + accum1.x;
-  o02_im = a*o02_im + accum1.y;
-  o10_re = a*o10_re + accum1.z;
-  o10_im = a*o10_im + accum1.w;
-  o11_re = a*o11_re + accum2.x;
-  o11_im = a*o11_im + accum2.y;
-  o12_re = a*o12_re + accum2.z;
-  o12_im = a*o12_im + accum2.w;
-  o20_re = a*o20_re + accum3.x;
-  o20_im = a*o20_im + accum3.y;
-  o21_re = a*o21_re + accum3.z;
-  o21_im = a*o21_im + accum3.w;
-  o22_re = a*o22_re + accum4.x;
-  o22_im = a*o22_im + accum4.y;
-  o30_re = a*o30_re + accum4.z;
-  o30_im = a*o30_im + accum4.w;
-  o31_re = a*o31_re + accum5.x;
-  o31_im = a*o31_im + accum5.y;
-  o32_re = a*o32_re + accum5.z;
-  o32_im = a*o32_im + accum5.w;
-#endif // SPINOR_DOUBLE
-  
+  o00_re = a*o00_re+acc00_re;
+  o00_im = a*o00_im+acc00_im;
+  o01_re = a*o01_re+acc01_re;
+  o01_im = a*o01_im+acc01_im;
+  o02_re = a*o02_re+acc02_re;
+  o02_im = a*o02_im+acc02_im;
+  o10_re = a*o10_re+acc10_re;
+  o10_im = a*o10_im+acc10_im;
+  o11_re = a*o11_re+acc11_re;
+  o11_im = a*o11_im+acc11_im;
+  o12_re = a*o12_re+acc12_re;
+  o12_im = a*o12_im+acc12_im;
+  o20_re = a*o20_re+acc20_re;
+  o20_im = a*o20_im+acc20_im;
+  o21_re = a*o21_re+acc21_re;
+  o21_im = a*o21_im+acc21_im;
+  o22_re = a*o22_re+acc22_re;
+  o22_im = a*o22_im+acc22_im;
+  o30_re = a*o30_re+acc30_re;
+  o30_im = a*o30_im+acc30_im;
+  o31_re = a*o31_re+acc31_re;
+  o31_im = a*o31_im+acc31_im;
+  o32_re = a*o32_re+acc32_re;
+  o32_im = a*o32_im+acc32_im;
 #endif // DSLASH_XPAY
 }
 
@@ -2652,6 +2671,31 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
+
+#undef acc00_re
+#undef acc00_im
+#undef acc01_re
+#undef acc01_im
+#undef acc02_re
+#undef acc02_im
+#undef acc10_re
+#undef acc10_im
+#undef acc11_re
+#undef acc11_im
+#undef acc12_re
+#undef acc12_im
+#undef acc20_re
+#undef acc20_im
+#undef acc21_re
+#undef acc21_im
+#undef acc22_re
+#undef acc22_im
+#undef acc30_re
+#undef acc30_im
+#undef acc31_re
+#undef acc31_im
+#undef acc32_re
+#undef acc32_im
 
 #undef c00_00_re
 #undef c01_01_re

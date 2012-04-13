@@ -16,7 +16,7 @@ class TuneKey {
   std::string aux;
 
   TuneKey() { }
-  TuneKey(std::string v, std::string n, std::string a=std::string())
+  TuneKey(std::string v, std::string n, std::string a=std::string("default"))
     : volume(v), name(n), aux(a) { }  
   TuneKey(const TuneKey &key)
     : volume(key.volume), name(key.name), aux(key.aux) { }

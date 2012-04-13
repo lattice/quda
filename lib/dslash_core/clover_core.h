@@ -274,7 +274,6 @@ if (sid >= param.threads) return;
 // read spinor from device memory
 READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
 {
-  
   // change to chiral basis
   {
     spinorFloat a00_re = -i10_re - i30_re;
@@ -694,58 +693,30 @@ READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
   
   READ_ACCUM(ACCUMTEX, sp_stride)
   
-#ifdef SPINOR_DOUBLE
-  o00_re = a*o00_re + accum0.x;
-  o00_im = a*o00_im + accum0.y;
-  o01_re = a*o01_re + accum1.x;
-  o01_im = a*o01_im + accum1.y;
-  o02_re = a*o02_re + accum2.x;
-  o02_im = a*o02_im + accum2.y;
-  o10_re = a*o10_re + accum3.x;
-  o10_im = a*o10_im + accum3.y;
-  o11_re = a*o11_re + accum4.x;
-  o11_im = a*o11_im + accum4.y;
-  o12_re = a*o12_re + accum5.x;
-  o12_im = a*o12_im + accum5.y;
-  o20_re = a*o20_re + accum6.x;
-  o20_im = a*o20_im + accum6.y;
-  o21_re = a*o21_re + accum7.x;
-  o21_im = a*o21_im + accum7.y;
-  o22_re = a*o22_re + accum8.x;
-  o22_im = a*o22_im + accum8.y;
-  o30_re = a*o30_re + accum9.x;
-  o30_im = a*o30_im + accum9.y;
-  o31_re = a*o31_re + accum10.x;
-  o31_im = a*o31_im + accum10.y;
-  o32_re = a*o32_re + accum11.x;
-  o32_im = a*o32_im + accum11.y;
-#else
-  o00_re = a*o00_re + accum0.x;
-  o00_im = a*o00_im + accum0.y;
-  o01_re = a*o01_re + accum0.z;
-  o01_im = a*o01_im + accum0.w;
-  o02_re = a*o02_re + accum1.x;
-  o02_im = a*o02_im + accum1.y;
-  o10_re = a*o10_re + accum1.z;
-  o10_im = a*o10_im + accum1.w;
-  o11_re = a*o11_re + accum2.x;
-  o11_im = a*o11_im + accum2.y;
-  o12_re = a*o12_re + accum2.z;
-  o12_im = a*o12_im + accum2.w;
-  o20_re = a*o20_re + accum3.x;
-  o20_im = a*o20_im + accum3.y;
-  o21_re = a*o21_re + accum3.z;
-  o21_im = a*o21_im + accum3.w;
-  o22_re = a*o22_re + accum4.x;
-  o22_im = a*o22_im + accum4.y;
-  o30_re = a*o30_re + accum4.z;
-  o30_im = a*o30_im + accum4.w;
-  o31_re = a*o31_re + accum5.x;
-  o31_im = a*o31_im + accum5.y;
-  o32_re = a*o32_re + accum5.z;
-  o32_im = a*o32_im + accum5.w;
-#endif // SPINOR_DOUBLE
-  
+  o00_re = a*o00_re+acc00_re;
+  o00_im = a*o00_im+acc00_im;
+  o01_re = a*o01_re+acc01_re;
+  o01_im = a*o01_im+acc01_im;
+  o02_re = a*o02_re+acc02_re;
+  o02_im = a*o02_im+acc02_im;
+  o10_re = a*o10_re+acc10_re;
+  o10_im = a*o10_im+acc10_im;
+  o11_re = a*o11_re+acc11_re;
+  o11_im = a*o11_im+acc11_im;
+  o12_re = a*o12_re+acc12_re;
+  o12_im = a*o12_im+acc12_im;
+  o20_re = a*o20_re+acc20_re;
+  o20_im = a*o20_im+acc20_im;
+  o21_re = a*o21_re+acc21_re;
+  o21_im = a*o21_im+acc21_im;
+  o22_re = a*o22_re+acc22_re;
+  o22_im = a*o22_im+acc22_im;
+  o30_re = a*o30_re+acc30_re;
+  o30_im = a*o30_im+acc30_im;
+  o31_re = a*o31_re+acc31_re;
+  o31_im = a*o31_im+acc31_im;
+  o32_re = a*o32_re+acc32_re;
+  o32_im = a*o32_im+acc32_im;
 #endif // DSLASH_XPAY
 }
 
