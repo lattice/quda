@@ -13,7 +13,7 @@
 #include "hw_quda.h"
 #include <fat_force_quda.h>
 #include <face_quda.h>
-
+#include <dslash_quda.h> 
 #include <sys/time.h>
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
@@ -51,7 +51,7 @@ int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
-
+extern bool tune;
 extern QudaPrecision prec;
 extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_DOUBLE_PRECISION;
@@ -575,6 +575,8 @@ hisq_force_end()
 static int 
 hisq_force_test(void)
 {
+  if (tune) setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+
   hisq_force_init();
 
   initLatticeConstants(*cudaGauge);
@@ -682,6 +684,8 @@ hisq_force_test(void)
   hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
+
+  checkCudaError();
 
   hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 

@@ -68,7 +68,7 @@ std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
 class GaugeField : public LatticeField {
 
  protected:
-  size_t bytes; // bytes allocated per clover full field 
+  size_t bytes; // bytes allocated per full field 
   int length;
   int real_length;
   int nColor;
