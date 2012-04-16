@@ -17,7 +17,7 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_10, sm_12, sm_13, sm_20, sm_21 (default: sm_20)]),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_10, sm_12, sm_13, sm_20, sm_21, sm_30 (default: sm_20)]),
  [ gpu_arch=${enableval} ],
  [ gpu_arch="sm_20" ]
 )
@@ -224,9 +224,9 @@ esac
 
 dnl CPU Arch
 case ${gpu_arch} in
-sm_10 | sm_11 | sm_12 | sm_13 | sm_20 | sm_21 ) ;;
+sm_10 | sm_11 | sm_12 | sm_13 | sm_20 | sm_21 | sm_30 ) ;;
 *) 
-  AC_MSG_ERROR([ GPU arch must be one of: sm_10, sm_11, sm_12, sm_13, sm_20, or sm_21 ])
+  AC_MSG_ERROR([ GPU arch must be one of: sm_10, sm_11, sm_12, sm_13, sm_20, sm_21 or sm_30 ])
   ;;
 esac
 
