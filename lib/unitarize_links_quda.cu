@@ -148,7 +148,6 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
     inline bool checkRelativeError(Real a, Real b, Real epsilon)
     {
       if( fabs((a-b)/b)  < epsilon ) return true;
-      printf("Relative error = %g\n", fabs((a-b)/b));
       return false;
     }
     
