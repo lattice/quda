@@ -54,7 +54,7 @@ CORE = $(QUDA_CORE:%=dslash_core/%)
 HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH))\"
 
 # limit maximum number of registers in BLAS routines to increase occupancy
-ifeq ($(strip $(GPU_ARCH)), sm_20)
+ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30))
   MAXREG =
 else
   MAXREG = --maxrregcount=80
