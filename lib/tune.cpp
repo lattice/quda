@@ -254,6 +254,8 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
     tuning = true;
     active_tunable = &tunable;
     best_time = FLT_MAX;
+
+    if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name.c_str());
     tunable.preTune();
 
     cudaEventCreate(&start);
@@ -305,6 +307,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
     cudaEventDestroy(start);
     cudaEventDestroy(end);
 
+    if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name.c_str());
     tunable.postTune();
     param = best_param;
     tunecache[key] = best_param;

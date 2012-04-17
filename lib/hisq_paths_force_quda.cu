@@ -772,11 +772,11 @@ namespace hisq {
 
     public:
       LepageMiddleLink(const cudaGaugeField &link, 
-		       const cudaGaugeField &prod, 
-		       const cudaGaugeField &QprevEven,
+		       const cudaGaugeField &oprod, 
+		       const cudaGaugeField &Qprev,
 		       int sig, int mu,
 		       typename RealTypeId<RealA>::Type coeff, 
-		       cudaGaugeField &P3, cudaGaugeField &newOpro,
+		       cudaGaugeField &P3, cudaGaugeField &newOprod,
 		       const hisq_kernel_param_t &kparam) :
 	link(link), oprod(oprod), Qprev(Qprev), sig(sig), mu(mu), 
 	coeff(coeff), P3(P3), newOprod(newOprod), kparam(kparam)
@@ -1189,7 +1189,7 @@ namespace hisq {
       }
       
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 	QudaReconstructType recon = link.Reconstruct();
 	
 	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -1282,6 +1282,7 @@ namespace hisq {
       }  
 
       void apply(const cudaStream_t &stream) {
+	// FIXME: why isn't tuning working here?
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 
         if(GOES_FORWARDS(sig)){
@@ -1296,7 +1297,6 @@ namespace hisq {
 								 static_cast<RealA*>(ForceMatrix.Even_p()), 
 								 static_cast<RealA*>(ForceMatrix.Odd_p()));
 	}
-	checkCudaError();
       }
 
       void preTune() {
@@ -1380,8 +1380,7 @@ namespace hisq {
        (typeA*)output.Even_p(), (typeA*)output.Odd_p());		
       
       void apply(const cudaStream_t &stream) {
-	checkCudaError();
-	
+	// FIXME: why isn't tuning working here?
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 	QudaReconstructType recon = link.Reconstruct();
 	
@@ -1404,7 +1403,6 @@ namespace hisq {
 	    do_longlink_dp_12_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);	    
 	  }
 	}
-	checkCudaError();
       }
 
 #undef CALL_ARGUMENTS	
@@ -1489,7 +1487,7 @@ namespace hisq {
        (typeA*)mom.Even_p(), (typeA*)mom.Odd_p()); 
       
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 	QudaReconstructType recon = link.Reconstruct();;
       
 	if(sizeof(RealA) == sizeof(float2)){
@@ -1509,8 +1507,6 @@ namespace hisq {
 	    do_complete_force_dp_12_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);	    
 	  }
 	}
-	
-	checkCudaError();
       }
 
 #undef CALL_ARGUMENTS	
@@ -1603,7 +1599,6 @@ namespace hisq {
 				cudaGaugeField &newOprod)
     {
 
-      QudaReconstructType recon = link.Reconstruct();
       Real coeff;
       Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
       Real mLepage, mFiveSt, mThreeSt;
@@ -1618,8 +1613,8 @@ namespace hisq {
 	if(GOES_FORWARDS(sig)){
 	  OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, 0.0, newOprod);
 	  oneLink.apply(0);
+	  checkCudaError();
 	} // GOES_FORWARDS(sig)
-	checkCudaError();
       }
 	
       hisq_kernel_param_t kparam_1g, kparam_2g;
@@ -1668,8 +1663,8 @@ namespace hisq {
 					      Pmu, P3, Qmu, // write only
 					      newOprod, kparam_2g);
 	  middleLink.apply(0);
-
 	  checkCudaError();
+
 	  for(int nu=0; nu < 8; nu++){
 	    if (nu == sig || nu == OPP_DIR(sig)
 		|| nu == mu || nu == OPP_DIR(mu)){
@@ -1698,7 +1693,6 @@ namespace hisq {
 					   P5, newOprod, kparam_1g);
 
 	      allLink.apply(0);
-
 	      checkCudaError();
 	      //return;
 	    }//rho  		
@@ -1722,6 +1716,7 @@ namespace hisq {
 				 P5, // write only
 				 newOprod, kparam_2g);
 	    lepageMiddleLink.apply(0);
+	    checkCudaError();
 
 	    if(ThreeSt != 0)coeff = Lepage/ThreeSt ; else coeff = 0;
 
@@ -1739,7 +1734,6 @@ namespace hisq {
 						   sig, mu, ThreeSt,
 						   newOprod, kparam_1g);
 	  sideLinkShort.apply(0);
-	    
 	  checkCudaError();			    
 	    
 	}//mu
@@ -1768,9 +1762,11 @@ namespace hisq {
 	if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
 	  CompleteForce<double2,double2> completeForce(link, oprod, sig, *force);
 	  completeForce.apply(0);
+	  checkCudaError();
 	}else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
 	  CompleteForce<float2,float2> completeForce(link, oprod, sig, *force);
 	  completeForce.apply(0);
+	  checkCudaError();
 	}else{
 	  errorQuda("Unsupported precision");
 	}
@@ -1797,9 +1793,11 @@ namespace hisq {
 	if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
 	  LongLinkTerm<double2,double2> longLink(link, oldOprod, sig, coeff, *newOprod);
 	  longLink.apply(0);
+	  checkCudaError();
 	}else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
 	  LongLinkTerm<float2,float2> longLink(link, oldOprod, sig, static_cast<float>(coeff), *newOprod);
 	  longLink.apply(0);
+	  checkCudaError();
 	}else{
 	  errorQuda("Unsupported precision");
 	}
