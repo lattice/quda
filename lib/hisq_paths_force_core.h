@@ -984,12 +984,13 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
 template<class RealA, class RealB,  int oddBit>
   __global__ void 
   HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* const linkOdd,
-					    const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
-					    int sig, typename RealTypeId<RealA>::Type coeff,
-					    RealA* const outputEven, RealA* const outputOdd)
+				     const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
+				     int sig, typename RealTypeId<RealA>::Type coeff,
+				     RealA* const outputEven, RealA* const outputOdd, const int threads)
 {
 #ifdef KERNEL_ENABLED		       
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (sid >= threads) return;
 
   int x[4];
   int z1 = sid/X1h;
@@ -1134,10 +1135,12 @@ template<class RealA, class RealB, int oddBit>
   HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const RealB* const linkOdd, 
 					   const RealA* const oprodEven, const RealA* const oprodOdd,
 					   int sig,
-					   RealA* const forceEven, RealA* const forceOdd)
+					   RealA* const forceEven, RealA* const forceOdd,
+					   const int threads)
 {
 #ifdef KERNEL_ENABLED		
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (sid >= threads) return;
 
   int x[4];
   int z1 = sid/X1h;

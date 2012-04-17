@@ -472,9 +472,10 @@ namespace hisq {
     __global__ void 
     do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOdd,
 			    int sig, typename RealTypeId<RealA>::Type coeff,
-			    RealA* const outputEven, RealA* const outputOdd)
+			    RealA* const outputEven, RealA* const outputOdd, const int threads)
     {
       int sid = blockIdx.x * blockDim.x + threadIdx.x;
+      if (sid >= threads) return;
 #ifdef MULTI_GPU
       int x[4];
       int z1 = sid/X1h;
@@ -1282,20 +1283,22 @@ namespace hisq {
       }  
 
       void apply(const cudaStream_t &stream) {
-	// FIXME: why isn't tuning working here?
-	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 
         if(GOES_FORWARDS(sig)){
           do_one_link_term_kernel<RealA,0><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
 								 static_cast<const RealA*>(oprod.Odd_p()), 
 								 sig, coeff,
 								 static_cast<RealA*>(ForceMatrix.Even_p()), 
-								 static_cast<RealA*>(ForceMatrix.Odd_p()));
+								 static_cast<RealA*>(ForceMatrix.Odd_p()),
+								 oprod.X()[0]*oprod.X()[1]*oprod.X()[2]*oprod.X()[3]/2);
           do_one_link_term_kernel<RealA,1><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
 								 static_cast<const RealA*>(oprod.Odd_p()), 
 								 sig, coeff,
 								 static_cast<RealA*>(ForceMatrix.Even_p()), 
-								 static_cast<RealA*>(ForceMatrix.Odd_p()));
+								 static_cast<RealA*>(ForceMatrix.Odd_p()),
+								 oprod.X()[0]*oprod.X()[1]*oprod.X()[2]*oprod.X()[3]/2);
+
 	}
       }
 
@@ -1377,11 +1380,11 @@ namespace hisq {
       ((typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
        (typeA*)naikOprod.Even_p(),  (typeA*)naikOprod.Odd_p(),		\
        sig, naik_coeff,							\
-       (typeA*)output.Even_p(), (typeA*)output.Odd_p());		
+       (typeA*)output.Even_p(), (typeA*)output.Odd_p(),			\
+      link.X()[0] * link.X()[1] * link.X()[2] * link.X()[3]/2);		
       
       void apply(const cudaStream_t &stream) {
-	// FIXME: why isn't tuning working here?
-	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 	QudaReconstructType recon = link.Reconstruct();
 	
         if(GOES_BACKWARDS(sig)) errorQuda("sig does not go forward\n");
@@ -1484,7 +1487,8 @@ namespace hisq {
       ((typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
        (typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
        sig,								\
-       (typeA*)mom.Even_p(), (typeA*)mom.Odd_p()); 
+       (typeA*)mom.Even_p(), (typeA*)mom.Odd_p(),			\
+      link.X()[0] * link.X()[1] * link.X()[2] * link.X()[3]/2);		
       
       void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
@@ -1758,6 +1762,7 @@ namespace hisq {
 			       cudaGaugeField* force)
     {
       bind_tex_link(link, oprod);
+
       for(int sig=0; sig<4; sig++){
 	if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
 	  CompleteForce<double2,double2> completeForce(link, oprod, sig, *force);
@@ -1786,7 +1791,6 @@ namespace hisq {
 			       const cudaGaugeField &link,
 			       cudaGaugeField  *newOprod)
     {
-      checkCudaError();
       bind_tex_link(link, *newOprod);
      
       for(int sig=0; sig<4; ++sig){
