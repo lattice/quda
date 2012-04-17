@@ -1131,18 +1131,20 @@ template<class RealA, class RealB>
       void longlink_terms(const RealB* const linkEven, const RealB* const linkOdd,
 			  const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
 			  int sig, typename RealTypeId<RealA>::Type naik_coeff,
-			  dim3 gridDim, dim3 blockDim, const cudaGaugeField& link, 
-			  RealA* const outputEven, RealA* const outputOdd)
+			  const cudaGaugeField& link, 
+			  RealA* const outputEven, RealA* const outputOdd,
+			  hisq_kernel_param_t kparam) 
       {
 	
-        dim3 halfGridDim(gridDim.x/2,1,1);
+	dim3 blockDim(BLOCK_DIM, 1,1);
+        dim3 halfGridDim((kparam.threads + blockDim.x-1)/blockDim.x,1,1);
 	
 	QudaReconstructType recon = link.Reconstruct();;
 	
 #define CALL_ARGUMENTS(typeA, typeB)	<<<halfGridDim,blockDim>>>((typeB*)linkEven, (typeB*)linkOdd, \
 								   (typeA*)naikOprodEven,  (typeA*)naikOprodOdd, \
 								   sig, naik_coeff, \
-								   (typeA*)outputEven, (typeA*)outputOdd); \
+								   (typeA*)outputEven, (typeA*)outputOdd, kparam); 
 	
 	
         if(GOES_BACKWARDS(sig)){
@@ -1320,58 +1322,34 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
 	  commDimPartitioned(3)
 	};
         hisq_kernel_param_t kparam_1g, kparam_2g;
-        hisq_kernel_param_t kparam_opt_1g, kparam_opt_2g;
 	
 
 #ifdef MULTI_GPU
-        kparam_1g.D1 = param.X[0]+2;
-        kparam_1g.D2 = param.X[1]+2;
-        kparam_1g.D3 = param.X[2]+2;
-        kparam_1g.D4 = param.X[3]+2;
-        kparam_1g.D1h = (param.X[0]+2)/2;
-	kparam_1g.base_idx[0]=1;
-	kparam_1g.base_idx[1]=1;
-	kparam_1g.base_idx[2]=1;
-	kparam_1g.base_idx[3]=1;
-        kparam_1g.threads = (param.X[0]+2)*(param.X[1]+2)*(param.X[2]+2)*(param.X[3]+2)/2;
-
-        kparam_2g.D1 = param.X[0]+4;
-        kparam_2g.D2 = param.X[1]+4;
-        kparam_2g.D3 = param.X[2]+4;
-        kparam_2g.D4 = param.X[3]+4;
-        kparam_2g.D1h = (param.X[0]+4)/2;
-        kparam_2g.base_idx[0]=0;
-        kparam_2g.base_idx[1]=0;
-        kparam_2g.base_idx[2]=0;
-        kparam_2g.base_idx[3]=0;
-
-        kparam_2g.threads = (param.X[0]+4)*(param.X[1]+4)*(param.X[2]+4)*(param.X[3]+4)/2;
+        kparam_1g.D1 = commDimPartitioned(0)?(param.X[0]+2):(param.X[0]);
+        kparam_1g.D2 = commDimPartitioned(1)?(param.X[1]+2):(param.X[1]);
+        kparam_1g.D3 = commDimPartitioned(2)?(param.X[2]+2):(param.X[2]);
+        kparam_1g.D4 = commDimPartitioned(3)?(param.X[3]+2):(param.X[3]);
+        kparam_1g.D1h =  kparam_1g.D1/2;
+	kparam_1g.base_idx[0]=commDimPartitioned(0)?1:2;
+	kparam_1g.base_idx[1]=commDimPartitioned(1)?1:2;
+	kparam_1g.base_idx[2]=commDimPartitioned(2)?1:2;
+	kparam_1g.base_idx[3]=commDimPartitioned(3)?1:2;
+        kparam_1g.threads = kparam_1g.D1*kparam_1g.D2*kparam_1g.D3*kparam_1g.D4/2;
 	
-        kparam_opt_1g.D1 = commDimPartitioned(0)?(param.X[0]+2):(param.X[0]);
-        kparam_opt_1g.D2 = commDimPartitioned(1)?(param.X[1]+2):(param.X[1]);
-        kparam_opt_1g.D3 = commDimPartitioned(2)?(param.X[2]+2):(param.X[2]);
-        kparam_opt_1g.D4 = commDimPartitioned(3)?(param.X[3]+2):(param.X[3]);
-        kparam_opt_1g.D1h =  kparam_opt_1g.D1/2;
-	kparam_opt_1g.base_idx[0]=commDimPartitioned(0)?1:2;
-	kparam_opt_1g.base_idx[1]=commDimPartitioned(1)?1:2;
-	kparam_opt_1g.base_idx[2]=commDimPartitioned(2)?1:2;
-	kparam_opt_1g.base_idx[3]=commDimPartitioned(3)?1:2;
-        kparam_opt_1g.threads = kparam_opt_1g.D1*kparam_opt_1g.D2*kparam_opt_1g.D3*kparam_opt_1g.D4/2;
-	
-        kparam_opt_2g.D1 = commDimPartitioned(0)?(param.X[0]+4):(param.X[0]);
-        kparam_opt_2g.D2 = commDimPartitioned(1)?(param.X[1]+4):(param.X[1]);
-        kparam_opt_2g.D3 = commDimPartitioned(2)?(param.X[2]+4):(param.X[2]);
-        kparam_opt_2g.D4 = commDimPartitioned(3)?(param.X[3]+4):(param.X[3]);
-        kparam_opt_2g.D1h = kparam_opt_2g.D1/2;
-        kparam_opt_2g.base_idx[0]=commDimPartitioned(0)?0:2;
-        kparam_opt_2g.base_idx[1]=commDimPartitioned(1)?0:2;
-        kparam_opt_2g.base_idx[2]=commDimPartitioned(2)?0:2;
-        kparam_opt_2g.base_idx[3]=commDimPartitioned(3)?0:2;
-        kparam_opt_2g.threads = kparam_opt_2g.D1*kparam_opt_2g.D2*kparam_opt_2g.D3*kparam_opt_2g.D4/2;
+        kparam_2g.D1 = commDimPartitioned(0)?(param.X[0]+4):(param.X[0]);
+        kparam_2g.D2 = commDimPartitioned(1)?(param.X[1]+4):(param.X[1]);
+        kparam_2g.D3 = commDimPartitioned(2)?(param.X[2]+4):(param.X[2]);
+        kparam_2g.D4 = commDimPartitioned(3)?(param.X[3]+4):(param.X[3]);
+        kparam_2g.D1h = kparam_2g.D1/2;
+        kparam_2g.base_idx[0]=commDimPartitioned(0)?0:2;
+        kparam_2g.base_idx[1]=commDimPartitioned(1)?0:2;
+        kparam_2g.base_idx[2]=commDimPartitioned(2)?0:2;
+        kparam_2g.base_idx[3]=commDimPartitioned(3)?0:2;
+        kparam_2g.threads = kparam_2g.D1*kparam_2g.D2*kparam_2g.D3*kparam_2g.D4/2;
 
 	
 	for(int i=0;i < 4; i++){
-	  kparam_1g.ghostDim[i] = kparam_2g.ghostDim[i]=kparam_opt_1g.ghostDim[i]=kparam_opt_2g.ghostDim[i] = ghostDim[i];
+	  kparam_1g.ghostDim[i] = kparam_2g.ghostDim[i]=kparam_1g.ghostDim[i]=kparam_2g.ghostDim[i] = ghostDim[i];
 	}
 #else
 	hisq_kernel_param_t kparam;
@@ -1407,7 +1385,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                 (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,                               // write only
                 (RealA*)P3.even.data, (RealA*)P3.odd.data,                                 // write only
                 (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,                               // write only
-                (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_opt_2g);
+                (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_2g);
 
 
             checkCudaError();
@@ -1428,7 +1406,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,  // write only
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,        // write only
                   (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,  // write only
-                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_opt_1g);
+                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
 
               checkCudaError();
 
@@ -1446,7 +1424,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
 					     (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
 					     link, sig, rho, SevenSt, coeff,
 					     (RealA*)P5.even.data, (RealA*)P5.odd.data, 
-					     (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_opt_1g);
+					     (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
 
 		allLink.apply(0);
 
@@ -1466,7 +1444,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   link,
                   sig, nu, mFiveSt, coeff,
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,    // write
-                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_opt_1g);
+                  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
                  
  	          checkCudaError();
 
@@ -1484,7 +1462,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   sig, mu, Lepage,
                   (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
 		  (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
-		  kparam_opt_2g);
+		  kparam_2g);
 
 
               if(ThreeSt != 0)coeff = Lepage/ThreeSt ; else coeff = 0;
@@ -1497,7 +1475,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                   sig, mu, mLepage, coeff,
                   (RealA*)P3.even.data, (RealA*)P3.odd.data,           // write only
                   (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
-		  kparam_opt_2g);
+		  kparam_2g);
 	      
                   checkCudaError();		
             } // Lepage != 0.0
@@ -1510,7 +1488,7 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
                 link,
                 sig, mu, ThreeSt,
 		(RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
-		kparam_opt_1g);
+		kparam_1g);
 	    
                 checkCudaError();			    
 	    
@@ -1577,6 +1555,12 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
      dim3 blockDim(BLOCK_DIM,1,1);
      dim3 gridDim(volume/blockDim.x, 1, 1);
 
+     hisq_kernel_param_t kparam;
+     for(int i =0;i < 4;i++){
+       kparam.ghostDim[i] = commDimPartitioned(i);
+     }
+     kparam.threads = volume/2;
+
      bind_tex_link(link, *newOprod);
      
      for(int sig=0; sig<4; ++sig){
@@ -1584,14 +1568,16 @@ unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
 	 longlink_terms((double2*)link.Even_p(), (double2*)link.Odd_p(),
 			(double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
 			sig, coeff, 
-			gridDim, blockDim, link, 
-			(double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p());
+			link, 
+			(double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p(),
+			kparam);
        }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
 	 longlink_terms((float2*)link.Even_p(), (float2*)link.Odd_p(),
 			(float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
 			sig, static_cast<float>(coeff), 
-			gridDim, blockDim, link,
-			(float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p());
+			link,
+			(float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p(),
+			kparam);
        }else{
 	 errorQuda("Unsupported precision");
        }

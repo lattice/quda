@@ -141,7 +141,7 @@ function complete_hisq_force_check {
     for prec in $precs; do
         for recon in $recons; do
                 for partition in $partitions; do
-                  cmd="$prog --sdim 8 --tdim 16 --prec $prec --recon $recon  --partition $partition --gauge-order $gauge_order --verify"
+                  cmd="$prog --sdim 4 --tdim 8 --prec $prec --recon $recon  --partition $partition --gauge-order $gauge_order --verify"
                   echo -ne  $cmd  "\t"..."\t"
                   echo "----------------------------------------------------------" >>$OUTFILE
                   echo $cmd >> $OUTFILE

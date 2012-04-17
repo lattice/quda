@@ -1003,9 +1003,10 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
 template<class RealA, class RealB,  int oddBit>
   __global__ void 
   HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* const linkOdd,
-					    const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
-					    int sig, typename RealTypeId<RealA>::Type coeff,
-					    RealA* const outputEven, RealA* const outputOdd)
+				     const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
+				     int sig, typename RealTypeId<RealA>::Type coeff,
+				     RealA* const outputEven, RealA* const outputOdd,
+				     hisq_kernel_param_t kparam)
 {
 #ifdef KERNEL_ENABLED		       
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1022,18 +1023,25 @@ template<class RealA, class RealB,  int oddBit>
 
   int new_x[4];
 #ifdef MULTI_GPU
-  new_x[0] = x[0]+2;
-  new_x[1] = x[1]+2;
-  new_x[2] = x[2]+2;
-  new_x[3] = x[3]+2;
-  int new_sid=(new_x[3]*E3E2E1 + new_x[2]*E2E1 + new_x[1]*E1 + new_x[0]) >>1;
+ int E[4]= {E1,E2,E3,E4};
+  x[0] = x[0]+2;
+  x[1] = x[1]+2;
+  x[2] = x[2]+2;
+  x[3] = x[3]+2;
+
+  int X= x[3]*E3E2E1 + x[2]*E2E1 + x[1]*E1 + x[0];
+  int new_sid = (X>> 1);
 #else
+
+  int X = 2*sid + x1odd;
+  int new_sid = sid;
+#endif
   new_x[0] = x[0];
   new_x[1] = x[1];
   new_x[2] = x[2];
   new_x[3] = x[3];
-  int new_sid = sid;
-#endif
+  int new_mem_idx = X;
+  
 
   RealA ab_link[ArrayLength<RealA>::result];
   RealA bc_link[ArrayLength<RealA>::result];
@@ -1057,14 +1065,7 @@ template<class RealA, class RealB,  int oddBit>
 
   const int & point_c = new_sid;
   int point_a, point_b, point_d, point_e;
-#ifndef MULTI_GPU
-  // need to work these indices
-  int X[4];
-  X[0] = X1;
-  X[1] = X2;
-  X[2] = X3;
-  X[3] = X4;
-#endif
+
 
   /*
    * 
@@ -1080,40 +1081,29 @@ template<class RealA, class RealB,  int oddBit>
   // compute the force for forward long links
   if(GOES_FORWARDS(sig))
     {
-#ifdef MULTI_GPU
-      new_x[sig] = new_x[sig] + 1;
-      point_d = (new_x[3]*E3E2E1+new_x[2]*E2E1+new_x[1]*E1+new_x[0]) >> 1;
-#else
-      new_x[sig] = (x[sig] + 1 + X[sig])%X[sig];
-      point_d = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-#endif
-      COMPUTE_LINK_SIGN(&de_link_sign, sig, new_x);
 
-#ifdef MULTI_GPU
-      new_x[sig] = new_x[sig] + 1;
-      point_e = (new_x[3]*E3E2E1+new_x[2]*E2E1+new_x[1]*E1+new_x[0]) >> 1;
-#else
-      new_x[sig] = (new_x[sig] + 1 + X[sig])%X[sig];
-      point_e = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-#endif
+      FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, X, new_mem_idx);
+      point_d = (new_mem_idx >> 1);
+      COMPUTE_LINK_SIGN(&de_link_sign, sig, new_x);
+ 
+
+      FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
+      point_e = (new_mem_idx >> 1);
       COMPUTE_LINK_SIGN(&ef_link_sign, sig, new_x);
 	  
-#ifdef MULTI_GPU
-      new_x[sig] = (x[sig]+2) - 1;
-      point_b = (new_x[3]*E3E2E1+new_x[2]*E2E1+new_x[1]*E1+new_x[0]) >> 1;
-#else
-      new_x[sig] = (x[sig] - 1 + X[sig])%X[sig];
-      point_b = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-#endif
+      
+      new_x[0] = x[0];
+      new_x[1] = x[1];
+      new_x[2] = x[2];
+      new_x[3] = x[3];
+
+      FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(sig, X, new_mem_idx);
+      point_b = (new_mem_idx >> 1);
       COMPUTE_LINK_SIGN(&bc_link_sign, sig, new_x);
-     
-#ifdef MULTI_GPU 
-      new_x[sig] = new_x[sig] - 1;
-      point_a = (new_x[3]*E3E2E1+new_x[2]*E2E1+new_x[1]*E1+new_x[0]) >> 1;
-#else
-      new_x[sig] = (new_x[sig] - 1 + X[sig])%X[sig];
-      point_a = (new_x[3]*X3X2X1+new_x[2]*X2X1+new_x[1]*X1+new_x[0]) >> 1;
-#endif
+
+
+      FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(sig, new_mem_idx, new_mem_idx);
+      point_a = (new_mem_idx >> 1);
       COMPUTE_LINK_SIGN(&ab_link_sign, sig, new_x);
       
       HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_a, ab_link, oddBit); 
