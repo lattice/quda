@@ -1334,7 +1334,7 @@ void apply(const cudaStream_t &stream) {
 									      }
 	
 									      void apply(const cudaStream_t &stream) {
-										TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+										TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 										QudaReconstructType recon = link.Reconstruct();
 	  
 										if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -1458,7 +1458,7 @@ void apply(const cudaStream_t &stream) {
       }  
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 
         if(GOES_FORWARDS(sig)){
           do_one_link_term_kernel<RealA,0><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
@@ -1579,7 +1579,7 @@ void apply(const cudaStream_t &stream) {
       void apply(const cudaStream_t &stream) {
 	checkCudaError();
 
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 	QudaReconstructType recon = link.Reconstruct();
 	
         if(GOES_BACKWARDS(sig)) errorQuda("sig does not go forward\n");
@@ -1718,7 +1718,7 @@ void apply(const cudaStream_t &stream) {
 							      sig,	\
 							      (typeA*)momEven, (typeA*)momOdd); 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 	QudaReconstructType recon = link.Reconstruct();;
       
 	if(sizeof(RealA) == sizeof(float2)){
