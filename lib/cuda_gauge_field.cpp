@@ -4,7 +4,8 @@
 #include <misc_helpers.h>
 
 cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
-  GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0)
+  GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0), 
+  backed_up(false)
 {
   if(create != QUDA_NULL_FIELD_CREATE &&  create != QUDA_ZERO_FIELD_CREATE){
     errorQuda("ERROR: create type(%d) not supported yet\n", create);
@@ -430,5 +431,21 @@ void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &p
     errorQuda("Invalid pack location %d", pack_location);
   }
 
+}
+
+void cudaGaugeField::backup() const {
+  if (backed_up) errorQuda("Gauge field already backedup");
+  backup_h = new char[bytes];
+  cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+  checkCudaError();
+  backed_up = true;
+}
+
+void cudaGaugeField::restore() {
+  if (!backed_up) errorQuda("Cannot retore since not backed up");
+  cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+  delete []backup_h;
+  checkCudaError();
+  backed_up = false;
 }
 

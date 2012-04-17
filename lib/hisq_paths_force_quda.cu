@@ -19,10 +19,6 @@
 namespace hisq {
   namespace fermion_force {
 
-    int linkVolume_cb;
-    int oProdVolume_cb;
-    int momVolume_cb;
-
     typedef struct hisq_kernel_param_s{
       unsigned long threads;
       int D1, D2,D3, D4, D1h;
@@ -605,25 +601,17 @@ namespace hisq {
     class MiddleLink : public Tunable {
 
     private:
-      const RealA* const oprodEven;
-      const RealA* const oprodOdd;
-      const RealA* const QprevEven;
-      const RealA* const QprevOdd;
-      const RealB* const linkEven;
-      const RealB* const linkOdd; 
       const cudaGaugeField &link;
+      const cudaGaugeField &oprod;
+      const cudaGaugeField &Qprev;
       const int sig;
       const int mu;
       typename RealTypeId<RealA>::Type &coeff; 
-      RealA* const PmuEven;
-      RealA* const PmuOdd; // write only
-      RealA* const P3Even;
-      RealA* const P3Odd;  // write only
-      RealA* const QmuEven;
-      RealA* const QmuOdd;   // write only
-      RealA* const newOprodEven;
-      RealA* const newOprodOdd;
-      hisq_kernel_param_t &kparam;
+      cudaGaugeField &Pmu;
+      cudaGaugeField &P3;
+      cudaGaugeField &Qmu;
+      cudaGaugeField &newOprod;
+      const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -636,29 +624,33 @@ namespace hisq {
 	return rtn;
       }
 
-      char* newOprodEven_h;
-      char* newOprodOdd_h;
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-
     public:
-      MiddleLink(const RealA* const oprodEven, const RealA* const oprodOdd,
-		 const RealA* const QprevEven, const RealA* const QprevOdd, 
-		 const RealB* const linkEven,  const RealB* const linkOdd, 
-		 const cudaGaugeField &link, int sig, int mu,
+      MiddleLink(const cudaGaugeField &link, 
+		 const cudaGaugeField &oprod,
+		 const cudaGaugeField &Qprev,
+		 int sig, int mu,
 		 typename RealTypeId<RealA>::Type coeff, 
-		 RealA* const PmuEven,  RealA* const PmuOdd, // write only
-		 RealA* const P3Even,   RealA* const P3Odd,  // write only
-		 RealA* const QmuEven,  RealA* const QmuOdd,   // write only
-		 RealA* const newOprodEven,  RealA* const newOprodOdd,
-		 hisq_kernel_param_t kparam) :
-	oprodEven(oprodEven), oprodOdd(oprodOdd), QprevEven(QprevEven), QprevOdd(QprevOdd),
-	linkEven(linkEven), linkOdd(linkOdd), link(link), sig(sig), mu(mu), 
-	coeff(coeff), PmuEven(PmuEven), PmuOdd(PmuOdd), 
-	P3Odd(P3Odd), P3Even(P3Even), QmuEven(QmuEven), QmuOdd(QmuOdd),
-	newOprodEven(newOprodEven), newOprodOdd(newOprodOdd), kparam(kparam)
-      {
-	;
-      }
+		 cudaGaugeField &Pmu, // write only
+		 cudaGaugeField &P3,  // write only
+		 cudaGaugeField &Qmu,
+		 cudaGaugeField &newOprod,
+		 const hisq_kernel_param_t &kparam) :
+	link(link), oprod(oprod), Qprev(Qprev), sig(sig), mu(mu), 
+	coeff(coeff), Pmu(Pmu), P3(P3), Qmu(Qmu), newOprod(newOprod), kparam(kparam)
+      {	; }
+      // need alternative constructor to hack around null pointer passing
+      MiddleLink(const cudaGaugeField &link, 
+		 const cudaGaugeField &oprod,
+		 int sig, int mu,
+		 typename RealTypeId<RealA>::Type coeff, 
+		 cudaGaugeField &Pmu, // write only
+		 cudaGaugeField &P3,  // write only
+		 cudaGaugeField &Qmu,
+		 cudaGaugeField &newOprod,
+		 const hisq_kernel_param_t &kparam) :
+	link(link), oprod(oprod), Qprev(link), sig(sig), mu(mu), 
+	coeff(coeff), Pmu(Pmu), P3(P3), Qmu(Qmu), newOprod(newOprod), kparam(kparam)
+      {	; }
       virtual ~MiddleLink() { ; }
 
       TuneKey tuneKey() const {
@@ -667,84 +659,73 @@ namespace hisq {
 	vol << kparam.D2 << "x";
 	vol << kparam.D3 << "x";
 	vol << kparam.D4;    
-	aux << "threads=" << kparam.threads << ",prec=" << sizeof(RealA)/realVectorLength;
+	aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
 	aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
       
-#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
-							     (typeA*)QprevEven, (typeA*)QprevOdd, \
-							     (typeB*)linkEven, (typeB*)linkOdd, \
-							     sig, mu, (typename RealTypeId<typeA>::Type)coeff, \
-							     (typeA*)PmuEven, (typeA*)PmuOdd, \
-							     (typeA*)P3Even, (typeA*)P3Odd, \
-							     (typeA*)QmuEven, (typeA*)QmuOdd, \
-							     (typeA*)newOprodEven, (typeA*)newOprodOdd,	\
-							     kparam)
-	
+#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
+      ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
+       (typeA*)Qprev_even, (typeA*)Qprev_odd,				\
+       (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       sig, mu, (typename RealTypeId<typeA>::Type)coeff,		\
+       (typeA*)Pmu.Even_p(), (typeA*)Pmu.Odd_p(),			\
+       (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
+       (typeA*)Qmu.Even_p(), (typeA*)Qmu.Odd_p(),			\
+       (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(), kparam)
+      
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
-									      if(sizeof(RealA) == sizeof(float2)){ \
-										if(recon  == QUDA_RECONSTRUCT_NO){ \
-										  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-										  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-										}else{ \
-										  do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-										  do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-										} \
-									      }else{ \
-										if(recon  == QUDA_RECONSTRUCT_NO){ \
-										  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-										  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-										}else{ \
-										  do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-										  do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-										} \
-									      }
+      if(sizeof(RealA) == sizeof(float2)){				\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      }else{								\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+      
+      void apply(const cudaStream_t &stream) {
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	QudaReconstructType recon = link.Reconstruct();
 
-									      void apply(const cudaStream_t &stream) {
-										TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-										QudaReconstructType recon = link.Reconstruct();
-	  
-										if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
-										  CALL_MIDDLE_LINK_KERNEL(1,1);
-										}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-										  CALL_MIDDLE_LINK_KERNEL(1,0);
-										}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-										  CALL_MIDDLE_LINK_KERNEL(0,1);
-										}else{
-										  CALL_MIDDLE_LINK_KERNEL(0,0);
-										}
-									      }
+	const void *Qprev_even = (&Qprev == &link) ? NULL : Qprev.Even_p();
+	const void *Qprev_odd = (&Qprev == &link) ? NULL : Qprev.Odd_p();
 	
+	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
+	  CALL_MIDDLE_LINK_KERNEL(1,1);
+	}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(1,0);
+	}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(0,1);
+	}else{
+	  CALL_MIDDLE_LINK_KERNEL(0,0);
+	}
+      }
+      
 #undef CALL_ARGUMENTS	
 #undef CALL_MIDDLE_LINK_KERNEL
-
+      
       void preTune() {
-	// calculate field sizes
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-	  
-	// create fields
-	newOprodEven_h = new char[oprod_bytes];
-	newOprodOdd_h = new char[oprod_bytes];
-	
-	// save data to host
-	cudaMemcpy(newOprodEven_h, newOprodEven, oprod_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(newOprodOdd_h, newOprodOdd, oprod_bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	Pmu.backup();
+	P3.backup();
+	Qmu.backup();
+	newOprod.backup();
       }
 
       void postTune() {
-	// calculate field sizes
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-
-	// restore data
-	cudaMemcpy(newOprodEven, newOprodEven_h, oprod_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(newOprodOdd, newOprodOdd_h, oprod_bytes, cudaMemcpyHostToDevice);
-
-	// cleanup
-	delete []newOprodEven_h;
-	delete []newOprodOdd_h;
-	checkCudaError();	
+	Pmu.restore();
+	P3.restore();
+	Qmu.restore();
+	newOprod.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
@@ -768,21 +749,15 @@ namespace hisq {
     class LepageMiddleLink : public Tunable {
 
     private:
-      const RealA* const oprodEven;
-      const RealA* const oprodOdd;
-      const RealA* const QprevEven;
-      const RealA* const QprevOdd;
-      const RealB* const linkEven;
-      const RealB* const linkOdd; 
       const cudaGaugeField &link;
+      const cudaGaugeField &oprod;
+      const cudaGaugeField &Qprev;
       const int sig;
       const int mu;
       typename RealTypeId<RealA>::Type &coeff; 
-      RealA* const P3Even; // write only
-      RealA* const P3Odd;  // write only
-      RealA* const newOprodEven;
-      RealA* const newOprodOdd;
-      hisq_kernel_param_t &kparam;
+      cudaGaugeField &P3; // write only
+      cudaGaugeField &newOprod;
+      const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -795,26 +770,17 @@ namespace hisq {
 	return rtn;
       }
 
-      char* newOprodEven_h;
-      char* newOprodOdd_h;
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-
     public:
-      LepageMiddleLink(const RealA* const oprodEven, const RealA* const oprodOdd,
-		       const RealA* const QprevEven, const RealA* const QprevOdd, 
-		       const RealB* const linkEven,  const RealB* const linkOdd, 
-		       const cudaGaugeField &link, int sig, int mu,
+      LepageMiddleLink(const cudaGaugeField &link, 
+		       const cudaGaugeField &prod, 
+		       const cudaGaugeField &QprevEven,
+		       int sig, int mu,
 		       typename RealTypeId<RealA>::Type coeff, 
-		       RealA* const P3Even,   RealA* const P3Odd,  // write only
-		       RealA* const newOprodEven,  RealA* const newOprodOdd,
-		       hisq_kernel_param_t kparam) :
-	oprodEven(oprodEven), oprodOdd(oprodOdd), QprevEven(QprevEven), QprevOdd(QprevOdd),
-	linkEven(linkEven), linkOdd(linkOdd), link(link), sig(sig), mu(mu), 
-	coeff(coeff), P3Odd(P3Odd), P3Even(P3Even), 
-	newOprodEven(newOprodEven), newOprodOdd(newOprodOdd), kparam(kparam)
-      {
-	;
-      }
+		       cudaGaugeField &P3, cudaGaugeField &newOpro,
+		       const hisq_kernel_param_t &kparam) :
+	link(link), oprod(oprod), Qprev(Qprev), sig(sig), mu(mu), 
+	coeff(coeff), P3(P3), newOprod(newOprod), kparam(kparam)
+      {	; }
       virtual ~LepageMiddleLink() { ; }
 
       TuneKey tuneKey() const {
@@ -823,84 +789,67 @@ namespace hisq {
 	vol << kparam.D2 << "x";
 	vol << kparam.D3 << "x";
 	vol << kparam.D4;    
-	aux << "threads=" << kparam.threads << ",prec=" << sizeof(RealA)/realVectorLength;
+	aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
 	aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
       
-#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
-							     (typeA*)QprevEven, (typeA*)QprevOdd, \
-							     (typeB*)linkEven, (typeB*)linkOdd, \
-							     sig, mu, (typename RealTypeId<typeA>::Type)coeff, \
-							     (typeA*)P3Even, (typeA*)P3Odd, \
-							     (typeA*)newOprodEven, (typeA*)newOprodOdd,	\
-							     kparam)
+#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
+      ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
+       (typeA*)Qprev.Even_p(), (typeA*)Qprev.Odd_p(),			\
+       (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       sig, mu, (typename RealTypeId<typeA>::Type)coeff,		\
+       (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
+       (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
+       kparam)
 	
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
-if(sizeof(RealA) == sizeof(float2)){ \
-  if(recon == QUDA_RECONSTRUCT_NO){					\
-    do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-    do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-  }else{								\
-    do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-    do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-  }									\
- }else{									\
-  if(recon == QUDA_RECONSTRUCT_NO){					\
-    do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-    do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-  }else{								\
-    do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-    do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-  }									\
- }
-									      
-									      
-void apply(const cudaStream_t &stream) {
-  TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-  QudaReconstructType recon = link.Reconstruct();
-  
-  if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
-    CALL_MIDDLE_LINK_KERNEL(1,1);
-  }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-    CALL_MIDDLE_LINK_KERNEL(1,0);
-  }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-    CALL_MIDDLE_LINK_KERNEL(0,1);
-  }else{
-    CALL_MIDDLE_LINK_KERNEL(0,0);
-  }
-  
-}
+      if(sizeof(RealA) == sizeof(float2)){				\
+	if(recon == QUDA_RECONSTRUCT_NO){				\
+	  do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      }else{								\
+	if(recon == QUDA_RECONSTRUCT_NO){				\
+	  do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+      
+      
+      void apply(const cudaStream_t &stream) {
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	QudaReconstructType recon = link.Reconstruct();
 	
+	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
+	  CALL_MIDDLE_LINK_KERNEL(1,1);
+	}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(1,0);
+	}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(0,1);
+	}else{
+	  CALL_MIDDLE_LINK_KERNEL(0,0);
+	}
+	
+      }
+      
 #undef CALL_ARGUMENTS	
 #undef CALL_MIDDLE_LINK_KERNEL
-
+      
       void preTune() {
-	// calculate field sizes
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-	  
-	// create fields
-	newOprodEven_h = new char[oprod_bytes];
-	newOprodOdd_h = new char[oprod_bytes];
-	
-	// save data to host
-	cudaMemcpy(newOprodEven_h, newOprodEven, oprod_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(newOprodOdd_h, newOprodOdd, oprod_bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	P3.backup();
+	newOprod.backup();
       }
 
       void postTune() {
-	// calculate field sizes
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-
-	// restore data
-	cudaMemcpy(newOprodEven, newOprodEven_h, oprod_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(newOprodOdd, newOprodOdd_h, oprod_bytes, cudaMemcpyHostToDevice);
-
-	// cleanup
-	delete []newOprodEven_h;
-	delete []newOprodOdd_h;
-	checkCudaError();	
+	P3.restore();
+	newOprod.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
@@ -923,22 +872,16 @@ void apply(const cudaStream_t &stream) {
     class SideLink : public Tunable {
 
     private:
-      const RealA* const P3Even;
-      const RealA* const P3Odd; 
-      const RealA* const oprodEven;
-      const RealA* const oprodOdd;
-      const RealB* const linkEven;
-      const RealB* const linkOdd; 
       const cudaGaugeField &link;
+      const cudaGaugeField &P3;
+      const cudaGaugeField &oprod;
       const int sig;
       const int mu;
       typename RealTypeId<RealA>::Type &coeff; 
       typename RealTypeId<RealA>::Type &accumu_coeff;
-      RealA* shortPEven;
-      RealA* shortPOdd;
-      RealA* const newOprodEven;
-      RealA* const newOprodOdd;
-      hisq_kernel_param_t &kparam;
+      cudaGaugeField &shortP;
+      cudaGaugeField &newOprod;
+      const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -951,29 +894,20 @@ void apply(const cudaStream_t &stream) {
 	return rtn;
       }
 
-      char* shortPEven_h;
-      char* shortPOdd_h;
-      char* newOprodEven_h;
-      char* newOprodOdd_h;
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-
     public:
-      SideLink(const RealA* const P3Even, const RealA* const P3Odd, 
-	       const RealA* const oprodEven, const RealA* const oprodOdd,
-	       const RealB* const linkEven,  const RealB* const linkOdd, 
-	       const cudaGaugeField &link, int sig, int mu, 
+      SideLink(const cudaGaugeField &link, 
+	       const cudaGaugeField &P3,
+	       const cudaGaugeField &oprod,
+	       int sig, int mu, 
 	       typename RealTypeId<RealA>::Type coeff, 
 	       typename RealTypeId<RealA>::Type accumu_coeff,
-	       RealA* shortPEven,  RealA* shortPOdd,
-	       RealA* newOprodEven, RealA* newOprodOdd,
-	       hisq_kernel_param_t kparam) :
-	P3Even(P3Even), P3Odd(P3Odd), oprodEven(oprodEven), oprodOdd(oprodOdd), 
-	linkEven(linkEven), linkOdd(linkOdd), link(link), sig(sig), mu(mu), 
-	coeff(coeff), accumu_coeff(accumu_coeff), shortPEven(shortPEven), shortPOdd(shortPOdd),
-	newOprodEven(newOprodEven), newOprodOdd(newOprodOdd), kparam(kparam)
-      {
-	;
-      }
+	       cudaGaugeField &shortP,
+	       cudaGaugeField &newOprod,
+	       const hisq_kernel_param_t &kparam) :
+	link(link), P3(P3), oprod(oprod), 
+	sig(sig), mu(mu), coeff(coeff), accumu_coeff(accumu_coeff), 
+	shortP(shortP), newOprod(newOprod), kparam(kparam)
+      {	; }
       virtual ~SideLink() { ; }
 
       TuneKey tuneKey() const {
@@ -982,94 +916,67 @@ void apply(const cudaStream_t &stream) {
 	vol << kparam.D2 << "x";
 	vol << kparam.D3 << "x";
 	vol << kparam.D4;    
-	aux << "threads=" << kparam.threads << ",prec=" << sizeof(RealA)/realVectorLength;
+	aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
 	aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
       
-#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>((typeA*)P3Even, (typeA*)P3Odd, \
-							     (typeA*)oprodEven,  (typeA*)oprodOdd, \
-							     (typeB*)linkEven, (typeB*)linkOdd, \
-							     sig, mu,	\
-							     (typename RealTypeId<typeA>::Type) coeff, \
-							     (typename RealTypeId<typeA>::Type) accumu_coeff, \
-							     (typeA*)shortPEven, (typeA*)shortPOdd, \
-							     (typeA*)newOprodEven, (typeA*)newOprodOdd,	\
-							     kparam)
+#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
+      ((typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
+       (typeA*)oprod.Even_p(),  (typeA*)oprod.Odd_p(),			\
+       (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       sig, mu,								\
+       (typename RealTypeId<typeA>::Type) coeff,			\
+       (typename RealTypeId<typeA>::Type) accumu_coeff,			\
+       (typeA*)shortP.Even_p(), (typeA*)shortP.Odd_p(),			\
+       (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
+       kparam)
 									      
-#define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
-if(sizeof(RealA) == sizeof(float2)){ \
-  if(recon  == QUDA_RECONSTRUCT_NO){					\
-    do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-    do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-  }else{								\
-    do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-    do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-  }									\
- }else{									\
-  if(recon  == QUDA_RECONSTRUCT_NO){					\
-    do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-    do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-  }else{								\
-    do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-    do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-  }									\
- }
-
-void apply(const cudaStream_t &stream) {
-  TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-  QudaReconstructType recon = link.Reconstruct();
-  
-  if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
-    CALL_SIDE_LINK_KERNEL(1,1);
-  }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-    CALL_SIDE_LINK_KERNEL(1,0); 
-  }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-    CALL_SIDE_LINK_KERNEL(0,1);
-  }else{
-    CALL_SIDE_LINK_KERNEL(0,0);
-  }
-}
+#define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)	\
+      if(sizeof(RealA) == sizeof(float2)){				\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      }else{								\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+      
+      void apply(const cudaStream_t &stream) {
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	QudaReconstructType recon = link.Reconstruct();
+	
+	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_SIDE_LINK_KERNEL(1,1);
+	}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_SIDE_LINK_KERNEL(1,0); 
+	}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_SIDE_LINK_KERNEL(0,1);
+	}else{
+	  CALL_SIDE_LINK_KERNEL(0,0);
+	}
+      }
       
 #undef CALL_SIDE_LINK_KERNEL
 #undef CALL_ARGUMENTS      
-
+      
       void preTune() {
-	// calculate field sizes
-	size_t link_bytes = 18*linkVolume_cb*sizeof(RealA)/realVectorLength;
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-	  
-	// create fields
-	shortPEven_h = new char[link_bytes];
-	shortPOdd_h = new char[link_bytes];
-	newOprodEven_h = new char[oprod_bytes];
-	newOprodOdd_h = new char[oprod_bytes];
-	
-	// save data to host
-	cudaMemcpy(shortPEven_h, shortPEven, link_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(shortPOdd_h, shortPOdd, link_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(newOprodEven_h, newOprodEven, oprod_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(newOprodOdd_h, newOprodOdd, oprod_bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	shortP.backup();
+	newOprod.backup();
       }
 
       void postTune() {
-	// calculate field sizes
-	size_t link_bytes = 18*linkVolume_cb*sizeof(RealA)/realVectorLength;
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-
-	// restore data
-	cudaMemcpy(shortPEven, shortPEven_h, link_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(shortPOdd, shortPOdd_h, link_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(newOprodEven, newOprodEven_h, oprod_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(newOprodOdd, newOprodOdd_h, oprod_bytes, cudaMemcpyHostToDevice);
-
-	// cleanup
-	delete []shortPEven_h;
-	delete []shortPOdd_h;
-	delete []newOprodEven_h;
-	delete []newOprodOdd_h;
-	checkCudaError();	
+	shortP.restore();
+	newOprod.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
@@ -1093,17 +1000,13 @@ void apply(const cudaStream_t &stream) {
     class SideLinkShort : public Tunable {
 
     private:
-      const RealA* const P3Even; 
-      const RealA* const P3Odd;  
-      const RealB* const linkEven;
-      const RealB* const linkOdd; 
       const cudaGaugeField &link;
+      const cudaGaugeField &P3; 
       const int sig;
       const int mu;
       typename RealTypeId<RealA>::Type &coeff; 
-      RealA* const newOprodEven;
-      RealA* const newOprodOdd;
-      hisq_kernel_param_t &kparam;
+      cudaGaugeField &newOprod;
+      const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -1116,23 +1019,12 @@ void apply(const cudaStream_t &stream) {
 	return rtn;
       }
 
-      char* newOprodEven_h;
-      char* newOprodOdd_h;
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-
     public:
-      SideLinkShort(const RealA* const P3Even, const RealA* const P3Odd, 
-		    const RealB* const linkEven,  const RealB* const linkOdd, 
-		    const cudaGaugeField &link, int sig, int mu, 
-		    typename RealTypeId<RealA>::Type coeff, 
-		    RealA* newOprodEven, RealA* newOprodOdd,
-		    hisq_kernel_param_t kparam) :
-	P3Even(P3Even), P3Odd(P3Odd), 
-	linkEven(linkEven), linkOdd(linkOdd), link(link), sig(sig), mu(mu), 
-	coeff(coeff), newOprodEven(newOprodEven), newOprodOdd(newOprodOdd), kparam(kparam)
-      {
-	;
-      }
+      SideLinkShort(const cudaGaugeField &link, const cudaGaugeField &P3, int sig, int mu, 
+		    typename RealTypeId<RealA>::Type coeff, cudaGaugeField &newOprod,
+		    const hisq_kernel_param_t &kparam) :
+	link(link), P3(P3), sig(sig), mu(mu), coeff(coeff), newOprod(newOprod), kparam(kparam)
+      {	; }
       virtual ~SideLinkShort() { ; }
 
       TuneKey tuneKey() const {
@@ -1141,84 +1033,63 @@ void apply(const cudaStream_t &stream) {
 	vol << kparam.D2 << "x";
 	vol << kparam.D3 << "x";
 	vol << kparam.D4;    
-	aux << "threads=" << kparam.threads << ",prec=" << sizeof(RealA)/realVectorLength;
+	aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
 	aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
       
-#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>((typeA*)P3Even, (typeA*)P3Odd, \
-							     (typeB*)linkEven, (typeB*)linkOdd, \
-							     sig, mu,	\
-							     (typename RealTypeId<typeA>::Type) coeff, \
-							     (typeA*)newOprodEven, (typeA*)newOprodOdd,	\
-							     kparam)
+#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
+      ((typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
+       (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       sig, mu,	(typename RealTypeId<typeA>::Type) coeff,		\
+       (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(), kparam)
 									      
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
-if(sizeof(RealA) == sizeof(float2)){ \
-  if(recon == QUDA_RECONSTRUCT_NO){					\
-    do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-    do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-  }else{								\
-    do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-    do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-  }									\
- }else{									\
-  if(recon == QUDA_RECONSTRUCT_NO){					\
-    do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-    do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-  }else{								\
-    do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-    do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-  }									\
- }
-									      
-void apply(const cudaStream_t &stream) {
-  TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-  QudaReconstructType recon = link.Reconstruct();
-  
-  if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
-    CALL_SIDE_LINK_KERNEL(1,1);
-  }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-    CALL_SIDE_LINK_KERNEL(1,0);
-    
-  }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-    CALL_SIDE_LINK_KERNEL(0,1);
-  }else{
-    CALL_SIDE_LINK_KERNEL(0,0);
-  }
-  
-}
+      if(sizeof(RealA) == sizeof(float2)){				\
+	if(recon == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      }else{								\
+	if(recon == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+      
+      void apply(const cudaStream_t &stream) {
+	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	QudaReconstructType recon = link.Reconstruct();
+	
+	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_SIDE_LINK_KERNEL(1,1);
+	}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_SIDE_LINK_KERNEL(1,0);
+	  
+	}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_SIDE_LINK_KERNEL(0,1);
+	}else{
+	  CALL_SIDE_LINK_KERNEL(0,0);
+	}
+	
+      }
       
 #undef CALL_SIDE_LINK_KERNEL
 #undef CALL_ARGUMENTS      
-
-
+      
+      
       void preTune() {
-	// calculate field sizes
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-	  
-	// create fields
-	newOprodEven_h = new char[oprod_bytes];
-	newOprodOdd_h = new char[oprod_bytes];
-	
-	// save data to host
-	cudaMemcpy(newOprodEven_h, newOprodEven, oprod_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(newOprodOdd_h, newOprodOdd, oprod_bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	newOprod.backup();
       }
 
       void postTune() {
-	// calculate field sizes
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-
-	// restore data
-	cudaMemcpy(newOprodEven, newOprodEven_h, oprod_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(newOprodOdd, newOprodOdd_h, oprod_bytes, cudaMemcpyHostToDevice);
-
-	// cleanup
-	delete []newOprodEven_h;
-	delete []newOprodOdd_h;
-	checkCudaError();	
+	newOprod.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
@@ -1241,22 +1112,16 @@ void apply(const cudaStream_t &stream) {
     class AllLink : public Tunable {
 
     private:
-      const RealA* const oprodEven;
-      const RealA* const oprodOdd;
-      const RealA* const QprevEven;
-      const RealA* const QprevOdd;
-      const RealB* const linkEven;
-      const RealB* const linkOdd; 
       const cudaGaugeField &link;
+      const cudaGaugeField &oprod;
+      const cudaGaugeField &Qprev;
       const int sig;
       const int mu;
       typename RealTypeId<RealA>::Type &coeff; 
       typename RealTypeId<RealA>::Type &accumu_coeff;
-      RealA* const shortPEven;
-      RealA* const shortPOdd;
-      RealA* const newOprodEven;
-      RealA* const newOprodOdd;
-      hisq_kernel_param_t &kparam;
+      cudaGaugeField &shortP;
+      cudaGaugeField &newOprod;
+      const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -1269,30 +1134,19 @@ void apply(const cudaStream_t &stream) {
 	return rtn;
       }
 
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-      char* shortPEven_h;
-      char* shortPOdd_h;
-      char* newOprodEven_h;
-      char* newOprodOdd_h;
-
     public:
-      AllLink(const RealA* const oprodEven, const RealA* const oprodOdd,
-	      const RealA* const QprevEven, const RealA* const QprevOdd, 
-	      const RealB* const linkEven,  const RealB* const linkOdd, 
-	      const cudaGaugeField &link, int sig, int mu,
+      AllLink(const cudaGaugeField &link, 
+	      const cudaGaugeField &oprod, 
+	      const cudaGaugeField &Qprev, 
+	      int sig, int mu,
 	      typename RealTypeId<RealA>::Type coeff, 
 	      typename RealTypeId<RealA>::Type  accumu_coeff,
-	      RealA* const shortPEven, RealA* const shortPOdd,
-	      RealA* const newOprodEven, RealA* const newOprodOdd,
-	      hisq_kernel_param_t kparam) : 
-	oprodEven(oprodEven), oprodOdd(oprodOdd), QprevEven(QprevEven), QprevOdd(QprevOdd),
-	linkEven(linkEven), linkOdd(linkOdd), link(link), sig(sig), mu(mu), 
-	coeff(coeff), accumu_coeff(accumu_coeff), shortPEven(shortPEven), shortPOdd(shortPOdd),
-	newOprodEven(newOprodEven), newOprodOdd(newOprodOdd), kparam(kparam)
-      {
-					    
-
-      }
+	      cudaGaugeField &shortP, cudaGaugeField &newOprod, 
+	      const hisq_kernel_param_t &kparam) : 
+	link(link), oprod(oprod), Qprev(Qprev), sig(sig), mu(mu), 
+	coeff(coeff), accumu_coeff(accumu_coeff), shortP(shortP), 
+	newOprod(newOprod), kparam(kparam)
+      { ; }
       virtual ~AllLink() { ; }
 
       TuneKey tuneKey() const {
@@ -1301,94 +1155,67 @@ void apply(const cudaStream_t &stream) {
 	vol << kparam.D2 << "x";
 	vol << kparam.D3 << "x";
 	vol << kparam.D4;    
-	aux << "threads=" << kparam.threads << ",prec=" << sizeof(RealA)/realVectorLength;
+	aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
 	aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
       
-#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>((typeA*)oprodEven, (typeA*)oprodOdd, \
-							     (typeA*)QprevEven, (typeA*)QprevOdd, \
-							     (typeB*)linkEven, (typeB*)linkOdd, sig,  mu, \
-							     (typename RealTypeId<typeA>::Type)coeff, \
-							     (typename RealTypeId<typeA>::Type)accumu_coeff, \
-							     (typeA*)shortPEven,(typeA*)shortPOdd, \
-							     (typeA*)newOprodEven, (typeA*)newOprodOdd, kparam)
-	
+#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
+      ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
+       (typeA*)Qprev.Even_p(), (typeA*)Qprev.Odd_p(),			\
+       (typeB*)link.Even_p(), (typeB*)link.Odd_p(), sig,  mu,		\
+       (typename RealTypeId<typeA>::Type)coeff,				\
+       (typename RealTypeId<typeA>::Type)accumu_coeff,			\
+       (typeA*)shortP.Even_p(),(typeA*)shortP.Odd_p(),			\
+       (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(), kparam)
+      
 #define CALL_ALL_LINK_KERNEL(sig_sign, mu_sign)				\
-									      if(sizeof(RealA) == sizeof(float2)){ \
-										if(recon  == QUDA_RECONSTRUCT_NO){ \
-										  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-										  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-										}else{ \
-										  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-										  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-										} \
-									      }else{ \
-										if(recon  == QUDA_RECONSTRUCT_NO){ \
-										  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-										  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-										}else{ \
-										  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-										  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-										} \
-									      }
+      if(sizeof(RealA) == sizeof(float2)){				\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
+	}else{								\
+	  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      }else{								\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}else{								\
+	  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+      
+      void apply(const cudaStream_t &stream) {
+	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
+	QudaReconstructType recon = link.Reconstruct();
 	
-									      void apply(const cudaStream_t &stream) {
-										TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
-										QudaReconstructType recon = link.Reconstruct();
-	  
-										if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
-										  CALL_ALL_LINK_KERNEL(1, 1);
-										}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-										  CALL_ALL_LINK_KERNEL(1, 0);
-										}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-										  CALL_ALL_LINK_KERNEL(0, 1);
-										}else{
-										  CALL_ALL_LINK_KERNEL(0, 0);
-										}
-	  	  
-										return;
-									      }
-
+	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_ALL_LINK_KERNEL(1, 1);
+	}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_ALL_LINK_KERNEL(1, 0);
+	}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_ALL_LINK_KERNEL(0, 1);
+	}else{
+	  CALL_ALL_LINK_KERNEL(0, 0);
+	}
+	
+	return;
+      }
+      
 #undef CALL_ARGUMENTS
 #undef CALL_ALL_LINK_KERNEL	    
-
+      
       void preTune() {
-	// calculate field sizes
-	size_t link_bytes = 18*linkVolume_cb*sizeof(RealA)/realVectorLength;
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-	  
-	// create fields
-	shortPEven_h = new char[link_bytes];
-	shortPOdd_h = new char[link_bytes];
-	newOprodEven_h = new char[oprod_bytes];
-	newOprodOdd_h = new char[oprod_bytes];
-	
-	// save data to host
-	cudaMemcpy(shortPEven_h, shortPEven, link_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(shortPOdd_h, shortPOdd, link_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(newOprodEven_h, newOprodEven, oprod_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(newOprodOdd_h, newOprodOdd, oprod_bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	shortP.backup();
+	newOprod.backup();
       }
 
       void postTune() {
-	// calculate field sizes
-	size_t link_bytes = 18*linkVolume_cb*sizeof(RealA)/realVectorLength;
-	size_t oprod_bytes = 4*18*oProdVolume_cb*sizeof(RealA)/realVectorLength;
-
-	// restore data
-	cudaMemcpy(shortPEven, shortPEven_h, link_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(shortPOdd, shortPOdd_h, link_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(newOprodEven, newOprodEven_h, oprod_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(newOprodOdd, newOprodOdd_h, oprod_bytes, cudaMemcpyHostToDevice);
-
-	// cleanup
-	delete []shortPEven_h;
-	delete []shortPOdd_h;
-	delete []newOprodEven_h;
-	delete []newOprodOdd_h;
-	checkCudaError();	
+	shortP.restore();
+	newOprod.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
@@ -1431,9 +1258,6 @@ void apply(const cudaStream_t &stream) {
 	return rtn;
       }
 
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-      char* ForceMatrix_h;
-
     public:
       OneLinkTerm(const cudaGaugeField &oprod, int sig, 
 		  typename RealTypeId<RealA>::Type coeff, 
@@ -1452,7 +1276,7 @@ void apply(const cudaStream_t &stream) {
 	vol << X[2] << "x";
 	vol << X[3];    
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	aux << "threads=" << threads << ",prec=" << sizeof(RealA)/realVectorLength;
+	aux << "threads=" << threads << ",prec=" << oprod.Precision();
 	aux << ",sig=" << sig << ",coeff=" << coeff;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
@@ -1476,21 +1300,11 @@ void apply(const cudaStream_t &stream) {
       }
 
       void preTune() {
-	// create fields
-	ForceMatrix_h = new char[ForceMatrix.Bytes()];
-	
-	// save data to host
-	cudaMemcpy(ForceMatrix_h, ForceMatrix.Gauge_p(), ForceMatrix.Bytes(), cudaMemcpyDeviceToHost);
-	checkCudaError();
+	ForceMatrix.backup();
       }
 
       void postTune() {
-	// restore data
-	cudaMemcpy(ForceMatrix.Gauge_p(), ForceMatrix_h, ForceMatrix.Bytes(), cudaMemcpyHostToDevice);
-
-	// cleanup
-	delete []ForceMatrix_h;
-	checkCudaError();	
+	ForceMatrix.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
@@ -1518,15 +1332,11 @@ void apply(const cudaStream_t &stream) {
     class LongLinkTerm : public Tunable {
 
     private:
-      const RealB* const linkEven;
-      const RealB* const linkOdd;
-      const RealA* const naikOprodEven;
-      const RealA* const naikOprodOdd;
+      const cudaGaugeField &link;
+      const cudaGaugeField &naikOprod;
       const int sig;
       typename RealTypeId<RealA>::Type naik_coeff;
-      const cudaGaugeField& link;
-      RealA* const outputEven;
-      RealA* const outputOdd;
+      cudaGaugeField &output;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -1535,55 +1345,48 @@ void apply(const cudaStream_t &stream) {
       bool advanceGridDim(TuneParam &param) const { return false; }
       bool advanceBlockDim(TuneParam &param) const {
 	bool rtn = Tunable::advanceBlockDim(param);
+	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
 	return rtn;
       }
 
-      const int* const X;
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-      char* outputEven_h;
-      char* outputOdd_h;
-
     public:
-      LongLinkTerm(const RealB* const linkEven, const RealB* const linkOdd,
-		   const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
+      LongLinkTerm(const cudaGaugeField &link, const cudaGaugeField &naikOprod,
 		   int sig, typename RealTypeId<RealA>::Type naik_coeff,
-		   const cudaGaugeField& link, 
-		   RealA* const outputEven, RealA* const outputOdd, const int* const X) :
-	linkEven(linkEven), linkOdd(linkOdd),
-	naikOprodEven(naikOprodEven), naikOprodOdd(naikOprodOdd),
-	sig(sig), naik_coeff(naik_coeff), link(link),
-	outputEven(outputEven), outputOdd(outputOdd), X(X)
+		   cudaGaugeField &output) :
+	link(link), naikOprod(naikOprod), sig(sig), naik_coeff(naik_coeff), output(output)
       { ; }
 
       virtual ~LongLinkTerm() { ; }
 
       TuneKey tuneKey() const {
 	std::stringstream vol, aux;
+	const int* const X = link.X();
 	vol << X[0] << "x";
 	vol << X[1] << "x";
 	vol << X[2] << "x";
 	vol << X[3];    
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	aux << "threads=" << threads << ",prec=" << sizeof(RealA)/realVectorLength;
+	aux << "threads=" << threads << ",prec=" << link.Precision();
 	aux << ",sig=" << sig;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
 
-#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid,tp.block>>>((typeB*)linkEven, (typeB*)linkOdd, \
-							    (typeA*)naikOprodEven,  (typeA*)naikOprodOdd, \
-							    sig, naik_coeff, \
-							    (typeA*)outputEven, (typeA*)outputOdd); \
-		
+#define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid,tp.block>>>		\
+      ((typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       (typeA*)naikOprod.Even_p(),  (typeA*)naikOprod.Odd_p(),		\
+       sig, naik_coeff,							\
+       (typeA*)output.Even_p(), (typeA*)output.Odd_p());		
+      
       void apply(const cudaStream_t &stream) {
 	checkCudaError();
-
+	
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 	QudaReconstructType recon = link.Reconstruct();
 	
         if(GOES_BACKWARDS(sig)) errorQuda("sig does not go forward\n");
-
+	
 	if(sizeof(RealA) == sizeof(float2)){
 	  if(recon == QUDA_RECONSTRUCT_NO){
 	    do_longlink_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
@@ -1607,36 +1410,17 @@ void apply(const cudaStream_t &stream) {
 #undef CALL_ARGUMENTS	
 
       void preTune() {
-	// calculate field sizes
-	size_t output_bytes = 4*18*linkVolume_cb*sizeof(RealA)/realVectorLength;
-	  
-	// create fields
-	outputEven_h = new char[output_bytes];
-	outputOdd_h = new char[output_bytes];
-	
-	// save data to host
-	cudaMemcpy(outputEven_h, outputEven, output_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(outputOdd_h, outputOdd, output_bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	output.backup();
       }
 
       void postTune() {
-	// calculate field sizes
-	size_t output_bytes = 4*18*linkVolume_cb*sizeof(RealA)/realVectorLength;
-
-	// restore data
-	cudaMemcpy(outputEven, outputEven_h, output_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(outputOdd, outputOdd_h, output_bytes, cudaMemcpyHostToDevice); 
-
-	// cleanup
-	delete []outputEven_h;
-	delete []outputOdd_h;
-	checkCudaError();
+	output.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
       {
 	Tunable::initTuneParam(param);
+	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1645,6 +1429,7 @@ void apply(const cudaStream_t &stream) {
       void defaultTuneParam(TuneParam &param) const
       {
 	Tunable::defaultTuneParam(param);
+	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1659,14 +1444,10 @@ void apply(const cudaStream_t &stream) {
     class CompleteForce : public Tunable {
 
     private:
-      const RealA* const oprodEven;
-      const RealA* const oprodOdd;
-      const RealB* const linkEven;
-      const RealB* const linkOdd;
       const cudaGaugeField &link;
+      const cudaGaugeField &oprod;
       const int sig;
-      RealA* const momEven;
-      RealA* const momOdd;
+      cudaGaugeField &mom;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -1675,48 +1456,38 @@ void apply(const cudaStream_t &stream) {
       bool advanceGridDim(TuneParam &param) const { return false; }
       bool advanceBlockDim(TuneParam &param) const {
 	bool rtn = Tunable::advanceBlockDim(param);
+	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
 	return rtn;
       }
 
-      const int* const X;
-      static const int realVectorLength = sizeof(RealA) / sizeof( ((RealA*)0)->x );
-      char* momEven_h;
-      char* momOdd_h;
-
     public:
-      CompleteForce(const RealA* const oprodEven, 
-		    const RealA* const oprodOdd,
-		    const RealB* const linkEven, 
-		    const RealB* const linkOdd, 
-		    const cudaGaugeField &link, int sig, 
-		    RealA* const momEven, 
-		    RealA* const momOdd,
-		    const int* const X) :
-	oprodEven(oprodEven), oprodOdd(oprodOdd), 
-	linkEven(linkEven), linkOdd(linkOdd), link(link),
-	sig(sig), momEven(momEven), momOdd(momOdd), X(X)
+      CompleteForce(const cudaGaugeField &link, const cudaGaugeField &oprod, 
+		    int sig, cudaGaugeField &mom) :
+	link(link), oprod(oprod), sig(sig), mom(mom)
       { ; }
 
       virtual ~CompleteForce() { ; }
 
       TuneKey tuneKey() const {
 	std::stringstream vol, aux;
+	const int* const X = link.X();
 	vol << X[0] << "x";
 	vol << X[1] << "x";
 	vol << X[2] << "x";
 	vol << X[3];    
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	aux << "threads=" << threads << ",prec=" << sizeof(RealA)/realVectorLength;
-	aux << ",sig=" << sig;
+	aux << "threads=" << threads << ",prec=" << link.Precision() << ",sig=" << sig;
 	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }  
 
-#define CALL_ARGUMENTS(typeA, typeB)  <<<tp.grid, tp.block>>>((typeB*)linkEven, (typeB*)linkOdd, \
-							      (typeA*)oprodEven, (typeA*)oprodOdd, \
-							      sig,	\
-							      (typeA*)momEven, (typeA*)momOdd); 
+#define CALL_ARGUMENTS(typeA, typeB)  <<<tp.grid, tp.block>>>		\
+      ((typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       (typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
+       sig,								\
+       (typeA*)mom.Even_p(), (typeA*)mom.Odd_p()); 
+      
       void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, verbosity);
 	QudaReconstructType recon = link.Reconstruct();;
@@ -1745,36 +1516,17 @@ void apply(const cudaStream_t &stream) {
 #undef CALL_ARGUMENTS	
 
       void preTune() {
-	// calculate field sizes
-	size_t mom_bytes = 4*10*momVolume_cb*sizeof(RealA)/realVectorLength;
-	  
-	// create fields
-	momEven_h = new char[mom_bytes];
-	momOdd_h = new char[mom_bytes];
-	
-	// save data to host
-	cudaMemcpy(momEven_h, momEven, mom_bytes, cudaMemcpyDeviceToHost);
-	cudaMemcpy(momOdd_h, momOdd, mom_bytes, cudaMemcpyDeviceToHost);
-	checkCudaError();
+	mom.backup();
       }
 
       void postTune() {
-	// calculate field sizes
-	size_t mom_bytes = 4*10*momVolume_cb*sizeof(RealA)/realVectorLength;
-
-	// restore data
-	cudaMemcpy(momEven, momEven_h, mom_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(momOdd, momOdd_h, mom_bytes, cudaMemcpyHostToDevice); 
-
-	// cleanup
-	delete []momEven_h;
-	delete []momOdd_h;
-	checkCudaError();
+	mom.restore();
       }
 
       virtual void initTuneParam(TuneParam &param) const
       {
 	Tunable::initTuneParam(param);
+	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1783,6 +1535,7 @@ void apply(const cudaStream_t &stream) {
       void defaultTuneParam(TuneParam &param) const
       {
 	Tunable::defaultTuneParam(param);
+	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1835,25 +1588,18 @@ void apply(const cudaStream_t &stream) {
       }
     }
 
-
-
-#define Pmu 	  tempmat[0]
-#define P3        tempmat[1]
-#define P5	  tempmat[2]
-#define Pnumu     tempmat[3]
-
-#define Qmu      tempCmat[0]
-#define Qnumu    tempCmat[1]
-
-
     template<class Real, class RealA, class RealB>
     static void
     do_hisq_staples_force_cuda( PathCoefficients<Real> act_path_coeff,
 				const QudaGaugeParam& param,
 				const cudaGaugeField &oprod, 
 				const cudaGaugeField &link,
-				FullMatrix tempmat[4], 
-				FullMatrix tempCmat[2], 
+				cudaGaugeField &Pmu,
+				cudaGaugeField &P3,
+				cudaGaugeField &P5,
+				cudaGaugeField &Pnumu,
+				cudaGaugeField &Qmu,
+				cudaGaugeField &Qnumu,
 				cudaGaugeField &newOprod)
     {
 
@@ -1861,18 +1607,6 @@ void apply(const cudaStream_t &stream) {
       Real coeff;
       Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
       Real mLepage, mFiveSt, mThreeSt;
-
-	
-#ifdef MULTI_GPU
-      // In multi-GPU, all fields are extended except for the momentum field
-      oProdVolume_cb = (param.X[0]+4)*(param.X[1]+4)*(param.X[2]+4)*(param.X[3]+4)/2;
-      linkVolume_cb = (param.X[0]+4)*(param.X[1]+4)*(param.X[2]+4)*(param.X[3]+4)/2;
-      momVolume_cb = (param.X[0])*(param.X[1])*(param.X[2])*(param.X[3])/2;
-#else
-      oProdVolume_cb = (param.X[0])*(param.X[1])*(param.X[2])*(param.X[3])/2;
-      linkVolume_cb = (param.X[0])*(param.X[1])*(param.X[2])*(param.X[3])/2;
-      momVolume_cb = (param.X[0])*(param.X[1])*(param.X[2])*(param.X[3])/2;
-#endif
 
       OneLink = act_path_coeff.one;
       ThreeSt = act_path_coeff.three; mThreeSt = -ThreeSt;
@@ -1929,15 +1663,10 @@ void apply(const cudaStream_t &stream) {
 	  //3-link
 	  //Kernel A: middle link
 
-	  MiddleLink<RealA,RealB> middleLink( (RealA*)oprod.Even_p(), (RealA*)oprod.Odd_p(),  // read only
-					      (RealA*)NULL,         (RealA*)NULL,             // read only
-					      (RealB*)link.Even_p(), (RealB*)link.Odd_p(),     // read only 
-					      link,  // read only
+	  MiddleLink<RealA,RealB> middleLink( link, oprod,  // read only
 					      sig, mu, mThreeSt,
-					      (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data, // write only
-					      (RealA*)P3.even.data, (RealA*)P3.odd.data,   // write only
-					      (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data, // write only
-					      (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_2g);
+					      Pmu, P3, Qmu, // write only
+					      newOprod, kparam_2g);
 	  middleLink.apply(0);
 
 	  checkCudaError();
@@ -1949,15 +1678,10 @@ void apply(const cudaStream_t &stream) {
 
 	    //5-link: middle link
 	    //Kernel B
-	    MiddleLink<RealA,RealB> middleLink((RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,      // read only
-					       (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,      // read only
-					       (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
-					       link, 
-					       sig, nu, FiveSt,
-					       (RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,  // write only
-					       (RealA*)P5.even.data, (RealA*)P5.odd.data,        // write only
-					       (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,  // write only
-					       (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
+	    MiddleLink<RealA,RealB> middleLink( link, Pmu, Qmu, // read only
+						sig, nu, FiveSt,
+						Pnumu, P5, Qnumu, // write only
+						newOprod, kparam_1g);
 	    middleLink.apply(0);
 	    checkCudaError();
 
@@ -1970,12 +1694,8 @@ void apply(const cudaStream_t &stream) {
 	      }
 	      //7-link: middle link and side link
 	      if(FiveSt != 0)coeff = SevenSt/FiveSt; else coeff = 0;
-	      AllLink<RealA,RealB> allLink((RealA*)Pnumu.even.data, (RealA*)Pnumu.odd.data,
-					   (RealA*)Qnumu.even.data, (RealA*)Qnumu.odd.data,
-					   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
-					   link, sig, rho, SevenSt, coeff,
-					   (RealA*)P5.even.data, (RealA*)P5.odd.data, 
-					   (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), kparam_1g);
+	      AllLink<RealA,RealB> allLink(link, Pnumu, Qnumu, sig, rho, SevenSt, coeff,
+					   P5, newOprod, kparam_1g);
 
 	      allLink.apply(0);
 
@@ -1985,13 +1705,10 @@ void apply(const cudaStream_t &stream) {
 
 	    //5-link: side link
 	    if(ThreeSt != 0)coeff = FiveSt/ThreeSt; else coeff = 0;
-	    SideLink<RealA,RealB> sideLink((RealA*)P5.even.data, (RealA*)P5.odd.data, // read only
-					   (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,//read only
-					   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
-					   link, sig, nu, mFiveSt, coeff,
-					   (RealA*)P3.even.data, (RealA*)P3.odd.data,    // write
-					   (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(), 
-					   kparam_1g);
+	    SideLink<RealA,RealB> sideLink(link, P5, Qmu, //read only
+					   sig, nu, mFiveSt, coeff,
+					   P3, // write only
+					   newOprod, kparam_1g);
 	    sideLink.apply(0);
 	    checkCudaError();
 
@@ -2000,36 +1717,27 @@ void apply(const cudaStream_t &stream) {
             //lepage
 	  if(Lepage != 0.){
 	    LepageMiddleLink<RealA,RealB> 
-	      lepageMiddleLink ( (RealA*)Pmu.even.data, (RealA*)Pmu.odd.data,     // read only
-				 (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data,     // read only
-				 (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
-				 link, sig, mu, Lepage,
-				 (RealA*)P5.even.data, (RealA*)P5.odd.data,       // write only
-				 (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
-				 kparam_2g);
+	      lepageMiddleLink ( link, Pmu, Qmu, // read only
+				 sig, mu, Lepage,
+				 P5, // write only
+				 newOprod, kparam_2g);
 	    lepageMiddleLink.apply(0);
 
 	    if(ThreeSt != 0)coeff = Lepage/ThreeSt ; else coeff = 0;
 
-	    SideLink<RealA, RealB> sideLink((RealA*)P5.even.data, (RealA*)P5.odd.data,// read only
-					    (RealA*)Qmu.even.data, (RealA*)Qmu.odd.data, // read only
-					    (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
-					    link, sig, mu, mLepage, coeff,
-					    (RealA*)P3.even.data, (RealA*)P3.odd.data,//write only
-					    (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
-					    kparam_2g);
+	    SideLink<RealA, RealB> sideLink(link, P5, Qmu, // read only
+					    sig, mu, mLepage, coeff,
+					    P3, //write only
+					    newOprod, kparam_2g);
 	      
 	    sideLink.apply(0);
 	    checkCudaError();		
 	  } // Lepage != 0.0
 
             //3-link side link
-	  SideLinkShort<RealA,RealB> sideLinkShort((RealA*)P3.even.data, (RealA*)P3.odd.data, 
-						   (RealB*)link.Even_p(), (RealB*)link.Odd_p(), 
-						   link,
+	  SideLinkShort<RealA,RealB> sideLinkShort(link, P3, // read only
 						   sig, mu, ThreeSt,
-						   (RealA*)newOprod.Even_p(), (RealA*)newOprod.Odd_p(),
-						   kparam_1g);
+						   newOprod, kparam_1g);
 	  sideLinkShort.apply(0);
 	    
 	  checkCudaError();			    
@@ -2058,20 +1766,10 @@ void apply(const cudaStream_t &stream) {
       bind_tex_link(link, oprod);
       for(int sig=0; sig<4; sig++){
 	if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-	  CompleteForce<double2,double2> 
-	    completeForce((double2*)oprod.Even_p(), (double2*)oprod.Odd_p(),
-			  (double2*)link.Even_p(), (double2*)link.Odd_p(), 
-			  link, sig, 
-			  (double2*)force->Even_p(), (double2*)force->Odd_p(),
-			  param.X);
+	  CompleteForce<double2,double2> completeForce(link, oprod, sig, *force);
 	  completeForce.apply(0);
 	}else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-	  CompleteForce<float2,float2>
-	    completeForce((float2*)oprod.Even_p(), (float2*)oprod.Odd_p(),
-			  (float2*)link.Even_p(), (float2*)link.Odd_p(), 
-			  link, sig, 
-			  (float2*)force->Even_p(), (float2*)force->Odd_p(),
-			  param.X);
+	  CompleteForce<float2,float2> completeForce(link, oprod, sig, *force);
 	  completeForce.apply(0);
 	}else{
 	  errorQuda("Unsupported precision");
@@ -2097,20 +1795,10 @@ void apply(const cudaStream_t &stream) {
      
       for(int sig=0; sig<4; ++sig){
 	if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-	  LongLinkTerm<double2,double2> 
-	    longLink((double2*)link.Even_p(), (double2*)link.Odd_p(),
-		     (double2*)oldOprod.Even_p(), (double2*)oldOprod.Odd_p(),
-		     sig, coeff, link, 
-		     (double2*)newOprod->Even_p(), (double2*)newOprod->Odd_p(), 
-		     param.X);
+	  LongLinkTerm<double2,double2> longLink(link, oldOprod, sig, coeff, *newOprod);
 	  longLink.apply(0);
 	}else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-	  LongLinkTerm<float2,float2> 
-	    longLink((float2*)link.Even_p(), (float2*)link.Odd_p(),
-		     (float2*)oldOprod.Even_p(), (float2*)oldOprod.Odd_p(),
-		     sig, static_cast<float>(coeff), link,
-		     (float2*)newOprod->Even_p(), (float2*)newOprod->Odd_p(),
-		     param.X);
+	  LongLinkTerm<float2,float2> longLink(link, oldOprod, sig, static_cast<float>(coeff), *newOprod);
 	  longLink.apply(0);
 	}else{
 	  errorQuda("Unsupported precision");
@@ -2142,20 +1830,21 @@ void apply(const cudaStream_t &stream) {
 	param.X[0],  param.X[1],  param.X[2],  param.X[3]
       };
 #endif	
-      FullMatrix tempmat[4];
-      for(int i=0; i<4; i++){
-	tempmat[i]  = createMatQuda(X, param.cuda_prec);
-      }
 
-      FullMatrix tempCompmat[2];
-      for(int i=0; i<2; i++){
-	tempCompmat[i] = createMatQuda(X, param.cuda_prec);
-      }	
+      // create color matrix fields with zero padding
+      int is_staple = 1;
+      int pad = 0;
+      GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, pad, is_staple);
+
+      cudaGaugeField Pmu(gauge_param);
+      cudaGaugeField P3(gauge_param);
+      cudaGaugeField P5(gauge_param);
+      cudaGaugeField Pnumu(gauge_param);
+      cudaGaugeField Qmu(gauge_param);
+      cudaGaugeField Qnumu(gauge_param);
 
       bind_tex_link(link, *newOprod);
 	
-
-
       cudaEvent_t start, end;
 	
       cudaEventCreate(&start);
@@ -2175,8 +1864,12 @@ void apply(const cudaStream_t &stream) {
 							    param,
 							    oprod,
 							    link, 
-							    tempmat, 
-							    tempCompmat, 
+							    Pmu,
+							    P3,
+							    P5,
+							    Pnumu,
+							    Qmu,
+							    Qnumu,
 							    *newOprod);
 							   
 
@@ -2193,8 +1886,12 @@ void apply(const cudaStream_t &stream) {
 							 param,
 							 oprod,
 							 link, 
-							 tempmat, 
-							 tempCompmat, 
+							 Pmu,
+							 P3,
+							 P5,
+							 Pnumu,
+							 Qmu,
+							 Qnumu,
 							 *newOprod);
       }else{
 	errorQuda("Unsupported precision");
@@ -2208,13 +1905,6 @@ void apply(const cudaStream_t &stream) {
 	
       unbind_tex_link(link, *newOprod);
 
-      for(int i=0; i<4; i++){
-	freeMatQuda(tempmat[i]);
-      }
-
-      for(int i=0; i<2; i++){
-	freeMatQuda(tempCompmat[i]);
-      }
       return; 
     }
 

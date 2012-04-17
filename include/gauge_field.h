@@ -49,7 +49,19 @@ struct GaugeFieldParam : public LatticeFieldParam {
 	  for(int dir=0; dir<nDim; ++dir) x[dir] = 0;
 	}
 	
-  
+  GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
+		  const int pad, const int is_staple) : LatticeFieldParam(), nColor(3), nFace(0), 
+    reconstruct(reconstruct), order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
+    link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
+    tadpole(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), is_staple(is_staple), pinned(0)
+    {
+      // variables declared in LatticeFieldParam
+      this->precision = precision;
+      this->verbosity = QUDA_SILENT;
+      this->nDim = 4;
+      this->pad = pad;
+      for(int dir=0; dir<nDim; ++dir) this->x[dir] = x[dir];
+    }
   
  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
     nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
@@ -141,6 +153,13 @@ class cudaGaugeField : public GaugeField {
   const void* Gauge_p() const { return gauge; }
   const void* Even_p() const { return even; }
   const void* Odd_p() const { return odd; }	
+
+  mutable char *backup_h;
+  mutable bool backed_up;
+  // backs up the cudaGaugeField to CPU memory
+  void backup() const;
+  // restores the cudaGaugeField to CUDA memory
+  void restore();
 
 };
 
