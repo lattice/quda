@@ -410,11 +410,16 @@ void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 	cudaHostAlloc(&buffer_h,src.Bytes(), 0);
       }
     
-      cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).v, src.Bytes(), cudaMemcpyHostToDevice);
+      //cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).v, src.Bytes(), cudaMemcpyHostToDevice);
+      cudaHostRegister((void*)(dynamic_cast<const cpuColorSpinorField&>(src).V()), src.Bytes(), cudaHostRegisterMapped);
+      checkCudaError();
     }
 
     const void *source = typeid(src) == typeid(cudaColorSpinorField) ?
-      dynamic_cast<const cudaColorSpinorField&>(src).V() : buffer_d;
+      dynamic_cast<const cudaColorSpinorField&>(src).V() : 
+      dynamic_cast<const cpuColorSpinorField&>(src).V(); //buffer_d
+    cudaHostGetDevicePointer((void**)&source, (void*)dynamic_cast<const cpuColorSpinorField&>(src).V(), 0);
+
     switch(nSpin){
     case 1:
       LOAD_SPINOR_CPU_TO_GPU(v, source, 1, QUDA_CUDA_FIELD_LOCATION);
@@ -554,11 +559,16 @@ void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 	cudaMalloc(&buffer_d,dest.Bytes());
 	cudaHostAlloc(&buffer_h,dest.Bytes(), 0);
       }
+      cudaHostRegister(dynamic_cast<cpuColorSpinorField&>(dest).V(), dest.Bytes(), cudaHostRegisterMapped);
     }    
 
     checkCudaError();
 
-    void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
+    void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? dynamic_cast<cudaColorSpinorField&>(dest).V() : 
+      dynamic_cast<cpuColorSpinorField&>(dest).V(); //buffer_d;
+    cudaHostGetDevicePointer(&dst, 
+			     (void*)dynamic_cast<const cpuColorSpinorField&>(dest).V(), 
+			     0);
 
     checkCudaError();
 
@@ -575,8 +585,8 @@ void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
     checkCudaError();
 
-    if (typeid(dest) == typeid(cpuColorSpinorField))
-      cudaMemcpy(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
+    //if (typeid(dest) == typeid(cpuColorSpinorField))
+    //cudaMemcpy(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
   }
 
   checkCudaError();
