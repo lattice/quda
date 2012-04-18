@@ -569,10 +569,10 @@ namespace hisq{
         void unitarizeForceCuda(const QudaGaugeParam& param, cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce, int* unitarization_failed)
         {
 
-          dim3 gridDim(cudaGauge.Volume()/BLOCK_DIM,1,1);
-          dim3 blockDim(BLOCK_DIM,1,1);
 
-          const int threads = gridDim.x*blockDim.x;
+          const int threads = cudaGauge.Volume();
+          dim3 blockDim(BLOCK_DIM,1,1);
+          dim3 gridDim((threads + BLOCK_DIM -1)/BLOCK_DIM,1,1);
 
 	  if(param.cuda_prec == QUDA_SINGLE_PRECISION){
 		  getUnitarizeForceField<<<gridDim,blockDim>>>(threads, (float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
