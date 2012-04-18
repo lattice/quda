@@ -1237,7 +1237,7 @@ namespace hisq {
 
 
     template<class RealA, class RealB>
-    class OneLinkTerm : public Tunable {
+      class OneLinkTerm : public Tunable {
 
     private:
       const cudaGaugeField &oprod;
@@ -1245,7 +1245,8 @@ namespace hisq {
       typename RealTypeId<RealA>::Type &coeff; 
       typename RealTypeId<RealA>::Type &naik_coeff;
       cudaGaugeField &ForceMatrix;
-
+      const int* X;
+      
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
 
@@ -1253,8 +1254,8 @@ namespace hisq {
       bool advanceGridDim(TuneParam &param) const { return false; }
       bool advanceBlockDim(TuneParam &param) const {
 	bool rtn = Tunable::advanceBlockDim(param);
-	const int* const X = oprod.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
+
 	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
 	return rtn;
       }
@@ -1263,15 +1264,15 @@ namespace hisq {
       OneLinkTerm(const cudaGaugeField &oprod, int sig, 
 		  typename RealTypeId<RealA>::Type coeff, 
 		  typename RealTypeId<RealA>::Type naik_coeff,
-		  cudaGaugeField &ForceMatrix) :
-	oprod(oprod), sig(sig), coeff(coeff), naik_coeff(naik_coeff), ForceMatrix(ForceMatrix)
+		  cudaGaugeField &ForceMatrix, const int* _X) :
+      oprod(oprod), sig(sig), coeff(coeff), naik_coeff(naik_coeff), ForceMatrix(ForceMatrix),
+	X(_X)
       { ; }
 
       virtual ~OneLinkTerm() { ; }
 
       TuneKey tuneKey() const {
 	std::stringstream vol, aux;
-	const int* const X = oprod.X();
 	vol << X[0] << "x";
 	vol << X[1] << "x";
 	vol << X[2] << "x";
@@ -1285,19 +1286,21 @@ namespace hisq {
       void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 
+	int threads = X[0]*X[1]*X[2]*X[3]/2;
+	
         if(GOES_FORWARDS(sig)){
           do_one_link_term_kernel<RealA,0><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
 								 static_cast<const RealA*>(oprod.Odd_p()), 
 								 sig, coeff,
 								 static_cast<RealA*>(ForceMatrix.Even_p()), 
 								 static_cast<RealA*>(ForceMatrix.Odd_p()),
-								 oprod.X()[0]*oprod.X()[1]*oprod.X()[2]*oprod.X()[3]/2);
+								 threads);
           do_one_link_term_kernel<RealA,1><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
 								 static_cast<const RealA*>(oprod.Odd_p()), 
 								 sig, coeff,
 								 static_cast<RealA*>(ForceMatrix.Even_p()), 
 								 static_cast<RealA*>(ForceMatrix.Odd_p()),
-								 oprod.X()[0]*oprod.X()[1]*oprod.X()[2]*oprod.X()[3]/2);
+								 threads);
 
 	}
       }
@@ -1313,7 +1316,7 @@ namespace hisq {
       virtual void initTuneParam(TuneParam &param) const
       {
 	Tunable::initTuneParam(param);
-	const int* const X = oprod.X();
+
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1322,7 +1325,6 @@ namespace hisq {
       void defaultTuneParam(TuneParam &param) const
       {
 	Tunable::defaultTuneParam(param);
-	const int* const X = oprod.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1340,6 +1342,7 @@ namespace hisq {
       const int sig;
       typename RealTypeId<RealA>::Type naik_coeff;
       cudaGaugeField &output;
+      const int * X;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
@@ -1348,24 +1351,23 @@ namespace hisq {
       bool advanceGridDim(TuneParam &param) const { return false; }
       bool advanceBlockDim(TuneParam &param) const {
 	bool rtn = Tunable::advanceBlockDim(param);
-	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
 	return rtn;
       }
 
     public:
-      LongLinkTerm(const cudaGaugeField &link, const cudaGaugeField &naikOprod,
+    LongLinkTerm(const cudaGaugeField &link, const cudaGaugeField &naikOprod,
 		   int sig, typename RealTypeId<RealA>::Type naik_coeff,
-		   cudaGaugeField &output) :
-	link(link), naikOprod(naikOprod), sig(sig), naik_coeff(naik_coeff), output(output)
+		   cudaGaugeField &output, const int* _X) :
+      link(link), naikOprod(naikOprod), sig(sig), naik_coeff(naik_coeff), output(output),
+	X(_X)
       { ; }
 
       virtual ~LongLinkTerm() { ; }
 
       TuneKey tuneKey() const {
 	std::stringstream vol, aux;
-	const int* const X = link.X();
 	vol << X[0] << "x";
 	vol << X[1] << "x";
 	vol << X[2] << "x";
@@ -1381,14 +1383,13 @@ namespace hisq {
        (typeA*)naikOprod.Even_p(),  (typeA*)naikOprod.Odd_p(),		\
        sig, naik_coeff,							\
        (typeA*)output.Even_p(), (typeA*)output.Odd_p(),			\
-      link.X()[0] * link.X()[1] * link.X()[2] * link.X()[3]/2);		
+       X[0] * X[1] * X[2] * X[3]/2);		
       
       void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 	QudaReconstructType recon = link.Reconstruct();
 	
         if(GOES_BACKWARDS(sig)) errorQuda("sig does not go forward\n");
-	
 	if(sizeof(RealA) == sizeof(float2)){
 	  if(recon == QUDA_RECONSTRUCT_NO){
 	    do_longlink_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
@@ -1421,7 +1422,6 @@ namespace hisq {
       virtual void initTuneParam(TuneParam &param) const
       {
 	Tunable::initTuneParam(param);
-	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1430,7 +1430,6 @@ namespace hisq {
       void defaultTuneParam(TuneParam &param) const
       {
 	Tunable::defaultTuneParam(param);
-	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1449,7 +1448,8 @@ namespace hisq {
       const cudaGaugeField &oprod;
       const int sig;
       cudaGaugeField &mom;
-
+      const int* X;
+      
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock() const { return 0; }
 
@@ -1457,23 +1457,21 @@ namespace hisq {
       bool advanceGridDim(TuneParam &param) const { return false; }
       bool advanceBlockDim(TuneParam &param) const {
 	bool rtn = Tunable::advanceBlockDim(param);
-	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
 	return rtn;
       }
 
     public:
-      CompleteForce(const cudaGaugeField &link, const cudaGaugeField &oprod, 
-		    int sig, cudaGaugeField &mom) :
-	link(link), oprod(oprod), sig(sig), mom(mom)
+    CompleteForce(const cudaGaugeField &link, const cudaGaugeField &oprod, 
+		    int sig, cudaGaugeField &mom, const int* _X) :
+      link(link), oprod(oprod), sig(sig), mom(mom), X(_X)
       { ; }
 
       virtual ~CompleteForce() { ; }
 
       TuneKey tuneKey() const {
 	std::stringstream vol, aux;
-	const int* const X = link.X();
 	vol << X[0] << "x";
 	vol << X[1] << "x";
 	vol << X[2] << "x";
@@ -1488,7 +1486,7 @@ namespace hisq {
        (typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
        sig,								\
        (typeA*)mom.Even_p(), (typeA*)mom.Odd_p(),			\
-      link.X()[0] * link.X()[1] * link.X()[2] * link.X()[3]/2);		
+       X[0] * X[1] * X[2] * X[3]/2);		
       
       void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
@@ -1526,7 +1524,6 @@ namespace hisq {
       virtual void initTuneParam(TuneParam &param) const
       {
 	Tunable::initTuneParam(param);
-	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
@@ -1535,11 +1532,10 @@ namespace hisq {
       void defaultTuneParam(TuneParam &param) const
       {
 	Tunable::defaultTuneParam(param);
-	const int* const X = link.X();
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
       }
-
+      
       long long flops() const { return 0; }
     };
 
@@ -1615,7 +1611,7 @@ namespace hisq {
 	
       for(int sig=0; sig<8; ++sig){
 	if(GOES_FORWARDS(sig)){
-	  OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, 0.0, newOprod);
+	  OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, 0.0, newOprod, param.X);
 	  oneLink.apply(0);
 	  checkCudaError();
 	} // GOES_FORWARDS(sig)
@@ -1765,11 +1761,11 @@ namespace hisq {
 
       for(int sig=0; sig<4; sig++){
 	if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-	  CompleteForce<double2,double2> completeForce(link, oprod, sig, *force);
+	  CompleteForce<double2,double2> completeForce(link, oprod, sig, *force, param.X);
 	  completeForce.apply(0);
 	  checkCudaError();
 	}else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-	  CompleteForce<float2,float2> completeForce(link, oprod, sig, *force);
+	  CompleteForce<float2,float2> completeForce(link, oprod, sig, *force, param.X);
 	  completeForce.apply(0);
 	  checkCudaError();
 	}else{
@@ -1792,14 +1788,15 @@ namespace hisq {
 			       cudaGaugeField  *newOprod)
     {
       bind_tex_link(link, *newOprod);
-     
+      
       for(int sig=0; sig<4; ++sig){
 	if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-	  LongLinkTerm<double2,double2> longLink(link, oldOprod, sig, coeff, *newOprod);
+	  LongLinkTerm<double2,double2> longLink(link, oldOprod, sig, coeff, *newOprod, param.X);
 	  longLink.apply(0);
 	  checkCudaError();
 	}else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-	  LongLinkTerm<float2,float2> longLink(link, oldOprod, sig, static_cast<float>(coeff), *newOprod);
+	  LongLinkTerm<float2,float2> longLink(link, oldOprod, sig, static_cast<float>(coeff), 
+					       *newOprod, param.X);
 	  longLink.apply(0);
 	  checkCudaError();
 	}else{

@@ -674,7 +674,7 @@ hisq_force_test(void)
   hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
-
+  
   hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);
   cudaDeviceSynchronize(); 
   gettimeofday(&t2, NULL);
