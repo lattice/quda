@@ -104,6 +104,7 @@ __constant__ int E1, E2, E3, E4, E1h;
 __constant__ int Vh_ex;
 __constant__ int E2E1;
 __constant__ int E3E2E1;
+
 __constant__ fat_force_const_t fl; //fatlink
 __constant__ fat_force_const_t gf; //gauge force
 __constant__ fat_force_const_t hf; //hisq force
