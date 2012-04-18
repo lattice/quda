@@ -718,7 +718,7 @@ hisq_force_test(void)
   
   float perf_flops = total_flops / (TDIFF(t0, t1)) *1e-9;
   float perf = total_io / (TDIFF(t0, t1)) *1e-9;
-  printfQuda("Staples time: %.2f ms, perf =%.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", TDIFF(t0,t1)*1000, perf_flops, perf);
+  printfQuda("Staples time: %.2f ms, perf = %.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", TDIFF(t0,t1)*1000, perf_flops, perf);
   printfQuda("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t1,t2)*1000, TDIFF(t2,t3)*1000);
   printfQuda("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1)*1000);
 
