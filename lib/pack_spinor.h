@@ -139,7 +139,6 @@ template <typename Float, int Ns, int Nc>
   const int block_dim = (blockIdx.x == gridDim.x-1) ? 
     volume - (gridDim.x-1)*blockDim.x : blockDim.x;
 
-  // use shared memory to perform transpose - ignore bank conflicts for now
   extern __shared__ Float s_data[];
 
   int x0 = x-tid;
@@ -159,10 +158,45 @@ template <typename Float, int Ns, int Nc>
 #pragma unroll
     for (int c=0; c<Nc; c++) 
 #pragma unroll
-      for (int z=0; z<2; z++) {
+      for (int z=0; z<2; z++) { // block+1 to avoid bank conflicts
 	int sh_idx = ((c*Ns+s)*2+z)*(blockDim.x+1) + tid;
 	v[(s*Nc + c)*2 + z] = s_data[sh_idx];
       }
+
+} 
+
+template <typename Float, int Ns, int Nc>
+  __device__ inline void save_shared(Float *field, const Float v[Ns*Nc*2], int x, int volume) {
+  const int tid = threadIdx.x;
+  const int vec_length = Ns*Nc*2;
+
+  // the length of the block on the last grid site might not extend to all threads
+  const int block_dim = (blockIdx.x == gridDim.x-1) ? 
+    volume - (gridDim.x-1)*blockDim.x : blockDim.x;
+
+  extern __shared__ Float s_data[];
+
+#pragma unroll
+  for (int s=0; s<Ns; s++)
+#pragma unroll
+    for (int c=0; c<Nc; c++) 
+#pragma unroll
+      for (int z=0; z<2; z++) { // block+1 to avoid bank conflicts
+	int sh_idx = ((c*Ns+s)*2+z)*(blockDim.x+1) + tid;
+	s_data[sh_idx] = v[(s*Nc + c)*2 + z];
+      }
+
+  __syncthreads();
+
+  int x0 = x-tid;
+  int i=tid;
+  while (i<vec_length*block_dim) {
+    int space_idx = i / vec_length;
+    int internal_idx = i - space_idx*vec_length;
+    int sh_idx = internal_idx*(blockDim.x+1) + space_idx;
+    field[x0*vec_length + i] = s_data[sh_idx];
+    i += block_dim;
+  }
 
 } 
 
@@ -184,34 +218,12 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::l
 }
 
 /**! float save specialization to obtain full coalescing. */
-/*template<> __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x) {
+template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x, int volume) {
 #ifdef __CUDA_ARCH__
-  const int tid = threadIdx.x;
-  const int Ns = 4;
-  const int Nc = 3;
-  const int vec_length = Ns*Nc*2;
-
-  // use shared memory to perform transpose - ignore bank conflicts for now
-  extern __shared__ float s_data[];
-  float *s = s_data + vec_length*tid;
-  //float *s = s_data + Ns*Nc*2*SHARED_STRIDE* (tid / SHARED_STRIDE) + (tid % SHARED_STRIDE);
-#pragma unroll
-  for (int s=0; s<Ns; s++)
-#pragma unroll
-    for (int c=0; c<Nc; c++) 
-#pragma unroll
-      for (int z=0; z<2; z++) 
-	s[(c*Ns + s)*2 + z] = v[(s*Nc + c)*2 + z];
-
-  __syncthreads();
-
-  int i=tid;
-  int x0 = blockDim.x*blockIdx.x;
-  while (i<vec_length*blockDim.x) {
-    field[x0*vec_length + i] = s_data[i];
-    i += blockDim.x;
-  }
+  save_shared<float, 4, 3>(field, v, x, volume);
 #else
+  const int Ns=4;
+  const int Nc=3;
   for (int s=0; s<Ns; s++) {
     for (int c=0; c<Nc; c++) {
       for (int z=0; z<2; z++) {
@@ -222,7 +234,6 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::l
 #endif
 }
 
-*/
 template <typename Float, int Ns, int Nc>
 struct SpaceSpinorColorOrder {
   Float *field;
@@ -345,6 +356,8 @@ class PackSpinor : Tunable {
     size_t regSize = sizeof(FloatOut) > sizeof(FloatIn) ? sizeof(FloatOut) : sizeof(FloatIn);
     return Ns*Nc*2*regSize;
   }
+
+  // the minimum shared memory per block is (block+1) because we pad to avoid bank conflicts
   int sharedBytesPerBlock(const TuneParam &param) const { return (param.block.x+1)*sharedBytesPerThread(); }
   bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
   bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
