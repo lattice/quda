@@ -550,7 +550,10 @@ void cudaColorSpinorField::packGhost(const int dim, const QudaParity parity, con
 #ifdef MULTI_GPU
   if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
     void* gpu_buf = this->backGhostFaceBuffer[dim];
-    packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
+    if(this->nDim == 5)//!For DW fermions
+      packFaceDW(gpu_buf, *this, dim, dagger, parity, *stream);
+    else	
+      packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
   }
 #else
   errorQuda("packGhost not built on single-GPU build");

@@ -1,9 +1,9 @@
-// dw_dslash_def.h - Domain Wall Dslash kernel definitions
+// dw_dslash_def.h - Domain wall Dslash kernel definitions
 
-// There are currently 36 different variants of the Domain Wall Dslash
-// kernel, each one characterized by a set of 4 options, where each
-// option can take one of several values (3*2*2*3 = 72).  This file
-// is structured so that the C preprocessor loops through all 36
+// There are currently 36 different variants of the domain
+// wall Dslash kernel, each one characterized by a set of 5 options, 
+// where each option can take one of several values (3*2*2*3 = 36).  
+// This file is structured so that the C preprocessor loops through all 36
 // variants (in a manner resembling a counter), sets the appropriate
 // macros, and defines the corresponding functions.
 //
@@ -11,7 +11,7 @@
 //
 // domainWallDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a dw Dslash^dagger kernel where the result is
+// This is a domain wall Dslash^dagger kernel where the result is
 // multiplied by "a" and summed with an input vector (Xpay), and the
 // gauge matrix is reconstructed from 12 real numbers.  More
 // generally, each function name is given by the concatenation of the
@@ -154,6 +154,8 @@
 
 #if (DD_PREC==0) // double-precision fields
 
+#define TPROJSCALE tProjScale
+
 // double-precision gauge field
 #if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define GAUGE0TEX gauge0
@@ -179,6 +181,13 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #define SPINORTEX spinorTexDouble
 #endif
+#if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
+#define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
+#define INTERTEX out
+#else
+#define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
+#define INTERTEX interTexDouble
+#endif
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
 #if (DD_XPAY==1)
@@ -192,7 +201,11 @@
 
 #endif
 
+#define SPINOR_HOP 12
+
 #elif (DD_PREC==1) // single-precision fields
+
+#define TPROJSCALE tProjScale_f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -223,6 +236,13 @@
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #define SPINORTEX spinorTexSingle
 #endif
+#ifdef DIRECT_ACCESS_WILSON_INTER
+#define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
+#define INTERTEX out
+#else
+#define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE_TEX
+#define INTERTEX interTexSingle
+#endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY==1)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
@@ -232,10 +252,13 @@
 #define ACCUMTEX accumTexSingle
 #define READ_ACCUM READ_ACCUM_SINGLE_TEX
 #endif
-
 #endif
 
+#define SPINOR_HOP 6
+
 #else             // half-precision fields
+
+#define TPROJSCALE tProjScale_f
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -264,6 +287,13 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #define SPINORTEX spinorTexHalf
 #endif
+#ifdef DIRECT_ACCESS_WILSON_INTER
+#define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
+#define INTERTEX out
+#else
+#define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF_TEX
+#define INTERTEX interTexHalf
+#endif
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
@@ -278,6 +308,8 @@
 
 #endif
 
+#define SPINOR_HOP 6
+
 #endif
 
 // only build double precision if supported
@@ -290,7 +322,7 @@
 
 template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-  (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
 #if DD_DAG
@@ -326,11 +358,17 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
-#undef WRITE_SPINOR
-#undef ACCUMTEX
+#undef READ_INTERMEDIATE_SPINOR
+#undef INTERTEX
 #undef READ_ACCUM
+#undef ACCUMTEX
+#undef WRITE_SPINOR
 #undef GAUGE_FLOAT2
 #undef SPINOR_DOUBLE
+
+#undef SPINOR_HOP
+
+#undef TPROJSCALE
 
 // prepare next set of options, or clean up after final iteration
 

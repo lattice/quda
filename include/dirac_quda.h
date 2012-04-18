@@ -19,6 +19,7 @@ class DiracParam {
   double kappa;
   double mass;
   double m5; // used by domain wall only
+  int Ls;    //!NEW: used by domain wall only  
   MatPCType matpcType;
   DagType dagger;
   cudaGaugeField *gauge;
@@ -122,6 +123,10 @@ class DiracWilson : public Dirac {
  public:
   DiracWilson(const DiracParam &param);
   DiracWilson(const DiracWilson &dirac);
+//BEGIN NEW
+  DiracWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW
+//END NEW    
+  
   virtual ~DiracWilson();
   DiracWilson& operator=(const DiracWilson &dirac);
 
