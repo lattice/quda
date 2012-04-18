@@ -22,7 +22,6 @@ const int test_type = 0;
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 ///const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
-const int tune = 1; // perform auto-tuning?
 
 const int loops = 1;
 
