@@ -674,7 +674,7 @@ class WilsonDslashCuda : public SharedDslashCuda {
     }
   }
 
-  long long flops() const { return (x ? 1368ll : 1320ll) * dslashConstants.VolumeCB(); }
+  long long flops() const { return (x ? 1368ll : 1320ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
 };
 
 template <typename sFloat, typename gFloat, typename cFloat>
@@ -768,7 +768,7 @@ class CloverDslashCuda : public SharedDslashCuda {
     }
   }
 
-  long long flops() const { return (x ? 1872ll : 1824ll) * dslashConstants.VolumeCB(); }
+  long long flops() const { return (x ? 1872ll : 1824ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
 };
 
 template <typename sFloat, typename gFloat, typename cFloat>
@@ -813,7 +813,8 @@ class AsymCloverDslashCuda : public SharedDslashCuda {
     : SharedDslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), gauge0(gauge0), gauge1(gauge1), clover(clover),
     cloverNorm(cloverNorm), in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
   { 
-    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
+    bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm);
+    if (!x) errorQuda("Asymmetric clover dslash only defined for Xpay");
   }
   virtual ~AsymCloverDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
 
@@ -822,14 +823,12 @@ class AsymCloverDslashCuda : public SharedDslashCuda {
     TuneKey key = DslashCuda::tuneKey();
     std::stringstream recon;
     recon << reconstruct;
-    key.aux += ",reconstruct=" + recon.str();
-    if (x) key.aux += ",Xpay";
+    key.aux += ",reconstruct=" + recon.str() + ",Xpay";
     return key;
   }
 
   void apply(const cudaStream_t &stream)
   {
-    if (!x) errorQuda("Asymmetric clover dslash only defined for Xpay");
 #ifdef SHARED_WILSON_DSLASH
     if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
       errorQuda("Shared dslash does not yet support X-dimension partitioning");
@@ -863,6 +862,7 @@ class AsymCloverDslashCuda : public SharedDslashCuda {
     }
   }
 
+  long long flops() const { return 1872ll * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
 };
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
@@ -971,7 +971,7 @@ class TwistedDslashCuda : public SharedDslashCuda {
     }
   }
 
-  long long flops() const { return (x ? 1416ll : 1392ll) * dslashConstants.VolumeCB(); }
+  long long flops() const { return (x ? 1416ll : 1392ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
 };
 
 template <typename sFloat, typename gFloat>
@@ -1049,7 +1049,7 @@ class DomainWallDslashCuda : public DslashCuda {
     }
   }
 
-  long long flops() const {
+  long long flops() const { // FIXME for multi-GPU
     long long bulk = (dslashConstants.Ls-2)*(dslashConstants.VolumeCB()/dslashConstants.Ls);
     long long wall = 2*dslashConstants.VolumeCB()/dslashConstants.Ls;
     return (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB() + 96ll*bulk + 120ll*wall;
@@ -1137,7 +1137,7 @@ private:
 
   int Nface() { return 6; }
 
-  long long flops() const { return (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); }
+  long long flops() const { return (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
 };
 
 #ifdef DSLASH_PROFILING
