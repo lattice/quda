@@ -481,7 +481,8 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  
+  if (sid >= kparam.threads) return;
+
   int z1 = sid / X1h;
   int x1h = sid - z1*X1h;
   int z2 = z1 / X2;
