@@ -504,12 +504,13 @@ namespace hisq{
 
 
         template<class Cmplx>
-          __global__ void getUnitarizeForceField(Cmplx* link_even, Cmplx* link_odd,
+          __global__ void getUnitarizeForceField(int threads, Cmplx* link_even, Cmplx* link_odd,
                                                  Cmplx* old_force_even, Cmplx* old_force_odd,
 						 																		 Cmplx* force_even, Cmplx* force_odd,
 																								 int* unitarization_failed)
           {
             int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
+	    if(mem_idx >= threads) return;
 	
             Cmplx* force;
             Cmplx* link;
@@ -568,16 +569,18 @@ namespace hisq{
         void unitarizeForceCuda(const QudaGaugeParam& param, cudaGaugeField& cudaOldForce, cudaGaugeField& cudaGauge,  cudaGaugeField* cudaNewForce, int* unitarization_failed)
         {
 
-          dim3 gridDim(cudaGauge.Volume()/BLOCK_DIM,1,1);
+
+          const int threads = cudaGauge.Volume();
           dim3 blockDim(BLOCK_DIM,1,1);
+          dim3 gridDim((threads + BLOCK_DIM -1)/BLOCK_DIM,1,1);
 
 	  if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-		  getUnitarizeForceField<<<gridDim,blockDim>>>((float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
+		  getUnitarizeForceField<<<gridDim,blockDim>>>(threads, (float2*)cudaGauge.Even_p(), (float2*)cudaGauge.Odd_p(),
 				  (float2*)cudaOldForce.Even_p(), (float2*)cudaOldForce.Odd_p(),
 				  (float2*)cudaNewForce->Even_p(), (float2*)cudaNewForce->Odd_p(),
 				  unitarization_failed);
 	  }else if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-		  getUnitarizeForceField<<<gridDim,blockDim>>>((double2*)cudaGauge.Even_p(), (double2*)cudaGauge.Odd_p(),
+		  getUnitarizeForceField<<<gridDim,blockDim>>>(threads, (double2*)cudaGauge.Even_p(), (double2*)cudaGauge.Odd_p(),
 				  (double2*)cudaOldForce.Even_p(), (double2*)cudaOldForce.Odd_p(),
 				  (double2*)cudaNewForce->Even_p(), (double2*)cudaNewForce->Odd_p(),
 				  unitarization_failed);

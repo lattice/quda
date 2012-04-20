@@ -1314,6 +1314,7 @@ struct ColorMatrix
 				Pnumu, Qnumu, link,
 				sig, rho, staple_coeff.seven, coeff, 
 				P5, newOprod);		
+
 	  } // rho 
 
 	  // 5-staple: side link
@@ -1322,7 +1323,10 @@ struct ColorMatrix
 			       P5, Qmu, link, 
 			       sig, nu, -FiveSt, coeff, 
 			       P3, newOprod);
+
+
 	} // nu 
+
 
 	// lepage
 	if(staple_coeff.lepage != 0.){
@@ -1339,6 +1343,7 @@ struct ColorMatrix
 			       P3, newOprod);
         } // lepage != 0
 
+	  
 	computeSideLinkField<Real>(dim, 
 			     P3, NULL, link, 
 			     sig, mu, ThreeSt, 0., 

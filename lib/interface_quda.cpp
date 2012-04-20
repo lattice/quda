@@ -475,6 +475,9 @@ void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const boo
     break;
   case QUDA_DOMAIN_WALL_DSLASH:
     diracParam.type = pc ? QUDA_DOMAIN_WALLPC_DIRAC : QUDA_DOMAIN_WALL_DIRAC;
+//BEGIN NEW :
+    diracParam.Ls = inv_param->Ls;
+//END NEW    
     break;
   case QUDA_ASQTAD_DSLASH:
     diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;

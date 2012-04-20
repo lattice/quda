@@ -606,6 +606,7 @@ hisq_force_test(void)
   cudaMom->loadCPUField(*refMom, QUDA_CPU_FIELD_LOCATION);
 
 
+
 #ifdef MULTI_GPU
   int optflag = 0;
   exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)cpuGauge_ex->Gauge_p(), cpuGauge->Order(), qudaGaugeParam.cpu_prec, optflag);
@@ -613,6 +614,7 @@ hisq_force_test(void)
 #else
   loadLinkToGPU(cudaGauge, cpuGauge, &qudaGaugeParam);  
 #endif
+
 
 
 #ifdef MULTI_GPU
@@ -653,7 +655,6 @@ hisq_force_test(void)
       coeff = d_act_path_coeff;
       naik_coeff = &d_act_path_coeff[1];
     }
-    
 #ifdef MULTI_GPU
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
@@ -670,6 +671,7 @@ hisq_force_test(void)
   struct timeval t0, t1, t2, t3;
 
   gettimeofday(&t0, NULL);
+
 #ifdef MULTI_GPU
   hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
   cudaDeviceSynchronize(); 
@@ -693,6 +695,7 @@ hisq_force_test(void)
   
   hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
 #endif
+
   cudaDeviceSynchronize();
 
   gettimeofday(&t3, NULL);
@@ -715,7 +718,7 @@ hisq_force_test(void)
   
   float perf_flops = total_flops / (TDIFF(t0, t1)) *1e-9;
   float perf = total_io / (TDIFF(t0, t1)) *1e-9;
-  printfQuda("Staples time: %.2f ms, perf =%.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", TDIFF(t0,t1)*1000, perf_flops, perf);
+  printfQuda("Staples time: %.2f ms, perf = %.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", TDIFF(t0,t1)*1000, perf_flops, perf);
   printfQuda("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0,t1)*1000, TDIFF(t1,t2)*1000, TDIFF(t2,t3)*1000);
   printfQuda("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1)*1000);
 
