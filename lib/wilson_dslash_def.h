@@ -173,7 +173,7 @@
 #define TPROJSCALE tProjScale
 
 // double-precision gauge field
-#if (defined DIRECT_ACCESS_WILSON_GAUGE) || (defined FERMI_NO_DBLE_TEX)
+#if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
