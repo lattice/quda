@@ -4,6 +4,10 @@
 #include <convert.h>
 
 
+// uncomment to disable texture reads
+//#define DIRECT_ACCESS_BLAS
+
+
 #if (__COMPUTE_CAPABILITY__ >= 130)
 __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 {
@@ -65,33 +69,33 @@ class Texture {
   template<> inline void Texture<outtype,intype,id>::unbind() { cudaUnbindTexture(tex_##intype##_##id); }
 
 
-#define DEF_FETCH(outtype, intype, id) \
+#define DEF_FETCH_TEX(outtype, intype, id) \
   template<> __device__ inline outtype Texture<outtype,intype,id>::fetch(unsigned int idx) \
   { return tex1Dfetch(tex_##intype##_##id,idx); }
+
+
+#define DEF_FETCH_DIRECT(outtype, intype, id) \
+  template<> __device__ inline outtype Texture<outtype,intype,id>::fetch(unsigned int idx) \
+  { outtype out; copyFloatN(out, spinor[idx]); return out; }
+
+
+#if defined(DIRECT_ACCESS_BLAS)
+#define DEF_FETCH DEF_FETCH_DIRECT
+#else
+#define DEF_FETCH DEF_FETCH_TEX
+#endif
+
+
+#if defined(DIRECT_ACCESS_BLAS) || defined(FERMI_NO_DBLE_TEX)
+#define DEF_FETCH_DBLE DEF_FETCH_DIRECT
+#else
+#define DEF_FETCH_DBLE DEF_FETCH_TEX
+#endif
 
 
 #define DEF_BIND_UNBIND_FETCH(outtype, intype, id) \
   DEF_BIND_UNBIND(outtype, intype, id)             \
   DEF_FETCH(outtype, intype, id)
-
-
-#ifdef FERMI_NO_DBLE_TEX
-
-#define DEF_FETCH_DOUBLE2(id) \
-  template<> __device__ inline double2 Texture<double2,double2,id>::fetch(unsigned int idx) \
-  { return spinor[idx]; } \
-  template<> __device__ inline float2 Texture<float2,double2,id>::fetch(unsigned int idx) \
-  { return make_float2(spinor[idx].x, spinor[idx].y); }
-
-#else
-
-#define DEF_FETCH_DOUBLE2(id) \
-  template<> __device__ inline double2 Texture<double2,double2,id>::fetch(unsigned int idx) \
-  { return fetch_double2(tex_double2_##id,idx); } \
-  template<> __device__ inline float2 Texture<float2,double2,id>::fetch(unsigned int idx) \
-  { double2 x = fetch_double2(tex_double2_##id,idx); return make_float2(x.x, x.y); }
-
-#endif // FERMI_NO_DBLE_TEX
 
 
 #define DEF_ALL(id)                          \
@@ -103,7 +107,8 @@ class Texture {
   DEF_BIND_UNBIND_FETCH(float4, float4, id)  \
   DEF_BIND_UNBIND(double2, double2, id)      \
   DEF_BIND_UNBIND(float2, double2, id)       \
-  DEF_FETCH_DOUBLE2(id)
+  DEF_FETCH_DBLE(double2, double2, id)       \
+  DEF_FETCH_DBLE(float2, double2, id)
 
 
 // Declare the textures and define the member functions of the corresponding templated classes.
@@ -116,9 +121,11 @@ DEF_ALL(4)
 
 #undef DECL_TEX
 #undef DEF_BIND_UNBIND
+#undef DEF_FETCH_DIRECT
+#undef DEF_FETCH_TEX
 #undef DEF_FETCH
+#undef DEF_FETCH_DBLE
 #undef DEF_BIND_UNBIND_FETCH
-#undef DEF_FETCH_DOUBLE2
 #undef DEF_ALL
 
 
