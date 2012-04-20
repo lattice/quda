@@ -474,10 +474,10 @@
 template<int oddBit, typename Float2, typename FloatN, typename Float>
   __global__ void
   GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd,
-			int dir, double eb3,
-			FloatN* linkEven, FloatN* linkOdd,
-			int* input_path, 
-			int* length, Float* path_coeff, int num_paths, kernel_param_t kparam)
+			const int dir, const double eb3,
+			const FloatN* linkEven, const FloatN* linkOdd,
+			const int* input_path, 
+			const int* length, const Float* path_coeff, const int num_paths, const kernel_param_t kparam)
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -524,7 +524,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
     //linka: current matrix
     //linkb: the loaded matrix in this round	
     SET_UNIT_SU3_MATRIX(linka);	
-    int* path = input_path + i*gf.path_max_length;
+    const int* path = input_path + i*gf.path_max_length;
 	
     int lnkdir;
     int path0 = path[0];

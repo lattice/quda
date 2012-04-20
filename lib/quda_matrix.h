@@ -769,6 +769,7 @@ namespace hisq{
 	template<class Cmplx>
 	__host__ __device__
         void printLink(const Matrix<Cmplx,3>& link){
+#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
           printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
           printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
           printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
@@ -779,6 +780,7 @@ namespace hisq{
           printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
           printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
           printf("\n");
+#endif
         }
 
 } // end namespace hisq

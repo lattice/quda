@@ -761,7 +761,7 @@ namespace hisq {
 	newOprod.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
+      void initTuneParam(TuneParam &param) const
       {
 	Tunable::initTuneParam(param);
 	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
