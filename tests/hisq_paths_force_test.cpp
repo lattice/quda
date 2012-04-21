@@ -609,7 +609,8 @@ hisq_force_test(void)
 
 #ifdef MULTI_GPU
   int optflag = 0;
-  exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)cpuGauge_ex->Gauge_p(), cpuGauge->Order(), qudaGaugeParam.cpu_prec, optflag);
+  int R[4] = {2, 2, 2, 2};
+  exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuGauge_ex->Gauge_p(), cpuGauge->Order(), qudaGaugeParam.cpu_prec, optflag);
   loadLinkToGPU_ex(cudaGauge_ex, cpuGauge_ex);  
 #else
   loadLinkToGPU(cudaGauge, cpuGauge, &qudaGaugeParam);  
@@ -618,7 +619,7 @@ hisq_force_test(void)
 
 
 #ifdef MULTI_GPU
-  exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)cpuOprod_ex->Gauge_p(), cpuOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag);
+  exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuOprod_ex->Gauge_p(), cpuOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag);
   loadLinkToGPU_ex(cudaOprod_ex, cpuOprod_ex); 
 #else
   loadLinkToGPU(cudaOprod, cpuOprod, &qudaGaugeParam);
@@ -626,7 +627,7 @@ hisq_force_test(void)
   
   
 #ifdef MULTI_GPU
-  exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)cpuLongLinkOprod_ex->Gauge_p(), cpuLongLinkOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag);
+  exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuLongLinkOprod_ex->Gauge_p(), cpuLongLinkOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag);
   loadLinkToGPU_ex(cudaLongLinkOprod_ex, cpuLongLinkOprod_ex);
 #else
   loadLinkToGPU(cudaLongLinkOprod, cpuLongLinkOprod, &qudaGaugeParam);
