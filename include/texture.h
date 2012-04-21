@@ -89,7 +89,9 @@ class Texture {
 #if defined(DIRECT_ACCESS_BLAS) || defined(FERMI_NO_DBLE_TEX)
 #define DEF_FETCH_DBLE DEF_FETCH_DIRECT
 #else
-#define DEF_FETCH_DBLE DEF_FETCH_TEX
+#define DEF_FETCH_DBLE(outtype, intype, id) \
+  template<> __device__ inline outtype Texture<outtype,double2,id>::fetch(unsigned int idx) \
+  { outtype out; copyFloatN(out, fetch_double2(tex_double2_##id,idx)); return out; }
 #endif
 
 
