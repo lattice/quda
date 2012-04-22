@@ -237,7 +237,9 @@ static loadParityHw(ParityHw ret, void *hw, QudaPrecision cpu_prec)
     }
     
     if (ret.precision != QUDA_HALF_PRECISION) {	
-	cudaMallocHost(&packedHw1, ret.bytes);
+      if (cudaMallocHost(&packedHw1, ret.bytes) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for packedHw1\n");
+	}
 	
 	if (ret.precision == QUDA_DOUBLE_PRECISION) {
 	    packParityHw((double2*)packedHw1, (double*)hw, ret.volume);
@@ -285,7 +287,9 @@ retrieveParityHw(void *res, ParityHw hw, QudaPrecision cpu_prec)
 {
     void *packedHw1 = 0;
     if (hw.precision != QUDA_HALF_PRECISION) {
-	cudaMallocHost((void**)&packedHw1, hw.bytes);
+      if (cudaMallocHost((void**)&packedHw1, hw.bytes) == cudaErrorMemoryAllocation) {
+	errorQuda("ERROR: cudaMallocHost failed for packedHw1\n");
+      }
 	cudaMemcpy(packedHw1, hw.data, hw.bytes, cudaMemcpyDeviceToHost);
 	
 	if (hw.precision == QUDA_DOUBLE_PRECISION) {

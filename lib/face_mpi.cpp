@@ -57,14 +57,19 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
     if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
     
-    cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf[dir], nbytes[dir]); 
-    cudaMallocHost((void**)&back_nbr_spinor_sendbuf[dir], nbytes[dir]);
+    if (cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_spinor_sendbuf\n");
+    }
+    if (cudaMallocHost((void**)&back_nbr_spinor_sendbuf[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for back_nbr_spinor_sendbuf\n");
+    }
     
-    if (fwd_nbr_spinor_sendbuf[dir] == NULL || back_nbr_spinor_sendbuf[dir] == NULL)
-      errorQuda("dir =%d, malloc failed for fwd_nbr_spinor_sendbuf/back_nbr_spinor_sendbuf", dir); 
-    
-    cudaMallocHost((void**)&fwd_nbr_spinor[dir], nbytes[dir]); 
-    cudaMallocHost((void**)&back_nbr_spinor[dir], nbytes[dir]); 
+    if (cudaMallocHost((void**)&fwd_nbr_spinor[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_spinor\n");
+    }
+    if (cudaMallocHost((void**)&back_nbr_spinor[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for back_nbr_spinor\n");
+    }
     
     if (fwd_nbr_spinor[dir] == NULL || back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
@@ -438,11 +443,19 @@ exchange_llfat_init(QudaPrecision prec)
       errorQuda("cudaMalloc() failed for back_nbr_staple_gpu\n");
     }
 
-    cudaMallocHost((void**)&fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);
-    cudaMallocHost((void**)&back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec);
+    if (cudaMallocHost((void**)&fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_staple\n");
+    }
+    if (cudaMallocHost((void**)&back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for back_nbr_staple\n");
+    }
 
-    cudaMallocHost((void**)&fwd_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec);
-    cudaMallocHost((void**)&back_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec);
+    if (cudaMallocHost((void**)&fwd_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_staple_sendbuf \n");
+    }
+    if (cudaMallocHost((void**)&back_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for back_nbr_staple_sendbuf\n");
+    }
   }
 
   

@@ -736,7 +736,9 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
     for(int i=0;i < 4; i++){
       
 #ifdef GPU_DIRECT 
-      cudaMallocHost((void**)&ghost_cpuGauge[i], 8*Vs[i]*gaugeSiteSize*prec);
+      if (cudaMallocHost((void**)&ghost_cpuGauge[i], 8*Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+	errorQuda("ERROR: cudaMallocHost failed for ghost_cpuGauge\n");
+      }
 #else
       ghost_cpuGauge[i] = malloc(8*Vs[i]*gaugeSiteSize*prec);
 #endif
@@ -772,7 +774,9 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 	  }
 	  //int rc = posix_memalign((void**)&ghost_cpuGauge_diag[nu*4+mu], ALIGNMENT, Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
 #ifdef GPU_DIRECT 
-	  cudaMallocHost((void**)&ghost_cpuGauge_diag[nu*4+mu],  Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
+	  if (cudaMallocHost((void**)&ghost_cpuGauge_diag[nu*4+mu],  Z[dir1]*Z[dir2]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+	    errorQuda("ERROR: cudaMallocHost failed for ghost_cpuGauge_diag\n");
+	  }
 #else
 	  ghost_cpuGauge_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
 #endif

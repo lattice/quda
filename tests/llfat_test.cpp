@@ -118,24 +118,21 @@ llfat_test(int test)
   */
   qudaGaugeParam.preserve_gauge =0;
   void* fatlink;
-  cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize);
-  if(fatlink == NULL){
-    errorQuda("ERROR: allocating fatlink failed\n");
+  if (cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for fatlink\n");
   }
-  
+
   void* sitelink[4];
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*gSize);
-    if(sitelink[i] == NULL){
-      errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
+    if (cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for sitelink\n");
     }
   }
   
   void* sitelink_ex[4];
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink_ex[i], V_ex*gaugeSiteSize*gSize);
-    if(sitelink_ex[i] == NULL){
-      errorQuda("ERROR; allocate sitelink_ex[%d] failed\n", i);
+    if (cudaMallocHost((void**)&sitelink_ex[i], V_ex*gaugeSiteSize*gSize) ==  cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for sitelink_ex\n");
     }
   }
 

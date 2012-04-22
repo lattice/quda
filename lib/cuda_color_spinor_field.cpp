@@ -169,7 +169,9 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
 
   if (!bufferInit) {
     bufferBytes = bytes;
-    cudaMallocHost(&buffer, bufferBytes);    
+    if (cudaMallocHost(&buffer, bufferBytes) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for buffer\n");
+    }
     bufferInit = true;
   }
 

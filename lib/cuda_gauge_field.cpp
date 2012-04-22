@@ -43,7 +43,9 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
 			   QudaLinkType type, double &fat_link_max) {
   // Use pinned memory
   FloatN *packed, *packedEven, *packedOdd;
-  cudaMallocHost(&packed, bytes);
+  if (cudaMallocHost(&packed, bytes) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packed\n");
+  }
   packedEven = packed;
   packedOdd = (FloatN*)((char*)packed + bytes/2);
 
@@ -119,8 +121,12 @@ template <typename Float, typename Float2>
 void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh, int pad) 
 {  
   Float2 *packedEven, *packedOdd;
-  cudaMallocHost(&packedEven, bytes/2); 
-  cudaMallocHost(&packedOdd, bytes/2); 
+  if(cudaMallocHost(&packedEven, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+  }
+  if (cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedOdd\n");
+  }
     
   packMomField(packedEven, (Float*)mom, 0, Vh, pad);
   packMomField(packedOdd,  (Float*)mom, 1, Vh, pad);
@@ -235,7 +241,9 @@ static void storeGaugeField(Float *cpuGauge, FloatN *gauge, GaugeFieldOrder cpu_
 
   // Use pinned memory
   FloatN *packed;
-  cudaMallocHost(&packed, bytes);
+  if (cudaMallocHost(&packed, bytes) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packed\n");
+  }
   cudaMemcpy(packed, gauge, bytes, cudaMemcpyDeviceToHost);
     
   FloatN *packedEven = packed;
@@ -312,8 +320,12 @@ storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd,
 		   int bytes, int V, int pad) 
 {    
   Float2 *packedEven, *packedOdd;   
-  cudaMallocHost(&packedEven, bytes/2); 
-  cudaMallocHost(&packedOdd, bytes/2); 
+  if (cudaMallocHost(&packedEven, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+  }
+  if (cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+  }
   cudaMemcpy(packedEven, even, bytes/2, cudaMemcpyDeviceToHost); 
   cudaMemcpy(packedOdd, odd, bytes/2, cudaMemcpyDeviceToHost);  
   

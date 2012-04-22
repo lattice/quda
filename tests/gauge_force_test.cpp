@@ -417,7 +417,9 @@ gauge_force_test(void)
   void* sitelink_1d;
   
 #ifdef GPU_DIRECT
-  cudaMallocHost(&sitelink_1d, 4*V*gaugeSiteSize*gSize);
+  if (cudaMallocHost(&sitelink_1d, 4*V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for sitelink_1d\n");
+  }
 #else
   sitelink_1d= malloc(4*V*gaugeSiteSize*gSize);
 #endif
@@ -431,7 +433,9 @@ gauge_force_test(void)
   void* sitelink_2d[4];
   for(int i=0;i < 4;i++){
 #ifdef GPU_DIRECT
-    cudaMallocHost(&sitelink_2d[i], V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
+    if(cudaMallocHost(&sitelink_2d[i], V*gaugeSiteSize*qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for sitelink_2d\n");
+  }
 #else
     sitelink_2d[i] = malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
 #endif
@@ -460,9 +464,13 @@ gauge_force_test(void)
   void* sitelink_ex_2d[4];
   void* sitelink_ex_1d;
 
-  cudaMallocHost((void**)&sitelink_ex_1d, 4*V_ex*gaugeSiteSize*gSize);  
+  if (cudaMallocHost((void**)&sitelink_ex_1d, 4*V_ex*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for sitelink_ex_1d\n");
+  }
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink_ex_2d[i], V_ex*gaugeSiteSize*gSize);
+    if (cudaMallocHost((void**)&sitelink_ex_2d[i], V_ex*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for sitelink_ex_2d\n");
+    }
     if(sitelink_ex_2d[i] == NULL){
       errorQuda("ERROR; allocate sitelink_ex[%d] failed\n", i);
     }

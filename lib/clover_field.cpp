@@ -289,11 +289,19 @@ void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void 
     errorQuda("Invalid clover order");
   }
 
-  cudaMallocHost(&packedEven, bytes/2);
-  cudaMallocHost(&packedOdd, bytes/2);
+  if (cudaMallocHost(&packedEven, bytes/2) ==  cudaErrorMemoryAllocation){
+    errorQuda("cudaMallocHost failed for packedEven\n");
+  }
+  if ( cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation){
+    errorQuda("cudaMallocHost failed for packedOdd\n");
+  }
   if (precision == QUDA_HALF_PRECISION) {
-    cudaMallocHost(&packedEvenNorm, norm_bytes/2);
-    cudaMallocHost(&packedOddNorm, norm_bytes/2);
+    if (cudaMallocHost(&packedEvenNorm, norm_bytes/2) == cudaErrorMemoryAllocation){
+      errorQuda("cudaMallocHost failed for packedEvenNorm\n");
+    }
+    if (cudaMallocHost(&packedOddNorm, norm_bytes/2) == cudaErrorMemoryAllocation){
+      errorQuda("cudaMallocHost failed for packedOddNorm\n");
+    }
   }
     
   if (precision == QUDA_DOUBLE_PRECISION) {
