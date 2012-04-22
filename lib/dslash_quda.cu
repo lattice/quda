@@ -1708,6 +1708,15 @@ void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGau
   inSpinor = (cudaColorSpinorField*)in; // EVIL
 
 #ifdef GPU_STAGGERED_DIRAC
+
+#ifdef MULTI_GPU
+  for(int i=0;i < 4; i++){
+    if(commDimPartitioned(i) && (fatGauge.X()[i] < 6)){
+      errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in staggered dslash\n");
+    }    
+  }
+#endif
+
   int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
   dslashParam.parity = parity;
