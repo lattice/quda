@@ -35,6 +35,8 @@ static int tgridid = -1;
 
 static int manual_set_partition[4] ={0, 0, 0, 0};
 
+#define X_FASTEST_DIM_NODE_RANKING
+
 void
 comm_set_gridsize(int x, int y, int z, int t)
 {
@@ -108,7 +110,7 @@ comm_partition(void)
 
   int leftover;
 
-#if 0
+#ifdef X_FASTEST_DIM_NODE_RANKING
   tgridid  = rank/(zgridsize*ygridsize*xgridsize);
   leftover = rank%(zgridsize*ygridsize*xgridsize);
   zgridid  = leftover/(ygridsize*xgridsize);
@@ -176,7 +178,7 @@ int
 comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
 {
   int ret;
-#if 0
+#ifdef X_FASTEST_DIM_NODE_RANKING
 #define GRID_ID(xid,yid,zid,tid) (tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid)
 #else
 #define GRID_ID(xid,yid,zid,tid) (xid*ygridsize*zgridsize*tgridsize+yid*zgridsize*tgridsize+zid*tgridsize+tid)
