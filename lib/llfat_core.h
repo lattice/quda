@@ -756,7 +756,7 @@
 template<int mu, int nu, int odd_bit>
   __global__ void
   LLFAT_KERNEL(do_siteComputeGenStapleParity, RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
-							   FloatN* sitelink_even, FloatN* sitelink_odd, 
+							   const FloatN* sitelink_even, const FloatN* sitelink_odd, 
 							   FloatM* fatlink_even, FloatM* fatlink_odd,	
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
@@ -899,9 +899,9 @@ template<int mu, int nu, int odd_bit>
 template<int mu, int nu, int odd_bit, int save_staple>
   __global__ void
   LLFAT_KERNEL(do_computeGenStapleFieldParity,RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
-							   FloatN* sitelink_even, FloatN* sitelink_odd,
+							   const FloatN* sitelink_even, const FloatN* sitelink_odd,
 							   FloatM* fatlink_even, FloatM* fatlink_odd,			    
-							   FloatM* mulink_even, FloatM* mulink_odd, 
+							   const FloatM* mulink_even, const FloatM* mulink_odd, 
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
   __shared__ FloatM sd_data[NUM_FLOATS*64];
@@ -1051,11 +1051,11 @@ template<int mu, int nu, int odd_bit, int save_staple>
 }
 
 __global__ void 
-LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_odd,
+LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const FloatN* sitelink_odd,
 					FloatM* fatlink_even, FloatM* fatlink_odd,
 					Float coeff0, Float coeff5)
 {
-  FloatN* my_sitelink;
+  const FloatN* my_sitelink;
   FloatM* my_fatlink;
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
   int mem_idx = sid;
@@ -1108,7 +1108,7 @@ LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_
 template<int mu, int nu, int odd_bit>
   __global__ void
   LLFAT_KERNEL_EX(do_siteComputeGenStapleParity, RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
-							      FloatN* sitelink_even, FloatN* sitelink_odd, 
+							      const FloatN* sitelink_even, const FloatN* sitelink_odd, 
 							      FloatM* fatlink_even, FloatM* fatlink_odd,	
 							      Float mycoeff, llfat_kernel_param_t kparam)
 {
@@ -1240,9 +1240,9 @@ template<int mu, int nu, int odd_bit>
 template<int mu, int nu, int odd_bit, int save_staple>
   __global__ void
   LLFAT_KERNEL_EX(do_computeGenStapleFieldParity,RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
-							      FloatN* sitelink_even, FloatN* sitelink_odd,
+							      const FloatN* sitelink_even, const FloatN* sitelink_odd,
 							      FloatM* fatlink_even, FloatM* fatlink_odd,			    
-							      FloatM* mulink_even, FloatM* mulink_odd, 
+							      const FloatM* mulink_even, const FloatM* mulink_odd, 
 							      Float mycoeff, llfat_kernel_param_t kparam)
 {
 #if 1
@@ -1361,13 +1361,13 @@ template<int mu, int nu, int odd_bit, int save_staple>
 
 
 __global__ void 
-LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(FloatN* sitelink_even, FloatN* sitelink_odd,
+LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const FloatN* sitelink_odd,
 					   FloatM* fatlink_even, FloatM* fatlink_odd,
 					   Float coeff0, Float coeff5, llfat_kernel_param_t kparam)
 {
 #if 1
 
-  FloatN* my_sitelink;
+  const FloatN* my_sitelink;
   FloatM* my_fatlink;
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
   int idx = sid;
