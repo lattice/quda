@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <cuda.h>
 
-namespace hisq{
+namespace quda{
 
   // Given a real type T, returns the corresponding complex type
   template<class T>
@@ -547,6 +547,7 @@ namespace hisq{
       }
       return;
     }
+
 
 
 

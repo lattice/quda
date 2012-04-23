@@ -4,7 +4,7 @@ GaugeField::GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &lo
   LatticeField(param, location), bytes(0), nColor(param.nColor), nFace(param.nFace),
   reconstruct(param.reconstruct), order(param.order), fixed(param.fixed), 
   link_type(param.link_type), t_boundary(param.t_boundary), anisotropy(param.anisotropy),
-  tadpole(param.tadpole), create(param.create), is_staple(param.is_staple)
+  tadpole(param.tadpole), create(param.create), gauge_dimension(param.gauge_dimension)
 {
   if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
   if (nDim != 4 && nDim != 1) errorQuda("Number of dimensions must be 4 or 1, not %d", nDim);
@@ -12,9 +12,12 @@ GaugeField::GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &lo
   if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
     errorQuda("Temporal gauge fixing only supported for Wilson links");
 
-  if(is_staple){
+  if(gauge_dimension == QUDA_GAUGE_STAPLE){
     real_length = volume*reconstruct;
     length = 2*stride*reconstruct; // two comes from being full lattice
+  } else if(gauge_dimension == QUDA_GAUGE_FMUNU){
+    real_length = 6*volume*reconstruct;
+    length = 2*6*stride*reconstruct; // two comes from being full lattice
   }else{
     real_length = 4*volume*reconstruct;
     length = 2*4*stride*reconstruct; // two comes from being full lattice
