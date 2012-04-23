@@ -4,6 +4,7 @@
 
 #include <quda_internal.h>
 #include <clover_field.h>
+#include <gauge_field.h>
 
 CloverField::CloverField(const CloverFieldParam &param, const QudaFieldLocation &location) :
   LatticeField(param, location), bytes(0), norm_bytes(0), nColor(3), nSpin(4)
@@ -329,111 +330,15 @@ void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void 
   }
 }
 
-struct CloverParam {
-  int X[4]; // grid dimensions
-  int lengthCB; // half length (include checkerboard spacetime, color, complex, direction)
-  int stride; // stride used on gauge field
-  int threads; // number of active threads required
-};
-
-/**
-  First pass only supports no reconstruct for expediency 
-
-  This will require 4-dimensional gauge fields with 6 directions (
- */
-
-template <typename Cmplx>
-__global__ void cloverComputeKernel(Cmplx *Fmunu, const Cmplx *gauge, const CloverParam param) {
-
-  // this is a full lattice index
-  int X = blockIdx.x * blockDim.x + threadIdx.x;
-  if (X >= threads) return;
-  
-  // thread ordering
-  // X = (((parity*X4 + x4)*X3 + x3)*X2 + x2)*X1h + x1h
-  // with x1 = 2*x1h + parity  
-
-  // For multi-gpu these need to have offets added on
-  // keep X[d] as the true local problem
-
-  // compute spacetime dimensions and parity
-  int aux1 = X / (param.X[0]/2);
-  int x[4];
-  x[0] = X - aux1 * (param.X[0]/2); // this is chbd x
-  int aux2 = aux1 / param.X[1];
-  x[1] = aux1 - aux2 * param.X[1];
-  int aux3 = aux2 / param.X[2];
-  x[2] = aux2 - aux3 * param.X[2];
-  int parity = aux3 / param.X[3];
-  x[3] = aux3 - aux4 * param.X[3];
-  x[0] += parity; // now this is the full index
-
-
-  for (int mu=0; mu<4; mu++) {
-    for (int nu=0; nu<mu; nu++) {
-      Matrix<Cmplx,3> F;
-      setZero(F);
-
-      Matrix<Cmplx,3> Ftmp;
-
-      // load U(x)_mu
-      Matrix<Cmplx,3> U_x_mu;
-      // X needs to be adjusted for extended indexing
-      loadLinkVariableFromArray(gauge+parity*param.lengthCB, mu, X/2, param.stride, &U_x_mu);
-
-      // load U(x+mu)_nu
-      int tmp = x[mu];
-      x[mu] = (x[mu]+1 == param.X[mu]) ? 0 : x[mu]+1; // these should be extended comparisons
-      // extended indices here
-      int xpmu_idx = (((x[3]*param.X[2] + x[2])*param.X[1] + x[1])*param.X[0] + x[0]) >> 1;
-      x[mu] = tmp; // restore index
-      Marix<Cmplx,3> U_xpmu_nu;
-      loadLinkVariableFromArray(gauge+((parity+1)&1)*param.lengthCB, nu, xpmu_idx, param.stride, &U_xpmu_nu);
-
-      Ftmp = U_xpmu_nu * U_x_mu;
-
-      // load U(x+nu)_mu
-      int tmp = x[nu];
-      x[nu] = (x[nu]+1 == param.X[nu]) ? 0 : x[nu]+1; 
-      int xpnu_idx = (((x[3]*param.X[2] + x[2])*param.X[1] + x[1])*param.X[0] + x[0]) >> 1;
-      x[nu] = tmp; // restore index
-      Marix<Cmplx,3> U_xpnu_mu;
-      loadLinkVariableFromArray(gauge+((parity+1)&1)*param.lengthCB, mu, xpnu_idx, param.stride, &U_xpnu_mu);
-
-      Ftmp = conj(U_xpnu_mu) * Ftmp;
-
-      // load U(x)_nu
-      Matrix<Cmplx,3> U_x_nu;
-      loadLinkVariableFromArray(gauge+parity*param.lengthCB, nu, X/2, param.stride, &U_x_nu);
-
-      Ftmp = conj(U_x_nu) * Ftmp;
-
-      // sum this contribution to Fmunu
-      F += Ftmp + conj(Ftmp);
-
-      int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
-      writeLinkVariableToArray(gauge+parity*param.lengthCB, munu_idx, X/2, param.stride, &F);
-    }
-  }
-
-
-}
 
 /**
    Computes Fmunu given the gauge field U
  */
-void cudaCloverField::compute(const cudaGaugeField &U) {
+void cudaCloverField::compute(const cudaGaugeField &gauge) {
 
-  if (U.Precision() != precision) 
+  if (gauge.Precision() != precision) 
     errorQuda("Gauge and clover precisions must match");
 
-  if (precision == QUDA_DOUBLE_PRECISION) {
-
-  } else if (precision == QUDA_SINGLE_PRECISION) {
-
-  } else {
-    errorQuda("Precision type %d not supported", precision);
-  }
-
+  computeCloverCuda(*this, gauge);
 
 }

@@ -122,16 +122,14 @@ namespace quda{
       return make_float2(a,b);
     } 
 
-  /*
-  //  doesn't seem to work
+
   template<class Cmplx> 
-  __device__ __host__ 
-  const Cmplx & operator+=(Cmplx & a, const Cmplx & b){
-  a.x += b.x; 
-  a.y += b.y;
-  return a;
+  __device__ __host__ Cmplx & operator+=(Cmplx & a, const Cmplx & b){
+    a.x += b.x; 
+    a.y += b.y;
+    return a;
   }
-   */
+ 
 
   template<class Cmplx>
     __device__ __host__ Cmplx operator+(const Cmplx & a, const Cmplx & b){
@@ -325,6 +323,16 @@ namespace quda{
         result.data[i] = a.data[i] + b.data[i];
       }
       return result;
+    }
+
+
+  template<class T, int N>
+    __device__ __host__ Matrix<T,N> operator+=(Matrix<T,N> & a, const Matrix<T,N> & b)
+    {
+      for(int i=0; i<N*N; i++){
+        a.data[i] += b.data[i];
+      }
+      return a;
     }
 
 
