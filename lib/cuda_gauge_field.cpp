@@ -140,6 +140,7 @@ void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh, int 
 
 void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
 {
+  if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
   checkField(cpu);
 
@@ -338,6 +339,7 @@ storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd,
 
 void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const
 {
+  if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
   // do device-side reordering then copy
   if (pack_location == QUDA_CUDA_FIELD_LOCATION) {

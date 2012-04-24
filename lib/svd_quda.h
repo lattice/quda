@@ -13,7 +13,7 @@
 #define LOG2 0.69314718055994530942
 
 
-namespace hisq{
+namespace quda{
 
   template<class Cmplx> 
     inline DEVICEHOST
@@ -660,7 +660,7 @@ namespace hisq{
       return;
     }
 
-} // end namespace hisq
+} // end namespace quda
 
 
 #endif // _SVD_QUDA_H

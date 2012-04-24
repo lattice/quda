@@ -16,7 +16,7 @@
 #define HISQ_SITE_MATRIX_LOAD_TEX 1
 #define HISQ_NEW_OPROD_LOAD_TEX 1
 
-namespace hisq {
+namespace quda {
   namespace fermion_force {
 
     typedef struct hisq_kernel_param_s{
@@ -761,7 +761,7 @@ namespace hisq {
 	newOprod.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
+      void initTuneParam(TuneParam &param) const
       {
 	Tunable::initTuneParam(param);
 	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
@@ -1930,7 +1930,6 @@ namespace hisq {
 			       cudaGaugeField  *newOprod)
     {
       bind_tex_link(link, *newOprod);
-
       const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
       hisq_kernel_param_t kparam;
       for(int i =0;i < 4;i++){
@@ -1979,9 +1978,8 @@ namespace hisq {
 #endif	
 
       // create color matrix fields with zero padding
-      int is_staple = 1;
       int pad = 0;
-      GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, pad, is_staple);
+      GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, pad, QUDA_SCALAR_GEOMETRY);
 
       cudaGaugeField Pmu(gauge_param);
       cudaGaugeField P3(gauge_param);
@@ -2056,4 +2054,4 @@ namespace hisq {
     }
 
   } // namespace fermion_force
-} // namespace hisq
+} // namespace quda

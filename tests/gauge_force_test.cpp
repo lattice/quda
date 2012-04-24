@@ -10,6 +10,7 @@
 #include "gauge_force_quda.h"
 #include <sys/time.h>
 #include "fat_force_quda.h"
+#include <dslash_quda.h>
 
 #ifdef MULTI_GPU
 #include <face_quda.h>
@@ -29,6 +30,8 @@ extern int ydim;
 extern int zdim;
 extern int tdim;
 extern void usage(char** argv);
+extern bool tune;
+
 int attempts = 1;
 
 int Z[4];
@@ -493,15 +496,12 @@ gauge_force_test(void)
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
     int x1 = 2*x1h + x1odd;
 
-
     if( x1< 2 || x1 >= X1 +2
         || x2< 2 || x2 >= X2 +2
         || x3< 2 || x3 >= X3 +2
         || x4< 2 || x4 >= X4 +2){
       continue;
     }
-
-
     
     x1 = (x1 - 2 + X1) % X1;
     x2 = (x2 - 2 + X2) % X2;
@@ -584,7 +584,11 @@ gauge_force_test(void)
       else if(dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
     }
   }
-  
+
+  if (tune) {
+    printfQuda("Tuning...\n");
+    setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+  }
   
   struct timeval t0, t1;
   double timeinfo[3];
@@ -599,7 +603,7 @@ gauge_force_test(void)
 #else
     computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
 			  loop_coeff, num_paths, max_length, eb3,
-			&qudaGaugeParam, timeinfo);
+			  &qudaGaugeParam, timeinfo);
 #endif  
     gettimeofday(&t1, NULL);
   }
@@ -613,7 +617,8 @@ gauge_force_test(void)
 #ifdef MULTI_GPU
       //last arg=0 means no optimization for communication, i.e. exchange data in all directions 
       //even they are not partitioned
-      exchange_cpu_sitelink_ex(qudaGaugeParam.X, (void**)sitelink_ex_2d,
+      int R[4] = {2, 2, 2, 2};
+      exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)sitelink_ex_2d,
 			       QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0);    
       gauge_force_reference(refmom, eb3, sitelink_2d, sitelink_ex_2d, qudaGaugeParam.cpu_prec,
 			    input_path_buf, length, loop_coeff, num_paths);

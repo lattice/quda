@@ -4,6 +4,7 @@
 
 #include <quda_internal.h>
 #include <clover_field.h>
+#include <gauge_field.h>
 
 CloverField::CloverField(const CloverFieldParam &param, const QudaFieldLocation &location) :
   LatticeField(param, location), bytes(0), norm_bytes(0), nColor(3), nSpin(4)
@@ -335,4 +336,17 @@ void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void 
     cudaFreeHost(packedEvenNorm);
     cudaFreeHost(packedOddNorm);
   }
+}
+
+
+/**
+   Computes Fmunu given the gauge field U
+ */
+void cudaCloverField::compute(const cudaGaugeField &gauge) {
+
+  if (gauge.Precision() != precision) 
+    errorQuda("Gauge and clover precisions must match");
+
+  computeCloverCuda(*this, gauge);
+
 }

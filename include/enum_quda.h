@@ -283,6 +283,13 @@ extern "C" {
     QUDA_FAT_PRESERVE_COMM_MEM=4,
   }QudaFatLinkFlag;
 
+  typedef enum QudaFieldGeometry_s {
+    QUDA_SCALAR_GEOMETRY,
+    QUDA_VECTOR_GEOMETRY,
+    QUDA_TENSOR_GEOMETRY,
+    QUDA_INVALID_GEOMETRY
+  } QudaFieldGeometry;
+
 #ifdef __cplusplus
 }
 #endif

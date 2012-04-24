@@ -8,7 +8,7 @@
 #include <gauge_field.h>
 
 
-//namespace hisq{
+//namespace quda{
 #define RETURN_IF_ERR if(err) return;
 
 extern int gauge_order;
@@ -1626,7 +1626,7 @@ void completeForceField(const int dim[4],
   }
   
 
-//} // namespace hisq
+//} // namespace quda
 
 
 

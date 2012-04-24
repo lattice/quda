@@ -1614,7 +1614,7 @@ void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
     gParam.pad    = qudaGaugeParam->staple_pad;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field      
+    gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
     cudaStapleField  = new cudaGaugeField(gParam);
     cudaStapleField1 = new cudaGaugeField(gParam);
   }
@@ -1744,7 +1744,8 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   }else{
     llfat_init_cuda_ex(qudaGaugeParam_ex);
 #ifdef MULTI_GPU
-    exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
+    int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
+    exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
 			     cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0);
 #endif
     gettimeofday(&t7, NULL);
@@ -1856,7 +1857,8 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
   
 #ifdef MULTI_GPU
-  exchange_cpu_sitelink_ex(qudaGaugeParam->X, (void**)cpuSiteLink->Gauge_p(), 
+  int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
+  exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
 			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
   loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
 #else  

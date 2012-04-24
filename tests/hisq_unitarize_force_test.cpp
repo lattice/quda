@@ -13,7 +13,7 @@
 #include "hw_quda.h"
 #include <sys/time.h>
 
-using namespace hisq::fermion_force;
+using namespace quda::fermion_force;
 extern void usage(char** argv);
 static int device = 0;
 cudaGaugeField *cudaGauge = NULL;
