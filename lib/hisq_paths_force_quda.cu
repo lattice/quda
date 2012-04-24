@@ -16,7 +16,7 @@
 #define HISQ_SITE_MATRIX_LOAD_TEX 1
 #define HISQ_NEW_OPROD_LOAD_TEX 1
 
-namespace hisq {
+namespace quda {
   namespace fermion_force {
 
     typedef struct hisq_kernel_param_s{
@@ -1978,9 +1978,8 @@ namespace hisq {
 #endif	
 
       // create color matrix fields with zero padding
-      int is_staple = 1;
       int pad = 0;
-      GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, pad, is_staple);
+      GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, pad, QUDA_SCALAR_GEOMETRY);
 
       cudaGaugeField Pmu(gauge_param);
       cudaGaugeField P3(gauge_param);
@@ -2055,4 +2054,4 @@ namespace hisq {
     }
 
   } // namespace fermion_force
-} // namespace hisq
+} // namespace quda

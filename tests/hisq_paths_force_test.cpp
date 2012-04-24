@@ -21,7 +21,7 @@
 #define GPU_DIRECT
 
 #include "fermion_force_reference.h"
-using namespace hisq::fermion_force;
+using namespace quda::fermion_force;
 
 extern void usage(char** argv);
 extern int device;

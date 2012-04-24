@@ -37,7 +37,7 @@ static bool   HOST_FL_REUNIT_SVD_ONLY;
 static double HOST_FL_REUNIT_SVD_REL_ERROR;
 static double HOST_FL_REUNIT_SVD_ABS_ERROR;
 static bool   HOST_FL_CHECK_UNITARIZATION;
-namespace hisq{
+namespace quda{
 
   void setUnitarizeLinksPadding(int input_padding, int output_padding)
   {
@@ -518,4 +518,4 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 
     
     
-} // namespace hisq
+} // namespace quda

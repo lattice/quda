@@ -792,5 +792,5 @@ namespace quda{
 #endif
         }
 
-} // end namespace hisq
+} // end namespace quda
 #endif // _QUDA_MATRIX_H_

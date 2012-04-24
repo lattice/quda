@@ -37,7 +37,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 #define HALF_VOLUME Vh
 #endif
  
-namespace hisq{
+namespace quda{
   namespace fermion_force{
 
 
@@ -645,6 +645,6 @@ namespace hisq{
     
     
   } // namespace fermion_force
-} // namespace hisq
+} // namespace quda
 
 

@@ -1614,7 +1614,7 @@ void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
     gParam.pad    = qudaGaugeParam->staple_pad;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.is_staple = 1; //these two condition means it is a staple instead of a normal gauge field      
+    gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
     cudaStapleField  = new cudaGaugeField(gParam);
     cudaStapleField1 = new cudaGaugeField(gParam);
   }

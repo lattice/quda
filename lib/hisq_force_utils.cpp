@@ -29,7 +29,7 @@ static QudaTboundary t_boundary_;
 // The following routines are needed to test the hisq fermion force code
 // Actually, some of these routines are deprecated, or will be soon, and 
 // ought to be removed.
-namespace hisq{
+namespace quda{
   namespace fermion_force{
 
 
@@ -362,4 +362,4 @@ namespace hisq{
     }
 
   } // end namespace fermion_force
-} // end namespace hisq
+} // end namespace quda

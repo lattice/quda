@@ -5,7 +5,7 @@
 
 #include <gauge_field.h>
 
-namespace hisq {
+namespace quda {
   namespace fermion_force {
 
   void hisqForceInitCuda(QudaGaugeParam* param);
@@ -49,6 +49,6 @@ namespace hisq {
 
 
  } // namespace fermion_force
-}  // namespace hisq
+}  // namespace quda
 
 #endif // _HISQ_FORCE_QUDA_H
