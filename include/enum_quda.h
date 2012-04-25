@@ -95,6 +95,12 @@ extern "C" {
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
 
+  typedef enum QudaSchwarzType_s {
+    QUDA_ADDITIVE_SCHWARZ,
+    QUDA_MULTIPLICATIVE_SCHWARZ,
+    QUDA_INVALID_SCHWARZ
+  } QudaSchwarzType;
+
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //
   // For the clover-improved Wilson Dirac operator, QUDA_MATPC_EVEN_EVEN

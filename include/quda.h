@@ -182,11 +182,17 @@ extern "C" {
     /** Maximum number of iterations allowed in the inner solver */
     int maxiter_precondition;
 
-    /** Precision used in the inner solver. */
+    /** Precision used in the inner solver */
     QudaPrecision prec_precondition;
 
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
+
+    /** Number of preconditioner cycles to perform per iteration */
+    int precondition_cycle;
+
+    /** Whether to use additive or multiplicative Schwarz preconditioning */
+    QudaSchwarzType schwarz_type;
 
   } QudaInvertParam;
 
