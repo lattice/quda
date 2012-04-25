@@ -1,6 +1,6 @@
-// *** CUDA DSLASH DAGGER ***
+// *** CUDA DSLASH ***
 
-#define DSLASH_SHARED_FLOATS_PER_THREAD 0
+#define DSLASH_SHARED_FLOATS_PER_THREAD 24
 
 
 #if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
@@ -11,6 +11,8 @@
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
+#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_DOUBLE2
+#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -61,6 +63,8 @@
 #define acc32_im accum11.y
 #else
 #define spinorFloat float
+#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_FLOAT4
+#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -180,6 +184,182 @@
 #define gT22_re (+g22_re)
 #define gT22_im (-g22_im)
 
+// first chiral block of inverted clover term
+#ifdef CLOVER_DOUBLE
+#define c00_00_re C0.x
+#define c01_01_re C0.y
+#define c02_02_re C1.x
+#define c10_10_re C1.y
+#define c11_11_re C2.x
+#define c12_12_re C2.y
+#define c01_00_re C3.x
+#define c01_00_im C3.y
+#define c02_00_re C4.x
+#define c02_00_im C4.y
+#define c10_00_re C5.x
+#define c10_00_im C5.y
+#define c11_00_re C6.x
+#define c11_00_im C6.y
+#define c12_00_re C7.x
+#define c12_00_im C7.y
+#define c02_01_re C8.x
+#define c02_01_im C8.y
+#define c10_01_re C9.x
+#define c10_01_im C9.y
+#define c11_01_re C10.x
+#define c11_01_im C10.y
+#define c12_01_re C11.x
+#define c12_01_im C11.y
+#define c10_02_re C12.x
+#define c10_02_im C12.y
+#define c11_02_re C13.x
+#define c11_02_im C13.y
+#define c12_02_re C14.x
+#define c12_02_im C14.y
+#define c11_10_re C15.x
+#define c11_10_im C15.y
+#define c12_10_re C16.x
+#define c12_10_im C16.y
+#define c12_11_re C17.x
+#define c12_11_im C17.y
+#else
+#define c00_00_re C0.x
+#define c01_01_re C0.y
+#define c02_02_re C0.z
+#define c10_10_re C0.w
+#define c11_11_re C1.x
+#define c12_12_re C1.y
+#define c01_00_re C1.z
+#define c01_00_im C1.w
+#define c02_00_re C2.x
+#define c02_00_im C2.y
+#define c10_00_re C2.z
+#define c10_00_im C2.w
+#define c11_00_re C3.x
+#define c11_00_im C3.y
+#define c12_00_re C3.z
+#define c12_00_im C3.w
+#define c02_01_re C4.x
+#define c02_01_im C4.y
+#define c10_01_re C4.z
+#define c10_01_im C4.w
+#define c11_01_re C5.x
+#define c11_01_im C5.y
+#define c12_01_re C5.z
+#define c12_01_im C5.w
+#define c10_02_re C6.x
+#define c10_02_im C6.y
+#define c11_02_re C6.z
+#define c11_02_im C6.w
+#define c12_02_re C7.x
+#define c12_02_im C7.y
+#define c11_10_re C7.z
+#define c11_10_im C7.w
+#define c12_10_re C8.x
+#define c12_10_im C8.y
+#define c12_11_re C8.z
+#define c12_11_im C8.w
+#endif // CLOVER_DOUBLE
+
+#define c00_01_re (+c01_00_re)
+#define c00_01_im (-c01_00_im)
+#define c00_02_re (+c02_00_re)
+#define c00_02_im (-c02_00_im)
+#define c01_02_re (+c02_01_re)
+#define c01_02_im (-c02_01_im)
+#define c00_10_re (+c10_00_re)
+#define c00_10_im (-c10_00_im)
+#define c01_10_re (+c10_01_re)
+#define c01_10_im (-c10_01_im)
+#define c02_10_re (+c10_02_re)
+#define c02_10_im (-c10_02_im)
+#define c00_11_re (+c11_00_re)
+#define c00_11_im (-c11_00_im)
+#define c01_11_re (+c11_01_re)
+#define c01_11_im (-c11_01_im)
+#define c02_11_re (+c11_02_re)
+#define c02_11_im (-c11_02_im)
+#define c10_11_re (+c11_10_re)
+#define c10_11_im (-c11_10_im)
+#define c00_12_re (+c12_00_re)
+#define c00_12_im (-c12_00_im)
+#define c01_12_re (+c12_01_re)
+#define c01_12_im (-c12_01_im)
+#define c02_12_re (+c12_02_re)
+#define c02_12_im (-c12_02_im)
+#define c10_12_re (+c12_10_re)
+#define c10_12_im (-c12_10_im)
+#define c11_12_re (+c12_11_re)
+#define c11_12_im (-c12_11_im)
+
+// second chiral block of inverted clover term (reuses C0,...,C9)
+#define c20_20_re c00_00_re
+#define c21_20_re c01_00_re
+#define c21_20_im c01_00_im
+#define c22_20_re c02_00_re
+#define c22_20_im c02_00_im
+#define c30_20_re c10_00_re
+#define c30_20_im c10_00_im
+#define c31_20_re c11_00_re
+#define c31_20_im c11_00_im
+#define c32_20_re c12_00_re
+#define c32_20_im c12_00_im
+#define c20_21_re c00_01_re
+#define c20_21_im c00_01_im
+#define c21_21_re c01_01_re
+#define c22_21_re c02_01_re
+#define c22_21_im c02_01_im
+#define c30_21_re c10_01_re
+#define c30_21_im c10_01_im
+#define c31_21_re c11_01_re
+#define c31_21_im c11_01_im
+#define c32_21_re c12_01_re
+#define c32_21_im c12_01_im
+#define c20_22_re c00_02_re
+#define c20_22_im c00_02_im
+#define c21_22_re c01_02_re
+#define c21_22_im c01_02_im
+#define c22_22_re c02_02_re
+#define c30_22_re c10_02_re
+#define c30_22_im c10_02_im
+#define c31_22_re c11_02_re
+#define c31_22_im c11_02_im
+#define c32_22_re c12_02_re
+#define c32_22_im c12_02_im
+#define c20_30_re c00_10_re
+#define c20_30_im c00_10_im
+#define c21_30_re c01_10_re
+#define c21_30_im c01_10_im
+#define c22_30_re c02_10_re
+#define c22_30_im c02_10_im
+#define c30_30_re c10_10_re
+#define c31_30_re c11_10_re
+#define c31_30_im c11_10_im
+#define c32_30_re c12_10_re
+#define c32_30_im c12_10_im
+#define c20_31_re c00_11_re
+#define c20_31_im c00_11_im
+#define c21_31_re c01_11_re
+#define c21_31_im c01_11_im
+#define c22_31_re c02_11_re
+#define c22_31_im c02_11_im
+#define c30_31_re c10_11_re
+#define c30_31_im c10_11_im
+#define c31_31_re c11_11_re
+#define c32_31_re c12_11_re
+#define c32_31_im c12_11_im
+#define c20_32_re c00_12_re
+#define c20_32_im c00_12_im
+#define c21_32_re c01_12_re
+#define c21_32_im c01_12_im
+#define c22_32_re c02_12_re
+#define c22_32_im c02_12_im
+#define c30_32_re c10_12_re
+#define c30_32_im c10_12_im
+#define c31_32_re c11_12_re
+#define c31_32_im c11_12_im
+#define c32_32_re c12_12_re
+
 // output spinor
 VOLATILE spinorFloat o00_re;
 VOLATILE spinorFloat o00_im;
@@ -206,6 +386,12 @@ VOLATILE spinorFloat o31_im;
 VOLATILE spinorFloat o32_re;
 VOLATILE spinorFloat o32_im;
 
+#ifdef SPINOR_DOUBLE
+#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
+#else
+#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
+#endif
+
 #include "read_gauge.h"
 #include "read_clover.h"
 #include "io_spinor.h"
@@ -224,22 +410,25 @@ int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
-  sid = blockIdx.x*blockDim.x + threadIdx.x;
-  if (sid >= param.threads) return;
-
   // Inline by hand for the moment and assume even dimensions
   //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
 
-  X = 2*sid;
-  int aux1 = X / X1;
-  x1 = X - aux1 * X1;
-  int aux2 = aux1 / X2;
-  x2 = aux1 - aux2 * X2;
-  x4 = aux2 / X3;
-  x3 = aux2 - x4 * X3;
-  aux1 = (param.parity + x4 + x3 + x2) & 1;
-  x1 += aux1;
-  X += aux1;
+  int xt = blockIdx.x*blockDim.x + threadIdx.x;
+  int aux = xt+xt;
+  if (aux >= X1*X4) return;
+
+  x4 = aux / X1;
+  x1 = aux - x4*X1;
+
+  x2 = blockIdx.y*blockDim.y + threadIdx.y;
+  if (x2 >= X2) return;
+
+  x3 = blockIdx.z*blockDim.z + threadIdx.z;
+  if (x3 >= X3) return;
+
+  x1 += (param.parity + x4 + x3 + x2) &1;
+  X = ((x4*X3 + x3)*X2 + x2)*X1 + x1;
+  sid = X >> 1; 
 
   o00_re = 0;  o00_im = 0;
   o01_re = 0;  o01_im = 0;
@@ -253,6 +442,454 @@ if (kernel_type == INTERIOR_KERNEL) {
   o30_re = 0;  o30_im = 0;
   o31_re = 0;  o31_im = 0;
   o32_re = 0;  o32_im = 0;
+#ifdef DSLASH_CLOVER_XPAY
+  
+  READ_ACCUM(ACCUMTEX, sp_stride)
+  
+#ifdef DSLASH_CLOVER
+  
+  // change to chiral basis
+  {
+    spinorFloat a00_re = -acc10_re - acc30_re;
+    spinorFloat a00_im = -acc10_im - acc30_im;
+    spinorFloat a10_re =  acc00_re + acc20_re;
+    spinorFloat a10_im =  acc00_im + acc20_im;
+    spinorFloat a20_re = -acc10_re + acc30_re;
+    spinorFloat a20_im = -acc10_im + acc30_im;
+    spinorFloat a30_re =  acc00_re - acc20_re;
+    spinorFloat a30_im =  acc00_im - acc20_im;
+    
+    acc00_re = a00_re;  acc00_im = a00_im;
+    acc10_re = a10_re;  acc10_im = a10_im;
+    acc20_re = a20_re;  acc20_im = a20_im;
+    acc30_re = a30_re;  acc30_im = a30_im;
+  }
+  
+  {
+    spinorFloat a01_re = -acc11_re - acc31_re;
+    spinorFloat a01_im = -acc11_im - acc31_im;
+    spinorFloat a11_re =  acc01_re + acc21_re;
+    spinorFloat a11_im =  acc01_im + acc21_im;
+    spinorFloat a21_re = -acc11_re + acc31_re;
+    spinorFloat a21_im = -acc11_im + acc31_im;
+    spinorFloat a31_re =  acc01_re - acc21_re;
+    spinorFloat a31_im =  acc01_im - acc21_im;
+    
+    acc01_re = a01_re;  acc01_im = a01_im;
+    acc11_re = a11_re;  acc11_im = a11_im;
+    acc21_re = a21_re;  acc21_im = a21_im;
+    acc31_re = a31_re;  acc31_im = a31_im;
+  }
+  
+  {
+    spinorFloat a02_re = -acc12_re - acc32_re;
+    spinorFloat a02_im = -acc12_im - acc32_im;
+    spinorFloat a12_re =  acc02_re + acc22_re;
+    spinorFloat a12_im =  acc02_im + acc22_im;
+    spinorFloat a22_re = -acc12_re + acc32_re;
+    spinorFloat a22_im = -acc12_im + acc32_im;
+    spinorFloat a32_re =  acc02_re - acc22_re;
+    spinorFloat a32_im =  acc02_im - acc22_im;
+    
+    acc02_re = a02_re;  acc02_im = a02_im;
+    acc12_re = a12_re;  acc12_im = a12_im;
+    acc22_re = a22_re;  acc22_im = a22_im;
+    acc32_re = a32_re;  acc32_im = a32_im;
+  }
+  
+  // apply first chiral block
+  {
+    READ_CLOVER(CLOVERTEX, 0)
+    
+    spinorFloat a00_re = 0; spinorFloat a00_im = 0;
+    spinorFloat a01_re = 0; spinorFloat a01_im = 0;
+    spinorFloat a02_re = 0; spinorFloat a02_im = 0;
+    spinorFloat a10_re = 0; spinorFloat a10_im = 0;
+    spinorFloat a11_re = 0; spinorFloat a11_im = 0;
+    spinorFloat a12_re = 0; spinorFloat a12_im = 0;
+    
+    a00_re += c00_00_re * acc00_re;
+    a00_im += c00_00_re * acc00_im;
+    a00_re += c00_01_re * acc01_re;
+    a00_re -= c00_01_im * acc01_im;
+    a00_im += c00_01_re * acc01_im;
+    a00_im += c00_01_im * acc01_re;
+    a00_re += c00_02_re * acc02_re;
+    a00_re -= c00_02_im * acc02_im;
+    a00_im += c00_02_re * acc02_im;
+    a00_im += c00_02_im * acc02_re;
+    a00_re += c00_10_re * acc10_re;
+    a00_re -= c00_10_im * acc10_im;
+    a00_im += c00_10_re * acc10_im;
+    a00_im += c00_10_im * acc10_re;
+    a00_re += c00_11_re * acc11_re;
+    a00_re -= c00_11_im * acc11_im;
+    a00_im += c00_11_re * acc11_im;
+    a00_im += c00_11_im * acc11_re;
+    a00_re += c00_12_re * acc12_re;
+    a00_re -= c00_12_im * acc12_im;
+    a00_im += c00_12_re * acc12_im;
+    a00_im += c00_12_im * acc12_re;
+    
+    a01_re += c01_00_re * acc00_re;
+    a01_re -= c01_00_im * acc00_im;
+    a01_im += c01_00_re * acc00_im;
+    a01_im += c01_00_im * acc00_re;
+    a01_re += c01_01_re * acc01_re;
+    a01_im += c01_01_re * acc01_im;
+    a01_re += c01_02_re * acc02_re;
+    a01_re -= c01_02_im * acc02_im;
+    a01_im += c01_02_re * acc02_im;
+    a01_im += c01_02_im * acc02_re;
+    a01_re += c01_10_re * acc10_re;
+    a01_re -= c01_10_im * acc10_im;
+    a01_im += c01_10_re * acc10_im;
+    a01_im += c01_10_im * acc10_re;
+    a01_re += c01_11_re * acc11_re;
+    a01_re -= c01_11_im * acc11_im;
+    a01_im += c01_11_re * acc11_im;
+    a01_im += c01_11_im * acc11_re;
+    a01_re += c01_12_re * acc12_re;
+    a01_re -= c01_12_im * acc12_im;
+    a01_im += c01_12_re * acc12_im;
+    a01_im += c01_12_im * acc12_re;
+    
+    a02_re += c02_00_re * acc00_re;
+    a02_re -= c02_00_im * acc00_im;
+    a02_im += c02_00_re * acc00_im;
+    a02_im += c02_00_im * acc00_re;
+    a02_re += c02_01_re * acc01_re;
+    a02_re -= c02_01_im * acc01_im;
+    a02_im += c02_01_re * acc01_im;
+    a02_im += c02_01_im * acc01_re;
+    a02_re += c02_02_re * acc02_re;
+    a02_im += c02_02_re * acc02_im;
+    a02_re += c02_10_re * acc10_re;
+    a02_re -= c02_10_im * acc10_im;
+    a02_im += c02_10_re * acc10_im;
+    a02_im += c02_10_im * acc10_re;
+    a02_re += c02_11_re * acc11_re;
+    a02_re -= c02_11_im * acc11_im;
+    a02_im += c02_11_re * acc11_im;
+    a02_im += c02_11_im * acc11_re;
+    a02_re += c02_12_re * acc12_re;
+    a02_re -= c02_12_im * acc12_im;
+    a02_im += c02_12_re * acc12_im;
+    a02_im += c02_12_im * acc12_re;
+    
+    a10_re += c10_00_re * acc00_re;
+    a10_re -= c10_00_im * acc00_im;
+    a10_im += c10_00_re * acc00_im;
+    a10_im += c10_00_im * acc00_re;
+    a10_re += c10_01_re * acc01_re;
+    a10_re -= c10_01_im * acc01_im;
+    a10_im += c10_01_re * acc01_im;
+    a10_im += c10_01_im * acc01_re;
+    a10_re += c10_02_re * acc02_re;
+    a10_re -= c10_02_im * acc02_im;
+    a10_im += c10_02_re * acc02_im;
+    a10_im += c10_02_im * acc02_re;
+    a10_re += c10_10_re * acc10_re;
+    a10_im += c10_10_re * acc10_im;
+    a10_re += c10_11_re * acc11_re;
+    a10_re -= c10_11_im * acc11_im;
+    a10_im += c10_11_re * acc11_im;
+    a10_im += c10_11_im * acc11_re;
+    a10_re += c10_12_re * acc12_re;
+    a10_re -= c10_12_im * acc12_im;
+    a10_im += c10_12_re * acc12_im;
+    a10_im += c10_12_im * acc12_re;
+    
+    a11_re += c11_00_re * acc00_re;
+    a11_re -= c11_00_im * acc00_im;
+    a11_im += c11_00_re * acc00_im;
+    a11_im += c11_00_im * acc00_re;
+    a11_re += c11_01_re * acc01_re;
+    a11_re -= c11_01_im * acc01_im;
+    a11_im += c11_01_re * acc01_im;
+    a11_im += c11_01_im * acc01_re;
+    a11_re += c11_02_re * acc02_re;
+    a11_re -= c11_02_im * acc02_im;
+    a11_im += c11_02_re * acc02_im;
+    a11_im += c11_02_im * acc02_re;
+    a11_re += c11_10_re * acc10_re;
+    a11_re -= c11_10_im * acc10_im;
+    a11_im += c11_10_re * acc10_im;
+    a11_im += c11_10_im * acc10_re;
+    a11_re += c11_11_re * acc11_re;
+    a11_im += c11_11_re * acc11_im;
+    a11_re += c11_12_re * acc12_re;
+    a11_re -= c11_12_im * acc12_im;
+    a11_im += c11_12_re * acc12_im;
+    a11_im += c11_12_im * acc12_re;
+    
+    a12_re += c12_00_re * acc00_re;
+    a12_re -= c12_00_im * acc00_im;
+    a12_im += c12_00_re * acc00_im;
+    a12_im += c12_00_im * acc00_re;
+    a12_re += c12_01_re * acc01_re;
+    a12_re -= c12_01_im * acc01_im;
+    a12_im += c12_01_re * acc01_im;
+    a12_im += c12_01_im * acc01_re;
+    a12_re += c12_02_re * acc02_re;
+    a12_re -= c12_02_im * acc02_im;
+    a12_im += c12_02_re * acc02_im;
+    a12_im += c12_02_im * acc02_re;
+    a12_re += c12_10_re * acc10_re;
+    a12_re -= c12_10_im * acc10_im;
+    a12_im += c12_10_re * acc10_im;
+    a12_im += c12_10_im * acc10_re;
+    a12_re += c12_11_re * acc11_re;
+    a12_re -= c12_11_im * acc11_im;
+    a12_im += c12_11_re * acc11_im;
+    a12_im += c12_11_im * acc11_re;
+    a12_re += c12_12_re * acc12_re;
+    a12_im += c12_12_re * acc12_im;
+    
+    acc00_re = a00_re;  acc00_im = a00_im;
+    acc01_re = a01_re;  acc01_im = a01_im;
+    acc02_re = a02_re;  acc02_im = a02_im;
+    acc10_re = a10_re;  acc10_im = a10_im;
+    acc11_re = a11_re;  acc11_im = a11_im;
+    acc12_re = a12_re;  acc12_im = a12_im;
+    
+  }
+  
+  // apply second chiral block
+  {
+    READ_CLOVER(CLOVERTEX, 1)
+    
+    spinorFloat a20_re = 0; spinorFloat a20_im = 0;
+    spinorFloat a21_re = 0; spinorFloat a21_im = 0;
+    spinorFloat a22_re = 0; spinorFloat a22_im = 0;
+    spinorFloat a30_re = 0; spinorFloat a30_im = 0;
+    spinorFloat a31_re = 0; spinorFloat a31_im = 0;
+    spinorFloat a32_re = 0; spinorFloat a32_im = 0;
+    
+    a20_re += c20_20_re * acc20_re;
+    a20_im += c20_20_re * acc20_im;
+    a20_re += c20_21_re * acc21_re;
+    a20_re -= c20_21_im * acc21_im;
+    a20_im += c20_21_re * acc21_im;
+    a20_im += c20_21_im * acc21_re;
+    a20_re += c20_22_re * acc22_re;
+    a20_re -= c20_22_im * acc22_im;
+    a20_im += c20_22_re * acc22_im;
+    a20_im += c20_22_im * acc22_re;
+    a20_re += c20_30_re * acc30_re;
+    a20_re -= c20_30_im * acc30_im;
+    a20_im += c20_30_re * acc30_im;
+    a20_im += c20_30_im * acc30_re;
+    a20_re += c20_31_re * acc31_re;
+    a20_re -= c20_31_im * acc31_im;
+    a20_im += c20_31_re * acc31_im;
+    a20_im += c20_31_im * acc31_re;
+    a20_re += c20_32_re * acc32_re;
+    a20_re -= c20_32_im * acc32_im;
+    a20_im += c20_32_re * acc32_im;
+    a20_im += c20_32_im * acc32_re;
+    
+    a21_re += c21_20_re * acc20_re;
+    a21_re -= c21_20_im * acc20_im;
+    a21_im += c21_20_re * acc20_im;
+    a21_im += c21_20_im * acc20_re;
+    a21_re += c21_21_re * acc21_re;
+    a21_im += c21_21_re * acc21_im;
+    a21_re += c21_22_re * acc22_re;
+    a21_re -= c21_22_im * acc22_im;
+    a21_im += c21_22_re * acc22_im;
+    a21_im += c21_22_im * acc22_re;
+    a21_re += c21_30_re * acc30_re;
+    a21_re -= c21_30_im * acc30_im;
+    a21_im += c21_30_re * acc30_im;
+    a21_im += c21_30_im * acc30_re;
+    a21_re += c21_31_re * acc31_re;
+    a21_re -= c21_31_im * acc31_im;
+    a21_im += c21_31_re * acc31_im;
+    a21_im += c21_31_im * acc31_re;
+    a21_re += c21_32_re * acc32_re;
+    a21_re -= c21_32_im * acc32_im;
+    a21_im += c21_32_re * acc32_im;
+    a21_im += c21_32_im * acc32_re;
+    
+    a22_re += c22_20_re * acc20_re;
+    a22_re -= c22_20_im * acc20_im;
+    a22_im += c22_20_re * acc20_im;
+    a22_im += c22_20_im * acc20_re;
+    a22_re += c22_21_re * acc21_re;
+    a22_re -= c22_21_im * acc21_im;
+    a22_im += c22_21_re * acc21_im;
+    a22_im += c22_21_im * acc21_re;
+    a22_re += c22_22_re * acc22_re;
+    a22_im += c22_22_re * acc22_im;
+    a22_re += c22_30_re * acc30_re;
+    a22_re -= c22_30_im * acc30_im;
+    a22_im += c22_30_re * acc30_im;
+    a22_im += c22_30_im * acc30_re;
+    a22_re += c22_31_re * acc31_re;
+    a22_re -= c22_31_im * acc31_im;
+    a22_im += c22_31_re * acc31_im;
+    a22_im += c22_31_im * acc31_re;
+    a22_re += c22_32_re * acc32_re;
+    a22_re -= c22_32_im * acc32_im;
+    a22_im += c22_32_re * acc32_im;
+    a22_im += c22_32_im * acc32_re;
+    
+    a30_re += c30_20_re * acc20_re;
+    a30_re -= c30_20_im * acc20_im;
+    a30_im += c30_20_re * acc20_im;
+    a30_im += c30_20_im * acc20_re;
+    a30_re += c30_21_re * acc21_re;
+    a30_re -= c30_21_im * acc21_im;
+    a30_im += c30_21_re * acc21_im;
+    a30_im += c30_21_im * acc21_re;
+    a30_re += c30_22_re * acc22_re;
+    a30_re -= c30_22_im * acc22_im;
+    a30_im += c30_22_re * acc22_im;
+    a30_im += c30_22_im * acc22_re;
+    a30_re += c30_30_re * acc30_re;
+    a30_im += c30_30_re * acc30_im;
+    a30_re += c30_31_re * acc31_re;
+    a30_re -= c30_31_im * acc31_im;
+    a30_im += c30_31_re * acc31_im;
+    a30_im += c30_31_im * acc31_re;
+    a30_re += c30_32_re * acc32_re;
+    a30_re -= c30_32_im * acc32_im;
+    a30_im += c30_32_re * acc32_im;
+    a30_im += c30_32_im * acc32_re;
+    
+    a31_re += c31_20_re * acc20_re;
+    a31_re -= c31_20_im * acc20_im;
+    a31_im += c31_20_re * acc20_im;
+    a31_im += c31_20_im * acc20_re;
+    a31_re += c31_21_re * acc21_re;
+    a31_re -= c31_21_im * acc21_im;
+    a31_im += c31_21_re * acc21_im;
+    a31_im += c31_21_im * acc21_re;
+    a31_re += c31_22_re * acc22_re;
+    a31_re -= c31_22_im * acc22_im;
+    a31_im += c31_22_re * acc22_im;
+    a31_im += c31_22_im * acc22_re;
+    a31_re += c31_30_re * acc30_re;
+    a31_re -= c31_30_im * acc30_im;
+    a31_im += c31_30_re * acc30_im;
+    a31_im += c31_30_im * acc30_re;
+    a31_re += c31_31_re * acc31_re;
+    a31_im += c31_31_re * acc31_im;
+    a31_re += c31_32_re * acc32_re;
+    a31_re -= c31_32_im * acc32_im;
+    a31_im += c31_32_re * acc32_im;
+    a31_im += c31_32_im * acc32_re;
+    
+    a32_re += c32_20_re * acc20_re;
+    a32_re -= c32_20_im * acc20_im;
+    a32_im += c32_20_re * acc20_im;
+    a32_im += c32_20_im * acc20_re;
+    a32_re += c32_21_re * acc21_re;
+    a32_re -= c32_21_im * acc21_im;
+    a32_im += c32_21_re * acc21_im;
+    a32_im += c32_21_im * acc21_re;
+    a32_re += c32_22_re * acc22_re;
+    a32_re -= c32_22_im * acc22_im;
+    a32_im += c32_22_re * acc22_im;
+    a32_im += c32_22_im * acc22_re;
+    a32_re += c32_30_re * acc30_re;
+    a32_re -= c32_30_im * acc30_im;
+    a32_im += c32_30_re * acc30_im;
+    a32_im += c32_30_im * acc30_re;
+    a32_re += c32_31_re * acc31_re;
+    a32_re -= c32_31_im * acc31_im;
+    a32_im += c32_31_re * acc31_im;
+    a32_im += c32_31_im * acc31_re;
+    a32_re += c32_32_re * acc32_re;
+    a32_im += c32_32_re * acc32_im;
+    
+    acc20_re = a20_re;  acc20_im = a20_im;
+    acc21_re = a21_re;  acc21_im = a21_im;
+    acc22_re = a22_re;  acc22_im = a22_im;
+    acc30_re = a30_re;  acc30_im = a30_im;
+    acc31_re = a31_re;  acc31_im = a31_im;
+    acc32_re = a32_re;  acc32_im = a32_im;
+    
+  }
+  
+  // change back from chiral basis
+  // (note: required factor of 1/2 is included in clover term normalization)
+  {
+    spinorFloat a00_re =  acc10_re + acc30_re;
+    spinorFloat a00_im =  acc10_im + acc30_im;
+    spinorFloat a10_re = -acc00_re - acc20_re;
+    spinorFloat a10_im = -acc00_im - acc20_im;
+    spinorFloat a20_re =  acc10_re - acc30_re;
+    spinorFloat a20_im =  acc10_im - acc30_im;
+    spinorFloat a30_re = -acc00_re + acc20_re;
+    spinorFloat a30_im = -acc00_im + acc20_im;
+    
+    acc00_re = a00_re;  acc00_im = a00_im;
+    acc10_re = a10_re;  acc10_im = a10_im;
+    acc20_re = a20_re;  acc20_im = a20_im;
+    acc30_re = a30_re;  acc30_im = a30_im;
+  }
+  
+  {
+    spinorFloat a01_re =  acc11_re + acc31_re;
+    spinorFloat a01_im =  acc11_im + acc31_im;
+    spinorFloat a11_re = -acc01_re - acc21_re;
+    spinorFloat a11_im = -acc01_im - acc21_im;
+    spinorFloat a21_re =  acc11_re - acc31_re;
+    spinorFloat a21_im =  acc11_im - acc31_im;
+    spinorFloat a31_re = -acc01_re + acc21_re;
+    spinorFloat a31_im = -acc01_im + acc21_im;
+    
+    acc01_re = a01_re;  acc01_im = a01_im;
+    acc11_re = a11_re;  acc11_im = a11_im;
+    acc21_re = a21_re;  acc21_im = a21_im;
+    acc31_re = a31_re;  acc31_im = a31_im;
+  }
+  
+  {
+    spinorFloat a02_re =  acc12_re + acc32_re;
+    spinorFloat a02_im =  acc12_im + acc32_im;
+    spinorFloat a12_re = -acc02_re - acc22_re;
+    spinorFloat a12_im = -acc02_im - acc22_im;
+    spinorFloat a22_re =  acc12_re - acc32_re;
+    spinorFloat a22_im =  acc12_im - acc32_im;
+    spinorFloat a32_re = -acc02_re + acc22_re;
+    spinorFloat a32_im = -acc02_im + acc22_im;
+    
+    acc02_re = a02_re;  acc02_im = a02_im;
+    acc12_re = a12_re;  acc12_im = a12_im;
+    acc22_re = a22_re;  acc22_im = a22_im;
+    acc32_re = a32_re;  acc32_im = a32_im;
+  }
+  
+#endif // DSLASH_CLOVER
+  
+  o00_re = acc00_re;
+  o00_im = acc00_im;
+  o01_re = acc01_re;
+  o01_im = acc01_im;
+  o02_re = acc02_re;
+  o02_im = acc02_im;
+  o10_re = acc10_re;
+  o10_im = acc10_im;
+  o11_re = acc11_re;
+  o11_im = acc11_im;
+  o12_re = acc12_re;
+  o12_im = acc12_im;
+  o20_re = acc20_re;
+  o20_im = acc20_im;
+  o21_re = acc21_re;
+  o21_im = acc21_im;
+  o22_re = acc22_re;
+  o22_im = acc22_im;
+  o30_re = acc30_re;
+  o30_im = acc30_im;
+  o31_re = acc31_re;
+  o31_im = acc31_im;
+  o32_re = acc32_re;
+  o32_im = acc32_im;
+#endif // DSLASH_CLOVER_XPAY
 
 #ifdef MULTI_GPU
 } else { // exterior kernel
@@ -298,11 +935,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
      (kernel_type == EXTERIOR_KERNEL_X && x1==X1m1) )
 #endif
 {
-  // Projector P0+
-  // 1 0 0 i 
-  // 0 1 i 0 
-  // 0 -i 1 0 
-  // -i 0 0 1 
+  // Projector P0-
+  // 1 0 0 -i 
+  // 0 1 -i 0 
+  // 0 i 1 0 
+  // i 0 0 1 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==X1m1 ? X-X1m1 : X+1) >> 1 :
@@ -327,19 +964,22 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
+    // store spinor into shared memory
+    WRITE_SPINOR_SHARED(threadIdx.x, threadIdx.y, threadIdx.z, i);
+    
     // project spinor into half spinors
-    a0_re = +i00_re-i30_im;
-    a0_im = +i00_im+i30_re;
-    a1_re = +i01_re-i31_im;
-    a1_im = +i01_im+i31_re;
-    a2_re = +i02_re-i32_im;
-    a2_im = +i02_im+i32_re;
-    b0_re = +i10_re-i20_im;
-    b0_im = +i10_im+i20_re;
-    b1_re = +i11_re-i21_im;
-    b1_im = +i11_im+i21_re;
-    b2_re = +i12_re-i22_im;
-    b2_im = +i12_im+i22_re;
+    a0_re = +i00_re+i30_im;
+    a0_im = +i00_im-i30_re;
+    a1_re = +i01_re+i31_im;
+    a1_im = +i01_im-i31_re;
+    a2_re = +i02_re+i32_im;
+    a2_im = +i02_im-i32_re;
+    b0_re = +i10_re+i20_im;
+    b0_im = +i10_im-i20_re;
+    b1_re = +i11_re+i21_im;
+    b1_im = +i11_im-i21_re;
+    b2_re = +i12_re+i22_im;
+    b2_im = +i12_im-i22_re;
   
 #ifdef MULTI_GPU
   } else {
@@ -455,32 +1095,32 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   B2_im += g22_re * b2_im;
   B2_im += g22_im * b2_re;
   
-  o00_re += A0_re;
-  o00_im += A0_im;
-  o10_re += B0_re;
-  o10_im += B0_im;
-  o20_re += B0_im;
-  o20_im -= B0_re;
-  o30_re += A0_im;
-  o30_im -= A0_re;
+  o00_re += a*A0_re;
+  o00_im += a*A0_im;
+  o10_re += a*B0_re;
+  o10_im += a*B0_im;
+  o20_re -= a*B0_im;
+  o20_im += a*B0_re;
+  o30_re -= a*A0_im;
+  o30_im += a*A0_re;
   
-  o01_re += A1_re;
-  o01_im += A1_im;
-  o11_re += B1_re;
-  o11_im += B1_im;
-  o21_re += B1_im;
-  o21_im -= B1_re;
-  o31_re += A1_im;
-  o31_im -= A1_re;
+  o01_re += a*A1_re;
+  o01_im += a*A1_im;
+  o11_re += a*B1_re;
+  o11_im += a*B1_im;
+  o21_re -= a*B1_im;
+  o21_im += a*B1_re;
+  o31_re -= a*A1_im;
+  o31_im += a*A1_re;
   
-  o02_re += A2_re;
-  o02_im += A2_im;
-  o12_re += B2_re;
-  o12_im += B2_im;
-  o22_re += B2_im;
-  o22_im -= B2_re;
-  o32_re += A2_im;
-  o32_im -= A2_re;
+  o02_re += a*A2_re;
+  o02_im += a*A2_im;
+  o12_re += a*B2_re;
+  o12_im += a*B2_im;
+  o22_re -= a*B2_im;
+  o22_im += a*B2_re;
+  o32_re -= a*A2_im;
+  o32_im += a*A2_re;
   
 }
 
@@ -489,11 +1129,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
      (kernel_type == EXTERIOR_KERNEL_X && x1==0) )
 #endif
 {
-  // Projector P0-
-  // 1 0 0 -i 
-  // 0 1 -i 0 
-  // 0 i 1 0 
-  // i 0 0 1 
+  // Projector P0+
+  // 1 0 0 i 
+  // 0 1 i 0 
+  // 0 -i 1 0 
+  // -i 0 0 1 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==0 ? X+X1m1 : X-1) >> 1 :
@@ -519,22 +1159,24 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
-    // read spinor from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    // load spinor from shared memory
+    int tx = (threadIdx.x > 0) ? threadIdx.x-1 : blockDim.x-1;
+    __syncthreads();
+    READ_SPINOR_SHARED(tx, threadIdx.y, threadIdx.z);
     
     // project spinor into half spinors
-    a0_re = +i00_re+i30_im;
-    a0_im = +i00_im-i30_re;
-    a1_re = +i01_re+i31_im;
-    a1_im = +i01_im-i31_re;
-    a2_re = +i02_re+i32_im;
-    a2_im = +i02_im-i32_re;
-    b0_re = +i10_re+i20_im;
-    b0_im = +i10_im-i20_re;
-    b1_re = +i11_re+i21_im;
-    b1_im = +i11_im-i21_re;
-    b2_re = +i12_re+i22_im;
-    b2_im = +i12_im-i22_re;
+    a0_re = +i00_re-i30_im;
+    a0_im = +i00_im+i30_re;
+    a1_re = +i01_re-i31_im;
+    a1_im = +i01_im+i31_re;
+    a2_re = +i02_re-i32_im;
+    a2_im = +i02_im+i32_re;
+    b0_re = +i10_re-i20_im;
+    b0_im = +i10_im+i20_re;
+    b1_re = +i11_re-i21_im;
+    b1_im = +i11_im+i21_re;
+    b2_re = +i12_re-i22_im;
+    b2_im = +i12_im+i22_re;
   
 #ifdef MULTI_GPU
   } else {
@@ -650,32 +1292,32 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   B2_im += gT22_re * b2_im;
   B2_im += gT22_im * b2_re;
   
-  o00_re += A0_re;
-  o00_im += A0_im;
-  o10_re += B0_re;
-  o10_im += B0_im;
-  o20_re -= B0_im;
-  o20_im += B0_re;
-  o30_re -= A0_im;
-  o30_im += A0_re;
+  o00_re += a*A0_re;
+  o00_im += a*A0_im;
+  o10_re += a*B0_re;
+  o10_im += a*B0_im;
+  o20_re += a*B0_im;
+  o20_im -= a*B0_re;
+  o30_re += a*A0_im;
+  o30_im -= a*A0_re;
   
-  o01_re += A1_re;
-  o01_im += A1_im;
-  o11_re += B1_re;
-  o11_im += B1_im;
-  o21_re -= B1_im;
-  o21_im += B1_re;
-  o31_re -= A1_im;
-  o31_im += A1_re;
+  o01_re += a*A1_re;
+  o01_im += a*A1_im;
+  o11_re += a*B1_re;
+  o11_im += a*B1_im;
+  o21_re += a*B1_im;
+  o21_im -= a*B1_re;
+  o31_re += a*A1_im;
+  o31_im -= a*A1_re;
   
-  o02_re += A2_re;
-  o02_im += A2_im;
-  o12_re += B2_re;
-  o12_im += B2_im;
-  o22_re -= B2_im;
-  o22_im += B2_re;
-  o32_re -= A2_im;
-  o32_im += A2_re;
+  o02_re += a*A2_re;
+  o02_im += a*A2_im;
+  o12_re += a*B2_re;
+  o12_im += a*B2_im;
+  o22_re += a*B2_im;
+  o22_im -= a*B2_re;
+  o32_re += a*A2_im;
+  o32_im -= a*A2_re;
   
 }
 
@@ -684,11 +1326,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
      (kernel_type == EXTERIOR_KERNEL_Y && x2==X2m1) )
 #endif
 {
-  // Projector P1+
-  // 1 0 0 1 
-  // 0 1 -1 0 
-  // 0 -1 1 0 
-  // 1 0 0 1 
+  // Projector P1-
+  // 1 0 0 -1 
+  // 0 1 1 0 
+  // 0 1 1 0 
+  // -1 0 0 1 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1 :
@@ -710,22 +1352,43 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.y == blockDim.y-1 && blockDim.y < X2 ) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
-    a0_re = +i00_re+i30_re;
-    a0_im = +i00_im+i30_im;
-    a1_re = +i01_re+i31_re;
-    a1_im = +i01_im+i31_im;
-    a2_re = +i02_re+i32_re;
-    a2_im = +i02_im+i32_im;
-    b0_re = +i10_re-i20_re;
-    b0_im = +i10_im-i20_im;
-    b1_re = +i11_re-i21_re;
-    b1_im = +i11_im-i21_im;
-    b2_re = +i12_re-i22_re;
-    b2_im = +i12_im-i22_im;
+    a0_re = +i00_re-i30_re;
+    a0_im = +i00_im-i30_im;
+    a1_re = +i01_re-i31_re;
+    a1_im = +i01_im-i31_im;
+    a2_re = +i02_re-i32_re;
+    a2_im = +i02_im-i32_im;
+    b0_re = +i10_re+i20_re;
+    b0_im = +i10_im+i20_im;
+    b1_re = +i11_re+i21_re;
+    b1_im = +i11_im+i21_im;
+    b2_re = +i12_re+i22_re;
+    b2_im = +i12_im+i22_im;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+    int ty = (threadIdx.y < blockDim.y - 1) ? threadIdx.y + 1 : 0;
+    READ_SPINOR_SHARED(tx, ty, threadIdx.z);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re-i30_re;
+    a0_im = +i00_im-i30_im;
+    a1_re = +i01_re-i31_re;
+    a1_im = +i01_im-i31_im;
+    a2_re = +i02_re-i32_re;
+    a2_im = +i02_im-i32_im;
+    b0_re = +i10_re+i20_re;
+    b0_im = +i10_im+i20_im;
+    b1_re = +i11_re+i21_re;
+    b1_im = +i11_im+i21_im;
+    b2_re = +i12_re+i22_re;
+    b2_im = +i12_im+i22_im;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -841,32 +1504,32 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   B2_im += g22_re * b2_im;
   B2_im += g22_im * b2_re;
   
-  o00_re += A0_re;
-  o00_im += A0_im;
-  o10_re += B0_re;
-  o10_im += B0_im;
-  o20_re -= B0_re;
-  o20_im -= B0_im;
-  o30_re += A0_re;
-  o30_im += A0_im;
+  o00_re += a*A0_re;
+  o00_im += a*A0_im;
+  o10_re += a*B0_re;
+  o10_im += a*B0_im;
+  o20_re += a*B0_re;
+  o20_im += a*B0_im;
+  o30_re -= a*A0_re;
+  o30_im -= a*A0_im;
   
-  o01_re += A1_re;
-  o01_im += A1_im;
-  o11_re += B1_re;
-  o11_im += B1_im;
-  o21_re -= B1_re;
-  o21_im -= B1_im;
-  o31_re += A1_re;
-  o31_im += A1_im;
+  o01_re += a*A1_re;
+  o01_im += a*A1_im;
+  o11_re += a*B1_re;
+  o11_im += a*B1_im;
+  o21_re += a*B1_re;
+  o21_im += a*B1_im;
+  o31_re -= a*A1_re;
+  o31_im -= a*A1_im;
   
-  o02_re += A2_re;
-  o02_im += A2_im;
-  o12_re += B2_re;
-  o12_im += B2_im;
-  o22_re -= B2_re;
-  o22_im -= B2_im;
-  o32_re += A2_re;
-  o32_im += A2_im;
+  o02_re += a*A2_re;
+  o02_im += a*A2_im;
+  o12_re += a*B2_re;
+  o12_im += a*B2_im;
+  o22_re += a*B2_re;
+  o22_im += a*B2_im;
+  o32_re -= a*A2_re;
+  o32_im -= a*A2_im;
   
 }
 
@@ -875,11 +1538,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
      (kernel_type == EXTERIOR_KERNEL_Y && x2==0) )
 #endif
 {
-  // Projector P1-
-  // 1 0 0 -1 
-  // 0 1 1 0 
-  // 0 1 1 0 
-  // -1 0 0 1 
+  // Projector P1+
+  // 1 0 0 1 
+  // 0 1 -1 0 
+  // 0 -1 1 0 
+  // 1 0 0 1 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==0 ? X+X2X1mX1 : X-X1) >> 1 :
@@ -905,22 +1568,43 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.y == 0 && blockDim.y < X2) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
-    a0_re = +i00_re-i30_re;
-    a0_im = +i00_im-i30_im;
-    a1_re = +i01_re-i31_re;
-    a1_im = +i01_im-i31_im;
-    a2_re = +i02_re-i32_re;
-    a2_im = +i02_im-i32_im;
-    b0_re = +i10_re+i20_re;
-    b0_im = +i10_im+i20_im;
-    b1_re = +i11_re+i21_re;
-    b1_im = +i11_im+i21_im;
-    b2_re = +i12_re+i22_re;
-    b2_im = +i12_im+i22_im;
+    a0_re = +i00_re+i30_re;
+    a0_im = +i00_im+i30_im;
+    a1_re = +i01_re+i31_re;
+    a1_im = +i01_im+i31_im;
+    a2_re = +i02_re+i32_re;
+    a2_im = +i02_im+i32_im;
+    b0_re = +i10_re-i20_re;
+    b0_im = +i10_im-i20_im;
+    b1_re = +i11_re-i21_re;
+    b1_im = +i11_im-i21_im;
+    b2_re = +i12_re-i22_re;
+    b2_im = +i12_im-i22_im;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+    int ty = (threadIdx.y > 0) ? threadIdx.y - 1 : blockDim.y - 1;
+    READ_SPINOR_SHARED(tx, ty, threadIdx.z);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re+i30_re;
+    a0_im = +i00_im+i30_im;
+    a1_re = +i01_re+i31_re;
+    a1_im = +i01_im+i31_im;
+    a2_re = +i02_re+i32_re;
+    a2_im = +i02_im+i32_im;
+    b0_re = +i10_re-i20_re;
+    b0_im = +i10_im-i20_im;
+    b1_re = +i11_re-i21_re;
+    b1_im = +i11_im-i21_im;
+    b2_re = +i12_re-i22_re;
+    b2_im = +i12_im-i22_im;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -1036,32 +1720,32 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   B2_im += gT22_re * b2_im;
   B2_im += gT22_im * b2_re;
   
-  o00_re += A0_re;
-  o00_im += A0_im;
-  o10_re += B0_re;
-  o10_im += B0_im;
-  o20_re += B0_re;
-  o20_im += B0_im;
-  o30_re -= A0_re;
-  o30_im -= A0_im;
+  o00_re += a*A0_re;
+  o00_im += a*A0_im;
+  o10_re += a*B0_re;
+  o10_im += a*B0_im;
+  o20_re -= a*B0_re;
+  o20_im -= a*B0_im;
+  o30_re += a*A0_re;
+  o30_im += a*A0_im;
   
-  o01_re += A1_re;
-  o01_im += A1_im;
-  o11_re += B1_re;
-  o11_im += B1_im;
-  o21_re += B1_re;
-  o21_im += B1_im;
-  o31_re -= A1_re;
-  o31_im -= A1_im;
+  o01_re += a*A1_re;
+  o01_im += a*A1_im;
+  o11_re += a*B1_re;
+  o11_im += a*B1_im;
+  o21_re -= a*B1_re;
+  o21_im -= a*B1_im;
+  o31_re += a*A1_re;
+  o31_im += a*A1_im;
   
-  o02_re += A2_re;
-  o02_im += A2_im;
-  o12_re += B2_re;
-  o12_im += B2_im;
-  o22_re += B2_re;
-  o22_im += B2_im;
-  o32_re -= A2_re;
-  o32_im -= A2_im;
+  o02_re += a*A2_re;
+  o02_im += a*A2_im;
+  o12_re += a*B2_re;
+  o12_im += a*B2_im;
+  o22_re -= a*B2_re;
+  o22_im -= a*B2_im;
+  o32_re += a*A2_re;
+  o32_im += a*A2_im;
   
 }
 
@@ -1070,11 +1754,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
      (kernel_type == EXTERIOR_KERNEL_Z && x3==X3m1) )
 #endif
 {
-  // Projector P2+
-  // 1 0 i 0 
-  // 0 1 0 -i 
-  // -i 0 1 0 
-  // 0 i 0 1 
+  // Projector P2-
+  // 1 0 -i 0 
+  // 0 1 0 i 
+  // i 0 1 0 
+  // 0 -i 0 1 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1 :
@@ -1096,22 +1780,43 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.z == blockDim.z-1 && blockDim.z < X3) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
-    a0_re = +i00_re-i20_im;
-    a0_im = +i00_im+i20_re;
-    a1_re = +i01_re-i21_im;
-    a1_im = +i01_im+i21_re;
-    a2_re = +i02_re-i22_im;
-    a2_im = +i02_im+i22_re;
-    b0_re = +i10_re+i30_im;
-    b0_im = +i10_im-i30_re;
-    b1_re = +i11_re+i31_im;
-    b1_im = +i11_im-i31_re;
-    b2_re = +i12_re+i32_im;
-    b2_im = +i12_im-i32_re;
+    a0_re = +i00_re+i20_im;
+    a0_im = +i00_im-i20_re;
+    a1_re = +i01_re+i21_im;
+    a1_im = +i01_im-i21_re;
+    a2_re = +i02_re+i22_im;
+    a2_im = +i02_im-i22_re;
+    b0_re = +i10_re-i30_im;
+    b0_im = +i10_im+i30_re;
+    b1_re = +i11_re-i31_im;
+    b1_im = +i11_im+i31_re;
+    b2_re = +i12_re-i32_im;
+    b2_im = +i12_im+i32_re;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+    int tz = (threadIdx.z < blockDim.z - 1) ? threadIdx.z + 1 : 0;
+    READ_SPINOR_SHARED(tx, threadIdx.y, tz);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re+i20_im;
+    a0_im = +i00_im-i20_re;
+    a1_re = +i01_re+i21_im;
+    a1_im = +i01_im-i21_re;
+    a2_re = +i02_re+i22_im;
+    a2_im = +i02_im-i22_re;
+    b0_re = +i10_re-i30_im;
+    b0_im = +i10_im+i30_re;
+    b1_re = +i11_re-i31_im;
+    b1_im = +i11_im+i31_re;
+    b2_re = +i12_re-i32_im;
+    b2_im = +i12_im+i32_re;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -1227,32 +1932,32 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   B2_im += g22_re * b2_im;
   B2_im += g22_im * b2_re;
   
-  o00_re += A0_re;
-  o00_im += A0_im;
-  o10_re += B0_re;
-  o10_im += B0_im;
-  o20_re += A0_im;
-  o20_im -= A0_re;
-  o30_re -= B0_im;
-  o30_im += B0_re;
+  o00_re += a*A0_re;
+  o00_im += a*A0_im;
+  o10_re += a*B0_re;
+  o10_im += a*B0_im;
+  o20_re -= a*A0_im;
+  o20_im += a*A0_re;
+  o30_re += a*B0_im;
+  o30_im -= a*B0_re;
   
-  o01_re += A1_re;
-  o01_im += A1_im;
-  o11_re += B1_re;
-  o11_im += B1_im;
-  o21_re += A1_im;
-  o21_im -= A1_re;
-  o31_re -= B1_im;
-  o31_im += B1_re;
+  o01_re += a*A1_re;
+  o01_im += a*A1_im;
+  o11_re += a*B1_re;
+  o11_im += a*B1_im;
+  o21_re -= a*A1_im;
+  o21_im += a*A1_re;
+  o31_re += a*B1_im;
+  o31_im -= a*B1_re;
   
-  o02_re += A2_re;
-  o02_im += A2_im;
-  o12_re += B2_re;
-  o12_im += B2_im;
-  o22_re += A2_im;
-  o22_im -= A2_re;
-  o32_re -= B2_im;
-  o32_im += B2_re;
+  o02_re += a*A2_re;
+  o02_im += a*A2_im;
+  o12_re += a*B2_re;
+  o12_im += a*B2_im;
+  o22_re -= a*A2_im;
+  o22_im += a*A2_re;
+  o32_re += a*B2_im;
+  o32_im -= a*B2_re;
   
 }
 
@@ -1261,11 +1966,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
      (kernel_type == EXTERIOR_KERNEL_Z && x3==0) )
 #endif
 {
-  // Projector P2-
-  // 1 0 -i 0 
-  // 0 1 0 i 
-  // i 0 1 0 
-  // 0 -i 0 1 
+  // Projector P2+
+  // 1 0 i 0 
+  // 0 1 0 -i 
+  // -i 0 1 0 
+  // 0 i 0 1 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1 :
@@ -1291,22 +1996,43 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   if (kernel_type == INTERIOR_KERNEL) {
 #endif
   
+    if (threadIdx.z == 0 && blockDim.z < X3) {
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
-    a0_re = +i00_re+i20_im;
-    a0_im = +i00_im-i20_re;
-    a1_re = +i01_re+i21_im;
-    a1_im = +i01_im-i21_re;
-    a2_re = +i02_re+i22_im;
-    a2_im = +i02_im-i22_re;
-    b0_re = +i10_re-i30_im;
-    b0_im = +i10_im+i30_re;
-    b1_re = +i11_re-i31_im;
-    b1_im = +i11_im+i31_re;
-    b2_re = +i12_re-i32_im;
-    b2_im = +i12_im+i32_re;
+    a0_re = +i00_re-i20_im;
+    a0_im = +i00_im+i20_re;
+    a1_re = +i01_re-i21_im;
+    a1_im = +i01_im+i21_re;
+    a2_re = +i02_re-i22_im;
+    a2_im = +i02_im+i22_re;
+    b0_re = +i10_re+i30_im;
+    b0_im = +i10_im-i30_re;
+    b1_re = +i11_re+i31_im;
+    b1_im = +i11_im-i31_re;
+    b2_re = +i12_re+i32_im;
+    b2_im = +i12_im-i32_re;
+    } else {
+    // load spinor from shared memory
+    int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+    int tz = (threadIdx.z > 0) ? threadIdx.z - 1 : blockDim.z - 1;
+    READ_SPINOR_SHARED(tx, threadIdx.y, tz);
+    
+    // project spinor into half spinors
+    a0_re = +i00_re-i20_im;
+    a0_im = +i00_im+i20_re;
+    a1_re = +i01_re-i21_im;
+    a1_im = +i01_im+i21_re;
+    a2_re = +i02_re-i22_im;
+    a2_im = +i02_im+i22_re;
+    b0_re = +i10_re+i30_im;
+    b0_im = +i10_im-i30_re;
+    b1_re = +i11_re+i31_im;
+    b1_im = +i11_im-i31_re;
+    b2_re = +i12_re+i32_im;
+    b2_im = +i12_im-i32_re;
+    }
   
 #ifdef MULTI_GPU
   } else {
@@ -1422,32 +2148,32 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   B2_im += gT22_re * b2_im;
   B2_im += gT22_im * b2_re;
   
-  o00_re += A0_re;
-  o00_im += A0_im;
-  o10_re += B0_re;
-  o10_im += B0_im;
-  o20_re -= A0_im;
-  o20_im += A0_re;
-  o30_re += B0_im;
-  o30_im -= B0_re;
+  o00_re += a*A0_re;
+  o00_im += a*A0_im;
+  o10_re += a*B0_re;
+  o10_im += a*B0_im;
+  o20_re += a*A0_im;
+  o20_im -= a*A0_re;
+  o30_re -= a*B0_im;
+  o30_im += a*B0_re;
   
-  o01_re += A1_re;
-  o01_im += A1_im;
-  o11_re += B1_re;
-  o11_im += B1_im;
-  o21_re -= A1_im;
-  o21_im += A1_re;
-  o31_re += B1_im;
-  o31_im -= B1_re;
+  o01_re += a*A1_re;
+  o01_im += a*A1_im;
+  o11_re += a*B1_re;
+  o11_im += a*B1_im;
+  o21_re += a*A1_im;
+  o21_im -= a*A1_re;
+  o31_re -= a*B1_im;
+  o31_im += a*B1_re;
   
-  o02_re += A2_re;
-  o02_im += A2_im;
-  o12_re += B2_re;
-  o12_im += B2_im;
-  o22_re -= A2_im;
-  o22_im += A2_re;
-  o32_re += B2_im;
-  o32_im -= B2_re;
+  o02_re += a*A2_re;
+  o02_im += a*A2_im;
+  o12_re += a*B2_re;
+  o12_im += a*B2_im;
+  o22_re += a*A2_im;
+  o22_im -= a*A2_re;
+  o32_re -= a*B2_im;
+  o32_im += a*B2_re;
   
 }
 
@@ -1456,11 +2182,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
      (kernel_type == EXTERIOR_KERNEL_T && x4==X4m1) )
 #endif
 {
-  // Projector P3+
-  // 2 0 0 0 
-  // 0 2 0 0 
+  // Projector P3-
   // 0 0 0 0 
   // 0 0 0 0 
+  // 0 0 2 0 
+  // 0 0 0 2 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1 :
@@ -1485,21 +2211,21 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read spinor from device memory
-      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
-      a0_re = +2*i00_re;
-      a0_im = +2*i00_im;
-      a1_re = +2*i01_re;
-      a1_im = +2*i01_im;
-      a2_re = +2*i02_re;
-      a2_im = +2*i02_im;
-      b0_re = +2*i10_re;
-      b0_im = +2*i10_im;
-      b1_re = +2*i11_re;
-      b1_im = +2*i11_im;
-      b2_re = +2*i12_re;
-      b2_im = +2*i12_im;
+      a0_re = +2*i20_re;
+      a0_im = +2*i20_im;
+      a1_re = +2*i21_re;
+      a1_im = +2*i21_im;
+      a2_re = +2*i22_re;
+      a2_im = +2*i22_im;
+      b0_re = +2*i30_re;
+      b0_im = +2*i30_im;
+      b1_re = +2*i31_re;
+      b1_im = +2*i31_im;
+      b2_re = +2*i32_re;
+      b2_im = +2*i32_im;
     
 #ifdef MULTI_GPU
     } else {
@@ -1528,20 +2254,20 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
     spinorFloat A2_re = a2_re; spinorFloat A2_im = a2_im;
     spinorFloat B2_re = b2_re; spinorFloat B2_im = b2_im;
     
-    o00_re += A0_re;
-    o00_im += A0_im;
-    o10_re += B0_re;
-    o10_im += B0_im;
+    o20_re += a*A0_re;
+    o20_im += a*A0_im;
+    o30_re += a*B0_re;
+    o30_im += a*B0_im;
     
-    o01_re += A1_re;
-    o01_im += A1_im;
-    o11_re += B1_re;
-    o11_im += B1_im;
+    o21_re += a*A1_re;
+    o21_im += a*A1_im;
+    o31_re += a*B1_re;
+    o31_im += a*B1_im;
     
-    o02_re += A2_re;
-    o02_im += A2_im;
-    o12_re += B2_re;
-    o12_im += B2_im;
+    o22_re += a*A2_re;
+    o22_im += a*A2_im;
+    o32_re += a*B2_re;
+    o32_im += a*B2_im;
     
   } else {
     spinorFloat a0_re, a0_im;
@@ -1556,21 +2282,21 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read spinor from device memory
-      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
-      a0_re = +2*i00_re;
-      a0_im = +2*i00_im;
-      a1_re = +2*i01_re;
-      a1_im = +2*i01_im;
-      a2_re = +2*i02_re;
-      a2_im = +2*i02_im;
-      b0_re = +2*i10_re;
-      b0_im = +2*i10_im;
-      b1_re = +2*i11_re;
-      b1_im = +2*i11_im;
-      b2_re = +2*i12_re;
-      b2_im = +2*i12_im;
+      a0_re = +2*i20_re;
+      a0_im = +2*i20_im;
+      a1_re = +2*i21_re;
+      a1_im = +2*i21_im;
+      a2_re = +2*i22_re;
+      a2_im = +2*i22_im;
+      b0_re = +2*i30_re;
+      b0_im = +2*i30_im;
+      b1_re = +2*i31_re;
+      b1_im = +2*i31_im;
+      b2_re = +2*i32_re;
+      b2_im = +2*i32_im;
     
 #ifdef MULTI_GPU
     } else {
@@ -1687,20 +2413,20 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
     B2_im += g22_re * b2_im;
     B2_im += g22_im * b2_re;
     
-    o00_re += A0_re;
-    o00_im += A0_im;
-    o10_re += B0_re;
-    o10_im += B0_im;
+    o20_re += a*A0_re;
+    o20_im += a*A0_im;
+    o30_re += a*B0_re;
+    o30_im += a*B0_im;
     
-    o01_re += A1_re;
-    o01_im += A1_im;
-    o11_re += B1_re;
-    o11_im += B1_im;
+    o21_re += a*A1_re;
+    o21_im += a*A1_im;
+    o31_re += a*B1_re;
+    o31_im += a*B1_im;
     
-    o02_re += A2_re;
-    o02_im += A2_im;
-    o12_re += B2_re;
-    o12_im += B2_im;
+    o22_re += a*A2_re;
+    o22_im += a*A2_im;
+    o32_re += a*B2_re;
+    o32_im += a*B2_im;
     
   }
 }
@@ -1710,11 +2436,11 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
      (kernel_type == EXTERIOR_KERNEL_T && x4==0) )
 #endif
 {
-  // Projector P3-
+  // Projector P3+
+  // 2 0 0 0 
+  // 0 2 0 0 
   // 0 0 0 0 
   // 0 0 0 0 
-  // 0 0 2 0 
-  // 0 0 0 2 
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1 :
@@ -1743,21 +2469,21 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read spinor from device memory
-      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
-      a0_re = +2*i20_re;
-      a0_im = +2*i20_im;
-      a1_re = +2*i21_re;
-      a1_im = +2*i21_im;
-      a2_re = +2*i22_re;
-      a2_im = +2*i22_im;
-      b0_re = +2*i30_re;
-      b0_im = +2*i30_im;
-      b1_re = +2*i31_re;
-      b1_im = +2*i31_im;
-      b2_re = +2*i32_re;
-      b2_im = +2*i32_im;
+      a0_re = +2*i00_re;
+      a0_im = +2*i00_im;
+      a1_re = +2*i01_re;
+      a1_im = +2*i01_im;
+      a2_re = +2*i02_re;
+      a2_im = +2*i02_im;
+      b0_re = +2*i10_re;
+      b0_im = +2*i10_im;
+      b1_re = +2*i11_re;
+      b1_im = +2*i11_im;
+      b2_re = +2*i12_re;
+      b2_im = +2*i12_im;
     
 #ifdef MULTI_GPU
     } else {
@@ -1786,20 +2512,20 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     spinorFloat A2_re = a2_re; spinorFloat A2_im = a2_im;
     spinorFloat B2_re = b2_re; spinorFloat B2_im = b2_im;
     
-    o20_re += A0_re;
-    o20_im += A0_im;
-    o30_re += B0_re;
-    o30_im += B0_im;
+    o00_re += a*A0_re;
+    o00_im += a*A0_im;
+    o10_re += a*B0_re;
+    o10_im += a*B0_im;
     
-    o21_re += A1_re;
-    o21_im += A1_im;
-    o31_re += B1_re;
-    o31_im += B1_im;
+    o01_re += a*A1_re;
+    o01_im += a*A1_im;
+    o11_re += a*B1_re;
+    o11_im += a*B1_im;
     
-    o22_re += A2_re;
-    o22_im += A2_im;
-    o32_re += B2_re;
-    o32_im += B2_im;
+    o02_re += a*A2_re;
+    o02_im += a*A2_im;
+    o12_re += a*B2_re;
+    o12_im += a*B2_im;
     
   } else {
     spinorFloat a0_re, a0_im;
@@ -1814,21 +2540,21 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read spinor from device memory
-      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
-      a0_re = +2*i20_re;
-      a0_im = +2*i20_im;
-      a1_re = +2*i21_re;
-      a1_im = +2*i21_im;
-      a2_re = +2*i22_re;
-      a2_im = +2*i22_im;
-      b0_re = +2*i30_re;
-      b0_im = +2*i30_im;
-      b1_re = +2*i31_re;
-      b1_im = +2*i31_im;
-      b2_re = +2*i32_re;
-      b2_im = +2*i32_im;
+      a0_re = +2*i00_re;
+      a0_im = +2*i00_im;
+      a1_re = +2*i01_re;
+      a1_im = +2*i01_im;
+      a2_re = +2*i02_re;
+      a2_im = +2*i02_im;
+      b0_re = +2*i10_re;
+      b0_im = +2*i10_im;
+      b1_re = +2*i11_re;
+      b1_im = +2*i11_im;
+      b2_re = +2*i12_re;
+      b2_im = +2*i12_im;
     
 #ifdef MULTI_GPU
     } else {
@@ -1945,163 +2671,35 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     B2_im += gT22_re * b2_im;
     B2_im += gT22_im * b2_re;
     
-    o20_re += A0_re;
-    o20_im += A0_im;
-    o30_re += B0_re;
-    o30_im += B0_im;
+    o00_re += a*A0_re;
+    o00_im += a*A0_im;
+    o10_re += a*B0_re;
+    o10_im += a*B0_im;
     
-    o21_re += A1_re;
-    o21_im += A1_im;
-    o31_re += B1_re;
-    o31_im += B1_im;
+    o01_re += a*A1_re;
+    o01_im += a*A1_im;
+    o11_re += a*B1_re;
+    o11_im += a*B1_im;
     
-    o22_re += A2_re;
-    o22_im += A2_im;
-    o32_re += B2_re;
-    o32_im += B2_im;
-    
-  }
-}
-
-#ifdef MULTI_GPU
-
-int incomplete = 0; // Have all 8 contributions been computed for this site?
-
-switch(kernel_type) { // intentional fall-through
-case INTERIOR_KERNEL:
-  incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-case EXTERIOR_KERNEL_T:
-  incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-case EXTERIOR_KERNEL_Z:
-  incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-case EXTERIOR_KERNEL_Y:
-  incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-}
-
-if (!incomplete)
-#endif // MULTI_GPU
-{
-  {
-    // apply twisted mass rotation
-    VOLATILE spinorFloat tmp00_re = +o00_re-o20_im*a;
-    VOLATILE spinorFloat tmp00_im = +o00_im+o20_re*a;
-    VOLATILE spinorFloat tmp01_re = +o01_re-o21_im*a;
-    VOLATILE spinorFloat tmp01_im = +o01_im+o21_re*a;
-    VOLATILE spinorFloat tmp02_re = +o02_re-o22_im*a;
-    VOLATILE spinorFloat tmp02_im = +o02_im+o22_re*a;
-    
-    VOLATILE spinorFloat tmp10_re = +o10_re-o30_im*a;
-    VOLATILE spinorFloat tmp10_im = +o10_im+o30_re*a;
-    VOLATILE spinorFloat tmp11_re = +o11_re-o31_im*a;
-    VOLATILE spinorFloat tmp11_im = +o11_im+o31_re*a;
-    VOLATILE spinorFloat tmp12_re = +o12_re-o32_im*a;
-    VOLATILE spinorFloat tmp12_im = +o12_im+o32_re*a;
-    
-    VOLATILE spinorFloat tmp20_re = -o00_im*a+o20_re;
-    VOLATILE spinorFloat tmp20_im = +o00_re*a+o20_im;
-    VOLATILE spinorFloat tmp21_re = -o01_im*a+o21_re;
-    VOLATILE spinorFloat tmp21_im = +o01_re*a+o21_im;
-    VOLATILE spinorFloat tmp22_re = -o02_im*a+o22_re;
-    VOLATILE spinorFloat tmp22_im = +o02_re*a+o22_im;
-    
-    VOLATILE spinorFloat tmp30_re = -o10_im*a+o30_re;
-    VOLATILE spinorFloat tmp30_im = +o10_re*a+o30_im;
-    VOLATILE spinorFloat tmp31_re = -o11_im*a+o31_re;
-    VOLATILE spinorFloat tmp31_im = +o11_re*a+o31_im;
-    VOLATILE spinorFloat tmp32_re = -o12_im*a+o32_re;
-    VOLATILE spinorFloat tmp32_im = +o12_re*a+o32_im;
-    
-    
-#ifndef DSLASH_XPAY
-    //scale by b = 1/(1 + a*a) 
-    o00_re = b*tmp00_re;
-    o00_im = b*tmp00_im;
-    o01_re = b*tmp01_re;
-    o01_im = b*tmp01_im;
-    o02_re = b*tmp02_re;
-    o02_im = b*tmp02_im;
-    o10_re = b*tmp10_re;
-    o10_im = b*tmp10_im;
-    o11_re = b*tmp11_re;
-    o11_im = b*tmp11_im;
-    o12_re = b*tmp12_re;
-    o12_im = b*tmp12_im;
-    o20_re = b*tmp20_re;
-    o20_im = b*tmp20_im;
-    o21_re = b*tmp21_re;
-    o21_im = b*tmp21_im;
-    o22_re = b*tmp22_re;
-    o22_im = b*tmp22_im;
-    o30_re = b*tmp30_re;
-    o30_im = b*tmp30_im;
-    o31_re = b*tmp31_re;
-    o31_im = b*tmp31_im;
-    o32_re = b*tmp32_re;
-    o32_im = b*tmp32_im;
-#else
-    o00_re = tmp00_re;
-    o00_im = tmp00_im;
-    o01_re = tmp01_re;
-    o01_im = tmp01_im;
-    o02_re = tmp02_re;
-    o02_im = tmp02_im;
-    o10_re = tmp10_re;
-    o10_im = tmp10_im;
-    o11_re = tmp11_re;
-    o11_im = tmp11_im;
-    o12_re = tmp12_re;
-    o12_im = tmp12_im;
-    o20_re = tmp20_re;
-    o20_im = tmp20_im;
-    o21_re = tmp21_re;
-    o21_im = tmp21_im;
-    o22_re = tmp22_re;
-    o22_im = tmp22_im;
-    o30_re = tmp30_re;
-    o30_im = tmp30_im;
-    o31_re = tmp31_re;
-    o31_im = tmp31_im;
-    o32_re = tmp32_re;
-    o32_im = tmp32_im;
-#endif // DSLASH_XPAY
+    o02_re += a*A2_re;
+    o02_im += a*A2_im;
+    o12_re += a*B2_re;
+    o12_im += a*B2_im;
     
   }
-#ifdef DSLASH_XPAY
-  
-  READ_ACCUM(ACCUMTEX, sp_stride)
-  
-  o00_re = b*o00_re+acc00_re;
-  o00_im = b*o00_im+acc00_im;
-  o01_re = b*o01_re+acc01_re;
-  o01_im = b*o01_im+acc01_im;
-  o02_re = b*o02_re+acc02_re;
-  o02_im = b*o02_im+acc02_im;
-  o10_re = b*o10_re+acc10_re;
-  o10_im = b*o10_im+acc10_im;
-  o11_re = b*o11_re+acc11_re;
-  o11_im = b*o11_im+acc11_im;
-  o12_re = b*o12_re+acc12_re;
-  o12_im = b*o12_im+acc12_im;
-  o20_re = b*o20_re+acc20_re;
-  o20_im = b*o20_im+acc20_im;
-  o21_re = b*o21_re+acc21_re;
-  o21_im = b*o21_im+acc21_im;
-  o22_re = b*o22_re+acc22_re;
-  o22_im = b*o22_im+acc22_im;
-  o30_re = b*o30_re+acc30_re;
-  o30_im = b*o30_im+acc30_im;
-  o31_re = b*o31_re+acc31_re;
-  o31_im = b*o31_im+acc31_im;
-  o32_re = b*o32_re+acc32_re;
-  o32_im = b*o32_im+acc32_im;
-#endif // DSLASH_XPAY
 }
+
+
 
 // write spinor field back to device memory
 WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
+#undef WRITE_SPINOR_SHARED
+#undef READ_SPINOR_SHARED
+#undef SHARED_STRIDE
+
 #undef A_re
 #undef A_im
 
@@ -2174,6 +2772,66 @@ WRITE_SPINOR(sp_stride);
 #undef acc32_re
 #undef acc32_im
 
+#undef c00_00_re
+#undef c01_01_re
+#undef c02_02_re
+#undef c10_10_re
+#undef c11_11_re
+#undef c12_12_re
+#undef c01_00_re
+#undef c01_00_im
+#undef c02_00_re
+#undef c02_00_im
+#undef c10_00_re
+#undef c10_00_im
+#undef c11_00_re
+#undef c11_00_im
+#undef c12_00_re
+#undef c12_00_im
+#undef c02_01_re
+#undef c02_01_im
+#undef c10_01_re
+#undef c10_01_im
+#undef c11_01_re
+#undef c11_01_im
+#undef c12_01_re
+#undef c12_01_im
+#undef c10_02_re
+#undef c10_02_im
+#undef c11_02_re
+#undef c11_02_im
+#undef c12_02_re
+#undef c12_02_im
+#undef c11_10_re
+#undef c11_10_im
+#undef c12_10_re
+#undef c12_10_im
+#undef c12_11_re
+#undef c12_11_im
 
+#undef o00_re
+#undef o00_im
+#undef o01_re
+#undef o01_im
+#undef o02_re
+#undef o02_im
+#undef o10_re
+#undef o10_im
+#undef o11_re
+#undef o11_im
+#undef o12_re
+#undef o12_im
+#undef o20_re
+#undef o20_im
+#undef o21_re
+#undef o21_im
+#undef o22_re
+#undef o22_im
+#undef o30_re
+#undef o30_im
+#undef o31_re
+#undef o31_im
+#undef o32_re
+#undef o32_im
 
 #undef VOLATILE

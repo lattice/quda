@@ -29,7 +29,7 @@ static QudaTboundary t_boundary_;
 // The following routines are needed to test the hisq fermion force code
 // Actually, some of these routines are deprecated, or will be soon, and 
 // ought to be removed.
-namespace hisq{
+namespace quda{
   namespace fermion_force{
 
 
@@ -216,8 +216,13 @@ namespace hisq{
       {
         // Use pinned memory 
         float2 *packedEven, *packedOdd;
-        cudaMallocHost(&packedEven, bytes_per_dir); // now
-        cudaMallocHost(&packedOdd, bytes_per_dir);
+        if(cudaMallocHost(&packedEven, bytes_per_dir) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+	}
+        if (cudaMallocHost(&packedOdd, bytes_per_dir) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for packedOdd\n");
+	}
+
         for(int dir=0; dir<4; dir++){
           packOprodFieldDir(packedEven, (float*)cpuOprod, dir, 0, Vh);
           packOprodFieldDir(packedOdd,  (float*)cpuOprod, dir, 1, Vh);
@@ -268,8 +273,12 @@ namespace hisq{
       fetchOprodFromGPUArraysQuda(void *cudaOprodEven, void *cudaOprodOdd, void *cpuOprod, size_t bytes, int Vh)
       {
         float2 *packedEven, *packedOdd;
-        cudaMallocHost(&packedEven,bytes);
-        cudaMallocHost(&packedOdd, bytes);
+        if(cudaMallocHost(&packedEven,bytes) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+	}
+        if (cudaMallocHost(&packedOdd, bytes) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for packedOdd\n");
+	}
 
 
         cudaMemcpy(packedEven, cudaOprodEven, bytes, cudaMemcpyDeviceToHost);
@@ -302,8 +311,12 @@ namespace hisq{
 	float2 *packedEven, *packedOdd;
         checkCudaError();
 
-        cudaMallocHost(&packedEven, bytes);
-        cudaMallocHost(&packedOdd, bytes);
+        if (cudaMallocHost(&packedEven, bytes) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+	}
+        if (cudaMallocHost(&packedOdd, bytes) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+	}
         checkCudaError();
 
 
@@ -362,4 +375,4 @@ namespace hisq{
     }
 
   } // end namespace fermion_force
-} // end namespace hisq
+} // end namespace quda

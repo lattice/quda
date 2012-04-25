@@ -5,7 +5,7 @@
 #include <mpi.h>
 #include <comm_quda.h>
 
-char hostname[128];
+static char hostname[128] = "undetermined";
 static int fwd_nbr=-1;
 static int back_nbr=-1;
 static int rank = 0;
@@ -34,6 +34,8 @@ static int zgridid = -1;
 static int tgridid = -1;
 
 static int manual_set_partition[4] ={0, 0, 0, 0};
+
+#define X_FASTEST_DIM_NODE_RANKING
 
 void
 comm_set_gridsize(int x, int y, int z, int t)
@@ -108,7 +110,7 @@ comm_partition(void)
 
   int leftover;
 
-#if 0
+#ifdef X_FASTEST_DIM_NODE_RANKING
   tgridid  = rank/(zgridsize*ygridsize*xgridsize);
   leftover = rank%(zgridsize*ygridsize*xgridsize);
   zgridid  = leftover/(ygridsize*xgridsize);
@@ -117,7 +119,6 @@ comm_partition(void)
   xgridid  = leftover%xgridsize;
   #define GRID_ID(xid,yid,zid,tid) (tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid)
 #else
-
   xgridid  = rank/(ygridsize*zgridsize*tgridsize);
   leftover = rank%(ygridsize*zgridsize*tgridsize);
   ygridid  = leftover/(zgridsize*tgridsize);
@@ -126,6 +127,7 @@ comm_partition(void)
   tgridid  = leftover%tgridsize;  
 #define GRID_ID(xid,yid,zid,tid) (xid*ygridsize*zgridsize*tgridsize+yid*zgridsize*tgridsize+zid*tgridsize+tid)
 #endif
+
   printf("My rank: %d, gridid(t,z,y,x): %d %d %d %d\n", rank, tgridid, zgridid, ygridid, xgridid);
 
 
@@ -166,19 +168,17 @@ comm_partition(void)
   tid=(tgridid -1+tgridsize)%tgridsize;
   t_back_nbr = GRID_ID(xid,yid,zid,tid);
 
-  printf("MPI rank: rank=%d, hostname=%s, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, hostname, x_fwd_nbr, x_back_nbr);
-  printf("MPI rank: rank=%d, hostname=%s, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, hostname, y_fwd_nbr, y_back_nbr);
-  printf("MPI rank: rank=%d, hostname=%s, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, hostname, z_fwd_nbr, z_back_nbr);
-  printf("MPI rank: rank=%d, hostname=%s, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, hostname, t_fwd_nbr, t_back_nbr);
-
-  
+  printf("MPI rank: rank=%d, hostname=%s, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, comm_hostname(), x_fwd_nbr, x_back_nbr);
+  printf("MPI rank: rank=%d, hostname=%s, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, comm_hostname(), y_fwd_nbr, y_back_nbr);
+  printf("MPI rank: rank=%d, hostname=%s, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, comm_hostname(), z_fwd_nbr, z_back_nbr);
+  printf("MPI rank: rank=%d, hostname=%s, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, comm_hostname(), t_fwd_nbr, t_back_nbr);
 }
 
 int 
 comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
 {
   int ret;
-#if 0
+#ifdef X_FASTEST_DIM_NODE_RANKING
 #define GRID_ID(xid,yid,zid,tid) (tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid)
 #else
 #define GRID_ID(xid,yid,zid,tid) (xid*ygridsize*zgridsize*tgridsize+yid*zgridsize*tgridsize+zid*tgridsize+tid)
@@ -198,7 +198,7 @@ comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
 
 
 void 
-comm_init()
+comm_init(void)
 {
   int i;
   
@@ -208,7 +208,9 @@ comm_init()
   }
   firsttime = 0;
 
-  gethostname(hostname, 128);  
+  gethostname(hostname, 128);
+  hostname[127] = '\0';
+
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -230,7 +232,6 @@ comm_init()
     comm_exit(1);
   }
   
-  gethostname(hostname, 128);
   int rc = MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD);
   if (rc != MPI_SUCCESS){
     printf("ERROR: MPI_Allgather failed for hostname\n");
@@ -258,12 +259,19 @@ comm_init()
   return;
 }
 
+char *
+comm_hostname(void)
+{
+  return hostname;
+}
+
 int comm_gpuid()
 {
   //int gpu = rank%getGpuCount();
 
   return which_gpu;
 }
+
 int
 comm_rank(void)
 {

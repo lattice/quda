@@ -254,6 +254,8 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
     tuning = true;
     active_tunable = &tunable;
     best_time = FLT_MAX;
+
+    if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name.c_str());
     tunable.preTune();
 
     cudaEventCreate(&start);
@@ -265,7 +267,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
 
     tunable.initTuneParam(param);
     while (tuning) {
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
       cudaGetLastError(); // clear error counter
       cudaEventRecord(start, 0);
       for (int i=0; i<tunable.tuningIter(); i++) {
@@ -274,7 +276,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
       cudaEventRecord(end, 0);
       cudaEventSynchronize(end);
       cudaEventElapsedTime(&elapsed_time, start, end);
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
       error = cudaGetLastError();
       elapsed_time /= (1e3 * tunable.tuningIter());
       if ((elapsed_time < best_time) && (error == cudaSuccess)) {
@@ -295,8 +297,8 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
       errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name.c_str(), key.aux.c_str(), key.volume.c_str());
     }
     if (verbosity >= QUDA_VERBOSE) {
-      printfQuda("Tuned %s giving %s", tunable.paramString(best_param).c_str(), tunable.perfString(best_time).c_str());
-      printfQuda(" for %s with %s\n", key.name.c_str(), key.aux.c_str());
+      printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
+		 tunable.perfString(best_time).c_str(), key.name.c_str(), key.aux.c_str());
     }
     time(&now);
     best_param.comment = "# " + tunable.perfString(best_time) + ", tuned ";
@@ -305,6 +307,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
     cudaEventDestroy(start);
     cudaEventDestroy(end);
 
+    if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name.c_str());
     tunable.postTune();
     param = best_param;
     tunecache[key] = best_param;

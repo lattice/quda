@@ -17,10 +17,9 @@ extern "C" {
     QUDA_ASQTAD_FAT_LINKS,
     QUDA_ASQTAD_LONG_LINKS,
     QUDA_ASQTAD_MOM_LINKS,
+    QUDA_ASQTAD_GENERAL_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
-
-  
 
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,
@@ -95,6 +94,12 @@ extern "C" {
     QUDA_NORMEQ_PC_SOLVE,
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
+
+  typedef enum QudaSchwarzType_s {
+    QUDA_ADDITIVE_SCHWARZ,
+    QUDA_MULTIPLICATIVE_SCHWARZ,
+    QUDA_INVALID_SCHWARZ
+  } QudaSchwarzType;
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //
@@ -284,6 +289,13 @@ extern "C" {
 
     QUDA_FAT_PRESERVE_COMM_MEM=4,
   }QudaFatLinkFlag;
+
+  typedef enum QudaFieldGeometry_s {
+    QUDA_SCALAR_GEOMETRY,
+    QUDA_VECTOR_GEOMETRY,
+    QUDA_TENSOR_GEOMETRY,
+    QUDA_INVALID_GEOMETRY
+  } QudaFieldGeometry;
 
 #ifdef __cplusplus
 }

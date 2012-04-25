@@ -20,7 +20,9 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
       if (create == QUDA_NULL_FIELD_CREATE 
 	  || create == QUDA_ZERO_FIELD_CREATE) {
 	if(pinned){
-	  cudaMallocHost(&gauge[d], volume * reconstruct * precision);
+	  if(cudaMallocHost(&gauge[d], volume * reconstruct * precision) == cudaErrorMemoryAllocation) {
+	    errorQuda("ERROR: cudaMallocHost failed for gauge\n");
+	  }
 	}else{
 	  gauge[d] = malloc(volume * reconstruct * precision);
 	}
@@ -40,7 +42,9 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
     if (create == QUDA_NULL_FIELD_CREATE ||
 	create == QUDA_ZERO_FIELD_CREATE) {
       if(pinned){
-	cudaMallocHost(&(gauge), nDim*volume*reconstruct*precision);
+	if (cudaMallocHost(&(gauge), nDim*volume*reconstruct*precision) == cudaErrorMemoryAllocation) {
+	  errorQuda("ERROR: cudaMallocHost failed for gauge\n");
+	}
       }else{
 	gauge = (void**)malloc(nDim * volume * reconstruct * precision);
       }
@@ -60,7 +64,9 @@ cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
   ghost = (void**)malloc(sizeof(void*)*QUDA_MAX_DIM);
   for (int i=0; i<nDim; i++) {
     if(pinned){
-      cudaMallocHost(&ghost[i], nFace * surface[i] * reconstruct * precision);
+      if (cudaMallocHost(&ghost[i], nFace * surface[i] * reconstruct * precision) == cudaErrorMemoryAllocation) {
+	errorQuda("ERROR: cudaMallocHost failed for ghost \n");
+      }
     }else{
       ghost[i] = malloc(nFace * surface[i] * reconstruct * precision);
     }

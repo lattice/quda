@@ -11,15 +11,6 @@
 #include <qmp.h>
 #endif
 
-/*
-  Multi-GPU TODOs
-  - test qmp code
-  - implement OpenMP version?
-  - split face kernels
-  - separate block sizes for body and face
-  - minimize pointer arithmetic in core code (need extra constant to replace SPINOR_HOP)
- */
-
 using namespace std;
 
 cudaStream_t *stream;
@@ -34,12 +25,21 @@ bool globalReduce = true;
 #endif
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
-		       const int nFace, const QudaPrecision precision) :
+		       const int nFace, const QudaPrecision precision, const int Ls) :
   Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
 {
   if (nDim > QUDA_MAX_DIM) errorQuda("nDim = %d is greater than the maximum of %d\n", nDim, QUDA_MAX_DIM);
+//BEGIN NEW
+  int Y[nDim];
+  Y[0] = X[0];
+  Y[1] = X[1];
+  Y[2] = X[2];
+  Y[3] = X[3];
+  if(nDim == 5) Y[nDim-1] = Ls;
+  setupDims(Y);
+//END NEW  
 
-  setupDims(X);
+  //setupDims(X);
 
   // set these both = 0 separate streams for forwards and backwards comms
   // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
@@ -530,11 +530,4 @@ int commDim(int dir) { return QMP_get_logical_dimensions()[dir]; }
 int commCoords(int dir) { return QMP_get_logical_coordinates()[dir]; }
 int commDimPartitioned(int dir){ return (manual_set_partition[dir] || ((commDim(dir) > 1)));}
 void commDimPartitionedSet(int dir){ manual_set_partition[dir] = 1; }
-void commBarrier() { QMP_barrier(); }
-#else
-int commDim(int dir) { return 1; }
-int commCoords(int dir) { return 0; }
-int commDimPartitioned(int dir){ return 0; }
-void commDimPartitionedSet(int dir){ ; }
-void commBarrier() { ; }
 #endif

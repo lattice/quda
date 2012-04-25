@@ -463,6 +463,33 @@
     var[5] = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*stride*6 + stride*5); \
   }while(0)
 
+#ifdef MULTI_GPU
+
+#define FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx, new_idx) do { \
+    switch(mydir){						      \
+    case 0:							       \
+      new_idx =  (xcomm || (new_x[0] != X1+1) )?(idx+1):(idx-X1m1);    \
+      new_x[0] = (xcomm || (new_x[0] != X1+1) )?(new_x[0]+1):2;		\
+      break;								\
+    case 1:								\
+      new_idx =  (ycomm || (new_x[1] != X2+1))?(idx+E1):(idx -X2m1*E1);	\
+      new_x[1] = (ycomm || (new_x[1] != X2+1))?(new_x[1]+1):2;		\
+      break;								\
+    case 2:								\
+      new_idx =  (zcomm || (new_x[2] != X3+1))?(idx+E2E1):(idx-X3m1*E2E1); \
+      new_x[2] = (zcomm || (new_x[2] != X3+1))?(new_x[2]+1):2;		\
+      break;								\
+    case 3:								\
+      new_idx =  (tcomm || (new_x[3] != X4+1))?(idx+E3E2E1):(idx-X4m1*E3E2E1); \
+      new_x[3] = (tcomm || (new_x[3] != X4+1))?(new_x[3]+1):2;		\
+      break;								\
+    }									\
+    if(new_x[mydir] >= E[mydir]) return;				\
+  }while(0)
+
+
+
+#else
 #define FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx, new_idx) do {	\
     switch(mydir){							\
     case 0:                                                             \
@@ -483,8 +510,34 @@
       break;								\
     }									\
   }while(0)
+#endif
+
+#ifdef MULTI_GPU
 
 
+#define FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx, new_idx) do {  \
+  switch(mydir){							\
+  case 0:								\
+    new_idx =  (xcomm || (new_x[0] != 2))?(idx-1):(idx+X1m1);		\
+    new_x[0] = (xcomm || (new_x[0] != 2))?(new_x[0]-1):(X1+1);		\
+    break;								\
+  case 1:								\
+    new_idx = (ycomm || (new_x[1] != 2))?(idx-E1):(idx+X2m1*E1);	\
+    new_x[1]= (ycomm || (new_x[1] != 2))?(new_x[1]-1):(X2+1);		\
+    break;								\
+  case 2:								\
+    new_idx = (zcomm || (new_x[2] != 2))?(idx-E2E1):(idx+X3m1*E2E1);	\
+    new_x[2]= (zcomm || (new_x[2] != 2))?(new_x[2]-1):(X3+1);		\
+    break;								\
+  case 3:								\
+    new_idx = (tcomm || (new_x[3] !=2))?(idx-E3E2E1):(idx+X4m1*E3E2E1); \
+    new_x[3]= (tcomm || (new_x[3] !=2))?(new_x[3]-1):(X4+1);		\
+    break;								\
+  }									\
+  if(new_x[mydir] < 0) return;						\
+  }while(0)
+
+#else
 #define FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx, new_idx) do {	\
     switch(mydir){							\
     case 0:                                                             \
@@ -505,21 +558,7 @@
       break;								\
     }									\
   }while(0)
-
-
-
-
-#define WRITE_MATRIX_18_SINGLE(mat, idx, var) do{ \
-    mat[idx + 0*Vh] = var[0];  \
-    mat[idx + 1*Vh] = var[1];  \
-    mat[idx + 2*Vh] = var[2];  \
-    mat[idx + 3*Vh] = var[3];  \
-    mat[idx + 4*Vh] = var[4];  \
-    mat[idx + 5*Vh] = var[5];  \
-    mat[idx + 6*Vh] = var[6];  \
-    mat[idx + 7*Vh] = var[7];  \
-    mat[idx + 8*Vh] = var[8];  \
-}while(0)
+#endif
 
 
 // matrix macros:

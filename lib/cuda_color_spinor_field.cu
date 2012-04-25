@@ -195,8 +195,11 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
   if (!bufferInit) {
     bufferBytes = bytes;
 
-    cudaHostAlloc(&buffer_h, bufferBytes, 0);
-    if (LOCATION == QUDA_CUDA_FIELD_LOCATION) cudaMalloc(&buffer_d, bufferBytes);
+    if (cudaHostAlloc(&buffer_h, bufferBytes, 0) == cudaErrorMemoryAllocation)
+      errorQuda("cudaHostAlloc failed for buffer_h");
+    if (LOCATION == QUDA_CUDA_FIELD_LOCATION) 
+      if (cudaMalloc(&buffer_d, bufferBytes) == cudaErrorMemoryAllocation)
+	errorQuda("cudaHostAlloc failed for buffer_d");
 
     bufferInit = true;
   }
@@ -660,7 +663,10 @@ void cudaColorSpinorField::packGhost(const int dim, const QudaParity parity, con
 #ifdef MULTI_GPU
   if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
     void* gpu_buf = this->backGhostFaceBuffer[dim];
-    packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
+    if(this->nDim == 5)//!For DW fermions
+      packFaceDW(gpu_buf, *this, dim, dagger, parity, *stream);
+    else	
+      packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
   }
 #else
   errorQuda("packGhost not built on single-GPU build");

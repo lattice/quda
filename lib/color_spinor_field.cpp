@@ -52,14 +52,19 @@ void ColorSpinorField::createGhostZone() {
 
   // calculate size of ghost zone required
   int ghostVolume = 0;
-  for (int i=0; i<nDim; i++) {
+//BEGIN NEW:  
+//temporal hack
+  int dims = nDim == 5 ? (nDim - 1) : nDim;
+  int x5   = nDim == 5 ? x[4] : 1; ///includes DW ghosts
+  for (int i=0; i<dims; i++) {
     ghostFace[i] = 0;
     if (commDimPartitioned(i)) {
       ghostFace[i] = 1;
-      for (int j=0; j<nDim; j++) {
+      for (int j=0; j<dims; j++) {
 	if (i==j) continue;
 	ghostFace[i] *= x[j];
       }
+      ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
       if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
       if (siteSubset == QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
       ghostVolume += ghostFace[i];
@@ -75,7 +80,8 @@ void ColorSpinorField::createGhostZone() {
     if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) 
       printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
 		 i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
-  }
+  }//end of outmost for loop
+//END NEW  
   int ghostNormVolume = num_norm_faces * ghostVolume;
   ghostVolume *= num_faces;
 

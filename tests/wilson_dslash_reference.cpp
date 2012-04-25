@@ -341,8 +341,9 @@ void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa,
 
   void *tmp = malloc(Vh*spinorSiteSize*precision);
     
+  // FIXME: remove once reference clover is finished
   // full dslash operator
-  if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
+  if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     wil_dslash(tmp, gauge, inEven, 1, daggerBit, precision, gauge_param);
     wil_dslash(outEven, gauge, tmp, 0, daggerBit, precision, gauge_param);
   } else {

@@ -6,7 +6,7 @@
 
 
 // The following routines are used to test the force calculation from hisq smearing
-namespace hisq{
+namespace quda{
   namespace fermion_force{
 
     typedef struct  {
@@ -62,7 +62,7 @@ namespace hisq{
 
 
   } // namespace fermion_force
-} // namespace hisq
+} // namespace quda
 
 
 #endif // _HISQ_FORCE_UTILS_H

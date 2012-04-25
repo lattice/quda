@@ -37,7 +37,7 @@ static bool   HOST_FL_REUNIT_SVD_ONLY;
 static double HOST_FL_REUNIT_SVD_REL_ERROR;
 static double HOST_FL_REUNIT_SVD_ABS_ERROR;
 static bool   HOST_FL_CHECK_UNITARIZATION;
-namespace hisq{
+namespace quda{
 
   void setUnitarizeLinksPadding(int input_padding, int output_padding)
   {
@@ -148,7 +148,6 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
     inline bool checkRelativeError(Real a, Real b, Real epsilon)
     {
       if( fabs((a-b)/b)  < epsilon ) return true;
-      printf("Relative error = %g\n", fabs((a-b)/b));
       return false;
     }
     
@@ -196,8 +195,9 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 
 		typename RealTypeId<Cmplx>::Type cosTheta; 
 		if(fabs(s) >= FL_UNITARIZE_EPS){
+		  const typename RealTypeId<Cmplx>::Type sqrt_s = sqrt(s);
 		  r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
-		  cosTheta = r/sqrt(s*s*s);
+		  cosTheta = r/(sqrt_s*sqrt_s*sqrt_s);
 		  if(fabs(cosTheta) >= 1.0){
 		    if( r > 0 ){ 
 			theta = 0.0;
@@ -207,9 +207,9 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 		  }else{ 
 			theta = acos(cosTheta);
 		  }
-		  g[0] = c[0]/3 + 2*sqrt(s)*cos( theta/3 );
-		  g[1] = c[0]/3 + 2*sqrt(s)*cos( theta/3 + FL_UNITARIZE_PI23 );
- 		  g[2] = c[0]/3 + 2*sqrt(s)*cos( theta/3 + 2*FL_UNITARIZE_PI23 );
+		  g[0] = c[0]/3 + 2*sqrt_s*cos( theta/3 );
+		  g[1] = c[0]/3 + 2*sqrt_s*cos( theta/3 + FL_UNITARIZE_PI23 );
+ 		  g[2] = c[0]/3 + 2*sqrt_s*cos( theta/3 + 2*FL_UNITARIZE_PI23 );
 		}
                 
 		// Check the eigenvalues, if the determinant does not match the product of the eigenvalues
@@ -298,7 +298,8 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
 	if(isUnitary(*result,FL_MAX_ERROR)==false)
 	{
 #if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
-          printf("ERROR: Unitarized link is not consistent with incoming link\n");
+          printf("ERROR: Link unitarity test failed\n");
+          printf("TOLERANCE: %g\n", FL_MAX_ERROR);
 #endif
 	  return false;
 	}
@@ -346,9 +347,11 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
   template<class Cmplx>
   __global__ void getUnitarizedField(const Cmplx* inlink_even, const Cmplx*  inlink_odd,
 				    Cmplx*  outlink_even, Cmplx*  outlink_odd,
-				    int* num_failures)
+				     int* num_failures, const int threads)
   {
     int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    if (mem_idx >= threads) return;
+
     const Cmplx* inlink;
     Cmplx* outlink;
 
@@ -388,81 +391,131 @@ bool isUnitarizedLinkConsistent(const Matrix<Cmplx,3>& initial_matrix,
     return;
   }
 
-
-  void unitarizeLinksCuda(const QudaGaugeParam& param, cudaGaugeField& infield, cudaGaugeField* outfield, int* num_failures)
-  {
-	
-    dim3 gridDim(infield.Volume()/BLOCK_DIM,1,1);
-    dim3 blockDim(BLOCK_DIM,1,1); 
-
-
-    checkCudaError();
-
-    if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-      getUnitarizedField<<<gridDim,blockDim>>>((float2*)infield.Even_p(), (float2*)infield.Odd_p(),
-					       (float2*)outfield->Even_p(), (float2*)outfield->Odd_p(),
-					       num_failures);
-						
-    }else if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-      getUnitarizedField<<<gridDim,blockDim>>>((double2*)infield.Even_p(), (double2*)infield.Odd_p(),
-					       (double2*)outfield->Even_p(), (double2*)outfield->Odd_p(),
-					       num_failures);
+  class UnitarizeLinksCuda : public Tunable {
+  private:
+    const cudaGaugeField &inField;
+    cudaGaugeField &outField;
+    int *fails;
+    
+    int sharedBytesPerThread() const { return 0; }
+    int sharedBytesPerBlock() const { return 0; }
+    
+    // don't tune the grid dimension
+    bool advanceGridDim(TuneParam &param) const { return false; }
+    bool advanceBlockDim(TuneParam &param) const {
+      bool rtn = Tunable::advanceBlockDim(param);
+      const int threads = inField.Volume();
+      param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
+      return rtn;
     }
+  public:
+    UnitarizeLinksCuda(const cudaGaugeField& inField, cudaGaugeField& outField,  int* fails) : 
+      inField(inField), outField(outField), fails(fails) { ; }
+    virtual ~UnitarizeLinksCuda() { ; }
+    
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      
+      if(inField.Precision() == QUDA_SINGLE_PRECISION){
+	getUnitarizedField<<<tp.grid,tp.block>>>((float2*)inField.Even_p(), (float2*)inField.Odd_p(),
+						 (float2*)outField.Even_p(), (float2*)outField.Odd_p(),
+						 fails, inField.Volume());
+      }else if(inField.Precision() == QUDA_DOUBLE_PRECISION){
+	getUnitarizedField<<<tp.grid,tp.block>>>((double2*)inField.Even_p(), (double2*)inField.Odd_p(),
+						 (double2*)outField.Even_p(), (double2*)outField.Odd_p(),
+						 fails, inField.Volume());
+      } else {
+	errorQuda("UnitarizeLinks not implemented for precision %d", inField.Precision());
+      }
+      
+    }
+    void preTune() { ; }
+    void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
+    
+    void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      const int threads = inField.Volume();
+      param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
+    }
+    
+      
+    /** sets default values for when tuning is disabled */
+    void defaultTuneParam(TuneParam &param) const {
+      Tunable::defaultTuneParam(param);
+      const int threads = inField.Volume();
+      param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
+    }
+      
+    long long flops() const { return 0; } // FIXME: add flops counter
 
-    checkCudaError();
-    return;
-  } // unitarize_links_cuda
+    TuneKey tuneKey() const {
+      std::stringstream vol, aux;
+      vol << inField.X()[0] << "x";
+      vol << inField.X()[1] << "x";
+      vol << inField.X()[2] << "x";
+      vol << inField.X()[3] << "x";
+      aux << "threads=" << inField.Volume() << ",prec=" << inField.Precision();
+      aux << "stride=" << inField.Stride();
+      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+    }  
+  }; // UnitarizeLinksCuda
+    
+  void unitarizeLinksCuda(const QudaGaugeParam& param,
+			  cudaGaugeField& inField,
+			  cudaGaugeField* outField, 
+			  int* fails) { 
+    UnitarizeLinksCuda unitarizeLinks(inField, *outField, fails);
+    unitarizeLinks.apply(0);
+  }
 
-
- 
   void unitarizeLinksCPU(const QudaGaugeParam& param, cpuGaugeField& infield, cpuGaugeField* outfield)
   {
     int num_failures = 0;
     Matrix<double2,3> inlink, outlink;
-
+      
     for(int i=0; i<infield.Volume(); ++i){
-	for(int dir=0; dir<4; ++dir){
-	  if(param.cpu_prec == QUDA_SINGLE_PRECISION){
-	    copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	    if( unitarizeLinkNewton<double2>(inlink, &outlink) == false ) num_failures++; 
-	    copyLinkToArray(((float*)(outfield->Gauge_p()) + (i*4 + dir)*18), outlink); 
-	  }else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
-	    copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	    if( unitarizeLinkNewton<double2>(inlink, &outlink) == false ) num_failures++; 
-	    copyLinkToArray(((double*)(outfield->Gauge_p()) + (i*4 + dir)*18), outlink); 
-	  } // precision?
-	} // dir
+      for(int dir=0; dir<4; ++dir){
+	if(param.cpu_prec == QUDA_SINGLE_PRECISION){
+	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  if( unitarizeLinkNewton<double2>(inlink, &outlink) == false ) num_failures++; 
+	  copyLinkToArray(((float*)(outfield->Gauge_p()) + (i*4 + dir)*18), outlink); 
+	}else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
+	  copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  if( unitarizeLinkNewton<double2>(inlink, &outlink) == false ) num_failures++; 
+	  copyLinkToArray(((double*)(outfield->Gauge_p()) + (i*4 + dir)*18), outlink); 
+	} // precision?
+      } // dir
     }  // loop over volume
     return;
   }
-
+    
   // CPU function which checks that the gauge field is unitary
   bool isUnitary(const QudaGaugeParam& param, cpuGaugeField& field, double max_error)
   {
     Matrix<double2,3> link, identity;
-
+      
     for(int i=0; i<field.Volume(); ++i){
-       for(int dir=0; dir<4; ++dir){
-         if(param.cpu_prec == QUDA_SINGLE_PRECISION){
-	    copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	 }else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){     
-	    copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	 }else{
+      for(int dir=0; dir<4; ++dir){
+	if(param.cpu_prec == QUDA_SINGLE_PRECISION){
+	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	}else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){     
+	  copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	}else{
 	  errorQuda("Unsupported precision\n");
-	 }
-	 if(isUnitary(link,max_error) == false){ 
-            printf("Unitarity failure\n");
-	    printf("site index = %d,\t direction = %d\n", i, dir);
-	    printLink(link);
-            identity = conj(link)*link;
-	    printLink(identity);
-            return false;
-	 }
-       } // dir
+	}
+	if(isUnitary(link,max_error) == false){ 
+	  printf("Unitarity failure\n");
+	  printf("site index = %d,\t direction = %d\n", i, dir);
+	  printLink(link);
+	  identity = conj(link)*link;
+	  printLink(identity);
+	  return false;
+	}
+      } // dir
     } // i	  
     return true;
   } // is unitary
 
-
-
-} // namespace hisq
+    
+    
+} // namespace quda
