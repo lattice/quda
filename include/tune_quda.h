@@ -16,8 +16,8 @@ class TuneKey {
   std::string aux;
 
   TuneKey() { }
-  TuneKey(std::string v, std::string n, std::string a=std::string())
-    : volume(v), name(n), aux(a) { }  
+  TuneKey(std::string v, std::string n, std::string a=std::string("type=default"))
+    : volume(v), name(n), aux(a) { }
   TuneKey(const TuneKey &key)
     : volume(key.volume), name(key.name), aux(key.aux) { }
 
@@ -66,7 +66,7 @@ class TuneParam {
 class Tunable {
 
  protected:
-  virtual long long flops() const { return 0; } // FIXME: make pure virtual
+  virtual long long flops() const = 0;
   virtual long long bytes() const { return 0; } // FIXME
 
   // the minimum number of shared bytes per thread

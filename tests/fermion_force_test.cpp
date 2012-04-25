@@ -53,7 +53,7 @@ setDims(int *X) {
   Vh = V/2;
 }
 
-extern void initCommonConstants(const LatticeField &gauge);
+extern void initLatticeConstants(const LatticeField &gauge);
 
 static void
 fermion_force_init()
@@ -162,7 +162,7 @@ fermion_force_test(void)
 {
  
   fermion_force_init();
-  initCommonConstants(*cudaGauge);
+  initLatticeConstants(*cudaGauge);
   fermion_force_init_cuda(&gaugeParam);
 
     
@@ -200,11 +200,11 @@ fermion_force_test(void)
   int flops = 433968;
 
   struct timeval t0, t1;
-  cudaThreadSynchronize();    
+  cudaDeviceSynchronize();    
 
   gettimeofday(&t0, NULL);
   fermion_force_cuda(eps, weight1, weight2, act_path_coeff, cudaHw, *cudaGauge, *cudaMom, &gaugeParam);
-  cudaThreadSynchronize();
+  cudaDeviceSynchronize();
   gettimeofday(&t1, NULL);
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
     

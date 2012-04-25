@@ -40,15 +40,25 @@
 
 #if (DD_CLOVER==0) // no clover
 #define DD_NAME_F dslash
-#else              // clover
+#elif (DD_CLOVER==1)   // clover
 #define DSLASH_CLOVER
 #define DD_NAME_F cloverDslash
+#else
+#define DSLASH_CLOVER
+#define DSLASH_CLOVER_XPAY
+#define DD_NAME_F asymCloverDslash
 #endif
 
 #if (DD_DAG==0) // no dagger
 #define DD_DAG_F
 #else           // dagger
 #define DD_DAG_F Dagger
+#endif
+
+// DSLASH_CLOVER_XPAY implies DD_XPAY=1
+#if (DD_XPAY==0) && defined(DSLASH_CLOVER_XPAY)
+#undef DD_XPAY
+#define DD_XPAY 1
 #endif
 
 #if (DD_XPAY==0) // no xpay 
@@ -163,7 +173,7 @@
 #define TPROJSCALE tProjScale
 
 // double-precision gauge field
-#if (defined DIRECT_ACCESS_WILSON_GAUGE) || (defined FERMI_NO_DBLE_TEX)
+#if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
@@ -386,9 +396,19 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   (DD_PARAM_OUT DD_PARAM_GAUGE DD_PARAM_CLOVER DD_PARAM_IN DD_PARAM_XPAY const DslashParam param) {
 
   // build Wilson or clover as appropriate
-#if ((DD_CLOVER==0 && BUILD_WILSON) || (DD_CLOVER==1 && BUILD_CLOVER))
+#if ((DD_CLOVER==0 && BUILD_WILSON) || ((DD_CLOVER==1 || DD_CLOVER==2) && BUILD_CLOVER))
 
 #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_dslash_dagger_fermi_core.h"
+#else
+#include "asym_wilson_clover_dslash_fermi_core.h"
+#endif
+
+#else
 
 #if DD_DAG
 #include "wilson_dslash_dagger_fermi_core.h"
@@ -396,7 +416,19 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "wilson_dslash_fermi_core.h"
 #endif
 
+#endif
+
 #elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_dslash_dagger_gt200_core.h"
+#else
+#include "asym_wilson_clover_dslash_gt200_core.h"
+#endif
+
+#else
 
 #if DD_DAG
 #include "wilson_dslash_dagger_gt200_core.h"
@@ -404,7 +436,19 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "wilson_dslash_gt200_core.h"
 #endif
 
+#endif
+
 #else  // fall-back is original G80 
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_dslash_dagger_g80_core.h"
+#else
+#include "asym_wilson_clover_dslash_g80_core.h"
+#endif
+
+#else
 
 #if DD_DAG
 #include "wilson_dslash_dagger_g80_core.h"
@@ -412,10 +456,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "wilson_dslash_g80_core.h"
 #endif
 
-#endif
+#endif // DSLASH_CLOVER_XPAY
 
 
-#endif
+#endif // __COMPUTE_CAPABILITY
+
+
+#endif // DD_CLOVER
 
 }
 
@@ -452,6 +499,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_CLOVER
 #undef CLOVERTEX
 #undef DSLASH_CLOVER
+#undef DSLASH_CLOVER_XPAY
 #undef GAUGE_FLOAT2
 #undef SPINOR_DOUBLE
 #undef CLOVER_DOUBLE
@@ -498,6 +546,9 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #if (DD_CLOVER==0)
 #undef DD_CLOVER
 #define DD_CLOVER 1
+#elif (DD_CLOVER==1)
+#undef DD_CLOVER
+#define DD_CLOVER 2
 
 #else
 

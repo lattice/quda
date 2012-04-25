@@ -134,10 +134,8 @@
 #define stapleT22_re (+staple22_re)
 #define stapleT22_im (-staple22_im)
 
-//#ifdef FERMI_DBLE_NO_TEX
-
-#ifdef FERMI_DBLE_NO_TEX
-#define READ_DOUBLE2_TEXTURE(x_tex, x, i)      x[i]
+#ifdef FERMI_NO_DBLE_TEX
+#define READ_DOUBLE2_TEXTURE(x_tex, x, i)      (x)[i]
 #else
 #define READ_DOUBLE2_TEXTURE(x_tex, x, i)  fetch_double2(x_tex, i)
 #endif

@@ -9,6 +9,8 @@
 
 #include <face_quda.h>
 
+#include <typeinfo>
+
 // Params for Dirac operator
 class DiracParam {
 
@@ -17,6 +19,7 @@ class DiracParam {
   double kappa;
   double mass;
   double m5; // used by domain wall only
+  int Ls;    //!NEW: used by domain wall only  
   MatPCType matpcType;
   DagType dagger;
   cudaGaugeField *gauge;
@@ -27,7 +30,7 @@ class DiracParam {
   double mu; // used by twisted mass only
 
   cudaColorSpinorField *tmp1;
-  cudaColorSpinorField *tmp2; // used only by Clover and TM
+  cudaColorSpinorField *tmp2; // used by Wilson-like kernels only
 
   QudaVerbosity verbose;
 
@@ -60,7 +63,7 @@ class Dirac {
   friend class DiracMdagM;
   friend class DiracMdag;
 
-  protected:
+ protected:
   cudaGaugeField &gauge;
   double kappa;
   double mass;
@@ -120,6 +123,10 @@ class DiracWilson : public Dirac {
  public:
   DiracWilson(const DiracParam &param);
   DiracWilson(const DiracWilson &dirac);
+//BEGIN NEW
+  DiracWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW
+//END NEW    
+  
   virtual ~DiracWilson();
   DiracWilson& operator=(const DiracWilson &dirac);
 
@@ -172,6 +179,8 @@ class DiracClover : public DiracWilson {
   DiracClover& operator=(const DiracClover &dirac);
 
   void Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
+  virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity,
+			  const cudaColorSpinorField &x, const double &k) const;
   virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
   virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
 
@@ -313,8 +322,8 @@ class DiracTwistedMassPC : public DiracTwistedMass {
 class DiracStaggered : public Dirac {
 
  protected:
-  cudaGaugeField *fatGauge;
-  cudaGaugeField *longGauge;
+  cudaGaugeField &fatGauge;
+  cudaGaugeField &longGauge;
   FaceBuffer face; // multi-gpu communication buffers
 
  public:
@@ -378,6 +387,8 @@ class DiracMatrix {
 			  cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const = 0;
 
   unsigned long long flops() const { return dirac->Flops(); }
+
+  std::string Type() const { return typeid(*dirac).name(); }
 };
 
 inline DiracMatrix::~DiracMatrix()

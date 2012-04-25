@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <cuda.h>
 
-namespace hisq{
+namespace quda{
 
   // Given a real type T, returns the corresponding complex type
   template<class T>
@@ -103,7 +103,7 @@ namespace hisq{
 
 
   template<class Cmplx>
-    __device__ __host__ 
+    __device__ __host__ inline 
     Cmplx makeComplex(const typename RealTypeId<Cmplx>::Type & a, const typename RealTypeId<Cmplx>::Type & b)
     {
       Cmplx z;
@@ -112,99 +112,97 @@ namespace hisq{
     }
 
 
-  __device__ __host__
+  __device__ __host__ inline
     double2 makeComplex(const double & a, const double & b){
       return make_double2(a,b);
     }
 
-  __device__ __host__
+  __device__ __host__ inline
     float2 makeComplex(const float & a, const float & b){
       return make_float2(a,b);
     } 
 
-  /*
-  //  doesn't seem to work
+
   template<class Cmplx> 
-  __device__ __host__ 
-  const Cmplx & operator+=(Cmplx & a, const Cmplx & b){
-  a.x += b.x; 
-  a.y += b.y;
-  return a;
+  __device__ __host__ inline Cmplx & operator+=(Cmplx & a, const Cmplx & b){
+    a.x += b.x; 
+    a.y += b.y;
+    return a;
   }
-   */
+ 
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator+(const Cmplx & a, const Cmplx & b){
+    __device__ __host__ inline Cmplx operator+(const Cmplx & a, const Cmplx & b){
       return makeComplex(a.x+b.x,a.y+b.y);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator-(const Cmplx & a, const Cmplx & b)
+    __device__ __host__ inline Cmplx operator-(const Cmplx & a, const Cmplx & b)
     {
       return makeComplex(a.x-b.x,a.y-b.y);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator*(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
+    __device__ __host__ inline Cmplx operator*(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
     {
       return makeComplex(a.x*scalar,a.y*scalar);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator/(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
+    __device__ __host__ inline Cmplx operator/(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
     {
       return makeComplex(a.x/scalar,a.y/scalar);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator+(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
+    __device__ __host__ inline Cmplx operator+(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
     {
       return makeComplex(a.x+scalar,a.y);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator+(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & a)
+    __device__ __host__ inline Cmplx operator+(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & a)
     {
       return makeComplex(a.x+scalar,a.y);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator-(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
+    __device__ __host__ inline Cmplx operator-(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
     {
       return makeComplex(a.x-scalar,a.y);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator-(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & a)
+    __device__ __host__ inline Cmplx operator-(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & a)
     {
       return makeComplex(scalar-a.x,-a.y);
     }
 
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator*(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & b)
+    __device__ __host__ inline Cmplx operator*(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & b)
     {
       return operator*(b,scalar);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx operator*(const Cmplx & a, const Cmplx & b)
+    __device__ __host__ inline Cmplx operator*(const Cmplx & a, const Cmplx & b)
     {
       return makeComplex(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
     }
 
   template<class Cmplx>
-    __device__ __host__ Cmplx conj(const Cmplx & a)
+    __device__ __host__ inline Cmplx conj(const Cmplx & a)
     {
       return makeComplex(a.x,-a.y);
     }
 
-  __device__ __host__ double conj(const double & a)
+  __device__ __host__ inline double conj(const double & a)
   {
     return a;
   }
 
-  __device__ __host__ float conj(const float & a)
+  __device__ __host__ inline float conj(const float & a)
   {
     return a;
   }
@@ -212,7 +210,7 @@ namespace hisq{
 
 
   template<class Cmplx>
-    __device__ __host__
+    __device__ __host__ inline
     Cmplx getPreciseInverse(const Cmplx & z){
       typename RealTypeId<Cmplx>::Type ratio, max, denom;
       if( fabs(z.x) > fabs(z.y) ){ max = z.x; ratio = z.y/max; }else{ max=z.y; ratio = z.x/max; }
@@ -222,12 +220,12 @@ namespace hisq{
 
 
   // for printing
-  std::ostream & operator << (std::ostream & os, const float2 & z){
+  inline std::ostream & operator << (std::ostream & os, const float2 & z){
     os << "(" << z.x << "," << z.y << ")";
     return os;
   }
 
-  std::ostream & operator << (std::ostream & os, const double2 & z){
+  inline std::ostream & operator << (std::ostream & os, const double2 & z){
     os << "(" << z.x << "," << z.y << ")";
     return os;
   }
@@ -238,19 +236,19 @@ namespace hisq{
     struct Zero
     {
       //static const T val;
-      __device__ __host__
+      __device__ __host__ inline
         static T val();
     };
 
   template<>
-    __device__ __host__
+    __device__ __host__ inline
     float2 Zero<float2>::val()  
     {
       return make_float2(0.,0.);
     }
 
   template<>
-    __device__ __host__
+    __device__ __host__ inline
     double2 Zero<double2>::val()
     {
       return make_double2(0.,0.);
@@ -261,24 +259,24 @@ namespace hisq{
   template<class T>
     struct Identity
     {
-      __device__  __host__
+      __device__  __host__ inline
         static T val();
     };
 
   template<>
-    __device__ __host__
+    __device__ __host__ inline
     float2 Identity<float2>::val(){
       return make_float2(1.,0.);
     }
 
   template<>
-    __device__ __host__
+    __device__ __host__ inline
     double2 Identity<double2>::val(){
       return make_double2(1.,0.);
     }
 
   template<int N>
-    inline  __device__ __host__
+    __device__ __host__ inline
     int index(int i, int j)
     {
       return i*N + j;
@@ -290,24 +288,24 @@ namespace hisq{
       public:
         T data[N*N];
 
-        __device__ __host__ T const & operator()(int i, int j) const{
+        __device__ __host__ inline T const & operator()(int i, int j) const{
           return data[index<N>(i,j)];
         }
 
-        __device__ __host__ T & operator()(int i, int j){
+        __device__ __host__ inline T & operator()(int i, int j){
           return data[index<N>(i,j)];
         }
     };
 
   template<class T>
-    __device__ __host__ T getTrace(const Matrix<T,3>& a)
+    __device__ __host__ inline T getTrace(const Matrix<T,3>& a)
     {
       return a(0,0) + a(1,1) + a(2,2);
     }
 
 
   template<class T>
-    __device__ __host__  T getDeterminant(const Matrix<T,3> & a){
+    __device__ __host__ inline  T getDeterminant(const Matrix<T,3> & a){
 
       T result;
       result = a(0,0)*(a(1,1)*a(2,2) - a(2,1)*a(1,2))
@@ -318,7 +316,7 @@ namespace hisq{
     }
 
   template<class T, int N>
-    __device__ __host__ Matrix<T,N> operator+(const Matrix<T,N> & a, const Matrix<T,N> & b)
+    __device__ __host__ inline Matrix<T,N> operator+(const Matrix<T,N> & a, const Matrix<T,N> & b)
     {
       Matrix<T,N> result;
       for(int i=0; i<N*N; i++){
@@ -328,9 +326,19 @@ namespace hisq{
     }
 
 
+  template<class T, int N>
+    __device__ __host__ inline Matrix<T,N> operator+=(Matrix<T,N> & a, const Matrix<T,N> & b)
+    {
+      for(int i=0; i<N*N; i++){
+        a.data[i] += b.data[i];
+      }
+      return a;
+    }
+
+
 
   template<class T, int N>
-    __device__ __host__ Matrix<T,N> operator-(const Matrix<T,N> & a, const Matrix<T,N> & b)
+    __device__ __host__ inline Matrix<T,N> operator-(const Matrix<T,N> & a, const Matrix<T,N> & b)
     {
       Matrix<T,N> result;
       for(int i=0; i<N*N; i++){
@@ -342,7 +350,7 @@ namespace hisq{
 
 
   template<class T, int N, class S>
-    __device__ __host__ Matrix<T,N> operator*(const S & scalar, const Matrix<T,N> & a){
+    __device__ __host__ inline Matrix<T,N> operator*(const S & scalar, const Matrix<T,N> & a){
       Matrix<T,N> result;
       for(int i=0; i<N*N; ++i){
         result.data[i] = scalar*a.data[i];
@@ -352,14 +360,14 @@ namespace hisq{
 
 
   template<class T, int N, class S>
-    __device__ __host__ Matrix<T,N> operator*(const Matrix<T,N> & a, const S & scalar){
+    __device__ __host__ inline Matrix<T,N> operator*(const Matrix<T,N> & a, const S & scalar){
       return scalar*a;
     }
 
 
 
   template<class T>
-    __device__ __host__
+    __device__ __host__ inline
     Matrix<T,3> operator*(const Matrix<T,3> & a, const Matrix<T,3> & b)
     {
       // The compiler has a hard time unrolling nested loops,
@@ -381,7 +389,7 @@ namespace hisq{
 
   // This is so that I can multiply real and complex matrices
   template<class T, class U>
-    __device__ __host__
+    __device__ __host__ inline
     Matrix<typename PromoteTypeId<T,U>::Type,3> operator*(const Matrix<T,3> & a, const Matrix<U,3> & b)
     {
       Matrix<typename PromoteTypeId<T,U>::Type,3> result;
@@ -400,7 +408,7 @@ namespace hisq{
 
 
   template<class T>
-    __device__ __host__
+    __device__ __host__ inline
     Matrix<T,2> operator*(const Matrix<T,2> & a, const Matrix<T,2> & b)
     {
       Matrix<T,2> result;
@@ -413,7 +421,7 @@ namespace hisq{
 
 
   template<class T, int N>
-    __device__ __host__
+    __device__ __host__ inline
     Matrix<T,N> conj(const Matrix<T,N> & other){
       Matrix<T,N> result;
       for(int i=0; i<N; ++i){
@@ -426,7 +434,7 @@ namespace hisq{
 
 
   template<class T> 
-    __device__  __host__
+    __device__  __host__ inline
     void computeMatrixInverse(const Matrix<T,3>& u, Matrix<T,3>* uinv)
     {
 
@@ -468,7 +476,7 @@ namespace hisq{
 
 
   template<class T, int N>
-    inline __device__ __host__
+    __device__ __host__ inline
     void setIdentity(Matrix<T,N>* m){
 
       for(int i=0; i<N; ++i){
@@ -482,7 +490,7 @@ namespace hisq{
 
 
   template<int N>
-    inline __device__ __host__
+    __device__ __host__ inline
     void setIdentity(Matrix<float2,N>* m){
 
       for(int i=0; i<N; ++i){
@@ -496,7 +504,7 @@ namespace hisq{
 
 
   template<int N>
-    inline __device__ __host__
+    __device__ __host__ inline
     void setIdentity(Matrix<double2,N>* m){
 
       for(int i=0; i<N; ++i){
@@ -511,7 +519,7 @@ namespace hisq{
 
   // Need to write more generic code for this!
   template<class T, int N>
-    inline __device__ __host__
+    __device__ __host__ inline
     void setZero(Matrix<T,N>* m){
 
       for(int i=0; i<N; ++i){
@@ -524,7 +532,7 @@ namespace hisq{
 
 
   template<int N>
-    inline __device__ __host__
+    __device__ __host__ inline
     void setZero(Matrix<float2,N>* m){
 
       for(int i=0; i<N; ++i){
@@ -537,7 +545,7 @@ namespace hisq{
 
 
   template<int N>
-    inline __device__ __host__
+    __device__ __host__ inline
     void setZero(Matrix<double2,N>* m){
 
       for(int i=0; i<N; ++i){
@@ -547,6 +555,7 @@ namespace hisq{
       }
       return;
     }
+
 
 
 
@@ -565,13 +574,13 @@ namespace hisq{
 
       public:
         // access function
-        __device__ __host__
+        __device__ __host__ inline
           T const & operator[](int i) const{
             return data[i];
           }
 
         // assignment function
-        __device__ __host__ 
+        __device__ __host__ inline 
           T & operator[](int i){
             return data[i];
           }
@@ -579,7 +588,7 @@ namespace hisq{
 
 
   template<class T, int N>
-    __device__  __host__ 
+    __device__  __host__ inline
     void copyColumn(const Matrix<T,N>& m, int c, Array<T,N>* a)
     {
       for(int i=0; i<N; ++i){
@@ -590,7 +599,7 @@ namespace hisq{
 
 
   template<class T, int N>
-    __device__ __host__
+    __device__ __host__ inline
     void outerProd(const Array<T,N>& a, const Array<T,N> & b, Matrix<T,N>* m){
       for(int i=0; i<N; ++i){
         const T conjb_i = conj(b[i]);
@@ -625,7 +634,7 @@ namespace hisq{
 
 
   template<class T>
-    __device__
+    __device__ inline
     void loadLinkVariableFromArray(const T* const array, int dir, int idx, int stride, Matrix<T,3> *link)
     {
       for(int i=0; i<9; ++i){
@@ -635,7 +644,7 @@ namespace hisq{
     }
 
 
-    __device__  
+    __device__ inline  
    void loadLinkVariableFromArray(const float2* const array, int dir, int idx, int stride, Matrix<double2,3> *link)
    { 
 		 float2 single_temp; 
@@ -652,7 +661,7 @@ namespace hisq{
 
 
   template<class T>
-    __device__
+    __device__ inline
     void writeLinkVariableToArray(const Matrix<T,3> & link,  int dir, int idx, int stride, T* const array)
     {
       for(int i=0; i<9; ++i){ 
@@ -664,7 +673,7 @@ namespace hisq{
 
 
 
-    __device__ 
+    __device__ inline 
 	  void writeLinkVariableToArray(const Matrix<double2,3> & link, int dir, int idx, int stride, float2* const array)
    {
 	    float2 single_temp;
@@ -679,7 +688,7 @@ namespace hisq{
 
 
   template<class Cmplx> 
-    __device__  __host__
+    __device__  __host__ inline
     void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
     {
 
@@ -718,7 +727,7 @@ namespace hisq{
       return;
     } 
   // template this! 
-        void copyArrayToLink(Matrix<float2,3>* link, float* array){
+        inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
           for(int i=0; i<3; ++i){
             for(int j=0; j<3; ++j){
               (*link)(i,j).x = array[(i*3+j)*2];
@@ -729,7 +738,7 @@ namespace hisq{
         }
 	
 	template<class Cmplx, class Real>
-        void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
+        inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
           for(int i=0; i<3; ++i){
             for(int j=0; j<3; ++j){
               (*link)(i,j).x = array[(i*3+j)*2];
@@ -741,7 +750,7 @@ namespace hisq{
 	
         
         // and this!
-        void copyLinkToArray(float* array, const Matrix<float2,3>& link){
+        inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
           for(int i=0; i<3; ++i){
             for(int j=0; j<3; ++j){
               array[(i*3+j)*2] = link(i,j).x;
@@ -752,8 +761,8 @@ namespace hisq{
         }
 
         // and this!
-	      template<class Cmplx, class Real>
-        void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
+	template<class Cmplx, class Real>
+        inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
           for(int i=0; i<3; ++i){
             for(int j=0; j<3; ++j){
               array[(i*3+j)*2] = link(i,j).x;
@@ -767,8 +776,9 @@ namespace hisq{
 
         // and this!
 	template<class Cmplx>
-	__host__ __device__
+	__host__ __device__ inline
         void printLink(const Matrix<Cmplx,3>& link){
+#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
           printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
           printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
           printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
@@ -779,7 +789,8 @@ namespace hisq{
           printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
           printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
           printf("\n");
+#endif
         }
 
-} // end namespace hisq
+} // end namespace quda
 #endif // _QUDA_MATRIX_H_

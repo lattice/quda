@@ -150,8 +150,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cuda_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
 
-  P(src_location, QUDA_INVALID_FIELD_LOCATION);
-  P(sol_location, QUDA_INVALID_FIELD_LOCATION);
+  // leave the default behviour to cpu pointers
+#if defined INIT_PARAM
+  P(input_location, QUDA_CPU_FIELD_LOCATION);
+  P(output_location, QUDA_CPU_FIELD_LOCATION);
+#else
+  P(input_location, QUDA_INVALID_FIELD_LOCATION);
+  P(output_location, QUDA_INVALID_FIELD_LOCATION);
+#endif
 
 #if defined INIT_PARAM
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
@@ -182,6 +188,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
   P(prec_precondition, QUDA_INVALID_PRECISION);
+  P(schwarz_type, QUDA_ADDITIVE_SCHWARZ); // defaults match previous interface behaviour
+  P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || 
       param->inv_type_precondition == QUDA_CG_INVERTER || 
@@ -191,6 +199,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
     P(prec_precondition, QUDA_INVALID_PRECISION);
   }
+  P(schwarz_type, QUDA_INVALID_SCHWARZ);
+  P(precondition_cycle, 0);              
 #endif
 
 

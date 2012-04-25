@@ -1,13 +1,15 @@
-/**
-   @file convert.h
-   @author M Clark
+#ifndef _CONVERT_H
+#define _CONVERT_H
 
-   @section DESCRIPTION 
-   Conversion functions that are used as building blocking for
-   arbitrary field and register ordering.
+/**
+ * @file convert.h
+ *
+ * @section DESCRIPTION 
+ * Conversion functions that are used as building blocks for
+ * arbitrary field and register ordering.
  */
 
-#pragma once
+#include <quda_internal.h> // for MAX_SHORT
 
 template <typename type> int vecLength() { return 0; }
 
@@ -23,11 +25,13 @@ template<> int vecLength<short4>() { return 4; }
 template<> int vecLength<float4>() { return 4; }
 template<> int vecLength<double4>() { return 4; }
 
-__device__ inline void copyFloatN(float2 &a, const float2 &b) { a = b; }
-__device__ inline void copyFloatN(double2 &a, const double2 &b) { a = make_double2(b.x, b.y); }
+static inline __device__ float s2f(const short &a) { return static_cast<float>(a)/MAX_SHORT; }
 
-__device__ inline void copyFloatN(float4 &a, const float4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
-__device__ inline void copyFloatN(double4 &a, const double4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
+template <typename FloatN>
+__device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }
+
+__device__ inline void copyFloatN(float2 &a, const short2 &b) { a = make_float2(s2f(b.x), s2f(b.y)); }
+__device__ inline void copyFloatN(float4 &a, const short4 &b) { a = make_float4(s2f(b.x), s2f(b.y), s2f(b.z), s2f(b.w)); }
 
 __device__ inline void copyFloatN(float2 &a, const double2 &b) { a = make_float2(b.x, b.y); }
 __device__ inline void copyFloatN(double2 &a, const float2 &b) { a = make_double2(b.x, b.y); }
@@ -167,3 +171,5 @@ template<> __device__ inline void convert<float2,double4>(float2 x[], double4 y[
     x[2*j+1] = make_float2(y[j].z, y[j].w);
   }
 }
+
+#endif // _CONVERT_H

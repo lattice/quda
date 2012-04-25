@@ -4,12 +4,18 @@
 
 #include <iostream>
 
+// FIXME: At the moment, it's unsafe for more than one Dirac operator to be active unless
+// they all have the same volume, etc. (used to initialize the various CUDA constants).
+
 Dirac::Dirac(const DiracParam &param) 
   : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
     dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
     verbose(param.verbose)
 {
   for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
+  initLatticeConstants(gauge);
+  initGaugeConstants(gauge);
+  initDslashConstants();
 }
 
 Dirac::Dirac(const Dirac &dirac) 
@@ -18,11 +24,12 @@ Dirac::Dirac(const Dirac &dirac)
     verbose(dirac.verbose)
 {
   for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
+  initLatticeConstants(gauge);
+  initGaugeConstants(gauge);
+  initDslashConstants();
 }
 
-Dirac::~Dirac() {
-
-}
+Dirac::~Dirac() { }
 
 Dirac& Dirac::operator=(const Dirac &dirac)
 {
@@ -40,7 +47,6 @@ Dirac& Dirac::operator=(const Dirac &dirac)
 
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
-
   return *this;
 }
 

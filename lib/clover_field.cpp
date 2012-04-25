@@ -4,6 +4,7 @@
 
 #include <quda_internal.h>
 #include <clover_field.h>
+#include <gauge_field.h>
 
 CloverField::CloverField(const CloverFieldParam &param, const QudaFieldLocation &location) :
   LatticeField(param, location), bytes(0), norm_bytes(0), nColor(3), nSpin(4)
@@ -289,11 +290,19 @@ void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void 
     errorQuda("Invalid clover order");
   }
 
-  cudaMallocHost(&packedEven, bytes/2);
-  cudaMallocHost(&packedOdd, bytes/2);
+  if (cudaMallocHost(&packedEven, bytes/2) ==  cudaErrorMemoryAllocation){
+    errorQuda("cudaMallocHost failed for packedEven\n");
+  }
+  if ( cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation){
+    errorQuda("cudaMallocHost failed for packedOdd\n");
+  }
   if (precision == QUDA_HALF_PRECISION) {
-    cudaMallocHost(&packedEvenNorm, norm_bytes/2);
-    cudaMallocHost(&packedOddNorm, norm_bytes/2);
+    if (cudaMallocHost(&packedEvenNorm, norm_bytes/2) == cudaErrorMemoryAllocation){
+      errorQuda("cudaMallocHost failed for packedEvenNorm\n");
+    }
+    if (cudaMallocHost(&packedOddNorm, norm_bytes/2) == cudaErrorMemoryAllocation){
+      errorQuda("cudaMallocHost failed for packedOddNorm\n");
+    }
   }
     
   if (precision == QUDA_DOUBLE_PRECISION) {
@@ -327,4 +336,17 @@ void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void 
     cudaFreeHost(packedEvenNorm);
     cudaFreeHost(packedOddNorm);
   }
+}
+
+
+/**
+   Computes Fmunu given the gauge field U
+ */
+void cudaCloverField::compute(const cudaGaugeField &gauge) {
+
+  if (gauge.Precision() != precision) 
+    errorQuda("Gauge and clover precisions must match");
+
+  computeCloverCuda(*this, gauge);
+
 }

@@ -10,10 +10,11 @@
  */
 
 #include <enum_quda.h>
+#include <stdio.h> /* for FILE */
 
 #define QUDA_VERSION_MAJOR     0
-#define QUDA_VERSION_MINOR     3
-#define QUDA_VERSION_SUBMINOR  3 
+#define QUDA_VERSION_MINOR     4
+#define QUDA_VERSION_SUBMINOR  1
 
 /**
  * @def   QUDA_VERSION
@@ -21,9 +22,6 @@
  */
 #define QUDA_VERSION ((QUDA_VERSION_MAJOR<<16) | (QUDA_VERSION_MINOR<<8) | QUDA_VERSION_SUBMINOR)
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * @def   QUDA_MAX_DIM
@@ -39,6 +37,10 @@ extern "C" {
  */
 #define QUDA_MAX_MULTI_SHIFT 32
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
   /**
    * Parameters having to do with the gauge field or the
@@ -90,8 +92,8 @@ extern "C" {
    */
   typedef struct QudaInvertParam_s {
 
-    QudaFieldLocation sol_location; /**< The location of the solution field */
-    QudaFieldLocation src_location; /**< The location of the source field */
+    QudaFieldLocation input_location; /**< The location of the input field */
+    QudaFieldLocation output_location; /**< The location of the output field */
 
     QudaDslashType dslash_type;
     QudaInverterType inv_type;
@@ -183,11 +185,17 @@ extern "C" {
     /** Maximum number of iterations allowed in the inner solver */
     int maxiter_precondition;
 
-    /** Precision used in the inner solver. */
+    /** Precision used in the inner solver */
     QudaPrecision prec_precondition;
 
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
+
+    /** Number of preconditioner cycles to perform per iteration */
+    int precondition_cycle;
+
+    /** Whether to use additive or multiplicative Schwarz preconditioning */
+    QudaSchwarzType schwarz_type;
 
   } QudaInvertParam;
 
@@ -195,6 +203,34 @@ extern "C" {
   /*
    * Interface functions, found in interface_quda.cpp
    */
+
+  /**
+   * Set parameters related to status reporting.
+   *
+   * In typical usage, this function will be called once (or not at
+   * all) just before the call to initQuda(), but it's valid to call
+   * it any number of times at any point during execution.  Prior to
+   * the first time it's called, the parameters take default values
+   * as indicated below.
+   *
+   * @param verbosity  Default verbosity, ranging from QUDA_SILENT to
+   *                   QUDA_DEBUG_VERBOSE.  Within a solver, this
+   *                   parameter is overridden by the "verbosity"
+   *                   member of QudaInvertParam.  The default value
+   *                   is QUDA_SUMMARIZE.
+   *
+   * @param prefix     String to prepend to all messages from QUDA.  This
+   *                   defaults to the empty string (""), but you may
+   *                   wish to specify something like "QUDA: " to
+   *                   distinguish QUDA's output from that of your
+   *                   application.
+   *
+   * @param outfile    File pointer (such as stdout, stderr, or a handle
+   *                   returned by fopen()) where messages should be
+   *                   printed.  The default is stdout.
+   */
+  void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[],
+			FILE *outfile);
 
   /**
    * Initialize the library.
@@ -205,6 +241,39 @@ extern "C" {
    *                allocation of devices to processes.
    */
   void initQuda(int device);
+
+  /**
+   * Finalize the library.
+   */
+  void endQuda(void);
+
+  /**
+   * A new QudaGaugeParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeParam gauge_param = newQudaGaugeParam();
+   */
+  QudaGaugeParam newQudaGaugeParam(void);
+
+  /**
+   * A new QudaInvertParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaInvertParam invert_param = newQudaInvertParam();
+   */
+  QudaInvertParam newQudaInvertParam(void);
+
+  /**
+   * Print the members of QudaGaugeParam.
+   */
+  void printQudaGaugeParam(QudaGaugeParam *param);
+
+  /**
+   * Print the members of QudaGaugeParam.
+   */
+  void printQudaInvertParam(QudaInvertParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -255,46 +324,21 @@ extern "C" {
 				 QudaInvertParam *param, double* offsets,
 				 int num_offsets, double* residue_sq);
     
-  /** Apply the Dslash operator (D_{eo} or D_{oe}) */
+  /**
+   * Apply the Dslash operator (D_{eo} or D_{oe}).
+   */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity parity);
 
-  /** Apply the full Dslash matrix, possibly even/odd preconditioned */
+  /**
+   * Apply the full Dslash matrix, possibly even/odd preconditioned.
+   */
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
-  /** Apply M^{\dag}M, possibly even/odd preconditioned */
+  /**
+   * Apply M^{\dag}M, possibly even/odd preconditioned.
+   */
   void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
-
-  /** Finalize the library */
-  void endQuda(void);
-
-  /**
-   * A new QudaGaugeParam should always be initialized immediately
-   * after it's defined (and prior to explicitly setting its members)
-   * using this function.  Typical usage is as follows:
-   *
-   *   QudaGaugeParam gauge_param = newQudaGaugeParam();
-   */
-  QudaGaugeParam newQudaGaugeParam(void);
-
-  /**
-   * A new QudaInvertParam should always be initialized immediately
-   * after it's defined (and prior to explicitly setting its members)
-   * using this function.  Typical usage is as follows:
-   *
-   *   QudaInvertParam invert_param = newQudaInvertParam();
-   */
-  QudaInvertParam newQudaInvertParam(void);
-
-  /**
-   * Print the members of QudaGaugeParam.
-   */
-  void printQudaGaugeParam(QudaGaugeParam *param);
-
-  /**
-   * Print the members of QudaGaugeParam.
-   */
-  void printQudaInvertParam(QudaInvertParam *param);
 
 
   /*
@@ -317,9 +361,9 @@ extern "C" {
   
   /*
    * The following routines are only used by the examples in tests/ .
-   * They should generally not be called in a typical application.
+   * They should not be called in a typical application.
    */  
-  void initCommsQuda(int argc, char **argv, const int *X, const int nDim);
+  void initCommsQuda(int argc, char **argv, const int *X, int nDim);
   void endCommsQuda();
 
 #ifdef __cplusplus

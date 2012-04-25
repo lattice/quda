@@ -4,7 +4,8 @@
 #include <misc_helpers.h>
 
 cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
-  GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0)
+  GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0), 
+  backed_up(false)
 {
   if(create != QUDA_NULL_FIELD_CREATE &&  create != QUDA_ZERO_FIELD_CREATE){
     errorQuda("ERROR: create type(%d) not supported yet\n", create);
@@ -42,7 +43,9 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
 			   QudaLinkType type, double &fat_link_max) {
   // Use pinned memory
   FloatN *packed, *packedEven, *packedOdd;
-  cudaMallocHost(&packed, bytes);
+  if (cudaMallocHost(&packed, bytes) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packed\n");
+  }
   packedEven = packed;
   packedOdd = (FloatN*)((char*)packed + bytes/2);
 
@@ -118,8 +121,12 @@ template <typename Float, typename Float2>
 void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh, int pad) 
 {  
   Float2 *packedEven, *packedOdd;
-  cudaMallocHost(&packedEven, bytes/2); 
-  cudaMallocHost(&packedOdd, bytes/2); 
+  if(cudaMallocHost(&packedEven, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+  }
+  if (cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedOdd\n");
+  }
     
   packMomField(packedEven, (Float*)mom, 0, Vh, pad);
   packMomField(packedOdd,  (Float*)mom, 1, Vh, pad);
@@ -133,6 +140,7 @@ void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh, int 
 
 void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
 {
+  if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
   checkField(cpu);
 
@@ -234,7 +242,9 @@ static void storeGaugeField(Float *cpuGauge, FloatN *gauge, GaugeFieldOrder cpu_
 
   // Use pinned memory
   FloatN *packed;
-  cudaMallocHost(&packed, bytes);
+  if (cudaMallocHost(&packed, bytes) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packed\n");
+  }
   cudaMemcpy(packed, gauge, bytes, cudaMemcpyDeviceToHost);
     
   FloatN *packedEven = packed;
@@ -311,8 +321,12 @@ storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd,
 		   int bytes, int V, int pad) 
 {    
   Float2 *packedEven, *packedOdd;   
-  cudaMallocHost(&packedEven, bytes/2); 
-  cudaMallocHost(&packedOdd, bytes/2); 
+  if (cudaMallocHost(&packedEven, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+  }
+  if (cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
+  }
   cudaMemcpy(packedEven, even, bytes/2, cudaMemcpyDeviceToHost); 
   cudaMemcpy(packedOdd, odd, bytes/2, cudaMemcpyDeviceToHost);  
   
@@ -325,6 +339,7 @@ storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd,
 
 void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const
 {
+  if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
   // do device-side reordering then copy
   if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
@@ -430,5 +445,21 @@ void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &p
     errorQuda("Invalid pack location %d", pack_location);
   }
 
+}
+
+void cudaGaugeField::backup() const {
+  if (backed_up) errorQuda("Gauge field already backedup");
+  backup_h = new char[bytes];
+  cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+  checkCudaError();
+  backed_up = true;
+}
+
+void cudaGaugeField::restore() {
+  if (!backed_up) errorQuda("Cannot retore since not backed up");
+  cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+  delete []backup_h;
+  checkCudaError();
+  backed_up = false;
 }
 

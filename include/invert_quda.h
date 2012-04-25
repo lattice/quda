@@ -76,6 +76,7 @@ class MR : public Solver {
   cudaColorSpinorField *Arp;
   cudaColorSpinorField *tmpp;
   bool init;
+  bool allocate_r;
 
  public:
   MR(DiracMatrix &mat, QudaInvertParam &invParam);

@@ -193,7 +193,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   // these low precision fields are used by the inner solver
   bool precMatch = true;
   cudaColorSpinorField *r_pre, *p_pre;
-  if (invParam.prec_precondition != invParam.cuda_prec_sloppy) {
+  if (invParam.prec_precondition != invParam.cuda_prec_sloppy || invParam.precondition_cycle > 1) {
     param.precision = invParam.prec_precondition;
     p_pre = new cudaColorSpinorField(x, param);
     r_pre = new cudaColorSpinorField(x, param);
@@ -215,12 +215,20 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   int k = 0;
 
+  // compute parity of the node
+  int parity = 0;
+  for (int i=0; i<4; i++) parity += commCoords(i);
+  parity = parity % 2;
+
   // calculate initial residual
   mat(r, x);
   double r2 = xmyNormCuda(b, r);  
   copyCuda(rSloppy, r);
 
   quda::blas_flops = 0;
+
+  cudaColorSpinorField rM(rSloppy);
+  cudaColorSpinorField xM(rSloppy);
 
   stopwatchStart();
 
@@ -237,27 +245,40 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     
     gettimeofday(&pre0, NULL);
 
-    if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) {
-      cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
-
-      copyCuda(rPre, rSloppy);
-
-      (*K)(pPre, rPre);
-
-      // relaxation p = omega*p + (1-omega)*r
-      if (invParam.omega!=1.0) axpbyCuda((1.0-invParam.omega), rPre, invParam.omega, pPre);
-
-      copyCuda(*p[k], pPre);
-    } else { // no preconditioner
-      *p[k] = rSloppy;
-    } 
-
-
-    gettimeofday(&pre1, NULL);
-
-    gettimeofday(&mat0, NULL);
-    matSloppy(*Ap[k], *p[k], tmp);
-    gettimeofday(&mat1, NULL);
+    for (int m=0; m<invParam.precondition_cycle; m++) {
+      if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) {
+	cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
+	
+	if (m==0) { // residual is just source
+	  copyCuda(rPre, rSloppy);
+	} else { // compute residual
+	  copyCuda(rM,rSloppy);
+	  axpyCuda(-1.0, *Ap[k], rM);
+	  copyCuda(rPre, rM);
+	}
+	
+	if ((parity+m)%2 == 0 || invParam.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
+	else copyCuda(pPre, rPre);
+	
+	// relaxation p = omega*p + (1-omega)*r
+	//if (invParam.omega!=1.0) axpbyCuda((1.0-invParam.omega), rPre, invParam.omega, pPre);
+	
+	if (m==0) { copyCuda(*p[k], pPre); }
+	else { copyCuda(tmp, pPre); xpyCuda(tmp, *p[k]); }
+      } else { // no preconditioner
+	*p[k] = rSloppy;
+      } 
+      
+      
+      gettimeofday(&pre1, NULL);
+      preT += timeInterval(pre0, pre1);
+      
+      gettimeofday(&mat0, NULL);
+      matSloppy(*Ap[k], *p[k], tmp);
+      gettimeofday(&mat1, NULL);
+      matT += timeInterval(mat0, mat1);
+    }
+    //    exit(0);
 
     orthoDir(beta, Ap, k);
 
@@ -316,8 +337,6 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     gettimeofday(&rst1, NULL);
 
     orthT += timeInterval(orth0, orth1);
-    matT += timeInterval(mat0, mat1);
-    preT += timeInterval(pre0, pre1);
     resT += timeInterval(rst0, rst1);
 
   }

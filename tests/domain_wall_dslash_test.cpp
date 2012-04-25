@@ -12,24 +12,27 @@
 
 #include <test_util.h>
 #include <domain_wall_dslash_reference.h>
+#include "misc.h"
+
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-const int test_type = 1;
+const int test_type = 0;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
-const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
+///const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int loops = 100;
-
-const int Ls = 16;
+const int Ls = 2;
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision cuda_prec = QUDA_SINGLE_PRECISION;
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
+
+//FullGauge gauge;
 
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp=0, *tmp2=0;
@@ -38,19 +41,45 @@ void *hostGauge[4];
 
 Dirac *dirac;
 
+//BEGIN NEW
+// Dirac operator type
+extern QudaDslashType dslash_type;
+
+extern bool tune;
+
+extern int device;
+extern int xdim;
+extern int ydim;
+extern int zdim;
+extern int tdim;
+extern int gridsize_from_cmdline[];
+extern QudaReconstructType link_recon;
+extern QudaPrecision prec;
+extern bool kernelPackT;
+extern QudaDagType dagger;
+
+extern char latfile[];
+
+extern int niter;
+
+//END NEW
+
 void init() {
+//BEGIN NEW  
+  kernelPackT = true; // Set true for kernel T face packing  
+//END NEW  
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = 16;
-  gauge_param.X[1] = 16;
-  gauge_param.X[2] = 16;
-  gauge_param.X[3] = 16;
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
   
   setDims(gauge_param.X, Ls);
 
-  gauge_param.anisotropy = 2.3;
+  gauge_param.anisotropy = 1.0;
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -77,17 +106,32 @@ void init() {
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
-  inv_param.src_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.sol_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
+  
+  if (inv_param.cpu_prec != gauge_param.cpu_prec) 
+    errorQuda("Gauge and spinor cpu precisions must match");  
+  
+#ifndef MULTI_GPU // free parameter for single GPU
   gauge_param.ga_pad = 0;
-  inv_param.sp_pad = 0;
+#else // must be this one c/b face for multi gpu
+  int x_face_size = Ls*gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = Ls*gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = Ls*gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = Ls*gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int pad_size =MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+  gauge_param.ga_pad = pad_size;    
+#endif    
+  inv_param.sp_pad = 0;// xdim*ydim*zdim;
   inv_param.cl_pad = 0;
 
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (test_type == 2) {
+  if (test_type == 2 || test_type == 3) {
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
@@ -141,6 +185,7 @@ void init() {
   printfQuda("Sending gauge field to GPU\n");
 
   loadGaugeQuda(hostGauge, &gauge_param);
+  //gauge = cudaGaugePrecise;
 
   if (!transfer) {
     csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
@@ -164,7 +209,7 @@ void init() {
     printfQuda("Creating cudaSpinorOut\n");
     cudaSpinorOut = new cudaColorSpinorField(csParam);
 
-    if (test_type == 2) csParam.x[0] /= 2;
+    if (test_type == 2 || test_type == 3) csParam.x[0] /= 2;
 
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp = new cudaColorSpinorField(csParam);
@@ -175,10 +220,10 @@ void init() {
     std::cout << "Source: CPU = " << norm2(*spinor) << ", CUDA = " << 
       norm2(*cudaSpinor) << std::endl;
 
-    bool pc = (test_type != 2);
+    bool pc = (test_type != 2 || test_type != 3);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.verbose = QUDA_VERBOSE;
+    diracParam.verbose = QUDA_DEBUG_VERBOSE;
     diracParam.tmp1 = tmp;
     diracParam.tmp2 = tmp2;
     
@@ -210,7 +255,7 @@ void end() {
 // execute kernel
 double dslashCUDA() {
 
-  printfQuda("Executing %d kernel loops...\n", loops);
+  printfQuda("Executing %d kernel loops...\n", niter);
   fflush(stdout);
 
   cudaEvent_t start, end;
@@ -218,7 +263,7 @@ double dslashCUDA() {
   cudaEventRecord(start, 0);
   cudaEventSynchronize(start);
 
-  for (int i = 0; i < loops; i++) {
+  for (int i = 0; i < niter; i++) {
     switch (test_type) {
     case 0:
       if (transfer) {
@@ -235,6 +280,12 @@ double dslashCUDA() {
 	dirac->M(*cudaSpinorOut, *cudaSpinor);
       }
       break;
+    case 3:
+      if (transfer) {
+	MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+      } else {
+	dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+      }
     }
   }
     
@@ -272,17 +323,18 @@ void dslashRef() {
   fflush(stdout);
   switch (test_type) {
   case 0:
-    dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, 
-	   inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
+    dw_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
     break;
   case 1:    
     matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, 
 	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
     break;
   case 2:
-    mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, 
-	inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
+    dw_mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
     break;
+  case 3:
+    dw_matdagmat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+    break; 
   default:
     printf("Test type not defined\n");
     exit(-1);
@@ -292,11 +344,47 @@ void dslashRef() {
     
 }
 
+void display_test_info()
+{
+  printfQuda("running the following test:\n");
+ 
+  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d\n", 
+	     get_prec_str(prec), get_recon_str(link_recon), 
+	     test_type, dagger, xdim, ydim, zdim, tdim);
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
+	     commDimPartitioned(0),
+	     commDimPartitioned(1),
+	     commDimPartitioned(2),
+	     commDimPartitioned(3));
+
+  return ;
+    
+}
+
+extern void usage(char**);
+
 int main(int argc, char **argv)
 {
+  
+  for (int i =1;i < argc; i++){    
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }  
+    
+    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
+
+
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+
+  display_test_info();
+  
   init();
 
-  float spinorGiB = (float)Vh*Ls*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
+  float spinorGiB = (float)Vh*spinorSiteSize*sizeof(inv_param.cpu_prec) / (1 << 30);
   printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
   printf("Gauge mem: %.3f GiB\n", gauge_param.gaugeGiB);
   
@@ -308,7 +396,7 @@ int main(int argc, char **argv)
     if (tune) { // warm-up run
       printfQuda("Tuning...\n");
       setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);      
-      dslashCUDA(1);
+      dslashCUDA();
     }
 
     double secs = dslashCUDA();
@@ -320,25 +408,24 @@ int main(int argc, char **argv)
     
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-
-    int spinor_floats = test_type ? 2*(9*24+24)+24 : 9*24+24;
-    if (inv_param.cuda_prec == QUDA_HALF_PRECISION) 
-      spinor_floats += test_type ? 2*(9*2 + 2) + 2 : 9*2 + 2; // relative size of norm is twice a short
-    int gauge_floats = (test_type ? 2 : 1) * (gauge_param.gauge_fix ? 6 : 8) * gauge_param.reconstruct;
-
-    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GB/s = %f\n\n", 
-	       (float)Vh*Ls*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/loops)*1e+9));
-
-
+    int floats = test_type ? 2*(7*24+8*gauge_param.reconstruct+24)+24 : 7*24+8*gauge_param.reconstruct+24;
+    printf("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printf("GiB/s = %f\n\n", Vh*floats*sizeof(float)/((secs/niter)*(1<<30)));
+ 
     if (!transfer) {
-      std::cout << "Results: CPU = " << norm2(*spinorRef) << ", CUDA = " << norm2(*cudaSpinorOut) << 
-	", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
+      double norm2_cpu = norm2(*spinorRef);
+      double norm2_cuda= norm2(*cudaSpinorOut);
+      double norm2_cpu_cuda= norm2(*spinorOut);
+      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
-      std::cout << "Result: CPU = " << norm2(*spinorRef) << ", CPU-CUDA = " << norm2(*spinorOut) << std::endl;
+      double norm2_cpu = norm2(*spinorRef);
+      double norm2_cpu_cuda= norm2(*spinorOut);
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
-    
+   
     cpuColorSpinorField::Compare(*spinorRef, *spinorOut);
-  }    
+  }
+    
   end();
+  endCommsQuda();
 }
