@@ -27,7 +27,7 @@
 // ***************************************************  
 
 
-namespace hisq {
+namespace quda {
 
 void setUnitarizeLinksPadding(int input_padding, 
 			     int output_padding);
@@ -49,7 +49,7 @@ void unitarizeLinksCPU(const QudaGaugeParam& param,
 
 bool isUnitary(const QudaGaugeParam& param, cpuGaugeField& field, double max_error);
 
-} // namespace hisq
+} // namespace quda
 
 
 #endif // _HISQ_LINKS_H

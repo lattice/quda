@@ -46,7 +46,7 @@ cpuGaugeField *cpuLong = NULL;
 
 static double tol = 1e-6;
 
-static int testtype = 0;
+extern int test_type;
 extern int xdim;
 extern int ydim;
 extern int zdim;
@@ -258,7 +258,7 @@ invert_test(void)
   ghost_longlink = (void**)cpuLong->Ghost();
 #endif
   
-  if(testtype == 6){    
+  if(test_type == 6){    
     record_gauge(gaugeParam.X, fatlink, fat_pad,
 		 longlink, link_pad,
 		 link_recon, link_recon_sloppy,
@@ -297,7 +297,7 @@ invert_test(void)
   double src2=0;
   int ret = 0;
 
-  switch(testtype){
+  switch(test_type){
   case 0: //even
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     
@@ -372,21 +372,21 @@ invert_test(void)
     
     len=Vh;
 
-    if (testtype == 3 || testtype == 6){
+    if (test_type == 3 || test_type == 6){
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
-    } else if (testtype == 4){
+    } else if (test_type == 4){
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
-    }else { //testtype ==5
+    }else { //test_type ==5
       errorQuda("test 5 not supported\n");
     }
     
     double residue_sq;
-    if (testtype == 6){
+    if (test_type == 6){
       invertMultiShiftQudaMixed(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);
     }else{      
       invertMultiShiftQuda(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);	
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     printfQuda("Final residue squred =%g\n", residue_sq);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
@@ -442,7 +442,7 @@ invert_test(void)
   }//switch
     
 
-  if (testtype <=2){
+  if (test_type <=2){
 
     printfQuda("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 	
@@ -492,7 +492,7 @@ display_test_info()
   printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n",
 	 get_prec_str(prec),get_prec_str(prec_sloppy),
 	 get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy), get_test_type(testtype), xdim, ydim, zdim, tdim);     
+	     get_recon_str(link_recon_sloppy), get_test_type(test_type), xdim, ydim, zdim, tdim);     
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -546,15 +546,6 @@ int main(int argc, char** argv)
       continue;
     }
     
-    
-    if( strcmp(argv[i], "--test") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      testtype = atoi(argv[i+1]);
-      i++;
-      continue;	    
-    }
     
     if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){

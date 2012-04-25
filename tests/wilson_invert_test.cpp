@@ -39,6 +39,8 @@ extern QudaPrecision  prec_sloppy;
 
 extern char latfile[];
 
+extern void usage(char** );
+
 void
 display_test_info()
 {
@@ -61,47 +63,15 @@ display_test_info()
   
 }
 
-extern void usage(char** );
 int main(int argc, char **argv)
 {
-  /*
-  int ndim=4, dims[4] = {1, 1, 1, 1};
-  char dimchar[] = {'X', 'Y', 'Z', 'T'};
-  char *gridsizeopt[] = {"--xgridsize", "--ygridsize", "--zgridsize", "--tgridsize"};
-
-  for (int i=1; i<argc; i++) {
-    for (int d=0; d<ndim; d++) {
-      if (!strcmp(argv[i], gridsizeopt[d])) {
-	if (i+1 >= argc) {
-	  printf("Usage: %s <args>\n", argv[0]);
-	  printf("%s\t Set %c comms grid size (default = 1)\n", gridsizeopt[d], dimchar[d]); 
-	  exit(1);
-	}     
-	dims[d] = atoi(argv[i+1]);
-	if (dims[d] <= 0 ) {
-	  printf("Error: Invalid %c grid size\n", dimchar[d]);
-	  exit(1);
-	}
-	i++;
-	break;
-      }
-    }
-  }
-  */
-
-
-
   int i;
   for (i =1;i < argc; i++){
-
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     } 
-    
-    printf("ERROR: Invalid option:%s\n", argv[i]);
+    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
-    
-
   }
 
 
@@ -122,7 +92,7 @@ int main(int argc, char **argv)
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
       dslash_type != QUDA_TWISTED_MASS_DSLASH) {
-    printf("dslash_type %d not supported\n", dslash_type);
+    printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
 
@@ -143,7 +113,7 @@ int main(int argc, char **argv)
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
 
-  gauge_param.anisotropy = 1.0;
+  gauge_param.anisotropy = 2.38;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -159,7 +129,7 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.2180;
+  double mass = -0.4125;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -174,13 +144,15 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
-  inv_param.gcrNkrylov = 30;
+  inv_param.gcrNkrylov = 10;
   inv_param.tol = 5e-7;
-  inv_param.maxiter = 30;
+  inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-1; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
   inv_param.verbosity_precondition = QUDA_SILENT;
@@ -285,7 +257,7 @@ int main(int argc, char **argv)
     spinorOut = malloc(V*spinorSiteSize*sSize);
   }
 
-  // create a point source at 0
+  // create a point source at 0 (in each subvolume...  FIXME)
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) *((float*)spinorIn) = 1.0;
   else *((double*)spinorIn) = 1.0;
 
@@ -314,17 +286,17 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
     
-  printf("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
+  printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printf("   Clover: %f GiB\n", inv_param.cloverGiB);
-  printf("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
+  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   if (multi_shift) {
 
     void *spinorTmp = malloc(V*spinorSiteSize*sSize);
 
-    printf("Host residuum checks: \n");
+    printfQuda("Host residuum checks: \n");
     for(int i=0; i < num_offsets; i++) {
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       
@@ -344,7 +316,7 @@ int main(int argc, char **argv)
       mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-      printf("Shift i=%d Relative residual: requested = %g, actual = %g\n", i, inv_param.tol, sqrt(nrm2/src2));
+      printfQuda("Shift i=%d Relative residual: requested = %g, actual = %g\n", i, inv_param.tol, sqrt(nrm2/src2));
     }
     free(spinorTmp);
 
@@ -377,7 +349,7 @@ int main(int argc, char **argv)
     mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-    printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+    printfQuda("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
 
   }
     

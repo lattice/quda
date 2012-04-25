@@ -2,22 +2,25 @@
 
 GaugeField::GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &location) :
   LatticeField(param, location), bytes(0), nColor(param.nColor), nFace(param.nFace),
-  reconstruct(param.reconstruct), order(param.order), fixed(param.fixed), 
-  link_type(param.link_type), t_boundary(param.t_boundary), anisotropy(param.anisotropy),
-  tadpole(param.tadpole), create(param.create), is_staple(param.is_staple)
+   geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 
+  fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
+  anisotropy(param.anisotropy), tadpole(param.tadpole), create(param.create)
 {
   if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
-  if (nDim != 4 && nDim != 1) errorQuda("Number of dimensions must be 4 or 1, not %d", nDim);
+  if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d", nDim);
   if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0) errorQuda("Anisotropy only supported for Wilson links");
   if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
     errorQuda("Temporal gauge fixing only supported for Wilson links");
 
-  if(is_staple){
+  if(geometry == QUDA_SCALAR_GEOMETRY) {
     real_length = volume*reconstruct;
     length = 2*stride*reconstruct; // two comes from being full lattice
-  }else{
-    real_length = 4*volume*reconstruct;
-    length = 2*4*stride*reconstruct; // two comes from being full lattice
+  } else if (geometry == QUDA_VECTOR_GEOMETRY) {
+    real_length = nDim*volume*reconstruct;
+    length = 2*nDim*stride*reconstruct; // two comes from being full lattice
+  } else if(geometry == QUDA_TENSOR_GEOMETRY){
+    real_length = (nDim*(nDim-1)/2)*volume*reconstruct;
+    length = 2*(nDim*(nDim-1)/2)*stride*reconstruct; // two comes from being full lattice
   }
 
   bytes = length*precision;

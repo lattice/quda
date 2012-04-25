@@ -15,14 +15,14 @@
 #include <color_spinor_field.h>
 
 MR::MR(DiracMatrix &mat, QudaInvertParam &invParam) :
-  Solver(invParam), mat(mat), init(false)
+  Solver(invParam), mat(mat), init(false), allocate_r(false)
 {
  
 }
 
 MR::~MR() {
   if (init) {
-    if (rp) delete rp;
+    if (allocate_r) delete rp;
     delete Arp;
     delete tmpp;
   }
@@ -36,8 +36,10 @@ void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (!init) {
     ColorSpinorParam param(x);
     param.create = QUDA_ZERO_FIELD_CREATE;
-    if (invParam.preserve_source == QUDA_PRESERVE_SOURCE_YES)
+    if (invParam.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
       rp = new cudaColorSpinorField(x, param); 
+      allocate_r = true;
+    }
     Arp = new cudaColorSpinorField(x);
     tmpp = new cudaColorSpinorField(x, param); //temporary for mat-vec
 

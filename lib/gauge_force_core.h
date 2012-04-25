@@ -474,14 +474,15 @@
 template<int oddBit, typename Float2, typename FloatN, typename Float>
   __global__ void
   GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd,
-			int dir, double eb3,
-			FloatN* linkEven, FloatN* linkOdd,
-			int* input_path, 
-			int* length, Float* path_coeff, int num_paths, kernel_param_t kparam)
+			const int dir, const double eb3,
+			const FloatN* linkEven, const FloatN* linkOdd,
+			const int* input_path, 
+			const int* length, const Float* path_coeff, const int num_paths, const kernel_param_t kparam)
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  
+  if (sid >= kparam.threads) return;
+
   int z1 = sid / X1h;
   int x1h = sid - z1*X1h;
   int z2 = z1 / X2;
@@ -524,7 +525,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
     //linka: current matrix
     //linkb: the loaded matrix in this round	
     SET_UNIT_SU3_MATRIX(linka);	
-    int* path = input_path + i*path_max_length;
+    const int* path = input_path + i*gf.path_max_length;
 	
     int lnkdir;
     int path0 = path[0];
@@ -602,7 +603,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
   SCALAR_MULT_SUB_SU3_MATRIX(linkb, linka, eb3, linka);
   MAKE_ANTI_HERMITIAN(linka, ah);
     
-  WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH, mom_ga_stride);
+  WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH, gf.mom_ga_stride);
 
   return;
 }

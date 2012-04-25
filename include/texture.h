@@ -1,6 +1,12 @@
+#ifndef _TEXTURE_H
+#define _TEXTURE_H
+
 #include <convert.h>
 
-#pragma once
+
+// uncomment to disable texture reads
+//#define DIRECT_ACCESS_BLAS
+
 
 #if (__COMPUTE_CAPABILITY__ >= 130)
 __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
@@ -16,41 +22,6 @@ __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
 }
 #endif
 
-texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_0;
-texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_1;
-texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_2;
-texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_3;
-texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_4;
-
-texture<short4,1,cudaReadModeNormalizedFloat> tex_short4_0;
-texture<short4,1,cudaReadModeNormalizedFloat> tex_short4_1;
-texture<short4,1,cudaReadModeNormalizedFloat> tex_short4_2;
-texture<short4,1,cudaReadModeNormalizedFloat> tex_short4_3;
-texture<short4,1,cudaReadModeNormalizedFloat> tex_short4_4;
-
-texture<float,1> tex_float_0;
-texture<float,1> tex_float_1;
-texture<float,1> tex_float_2;
-texture<float,1> tex_float_3;
-texture<float,1> tex_float_4;
-
-texture<float2,1> tex_float2_0;
-texture<float2,1> tex_float2_1;
-texture<float2,1> tex_float2_2;
-texture<float2,1> tex_float2_3;
-texture<float2,1> tex_float2_4;
-
-texture<float4,1> tex_float4_0;
-texture<float4,1> tex_float4_1;
-texture<float4,1> tex_float4_2;
-texture<float4,1> tex_float4_3;
-texture<float4,1> tex_float4_4;
-
-texture<int4,1> tex_int4_0;
-texture<int4,1> tex_int4_1;
-texture<int4,1> tex_int4_2;
-texture<int4,1> tex_int4_3;
-texture<int4,1> tex_int4_4;
 
 #define MAX_TEXELS (1<<27)
 
@@ -82,234 +53,83 @@ class Texture {
  __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
 };
 
-template<> inline void Texture<float2,short2,0>::bind(const short2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short2_0, ptr, bytes); }
-template<> inline void Texture<float2,short2,1>::bind(const short2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short2_1, ptr, bytes); }
-template<> inline void Texture<float2,short2,2>::bind(const short2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short2_2, ptr, bytes); }
-template<> inline void Texture<float2,short2,3>::bind(const short2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short2_3, ptr, bytes); }
-template<> inline void Texture<float2,short2,4>::bind(const short2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short2_4, ptr, bytes); }
 
-template<> inline void Texture<float4,short4,0>::bind(const short4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short4_0, ptr, bytes); }
-template<> inline void Texture<float4,short4,1>::bind(const short4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short4_1, ptr, bytes); }
-template<> inline void Texture<float4,short4,2>::bind(const short4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short4_2, ptr, bytes); }
-template<> inline void Texture<float4,short4,3>::bind(const short4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short4_3, ptr, bytes); }
-template<> inline void Texture<float4,short4,4>::bind(const short4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_short4_4, ptr, bytes); }
+#define DECL_TEX(id) \
+  texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_##id; \
+  texture<short4,1,cudaReadModeNormalizedFloat> tex_short4_##id; \
+  texture<float,1> tex_float_##id;   \
+  texture<float2,1> tex_float2_##id; \
+  texture<float4,1> tex_float4_##id; \
+  texture<int4,1> tex_double2_##id;
 
-template<> inline void Texture<float,float,0>::bind(const float *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float_0, ptr, bytes); }
-template<> inline void Texture<float,float,1>::bind(const float *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float_1, ptr, bytes); }
-template<> inline void Texture<float,float,2>::bind(const float *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float_2, ptr, bytes); }
-template<> inline void Texture<float,float,3>::bind(const float *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float_3, ptr, bytes); }
-template<> inline void Texture<float,float,4>::bind(const float *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float_4, ptr, bytes); }
 
-template<> inline void Texture<float2,float2,0>::bind(const float2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float2_0, ptr, bytes); }
-template<> inline void Texture<float2,float2,1>::bind(const float2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float2_1, ptr, bytes); }
-template<> inline void Texture<float2,float2,2>::bind(const float2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float2_2, ptr, bytes); }
-template<> inline void Texture<float2,float2,3>::bind(const float2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float2_3, ptr, bytes); }
-template<> inline void Texture<float2,float2,4>::bind(const float2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float2_4, ptr, bytes); }
+#define DEF_BIND_UNBIND(outtype, intype, id) \
+  template<> inline void Texture<outtype,intype,id>::bind(const intype *ptr, size_t bytes) \
+  { cudaBindTexture(0,tex_##intype##_##id, ptr, bytes); } \
+  template<> inline void Texture<outtype,intype,id>::unbind() { cudaUnbindTexture(tex_##intype##_##id); }
 
-template<> inline void Texture<float4,float4,0>::bind(const float4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float4_0, ptr, bytes); }
-template<> inline void Texture<float4,float4,1>::bind(const float4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float4_1, ptr, bytes); }
-template<> inline void Texture<float4,float4,2>::bind(const float4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float4_2, ptr, bytes); }
-template<> inline void Texture<float4,float4,3>::bind(const float4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float4_3, ptr, bytes); }
-template<> inline void Texture<float4,float4,4>::bind(const float4 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_float4_4, ptr, bytes); }
 
-template<> inline void Texture<double2,double2,0>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_0, ptr, bytes); }
-template<> inline void Texture<double2,double2,1>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_1, ptr, bytes); }
-template<> inline void Texture<double2,double2,2>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_2, ptr, bytes); }
-template<> inline void Texture<double2,double2,3>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_3, ptr, bytes); }
-template<> inline void Texture<double2,double2,4>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_4, ptr, bytes); }
+#define DEF_FETCH_TEX(outtype, intype, id) \
+  template<> __device__ inline outtype Texture<outtype,intype,id>::fetch(unsigned int idx) \
+  { return tex1Dfetch(tex_##intype##_##id,idx); }
 
-template<> inline void Texture<float2,double2,0>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_0, ptr, bytes); }
-template<> inline void Texture<float2,double2,1>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_1, ptr, bytes); }
-template<> inline void Texture<float2,double2,2>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_2, ptr, bytes); }
-template<> inline void Texture<float2,double2,3>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_3, ptr, bytes); }
-template<> inline void Texture<float2,double2,4>::bind(const double2 *ptr, size_t bytes) 
-{ cudaBindTexture(0,tex_int4_4, ptr, bytes); }
 
-template<> inline void Texture<float2,short2,0>::unbind() { cudaUnbindTexture(tex_short2_0); }
-template<> inline void Texture<float2,short2,1>::unbind() { cudaUnbindTexture(tex_short2_1); }
-template<> inline void Texture<float2,short2,2>::unbind() { cudaUnbindTexture(tex_short2_2); }
-template<> inline void Texture<float2,short2,3>::unbind() { cudaUnbindTexture(tex_short2_3); }
-template<> inline void Texture<float2,short2,4>::unbind() { cudaUnbindTexture(tex_short2_4); }
+#define DEF_FETCH_DIRECT(outtype, intype, id) \
+  template<> __device__ inline outtype Texture<outtype,intype,id>::fetch(unsigned int idx) \
+  { outtype out; copyFloatN(out, spinor[idx]); return out; }
 
-template<> inline void Texture<float4,short4,0>::unbind() { cudaUnbindTexture(tex_short4_0); }
-template<> inline void Texture<float4,short4,1>::unbind() { cudaUnbindTexture(tex_short4_1); }
-template<> inline void Texture<float4,short4,2>::unbind() { cudaUnbindTexture(tex_short4_2); }
-template<> inline void Texture<float4,short4,3>::unbind() { cudaUnbindTexture(tex_short4_3); }
-template<> inline void Texture<float4,short4,4>::unbind() { cudaUnbindTexture(tex_short4_4); }
 
-template<> inline void Texture<float,float,0>::unbind() { cudaUnbindTexture(tex_float_0); }
-template<> inline void Texture<float,float,1>::unbind() { cudaUnbindTexture(tex_float_1); }
-template<> inline void Texture<float,float,2>::unbind() { cudaUnbindTexture(tex_float_2); }
-template<> inline void Texture<float,float,3>::unbind() { cudaUnbindTexture(tex_float_3); }
-template<> inline void Texture<float,float,4>::unbind() { cudaUnbindTexture(tex_float_4); }
-
-template<> inline void Texture<float2,float2,0>::unbind() { cudaUnbindTexture(tex_float2_0); }
-template<> inline void Texture<float2,float2,1>::unbind() { cudaUnbindTexture(tex_float2_1); }
-template<> inline void Texture<float2,float2,2>::unbind() { cudaUnbindTexture(tex_float2_2); }
-template<> inline void Texture<float2,float2,3>::unbind() { cudaUnbindTexture(tex_float2_3); }
-template<> inline void Texture<float2,float2,4>::unbind() { cudaUnbindTexture(tex_float2_4); }
-
-template<> inline void Texture<float4,float4,0>::unbind() { cudaUnbindTexture(tex_float4_0); }
-template<> inline void Texture<float4,float4,1>::unbind() { cudaUnbindTexture(tex_float4_1); }
-template<> inline void Texture<float4,float4,2>::unbind() { cudaUnbindTexture(tex_float4_2); }
-template<> inline void Texture<float4,float4,3>::unbind() { cudaUnbindTexture(tex_float4_3); }
-template<> inline void Texture<float4,float4,4>::unbind() { cudaUnbindTexture(tex_float4_4); }
-
-template<> inline void Texture<double2,double2,0>::unbind() { cudaUnbindTexture(tex_int4_0); }
-template<> inline void Texture<double2,double2,1>::unbind() { cudaUnbindTexture(tex_int4_1); }
-template<> inline void Texture<double2,double2,2>::unbind() { cudaUnbindTexture(tex_int4_2); }
-template<> inline void Texture<double2,double2,3>::unbind() { cudaUnbindTexture(tex_int4_3); }
-template<> inline void Texture<double2,double2,4>::unbind() { cudaUnbindTexture(tex_int4_4); }
-
-template<> inline void Texture<float2,double2,0>::unbind() { cudaUnbindTexture(tex_int4_0); }
-template<> inline void Texture<float2,double2,1>::unbind() { cudaUnbindTexture(tex_int4_1); }
-template<> inline void Texture<float2,double2,2>::unbind() { cudaUnbindTexture(tex_int4_2); }
-template<> inline void Texture<float2,double2,3>::unbind() { cudaUnbindTexture(tex_int4_3); }
-template<> inline void Texture<float2,double2,4>::unbind() { cudaUnbindTexture(tex_int4_4); }
-
-// short2
-template<> __device__ inline float2 Texture<float2,short2,0>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short2_0,idx); }
-template<> __device__ inline float2 Texture<float2,short2,1>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short2_1,idx); }
-template<> __device__ inline float2 Texture<float2,short2,2>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short2_2,idx); }
-template<> __device__ inline float2 Texture<float2,short2,3>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short2_3,idx); }
-template<> __device__ inline float2 Texture<float2,short2,4>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short2_4,idx); }
-
-// short4
-template<> __device__ inline float4 Texture<float4,short4,0>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short4_0,idx); }
-template<> __device__ inline float4 Texture<float4,short4,1>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short4_1,idx); }
-template<> __device__ inline float4 Texture<float4,short4,2>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short4_2,idx); }
-template<> __device__ inline float4 Texture<float4,short4,3>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short4_3,idx); }
-template<> __device__ inline float4 Texture<float4,short4,4>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_short4_4,idx); }
-
-// float
-template<> __device__ inline float Texture<float,float,0>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float_0,idx); }
-template<> __device__ inline float Texture<float,float,1>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float_1,idx); }
-template<> __device__ inline float Texture<float,float,2>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float_2,idx); }
-template<> __device__ inline float Texture<float,float,3>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float_3,idx); }
-template<> __device__ inline float Texture<float,float,4>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float_4,idx); }
-
-// float2
-template<> __device__ inline float2 Texture<float2,float2,0>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float2_0,idx); }
-template<> __device__ inline float2 Texture<float2,float2,1>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float2_1,idx); }
-template<> __device__ inline float2 Texture<float2,float2,2>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float2_2,idx); }
-template<> __device__ inline float2 Texture<float2,float2,3>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float2_3,idx); }
-template<> __device__ inline float2 Texture<float2,float2,4>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float2_4,idx); }
-
-// float4
-template<> __device__ inline float4 Texture<float4,float4,0>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float4_0,idx); }
-template<> __device__ inline float4 Texture<float4,float4,1>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float4_1,idx); }
-template<> __device__ inline float4 Texture<float4,float4,2>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float4_2,idx); }
-template<> __device__ inline float4 Texture<float4,float4,3>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float4_3,idx); }
-template<> __device__ inline float4 Texture<float4,float4,4>::fetch(unsigned int idx) 
-{ return tex1Dfetch(tex_float4_4,idx); }
-
-// double2
-#ifndef FERMI_NO_DBLE_TEX
-template<> __device__ inline double2 Texture<double2,double2,0>::fetch(unsigned int idx) 
-{ return fetch_double2(tex_int4_0,idx); }
-template<> __device__ inline double2 Texture<double2,double2,1>::fetch(unsigned int idx) 
-{ return fetch_double2(tex_int4_1,idx); }
-template<> __device__ inline double2 Texture<double2,double2,2>::fetch(unsigned int idx) 
-{ return fetch_double2(tex_int4_2,idx); }
-template<> __device__ inline double2 Texture<double2,double2,3>::fetch(unsigned int idx) 
-{ return fetch_double2(tex_int4_3,idx); }
-template<> __device__ inline double2 Texture<double2,double2,4>::fetch(unsigned int idx) 
-{ return fetch_double2(tex_int4_4,idx); }
-
-template<> __device__ inline float2 Texture<float2,double2,0>::fetch(unsigned int idx) 
-{ double2 x = fetch_double2(tex_int4_0,idx); return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,1>::fetch(unsigned int idx) 
-{ double2 x = fetch_double2(tex_int4_1,idx); return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,2>::fetch(unsigned int idx) 
-{ double2 x = fetch_double2(tex_int4_2,idx); return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,3>::fetch(unsigned int idx) 
-{ double2 x = fetch_double2(tex_int4_3,idx); return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,4>::fetch(unsigned int idx) 
-{ double2 x = fetch_double2(tex_int4_4,idx); return make_float2(x.x, x.y); }
-
+#if defined(DIRECT_ACCESS_BLAS)
+#define DEF_FETCH DEF_FETCH_DIRECT
 #else
+#define DEF_FETCH DEF_FETCH_TEX
+#endif
 
-template<> __device__ inline double2 Texture<double2,double2,0>::fetch(unsigned int idx) 
-{ return spinor[idx]; }
-template<> __device__ inline double2 Texture<double2,double2,1>::fetch(unsigned int idx) 
-{ return spinor[idx]; }
-template<> __device__ inline double2 Texture<double2,double2,2>::fetch(unsigned int idx) 
-{ return spinor[idx]; }
-template<> __device__ inline double2 Texture<double2,double2,3>::fetch(unsigned int idx) 
-{ return spinor[idx]; }
-template<> __device__ inline double2 Texture<double2,double2,4>::fetch(unsigned int idx) 
-{ return spinor[idx]; }
 
-template<> __device__ inline float2 Texture<float2,double2,0>::fetch(unsigned int idx) 
-{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,1>::fetch(unsigned int idx) 
-{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,2>::fetch(unsigned int idx) 
-{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,3>::fetch(unsigned int idx) 
-{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
-template<> __device__ inline float2 Texture<float2,double2,4>::fetch(unsigned int idx) 
-{ double2 x = spinor[idx]; return make_float2(x.x, x.y); }
+#if defined(DIRECT_ACCESS_BLAS) || defined(FERMI_NO_DBLE_TEX)
+#define DEF_FETCH_DBLE DEF_FETCH_DIRECT
+#else
+#define DEF_FETCH_DBLE(outtype, intype, id) \
+  template<> __device__ inline outtype Texture<outtype,double2,id>::fetch(unsigned int idx) \
+  { outtype out; copyFloatN(out, fetch_double2(tex_double2_##id,idx)); return out; }
+#endif
 
-#endif //  FERMI_NO_DBLE_TEX
+
+#define DEF_BIND_UNBIND_FETCH(outtype, intype, id) \
+  DEF_BIND_UNBIND(outtype, intype, id)             \
+  DEF_FETCH(outtype, intype, id)
+
+
+#define DEF_ALL(id)                          \
+  DECL_TEX(id)                               \
+  DEF_BIND_UNBIND_FETCH(float2, short2, id)  \
+  DEF_BIND_UNBIND_FETCH(float4, short4, id)  \
+  DEF_BIND_UNBIND_FETCH(float, float, id)    \
+  DEF_BIND_UNBIND_FETCH(float2, float2, id)  \
+  DEF_BIND_UNBIND_FETCH(float4, float4, id)  \
+  DEF_BIND_UNBIND(double2, double2, id)      \
+  DEF_BIND_UNBIND(float2, double2, id)       \
+  DEF_FETCH_DBLE(double2, double2, id)       \
+  DEF_FETCH_DBLE(float2, double2, id)
+
+
+// Declare the textures and define the member functions of the corresponding templated classes.
+DEF_ALL(0)
+DEF_ALL(1)
+DEF_ALL(2)
+DEF_ALL(3)
+DEF_ALL(4)
+
+
+#undef DECL_TEX
+#undef DEF_BIND_UNBIND
+#undef DEF_FETCH_DIRECT
+#undef DEF_FETCH_TEX
+#undef DEF_FETCH
+#undef DEF_FETCH_DBLE
+#undef DEF_BIND_UNBIND_FETCH
+#undef DEF_ALL
+
 
 /**
    Checks that the types are set correctly.  The precision used in the
@@ -556,3 +376,4 @@ __device__ inline void Spinor<double2, double4, short4, 12>::save(double2 x[12],
   saveHalf<short4, double4, 6>(spinor, norm, y, i, stride);
 }
 
+#endif // _TEXTURE_H

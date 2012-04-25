@@ -7,19 +7,17 @@
 #endif
 
 
-__constant__ int path_max_length;
-
 #define GF_SITE_MATRIX_LOAD_TEX 1
 
 //single precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, gf.site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, gf.site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) RECONSTRUCT_LINK_12(sign,var)
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4
 #define N_IN_FLOATN 4
@@ -35,13 +33,13 @@ __constant__ int path_max_length;
 
 //double precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, gf.site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, gf.site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) RECONSTRUCT_LINK_12(sign,var)
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
@@ -57,13 +55,13 @@ __constant__ int path_max_length;
 
 //single precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, gf.site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, gf.site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var,mom_ga_stride)
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var,gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) 
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
@@ -79,13 +77,13 @@ __constant__ int path_max_length;
 
 //double precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, gf.site_ga_stride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, gf.site_ga_stride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, gf.site_ga_stride)
 #endif
-#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, mom_ga_stride)
+#define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) 
 #define DECLARE_LINK_VARS(var) FloatN var##0, var##1, var##2, var##3, var##4, var##5, var##6, var##7, var##8 
 #define N_IN_FLOATN 2
@@ -109,49 +107,178 @@ gauge_force_init_cuda(QudaGaugeParam* param, int path_max_length)
   }
   gauge_force_init_cuda_flag=1;
 
-
-#ifdef MULTI_GPU
-  int E1 = param->X[0] + 4;
-  int E1h = E1/2;
-  int E2 = param->X[1] + 4;
-  int E3 = param->X[2] + 4;
-  int E4 = param->X[3] + 4;
-  int E2E1 =E2*E1;
-  int E3E2E1=E3*E2*E1;
-  int Vh_ex = E1*E2*E3*E4/2;
-  
-  cudaMemcpyToSymbol("E1", &E1, sizeof(int));
-  cudaMemcpyToSymbol("E1h", &E1h, sizeof(int));
-  cudaMemcpyToSymbol("E2", &E2, sizeof(int));
-  cudaMemcpyToSymbol("E3", &E3, sizeof(int));
-  cudaMemcpyToSymbol("E4", &E4, sizeof(int));
-  cudaMemcpyToSymbol("E2E1", &E2E1, sizeof(int));
-  cudaMemcpyToSymbol("E3E2E1", &E3E2E1, sizeof(int));
-  
-  cudaMemcpyToSymbol("Vh_ex", &Vh_ex, sizeof(int));
-#endif    
-
   int* X = param->X;
-  int Vh = X[0]*X[1]*X[2]*X[3]/2;
-  cudaMemcpyToSymbol("path_max_length", &path_max_length, sizeof(int));
   
-#ifdef MULTI_GPU
-  int site_ga_stride = param->site_ga_pad + Vh_ex;
+  int Vh = X[0]*X[1]*X[2]*X[3]/2;
+  fat_force_const_t gf;
+  gf.path_max_length = path_max_length;  
+#ifdef MULTI_GPU  
+  int Vh_ex = (X[0]+4)*(X[1]+4)*(X[2]+4)*(X[3]+4)/2;
+  gf.site_ga_stride = param->site_ga_pad + Vh_ex;
 #else  
-  int site_ga_stride = param->site_ga_pad + Vh;
+  gf.site_ga_stride = param->site_ga_pad + Vh;
 #endif
-
-  cudaMemcpyToSymbol("site_ga_stride", &site_ga_stride, sizeof(int));
-  int mom_ga_stride = param->mom_ga_pad + Vh;
-  cudaMemcpyToSymbol("mom_ga_stride", &mom_ga_stride, sizeof(int));
-     
+  
+  gf.mom_ga_stride = param->mom_ga_pad + Vh;  
+  cudaMemcpyToSymbol("gf", &gf, sizeof(fat_force_const_t));     
 }
 
 
+class GaugeForceCuda : public Tunable {
+
+ private:
+  cudaGaugeField &mom;
+  const int dir;
+  const double &eb3;
+  const cudaGaugeField &link;
+  const int *input_path;
+  const int *length;
+  const void *path_coeff;
+  const int num_paths;
+  const kernel_param_t &kparam;
+
+  int sharedBytesPerThread() const { return 0; }
+  int sharedBytesPerBlock() const { return 0; }
+  
+  // don't tune the grid dimension
+  bool advanceGridDim(TuneParam &param) const { return false; }
+  bool advanceBlockDim(TuneParam &param) const {
+    bool rtn = Tunable::advanceBlockDim(param);
+    param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
+    return rtn;
+  }
+
+ public:
+  GaugeForceCuda(cudaGaugeField &mom, const int dir, const double &eb3, const cudaGaugeField &link,
+		 const int *input_path, const int *length, const void *path_coeff, 
+		 const int num_paths, const kernel_param_t &kparam) :
+    mom(mom), dir(dir), eb3(eb3), link(link), input_path(input_path), length(length), 
+    path_coeff(path_coeff), num_paths(num_paths), kparam(kparam) { 
+
+    if(link.Precision() == QUDA_DOUBLE_PRECISION){
+      cudaBindTexture(0, siteLink0TexDouble, link.Even_p(), link.Bytes()/2);
+      cudaBindTexture(0, siteLink1TexDouble, link.Odd_p(), link.Bytes()/2);			      
+    }else{ //QUDA_SINGLE_PRECISION
+      if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
+	cudaBindTexture(0, siteLink0TexSingle, link.Even_p(), link.Bytes()/2);
+	cudaBindTexture(0, siteLink1TexSingle, link.Odd_p(), link.Bytes()/2);		
+      }else{//QUDA_RECONSTRUCT_12
+	cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
+	cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);	
+      }
+    }
+  }
+
+  virtual ~GaugeForceCuda() {
+    if(link.Precision() == QUDA_DOUBLE_PRECISION){
+      cudaBindTexture(0, siteLink0TexDouble, link.Even_p(), link.Bytes()/2);
+      cudaBindTexture(0, siteLink1TexDouble, link.Odd_p(), link.Bytes()/2);			      
+    }else{ //QUDA_SINGLE_PRECISION
+      if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
+	cudaBindTexture(0, siteLink0TexSingle, link.Even_p(), link.Bytes()/2);
+	cudaBindTexture(0, siteLink1TexSingle, link.Odd_p(), link.Bytes()/2);		
+      }else{//QUDA_RECONSTRUCT_12
+	cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
+	cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);	
+      }
+    }
+  }
+
+  void apply(const cudaStream_t &stream) {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);    
+    if(link.Precision() == QUDA_DOUBLE_PRECISION){      
+      if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
+	parity_compute_gauge_force_kernel_dp18<0><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+									 dir, eb3,
+									 (double2*)link.Even_p(), (double2*)link.Odd_p(), 
+									 input_path, length, (double*)path_coeff,
+									 num_paths, kparam);   
+	parity_compute_gauge_force_kernel_dp18<1><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+									 dir, eb3,
+									 (double2*)link.Even_p(), (double2*)link.Odd_p(), 
+									 input_path, length, (double*)path_coeff,
+									 num_paths, kparam);  
+	
+      }else{ //QUDA_RECONSTRUCT_12
+   	parity_compute_gauge_force_kernel_dp12<0><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+									 dir, eb3,
+									 (double2*)link.Even_p(), (double2*)link.Odd_p(), 
+									 input_path, length, (double*)path_coeff,
+									 num_paths, kparam);   
+	parity_compute_gauge_force_kernel_dp12<1><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+									 dir, eb3,
+									 (double2*)link.Even_p(), (double2*)link.Odd_p(), 
+									 input_path, length, (double*)path_coeff,
+									 num_paths, kparam);    
+      }
+    }else{ //QUDA_SINGLE_PRECISION
+      if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
+	
+	parity_compute_gauge_force_kernel_sp18<0><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+									 dir, eb3,
+									 (float2*)link.Even_p(), (float2*)link.Odd_p(), 
+									 input_path, length, (float*)path_coeff,
+									 num_paths, kparam);   
+	parity_compute_gauge_force_kernel_sp18<1><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+									 dir, eb3,
+									 (float2*)link.Even_p(), (float2*)link.Odd_p(), 
+									 input_path, length, (float*)path_coeff,
+									 num_paths, kparam); 
+	
+      }else{ //QUDA_RECONSTRUCT_12
+	parity_compute_gauge_force_kernel_sp12<0><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+									 dir, eb3,
+									 (float4*)link.Even_p(), (float4*)link.Odd_p(), 
+									 input_path, length, (float*)path_coeff,
+									 num_paths, kparam);   
+	//odd
+	/* The reason we do not switch the even/odd function input paramemters and the texture binding
+	 * is that we use the oddbit to decided where to load, in the kernel function
+	 */
+	parity_compute_gauge_force_kernel_sp12<1><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+									 dir, eb3,
+									 (float4*)link.Even_p(), (float4*)link.Odd_p(), 
+									 input_path, length, (float*)path_coeff,
+									 num_paths, kparam);  
+      }
+    }
+  }
+  
+  void preTune() { mom.backup(); }
+  void postTune() { mom.restore(); } 
+  
+  void initTuneParam(TuneParam &param) const {
+    Tunable::initTuneParam(param);
+    param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
+  }
+  
+  
+  /** sets default values for when tuning is disabled */
+  void defaultTuneParam(TuneParam &param) const {
+    Tunable::defaultTuneParam(param);
+    param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
+  }
+  
+  long long flops() const { return 0; } // FIXME: add flops counter
+  
+  TuneKey tuneKey() const {
+    std::stringstream vol, aux;
+    vol << link.X()[0] << "x";
+    vol << link.X()[1] << "x";
+    vol << link.X()[2] << "x";
+    vol << link.X()[3] << "x";
+    aux << "threads=" << link.Volume() << ",prec=" << link.Precision();
+    aux << "stride=" << link.Stride() << ",recon=" << link.Reconstruct();
+    aux << "dir=" << dir << "num_paths=" << num_paths;
+    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+  }  
+  
+};
+  
 void
-gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeField& cudaSiteLink,
-		     QudaGaugeParam* param, int** input_path, 
-		     int* length, void* path_coeff, int num_paths, int max_length)
+gauge_force_cuda_dir(cudaGaugeField& cudaMom, const int dir, const double eb3, const cudaGaugeField& cudaSiteLink,
+		     const QudaGaugeParam* param, int** input_path, const int* length, const void* path_coeff, 
+		     const int num_paths, const int max_length)
 {
   int i, j;
     //input_path
@@ -196,120 +323,26 @@ gauge_force_cuda_dir(cudaGaugeField&  cudaMom, int dir, double eb3, cudaGaugeFie
 
     //compute the gauge forces
     int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
-    dim3 blockDim(BLOCK_DIM, 1,1);
-    dim3 gridDim(volume/blockDim.x, 1, 1);
-    dim3 halfGridDim(volume/(2*blockDim.x), 1, 1);
         
-    void* momEven = (void*)cudaMom.Even_p();
-    void* momOdd = (void*)cudaMom.Odd_p();
-
-    void* linkEven = (void*)cudaSiteLink.Even_p();
-    void* linkOdd = (void*)cudaSiteLink.Odd_p();        
-    
     kernel_param_t kparam;
 #ifdef MULTI_GPU
     for(int i =0;i < 4;i++){
       kparam.ghostDim[i] = commDimPartitioned(i);
     }
 #endif
-
     kparam.threads  = volume/2;
 
-    if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
-      cudaBindTexture(0, siteLink0TexDouble, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
-      cudaBindTexture(0, siteLink1TexDouble, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);			      
-    }else{ //QUDA_SINGLE_PRECISION
-      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
-	cudaBindTexture(0, siteLink0TexSingle, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
-	cudaBindTexture(0, siteLink1TexSingle, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);		
-      }else{//QUDA_RECONSTRUCT_12
-	cudaBindTexture(0, siteLink0TexSingle_recon, cudaSiteLink.Even_p(), cudaSiteLink.Bytes()/2);
-	cudaBindTexture(0, siteLink1TexSingle_recon, cudaSiteLink.Odd_p(), cudaSiteLink.Bytes()/2);	
-      }
-    }
     
-    if(param->cuda_prec == QUDA_DOUBLE_PRECISION){      
-      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
-	parity_compute_gauge_force_kernel_dp18<0><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
-									dir, eb3,
-									(double2*)linkEven, (double2*)linkOdd, 
-									input_path_d, length_d, (double*)path_coeff_d,
-									     num_paths, kparam);   
-	parity_compute_gauge_force_kernel_dp18<1><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
-									dir, eb3,
-									(double2*)linkEven, (double2*)linkOdd, 
-									input_path_d, length_d, (double*)path_coeff_d,
-									     num_paths, kparam);  
-		
-      }else{ //QUDA_RECONSTRUCT_12
-   	parity_compute_gauge_force_kernel_dp12<0><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
-									     dir, eb3,
-									     (double2*)linkEven, (double2*)linkOdd, 
-									     input_path_d, length_d, (double*)path_coeff_d,
-									     num_paths, kparam);   
-	parity_compute_gauge_force_kernel_dp12<1><<<halfGridDim, blockDim>>>((double2*)momEven, (double2*)momOdd,
-									     dir, eb3,
-									     (double2*)linkEven, (double2*)linkOdd, 
-									     input_path_d, length_d, (double*)path_coeff_d,
-									     num_paths, kparam);    
-      }
-    }else{ //QUDA_SINGLE_PRECISION
-      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
-	
-	parity_compute_gauge_force_kernel_sp18<0><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
-									     dir, eb3,
-									     (float2*)linkEven, (float2*)linkOdd, 
-									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths, kparam);   
-	parity_compute_gauge_force_kernel_sp18<1><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
-									     dir, eb3,
-									     (float2*)linkEven, (float2*)linkOdd, 
-									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths, kparam); 
-	
-      }else{ //QUDA_RECONSTRUCT_12
-	parity_compute_gauge_force_kernel_sp12<0><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
-									     dir, eb3,
-									     (float4*)linkEven, (float4*)linkOdd, 
-									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths, kparam);   
-	//odd
-	/* The reason we do not switch the even/odd function input paramemters and the texture binding
-	 * is that we use the oddbit to decided where to load, in the kernel function
-	 */
-	parity_compute_gauge_force_kernel_sp12<1><<<halfGridDim, blockDim>>>((float2*)momEven, (float2*)momOdd,
-									     dir, eb3,
-									     (float4*)linkEven, (float4*)linkOdd, 
-									     input_path_d, length_d, (float*)path_coeff_d,
-									     num_paths, kparam);  
-      }
-      
-    }
-    
-
-    if(param->cuda_prec == QUDA_DOUBLE_PRECISION){
-      cudaUnbindTexture(siteLink0TexDouble);
-      cudaUnbindTexture(siteLink1TexDouble);
-    }else{ //QUDA_SINGLE_PRECISION
-      if(param->reconstruct == QUDA_RECONSTRUCT_NO){
-	cudaUnbindTexture(siteLink0TexSingle);
-	cudaUnbindTexture(siteLink1TexSingle);
-      }else{//QUDA_RECONSTRUCT_12
-	cudaUnbindTexture(siteLink0TexSingle_recon);
-	cudaUnbindTexture(siteLink1TexSingle_recon);
-      }
-    }
-
-    
+    // call here
+    GaugeForceCuda gaugeForce(cudaMom, dir, eb3, cudaSiteLink, input_path_d, 
+			      length_d, path_coeff_d, num_paths, kparam);
+    gaugeForce.apply(0);
     checkCudaError();
     
     cudaFree(input_path_d); checkCudaError();
     free(input_path_h);
     cudaFree(length_d);
     cudaFree(path_coeff_d);
-
-    
-
 }
 
 

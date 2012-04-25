@@ -36,7 +36,7 @@ static int Vh_ex;
 static int X1, X1h, X2, X3, X4;
 static int E1, E1h, E2, E3, E4;
 
-
+extern int test_type;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
@@ -118,24 +118,21 @@ llfat_test(int test)
   */
   qudaGaugeParam.preserve_gauge =0;
   void* fatlink;
-  cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize);
-  if(fatlink == NULL){
-    errorQuda("ERROR: allocating fatlink failed\n");
+  if (cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
+    errorQuda("ERROR: cudaMallocHost failed for fatlink\n");
   }
-  
+
   void* sitelink[4];
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*gSize);
-    if(sitelink[i] == NULL){
-      errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
+    if (cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for sitelink\n");
     }
   }
   
   void* sitelink_ex[4];
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink_ex[i], V_ex*gaugeSiteSize*gSize);
-    if(sitelink_ex[i] == NULL){
-      errorQuda("ERROR; allocate sitelink_ex[%d] failed\n", i);
+    if (cudaMallocHost((void**)&sitelink_ex[i], V_ex*gaugeSiteSize*gSize) ==  cudaErrorMemoryAllocation) {
+      errorQuda("ERROR: cudaMallocHost failed for sitelink_ex\n");
     }
   }
 
@@ -462,17 +459,6 @@ main(int argc, char **argv)
       continue;
     }
 
-    
-    if( strcmp(argv[i], "--test") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }
-      test = atoi(argv[i+1]);
-      i++;
-      continue;
-    }
-
-
     if( strcmp(argv[i], "--gauge-order") == 0){
       if(i+1 >= argc){
 	usage(argv);
@@ -499,6 +485,8 @@ main(int argc, char **argv)
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+
+  test = test_type;
 
 #ifdef MULTI_GPU
   if(gauge_order == QUDA_MILC_GAUGE_ORDER && test == 0){

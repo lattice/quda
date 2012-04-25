@@ -33,7 +33,7 @@ static QudaTboundary t_boundary_;
 
 /********************** Staple code, used by link fattening **************/
 
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE)
+#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) ||defined(GPU_HISQ_FORCE)
 
 
 template <typename Float>
@@ -736,7 +736,9 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
     for(int i=0;i < 4; i++){
       
 #ifdef GPU_DIRECT 
-      cudaMallocHost((void**)&ghost_cpuGauge[i], 8*Vs[i]*gaugeSiteSize*prec);
+      if (cudaMallocHost((void**)&ghost_cpuGauge[i], 8*Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+	errorQuda("ERROR: cudaMallocHost failed for ghost_cpuGauge\n");
+      }
 #else
       ghost_cpuGauge[i] = malloc(8*Vs[i]*gaugeSiteSize*prec);
 #endif
@@ -772,7 +774,9 @@ loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam
 	  }
 	  //int rc = posix_memalign((void**)&ghost_cpuGauge_diag[nu*4+mu], ALIGNMENT, Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
 #ifdef GPU_DIRECT 
-	  cudaMallocHost((void**)&ghost_cpuGauge_diag[nu*4+mu],  Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
+	  if (cudaMallocHost((void**)&ghost_cpuGauge_diag[nu*4+mu],  Z[dir1]*Z[dir2]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
+	    errorQuda("ERROR: cudaMallocHost failed for ghost_cpuGauge_diag\n");
+	  }
 #else
 	  ghost_cpuGauge_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
 #endif
@@ -916,7 +920,6 @@ loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge)
   QudaPrecision prec= cudaGauge->Precision();
   const int* E = cudaGauge->X();
   int pad = cudaGauge->Pad();
-  
   do_loadLinkToGPU_ex(E, cudaGauge->Even_p(), cudaGauge->Odd_p(), (void**)cpuGauge->Gauge_p(),
 		      cudaGauge->Reconstruct(), cudaGauge->Bytes(), cudaGauge->VolumeCB(), pad,
 		      prec, cpuGauge->Order());

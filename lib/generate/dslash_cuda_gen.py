@@ -129,9 +129,15 @@ def c_im(b, sm, cm, sn, cn): return "c"+`(sm+2*b)`+`cm`+"_"+`(sn+2*b)`+`cn`+"_im
 def a_re(b, s, c): return "a"+`(s+2*b)`+`c`+"_re"
 def a_im(b, s, c): return "a"+`(s+2*b)`+`c`+"_im"
 
+def acc_re(s, c): return "acc"+`s`+`c`+"_re"
+def acc_im(s, c): return "acc"+`s`+`c`+"_im"
+
 def tmp_re(s, c): return "tmp"+`s`+`c`+"_re"
 def tmp_im(s, c): return "tmp"+`s`+`c`+"_im"
 
+def spinor(name, s, c, z): 
+    if z==0: return name+`s`+`c`+"_re"
+    else: return name+`s`+`c`+"_im"
 
 def def_input_spinor():
     str = ""
@@ -147,6 +153,12 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
+    if dslash and not pack:
+        for s in range(0,4):
+            for c in range(0,3):
+                i = 3*s+c
+                str += "#define "+acc_re(s,c)+" accum"+nthFloat2(2*i+0)+"\n"
+                str += "#define "+acc_im(s,c)+" accum"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
     if sharedDslash: 
@@ -157,6 +169,12 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
+    if dslash and not pack:
+        for s in range(0,4):
+            for c in range(0,3):
+                i = 3*s+c
+                str += "#define "+acc_re(s,c)+" accum"+nthFloat4(2*i+0)+"\n"
+                str += "#define "+acc_im(s,c)+" accum"+nthFloat4(2*i+1)+"\n"
     str += "#endif // SPINOR_DOUBLE\n\n"
     return str
 # end def def_input_spinor
@@ -427,6 +445,7 @@ if (kernel_type == INTERIOR_KERNEL) {
             for c in range(0,3):
                 out += out_re(s,c)+" = 0;  "+out_im(s,c)+" = 0;\n"
         prolog_str+= indent(out)
+        if asymClover: prolog_str += indent(clover_xpay())
 
         prolog_str+= (
 """
@@ -754,21 +773,33 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             h_out = h
             if row_cnt[0] == 0: # projector defined on lower half only
                 h_out = h+2
-            reconstruct += out_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
-            reconstruct += out_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
+            if not asymClover:
+                reconstruct += out_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
+                reconstruct += out_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
+            else:
+                reconstruct += out_re(h_out, m) + " += a*" + h2_re(h,m) + ";\n"
+                reconstruct += out_im(h_out, m) + " += a*" + h2_im(h,m) + ";\n"
     
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
             im = c.imag
-            if im == 0 and re == 0:
-                ()
-            elif im == 0:
-                reconstruct += out_re(s, m) + " " + sign(re) + "= " + h2_re(h,m) + ";\n"
-                reconstruct += out_im(s, m) + " " + sign(re) + "= " + h2_im(h,m) + ";\n"
-            elif re == 0:
-                reconstruct += out_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
-                reconstruct += out_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
+            if not asymClover:
+                if im == 0 and re == 0: ()
+                elif im == 0:
+                    reconstruct += out_re(s, m) + " " + sign(re) + "= " + h2_re(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(re) + "= " + h2_im(h,m) + ";\n"
+                elif re == 0:
+                    reconstruct += out_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
+            else:
+                if im == 0 and re == 0: ()
+                elif im == 0:
+                    reconstruct += out_re(s, m) + " " + sign(re) + "= a*" + h2_re(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(re) + "= a*" + h2_im(h,m) + ";\n"
+                elif re == 0:
+                    reconstruct += out_re(s, m) + " " + sign(-im) + "= a*" + h2_im(h,m) + ";\n"
+                    reconstruct += out_im(s, m) + " " + sign(+im) + "= a*" + h2_re(h,m) + ";\n"
         
         reconstruct += "\n"
 
@@ -797,47 +828,47 @@ def input_spinor(s,c,z):
         if z==0: return in_re(s,c)
         else: return in_im(s,c)        
 
-def to_chiral_basis(c):
+def to_chiral_basis(v_out,v_in,c):
     str = ""
-    str += "spinorFloat "+a_re(0,0,c)+" = -"+input_spinor(1,c,0)+" - "+input_spinor(3,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,0,c)+" = -"+input_spinor(1,c,1)+" - "+input_spinor(3,c,1)+";\n"
-    str += "spinorFloat "+a_re(0,1,c)+" =  "+input_spinor(0,c,0)+" + "+input_spinor(2,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,1,c)+" =  "+input_spinor(0,c,1)+" + "+input_spinor(2,c,1)+";\n"
-    str += "spinorFloat "+a_re(0,2,c)+" = -"+input_spinor(1,c,0)+" + "+input_spinor(3,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,2,c)+" = -"+input_spinor(1,c,1)+" + "+input_spinor(3,c,1)+";\n"
-    str += "spinorFloat "+a_re(0,3,c)+" =  "+input_spinor(0,c,0)+" - "+input_spinor(2,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,3,c)+" =  "+input_spinor(0,c,1)+" - "+input_spinor(2,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,0,c)+" = -"+spinor(v_in,1,c,0)+" - "+spinor(v_in,3,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,0,c)+" = -"+spinor(v_in,1,c,1)+" - "+spinor(v_in,3,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,1,c)+" =  "+spinor(v_in,0,c,0)+" + "+spinor(v_in,2,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,1,c)+" =  "+spinor(v_in,0,c,1)+" + "+spinor(v_in,2,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,2,c)+" = -"+spinor(v_in,1,c,0)+" + "+spinor(v_in,3,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,2,c)+" = -"+spinor(v_in,1,c,1)+" + "+spinor(v_in,3,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,3,c)+" =  "+spinor(v_in,0,c,0)+" - "+spinor(v_in,2,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,3,c)+" =  "+spinor(v_in,0,c,1)+" - "+spinor(v_in,2,c,1)+";\n"
     str += "\n"
 
     for s in range (0,4):
-        str += out_re(s,c)+" = "+a_re(0,s,c)+";  "
-        str += out_im(s,c)+" = "+a_im(0,s,c)+";\n"
+        str += spinor(v_out,s,c,0)+" = "+a_re(0,s,c)+";  "
+        str += spinor(v_out,s,c,1)+" = "+a_im(0,s,c)+";\n"
 
     return block(str)+"\n\n"
 # end def to_chiral_basis
 
 
-def from_chiral_basis(c): # note: factor of 1/2 is included in clover term normalization
+def from_chiral_basis(v_out,v_in,c): # note: factor of 1/2 is included in clover term normalization
     str = ""
-    str += "spinorFloat "+a_re(0,0,c)+" =  "+out_re(1,c)+" + "+out_re(3,c)+";\n"
-    str += "spinorFloat "+a_im(0,0,c)+" =  "+out_im(1,c)+" + "+out_im(3,c)+";\n"
-    str += "spinorFloat "+a_re(0,1,c)+" = -"+out_re(0,c)+" - "+out_re(2,c)+";\n"
-    str += "spinorFloat "+a_im(0,1,c)+" = -"+out_im(0,c)+" - "+out_im(2,c)+";\n"
-    str += "spinorFloat "+a_re(0,2,c)+" =  "+out_re(1,c)+" - "+out_re(3,c)+";\n"
-    str += "spinorFloat "+a_im(0,2,c)+" =  "+out_im(1,c)+" - "+out_im(3,c)+";\n"
-    str += "spinorFloat "+a_re(0,3,c)+" = -"+out_re(0,c)+" + "+out_re(2,c)+";\n"
-    str += "spinorFloat "+a_im(0,3,c)+" = -"+out_im(0,c)+" + "+out_im(2,c)+";\n"
+    str += "spinorFloat "+a_re(0,0,c)+" =  "+spinor(v_in,1,c,0)+" + "+spinor(v_in,3,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,0,c)+" =  "+spinor(v_in,1,c,1)+" + "+spinor(v_in,3,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,1,c)+" = -"+spinor(v_in,0,c,0)+" - "+spinor(v_in,2,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,1,c)+" = -"+spinor(v_in,0,c,1)+" - "+spinor(v_in,2,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,2,c)+" =  "+spinor(v_in,1,c,0)+" - "+spinor(v_in,3,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,2,c)+" =  "+spinor(v_in,1,c,1)+" - "+spinor(v_in,3,c,1)+";\n"
+    str += "spinorFloat "+a_re(0,3,c)+" = -"+spinor(v_in,0,c,0)+" + "+spinor(v_in,2,c,0)+";\n"
+    str += "spinorFloat "+a_im(0,3,c)+" = -"+spinor(v_in,0,c,1)+" + "+spinor(v_in,2,c,1)+";\n"
     str += "\n"
 
     for s in range (0,4):
-        str += out_re(s,c)+" = "+a_re(0,s,c)+";  "
-        str += out_im(s,c)+" = "+a_im(0,s,c)+";\n"
+        str += spinor(v_out,s,c,0)+" = "+a_re(0,s,c)+";  "
+        str += spinor(v_out,s,c,1)+" = "+a_im(0,s,c)+";\n"
 
     return block(str)+"\n\n"
 # end def from_chiral_basis
 
 
-def clover_mult(chi):
+def clover_mult(v_out, v_in, chi):
     str = "READ_CLOVER(CLOVERTEX, "+`chi`+")\n\n"
 
     for s in range (0,2):
@@ -849,38 +880,38 @@ def clover_mult(chi):
         for cm in range (0,3):
             for sn in range (0,2):
                 for cn in range (0,3):
-                    str += a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n"
+                    str += a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,0)+";\n"
                     if (sn != sm) or (cn != cm): 
-                        str += a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n"
+                        str += a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,1)+";\n"
                     #else: str += ";\n"
-                    str += a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+out_im(2*chi+sn,cn)+";\n"
+                    str += a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,1)+";\n"
                     if (sn != sm) or (cn != cm): 
-                        str += a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+out_re(2*chi+sn,cn)+";\n"
+                        str += a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,0)+";\n"
                     #else: str += ";\n"
             str += "\n"
 
     for s in range (0,2):
         for c in range (0,3):
-            str += out_re(2*chi+s,c)+" = "+a_re(chi,s,c)+";  "
-            str += out_im(2*chi+s,c)+" = "+a_im(chi,s,c)+";\n"
+            str += spinor(v_out,2*chi+s,c,0)+" = "+a_re(chi,s,c)+";  "
+            str += spinor(v_out,2*chi+s,c,1)+" = "+a_im(chi,s,c)+";\n"
     str += "\n"
 
     return block(str)+"\n\n"
 # end def clover_mult
 
 
-def apply_clover():
+def apply_clover(v_out,v_in):
     str = ""
     if dslash: str += "#ifdef DSLASH_CLOVER\n\n"
     str += "// change to chiral basis\n"
-    str += to_chiral_basis(0) + to_chiral_basis(1) + to_chiral_basis(2)
+    str += to_chiral_basis(v_out,v_in,0) + to_chiral_basis(v_out,v_in,1) + to_chiral_basis(v_out,v_in,2)
     str += "// apply first chiral block\n"
-    str += clover_mult(0)
+    str += clover_mult(v_out,v_out,0)
     str += "// apply second chiral block\n"
-    str += clover_mult(1)
+    str += clover_mult(v_out,v_out,1)
     str += "// change back from chiral basis\n"
     str += "// (note: required factor of 1/2 is included in clover term normalization)\n"
-    str += from_chiral_basis(0) + from_chiral_basis(1) + from_chiral_basis(2)
+    str += from_chiral_basis(v_out,v_out,0) + from_chiral_basis(v_out,v_out,1) + from_chiral_basis(v_out,v_out,2)
     if dslash: str += "#endif // DSLASH_CLOVER\n\n"
 
     return str
@@ -946,35 +977,39 @@ def twisted():
 # end def twisted
 
 
+def clover_xpay():
+    str = ""
+    str += "#ifdef DSLASH_CLOVER_XPAY\n\n"
+    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
+
+    str += apply_clover("acc","acc")
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += out_re(s,c) +" = "+acc_re(s,c)+";\n"
+            str += out_im(s,c) +" = "+acc_im(s,c)+";\n"
+
+    str += "#endif // DSLASH_CLOVER_XPAY\n"
+
+    return str
+#end def clover_xpay    
+
 def xpay():
     str = ""
     str += "#ifdef DSLASH_XPAY\n\n"
     str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
-    str += "#ifdef SPINOR_DOUBLE\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             if twist == False:
-                str += out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
+                str += out_re(s,c) +" = a*"+out_re(s,c)+"+"+acc_re(s,c)+";\n"
+                str += out_im(s,c) +" = a*"+out_im(s,c)+"+"+acc_im(s,c)+";\n"
             else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
+                str += out_re(s,c) +" = b*"+out_re(s,c)+"+"+acc_re(s,c)+";\n"
+                str += out_im(s,c) +" = b*"+out_im(s,c)+"+"+acc_im(s,c)+";\n"
 
-    str += "#else\n"
-
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
-
-    str += "#endif // SPINOR_DOUBLE\n\n"
     str += "#endif // DSLASH_XPAY\n"
 
     return str
@@ -983,7 +1018,7 @@ def xpay():
 
 def epilog():
     str = ""
-    if dslash:
+    if dslash and not asymClover:
         if twist:
             str += "#ifdef MULTI_GPU\n"
         else:
@@ -1006,8 +1041,16 @@ case EXTERIOR_KERNEL_Y:
 """)    
         str += "if (!incomplete)\n"
         str += "#endif // MULTI_GPU\n"
-    
-    str += block( "\n" + (twisted() if twist else apply_clover()) + xpay() )
+
+    if not asymClover:
+        block_str = ""
+        if twist: block_str += twisted()
+        #elif asymClover: block_str += clover_xpay()
+        elif dslash: block_str += apply_clover("o","o")
+        else: block_str += apply_clover("o","i")
+        if not asymClover: block_str += xpay()
+
+        str += block( block_str )
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
@@ -1037,6 +1080,14 @@ case EXTERIOR_KERNEL_Y:
             str += "#undef "+in_re(s,c)+"\n"
             str += "#undef "+in_im(s,c)+"\n"
     str += "\n"
+
+    if dslash:
+        for s in range(0,4):
+            for c in range(0,3):
+                i = 3*s+c
+                str += "#undef "+acc_re(s,c)+"\n"
+                str += "#undef "+acc_im(s,c)+"\n"
+        str += "\n"
 
     if clover == True:
         for m in range(0,6):
@@ -1125,6 +1176,7 @@ def generate_dslash_kernels(arch):
     global dagger
     global clover
     global twist
+    global asymClover
 
     sharedFloats = 0
     if arch >= 200:
@@ -1160,6 +1212,24 @@ def generate_dslash_kernels(arch):
     f.write(generate_dslash())
     f.close()
 
+    asymClover = True
+
+    dagger = False
+    filename = 'dslash_core/asym_wilson_clover_dslash_' + name + '_core.h'
+    print sys.argv[0] + ": generating " + filename;
+    f = open(filename, 'w')
+    f.write(generate_dslash())
+    f.close()
+
+    dagger = True
+    filename = 'dslash_core/asym_wilson_clover_dslash_dagger_' + name + '_core.h'
+    print sys.argv[0] + ": generating " + filename;
+    f = open(filename, 'w')
+    f.write(generate_dslash())
+    f.close()
+    
+    asymClover = False
+
     twist = True
     clover = False
     dagger = False
@@ -1176,6 +1246,7 @@ def generate_dslash_kernels(arch):
     f.write(generate_dslash())
     f.close()
 
+    twist = False
     dslash = False
 
 
@@ -1184,8 +1255,10 @@ dslash = False
 dagger = False
 twist = False
 clover = False
+asymClover = False
 sharedFloats = 0
 sharedDslash = False
+pack = False
 
 # generate dslash kernels
 arch = 200
@@ -1203,6 +1276,7 @@ sharedFloats = 0
 twist = False
 clover = False
 dagger = False
+pack = True
 print sys.argv[0] + ": generating wilson_pack_face_core.h";
 f = open('dslash_core/wilson_pack_face_core.h', 'w')
 f.write(generate_pack())
@@ -1214,6 +1288,7 @@ f = open('dslash_core/wilson_pack_face_dagger_core.h', 'w')
 f.write(generate_pack())
 f.close()
 dslash = False
+pack = False
 
 # generate clover solo term
 clover = True

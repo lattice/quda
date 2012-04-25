@@ -191,8 +191,7 @@ int link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugePar
 template<typename Float>
 int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugeParam* gaugeParam, int oddBit)
 {
-    
-    int ret =0;
+    int ret = 0;
     
     Float refc_buf[6];
     Float* refc = &refc_buf[0];
@@ -210,12 +209,18 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
     accumulateConjugateProduct(refc + 2*2, a + 0*2, b + 1*2, +1);
     accumulateConjugateProduct(refc + 2*2, a + 1*2, b + 0*2, -1);
 
-
     int X1h=gaugeParam->X[0]/2;
     int X1 =gaugeParam->X[0];    
     int X2 =gaugeParam->X[1];
     int X3 =gaugeParam->X[2];
     int X4 =gaugeParam->X[3];
+
+  // only apply temporal boundary condition if I'm the last node in T
+#ifdef MULTI_GPU
+  bool last_node_in_t = (commCoords(3) == commDim(3)-1);
+#else
+  bool last_node_in_t = true;
+#endif
 
 #if 1        
     double coeff= 1.0;
@@ -244,7 +249,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
            }
        }
        if (dir == TUP){
-	 if ((commCoords(3) == commDim(3) -1) && i4 == (X4-1) ){
+	 if (last_node_in_t && i4 == (X4-1) ){
 	   coeff *= -1;
 	 } 
        }       

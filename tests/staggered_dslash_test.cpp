@@ -26,7 +26,7 @@
 
 extern void usage(char** argv );
 
-int test_type = 0;
+extern int test_type;
 
 extern bool tune;
 
@@ -262,7 +262,7 @@ void init()
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
 	
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     checkCudaError();
 	
     double spinor_norm2 = norm2(*spinor);
@@ -515,18 +515,6 @@ int main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }    
-    
-    if( strcmp(argv[i], "--test") == 0){
-      if (i+1 >= argc){
-	usage(argv);
-      }	    
-      test_type =  atoi(argv[i+1]);
-      if (test_type < 0 || test_type > 2){
-	errorQuda("Error: invalid test type");
-      }
-      i++;
-      continue;	    
-    }
     
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
