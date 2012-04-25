@@ -166,8 +166,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
-  inv_param->src_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param->sol_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param->input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param->output_location = QUDA_CPU_FIELD_LOCATION;
 }
 
 int

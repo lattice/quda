@@ -405,6 +405,7 @@ class PackSpinor : Tunable {
     param.grid = dim3( (volume+param.block.x-1) / param.block.x, 1, 1);
   }
 
+  long long flops() const { return 0; } 
   long long bytes() const { return in.Bytes() + out.Bytes(); } 
 };
 

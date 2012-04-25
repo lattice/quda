@@ -166,8 +166,8 @@ int main(int argc, char **argv)
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  inv_param.src_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.sol_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 

@@ -139,8 +139,8 @@ void init()
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
 
-  inv_param.src_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.sol_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   int tmpint = MAX(X[1]*X[2]*X[3], X[0]*X[2]*X[3]);
   tmpint = MAX(tmpint, X[0]*X[1]*X[3]);

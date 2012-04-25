@@ -106,8 +106,8 @@ void init() {
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
-  inv_param.src_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.sol_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   
   if (inv_param.cpu_prec != gauge_param.cpu_prec) 

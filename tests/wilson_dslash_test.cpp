@@ -101,8 +101,8 @@ void init(int argc, char **argv) {
 
   inv_param.cuda_prec = cuda_prec;
 
-  inv_param.src_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.sol_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
 #ifndef MULTI_GPU // free parameter for single GPU
   gauge_param.ga_pad = 0;
@@ -324,10 +324,10 @@ double dslashCUDA(int niter) {
       if (transfer) {
 	dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
       } else {
-	inv_param.src_location = QUDA_CUDA_FIELD_LOCATION;
-	inv_param.sol_location = QUDA_CUDA_FIELD_LOCATION;
-	dslashQuda(cudaSpinorOut->V(), cudaSpinor->V(), &inv_param, parity);
-	//dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+	//inv_param.input_location = QUDA_CUDA_FIELD_LOCATION;
+	//inv_param.output_location = QUDA_CUDA_FIELD_LOCATION;
+	//dslashQuda(cudaSpinorOut->V(), cudaSpinor->V(), &inv_param, parity);
+	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;
     case 1:
