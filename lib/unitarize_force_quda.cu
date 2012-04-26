@@ -573,7 +573,7 @@ namespace quda{
       int *fails;
 
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }
