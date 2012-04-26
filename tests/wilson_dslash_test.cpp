@@ -316,8 +316,6 @@ double dslashCUDA(int niter) {
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);
 
-  printf("\n\n\n\n");
-
   for (int i = 0; i < niter; i++) {
     switch (test_type) {
     case 0:
@@ -349,7 +347,6 @@ double dslashCUDA(int niter) {
     }
   }
     
-  printf("\n\n\n\n");
   cudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;

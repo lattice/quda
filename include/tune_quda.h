@@ -91,7 +91,7 @@ class Tunable {
   virtual bool advanceBlockDim(TuneParam &param) const
   {
     const unsigned int max_threads = 512; // FIXME: use deviceProp.maxThreadsDim[0];
-    const unsigned int max_shared = 3*16384; // FIXME: use deviceProp.sharedMemPerBlock;
+    const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
     const int step = 32; // FIXME: use deviceProp.warpSize;
     param.block.x += step;
     if (param.block.x > max_threads || sharedBytesPerThread()*param.block.x > max_shared) {

@@ -30,7 +30,7 @@ QudaPrecision cudaColorSpinorField::facePrecision;
 
 extern bool kernelPackT;
 
-#define REORDER_LOCATION QUDA_CUDA_FIELD_LOCATION
+#define REORDER_LOCATION QUDA_CPU_FIELD_LOCATION
 
 /*cudaColorSpinorField::cudaColorSpinorField() : 
   ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
@@ -228,8 +228,7 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     (dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
     (dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
   }
-  
-  printf("alloc = %d\n", alloc);
+
 }
 void cudaColorSpinorField::freeBuffer() {
   if (bufferInit) {
@@ -244,7 +243,6 @@ void cudaColorSpinorField::freeBuffer() {
 }
 
 void cudaColorSpinorField::destroy() {
-  printf("destroy = %d\n", alloc);
   if (alloc) {
     cudaFree(v);
     if (precision == QUDA_HALF_PRECISION) cudaFree(norm);
@@ -413,8 +411,9 @@ void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 	cudaHostAlloc(&buffer_h,src.Bytes(), 0);
       }
     
-      cudaHostRegister((void*)(dynamic_cast<const cpuColorSpinorField&>(src).V()), src.Bytes(), cudaHostRegisterMapped);
+      //cudaHostRegister((void*)(dynamic_cast<const cpuColorSpinorField&>(src).V()), src.Bytes(), cudaHostRegisterMapped);
       cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).V(), src.Bytes(), cudaMemcpyHostToDevice);
+      //cudaHostUnregister((void*)(dynamic_cast<const cpuColorSpinorField&>(src).V()));
       checkCudaError();
     }
 
@@ -562,7 +561,7 @@ void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 	cudaMalloc(&buffer_d,dest.Bytes());
 	cudaHostAlloc(&buffer_h,dest.Bytes(), 0);
       }
-      cudaHostRegister(dynamic_cast<cpuColorSpinorField&>(dest).V(), dest.Bytes(), cudaHostRegisterMapped);
+      //cudaHostRegister(dynamic_cast<cpuColorSpinorField&>(dest).V(), dest.Bytes(), cudaHostRegisterMapped);
     }    
 
     void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
@@ -580,8 +579,10 @@ void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
       errorQuda("invalid number of spinors in function");
     }
 
-    if (typeid(dest) == typeid(cpuColorSpinorField))
+    if (typeid(dest) == typeid(cpuColorSpinorField)) {
       cudaMemcpy(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
+      //cudaHostUnregister((void*)(dynamic_cast<const cpuColorSpinorField&>(dest).V()));
+    }
   }
 
   checkCudaError();
