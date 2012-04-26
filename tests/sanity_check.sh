@@ -39,7 +39,7 @@ function basic_sanity_check {
 	        recon="12"
                 fi
 
-	        cmd="./$prog --sdim 8 --tdim 16 --recon $recon --prec $prec $extra_args"
+	        cmd="./$prog --sdim 8 --tdim 16 --recon $recon --prec $prec $extra_args --tune false"
 	        echo -ne  $cmd  "\t"..."\t"
 	        echo "----------------------------------------------------------" >>$OUTFILE
                 echo $cmd >> $OUTFILE

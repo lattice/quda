@@ -71,8 +71,11 @@ cpuGaugeField *cpuOprod_ex = NULL;
 cudaGaugeField *cudaOprod_ex = NULL;
 cpuGaugeField *cpuLongLinkOprod_ex = NULL;
 cudaGaugeField *cudaLongLinkOprod_ex = NULL;
+#ifdef MULTI_GPU
+GaugeFieldParam gParam_ex;
+#endif
 
-
+GaugeFieldParam gParam;
 
 static void setPrecision(QudaPrecision precision)
 {
@@ -253,13 +256,13 @@ hisq_force_init()
 
 
   
-  GaugeFieldParam gParam(0, qudaGaugeParam);
+  gParam = GaugeFieldParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_ASQTAD_GENERAL_LINKS;
   cpuGauge = new cpuGaugeField(gParam);
   
 #ifdef MULTI_GPU
-  GaugeFieldParam gParam_ex(0, qudaGaugeParam_ex);
+  gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_ASQTAD_GENERAL_LINKS;
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
@@ -389,6 +392,18 @@ hisq_force_init()
   
 #endif
 
+
+  
+#ifdef MULTI_GPU
+  gParam_ex.precision = prec;
+  gParam_ex.reconstruct = link_recon;
+  //gParam_ex.pad = E1*E2*E3/2;
+  gParam_ex.pad = 0;
+  cudaGauge_ex = new cudaGaugeField(gParam_ex);
+  qudaGaugeParam.site_ga_pad = gParam_ex.pad;
+  //record gauge pad size  
+
+#else
   gParam.precision = qudaGaugeParam.cuda_prec;
   gParam.reconstruct = link_recon;
   gParam.pad = X1*X2*X3/2;
@@ -396,13 +411,6 @@ hisq_force_init()
   //record gauge pad size
   qudaGaugeParam.site_ga_pad = gParam.pad;
   
-#ifdef MULTI_GPU
-  gParam_ex.precision = prec;
-  gParam_ex.reconstruct = link_recon;
-  gParam_ex.pad = E1*E2*E3/2;
-  cudaGauge_ex = new cudaGaugeField(gParam_ex);
-  qudaGaugeParam.site_ga_pad = gParam_ex.pad;
-  //record gauge pad size  
 #endif
   
 #ifdef MULTI_GPU
@@ -413,7 +421,7 @@ hisq_force_init()
   
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaForce_ex = new cudaGaugeField(gParam_ex); 
-#endif
+#else
   gParam.pad = 0;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -421,20 +429,16 @@ hisq_force_init()
   
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaForce = new cudaGaugeField(gParam); 
-
+#endif
 
   // create the momentum matrix
+  gParam.pad = 0;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.order = QUDA_MILC_GAUGE_ORDER;
   cpuMom = new cpuGaugeField(gParam);
   refMom = new cpuGaugeField(gParam);  
   
-  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
-  gParam.pad = X1*X2*X3/2;
-  cudaMom = new cudaGaugeField(gParam); // Are the elements initialised to zero? - No!
-  //record the mom pad
-  qudaGaugeParam.mom_ga_pad = gParam.pad;
   
   createMomCPU(cpuMom->Gauge_p(), mom_prec);
   hw = malloc(4*cpuGauge->Volume()*hwSiteSize*qudaGaugeParam.cpu_prec);
@@ -516,14 +520,12 @@ hisq_force_init()
 
 
   cudaOprod_ex = new cudaGaugeField(gParam_ex);
-  cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
-#endif
-
-
+#else
 
   cudaOprod = new cudaGaugeField(gParam);
   cudaLongLinkOprod = new cudaGaugeField(gParam);
 
+#endif
 
   return;
 }
@@ -544,19 +546,19 @@ hisq_force_end()
   free(siteLink_1d);
 
   delete cudaMom;
-  delete cudaForce;
   delete cudaGauge;
-  delete cudaOprod;
-  delete cudaLongLinkOprod;
 #ifdef MULTI_GPU
   delete cudaForce_ex;
-  delete cudaGauge_ex;
-  delete cudaOprod_ex;
+  delete cudaGauge_ex; 
+  //delete cudaOprod_ex; // already deleted
   delete cudaLongLinkOprod_ex;
+#else
+  delete cudaForce;
+  delete cudaOprod;
+  delete cudaLongLinkOprod;
 #endif  
   
   delete cpuGauge;
-  delete cpuForce;
   delete cpuMom;
   delete refMom;
   delete cpuOprod;  
@@ -567,6 +569,8 @@ hisq_force_end()
   delete cpuForce_ex;
   delete cpuOprod_ex;  
   delete cpuLongLinkOprod_ex;
+#else
+  delete cpuForce;
 #endif
 
   free(hw);
@@ -583,8 +587,7 @@ hisq_force_test(void)
 
   hisq_force_init();
 
-  initLatticeConstants(*cudaGauge);
-  initGaugeConstants(*cudaGauge);
+  initLatticeConstants(*cpuMom);
   hisqForceInitCuda(&qudaGaugeParam);
 
 
@@ -607,7 +610,6 @@ hisq_force_test(void)
   }
   
   
-  cudaMom->loadCPUField(*refMom, QUDA_CPU_FIELD_LOCATION);
 
 
 
@@ -631,10 +633,10 @@ hisq_force_test(void)
   
   
 #ifdef MULTI_GPU
+
   exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuLongLinkOprod_ex->Gauge_p(), cpuLongLinkOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag);
-  loadLinkToGPU_ex(cudaLongLinkOprod_ex, cpuLongLinkOprod_ex);
 #else
-  loadLinkToGPU(cudaLongLinkOprod, cpuLongLinkOprod, &qudaGaugeParam);
+  
 #endif
 
   
@@ -682,24 +684,45 @@ hisq_force_test(void)
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
   
-  hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);
+  delete cudaOprod_ex; //doing this to lower the peak memory usage
+  cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
+  loadLinkToGPU_ex(cudaLongLinkOprod_ex, cpuLongLinkOprod_ex);
+  hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
   cudaDeviceSynchronize(); 
-  gettimeofday(&t2, NULL);
   
-  hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);
+  gettimeofday(&t2, NULL);
+
 #else
   hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
 
   checkCudaError();
+  loadLinkToGPU(cudaLongLinkOprod, cpuLongLinkOprod, &qudaGaugeParam);
 
   hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 
   gettimeofday(&t2, NULL);
   
+#endif
+
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.pad = 0; //X1*X2*X3/2;
+  cudaMom = new cudaGaugeField(gParam); // Are the elements initialised to zero? - No!
+
+  //record the mom pad
+  qudaGaugeParam.mom_ga_pad = gParam.pad;
+  cudaMom->loadCPUField(*refMom, QUDA_CPU_FIELD_LOCATION);
+  
+#ifdef MULTI_GPU
+  hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);  
+#else
   hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
 #endif
+
+
 
   cudaDeviceSynchronize();
 

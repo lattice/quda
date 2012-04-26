@@ -348,9 +348,9 @@ invert_test(void)
   case 5:
   case 6:
 
-#define NUM_OFFSETS 7
+#define NUM_OFFSETS 12
         
-    double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81};
+    double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81, 3.0, 3.1, 3.2, 3.3, 3.4};
     double offsets[NUM_OFFSETS];	
     int num_offsets =NUM_OFFSETS;
     void* outArray[NUM_OFFSETS];

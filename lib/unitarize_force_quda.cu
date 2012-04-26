@@ -544,7 +544,7 @@ namespace quda{
 
     void unitarizeForceCPU(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
     {
-
+      
       int num_failures = 0;	
       Matrix<double2,3> old_force, new_force, v;
       for(int i=0; i<cpuGauge.Volume(); ++i){
