@@ -221,6 +221,8 @@ void saveTuneCache(QudaVerbosity verbosity)
     close(lock_handle);
     remove(lock_path.c_str());
 
+    initial_cache_size = tunecache.size();
+
 #ifdef MULTI_GPU
   }
 #endif
