@@ -1,8 +1,8 @@
 #ifndef _UTIL_QUDA_H
 #define _UTIL_QUDA_H
 
-#include <cstdio>
-#include <cstdlib>
+#include <stdio.h>
+#include <stdlib.h>
 #include <enum_quda.h>
 #include <comm_quda.h>
 
@@ -11,7 +11,7 @@ QudaVerbosity getVerbosity();
 char *getOutputPrefix();
 FILE *getOutputFile();
 
-void setVerbosity(const QudaVerbosity &verbosity);
+void setVerbosity(const QudaVerbosity verbosity);
 void setOutputPrefix(const char *prefix);
 void setOutputFile(FILE *outfile);
 
