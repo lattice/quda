@@ -144,6 +144,7 @@ void initQuda(int dev)
   for(int i=0; i<deviceCount; i++) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
+    checkCudaError();
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
     }
@@ -177,6 +178,7 @@ void initQuda(int dev)
 #endif
   
   cudaGetDeviceProperties(&deviceProp, dev);
+  checkCudaError();
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
@@ -185,6 +187,7 @@ void initQuda(int dev)
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
   cudaSetDevice(dev);
+  checkCudaError();
 
 #ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
@@ -193,6 +196,7 @@ void initQuda(int dev)
 #endif
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
+  checkCudaError();
 
   initCache();
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
@@ -202,6 +206,7 @@ void initQuda(int dev)
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
   }
+  checkCudaError();
   createDslashEvents();
 
   quda::initBlas();
