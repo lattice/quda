@@ -460,7 +460,7 @@ void endQuda(void)
   }
   destroyDslashEvents();
 
-  saveTuneCache(QUDA_VERBOSE);
+  saveTuneCache(getVerbosity());
 }
 
 
@@ -978,8 +978,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_x;
   delete b;
   delete x;
-  
-  return;
+
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
 }
 
 
@@ -1176,7 +1177,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   delete [] hp_x;
 
-  return;
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
 }
 
 /************************************** Ugly Mixed precision multishift CG solver ****************************/
@@ -1565,7 +1567,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   delete [] hp_x;
 
-  return;
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
 }
 
 
