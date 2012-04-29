@@ -405,11 +405,8 @@ then
   AC_MSG_NOTICE([Domain wall doesn't support multi-GPU yet: disabling ])
   build_dwf_dirac="no";
 
-  AC_MSG_NOTICE([Gauge force doesn't support multi-GPU yet: disabling ])
-  build_gauge_force="no"
-
   AC_MSG_NOTICE([Asqtad fermion force doesn't support multi-GPU yet: disabling ])
-  build_staggered_force="no"
+  build_staggered_force="no";
 
 
   if test "X${qmp_home}X" = "XX"; then
