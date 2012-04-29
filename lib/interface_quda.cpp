@@ -144,6 +144,7 @@ void initQuda(int dev)
   for(int i=0; i<deviceCount; i++) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
+    checkCudaError();
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
     }
@@ -177,6 +178,7 @@ void initQuda(int dev)
 #endif
   
   cudaGetDeviceProperties(&deviceProp, dev);
+  checkCudaError();
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
@@ -185,6 +187,7 @@ void initQuda(int dev)
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
   cudaSetDevice(dev);
+  checkCudaError();
 
 #ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
@@ -193,6 +196,7 @@ void initQuda(int dev)
 #endif
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
+  checkCudaError();
 
   initCache();
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
@@ -202,6 +206,7 @@ void initQuda(int dev)
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
   }
+  checkCudaError();
   createDslashEvents();
 
   quda::initBlas();
@@ -455,7 +460,7 @@ void endQuda(void)
   }
   destroyDslashEvents();
 
-  saveTuneCache(QUDA_VERBOSE);
+  saveTuneCache(getVerbosity());
 }
 
 
@@ -973,8 +978,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_x;
   delete b;
   delete x;
-  
-  return;
+
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
 }
 
 
@@ -1171,7 +1177,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   delete [] hp_x;
 
-  return;
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
 }
 
 /************************************** Ugly Mixed precision multishift CG solver ****************************/
@@ -1560,7 +1567,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   delete [] hp_x;
 
-  return;
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
 }
 
 

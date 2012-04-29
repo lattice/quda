@@ -619,7 +619,7 @@ namespace quda {
       const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
 
       // don't tune the grid dimension
@@ -794,7 +794,7 @@ namespace quda {
       const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }
@@ -940,7 +940,7 @@ namespace quda {
       const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }
@@ -1087,7 +1087,7 @@ namespace quda {
       const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }
@@ -1224,7 +1224,7 @@ namespace quda {
       const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }
@@ -1368,7 +1368,7 @@ namespace quda {
       const int* X;
       
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }
@@ -1466,7 +1466,7 @@ namespace quda {
       const hisq_kernel_param_t &kparam;
 
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }
@@ -1572,7 +1572,7 @@ namespace quda {
       const int* X;
       
       int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock() const { return 0; }
+      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool advanceGridDim(TuneParam &param) const { return false; }

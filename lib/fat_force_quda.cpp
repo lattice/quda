@@ -839,27 +839,21 @@ do_loadLinkToGPU_ex(const int* X, void *even, void *odd, void**cpuGauge,
                     QudaPrecision prec, QudaGaugeFieldOrder cpu_order)
 {
 
-  cudaStream_t streams[2];
-  for(int i=0;i < 2; i++){
-    cudaStreamCreate(&streams[i]);
-  }
-
-
   int i;
   char* tmp_even = NULL;
   char* tmp_odd = NULL;
   int len = Vh_ex*gaugeSiteSize*prec;
   
-  if(cudaMalloc(&tmp_even, 8*len) != cudaSuccess){
+  if(cudaMalloc(&tmp_even, 4*len) != cudaSuccess){
     errorQuda("Error: cudaMalloc failed for tmp_even\n");
   }
-  tmp_odd = tmp_even + 4*len;
+  tmp_odd = tmp_even;
 
   //even links
   if(cpu_order == QUDA_QDP_GAUGE_ORDER){
     for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-      cudaMemcpyAsync(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]);
+      cudaMemcpyAsync(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
 #else
       cudaMemcpy(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
 #endif
@@ -867,42 +861,33 @@ do_loadLinkToGPU_ex(const int* X, void *even, void *odd, void**cpuGauge,
     }
   }else{ //QUDA_MILC_GAUGE_ORDER
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice, streams[0]);
+    cudaMemcpyAsync(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
 #else
     cudaMemcpy(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
 #endif
   }
   
-  link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, Vh_ex, pad, 0, prec, cpu_order, streams[0]);
+  link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, Vh_ex, pad, 0, prec, cpu_order, 0/*default stream*/);
   
   //odd links
   if(cpu_order == QUDA_QDP_GAUGE_ORDER){
     for(i=0;i < 4; i++){
 #ifdef GPU_DIRECT 
-      cudaMemcpyAsync(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[1]);
+      cudaMemcpyAsync(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #else
       cudaMemcpy(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
     }
   }else{//QUDA_MILC_GAUGE_ORDER
 #ifdef GPU_DIRECT 
-    cudaMemcpyAsync(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[1]);
+    cudaMemcpyAsync(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #else
     cudaMemcpy(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
   }
-  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh_ex, pad, 0, prec, cpu_order, streams[1]);
+  link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh_ex, pad, 0, prec, cpu_order, 0 /*default stream*/);
   
-  
-  for(int i=0;i < 2;i++){
-    cudaStreamSynchronize(streams[i]);
-  }
-
   cudaFree(tmp_even);
-
-  for(int i=0;i < 2;i++){
-    cudaStreamDestroy(streams[i]);
-  }
   
 }
 

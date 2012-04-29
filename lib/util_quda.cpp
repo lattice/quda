@@ -17,7 +17,7 @@ QudaVerbosity getVerbosity() { return verbosity_; }
 char *getOutputPrefix() { return prefix_; }
 FILE *getOutputFile() { return outfile_; }
 
-void setVerbosity(const QudaVerbosity &verbosity)
+void setVerbosity(const QudaVerbosity verbosity)
 {
   verbosity_ = verbosity;
 };
