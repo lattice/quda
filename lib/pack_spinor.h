@@ -475,17 +475,29 @@ void packSpinor(FloatN *dest, Float *src, int V, int pad, const int x[], int des
 	evenOff = srcLength/2;
       }
 
-      int Vh = V;
+      int Vh = V/2;
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh);
-	FloatNOrder<FloatN, Ns, Nc, N> outOrder(dest, Vh, Vh+pad);
-	packParitySpinor<Ns,Nc>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
-	packParitySpinor<Ns,Nc>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
+        {
+	  SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src+evenOff, Vh, Vh);
+	  FloatNOrder<FloatN, Ns, Nc, N> outOrder(dest, Vh, Vh+pad);
+	  packParitySpinor<Ns,Nc>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
+        }
+	{
+	  SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src+oddOff, Vh, Vh);
+	  FloatNOrder<FloatN, Ns, Nc, N> outOrder(dest + destLength/2, Vh, Vh+pad);
+	  packParitySpinor<Ns,Nc>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
+	}
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-	SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, Vh, Vh);
-	FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
-	packParitySpinor<Ns,Nc>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
-	packParitySpinor<Ns,Nc>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
+	{
+	  SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src+evenOff, Vh, Vh);
+	  FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest, Vh, Vh+pad);
+	  packParitySpinor<Ns,Nc>(dest, src+evenOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
+	}
+	{
+	  SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src+oddOff, Vh, Vh);
+	  FloatNOrder<FloatN, N, Ns, Nc> outOrder(dest + destLength/2, Vh, Vh+pad);
+	  packParitySpinor<Ns,Nc>(dest + destLength/2, src+oddOff, outOrder, inOrder, Vh, pad, destBasis, srcBasis, location);
+	}
       } else {
 	errorQuda("Source field order not supported");
 	}
