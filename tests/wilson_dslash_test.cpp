@@ -14,6 +14,7 @@
 #include <test_util.h>
 #include <dslash_util.h>
 #include <wilson_dslash_reference.h>
+#include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
 #include <gauge_qio.h>
@@ -22,6 +23,9 @@
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const int transfer = 0; // include transfer time in the benchmark?
+
+const int myLs = 8; // FIXME
+double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec;
@@ -60,9 +64,7 @@ extern char latfile[];
 
 void init(int argc, char **argv) {
 
-
-  kernelPackT = false; // Set true for kernel T face packing
-  cuda_prec= prec;
+  cuda_prec = prec;
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
@@ -71,14 +73,23 @@ void init(int argc, char **argv) {
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
-  setDims(gauge_param.X);
+
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    dw_setDims(gauge_param.X, myLs);
+    kernelPackT = true;
+  } else {
+    setDims(gauge_param.X);
+    Ls = 1;
+    kernelPackT = false;
+  }
+
   setSpinorSiteSize(24);
 
   gauge_param.anisotropy = 1.0;
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
 
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
@@ -92,15 +103,21 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     inv_param.mu = 0.01;
     inv_param.twist_flavor = QUDA_TWIST_MINUS;
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    inv_param.mass = 0.01;
+    inv_param.m5 = -1.5;
+    kappa5 = 0.5/(5 + inv_param.m5);
   }
 
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  inv_param.Ls = Ls;
+  
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = dagger;
 
   inv_param.cpu_prec = cpu_prec;
-  if (inv_param.cpu_prec != gauge_param.cpu_prec) 
-    errorQuda("Gauge and spinor cpu precisions must match");
-
+  if (inv_param.cpu_prec != gauge_param.cpu_prec) {
+    errorQuda("Gauge and spinor CPU precisions must match");
+  }
   inv_param.cuda_prec = cuda_prec;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
@@ -109,10 +126,10 @@ void init(int argc, char **argv) {
 #ifndef MULTI_GPU // free parameter for single GPU
   gauge_param.ga_pad = 0;
 #else // must be this one c/b face for multi gpu
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int x_face_size = Ls*gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = Ls*gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = Ls*gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = Ls*gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
   int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
@@ -178,6 +195,11 @@ void init(int argc, char **argv) {
   }
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    csParam.nDim = 5;
+    csParam.x[4] = Ls;
+  }
+
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
   if (test_type < 2 || test_type ==3) {
@@ -188,7 +210,7 @@ void init(int argc, char **argv) {
   }    
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = inv_param.gamma_basis; 
+  csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
 
   //csParam.verbose = QUDA_DEBUG_VERBOSE;
@@ -399,7 +421,7 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
-  } else { // twisted mass
+  } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     switch (test_type) {
     case 0:
       tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
@@ -429,6 +451,27 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+    switch (test_type) {
+    case 0:
+      dw_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 1:    
+      dw_matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 2:
+      dw_mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 3:
+      dw_matdagmat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+    break; 
+    default:
+      printf("Test type not supported for domain wall\n");
+      exit(-1);
+    }
+  } else {
+    printfQuda("Unsupported dslash_type\n");
+    exit(-1);
   }
 
   printfQuda("done.\n");
@@ -514,7 +557,7 @@ int main(int argc, char **argv)
     }
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printfQuda("GB/s = %f\n\n", 
-	       Vh*(spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
+	       Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
     
     if (!transfer) {
       double norm2_cpu = norm2(*spinorRef);

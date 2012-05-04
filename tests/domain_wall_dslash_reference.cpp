@@ -751,9 +751,10 @@ void dw_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, Qud
   else xpay((float*)in, -(float)kappa, (float*)out, V5*spinorSiteSize);
 }
 
-void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm) {
+void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
+{
 
-  void *tmp = malloc(V5*spinorSiteSize*sizeof(precision));  
+  void *tmp = malloc(V5*spinorSiteSize*precision);  
   dw_mat(tmp, gauge, in, kappa, dagger_bit, precision, gauge_param, mferm);
   dagger_bit = (dagger_bit == 1) ? 0 : 1;
   dw_mat(out, gauge, tmp, kappa, dagger_bit, precision, gauge_param, mferm);
@@ -761,20 +762,18 @@ void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bi
   free(tmp);
 }
 
-void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision, double mferm) {
-
-  errorQuda("unimplemented");
-
-  void *tmp = malloc(V5*spinorSiteSize*sizeof(precision));  
+void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
+{
+  void *tmp = malloc(V5h*spinorSiteSize*precision);  
   
-  if(matpc_type == QUDA_MATPC_EVEN_EVEN)
-  {
+  if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    dw_dslash(tmp, gauge, in, 1, dagger_bit, precision, gauge_param, mferm);
+    dw_dslash(out, gauge, tmp, 0, dagger_bit, precision, gauge_param, mferm);
+  } else {
+    dw_dslash(tmp, gauge, in, 0, dagger_bit, precision, gauge_param, mferm);
+    dw_dslash(out, gauge, tmp, 1, dagger_bit, precision, gauge_param, mferm);
+  }
 
-  }
-  else
-  {
-  }
-  
   free(tmp);
 }
 

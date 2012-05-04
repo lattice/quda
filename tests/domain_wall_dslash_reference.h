@@ -15,7 +15,8 @@ extern "C" {
 
   void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &param, double mferm);
 
-  void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision, double mferm);
+  void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision,
+		QudaGaugeParam &gauge_param, double mferm);
 
 #ifdef __cplusplus
 }
