@@ -7,7 +7,7 @@
 #include <util_quda.h>
 
 #include <test_util.h>
-#include <wilson_dslash_reference.h>
+#include <dslash_util.h>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>

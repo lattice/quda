@@ -8,9 +8,27 @@
 #define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
 #define momSiteSize    10 // real numbers per momentum
 #define hwSiteSize    12 // real numbers per half wilson
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+  extern int Z[4];
+  extern int V;
+  extern int Vh;
+  extern int Vs_t;
+  extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+  extern int faceVolume[4];
+  
+  extern int Ls;
+  extern int V5;
+  extern int V5h;
+  
+  extern int mySpinorSiteSize;
+
+  void setDims(int *X);
+  void dw_setDims(int *X, const int L5);
+  void setSpinorSiteSize(int n);
 
   int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) ;

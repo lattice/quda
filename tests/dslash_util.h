@@ -1,46 +1,34 @@
-int Z[4];
-int V;
-int Vh;
-int Vs_t;
-int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
-int faceVolume[4];
+#ifndef _DSLASH_UTIL_H
+#define _DSLASH_UTIL_H
 
-void setDims(int *X) {
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    Z[d] = X[d];
-
-    faceVolume[d] = 1;
-    for (int i=0; i<4; i++) {
-      if (i==d) continue;
-      faceVolume[d] *= X[i];
-    }
-  }
-  Vh = V/2;
-
-  Vs_t = Z[0]*Z[1]*Z[2];
-  Vsh_t = Vs_t/2;
-}
+#include <test_util.h>
 
 template <typename Float>
-void sum(Float *dst, Float *a, Float *b, int cnt) {
+static inline void sum(Float *dst, Float *a, Float *b, int cnt) {
   for (int i = 0; i < cnt; i++)
     dst[i] = a[i] + b[i];
 }
+
 template <typename Float>
-void sub(Float *dst, Float *a, Float *b, int cnt) {
+static inline void sub(Float *dst, Float *a, Float *b, int cnt) {
   for (int i = 0; i < cnt; i++)
     dst[i] = a[i] - b[i];
 }
+
+template <typename Float>
+static inline void ax(Float *dst, Float a, Float *x, int cnt) {
+  for (int i = 0; i < cnt; i++)
+    dst[i] = a * x[i];
+}
+
 // performs the operation y[i] = x[i] + a*y[i]
 template <typename Float>
-void xpay(Float *x, Float a, Float *y, int len) {
+static inline void xpay(Float *x, Float a, Float *y, int len) {
   for (int i=0; i<len; i++) y[i] = x[i] + a*y[i];
 }
 // performs the operation y[i] = a*x[i] - y[i]
 template <typename Float>
-void axmy(Float *x, Float a, Float *y, int len) {
+static inline void axmy(Float *x, Float a, Float *y, int len) {
   for (int i=0; i<len; i++) y[i] = a*x[i] - y[i];
 }
 
@@ -52,12 +40,12 @@ static double norm2(Float *v, int len) {
 }
 
 template <typename Float>
-void negx(Float *x, int len) {
+static inline void negx(Float *x, int len) {
   for (int i=0; i<len; i++) x[i] = -x[i];
 }
 
 template <typename sFloat, typename gFloat>
-void dot(sFloat* res, gFloat* a, sFloat* b) {
+static inline void dot(sFloat* res, gFloat* a, sFloat* b) {
   res[0] = res[1] = 0;
   for (int m = 0; m < 3; m++) {
     sFloat a_re = a[2*m+0];
@@ -70,7 +58,7 @@ void dot(sFloat* res, gFloat* a, sFloat* b) {
 }
 
 template <typename Float>
-void su3Transpose(Float *res, Float *mat) {
+static inline void su3Transpose(Float *res, Float *mat) {
   for (int m = 0; m < 3; m++) {
     for (int n = 0; n < 3; n++) {
       res[m*(3*2) + n*(2) + 0] = + mat[n*(3*2) + m*(2) + 0];
@@ -81,12 +69,12 @@ void su3Transpose(Float *res, Float *mat) {
 
 
 template <typename sFloat, typename gFloat>
-void su3Mul(sFloat *res, gFloat *mat, sFloat *vec) {
+static inline void su3Mul(sFloat *res, gFloat *mat, sFloat *vec) {
   for (int n = 0; n < 3; n++) dot(&res[n*(2)], &mat[n*(3*2)], vec);
 }
 
 template <typename sFloat, typename gFloat>
-void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
+static inline void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
   gFloat matT[3*3*2];
   su3Transpose(matT, mat);
   su3Mul(res, matT, vec);
@@ -105,7 +93,7 @@ void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
 
 
 template <typename Float>
-Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance) {
+static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd, int nbr_distance) {
   Float **gaugeField;
   int j;
   int d = nbr_distance;
@@ -128,7 +116,7 @@ Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd
 }
 
 template <typename Float>
-Float *spinorNeighbor(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance) 
+static inline Float *spinorNeighbor(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance) 
 {
   int j;
   int nb = neighbor_distance;
@@ -150,7 +138,7 @@ Float *spinorNeighbor(int i, int dir, int oddBit, Float *spinorField, int neighb
 
 #ifdef MULTI_GPU
 
-int
+static inline int
 x4_mg(int i, int oddBit)
 {
   int Y = fullLatticeIndex(i, oddBit);
@@ -159,7 +147,7 @@ x4_mg(int i, int oddBit)
 }
 
 template <typename Float>
-Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
+static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd,
 			Float** ghostGaugeEven, Float** ghostGaugeOdd, int n_ghost_faces, int nbr_distance) {
   Float **gaugeField;
   int j;
@@ -238,8 +226,8 @@ Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeEven, Float **g
 }
 
 template <typename Float>
-Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField, Float** fwd_nbr_spinor, 
-			     Float** back_nbr_spinor, int neighbor_distance, int nFace)
+static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField, Float** fwd_nbr_spinor, 
+					   Float** back_nbr_spinor, int neighbor_distance, int nFace)
 {
   int j;
   int nb = neighbor_distance;
@@ -341,4 +329,6 @@ Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField, Flo
   return &spinorField[j*(mySpinorSiteSize)];
 }
 
-#endif
+#endif // MULTI_GPU
+
+#endif // _DSLASH_UTIL_H

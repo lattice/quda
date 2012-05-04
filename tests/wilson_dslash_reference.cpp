@@ -12,8 +12,6 @@
 #include <color_spinor_field.h>
 #include <face_quda.h>
 
-static int mySpinorSiteSize = 24;
-
 #include <dslash_util.h>
 
 static const double projector[8][4][4][2] = {

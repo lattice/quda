@@ -12,6 +12,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <dslash_util.h>
 #include <wilson_dslash_reference.h>
 #include "misc.h"
 
@@ -71,6 +72,7 @@ void init(int argc, char **argv) {
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
   setDims(gauge_param.X);
+  setSpinorSiteSize(24);
 
   gauge_param.anisotropy = 1.0;
 

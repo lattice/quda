@@ -15,8 +15,6 @@
 
 extern void *memset(void *s, int c, size_t n);
 
-static int mySpinorSiteSize = 6;
-
 #include <dslash_util.h>
 
 //

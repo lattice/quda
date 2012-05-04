@@ -8,12 +8,6 @@
 extern "C" {
 #endif
 
-  extern int Z[4];
-  extern int Vh;
-  extern int V;
-
-  void setDims(int *);
-
   void wil_dslash(void *res, void **gauge, void *spinorField, int oddBit,
 		  int daggerBit, QudaPrecision precision, QudaGaugeParam &param);
   

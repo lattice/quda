@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include <test_util.h>
+#include <dslash_util.h>
 #include <blas_reference.h>
 #include <staggered_dslash_reference.h>
 #include <quda.h>
@@ -54,16 +55,7 @@ extern int tdim;
 extern bool kernelPackT;
 extern int gridsize_from_cmdline[];
 
-
 static void end();
-
-extern int Z[4];
-extern int V;
-extern int Vh;
-static int Vs_x, Vs_y, Vs_z, Vs_t;
-extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
-static int Vsh[4];
-
 
 template<typename Float>
 void constructSpinorField(Float *res) {
@@ -77,32 +69,6 @@ void constructSpinorField(Float *res) {
   }
 }
 
-void
-setDimConstants(int *X)
-{
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    Z[d] = X[d];
-  }
-  Vh = V/2;
-
-  Vs_x = X[1]*X[2]*X[3];
-  Vs_y = X[0]*X[2]*X[3];
-  Vs_z = X[0]*X[1]*X[3];
-  Vs_t = X[0]*X[1]*X[2];
-
-
-  Vsh_x = Vs_x/2;
-  Vsh_y = Vs_y/2;
-  Vsh_z = Vs_z/2;
-  Vsh_t = Vs_t/2;
-
-  Vsh[0] = Vsh_x;
-  Vsh[1] = Vsh_y;
-  Vsh[2] = Vsh_z;
-  Vsh[3] = Vsh_t;
-}
 
 static void
 set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
@@ -188,7 +154,7 @@ invert_test(void)
   initQuda(device);
 
   setDims(gaugeParam.X);
-  setDimConstants(gaugeParam.X);
+  setSpinorSiteSize(6);
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   for (int dir = 0; dir < 4; dir++) {

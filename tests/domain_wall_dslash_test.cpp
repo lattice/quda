@@ -11,6 +11,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <dslash_util.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
@@ -23,7 +24,7 @@ const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 ///const QudaDagType dagger = QUDA_DAG_NO;     // apply Dslash or Dslash dagger?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int Ls = 2;
+const int myLs = 2;
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -77,7 +78,8 @@ void init() {
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
   
-  setDims(gauge_param.X, Ls);
+  dw_setDims(gauge_param.X, myLs);
+  setSpinorSiteSize(24);
 
   gauge_param.anisotropy = 1.0;
 
@@ -326,8 +328,7 @@ void dslashRef() {
     dw_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
     break;
   case 1:    
-    matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, 
-	  inv_param.cpu_prec, gauge_param.cpu_prec, inv_param.mass);
+    dw_matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, gauge_param.cpu_prec, inv_param.mass);
     break;
   case 2:
     dw_mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);

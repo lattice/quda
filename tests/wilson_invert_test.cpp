@@ -6,6 +6,7 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
 #include "misc.h"
@@ -202,6 +203,7 @@ int main(int argc, char **argv)
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
   setDims(gauge_param.X);
+  setSpinorSiteSize(24);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

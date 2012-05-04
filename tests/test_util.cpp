@@ -11,13 +11,78 @@
 #include <face_quda.h>
 #include "misc.h"
 
+using namespace std;
+
 #define XUP 0
 #define YUP 1
 #define ZUP 2
 #define TUP 3
 
+int Z[4];
+int V;
+int Vh;
+int Vs_t;
+int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
+int faceVolume[4];
+
+int Ls;
+int V5;
+int V5h;
+
+int mySpinorSiteSize;
+
 extern float fat_link_max;
-using namespace std;
+
+
+void setDims(int *X) {
+  V = 1;
+  for (int d=0; d< 4; d++) {
+    V *= X[d];
+    Z[d] = X[d];
+
+    faceVolume[d] = 1;
+    for (int i=0; i<4; i++) {
+      if (i==d) continue;
+      faceVolume[d] *= X[i];
+    }
+  }
+  Vh = V/2;
+
+  Vs_t = Z[0]*Z[1]*Z[2];
+  Vsh_t = Vs_t/2;
+}
+
+
+void dw_setDims(int *X, const int L5) 
+{
+  V = 1;
+  for (int d=0; d< 4; d++) 
+  {
+    V *= X[d];
+    Z[d] = X[d];
+
+    faceVolume[d] = 1;
+    for (int i=0; i<4; i++) {
+      if (i==d) continue;
+      faceVolume[d] *= X[i];
+    }
+  }
+  Vh = V/2;
+  
+  Ls = L5;
+  V5 = V*Ls;
+  V5h = Vh*Ls;
+
+  Vs_t = Z[0]*Z[1]*Z[2]*Ls;//?
+  Vsh_t = Vs_t/2;  //?
+}
+
+
+void setSpinorSiteSize(int n)
+{
+  mySpinorSiteSize = n;
+}
+
 
 template <typename Float>
 static void printVector(Float *v) {

@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include <test_util.h>
-#include <wilson_dslash_reference.h>
+#include <dslash_util.h>
 
 #include <gauge_qio.h>
 

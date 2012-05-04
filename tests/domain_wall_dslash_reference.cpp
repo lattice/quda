@@ -5,67 +5,13 @@
 
 #include <quda.h>
 #include <test_util.h>
+#include <dslash_util.h>
 #include <domain_wall_dslash_reference.h>
 #include <blas_reference.h>
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <face_quda.h>
-
-int Z[4];
-int V;
-int Vh;
-
-int Ls;
-int V5;
-int V5h;
-
-int Vs_t;
-int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
-int faceVolume[4];
-
-
-void setDims(int *X, const int L5) 
-{
-  V = 1;
-  for (int d=0; d< 4; d++) 
-  {
-    V *= X[d];
-    Z[d] = X[d];
-
-    faceVolume[d] = 1;
-    for (int i=0; i<4; i++) {
-      if (i==d) continue;
-      faceVolume[d] *= X[i];
-    }
-  }
-  Vh = V/2;
-  
-  Ls = L5;
-  V5 = V*Ls;
-  V5h = Vh*Ls;
-
-  Vs_t = Z[0]*Z[1]*Z[2]*Ls;//?
-  Vsh_t = Vs_t/2;  //?
-}
-
-template <typename Float>
-void sum(Float *dst, Float *a, Float *b, int cnt) {
-  for (int i = 0; i < cnt; i++)
-    dst[i] = a[i] + b[i];
-}
-
-template <typename Float>
-void product(Float *dst, Float a, Float *b, int cnt) {
-  for (int i = 0; i < cnt; i++)
-    dst[i] = a * b[i];
-}
-
-// performs the operation y[i] = x[i] + a*y[i]
-template <typename Float>
-void xpay(Float *x, Float a, Float *y, int len) {
-    for (int i=0; i<len; i++) y[i] = x[i] + a*y[i];
-}
 
 
 // i represents a "half index" into an even or odd "half lattice".
@@ -425,41 +371,6 @@ Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField) {
 }
 
 
-template <typename sFloat, typename gFloat>
-void dot(sFloat* res, gFloat* a, sFloat* b) {
-  res[0] = res[1] = 0;
-  for (int m = 0; m < 3; m++) {
-    sFloat a_re = a[2*m+0];
-    sFloat a_im = a[2*m+1];
-    sFloat b_re = b[2*m+0];
-    sFloat b_im = b[2*m+1];
-    res[0] += a_re * b_re - a_im * b_im;
-    res[1] += a_re * b_im + a_im * b_re;
-  }
-}
-
-template <typename Float>
-void su3Transpose(Float *res, Float *mat) {
-  for (int m = 0; m < 3; m++) {
-    for (int n = 0; n < 3; n++) {
-      res[m*(3*2) + n*(2) + 0] = + mat[n*(3*2) + m*(2) + 0];
-      res[m*(3*2) + n*(2) + 1] = - mat[n*(3*2) + m*(2) + 1];
-    }
-  }
-}
-
-template <typename sFloat, typename gFloat>
-void su3Mul(sFloat *res, gFloat *mat, sFloat *vec) {
-  for (int n = 0; n < 3; n++) dot(&res[n*(2)], &mat[n*(3*2)], vec);
-}
-
-template <typename sFloat, typename gFloat>
-void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
-  gFloat matT[3*3*2];
-  su3Transpose(matT, mat);
-  su3Mul(res, matT, vec);
-}
-
 //J  Directions 0..7 were used in the 4d code.
 //J  Directions 8,9 will be for P_- and P_+, chiral
 //J  projectors.
@@ -690,7 +601,7 @@ void dslashReference_5th(sFloat *res, sFloat *spinorField,
       int X = fullLatticeIndex_5d(i, oddBit);
       int xs = X/(Z[3]*Z[2]*Z[1]*Z[0]);
       if ( (xs == 0 && dir == 9) || (xs == Ls-1 && dir == 8) ) {
-        product(projectedSpinor,(sFloat)(-mferm),projectedSpinor,4*3*2);
+        ax(projectedSpinor,(sFloat)(-mferm),projectedSpinor,4*3*2);
       } 
       sum(&res[i*(4*3*2)], &res[i*(4*3*2)], projectedSpinor, 4*3*2);
     }
@@ -739,11 +650,8 @@ void dslash(void *res, void **gaugeFull, void *spinorField,
 
 //BEGIN NEW
 // this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
-void dw_dslash
-(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm) 
+void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm) 
 {
-  int mySpinorSiteSize = 24;
-
 #ifndef MULTI_GPU
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_4d_sgpu((double*)out, (double**)gauge, (double*)in, oddBit, daggerBit);
@@ -853,7 +761,9 @@ void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bi
   free(tmp);
 }
 
-void dw_matpc(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaMatPCType matpc_type, QudaPrecision precision, double mferm) {
+void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision, double mferm) {
+
+  errorQuda("unimplemented");
 
   void *tmp = malloc(V5*spinorSiteSize*sizeof(precision));  
   

@@ -13,6 +13,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <gauge_field.h>
 
@@ -65,41 +66,7 @@ extern int device;
 
 int X[4];
 
-
 Dirac* dirac;
-extern int Z[4];
-extern int V;
-extern int Vh;
-static int Vs_x, Vs_y, Vs_z, Vs_t;
-extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
-static int Vsh[4];
-
-void
-setDimConstants(int *X)
-{
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    Z[d] = X[d];
-  }
-  Vh = V/2;
-
-  Vs_x = X[1]*X[2]*X[3];
-  Vs_y = X[0]*X[2]*X[3];
-  Vs_z = X[0]*X[1]*X[3];
-  Vs_t = X[0]*X[1]*X[2];
-
-
-  Vsh_x = Vs_x/2;
-  Vsh_y = Vs_y/2;
-  Vsh_z = Vs_z/2;
-  Vsh_t = Vs_t/2;
-
-  Vsh[0] = Vsh_x;
-  Vsh[1] = Vsh_y;
-  Vsh[2] = Vsh_z;
-  Vsh[3] = Vsh_t;
-}
 
 void init()
 {    
@@ -115,8 +82,7 @@ void init()
   gaugeParam.X[3] = X[3] = tdim;
 
   setDims(gaugeParam.X);
-
-  setDimConstants(gaugeParam.X);
+  setSpinorSiteSize(6);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.cuda_prec = prec;

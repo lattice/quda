@@ -8,8 +8,7 @@
 #include <test_util.h>
 #include <face_quda.h>
 
-// include the next two lines because of nasty globals used in the tests
-#define mySpinorSiteSize 24
+// include because of nasty globals used in the tests
 #include <dslash_util.h>
 
 // Wilson, clover-improved Wilson, and twisted mass are supported.
@@ -613,8 +612,7 @@ double test(int kernel) {
 
 int main(int argc, char** argv)
 {
-  int i;
-  for (i =1;i < argc; i++){
+  for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     } 
@@ -622,6 +620,7 @@ int main(int argc, char** argv)
     usage(argv);
   }
 
+  setSpinorSiteSize(24);
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
   display_test_info();
   initQuda(device);
