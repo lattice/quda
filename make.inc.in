@@ -120,12 +120,12 @@ endif
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
   COPT += -DGPU_WILSON_DIRAC
-  WILSON_DIRAC_TEST=wilson_dslash_test wilson_invert_test
+  DIRAC_TEST = dslash_test invert_test
 endif
 ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
   NVCCOPT += -DGPU_DOMAIN_WALL_DIRAC
   COPT += -DGPU_DOMAIN_WALL_DIRAC
-  DOMAIN_WALL_DIRAC_TEST=domain_wall_dslash_test domain_wall_invert_test
+  DIRAC_TEST = dslash_test invert_test
 endif
 ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   NVCCOPT += -DGPU_STAGGERED_DIRAC
