@@ -13,6 +13,10 @@ Version 0.4.1
   finer-grained control of status reporting.  See the description in
   include/quda.h for usage information.
 
+- Merged wilson_dslash_test and domain_wall_dslash_test together into
+  a unified dslash_test, and likewise for invert_test.  The staggered
+  tests are still separate for now.
+
 
 Version 0.4.0 - 4 April 2012
 
