@@ -580,7 +580,7 @@ static inline __device__ void coordsFromDWFaceIndex(int &cb_idx, Int &X, Int &Y,
 
 #ifdef MULTI_GPU
 
-#ifdef GPU_WILSON_DIRAC
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 
 // double precision
 #if (defined DIRECT_ACCESS_WILSON_PACK_SPINOR) || (defined FERMI_NO_DBLE_TEX)
@@ -706,7 +706,7 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
   packFaceWilsonCore<dim, dagger>(out, outNorm, in, inNorm, idx, face_idx, face_volume, face_num);
 }
 
-#endif // GPU_WILSON_DIRAC
+#endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
 
 
 template <typename FloatN>
