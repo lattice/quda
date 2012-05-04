@@ -178,7 +178,7 @@ void initQuda(int dev)
 #endif
   
   cudaGetDeviceProperties(&deviceProp, dev);
-  checkCudaError();
+  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
@@ -187,7 +187,7 @@ void initQuda(int dev)
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
   cudaSetDevice(dev);
-  checkCudaError();
+  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 
 #ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
@@ -196,7 +196,7 @@ void initQuda(int dev)
 #endif
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
-  checkCudaError();
+  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 
   initCache();
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);

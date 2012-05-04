@@ -72,22 +72,23 @@ void setOutputFile(FILE *outfile);
 #endif // MULTI_GPU
 
 
-#ifdef HOST_DEBUG
-
-#define checkCudaError() do {                          \
-  cudaDeviceSynchronize();                             \
+#define checkCudaErrorNoSync() do {                    \
   cudaError_t error = cudaGetLastError();              \
   if (error != cudaSuccess)                            \
     errorQuda("(CUDA) %s", cudaGetErrorString(error)); \
 } while (0)
 
+
+#ifdef HOST_DEBUG
+
+#define checkCudaError() do {  \
+  cudaDeviceSynchronize();     \
+  checkCudaErrorNoSync();      \
+} while (0)
+
 #else
 
-#define checkCudaError() do {                           \
-  cudaError_t error = cudaGetLastError();               \
-  if (error != cudaSuccess)                             \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error));  \
-} while (0)
+#define checkCudaError() checkCudaErrorNoSync()
 
 #endif // HOST_DEBUG
 
