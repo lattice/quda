@@ -2679,7 +2679,7 @@ ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
-, ac_ext=cpp
+ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
@@ -3868,10 +3868,6 @@ if test "X${multi_gpu}X" = "XyesX";
 then
   { $as_echo "$as_me:${as_lineno-$LINENO}: Enabling Multi-GPU" >&5
 $as_echo "$as_me: Enabling Multi-GPU" >&6;}
-
-  { $as_echo "$as_me:${as_lineno-$LINENO}: Domain wall doesn't support multi-GPU yet: disabling " >&5
-$as_echo "$as_me: Domain wall doesn't support multi-GPU yet: disabling " >&6;}
-  build_dwf_dirac="no";
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&5
 $as_echo "$as_me: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&6;}
