@@ -48,7 +48,7 @@ function run_dslash_test {
     precs="double single half"
     recons="18 12"
     
-    prog="wilson_dslash_test"
+    prog="dslash_test"
     if [ ! -e "$prog" ]; then
         echo "The program $prog does not exist; this program will not be tested!"
         exit
