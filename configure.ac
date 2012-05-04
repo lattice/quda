@@ -402,9 +402,6 @@ if test "X${multi_gpu}X" = "XyesX";
 then 
   AC_MSG_NOTICE([Enabling Multi-GPU])
   
-  AC_MSG_NOTICE([Domain wall doesn't support multi-GPU yet: disabling ])
-  build_dwf_dirac="no";
-
   AC_MSG_NOTICE([Asqtad fermion force doesn't support multi-GPU yet: disabling ])
   build_staggered_force="no";
 
