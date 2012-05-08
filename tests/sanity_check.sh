@@ -252,7 +252,7 @@ for action in $*; do
     * )
 	echo "ERROR: invalid option ($action)!"
 	echo "Valid options: "
-	echo "              basic/fat/dslash/gf/hisq/all"
+	echo "              basic/fat/dslash/invert/gf/hisq/all"
 	exit
 	;;
   esac

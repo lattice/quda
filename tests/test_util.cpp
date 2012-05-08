@@ -50,6 +50,12 @@ void setDims(int *X) {
 
   Vs_t = Z[0]*Z[1]*Z[2];
   Vsh_t = Vs_t/2;
+
+  Vsh_x = X[1]*X[2]*X[3]/2;
+  Vsh_y = X[0]*X[2]*X[3]/2;
+  Vsh_z = X[0]*X[1]*X[3]/2;
+  Vsh_t = X[0]*X[1]*X[2]/2;
+
 }
 
 
