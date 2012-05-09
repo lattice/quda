@@ -21,9 +21,14 @@ using namespace std;
 int Z[4];
 int V;
 int Vh;
-int Vs_t;
+int Vs_x, Vs_y, Vs_z, Vs_t;
 int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 int faceVolume[4];
+
+//extended volume, +4
+int E1, E1h, E2, E3, E4; 
+int E[4];
+int V_ex, Vh_ex;
 
 int Ls;
 int V5;
@@ -48,13 +53,25 @@ void setDims(int *X) {
   }
   Vh = V/2;
 
-  Vs_t = Z[0]*Z[1]*Z[2];
+  Vs_x = X[1]*X[2]*X[3];
+  Vs_y = X[0]*X[2]*X[3];
+  Vs_z = X[0]*X[1]*X[3];
+  Vs_t = X[0]*X[1]*X[2];
+  
+  Vsh_x = Vs_x/2;
+  Vsh_y = Vs_y/2;
+  Vsh_z = Vs_z/2;
   Vsh_t = Vs_t/2;
 
-  Vsh_x = X[1]*X[2]*X[3]/2;
-  Vsh_y = X[0]*X[2]*X[3]/2;
-  Vsh_z = X[0]*X[1]*X[3]/2;
-  Vsh_t = X[0]*X[1]*X[2]/2;
+
+  E1=X[0]+4; E2=X[1]+4; E3=X[2]+4; E4=X[3]+4;
+  E1h=E1/2;
+  E[0] = E1;
+  E[1] = E2;
+  E[2] = E3;
+  E[3] = E4;
+  V_ex = E1*E2*E3*E4;
+  Vh_ex = V_ex/2;
 
 }
 

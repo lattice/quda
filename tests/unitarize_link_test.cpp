@@ -28,15 +28,6 @@ extern void usage(char** argv);
 static int verify_results = 0;
 
 extern int device;
-int Z[4];
-int V;
-int Vh;
-int Vs[4];
-int Vsh[4];
-
-static int V_ex;
-static int Vh_ex;
-
 
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
@@ -57,27 +48,6 @@ static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
 static size_t gSize;
 
-void
-setDims(const int *X) {
-  V = 1;
-  for (int dir=0; dir<4; ++dir) {
-    V *= X[dir];
-    Z[dir] = X[dir];
-  }
-  Vh = V/2;
-
-  Vs[0] =  X[1]*X[2]*X[3];
-  Vs[1] =  X[0]*X[2]*X[3];
-  Vs[2] =  X[0]*X[1]*X[3];
-  Vs[3] =  X[0]*X[1]*X[2];
-  for(int dir=0; dir<4; ++dir) Vsh[dir] = Vs[dir]/2;
-  V_ex = 1;
-  for (int d=0; d< 4; d++) {
-    V_ex *= X[d]+4;
-  }
-  Vh_ex = V_ex/2;
-  return;
-}
 
 static int
 unitarize_link_test()

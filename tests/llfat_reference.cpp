@@ -47,14 +47,8 @@ typedef struct { dcomplex c[3]; } dsu3_vector;
 #define CMUL_J(a,b,c) { (c).real = (a).real*(b).real + (a).imag*(b).imag; \
     (c).imag = (a).imag*(b).real - (a).real*(b).imag; }
 
-extern int Z[4];
-extern int V;
-extern int Vh;
-extern int Vs[];
-extern int Vsh[];
-extern int Vs_x, Vs_y, Vs_z, Vs_t;
-extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
-
+static int Vs[4];
+static int Vsh[4];
 
 template<typename su3_matrix, typename Real>
 void 
@@ -334,6 +328,17 @@ void llfat_cpu(void** fatlink, su3_matrix** sitelink, Float* act_path_coeff)
 void
 llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_path_coeff)
 {
+  Vs[0] = Vs_x;
+  Vs[1] = Vs_y;
+  Vs[2] = Vs_z;
+  Vs[3] = Vs_t;
+  
+  Vsh[0] = Vsh_x;
+  Vsh[1] = Vsh_y;
+  Vsh[2] = Vsh_z;
+  Vsh[3] = Vsh_t;
+
+
   switch(prec){
   case QUDA_DOUBLE_PRECISION:{
     llfat_cpu((void**)fatlink, (dsu3_matrix**)sitelink, (double*) act_path_coeff);
@@ -372,7 +377,7 @@ llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu,
   int X1 = Z[0];  
   int X2 = Z[1];
   int X3 = Z[2];
-  int X4 = Z[3];
+  //int X4 = Z[3];
   int X1h =X1/2;
   
   int X2X1 = X1*X2;
@@ -713,6 +718,16 @@ void
 llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink,
 		   void** ghost_sitelink_diag, QudaPrecision prec, void* act_path_coeff)
 {
+
+  Vs[0] = Vs_x;
+  Vs[1] = Vs_y;
+  Vs[2] = Vs_z;
+  Vs[3] = Vs_t;
+  
+  Vsh[0] = Vsh_x;
+  Vsh[1] = Vsh_y;
+  Vsh[2] = Vsh_z;
+  Vsh[3] = Vsh_t;
 
   switch(prec){
   case QUDA_DOUBLE_PRECISION:{

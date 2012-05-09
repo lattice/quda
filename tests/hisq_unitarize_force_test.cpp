@@ -56,23 +56,6 @@ void setPrecision(QudaPrecision precision)
 }
 
 
-int Z[4];
-int V;
-int Vh;
-
-
-void
-setDims(int *X){
-  V = 1;
-  for(int dir=0; dir<4; ++dir){
-    V *= X[dir];
-    Z[dir] = X[dir];
-  }
-  Vh = V/2;
-  return;
-}
-
-
 void initLatticeConstants(const LatticeField &lat);
 void initGaugeConstants(const cudaGaugeField &gauge);
 

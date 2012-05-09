@@ -86,45 +86,6 @@ static void setPrecision(QudaPrecision precision)
   return;
 }
 
-int Z[4];
-int V;
-int Vh;
-int V_ex;
-int Vh_ex;
-
-static int X1, X1h, X2, X3, X4;
-static int E1, E1h, E2, E3, E4;
-int E[4];
-
-
-void
-setDims(int *X)
-{
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    Z[d] = X[d];
-  }
-  Vh = V/2;
-
-  V_ex = 1;
-  for (int d=0; d< 4; d++) {
-    V_ex *= X[d]+4;
-  }
-  Vh_ex = V_ex/2;
-
-  X1=X[0]; X2 = X[1]; X3=X[2]; X4=X[3];
-  X1h=X1/2;
-  E1=X1+4; E2=X2+4; E3=X3+4; E4=X4+4;
-  E1h=E1/2;
-
-  E[0] = E1;
-  E[1] = E2;
-  E[2] = E3;
-  E[3] = E4;
-
-}
-
 
 void
 total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io, double* flops)
@@ -294,6 +255,11 @@ hisq_force_init()
   
   // fills the gauge field with random numbers
   createSiteLinkCPU(siteLink_2d, qudaGaugeParam.cpu_prec, 1);
+
+  int X1 = Z[0];
+  int X2 = Z[1];
+  int X3 = Z[2];
+  int X4 = Z[3];
   for(int i=0; i < V_ex; i++){
     int sid = i;
     int oddBit=0;
@@ -592,7 +558,7 @@ hisq_force_test(void)
 
 
    
-  float weight = 1.0;
+  //float weight = 1.0;
   float act_path_coeff[6];
 
   act_path_coeff[0] = 0.625000;
@@ -603,7 +569,7 @@ hisq_force_test(void)
   act_path_coeff[5] = -0.123113;
 
 
-  double d_weight = 1.0;
+  //double d_weight = 1.0;
   double d_act_path_coeff[6];
   for(int i=0; i<6; ++i){
     d_act_path_coeff[i] = act_path_coeff[i];

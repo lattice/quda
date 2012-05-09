@@ -16,10 +16,13 @@ extern "C" {
   extern int Z[4];
   extern int V;
   extern int Vh;
-  extern int Vs_t;
+  extern int Vs_x, Vs_y, Vs_z, Vs_t;
   extern int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
   extern int faceVolume[4];
-  
+  extern int E1, E1h, E2, E3, E4; 
+  extern int E[4];
+  extern int V_ex, Vh_ex;
+
   extern int Ls;
   extern int V5;
   extern int V5h;

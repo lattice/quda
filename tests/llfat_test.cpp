@@ -22,20 +22,6 @@ extern void usage(char** argv);
 static int verify_results = 0;
 
 extern int device;
-int Z[4];
-int V;
-int Vh;
-int Vs[4];
-int Vsh[4];
-static int Vs_x, Vs_y, Vs_z, Vs_t;
-static int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
-
-static int V_ex;
-static int Vh_ex;
-
-static int X1, X1h, X2, X3, X4;
-static int E1, E1h, E2, E3, E4;
-
 extern int test_type;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
@@ -46,39 +32,6 @@ static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
 static size_t gSize;
-
-void
-setDims(int *X) {
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    Z[d] = X[d];
-  }
-  Vh = V/2;
-
-  Vs[0] = Vs_x = X[1]*X[2]*X[3];
-  Vs[1] = Vs_y = X[0]*X[2]*X[3];
-  Vs[2] = Vs_z = X[0]*X[1]*X[3];
-  Vs[3] = Vs_t = X[0]*X[1]*X[2];
-  Vsh[0] = Vsh_x = Vs_x/2;
-  Vsh[1] = Vsh_y = Vs_y/2;
-  Vsh[2] = Vsh_z = Vs_z/2;
-  Vsh[3] = Vsh_t = Vs_t/2;
-
-
-  V_ex = 1;
-  for (int d=0; d< 4; d++) {
-    V_ex *= X[d]+4;
-  }
-  Vh_ex = V_ex/2;
-
-  X1=X[0]; X2 = X[1]; X3=X[2]; X4=X[3];
-  X1h=X1/2;
-  E1=X1+4; E2=X2+4; E3=X3+4; E4=X4+4;
-  E1h=E1/2;
-  
-  
-}
 
 static int
 llfat_test(int test)
@@ -162,6 +115,10 @@ llfat_test(int test)
 	  }
   }
 
+  int X1=Z[0];
+  int X2=Z[1];
+  int X3=Z[2];
+  int X4=Z[3];
 
   for(int i=0; i < V_ex; i++){
     int sid = i;
@@ -273,8 +230,9 @@ llfat_test(int test)
     int optflag = 0;
     //we need x,y,z site links in the back and forward T slice
     // so it is 3*2*Vs_t
+    int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
     for(int i=0;i < 4; i++){
-    ghost_sitelink[i] = malloc(8*Vs[i]*gaugeSiteSize*gSize);
+      ghost_sitelink[i] = malloc(8*Vs[i]*gaugeSiteSize*gSize);
     if (ghost_sitelink[i] == NULL){
       printf("ERROR: malloc failed for ghost_sitelink[%d] \n",i);
       exit(1);

@@ -16,8 +16,6 @@
 #include <face_quda.h>
 #endif
 
-#define GPU_DIRECT
-
 extern int device;
 
 static QudaGaugeParam qudaGaugeParam;
@@ -33,18 +31,6 @@ extern void usage(char** argv);
 extern bool tune;
 
 int attempts = 1;
-
-int Z[4];
-int V;
-int Vh;
-
-int V_ex;
-int Vh_ex;
-
-static int X1, X1h, X2, X3, X4;
-static int E1, E1h, E2, E3, E4;
-
-int E[4];
 
 extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
@@ -362,34 +348,6 @@ int path_dir_t[][5] = {
 
 
 
-void
-setDims(int *X) {
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    Z[d] = X[d];
-  }
-  Vh = V/2;
-
-  V_ex = 1;
-  for (int d=0; d< 4; d++) {
-    V_ex *= X[d]+4;
-  }
-  Vh_ex = V_ex/2;
-  
-  X1=X[0]; X2 = X[1]; X3=X[2]; X4=X[3];
-  X1h=X1/2;
-  E1=X1+4; E2=X2+4; E3=X3+4; E4=X4+4;
-  E1h=E1/2;
-  
-  E[0] = E1;
-  E[1] = E2;
-  E[2] = E3;
-  E[3] = E4;
-}
-
-
-
 static int
 gauge_force_test(void) 
 {
@@ -478,6 +436,11 @@ gauge_force_test(void)
       errorQuda("ERROR; allocate sitelink_ex[%d] failed\n", i);
     }
   }
+
+  int X1= Z[0];
+  int X2= Z[1];
+  int X3= Z[2];
+  int X4= Z[3];
 
   for(int i=0; i < V_ex; i++){
     int sid = i;
