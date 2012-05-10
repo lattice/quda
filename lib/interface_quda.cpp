@@ -979,6 +979,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete b;
   delete x;
 
+  delete d;
+  delete dSloppy;
+  delete dPre;
+
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 }
@@ -1177,6 +1181,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   delete [] hp_x;
 
+  delete d;
+  delete dSloppy;
+  delete dPre;
+  
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 }
@@ -1518,11 +1526,11 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   /*FIXME: to avoid setfault*/
   gaugeFatPrecondition =gaugeFatSloppy;
   gaugeLongPrecondition =gaugeLongSloppy;
-
-  if (dPre && dPre != dSloppy) delete dPre;
-  if (dSloppy && dSloppy != d) delete dSloppy;
-  if (d) delete d;
-
+  
+  delete dPre;
+  delete dSloppy;
+  delete d;
+  
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *param, pc_solve);
 
@@ -1566,6 +1574,11 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   delete [] x;
 
   delete [] hp_x;
+  
+  delete dPre;
+  delete dSloppy;
+  delete d;
+
 
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());

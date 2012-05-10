@@ -41,7 +41,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
 
-  
   for(int i=0;i < QUDA_MAX_DIM; i++){
     recv_request1[i] = malloc(sizeof(MPI_Request));
     recv_request2[i] = malloc(sizeof(MPI_Request));
@@ -124,7 +123,7 @@ void FaceBuffer::setupDims(const int* X)
 
 FaceBuffer::~FaceBuffer()
 {
-  
+ 
   for(int i=0;i < QUDA_MAX_DIM; i++){
     free((void*)recv_request1[i]);
     free((void*)recv_request2[i]);
