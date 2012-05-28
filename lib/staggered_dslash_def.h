@@ -6,7 +6,7 @@
 
 #ifndef DD_LOOP
 #define DD_LOOP
-#define DD_AXPY 0
+
 #define DD_RECON 0
 #define DD_PREC 0
 #endif

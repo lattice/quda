@@ -366,7 +366,7 @@ void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
 
 #define gaugeSiteSize 18
 
-#ifdef GPU_DIRECT
+#ifndef GPU_DIRECT
 static void* fwd_nbr_staple_cpu[4];
 static void* back_nbr_staple_cpu[4];
 static void* fwd_nbr_staple_sendbuf_cpu[4];
@@ -459,7 +459,7 @@ exchange_llfat_init(QudaPrecision prec)
 
   
 
-#ifdef GPU_DIRECT
+#ifndef GPU_DIRECT
   for(int i=0;i < 4; i++){
     fwd_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
     back_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
@@ -1296,7 +1296,7 @@ exchange_llfat_cleanup(void)
 
   }
 
-#ifdef GPU_DIRECT
+#ifndef GPU_DIRECT
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_cpu[i]){
       free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] =NULL;
