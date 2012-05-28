@@ -1244,22 +1244,27 @@ do_create_precise_cuda_gauge(void)
   cudaGaugeField *tmp_fat_precondition = gaugeFatPrecondition;
   cudaGaugeField *tmp_long_precondition = gaugeLongPrecondition;
 
-  gaugeFatPrecise = gaugeFatSloppy = gaugeFatPrecondition = NULL;
-  gaugeLongPrecise = gaugeLongSloppy = gaugeLongPrecondition = NULL;
   
   //create precise links
-  gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = gauge_param->cuda_prec_precondition = prec;
-  gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
-  gauge_param->ga_pad = fatlink_pad;
-  gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(fatlink, gauge_param);
+  if(gauge_param->cuda_prec != gauge_param->cuda_prec_sloppy){
+    gaugeFatPrecise = gaugeFatSloppy = gaugeFatPrecondition = NULL;
+    gaugeLongPrecise = gaugeLongSloppy = gaugeLongPrecondition = NULL;
+    gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = gauge_param->cuda_prec_precondition = prec;
+    gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
+    gauge_param->ga_pad = fatlink_pad;
+    gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda(fatlink, gauge_param);
 
-  
-  gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
-  gauge_param->ga_pad = longlink_pad;
-  gauge_param->reconstruct = longlink_recon;
-  gauge_param->reconstruct_sloppy = longlink_recon_sloppy;
-  loadGaugeQuda(longlink, gauge_param);
+    
+    gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
+    gauge_param->ga_pad = longlink_pad;
+    gauge_param->reconstruct = longlink_recon;
+    gauge_param->reconstruct_sloppy = longlink_recon_sloppy;
+    loadGaugeQuda(longlink, gauge_param);
+  }else{
+    gaugeFatPrecise = gaugeFatSloppy;
+    gaugeLongPrecise = gaugeLongSloppy;
+  }
 
   //set prec/prec_sloppy it back
   gauge_param->cuda_prec = prec;
