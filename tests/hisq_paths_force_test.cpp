@@ -219,13 +219,13 @@ hisq_force_init()
   
   gParam = GaugeFieldParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type = QUDA_ASQTAD_GENERAL_LINKS;
+  gParam.link_type = QUDA_GENERAL_LINKS;
   cpuGauge = new cpuGaugeField(gParam);
   
 #ifdef MULTI_GPU
   gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
-  gParam_ex.link_type = QUDA_ASQTAD_GENERAL_LINKS;
+  gParam_ex.link_type = QUDA_GENERAL_LINKS;
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 #endif
 
@@ -416,7 +416,7 @@ hisq_force_init()
   createHwCPU(hw, hw_prec);
 
 
-  gParam.link_type = QUDA_ASQTAD_GENERAL_LINKS;
+  gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.order = gauge_order;
   gParam.pad = 0;
@@ -426,7 +426,7 @@ hisq_force_init()
   computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod->Gauge_p(), hw_prec, 3, gauge_order);
 
 #ifdef MULTI_GPU
-  gParam_ex.link_type = QUDA_ASQTAD_GENERAL_LINKS;
+  gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.order = gauge_order;
   cpuOprod_ex = new cpuGaugeField(gParam_ex);
