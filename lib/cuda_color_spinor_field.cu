@@ -61,13 +61,13 @@ cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
 // creates a copy of src, any differences defined in param
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
   ColorSpinorField(src), v(0), norm(0), alloc(false), init(true) {  
-// can only overide if we are not using a reference or parity special case
 
+  // can only overide if we are not using a reference or parity special case
   if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
       (param.create == QUDA_REFERENCE_FIELD_CREATE && 
        src.SiteSubset() == QUDA_FULL_SITE_SUBSET && 
        param.siteSubset == QUDA_PARITY_SITE_SUBSET && 
-       src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) ) {
+       typeid(src) == typeid(cudaColorSpinorField) ) ) {
     reset(param);
   } else {
     errorQuda("Undefined behaviour"); // else silent bug possible?
@@ -81,15 +81,13 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
   } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
     zero();
   } else if (param.create == QUDA_COPY_FIELD_CREATE) {
-    if (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
-      copy(dynamic_cast<const cudaColorSpinorField&>(src));    
-    } else if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
-      loadSpinorField(src);
+    if (src.FieldOrder() == fieldOrder && typeid(src) == typeid(cudaColorSpinorField)) {
+      copy(dynamic_cast<const cudaColorSpinorField&>(src));
     } else {
-      errorQuda("FieldLocation %d not supported", src.FieldLocation());
+      loadSpinorField(src);
     }
   } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-    if (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
+    if (typeid(src) == typeid(cudaColorSpinorField)) {
       v = (dynamic_cast<const cudaColorSpinorField&>(src)).v;
       norm = (dynamic_cast<const cudaColorSpinorField&>(src)).norm;
     } else {
@@ -105,12 +103,12 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src)
   : ColorSpinorField(src), alloc(false), init(true) {
   fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   create(QUDA_COPY_FIELD_CREATE);
-  if (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
+  if (typeid(src) == typeid(cudaColorSpinorField) && src.FieldOrder() == fieldOrder) {
     copy(dynamic_cast<const cudaColorSpinorField&>(src));
-  } else if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
+  } else {
     loadSpinorField(src);
   } else {
-    errorQuda("FieldLocation not supported");
+    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
   }
 }
 
@@ -120,7 +118,7 @@ ColorSpinorField& cudaColorSpinorField::operator=(const ColorSpinorField &src) {
   } else if (typeid(src) == typeid(cpuColorSpinorField)) {
    *this = (dynamic_cast<const cpuColorSpinorField&>(src));
   } else {
-    errorQuda("FieldLocation not supported");
+    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
   }
   return *this;
 }
@@ -403,7 +401,7 @@ void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
     // (temporary?) bug fix for padding
     cudaMemset(v, 0, bufferBytes);
 
-    if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
+    if (typeid(src) == typeid(cpuColorSpinorField)) {
       if (src.Bytes() > bufferBytes) {
 	cudaFree(buffer_d);
 	cudaFreeHost(buffer_h);

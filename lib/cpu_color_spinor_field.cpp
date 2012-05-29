@@ -65,9 +65,9 @@ cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) :
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) : 
   ColorSpinorField(src), init(false), reference(false), order_double(NULL), order_single(NULL) {
   create(QUDA_COPY_FIELD_CREATE);
-  if (src.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
+  if (typeid(src) == typeid(cpuColorSpinorField)) {
     memcpy(v, dynamic_cast<const cpuColorSpinorField&>(src).v, bytes);
-  } else if (src.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
+  } else if (typeid(src) == typeid(cudaColorSpinorField)) {
     dynamic_cast<const cudaColorSpinorField&>(src).saveSpinorField(*this);
   } else {
     errorQuda("FieldType not supported");
@@ -87,9 +87,9 @@ ColorSpinorField& cpuColorSpinorField::operator=(const ColorSpinorField &src) {
   } else if (typeid(src) == typeid(cpuColorSpinorField)) {
    *this = (dynamic_cast<const cpuColorSpinorField&>(src));
   } else {
-    errorQuda("FieldLocation not supported");
+    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
   }
- return *this;
+  return *this;
 }
 
 cpuColorSpinorField& cpuColorSpinorField::operator=(const cpuColorSpinorField &src) {

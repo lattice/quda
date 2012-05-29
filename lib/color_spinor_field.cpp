@@ -265,12 +265,12 @@ void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorFi
 double norm2(const ColorSpinorField &a) {
 
   double rtn = 0.0;
-  if (a.FieldLocation() == QUDA_CUDA_FIELD_LOCATION) {
+  if (typeid(a) == typeid(cudaColorSpinorField)) {
     rtn = normCuda(dynamic_cast<const cudaColorSpinorField&>(a));
-  } else if (a.FieldLocation() == QUDA_CPU_FIELD_LOCATION) {
+  } else if (typeid(a) == typeid(cpuColorSpinorField)) {
     rtn = normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
   } else {
-    errorQuda("Field type %d not supported", a.FieldLocation());
+    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
   }
 
   return rtn;
