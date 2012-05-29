@@ -13,11 +13,15 @@ extern "C" {
   //
 
   typedef enum QudaLinkType_s {
-    QUDA_WILSON_LINKS, // used by wilson, clover, twisted mass, and domain wall
-    QUDA_ASQTAD_FAT_LINKS,
-    QUDA_ASQTAD_LONG_LINKS,
-    QUDA_ASQTAD_MOM_LINKS,
-    QUDA_ASQTAD_GENERAL_LINKS,
+    QUDA_SU3_LINKS,
+    QUDA_GENERAL_LINKS,
+    QUDA_THREE_LINKS,
+    QUDA_MOMENTUM,
+    QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
+    QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
+    QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
+    QUDA_ASQTAD_MOM_LINKS  = QUDA_MOMENTUM,
+    QUDA_ASQTAD_GENERAL_LINKS = QUDA_GENERAL_LINKS,
     QUDA_INVALID_LINKS = QUDA_INVALID_ENUM
   } QudaLinkType;
 
