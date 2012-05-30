@@ -4,7 +4,7 @@
 #include <string.h>
 
 cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
-  GaugeField(param, QUDA_CPU_FIELD_LOCATION), pinned(param.pinned) {
+  GaugeField(param), pinned(param.pinned) {
 
   if (reconstruct != QUDA_RECONSTRUCT_NO && 
       reconstruct != QUDA_RECONSTRUCT_10)

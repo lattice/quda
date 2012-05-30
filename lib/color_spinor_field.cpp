@@ -20,8 +20,7 @@ ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(para
 								    even(0), odd(0) 
 {
   create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
-	 param.fieldLocation, param.siteSubset, param.siteOrder, param.fieldOrder, 
-	 param.gammaBasis);
+	 param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis);
 
 }
 
@@ -29,8 +28,7 @@ ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(fiel
 								    even(0), odd(0)
 {
   create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
-	 field.fieldLocation, field.siteSubset, field.siteOrder, field.fieldOrder, 
-	 field.gammaBasis);
+	 field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis);
 
 }
 
@@ -40,8 +38,8 @@ ColorSpinorField::~ColorSpinorField() {
 
 void ColorSpinorField::createGhostZone() {
 
-  if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) 
-    printfQuda("Location = %d, Precision = %d, Subset = %d\n", fieldLocation, precision, siteSubset);
+  if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) 
+    printfQuda("Location = %d, Precision = %d, Subset = %d\n", Location(), precision, siteSubset);
 
   int num_faces = 1;
   int num_norm_faces=2;
@@ -77,7 +75,7 @@ void ColorSpinorField::createGhostZone() {
       ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
     }
 
-    if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) 
+    if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) 
       printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
 		 i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
   }//end of outmost for loop
@@ -85,7 +83,7 @@ void ColorSpinorField::createGhostZone() {
   int ghostNormVolume = num_norm_faces * ghostVolume;
   ghostVolume *= num_faces;
 
-  if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) 
+  if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) 
     printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
 
 // ghost zones are calculated on c/b volumes
@@ -106,7 +104,7 @@ void ColorSpinorField::createGhostZone() {
   }
 
   // no ghost zones for cpu fields (yet?)
-  if (fieldLocation == QUDA_CPU_FIELD_LOCATION) {
+  if (Location() == QUDA_CPU_FIELD_LOCATION) {
     ghost_length = 0;
     ghost_norm_length = 0;
     total_length = length;
@@ -115,17 +113,16 @@ void ColorSpinorField::createGhostZone() {
 
   if (precision != QUDA_HALF_PRECISION) total_norm_length = 0;
 
-  if (verbose == QUDA_DEBUG_VERBOSE && fieldLocation == QUDA_CUDA_FIELD_LOCATION) {
+  if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) {
     printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
     printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
   }
 }
 
 void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
-			      QudaPrecision Prec, int Pad, QudaFieldLocation fieldLocation, 
-			      QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, 
-			      QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis) {
-  this->fieldLocation = fieldLocation;
+			      QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
+			      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
+			      QudaGammaBasis gammaBasis) {
   this->siteSubset = siteSubset;
   this->siteOrder = siteOrder;
   this->fieldOrder = fieldOrder;
@@ -172,7 +169,7 @@ void ColorSpinorField::destroy() {
 ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
   if (&src != this) {
     create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
-	   src.precision, src.pad, src.fieldLocation, src.siteSubset, 
+	   src.precision, src.pad, src.siteSubset, 
 	   src.siteOrder, src.fieldOrder, src.gammaBasis);    
   }
   return *this;
@@ -180,8 +177,6 @@ ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
 
 // Resets the attributes of this field if param disagrees (and is defined)
 void ColorSpinorField::reset(const ColorSpinorParam &param) {
-
-  if (param.fieldLocation != QUDA_INVALID_FIELD_LOCATION) fieldLocation = param.fieldLocation;
 
   if (param.nColor != 0) nColor = param.nColor;
   if (param.nSpin != 0) nSpin = param.nSpin;
@@ -234,13 +229,25 @@ void ColorSpinorField::fill(ColorSpinorParam &param) const {
   param.nDim = nDim;
   memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
   param.pad = pad;
-  param.fieldLocation = fieldLocation;
   param.siteSubset = siteSubset;
   param.siteOrder = siteOrder;
   param.fieldOrder = fieldOrder;
   param.gammaBasis = gammaBasis;
   param.create = QUDA_INVALID_FIELD_CREATE;
   param.verbose = verbose;
+}
+
+// Query the location of the field based on typeid
+QudaFieldLocation ColorSpinorField::Location() const { 
+  QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
+  if (typeid(*this)==typeid(cudaColorSpinorField)) {
+    location = QUDA_CUDA_FIELD_LOCATION; 
+  } else if (typeid(*this)==typeid(cpuColorSpinorField)) {
+    location = QUDA_CPU_FIELD_LOCATION;
+  } else {
+    errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
+  }
+  return location;
 }
 
 // For kernels with precision conversion built in
@@ -270,14 +277,14 @@ double norm2(const ColorSpinorField &a) {
   } else if (typeid(a) == typeid(cpuColorSpinorField)) {
     rtn = normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
   } else {
-    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
+    errorQuda("Unknown input ColorSpinorField %s", typeid(a).name());
   }
 
   return rtn;
 }
 
 std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
-  out << "fieldLocation = " << a.fieldLocation << std::endl;
+  out << "typdid = " << typeid(a).name() << std::endl;
   out << "nColor = " << a.nColor << std::endl;
   out << "nSpin = " << a.nSpin << std::endl;
   out << "twistFlavor = " << a.twistFlavor << std::endl;

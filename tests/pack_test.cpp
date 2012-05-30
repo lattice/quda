@@ -54,7 +54,6 @@ void init() {
   }
   cpsCpuGauge_p = malloc(4*V*gaugeSiteSize*param.cpu_prec);
 
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
@@ -74,7 +73,6 @@ void init() {
 
   initQuda(0);
 
-  csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];

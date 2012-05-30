@@ -6,8 +6,8 @@
 #include <clover_field.h>
 #include <gauge_field.h>
 
-CloverField::CloverField(const CloverFieldParam &param, const QudaFieldLocation &location) :
-  LatticeField(param, location), bytes(0), norm_bytes(0), nColor(3), nSpin(4)
+CloverField::CloverField(const CloverFieldParam &param) :
+  LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4)
 {
   if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -32,7 +32,7 @@ cudaCloverField::cudaCloverField(const void *h_clov, const void *h_clov_inv,
 				 const QudaPrecision cpu_prec, 
 				 const QudaCloverFieldOrder cpu_order,
 				 const CloverFieldParam &param)
-  : CloverField(param, QUDA_CUDA_FIELD_LOCATION), clover(0), norm(0), cloverInv(0), invNorm(0)
+  : CloverField(param), clover(0), norm(0), cloverInv(0), invNorm(0)
 {
   
 

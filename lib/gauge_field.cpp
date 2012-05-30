@@ -1,7 +1,7 @@
 #include <gauge_field.h>
 
-GaugeField::GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &location) :
-  LatticeField(param, location), bytes(0), nColor(param.nColor), nFace(param.nFace),
+GaugeField::GaugeField(const GaugeFieldParam &param) :
+  LatticeField(param), bytes(0), nColor(param.nColor), nFace(param.nFace),
    geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 
   fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
   anisotropy(param.anisotropy), tadpole(param.tadpole), create(param.create)

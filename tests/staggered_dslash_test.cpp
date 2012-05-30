@@ -117,7 +117,6 @@ void init()
   inv_param.sp_pad = tmpint;
 
   ColorSpinorParam csParam;
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=4;
@@ -210,7 +209,6 @@ void init()
 
     //csParam.verbose = QUDA_DEBUG_VERBOSE;
 	
-    csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;

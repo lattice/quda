@@ -73,7 +73,6 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
     errorQuda("Undefined behaviour"); // else silent bug possible?
   }
 
-  fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   create(param.create);
 
   if (param.create == QUDA_NULL_FIELD_CREATE) {
@@ -101,14 +100,13 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
 
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
   : ColorSpinorField(src), alloc(false), init(true) {
-  fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   create(QUDA_COPY_FIELD_CREATE);
   if (typeid(src) == typeid(cudaColorSpinorField) && src.FieldOrder() == fieldOrder) {
     copy(dynamic_cast<const cudaColorSpinorField&>(src));
-  } else {
+  } else if (typeid(src) == typeid(cpuColorSpinorField) || typeid(src) == typeid(cudaColorSpinorField)) {
     loadSpinorField(src);
   } else {
-    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
+    errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
   }
 }
 
@@ -118,7 +116,7 @@ ColorSpinorField& cudaColorSpinorField::operator=(const ColorSpinorField &src) {
   } else if (typeid(src) == typeid(cpuColorSpinorField)) {
    *this = (dynamic_cast<const cpuColorSpinorField&>(src));
   } else {
-    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
+    errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
   }
   return *this;
 }
@@ -129,7 +127,6 @@ cudaColorSpinorField& cudaColorSpinorField::operator=(const cudaColorSpinorField
     if (!ColorSpinorField::init) { // note this will turn a reference field into a regular field
       destroy();
       ColorSpinorField::operator=(src);
-      fieldLocation = QUDA_CUDA_FIELD_LOCATION;
       create(QUDA_COPY_FIELD_CREATE);
     }
     copy(src);
@@ -142,7 +139,6 @@ cudaColorSpinorField& cudaColorSpinorField::operator=(const cpuColorSpinorField 
   if (!ColorSpinorField::init) { // note this will turn a reference field into a regular field
     destroy();
     ColorSpinorField::operator=(src);
-    fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     create(QUDA_COPY_FIELD_CREATE);
   }
   loadSpinorField(src);

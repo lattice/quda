@@ -187,7 +187,6 @@ void init(int argc, char **argv) {
 
   ColorSpinorParam csParam;
   
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -258,7 +257,6 @@ void init(int argc, char **argv) {
   }
 
   if (!transfer) {
-    csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;

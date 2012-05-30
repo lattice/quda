@@ -48,18 +48,12 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
   } else {
     errorQuda("Creation type %d not supported", param.create);
   }
-
-  if (fieldLocation != QUDA_CPU_FIELD_LOCATION) 
-    errorQuda("Location incorrectly set");
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) : 
   ColorSpinorField(src), init(false), reference(false), order_double(NULL), order_single(NULL) {
   create(QUDA_COPY_FIELD_CREATE);
   memcpy(v,src.v,bytes);
-
-  if (fieldLocation != QUDA_CPU_FIELD_LOCATION) 
-    errorQuda("Location incorrectly set");
 }
 
 cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) : 
@@ -72,9 +66,6 @@ cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) :
   } else {
     errorQuda("FieldType not supported");
   }
-
-  if (fieldLocation != QUDA_CPU_FIELD_LOCATION) 
-    errorQuda("Location incorrectly set");
 }
 
 cpuColorSpinorField::~cpuColorSpinorField() {
@@ -87,7 +78,7 @@ ColorSpinorField& cpuColorSpinorField::operator=(const ColorSpinorField &src) {
   } else if (typeid(src) == typeid(cpuColorSpinorField)) {
    *this = (dynamic_cast<const cpuColorSpinorField&>(src));
   } else {
-    errorQuda("Unknown input ColorSpinorField %s", typid(a).name());
+    errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
   }
   return *this;
 }
@@ -98,7 +89,6 @@ cpuColorSpinorField& cpuColorSpinorField::operator=(const cpuColorSpinorField &s
       destroy();
       // keep current attributes unless unset
       if (!ColorSpinorField::init) ColorSpinorField::operator=(src);
-      fieldLocation = QUDA_CPU_FIELD_LOCATION;
       create(QUDA_COPY_FIELD_CREATE);
     }
     copy(src);
@@ -111,7 +101,6 @@ cpuColorSpinorField& cpuColorSpinorField::operator=(const cudaColorSpinorField &
     destroy();
     // keep current attributes unless unset
     if (!ColorSpinorField::init) ColorSpinorField::operator=(src);
-    fieldLocation = QUDA_CPU_FIELD_LOCATION;
     create(QUDA_COPY_FIELD_CREATE);
   }
   src.saveSpinorField(*this);
