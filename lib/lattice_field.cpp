@@ -1,3 +1,4 @@
+#include <typeinfo>
 #include <quda_internal.h>
 #include <lattice_field.h>
 #include <gauge_field.h>
@@ -6,11 +7,6 @@
 LatticeField::LatticeField(const LatticeFieldParam &param)
   : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision)
 {
-  if (Location() == QUDA_CPU_FIELD_LOCATION) {
-    if (precision == QUDA_HALF_PRECISION) errorQuda("CPU fields do not support half precision");
-    if (pad != 0) errorQuda("CPU fields do not support non-zero padding");
-  }
-  
   for (int i=0; i<nDim; i++) {
     x[i] = param.x[i];
     volume *= param.x[i];

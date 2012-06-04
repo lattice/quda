@@ -1,6 +1,7 @@
 #include <color_spinor_field.h>
 #include <string.h>
 #include <iostream>
+#include <typeinfo>
 #include <face_quda.h>
 
 // forward declarations
@@ -38,8 +39,8 @@ ColorSpinorField::~ColorSpinorField() {
 
 void ColorSpinorField::createGhostZone() {
 
-  if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) 
-    printfQuda("Location = %d, Precision = %d, Subset = %d\n", Location(), precision, siteSubset);
+  if (verbose == QUDA_DEBUG_VERBOSE) 
+    printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
 
   int num_faces = 1;
   int num_norm_faces=2;
@@ -75,7 +76,7 @@ void ColorSpinorField::createGhostZone() {
       ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
     }
 
-    if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) 
+    if (verbose == QUDA_DEBUG_VERBOSE) 
       printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
 		 i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
   }//end of outmost for loop
@@ -83,7 +84,7 @@ void ColorSpinorField::createGhostZone() {
   int ghostNormVolume = num_norm_faces * ghostVolume;
   ghostVolume *= num_faces;
 
-  if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) 
+  if (verbose == QUDA_DEBUG_VERBOSE) 
     printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
 
 // ghost zones are calculated on c/b volumes
@@ -103,17 +104,9 @@ void ColorSpinorField::createGhostZone() {
     total_norm_length = (precision == QUDA_HALF_PRECISION) ? stride + ghost_norm_length : 0; // norm length = stride
   }
 
-  // no ghost zones for cpu fields (yet?)
-  if (Location() == QUDA_CPU_FIELD_LOCATION) {
-    ghost_length = 0;
-    ghost_norm_length = 0;
-    total_length = length;
-    total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
-  }
-
   if (precision != QUDA_HALF_PRECISION) total_norm_length = 0;
 
-  if (verbose == QUDA_DEBUG_VERBOSE && Location() == QUDA_CUDA_FIELD_LOCATION) {
+  if (verbose == QUDA_DEBUG_VERBOSE) {
     printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
     printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
   }
@@ -235,19 +228,6 @@ void ColorSpinorField::fill(ColorSpinorParam &param) const {
   param.gammaBasis = gammaBasis;
   param.create = QUDA_INVALID_FIELD_CREATE;
   param.verbose = verbose;
-}
-
-// Query the location of the field based on typeid
-QudaFieldLocation ColorSpinorField::Location() const { 
-  QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-  if (typeid(*this)==typeid(cudaColorSpinorField)) {
-    location = QUDA_CUDA_FIELD_LOCATION; 
-  } else if (typeid(*this)==typeid(cpuColorSpinorField)) {
-    location = QUDA_CPU_FIELD_LOCATION;
-  } else {
-    errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
-  }
-  return location;
 }
 
 // For kernels with precision conversion built in

@@ -228,7 +228,7 @@ class ColorSpinorField {
   void PrintDims() const { printf("dimensions=%d %d %d %d\n",
 				  x[0], x[1], x[2], x[3]);}
   
-  QudaFieldLocation Location() const;
+  virtual QudaFieldLocation Location() const = 0;
   QudaSiteSubset SiteSubset() const { return siteSubset; }
   QudaSiteOrder SiteOrder() const { return siteOrder; }
   QudaFieldOrder FieldOrder() const { return fieldOrder; }
@@ -307,6 +307,8 @@ class cudaColorSpinorField : public ColorSpinorField {
 
   void zero();
 
+  QudaFieldLocation Location() const;
+
   friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
 };
 
@@ -376,6 +378,8 @@ class cpuColorSpinorField : public ColorSpinorField {
 
   void copy(const cpuColorSpinorField&);
   void zero();
+
+  QudaFieldLocation Location() const;
 };
 
 

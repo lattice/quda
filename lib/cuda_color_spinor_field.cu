@@ -755,6 +755,11 @@ void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim,
 
 }
 
+// Return the location of the field
+QudaFieldLocation cudaColorSpinorField::Location() const { 
+  return QUDA_CUDA_FIELD_LOCATION;
+}
+
 std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
   out << (const ColorSpinorField&)a;
   out << "v = " << a.v << std::endl;
