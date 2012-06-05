@@ -158,11 +158,10 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
 
   //FIXME: This addition is temporary to ensure we have the correct
   //field order for a given precision
-  if (precision == QUDA_DOUBLE_PRECISION) fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+  //if (precision == QUDA_DOUBLE_PRECISION) fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
   if (create != QUDA_REFERENCE_FIELD_CREATE) {
-    // Overallocate to hold tface bytes extra
     if (cudaMalloc((void**)&v, bytes) == cudaErrorMemoryAllocation) {
       errorQuda("Error allocating spinor: bytes=%lu", (unsigned long)bytes);
     }
