@@ -165,15 +165,14 @@ void packTest() {
     }*/
 #endif
 
-  printf("%d %d\n", cudaSpinor->Stride(), spinor->Stride());
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
-  printf("Spinor send time = %e seconds\n", sSendTime);
+  printf("Spinor send time = %e seconds\n", sSendTime); fflush(stdout);
 
   stopwatchStart();
   *spinor2 = *cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
-  printf("Spinor receive time = %e seconds\n", sRecTime);
+  printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
   
 #if (CUDA_VERSION >= 4010)
   //cudaHostUnregister(spinor->V());

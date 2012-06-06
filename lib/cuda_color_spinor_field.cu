@@ -310,6 +310,7 @@ void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
   if (siteSubset != src.SiteSubset()) {
     errorQuda("Subset types do not match %d %d", siteSubset, src.SiteSubset());
   }
+
   if (precision == QUDA_HALF_PRECISION) {
     ColorSpinorParam param(*this); // acquire all attributes of this
     param.precision = QUDA_SINGLE_PRECISION; // change precision
@@ -334,45 +335,55 @@ void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
   if (precision == QUDA_DOUBLE_PRECISION) {				\
     if (src.Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,1>((double*)DST, (double*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,2>((double*)DST, (double*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
 	errorQuda("double4 not supported");				\
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,1>((double*)DST, (float*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,2>((double*)DST, (float*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) { errorQuda("double4 not supported"); }	\
     }									\
   } else {								\
     if (src.Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,1>((float*)DST, (double*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,2>((float*)DST, (double*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (double*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,4>((float*)DST, (double*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,1>((float*)DST, (float*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,2>((float*)DST, (float*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (float*)SRC, volume, pad, x, total_length, src.TotalLength(), \
-			     src.SiteSubset(), src.SiteOrder(), gammaBasis, src.GammaBasis(), src.FieldOrder(), loc); \
+	packSpinor<3,myNs,4>((float*)DST, (float*)SRC, volume, pad, x, src.SiteSubset(), src.SiteOrder(),\
+			     TotalLength(), src.TotalLength(), GammaBasis(), src.GammaBasis(), \
+			     FieldOrder(), src.FieldOrder(), loc);	\
       }									\
     }									\
   }
@@ -486,50 +497,60 @@ void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 #define SAVE_SPINOR_GPU_TO_CPU(dst, src, myNs, loc)			\
   if (precision == QUDA_DOUBLE_PRECISION) {				\
     if (dest.Precision() == QUDA_DOUBLE_PRECISION) {			\
-	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	    unpackSpinor<3,myNs,1>((double*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	    unpackSpinor<3,myNs,2>((double*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      errorQuda("double4 not supported");			\
-	  }								\
-      } else {								\
-	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	    unpackSpinor<3,myNs,1>((float*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	    unpackSpinor<3,myNs,2>((float*)dst, (double*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	      errorQuda("double4 not supported");			\
-	  }								\
+      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
+	packSpinor<3,myNs,1>((double*)dst, (double*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
+	packSpinor<3,myNs,2>((double*)dst, (double*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
+	errorQuda("double4 not supported");				\
       }									\
+    } else {								\
+      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
+	packSpinor<3,myNs,1>((float*)dst, (double*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
+	packSpinor<3,myNs,2>((float*)dst, (double*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
+	errorQuda("double4 not supported");				\
+      }									\
+    }									\
   } else {								\
     if (dest.Precision() == QUDA_DOUBLE_PRECISION) {			\
-	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	    unpackSpinor<3,myNs,1>((double*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	    unpackSpinor<3,myNs,2>((double*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	    unpackSpinor<3,myNs,4>((double*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  }								\
-      } else {								\
-	  if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {				\
-	    unpackSpinor<3,myNs,1>((float*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {			\
-	    unpackSpinor<3,myNs,2>((float*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {			\
-	    unpackSpinor<3,myNs,4>((float*)dst, (float*)src, volume, pad, x, dest.TotalLength(), total_length, \
-				     dest.SiteSubset(), dest.SiteOrder(), dest.GammaBasis(), gammaBasis, dest.FieldOrder(), loc); \
-	  }								\
+      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
+	packSpinor<3,myNs,1>((double*)dst, (float*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
+	packSpinor<3,myNs,2>((double*)dst, (float*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
+	packSpinor<3,myNs,4>((double*)dst, (float*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
       }									\
+    } else {								\
+      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
+	packSpinor<3,myNs,1>((float*)dst, (float*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
+	packSpinor<3,myNs,2>((float*)dst, (float*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
+	packSpinor<3,myNs,4>((float*)dst, (float*)src, volume, pad, x, dest.SiteSubset(), dest.SiteOrder(), \
+			     dest.TotalLength(), TotalLength(),	dest.GammaBasis(), GammaBasis(), \
+			     dest.FieldOrder(), FieldOrder(), loc);	\
+      }									\
+    }									\
   }
 
   if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
