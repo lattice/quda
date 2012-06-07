@@ -1560,7 +1560,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     }
     
     param->iter = total_iters;
-    
+    param->secs = total_secs;
+    param->gflops = total_gflops;	
     delete high_x;
   }
   

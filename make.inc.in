@@ -217,10 +217,10 @@ ifeq ($(strip $(USE_QDPJIT)), yes)
   NVCCOPT += -DUSE_QDPJIT
   COPT += -DUSE_QDPJIT
   LIB += $(QDPXX_LDFLAGS) $(QDPXX_LIBS)
-  INC += $(QDPXX_CXXFLAGS)
+  INC += -I$(QDP_INSTALL_PATH)/include
 
   CFLAGS = -Wall -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall $(COPT) $(INC)
+  CXXFLAGS = -Wall $(COPT) $(INC) $(QDPXX_CXXFLAGS)
   NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
   NVCCFLAGS = $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
