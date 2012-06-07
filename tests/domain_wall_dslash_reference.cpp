@@ -774,6 +774,11 @@ void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType mat
     dw_dslash(out, gauge, tmp, 1, dagger_bit, precision, gauge_param, mferm);
   }
 
+  // lastly apply the kappa term
+  double kappa2 = -kappa*kappa;
+  if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)in, kappa2, (double*)out, V5h*spinorSiteSize);
+  else xpay((float*)in, (float)kappa2, (float*)out, V5h*spinorSiteSize);
+
   free(tmp);
 }
 
