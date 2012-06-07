@@ -144,7 +144,7 @@ void initQuda(int dev)
   for(int i=0; i<deviceCount; i++) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
-    checkCudaError();
+    checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
     }
@@ -196,7 +196,7 @@ void initQuda(int dev)
 #endif
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
-  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+  checkCudaError();
 
   initCache();
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
