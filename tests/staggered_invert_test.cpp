@@ -175,7 +175,6 @@ invert_test(void)
   }  
  
   ColorSpinorParam csParam;
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=4;

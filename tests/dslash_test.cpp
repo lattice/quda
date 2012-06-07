@@ -24,7 +24,7 @@
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int myLs = 8; // FIXME
+const int myLs = 16; // FIXME
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -187,7 +187,6 @@ void init(int argc, char **argv) {
 
   ColorSpinorParam csParam;
   
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -258,7 +257,6 @@ void init(int argc, char **argv) {
   }
 
   if (!transfer) {
-    csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
@@ -346,9 +344,6 @@ double dslashCUDA(int niter) {
       if (transfer) {
 	dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
       } else {
-	//inv_param.input_location = QUDA_CUDA_FIELD_LOCATION;
-	//inv_param.output_location = QUDA_CUDA_FIELD_LOCATION;
-	//dslashQuda(cudaSpinorOut->V(), cudaSpinor->V(), &inv_param, parity);
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;
@@ -462,7 +457,11 @@ void dslashRef() {
     case 2:
       dw_mat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       break;
-    case 3:
+    case 3:    
+      dw_matpc(spinorTmp->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, QUDA_DAG_NO, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      dw_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), kappa5, inv_param.matpc_type, QUDA_DAG_YES, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 4:
       dw_matdagmat(spinorRef->V(), hostGauge, spinor->V(), kappa5, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
     break; 
     default:

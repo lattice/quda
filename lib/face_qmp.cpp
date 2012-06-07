@@ -26,8 +26,9 @@ bool globalReduce = true;
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision, const int Ls) :
-  Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
+  Ninternal(Ninternal), precision(precision), nDim(nDim), nDimComms(nDim), nFace(nFace)
 {
+
   if (nDim > QUDA_MAX_DIM) errorQuda("nDim = %d is greater than the maximum of %d\n", nDim, QUDA_MAX_DIM);
 //BEGIN NEW
   int Y[nDim];
@@ -35,7 +36,10 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   Y[1] = X[1];
   Y[2] = X[2];
   Y[3] = X[3];
-  if(nDim == 5) Y[nDim-1] = Ls;
+  if(nDim == 5) {
+    Y[nDim-1] = Ls;
+    nDimComms = 4;
+  }
   setupDims(Y);
 //END NEW  
 
@@ -50,10 +54,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   
   unsigned int flag = cudaHostAllocDefault;
 
-  //printf("nDim = %d\n", nDim);
-
   // Buffers hold half spinors
-  for (int i=0; i<nDim; i++) {
+  for (int i=0; i<nDimComms; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
 
     // add extra space for the norms for half precision
@@ -70,7 +72,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     if( !my_back_face[i] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[i]);
   }
 
-  for (int i=0; i<nDim; i++) {
+  for (int i=0; i<nDimComms; i++) {
 #ifdef QMP_COMMS
     cudaHostAlloc(&(from_fwd_face[i]), nbytes[i], flag);
     if( !from_fwd_face[i] ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes[i]);
@@ -105,7 +107,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   }
 
 #ifdef QMP_COMMS
-  for (int i=0; i<nDim; i++) {
+  for (int i=0; i<nDimComms; i++) {
 
     mm_send_fwd[i] = QMP_declare_msgmem(ib_my_fwd_face[i], nbytes[i]);
     if( mm_send_fwd[i] == NULL ) errorQuda("Unable to allocate send fwd message mem");
@@ -142,7 +144,7 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
 void FaceBuffer::setupDims(const int* X)
 {
   Volume = 1;
-  for (int d=0; d< nDim; d++) {
+  for (int d=0; d<nDim; d++) {
     this->X[d] = X[d];
     Volume *= this->X[d];    
   }
@@ -164,7 +166,7 @@ FaceBuffer::~FaceBuffer()
 {
   
   //printf("Ndim = %d\n", nDim);
-  for (int i=0; i<nDim; i++) {
+  for (int i=0; i<nDimComms; i++) {
 #ifdef QMP_COMMS
 
 #ifndef GPU_DIRECT
@@ -189,7 +191,7 @@ FaceBuffer::~FaceBuffer()
     cudaFreeHost(my_back_face[i]);
   }
 
-  for (int i=0; i<nDim; i++) {
+  for (int i=0; i<nDimComms; i++) {
     my_fwd_face[i]=NULL;
     my_back_face[i]=NULL;
     from_fwd_face[i]=NULL;

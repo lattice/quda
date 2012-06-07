@@ -40,7 +40,8 @@ class FaceBuffer {
   int faceVolume[QUDA_MAX_DIM];
   int faceVolumeCB[QUDA_MAX_DIM];
   int X[QUDA_MAX_DIM];
-  int nDim;
+  int nDim; // the actual number of space-time communications
+  int nDimComms; // the number of dimensions in which we communicate
   int nFace;
 
   size_t nbytes[QUDA_MAX_DIM];

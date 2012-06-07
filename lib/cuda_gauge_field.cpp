@@ -4,7 +4,7 @@
 #include <misc_helpers.h>
 
 cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
-  GaugeField(param, QUDA_CUDA_FIELD_LOCATION), gauge(0), even(0), odd(0), 
+  GaugeField(param), gauge(0), even(0), odd(0), 
   backed_up(false)
 {
   if(create != QUDA_NULL_FIELD_CREATE &&  create != QUDA_ZERO_FIELD_CREATE){
