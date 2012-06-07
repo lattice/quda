@@ -18,8 +18,6 @@
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-#define GPU_DIRECT
-
 #include "fermion_force_reference.h"
 using namespace quda::fermion_force;
 
