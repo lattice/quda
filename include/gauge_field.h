@@ -99,7 +99,7 @@ class GaugeField : public LatticeField {
   QudaFieldCreate create; // used to determine the type of field created
   
  public:
-  GaugeField(const GaugeFieldParam &param, const QudaFieldLocation &location);
+  GaugeField(const GaugeFieldParam &param);
   virtual ~GaugeField();
 
   int Length() const { return length; }

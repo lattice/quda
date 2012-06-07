@@ -55,11 +55,10 @@ class LatticeField {
   int surfaceCB[QUDA_MAX_DIM];
 
   QudaPrecision precision;
-  QudaFieldLocation location;
   QudaVerbosity verbosity;
 
  public:
-  LatticeField(const LatticeFieldParam &param, const QudaFieldLocation &Location);
+  LatticeField(const LatticeFieldParam &param);
   virtual ~LatticeField() { ; }
 
   const int* X() const { return x; }
@@ -70,7 +69,7 @@ class LatticeField {
   int Pad() const { return pad; }
 
   QudaPrecision Precision() const { return precision; }
-  QudaFieldLocation Location() const { return location; }
+  QudaFieldLocation Location() const;
   QudaVerbosity Verbosity() const { return verbosity; }
   size_t GBytes() const { return total_bytes / (1<<30); } // returns total storage allocated
 

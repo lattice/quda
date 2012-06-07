@@ -83,9 +83,9 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
-  display_test_info();
-
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+
+  display_test_info();
 
   // *** QUDA parameters begin here.
 

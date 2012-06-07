@@ -19,7 +19,7 @@ class CloverField : public LatticeField {
   int nSpin;
 
  public:
-  CloverField(const CloverFieldParam &param, const QudaFieldLocation &location);
+  CloverField(const CloverFieldParam &param);
   virtual ~CloverField();
 };
 

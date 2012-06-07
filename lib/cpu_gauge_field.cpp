@@ -4,8 +4,11 @@
 #include <string.h>
 
 cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
-  GaugeField(param, QUDA_CPU_FIELD_LOCATION), pinned(param.pinned) {
+  GaugeField(param), pinned(param.pinned) {
 
+  if (precision == QUDA_HALF_PRECISION) errorQuda("CPU fields do not support half precision");
+  if (pad != 0) errorQuda("CPU fields do not support non-zero padding");
+  
   if (reconstruct != QUDA_RECONSTRUCT_NO && 
       reconstruct != QUDA_RECONSTRUCT_10)
     errorQuda("Reconstruction type %d not supported", reconstruct);

@@ -188,7 +188,6 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
   csParam.v = in;
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;

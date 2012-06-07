@@ -31,16 +31,16 @@ const QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION;
 
 void init() {
 
-  param.cpu_prec = QUDA_SINGLE_PRECISION;
+  param.cpu_prec = QUDA_DOUBLE_PRECISION;
   param.cuda_prec = QUDA_SINGLE_PRECISION;
   param.reconstruct = QUDA_RECONSTRUCT_12;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] =16;
-  param.X[1] =16;
-  param.X[2] =16;
-  param.X[3] =16;
+  param.X[0] =24;
+  param.X[1] =24;
+  param.X[2] =24;
+  param.X[3] =24;
   param.ga_pad = 0;
   setDims(param.X);
 
@@ -54,12 +54,11 @@ void init() {
   }
   cpsCpuGauge_p = malloc(4*V*gaugeSiteSize*param.cpu_prec);
 
-  csParam.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
-  csParam.precision = QUDA_SINGLE_PRECISION;
+  csParam.precision = QUDA_DOUBLE_PRECISION;
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -74,9 +73,9 @@ void init() {
 
   initQuda(0);
 
-  csParam.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
-  csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-  csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  csParam.precision = QUDA_SINGLE_PRECISION;
+  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
   csParam.precision = QUDA_SINGLE_PRECISION;
 
@@ -167,15 +166,14 @@ void packTest() {
     }*/
 #endif
 
-  printf("%d %d\n", cudaSpinor->Stride(), spinor->Stride());
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
-  printf("Spinor send time = %e seconds\n", sSendTime);
+  printf("Spinor send time = %e seconds\n", sSendTime); fflush(stdout);
 
   stopwatchStart();
   *spinor2 = *cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
-  printf("Spinor receive time = %e seconds\n", sRecTime);
+  printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
   
 #if (CUDA_VERSION >= 4010)
   //cudaHostUnregister(spinor->V());

@@ -65,7 +65,6 @@ void initFields(int prec)
   QudaPrecision low_aux_prec;
 
   ColorSpinorParam param;
-  param.fieldLocation = QUDA_CPU_FIELD_LOCATION;
   param.nColor = 3;
   // set spin according to the type of dslash
   Nspin = (dslash_type == QUDA_ASQTAD_DSLASH) ? 1 : 4;
@@ -107,7 +106,6 @@ void initFields(int prec)
   param.pad = 0; //LX*LY*LZ/2;
   
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  param.fieldLocation = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_ZERO_FIELD_CREATE;
 
   switch(prec) {
