@@ -442,14 +442,14 @@ const double projector[10][4][4][2] = {
 
 // todo pass projector
 template <typename Float>
-void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
+void multiplySpinorByDiracProjector5(Float *res, int projIdx, Float *spinorIn) {
   for (int i=0; i<4*3*2; i++) res[i] = 0.0;
 
   for (int s = 0; s < 4; s++) {
     for (int t = 0; t < 4; t++) {
       Float projRe = projector[projIdx][s][t][0];
       Float projIm = projector[projIdx][s][t][1];
-      
+
       for (int m = 0; m < 3; m++) {
 	Float spinorRe = spinorIn[t*(3*2) + m*(2) + 0];
 	Float spinorIm = spinorIn[t*(3*2) + m*(2) + 1];
@@ -512,7 +512,7 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
         sFloat *spinor = spinorNeighbor_5d(sp_idx, dir, oddBit, spinorField);
         sFloat projectedSpinor[4*3*2], gaugedSpinor[4*3*2];
         int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
-        multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
+        multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
       
         for (int s = 0; s < 4; s++) {
 	        if (dir % 2 == 0) {
@@ -570,7 +570,7 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 	
 	sFloat projectedSpinor[mySpinorSiteSize], gaugedSpinor[mySpinorSiteSize];
 	int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
-	multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
+	multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
       
 	for (int s = 0; s < 4; s++) 
 	{
@@ -596,10 +596,11 @@ void dslashReference_5th(sFloat *res, sFloat *spinorField,
       sFloat *spinor = spinorNeighbor_5d(i, dir, oddBit, spinorField);
       sFloat projectedSpinor[4*3*2];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
-      multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
+      multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
       //J  Need a conditional here for s=0 and s=Ls-1.
       int X = fullLatticeIndex_5d(i, oddBit);
       int xs = X/(Z[3]*Z[2]*Z[1]*Z[0]);
+
       if ( (xs == 0 && dir == 9) || (xs == Ls-1 && dir == 8) ) {
         ax(projectedSpinor,(sFloat)(-mferm),projectedSpinor,4*3*2);
       } 

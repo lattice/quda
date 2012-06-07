@@ -24,7 +24,7 @@
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int myLs = 8; // FIXME
+const int myLs = 16; // FIXME
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -344,9 +344,6 @@ double dslashCUDA(int niter) {
       if (transfer) {
 	dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
       } else {
-	//inv_param.input_location = QUDA_CUDA_FIELD_LOCATION;
-	//inv_param.output_location = QUDA_CUDA_FIELD_LOCATION;
-	//dslashQuda(cudaSpinorOut->V(), cudaSpinor->V(), &inv_param, parity);
 	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
       }
       break;
