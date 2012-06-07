@@ -223,6 +223,7 @@ class ColorSpinorField {
   int TotalLength() const { return total_length; }
   int Stride() const { return stride; }
   int Volume() const { return volume; }
+  int Pad() const { return pad; }
   size_t Bytes() const { return bytes; }
   size_t NormBytes() const { return norm_bytes; }
   void PrintDims() const { printf("dimensions=%d %d %d %d\n",
@@ -270,7 +271,8 @@ class cudaColorSpinorField : public ColorSpinorField {
   void copy(const cudaColorSpinorField &);
 
   void zeroPad();
-
+  
+  void resizeBuffer(size_t bytes) const;
   void loadSpinorField(const ColorSpinorField &src);
   void saveSpinorField (ColorSpinorField &src) const;
 

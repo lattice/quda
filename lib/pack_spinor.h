@@ -446,13 +446,34 @@ void packParitySpinor(FloatOut *dst, FloatIn *src, OutOrder &outOrder, const InO
 }
 
 
-template <int Nc, int Ns, int N, typename Float, typename FloatN>
-void packSpinor(FloatN *dst, Float *src, int V, int pad, const int x[], 
-		QudaSiteSubset subset, QudaSiteOrder siteOrder, 
-		int dstLength, int srcLength, 
-		QudaGammaBasis dstBasis, QudaGammaBasis srcBasis, 
-		QudaFieldOrder dstOrder, QudaFieldOrder srcOrder, 
-		QudaFieldLocation location) {
+template <int Nc, int Ns, int N, typename dstFloat, typename srcFloat>
+void packSpinor(dstFloat *Dst, srcFloat *Src, ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location) {
+
+  if (dst.Ndim() != src.Ndim()) {
+    errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());
+  }
+
+  if (dst.Volume() != src.Volume()) {
+    errorQuda("Volumes %d %d don't match", dst.Volume(), src.Volume());
+  }
+
+  if (dst.SiteOrder() != src.SiteOrder()) {
+    errorQuda("Subset orders %d %d don't match", dst.SiteOrder(), src.SiteOrder());
+  }
+
+  if (dst.SiteSubset() != src.SiteSubset()) {
+    errorQuda("Subset types do not match %d %d", dst.SiteSubset(), src.SiteSubset());
+  }
+
+  int V = dst.Volume();
+  QudaSiteSubset subset = dst.SiteSubset();
+  QudaSiteOrder siteOrder = dst.SiteOrder();
+  int dstLength = dst.TotalLength();
+  int srcLength = src.TotalLength();
+  QudaGammaBasis dstBasis = dst.GammaBasis();
+  QudaGammaBasis srcBasis = src.GammaBasis();
+  QudaFieldOrder dstOrder = dst.FieldOrder();
+  QudaFieldOrder srcOrder = src.FieldOrder(); 
 
   // We currently only support parity-ordered fields; even-odd or odd-even
   if (siteOrder == QUDA_LEXICOGRAPHIC_SITE_ORDER) {
@@ -473,52 +494,54 @@ void packSpinor(FloatN *dst, Float *src, int V, int pad, const int x[],
     int Vh = V/2;
     if ((dstOrder == QUDA_FLOAT4_FIELD_ORDER || dstOrder == QUDA_FLOAT2_FIELD_ORDER) &&
 	(srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER)) {
+      if (src.Pad() != 0) errorQuda("Non-zero pad not supported with fieldOrder %d\n", srcOrder);
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	{
-	  SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src+evenOff, Vh, Vh);
-	  FloatNOrder<FloatN, Ns, Nc, N> outOrder(dst, Vh, Vh+pad);
-	  packParitySpinor<Ns,Nc>(dst, src+evenOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  SpaceSpinorColorOrder<srcFloat, Ns, Nc> inOrder(Src+evenOff, Vh, Vh);
+	  FloatNOrder<dstFloat, Ns, Nc, N> outOrder(Dst, Vh, Vh+dst.Pad());
+	  packParitySpinor<Ns,Nc>(Dst, Src+evenOff, outOrder, inOrder, Vh, dst.Pad(), dstBasis, srcBasis, location);
 	}
 	{
-	  SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src+oddOff, Vh, Vh);
-	  FloatNOrder<FloatN, Ns, Nc, N> outOrder(dst + dstLength/2, Vh, Vh+pad);
-	    packParitySpinor<Ns,Nc>(dst + dstLength/2, src+oddOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  SpaceSpinorColorOrder<srcFloat, Ns, Nc> inOrder(Src+oddOff, Vh, Vh);
+	  FloatNOrder<dstFloat, Ns, Nc, N> outOrder(Dst + dstLength/2, Vh, Vh+dst.Pad());
+	  packParitySpinor<Ns,Nc>(Dst + dstLength/2, Src+oddOff, outOrder, inOrder, Vh, dst.Pad(), dstBasis, srcBasis, location);
 	}
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
 	{
-	  SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src+evenOff, Vh, Vh);
-	  FloatNOrder<FloatN, N, Ns, Nc> outOrder(dst, Vh, Vh+pad);
-	  packParitySpinor<Ns,Nc>(dst, src+evenOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  SpaceColorSpinorOrder<srcFloat, Ns, Nc> inOrder(Src+evenOff, Vh, Vh);
+	  FloatNOrder<dstFloat, N, Ns, Nc> outOrder(Dst, Vh, Vh+dst.Pad());
+	  packParitySpinor<Ns,Nc>(Dst, Src+evenOff, outOrder, inOrder, Vh, dst.Pad(), dstBasis, srcBasis, location);
 	}
 	{
-	  SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src+oddOff, Vh, Vh);
-	  FloatNOrder<FloatN, N, Ns, Nc> outOrder(dst + dstLength/2, Vh, Vh+pad);
-	  packParitySpinor<Ns,Nc>(dst + dstLength/2, src+oddOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  SpaceColorSpinorOrder<srcFloat, Ns, Nc> inOrder(Src+oddOff, Vh, Vh);
+	  FloatNOrder<dstFloat, N, Ns, Nc> outOrder(Dst + dstLength/2, Vh, Vh+dst.Pad());
+	  packParitySpinor<Ns,Nc>(Dst + dstLength/2, Src+oddOff, outOrder, inOrder, Vh, dst.Pad(), dstBasis, srcBasis, location);
 	}
       }
     } else if ((srcOrder == QUDA_FLOAT4_FIELD_ORDER || srcOrder == QUDA_FLOAT2_FIELD_ORDER) &&
 	       (dstOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || dstOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER)) {
+      if (dst.Pad() != 0) errorQuda("Non-zero pad not supported with fieldOrder %d\n", dstOrder);
       if (dstOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	{
-	  FloatNOrder<Float, Ns, Nc, N> inOrder(src+evenOff, Vh, Vh+pad);
-	  SpaceSpinorColorOrder<FloatN, Ns, Nc> outOrder(dst, Vh, Vh);
-	  packParitySpinor<Ns,Nc>(dst, src+evenOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  FloatNOrder<srcFloat, Ns, Nc, N> inOrder(Src+evenOff, Vh, Vh+src.Pad());
+	  SpaceSpinorColorOrder<dstFloat, Ns, Nc> outOrder(Dst, Vh, Vh);
+	  packParitySpinor<Ns,Nc>(Dst, Src+evenOff, outOrder, inOrder, Vh, src.Pad(), dstBasis, srcBasis, location);
 	}
 	{
-	  FloatNOrder<Float, Ns, Nc, N> inOrder(src+oddOff, Vh, Vh+pad);
-	  SpaceSpinorColorOrder<FloatN, Ns, Nc> outOrder(dst + dstLength/2, Vh, Vh);
-	  packParitySpinor<Ns,Nc>(dst + dstLength/2, src+oddOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  FloatNOrder<srcFloat, Ns, Nc, N> inOrder(Src+oddOff, Vh, Vh+src.Pad());
+	  SpaceSpinorColorOrder<dstFloat, Ns, Nc> outOrder(Dst + dstLength/2, Vh, Vh);
+	  packParitySpinor<Ns,Nc>(Dst + dstLength/2, Src+oddOff, outOrder, inOrder, Vh, src.Pad(), dstBasis, srcBasis, location);
 	}
       } else if (dstOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
 	{
-	  FloatNOrder<Float, Ns, Nc, N> inOrder(src+evenOff, Vh, Vh+pad);
-	  SpaceColorSpinorOrder<FloatN, Ns, Nc> outOrder(dst, Vh, Vh);
-	  packParitySpinor<Ns,Nc>(dst, src+evenOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  FloatNOrder<srcFloat, Ns, Nc, N> inOrder(Src+evenOff, Vh, Vh+src.Pad());
+	  SpaceColorSpinorOrder<dstFloat, Ns, Nc> outOrder(Dst, Vh, Vh);
+	  packParitySpinor<Ns,Nc>(Dst, Src+evenOff, outOrder, inOrder, Vh, src.Pad(), dstBasis, srcBasis, location);
 	  }
 	{	  
-	  FloatNOrder<Float, Ns, Nc, N> inOrder(src+oddOff, Vh, Vh+pad);
-	  SpaceColorSpinorOrder<FloatN, Ns, Nc> outOrder(dst + dstLength/2, Vh, Vh);
-	  packParitySpinor<Ns,Nc>(dst + dstLength/2, src+oddOff, outOrder, inOrder, Vh, pad, dstBasis, srcBasis, location);
+	  FloatNOrder<srcFloat, Ns, Nc, N> inOrder(Src+oddOff, Vh, Vh+src.Pad());
+	  SpaceColorSpinorOrder<dstFloat, Ns, Nc> outOrder(Dst + dstLength/2, Vh, Vh);
+	  packParitySpinor<Ns,Nc>(Dst + dstLength/2, Src+oddOff, outOrder, inOrder, Vh, src.Pad(), dstBasis, srcBasis, location);
 	}
       }
     } else {
@@ -529,25 +552,27 @@ void packSpinor(FloatN *dst, Float *src, int V, int pad, const int x[],
 
     if ((dstOrder == QUDA_FLOAT4_FIELD_ORDER || dstOrder == QUDA_FLOAT2_FIELD_ORDER) &&
 	(srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER)) {
+      if (src.Pad() != 0) errorQuda("Non-zero pad not supported with fieldOrder %d\n", srcOrder);
       if (srcOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	SpaceSpinorColorOrder<Float, Ns, Nc> inOrder(src, V, V);
-	FloatNOrder<FloatN, Ns, Nc, N> outOrder(dst, V, V+pad);
-	packParitySpinor<Ns,Nc>(dst, src, outOrder, inOrder, V, pad, dstBasis, srcBasis, location);
+	SpaceSpinorColorOrder<srcFloat, Ns, Nc> inOrder(Src, V, V);
+	FloatNOrder<dstFloat, Ns, Nc, N> outOrder(Dst, V, V+dst.Pad());
+	packParitySpinor<Ns,Nc>(Dst, Src, outOrder, inOrder, V, dst.Pad(), dstBasis, srcBasis, location);
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-	SpaceColorSpinorOrder<Float, Ns, Nc> inOrder(src, V, V);
-	FloatNOrder<FloatN, Ns, Nc, N> outOrder(dst, V, V+pad);
-	packParitySpinor<Ns,Nc>(dst, src, outOrder, inOrder, V, pad, dstBasis, srcBasis, location);
+	SpaceColorSpinorOrder<srcFloat, Ns, Nc> inOrder(Src, V, V);
+	FloatNOrder<dstFloat, Ns, Nc, N> outOrder(Dst, V, V+dst.Pad());
+	packParitySpinor<Ns,Nc>(Dst, Src, outOrder, inOrder, V, dst.Pad(), dstBasis, srcBasis, location);
       }
     } else if ((srcOrder == QUDA_FLOAT4_FIELD_ORDER || srcOrder == QUDA_FLOAT2_FIELD_ORDER) &&
 	  (dstOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || dstOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER)) {
+      if (dst.Pad() != 0) errorQuda("Non-zero pad not supported with fieldOrder %d\n", dstOrder);
       if (dstOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	FloatNOrder<Float, Ns, Nc, N> inOrder(src, V, V+pad);
-	SpaceSpinorColorOrder<FloatN, Ns, Nc> outOrder(dst, V, V);
-	packParitySpinor<Ns,Nc>(dst, src, outOrder, inOrder, V, pad, dstBasis, srcBasis, location);
+	FloatNOrder<srcFloat, Ns, Nc, N> inOrder(Src, V, V+src.Pad());
+	SpaceSpinorColorOrder<dstFloat, Ns, Nc> outOrder(Dst, V, V);
+	packParitySpinor<Ns,Nc>(Dst, Src, outOrder, inOrder, V, src.Pad(), dstBasis, srcBasis, location);
       } else if (dstOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-	FloatNOrder<Float, Ns, Nc, N> inOrder(src, V, V+pad);
-	SpaceColorSpinorOrder<FloatN, Ns, Nc> outOrder(dst, V, V);
-	packParitySpinor<Ns,Nc>(dst, src, outOrder, inOrder, V, pad, dstBasis, srcBasis, location);
+	FloatNOrder<srcFloat, Ns, Nc, N> inOrder(Src, V, V+src.Pad());
+	SpaceColorSpinorOrder<dstFloat, Ns, Nc> outOrder(Dst, V, V);
+	packParitySpinor<Ns,Nc>(Dst, Src, outOrder, inOrder, V, src.Pad(), dstBasis, srcBasis, location);
       }
     } else {
       errorQuda("Field order conversion from %d to %d not supported", srcOrder, dstOrder);
