@@ -178,6 +178,37 @@ class Tunable {
     return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
   }
 
+  /**
+   * Check the launch parameters of the kernel to ensure that they are
+   * valid for the current device.
+   */
+  void checkLaunchParam(TuneParam &param) {
+    
+    if (param.block.x > deviceProp.maxThreadsDim[0])
+      errorQuda("Requested X-dimension block size %d greater than hardware limit %d", 
+		param.block.x, deviceProp.maxThreadsDim[0]);
+      
+    if (param.block.y > deviceProp.maxThreadsDim[1])
+      errorQuda("Requested Y-dimension block size %d greater than hardware limit %d", 
+		param.block.y, deviceProp.maxThreadsDim[1]);
+	
+    if (param.block.z > deviceProp.maxThreadsDim[2])
+      errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", 
+		param.block.z, deviceProp.maxThreadsDim[2]);
+	  
+    if (param.grid.x > deviceProp.maxGridSize[0])
+      errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", 
+		param.block.x, deviceProp.maxGridSize[0]);
+    
+    if (param.grid.y > deviceProp.maxGridSize[1])
+      errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", 
+		param.block.y, deviceProp.maxGridSize[1]);
+    
+    if (param.grid.z > deviceProp.maxGridSize[2])
+      errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d", 
+		param.block.z, deviceProp.maxGridSize[2]);
+  }
+
 };
 
 void loadTuneCache(QudaVerbosity verbosity);

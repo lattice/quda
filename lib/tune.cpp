@@ -228,7 +228,6 @@ void saveTuneCache(QudaVerbosity verbosity)
 #endif
 }
 
-
 /**
  * Return the optimal launch parameters for a given kernel, either by retrieving them from tunecache or autotuning
  * on the spot.
@@ -249,8 +248,10 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
 
   if (enabled == QUDA_TUNE_NO) {
     tunable.defaultTuneParam(param);
+    tunable.checkLaunchParam(param);
   } else if (tunecache.count(key)) {
     param = tunecache[key];
+    tunable.checkLaunchParam(param);
   } else if (!tuning) {
 
     tuning = true;
@@ -271,6 +272,7 @@ TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity
     while (tuning) {
       cudaDeviceSynchronize();
       cudaGetLastError(); // clear error counter
+      tunable.checkLaunchParam(param);
       cudaEventRecord(start, 0);
       for (int i=0; i<tunable.tuningIter(); i++) {
 	tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
