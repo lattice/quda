@@ -1203,7 +1203,7 @@ exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cuda
 
   int i = dir;
   int len = Vs[i]*gaugeSiteSize*prec;
-  int normlen = Vs[i]*sizeof(float);
+  //int normlen = Vs[i]*sizeof(float);
   
   if(recv_whichway == QUDA_BACKWARDS){   
 #ifdef GPU_DIRECT
@@ -1249,9 +1249,11 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
   
 
   int i = dir;
+#ifndef GPU_DIRECT
   int len = Vs[i]*gaugeSiteSize*prec;
   int normlen = Vs[i]*sizeof(float);
-  
+#endif  
+
   if(recv_whichway == QUDA_BACKWARDS){   
     comm_wait(&llfat_recv_request1[i]);
     comm_wait(&llfat_send_request1[i]);
