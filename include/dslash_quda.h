@@ -12,7 +12,6 @@ void setFace(const FaceBuffer &face);
 extern "C" {
 #endif
 
-  void initCache();
   void setDslashTuning(QudaTune tune, QudaVerbosity verbose);
 
 #ifdef DSLASH_PROFILING

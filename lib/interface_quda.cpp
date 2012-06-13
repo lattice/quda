@@ -198,7 +198,7 @@ void initQuda(int dev)
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
   checkCudaError();
 
-  initCache();
+  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
 
