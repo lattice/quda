@@ -477,8 +477,6 @@ void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim,
     int x1odd = (x2 + x3 + x4 + x5 + oddBit) & 1;
 //END NEW
     int x1 = 2*x1h + x1odd;
-    int X = 2*sid + x1odd; 
-
 
     int ghost_face_idx ;
     
