@@ -179,26 +179,6 @@ static inline __device__ float2 short22float2(short2 a) {
 #include <face_quda.h>
 
 
-__global__ void dummyKernel() {
-  // do nothing
-}
-
-void initCache() {
-
-#if (__COMPUTE_CAPABILITY__ >= 200)
-
-  static int firsttime = 1;
-  if (firsttime){	
-    cudaFuncSetCacheConfig(dummyKernel, cudaFuncCachePreferL1);
-    dummyKernel<<<1,1>>>();
-    firsttime=0;
-  }
-
-#endif
-
-}
-
-
 void setFace(const FaceBuffer &Face) {
   face = (FaceBuffer*)&Face; // nasty
 }
