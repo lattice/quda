@@ -400,11 +400,12 @@ hisq_force_init()
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuMom = new cpuGaugeField(gParam);
   refMom = new cpuGaugeField(gParam);  
-  
-  
-  createMomCPU(cpuMom->Gauge_p(), mom_prec);
+    
+  //createMomCPU(cpuMom->Gauge_p(), mom_prec);
+
   hw = malloc(4*cpuGauge->Volume()*hwSiteSize*qudaGaugeParam.cpu_prec);
   if (hw == NULL){
     fprintf(stderr, "ERROR: malloc failed for hw\n");
@@ -678,7 +679,6 @@ hisq_force_test(void)
 
   //record the mom pad
   qudaGaugeParam.mom_ga_pad = gParam.pad;
-  cudaMom->loadCPUField(*refMom, QUDA_CPU_FIELD_LOCATION);
   
 #ifdef MULTI_GPU
   hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);  
@@ -693,8 +693,6 @@ hisq_force_test(void)
   gettimeofday(&t3, NULL);
 
   checkCudaError();
-
-
 
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
 
