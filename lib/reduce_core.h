@@ -279,7 +279,7 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
   } else if (tp.block.x == 512) {
     reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-  } /*else if (tp.block.x == 544) {
+  } else if (tp.block.x == 544) {
     reduceKernel<544,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
   } else if (tp.block.x == 576) {
@@ -327,7 +327,7 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
   } else if (tp.block.x == 1024) {
     reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
       <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
-      } */ else {
+  } else {
     errorQuda("Reduction not implemented for %d threads", tp.block.x);
   }
 
