@@ -363,6 +363,9 @@ void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
   }
 
   if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuColorSpinorField)) {
+    // (temporary?) bug fix for padding
+    memset(buffer_h, 0, bufferBytes);
+
     switch(nSpin){
     case 1:
       REORDER_SPINOR_FIELD(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
@@ -378,6 +381,9 @@ void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
     cudaMemcpy(v, buffer_h, bytes, cudaMemcpyHostToDevice);
 
   } else {
+    // (temporary?) bug fix for padding
+    cudaMemset(v, 0, bufferBytes);
+
     if (typeid(src) == typeid(cpuColorSpinorField)) {
       resizeBuffer(src.Bytes());
       cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).V(), src.Bytes(), cudaMemcpyHostToDevice);
