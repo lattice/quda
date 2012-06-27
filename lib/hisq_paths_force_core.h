@@ -783,12 +783,14 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 *
 ************************************************************************************************/
 
-template<class RealA, class RealB, short sig_positive, short mu_positive, short _oddBit, int oddness_change>
+#define SHORT int 
+
+template<class RealA, class RealB, SHORT sig_positive, SHORT mu_positive, SHORT _oddBit, int oddness_change>
   __global__ void
   HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd, 
 				     const RealA* const QprevEven, const RealA* const QprevOdd,
 				     const RealB* const linkEven, const RealB* const linkOdd,
-				     short sig, short mu, 
+				     SHORT sig, SHORT mu, 
 				     typename RealTypeId<RealA>::Type coeff, 
 				     typename RealTypeId<RealA>::Type accumu_coeff,
 				     RealA* const shortPEven, RealA* const shortPOdd,
@@ -796,18 +798,18 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
 				     hisq_kernel_param_t kparam)
 {
 #ifdef KERNEL_ENABLED		
-  short oddBit = _oddBit;
+  SHORT oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
-  short x[4];
+  SHORT x[4];
   int z1 = sid/D1h;
-  short x1h = sid - z1*D1h;
+  SHORT x1h = sid - z1*D1h;
   int z2 = z1/D2;
   x[1] = z1 - z2*D2;
   x[3] = z2/D3;
   x[2] = z2 - x[3]*D3;
-  short x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  SHORT x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
 
 #if(RECON == 12)
@@ -816,7 +818,7 @@ template<class RealA, class RealB, short sig_positive, short mu_positive, short 
   int bc_link_sign;
 #endif
   
-  short new_x[4];
+  SHORT new_x[4];
 
   RealA ab_link[ArrayLength<RealA>::result];
   RealA bc_link[ArrayLength<RealA>::result];
