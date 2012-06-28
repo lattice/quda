@@ -159,7 +159,8 @@ class Tunable {
 
   virtual void initTuneParam(TuneParam &param) const
   {
-    const int min_block_size = 32;
+   /*FIXME: temporary fix for running 48^3 x 12 lattic esize*/
+    const int min_block_size = 64;
     param.block = dim3(min_block_size,1,1);
     param.grid = dim3(1,1,1);
     param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock(param) ?
@@ -196,10 +197,11 @@ class Tunable {
       errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", 
 		param.block.z, deviceProp.maxThreadsDim[2]);
 	  
-    if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+    if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0]){
       errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", 
 		param.grid.x, deviceProp.maxGridSize[0]);
-    
+
+    }
     if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
       errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", 
 		param.grid.y, deviceProp.maxGridSize[1]);

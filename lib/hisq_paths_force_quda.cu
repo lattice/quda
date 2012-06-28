@@ -26,12 +26,12 @@ namespace quda {
       int ghostDim[4];
     }hisq_kernel_param_t;
 
-    
     texture<int4, 1> newOprod0TexDouble;
     texture<int4, 1> newOprod1TexDouble;
     texture<float2, 1, cudaReadModeElementType>  newOprod0TexSingle;
     texture<float2, 1, cudaReadModeElementType> newOprod1TexSingle;
-    
+
+
     void hisqForceInitCuda(QudaGaugeParam* param)
     {
       static int hisq_force_init_cuda_flag = 0; 
@@ -509,7 +509,7 @@ namespace quda {
 
 #define NEWOPROD_EVEN_TEX newOprod0TexDouble
 #define NEWOPROD_ODD_TEX newOprod1TexDouble
-#ifdef HISQ_NEW_OPROD_LOAD_TEX
+#if (HISQ_NEW_OPROD_LOAD_TEX == 1)
 #define LOAD_TEX_ENTRY(tex, field, idx)  READ_DOUBLE2_TEXTURE(tex, field, idx)
 #else
 #define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
@@ -556,7 +556,7 @@ namespace quda {
 #define NEWOPROD_EVEN_TEX newOprod0TexSingle
 #define NEWOPROD_ODD_TEX newOprod1TexSingle
 
-#ifdef HISQ_NEW_OPROD_LOAD_TEX
+#if (HISQ_NEW_OPROD_LOAD_TEX==1)
 #define LOAD_TEX_ENTRY(tex, field, idx)  tex1Dfetch(tex,idx)
 #else
 #define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
@@ -1745,7 +1745,8 @@ namespace quda {
       FiveSt  = act_path_coeff.five; mFiveSt  = -FiveSt;
       SevenSt = act_path_coeff.seven; 
       Lepage  = act_path_coeff.lepage; mLepage  = -Lepage;
-	
+
+
       for(int sig=0; sig<8; ++sig){
 	if(GOES_FORWARDS(sig)){
 	  OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, 0.0, newOprod, param.X);
@@ -1754,7 +1755,7 @@ namespace quda {
 	} // GOES_FORWARDS(sig)
       }
       
-      
+
       int ghostDim[4]={
 	commDimPartitioned(0),
 	commDimPartitioned(1),
@@ -1807,9 +1808,6 @@ namespace quda {
       kparam_2g = kparam_1g = kparam;
       
 #endif
-      dim3 gridDim_1g((kparam_1g.threads+blockDim.x-1)/blockDim.x, 1, 1);
-      dim3 gridDim_2g((kparam_2g.threads+blockDim.x-1)/blockDim.x, 1, 1);
-      
       for(int sig=0; sig<8; sig++){
 	for(int mu=0; mu<8; mu++){
 	  if ( (mu == sig) || (mu == OPP_DIR(sig))){
@@ -1830,7 +1828,6 @@ namespace quda {
 		|| nu == mu || nu == OPP_DIR(mu)){
 	      continue;
 	    }
-
 	    //5-link: middle link
 	    //Kernel B
 	    MiddleLink<RealA,RealB> middleLink( link, Pmu, Qmu, // read only
@@ -1853,6 +1850,7 @@ namespace quda {
 					   P5, newOprod, kparam_1g);
 
 	      allLink.apply(0);
+
 	      checkCudaError();
 	      //return;
 	    }//rho  		
@@ -1867,7 +1865,6 @@ namespace quda {
 	    checkCudaError();
 
 	  } //nu 
-
 
             //lepage
 	  if(Lepage != 0.){
