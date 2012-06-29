@@ -159,8 +159,7 @@ class Tunable {
 
   virtual void initTuneParam(TuneParam &param) const
   {
-   /*FIXME: temporary fix for running 48^3 x 12 lattic esize*/
-    const int min_block_size = 64;
+    const int min_block_size = deviceProp.warpSize;
     param.block = dim3(min_block_size,1,1);
     param.grid = dim3(1,1,1);
     param.shared_bytes = sharedBytesPerThread()*min_block_size > sharedBytesPerBlock(param) ?

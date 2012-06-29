@@ -777,18 +777,22 @@ namespace quda {
 	newOprod.restore();
       }
 
-      void initTuneParam(TuneParam &param) const
+      virtual void initTuneParam(TuneParam &param) const
       {
-	Tunable::initTuneParam(param);
+	const unsigned int max_threads = deviceProp.maxThreadsDim[0];
+	const unsigned int max_blocks = deviceProp.maxGridSize[0];
+	const int step = deviceProp.warpSize;
+	param.block = dim3((kparam.threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
+	param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
+	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
 	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
+	param.shared_bytes = sharedBytesPerThread()*param.block.x > sharedBytesPerBlock(param) ?
+	  sharedBytesPerThread()*param.block.x : sharedBytesPerBlock(param);
       }
-
       
       /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const
-      {
-	Tunable::defaultTuneParam(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
+      void defaultTuneParam(TuneParam &param) const {
+	initTuneParam(param);
       }
 
       long long flops() const { return 0; }
