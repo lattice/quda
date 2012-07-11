@@ -1,7 +1,7 @@
-// dw_dslash_def.h - Domain wall Dslash kernel definitions
+// tm_dslash_def.h - Twisted Mass Dslash kernel definitions
 
-// There are currently 36 different variants of the domain
-// wall Dslash kernel, each one characterized by a set of 5 options, 
+// There are currently 36 different variants of the Twisted Mass
+// Wilson Dslash kernel, each one characterized by a set of 5 options, 
 // where each option can take one of several values (3*2*2*3 = 36).  
 // This file is structured so that the C preprocessor loops through all 36
 // variants (in a manner resembling a counter), sets the appropriate
@@ -9,15 +9,15 @@
 //
 // As an example of the function naming conventions, consider
 //
-// domainWallDslash12DaggerXpayKernel(float4* out, ...).
+// twistedMassDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a domain wall Dslash^dagger kernel where the result is
+// This is a twisted mass Dslash^dagger kernel where the result is
 // multiplied by "a" and summed with an input vector (Xpay), and the
 // gauge matrix is reconstructed from 12 real numbers.  More
 // generally, each function name is given by the concatenation of the
 // following 4 fields, with "Kernel" at the end:
 //
-// DD_NAME_F = domainWallDslash
+// DD_NAME_F = twistedMassDslash
 // DD_RECON_F = 8, 12, 18
 // DD_DAG_F = Dagger, [blank]
 // DD_XPAY_F = Xpay, [blank]
@@ -47,7 +47,7 @@
 
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#else            // xpay
+#else
 #define DSLASH_XPAY
 #define DD_XPAY_F Xpay
 #endif
@@ -67,27 +67,27 @@
 #define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_DOUBLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_DOUBLE2
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_8_DOUBLE2
 #else 
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_DOUBLE2_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_8_DOUBLE2_TEX
 #endif // DIRECT_ACCESS_LINK
 
 #elif (DD_PREC==1)
 #define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_FLOAT4
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_8_FLOAT4
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_FLOAT4_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_8_FLOAT4_TEX
 #endif // DIRECT_ACCESS_LINK
 
 #else
 #define DD_PARAM2 const short4 *gauge0, const short4* gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_SHORT4
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_8_SHORT4
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_SHORT4_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_8_SHORT4_TEX
 #endif // DIRECT_ACCESS_LINK
 #endif // DD_PREC
 #elif (DD_RECON==1) // reconstruct from 12 reals
@@ -96,9 +96,9 @@
 #if (DD_PREC==0)
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_DOUBLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_DOUBLE2
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_12_DOUBLE2
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_DOUBLE2_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_12_DOUBLE2_TEX
 #endif // DIRECT_ACCESS_LINK
 #define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 
@@ -106,18 +106,18 @@
 #define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_FLOAT4
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_12_FLOAT4
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_FLOAT4_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_12_FLOAT4_TEX
 #endif // DIRECT_ACCESS_LINK
 
 #else
 #define DD_PARAM2 const short4 *gauge0, const short4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SHORT4
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_12_SHORT4
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SHORT4_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_12_SHORT4_TEX
 #endif // DIRECT_ACCESS_LINK
 #endif // DD_PREC
 #else               // no reconstruct, load all components
@@ -126,9 +126,9 @@
 #if (DD_PREC==0)
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_DOUBLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_DOUBLE2
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_18_DOUBLE2
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_DOUBLE2_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_18_DOUBLE2_TEX
 #endif // DIRECT_ACCESS_LINK
 #define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 
@@ -136,18 +136,18 @@
 #define DD_PARAM2 const float4 *gauge0, const float4 *gauge1 // FIXME for direct reading, really float2
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_FLOAT2
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_18_FLOAT2
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_FLOAT2_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_18_FLOAT2_TEX
 #endif // DIRECT_ACCESS_LINK
 
 #else
 #define DD_PARAM2 const short4 *gauge0, const short4 *gauge1 // FIXME for direct reading, really short2
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
 #ifdef DIRECT_ACCESS_LINK
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_SHORT2
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_18_SHORT2
 #else
-#define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_SHORT2_TEX
+#define ASSN_GAUGE_MATRIX ASSN_GAUGE_MATRIX_18_SHORT2_TEX
 #endif //DIRECT_ACCESS_LINK
 #endif
 #endif
@@ -350,7 +350,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_FUNC
 
 #undef DSLASH_XPAY
-#undef READ_GAUGE_MATRIX
+#undef ASSN_GAUGE_MATRIX
 #undef RECONSTRUCT_GAUGE_MATRIX
 #undef GAUGE0TEX
 #undef GAUGE1TEX
