@@ -72,6 +72,7 @@ void caxpbypczpwCuda(const quda::Complex &, cudaColorSpinorField &, const quda::
 		     const quda::Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
 quda::Complex caxpyDotzyCuda(const quda::Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 		       cudaColorSpinorField &z);
+double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r);
 
 // CPU variants
 
@@ -123,5 +124,6 @@ void caxpbypczpwCpu(const quda::Complex &, cpuColorSpinorField &, const quda::Co
 		    const quda::Complex &, cpuColorSpinorField &, cpuColorSpinorField &);
 quda::Complex caxpyDotzyCpu(const quda::Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
 		      cpuColorSpinorField &z);
+double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &r);
 
 #endif // _QUDA_BLAS_H

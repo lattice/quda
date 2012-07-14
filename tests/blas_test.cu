@@ -24,7 +24,7 @@ extern int niter;
 
 extern void usage(char** );
 
-const int Nkernels = 31;
+const int Nkernels = 32;
 
 cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
@@ -317,6 +317,10 @@ double benchmark(int kernel, const int niter) {
       caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
+    case 31:
+      HeavyQuarkResidualNormCuda(*xD, *yD);
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -601,6 +605,15 @@ double test(int kernel) {
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
+  case 31:
+    *xD = *xH;
+    *yD = *yH;
+    { double3 d = HeavyQuarkResidualNormCuda(*xD, *yD);
+      double3 h = HeavyQuarkResidualNormCpu(*xH, *yH);
+      error = fabs(d.x - h.x) / fabs(h.x) + 
+	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
@@ -654,7 +667,8 @@ int main(int argc, char** argv)
     "caxpyDotzy",
     "cDotProductNormA",
     "cDotProductNormB",
-    "caxpbypzYmbwcDotProductWYNormY"
+    "caxpbypzYmbwcDotProductWYNormY",
+    "HeavyQuarkResidualNorm"
   };
 
   char *prec_str[] = {"half", "single", "double"};

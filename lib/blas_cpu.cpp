@@ -303,3 +303,39 @@ quda::Complex caxpyDotzyCpu(const quda::Complex &a, cpuColorSpinorField &x, cpuC
   caxpyCpu(a, x, y);
   return cDotProductCpu(z, y);
 }
+
+template <typename Float>
+double3 HeavyQuarkResidualNorm(const Float *x, const Float *r, const int volume, const int Nint) {
+
+  double3 sum = make_double3(0.0, 0.0, 0.0);
+  for (int i = 0; i<volume; i++) {
+    double x2 = 0;
+    double r2 = 0;
+
+    for (int j=0; j<Nint; j++) { // loop over internal degrees of freedom
+      int k = i*Nint + j;
+      x2 += x[k]*x[k];
+      r2 += r[k]*r[k];
+    }
+
+    sum.x += x2;
+    sum.y += r2;
+    sum.z += sqrt(r2 / x2); 
+  }
+  return sum;
+}
+
+
+double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &r) {
+  double3 rtn;
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    rtn = HeavyQuarkResidualNorm<double>((const double*)(x.V()), (const double*)(r.V()), 
+					 x.Volume(), 2*x.Ncolor()*x.Nspin());
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    rtn = HeavyQuarkResidualNorm<float>((const float*)(x.V()), (const float*)(r.V()), 
+					x.Volume(), 2*x.Ncolor()*x.Nspin());
+  } else {
+    errorQuda("Precision type %d not implemented", x.Precision());
+  }
+  return rtn;
+}
