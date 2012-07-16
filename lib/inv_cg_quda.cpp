@@ -82,6 +82,13 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double maxrr = rNorm;
   double delta = invParam.reliable_delta;
 
+  const int volume = x.Volume();
+  const bool use_heavy_quark_res = true;
+  double heavy_quark_residual;
+  if(use_heavy_quark_res) heavy_quark_residual = HeavyQuarkResidualNormQuda(x,r).z/volume;
+  double & convergence_measure     =  (use_heavy_quark_res) ? heavy_quark_residual : r2;
+  double & convergence_threshold  =  (use_heavy_quark_res) ? stop : invParam.tol;
+
   if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
     double x2 = norm2(x);
     double p2 = norm2(p);
@@ -91,15 +98,10 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
   }
 
-  const int volume = x.Volume();
-  const bool use_heavy_quark_res = true;
-  double heavy_quark_residual = (use_heavy_quark_res) ? HeavyQuarkNormQuda(x,r).z/volume : 0;
-
   quda::blas_flops = 0;
 
   stopwatchStart();
-  //while (r2 > stop || heavy_quark_residual > invParam.tol  && k<invParam.maxiter) {
-  while (heavy_quark_residual > invParam.tol  && k<invParam.maxiter) {
+  while (convergence_measure > convergence_threshold  && k<invParam.maxiter) {
 
     matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
@@ -140,7 +142,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
     k++;
     
-    if(use_heavy_quark_res) heavy_quark_residual = HeavyQuarkNormQuda(x,r).z/volume;
+    if(use_heavy_quark_res) heavy_quark_residual = HeavyQuarkResidualNormQuda(x,r).z/volume;
 
     if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
       double x2 = norm2(x);
@@ -152,6 +154,8 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     }
 
   }
+
+  printf("Heavy-quark residual: %lf, Tolerance: %lf\n", convergence_measure, convergence_threshold);
 
   if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
   xpyCuda(y, x);
