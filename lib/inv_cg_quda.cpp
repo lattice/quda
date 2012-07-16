@@ -91,10 +91,15 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
   }
 
+  const int volume = x.Volume();
+  const bool use_heavy_quark_res = true;
+  double heavy_quark_residual = (use_heavy_quark_res) ? HeavyQuarkNormQuda(x,r).z/volume : 0;
+
   quda::blas_flops = 0;
 
   stopwatchStart();
-  while (r2 > stop && k<invParam.maxiter) {
+  //while (r2 > stop || heavy_quark_residual > invParam.tol  && k<invParam.maxiter) {
+  while (heavy_quark_residual > invParam.tol  && k<invParam.maxiter) {
 
     matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
@@ -134,6 +139,9 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     }
 
     k++;
+    
+    if(use_heavy_quark_res) heavy_quark_residual = HeavyQuarkNormQuda(x,r).z/volume;
+
     if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
       double x2 = norm2(x);
       double p2 = norm2(p);
@@ -142,6 +150,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     } else if (invParam.verbosity >= QUDA_VERBOSE) {
       printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
     }
+
   }
 
   if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
