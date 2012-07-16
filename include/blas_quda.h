@@ -126,4 +126,6 @@ quda::Complex caxpyDotzyCpu(const quda::Complex &a, cpuColorSpinorField &x, cpuC
 		      cpuColorSpinorField &z);
 double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &r);
 
+double3 HeavyQuarkResidualNormCuda(cpuColorSpinorField &x, cpuColorSpinorField &r);
+
 #endif // _QUDA_BLAS_H
