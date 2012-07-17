@@ -161,7 +161,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
       double x2 = norm2(x);
       double p2 = norm2(p);
       if(use_heavy_quark_res){
-        printfQuda("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
+        printfQuda("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e, heavy-quark residual = %e\n", 
 	       k, r2, x2, p2, alpha, beta, heavy_quark_residual);
       }else{
         printfQuda("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
@@ -169,7 +169,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
       } 
     } else if (invParam.verbosity >= QUDA_VERBOSE) {
       if(use_heavy_quark_res){
-        printfQuda("CG: %d iterations, r2 = %e, heavy_quark_residual = %e\n", k, r2, heavy_quark_residual);
+        printfQuda("CG: %d iterations, r2 = %e, heavy-quark residual = %e\n", k, r2, heavy_quark_residual);
       }else{
         printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
       }
