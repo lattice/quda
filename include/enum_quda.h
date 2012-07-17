@@ -105,6 +105,11 @@ extern "C" {
     QUDA_INVALID_SCHWARZ
   } QudaSchwarzType;
 
+  typedef enum QudaResidualType_s {
+    QUDA_STANDARD_RESIDUAL;
+    QUDA_HEAVY_QUARK_RESIDUAL;
+  } QudaResidualType;
+
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //
   // For the clover-improved Wilson Dirac operator, QUDA_MATPC_EVEN_EVEN

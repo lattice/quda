@@ -67,6 +67,12 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   cudaColorSpinorField &xSloppy = *x_sloppy;
   cudaColorSpinorField &rSloppy = *r_sloppy;
 
+  const bool use_heavy_quark_res = (invParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+  // additional field used for heavy quark propagator; 
+  param.create = QUDA_ZERO_FIELD_CREATE;
+  cudaColorSpinorField* zSloppy;
+  if(use_heavy_quark_res) zSloppy = new cudaColorSpinorField(b, param); 
+
   cudaColorSpinorField p(rSloppy);
 
   double r2_old;
@@ -83,16 +89,15 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   double delta = invParam.reliable_delta;
 
   const int volume = x.Volume();
-  const bool use_heavy_quark_res = true;
   double heavy_quark_residual;
-  if(use_heavy_quark_res) heavy_quark_residual = HeavyQuarkResidualNormQuda(x,r).z/volume;
-  double & convergence_measure     =  (use_heavy_quark_res) ? heavy_quark_residual : r2;
-  double & convergence_threshold  =  (use_heavy_quark_res) ? stop : invParam.tol;
+  if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z/volume);
+  double & distance_to_solution   =  (use_heavy_quark_res) ? heavy_quark_residual : r2;
+  double & convergence_threshold  =  (use_heavy_quark_res) ? invParam.tol : stop;
 
   if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
     double x2 = norm2(x);
     double p2 = norm2(p);
-    printf("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
+    printfQuda("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
 	   k, r2, x2, p2, alpha, beta);
   } else if (invParam.verbosity >= QUDA_VERBOSE) {
     printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
@@ -101,7 +106,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   quda::blas_flops = 0;
 
   stopwatchStart();
-  while (convergence_measure > convergence_threshold  && k<invParam.maxiter) {
+  while (distance_to_solution > convergence_threshold  && k<invParam.maxiter) {
 
     matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
@@ -120,6 +125,13 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     if ( !(updateR || updateX)) {
       beta = r2 / r2_old;
       axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
+
+      if(use_heavy_quark_res){ 
+        copyCuda(*zSloppy,y);
+	xpyCuda(xSloppy,*zSloppy);
+        heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(*zSloppy,rSloppy).z/volume);
+      }
+
     } else {
       axpyCuda(alpha, p, xSloppy);
       if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -138,27 +150,38 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
       beta = r2 / r2_old; 
       xpayCuda(rSloppy, beta, p);
+
+      if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(y,r).z/volume);
     }
 
     k++;
     
-    if(use_heavy_quark_res) heavy_quark_residual = HeavyQuarkResidualNormQuda(x,r).z/volume;
 
     if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
       double x2 = norm2(x);
       double p2 = norm2(p);
-      printf("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
-	     k, r2, x2, p2, alpha, beta);
+      if(use_heavy_quark_res){
+        printfQuda("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
+	       k, r2, x2, p2, alpha, beta, heavy_quark_residual);
+      }else{
+        printfQuda("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
+	       k, r2, x2, p2, alpha, beta);
+      } 
     } else if (invParam.verbosity >= QUDA_VERBOSE) {
-      printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+      if(use_heavy_quark_res){
+        printfQuda("CG: %d iterations, r2 = %e, heavy_quark_residual = %e\n", k, r2, heavy_quark_residual);
+      }else{
+        printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+      }
     }
 
   }
 
-  printf("Heavy-quark residual: %lf, Tolerance: %lf\n", convergence_measure, convergence_threshold);
 
   if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
   xpyCuda(y, x);
+
+ 
 
   invParam.secs = stopwatchReadSeconds();
 
@@ -181,8 +204,13 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   if (invParam.verbosity >= QUDA_SUMMARIZE){
     mat(r, x, y);
     double true_res = xmyNormCuda(b, r);
-    printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-	       k, sqrt(r2/src_norm), sqrt(true_res / src_norm));    
+    if(use_heavy_quark_res){
+      printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e;  heavy-quark residual = %e\n", 
+	         k, sqrt(r2/src_norm), sqrt(true_res / src_norm), heavy_quark_residual);    
+    }else{
+      printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+	         k, sqrt(r2/src_norm), sqrt(true_res / src_norm));    
+    }
   }
 
   if (&tmp2 != &tmp) delete tmp2_p;
@@ -191,6 +219,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     delete r_sloppy;
     delete x_sloppy;
   }
+  if(use_heavy_quark_res) delete zSloppy;
 
   return;
 }
