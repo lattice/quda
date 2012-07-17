@@ -1037,7 +1037,7 @@ struct HeavyQuarkResidualNorm : public ReduceFunctor<ReduceType, Float2, FloatN>
 
   //! sum the solution and residual norms, and compute the heavy-quark norm
   __device__ void post(ReduceType &sum) 
-  { sum.x += aux.x; sum.y += aux.y; sum.z += sqrt(aux.y / aux.x); }
+  { sum.x += aux.x; sum.y += aux.y; sum.z += (aux.y / aux.x); }
 
   static int streams() { return 2; } //! total number of input and output streams
   static int flops() { return 4; } //! undercounts since it excludes the per-site division
