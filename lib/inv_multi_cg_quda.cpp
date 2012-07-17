@@ -107,7 +107,16 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
     
   double r2 = b2;
   double r2_old;
-  double stop = r2*invParam.tol*invParam.tol; // stopping condition of solver
+
+
+  // Set a lower bound on the tolerance.
+  // Not sure if this is the best way to account for finite precision.
+  // Perhaps I should enforce a lower bound on "stop" instead.
+  
+  const double min_tolerance = (param.precision == QUDA_DOUBLE_PRECISION) ? invParam.tol : (param.precision == QUDA_SINGLE_PRECISION) ? 1e-6 : 1e-4;
+  const double tolerance = (invParam.tol < min_tolerance) ? min_tolerance : invParam.tol;
+
+  double stop = r2*tolerance*tolerance; // stopping condition of solver
     
   double pAp;
     
