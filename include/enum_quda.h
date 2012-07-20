@@ -258,9 +258,9 @@ extern "C" {
   } QudaSourceType;
   
   typedef enum QudaTwistFlavorType_s {
+    QUDA_TWIST_NO  = 0,
     QUDA_TWIST_MINUS = -1,
     QUDA_TWIST_PLUS = +1,
-    QUDA_TWIST_NO  = 0,
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
   } QudaTwistFlavorType;  
 
@@ -271,8 +271,8 @@ extern "C" {
   } QudaTwistGamma5Type;
 
   typedef enum QudaUseInitGuess_s {
-    QUDA_USE_INIT_GUESS_YES,
     QUDA_USE_INIT_GUESS_NO,    
+    QUDA_USE_INIT_GUESS_YES,
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
 
@@ -281,18 +281,17 @@ extern "C" {
     QUDA_FORWARDS
   } QudaDirection;
   
-  typedef enum QudaComputeFatMethod_s{
+  typedef enum QudaComputeFatMethod_s {
     QUDA_COMPUTE_FAT_STANDARD,
     QUDA_COMPUTE_FAT_EXTENDED_VOLUME,
     QUDA_COMPUTE_FAT_INVALID=  QUDA_INVALID_ENUM
-  }QudaComputeFatMethod;
+  } QudaComputeFatMethod;
 
-  typedef enum QudaFatLinkFlag_s{
+  typedef enum QudaFatLinkFlag_s {
     QUDA_FAT_PRESERVE_CPU_GAUGE=1,
     QUDA_FAT_PRESERVE_GPU_GAUGE=2,
-
-    QUDA_FAT_PRESERVE_COMM_MEM=4,
-  }QudaFatLinkFlag;
+    QUDA_FAT_PRESERVE_COMM_MEM=4
+  } QudaFatLinkFlag;
 
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY,
