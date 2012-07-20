@@ -79,10 +79,8 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(ga_pad, INVALID_INT);
   
 #if defined INIT_PARAM
-  P(packed_size, 0);
   P(gaugeGiB, 0.0);
 #else
-  P(packed_size, INVALID_INT);
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
 

@@ -79,7 +79,6 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
-    int packed_size;
     double gaugeGiB;
 
     int preserve_gauge; /**< Used by link fattening */
@@ -158,9 +157,6 @@ extern "C" {
 
     /** Enable auto-tuning? */
     QudaTune tune;
-
-    /** Free the Dirac operator or keep it resident? */
-    QudaPreserveDirac preserve_dirac;
 
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
@@ -267,16 +263,20 @@ extern "C" {
 
   /**
    * Print the members of QudaGaugeParam.
+   * @param param The QudaGaugeParam whose elements we are to print.
    */
   void printQudaGaugeParam(QudaGaugeParam *param);
 
   /**
    * Print the members of QudaGaugeParam.
+   * @param param The QudaGaugeParam whose elements we are to print.
    */
   void printQudaInvertParam(QudaInvertParam *param);
 
   /**
    * Load the gauge field from the host.
+   * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
+   * @param param   Contains all metadata regarding host and device storage
    */
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
@@ -287,12 +287,17 @@ extern "C" {
 
   /**
    * Save the gauge field to the host.
+   * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
+   * @param param   Contains all metadata regarding host and device storage
    */
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
   /**
    * Load the clover term and/or the clover inverse from the host.
    * Either h_clover or h_clovinv may be set to NULL.
+   * @param h_clover    Base pointer to host clover field
+   * @param h_cloverinv Base pointer to host clover inverse field
+   * @param inv_param   Contains all metadata regarding host and device storage
    */
   void loadCloverQuda(void *h_clover, void *h_clovinv,
 		      QudaInvertParam *inv_param);
@@ -306,11 +311,19 @@ extern "C" {
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().
+   * @param h_x    Solution spinor field
+   * @param h_b    Source spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
    */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
    * Solve for multiple shifts (e.g., masses).
+   * @param _hp_x    Array of solution spinor fields
+   * @param _hp_b    Array of source spinor fields
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
    */
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			    double* offsets, int num_offsets,
@@ -319,6 +332,10 @@ extern "C" {
   /**
    * Mixed-precision multi-shift solver.  In the future, this functionality
    * will be folded into invertMultiShiftQuda().
+   * @param _hp_x    Array of solution spinor fields
+   * @param _hp_b    Array of source spinor fields
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
    */
   void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b,
 				 QudaInvertParam *param, double* offsets,
@@ -326,17 +343,29 @@ extern "C" {
     
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity parity);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
    */
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
   /**
    * Apply M^{\dag}M, possibly even/odd preconditioned.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
    */
   void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
@@ -370,6 +399,7 @@ extern "C" {
 }
 #endif
 
+#include <quda_fortran.h>
 //#include <quda_new_interface.h>
 
 #endif /* _QUDA_H */

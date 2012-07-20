@@ -85,7 +85,6 @@ unitarize_link_test()
   qudaGaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   qudaGaugeParam.gauge_fix   	   = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad      	   = 0;
-  qudaGaugeParam.packed_size 	   = 0;
   qudaGaugeParam.gaugeGiB    	   = 0;
   qudaGaugeParam.flag              = false;
 

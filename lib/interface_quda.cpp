@@ -824,6 +824,7 @@ cudaGaugeField* checkGauge(QudaInvertParam *param) {
   return cudaGauge;
 }
 
+
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   // check the gauge fields have been created
@@ -1988,3 +1989,24 @@ void endCommsQuda() {
 
 #endif
 }
+
+/*
+  The following interface functions are for the Fortran interface.
+*/
+
+void init_quda_(int dev) { initQuda(dev); }
+void end_quda_() { endQuda(); }
+void load_gauge_quda_(void *h_gauge, QudaGaugeParam *param) { loadGaugeQuda(h_gauge, param); }
+void free_gauge_quda_() { freeGaugeQuda(); }
+void load_clover_quda_(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param) 
+{ loadCloverQuda(h_clover, h_clovinv, inv_param); }
+void free_clover_quda_(void) { freeCloverQuda(); }
+void dslash_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
+		  QudaParity parity) { dslashQuda(h_out, h_in, inv_param, parity); }
+void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
+{ MatQuda(h_out, h_in, inv_param); }
+void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
+{ MatDagMatQuda(h_out, h_in, inv_param); }
+void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
+{ invertQuda(hp_x, hp_b, param); }    
+
