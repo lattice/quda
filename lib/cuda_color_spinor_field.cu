@@ -50,6 +50,7 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
   } else if (param.create == QUDA_COPY_FIELD_CREATE){
     errorQuda("not implemented");
   }
+  checkCudaError();
 }
 
 cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
@@ -215,13 +216,16 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
       (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + norm_bytes/2);
   }
 
-  if (siteSubset != QUDA_FULL_SITE_SUBSET) {
-    zeroPad();
-  } else {
-    (dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
-    (dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
+  if (create != QUDA_REFERENCE_FIELD_CREATE) {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET) {
+      zeroPad();
+    } else {
+      (dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
+      (dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
+    }
   }
 
+  checkCudaError();
 }
 void cudaColorSpinorField::freeBuffer() {
   if (bufferInit) {
@@ -278,7 +282,7 @@ void cudaColorSpinorField::zeroPad() {
   size_t pad_bytes = (stride - volume) * precision * fieldOrder;
   int Npad = nColor * nSpin * 2 / fieldOrder;
   for (int i=0; i<Npad; i++) {
-    if (pad_bytes) cudaMemset((char*)v + (volume + i*stride)*fieldOrder*precision, 0, pad_bytes);      
+    if (pad_bytes) cudaMemset((char*)v + (volume + i*stride)*fieldOrder*precision, 0, pad_bytes);
   }
 }
 
