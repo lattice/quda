@@ -11,10 +11,26 @@ Transfer::~Transfer() {
 // apply the prolongator
 void Transfer::P(cpuColorSpinorField &out, cpuColorSpinorField &in) {
 
+  if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+    prolongate(tmp->order_double, in->order_double, geo_map, spin_map);
+    rotateFineColor(out->order_double, tmp->order_double, V->order_double);
+  } else {
+    prolongate(tmp->order_single, in->order_single, geo_map, spin_map);
+    rotateFineColor(out->order_single, tmp->order_single, V->order_single);
+  }
+
 }
 
 // apply the restrictor
 void Transfer::R(cpuColorSpinorField &out, cpuColorSpinorField &in) {
+
+  if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+    rotateCoarseColor(tmp->order_double, in->order_double, V->order_double);
+    restrict(out->order_double, tmp->order_double, geo_map, spin_map);
+  } else {
+    rotateCoarseColor(tmp->order_single, in->order_single, V->order_single);
+    restrict(out->order_single, tmp->order_single, geo_map, spin_map);
+  }
 
 }
 
