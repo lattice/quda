@@ -1,10 +1,73 @@
 #include <transfer.h>
 
-Transfer::Transfer(cpuColorSpinorField *B, int Nvec, int *geo_bs, int spin_bs) {
+Transfer::Transfer(cpuColorSpinorField *B, int Nvec, int *geo_bs, int spin_bs)
+  : V(0), tmp(0), geo_map(0), spin_map(0) 
+{
 
+  // create the storage for the final block orthogonal elements
+  ColorSpinorParam param(B[0]); // takes the geometry from the null-space vectors
+  param.nSpin = B[0].Ncolor(); // the spin dimension corresponds to fine nColor
+  param.nColor = B[0].Nspin() * Nvec; // nColor = number of spin components * number of null-space vectors
+  V = new cpuColorSpinorField(param);
+
+  // create the storage for the intermediate temporary vector
+  param.nSpin = B[0].Nspin(); // tmp has same nSpin has the fine dimension
+  param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
+  tmp = new cpuColorSpinorField(param);
+
+  // allocate and compute the fine-to-coarse site map
+  geo_map = new int[B[0].Ndim()];
+  createGeoMap(geo_bs);
+
+  // allocate the fine-to-coarse spin map
+  spin_map = new int[B[0].Nspin() / spin_bs];
+  createSpinMap(spin_bs);
 }
 
 Transfer::~Transfer() {
+
+  if (spin_map) delete [] spin_map;
+  if (geo_map) delete [] geo_map;
+
+  if (V) delete V;
+  if (tmp) delete tmp;
+
+}
+
+// compute the fine-to-coarse site map
+void Transfer::createGeoMap(int *geo_bs) {
+
+  int x[QUDA_MAX_DIM];
+
+  // create a spinor with coarse geometry so we can use its OffsetIndex member function
+  ColorSpinorParam param(tmp);
+  param.nColor = 1;
+  param.nSpin = 1;
+  cpuColorSpinorField coarse(param);
+
+  // compute the coarse grid point for every site
+  for (int i=0; i<tmp.Volume(); i++) {
+
+    // compute the lattice-site index for this offet index
+    tmp.LatticeIndex(x, i);
+    
+    // compute the corresponding coarse-grid index given the block size
+    for (int d=0; d<tmp.Ndim(); d++) x[d] /= geo_bs[d];
+
+    // compute the coarse-offset index and store in the geo_map
+    int k;
+    coarse.SiteIndex(k, x);
+    geo_map[i] = k;
+  }
+
+}
+
+// compute the fine spin to coarse spin map
+void Transfer::createSpinMap(int spin_bs) {
+
+  for (int s=0; s<B[0].Nspin(); s++) {
+    spin_map[s] = s / spin_bs;
+  }
 
 }
 

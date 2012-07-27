@@ -15,16 +15,16 @@
 class Transfer {
 
   /** The block-normalized null-space components that define the prolongator */
-  cpuGaugeField V;
-
-  /** The mapping onto coarse sites from fine sites */
-  unsigned int *geo_map;
-
-  /** The mapping onto coarse spin from fine spin */
-  unsigned int *spin_map;
+  cpuColorSpinorField *V.
 
   /** A temporary field with fine geometry but coarse color */
-  cpuColorSpinorField tmp;
+  cpuColorSpinorField *tmp;
+
+  /** The mapping onto coarse sites from fine sites */
+  int *geo_map;
+
+  /** The mapping onto coarse spin from fine spin */
+  int *spin_map;
 
   /** 
    * The constructor for Transfer
@@ -37,6 +37,18 @@ class Transfer {
 
   /** The destructor for Transfer */
   virtual ~Transfer();
+
+  /** 
+   * Creates the map between fine and coarse grids 
+   * @param geo_bs An array storing the block size in each geometric dimension
+   */
+  void createGeoMap(int *geo_bs);
+
+  /** 
+   * Creates the map between fine and coarse spin dimensions
+   * @param spin_bs The spin block size
+   */
+  void createSpinMap(int spin_bs);
 
   /** 
    * Apply the prolongator
