@@ -85,6 +85,8 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
   // FIXME - hack for the moment
   fat_link_max_ = fat_link_max;
 
+  printf("Order = %d \n", cpu_order);
+
   int nFaceLocal = 1;
   if (cpu_order == QUDA_QDP_GAUGE_ORDER) {
     packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, volumeCB, 
@@ -97,6 +99,9 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
   } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
     packMILCGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad);
     packMILCGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad);    
+  } else if (cpu_order == QUDA_BQCD_GAUGE_ORDER) {
+    packBQCDGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad);
+    packBQCDGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad);    
   } else {
     errorQuda("Invalid gauge_order %d", cpu_order);
   }
@@ -259,6 +264,9 @@ static void storeGaugeField(Float *cpuGauge, FloatN *gauge, GaugeFieldOrder cpu_
   } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
     unpackMILCGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad);
     unpackMILCGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad);
+  } else if (cpu_order == QUDA_BQCD_GAUGE_ORDER) {
+    unpackBQCDGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad);
+    unpackBQCDGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad);
   } else {
     errorQuda("Invalid gauge_order");
   }

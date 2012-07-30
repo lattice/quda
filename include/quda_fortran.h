@@ -6,9 +6,9 @@
  * @brief Fortran interface functions
  *
  * The following are Fortran interface functions to QUDA that mirror
- * the C-equivalents.  This essentially just means making all the
- * characters lower case and adding a trailing underscore, but
- * additional differences could crop in the future.
+ * the C-equivalents.  This essentially just means making all calls by
+ * refere, using all the lower-case characters and adding a trailing
+ * underscore.
  */
 
 #ifdef __cplusplus
@@ -23,7 +23,7 @@ extern "C" {
    *                per-process basis or set to -1 to enable a default
    *                allocation of devices to processes.
    */
-  void init_quda_(int device);
+  void init_quda_(int *device);
 
   /**
    * Finalize the library.
@@ -64,8 +64,8 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage
    */
-  void dslash_quda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-		   QudaParity parity);
+  void dslash_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
+		    QudaParity *parity);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.

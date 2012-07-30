@@ -40,10 +40,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   printfQuda("QUDA Gauge Parameters:\n");
 #endif
 
-  P(X[0], INVALID_INT);
-  P(X[1], INVALID_INT);
-  P(X[2], INVALID_INT);
-  P(X[3], INVALID_INT);
+  for (int i=0; i<4; i++) P(X[i], INVALID_INT);
 
 #if defined INIT_PARAM
   P(anisotropy, INVALID_DOUBLE);
