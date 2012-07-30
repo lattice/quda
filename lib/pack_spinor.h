@@ -509,12 +509,12 @@ void packSpinor(dstFloat *Dst, srcFloat *Src, ColorSpinorField &dst, const Color
       } else if (srcOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
 	{
 	  SpaceColorSpinorOrder<srcFloat, Ns, Nc> inOrder(Src+evenOff, Vh, Vh);
-	  FloatNOrder<dstFloat, N, Ns, Nc> outOrder(Dst, Vh, Vh+dst.Pad());
+	  FloatNOrder<dstFloat, Ns, Nc, N> outOrder(Dst, Vh, Vh+dst.Pad());
 	  packParitySpinor<Ns,Nc>(Dst, Src+evenOff, outOrder, inOrder, Vh, dst.Pad(), dstBasis, srcBasis, location);
 	}
 	{
 	  SpaceColorSpinorOrder<srcFloat, Ns, Nc> inOrder(Src+oddOff, Vh, Vh);
-	  FloatNOrder<dstFloat, N, Ns, Nc> outOrder(Dst + dstLength/2, Vh, Vh+dst.Pad());
+	  FloatNOrder<dstFloat, Ns, Nc, N> outOrder(Dst + dstLength/2, Vh, Vh+dst.Pad());
 	  packParitySpinor<Ns,Nc>(Dst + dstLength/2, Src+oddOff, outOrder, inOrder, Vh, dst.Pad(), dstBasis, srcBasis, location);
 	}
       }
