@@ -74,6 +74,10 @@ class LatticeField {
   size_t GBytes() const { return total_bytes / (1<<30); } // returns total storage allocated
 
   void checkField(const LatticeField &);
+
+  void read(char *filename);
+  void write(char *filename);
+
 };
 
 #endif // _LATTICE_FIELD_H

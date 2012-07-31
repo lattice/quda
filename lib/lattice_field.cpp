@@ -47,6 +47,14 @@ QudaFieldLocation LatticeField::Location() const {
   return location;
 }
 
+void LatticeField::read(char *filename) {
+  errorQuda("Not implemented");
+}
+
+void LatticeField::write(char *filename) {
+  errorQuda("Not implemented");
+}
+
 // This doesn't really live here, but is fine for the moment
 std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param)
 {

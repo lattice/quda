@@ -339,7 +339,7 @@ int cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpi
     if (b.precision == QUDA_DOUBLE_PRECISION)
       ret = compareSpinor(*(a.order_single), *(b.order_double), tol);
     else
-      ret =compareSpinor(*(a.order_single), *(b.order_single), tol);
+      ret = compareSpinor(*(a.order_single), *(b.order_single), tol);
 
   return ret;
 }
