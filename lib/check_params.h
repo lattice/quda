@@ -193,9 +193,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
     P(prec_precondition, QUDA_INVALID_PRECISION);
+    P(schwarz_type, QUDA_INVALID_SCHWARZ);
+    P(precondition_cycle, 0);              
   }
-  P(schwarz_type, QUDA_INVALID_SCHWARZ);
-  P(precondition_cycle, 0);              
 #endif
 
 

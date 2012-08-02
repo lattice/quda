@@ -85,8 +85,6 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
   // FIXME - hack for the moment
   fat_link_max_ = fat_link_max;
 
-  printf("Order = %d \n", cpu_order);
-
   int nFaceLocal = 1;
   if (cpu_order == QUDA_QDP_GAUGE_ORDER) {
     packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, volumeCB, 

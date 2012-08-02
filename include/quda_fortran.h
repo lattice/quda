@@ -31,6 +31,18 @@ extern "C" {
   void end_quda_(void);
 
   /**
+   * Initializes the QudaGaugeParam with default entries.
+   * @param The QudaGaugeParam to be initialized
+   */
+  void new_quda_gauge_param_(QudaGaugeParam *param);
+
+  /**
+   * Initializes the QudaInvertParam with default entries.
+   * @param The QudaInvertParam to be initialized
+   */
+  void new_quda_invert_param_(QudaInvertParam *param);
+
+  /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
    * @param param   Contains all metadata regarding host and device storage
