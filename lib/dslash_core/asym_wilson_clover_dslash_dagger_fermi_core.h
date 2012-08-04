@@ -450,14 +450,14 @@ if (kernel_type == INTERIOR_KERNEL) {
   
   // change to chiral basis
   {
-    spinorFloat a00_re = -acc10_re - acc30_re;
-    spinorFloat a00_im = -acc10_im - acc30_im;
-    spinorFloat a10_re =  acc00_re + acc20_re;
-    spinorFloat a10_im =  acc00_im + acc20_im;
-    spinorFloat a20_re = -acc10_re + acc30_re;
-    spinorFloat a20_im = -acc10_im + acc30_im;
-    spinorFloat a30_re =  acc00_re - acc20_re;
-    spinorFloat a30_im =  acc00_im - acc20_im;
+    spinorFloat a00_re =  acc00_re + acc20_re;
+    spinorFloat a00_im =  acc00_im + acc20_im;
+    spinorFloat a10_re =  acc10_re + acc30_re;
+    spinorFloat a10_im =  acc10_im + acc30_im;
+    spinorFloat a20_re =  acc00_re - acc20_re;
+    spinorFloat a20_im =  acc00_im - acc20_im;
+    spinorFloat a30_re =  acc10_re - acc30_re;
+    spinorFloat a30_im =  acc10_im - acc30_im;
     
     acc00_re = a00_re;  acc00_im = a00_im;
     acc10_re = a10_re;  acc10_im = a10_im;
@@ -466,14 +466,14 @@ if (kernel_type == INTERIOR_KERNEL) {
   }
   
   {
-    spinorFloat a01_re = -acc11_re - acc31_re;
-    spinorFloat a01_im = -acc11_im - acc31_im;
-    spinorFloat a11_re =  acc01_re + acc21_re;
-    spinorFloat a11_im =  acc01_im + acc21_im;
-    spinorFloat a21_re = -acc11_re + acc31_re;
-    spinorFloat a21_im = -acc11_im + acc31_im;
-    spinorFloat a31_re =  acc01_re - acc21_re;
-    spinorFloat a31_im =  acc01_im - acc21_im;
+    spinorFloat a01_re =  acc01_re + acc21_re;
+    spinorFloat a01_im =  acc01_im + acc21_im;
+    spinorFloat a11_re =  acc11_re + acc31_re;
+    spinorFloat a11_im =  acc11_im + acc31_im;
+    spinorFloat a21_re =  acc01_re - acc21_re;
+    spinorFloat a21_im =  acc01_im - acc21_im;
+    spinorFloat a31_re =  acc11_re - acc31_re;
+    spinorFloat a31_im =  acc11_im - acc31_im;
     
     acc01_re = a01_re;  acc01_im = a01_im;
     acc11_re = a11_re;  acc11_im = a11_im;
@@ -482,14 +482,14 @@ if (kernel_type == INTERIOR_KERNEL) {
   }
   
   {
-    spinorFloat a02_re = -acc12_re - acc32_re;
-    spinorFloat a02_im = -acc12_im - acc32_im;
-    spinorFloat a12_re =  acc02_re + acc22_re;
-    spinorFloat a12_im =  acc02_im + acc22_im;
-    spinorFloat a22_re = -acc12_re + acc32_re;
-    spinorFloat a22_im = -acc12_im + acc32_im;
-    spinorFloat a32_re =  acc02_re - acc22_re;
-    spinorFloat a32_im =  acc02_im - acc22_im;
+    spinorFloat a02_re =  acc02_re + acc22_re;
+    spinorFloat a02_im =  acc02_im + acc22_im;
+    spinorFloat a12_re =  acc12_re + acc32_re;
+    spinorFloat a12_im =  acc12_im + acc32_im;
+    spinorFloat a22_re =  acc02_re - acc22_re;
+    spinorFloat a22_im =  acc02_im - acc22_im;
+    spinorFloat a32_re =  acc12_re - acc32_re;
+    spinorFloat a32_im =  acc12_im - acc32_im;
     
     acc02_re = a02_re;  acc02_im = a02_im;
     acc12_re = a12_re;  acc12_im = a12_im;
@@ -816,14 +816,14 @@ if (kernel_type == INTERIOR_KERNEL) {
   // change back from chiral basis
   // (note: required factor of 1/2 is included in clover term normalization)
   {
-    spinorFloat a00_re =  acc10_re + acc30_re;
-    spinorFloat a00_im =  acc10_im + acc30_im;
-    spinorFloat a10_re = -acc00_re - acc20_re;
-    spinorFloat a10_im = -acc00_im - acc20_im;
-    spinorFloat a20_re =  acc10_re - acc30_re;
-    spinorFloat a20_im =  acc10_im - acc30_im;
-    spinorFloat a30_re = -acc00_re + acc20_re;
-    spinorFloat a30_im = -acc00_im + acc20_im;
+    spinorFloat a00_re =  acc00_re + acc20_re;
+    spinorFloat a00_im =  acc00_im + acc20_im;
+    spinorFloat a10_re =  acc10_re + acc30_re;
+    spinorFloat a10_im =  acc10_im + acc30_im;
+    spinorFloat a20_re =  acc00_re - acc20_re;
+    spinorFloat a20_im =  acc00_im - acc20_im;
+    spinorFloat a30_re =  acc10_re - acc30_re;
+    spinorFloat a30_im =  acc10_im - acc30_im;
     
     acc00_re = a00_re;  acc00_im = a00_im;
     acc10_re = a10_re;  acc10_im = a10_im;
@@ -832,14 +832,14 @@ if (kernel_type == INTERIOR_KERNEL) {
   }
   
   {
-    spinorFloat a01_re =  acc11_re + acc31_re;
-    spinorFloat a01_im =  acc11_im + acc31_im;
-    spinorFloat a11_re = -acc01_re - acc21_re;
-    spinorFloat a11_im = -acc01_im - acc21_im;
-    spinorFloat a21_re =  acc11_re - acc31_re;
-    spinorFloat a21_im =  acc11_im - acc31_im;
-    spinorFloat a31_re = -acc01_re + acc21_re;
-    spinorFloat a31_im = -acc01_im + acc21_im;
+    spinorFloat a01_re =  acc01_re + acc21_re;
+    spinorFloat a01_im =  acc01_im + acc21_im;
+    spinorFloat a11_re =  acc11_re + acc31_re;
+    spinorFloat a11_im =  acc11_im + acc31_im;
+    spinorFloat a21_re =  acc01_re - acc21_re;
+    spinorFloat a21_im =  acc01_im - acc21_im;
+    spinorFloat a31_re =  acc11_re - acc31_re;
+    spinorFloat a31_im =  acc11_im - acc31_im;
     
     acc01_re = a01_re;  acc01_im = a01_im;
     acc11_re = a11_re;  acc11_im = a11_im;
@@ -848,14 +848,14 @@ if (kernel_type == INTERIOR_KERNEL) {
   }
   
   {
-    spinorFloat a02_re =  acc12_re + acc32_re;
-    spinorFloat a02_im =  acc12_im + acc32_im;
-    spinorFloat a12_re = -acc02_re - acc22_re;
-    spinorFloat a12_im = -acc02_im - acc22_im;
-    spinorFloat a22_re =  acc12_re - acc32_re;
-    spinorFloat a22_im =  acc12_im - acc32_im;
-    spinorFloat a32_re = -acc02_re + acc22_re;
-    spinorFloat a32_im = -acc02_im + acc22_im;
+    spinorFloat a02_re =  acc02_re + acc22_re;
+    spinorFloat a02_im =  acc02_im + acc22_im;
+    spinorFloat a12_re =  acc12_re + acc32_re;
+    spinorFloat a12_im =  acc12_im + acc32_im;
+    spinorFloat a22_re =  acc02_re - acc22_re;
+    spinorFloat a22_im =  acc02_im - acc22_im;
+    spinorFloat a32_re =  acc12_re - acc32_re;
+    spinorFloat a32_im =  acc12_im - acc32_im;
     
     acc02_re = a02_re;  acc02_im = a02_im;
     acc12_re = a12_re;  acc12_im = a12_im;

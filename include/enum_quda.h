@@ -154,6 +154,7 @@ extern "C" {
   typedef enum QudaCloverFieldOrder_s {
     QUDA_PACKED_CLOVER_ORDER,     // even-odd, packed
     QUDA_LEX_PACKED_CLOVER_ORDER, // lexicographical order, packed
+    QUDA_BQCD_CLOVER_ORDER, // even-odd, super-diagonal packed and reordered
     QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
   } QudaCloverFieldOrder;
 

@@ -347,9 +347,22 @@ extern "C" {
    * @param h_in   Input spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage
+   * @param parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity parity);
+
+  /**
+   * Apply the clover operator or its inverse.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   * @param parity The source and destination parity of the field
+   * @param inverse Whether to apply the inverse of the clover term
+   */
+  void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
+		  QudaParity *parity, int inverse);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.

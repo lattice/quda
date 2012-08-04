@@ -217,7 +217,8 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  //printQudaGaugeParam(param);
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (verbosity == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
 
   checkGaugeParam(param);
 
@@ -272,11 +273,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   
   switch (param->type) {
   case QUDA_WILSON_LINKS:
-    if (gaugePrecise) errorQuda("Precise gauge field already allocated");
+    //if (gaugePrecise) errorQuda("Precise gauge field already allocated");
     gaugePrecise = precise;
-    if (gaugeSloppy) errorQuda("Sloppy gauge field already allocated");
+    //if (gaugeSloppy) errorQuda("Sloppy gauge field already allocated");
     gaugeSloppy = sloppy;
-    if (gaugePrecondition) errorQuda("Precondition gauge field already allocated");
+    //if (gaugePrecondition) errorQuda("Precondition gauge field already allocated");
     gaugePrecondition = precondition;
     break;
   case QUDA_ASQTAD_FAT_LINKS:
@@ -303,6 +304,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
+  if (!initialized) errorQuda("QUDA not initialized");
   checkGaugeParam(param);
 
   // Set the specific cpu parameters and create the cpu gauge field
@@ -329,6 +331,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+  if (!initialized) errorQuda("QUDA not initialized");
 
   if (!h_clover && !h_clovinv) {
     errorQuda("loadCloverQuda() called with neither clover term nor inverse");
@@ -407,6 +410,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
 void freeGaugeQuda(void) 
 {  
+  if (!initialized) errorQuda("QUDA not initialized");
   if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
   if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
   if (gaugePrecise) delete gaugePrecise;
@@ -435,6 +439,7 @@ void freeGaugeQuda(void)
 
 void freeCloverQuda(void)
 {
+  if (!initialized) errorQuda("QUDA not initialized");
   if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
   if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
   if (cloverPrecise) delete cloverPrecise;
@@ -663,6 +668,9 @@ static void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolu
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+  if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
+    errorQuda("Clover field not allocated");
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   ColorSpinorParam cpuParam(h_in, inv_param->input_location, *inv_param, gaugePrecise->X(), 1);
@@ -678,10 +686,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     double cpu = norm2(*in_h);
     double gpu = norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  for (int i=0; i<in_h->Volume(); i++) {
-    ((cpuColorSpinorField*)in_h)->PrintVector(i);
   }
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -716,10 +720,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
-  for (int i=0; i<in_h->Volume(); i++) {
-    ((cpuColorSpinorField*)out_h)->PrintVector(i);
-  }
-
   delete out_h;
   delete in_h;
 }
@@ -727,6 +727,10 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  verbosity = inv_param->verbosity;
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+  if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
+    errorQuda("Clover field not allocated");
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
@@ -788,6 +792,10 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
 void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+  if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
+    errorQuda("Clover field not allocated");
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
@@ -885,8 +893,75 @@ cudaGaugeField* checkGauge(QudaInvertParam *param) {
 }
 
 
+void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
+{
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+  if (cloverPrecise == NULL) errorQuda("Clover field not allocated");
+  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH)
+    errorQuda("Cannot apply the clover term for a non Wilson-clover dslash");
+
+  ColorSpinorParam cpuParam(h_in, inv_param->input_location, *inv_param, gaugePrecise->X(), 1);
+
+  ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (verbosity >= QUDA_VERBOSE) {
+    double cpu = norm2(*in_h);
+    double gpu = norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
+    axCuda(gaugePrecise->Anisotropy(), in);
+  }
+  bool pc = true;
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+
+  DiracCloverPC dirac(diracParam); // create the Dirac operator
+  if (!inverse) dirac.Clover(out, in, parity); // apply the clover operator
+  else dirac.CloverInv(out, in, parity);
+
+  cpuParam.v = h_out;
+
+  ColorSpinorField *out_h = (inv_param->output_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  *out_h = out;
+  
+  if (verbosity >= QUDA_VERBOSE) {
+    double cpu = norm2(*out_h);
+    double gpu = norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  /*for (int i=0; i<in_h->Volume(); i++) {
+    ((cpuColorSpinorField*)out_h)->PrintVector(i);
+    }*/
+
+  delete out_h;
+  delete in_h;
+}
+
+
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  if (!initialized) errorQuda("QUDA not initialized");
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
   // check the gauge fields have been created
@@ -1056,6 +1131,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
+  if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
   checkInvertParam(param);
@@ -1391,7 +1467,7 @@ void
 invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
-
+  if (!initialized) errorQuda("QUDA not initialized");
 
   QudaPrecision high_prec = param->cuda_prec;
   param->cuda_prec = param->cuda_prec_sloppy;
@@ -2065,6 +2141,8 @@ void load_clover_quda_(void *h_clover, void *h_clovinv, QudaInvertParam *inv_par
 void free_clover_quda_(void) { freeCloverQuda(); }
 void dslash_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity *parity) { dslashQuda(h_out, h_in, inv_param, *parity); }
+void clover_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
+		  QudaParity *parity, int *inverse) { CloverQuda(h_out, h_in, inv_param, *parity, *inverse); }
 void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
