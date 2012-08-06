@@ -116,9 +116,14 @@ cpuGaugeField::~cpuGaugeField() {
   
 }
 
+// FIXME - replace this with a functor approach to more easily arbitrary ordering
 template <typename Float>
-void packGhost(Float **gauge, Float **ghost, const int nFace, const int *X, 
-	       const int volumeCB, const int *surfaceCB) {
+void packGhost(Float **ghost, const Float **gauge, const int nFace, const int *X, 
+	       const int volumeCB, const int *surfaceCB, const QudaGaugeFieldOrder order) {
+
+  if (order != QUDA_QDP_GAUGE_ORDER && order != QUDA_BQCD_GAUGE_ORDER) 
+    errorQuda("packGhost not supported for %d gauge field order", order);
+
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
 
@@ -149,8 +154,19 @@ void packGhost(Float **gauge, Float **ghost, const int nFace, const int *X,
 
   for(int dir =0; dir < 4; dir++)
     {
-      Float* even_src = gauge[dir];
-      Float* odd_src = gauge[dir] + volumeCB*gaugeSiteSize;
+      const Float* even_src;
+      const Float* odd_src;
+
+      if (order == QUDA_BQCD_GAUGE_ORDER) {
+	// need to add on halo region
+	int mu_offset = X[0]/2 + 2;
+	for (int i=1; i<4; i++) mu_offset *= (X[i] + 2);
+	even_src = (const Float*)gauge + (dir*2+0)*mu_offset*gaugeSiteSize;
+	odd_src = (const Float*)gauge + (dir*2+1)*mu_offset*gaugeSiteSize;
+      } else { // QDP_GAUGE_FIELD_ORDER
+	even_src = gauge[dir];
+	odd_src = gauge[dir] + volumeCB*gaugeSiteSize;
+      }
 
       Float* even_dst;
       Float* odd_dst;
@@ -210,9 +226,9 @@ void cpuGaugeField::exchangeGhost() const {
 
   // get the links into a contiguous buffer
   if (precision == QUDA_DOUBLE_PRECISION) {
-    packGhost((double**)gauge, (double**)send, nFace, x, volumeCB, surfaceCB);
+    packGhost((double**)send, (const double**)gauge, nFace, x, volumeCB, surfaceCB, order);
   } else {
-    packGhost((float**)gauge, (float**)send, nFace, x, volumeCB, surfaceCB);
+    packGhost((float**)send, (const float**)gauge, nFace, x, volumeCB, surfaceCB, order);
   }
 
   // communicate between nodes

@@ -56,7 +56,7 @@ static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **c
   if( ! cpuGauge ) errorQuda( "cpuGauge is borked\n");
 
 #ifdef MULTI_GPU
-  if (cpu_order != QUDA_QDP_GAUGE_ORDER)
+  if (cpu_order != QUDA_QDP_GAUGE_ORDER && cpu_order != QUDA_BQCD_GAUGE_ORDER)
     errorQuda("Only QUDA_QDP_GAUGE_ORDER is supported for multi-gpu\n");
 #endif
 
