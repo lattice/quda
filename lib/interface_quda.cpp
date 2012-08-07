@@ -2155,3 +2155,6 @@ void new_quda_gauge_param_(QudaGaugeParam *param) {
 void new_quda_invert_param_(QudaInvertParam *param) {
   *param = newQudaInvertParam();
 }
+void comm_set_gridsize_(int *grid) {
+  comm_set_gridsize(grid[0], grid[1], grid[2], grid[3]);
+}

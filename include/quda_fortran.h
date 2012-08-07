@@ -31,6 +31,14 @@ extern "C" {
   void end_quda_(void);
 
   /**
+   * Setter method for the comm grid size to all us to reuse BQCD's
+   * MPI topology.  This is considered a temporary hack that will be
+   * fixed when an interface for setting the logical topology is
+   * created (issue 31 on github).
+   */
+  void comm_set_gridsize_(int *grid);
+
+  /**
    * Initializes the QudaGaugeParam with default entries.
    * @param The QudaGaugeParam to be initialized
    */
