@@ -547,7 +547,7 @@ void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const 
 static void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
 			QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
 {   
- if (verbosity >= QUDA_VERBOSE) {
+ if (verbosity >= QUDA_DEBUG_VERBOSE) {
     printfQuda("Mass rescale: Kappa is: %f\n", kappa);
     printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
     double nin = norm2(b);
@@ -594,7 +594,7 @@ static void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionT
   }
 
   if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
- if (verbosity >= QUDA_VERBOSE) {
+ if (verbosity >= QUDA_DEBUG_VERBOSE) {
     printfQuda("Mass rescale: Kappa is: %f\n", kappa);
     printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
     double nin = norm2(b);
@@ -878,12 +878,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   ColorSpinorField *h_x = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
 
-    
   // download source
-  ColorSpinorParam cudaParam(cpuParam, *param);     
+  ColorSpinorParam cudaParam(cpuParam, *param);
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam); 
-
 
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
@@ -901,7 +899,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->verbosity >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
+    double nh_x = norm2(*h_x);
+    double nx = norm2(*x);
     printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
+    printfQuda("Solution: CPU = %f, CUDA copy = %f\n", nh_x, nx);
   }
 
   setDslashTuning(param->tune, param->verbosity);
@@ -910,7 +911,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (param->verbosity >= QUDA_VERBOSE) {
     double nin = norm2(*in);
+    double nout = norm2(*out);
     printfQuda("Prepared source = %f\n", nin);   
+    printfQuda("Prepared solution = %f\n", nout);   
   }
 
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
@@ -924,9 +927,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     // prepare source if we are doing CGNR
-    if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
-      copyCuda(*out, *in);
-      dirac.Mdag(*in, *out);
+    if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && 
+	param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
+      cudaColorSpinorField tmp(*in);
+      dirac.Mdag(*in, tmp);
     }
     {
       DiracMdagM m(dirac), mSloppy(diracSloppy);
