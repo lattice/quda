@@ -73,25 +73,39 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   cudaColorSpinorField &v = *vp;
   cudaColorSpinorField &tmp = *tmpp;
   cudaColorSpinorField &t = *tp;
-
   cudaColorSpinorField &w = *wp;
   cudaColorSpinorField &z = *zp;
 
   cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
+  double b2; // norm sq of source
+  double r2; // norm sq of residual
+
+  // compute initial residual depending on whether we have an initial guess or not
+  if (invParam.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+    mat(r, x, y);
+    r2 = xmyNormCuda(b, r);
+    b2 = normCuda(b);
+    copyCuda(y, x);
+  } else {
+    copyCuda(r, b);
+    r2 = normCuda(b);
+    b2 = r2;
+  }
+
+  // set field aliasing according to whether we are doing mixed precision or not
   if (invParam.cuda_prec_sloppy == x.Precision()) {
     x_sloppy = &x;
     r_sloppy = &r;
     r_0 = &b;
     zeroCuda(*x_sloppy);
-    copyCuda(*r_sloppy, b);
   } else {
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.precision = invParam.cuda_prec_sloppy;
     x_sloppy = new cudaColorSpinorField(x, csParam);
     csParam.create = QUDA_COPY_FIELD_CREATE;
-    r_sloppy = new cudaColorSpinorField(b, csParam);
+    r_sloppy = new cudaColorSpinorField(r, csParam);
     r_0 = new cudaColorSpinorField(b, csParam);
   }
 
@@ -103,9 +117,6 @@ void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   QudaInvertParam invert_param_inner = newQudaInvertParam();
   fillInnerInvertParam(invert_param_inner, invParam);
 
-  double b2 = normCuda(b);
-
-  double r2 = b2;
   double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
   double delta = invParam.reliable_delta;
 

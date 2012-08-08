@@ -220,17 +220,17 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   for (int i=0; i<4; i++) parity += commCoords(i);
   parity = parity % 2;
 
+  cudaColorSpinorField rM(rSloppy);
+  cudaColorSpinorField xM(rSloppy);
+
+  quda::blas_flops = 0;
+
+  stopwatchStart();
+
   // calculate initial residual
   mat(r, x);
   double r2 = xmyNormCuda(b, r);  
   copyCuda(rSloppy, r);
-
-  quda::blas_flops = 0;
-
-  cudaColorSpinorField rM(rSloppy);
-  cudaColorSpinorField xM(rSloppy);
-
-  stopwatchStart();
 
   int total_iter = 0;
   int restart = 0;
@@ -341,7 +341,7 @@ void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
   }
 
-  copyCuda(x, y);
+  if (total_iter > 0) copyCuda(x, y);
 
   if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
     warningQuda("Exceeded maximum iterations %d", invParam.maxiter);

@@ -886,6 +886,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
 
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
+    // initial guess only supported for single-pass solvers
+    if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
+	(param->inv_type == QUDA_BICGSTAB_INVERTER || param->inv_type == QUDA_GCR_INVERTER)) {
+      errorQuda("Initial guess not supported for two-pass solver");
+    }
+
     x = new cudaColorSpinorField(*h_x, cudaParam); // solution  
   } else { // zero initial guess
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -917,6 +923,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
+    // prepare source if we are doing CGNR
     if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
       copyCuda(*out, *in);
       dirac.Mdag(*in, *out);
