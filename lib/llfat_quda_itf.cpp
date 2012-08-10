@@ -50,6 +50,7 @@ llfat_cuda(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
   for(int i=0;i < 4;i++){
      kparam.ghostDim[i] = commDimPartitioned(i);
   }
+#ifdef MULTI_GPU
   int ktype[8] = {
 		LLFAT_EXTERIOR_KERNEL_BACK_X, 
 		LLFAT_EXTERIOR_KERNEL_FWD_X, 
@@ -60,7 +61,7 @@ llfat_cuda(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 		LLFAT_EXTERIOR_KERNEL_BACK_T, 
 		LLFAT_EXTERIOR_KERNEL_FWD_T, 
   };
-
+#endif
 
   for(int dir = 0;dir < 4; dir++){
     for(int nu = 0; nu < 4; nu++){

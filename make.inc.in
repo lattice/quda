@@ -144,14 +144,12 @@ ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK
   FATLINK_TEST=llfat_test
   COPT += -DGPU_FATLINK
-  FATLINK_ITF_OBJS=llfat_quda_itf.o
 endif
 ifeq ($(strip $(BUILD_HISQLINK)), yes)
   ifneq ($(strip $(BUILD_FATLINK)), yes) 
     NVCCOPT += -DGPU_FATLINK
     COPT    += -DGPU_FATLINK
     FATLINK_TEST=llfat_test
-    FATLINK_ITF_OBJS=llfat_quda_itf.o
   endif
   NVCCOPT += -DGPU_UNITARIZE
   COPT    += -DGPU_UNITARIZE
@@ -169,7 +167,7 @@ endif
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   NVCCOPT += -DGPU_HISQ_FORCE
   COPT += -DGPU_HISQ_FORCE
-  HISQ_PATHS_FORCE_TEST=hisq_paths_force_test
+  HISQ_PATHS_FORCE_TEST=hisq_paths_force_test fat_force_quda.o
   HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
 endif
 ifeq ($(strip $(HOST_DEBUG)), yes)
