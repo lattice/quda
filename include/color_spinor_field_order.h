@@ -53,7 +53,7 @@ class ColorSpinorFieldOrder {
    * @param s spin index
    * @param c color index
    */
-  virtual const complex<Float>& operator()(const int &x, const int &s, const int &c) const = 0;
+  virtual const std::complex<Float>& operator()(const int &x, const int &s, const int &c) const = 0;
 
   /**
    * Writable complex-member accessor function
@@ -61,7 +61,7 @@ class ColorSpinorFieldOrder {
    * @param s spin index
    * @param c color index
    */
-  virtual complex<Float>& operator()(const int &x, const int &s, const int &c) = 0;
+  virtual std::complex<Float>& operator()(const int &x, const int &s, const int &c) = 0;
 
   /** Returns the number of field colors */
   int Ncolor() const { return field.Ncolor(); }
@@ -72,6 +72,8 @@ class ColorSpinorFieldOrder {
   /** Returns the field volume */
   int Volume() const { return field.Volume(); }
 
+  /** Returns the field geometric dimension */
+  int Ndim() const { return field.Ndim(); }
 };
 
 template <typename Float>
@@ -95,28 +97,14 @@ class SpaceSpinColorOrder : public ColorSpinorFieldOrder<Float> {
     return *((Float*)(field.v) + index);
   }
 
-  const complex<Float>& operator()(const int &x, const int &i, const int &j) const {
+  const std::complex<Float>& operator()(const int &x, const int &s, const int &c) const {
     unsigned long index = (x*field.nSpin+s)*field.nColor+c;
-    return *((Float*)(field.v) + index);
+    return *(static_cast<std::complex<Float>*>(field.v) + index);
   }
 
-  complex<Float>& operator()(const int &x, const int &i, const int &j) {
+  std::complex<Float>& operator()(const int &x, const int &s, const int &c) {
     unsigned long index = (x*field.nSpin+s)*field.nColor+c;
-    return *((Float*)(field.v) + index);
-  }
-
-  void LatticeIndex(const int *y, const int i) {
-    for (int k=0; k<nDim-1; k++) {
-      y[k] = i % x[k];
-      i /= x[k];
-    }
-  }
-
-  void SiteIndex(const int i, const int *y) {
-    i = y[nDim-1];
-    for (int k=nDim-2; k>=0; k--) {
-      i = i * x[i] + y[i];
-    }
+    return *(static_cast<std::complex<Float>*>(field.v) + index);
   }
 
 };
@@ -142,14 +130,14 @@ class SpaceColorSpinOrder : public ColorSpinorFieldOrder<Float> {
     return *((Float*)(field.v) + index);
   }
 
-  const complex<Float>& operator()(const int &x, const int &s, const int &c, const int &z) const {
+  const std::complex<Float>& operator()(const int &x, const int &s, const int &c) const {
     unsigned long index = (x*field.nColor+c)*field.nSpin+s;
-    return *((complex<Float>*)(field.v) + index);
+    return *(static_cast<std::complex<Float>*>(field.v) + index);
   }
 
-  complex<Float>& operator()(const int &x, const int &s, const int &c, const int &z) {
+  std::complex<Float>& operator()(const int &x, const int &s, const int &c) {
     unsigned long index = (x*field.nColor+c)*field.nSpin+s;    
-    return *((complex<Float>*)(field.v) + index);
+    return *(static_cast<std::complex<Float>*>(field.v) + index);
   }
 };
 
@@ -185,17 +173,17 @@ class QOPDomainWallOrder : public ColorSpinorFieldOrder<Float> {
     return ((Float**)(field.v))[ls][index_4d];
   }
 
-  const complex<Float>& operator()(const int &x, const int &s, const int &c) const {
+  const std::complex<Float>& operator()(const int &x, const int &s, const int &c) const {
     int ls = x / Ls;
     int x_4d = x - ls*volume_4d;
     unsigned long index_4d = (x_4d*field.nColor+c)*field.nSpin+s;
-    return ((complex<Float>**)(field.v))[ls][index_4d];
+    return (static_cast<std::complex<Float>**>(field.v))[ls][index_4d];
   }
 
-  complex<Float>& operator()(const int &x, const int &s, const int &c) {
+  std::complex<Float>& operator()(const int &x, const int &s, const int &c) {
     int ls = x / Ls;
     int x_4d = x - ls*volume_4d;
     unsigned long index_4d = (x_4d*field.nColor+c)*field.nSpin+s;
-    return ((complex<Float>**)(field.v))[ls][index_4d];
+    return (static_cast<std::complex<Float>**>(field.v))[ls][index_4d];
   }
 };

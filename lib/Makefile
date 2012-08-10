@@ -1,15 +1,17 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o inv_mr_quda.o \
-	interface_quda.o util_quda.o hw_quda.o \
-	blas_cpu.o clover_field.o color_spinor_field.o	\
-	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	     \
-	lattice_field.o gauge_field.o cpu_gauge_field.o cuda_gauge_field.o \
-	dirac_clover.o dirac_wilson.o dirac_staggered.o dirac_domain_wall.o  \
-	dirac_twisted_mass.o tune.o fat_force_quda.o hisq_force_utils.o \
-	clover_quda.o dslash_quda.o blas_quda.o \
-	${NUMA_AFFINITY_OBJS} ${FACE_COMMS_OBJS} ${FATLINK_ITF_OBJS}
+QUDA_OBJS = transfer.o inv_bicgstab_quda.o inv_cg_quda.o		\
+	inv_multi_cg_quda.o inv_gcr_quda.o inv_mr_quda.o		\
+	interface_quda.o util_quda.o hw_quda.o blas_cpu.o		\
+	clover_field.o color_spinor_field.o cpu_color_spinor_field.o	\
+	cuda_color_spinor_field.o dirac.o lattice_field.o		\
+	gauge_field.o cpu_gauge_field.o cuda_gauge_field.o		\
+	dirac_clover.o dirac_wilson.o dirac_staggered.o			\
+	dirac_domain_wall.o dirac_twisted_mass.o tune.o			\
+	fat_force_quda.o hisq_force_utils.o clover_quda.o		\
+	dslash_quda.o blas_quda.o ${NUMA_AFFINITY_OBJS}			\
+	${FACE_COMMS_OBJS} ${FATLINK_ITF_OBJS}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -17,7 +19,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
 	gauge_field.h hisq_force_utils.h double_single.h texture.h	\
-	numa_affinity.h
+	numa_affinity.h transfer.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h reduce_core.h

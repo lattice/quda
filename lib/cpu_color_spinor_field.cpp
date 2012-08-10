@@ -200,24 +200,26 @@ void cpuColorSpinorField::destroy() {
   lattice coordinates that are computed here are full-field
   coordinates.
  */
-void cpuColorSpinorField::LatticeIndex(const int *y, const int i) const {
+void cpuColorSpinorField::LatticeIndex(int *y, int i) const {
+
+  int z[QUDA_MAX_DIM];
+  memcpy(z, x, QUDA_MAX_DIM*sizeof(int));
 
   // parity is the slowest running dimension
   int parity = 0;
-  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
+  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     parity = i % (volume / 2);
     i /= (volume / 2);
-    x[0] /= 2; // half this for convenience
+    z[0] /= 2; // half this for convenience
   }
 
   for (int d=0; d<nDim; d++) {
-    y[d] = i % x[d];
-    i /= x[d];    
+    y[d] = i % z[d];
+    i /= z[d];    
   }
 
   // convert into the full-field lattice coordinate
-  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
-    x[0] *= 2; // restore the x dimension
+  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     for (int d=1; d<nDim; d++) parity += y[d];
     parity = parity & 1;
   }
@@ -229,11 +231,11 @@ void cpuColorSpinorField::LatticeIndex(const int *y, const int i) const {
   With full fields, we assume that the field is even-odd ordered.  The
   input lattice coordinates are always full-field coordinates.
  */
-void cpuColorSpinorField::OffsetIndex(const int i, const int *y) const {
+void cpuColorSpinorField::OffsetIndex(int &i, int *y) const {
 
   int parity = 0;
   int y0 = y[0];
-  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
+  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     for (int d=1; d<nDim; d++) parity += y[d];
     parity = parity & 1;
     y0 = y[0];
@@ -245,7 +247,7 @@ void cpuColorSpinorField::OffsetIndex(const int i, const int *y) const {
     i = x[d]*i + y[d];
   }
 
-  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
+  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
     i = i + parity * (volume / 2);
     y[0] = y0;
   }

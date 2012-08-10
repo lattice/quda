@@ -235,20 +235,6 @@ class ColorSpinorField {
   QudaFieldOrder FieldOrder() const { return fieldOrder; }
   QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-  /** 
-   * Compute the n-dimensional site index given the 1-d offset index
-   * @param y n-dimensional site index
-   * @param i 1-dimensional site index
-   */
-  void LatticeIndex(const int *y, const int i) const;
-
-  /** 
-   * Compute the 1-d offset index given the n-dimensional site index
-   * @param i 1-dimensional site index
-   * @param y n-dimensional site index
-   */
-  void OffsetIndex(const int i, const int *y) const;
-
   int GhostLength() const { return ghost_length; }
   const int *GhostFace() const { return ghostFace; }  
   int GhostOffset(const int i) const { return ghostOffset[i]; }  
@@ -338,6 +324,7 @@ template <typename Float> class QOPDomainWallOrder;
 class cpuColorSpinorField : public ColorSpinorField {
 
   friend class cudaColorSpinorField;
+  friend class Transfer; // to allow access to the order functors
 
   template <typename Float> friend class SpaceColorSpinOrder;
   template <typename Float> friend class SpaceSpinColorOrder;
@@ -396,6 +383,20 @@ class cpuColorSpinorField : public ColorSpinorField {
   void zero();
 
   QudaFieldLocation Location() const;
+
+  /** 
+   * Compute the n-dimensional site index given the 1-d offset index
+   * @param y n-dimensional site index
+   * @param i 1-dimensional site index
+   */
+  void LatticeIndex(int *y, int i) const;
+
+  /** 
+   * Compute the 1-d offset index given the n-dimensional site index
+   * @param i 1-dimensional site index
+   * @param y n-dimensional site index
+   */
+  void OffsetIndex(int &i, int *y) const;
 };
 
 
