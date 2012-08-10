@@ -611,7 +611,7 @@ namespace quda {
       const cudaGaugeField &Qprev;
       const int sig;
       const int mu;
-      typename RealTypeId<RealA>::Type &coeff; 
+      const typename RealTypeId<RealA>::Type &coeff; 
       cudaGaugeField &Pmu;
       cudaGaugeField &P3;
       cudaGaugeField &Qmu;
@@ -651,7 +651,7 @@ namespace quda {
 		 const cudaGaugeField &oprod,
 		 const cudaGaugeField &Qprev,
 		 int sig, int mu,
-		 typename RealTypeId<RealA>::Type coeff, 
+		 const typename RealTypeId<RealA>::Type &coeff, 
 		 cudaGaugeField &Pmu, // write only
 		 cudaGaugeField &P3,  // write only
 		 cudaGaugeField &Qmu,
@@ -664,7 +664,7 @@ namespace quda {
       MiddleLink(const cudaGaugeField &link, 
 		 const cudaGaugeField &oprod,
 		 int sig, int mu,
-		 typename RealTypeId<RealA>::Type coeff, 
+		 const typename RealTypeId<RealA>::Type &coeff, 
 		 cudaGaugeField &Pmu, // write only
 		 cudaGaugeField &P3,  // write only
 		 cudaGaugeField &Qmu,
@@ -691,7 +691,7 @@ namespace quda {
       ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
        (typeA*)Qprev_even, (typeA*)Qprev_odd,				\
        (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
-       sig, mu, (typename RealTypeId<typeA>::Type)coeff,		\
+       sig, mu, coeff,							\
        (typeA*)Pmu.Even_p(), (typeA*)Pmu.Odd_p(),			\
        (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
        (typeA*)Qmu.Even_p(), (typeA*)Qmu.Odd_p(),			\
@@ -808,7 +808,7 @@ namespace quda {
       const cudaGaugeField &Qprev;
       const int sig;
       const int mu;
-      typename RealTypeId<RealA>::Type &coeff; 
+      const typename RealTypeId<RealA>::Type &coeff; 
       cudaGaugeField &P3; // write only
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
@@ -829,7 +829,7 @@ namespace quda {
 		       const cudaGaugeField &oprod, 
 		       const cudaGaugeField &Qprev,
 		       int sig, int mu,
-		       typename RealTypeId<RealA>::Type coeff, 
+		       const typename RealTypeId<RealA>::Type &coeff, 
 		       cudaGaugeField &P3, cudaGaugeField &newOprod,
 		       const hisq_kernel_param_t &kparam) :
 	link(link), oprod(oprod), Qprev(Qprev), sig(sig), mu(mu), 
@@ -852,7 +852,7 @@ namespace quda {
       ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
        (typeA*)Qprev.Even_p(), (typeA*)Qprev.Odd_p(),			\
        (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
-       sig, mu, (typename RealTypeId<typeA>::Type)coeff,		\
+       sig, mu, coeff,							\
        (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
        (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
        kparam)
@@ -953,8 +953,8 @@ namespace quda {
       const cudaGaugeField &oprod;
       const int sig;
       const int mu;
-      typename RealTypeId<RealA>::Type &coeff; 
-      typename RealTypeId<RealA>::Type &accumu_coeff;
+      const typename RealTypeId<RealA>::Type &coeff; 
+      const typename RealTypeId<RealA>::Type &accumu_coeff;
       cudaGaugeField &shortP;
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
@@ -975,8 +975,8 @@ namespace quda {
 	       const cudaGaugeField &P3,
 	       const cudaGaugeField &oprod,
 	       int sig, int mu, 
-	       typename RealTypeId<RealA>::Type coeff, 
-	       typename RealTypeId<RealA>::Type accumu_coeff,
+	       const typename RealTypeId<RealA>::Type &coeff, 
+	       const typename RealTypeId<RealA>::Type &accumu_coeff,
 	       cudaGaugeField &shortP,
 	       cudaGaugeField &newOprod,
 	       const hisq_kernel_param_t &kparam) :
@@ -1002,7 +1002,7 @@ namespace quda {
        (typeA*)oprod.Even_p(),  (typeA*)oprod.Odd_p(),			\
        (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
        sig, mu,								\
-       (typename RealTypeId<typeA>::Type) coeff,			\
+       coeff,			\
        (typename RealTypeId<typeA>::Type) accumu_coeff,			\
        (typeA*)shortP.Even_p(), (typeA*)shortP.Odd_p(),			\
        (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
@@ -1102,7 +1102,7 @@ namespace quda {
       const cudaGaugeField &P3; 
       const int sig;
       const int mu;
-      typename RealTypeId<RealA>::Type &coeff; 
+      const typename RealTypeId<RealA>::Type &coeff; 
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
 
@@ -1119,7 +1119,7 @@ namespace quda {
 
     public:
       SideLinkShort(const cudaGaugeField &link, const cudaGaugeField &P3, int sig, int mu, 
-		    typename RealTypeId<RealA>::Type coeff, cudaGaugeField &newOprod,
+		    const typename RealTypeId<RealA>::Type &coeff, cudaGaugeField &newOprod,
 		    const hisq_kernel_param_t &kparam) :
 	link(link), P3(P3), sig(sig), mu(mu), coeff(coeff), newOprod(newOprod), kparam(kparam)
       {	; }
@@ -1237,8 +1237,8 @@ namespace quda {
       const cudaGaugeField &Qprev;
       const int sig;
       const int mu;
-      typename RealTypeId<RealA>::Type &coeff; 
-      typename RealTypeId<RealA>::Type &accumu_coeff;
+      const typename RealTypeId<RealA>::Type &coeff; 
+      const typename RealTypeId<RealA>::Type &accumu_coeff;
       cudaGaugeField &shortP;
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
@@ -1259,8 +1259,8 @@ namespace quda {
 	      const cudaGaugeField &oprod, 
 	      const cudaGaugeField &Qprev, 
 	      int sig, int mu,
-	      typename RealTypeId<RealA>::Type coeff, 
-	      typename RealTypeId<RealA>::Type  accumu_coeff,
+	      const typename RealTypeId<RealA>::Type &coeff, 
+	      const typename RealTypeId<RealA>::Type &accumu_coeff,
 	      cudaGaugeField &shortP, cudaGaugeField &newOprod, 
 	      const hisq_kernel_param_t &kparam) : 
 	link(link), oprod(oprod), Qprev(Qprev), sig(sig), mu(mu), 
@@ -1382,8 +1382,7 @@ namespace quda {
     private:
       const cudaGaugeField &oprod;
       const int sig;
-      typename RealTypeId<RealA>::Type &coeff; 
-      typename RealTypeId<RealA>::Type &naik_coeff;
+      const typename RealTypeId<RealA>::Type &coeff; 
       cudaGaugeField &ForceMatrix;
       const int* X;
       
@@ -1402,11 +1401,9 @@ namespace quda {
 
     public:
       OneLinkTerm(const cudaGaugeField &oprod, int sig, 
-		  typename RealTypeId<RealA>::Type coeff, 
-		  typename RealTypeId<RealA>::Type naik_coeff,
+		  const typename RealTypeId<RealA>::Type &coeff, 
 		  cudaGaugeField &ForceMatrix, const int* _X) :
-      oprod(oprod), sig(sig), coeff(coeff), naik_coeff(naik_coeff), ForceMatrix(ForceMatrix),
-	X(_X)
+      oprod(oprod), sig(sig), coeff(coeff), ForceMatrix(ForceMatrix), X(_X)
       { ; }
 
       virtual ~OneLinkTerm() { ; }
@@ -1480,7 +1477,7 @@ namespace quda {
       const cudaGaugeField &link;
       const cudaGaugeField &naikOprod;
       const int sig;
-      typename RealTypeId<RealA>::Type naik_coeff;
+      const typename RealTypeId<RealA>::Type &naik_coeff;
       cudaGaugeField &output;
       const int * X;
       const hisq_kernel_param_t &kparam;
@@ -1499,7 +1496,7 @@ namespace quda {
 
     public:
     LongLinkTerm(const cudaGaugeField &link, const cudaGaugeField &naikOprod,
-		   int sig, typename RealTypeId<RealA>::Type naik_coeff,
+		   int sig, const typename RealTypeId<RealA>::Type &naik_coeff,
 		 cudaGaugeField &output, const int* _X, const hisq_kernel_param_t &kparam) :
       link(link), naikOprod(naikOprod), sig(sig), naik_coeff(naik_coeff), output(output),
 	X(_X), kparam(kparam)
@@ -1751,9 +1748,10 @@ namespace quda {
       Lepage  = act_path_coeff.lepage; mLepage  = -Lepage;
 
 
+	  
       for(int sig=0; sig<8; ++sig){
 	if(GOES_FORWARDS(sig)){
-	  OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, 0.0, newOprod, param.X);
+	  OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, newOprod, param.X);
 	  oneLink.apply(0);
 	  checkCudaError();
 	} // GOES_FORWARDS(sig)
@@ -1841,7 +1839,6 @@ namespace quda {
 	    middleLink.apply(0);
 	    checkCudaError();
 
-
 	    for(int rho = 0; rho < 8; rho++){
 	      if (rho == sig || rho == OPP_DIR(sig)
 		  || rho == mu || rho == OPP_DIR(mu)
@@ -1854,8 +1851,8 @@ namespace quda {
 					   P5, newOprod, kparam_1g);
 
 	      allLink.apply(0);
-
 	      checkCudaError();
+
 	      //return;
 	    }//rho  		
 
@@ -1889,6 +1886,7 @@ namespace quda {
 	      
 	    sideLink.apply(0);
 	    checkCudaError();		
+
 	  } // Lepage != 0.0
 
             //3-link side link
