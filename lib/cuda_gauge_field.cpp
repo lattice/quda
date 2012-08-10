@@ -2,6 +2,7 @@
 #include <face_quda.h>
 #include <typeinfo>
 #include <misc_helpers.h>
+#include <blas_quda.h>
 
 cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
   GaugeField(param), gauge(0), even(0), odd(0), 
@@ -463,3 +464,40 @@ void cudaGaugeField::restore() {
   backed_up = false;
 }
 
+// Return the L2 norm squared of the gauge field
+double norm2(const cudaGaugeField &a) {
+  
+  int spin = 0;
+  switch (a.Geometry()) {
+  case QUDA_SCALAR_GEOMETRY:
+    spin = 1;
+    break;
+  case QUDA_VECTOR_GEOMETRY:
+    spin = a.Ndim();
+    break;
+  case QUDA_TENSOR_GEOMETRY:
+    spin = a.Ndim() * (a.Ndim()-1);
+    break;
+  default:
+    errorQuda("Unsupported field geometry %d", a.Geometry());
+  }
+
+  if (a.Precision() == QUDA_HALF_PRECISION) 
+    errorQuda("Casting a cudaGaugeField into cudaColorSpinorField not possible in half precision");
+
+  ColorSpinorParam spinor_param;
+  spinor_param.nColor = a.Reconstruct()/2;
+  spinor_param.nSpin = a.Ndim();
+  spinor_param.nDim = spin;
+  for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
+  spinor_param.precision = a.Precision();
+  spinor_param.pad = a.Pad();
+  spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  spinor_param.fieldOrder = (QudaFieldOrder)a.FieldOrder();
+  spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
+  spinor_param.v = (void*)a.Gauge_p();
+  cudaColorSpinorField b(spinor_param);
+  return norm2(b);
+}

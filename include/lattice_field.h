@@ -61,6 +61,7 @@ class LatticeField {
   LatticeField(const LatticeFieldParam &param);
   virtual ~LatticeField() { ; }
 
+  int Ndim() const { return nDim; }
   const int* X() const { return x; }
   int Volume() const { return volume; }
   int VolumeCB() const { return volumeCB; }

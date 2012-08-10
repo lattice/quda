@@ -102,9 +102,7 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
   }
   cudaColorSpinorField &tmp2 = *tmp2_p;
 
-  double b2 = 0.0;
-  b2 = normCuda(b);
-    
+  double b2 = normCuda(b);
   double r2 = b2;
   double r2_old;
 
@@ -124,8 +122,6 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
     
   stopwatchStart();
   while (r2 > stop &&  k < invParam.maxiter) {
-    //dslashCuda_st(tmp_sloppy, fatlinkSloppy, longlinkSloppy, p[0], 1 - oddBit, 0);
-    //dslashAxpyCuda(Ap, fatlinkSloppy, longlinkSloppy, tmp_sloppy, oddBit, 0, p[0], msq_x4);
     matSloppy(*Ap, *p[0], tmp1, tmp2);
     if (invParam.dslash_type != QUDA_ASQTAD_DSLASH){
       axpyCuda(offset[0], *p[0], *Ap);

@@ -76,9 +76,11 @@ void ColorSpinorField::createGhostZone() {
       ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
     }
 
+#ifdef MULTI_GPU
     if (verbose == QUDA_DEBUG_VERBOSE) 
       printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
 		 i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
+#endif
   }//end of outmost for loop
 //END NEW  
   int ghostNormVolume = num_norm_faces * ghostVolume;
@@ -153,6 +155,7 @@ void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistF
   norm_bytes = total_norm_length * sizeof(float);
   norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
   init = true;
+
 }
 
 void ColorSpinorField::destroy() {
@@ -211,6 +214,12 @@ void ColorSpinorField::reset(const ColorSpinorParam &param) {
   norm_bytes = total_norm_length * sizeof(float);
   norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
   if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
+
+  if (verbose >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("\nPrinting out reset field\n");
+    std::cout << *this << std::endl;
+    printfQuda("\n");
+  }
 }
 
 // Fills the param with the contents of this field

@@ -111,7 +111,9 @@ class GaugeField : public LatticeField {
   QudaTboundary TBoundary() const { return t_boundary; }
   QudaLinkType LinkType() const { return link_type; }
   QudaGaugeFixed GaugeFixed() const { return fixed; }
-
+  QudaGaugeFieldOrder FieldOrder() const { return order; }
+  QudaFieldGeometry Geometry() const { return geometry; }
+  
   void checkField(const GaugeField &);
 
   const size_t& Bytes() const { return bytes; }
@@ -185,6 +187,14 @@ class cpuGaugeField : public GaugeField {
   void* Gauge_p() { return gauge; }
   void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 };
+
+/**
+   This is a debugging function, where we cast a gauge field into a
+   spinor field so we can compute its L2 norm.
+   @param a The gauge field that we want the norm of
+   @return The L2 norm squared of the gauge field
+ */
+double norm2(const cudaGaugeField &a);
 
 #define gaugeSiteSize 18 // real numbers per gauge field
   

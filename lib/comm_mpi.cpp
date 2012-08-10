@@ -48,10 +48,10 @@ comm_set_gridsize(int x, int y, int z, int t)
   return;
 }
 
-/* This function is for and testing debugging purpose only
- * The partitioning schedume should be generated automically 
- * in production runs. Don't use this function if you don't know
- * what you are doing
+/* This function is for and testing debugging purpose only The
+ * partitioning schedume should be generated automatically in
+ * production runs. Don't use this function if you don't know what you
+ * are doing
  */
 void
 comm_dim_partitioned_set(int dir)

@@ -39,14 +39,21 @@ extern bool kernelPackT;
 
 cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
   ColorSpinorField(param), v(0), norm(0), alloc(false), init(true) {
+
+  // this must come before create
+  if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+    v = param.v;
+    norm = param.norm;
+  }
+
   create(param.create);
+
   if  (param.create == QUDA_NULL_FIELD_CREATE) {
     // do nothing
   } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
     zero();
   } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-    v = param.v;
-    norm = param.norm;
+    // dp nothing
   } else if (param.create == QUDA_COPY_FIELD_CREATE){
     errorQuda("not implemented");
   }
@@ -74,6 +81,16 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
     errorQuda("Undefined behaviour"); // else silent bug possible?
   }
 
+  // This must be set before create is called
+  if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+    if (typeid(src) == typeid(cudaColorSpinorField)) {
+      v = (dynamic_cast<const cudaColorSpinorField&>(src)).v;
+      norm = (dynamic_cast<const cudaColorSpinorField&>(src)).norm;
+    } else {
+      errorQuda("Cannot reference a non-cuda field");
+    }
+  }
+
   create(param.create);
 
   if (param.create == QUDA_NULL_FIELD_CREATE) {
@@ -87,12 +104,7 @@ cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const Co
       loadSpinorField(src);
     }
   } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-    if (typeid(src) == typeid(cudaColorSpinorField)) {
-      v = (dynamic_cast<const cudaColorSpinorField&>(src)).v;
-      norm = (dynamic_cast<const cudaColorSpinorField&>(src)).norm;
-    } else {
-      errorQuda("Cannot reference a non cuda field");
-    }
+    // do nothing
   } else {
     errorQuda("CreateType %d not implemented", param.create);
   }
@@ -210,6 +222,7 @@ void cudaColorSpinorField::create(const QudaFieldCreate create) {
     param.norm = norm;
     even = new cudaColorSpinorField(*this, param);
     odd = new cudaColorSpinorField(*this, param);
+
     // need this hackery for the moment (need to locate the odd pointer half way into the full field)
     (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((unsigned long)v + bytes/2);
     if (precision == QUDA_HALF_PRECISION) 
