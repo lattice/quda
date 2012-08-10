@@ -194,6 +194,65 @@ void cpuColorSpinorField::destroy() {
 
 }
 
+/*
+  Convert from 1-dimensional index to the n-dimensional spatial index.
+  With full fields, we assume that the field is even-odd ordered.  The
+  lattice coordinates that are computed here are full-field
+  coordinates.
+ */
+void cpuColorSpinorField::LatticeIndex(const int *y, const int i) const {
+
+  // parity is the slowest running dimension
+  int parity = 0;
+  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
+    parity = i % (volume / 2);
+    i /= (volume / 2);
+    x[0] /= 2; // half this for convenience
+  }
+
+  for (int d=0; d<nDim; d++) {
+    y[d] = i % x[d];
+    i /= x[d];    
+  }
+
+  // convert into the full-field lattice coordinate
+  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
+    x[0] *= 2; // restore the x dimension
+    for (int d=1; d<nDim; d++) parity += y[d];
+    parity = parity & 1;
+  }
+  y[0] = 2*y[0] + parity;  // compute the full x coordinate
+}
+
+/*
+  Convert from n-dimensional spatial index to the 1-dimensional index.
+  With full fields, we assume that the field is even-odd ordered.  The
+  input lattice coordinates are always full-field coordinates.
+ */
+void cpuColorSpinorField::OffsetIndex(const int i, const int *y) const {
+
+  int parity = 0;
+  int y0 = y[0];
+  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
+    for (int d=1; d<nDim; d++) parity += y[d];
+    parity = parity & 1;
+    y0 = y[0];
+    y[0] /= 2;
+  }
+
+  i = y[nDim-1];
+  for (int d=nDim-2; d>=0; d--) {
+    i = x[d]*i + y[d];
+  }
+
+  if (siteSubset == QUDA_FULL_FIELD_SUBSET) {
+    i = i + parity * (volume / 2);
+    y[0] = y0;
+  }
+
+}
+
+
 template <class D, class S>
 void genericCopy(D &dst, const S &src) {
 

@@ -240,14 +240,14 @@ class ColorSpinorField {
    * @param y n-dimensional site index
    * @param i 1-dimensional site index
    */
-  void LatticeIndex(const int *y, const int i);
+  void LatticeIndex(const int *y, const int i) const;
 
   /** 
    * Compute the 1-d offset index given the n-dimensional site index
    * @param i 1-dimensional site index
    * @param y n-dimensional site index
    */
-  void OffsetIndex(const int i, const int *y);
+  void OffsetIndex(const int i, const int *y) const;
 
   int GhostLength() const { return ghost_length; }
   const int *GhostFace() const { return ghostFace; }  
