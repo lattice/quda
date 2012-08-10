@@ -30,6 +30,7 @@ class Transfer {
    * The constructor for Transfer
    * @param B Array of null-space vectors
    * @param Nvec Number of null-space vectors
+   * @param d The Dirac operator to which these null-space vectors correspond
    * @param geo_map Geometric mapping from fine grid to coarse grid 
    * @param spin_map Mapping from fine spin to coarse spin 
    */
