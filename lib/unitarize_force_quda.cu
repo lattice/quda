@@ -5,10 +5,10 @@
 #include <cuda.h>
 #include <gauge_field.h>
 
-#include "quda_matrix.h"
-#include "svd_quda.h"
+#include <quda_matrix.h>
+#include <svd_quda.h>
 
-
+namespace quda{
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
@@ -37,35 +37,34 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 #define HALF_VOLUME Vh
 #endif
  
-namespace quda{
   namespace fermion_force{
 
 
 
-    void setUnitarizeForceConstants(double unitarize_eps, double hisq_force_filter, double max_det_error, 
-				    bool allow_svd, bool svd_only,
-				    double svd_rel_error, double svd_abs_error)
+    void setUnitarizeForceConstants(double unitarize_eps_h, double hisq_force_filter_h, 
+				    double max_det_error_h, bool allow_svd_h, bool svd_only_h,
+				    double svd_rel_error_h, double svd_abs_error_h)
     {
 
       // not_set is only initialised once
       static bool not_set=true;
 		
       if(not_set){
-	cudaMemcpyToSymbol("DEV_HISQ_UNITARIZE_EPS", &unitarize_eps, sizeof(double));
-	cudaMemcpyToSymbol("DEV_HISQ_FORCE_FILTER", &hisq_force_filter, sizeof(double));
-	cudaMemcpyToSymbol("DEV_MAX_DET_ERROR", &max_det_error, sizeof(double));
-	cudaMemcpyToSymbol("DEV_REUNIT_ALLOW_SVD", &allow_svd, sizeof(bool));
-	cudaMemcpyToSymbol("DEV_REUNIT_SVD_ONLY", &svd_only, sizeof(bool));
-	cudaMemcpyToSymbol("DEV_REUNIT_SVD_REL_ERROR", &svd_rel_error, sizeof(double));
-	cudaMemcpyToSymbol("DEV_REUNIT_SVD_ABS_ERROR", &svd_abs_error, sizeof(double));
+	cudaMemcpyToSymbol(DEV_HISQ_UNITARIZE_EPS, &unitarize_eps_h, sizeof(double));
+	cudaMemcpyToSymbol(DEV_HISQ_FORCE_FILTER, &hisq_force_filter_h, sizeof(double));
+	cudaMemcpyToSymbol(DEV_MAX_DET_ERROR, &max_det_error_h, sizeof(double));
+	cudaMemcpyToSymbol(DEV_REUNIT_ALLOW_SVD, &allow_svd_h, sizeof(bool));
+	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ONLY, &svd_only_h, sizeof(bool));
+	cudaMemcpyToSymbol(DEV_REUNIT_SVD_REL_ERROR, &svd_rel_error_h, sizeof(double));
+	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ABS_ERROR, &svd_abs_error_h, sizeof(double));
 	
-	HOST_HISQ_UNITARIZE_EPS = unitarize_eps;
-	HOST_HISQ_FORCE_FILTER = hisq_force_filter;
-	HOST_MAX_DET_ERROR = max_det_error;     
-	HOST_REUNIT_ALLOW_SVD = allow_svd;
-	HOST_REUNIT_SVD_ONLY = svd_only;
-	HOST_REUNIT_SVD_REL_ERROR = svd_rel_error;
-	HOST_REUNIT_SVD_ABS_ERROR = svd_abs_error;
+	HOST_HISQ_UNITARIZE_EPS = unitarize_eps_h;
+	HOST_HISQ_FORCE_FILTER = hisq_force_filter_h;
+	HOST_MAX_DET_ERROR = max_det_error_h;     
+	HOST_REUNIT_ALLOW_SVD = allow_svd_h;
+	HOST_REUNIT_SVD_ONLY = svd_only_h;
+	HOST_REUNIT_SVD_REL_ERROR = svd_rel_error_h;
+	HOST_REUNIT_SVD_ABS_ERROR = svd_abs_error_h;
 
 	not_set = false;
       }

@@ -12,6 +12,8 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
+using namespace quda;
+
 QudaGaugeParam param;
 cudaColorSpinorField *cudaSpinor;
 
@@ -24,23 +26,34 @@ ColorSpinorParam csParam;
 float kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
+
+extern int device;
+extern int xdim;
+extern int ydim;
+extern int zdim;
+extern int tdim;
+extern QudaReconstructType link_recon;
+extern QudaPrecision prec;
+extern char latfile[];
     
+QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
+
 // where is the packing / unpacking taking place
 //most orders are CPU only currently
 const QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION;
 
 void init() {
 
-  param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  param.cuda_prec = QUDA_SINGLE_PRECISION;
-  param.reconstruct = QUDA_RECONSTRUCT_12;
+  param.cpu_prec = prec_cpu;
+  param.cuda_prec = prec;
+  param.reconstruct = link_recon;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
   
-  param.X[0] =24;
-  param.X[1] =24;
-  param.X[2] =24;
-  param.X[3] =24;
+  param.X[0] = xdim;
+  param.X[1] = ydim;
+  param.X[2] = zdim;
+  param.X[3] = tdim;
   param.ga_pad = 0;
   setDims(param.X);
 
@@ -58,7 +71,7 @@ void init() {
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
-  csParam.precision = QUDA_DOUBLE_PRECISION;
+  csParam.precision = prec_cpu;
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -71,13 +84,12 @@ void init() {
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
-  initQuda(0);
+  initQuda(device);
 
-  csParam.precision = QUDA_SINGLE_PRECISION;
-  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  csParam.precision = prec;
+  csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
-  csParam.precision = QUDA_SINGLE_PRECISION;
 
   cudaSpinor = new cudaColorSpinorField(csParam);
 }
@@ -193,7 +205,18 @@ void packTest() {
 
 }
 
+extern void usage(char**);
+
 int main(int argc, char **argv) {
+  for (int i=1; i<argc; i++){    
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }  
+    
+    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
+
   init();
   packTest();
   end();

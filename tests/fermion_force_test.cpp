@@ -11,6 +11,9 @@
 #include "fermion_force_quda.h"
 #include "hw_quda.h"
 #include <sys/time.h>
+#include <dslash_quda.h>
+
+using namespace quda;
 
 extern void usage(char** argv);
 extern int device;
@@ -39,21 +42,6 @@ QudaPrecision hw_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision mom_prec = QUDA_SINGLE_PRECISION;
 
 QudaPrecision cpu_hw_prec = QUDA_SINGLE_PRECISION;
-
-int Z[4];
-int V;
-int Vh;
-void
-setDims(int *X) {
-  V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-    Z[d] = X[d];
-  }
-  Vh = V/2;
-}
-
-extern void initLatticeConstants(const LatticeField &gauge);
 
 static void
 fermion_force_init()

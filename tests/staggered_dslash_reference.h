@@ -9,6 +9,8 @@ extern int Z[4];
 extern int Vh;
 extern int V;
 
+using namespace quda;
+
 void setDims(int *);
 
 void staggered_dslash(void *res, void ** fatlink, void** longlink, void *spinorField,

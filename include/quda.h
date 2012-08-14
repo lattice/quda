@@ -358,6 +358,13 @@ extern "C" {
   int computeFatLinkQuda(void* fatlink, void** sitelink,
 			 double* act_path_coeff, QudaGaugeParam* param, 
 			 QudaComputeFatMethod method);
+
+  /**
+   * Compute the gauge action force.
+   */
+  int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
+			    void* loop_coeff, int num_paths, int max_length, double eb3,
+			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
   
   /*
    * The following routines are only used by the examples in tests/ .

@@ -21,6 +21,8 @@
 
 #include <assert.h>
 
+using namespace quda;
+
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)

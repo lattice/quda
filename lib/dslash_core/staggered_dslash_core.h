@@ -86,11 +86,7 @@
 #define long22_re LONG8.x
 #define long22_im LONG8.y
 
-#define A_re LONG9.x
-#define A_im LONG9.y
-
 #else
-
 
 #define fat00_re FAT0.x
 #define fat00_im FAT0.y
@@ -149,8 +145,6 @@
 #define long21_im LONG3.w
 #define long22_re LONG4.x
 #define long22_im LONG4.y
-#define A_re LONG4.z
-#define A_im LONG4.w
 #endif
 
 #endif
@@ -1134,9 +1128,6 @@ WRITE_SPINOR(out);
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
 #undef SHARED_STRIDE
-
-#undef A_re
-#undef A_im
 
 #undef g00_re
 #undef g00_im

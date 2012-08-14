@@ -3,10 +3,6 @@
 
 #include "quda.h"
 
-#ifdef __cplusplus
-extern "C"{
-#endif
-
 #define LLFAT_INTERIOR_KERNEL 0
 #define LLFAT_EXTERIOR_KERNEL_FWD_X 1
 #define LLFAT_EXTERIOR_KERNEL_BACK_X 2
@@ -17,7 +13,9 @@ extern "C"{
 #define LLFAT_EXTERIOR_KERNEL_FWD_T 7
 #define LLFAT_EXTERIOR_KERNEL_BACK_T 8
 
-  typedef struct llfat_kernel_param_s{
+namespace quda {
+  
+  typedef struct llfat_kernel_param_s {
     unsigned long threads;
     int ghostDim[4]; // Whether a ghost zone has been allocated for a given dimension
     int kernel_type;
@@ -28,7 +26,7 @@ extern "C"{
     dim3 halfGridDim;
     int base_idx;
     
-  }llfat_kernel_param_t;
+  } llfat_kernel_param_t;
   
 
   void llfat_cuda(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink, 
@@ -81,11 +79,9 @@ extern "C"{
 
 
   void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
-                        QudaGaugeParam* qudaGaugeParam, QudaComputeFatMethod method,
-                        cudaGaugeField* cudaFatLink, struct timeval time_array[]);
-
-#ifdef __cplusplus
-}
-#endif
+			  QudaGaugeParam* qudaGaugeParam, QudaComputeFatMethod method,
+			  cudaGaugeField* cudaFatLink, struct timeval time_array[]);
+  
+} // namespace quda
 
 #endif // _LLFAT_QUDA_H

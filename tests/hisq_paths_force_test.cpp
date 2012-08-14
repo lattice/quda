@@ -19,7 +19,7 @@
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
 #include "fermion_force_reference.h"
-using namespace quda::fermion_force;
+using namespace quda;
 
 extern void usage(char** argv);
 extern int device;
@@ -178,10 +178,6 @@ total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double* io,
   printfQuda("flop/byte =%.1f\n", total_flops/total_io);
   return ;  
 }
-
-void initLatticeConstants(const LatticeField &lat);
-void initGaugeConstants(const cudaGaugeField &gauge);
-
 
 // allocate memory
 // set the layout, etc.
@@ -553,7 +549,7 @@ hisq_force_test(void)
   hisq_force_init();
 
   initLatticeConstants(*cpuMom);
-  hisqForceInitCuda(&qudaGaugeParam);
+  fermion_force::hisqForceInitCuda(&qudaGaugeParam);
 
 
    
@@ -618,15 +614,6 @@ hisq_force_test(void)
     }
     */
     
-    void* coeff;
-    void* naik_coeff;
-    if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
-      coeff = act_path_coeff;
-      naik_coeff = &act_path_coeff[1];
-    }else{
-      coeff = d_act_path_coeff;
-      naik_coeff = &d_act_path_coeff[1];
-    }
 #ifdef MULTI_GPU
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
@@ -645,27 +632,27 @@ hisq_force_test(void)
   gettimeofday(&t0, NULL);
 
 #ifdef MULTI_GPU
-  hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
+  fermion_force::hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod_ex, *cudaGauge_ex, cudaForce_ex);
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
   
   delete cudaOprod_ex; //doing this to lower the peak memory usage
   cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
   loadLinkToGPU_ex(cudaLongLinkOprod_ex, cpuLongLinkOprod_ex);
-  hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
+  fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
   cudaDeviceSynchronize(); 
   
   gettimeofday(&t2, NULL);
 
 #else
-  hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+  fermion_force::hisqStaplesForceCuda(d_act_path_coeff, qudaGaugeParam, *cudaOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 
   gettimeofday(&t1, NULL);
 
   checkCudaError();
   loadLinkToGPU(cudaLongLinkOprod, cpuLongLinkOprod, &qudaGaugeParam);
 
-  hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
+  fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 
   gettimeofday(&t2, NULL);
   
@@ -681,9 +668,9 @@ hisq_force_test(void)
   qudaGaugeParam.mom_ga_pad = gParam.pad;
   
 #ifdef MULTI_GPU
-  hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);  
+  fermion_force::hisqCompleteForceCuda(qudaGaugeParam, *cudaForce_ex, *cudaGauge_ex, cudaMom);  
 #else
-  hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
+  fermion_force::hisqCompleteForceCuda(qudaGaugeParam, *cudaForce, *cudaGauge, cudaMom);
 #endif
 
 
