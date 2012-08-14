@@ -5,38 +5,20 @@
 
 #include <typeinfo>
 #include <quda.h>
-#include "fat_force_quda.h"
 #include <quda_internal.h>
+#include <fat_force_quda.h>
 #include <face_quda.h>
-#include "misc_helpers.h"
+#include <misc_helpers.h>
 #include <assert.h>
-#include <cuda.h>
-#include "gauge_field.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define ALIGNMENT 4096 
-
-#ifdef MPI_COMMS
-#include "face_quda.h"
-#endif
-
-namespace quda {
-
-  static double anisotropy_;
-  extern float fat_link_max_;
-  static int X_[4];
-  static QudaTboundary t_boundary_;
-
-#define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
-#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
-
-#include <pack_gauge.h>
 
   /********************** Staple code, used by link fattening **************/
 
 #if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) ||defined(GPU_HISQ_FORCE)
 
+namespace quda {
 
   template <typename Float>
   void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace, int* X) {

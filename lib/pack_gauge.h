@@ -787,8 +787,6 @@ template <typename Float, typename Float2>
   }      
 }
 
-
-
 template <typename Float, typename Float2>
   inline void unpack10(Float* m, Float2 *res, int dir, int Vh, int pad) 
 {
@@ -813,4 +811,3 @@ template <typename Float, typename Float2>
     }
   }
 }
-

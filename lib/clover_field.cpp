@@ -180,7 +180,6 @@ namespace quda {
       for (int i = 0; i < Vh; i++) {
 	Float tmp[72];
 	reorderBQCD(tmp, clover+72*i);
-	if (i==0) printf("%e %e %e %e %e %e\n", ((double*)tmp)[0],((double*)tmp)[1],((double*)tmp)[2],((double*)tmp)[3],((double*)tmp)[4],((double*)tmp)[5]);
 	packCloverMatrix<true>(res+i, tmp, Vh+pad);      
       }
     }

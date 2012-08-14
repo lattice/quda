@@ -2170,5 +2170,9 @@ void new_quda_invert_param_(QudaInvertParam *param) {
   *param = newQudaInvertParam();
 }
 void comm_set_gridsize_(int *grid) {
+#ifdef MPI_COMMS 
   comm_set_gridsize(grid[0], grid[1], grid[2], grid[3]);
+#else
+  errorQuda("Not implemented for non-MPI communications");
+#endif
 }
