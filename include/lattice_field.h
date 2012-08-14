@@ -4,9 +4,15 @@
 #include <quda.h>
 #include <iostream>
 
-namespace quda {
+/**
+ * @file lattice_field.h
+ *
+ * @section DESCRIPTION 
+ *
+ * LatticeField is an abstract base clase for all Field objects.
+ */
 
-  // LatticeField is an abstract base clase for all Field objects.
+namespace quda {
 
   // Forward declaration of all children
   class ColorSpinorField;
@@ -30,12 +36,16 @@ namespace quda {
     QudaVerbosity verbosity;
 
     LatticeFieldParam() { ; }
-
-    // constructor for creating a cpuGaugeField only
-  LatticeFieldParam(const QudaGaugeParam &param) : nDim(4), pad(0), 
+    
+    /**
+       Constructor for creating a LatticeField from a QudaGaugeParam
+       @param param Contains the metadate for creating the
+       LatticeField
+    */
+    LatticeFieldParam(const QudaGaugeParam &param) : nDim(4), pad(0), 
       precision(param.cpu_prec), verbosity(QUDA_SILENT)  {
-    for (int i=0; i<nDim; i++) x[i] = param.X[i];
-  }
+      for (int i=0; i<nDim; i++) x[i] = param.X[i];
+    }
   };
 
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param);
@@ -59,25 +69,93 @@ namespace quda {
     QudaPrecision precision;
     QudaVerbosity verbosity;
 
-  public:
-    LatticeField(const LatticeFieldParam &param);
-    virtual ~LatticeField() { ; }
+ public:
+  /**
+     Constructor for creating a LatticeField from a LatticeFieldParam
+     @param param Contains the metadata for creating the LatticeField
+  */
+  LatticeField(const LatticeFieldParam &param);
 
-    int Ndim() const { return nDim; }
-    const int* X() const { return x; }
-    int Volume() const { return volume; }
-    int VolumeCB() const { return volumeCB; }
-    int SurfaceCB(const int i) const { return surfaceCB[i]; }
-    int Stride() const { return stride; }
-    int Pad() const { return pad; }
+  /**
+     Destructor for LatticeField
+  */
+  virtual ~LatticeField() { ; }
 
-    QudaPrecision Precision() const { return precision; }
-    QudaFieldLocation Location() const;
-    QudaVerbosity Verbosity() const { return verbosity; }
-    size_t GBytes() const { return total_bytes / (1<<30); } // returns total storage allocated
+  /**
+     @return The dimension of the lattice 
+  */
+  int Ndim() const { return nDim; }
 
-    void checkField(const LatticeField &);
-  };
+  /**
+     @return The pointer to the lattice-dimension array
+  */
+  const int* X() const { return x; }
+
+  /**
+     @return The full-field volume
+  */
+  int Volume() const { return volume; }
+
+  /**
+     @return The single-parity volume
+  */
+  int VolumeCB() const { return volumeCB; }
+
+  /**
+     @param i The dimension of the requested surface 
+     @return The single-parity surface of dimension i
+  */
+  int SurfaceCB(const int i) const { return surfaceCB[i]; }
+
+  /**
+     @return The single-parity stride of the field     
+  */
+  int Stride() const { return stride; }
+
+  /**
+     @return The field padding
+  */
+  int Pad() const { return pad; }
+
+  /**
+     @return The field precision
+  */
+  QudaPrecision Precision() const { return precision; }
+
+  /**
+     @return The location of the field
+  */
+  QudaFieldLocation Location() const;
+
+  /**
+     @return The verbosity of the field
+  */
+  QudaVerbosity Verbosity() const { return verbosity; }
+
+  /**
+     @return The total storage allocated
+  */
+  size_t GBytes() const { return total_bytes / (1<<30); }
+
+  /**
+     Check that the metadata of *this and a are compatible
+     @param a The LatticeField to which we are comparing
+  */
+  void checkField(const LatticeField &a);
+
+  /**
+     Read in the field specified by filenemae
+     @param filename The name of the file to read
+  */
+  virtual void read(char *filename);
+
+  /**
+     Write the field in the file specified by filename
+     @param filename The name of the file to write
+  */
+  virtual void write(char *filename);
+
+};
 
 } // namespace quda
 

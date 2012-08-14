@@ -7,20 +7,20 @@
 #include <color_spinor_field_order.h>
 
 /*
-Maybe this will be useful at some point
+  Maybe this will be useful at some point
 
-#define myalloc(type, n, m0) (type *) aligned_malloc(n*sizeof(type), m0)
+  #define myalloc(type, n, m0) (type *) aligned_malloc(n*sizeof(type), m0)
 
-#define ALIGN 16
-void *
-aligned_malloc(size_t n, void **m0)
-{
+  #define ALIGN 16
+  void *
+  aligned_malloc(size_t n, void **m0)
+  {
   size_t m = (size_t) malloc(n+ALIGN);
   *m0 = (void*)m;
   size_t r = m % ALIGN;
   if(r) m += (ALIGN - r);
   return (void *)m;
-}
+  }
 */
 
 namespace quda {
@@ -196,9 +196,68 @@ namespace quda {
 
   }
 
+  /*
+    Convert from 1-dimensional index to the n-dimensional spatial index.
+    With full fields, we assume that the field is even-odd ordered.  The
+    lattice coordinates that are computed here are full-field
+    coordinates.
+  */
+  void cpuColorSpinorField::LatticeIndex(int *y, int i) const {
+
+    int z[QUDA_MAX_DIM];
+    memcpy(z, x, QUDA_MAX_DIM*sizeof(int));
+
+    // parity is the slowest running dimension
+    int parity = 0;
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      parity = i % (volume / 2);
+      i /= (volume / 2);
+      z[0] /= 2; // half this for convenience
+    }
+
+    for (int d=0; d<nDim; d++) {
+      y[d] = i % z[d];
+      i /= z[d];    
+    }
+
+    // convert into the full-field lattice coordinate
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      for (int d=1; d<nDim; d++) parity += y[d];
+      parity = parity & 1;
+    }
+    y[0] = 2*y[0] + parity;  // compute the full x coordinate
+  }
+
+  /*
+    Convert from n-dimensional spatial index to the 1-dimensional index.
+    With full fields, we assume that the field is even-odd ordered.  The
+    input lattice coordinates are always full-field coordinates.
+  */
+  void cpuColorSpinorField::OffsetIndex(int &i, int *y) const {
+
+    int parity = 0;
+    int y0 = y[0];
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      for (int d=1; d<nDim; d++) parity += y[d];
+      parity = parity & 1;
+      y0 = y[0];
+      y[0] /= 2;
+    }
+
+    i = y[nDim-1];
+    for (int d=nDim-2; d>=0; d--) {
+      i = x[d]*i + y[d];
+    }
+
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      i = i + parity * (volume / 2);
+      y[0] = y0;
+    }
+
+  }
+
   template <class D, class S>
   void genericCopy(D &dst, const S &src) {
-
     for (int x=0; x<dst.Volume(); x++) {
       for (int s=0; s<dst.Nspin(); s++) {
 	for (int c=0; c<dst.Ncolor(); c++) {

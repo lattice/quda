@@ -271,6 +271,7 @@ namespace quda {
 
     void zeroPad();
   
+
     void resizeBuffer(size_t bytes) const;
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
@@ -323,6 +324,7 @@ namespace quda {
   class cpuColorSpinorField : public ColorSpinorField {
 
     friend class cudaColorSpinorField;
+    friend class Transfer; // to allow access to the order functors
 
     template <typename Float> friend class SpaceColorSpinOrder;
     template <typename Float> friend class SpaceSpinColorOrder;
@@ -380,7 +382,24 @@ namespace quda {
     void copy(const cpuColorSpinorField&);
     void zero();
 
+    /**
+     * @return The location of the field (CUDA or CPU)
+     */
     QudaFieldLocation Location() const;
+    
+    /** 
+     * Compute the n-dimensional site index given the 1-d offset index
+     * @param y n-dimensional site index
+     * @param i 1-dimensional site index
+     */
+    void LatticeIndex(int *y, int i) const;
+    
+    /** 
+     * Compute the 1-d offset index given the n-dimensional site index
+     * @param i 1-dimensional site index
+     * @param y n-dimensional site index
+     */
+    void OffsetIndex(int &i, int *y) const;
   };
 
 } // namespace quda

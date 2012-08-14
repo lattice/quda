@@ -47,6 +47,14 @@ namespace quda {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
     }
     return location;
+}
+
+  void LatticeField::read(char *filename) {
+    errorQuda("Not implemented");
+  }
+  
+  void LatticeField::write(char *filename) {
+    errorQuda("Not implemented");
   }
 
   // This doesn't really live here, but is fine for the moment
