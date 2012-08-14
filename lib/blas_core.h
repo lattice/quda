@@ -215,10 +215,10 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
 	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>, Functor<float2, float2> >
 	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    quda::blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
+    blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
   }
-  quda::blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
-  quda::blas_flops += Functor<double2,double2>::flops()*x.RealLength();
+  blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
+  blas_flops += Functor<double2,double2>::flops()*x.RealLength();
 
   blas->apply(*blasStream);
   delete blas;

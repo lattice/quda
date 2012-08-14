@@ -5,9 +5,12 @@
 #include <quda.h>
 #include "gauge_field.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define freeLinkQuda freeGaugeField
+
+#define momSiteSize   10 // real numbers per momentum
+#define gaugeSiteSize 18 // real numbers per gauge field
+
+namespace quda {
 
   void loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam* param);
   void loadLinkToGPU_ex(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge);
@@ -26,13 +29,7 @@ extern "C" {
     void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void** cpuGhostStapleFwd, int nFace, QudaPrecision precision, int* X);
   void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFwd, int dir, int nFace, QudaPrecision precision, int* X);
   void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir1, int dir2, QudaPrecision prec);
-#define freeLinkQuda freeGaugeField
 
-#define momSiteSize   10 // real numbers per momentum
-#define gaugeSiteSize 18 // real numbers per gauge field
-  
-#ifdef __cplusplus
-}
-#endif
+} // namespace quda
 
 #endif // _GAUGE_QUDA_H

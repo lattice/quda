@@ -1,13 +1,13 @@
 #define MAX(a,b) ((a)>(b) ? (a):(b))
 
-typedef struct fat_force_stride_s{
+typedef struct fat_force_stride_s {
   int fat_ga_stride;
   int site_ga_stride;
   int staple_stride;
   int mom_ga_stride;
   int path_max_length;
   int color_matrix_stride;
-}fat_force_const_t;
+} fat_force_const_t;
 
 __constant__ int X1h;
 __constant__ int X2h;
@@ -112,146 +112,143 @@ __constant__ fat_force_const_t hf; //hisq force
 
 void initLatticeConstants(const LatticeField &lat)
 {
-  int Vh = lat.VolumeCB();
-  cudaMemcpyToSymbol("Vh", &Vh, sizeof(int));  
-  
+  checkCudaError();
+
+  int volumeCB = lat.VolumeCB();
+  cudaMemcpyToSymbol(Vh, &volumeCB, sizeof(int));  
+
   Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
-  cudaMemcpyToSymbol("Vs", &Vspatial, sizeof(int));
+  cudaMemcpyToSymbol(Vs, &Vspatial, sizeof(int));
 
   int half_Vspatial = Vspatial;
-  cudaMemcpyToSymbol("Vsh", &half_Vspatial, sizeof(int));
+  cudaMemcpyToSymbol(Vsh, &half_Vspatial, sizeof(int));
 
-  int X1 = lat.X()[0];
-  cudaMemcpyToSymbol("X1", &X1, sizeof(int));  
+  int L1 = lat.X()[0];
+  cudaMemcpyToSymbol(X1, &L1, sizeof(int));  
 
-  int X2 = lat.X()[1];
-  cudaMemcpyToSymbol("X2", &X2, sizeof(int));  
+  int L2 = lat.X()[1];
+  cudaMemcpyToSymbol(X2, &L2, sizeof(int));  
 
-  int X3 = lat.X()[2];
-  cudaMemcpyToSymbol("X3", &X3, sizeof(int));  
+  int L3 = lat.X()[2];
+  cudaMemcpyToSymbol(X3, &L3, sizeof(int));  
 
-  int X4 = lat.X()[3];
-  cudaMemcpyToSymbol("X4", &X4, sizeof(int));  
+  int L4 = lat.X()[3];
+  cudaMemcpyToSymbol(X4, &L4, sizeof(int));  
 
-  int ghostFace[4];
-  ghostFace[0] = X2*X3*X4/2;
-  ghostFace[1] = X1*X3*X4/2;
-  ghostFace[2] = X1*X2*X4/2;
-  ghostFace[3] = X1*X2*X3/2;
-  cudaMemcpyToSymbol("ghostFace", ghostFace, 4*sizeof(int));  
+  int ghostFace_h[4];
+  ghostFace_h[0] = L2*L3*L4/2;
+  ghostFace_h[1] = L1*L3*L4/2;
+  ghostFace_h[2] = L1*L2*L4/2;
+  ghostFace_h[3] = L1*L2*L3/2;
+  cudaMemcpyToSymbol(ghostFace, ghostFace_h, 4*sizeof(int));  
 
-  int X1_3 = 3*X1;
-  cudaMemcpyToSymbol("X1_3", &X1_3, sizeof(int));  
+  int L1_3 = 3*L1;
+  cudaMemcpyToSymbol(X1_3, &L1_3, sizeof(int));  
 
-  int X2_3 = 3*X2;
-  cudaMemcpyToSymbol("X2_3", &X2_3, sizeof(int));  
+  int L2_3 = 3*L2;
+  cudaMemcpyToSymbol(X2_3, &L2_3, sizeof(int));  
 
-  int X3_3 = 3*X3;
-  cudaMemcpyToSymbol("X3_3", &X3_3, sizeof(int));  
+  int L3_3 = 3*L3;
+  cudaMemcpyToSymbol(X3_3, &L3_3, sizeof(int));  
 
-  int X4_3 = 3*X4;
-  cudaMemcpyToSymbol("X4_3", &X4_3, sizeof(int));  
+  int L4_3 = 3*L4;
+  cudaMemcpyToSymbol(X4_3, &L4_3, sizeof(int));  
 
+  int L2L1 = L2*L1;
+  cudaMemcpyToSymbol(X2X1, &L2L1, sizeof(int));  
 
-  int X2X1 = X2*X1;
-  cudaMemcpyToSymbol("X2X1", &X2X1, sizeof(int));  
+  int L3L1 = L3*L1;
+  cudaMemcpyToSymbol(X3X1, &L3L1, sizeof(int));  
 
-  int X3X1 = X3*X1;
-  cudaMemcpyToSymbol("X3X1", &X3X1, sizeof(int));  
+  int L3L2 = L3*L2;
+  cudaMemcpyToSymbol(X3X2, &L3L2, sizeof(int));  
 
-  int X3X2 = X3*X2;
-  cudaMemcpyToSymbol("X3X2", &X3X2, sizeof(int));  
-
-
-  int X3X2X1 = X3*X2*X1;
-  cudaMemcpyToSymbol("X3X2X1", &X3X2X1, sizeof(int));  
+  int L3L2L1 = L3*L2*L1;
+  cudaMemcpyToSymbol(X3X2X1, &L3L2L1, sizeof(int));  
   
-  int X4X2X1 = X4*X2*X1;
-  cudaMemcpyToSymbol("X4X2X1", &X4X2X1, sizeof(int));  
+  int L4L2L1 = L4*L2*L1;
+  cudaMemcpyToSymbol(X4X2X1, &L4L2L1, sizeof(int));  
 
-  int X4X2X1h = X4*X2*X1/2;
-  cudaMemcpyToSymbol("X4X2X1h", &X4X2X1h, sizeof(int));  
+  int L4L2L1h = L4*L2*L1/2;
+  cudaMemcpyToSymbol(X4X2X1h, &L4L2L1h, sizeof(int));  
 
-  int X4X3X1 = X4*X3*X1;
-  cudaMemcpyToSymbol("X4X3X1", &X4X3X1, sizeof(int));  
+  int L4L3L1 = L4*L3*L1;
+  cudaMemcpyToSymbol(X4X3X1, &L4L3L1, sizeof(int));  
 
-  int X4X3X1h = X4*X3*X1/2;
-  cudaMemcpyToSymbol("X4X3X1h", &X4X3X1h, sizeof(int));  
+  int L4L3L1h = L4*L3*L1/2;
+  cudaMemcpyToSymbol(X4X3X1h, &L4L3L1h, sizeof(int));  
 
-  int X4X3X2 = X4*X3*X2;
-  cudaMemcpyToSymbol("X4X3X2", &X4X3X2, sizeof(int));  
+  int L4L3L2 = L4*L3*L2;
+  cudaMemcpyToSymbol(X4X3X2, &L4L3L2, sizeof(int));  
 
- int X4X3X2h = X4*X3*X2/2;
-  cudaMemcpyToSymbol("X4X3X2h", &X4X3X2h, sizeof(int));  
+  int L4L3L2h = L4*L3*L2/2;
+  cudaMemcpyToSymbol(X4X3X2h, &L4L3L2h, sizeof(int));  
 
-  int X2X1_3 = 3*X2*X1;
-  cudaMemcpyToSymbol("X2X1_3", &X2X1_3, sizeof(int));  
+  int L2L1_3 = 3*L2*L1;
+  cudaMemcpyToSymbol(X2X1_3, &L2L1_3, sizeof(int));  
   
-  int X3X2X1_3 = 3*X3*X2*X1;
-  cudaMemcpyToSymbol("X3X2X1_3", &X3X2X1_3, sizeof(int)); 
+  int L3L2L1_3 = 3*L3*L2*L1;
+  cudaMemcpyToSymbol(X3X2X1_3, &L3L2L1_3, sizeof(int)); 
 
+  int L1h = L1/2;
+  cudaMemcpyToSymbol(X1h, &L1h, sizeof(int));  
 
-  int X1h = X1/2;
-  cudaMemcpyToSymbol("X1h", &X1h, sizeof(int));  
+  int L2h = L2/2;
+  cudaMemcpyToSymbol(X2h, &L2h, sizeof(int));  
 
-  int X2h = X2/2;
-  cudaMemcpyToSymbol("X2h", &X2h, sizeof(int));  
+  int L1m1 = L1 - 1;
+  cudaMemcpyToSymbol(X1m1, &L1m1, sizeof(int));  
 
-  int X1m1 = X1 - 1;
-  cudaMemcpyToSymbol("X1m1", &X1m1, sizeof(int));  
+  int L2m1 = L2 - 1;
+  cudaMemcpyToSymbol(X2m1, &L2m1, sizeof(int));  
 
-  int X2m1 = X2 - 1;
-  cudaMemcpyToSymbol("X2m1", &X2m1, sizeof(int));  
+  int L3m1 = L3 - 1;
+  cudaMemcpyToSymbol(X3m1, &L3m1, sizeof(int));  
 
-  int X3m1 = X3 - 1;
-  cudaMemcpyToSymbol("X3m1", &X3m1, sizeof(int));  
-
-  int X4m1 = X4 - 1;
-  cudaMemcpyToSymbol("X4m1", &X4m1, sizeof(int));  
+  int L4m1 = L4 - 1;
+  cudaMemcpyToSymbol(X4m1, &L4m1, sizeof(int));  
   
-  int X1m3 = X1 - 3;
-  cudaMemcpyToSymbol("X1m3", &X1m3, sizeof(int));  
+  int L1m3 = L1 - 3;
+  cudaMemcpyToSymbol(X1m3, &L1m3, sizeof(int));  
 
-  int X2m3 = X2 - 3;
-  cudaMemcpyToSymbol("X2m3", &X2m3, sizeof(int));  
+  int L2m3 = L2 - 3;
+  cudaMemcpyToSymbol(X2m3, &L2m3, sizeof(int));  
 
-  int X3m3 = X3 - 3;
-  cudaMemcpyToSymbol("X3m3", &X3m3, sizeof(int));  
+  int L3m3 = L3 - 3;
+  cudaMemcpyToSymbol(X3m3, &L3m3, sizeof(int));  
 
-  int X4m3 = X4 - 3;
-  cudaMemcpyToSymbol("X4m3", &X4m3, sizeof(int));  
+  int L4m3 = L4 - 3;
+  cudaMemcpyToSymbol(X4m3, &L4m3, sizeof(int));  
 
+  int L2L1mL1 = L2L1 - L1;
+  cudaMemcpyToSymbol(X2X1mX1, &L2L1mL1, sizeof(int));  
 
-  int X2X1mX1 = X2X1 - X1;
-  cudaMemcpyToSymbol("X2X1mX1", &X2X1mX1, sizeof(int));  
+  int L3L2L1mL2L1 = L3L2L1 - L2L1;
+  cudaMemcpyToSymbol(X3X2X1mX2X1, &L3L2L1mL2L1, sizeof(int));  
 
-  int X3X2X1mX2X1 = X3X2X1 - X2X1;
-  cudaMemcpyToSymbol("X3X2X1mX2X1", &X3X2X1mX2X1, sizeof(int));  
+  int L4L3L2L1mL3L2L1 = (L4-1)*L3L2L1;
+  cudaMemcpyToSymbol(X4X3X2X1mX3X2X1, &L4L3L2L1mL3L2L1, sizeof(int));  
 
-  int X4X3X2X1mX3X2X1 = (X4-1)*X3X2X1;
-  cudaMemcpyToSymbol("X4X3X2X1mX3X2X1", &X4X3X2X1mX3X2X1, sizeof(int));  
+  int L4L3L2L1hmL3L2L1h = (L4-1)*L3*L2*L1h;
+  cudaMemcpyToSymbol(X4X3X2X1hmX3X2X1h, &L4L3L2L1hmL3L2L1h, sizeof(int));  
 
-  int X4X3X2X1hmX3X2X1h = (X4-1)*X3*X2*X1h;
-  cudaMemcpyToSymbol("X4X3X2X1hmX3X2X1h", &X4X3X2X1hmX3X2X1h, sizeof(int));  
+  int L2L1m3L1 = L2L1 - 3*L1;
+  cudaMemcpyToSymbol(X2X1m3X1, &L2L1m3L1, sizeof(int));  
 
-  int X2X1m3X1 = X2X1 - 3*X1;
-  cudaMemcpyToSymbol("X2X1m3X1", &X2X1m3X1, sizeof(int));  
+  int L3L2L1m3L2L1 = L3L2L1 - 3*L2L1;
+  cudaMemcpyToSymbol(X3X2X1m3X2X1, &L3L2L1m3L2L1, sizeof(int));  
 
-  int X3X2X1m3X2X1 = X3X2X1 - 3*X2X1;
-  cudaMemcpyToSymbol("X3X2X1m3X2X1", &X3X2X1m3X2X1, sizeof(int));  
+  int L4L3L2L1m3L3L2L1 = (L4-3)*L3L2L1;
+  cudaMemcpyToSymbol(X4X3X2X1m3X3X2X1, &L4L3L2L1m3L3L2L1, sizeof(int));  
 
-  int X4X3X2X1m3X3X2X1 = (X4-3)*X3X2X1;
-  cudaMemcpyToSymbol("X4X3X2X1m3X3X2X1", &X4X3X2X1m3X3X2X1, sizeof(int));  
-
-  int X4X3X2X1hm3X3X2X1h = (X4-3)*X3*X2*X1h;
-  cudaMemcpyToSymbol("X4X3X2X1hm3X3X2X1h", &X4X3X2X1hm3X3X2X1h, sizeof(int)); 
-  
-  int Vh_2d_max = MAX(X1*X2/2, X1*X3/2);
-  Vh_2d_max = MAX(Vh_2d_max, X1*X4/2);
-  Vh_2d_max = MAX(Vh_2d_max, X2*X3/2);
-  Vh_2d_max = MAX(Vh_2d_max, X2*X4/2);
-  Vh_2d_max = MAX(Vh_2d_max, X3*X4/2);
-  cudaMemcpyToSymbol("Vh_2d_max", &Vh_2d_max, sizeof(int));
+  int L4L3L2L1hm3L3L2L1h = (L4-3)*L3*L2*L1h;
+  cudaMemcpyToSymbol(X4X3X2X1hm3X3X2X1h, &L4L3L2L1hm3L3L2L1h, sizeof(int)); 
+  int Vh_2d_max_h = MAX(L1*L2/2, L1*L3/2);
+  Vh_2d_max_h = MAX(Vh_2d_max_h, L1*L4/2);
+  Vh_2d_max_h = MAX(Vh_2d_max_h, L2*L3/2);
+  Vh_2d_max_h = MAX(Vh_2d_max_h, L2*L4/2);
+  Vh_2d_max_h = MAX(Vh_2d_max_h, L3*L4/2);
+  cudaMemcpyToSymbol(Vh_2d_max, &Vh_2d_max_h, sizeof(int));
 
 #ifdef MULTI_GPU
   bool first_node_in_t = (commCoords(3) == 0);
@@ -261,33 +258,33 @@ void initLatticeConstants(const LatticeField &lat)
   bool last_node_in_t = true;
 #endif
 
-  cudaMemcpyToSymbol("Pt0", &(first_node_in_t), sizeof(bool)); 
-  cudaMemcpyToSymbol("PtNm1", &(last_node_in_t), sizeof(bool)); 
+  cudaMemcpyToSymbol(Pt0, &(first_node_in_t), sizeof(bool)); 
+  cudaMemcpyToSymbol(PtNm1, &(last_node_in_t), sizeof(bool)); 
 
   //constants used by fatlink/gauge force/hisq force code
-  int E1  = X1+4;
-  int E1h = E1/2;
-  int E2  = X2+4;
-  int E3  = X3+4;
-  int E4  = X4+4;
-  int E2E1   = E2*E1;
-  int E3E2E1 = E3*E2*E1;
-  int Vh_ex  = E1*E2*E3*E4/2;
-  
-  cudaMemcpyToSymbol("E1", &E1, sizeof(int));
-  cudaMemcpyToSymbol("E1h", &E1h, sizeof(int));
-  cudaMemcpyToSymbol("E2", &E2, sizeof(int));
-  cudaMemcpyToSymbol("E3", &E3, sizeof(int));
-  cudaMemcpyToSymbol("E4", &E4, sizeof(int));
-  cudaMemcpyToSymbol("E2E1", &E2E1, sizeof(int));
-  cudaMemcpyToSymbol("E3E2E1", &E3E2E1, sizeof(int));
-  cudaMemcpyToSymbol("Vh_ex", &Vh_ex, sizeof(int));  
+  int E1_h  = L1+4;
+  int E1h_h = E1_h/2;
+  int E2_h  = L2+4;
+  int E3_h  = L3+4;
+  int E4_h  = L4+4;
+  int E2E1_h   = E2_h*E1_h;
+  int E3E2E1_h = E3_h*E2_h*E1_h;
+  int Vh_ex_h  = E1_h*E2_h*E3_h*E4_h/2;
+
+  cudaMemcpyToSymbol(E1, &E1_h, sizeof(int));
+  cudaMemcpyToSymbol(E1h, &E1h_h, sizeof(int));
+  cudaMemcpyToSymbol(E2, &E2_h, sizeof(int));
+  cudaMemcpyToSymbol(E3, &E3_h, sizeof(int));
+  cudaMemcpyToSymbol(E4, &E4_h, sizeof(int));
+  cudaMemcpyToSymbol(E2E1, &E2E1_h, sizeof(int));
+  cudaMemcpyToSymbol(E3E2E1, &E3E2E1_h, sizeof(int));
+  cudaMemcpyToSymbol(Vh_ex, &Vh_ex_h, sizeof(int));  
 
   // copy a few of the constants needed by tuneLaunch()
-  dslashConstants.x[0] = X1;
-  dslashConstants.x[1] = X2;
-  dslashConstants.x[2] = X3;
-  dslashConstants.x[3] = X4;
+  dslashConstants.x[0] = L1;
+  dslashConstants.x[1] = L2;
+  dslashConstants.x[2] = L3;
+  dslashConstants.x[3] = L4;
 
   checkCudaError();
 }
@@ -295,37 +292,37 @@ void initLatticeConstants(const LatticeField &lat)
 
 void initGaugeConstants(const cudaGaugeField &gauge) 
 {
-  int ga_stride = gauge.Stride();
-  cudaMemcpyToSymbol("ga_stride", &ga_stride, sizeof(int));  
+  int ga_stride_h = gauge.Stride();
+  cudaMemcpyToSymbol(ga_stride, &ga_stride_h, sizeof(int));  
 
   int gf = (gauge.GaugeFixed() == QUDA_GAUGE_FIXED_YES);
-  cudaMemcpyToSymbol("gauge_fixed", &(gf), sizeof(int));
+  cudaMemcpyToSymbol(gauge_fixed, &(gf), sizeof(int));
 
   double anisotropy_ = gauge.Anisotropy();
-  cudaMemcpyToSymbol("anisotropy", &(anisotropy_), sizeof(double));
+  cudaMemcpyToSymbol(anisotropy, &(anisotropy_), sizeof(double));
 
   double t_bc = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
-  cudaMemcpyToSymbol("t_boundary", &(t_bc), sizeof(double));
+  cudaMemcpyToSymbol(t_boundary, &(t_bc), sizeof(double));
 
-  double coeff = -24.0*gauge.Tadpole()*gauge.Tadpole();
-  cudaMemcpyToSymbol("coeff", &(coeff), sizeof(double));
+  double coeff_h = -24.0*gauge.Tadpole()*gauge.Tadpole();
+  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
 
-  float anisotropy_f = gauge.Anisotropy();
-  cudaMemcpyToSymbol("anisotropy_f", &(anisotropy_f), sizeof(float));
+  float anisotropy_fh = gauge.Anisotropy();
+  cudaMemcpyToSymbol(anisotropy_f, &(anisotropy_fh), sizeof(float));
 
   float t_bc_f = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
-  cudaMemcpyToSymbol("t_boundary_f", &(t_bc_f), sizeof(float));
+  cudaMemcpyToSymbol(t_boundary_f, &(t_bc_f), sizeof(float));
 
-  float coeff_f = -24.0*gauge.Tadpole()*gauge.Tadpole();
-  cudaMemcpyToSymbol("coeff_f", &(coeff_f), sizeof(float));
+  float coeff_fh = -24.0*gauge.Tadpole()*gauge.Tadpole();
+  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
 
   // constants used by the READ_GAUGE() macros in read_gauge.h
-  float2 An2 = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
-  cudaMemcpyToSymbol("An2", &(An2), sizeof(float2));
-  float2 TB2 = make_float2(t_bc_f, 1.0 / (t_bc_f * t_bc_f));
-  cudaMemcpyToSymbol("TB2", &(TB2), sizeof(float2));
-  float2 No2 = make_float2(1.0, 1.0);
-  cudaMemcpyToSymbol("No2", &(No2), sizeof(float2));
+  float2 An2_h = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
+  cudaMemcpyToSymbol(An2, &(An2_h), sizeof(float2));
+  float2 TB2_h = make_float2(t_bc_f, 1.0 / (t_bc_f * t_bc_f));
+  cudaMemcpyToSymbol(TB2, &(TB2_h), sizeof(float2));
+  float2 No2_h = make_float2(1.0, 1.0);
+  cudaMemcpyToSymbol(No2, &(No2_h), sizeof(float2));
 
   checkCudaError();
 }
@@ -340,18 +337,18 @@ void initSpinorConstants(const cudaColorSpinorField &spinor)
   static int last_sp_stride = -1;
   static int last_Ls = -1;
 
-  int sp_stride = spinor.Stride();
-  if (sp_stride != last_sp_stride) {
-    cudaMemcpyToSymbol("sp_stride", &sp_stride, sizeof(int));
+  int sp_stride_h = spinor.Stride();
+  if (sp_stride_h != last_sp_stride) {
+    cudaMemcpyToSymbol(sp_stride, &sp_stride_h, sizeof(int));
     checkCudaError();
   }
   
   // for domain wall:
   if (spinor.Ndim() == 5) {
-    int Ls = spinor.X(4);
-    if (Ls != last_Ls) {
-      cudaMemcpyToSymbol("Ls", &Ls, sizeof(int));  
-      dslashConstants.Ls = Ls; // needed by tuneLaunch()
+    int Ls_h = spinor.X(4);
+    if (Ls_h != last_Ls) {
+      cudaMemcpyToSymbol(Ls, &Ls_h, sizeof(int));  
+      dslashConstants.Ls = Ls_h; // needed by tuneLaunch()
       checkCudaError();
     }
   }
@@ -360,16 +357,16 @@ void initSpinorConstants(const cudaColorSpinorField &spinor)
 
 void initDslashConstants()
 {
-  float pi_f = M_PI;
-  cudaMemcpyToSymbol("pi_f", &pi_f, sizeof(float));
+  float pi_f_h = M_PI;
+  cudaMemcpyToSymbol(pi_f, &pi_f_h, sizeof(float));
 
   // temporary additions (?) for checking Ron's T-packing kernel with old multi-gpu kernel
 
-  double tProjScale = (kernelPackT ? 1.0 : 2.0);
-  cudaMemcpyToSymbol("tProjScale", &tProjScale, sizeof(double));
+  double tProjScale_h = (kernelPackT ? 1.0 : 2.0);
+  cudaMemcpyToSymbol(tProjScale, &tProjScale_h, sizeof(double));
 
-  float tProjScale_f = (float)tProjScale;
-  cudaMemcpyToSymbol("tProjScale_f", &tProjScale_f, sizeof(float));
+  float tProjScale_fh = (float)tProjScale_h;
+  cudaMemcpyToSymbol(tProjScale_f, &tProjScale_fh, sizeof(float));
 
   checkCudaError();
 }
@@ -377,8 +374,8 @@ void initDslashConstants()
 
 void initCloverConstants (const cudaCloverField &clover)
 {
-  int cl_stride = clover.Stride();
-  cudaMemcpyToSymbol("cl_stride", &cl_stride, sizeof(int));  
+  int cl_stride_h = clover.Stride();
+  cudaMemcpyToSymbol(cl_stride, &cl_stride_h, sizeof(int));  
 
   checkCudaError();
 }
@@ -386,13 +383,13 @@ void initCloverConstants (const cudaCloverField &clover)
 
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge)
 {
-  int fat_ga_stride = fatgauge.Stride();
-  int long_ga_stride = longgauge.Stride();
-  float fat_link_max = fatgauge.LinkMax();
+  int fat_ga_stride_h = fatgauge.Stride();
+  int long_ga_stride_h = longgauge.Stride();
+  float fat_link_max_h = fatgauge.LinkMax();
   
-  cudaMemcpyToSymbol("fat_ga_stride", &fat_ga_stride, sizeof(int));  
-  cudaMemcpyToSymbol("long_ga_stride", &long_ga_stride, sizeof(int));  
-  cudaMemcpyToSymbol("fat_ga_max", &fat_link_max, sizeof(float));
+  cudaMemcpyToSymbol(fat_ga_stride, &fat_ga_stride_h, sizeof(int));  
+  cudaMemcpyToSymbol(long_ga_stride, &long_ga_stride_h, sizeof(int));  
+  cudaMemcpyToSymbol(fat_ga_max, &fat_link_max_h, sizeof(float));
 
   checkCudaError();
 }

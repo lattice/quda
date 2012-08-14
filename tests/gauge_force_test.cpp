@@ -550,7 +550,7 @@ gauge_force_test(void)
 
   if (tune) {
     printfQuda("Tuning...\n");
-    setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+    quda::setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
   }
   
   struct timeval t0, t1;

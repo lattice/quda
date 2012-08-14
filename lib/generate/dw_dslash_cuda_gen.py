@@ -174,9 +174,6 @@ def def_gauge():
             str += "#define "+g_re(0,m,n)+" G"+nthFloat2(2*i+0)+"\n"
             str += "#define "+g_im(0,m,n)+" G"+nthFloat2(2*i+1)+"\n"
 
-    str += "// temporaries\n"
-    str += "#define A_re G"+nthFloat2(18)+"\n"
-    str += "#define A_im G"+nthFloat2(19)+"\n"
     str += "\n"
     str += "#else\n"
     for m in range(0,3):
@@ -185,9 +182,6 @@ def def_gauge():
             str += "#define "+g_re(0,m,n)+" G"+nthFloat4(2*i+0)+"\n"
             str += "#define "+g_im(0,m,n)+" G"+nthFloat4(2*i+1)+"\n"
 
-    str += "// temporaries\n"
-    str += "#define A_re G"+nthFloat4(18)+"\n"
-    str += "#define A_im G"+nthFloat4(19)+"\n"
     str += "\n"
     str += "#endif // GAUGE_DOUBLE\n\n"
             
@@ -458,7 +452,6 @@ double2 G5;
 double2 G6;
 double2 G7;
 double2 G8;
-double2 G9;
 #else
 float2 G0;
 float2 G1;
@@ -469,7 +462,6 @@ float2 G5;
 float2 G6;
 float2 G7;
 float2 G8;
-float2 G9;
 #endif
 #else
 float4 G0;
@@ -1055,9 +1047,6 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
     str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:
-        str += "#undef A_re\n"
-        str += "#undef A_im\n\n"
-
         for m in range(0,3):
             for n in range(0,3):
                 i = 3*m+n
@@ -1173,14 +1162,14 @@ clover = False
 print sys.argv[0] + ": generating dw_dslash_core.h";
 dslash = True
 dagger = False
-f = open('../dslash_core/dw_dslash_core.h', 'w')
+f = open('dslash_core/dw_dslash_core.h', 'w')
 f.write(generate_dslash())
 f.close()
 
 print sys.argv[0] + ": generating dw_dslash_dagger_core.h";
 dslash = True
 dagger = True
-f = open('../dslash_core/dw_dslash_dagger_core.h', 'w')
+f = open('dslash_core/dw_dslash_dagger_core.h', 'w')
 f.write(generate_dslash())
 f.close()
 

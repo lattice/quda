@@ -21,6 +21,8 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
+using namespace quda;
+
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const int transfer = 0; // include transfer time in the benchmark?
 
@@ -56,7 +58,6 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
-extern bool kernelPackT;
 extern QudaDagType dagger;
 
 extern int niter;
@@ -76,11 +77,11 @@ void init(int argc, char **argv) {
 
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     dw_setDims(gauge_param.X, myLs);
-    kernelPackT = true;
+    setKernelPackT(true);
   } else {
     setDims(gauge_param.X);
     Ls = 1;
-    kernelPackT = false;
+    setKernelPackT(false);
   }
 
   setSpinorSiteSize(24);

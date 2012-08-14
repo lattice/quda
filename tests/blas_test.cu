@@ -26,6 +26,8 @@ extern void usage(char** );
 
 const int Nkernels = 31;
 
+using namespace quda;
+
 cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
 int Nspin;

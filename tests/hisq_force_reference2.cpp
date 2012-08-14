@@ -7,8 +7,9 @@
 #include <quda.h>
 #include <gauge_field.h>
 
+using namespace quda;
+//namespace quda {
 
-//namespace quda{
 #define RETURN_IF_ERR if(err) return;
 
 extern int gauge_order;
