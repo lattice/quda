@@ -116,7 +116,7 @@ unitarize_link_test()
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
 
-  initLatticeConstants(*cudaFatLink);
+  quda::initLatticeConstants(*cudaFatLink);
 
   void* fatlink = (void*)malloc(4*V*gaugeSiteSize*gSize);
   if(fatlink == NULL){

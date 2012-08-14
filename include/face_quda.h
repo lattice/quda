@@ -64,13 +64,13 @@ class FaceBuffer {
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream);
-  void gather(cudaColorSpinorField &in, int dagger, int dir);
+  void pack(quda::cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream);
+  void gather(quda::cudaColorSpinorField &in, int dagger, int dir);
   void commsStart(int dir);
   int  commsQuery(int dir);
-  void scatter(cudaColorSpinorField &out, int dagger, int dir);
+  void scatter(quda::cudaColorSpinorField &out, int dagger, int dir);
 
-  void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
+  void exchangeCpuSpinor(quda::cpuColorSpinorField &in, int parity, int dagger);
 
   void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
 };
@@ -135,13 +135,13 @@ class FaceBuffer {
   FaceBuffer(const FaceBuffer &);
   virtual ~FaceBuffer();
 
-  void pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream);
-  void gather(cudaColorSpinorField &in, int dagger, int dir);
+  void pack(quda::cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream);
+  void gather(quda::cudaColorSpinorField &in, int dagger, int dir);
   void commsStart(int dir);
   int  commsQuery(int dir);
-  void scatter(cudaColorSpinorField &out, int dagger, int dir);
+  void scatter(quda::cudaColorSpinorField &out, int dagger, int dir);
 
-  void exchangeCpuSpinor(cpuColorSpinorField &in, int parity, int dagger);
+  void exchangeCpuSpinor(quda::cpuColorSpinorField &in, int parity, int dagger);
 
   void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
 

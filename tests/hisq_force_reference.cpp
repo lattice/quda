@@ -837,15 +837,17 @@ void do_color_matrix_hisq_force_reference(Real eps, Real weight,
           continue;
         }
 
-        // 5 link path
-        //
-        //        sig
-        //    A ________
-        //     |        |
-        //    /|\      \|/
-        //     |        |
-        //      \	 \
-        //	 \        \
+	/*
+         5 link path
+        
+                sig
+            A ________
+             |        |
+            /|\      \|/
+             |        |
+              \	       \
+               \        \
+	*/
 
         u_shift_mat(Pmu, Pnumu, OPP_DIR(nu), sitelink);
         u_shift_mat(Qmu, Qnumu, OPP_DIR(nu), sitelink);
@@ -1011,16 +1013,18 @@ void do_halfwilson_hisq_force_reference(Real eps, Real weight,
 	 || nu == mu || nu == OPP_DIR(mu)){
 	 continue;
         }
-	
-	// 5 link path
-        //
-	//        sig
-	//    A ________
-	//     |        |
-	//    /|\      \|/
-	//     |        |
-	//      \        \
-	//	 \        \
+
+	/*	
+	 5 link path
+        
+	        sig
+	    A ________
+	     |        |
+	    /|\      \|/
+	     |        |
+	      \        \
+	       \        \
+	*/
 
 	u_shift_mat(Pmu, Pnumu, OPP_DIR(nu), sitelink);
 	u_shift_mat(Qmu, Qnumu, OPP_DIR(nu), sitelink);

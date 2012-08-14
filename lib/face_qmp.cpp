@@ -11,7 +11,7 @@
 #include <qmp.h>
 #endif
 
-using namespace std;
+using namespace quda;
 
 cudaStream_t *stream;
 

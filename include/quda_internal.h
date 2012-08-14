@@ -67,11 +67,15 @@ extern "C" {
 }
 #endif
 
+namespace quda {
+
 #ifdef MULTI_GPU
   const int Nstream = 9;
 #else
   const int Nstream = 1;
 #endif
+
+} // namespace quda
 
 extern int verbose;
   

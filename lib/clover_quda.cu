@@ -15,12 +15,12 @@ namespace quda {
   };
   
   /**
-   linkIndex computes the spacetime index of the link with coordinate
-   y = x + dx.
+     linkIndex computes the spacetime index of the link with coordinate
+     y = x + dx.
 
-   @param x - coordinate in spacetime
-   @param dx - coordinate offsets in spacetime
-   @param param - CloverParam struct
+     @param x - coordinate in spacetime
+     @param dx - coordinate offsets in spacetime
+     @param param - CloverParam struct
   */
   __device__ inline int linkIndex(int x[], int dx[], const CloverParam &param) {
     int y[4];
@@ -245,41 +245,42 @@ namespace quda {
 
   }
 
-} // namespace quda
-
-void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge) {
+  void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge) {
 
 #ifdef GPU_CLOVER_DIRAC
-  using namespace quda;
+    using namespace quda;
 
-  // first create the field-strength tensor
-  int pad = 0;
-  GaugeFieldParam tensor_param(gauge.X(), gauge.Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
-  cudaGaugeField Fmunu(tensor_param);
+    // first create the field-strength tensor
+    int pad = 0;
+    GaugeFieldParam tensor_param(gauge.X(), gauge.Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
+    cudaGaugeField Fmunu(tensor_param);
 
-  // set the kernel parameters
-  CloverParam param;
-  param.threads = gauge.Volume();
-  for (int i=0; i<4; i++) param.X[i] = gauge.X()[i];
-  param.gaugeLengthCB = gauge.Length() / 2; 
-  param.gaugeStride = gauge.Stride();
-  param.FmunuLengthCB = Fmunu.Length() / 2;
-  param.FmunuStride = Fmunu.Stride();
+    // set the kernel parameters
+    CloverParam param;
+    param.threads = gauge.Volume();
+    for (int i=0; i<4; i++) param.X[i] = gauge.X()[i];
+    param.gaugeLengthCB = gauge.Length() / 2; 
+    param.gaugeStride = gauge.Stride();
+    param.FmunuLengthCB = Fmunu.Length() / 2;
+    param.FmunuStride = Fmunu.Stride();
 
-  dim3 blockDim(32, 1, 1);
-  dim3 gridDim((param.threads + blockDim.x - 1) / blockDim.x, 1, 1);
+    dim3 blockDim(32, 1, 1);
+    dim3 gridDim((param.threads + blockDim.x - 1) / blockDim.x, 1, 1);
 
-  if (gauge.Precision() == QUDA_DOUBLE_PRECISION) { 
-    computeFmunuKernel<<<gridDim,blockDim>>>((double2*)Fmunu.Gauge_p(), (double2*)gauge.Gauge_p(), param);
-  } else {
-    computeFmunuKernel<<<gridDim,blockDim>>>((float2*)Fmunu.Gauge_p(), (float2*)gauge.Gauge_p(), param);
-  }
+    if (gauge.Precision() == QUDA_DOUBLE_PRECISION) { 
+      computeFmunuKernel<<<gridDim,blockDim>>>((double2*)Fmunu.Gauge_p(), (double2*)gauge.Gauge_p(), param);
+    } else {
+      computeFmunuKernel<<<gridDim,blockDim>>>((float2*)Fmunu.Gauge_p(), (float2*)gauge.Gauge_p(), param);
+    }
 
-  // Now contract this into the clover term
+    // Now contract this into the clover term
 
 
 #else
-  errorQuda("Clover dslash has not been built");
+    errorQuda("Clover dslash has not been built");
 #endif
 
-}
+  }
+
+} // namespace quda
+

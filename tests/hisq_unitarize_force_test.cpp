@@ -12,10 +12,10 @@
 #include "hisq_force_utils.h"
 #include "hw_quda.h"
 #include <sys/time.h>
+#include <dslash_quda.h>
 
-using namespace quda::fermion_force;
+using namespace quda;
 extern void usage(char** argv);
-static int device = 0;
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField  *cpuGauge  = NULL;
 
@@ -35,6 +35,7 @@ cudaGaugeField *cudaOprod = NULL;
 
 int verify_results = 0;
 int ODD_BIT = 1;
+extern int device;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
@@ -54,10 +55,6 @@ void setPrecision(QudaPrecision precision)
   
   return;
 }
-
-
-void initLatticeConstants(const LatticeField &lat);
-void initGaugeConstants(const cudaGaugeField &gauge);
 
 
 // allocate memory
@@ -169,10 +166,9 @@ static void
 hisq_force_test()
 {
   hisq_force_init();
-
+  fermion_force::hisqForceInitCuda(&gaugeParam);
   initLatticeConstants(*cudaGauge);
   initGaugeConstants(*cudaGauge);
-  hisqForceInitCuda(&gaugeParam);
 
   float act_path_coeff[6];
   act_path_coeff[0] = 0.625000;
@@ -206,10 +202,10 @@ hisq_force_test()
   const double svd_rel_err = 1e-8;
   const double svd_abs_err = 1e-8;
 
-  setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
+  fermion_force::setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
   
   // First of all we fatten the links on the GPU
-  hisqStaplesForceCuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
+  fermion_force::hisqStaplesForceCuda(d_act_path_coeff, gaugeParam, *cudaOprod, *cudaGauge, cudaForce);
 
   cudaDeviceSynchronize();
 
@@ -221,9 +217,9 @@ hisq_force_test()
   int* unitarization_failed_dev; 
   cudaMalloc((void**)&unitarization_failed_dev, sizeof(int));
 
-  unitarizeForceCuda(gaugeParam, *cudaForce, *cudaGauge, cudaOprod, unitarization_failed_dev); // output is written to cudaOprod.
+  fermion_force::unitarizeForceCuda(gaugeParam, *cudaForce, *cudaGauge, cudaOprod, unitarization_failed_dev); // output is written to cudaOprod.
   if(verify_results){
-    unitarizeForceCPU(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
+    fermion_force::unitarizeForceCPU(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
   }
   cudaDeviceSynchronize();
   checkCudaError();

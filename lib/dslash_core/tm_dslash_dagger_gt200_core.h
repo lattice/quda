@@ -131,9 +131,6 @@
 #define g21_im G7.y
 #define g22_re G8.x
 #define g22_im G8.y
-// temporaries
-#define A_re G9.x
-#define A_im G9.y
 
 #else
 #define g00_re G0.x
@@ -154,9 +151,6 @@
 #define g21_im G3.w
 #define g22_re G4.x
 #define g22_im G4.y
-// temporaries
-#define A_re G4.z
-#define A_im G4.w
 
 #endif // GAUGE_DOUBLE
 
@@ -2102,9 +2096,6 @@ WRITE_SPINOR(sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
-#undef A_re
-#undef A_im
-
 #undef g00_re
 #undef g00_im
 #undef g01_re

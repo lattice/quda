@@ -43,18 +43,20 @@ namespace quda {
 	
       int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
 	
-      fat_force_const_t hf;
+      fat_force_const_t hf_h;
 #ifdef MULTI_GPU
       int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
-      hf.site_ga_stride = Vh_ex + param->site_ga_pad;;
-      hf.color_matrix_stride = Vh_ex;
+      hf_h.site_ga_stride = Vh_ex + param->site_ga_pad;;
+      hf_h.color_matrix_stride = Vh_ex;
 #else
-      hf.site_ga_stride = Vh + param->site_ga_pad;
-      hf.color_matrix_stride = Vh;
+      hf_h.site_ga_stride = Vh + param->site_ga_pad;
+      hf_h.color_matrix_stride = Vh;
 #endif
-      hf.mom_ga_stride = Vh + param->mom_ga_pad;
+      hf_h.mom_ga_stride = Vh + param->mom_ga_pad;
 	
-      cudaMemcpyToSymbol("hf", &hf, sizeof(fat_force_const_t));
+      cudaMemcpyToSymbol(hf, &hf_h, sizeof(fat_force_const_t));
+
+      checkCudaError();
     }
     
 

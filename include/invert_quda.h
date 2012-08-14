@@ -6,121 +6,125 @@
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
-class Solver {
+namespace quda {
 
- protected:
-  QudaInvertParam &invParam;
+  class Solver {
 
- public:
+  protected:
+    QudaInvertParam &invParam;
+
+  public:
   Solver(QudaInvertParam &invParam) : invParam(invParam) { ; }
-  virtual ~Solver() { ; }
+    virtual ~Solver() { ; }
 
-  virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
-};
+    virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+  };
 
-class CG : public Solver {
+  class CG : public Solver {
 
- private:
-  const DiracMatrix &mat;
-  const DiracMatrix &matSloppy;
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
 
- public:
-  CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
-  virtual ~CG();
+  public:
+    CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
+    virtual ~CG();
 
-  void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-};
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
 
-class BiCGstab : public Solver {
+  class BiCGstab : public Solver {
 
- private:
-  DiracMatrix &mat;
-  const DiracMatrix &matSloppy;
-  const DiracMatrix &matPrecon;
+  private:
+    DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
 
-  // pointers to fields to avoid multiple creation overhead
-  cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
-  bool init;
+    // pointers to fields to avoid multiple creation overhead
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
+    bool init;
 
- public:
-  BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	   QudaInvertParam &invParam);
-  virtual ~BiCGstab();
+  public:
+    BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
+	     QudaInvertParam &invParam);
+    virtual ~BiCGstab();
 
-  void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-};
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
 
-class GCR : public Solver {
+  class GCR : public Solver {
 
- private:
-  const DiracMatrix &mat;
-  const DiracMatrix &matSloppy;
-  const DiracMatrix &matPrecon;
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
 
-  Solver *K;
-  QudaInvertParam Kparam; // parameters for preconditioner solve
+    Solver *K;
+    QudaInvertParam Kparam; // parameters for preconditioner solve
 
- public:
-  GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-      QudaInvertParam &invParam);
-  virtual ~GCR();
+  public:
+    GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
+	QudaInvertParam &invParam);
+    virtual ~GCR();
 
-  void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-};
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
 
-class MR : public Solver {
+  class MR : public Solver {
 
- private:
-  const DiracMatrix &mat;
-  cudaColorSpinorField *rp;
-  cudaColorSpinorField *Arp;
-  cudaColorSpinorField *tmpp;
-  bool init;
-  bool allocate_r;
+  private:
+    const DiracMatrix &mat;
+    cudaColorSpinorField *rp;
+    cudaColorSpinorField *Arp;
+    cudaColorSpinorField *tmpp;
+    bool init;
+    bool allocate_r;
 
- public:
-  MR(DiracMatrix &mat, QudaInvertParam &invParam);
-  virtual ~MR();
+  public:
+    MR(DiracMatrix &mat, QudaInvertParam &invParam);
+    virtual ~MR();
 
-  void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-};
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
 
-// multigrid solver
-class alphaSA : public Solver {
+  // multigrid solver
+  class alphaSA : public Solver {
 
- protected:
-  const DiracMatrix &mat;
+  protected:
+    const DiracMatrix &mat;
 
- public:
-  alphaSA(DiracMatrix &mat, QudaInvertParam &invParam);
-  virtual ~alphaSA() { ; }
+  public:
+    alphaSA(DiracMatrix &mat, QudaInvertParam &invParam);
+    virtual ~alphaSA() { ; }
 
-  void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
-};
+    void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
+  };
 
-class MultiShiftSolver {
+  class MultiShiftSolver {
 
- protected:
-  QudaInvertParam &invParam;
+  protected:
+    QudaInvertParam &invParam;
 
- public:
+  public:
   MultiShiftSolver(QudaInvertParam &invParam) : invParam(invParam) { ; }
-  virtual ~MultiShiftSolver() { ; }
+    virtual ~MultiShiftSolver() { ; }
 
-  virtual void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in) = 0;
-};
+    virtual void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in) = 0;
+  };
 
-class MultiShiftCG : public MultiShiftSolver {
+  class MultiShiftCG : public MultiShiftSolver {
 
- protected:
-  const DiracMatrix &mat;
-  const DiracMatrix &matSloppy;
+  protected:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
 
- public:
-  MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
-  virtual ~MultiShiftCG();
+  public:
+    MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
+    virtual ~MultiShiftCG();
 
-  void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
-};
+    void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
+  };
+
+} // namespace quda
 
 #endif // _INVERT_QUDA_H

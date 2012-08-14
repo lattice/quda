@@ -17,7 +17,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
 	gauge_field.h hisq_force_utils.h double_single.h texture.h	\
-	numa_affinity.h
+	numa_affinity.h misc_helpers.h fermion_force_quda.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h reduce_core.h
@@ -32,7 +32,7 @@ DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h \
         llfat_quda.cu unitarize_links_quda.cu fermion_force_quda.cu          \
 	gauge_force_quda.cu hisq_paths_force_quda.cu unitarize_force_quda.cu    \
 	gauge_force_core.h hisq_paths_force_core.h  llfat_core.h svd_quda.h \
-	read_clover.h read_gauge.h
+	read_clover.h read_gauge.h misc_helpers.cu
 
 
 # files containing complex macros and other code fragments to be inlined,
@@ -77,6 +77,7 @@ $(QUDA): $(QUDA_OBJS) ../make.inc
 	ar cru $@ $(QUDA_OBJS)
 gen:
 	$(PYTHON) generate/dslash_cuda_gen.py
+	$(PYTHON) generate/dw_dslash_cuda_gen.py
 
 clean:
 	-rm -f *.o $(QUDA)
