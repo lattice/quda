@@ -16,6 +16,9 @@ tune:
 gen:
 	$(MAKE) -C lib/ gen
 
+fortran: lib 
+	$(MAKE) -C lib/ quda_fortran.o
+
 clean:
 	$(MAKE) -C lib/ clean
 	$(MAKE) -C tests/ clean

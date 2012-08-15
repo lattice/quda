@@ -8,8 +8,21 @@
 
 namespace quda {
 
+  /**
+     @param tune Sets whether to tune the dslash kernels or not
+     @param verbose The verbosity level to use in the dslash tuning functions
+  */
   void setDslashTuning(QudaTune tune, QudaVerbosity verbose);
+
+  /**
+     @param pack Sets whether to use a kernel to pack the T dimension
+   */
   void setKernelPackT(bool pack);
+
+  /**
+     @return Whether the T dimension is kernel packed or not
+   */
+  bool getKernelPackT();
 
 #ifdef DSLASH_PROFILING
   void printDslashProfile();

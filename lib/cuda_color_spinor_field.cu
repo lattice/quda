@@ -32,8 +32,6 @@ namespace quda {
   void* cudaColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
   QudaPrecision cudaColorSpinorField::facePrecision; 
 
-  extern bool kernelPackT;
-
   /*cudaColorSpinorField::cudaColorSpinorField() : 
     ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
 
@@ -557,7 +555,7 @@ namespace quda {
   void cudaColorSpinorField::packGhost(const int dim, const QudaParity parity, const int dagger, cudaStream_t *stream) 
   {
 #ifdef MULTI_GPU
-    if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
       void* gpu_buf = this->backGhostFaceBuffer[dim];
       if(this->nDim == 5)//!For DW fermions
 	packFaceDW(gpu_buf, *this, dim, dagger, parity, *stream);
@@ -579,7 +577,7 @@ namespace quda {
     int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
-    if (dim !=3 || kernelPackT) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
       if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);

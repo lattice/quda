@@ -103,15 +103,15 @@ namespace quda {
 
     if ( cloverInv ) cudaFree(cloverInv);
     if ( invNorm ) cudaFree(invNorm);
-
+    
     checkCudaError();
   }
 
-  template <typename Float>
+  template <bool bqcd, typename Float>
   static inline void packCloverMatrix(float4* a, Float *b, int Vh)
   {
-    const Float half = 0.5; // pre-include factor of 1/2 introduced by basis change
-
+    const Float half = bqcd ? 1.0 : 0.5; // pre-include factor of 1/2 introduced by basis change
+    
     for (int i=0; i<18; i++) {
       a[i*Vh].x = half * b[4*i+0];
       a[i*Vh].y = half * b[4*i+1];
@@ -120,10 +120,10 @@ namespace quda {
     }
   }
 
-  template <typename Float>
+  template <bool bqcd, typename Float>
   static inline void packCloverMatrix(double2* a, Float *b, int Vh)
   {
-    const Float half = 0.5; // pre-include factor of 1/2 introduced by basis change
+    const Float half = bqcd ? 1.0 : 0.5; // pre-include factor of 1/2 introduced by basis change
 
     for (int i=0; i<36; i++) {
       a[i*Vh].x = half * b[2*i+0];
@@ -131,11 +131,63 @@ namespace quda {
     }
   }
 
+  /**
+     Function to reorder a BQCD clover matrix into the order that is
+     expected by QUDA.  As well as reordering the clover matrix
+     elements, we are also changing basis/
+     
+     @param quda The output clover matrix in QUDA order
+     @param bqcd The input clover matrix in BQCD order
+  */
+  template <typename Float>
+  static inline void reorderBQCD(Float *quda, Float *bqcd) {
+    
+    /*    int bq[36] = { 0,  1, 20, 21, 32, 33,                   // diagonal
+		   2,  3,  4,  5,  6,  7,  8,  9, 10, 11,   // column 1
+		   12, 13, 14, 15, 16, 17, 18, 19,          // column 2
+		   22, 23, 24, 25, 26, 27,                  // column 3
+		   28, 29, 30, 31,                          // column 4
+		   34, 35}; */
+    
+    int bq[36] = { 21, 32, 33, 0,  1, 20,                   // diagonal
+		   28, 29, 30, 31, 6, 7,  14, 15, 22, 23,   // column 1  6
+		   34, 35, 8, 9, 16, 17, 24, 25,            // column 2  16
+		   10, 11, 18, 19, 26, 27,                  // column 3  24
+		    2,  3,  4,  5,                          // column 4  30
+		   12, 13};
+    
+    // flip the sign of the imaginary components
+    int sign[36];
+    for (int i=0; i<6; i++) sign[i] = 1;
+    for (int i=6; i<36; i+=2) {
+      if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) ) {
+	sign[i] = -1; sign[i+1] = -1;	
+	} else {
+	sign[i] = 1; sign[i+1] = -1;
+      }
+    }
+    
+    // first chiral block
+    for (int i=0; i<36; i++) quda[i] = sign[i] * bqcd[bq[i]];
+    
+    // second chiral block
+    for (int i=0; i<36; i++) quda[i+36] = sign[i] * bqcd[bq[i]+36];
+  }
+  
   template <typename Float, typename FloatN>
-  static void packParityClover(FloatN *res, Float *clover, int Vh, int pad)
+  static void packParityClover(FloatN *res, Float *clover, int Vh, int pad, 
+			       const QudaCloverFieldOrder cpu_order)
   {
-    for (int i = 0; i < Vh; i++) {
-      packCloverMatrix(res+i, clover+72*i, Vh+pad);
+    if (cpu_order == QUDA_PACKED_CLOVER_ORDER) {
+      for (int i = 0; i < Vh; i++) {
+	packCloverMatrix<false>(res+i, clover+72*i, Vh+pad);
+      }
+    } else { // must be doing BQCD order
+      for (int i = 0; i < Vh; i++) {
+	Float tmp[72];
+	reorderBQCD(tmp, clover+72*i);
+	packCloverMatrix<true>(res+i, tmp, Vh+pad);      
+      }
     }
   }
 
@@ -150,22 +202,22 @@ namespace quda {
 
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	packCloverMatrix(even+i, clover+72*k, Vh+pad);
+	packCloverMatrix<false>(even+i, clover+72*k, Vh+pad);
       }
-    
+      
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packCloverMatrix(odd+i, clover+72*k, Vh+pad);
+	packCloverMatrix<false>(odd+i, clover+72*k, Vh+pad);
       }
     }
   }
 
-  template<typename Float>
+  template<bool bqcd, typename Float>
   static inline void packCloverMatrixHalf(short4 *res, float *norm, Float *clover, int Vh)
   {
-    const Float half = 0.5; // pre-include factor of 1/2 introduced by basis change
+    const Float half = bqcd ? 1.0 : 0.5; // pre-include factor of 1/2 introduced by basis change
     Float max, a, c;
-
+    
     // treat the two chiral blocks separately
     for (int chi=0; chi<2; chi++) {
       max = fabs(clover[0]);
@@ -186,31 +238,40 @@ namespace quda {
   }
 
   template <typename Float>
-  static void packParityCloverHalf(short4 *res, float *norm, Float *clover, int Vh, int pad)
+    static void packParityCloverHalf(short4 *res, float *norm, Float *clover, 
+				     int Vh, int pad, const CloverFieldOrder cpu_order)
   {
-    for (int i = 0; i < Vh; i++) {
-      packCloverMatrixHalf(res+i, norm+i, clover+72*i, Vh+pad);
+    if (cpu_order == QUDA_PACKED_CLOVER_ORDER) {
+      for (int i = 0; i < Vh; i++) {
+	packCloverMatrixHalf<false>(res+i, norm+i, clover+72*i, Vh+pad);
+      }
+    } else { // must be doing BQCD order
+      for (int i = 0; i < Vh; i++) {
+	Float tmp[72];
+	reorderBQCD(tmp, clover+72*i);
+	packCloverMatrixHalf<true>(res+i, norm+i, tmp, Vh+pad);
+      }
     }
   }
-
+  
   template <typename Float>
-  static void packFullCloverHalf(short4 *even, float *evenNorm, short4 *odd, float *oddNorm,
-				 Float *clover, int *X, int pad)
+    static void packFullCloverHalf(short4 *even, float *evenNorm, short4 *odd, float *oddNorm,
+				   Float *clover, int *X, int pad)
   {
     int Vh = X[0]*X[1]*X[2]*X[3]/2;
-
+    
     for (int i=0; i<Vh; i++) {
-
+      
       int boundaryCrossings = i/X[0] + i/(X[1]*X[0]) + i/(X[2]*X[1]*X[0]);
-
+      
       { // even sites
 	int k = 2*i + boundaryCrossings%2; 
-	packCloverMatrixHalf(even+i, evenNorm+i, clover+72*k, Vh+pad);
+	packCloverMatrixHalf<false>(even+i, evenNorm+i, clover+72*k, Vh+pad);
       }
-    
+      
       { // odd sites
 	int k = 2*i + (boundaryCrossings+1)%2;
-	packCloverMatrixHalf(odd+i, oddNorm+i, clover+72*k, Vh+pad);
+	packCloverMatrixHalf<false>(odd+i, oddNorm+i, clover+72*k, Vh+pad);
       }
     }
   }
@@ -219,10 +280,10 @@ namespace quda {
 				     const QudaPrecision cpu_prec, const CloverFieldOrder cpu_order) {
 
     void *h_clover_odd = (char*)h_clover + cpu_prec*real_length/2;
-
+    
     if (cpu_order == QUDA_LEX_PACKED_CLOVER_ORDER) {
       loadFullField(clover, norm, (char*)clover+bytes/2, (char*)norm+norm_bytes/2, h_clover, cpu_prec, cpu_order);
-    } else if (cpu_order == QUDA_PACKED_CLOVER_ORDER) {
+    } else if (cpu_order == QUDA_PACKED_CLOVER_ORDER || cpu_order == QUDA_BQCD_CLOVER_ORDER) {
       loadParityField(clover, norm, h_clover, cpu_prec, cpu_order);
       loadParityField((char*)clover+bytes/2, (char*)norm+norm_bytes/2, h_clover_odd, cpu_prec, cpu_order);
     } else {
@@ -239,7 +300,7 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION && cpu_prec != QUDA_DOUBLE_PRECISION) {
       errorQuda("Cannot have CUDA double precision without CPU double precision");
     }
-    if (cpu_order != QUDA_PACKED_CLOVER_ORDER) 
+    if (cpu_order != QUDA_PACKED_CLOVER_ORDER && cpu_order != QUDA_BQCD_CLOVER_ORDER) 
       errorQuda("Invalid clover order %d", cpu_order);
 
     if (cudaMallocHost(&packedClover, bytes/2) == cudaErrorMemoryAllocation)
@@ -253,20 +314,20 @@ namespace quda {
     }
     
     if (precision == QUDA_DOUBLE_PRECISION) {
-      packParityClover((double2 *)packedClover, (double *)h_clover, volumeCB, pad);
+      packParityClover((double2 *)packedClover, (double *)h_clover, volumeCB, pad, cpu_order);
     } else if (precision == QUDA_SINGLE_PRECISION) {
       if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-	packParityClover((float4 *)packedClover, (double *)h_clover, volumeCB, pad);
+	packParityClover((float4 *)packedClover, (double *)h_clover, volumeCB, pad, cpu_order);
       } else {
-	packParityClover((float4 *)packedClover, (float *)h_clover, volumeCB, pad);
+	packParityClover((float4 *)packedClover, (float *)h_clover, volumeCB, pad, cpu_order);
       }
     } else {
       if (cpu_prec == QUDA_DOUBLE_PRECISION) {
 	packParityCloverHalf((short4 *)packedClover, (float *)packedCloverNorm, 
-			     (double *)h_clover, volumeCB, pad);
+			     (double *)h_clover, volumeCB, pad, cpu_order);
       } else {
 	packParityCloverHalf((short4 *)packedClover, (float *)packedCloverNorm, 
-			     (float *)h_clover, volumeCB, pad);
+			     (float *)h_clover, volumeCB, pad, cpu_order);
       }
     }
   

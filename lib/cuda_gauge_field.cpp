@@ -59,7 +59,7 @@ namespace quda {
     if( ! cpuGauge ) errorQuda( "cpuGauge is borked\n");
 
 #ifdef MULTI_GPU
-    if (cpu_order != QUDA_QDP_GAUGE_ORDER)
+    if (cpu_order != QUDA_QDP_GAUGE_ORDER && cpu_order != QUDA_BQCD_GAUGE_ORDER)
       errorQuda("Only QUDA_QDP_GAUGE_ORDER is supported for multi-gpu\n");
 #endif
 
@@ -81,13 +81,14 @@ namespace quda {
 #ifdef MULTI_GPU
     reduceMaxDouble(fat_link_max_double);
 #endif
+
     fat_link_max = fat_link_max_double;
-
+    
     int voxels[] = {volumeCB, volumeCB, volumeCB, volumeCB};
-
+    
     // FIXME - hack for the moment
     fat_link_max_ = fat_link_max;
-
+    
     int nFaceLocal = 1;
     if (cpu_order == QUDA_QDP_GAUGE_ORDER) {
       packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, volumeCB, 
@@ -100,6 +101,9 @@ namespace quda {
     } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
       packMILCGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad);
       packMILCGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad);    
+    } else if (cpu_order == QUDA_BQCD_GAUGE_ORDER) {
+      packBQCDGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad);
+      packBQCDGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad);    
     } else {
       errorQuda("Invalid gauge_order %d", cpu_order);
     }
@@ -262,6 +266,9 @@ namespace quda {
     } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
       unpackMILCGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad);
       unpackMILCGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad);
+    } else if (cpu_order == QUDA_BQCD_GAUGE_ORDER) {
+      unpackBQCDGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad);
+      unpackBQCDGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad);
     } else {
       errorQuda("Invalid gauge_order");
     }

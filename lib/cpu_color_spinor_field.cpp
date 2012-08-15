@@ -341,21 +341,23 @@ namespace quda {
       if (b.precision == QUDA_DOUBLE_PRECISION)
 	ret = compareSpinor(*(a.order_single), *(b.order_double), tol);
       else
-	ret =compareSpinor(*(a.order_single), *(b.order_single), tol);
+	ret = compareSpinor(*(a.order_single), *(b.order_single), tol);
 
     return ret;
   }
+
 
   template <class Order>
   void print_vector(const Order &o, unsigned int x) {
 
     for (int s=0; s<o.Nspin(); s++) {
+      std::cout << "x = " << x << ", s = " << s << ", { ";
       for (int c=0; c<o.Ncolor(); c++) {
-	for (int z=0; z<2; z++) {
-	  std::cout << o(x, s, c, z) << std::endl;
-	}
+	std::cout << " ( " << o(x, s, c, 0) << " , " ;
+	if (c<o.Ncolor()-1) std::cout << o(x, s, c, 1) << " ) ," ;
+	else std::cout << o(x, s, c, 1) << " ) " ;
       }
-      std::cout << std::endl;
+      std::cout << " } " << std::endl;
     }
 
   }

@@ -523,6 +523,9 @@ AC_SUBST( FECC, [${CC}])
 AC_MSG_NOTICE([Setting FECXX = ${CXX} ])
 AC_SUBST( FECXX, [${CXX}])
 
+AC_MSG_NOTICE([Setting FEF90 = ${F90} ])
+AC_SUBST( FEF90, [${F90}])
+
 AC_MSG_NOTICE([Setting MPI_HOME=${mpi_home}])
 AC_SUBST( MPI_HOME, [${mpi_home}] )
 

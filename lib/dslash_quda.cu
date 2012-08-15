@@ -126,9 +126,9 @@ namespace quda {
   // as opposed to multiple calls to cudaMemcpy()
   static bool kernelPackT = false;
 
-  void setKernelPackT(bool packT) {
-    kernelPackT = packT;
-  }
+  void setKernelPackT(bool packT) { kernelPackT = packT; }
+
+  bool getKernelPackT() { return kernelPackT; }
 
 
 #include <dslash_textures.h>

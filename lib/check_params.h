@@ -40,10 +40,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   printfQuda("QUDA Gauge Parameters:\n");
 #endif
 
-  P(X[0], INVALID_INT);
-  P(X[1], INVALID_INT);
-  P(X[2], INVALID_INT);
-  P(X[3], INVALID_INT);
+  for (int i=0; i<4; i++) P(X[i], INVALID_INT);
 
 #if defined INIT_PARAM
   P(anisotropy, INVALID_DOUBLE);
@@ -79,10 +76,8 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(ga_pad, INVALID_INT);
   
 #if defined INIT_PARAM
-  P(packed_size, 0);
   P(gaugeGiB, 0.0);
 #else
-  P(packed_size, INVALID_INT);
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
 
@@ -198,9 +193,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
     P(prec_precondition, QUDA_INVALID_PRECISION);
+    P(schwarz_type, QUDA_INVALID_SCHWARZ);
+    P(precondition_cycle, 0);              
   }
-  P(schwarz_type, QUDA_INVALID_SCHWARZ);
-  P(precondition_cycle, 0);              
 #endif
 
 

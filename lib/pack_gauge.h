@@ -678,6 +678,88 @@ static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
 
 }
 
+// Assume the gauge field is BQCD ordered: 1-d array with
+// [mu][even-odd][spacetime+halos][column][row]
+template <typename Float, typename FloatN>
+void packBQCDGaugeField(FloatN *res, Float *gauge, int oddBit, 
+			QudaReconstructType reconstruct, int Vh, int pad)
+{
+
+  // need to add on halo region
+  int mu_offset = X_[0]/2 + 2;
+  for (int i=1; i<4; i++) mu_offset *= (X_[i] + 2);
+  Float gT[18];
+
+  int dir, i;
+  if (reconstruct == QUDA_RECONSTRUCT_12) {
+    for (dir = 0; dir < 4; dir++) {
+      Float *g = gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
+      for (i = 0; i < Vh; i++) {
+	transposeScale(gT, g+i*18, 1.0);
+	pack12(res+i, gT, dir, Vh+pad);
+      }
+    }
+  } else if (reconstruct == QUDA_RECONSTRUCT_8){
+    for (dir = 0; dir < 4; dir++) {
+      Float *g = gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
+      //Float *g = gauge + (dir*2+oddBit)*Vh*gaugeSiteSize;
+      for (i = 0; i < Vh; i++) {
+	transposeScale(gT, g+i*18, 1.0);
+	pack8(res+i, gT, dir, Vh+pad);
+      }
+    }
+  }else{
+    // FIXME - need to workout row-col order
+    for (dir = 0; dir < 4; dir++) {
+      Float *g = gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
+      //Float *g = gauge + (dir*2+oddBit)*Vh*gaugeSiteSize;
+      for (i = 0; i < Vh; i++) {
+	transposeScale(gT, g+i*18, 1.0);
+	pack18(res+i, gT, dir, Vh+pad);
+	//pack18(res+i, g+i*gaugeSiteSize, dir, Vh+pad);
+      }
+    }
+  }
+}
+
+// Assume the gauge field is BQCD ordered: 1-d array with
+// [mu][even-odd][spacetime+halos][column][row]
+template <typename Float, typename FloatN>
+static void unpackBQCDGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
+				 QudaReconstructType reconstruct, int V, int pad) {
+  // need to add on halo region
+  int mu_offset = X_[0]/2 + 2;
+  for (int i=1; i<4; i++) mu_offset *= (X_[i] + 2);
+  Float gT[18];
+
+  if (reconstruct == QUDA_RECONSTRUCT_12) {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
+      for (int i = 0; i < V; i++) {
+	unpack12(gT, d_gauge+i, dir, V+pad, i);
+	transposeScale(hg+i*18, gT, 1.0);
+      }
+    } 
+  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
+      for (int i = 0; i < V; i++) {
+	unpack8(gT, d_gauge+i, dir, V+pad, i);
+	transposeScale(hg+i*18, gT, 1.0);
+      }
+    }
+  } else {
+    for (int dir = 0; dir < 4; dir++) {
+      Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
+      for (int i = 0; i < V; i++) {
+	unpack18(gT, d_gauge+i, dir, V+pad);
+	transposeScale(hg+i*18, gT, 1.0);
+      }
+    }
+  }
+
+}
+
 /*
   Momentum packing/unpacking routines: these are for length 10
   vectors, stored in Float2 format.
@@ -705,8 +787,6 @@ template <typename Float, typename Float2>
   }      
 }
 
-
-
 template <typename Float, typename Float2>
   inline void unpack10(Float* m, Float2 *res, int dir, int Vh, int pad) 
 {
@@ -731,4 +811,3 @@ template <typename Float, typename Float2>
     }
   }
 }
-

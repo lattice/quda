@@ -841,7 +841,6 @@ def to_chiral_basis(v_out,v_in,c):
     return block(str)+"\n\n"
 # end def to_chiral_basis
 
-
 def from_chiral_basis(v_out,v_in,c): # note: factor of 1/2 is included in clover term normalization
     str = ""
     str += "spinorFloat "+a_re(0,0,c)+" =  "+spinor(v_in,1,c,0)+" + "+spinor(v_in,3,c,0)+";\n"
