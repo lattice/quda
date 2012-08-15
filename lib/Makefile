@@ -100,4 +100,8 @@ dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 %.o: %.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
+quda_fortran.o: quda_fortran.F90 ../include/enum_quda_fortran.h
+	$(CC) -Wall -E -I../include $< > $*.f90
+	$(F90) -c -fno-range-check $*.f90
+
 .PHONY: all gen clean

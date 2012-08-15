@@ -45,6 +45,7 @@ USE_QDPJIT = @USE_QDPJIT@  # build QDP-JIT support?
 
 FECC = @FECC@ 	           # front-end CC
 FECXX = @FECXX@            # front-end CXX
+FEF90 = @FEF90@            # front-end F90
 
 MPI_HOME=@MPI_HOME@
 QMP_HOME=@QMP_HOME@
@@ -85,6 +86,7 @@ endif
 
 CC  = $(FECC)
 CXX = $(FECXX)
+F90 = $(FEF90)
 
 ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_CFLAGS =
