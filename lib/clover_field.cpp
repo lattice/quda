@@ -133,13 +133,8 @@ namespace quda {
 
   /**
      Function to reorder a BQCD clover matrix into the order that is
-     expected by QUDA.  
-     
-     FIXME: An outstanding issue is that a different basis for the clover
-     matrix elements is actually used between QUDA and BQCD.  This is
-     currently taken care with a custom bqcd basis change in the
-     kernels.  Instead we must change the clover matrix elements in this
-     function.
+     expected by QUDA.  As well as reordering the clover matrix
+     elements, we are also changing basis/
      
      @param quda The output clover matrix in QUDA order
      @param bqcd The input clover matrix in BQCD order
@@ -147,18 +142,29 @@ namespace quda {
   template <typename Float>
   static inline void reorderBQCD(Float *quda, Float *bqcd) {
     
-    int bq[36] = { 0,  1, 20, 21, 32, 33,                   // diagonal
+    /*    int bq[36] = { 0,  1, 20, 21, 32, 33,                   // diagonal
 		   2,  3,  4,  5,  6,  7,  8,  9, 10, 11,   // column 1
 		   12, 13, 14, 15, 16, 17, 18, 19,          // column 2
 		   22, 23, 24, 25, 26, 27,                  // column 3
 		   28, 29, 30, 31,                          // column 4
-		   34, 35};
+		   34, 35}; */
+    
+    int bq[36] = { 21, 32, 33, 0,  1, 20,                   // diagonal
+		   28, 29, 30, 31, 6, 7,  14, 15, 22, 23,   // column 1  6
+		   34, 35, 8, 9, 16, 17, 24, 25,            // column 2  16
+		   10, 11, 18, 19, 26, 27,                  // column 3  24
+		    2,  3,  4,  5,                          // column 4  30
+		   12, 13};
     
     // flip the sign of the imaginary components
     int sign[36];
     for (int i=0; i<6; i++) sign[i] = 1;
     for (int i=6; i<36; i+=2) {
-      sign[i] = 1; sign[i+1] = -1;
+      if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) ) {
+	sign[i] = -1; sign[i+1] = -1;	
+	} else {
+	sign[i] = 1; sign[i+1] = -1;
+      }
     }
     
     // first chiral block

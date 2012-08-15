@@ -13,6 +13,7 @@
 #include <color_spinor_field.h>
 #include <face_quda.h>
 
+using namespace quda;
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.

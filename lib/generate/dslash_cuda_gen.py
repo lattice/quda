@@ -841,26 +841,6 @@ def to_chiral_basis(v_out,v_in,c):
     return block(str)+"\n\n"
 # end def to_chiral_basis
 
-def to_bqcd_clover_basis(v_out,v_in,c):
-    str = ""
-    str += "spinorFloat "+a_re(0,0,c)+" =  "+spinor(v_in,0,c,0)+" + "+spinor(v_in,2,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,0,c)+" =  "+spinor(v_in,0,c,1)+" + "+spinor(v_in,2,c,1)+";\n"
-    str += "spinorFloat "+a_re(0,1,c)+" =  "+spinor(v_in,1,c,0)+" + "+spinor(v_in,3,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,1,c)+" =  "+spinor(v_in,1,c,1)+" + "+spinor(v_in,3,c,1)+";\n"
-    str += "spinorFloat "+a_re(0,2,c)+" =  "+spinor(v_in,0,c,0)+" - "+spinor(v_in,2,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,2,c)+" =  "+spinor(v_in,0,c,1)+" - "+spinor(v_in,2,c,1)+";\n"
-    str += "spinorFloat "+a_re(0,3,c)+" =  "+spinor(v_in,1,c,0)+" - "+spinor(v_in,3,c,0)+";\n"
-    str += "spinorFloat "+a_im(0,3,c)+" =  "+spinor(v_in,1,c,1)+" - "+spinor(v_in,3,c,1)+";\n"
-    str += "\n"
-
-    for s in range (0,4):
-        str += spinor(v_out,s,c,0)+" = "+a_re(0,s,c)+";  "
-        str += spinor(v_out,s,c,1)+" = "+a_im(0,s,c)+";\n"
-
-    return block(str)+"\n\n"
-# end def to_chiral_basis
-
-
 def from_chiral_basis(v_out,v_in,c): # note: factor of 1/2 is included in clover term normalization
     str = ""
     str += "spinorFloat "+a_re(0,0,c)+" =  "+spinor(v_in,1,c,0)+" + "+spinor(v_in,3,c,0)+";\n"
@@ -917,16 +897,14 @@ def apply_clover(v_out,v_in):
     str = ""
     if dslash: str += "#ifdef DSLASH_CLOVER\n\n"
     str += "// change to chiral basis\n"
-    #str += to_chiral_basis(v_out,v_in,0) + to_chiral_basis(v_out,v_in,1) + to_chiral_basis(v_out,v_in,2)
-    str += to_bqcd_clover_basis(v_out,v_in,0) + to_bqcd_clover_basis(v_out,v_in,1) + to_bqcd_clover_basis(v_out,v_in,2)
+    str += to_chiral_basis(v_out,v_in,0) + to_chiral_basis(v_out,v_in,1) + to_chiral_basis(v_out,v_in,2)
     str += "// apply first chiral block\n"
     str += clover_mult(v_out,v_out,0)
     str += "// apply second chiral block\n"
     str += clover_mult(v_out,v_out,1)
     str += "// change back from chiral basis\n"
     str += "// (note: required factor of 1/2 is included in clover term normalization)\n"
-#    str += from_chiral_basis(v_out,v_out,0) + from_chiral_basis(v_out,v_out,1) + from_chiral_basis(v_out,v_out,2)
-    str += to_bqcd_clover_basis(v_out,v_out,0) + to_bqcd_clover_basis(v_out,v_out,1) + to_bqcd_clover_basis(v_out,v_out,2)
+    str += from_chiral_basis(v_out,v_out,0) + from_chiral_basis(v_out,v_out,1) + from_chiral_basis(v_out,v_out,2)
     if dslash: str += "#endif // DSLASH_CLOVER\n\n"
 
     return str

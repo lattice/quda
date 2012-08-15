@@ -52,7 +52,6 @@ extern int xdim;
 extern int ydim;
 extern int zdim;
 extern int tdim;
-extern bool kernelPackT;
 extern int gridsize_from_cmdline[];
 
 static void end();

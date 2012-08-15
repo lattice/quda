@@ -14,6 +14,8 @@
 
 #include <dslash_util.h>
 
+using namespace quda;
+
 static const double projector[8][4][4][2] = {
   {
     {{1,0}, {0,0}, {0,0}, {0,-1}},

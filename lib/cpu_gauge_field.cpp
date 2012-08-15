@@ -229,9 +229,9 @@ namespace quda {
 
     // get the links into a contiguous buffer
     if (precision == QUDA_DOUBLE_PRECISION) {
-      packGhost((double**)gauge, (const double**)send, nFace, x, volumeCB, surfaceCB, order);
+      packGhost((double**)send, (const double**)gauge, nFace, x, volumeCB, surfaceCB, order);
     } else {
-      packGhost((float**)gauge, (const float**)send, nFace, x, volumeCB, surfaceCB, order);
+      packGhost((float**)send, (const float**)gauge, nFace, x, volumeCB, surfaceCB, order);
     }
 
     // communicate between nodes

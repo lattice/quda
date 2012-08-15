@@ -333,6 +333,9 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+  verbosity = inv_param->verbosity;
+  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
   if (!initialized) errorQuda("QUDA not initialized");
 
   if (!h_clover && !h_clovinv) {
@@ -690,6 +693,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
+
+  verbosity = inv_param->verbosity;
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   ColorSpinorParam cpuParam(h_in, inv_param->input_location, *inv_param, gaugePrecise->X(), 1);
@@ -902,6 +907,8 @@ void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL) errorQuda("Clover field not allocated");
+
+  verbosity = inv_param->verbosity;
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH)
