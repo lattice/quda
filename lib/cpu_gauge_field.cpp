@@ -118,6 +118,18 @@ namespace quda {
   
   }
   
+  // transpose the matrix
+  template <typename Float>
+  inline void transpose(Float *gT, const Float *g) {
+    for (int ic=0; ic<3; ic++) {
+      for (int jc=0; jc<3; jc++) { 
+	for (int r=0; r<2; r++) {
+	  gT[(ic*3+jc)*2+r] = g[(jc*3+ic)*2+r];
+	}
+      }
+    }
+  }
+
   // FIXME - replace this with a functor approach to more easily arbitrary ordering
   template <typename Float>
     void packGhost(Float **ghost, const Float **gauge, const int nFace, const int *X, 
@@ -195,13 +207,31 @@ namespace quda {
 		int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
 		int oddness = (a+b+c+d)%2;
 		if (oddness == 0){ //even
-		  for(int i=0;i < 18;i++){
-		    even_dst[18*even_dst_index+i] = even_src[18*index + i];
+		  if (order == QUDA_BQCD_GAUGE_ORDER) {
+		    // we do transposition here so we can just call packQDPGauge for the ghost zone
+		    Float gT[18];
+		    transpose(gT, &even_src[18*index]);
+		    for(int i=0; i<18; i++){
+		      even_dst[18*even_dst_index+i] = gT[i];
+		    }		    
+		  } else {
+		    for(int i=0;i < 18;i++){
+		      even_dst[18*even_dst_index+i] = even_src[18*index + i];
+		    }
 		  }
 		  even_dst_index++;
 		}else{ //odd
-		  for(int i=0;i < 18;i++){
-		    odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
+		  if (order == QUDA_BQCD_GAUGE_ORDER) {
+		    // we do transposition here so we can just call packQDPGauge for the ghost zone
+		    Float gT[18];
+		    transpose(gT, &odd_src[18*index]);
+		    for(int i=0; i<18; i++){
+		      odd_dst[18*odd_dst_index+i] = gT[i];
+		    }		    
+		  } else {
+		    for(int i=0;i < 18;i++){
+		      odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
+		    }
 		  }
 		  odd_dst_index++;
 		}
@@ -237,13 +267,6 @@ namespace quda {
     // communicate between nodes
     FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
     faceBuf.exchangeCpuLink(ghost, send);
-
-    for (int i=0; i<4; i++) {
-      double sum = 0.0;
-      for (int j=0; j<nFace*surface[i]*reconstruct; j++) {
-	sum += ((double*)(ghost[i]))[j];
-      }
-    }
 
     for (int d=0; d<nDim; d++) free(send[d]);
     free(send);
