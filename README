@@ -75,6 +75,11 @@ configure into thinking that it's cross-compiling by setting the
 --build=none and --host=<HOST> flags.  For the latter,
 "--host=x86_64-linux-gnu" should work on a 64-bit linux system.
 
+If Fortran interface support is desired, then the F90 environment
+variable should be set when configure is invoked.  To build the
+Fortran interface modules, then the Makefile target "fortran" should
+be given, since this is not built by default.
+
 Throughout the library, auto-tuning is used to select optimal launch
 parameters for most performance-critical kernels.  This tuning
 process takes some time and will generally slow things down the first
