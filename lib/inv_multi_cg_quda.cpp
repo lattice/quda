@@ -109,8 +109,9 @@ namespace quda {
     // Not sure if this is the best way to account for finite precision.
     // Perhaps I should enforce a lower bound on "stop" instead.
   
-    const double min_tolerance = (param.precision == QUDA_DOUBLE_PRECISION) ? invParam.tol : (param.precision == QUDA_SINGLE_PRECISION) ? 1e-6 : 1e-4;
-    const double tolerance = (invParam.tol < min_tolerance) ? min_tolerance : invParam.tol;
+    //const double min_tolerance = (param.precision == QUDA_DOUBLE_PRECISION) ? invParam.tol : (param.precision == QUDA_SINGLE_PRECISION) ? 1e-6 : 1e-4;
+    //const double tolerance = (invParam.tol < min_tolerance) ? min_tolerance : invParam.tol;
+    const double tolerance = invParam.tol;
 
     double stop = r2*tolerance*tolerance; // stopping condition of solver
     
@@ -223,8 +224,8 @@ namespace quda {
     }
     double true_res = xmyNormCuda(b, *r);
     if (invParam.verbosity >= QUDA_SUMMARIZE){
-      printfQuda("MultiShift CG: Converged after %d iterations, r2 = %e, relative true_r2 = %e\n", 
-		 k,r2, (true_res / b2));
+      printfQuda("MultiShift CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+		 k, sqrt(r2/b2), sqrt(true_res / b2));    
     }    
     if (invParam.verbosity >= QUDA_VERBOSE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
