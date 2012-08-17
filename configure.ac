@@ -149,8 +149,8 @@ AC_ARG_WITH(mpi,
 
 
 AS_CASE([$build_mpi],
-	[yes], [AC_PROG_CC($mpi_home/bin/mpicc mpicc), AC_PROG_CXX($mpi_home/bin/mpicxx mpicxx CC)],
-	[no], [AC_PROG_CC(gcc cc), AC_PROG_CXX(g++ CC cxx)])
+	[yes], [AC_PROG_CC($mpi_home/bin/mpicc mpicc) AC_PROG_CXX($mpi_home/bin/mpicxx mpicxx CC)],
+	[no], [AC_PROG_CC(gcc cc) AC_PROG_CXX(g++ CC cxx)])
 
 
 AC_ARG_WITH(qmp,

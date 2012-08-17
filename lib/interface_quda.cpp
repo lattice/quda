@@ -27,6 +27,8 @@
 #include <cuda.h>
 
 #ifdef MULTI_GPU
+extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
+                              QudaPrecision gPrecision, int optflag);
 #ifdef MPI_COMMS
 #include <mpi.h>
 #endif

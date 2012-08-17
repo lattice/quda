@@ -12,6 +12,10 @@
 
 #define BLOCK_DIM 64
 
+extern void exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream);
+extern void exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream);
+extern void exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream);
+
 namespace quda {
 
   void
