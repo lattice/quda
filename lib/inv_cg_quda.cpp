@@ -103,7 +103,12 @@ namespace quda {
       pAp = reDotProductCuda(p, Ap);
       alpha = r2 / pAp;        
       r2_old = r2;
+
+      copyCuda(tmp, rSloppy);
       r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+      xpayCuda(rSloppy, -1.0, tmp);
+      double zr = reDotProductCuda(rSloppy, tmp);
+
 
       // reliable update conditions
       rNorm = sqrt(r2);
@@ -113,7 +118,8 @@ namespace quda {
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
       if ( !(updateR || updateX)) {
-	beta = r2 / r2_old;
+	beta = zr / r2_old;
+	//beta = r2 / r2_old;
 	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
       } else {
 	axpyCuda(alpha, p, xSloppy);
@@ -122,8 +128,16 @@ namespace quda {
 	xpyCuda(x, y); // swap these around?
 	mat(r, y, x); // here we can use x as tmp
 	r2 = xmyNormCuda(b, r);
+
 	if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
 	zeroCuda(xSloppy);
+
+	// break-out check if we have reached the limit of the precision
+	if (sqrt(r2) > r0Norm) { // reuse r0Norm for this
+	  warningQuda("CG: new reliable residual norm is greater than previous reliable residual norm");
+	  k++;
+	  break;
+	}
 
 	rNorm = sqrt(r2);
 	maxrr = rNorm;

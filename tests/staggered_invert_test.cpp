@@ -101,7 +101,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // outer solver parameters
   inv_param->inv_type = QUDA_CG_INVERTER;
   inv_param->tol = tol;
-  inv_param->maxiter = 10000;
+  inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1; // ignored by multi-shift solver
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
@@ -141,7 +141,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.1;
+  double mass = 0.001;
 
   set_params(&gaugeParam, &inv_param,
 	     xdim, ydim, zdim, tdim,
@@ -314,7 +314,9 @@ invert_test(void)
 
 #define NUM_OFFSETS 12
         
-    double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81, 3.0, 3.1, 3.2, 3.3, 3.4};
+    //double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81, 3.0, 3.1, 3.2, 3.3, 3.4};
+    double masses[NUM_OFFSETS] ={0.1, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81, 3.0, 3.1, 3.2, 3.3, 3.4};
+    // double masses[NUM_OFFSETS] ={0.1};
     double offsets[NUM_OFFSETS];	
     int num_offsets =NUM_OFFSETS;
     void* outArray[NUM_OFFSETS];
@@ -351,7 +353,7 @@ invert_test(void)
       invertMultiShiftQuda(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);	
     }
     cudaDeviceSynchronize();
-    printfQuda("Final residue squred =%g\n", residue_sq);
+    printfQuda("Final residue squared =%g\n", residue_sq);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     

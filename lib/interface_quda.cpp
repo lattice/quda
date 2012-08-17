@@ -1323,6 +1323,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   delete [] unscaled_shifts;
 
   for(int i=0; i < param->num_offset; i++) { 
+    if (param->verbosity >= QUDA_VERBOSE){
+      double nx = norm2(*x[i]);
+      printfQuda("Solution %d = %f\n", i, nx);
+    }
+
     *h_x[i] = *x[i];
   }
 
