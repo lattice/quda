@@ -186,12 +186,10 @@ namespace quda {
 
   }
 
-  /*
-    Orthogonalise the nc vectors v[] of length n
-  */
+  // Orthogonalise the nc vectors v[] of length n
   template <class Complex>
   void blockGramSchmidt(Complex ***v, int nBlocks, int Nc, int blockSize) {
-
+    
     for (int b=0; b<nBlocks; b++) {
       for (int jc=0; jc<Nc; jc++) {
       
