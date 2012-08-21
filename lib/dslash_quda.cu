@@ -39,15 +39,15 @@
 
 #include <inline_ptx.h>
 
-namespace quda {
+enum KernelType {
+  INTERIOR_KERNEL = 5,
+  EXTERIOR_KERNEL_X = 0,
+  EXTERIOR_KERNEL_Y = 1,
+  EXTERIOR_KERNEL_Z = 2,
+  EXTERIOR_KERNEL_T = 3
+};
 
-  enum KernelType {
-    INTERIOR_KERNEL = 5,
-    EXTERIOR_KERNEL_X = 0,
-    EXTERIOR_KERNEL_Y = 1,
-    EXTERIOR_KERNEL_Z = 2,
-    EXTERIOR_KERNEL_T = 3
-  };
+namespace quda {
 
   struct DslashParam {
     int threads; // the desired number of active threads
