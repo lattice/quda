@@ -1150,22 +1150,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  * Generic version of the multi-shift solver. Should work for
  * most fermions. Note, offset[0] is not folded into the mass parameter 
  */
-void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			  double* offsets, int num_offsets, double* residue_sq)
+void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
   if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
   checkInvertParam(param);
 
-  param->num_offset = num_offsets;
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
-  for (int i=0; i<param->num_offset; i++) {
-    param->offset[i] = offsets[i];
-    param->tol_offset[i] = residue_sq[i];
-  }
 
   verbosity = param->verbosity;
 
@@ -1204,13 +1198,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   param->gflops = 0;
   param->iter = 0;
   
-  // Find the smallest shift and its offset.
-  double low_offset = param->offset[0];
-  int low_index = 0;
-  for (int i=1;i < param->num_offset;i++){
-    if (param->offset[i] < low_offset){
-      low_offset = param->offset[i];
-      low_index = i;
+  for (int i=0; i<param->num_offset-1; i++) {
+    for (int j=i+1; j<param->num_offset; j++) {
+      if (param->offset[i] > param->offset[j])
+	errorQuda("Offsets must be ordered from smallest to largest");
     }
   }
   
@@ -1223,18 +1214,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     hp_x[i] = _hp_x[i];
   }
   
-  // Now shift things so that the vector with the smallest shift 
-  // is in the first position of the array
-  if (low_index != 0){
-    void* tmp = hp_x[0];
-    hp_x[0] = hp_x[low_index] ;
-    hp_x[low_index] = tmp;
-    
-    double tmp1 = param->offset[0];
-    param->offset[0]= param->offset[low_index];
-    param->offset[low_index] =tmp1;
-  }
-    
   // Create the matrix.
   // The way this works is that createDirac will create 'd' and 'dSloppy'
   // which are global. We then grab these with references...
@@ -1490,22 +1469,16 @@ do_create_sloppy_cuda_gauge(void)
 
 
 void 
-invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			  double* offsets, int num_offsets, double* residue_sq)
+invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
   if (!initialized) errorQuda("QUDA not initialized");
 
   QudaPrecision high_prec = param->cuda_prec;
   param->cuda_prec = param->cuda_prec_sloppy;
   
-  param->num_offset = num_offsets;
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
-  for (int i=0; i<param->num_offset; i++) {
-    param->offset[i] = offsets[i];
-    param->tol_offset[i] = residue_sq[i];
-  }
 
   do_create_sloppy_cuda_gauge();
 
@@ -1552,16 +1525,13 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   param->gflops = 0;
   param->iter = 0;
   
-  // Find the smallest shift and its offset.
-  double low_offset = param->offset[0];
-  int low_index = 0;
-  for (int i=1;i < param->num_offset;i++){
-    if (param->offset[i] < low_offset){
-      low_offset = param->offset[i];
-      low_index = i;
+  for (int i=0; i<param->num_offset-1; i++) {
+    for (int j=i+1; j<param->num_offset; j++) {
+      if (param->offset[i] > param->offset[j])
+	errorQuda("Offsets must be ordered from smallest to largest");
     }
   }
-  
+
   // Host pointers for x, take a copy of the input host pointers
   void** hp_x;
   hp_x = new void* [ param->num_offset ];
@@ -1571,18 +1541,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
     hp_x[i] = _hp_x[i];
   }
   
-  // Now shift things so that the vector with the smallest shift 
-  // is in the first position of the array
-  if (low_index != 0){
-    void* tmp = hp_x[0];
-    hp_x[0] = hp_x[low_index] ;
-    hp_x[low_index] = tmp;
-    
-    double tmp1 = param->offset[0];
-    param->offset[0]= param->offset[low_index];
-    param->offset[low_index] =tmp1;
-  }
-    
   // Create the matrix.
   // The way this works is that createDirac will create 'd' and 'dSloppy'
   // which are global. We then grab these with references...

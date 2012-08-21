@@ -106,7 +106,8 @@ extern "C" {
     double mu;    /**< Twisted mass parameter */
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
-    double tol;
+    double tol;   /**< Solver tolerance in the L2 residual norm */
+    double true_res; /**< Actual L2 residual norm achieved in solver */
     int maxiter;
     double reliable_delta; /**< Reliable update tolerance */
 
@@ -116,7 +117,10 @@ extern "C" {
     double offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_MULTI_SHIFT];
+    double tol_offset[QUDA_MAX_MULTI_SHIFT];     
+
+    /** Actual L2 residual norm achieved in solver for each offset */
+    double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
 
     QudaSolutionType solution_type;  /**< Type of system to solve */
     QudaSolveType solve_type;        /**< How to solve it */
@@ -325,9 +329,7 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			    double* offsets, int num_offsets,
-			    double* residue_sq);
+  void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
 
   /**
    * Mixed-precision multi-shift solver.  In the future, this functionality
@@ -337,9 +339,7 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b,
-				 QudaInvertParam *param, double* offsets,
-				 int num_offsets, double* residue_sq);
+  void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param);
     
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).

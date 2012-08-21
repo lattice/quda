@@ -106,8 +106,9 @@ namespace quda {
 
       copyCuda(tmp, rSloppy);
       r2 = axpyNormCuda(-alpha, Ap, rSloppy);
-      xpayCuda(rSloppy, -1.0, tmp);
-      double zr = reDotProductCuda(rSloppy, tmp);
+
+      //xpayCuda(rSloppy, -1.0, tmp);
+      //double zr = reDotProductCuda(rSloppy, tmp);
 
 
       // reliable update conditions
@@ -118,8 +119,8 @@ namespace quda {
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
       if ( !(updateR || updateX)) {
-	beta = zr / r2_old;
-	//beta = r2 / r2_old;
+	//beta = zr / r2_old;
+	beta = r2 / r2_old;
 	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
       } else {
 	axpyCuda(alpha, p, xSloppy);
@@ -163,14 +164,24 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
 
-    invParam.secs = stopwatchReadSeconds();
-
   
     if (k==invParam.maxiter) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
     if (invParam.verbosity >= QUDA_SUMMARIZE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
+
+    // compute the true residual
+    mat(r, x, y);
+    double true_res = xmyNormCuda(b, r);
+    invParam.true_res = sqrt(true_res / src_norm);
+
+    invParam.secs = stopwatchReadSeconds();
+
+    if (invParam.verbosity >= QUDA_SUMMARIZE){
+      printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+		 k, sqrt(r2/src_norm), invParam.true_res);    
+    }
 
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
@@ -180,13 +191,6 @@ namespace quda {
     invParam.iter = k;
 
     quda::blas_flops = 0;
-
-    if (invParam.verbosity >= QUDA_SUMMARIZE){
-      mat(r, x, y);
-      double true_res = xmyNormCuda(b, r);
-      printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		 k, sqrt(r2/src_norm), sqrt(true_res / src_norm));    
-    }
 
     if (&tmp2 != &tmp) delete tmp2_p;
 

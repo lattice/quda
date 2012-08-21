@@ -16,7 +16,7 @@
  * For staggered, the mass is folded into the dirac operator
  * Otherwise the matrix mass is 'unmodified'. 
  *
- * THe lowest offset is in offsets[0]
+ * The lowest offset is in offsets[0]
  *
  */
 
@@ -36,11 +36,9 @@ namespace quda {
  
     int num_offset = invParam.num_offset;
     double *offset = invParam.offset;
-    double *residue_sq = invParam.tol_offset;
  
     if (num_offset == 0) return;
 
-    int *finished = new int [num_offset];
     double *zeta_i = new double[num_offset];
     double *zeta_im1 = new double[num_offset];
     double *zeta_ip1 = new double[num_offset];
@@ -52,7 +50,6 @@ namespace quda {
     int j_low = 0;   
     int num_offset_now = num_offset;
     for (i=0; i<num_offset; i++) {
-      finished[i] = 0;
       zeta_im1[i] = zeta_i[i] = 1.0;
       beta_im1[i] = -1.0;
       alpha[i] = 0.0;
@@ -61,7 +58,6 @@ namespace quda {
     //double msq_x4 = offset[0];
 
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
-  
     cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset], *r_sloppy;
   
     ColorSpinorParam param;
@@ -83,7 +79,7 @@ namespace quda {
     }
   
     cudaColorSpinorField **p = new cudaColorSpinorField*[num_offset];  
-    for(i=0;i < num_offset;i++){
+    for(i=0; i<num_offset; i++){
       p[i]= new cudaColorSpinorField(*r_sloppy);    
     }
   
@@ -101,90 +97,68 @@ namespace quda {
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     double b2 = normCuda(b);
-    double r2 = b2;
-    double r2_old;
 
-
-    // Set a lower bound on the tolerance.
-    // Not sure if this is the best way to account for finite precision.
-    // Perhaps I should enforce a lower bound on "stop" instead.
-  
     //const double min_tolerance = (param.precision == QUDA_DOUBLE_PRECISION) ? invParam.tol : (param.precision == QUDA_SINGLE_PRECISION) ? 1e-6 : 1e-4;
     //const double tolerance = (invParam.tol < min_tolerance) ? min_tolerance : invParam.tol;
-    const double tolerance = invParam.tol;
-
-    double stop = r2*tolerance*tolerance; // stopping condition of solver
     
+    // stopping condition of each shift
+    double stop[QUDA_MAX_MULTI_SHIFT];
+    double r2[QUDA_MAX_MULTI_SHIFT];
+    bool finished[QUDA_MAX_MULTI_SHIFT];
+    for (int i=0; i<num_offset; i++) {
+      r2[i] = b2;
+      stop[i] = r2[i] * invParam.tol_offset[i] * invParam.tol_offset[i];
+      finished[i] = 0;
+    }
+
+    double r2_old;
     double pAp;
     
     int k = 0;
     
     stopwatchStart();
-    while (r2 > stop &&  k < invParam.maxiter) {
+    while (r2[0] > stop[0] &&  k < invParam.maxiter) {
       matSloppy(*Ap, *p[0], tmp1, tmp2);
-      if (invParam.dslash_type != QUDA_ASQTAD_DSLASH){
-	axpyCuda(offset[0], *p[0], *Ap);
-      }
+      if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) axpyCuda(offset[0], *p[0], *Ap);
+
       pAp = reDotProductCuda(*p[0], *Ap);
-      beta_i[0] = r2 / pAp;        
+      beta_i[0] = r2[0] / pAp;        
 
       zeta_ip1[0] = 1.0;
       for (j=1; j<num_offset_now; j++) {
 	zeta_ip1[j] = zeta_i[j] * zeta_im1[j] * beta_im1[j_low];
 	double c1 = beta_i[j_low] * alpha[j_low] * (zeta_im1[j]-zeta_i[j]);
 	double c2 = zeta_im1[j] * beta_im1[j_low] * (1.0+(offset[j]-offset[0])*beta_i[j_low]);
-	/*THISBLOWSUP
-	  zeta_ip1[j] /= c1 + c2;
-	  beta_i[j] = beta_i[j_low] * zeta_ip1[j] / zeta_i[j];
-	*/
-	/*TRYTHIS*/
-	if( (c1+c2) != 0.0 )
-	  zeta_ip1[j] /= (c1 + c2); 
-	else {
-	  zeta_ip1[j] = 0.0;
-	  finished[j] = 1;
-	}
-	if( zeta_i[j] != 0.0) {
-	  beta_i[j] = beta_i[j_low] * zeta_ip1[j] / zeta_i[j];
-	} else  {
-	  zeta_ip1[j] = 0.0;
-	  beta_i[j] = 0.0;
-	  finished[j] = 1;
-	  if (invParam.verbosity >= QUDA_VERBOSE)
-	    printfQuda("SETTING A ZERO, j=%d, num_offset_now=%d\n",j,num_offset_now);
-	  //if(j==num_offset_now-1)node0_PRINTF("REDUCING OFFSET\n");
-	  if(j==num_offset_now-1) num_offset_now--;
-	  // don't work any more on finished solutions
-	  // this only works if largest offsets are last, otherwise
-	  // just wastes time multiplying by zero
-	}
+
+	zeta_ip1[j] /= (c1 + c2); 
+	beta_i[j] = beta_i[j_low] * zeta_ip1[j] / zeta_i[j];
       }	
 	
-      r2_old = r2;
-      r2 = axpyNormCuda(-beta_i[j_low], *Ap, *r_sloppy);
+      r2_old = r2[0];
+      r2[0] = axpyNormCuda(-beta_i[j_low], *Ap, *r_sloppy);
 
-      alpha[0] = r2 / r2_old;
-	
-      for (j=1; j<num_offset_now; j++) {
-	/*THISBLOWSUP
-	  alpha[j] = alpha[j_low] * zeta_ip1[j] * beta_i[j] /
-	  (zeta_i[j] * beta_i[j_low]);
-	*/
-	/*TRYTHIS*/
-	if( zeta_i[j] * beta_i[j_low] != 0.0)
-	  alpha[j] = alpha[j_low] * zeta_ip1[j] * beta_i[j] /
-	    (zeta_i[j] * beta_i[j_low]);
-	else {
-	  alpha[j] = 0.0;
-	  finished[j] = 1;
-	}
-      }
-	
+      alpha[0] = r2[0] / r2_old;	
+      for (j=1; j<num_offset_now; j++) 
+	alpha[j] = alpha[j_low] * zeta_ip1[j] * beta_i[j] / (zeta_i[j] * beta_i[j_low]);
+
+      // update p[0] and x[0]
       axpyZpbxCuda(beta_i[0], *p[0], *x_sloppy[0], *r_sloppy, alpha[0]);	
-      for (j=1; j<num_offset_now; j++) {
+      for (j=1; j<num_offset_now; j++) { // update p[i] and x[i]
 	axpyBzpcxCuda(beta_i[j], *p[j], *x_sloppy[j], zeta_ip1[j], *r_sloppy, alpha[j]);
       }
     
+      // now we can check if any of the shifts have converged and remove them
+      for (j=1; j<num_offset_now; j++) {
+	r2[j] = zeta_ip1[j] * zeta_ip1[j] * r2[0];
+	if (r2[j] < stop[j]) {
+	  if (invParam.verbosity >= QUDA_VERBOSE)
+	    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
+	  num_offset_now--;
+	  finished[j] = 1;
+	}
+      }
+
+      // the current scalars become the old scalars in the next iteration
       for (j=0; j<num_offset_now; j++) {
 	beta_im1[j] = beta_i[j];
 	zeta_im1[j] = zeta_i[j];
@@ -192,81 +166,61 @@ namespace quda {
       }
 
       k++;
-      if (invParam.verbosity >= QUDA_VERBOSE){
-	printfQuda("Multimass CG: %d iterations, r2 = %e\n", k, r2);
-      }
+      if (invParam.verbosity >= QUDA_VERBOSE)
+	printfQuda("Multimass CG: Shift %d converged after %d iterations, r2 = %e\n", 0, k, r2[0]);
     }
     
     if (x[0]->Precision() != x_sloppy[0]->Precision()) {
-      for(i=0;i < num_offset; i++){
-	copyCuda(*x[i], *x_sloppy[i]);
-      }
+      for(i=0; i < num_offset; i++) copyCuda(*x[i], *x_sloppy[i]);
     }
 
-    *residue_sq = r2;
-
-    invParam.secs = stopwatchReadSeconds();
-     
-    if (k==invParam.maxiter) {
-      warningQuda("Exceeded maximum iterations %d\n", invParam.maxiter);
-    }
+    if (k==invParam.maxiter) warningQuda("Exceeded maximum iterations %d\n", invParam.maxiter);
     
+    if (invParam.verbosity >= QUDA_VERBOSE){
+      printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+      for(int i=0; i < num_offset; i++) { 
+	mat(*r, *x[i]); 
+	if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) {
+	  axpyCuda(offset[i], *x[i], *r); // Offset it.
+	} else if (i!=0) {
+	  axpyCuda(offset[i]-offset[0], *x[i], *r); // Offset it.
+	}
+	double true_res = xmyNormCuda(b, *r);
+	invParam.true_res_offset[i] = sqrt(true_res/b2);
+	printfQuda(" shift=%d, relative residua: iterated = %e, true = %e\n", 
+		   i, sqrt(r2[i]/b2), sqrt(true_res/b2));
+
+	if (i!=0 && !finished[i]) warningQuda(" shift %d failed to converge\n", i);
+      }
+    }      
+  
+    invParam.secs = stopwatchReadSeconds();
+
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
 
     invParam.gflops = gflops;
     invParam.iter = k;
   
-    // Calculate the true residual of the system with the smallest shift
-    mat(*r, *x[0]); 
-    if (invParam.dslash_type != QUDA_ASQTAD_DSLASH){
-      axpyCuda(offset[0],*x[0], *r); // Offset it.
-    }
-    double true_res = xmyNormCuda(b, *r);
-    if (invParam.verbosity >= QUDA_SUMMARIZE){
-      printfQuda("MultiShift CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		 k, sqrt(r2/b2), sqrt(true_res / b2));    
-    }    
-    if (invParam.verbosity >= QUDA_VERBOSE){
-      printfQuda("MultiShift CG: Converged after %d iterations\n", k);
-      printfQuda(" shift=0 resid_rel=%e\n", sqrt(true_res/b2));
-      for(int i=1; i < num_offset; i++) { 
-	mat(*r, *x[i]); 
-	if (invParam.dslash_type != QUDA_ASQTAD_DSLASH){
-	  axpyCuda(offset[i],*x[i], *r); // Offset it.
-	}else{
-	  axpyCuda(offset[i]-offset[0],*x[i], *r); // Offset it.
-	}
-	true_res = xmyNormCuda(b, *r);
-	printfQuda(" shift=%d resid_rel=%e\n",i, sqrt(true_res/b2));
-      }
-    }      
-  
     if (&tmp2 != &tmp1) delete tmp2_p;
 
     delete r;
-    for(i=0;i < num_offset; i++){
-      delete p[i];
-    }
+    for(i=0;i < num_offset; i++) delete p[i];
     delete p;
     delete Ap;
   
     if (invParam.cuda_prec_sloppy != x[0]->Precision()) {
-      for(i=0;i < num_offset;i++){
-	delete x_sloppy[i];
-      }
+      for(i=0; i<num_offset; i++) delete x_sloppy[i];
       delete r_sloppy;
     }
     delete x_sloppy;
   
-    delete []finished;
     delete []zeta_i;
     delete []zeta_im1;
     delete []zeta_ip1;
     delete []beta_i;
     delete []beta_im1;
     delete []alpha;
- 
   }
 
 } // namespace quda

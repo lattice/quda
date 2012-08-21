@@ -242,6 +242,11 @@ namespace quda {
     if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+      // Calculate the true residual
+      mat(r, x);
+      double true_res = xmyNormCuda(b, r);
+      invParam.true_res = sqrt(true_res / b2);
+      
       invParam.secs += stopwatchReadSeconds();
 
       double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
@@ -252,10 +257,6 @@ namespace quda {
       invParam.iter += k;
     
       if (invParam.verbosity >= QUDA_SUMMARIZE) {
-	// Calculate the true residual
-	mat(r, x);
-	double true_res = xmyNormCuda(b, r);
-      
 	printfQuda("BiCGstab: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 		   k, sqrt(r2/b2), sqrt(true_res / b2));    
       }

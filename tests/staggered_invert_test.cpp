@@ -45,7 +45,7 @@ cpuColorSpinorField* tmp;
 cpuGaugeField *cpuFat = NULL;
 cpuGaugeField *cpuLong = NULL;
 
-static double tol = 1e-6;
+static double tol = 1e-7;
 
 extern int test_type;
 extern int xdim;
@@ -141,7 +141,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.001;
+  double mass = 0.1;
 
   set_params(&gaugeParam, &inv_param,
 	     xdim, ydim, zdim, tdim,
@@ -314,26 +314,22 @@ invert_test(void)
 
 #define NUM_OFFSETS 12
         
-    //double masses[NUM_OFFSETS] ={5.05, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81, 3.0, 3.1, 3.2, 3.3, 3.4};
-    double masses[NUM_OFFSETS] ={0.1, 1.23, 2.64, 2.33, 2.70, 2.77, 2.81, 3.0, 3.1, 3.2, 3.3, 3.4};
-    // double masses[NUM_OFFSETS] ={0.1};
-    double offsets[NUM_OFFSETS];	
-    int num_offsets =NUM_OFFSETS;
+    double masses[NUM_OFFSETS] ={0.23, 0.33, 0.64, 0.70, 0.77, 0.81, 1.0, 1.1, 1.2, 1.3, 1.4, 2.05};
+    inv_param.num_offset = NUM_OFFSETS;
+    // these can be set independently
+    for (int i=0; i<inv_param.num_offset; i++) inv_param.tol_offset[i] = inv_param.tol;
     void* outArray[NUM_OFFSETS];
     int len;
     
     cpuColorSpinorField* spinorOutArray[NUM_OFFSETS];
     spinorOutArray[0] = out;    
-    for(int i=1;i < num_offsets; i++){
+    for(int i=1;i < inv_param.num_offset; i++){
       spinorOutArray[i] = new cpuColorSpinorField(csParam);       
     }
     
-    for(int i=0;i < num_offsets; i++){
+    for(int i=0;i < inv_param.num_offset; i++){
       outArray[i] = spinorOutArray[i]->V();
-    }
-
-    for (int i=0; i< num_offsets;i++){
-      offsets[i] = 4*masses[i]*masses[i];
+      inv_param.offset[i] = 4*masses[i]*masses[i];
     }
     
     len=Vh;
@@ -346,14 +342,12 @@ invert_test(void)
       errorQuda("test 5 not supported\n");
     }
     
-    double residue_sq;
     if (test_type == 6){
-      invertMultiShiftQudaMixed(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);
+      invertMultiShiftQudaMixed(outArray, in->V(), &inv_param);
     }else{      
-      invertMultiShiftQuda(outArray, in->V(), &inv_param, offsets, num_offsets, &residue_sq);	
+      invertMultiShiftQuda(outArray, in->V(), &inv_param);	
     }
     cudaDeviceSynchronize();
-    printfQuda("Final residue squared =%g\n", residue_sq);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     
@@ -375,7 +369,7 @@ invert_test(void)
       errorQuda("ERROR: invalid spinor parity \n");
       exit(1);
     }
-    for(int i=0;i < num_offsets;i++){
+    for(int i=0;i < inv_param.num_offset;i++){
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU
       matdagmat_mg4dir(ref, fatlink, longlink, ghost_fatlink, ghost_longlink, 
@@ -388,10 +382,11 @@ invert_test(void)
       double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       
-      printfQuda("relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+      printfQuda("relative residual, requested = %g, QUDA true = %g, host true = %g\n", 
+		 inv_param.tol_offset[i], inv_param.true_res_offset[i], sqrt(nrm2/src2));
 
       //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-      if (sqrt(nrm2/src2) > 10*inv_param.tol){
+      if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
 	ret |=1;
       }
     }
@@ -400,17 +395,15 @@ invert_test(void)
       errorQuda("Converge failed!\n");
     }
 
-    for(int i=1; i < num_offsets;i++){
-      delete spinorOutArray[i];
-    }
-
+    for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
     
   }//switch
     
 
   if (test_type <=2){
 
-    printfQuda("Relative residual, requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+    printfQuda("Relative residual, requested = %g, QUDA true %g, host true = %g\n", 
+	       inv_param.tol, inv_param.true_res, sqrt(nrm2/src2));
 	
     printfQuda("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	       time0, inv_param.iter, inv_param.secs,

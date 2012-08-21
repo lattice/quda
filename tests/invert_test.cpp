@@ -104,10 +104,6 @@ int main(int argc, char **argv)
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
   QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
 
-  // offsets used only by multi-shift solver
-  int num_offsets = 4;
-  double offsets[4] = {0.01, 0.02, 0.03, 0.04};
-
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
@@ -148,12 +144,17 @@ int main(int argc, char **argv)
     kappa5 = 0.5/(5 + inv_param.m5);  
   }
 
+  // offsets used only by multi-shift solver
+  inv_param.num_offset = 4;
+  double offset[QUDA_MAX_MULTI_SHIFT] = {0.01, 0.02, 0.03, 0.04};
+  for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
+
   inv_param.solution_type = QUDA_MATPC_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || 1) {
     inv_param.solve_type = QUDA_NORMEQ_PC_SOLVE;
     inv_param.inv_type = QUDA_CG_INVERTER;
   } else {
@@ -163,6 +164,8 @@ int main(int argc, char **argv)
 
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 5e-7;
+  // these can be set individually
+  for (int i=0; i<inv_param.num_offset; i++) inv_param.tol_offset[i] = inv_param.tol;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-1; // ignored by multi-shift solver
 
@@ -272,8 +275,8 @@ int main(int argc, char **argv)
 
   void *spinorOut = NULL, **spinorOutMulti = NULL;
   if (multi_shift) {
-    spinorOutMulti = (void**)malloc(num_offsets*sizeof(void *));
-    for (int i=0; i<num_offsets; i++) {
+    spinorOutMulti = (void**)malloc(inv_param.num_offset*sizeof(void *));
+    for (int i=0; i<inv_param.num_offset; i++) {
       spinorOutMulti[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
     }
   } else {
@@ -298,8 +301,7 @@ int main(int argc, char **argv)
   
   // perform the inversion
   if (multi_shift) {
-    double resid_sq;
-    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param, offsets, num_offsets, &resid_sq);
+    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
   } else {
     invertQuda(spinorOut, spinorIn, &inv_param);
   }
@@ -319,7 +321,7 @@ int main(int argc, char **argv)
     void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
     printfQuda("Host residuum checks: \n");
-    for(int i=0; i < num_offsets; i++) {
+    for(int i=0; i < inv_param.num_offset; i++) {
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -337,11 +339,12 @@ int main(int argc, char **argv)
         exit(-1);
       }
 
-      axpy(offsets[i], spinorOutMulti[i], spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-      printfQuda("Shift i=%d Relative residual: requested = %g, actual = %g\n", i, inv_param.tol, sqrt(nrm2/src2));
+      printfQuda("Shift i=%d Relative residual: requested = %g, QUDA true = %g, host true %g\n", 
+		 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], sqrt(nrm2/src2));
     }
     free(spinorTmp);
 
@@ -397,7 +400,8 @@ int main(int argc, char **argv)
     mxpy(spinorIn, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
     double src2 = norm_2(spinorIn, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-    printf("Relative residual: requested = %g, actual = %g\n", inv_param.tol, sqrt(nrm2/src2));
+    printfQuda("Relative residual: requested = %g, QUDA true = %g, host true %g\n", 
+	       inv_param.tol, inv_param.true_res, sqrt(nrm2/src2));
     
   }
 

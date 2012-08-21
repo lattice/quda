@@ -350,21 +350,22 @@ namespace quda {
 
     if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
   
+    // Calculate the true residual
+    mat(r, x);
+    double true_res = xmyNormCuda(b, r);
+    invParam.true_res = sqrt(true_res / b2);
+    
     invParam.secs += stopwatchReadSeconds();
   
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
-    printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
-	       gflops / stopwatchReadSeconds(), invParam.secs, preT, matT, orthT, resT);
+    printfQuda("gflops = %f time = %e: Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
+	       gflops / invParam.secs, invParam.secs, preT, matT, orthT, resT);
     invParam.gflops += gflops;
     invParam.iter += total_iter;
   
     if (invParam.verbosity >= QUDA_SUMMARIZE) {
-      // Calculate the true residual
-      mat(r, x);
-      double true_res = xmyNormCuda(b, r);
-    
       printfQuda("GCR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 		 total_iter, sqrt(r2/b2), sqrt(true_res / b2));    
     }
