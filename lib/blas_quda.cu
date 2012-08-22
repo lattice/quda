@@ -1019,4 +1019,32 @@ namespace quda {
       (kernel, make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
   }
 
+
+  /**
+     Specialized kernel for the modified CG norm computation for
+     computing beta.  Computes y = y + a*x and returns norm(y) and
+     dot(y, delta(y)) where delta(y) is the difference between the
+     input and out y vector.
+  */
+  template <typename ReduceType, typename Float2, typename FloatN>
+  struct axpyCGNorm2 {
+    Float2 a;
+    axpyCGNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
+    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
+      FloatN y_new = y + a.x*x;
+      sum.x += norm2_(y_new); 
+      sum.y += dot_(y_new, y_new-y);
+      y = y_new;
+    }
+    static int streams() { return 3; } //! total number of input and output streams
+    static int flops() { return 6; } //! flops per real element
+  };
+
+  Complex axpyCGNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+    const int kernel = 31;
+    double2 cg_norm = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,axpyCGNorm2,0,1,0>
+      (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    return Complex(cg_norm.x, cg_norm.y);
+  }
+
 } // namespace quda

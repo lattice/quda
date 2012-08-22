@@ -41,7 +41,7 @@ namespace quda {
     zeroCuda(y);
 
     double r2 = xmyNormCuda(b, r);
-    rUpdate ++;
+    rUpdate++;
   
     param.precision = invParam.cuda_prec_sloppy;
     cudaColorSpinorField Ap(x, param);
@@ -104,12 +104,13 @@ namespace quda {
       alpha = r2 / pAp;        
       r2_old = r2;
 
-      copyCuda(tmp, rSloppy);
-      r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+      //copyCuda(tmp, rSloppy);
 
-      //xpayCuda(rSloppy, -1.0, tmp);
-      //double zr = reDotProductCuda(rSloppy, tmp);
-
+      // here we are deploying the alternative beta computation 
+      //r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
+      r2 = real(cg_norm); // (r_new, r_new)
+      double zr = imag(cg_norm); // (r_new, r_new-r_old)
 
       // reliable update conditions
       rNorm = sqrt(r2);
@@ -119,8 +120,8 @@ namespace quda {
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
       if ( !(updateR || updateX)) {
-	//beta = zr / r2_old;
-	beta = r2 / r2_old;
+	beta = zr / r2_old;
+	//beta = r2 / r2_old;
 	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
       } else {
 	axpyCuda(alpha, p, xSloppy);
@@ -135,8 +136,9 @@ namespace quda {
 
 	// break-out check if we have reached the limit of the precision
 	if (sqrt(r2) > r0Norm) { // reuse r0Norm for this
-	  warningQuda("CG: new reliable residual norm is greater than previous reliable residual norm");
+	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
 	  k++;
+	  rUpdate++;
 	  break;
 	}
 
