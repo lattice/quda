@@ -169,7 +169,7 @@ endif
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   NVCCOPT += -DGPU_HISQ_FORCE
   COPT += -DGPU_HISQ_FORCE
-  HISQ_PATHS_FORCE_TEST=hisq_paths_force_test fat_force_quda.o
+  HISQ_PATHS_FORCE_TEST=hisq_paths_force_test
   HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
 endif
 ifeq ($(strip $(HOST_DEBUG)), yes)
