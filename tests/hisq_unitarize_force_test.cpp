@@ -24,7 +24,6 @@ cpuGaugeField  *cpuForce = NULL;
 
 cpuGaugeField *cpuReference = NULL;
 
-static FullHw cudaHw;
 static QudaGaugeParam gaugeParam;
 static void* hw; // the array of half_wilson_vector
 
@@ -33,7 +32,8 @@ cpuGaugeField *cpuOprod = NULL;
 cudaGaugeField *cudaOprod = NULL;
 
 
-int verify_results = 0;
+int verify_results = 1;
+double accuracy = 1e-5;
 int ODD_BIT = 1;
 extern int device;
 extern int xdim, ydim, zdim, tdim;
@@ -75,13 +75,14 @@ hisq_force_init()
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
 
-  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  //gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
   GaugeFieldParam gParam(0, gaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
 
   cpuGauge = new cpuGaugeField(gParam);
-
+/*
   // this is a hack to get the gauge field to appear as a void** rather than void*
   void* siteLink_2d[4];
     for(int i=0;i < 4;i++){
@@ -90,6 +91,11 @@ hisq_force_init()
 
   // fills the gauge field with random numbers
   createSiteLinkCPU(siteLink_2d, gaugeParam.cpu_prec, 0);
+*/
+  
+  createSiteLinkCPU((void**)cpuGauge->Gauge_p(), gaugeParam.cpu_prec, 0);
+
+
 
   gParam.precision = gaugeParam.cuda_prec;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -99,13 +105,10 @@ hisq_force_init()
   // cannot reconstruct, since the force matrix is not in SU(3)
   gParam.precision = gaugeParam.cpu_prec;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuForce = new cpuGaugeField(gParam); 
-  memset(cpuForce->Gauge_p(), 0, 4*cpuForce->Volume()*gaugeSiteSize*gaugeParam.cpu_prec);
-
   cpuReference = new cpuGaugeField(gParam);
-  memset(cpuReference->Gauge_p(), 0, 4*cpuReference->Volume()*gaugeSiteSize*gaugeParam.cpu_prec);
   
-
 
   gParam.precision = gaugeParam.cuda_prec;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -125,21 +128,19 @@ hisq_force_init()
   }
 
   createHwCPU(hw, hw_prec);
-  cudaHw = createHwQuda(gaugeParam.X, hw_prec);
-
 
 
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.precision = gaugeParam.cpu_prec;
   cpuOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, QUDA_MILC_GAUGE_ORDER);
+  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, QUDA_QDP_GAUGE_ORDER);
 
 
   gParam.precision = hw_prec;
   cudaOprod = new cudaGaugeField(gParam);
 
   checkCudaError();	
-  
+
   return;
 }
 
@@ -150,7 +151,6 @@ hisq_force_end()
   delete cudaForce;
   delete cudaOprod;
   delete cudaGauge;
-  freeHwQuda(cudaHw);
   
   delete cpuGauge;
   delete cpuForce;
@@ -191,7 +191,6 @@ hisq_force_test()
   // copy the outer product field to the GPU
   cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
 
-  loadHwToGPU(cudaHw, hw, cpu_hw_prec);
 
 
   const double unitarize_eps = 1e-5;
@@ -217,7 +216,9 @@ hisq_force_test()
   int* unitarization_failed_dev; 
   cudaMalloc((void**)&unitarization_failed_dev, sizeof(int));
 
+
   fermion_force::unitarizeForceCuda(gaugeParam, *cudaForce, *cudaGauge, cudaOprod, unitarization_failed_dev); // output is written to cudaOprod.
+
   if(verify_results){
     fermion_force::unitarizeForceCPU(gaugeParam, *cpuForce, *cpuGauge, cpuOprod);
   }
@@ -227,10 +228,15 @@ hisq_force_test()
 
   cudaOprod->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION); 
 
-  int res;
-  res = compare_floats(cpuOprod->Gauge_p(), cpuOprod->Gauge_p(), 4*cpuReference->Volume()*gaugeSiteSize, 1e-5, gaugeParam.cpu_prec);
-
-  printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
+  for(int dir=0; dir<4; ++dir){
+    int res = 0;
+    if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
+      res = compare_floats(((double**)cpuReference->Gauge_p())[dir], ((double**)cpuOprod->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
+    }else{
+      res = compare_floats(((float**)cpuReference->Gauge_p())[dir], ((float**)cpuOprod->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);	
+    }
+    printfQuda("Dir:%d  Test %s\n",dir,(1 == res) ? "PASSED" : "FAILED");
+  }
 
   hisq_force_end();
 }
@@ -254,7 +260,7 @@ void
 usage_extra(char** argv )
 {
   printf("Extra options: \n");
-  printf("    --verify                                  # Verify the GPU results using CPU results\n");
+  printf("    --no_verify                                  # Do not verify the GPU results using CPU results\n");
   return ;
 }
 
@@ -268,10 +274,12 @@ main(int argc, char **argv)
       continue;
     }  
 
-    if( strcmp(argv[i], "--verify") == 0){
-      verify_results=1;
+    if( strcmp(argv[i], "--no_verify") == 0){
+      verify_results=0;
       continue;	    
     }	
+
+
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
