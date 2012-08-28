@@ -153,6 +153,7 @@ ifeq ($(strip $(BUILD_HISQLINK)), yes)
     COPT    += -DGPU_FATLINK
     FATLINK_TEST=llfat_test
   endif
+  UNITARIZE_LINK_TEST=unitarize_link_test
   NVCCOPT += -DGPU_UNITARIZE
   COPT    += -DGPU_UNITARIZE
 endif

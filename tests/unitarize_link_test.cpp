@@ -24,8 +24,10 @@
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
+using namespace quda;
+
+
 extern void usage(char** argv);
-static int verify_results = 0;
 
 extern int device;
 
@@ -34,7 +36,7 @@ static bool reunit_allow_svd = true;
 static bool reunit_svd_only  = false;
 static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-5;
-static double max_allowed_error = 1e-12;
+static double max_allowed_error = 1e-11;
 static bool check_unitarization = true;
 
 
@@ -77,7 +79,7 @@ unitarize_link_test()
   qudaGaugeParam.type = QUDA_WILSON_LINKS;
 
 
-  hisq::fermion_force::hisqForceInitCuda(&qudaGaugeParam);
+  fermion_force::hisqForceInitCuda(&qudaGaugeParam);
   
   qudaGaugeParam.t_boundary  	   = QUDA_PERIODIC_T;
   qudaGaugeParam.anisotropy  	   = 1.0;
@@ -86,7 +88,7 @@ unitarize_link_test()
   qudaGaugeParam.gauge_fix   	   = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad      	   = 0;
   qudaGaugeParam.gaugeGiB    	   = 0;
-  qudaGaugeParam.flag              = false;
+  qudaGaugeParam.preserve_gauge             = false;
 
    
   qudaGaugeParam.cpu_prec = cpu_prec;
@@ -94,7 +96,7 @@ unitarize_link_test()
   qudaGaugeParam.gauge_order = gauge_order;
   qudaGaugeParam.type=QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
-  qudaGaugeParam.flag = QUDA_FAT_PRESERVE_CPU_GAUGE
+  qudaGaugeParam.preserve_gauge = QUDA_FAT_PRESERVE_CPU_GAUGE
     | QUDA_FAT_PRESERVE_GPU_GAUGE
     | QUDA_FAT_PRESERVE_COMM_MEM;
 
@@ -102,10 +104,8 @@ unitarize_link_test()
  
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
-  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
   gParam.link_type = QUDA_WILSON_LINKS;
-  gParam.order     = QUDA_MILC_GAUGE_ORDER;
-  cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
+  gParam.order     = QUDA_QDP_GAUGE_ORDER;
 
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
@@ -149,30 +149,38 @@ unitarize_link_test()
 			   QUDA_COMPUTE_FAT_STANDARD);
   } // gauge order is QDP_GAUGE_ORDER
 
-  cpuOutLink->setGauge((void**)fatlink);
+
+  void* fatlink_2d[4];
+  for(int dir=0; dir<4; ++dir){
+    fatlink_2d[dir] = (char*)fatlink + dir*V*gaugeSiteSize*gSize;
+  }
+
+
+  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge     = fatlink_2d;
+  cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
  
 
- 
-  hisq::setUnitarizeLinksConstants(unitarize_eps,
+  setUnitarizeLinksConstants(unitarize_eps,
 				   max_allowed_error,
 				   reunit_allow_svd,
 				   reunit_svd_only,
 				   svd_rel_error,
 				   svd_abs_error);
  
-  hisq::setUnitarizeLinksPadding(0,0);
+  setUnitarizeLinksPadding(0,0);
 
   int* num_failures_dev;
   if(cudaMalloc(&num_failures_dev, sizeof(int)) != cudaSuccess){
-	errorQuda("cudaMallo failed for num_failures_dev\n");
+	errorQuda("cudaMalloc failed for num_failures_dev\n");
   }
   cudaMemset(num_failures_dev, 0, sizeof(int));
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
-  hisq::unitarizeLinksCuda(qudaGaugeParam,*cudaFatLink, cudaULink, num_failures_dev);
+  unitarizeLinksCuda(qudaGaugeParam,*cudaFatLink, cudaULink, num_failures_dev);
   cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
