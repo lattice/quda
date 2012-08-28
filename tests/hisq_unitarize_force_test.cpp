@@ -229,12 +229,7 @@ hisq_force_test()
   cudaOprod->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION); 
 
   for(int dir=0; dir<4; ++dir){
-    int res = 0;
-    if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-      res = compare_floats(((double**)cpuReference->Gauge_p())[dir], ((double**)cpuOprod->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
-    }else{
-      res = compare_floats(((float**)cpuReference->Gauge_p())[dir], ((float**)cpuOprod->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);	
-    }
+    int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuOprod->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);	
     printfQuda("Dir:%d  Test %s\n",dir,(1 == res) ? "PASSED" : "FAILED");
   }
 
