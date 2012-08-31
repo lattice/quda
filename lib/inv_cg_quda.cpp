@@ -104,10 +104,8 @@ namespace quda {
       alpha = r2 / pAp;        
       r2_old = r2;
 
-      //copyCuda(tmp, rSloppy);
-
-      // here we are deploying the alternative beta computation 
       //r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+      // here we are deploying the alternative beta computation 
       Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
       r2 = real(cg_norm); // (r_new, r_new)
       double zr = imag(cg_norm); // (r_new, r_new-r_old)
@@ -120,7 +118,7 @@ namespace quda {
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
       if ( !(updateR || updateX)) {
-	beta = zr / r2_old;
+	beta = zr / r2_old; // use the stabilized beta computation
 	//beta = r2 / r2_old;
 	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
       } else {
@@ -147,6 +145,10 @@ namespace quda {
 	maxrx = rNorm;
 	r0Norm = rNorm;      
 	rUpdate++;
+
+	// this is an experiment where we restore orthogonality of the gradient vector
+	//double rp = reDotProductCuda(rSloppy, p) / (r2);
+	//axpyCuda(-rp, rSloppy, p);
 
 	beta = r2 / r2_old; 
 	xpayCuda(rSloppy, beta, p);

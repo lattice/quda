@@ -141,7 +141,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.1;
+  double mass = 0.002;
 
   set_params(&gaugeParam, &inv_param,
 	     xdim, ydim, zdim, tdim,
@@ -314,7 +314,7 @@ invert_test(void)
 
 #define NUM_OFFSETS 12
         
-    double masses[NUM_OFFSETS] ={0.23, 0.33, 0.64, 0.70, 0.77, 0.81, 1.0, 1.1, 1.2, 1.3, 1.4, 2.05};
+    double masses[NUM_OFFSETS] ={0.002, 0.0021, 0.0064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
     inv_param.num_offset = NUM_OFFSETS;
     // these can be set independently
     for (int i=0; i<inv_param.num_offset; i++) inv_param.tol_offset[i] = inv_param.tol;
