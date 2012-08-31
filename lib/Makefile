@@ -73,8 +73,10 @@ endif
 
 all: $(QUDA)
 
+
 $(QUDA): $(QUDA_OBJS) ../make.inc
 	ar cru $@ $(QUDA_OBJS)
+
 gen:
 	$(PYTHON) generate/dslash_cuda_gen.py
 	$(PYTHON) generate/dw_dslash_cuda_gen.py

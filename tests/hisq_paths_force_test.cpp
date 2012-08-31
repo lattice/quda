@@ -44,7 +44,7 @@ cudaGaugeField *cudaOprod = NULL;
 cpuGaugeField *cpuLongLinkOprod = NULL;
 cudaGaugeField *cudaLongLinkOprod = NULL;
 
-int verify_results = 0;
+int verify_results = 1;
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
@@ -573,7 +573,6 @@ hisq_force_test(void)
   
 
 
-
 #ifdef MULTI_GPU
   int optflag = 0;
   int R[4] = {2, 2, 2, 2};
@@ -583,6 +582,7 @@ hisq_force_test(void)
   loadLinkToGPU(cudaGauge, cpuGauge, &qudaGaugeParam);  
 #endif
 
+  
 
 
 #ifdef MULTI_GPU
@@ -592,12 +592,11 @@ hisq_force_test(void)
   loadLinkToGPU(cudaOprod, cpuOprod, &qudaGaugeParam);
 #endif
   
-  
-#ifdef MULTI_GPU
 
+
+ 
+#ifdef MULTI_GPU
   exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuLongLinkOprod_ex->Gauge_p(), cpuLongLinkOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag);
-#else
-  
 #endif
 
   
@@ -625,6 +624,9 @@ hisq_force_test(void)
 #endif
 
   }
+
+
+
   gettimeofday(&ht1, NULL);
 
   struct timeval t0, t1, t2, t3;
@@ -724,7 +726,7 @@ void
 usage_extra(char** argv )
 {
   printfQuda("Extra options: \n");
-  printfQuda("    --verify                                  # Verify the GPU results using CPU results\n");
+  printfQuda("    --no_verify                                  # Do not verify the GPU results using CPU results\n");
   return ;
 }
 int 
@@ -754,8 +756,8 @@ main(int argc, char **argv)
       continue;
     }
 
-    if( strcmp(argv[i], "--verify") == 0){
-      verify_results=1;
+    if( strcmp(argv[i], "--no_verify") == 0){
+      verify_results=0;
       continue;	    
     }	
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);

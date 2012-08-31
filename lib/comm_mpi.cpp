@@ -567,6 +567,23 @@ comm_allreduce(double* data)
   return;
 } 
 
+
+void 
+comm_allreduce_int(int* data)
+{
+  int recvbuf;
+  int rc = MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  if(rc!=MPI_SUCCESS){
+    printf("ERROR: MPI_Allreduce failed\n");
+    comm_exit(1); 
+  }
+  *data = recvbuf;
+  return;
+}
+
+
+
+
 //reduce n double value
 void
 comm_allreduce_array(double* data, size_t size)
