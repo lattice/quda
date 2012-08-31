@@ -22,8 +22,9 @@
 
 namespace quda {
 
-  MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam) 
-    : MultiShiftSolver(invParam), mat(mat), matSloppy(matSloppy) {
+  MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam,
+			     TimeProfile &profile) 
+    : MultiShiftSolver(invParam, profile), mat(mat), matSloppy(matSloppy) {
 
   }
 

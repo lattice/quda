@@ -92,6 +92,12 @@ cudaCloverField *cloverPrecise = NULL;
 cudaCloverField *cloverSloppy = NULL;
 cudaCloverField *cloverPrecondition = NULL;
 
+/*Dirac *diracPrecise = NULL;
+Dirac *diracSloppy = NULL;
+Dirac *diracPrecondition = NULL;
+*/
+
+
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 
@@ -974,6 +980,9 @@ void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  TimeProfile profile("invertQuda");
+  profile[QUDA_PROFILE_TOTAL].Start();
+
   if (!initialized) errorQuda("QUDA not initialized");
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
@@ -1013,6 +1022,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
 
+  profile[QUDA_PROFILE_H2D].Start();
+
   cudaColorSpinorField *b = NULL;
   cudaColorSpinorField *x = NULL;
   cudaColorSpinorField *in = NULL;
@@ -1047,6 +1058,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = new cudaColorSpinorField(cudaParam); // solution
   }
     
+  profile[QUDA_PROFILE_H2D].Stop();
+
   if (param->verbosity >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
@@ -1074,6 +1087,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source post mass rescale = %f\n", nin);   
   }
   
+  
 
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
@@ -1085,33 +1099,33 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
     {
       DiracMdagM m(dirac), mSloppy(diracSloppy);
-      CG cg(m, mSloppy, *param);
+      CG cg(m, mSloppy, *param, profile);
       cg(*out, *in);
     }
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      BiCGstab bicg(m, mSloppy, mPre, *param);
+      BiCGstab bicg(m, mSloppy, mPre, *param, profile);
       bicg(*out, *in);
       copyCuda(*in, *out);
     }
     {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      BiCGstab bicg(m, mSloppy, mPre, *param);
+      BiCGstab bicg(m, mSloppy, mPre, *param, profile);
       bicg(*out, *in);
     }
     break;
   case QUDA_GCR_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      GCR gcr(m, mSloppy, mPre, *param);
+      GCR gcr(m, mSloppy, mPre, *param, profile);
       gcr(*out, *in);
       copyCuda(*in, *out);
     }
     {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      GCR gcr(m, mSloppy, mPre, *param);
+      GCR gcr(m, mSloppy, mPre, *param, profile);
       gcr(*out, *in);
     }
     break;
@@ -1125,7 +1139,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
+  profile[QUDA_PROFILE_D2H].Start();
   *h_x = *x;
+  profile[QUDA_PROFILE_D2H].Stop();
   
   if (param->verbosity >= QUDA_VERBOSE){
     double nx = norm2(*x);
@@ -1144,6 +1160,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
+
+  profile[QUDA_PROFILE_TOTAL].Stop();
+  if (param->verbosity >= QUDA_VERBOSE) profile.Print();
 }
 
 
@@ -1155,6 +1174,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
+  TimeProfile profile("invertMultiShiftQuda");
+  profile[QUDA_PROFILE_TOTAL].Start();
+
   if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
@@ -1313,7 +1335,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
-    MultiShiftCG cg_m(m, mSloppy, *param);
+    MultiShiftCG cg_m(m, mSloppy, *param, profile);
     cg_m(x, *b);  
   }
 
@@ -1347,6 +1369,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
   
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
+
+  profile[QUDA_PROFILE_TOTAL].Stop();
+  if (param->verbosity >= QUDA_VERBOSE) profile.Print();
 }
 
 /************************************** Ugly Mixed precision multishift CG solver ****************************/
@@ -1490,6 +1515,9 @@ void
 invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 			  double* offsets, int num_offsets, double* residue_sq)
 {
+  TimeProfile profile("invertMultiShiftQudaMixed");
+  profile[QUDA_PROFILE_TOTAL].Start();
+
   if (!initialized) errorQuda("QUDA not initialized");
 
   QudaPrecision high_prec = param->cuda_prec;
@@ -1665,7 +1693,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   {
     DiracMdagM m(diracSloppy);
-    MultiShiftCG cg_m(m, m, *param);
+    MultiShiftCG cg_m(m, m, *param, profile);
     cg_m(x, *b);  
   }
     
@@ -1713,7 +1741,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
       dirac2.setMass(mass);
       diracSloppy2.setMass(mass);
       DiracMdagM m(dirac2), mSloppy(diracSloppy2);
-      CG cg(m, mSloppy, *param);
+      CG cg(m, mSloppy, *param, profile);
       cg(*high_x, *b);      
       total_iters += param->iter;
       total_secs  += param->secs;
@@ -1747,6 +1775,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param,
 
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
+
+  profile[QUDA_PROFILE_TOTAL].Stop();
+  if (param->verbosity >= QUDA_VERBOSE) profile.Print();
 }
 
 
