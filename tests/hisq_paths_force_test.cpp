@@ -296,20 +296,6 @@ hisq_force_init()
       memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
     }//dir
 
-    /*
-    if(x1 == 0 && x2 == 0&& x3 == 0&& x4 == 0 && i == 1885)
-    {
-      float* data = ((float*)siteLink_ex_2d[0]) + i*18;
-      printf("cpu matrix\n");
-      for(int j=0; j<3; j++){
-	printf("(%f %f) (%f %f) (%f %f)\n", data[0], data[1], data[2], data[3], data[4], data[5]);
-	data += 6;
-      }
-      
-    }
-    */
-
-
   }//i
 
   
