@@ -136,30 +136,37 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam) :
-    Solver(invParam), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0)
+  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam,
+	   TimeProfile &profile) :
+    Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0)
   {
 
     Kparam = newQudaInvertParam();
     fillInnerInvertParam(Kparam, invParam);
 
     if (invParam.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
-      K = new CG(matPrecon, matPrecon, Kparam);
+      K = new CG(matPrecon, matPrecon, Kparam, profile);
     else if (invParam.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
-      K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam);
+      K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
     else if (invParam.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
-      K = new MR(matPrecon, Kparam);
+      K = new MR(matPrecon, Kparam, profile);
     else if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
       errorQuda("Unknown inner solver %d", invParam.inv_type_precondition);
 
   }
 
   GCR::~GCR() {
+    profile[QUDA_PROFILE_FREE].Start();
+
     if (K) delete K;
+
+    profile[QUDA_PROFILE_FREE].Stop();
   }
 
   void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
+    profile[QUDA_PROFILE_PREAMBLE].Start();
+
     int Nkrylov = invParam.gcrNkrylov; // size of Krylov space
 
     ColorSpinorParam param(x);
@@ -242,6 +249,9 @@ namespace quda {
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
 
     double orthT = 0, matT = 0, preT = 0, resT = 0;
+
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
 
     while (r2 > stop && total_iter < invParam.maxiter) {
     
@@ -345,6 +355,9 @@ namespace quda {
 
     if (total_iter > 0) copyCuda(x, y);
 
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+    profile[QUDA_PROFILE_EPILOGUE].Start();
+
     if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
@@ -390,6 +403,8 @@ namespace quda {
     for (int i=0; i<Nkrylov; i++) delete []beta[i];
     delete []beta;
     delete gamma;
+
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
 
     return;
   }

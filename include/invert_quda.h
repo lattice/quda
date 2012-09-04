@@ -12,12 +12,16 @@ namespace quda {
 
   protected:
     QudaInvertParam &invParam;
+    TimeProfile &profile;
 
   public:
-  Solver(QudaInvertParam &invParam) : invParam(invParam) { ; }
+  Solver(QudaInvertParam &invParam, TimeProfile &profile) : invParam(invParam), profile(profile) { ; }
     virtual ~Solver() { ; }
 
     virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+
+    // Solver factory
+    static Solver* create(const QudaInvertParam &param);
   };
 
   class CG : public Solver {
@@ -27,7 +31,7 @@ namespace quda {
     const DiracMatrix &matSloppy;
 
   public:
-    CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
+    CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~CG();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -46,7 +50,7 @@ namespace quda {
 
   public:
     BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	     QudaInvertParam &invParam);
+	     QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~BiCGstab();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -64,7 +68,7 @@ namespace quda {
 
   public:
     GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	QudaInvertParam &invParam);
+	QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~GCR();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -81,7 +85,7 @@ namespace quda {
     bool allocate_r;
 
   public:
-    MR(DiracMatrix &mat, QudaInvertParam &invParam);
+    MR(DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~MR();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -94,7 +98,7 @@ namespace quda {
     const DiracMatrix &mat;
 
   public:
-    alphaSA(DiracMatrix &mat, QudaInvertParam &invParam);
+    alphaSA(DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~alphaSA() { ; }
 
     void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
@@ -104,9 +108,11 @@ namespace quda {
 
   protected:
     QudaInvertParam &invParam;
+    TimeProfile &profile;
 
   public:
-  MultiShiftSolver(QudaInvertParam &invParam) : invParam(invParam) { ; }
+    MultiShiftSolver(QudaInvertParam &invParam, TimeProfile &profile) : 
+    invParam(invParam), profile(profile) { ; }
     virtual ~MultiShiftSolver() { ; }
 
     virtual void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in) = 0;
@@ -119,7 +125,7 @@ namespace quda {
     const DiracMatrix &matSloppy;
 
   public:
-    MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
+    MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~MultiShiftCG();
 
     void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);

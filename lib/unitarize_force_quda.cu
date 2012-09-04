@@ -22,6 +22,8 @@ __constant__ bool DEV_REUNIT_SVD_ONLY;
 __constant__ double DEV_REUNIT_SVD_REL_ERROR;
 __constant__ double DEV_REUNIT_SVD_ABS_ERROR;
 
+
+ 
 static double HOST_HISQ_UNITARIZE_EPS;
 static double HOST_HISQ_FORCE_FILTER;
 static double HOST_MAX_DET_ERROR;
@@ -31,14 +33,9 @@ static double HOST_REUNIT_SVD_REL_ERROR;
 static double HOST_REUNIT_SVD_ABS_ERROR;
 
 
-#ifdef MULTI_GPU
-#define HALF_VOLUME Vh_ex
-#else // single gpu
-#define HALF_VOLUME Vh
-#endif
+
  
   namespace fermion_force{
-
 
 
     void setUnitarizeForceConstants(double unitarize_eps_h, double hisq_force_filter_h, 
@@ -508,7 +505,10 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 					   Cmplx* force_even, Cmplx* force_odd,
 					   int* unitarization_failed)
     {
+       
       int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
+      // The number of GPU threads is equal to the local volume
+      const int HALF_VOLUME = threads/2;
       if(mem_idx >= threads) return;
 	
       Cmplx* force;
@@ -519,10 +519,10 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       link = link_even;
       old_force = old_force_even;
       if(mem_idx >= HALF_VOLUME){
-	mem_idx = mem_idx - HALF_VOLUME;
-	force = force_odd;
-	link = link_odd;
-	old_force = old_force_odd;
+	      mem_idx = mem_idx - HALF_VOLUME;
+	      force = force_odd;
+	      link = link_odd;
+	      old_force = old_force_odd;
       }
 
 

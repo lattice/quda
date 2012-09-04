@@ -26,12 +26,14 @@ namespace quda {
   }
 
 
-  BiCGstab::BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam) :
-    Solver(invParam), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false) {
+  BiCGstab::BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam, TimeProfile &profile) :
+    Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false) {
 
   }
 
   BiCGstab::~BiCGstab() {
+    profile[QUDA_PROFILE_FREE].Start();
+
     if(init) {
       if (wp && wp != pp) delete wp;
       if (zp && zp != pp) delete zp;
@@ -42,10 +44,14 @@ namespace quda {
       delete tmpp;
       delete tp;
     }
+
+    profile[QUDA_PROFILE_FREE].Stop();
   }
 
   void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
+    profile[QUDA_PROFILE_PREAMBLE].Start();
+
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -146,6 +152,9 @@ namespace quda {
       stopwatchStart();
     }
 
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
+
     while (r2 > stop && k<invParam.maxiter) {
     
       if (k==0) {
@@ -236,7 +245,10 @@ namespace quda {
   
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
-    
+
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+    profile[QUDA_PROFILE_EPILOGUE].Start();
+
     if (k==invParam.maxiter) warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
     if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
@@ -261,11 +273,15 @@ namespace quda {
       }
     }
 
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
+
+    profile[QUDA_PROFILE_FREE].Start();
     if (invParam.cuda_prec_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
       delete x_sloppy;
     }
+    profile[QUDA_PROFILE_FREE].Stop();
 
     return;
   }

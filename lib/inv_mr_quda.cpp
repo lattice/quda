@@ -16,8 +16,8 @@
 
 namespace quda {
 
-  MR::MR(DiracMatrix &mat, QudaInvertParam &invParam) :
-    Solver(invParam), mat(mat), init(false), allocate_r(false)
+  MR::MR(DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile) :
+    Solver(invParam, profile), mat(mat), init(false), allocate_r(false)
   {
  
   }

@@ -104,18 +104,27 @@ unitarize_link_test()
  
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
-  gParam.link_type = QUDA_WILSON_LINKS;
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.order     = QUDA_QDP_GAUGE_ORDER;
 
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = QUDA_WILSON_LINKS;
+  gParam.link_type   = QUDA_ASQTAD_MOM_LINKS;
   gParam.order       = QUDA_QDP_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
 
+#define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
+#if (QUDA_VER > 400)
   quda::initLatticeConstants(*cudaFatLink);
+#else
+  quda::initCommonConstants(*cudaFatLink);
+#endif
+
+
+
+
 
   void* fatlink = (void*)malloc(4*V*gaugeSiteSize*gSize);
   if(fatlink == NULL){
@@ -130,6 +139,7 @@ unitarize_link_test()
     }
   }
   
+
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
 
   double act_path_coeff[6];
@@ -159,8 +169,8 @@ unitarize_link_test()
   gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge     = fatlink_2d;
   cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
+
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
- 
 
   setUnitarizeLinksConstants(unitarize_eps,
 				   max_allowed_error,
@@ -249,10 +259,18 @@ main(int argc, char **argv)
 
   display_test_info();
   int num_failures = unitarize_link_test();
+  int num_procs = 1;
+#ifdef MULTI_GPU
+  comm_allreduce_int(&num_failures);
+  num_procs = comm_size();
+#endif
+
   printfQuda("Number of failures = %d\n", num_failures);
   if(num_failures > 0){
-    printfQuda("Failure rate = %lf%\n", num_failures/(4.0*V));
+    printfQuda("Failure rate = %lf%\n", num_failures/(4.0*V*num_procs));
     printfQuda("You may want to increase your error tolerance or vary the unitarization parameters\n");
+  }else{
+    printfQuda("Unitarization successfull!\n");
   }
   endCommsQuda();
 

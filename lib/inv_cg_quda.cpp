@@ -16,8 +16,8 @@
 
 namespace quda {
 
-  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam) :
-    Solver(invParam), mat(mat), matSloppy(matSloppy)
+  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile) :
+    Solver(invParam, profile), mat(mat), matSloppy(matSloppy)
   {
 
   }
