@@ -425,7 +425,7 @@ setup_dims(int* X)
 }
 
 void 
-exchange_llfat_ini(QudaPrecision prec)
+exchange_llfat_init(QudaPrecision prec)
 {
   static int initialized = 0;
   if (initialized){

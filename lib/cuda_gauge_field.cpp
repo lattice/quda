@@ -63,20 +63,31 @@ namespace quda {
       errorQuda("Only QUDA_QDP_GAUGE_ORDER is supported for multi-gpu\n");
 #endif
 
+
     //for QUDA_ASQTAD_FAT_LINKS, need to find out the max value
     //fat_link_max will be used in encoding half precision fat link
     if(type == QUDA_ASQTAD_FAT_LINKS){
       fat_link_max = 0.0;
-      for(int dir=0; dir < 4; dir++){
-	for(int i=0;i < 2*volumeCB*gaugeSiteSize; i++){
-	  Float** tmp = (Float**)cpuGauge;
-	  if( tmp[dir][i] > fat_link_max ){
-	    fat_link_max = tmp[dir][i];
+      if(cpu_order == QUDA_QDP_GAUGE_ORDER){
+        for(int dir=0; dir < 4; dir++){
+	  for(int i=0;i < 2*volumeCB*gaugeSiteSize; i++){
+	    Float** tmp = (Float**)cpuGauge;
+	    if( tmp[dir][i] > fat_link_max ){
+	      fat_link_max = tmp[dir][i];
+	    }
 	  }
+	}
+      }else{ // !QUDA_QDP_GAUGE_ORDER
+        for(int i=0; i<8*volumeCB*gaugeSiteSize; ++i){
+	  if(cpuGauge[i] > fat_link_max){ fat_link_max = cpuGauge[i]; }
 	}
       }
     }
-  
+
+
+
+
+
     double fat_link_max_double = fat_link_max;
 #ifdef MULTI_GPU
     reduceMaxDouble(fat_link_max_double);

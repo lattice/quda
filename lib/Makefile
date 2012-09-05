@@ -1,7 +1,7 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o inv_mr_quda.o \
+QUDA_OBJS = timer.o inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o inv_mr_quda.o \
 	interface_quda.o util_quda.o hw_quda.o \
 	blas_cpu.o clover_field.o color_spinor_field.o	\
 	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	     \
@@ -73,8 +73,10 @@ endif
 
 all: $(QUDA)
 
+
 $(QUDA): $(QUDA_OBJS) ../make.inc
 	ar cru $@ $(QUDA_OBJS)
+
 gen:
 	$(PYTHON) generate/dslash_cuda_gen.py
 	$(PYTHON) generate/dw_dslash_cuda_gen.py

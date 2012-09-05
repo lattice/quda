@@ -1416,7 +1416,7 @@ QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4]={1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
-bool tune = true;
+bool tune = false;
 int niter = 10;
 int test_type = 0;
 

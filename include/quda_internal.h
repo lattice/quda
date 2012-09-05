@@ -3,6 +3,8 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <sys/time.h>
+#include <string>
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
@@ -68,6 +70,72 @@ extern "C" {
 #endif
 
 namespace quda {
+
+  /**
+   * Use this for recording a fine-grained profile of a QUDA
+   * algorithm.  This uses host-side measurement, so should be used
+   * for timing fully host-device synchronous algorithms.
+   */
+  struct Timer {
+    /**< The cumulative sum of time */
+    double time;
+
+    /**< Used to store when the timer was last started */
+    timeval start;
+
+    /**< Used to store when the timer was last stopped */
+    timeval stop;
+
+    /**< Are we currently timing? */
+    bool running;
+    
+  Timer() : time(0.0), running(false) { ; } 
+
+    void Start() {
+      if (running) errorQuda("Cannot start an already running timer");
+      gettimeofday(&start, NULL);
+      running = true;
+    }
+
+    void Stop() {
+      if (!running) errorQuda("Cannot start an already running timer");
+      gettimeofday(&stop, NULL);
+
+      long ds = stop.tv_sec - start.tv_sec;
+      long dus = stop.tv_usec - start.tv_usec;
+      time += ds + 0.000001*dus;
+
+      running = false;
+    }
+  };
+
+  /**< Enumeration type used for writing a simple but extensible profiling framework. */
+  enum QudaProfileType {
+    QUDA_PROFILE_H2D, /**< host -> device transfers */
+    QUDA_PROFILE_D2H, /**< The time in seconds for device -> host transfers */
+    QUDA_PROFILE_INIT, /**< The time in seconds taken for initiation */
+    QUDA_PROFILE_PREAMBLE, /**< The time in seconds taken for any preamble */
+    QUDA_PROFILE_COMPUTE, /**< The time in seconds taken for the actual computation */
+    QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
+    QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
+    QUDA_PROFILE_TOTAL, /**< The total time in seconds for the algorithm. Must be the penultimate type. */
+    QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
+  };
+
+  struct TimeProfile {
+    std::string fname;  /**< Which function are we profiling */
+
+    Timer profile[QUDA_PROFILE_COUNT];
+    static std::string pname[];
+
+    TimeProfile(std::string fname) : fname(fname) { ; }
+
+    /**< Print out the profile information */
+    void Print();
+
+    /**< Return the profile[idx] */
+    Timer& operator[](int idx) { return profile[idx]; }
+  };
 
 #ifdef MULTI_GPU
   const int Nstream = 9;
