@@ -80,6 +80,9 @@ namespace quda {
     /**< The cumulative sum of time */
     double time;
 
+    /**< The last recorded time interval */
+    double last;
+
     /**< Used to store when the timer was last started */
     timeval start;
 
@@ -89,7 +92,7 @@ namespace quda {
     /**< Are we currently timing? */
     bool running;
     
-  Timer() : time(0.0), running(false) { ; } 
+  Timer() : time(0.0), last(0.0), running(false) { ; } 
 
     void Start() {
       if (running) errorQuda("Cannot start an already running timer");
@@ -103,10 +106,14 @@ namespace quda {
 
       long ds = stop.tv_sec - start.tv_sec;
       long dus = stop.tv_usec - start.tv_usec;
-      time += ds + 0.000001*dus;
+      last = ds + 0.000001*dus;
+      time += last;
 
       running = false;
     }
+
+    double Last() { return last; }
+
   };
 
   /**< Enumeration type used for writing a simple but extensible profiling framework. */

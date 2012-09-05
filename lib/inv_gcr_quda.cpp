@@ -165,7 +165,7 @@ namespace quda {
 
   void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
-    profile[QUDA_PROFILE_PREAMBLE].Start();
+    profile[QUDA_PROFILE_INIT].Start();
 
     int Nkrylov = invParam.gcrNkrylov; // size of Krylov space
 
@@ -232,9 +232,10 @@ namespace quda {
     cudaColorSpinorField rM(rSloppy);
     cudaColorSpinorField xM(rSloppy);
 
-    quda::blas_flops = 0;
+    profile[QUDA_PROFILE_INIT].Stop();
+    profile[QUDA_PROFILE_PREAMBLE].Start();
 
-    stopwatchStart();
+    quda::blas_flops = 0;
 
     // calculate initial residual
     mat(r, x);
@@ -245,10 +246,10 @@ namespace quda {
     int restart = 0;
     double r2_old = r2;
 
+    double orthT = 0, matT = 0, preT = 0, resT = 0;
+
     if (invParam.verbosity >= QUDA_VERBOSE) 
       printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
-
-    double orthT = 0, matT = 0, preT = 0, resT = 0;
 
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
@@ -358,26 +359,37 @@ namespace quda {
     profile[QUDA_PROFILE_COMPUTE].Stop();
     profile[QUDA_PROFILE_EPILOGUE].Start();
 
+    invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
+  
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    reduceDouble(gflops);
+
     if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
     if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
   
-    invParam.secs += stopwatchReadSeconds();
-  
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-    reduceDouble(gflops);
-
-    printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
-	       gflops / stopwatchReadSeconds(), invParam.secs, preT, matT, orthT, resT);
+    // Calculate the true residual
+    mat(r, x);
+    double true_res = xmyNormCuda(b, r);
+    invParam.true_res = sqrt(true_res / b2);
+    
+    if (invParam.verbosity >= QUDA_SUMMARIZE)
+      printfQuda("gflops = %f time = %e: Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
+		 gflops / invParam.secs, invParam.secs, preT, matT, orthT, resT);
     invParam.gflops += gflops;
     invParam.iter += total_iter;
   
+    // reset the flops counters
+    quda::blas_flops = 0;
+    mat.flops();
+    matSloppy.flops();
+    matPrecon.flops();
+
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile[QUDA_PROFILE_FREE].Start();
+
     if (invParam.verbosity >= QUDA_SUMMARIZE) {
-      // Calculate the true residual
-      mat(r, x);
-      double true_res = xmyNormCuda(b, r);
-    
       printfQuda("GCR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 		 total_iter, sqrt(r2/b2), sqrt(true_res / b2));    
     }
@@ -404,7 +416,7 @@ namespace quda {
     delete []beta;
     delete gamma;
 
-    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile[QUDA_PROFILE_FREE].Stop();
 
     return;
   }

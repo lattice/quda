@@ -71,6 +71,7 @@ namespace quda {
 		       const Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
   Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 			       cudaColorSpinorField &z);
+  Complex axpyCGNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
 
   // CPU variants
 

@@ -1416,7 +1416,7 @@ QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4]={1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
-bool tune = false;
+bool tune = true;
 int niter = 10;
 int test_type = 0;
 
@@ -1765,4 +1765,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
   *idx = i;
   return ret ;
 
+}
+
+
+static struct timeval startTime;
+
+void stopwatchStart() {
+  gettimeofday(&startTime, NULL);
+}
+
+double stopwatchReadSeconds() {
+  struct timeval endTime;
+  gettimeofday(&endTime, NULL);
+
+  long ds = endTime.tv_sec - startTime.tv_sec;
+  long dus = endTime.tv_usec - startTime.tv_usec;
+  return ds + 0.000001*dus;
 }

@@ -149,7 +149,6 @@ namespace quda {
 
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
       quda::blas_flops = 0;    
-      stopwatchStart();
     }
 
     profile[QUDA_PROFILE_PREAMBLE].Stop();
@@ -249,29 +248,33 @@ namespace quda {
     profile[QUDA_PROFILE_COMPUTE].Stop();
     profile[QUDA_PROFILE_EPILOGUE].Start();
 
+    invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    reduceDouble(gflops);
+
+    invParam.gflops += gflops;
+    invParam.iter += k;
+
     if (k==invParam.maxiter) warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
     if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
-      invParam.secs += stopwatchReadSeconds();
-
-      double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-      reduceDouble(gflops);
-
-      //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
-      invParam.gflops += gflops;
-      invParam.iter += k;
-    
-      if (invParam.verbosity >= QUDA_SUMMARIZE) {
-	// Calculate the true residual
-	mat(r, x);
-	double true_res = xmyNormCuda(b, r);
+      // Calculate the true residual
+      mat(r, x);
+      double true_res = xmyNormCuda(b, r);
+      invParam.true_res = sqrt(true_res / b2);
       
+      if (invParam.verbosity >= QUDA_SUMMARIZE) {
 	printfQuda("BiCGstab: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 		   k, sqrt(r2/b2), sqrt(true_res / b2));    
       }
     }
+
+    // reset the flops counters
+    quda::blas_flops = 0;
+    mat.flops();
+    matSloppy.flops();
 
     profile[QUDA_PROFILE_EPILOGUE].Stop();
 

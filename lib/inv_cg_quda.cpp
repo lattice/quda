@@ -28,6 +28,7 @@ namespace quda {
 
   void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
+    profile[QUDA_PROFILE_INIT].Start();
     int k=0;
     int rUpdate = 0;
     
@@ -41,7 +42,7 @@ namespace quda {
     zeroCuda(y);
 
     double r2 = xmyNormCuda(b, r);
-    rUpdate ++;
+    rUpdate++;
   
     param.precision = invParam.cuda_prec_sloppy;
     cudaColorSpinorField Ap(x, param);
@@ -71,6 +72,9 @@ namespace quda {
 
     cudaColorSpinorField p(rSloppy);
 
+    profile[QUDA_PROFILE_INIT].Stop();
+    profile[QUDA_PROFILE_PREAMBLE].Start();
+
     double r2_old;
     double src_norm = norm2(b);
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver
@@ -93,9 +97,10 @@ namespace quda {
       printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
     }
 
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
     quda::blas_flops = 0;
 
-    stopwatchStart();
     while (r2 > stop && k<invParam.maxiter) {
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
@@ -103,7 +108,12 @@ namespace quda {
       pAp = reDotProductCuda(p, Ap);
       alpha = r2 / pAp;        
       r2_old = r2;
-      r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+
+      //r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+      // here we are deploying the alternative beta computation 
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
+      r2 = real(cg_norm); // (r_new, r_new)
+      double zr = imag(cg_norm); // (r_new, r_new-r_old)
 
       // reliable update conditions
       rNorm = sqrt(r2);
@@ -113,7 +123,8 @@ namespace quda {
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
       if ( !(updateR || updateX)) {
-	beta = r2 / r2_old;
+	beta = zr / r2_old; // use the stabilized beta computation
+	//beta = r2 / r2_old;
 	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
       } else {
 	axpyCuda(alpha, p, xSloppy);
@@ -122,14 +133,27 @@ namespace quda {
 	xpyCuda(x, y); // swap these around?
 	mat(r, y, x); // here we can use x as tmp
 	r2 = xmyNormCuda(b, r);
+
 	if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
 	zeroCuda(xSloppy);
+
+	// break-out check if we have reached the limit of the precision
+	if (sqrt(r2) > r0Norm) { // reuse r0Norm for this
+	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
+	  k++;
+	  rUpdate++;
+	  break;
+	}
 
 	rNorm = sqrt(r2);
 	maxrr = rNorm;
 	maxrx = rNorm;
 	r0Norm = rNorm;      
 	rUpdate++;
+
+	// this is an experiment where we restore orthogonality of the gradient vector
+	//double rp = reDotProductCuda(rSloppy, p) / (r2);
+	//axpyCuda(-rp, rSloppy, p);
 
 	beta = r2 / r2_old; 
 	xpayCuda(rSloppy, beta, p);
@@ -149,30 +173,38 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
 
-    invParam.secs = stopwatchReadSeconds();
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+    profile[QUDA_PROFILE_EPILOGUE].Start();
 
-  
+    invParam.secs = profile[QUDA_PROFILE_COMPUTE].Last();
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
+    reduceDouble(gflops);
+      invParam.gflops = gflops;
+    invParam.iter = k;
+
     if (k==invParam.maxiter) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
     if (invParam.verbosity >= QUDA_SUMMARIZE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
-    reduceDouble(gflops);
-
-    //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
-    invParam.gflops = gflops;
-    invParam.iter = k;
-
-    quda::blas_flops = 0;
+    // compute the true residual
+    mat(r, x, y);
+    double true_res = xmyNormCuda(b, r);
+    invParam.true_res = sqrt(true_res / src_norm);
 
     if (invParam.verbosity >= QUDA_SUMMARIZE){
-      mat(r, x, y);
-      double true_res = xmyNormCuda(b, r);
       printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		 k, sqrt(r2/src_norm), sqrt(true_res / src_norm));    
+		 k, sqrt(r2/src_norm), invParam.true_res);    
     }
+
+    // reset the flops counters
+    quda::blas_flops = 0;
+    mat.flops();
+    matSloppy.flops();
+
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile[QUDA_PROFILE_FREE].Start();
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
@@ -182,6 +214,8 @@ namespace quda {
     }
 
     return;
+
+    profile[QUDA_PROFILE_FREE].Stop();
   }
 
 } // namespace quda
