@@ -77,12 +77,14 @@ namespace quda {
 	    }
 	  }
 	}
-      }else{ // !QUDA_QDP_GAUGE_ORDER
+      }else if(cpu_order == QUDA_MILC_GAUGE_ORDER || cpu_order == QUDA_CPS_WILSON_GAUGE_ORDER){
         for(int i=0; i<8*volumeCB*gaugeSiteSize; ++i){
 	  if(cpuGauge[i] > fat_link_max){ fat_link_max = cpuGauge[i]; }
 	}
+      }else{
+	errorQuda("Gauge ordering scheme not supported\n");
       }
-    }
+    } 
 
 
 
