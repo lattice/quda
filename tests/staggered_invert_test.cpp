@@ -351,8 +351,8 @@ invert_test(void)
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
     
-    printfQuda("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
-	       time0, inv_param.iter, inv_param.secs,
+    printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n", 
+	       time0, inv_param.secs, inv_param.iter, inv_param.secs,
 	       inv_param.gflops/inv_param.secs);
     
     
@@ -391,9 +391,7 @@ invert_test(void)
       }
     }
 
-    if (ret ==1){
-      errorQuda("Converge failed!\n");
-    }
+    if (ret ==1) printfQuda("Converge failed!\n");
 
     for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
     
@@ -405,14 +403,14 @@ invert_test(void)
     printfQuda("Relative residual, requested = %g, QUDA true %g, host true = %g\n", 
 	       inv_param.tol, inv_param.true_res, sqrt(nrm2/src2));
 	
-    printfQuda("done: total time = %g secs, %i iter / %g secs = %g gflops, \n", 
-	       time0, inv_param.iter, inv_param.secs,
+    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
+	       time0, inv_param.secs, inv_param.iter, inv_param.secs,
 	       inv_param.gflops/inv_param.secs);
     
     //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
-    if (sqrt(nrm2/src2) > 100*inv_param.tol){
+    if (sqrt(nrm2/src2) > 10*inv_param.tol){
       ret = 1;
-      errorQuda("Convergence failed!\n");
+      printfQuda("Convergence failed!\n");
     }
   }
 

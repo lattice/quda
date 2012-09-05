@@ -28,6 +28,7 @@ namespace quda {
 
   void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
+    profile[QUDA_PROFILE_INIT].Start();
     int k=0;
     int rUpdate = 0;
     
@@ -71,6 +72,9 @@ namespace quda {
 
     cudaColorSpinorField p(rSloppy);
 
+    profile[QUDA_PROFILE_INIT].Stop();
+    profile[QUDA_PROFILE_PREAMBLE].Start();
+
     double r2_old;
     double src_norm = norm2(b);
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver
@@ -93,9 +97,10 @@ namespace quda {
       printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
     }
 
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
     quda::blas_flops = 0;
 
-    stopwatchStart();
     while (r2 > stop && k<invParam.maxiter) {
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
@@ -168,7 +173,15 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
 
-  
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+    profile[QUDA_PROFILE_EPILOGUE].Start();
+
+    invParam.secs = profile[QUDA_PROFILE_COMPUTE].Last();
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
+    reduceDouble(gflops);
+      invParam.gflops = gflops;
+    invParam.iter = k;
+
     if (k==invParam.maxiter) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
@@ -180,21 +193,18 @@ namespace quda {
     double true_res = xmyNormCuda(b, r);
     invParam.true_res = sqrt(true_res / src_norm);
 
-    invParam.secs = stopwatchReadSeconds();
-
     if (invParam.verbosity >= QUDA_SUMMARIZE){
       printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 		 k, sqrt(r2/src_norm), invParam.true_res);    
     }
 
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
-    reduceDouble(gflops);
-
-    //  printfQuda("%f gflops\n", gflops / stopwatchReadSeconds());
-    invParam.gflops = gflops;
-    invParam.iter = k;
-
+    // reset the flops counters
     quda::blas_flops = 0;
+    mat.flops();
+    matSloppy.flops();
+
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile[QUDA_PROFILE_FREE].Start();
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
@@ -204,6 +214,8 @@ namespace quda {
     }
 
     return;
+
+    profile[QUDA_PROFILE_FREE].Stop();
   }
 
 } // namespace quda

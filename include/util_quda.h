@@ -93,16 +93,4 @@ void setOutputFile(FILE *outfile);
 #endif // HOST_DEBUG
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-  
-  void stopwatchStart();
-  double stopwatchReadSeconds();
-
-#ifdef __cplusplus
-}
-#endif
-
-
 #endif // _UTIL_QUDA_H

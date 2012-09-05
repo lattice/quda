@@ -103,6 +103,26 @@ cudaStream_t *streams;
 
 static bool initialized = false;
 
+//!< Profiler for initQuda
+TimeProfile profileInit("initQuda");
+
+//!< Profile for loadGaugeQuda / saveGaugeQuda
+TimeProfile profileGauge("loadGaugeQuda");
+
+//!< Profile for loadCloverQuda
+TimeProfile profileClover("loadCloverQuda");
+
+//!< Profiler for invertQuda
+TimeProfile profileInvert("invertQuda");
+
+//!< Profiler for invertMultiShiftQuda
+TimeProfile profileMulti("invertMultiShiftQuda");
+
+//!< Profiler for invertMultiShiftMixedQuda
+TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
+
+//!< Profiler for endQuda
+TimeProfile profileEnd("endQuda");
 
 int getGpuCount()
 {
@@ -128,6 +148,8 @@ void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfil
 
 void initQuda(int dev)
 {
+  profileInit[QUDA_PROFILE_TOTAL].Start();
+
   //static bool initialized = false;
   if (initialized) return;
   initialized = true;
@@ -222,11 +244,15 @@ void initQuda(int dev)
   initBlas();
 
   loadTuneCache(getVerbosity());
+
+  profileInit[QUDA_PROFILE_TOTAL].Stop();
 }
 
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
+  profileGauge[QUDA_PROFILE_TOTAL].Start();
+
   if (!initialized) errorQuda("QUDA not initialized");
   if (verbosity == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
 
@@ -237,6 +263,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   cpuGaugeField cpu(gauge_param);
 
+  profileGauge[QUDA_PROFILE_H2D].Start();  
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
   gauge_param.precision = param->cuda_prec;
@@ -280,6 +307,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   } else {
     precondition = sloppy;
   }
+  profileGauge[QUDA_PROFILE_H2D].Stop();  
   
   switch (param->type) {
   case QUDA_WILSON_LINKS:
@@ -310,10 +338,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
+  profileGauge[QUDA_PROFILE_TOTAL].Stop();
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
+  profileGauge[QUDA_PROFILE_TOTAL].Start();
+
   if (!initialized) errorQuda("QUDA not initialized");
   checkGaugeParam(param);
 
@@ -335,12 +366,18 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
+  profileGauge[QUDA_PROFILE_D2H].Start();  
   cudaGauge->saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  profileGauge[QUDA_PROFILE_D2H].Stop();  
+
+  profileGauge[QUDA_PROFILE_TOTAL].Stop();
 }
 
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+  profileClover[QUDA_PROFILE_TOTAL].Start();
+
   verbosity = inv_param->verbosity;
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
@@ -394,6 +431,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.precision = inv_param->clover_cuda_prec;
   clover_param.pad = inv_param->cl_pad;
 
+  profileClover[QUDA_PROFILE_H2D].Start();
+
   cloverPrecise = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
 				      inv_param->clover_order, clover_param);
   inv_param->cloverGiB = cloverPrecise->GBytes();
@@ -418,7 +457,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   } else {
     cloverPrecondition = cloverSloppy;
   }
+  profileClover[QUDA_PROFILE_H2D].Stop();
 
+  profileClover[QUDA_PROFILE_TOTAL].Stop();
 }
 
 void freeGaugeQuda(void) 
@@ -465,6 +506,8 @@ void freeCloverQuda(void)
 
 void endQuda(void)
 {
+  profileEnd[QUDA_PROFILE_TOTAL].Start();
+
   if (!initialized) return;
 
   cudaColorSpinorField::freeBuffer();
@@ -488,6 +531,19 @@ void endQuda(void)
   cudaDeviceReset();
 
   initialized = false;
+
+  profileEnd[QUDA_PROFILE_TOTAL].Stop();
+
+  // print out the profile information of the lifetime of the library
+  if (verbosity >= QUDA_SUMMARIZE) {
+    profileInit.Print();
+    profileGauge.Print();
+    profileClover.Print();
+    profileInvert.Print();
+    profileMulti.Print();
+    profileMultiMixed.Print();
+    profileEnd.Print();
+  }
 }
 
 
@@ -980,8 +1036,7 @@ void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
-  TimeProfile profile("invertQuda");
-  profile[QUDA_PROFILE_TOTAL].Start();
+  profileInvert[QUDA_PROFILE_TOTAL].Start();
 
   if (!initialized) errorQuda("QUDA not initialized");
   if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
@@ -1022,7 +1077,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
 
-  profile[QUDA_PROFILE_H2D].Start();
+  profileInvert[QUDA_PROFILE_H2D].Start();
 
   cudaColorSpinorField *b = NULL;
   cudaColorSpinorField *x = NULL;
@@ -1058,7 +1113,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = new cudaColorSpinorField(cudaParam); // solution
   }
     
-  profile[QUDA_PROFILE_H2D].Stop();
+  profileInvert[QUDA_PROFILE_H2D].Stop();
 
   if (param->verbosity >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
@@ -1099,33 +1154,33 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
     {
       DiracMdagM m(dirac), mSloppy(diracSloppy);
-      CG cg(m, mSloppy, *param, profile);
+      CG cg(m, mSloppy, *param, profileInvert);
       cg(*out, *in);
     }
     break;
   case QUDA_BICGSTAB_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      BiCGstab bicg(m, mSloppy, mPre, *param, profile);
+      BiCGstab bicg(m, mSloppy, mPre, *param, profileInvert);
       bicg(*out, *in);
       copyCuda(*in, *out);
     }
     {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      BiCGstab bicg(m, mSloppy, mPre, *param, profile);
+      BiCGstab bicg(m, mSloppy, mPre, *param, profileInvert);
       bicg(*out, *in);
     }
     break;
   case QUDA_GCR_INVERTER:
     if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      GCR gcr(m, mSloppy, mPre, *param, profile);
+      GCR gcr(m, mSloppy, mPre, *param, profileInvert);
       gcr(*out, *in);
       copyCuda(*in, *out);
     }
     {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      GCR gcr(m, mSloppy, mPre, *param, profile);
+      GCR gcr(m, mSloppy, mPre, *param, profileInvert);
       gcr(*out, *in);
     }
     break;
@@ -1139,9 +1194,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
-  profile[QUDA_PROFILE_D2H].Start();
+  profileInvert[QUDA_PROFILE_D2H].Start();
   *h_x = *x;
-  profile[QUDA_PROFILE_D2H].Stop();
+  profileInvert[QUDA_PROFILE_D2H].Stop();
   
   if (param->verbosity >= QUDA_VERBOSE){
     double nx = norm2(*x);
@@ -1161,8 +1216,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
-  profile[QUDA_PROFILE_TOTAL].Stop();
-  if (param->verbosity >= QUDA_VERBOSE) profile.Print();
+  profileInvert[QUDA_PROFILE_TOTAL].Stop();
 }
 
 
@@ -1173,8 +1227,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
-  TimeProfile profile("invertMultiShiftQuda");
-  profile[QUDA_PROFILE_TOTAL].Start();
+  profileMulti[QUDA_PROFILE_TOTAL].Start();
 
   if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created
@@ -1282,11 +1335,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     h_x[i] = new cpuColorSpinorField(cpuParam);
   }
 
+
+  profileMulti[QUDA_PROFILE_H2D].Start();
   // Now I need a colorSpinorParam for the device
   ColorSpinorParam cudaParam(cpuParam, *param);
   // This setting will download a host vector
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
+  profileMulti[QUDA_PROFILE_H2D].Stop();
 
   // Create the solution fields filled with zero
   x = new cudaColorSpinorField* [ param->num_offset ];
@@ -1314,7 +1370,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
-    MultiShiftCG cg_m(m, mSloppy, *param, profile);
+    MultiShiftCG cg_m(m, mSloppy, *param, profileMulti);
     cg_m(x, *b);  
   }
 
@@ -1325,6 +1381,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   delete [] unscaled_shifts;
 
+  profileMulti[QUDA_PROFILE_D2H].Start();
   for(int i=0; i < param->num_offset; i++) { 
     if (param->verbosity >= QUDA_VERBOSE){
       double nx = norm2(*x[i]);
@@ -1333,6 +1390,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
     *h_x[i] = *x[i];
   }
+  profileMulti[QUDA_PROFILE_D2H].Stop();
 
   for(int i=0; i < param->num_offset; i++){ 
     delete h_x[i];
@@ -1354,8 +1412,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
-  profile[QUDA_PROFILE_TOTAL].Stop();
-  if (param->verbosity >= QUDA_VERBOSE) profile.Print();
+  profileMulti[QUDA_PROFILE_TOTAL].Stop();
 }
 
 /************************************** Ugly Mixed precision multishift CG solver ****************************/
@@ -1498,9 +1555,7 @@ do_create_sloppy_cuda_gauge(void)
 void 
 invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
-  TimeProfile profile("invertMultiShiftQudaMixed");
-  profile[QUDA_PROFILE_TOTAL].Start();
-
+  profileMultiMixed[QUDA_PROFILE_TOTAL].Start();
   if (!initialized) errorQuda("QUDA not initialized");
 
   QudaPrecision high_prec = param->cuda_prec;
@@ -1626,7 +1681,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   ColorSpinorParam cudaParam(cpuParam, *param);
   // This setting will download a host vector
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  profileMultiMixed[QUDA_PROFILE_H2D].Start();
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
+  profileMultiMixed[QUDA_PROFILE_H2D].Stop();
 
   // Create the solution fields filled with zero
   x = new cudaColorSpinorField* [ param->num_offset ];
@@ -1656,7 +1713,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   {
     DiracMdagM m(diracSloppy);
-    MultiShiftCG cg_m(m, m, *param, profile);
+    MultiShiftCG cg_m(m, m, *param, profileMultiMixed);
     cg_m(x, *b);  
   }
     
@@ -1675,8 +1732,10 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   param->cuda_prec = high_prec;
   do_create_precise_cuda_gauge();
   
+  profileMultiMixed[QUDA_PROFILE_H2D].Start();
   b = new cudaColorSpinorField(cudaParam);
   *b = *h_b;
+  profileMultiMixed[QUDA_PROFILE_H2D].Stop();
   
   /*FIXME: to avoid setfault*/
   gaugeFatPrecondition =gaugeFatSloppy;
@@ -1704,12 +1763,14 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       dirac2.setMass(mass);
       diracSloppy2.setMass(mass);
       DiracMdagM m(dirac2), mSloppy(diracSloppy2);
-      CG cg(m, mSloppy, *param, profile);
+      CG cg(m, mSloppy, *param, profileMultiMixed);
       cg(*high_x, *b);      
       total_iters += param->iter;
       total_secs  += param->secs;
       total_gflops += param->gflops;      
+      profileMultiMixed[QUDA_PROFILE_D2H].Start();
       *h_x[i] = *high_x;
+      profileMultiMixed[QUDA_PROFILE_D2H].Stop();
     }
     
     param->iter = total_iters;
@@ -1739,8 +1800,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
-  profile[QUDA_PROFILE_TOTAL].Stop();
-  if (param->verbosity >= QUDA_VERBOSE) profile.Print();
+  profileMultiMixed[QUDA_PROFILE_TOTAL].Stop();
 }
 
 

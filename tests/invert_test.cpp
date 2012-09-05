@@ -293,18 +293,12 @@ int main(int argc, char **argv)
   // initialize the QUDA library
   initQuda(device);
 
-  double timeInit = clock();
-
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
-
-  double timeGauge = ((double)clock());
 
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-  double timeClover = (double)clock();
-  
   // perform the inversion
   if (multi_shift) {
     invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
@@ -313,24 +307,14 @@ int main(int argc, char **argv)
   }
 
   // stop the timer
-  timeClover -= timeGauge;
-  timeGauge -= timeInit;
-  timeInit += time0;
   time0 += clock();
-
   time0 /= CLOCKS_PER_SEC;
-  timeInit /= CLOCKS_PER_SEC;
-  timeGauge /= CLOCKS_PER_SEC;
-  timeClover /= CLOCKS_PER_SEC;
     
   printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("   initQuda       = %g secs\n", timeInit);
-  printfQuda("   loadGaugeQuda  = %g secs\n", timeGauge);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printfQuda("   loadCloverQuda = %g secs\n", timeClover);
 
   if (multi_shift) {
 

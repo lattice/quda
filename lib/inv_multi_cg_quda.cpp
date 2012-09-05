@@ -56,7 +56,8 @@ namespace quda {
 
   void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
   {
- 
+    profile[QUDA_PROFILE_INIT].Start();
+
     int num_offset = invParam.num_offset;
     double *offset = invParam.offset;
  
@@ -120,11 +121,11 @@ namespace quda {
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
+    profile[QUDA_PROFILE_INIT].Stop();
+    profile[QUDA_PROFILE_PREAMBLE].Start();
+
     double b2 = normCuda(b);
 
-    //const double min_tolerance = (param.precision == QUDA_DOUBLE_PRECISION) ? invParam.tol : (param.precision == QUDA_SINGLE_PRECISION) ? 1e-6 : 1e-4;
-    //const double tolerance = (invParam.tol < min_tolerance) ? min_tolerance : invParam.tol;
-    
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
     double r2[QUDA_MAX_MULTI_SHIFT];
@@ -152,10 +153,11 @@ namespace quda {
     
     int k = 0;
     int rUpdate = 0;
-
     quda::blas_flops = 0;
 
-    stopwatchStart();
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
+
     while (r2[0] > stop[0] &&  k < invParam.maxiter) {
       matSloppy(*Ap, *p[0], tmp1, tmp2);
       if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) axpyCuda(offset[0], *p[0], *Ap);
@@ -258,8 +260,17 @@ namespace quda {
       if (reliable) xpyCuda(*y[i], *x[i]);
     }
 
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+    profile[QUDA_PROFILE_EPILOGUE].Start();
+
     if (k==invParam.maxiter) warningQuda("Exceeded maximum iterations %d\n", invParam.maxiter);
     
+    invParam.secs = profile[QUDA_PROFILE_COMPUTE].Last();
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
+    reduceDouble(gflops);
+    invParam.gflops = gflops;
+    invParam.iter = k;
+
     if (invParam.verbosity >= QUDA_VERBOSE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
       for(int i=0; i < num_offset; i++) { 
@@ -276,14 +287,14 @@ namespace quda {
       }
     }      
   
-    invParam.secs = stopwatchReadSeconds();
+    // reset the flops counters
+    quda::blas_flops = 0;
+    mat.flops();
+    matSloppy.flops();
 
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
-    reduceDouble(gflops);
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile[QUDA_PROFILE_FREE].Start();
 
-    invParam.gflops = gflops;
-    invParam.iter = k;
-  
     if (&tmp2 != &tmp1) delete tmp2_p;
 
     delete r;
@@ -307,6 +318,9 @@ namespace quda {
     delete []zeta;
     delete []alpha;
     delete []beta;
+
+    profile[QUDA_PROFILE_FREE].Stop();
+
   }
 
 } // namespace quda
