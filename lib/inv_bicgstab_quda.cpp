@@ -57,7 +57,7 @@ namespace quda {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       yp = new cudaColorSpinorField(x, csParam);
       rp = new cudaColorSpinorField(x, csParam); 
-      csParam.precision = invParam.cuda_prec_sloppy;
+      csParam.setPrecision(invParam.cuda_prec_sloppy);
       pp = new cudaColorSpinorField(x, csParam);
       vp = new cudaColorSpinorField(x, csParam);
       tmpp = new cudaColorSpinorField(x, csParam);
@@ -110,7 +110,7 @@ namespace quda {
     } else {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.precision = invParam.cuda_prec_sloppy;
+      csParam.setPrecision(invParam.cuda_prec_sloppy);
       x_sloppy = new cudaColorSpinorField(x, csParam);
       csParam.create = QUDA_COPY_FIELD_CREATE;
       r_sloppy = new cudaColorSpinorField(r, csParam);
@@ -207,10 +207,6 @@ namespace quda {
       rho = quda::Complex(rho_r2.x, rho_r2.y);
       r2 = rho_r2.z;
 
-      if (invParam.verbosity == QUDA_DEBUG_VERBOSE)
-	printfQuda("DEBUG: %d iterated residual norm = %e, true residual norm = %e\n",
-		   k, norm2(rSloppy), resNorm(matSloppy, b, xSloppy));
-
       // reliable updates
       rNorm = sqrt(r2);
       if (rNorm > maxrx) maxrx = rNorm;
@@ -224,6 +220,7 @@ namespace quda {
 	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
 	xpyCuda(x, y); // swap these around?
+
 	mat(r, y, x);
 	r2 = xmyNormCuda(b, r);
 
@@ -241,7 +238,7 @@ namespace quda {
       if (invParam.verbosity >= QUDA_VERBOSE) 
 	printfQuda("BiCGstab: %d iterations, r2 = %e\n", k, r2);
     }
-  
+
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
 
@@ -275,6 +272,7 @@ namespace quda {
     quda::blas_flops = 0;
     mat.flops();
     matSloppy.flops();
+    matPrecon.flops();
 
     profile[QUDA_PROFILE_EPILOGUE].Stop();
 

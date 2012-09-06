@@ -1142,8 +1142,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source post mass rescale = %f\n", nin);   
   }
   
-  
-
   switch (param->inv_type) {
   case QUDA_CG_INVERTER:
     // prepare source if we are doing CGNR
@@ -1159,12 +1157,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
     break;
   case QUDA_BICGSTAB_INVERTER:
-    if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      BiCGstab bicg(m, mSloppy, mPre, *param, profileInvert);
-      bicg(*out, *in);
-      copyCuda(*in, *out);
-    }
+    if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION)
+      {
+	DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+	BiCGstab bicg(m, mSloppy, mPre, *param, profileInvert);
+	bicg(*out, *in);
+	copyCuda(*in, *out);
+      }
     {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       BiCGstab bicg(m, mSloppy, mPre, *param, profileInvert);

@@ -172,11 +172,10 @@ namespace quda {
     ColorSpinorParam param(x);
     param.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField r(x, param); 
-
     cudaColorSpinorField y(x, param); // high precision accumulator
 
     // create sloppy fields used for orthogonalization
-    param.precision = invParam.cuda_prec_sloppy;
+    param.setPrecision(invParam.cuda_prec_sloppy);
     cudaColorSpinorField **p = new cudaColorSpinorField*[Nkrylov];
     cudaColorSpinorField **Ap = new cudaColorSpinorField*[Nkrylov];
     for (int i=0; i<Nkrylov; i++) {
@@ -188,7 +187,7 @@ namespace quda {
 
     cudaColorSpinorField *x_sloppy, *r_sloppy;
     if (invParam.cuda_prec_sloppy != invParam.cuda_prec) {
-      param.precision = invParam.cuda_prec_sloppy;
+      param.setPrecision(invParam.cuda_prec_sloppy);
       x_sloppy = new cudaColorSpinorField(x, param);
       r_sloppy = new cudaColorSpinorField(x, param);
     } else {

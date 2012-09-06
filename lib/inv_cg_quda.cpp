@@ -44,7 +44,7 @@ namespace quda {
     double r2 = xmyNormCuda(b, r);
     rUpdate++;
   
-    param.precision = invParam.cuda_prec_sloppy;
+    param.setPrecision(invParam.cuda_prec_sloppy);
     cudaColorSpinorField Ap(x, param);
     cudaColorSpinorField tmp(x, param);
 

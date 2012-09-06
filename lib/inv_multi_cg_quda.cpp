@@ -84,13 +84,13 @@ namespace quda {
     cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset], *r_sloppy;
     cudaColorSpinorField **y = reliable ? new cudaColorSpinorField*[num_offset] : NULL;
   
-    ColorSpinorParam param;
+    ColorSpinorParam param(b);
     param.create = QUDA_ZERO_FIELD_CREATE;
 
     if (reliable)
       for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, param);
 
-    param.precision = invParam.cuda_prec_sloppy;
+    param.setPrecision(invParam.cuda_prec_sloppy);
   
     if (invParam.cuda_prec_sloppy == x[0]->Precision()) {
       for (int i=0; i<num_offset; i++){
@@ -109,7 +109,6 @@ namespace quda {
     for (int i=0; i<num_offset; i++) p[i]= new cudaColorSpinorField(*r_sloppy);    
   
     param.create = QUDA_ZERO_FIELD_CREATE;
-    param.precision = invParam.cuda_prec_sloppy;
     cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, param);
   
     cudaColorSpinorField tmp1(*Ap, param);

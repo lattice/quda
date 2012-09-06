@@ -16,14 +16,8 @@
 #include <face_quda.h>
 #endif
 
-static double anisotropy_;
 extern float fat_link_max_;
-static int X_[4];
-static QudaTboundary t_boundary_;
 
-
-
-#include <pack_gauge.h>
 #include <hisq_force_utils.h>
 
 // The following routines are needed to test the hisq fermion force code

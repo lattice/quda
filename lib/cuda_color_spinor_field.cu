@@ -63,7 +63,8 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), v(0), norm(0), alloc(false), init(true) {
     create(QUDA_COPY_FIELD_CREATE);
-    copy(src);
+    if (isNative() && src.isNative()) copy(src);
+    else errorQuda("Cannot copy using non-native fields");
   }
 
   // creates a copy of src, any differences defined in param
@@ -98,7 +99,8 @@ namespace quda {
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
     } else if (param.create == QUDA_COPY_FIELD_CREATE) {
-      if (src.FieldOrder() == fieldOrder && typeid(src) == typeid(cudaColorSpinorField)) {
+      if (typeid(src) == typeid(cudaColorSpinorField) && 
+	  isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
 	copy(dynamic_cast<const cudaColorSpinorField&>(src));
       } else {
 	loadSpinorField(src);
@@ -114,7 +116,8 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true) {
     create(QUDA_COPY_FIELD_CREATE);
-    if (typeid(src) == typeid(cudaColorSpinorField) && src.FieldOrder() == fieldOrder) {
+    if (typeid(src) == typeid(cudaColorSpinorField) && 
+	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
       copy(dynamic_cast<const cudaColorSpinorField&>(src));
     } else if (typeid(src) == typeid(cpuColorSpinorField) || typeid(src) == typeid(cudaColorSpinorField)) {
       loadSpinorField(src);
@@ -142,7 +145,8 @@ namespace quda {
 	ColorSpinorField::operator=(src);
 	create(QUDA_COPY_FIELD_CREATE);
       }
-      copy(src);
+      if (isNative() && src.isNative()) copy(src);
+      else errorQuda("Cannot copy using non-native fields");
     }
     return *this;
   }
@@ -162,6 +166,27 @@ namespace quda {
     destroy();
   }
 
+  // return true if the field is a native field (ordering, precision, spin)
+  bool cudaColorSpinorField::isNative() const {
+
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+    } else if (precision == QUDA_SINGLE_PRECISION) {
+      if (nSpin == 4) {
+	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
+      } else if (nSpin == 1) {
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+      }
+    } else if (precision == QUDA_HALF_PRECISION) {
+      if (nSpin == 4) {
+	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
+      } else if (nSpin == 1) {
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+      }
+    }
+
+    return false;
+  }
 
   void cudaColorSpinorField::create(const QudaFieldCreate create) {
 
@@ -361,7 +386,7 @@ namespace quda {
 
     if (precision == QUDA_HALF_PRECISION) {
       ColorSpinorParam param(*this); // acquire all attributes of this
-      param.precision = QUDA_SINGLE_PRECISION; // change precision
+      param.setPrecision(QUDA_SINGLE_PRECISION); // change precision
       param.create = QUDA_COPY_FIELD_CREATE;
       cudaColorSpinorField tmp(src, param);
       copy(tmp);
