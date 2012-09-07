@@ -21,8 +21,9 @@
 #elif defined CHECK_PARAM
 #define P(x, val) if (param->x == val) errorQuda("Parameter " #x " undefined")
 #elif defined PRINT_PARAM
-#define P(x, val) \
-  printfQuda((val == INVALID_DOUBLE) ? #x " = %g\n" : #x " = %e\n", param->x)
+#define P(x, val)							\
+  { if (val == INVALID_DOUBLE) printfQuda(#x " = %g\n", (double)param->x); \
+    else printfQuda(#x " = %d\n", (int)param->x); }
 #else
 #error INIT_PARAM, CHECK_PARAM, and PRINT_PARAM all undefined in check_params.h
 #endif
