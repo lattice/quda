@@ -1367,10 +1367,34 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, param->offset[i]);
   }
 
+  // use multi-shift CG
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
     MultiShiftCG cg_m(m, mSloppy, *param, profileMulti);
     cg_m(x, *b);  
+  }
+
+  // check each shift has the desired tolerance and use sequential CG to refine
+  for(int i=0; i < param->num_offset; i++) { 
+    if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
+      if (param->true_res_offset[i] > param->tol_offset[i]) {
+	dirac.setMass(sqrt(param->offset[i]/4));  
+	diracSloppy.setMass(sqrt(param->offset[i]/4));  
+	if (param->verbosity >= QUDA_SUMMARIZE) 
+	  printfQuda("Refining shift %d since achieved true residual %e is greater than requested %e\n",
+		     i, param->true_res_offset[i], param->tol_offset[i]);
+	DiracMdagM m(dirac), mSloppy(diracSloppy);
+	param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+	param->tol = param->tol_offset[i];
+	CG cg(m, mSloppy, *param, profileMulti);
+	cg(*x[i], *b);        
+	param->true_res_offset[i] = param->true_res;
+	dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+	diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+      }
+    } else {
+      warningQuda("Refinement only supported on staggered quarks currently");
+    }
   }
 
   // restore shifts -- avoid side effects
