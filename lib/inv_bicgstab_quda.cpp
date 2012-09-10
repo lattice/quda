@@ -283,7 +283,7 @@ namespace quda {
       delete x_sloppy;
     }
     profile[QUDA_PROFILE_FREE].Stop();
-
+    
     return;
   }
 

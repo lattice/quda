@@ -180,7 +180,7 @@ namespace quda {
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
       invParam.gflops = gflops;
-    invParam.iter = k;
+    invParam.iter += k;
 
     if (k==invParam.maxiter) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
@@ -213,9 +213,9 @@ namespace quda {
       delete x_sloppy;
     }
 
-    return;
-
     profile[QUDA_PROFILE_FREE].Stop();
+
+    return;
   }
 
 } // namespace quda
