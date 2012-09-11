@@ -138,13 +138,14 @@ namespace quda {
   solution as a linear combination of a given number of previous
   solutions.  Following Brower et al, only the orthogonalised vector
   basis is stored to conserve memory.*/
-  class MinResExt : public Solver {
+  class MinResExt {
 
   protected:
     const DiracMatrix &mat;
+    TimeProfile &profile;
 
   public:
-    MinResExt(DiracMatrix &mat, QudaInvertParam &param, TimeProfile &profile);
+    MinResExt(DiracMatrix &mat, TimeProfile &profile);
     virtual ~MinResExt();
 
     /**

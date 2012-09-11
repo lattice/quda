@@ -3,22 +3,14 @@
 
 namespace quda {
 
-  MinResExt::MinResExt(DiracMatrix &mat, QudaInvertParam &param, TimeProfile &profile) 
-    : Solver(param, profile), mat(mat) {
+  MinResExt::MinResExt(DiracMatrix &mat, TimeProfile &profile) 
+    : mat(mat), profile(profile){
 
   }
 
   MinResExt::~MinResExt() {
 
   }
-
-  /*  template <typename T>
-  inline void swap(T &a, T &b) {
-    T tmp;
-    tmp = a;
-    a = b;
-    b = tmp;
-    }*/
 
   void MinResExt::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, 
 			     cudaColorSpinorField **p, cudaColorSpinorField **q, int N) {
@@ -103,6 +95,7 @@ namespace quda {
       alpha[i] = (beta[i]-alpha[i])/G[i][i];
       caxpyCuda(alpha[i], *p[i], x);
       caxpyCuda(-alpha[i], *q[i], b);
+      //printfQuda("%d %e %e\n", i, real(alpha[i]), imag(alpha[i]));
     }
 
     double rsd = sqrt(norm2(b) / b2 );
