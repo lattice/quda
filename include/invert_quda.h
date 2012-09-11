@@ -131,6 +131,21 @@ namespace quda {
     void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
   };
 
+  /**
+     Minimum residual extrapolation.  Builds the optimum least-square
+     residual approximation to Ax=b, where x = sum_i alpha_i p_i.
+   */
+  class MinResExt : public Solver {
+
+  protected:
+
+  public:
+    MinResExt(DiracMatrix &mat, QudaInvertParam &param, TimeProfile &profile);
+    virtual ~MinResExt();
+
+    void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p);
+  }
+
 } // namespace quda
 
 #endif // _INVERT_QUDA_H
