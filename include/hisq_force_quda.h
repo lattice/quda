@@ -1,8 +1,8 @@
 #ifndef _HISQ_FORCE_QUDA_H
 #define _HISQ_FORCE_QUDA_H
 
-#include "hisq_force_utils.h"
-
+#include <quda_internal.h>
+#include <quda.h>
 #include <gauge_field.h>
 
 namespace quda {

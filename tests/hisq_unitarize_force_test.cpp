@@ -9,7 +9,6 @@
 #include "misc.h"
 #include "hisq_force_reference.h"
 #include "hisq_force_quda.h"
-#include "hisq_force_utils.h"
 #include "hw_quda.h"
 #include <sys/time.h>
 #include <dslash_quda.h>
