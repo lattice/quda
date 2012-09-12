@@ -79,7 +79,6 @@ unitarize_link_test()
   qudaGaugeParam.type = QUDA_WILSON_LINKS;
 
 
-  fermion_force::hisqForceInitCuda(&qudaGaugeParam);
   
   qudaGaugeParam.t_boundary  	   = QUDA_PERIODIC_T;
   qudaGaugeParam.anisotropy  	   = 1.0;
