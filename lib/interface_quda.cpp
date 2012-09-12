@@ -647,10 +647,10 @@ namespace quda {
 		   QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
   {   
     if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("Mass rescale: Kappa is: %f\n", kappa);
+      printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
       double nin = norm2(b);
-      printfQuda("Mass rescale: norm of source in = %f\n", nin);
+      printfQuda("Mass rescale: norm of source in = %g\n", nin);
     }
  
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -694,10 +694,10 @@ namespace quda {
 
     if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
     if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("Mass rescale: Kappa is: %f\n", kappa);
+      printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
       double nin = norm2(b);
-      printfQuda("Mass rescale: norm of source out = %f\n", nin);
+      printfQuda("Mass rescale: norm of source out = %g\n", nin);
     }
 
   }
@@ -1120,8 +1120,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nb = norm2(*b);
     double nh_x = norm2(*h_x);
     double nx = norm2(*x);
-    printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
-    printfQuda("Solution: CPU = %f, CUDA copy = %f\n", nh_x, nx);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+    printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
   }
 
   setDslashTuning(param->tune, param->verbosity);
@@ -1131,15 +1131,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->verbosity >= QUDA_VERBOSE) {
     double nin = norm2(*in);
     double nout = norm2(*out);
-    printfQuda("Prepared source = %f\n", nin);   
-    printfQuda("Prepared solution = %f\n", nout);   
+    printfQuda("Prepared source = %g\n", nin);   
+    printfQuda("Prepared solution = %g\n", nout);   
   }
 
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
 
   if (param->verbosity >= QUDA_VERBOSE) {
     double nin = norm2(*in);
-    printfQuda("Prepared source post mass rescale = %f\n", nin);   
+    printfQuda("Prepared source post mass rescale = %g\n", nin);   
   }
   
   switch (param->inv_type) {
@@ -1189,7 +1189,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   if (param->verbosity >= QUDA_VERBOSE){
    double nx = norm2(*x);
-   printfQuda("Solution = %f\n",nx);
+   printfQuda("Solution = %g\n",nx);
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
@@ -1200,7 +1200,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->verbosity >= QUDA_VERBOSE){
     double nx = norm2(*x);
     double nh_x = norm2(*h_x);
-    printfQuda("Reconstructed: CUDA solution = %f, CPU copy = %f\n", nx, nh_x);
+    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
   }
   
   delete h_b;
@@ -1354,7 +1354,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if( param->verbosity >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
-    printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
   setDslashTuning(param->tune, param->verbosity);
@@ -1408,7 +1408,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   for(int i=0; i < param->num_offset; i++) { 
     if (param->verbosity >= QUDA_VERBOSE){
       double nx = norm2(*x[i]);
-      printfQuda("Solution %d = %f\n", i, nx);
+      printfQuda("Solution %d = %g\n", i, nx);
     }
 
     *h_x[i] = *x[i];
@@ -1719,7 +1719,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if( param->verbosity >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
-    printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
   // tune the Dirac Kernel
