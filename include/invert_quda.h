@@ -132,19 +132,33 @@ namespace quda {
   };
 
   /**
-     Minimum residual extrapolation.  Builds the optimum least-square
-     residual approximation to Ax=b, where x = sum_i alpha_i p_i.
-   */
-  class MinResExt : public Solver {
+  This computes the optimum guess for the system Ax=b in the L2
+  residual norm.  For use in the HMD force calculations using a
+  minimal residual chronological method This computes the guess
+  solution as a linear combination of a given number of previous
+  solutions.  Following Brower et al, only the orthogonalised vector
+  basis is stored to conserve memory.*/
+  class MinResExt {
 
   protected:
+    const DiracMatrix &mat;
+    TimeProfile &profile;
 
   public:
-    MinResExt(DiracMatrix &mat, QudaInvertParam &param, TimeProfile &profile);
+    MinResExt(DiracMatrix &mat, TimeProfile &profile);
     virtual ~MinResExt();
 
-    void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p);
-  }
+    /**
+       param x The optimum for the solution vector.
+       param b The source vector in the equation to be solved. This is not preserved.
+       param p The basis vectors in which we are building the guess
+       param q The basis vectors multipled by A
+       param N The number of basis vectors
+       return The residue of this guess.
+    */  
+    void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p,
+		    cudaColorSpinorField **q, int N);
+  };
 
 } // namespace quda
 

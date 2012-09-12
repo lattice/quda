@@ -1374,6 +1374,36 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     cg_m(x, *b);  
   }
 
+  // experimenting with Minimum residual extrapolation
+  /*
+  cudaColorSpinorField **q = new cudaColorSpinorField* [ param->num_offset ];
+  cudaColorSpinorField **z = new cudaColorSpinorField* [ param->num_offset ];
+  cudaColorSpinorField tmp(cudaParam);
+
+  for(int i=0; i < param->num_offset; i++) {
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+    q[i] = new cudaColorSpinorField(cudaParam);
+    cudaParam.create = QUDA_COPY_FIELD_CREATE;
+    z[i] = new cudaColorSpinorField(*x[i], cudaParam);
+  }
+
+  for(int i=0; i < param->num_offset; i++) {
+    dirac.setMass(sqrt(param->offset[i]/4));  
+    DiracMdagM m(dirac);
+    MinResExt mre(m, profileMulti);
+    copyCuda(tmp, *b);
+    mre(*x[i], tmp, z, q, param -> num_offset);
+    dirac.setMass(sqrt(param->offset[0]/4));  
+  }
+
+  for(int i=0; i < param->num_offset; i++) {
+    delete q[i];
+    delete z[i];
+  }
+  delete []q;
+  delete []z;
+  */
+
   // check each shift has the desired tolerance and use sequential CG to refine
   for(int i=0; i < param->num_offset; i++) { 
     if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
@@ -1384,6 +1414,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  printfQuda("Refining shift %d since achieved true residual %e is greater than requested %e\n",
 		     i, param->true_res_offset[i], param->tol_offset[i]);
 	DiracMdagM m(dirac), mSloppy(diracSloppy);
+
 	param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 	param->tol = param->tol_offset[i];
 	CG cg(m, mSloppy, *param, profileMulti);
