@@ -1,5 +1,5 @@
 
-Release Notes for QUDA v0.4.1 (PRE-RELEASE)                 XX April 2012
+Release Notes for QUDA v0.5.0                      XX September 2012
 -----------------------------
 
 Overview:
@@ -22,8 +22,8 @@ except domain wall.
 Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.7 and Ubuntu 10.04)
-using release 4.1 of the CUDA toolkit.  CUDA 3.x and earlier are no
-longer supported.  The library also seems to work under Mac OS X
+using release 4.0, 4.1, 4.2 and 5.0 of the CUDA toolkit.  CUDA 3.x and
+earlier are not supported.  The library also works under Mac OS X
 10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
 Intel-based Macs.
 
@@ -97,10 +97,10 @@ for one card on a different card may lead to unexpected errors.
 Using the Library:
 
 Include the header file include/quda.h in your application, link
-against lib/libquda.a, and study tests/wilson_invert_test.c (or the
-corresponding tests for staggered, domain wall, and twisted mass) for
-an example of the interface.  The various inverter options are
-enumerated in include/enum_quda.h.
+against lib/libquda.a, and study tests/invert_test.c (or the
+corresponding tests for staggered fermions) for an example of the
+interface.  The various inverter options are enumerated in
+include/enum_quda.h.
 
 
 Known Issues:
@@ -112,14 +112,13 @@ Known Issues:
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
 
-* With current drivers, Fermi-based GeForce cards suffer from
-  occasional hangs when reading from double-precision textures,
-  recoverable only with a soft reset.  Such texture reads are thus
-  disabled by default at the expense of some performance.  To
-  re-enable double-precision texture reads on Fermi-based Tesla and
-  Quadro cards, pass the --enable-fermi-double-tex flag to configure.
-  This flag has no effect when the library is build for GPU
-  architectures other than Fermi (sm_20).
+* With drivers earlier than CUDA 5.0 (the final production release),
+  Fermi-based GeForce cards suffer from occasional hangs when reading
+  from double-precision textures, recoverable only with a soft reset.
+  The recommended solution is to upgrade to the CUDA 5.0 driver.
+  Alternatively, such texture reads can be disabled by default at the
+  expense of some performance.  To disable double-precision texture
+  reads pass the --disable-fermi-double-tex flag to configure.
 
 * The auto-tuner reports "0 Gflop/s" and "0 GB/s" for several of the
   Dslash kernels (visible if the verbosity is set to at least

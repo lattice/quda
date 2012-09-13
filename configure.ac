@@ -202,9 +202,9 @@ fi
 
 
 AC_ARG_ENABLE(fermi-double-tex,
- AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: disabled)]),
+ AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: enabled)]),
  [ fermi_double_tex=${enableval}],
- [ fermi_double_tex="no" ]
+ [ fermi_double_tex="yes" ]
 )
 
 AC_ARG_ENABLE(numa-affinity,

@@ -98,6 +98,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     
   }
   
+  checkCudaError();
+
   return;
 }
 
@@ -184,8 +186,9 @@ FaceBuffer::~FaceBuffer()
     }
 #endif
 
-    
   }
+
+  checkCudaError();
 }
 
 void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream_p)
@@ -492,6 +495,8 @@ exchange_llfat_init(QudaPrecision prec)
   }
 #endif
   
+  checkCudaError();
+
   return;
 }
 
@@ -1346,6 +1351,8 @@ exchange_llfat_cleanup(void)
       cudaHostUnregister(back_nbr_staple_sendbuf[i]); free(back_nbr_staple_sendbuf[i]); back_nbr_staple_sendbuf[i] = NULL;
     }
   }
+
+  checkCudaError();
 
 }
 

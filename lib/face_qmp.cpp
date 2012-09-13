@@ -135,6 +135,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   }
 #endif
 
+  checkCudaError();
 }
 
 FaceBuffer::FaceBuffer(const FaceBuffer &face) {
@@ -205,6 +206,8 @@ FaceBuffer::~FaceBuffer()
     from_fwd_face[i]=NULL;
     from_back_face[i]=NULL;
   }
+
+  checkCudaError();
 }
 
 void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream_p)
