@@ -52,24 +52,28 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     }
   }
 
+  unsigned int flag = cudaHostAllocDefault;
+
   for(int dir =0 ; dir < 4;dir++){
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
     if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
     
-    if (cudaMallocHost((void**)&fwd_nbr_spinor_sendbuf[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_spinor_sendbuf\n");
-    }
-    if (cudaMallocHost((void**)&back_nbr_spinor_sendbuf[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for back_nbr_spinor_sendbuf\n");
-    }
-    
-    if (cudaMallocHost((void**)&fwd_nbr_spinor[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_spinor\n");
-    }
-    if (cudaMallocHost((void**)&back_nbr_spinor[dir], nbytes[dir]) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for back_nbr_spinor\n");
-    }
-    
+    fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
+    if( !fwd_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);
+    cudaHostRegister(fwd_nbr_spinor_sendbuf[dir], nbytes[dir], flag);
+  
+    back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
+    if( !back_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[dir]);
+    cudaHostRegister(back_nbr_spinor_sendbuf[dir], nbytes[dir], flag);
+
+    fwd_nbr_spinor[dir] = malloc(nbytes[dir]);
+    if( !fwd_nbr_spinor[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);
+    cudaHostRegister(fwd_nbr_spinor[dir], nbytes[dir], flag);
+  
+    back_nbr_spinor[dir] = malloc(nbytes[dir]);
+    if( !back_nbr_spinor[dir] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[dir]);
+    cudaHostRegister(back_nbr_spinor[dir], nbytes[dir], flag);
+
     if (fwd_nbr_spinor[dir] == NULL || back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
 
@@ -133,19 +137,23 @@ FaceBuffer::~FaceBuffer()
 
   for(int dir =0; dir < 4; dir++){
     if(fwd_nbr_spinor_sendbuf[dir]) {
-      cudaFreeHost(fwd_nbr_spinor_sendbuf[dir]);
+      cudaHostUnregister(fwd_nbr_spinor_sendbuf[dir]);
+      free(fwd_nbr_spinor_sendbuf[dir]);
       fwd_nbr_spinor_sendbuf[dir] = NULL;
     }
     if(back_nbr_spinor_sendbuf[dir]) {
-      cudaFreeHost(back_nbr_spinor_sendbuf[dir]);
+      cudaHostUnregister(back_nbr_spinor_sendbuf[dir]);
+      free(back_nbr_spinor_sendbuf[dir]);
       back_nbr_spinor_sendbuf[dir] = NULL;
     }
     if(fwd_nbr_spinor[dir]) {
-      cudaFreeHost(fwd_nbr_spinor[dir]);
+      cudaHostUnregister(fwd_nbr_spinor[dir]);
+      free(fwd_nbr_spinor[dir]);
       fwd_nbr_spinor[dir] = NULL;
     }
     if(back_nbr_spinor[dir]) {
-      cudaFreeHost(back_nbr_spinor[dir]);
+      cudaHostUnregister(back_nbr_spinor[dir]);
+      free(back_nbr_spinor[dir]);
       back_nbr_spinor[dir] = NULL;
     }    
 
@@ -434,6 +442,8 @@ exchange_llfat_init(QudaPrecision prec)
   initialized = 1;
   
 
+  unsigned int flag = cudaHostAllocDefault;
+
   for(int i=0;i < 4; i++){
     if(cudaMalloc((void**)&fwd_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec) != cudaSuccess){
       errorQuda("cudaMalloc() failed for fwd_nbr_staple_gpu\n");
@@ -442,19 +452,21 @@ exchange_llfat_init(QudaPrecision prec)
       errorQuda("cudaMalloc() failed for back_nbr_staple_gpu\n");
     }
 
-    if (cudaMallocHost((void**)&fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_staple\n");
-    }
-    if (cudaMallocHost((void**)&back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for back_nbr_staple\n");
-    }
+    fwd_nbr_staple[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    if( !fwd_nbr_staple[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", Vs[i]*gaugeSiteSize*prec);
+    cudaHostRegister(fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec, flag);
+  
+    back_nbr_staple[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    if( !back_nbr_staple[i] ) errorQuda("Unable to allocate my_back_face with size %lu", Vs[i]*gaugeSiteSize*prec);
+    cudaHostRegister(back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec, flag);
 
-    if (cudaMallocHost((void**)&fwd_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for fwd_nbr_staple_sendbuf \n");
-    }
-    if (cudaMallocHost((void**)&back_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for back_nbr_staple_sendbuf\n");
-    }
+    fwd_nbr_staple_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    if( !fwd_nbr_staple_sendbuf[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", Vs[i]*gaugeSiteSize*prec);
+    cudaHostRegister(fwd_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec, flag);
+  
+    back_nbr_staple_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*prec);
+    if( !back_nbr_staple_sendbuf[i]) errorQuda("Unable to allocate my_back_face with size %lu", Vs[i]*gaugeSiteSize*prec);
+    cudaHostRegister(back_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec, flag);
   }
 
   
@@ -1319,19 +1331,19 @@ exchange_llfat_cleanup(void)
 
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple[i]){
-      cudaFreeHost(fwd_nbr_staple[i]); fwd_nbr_staple[i] = NULL;
+      cudaHostUnregister(fwd_nbr_staple[i]); free(fwd_nbr_staple[i]); fwd_nbr_staple[i] = NULL;
     }
     if(back_nbr_staple[i]){
-      cudaFreeHost(back_nbr_staple[i]); back_nbr_staple[i] = NULL;
+      cudaHostUnregister(back_nbr_staple[i]); free(back_nbr_staple[i]); back_nbr_staple[i] = NULL;
     }
   }
   
   for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_sendbuf[i]){
-      cudaFreeHost(fwd_nbr_staple_sendbuf[i]); fwd_nbr_staple_sendbuf[i] = NULL;
+      cudaHostUnregister(fwd_nbr_staple_sendbuf[i]); free(fwd_nbr_staple_sendbuf[i]); fwd_nbr_staple_sendbuf[i] = NULL;
     }
     if(back_nbr_staple_sendbuf[i]){
-      cudaFreeHost(back_nbr_staple_sendbuf[i]); back_nbr_staple_sendbuf[i] = NULL;
+      cudaHostUnregister(back_nbr_staple_sendbuf[i]); free(back_nbr_staple_sendbuf[i]); back_nbr_staple_sendbuf[i] = NULL;
     }
   }
 

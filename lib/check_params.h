@@ -248,6 +248,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(residual_type, QUDA_L2_RELATIVE_RESIDUAL);
+#else
+  P(residual_type, QUDA_INVALID_RESIDUAL);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 }

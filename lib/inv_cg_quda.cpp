@@ -29,8 +29,6 @@ namespace quda {
   void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
     profile[QUDA_PROFILE_INIT].Start();
-    int k=0;
-    int rUpdate = 0;
     
     cudaColorSpinorField r(b);
 
@@ -42,7 +40,6 @@ namespace quda {
     zeroCuda(y);
 
     double r2 = xmyNormCuda(b, r);
-    rUpdate++;
   
     param.setPrecision(invParam.cuda_prec_sloppy);
     cudaColorSpinorField Ap(x, param);
@@ -69,9 +66,10 @@ namespace quda {
 
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
-
     cudaColorSpinorField p(rSloppy);
-
+    
+    const bool use_heavy_quark_res = (invParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    
     profile[QUDA_PROFILE_INIT].Stop();
     profile[QUDA_PROFILE_PREAMBLE].Start();
 
@@ -79,8 +77,14 @@ namespace quda {
     double src_norm = norm2(b);
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver
 
+    double heavy_quark_residual;
+    if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    double & distance_to_solution   =  (use_heavy_quark_res) ? heavy_quark_residual : r2;
+    double & convergence_threshold  =  (use_heavy_quark_res) ? invParam.tol : stop;
+
     double alpha=0.0, beta=0.0;
     double pAp;
+    int rUpdate = 0;
 
     double rNorm = sqrt(r2);
     double r0Norm = rNorm;
@@ -88,21 +92,21 @@ namespace quda {
     double maxrr = rNorm;
     double delta = invParam.reliable_delta;
 
-    if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
-      double x2 = norm2(x);
-      double p2 = norm2(p);
-      printf("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
-	     k, r2, x2, p2, alpha, beta);
-    } else if (invParam.verbosity >= QUDA_VERBOSE) {
-      printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
-    }
-
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
     quda::blas_flops = 0;
 
-    while (r2 > stop && k<invParam.maxiter) {
+    int k=0;
 
+    if (invParam.verbosity >= QUDA_VERBOSE) {
+      if (use_heavy_quark_res) {
+        printfQuda("CG: %d iterations, r2 = %e, heavy-quark residual = %e\n", k, r2, heavy_quark_residual);
+      } else {
+        printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+      }
+    }
+
+    while (distance_to_solution > convergence_threshold  && k < invParam.maxiter) {
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
       pAp = reDotProductCuda(p, Ap);
@@ -126,6 +130,13 @@ namespace quda {
 	beta = zr / r2_old; // use the stabilized beta computation
 	//beta = r2 / r2_old;
 	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
+
+	if (use_heavy_quark_res) { 
+	  copyCuda(tmp,y);
+	  xpyCuda(xSloppy,tmp);
+	  heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(tmp,rSloppy).z);
+	}
+
       } else {
 	axpyCuda(alpha, p, xSloppy);
 	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -157,17 +168,20 @@ namespace quda {
 
 	beta = r2 / r2_old; 
 	xpayCuda(rSloppy, beta, p);
+
+	if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
       }
 
       k++;
-      if (invParam.verbosity == QUDA_DEBUG_VERBOSE) {
-	double x2 = norm2(x);
-	double p2 = norm2(p);
-	printf("CG: %d iterations, r2 = %e, x2 = %e, p2 = %e, alpha = %e, beta = %e\n", 
-	       k, r2, x2, p2, alpha, beta);
-      } else if (invParam.verbosity >= QUDA_VERBOSE) {
-	printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+
+      if (invParam.verbosity >= QUDA_VERBOSE) {
+	if (use_heavy_quark_res) {
+	  printfQuda("CG: %d iterations, r2 = %e, heavy-quark residual = %e\n", k, r2, heavy_quark_residual);
+	} else {
+	  printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+	}
       }
+
     }
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -180,7 +194,7 @@ namespace quda {
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
       invParam.gflops = gflops;
-    invParam.iter = k;
+    invParam.iter += k;
 
     if (k==invParam.maxiter) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
@@ -192,10 +206,16 @@ namespace quda {
     mat(r, x, y);
     double true_res = xmyNormCuda(b, r);
     invParam.true_res = sqrt(true_res / src_norm);
+    if (use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 
-    if (invParam.verbosity >= QUDA_SUMMARIZE){
-      printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		 k, sqrt(r2/src_norm), invParam.true_res);    
+    if (invParam.verbosity >= QUDA_SUMMARIZE) {
+      if (use_heavy_quark_res) {
+	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e, heavy-quark residual = %e\n", k, sqrt(r2/src_norm), invParam.true_res, heavy_quark_residual);    
+      }else{
+	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+		   k, sqrt(r2/src_norm), invParam.true_res);
+      }
+
     }
 
     // reset the flops counters
@@ -213,9 +233,9 @@ namespace quda {
       delete x_sloppy;
     }
 
-    return;
-
     profile[QUDA_PROFILE_FREE].Stop();
+
+    return;
   }
 
 } // namespace quda

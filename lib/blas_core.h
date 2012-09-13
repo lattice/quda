@@ -116,7 +116,7 @@ public:
  */
 template <template <typename Float, typename FloatN> class Functor,
 	  int writeX, int writeY, int writeZ, int writeW>
-void blasCuda(const int kernel, const double2 &a, const double2 &b, const double2 &c,
+void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	      cudaColorSpinorField &x, cudaColorSpinorField &y, 
 	      cudaColorSpinorField &z, cudaColorSpinorField &w) {
   checkSpinor(x, y);
@@ -128,9 +128,9 @@ void blasCuda(const int kernel, const double2 &a, const double2 &b, const double
 
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     blasCuda<Functor,writeX,writeY,writeZ,writeW>
-      (kernel, a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
+      (a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
     blasCuda<Functor,writeX,writeY,writeZ,writeW>
-      (kernel, a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd());
+      (a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd());
     return;
   }
 

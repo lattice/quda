@@ -81,7 +81,8 @@ namespace quda {
       if (invParam.tol_offset[j] < invParam.reliable_delta) reliable = true;
 
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
-    cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset], *r_sloppy;
+    cudaColorSpinorField *r_sloppy;
+    cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset];
     cudaColorSpinorField **y = reliable ? new cudaColorSpinorField*[num_offset] : NULL;
   
     ColorSpinorParam param(b);
@@ -268,21 +269,24 @@ namespace quda {
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
     invParam.gflops = gflops;
-    invParam.iter = k;
+    invParam.iter += k;
 
-    if (invParam.verbosity >= QUDA_VERBOSE){
+    for(int i=0; i < num_offset; i++) { 
+      mat(*r, *x[i]); 
+      if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) {
+	axpyCuda(offset[i], *x[i], *r); // Offset it.
+      } else if (i!=0) {
+	axpyCuda(offset[i]-offset[0], *x[i], *r); // Offset it.
+      }
+      double true_res = xmyNormCuda(b, *r);
+      invParam.true_res_offset[i] = sqrt(true_res/b2);
+    }
+
+    if (invParam.verbosity >= QUDA_SUMMARIZE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
       for(int i=0; i < num_offset; i++) { 
-	mat(*r, *x[i]); 
-	if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) {
-	  axpyCuda(offset[i], *x[i], *r); // Offset it.
-	} else if (i!=0) {
-	  axpyCuda(offset[i]-offset[0], *x[i], *r); // Offset it.
-	}
-	double true_res = xmyNormCuda(b, *r);
-	invParam.true_res_offset[i] = sqrt(true_res/b2);
 	printfQuda(" shift=%d, relative residua: iterated = %e, true = %e\n", 
-		   i, sqrt(r2[i]/b2), sqrt(true_res/b2));
+		   i, sqrt(r2[i]/b2), invParam.true_res_offset[i]);
       }
     }      
   
@@ -298,13 +302,13 @@ namespace quda {
 
     delete r;
     for (int i=0; i<num_offset; i++) delete p[i];
+    delete []p;
 
     if (reliable) {
       for (int i=0; i<num_offset; i++) delete y[i];
       delete []y;
     }
 
-    delete p;
     delete Ap;
   
     if (invParam.cuda_prec_sloppy != x[0]->Precision()) {
@@ -320,6 +324,7 @@ namespace quda {
 
     profile[QUDA_PROFILE_FREE].Stop();
 
+    return;
   }
 
 } // namespace quda

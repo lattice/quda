@@ -647,10 +647,10 @@ namespace quda {
 		   QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
   {   
     if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("Mass rescale: Kappa is: %f\n", kappa);
+      printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
       double nin = norm2(b);
-      printfQuda("Mass rescale: norm of source in = %f\n", nin);
+      printfQuda("Mass rescale: norm of source in = %g\n", nin);
     }
  
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -694,10 +694,10 @@ namespace quda {
 
     if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
     if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("Mass rescale: Kappa is: %f\n", kappa);
+      printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
       double nin = norm2(b);
-      printfQuda("Mass rescale: norm of source out = %f\n", nin);
+      printfQuda("Mass rescale: norm of source out = %g\n", nin);
     }
 
   }
@@ -1112,6 +1112,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     x = new cudaColorSpinorField(cudaParam); // solution
   }
+
+  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL && 
+      (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) ) {
+    errorQuda("Heavy quark residual only supported for CG and BiCGStab");
+  }
     
   profileInvert[QUDA_PROFILE_H2D].Stop();
 
@@ -1120,8 +1125,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nb = norm2(*b);
     double nh_x = norm2(*h_x);
     double nx = norm2(*x);
-    printfQuda("Source: CPU = %f, CUDA copy = %f\n", nh_b, nb);
-    printfQuda("Solution: CPU = %f, CUDA copy = %f\n", nh_x, nx);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+    printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
   }
 
   setDslashTuning(param->tune, param->verbosity);
@@ -1131,15 +1136,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->verbosity >= QUDA_VERBOSE) {
     double nin = norm2(*in);
     double nout = norm2(*out);
-    printfQuda("Prepared source = %f\n", nin);   
-    printfQuda("Prepared solution = %f\n", nout);   
+    printfQuda("Prepared source = %g\n", nin);   
+    printfQuda("Prepared solution = %g\n", nout);   
   }
 
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
 
   if (param->verbosity >= QUDA_VERBOSE) {
     double nin = norm2(*in);
-    printfQuda("Prepared source post mass rescale = %f\n", nin);   
+    printfQuda("Prepared source post mass rescale = %g\n", nin);   
   }
   
   switch (param->inv_type) {
@@ -1189,7 +1194,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   if (param->verbosity >= QUDA_VERBOSE){
    double nx = norm2(*x);
-   printfQuda("Solution = %f\n",nx);
+   printfQuda("Solution = %g\n",nx);
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
@@ -1200,7 +1205,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->verbosity >= QUDA_VERBOSE){
     double nx = norm2(*x);
     double nh_x = norm2(*h_x);
-    printfQuda("Reconstructed: CUDA solution = %f, CPU copy = %f\n", nx, nh_x);
+    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
   }
   
   delete h_b;
@@ -1236,6 +1241,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+
+  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL)
+    errorQuda("Heavy quark residual not yet supported for multi-shift solvers");
 
   verbosity = param->verbosity;
 
@@ -1354,7 +1362,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if( param->verbosity >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
-    printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
   setDslashTuning(param->tune, param->verbosity);
@@ -1367,10 +1375,65 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, param->offset[i]);
   }
 
+  // use multi-shift CG
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
     MultiShiftCG cg_m(m, mSloppy, *param, profileMulti);
     cg_m(x, *b);  
+  }
+
+  // experimenting with Minimum residual extrapolation
+  /*
+  cudaColorSpinorField **q = new cudaColorSpinorField* [ param->num_offset ];
+  cudaColorSpinorField **z = new cudaColorSpinorField* [ param->num_offset ];
+  cudaColorSpinorField tmp(cudaParam);
+
+  for(int i=0; i < param->num_offset; i++) {
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+    q[i] = new cudaColorSpinorField(cudaParam);
+    cudaParam.create = QUDA_COPY_FIELD_CREATE;
+    z[i] = new cudaColorSpinorField(*x[i], cudaParam);
+  }
+
+  for(int i=0; i < param->num_offset; i++) {
+    dirac.setMass(sqrt(param->offset[i]/4));  
+    DiracMdagM m(dirac);
+    MinResExt mre(m, profileMulti);
+    copyCuda(tmp, *b);
+    mre(*x[i], tmp, z, q, param -> num_offset);
+    dirac.setMass(sqrt(param->offset[0]/4));  
+  }
+
+  for(int i=0; i < param->num_offset; i++) {
+    delete q[i];
+    delete z[i];
+  }
+  delete []q;
+  delete []z;
+  */
+
+  // check each shift has the desired tolerance and use sequential CG to refine
+  for(int i=0; i < param->num_offset; i++) { 
+    if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
+      if (param->true_res_offset[i] > param->tol_offset[i]) {
+	dirac.setMass(sqrt(param->offset[i]/4));  
+	diracSloppy.setMass(sqrt(param->offset[i]/4));  
+	if (param->verbosity >= QUDA_SUMMARIZE) 
+	  printfQuda("Refining shift %d since achieved true residual %e is greater than requested %e\n",
+		     i, param->true_res_offset[i], param->tol_offset[i]);
+	DiracMdagM m(dirac), mSloppy(diracSloppy);
+
+	param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+	param->tol = param->tol_offset[i];
+	CG cg(m, mSloppy, *param, profileMulti);
+	cg(*x[i], *b);        
+	param->true_res_offset[i] = param->true_res;
+	dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+	diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+      }
+    } else {
+      warningQuda("Refinement only supported on staggered quarks currently");
+    }
   }
 
   // restore shifts -- avoid side effects
@@ -1384,7 +1447,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   for(int i=0; i < param->num_offset; i++) { 
     if (param->verbosity >= QUDA_VERBOSE){
       double nx = norm2(*x[i]);
-      printfQuda("Solution %d = %f\n", i, nx);
+      printfQuda("Solution %d = %g\n", i, nx);
     }
 
     *h_x[i] = *x[i];
@@ -1564,6 +1627,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
 
+  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL)
+    errorQuda("Heavy quark residual not yet supported for multi-shift solvers");
+
   do_create_sloppy_cuda_gauge();
 
   // check the gauge fields have been created
@@ -1695,7 +1761,7 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if( param->verbosity >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
-    printfQuda("Source: CPU= %f, CUDA copy = %f\n", nh_b,nb);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
   // tune the Dirac Kernel

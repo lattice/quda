@@ -60,25 +60,25 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
-    //printf("bytes = %d, nFace = %d, faceVolume = %d, Ndof = %d, prec =  %d\n", 
-    //	   nbytes[i], nFace, faceVolumeCB[i], Ninternal, precision);
 
-    cudaHostAlloc(&(my_fwd_face[i]), nbytes[i], flag);
+    my_fwd_face[i] = malloc(nbytes[i]);
     if( !my_fwd_face[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[i]);
+    cudaHostRegister(my_fwd_face[i], nbytes[i], flag);
   
-    //printf("%d\n", nbytes[i]);
-
-    cudaHostAlloc(&(my_back_face[i]), nbytes[i], flag);
+    my_back_face[i] = malloc(nbytes[i]);
     if( !my_back_face[i] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[i]);
+    cudaHostRegister(my_back_face[i], nbytes[i], flag);
   }
 
   for (int i=0; i<nDimComms; i++) {
 #ifdef QMP_COMMS
-    cudaHostAlloc(&(from_fwd_face[i]), nbytes[i], flag);
+    from_fwd_face[i] = malloc(nbytes[i]);
     if( !from_fwd_face[i] ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes[i]);
+    cudaHostRegister(from_fwd_face[i], nbytes[i], flag);
     
-    cudaHostAlloc(&(from_back_face[i]), nbytes[i], flag);
+    from_back_face[i] = malloc(nbytes[i]);
     if( !from_back_face[i] ) errorQuda("Unable to allocate from_back_face with size %lu", nbytes[i]);
+    cudaHostRegister(from_back_face[i], nbytes[i], flag);
 
 // if no GPUDirect so need separate IB and GPU host buffers
 #ifndef GPU_DIRECT
@@ -184,11 +184,19 @@ FaceBuffer::~FaceBuffer()
     QMP_free_msgmem(mm_send_back[i]);
     QMP_free_msgmem(mm_from_fwd[i]);
     QMP_free_msgmem(mm_from_back[i]);
-    cudaFreeHost(from_fwd_face[i]); // these are aliasing pointers for non-qmp case
-    cudaFreeHost(from_back_face[i]);// these are aliasing pointers for non-qmp case
-#endif
-    cudaFreeHost(my_fwd_face[i]);
-    cudaFreeHost(my_back_face[i]);
+
+    cudaHostUnregister(from_fwd_face[i]);
+    free(from_fwd_face[i]);
+
+    cudaHostUnregister(from_back_face[i]);
+    free(from_back_face[i]);
+#endif // QMP_COMMS
+
+    cudaHostUnregister(my_fwd_face[i]);
+    free(my_fwd_face[i]);
+
+    cudaHostUnregister(my_back_face[i]);
+    free(my_back_face[i]);
   }
 
   for (int i=0; i<nDimComms; i++) {
