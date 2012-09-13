@@ -339,6 +339,7 @@ namespace quda {
     } else {
       errorQuda("Precision type %d not implemented", x.Precision());
     }
+    rtn.z /= x.Volume();
     return rtn;
   }
   

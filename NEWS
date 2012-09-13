@@ -2,7 +2,14 @@
 Version 0.5.0
 
 - Full support for CUDA 5.0, including GK110 (Kepler 2) GPUs.  QUDA
-  has, however, yet to be fully optimied for GK110.
+  has, however, yet to be fully optimized for GK110.
+
+- The domain-wall dirac operator is now fully multi-GPU capable and
+  the kernels are built buy Python code generation.  These have yet to
+  be fully optimized.
+
+- QUDA now officially supports the qdp-jit library to enable complete
+  acceleration of Chroma on GPUs.
 
 - QUDA now supports a Fortran interface.  This can found in
   include/quda_fortran.h and lib/quda_fortran.F90.
@@ -32,7 +39,7 @@ Version 0.5.0
   CG solver.
 
 - The BiCGstab solver now supports an initial guess strategy.  This is
-  presently only supported when employing a one-pass system and does
+  presently only supported when employing a one-pass solve and does
   not yet support a two-pass solve (e.g., of the normal equations).
 
 - Added a new interface function, setVerbosityQuda(), to allow for
