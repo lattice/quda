@@ -197,6 +197,9 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
+    /** Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence */
+    QudaResidualType residual_type;
+
   } QudaInvertParam;
 
 

@@ -350,8 +350,7 @@ namespace quda {
   };
 
   void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y) {
-    const int kernel = 2;
-    blasCuda<axpby,0,1,0,0>(kernel, make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
+    blasCuda<axpby,0,1,0,0>(make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
 			    x, y, x, x);
   }
 
@@ -367,8 +366,7 @@ namespace quda {
   };
 
   void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 3;
-    blasCuda<xpy,0,1,0,0>(kernel, make_double2(1.0, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
+    blasCuda<xpy,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
 			  x, y, x, x);
   }
 
@@ -385,8 +383,7 @@ namespace quda {
   };
 
   void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 4;
-    blasCuda<axpy,0,1,0,0>(kernel, make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
+    blasCuda<axpy,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
 			   x, y, x, x);
   }
 
@@ -403,8 +400,7 @@ namespace quda {
   };
 
   void xpayCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y) {
-    const int kernel = 5;
-    blasCuda<xpay,0,1,0,0>(kernel, make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0),
+    blasCuda<xpay,0,1,0,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0),
 			   x, y, x, x);
   }
 
@@ -420,8 +416,7 @@ namespace quda {
   };
 
   void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 6;
-    blasCuda<mxpy,0,1,0,0>(kernel, make_double2(1.0, 0.0), make_double2(1.0, 0.0), 
+    blasCuda<mxpy,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0), 
 			   make_double2(0.0, 0.0), x, y, x, x);
   }
 
@@ -438,8 +433,7 @@ namespace quda {
   };
 
   void axCuda(const double &a, cudaColorSpinorField &x) {
-    const int kernel = 7;
-    blasCuda<ax,1,0,0,0>(kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), 
+    blasCuda<ax,1,0,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0), 
 			 make_double2(0.0, 0.0), x, x, x, x);
   }
 
@@ -474,8 +468,7 @@ namespace quda {
   };
 
   void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 8;
-    blasCuda<caxpy,0,1,0,0>(kernel, make_double2(real(a),imag(a)), make_double2(0.0, 0.0), 
+    blasCuda<caxpy,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0), 
 			    make_double2(0.0, 0.0), x, y, x, x);
   }
 
@@ -514,8 +507,7 @@ namespace quda {
   };
 
   void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y) {
-    const int kernel = 9;
-    blasCuda<caxpby,0,1,0,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<caxpby,0,1,0,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
 			     make_double2(0.0, 0.0), x, y, x, x);
   }
 
@@ -559,8 +551,7 @@ namespace quda {
 
   void cxpaypbzCuda(cudaColorSpinorField &x, const Complex &a, cudaColorSpinorField &y, 
 		    const Complex &b, cudaColorSpinorField &z) {
-    const int kernel = 10;
-    blasCuda<cxpaypbz,0,0,1,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<cxpaypbz,0,0,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
 			       make_double2(0.0, 0.0), x, y, z, z);
   }
 
@@ -581,8 +572,7 @@ namespace quda {
 
   void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, 
 		     cudaColorSpinorField& z, const double &c) {
-    const int kernel = 11;
-    blasCuda<axpyBzpcx,1,1,0,0>(kernel, make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0), 
+    blasCuda<axpyBzpcx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0), 
 				x, y, z, x);
   }
 
@@ -602,9 +592,8 @@ namespace quda {
 
   void axpyZpbxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y,
 		    cudaColorSpinorField& z, const double &b) {
-    const int kernel = 12;
     // swap arguments around 
-    blasCuda<axpyZpbx,1,1,0,0>(kernel, make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+    blasCuda<axpyZpbx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
 			       x, y, z, x);
   }
 
@@ -625,8 +614,7 @@ namespace quda {
 
   void caxpbypzYmbwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 			cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w) {
-    const int kernel = 12;
-    blasCuda<caxpbypzYmbw,0,1,1,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<caxpbypzYmbw,0,1,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
 				   make_double2(0.0,0.0), x, y, z, w);
   }
 
@@ -646,9 +634,8 @@ namespace quda {
 
   void cabxpyAxCuda(const double &a, const Complex &b, 
 		    cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 14;
     // swap arguments around 
-    blasCuda<cabxpyAx,1,1,0,0>(kernel, make_double2(a,0.0), make_double2(b.real(),b.imag()), 
+    blasCuda<cabxpyAx,1,1,0,0>(make_double2(a,0.0), make_double2(b.real(),b.imag()), 
 			       make_double2(0.0,0.0), x, y, x, x);
   }
 
@@ -668,8 +655,7 @@ namespace quda {
 
   void caxpbypzCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 		    cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    const int kernel = 15;
-    blasCuda<caxpbypz,0,0,1,0>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
+    blasCuda<caxpbypz,0,0,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
 			       make_double2(0.0,0.0), x, y, z, z);
   }
 
@@ -692,8 +678,7 @@ namespace quda {
   void caxpbypczpwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 		       cudaColorSpinorField &y, const Complex &c, cudaColorSpinorField &z, 
 		       cudaColorSpinorField &w) {
-    const int kernel = 16;
-    blasCuda<caxpbypczpw,0,0,0,1>(kernel, make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
+    blasCuda<caxpbypczpw,0,0,0,1>(make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
 				  make_double2(c.real(), c.imag()), x, y, z, w);
   }
 
@@ -715,11 +700,27 @@ namespace quda {
 
   void caxpyXmazCuda(const Complex &a, cudaColorSpinorField &x, 
 		     cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    const int kernel = 17;
-    blasCuda<caxpyxmaz,1,1,0,0>(kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), 
+    blasCuda<caxpyxmaz,1,1,0,0>(make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), 
 				make_double2(0.0, 0.0), x, y, z, x);
   }
 
+  /**
+     Base class from which all reduction functors should derive.
+  */
+  template <typename ReduceType, typename Float2, typename FloatN>
+  struct ReduceFunctor {
+    
+    //! pre-computation routine called before the "M-loop"
+    virtual __device__ void pre() { ; }
+    
+    //! where the reduction is usually computed and any auxiliary operations
+    virtual __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, 
+				       FloatN &z, FloatN &w, FloatN &v) = 0;
+    
+    //! post-computation routine called after the "M-loop"
+    virtual __device__ void post(ReduceType &sum) { ; }
+    
+  };
 
   /**
      Return the L2 norm of x
@@ -729,9 +730,9 @@ namespace quda {
   __device__ float norm2_(const float4 &a) { return a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w; }
 
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct Norm2 {
+  struct Norm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Norm2(const Float2 &a, const Float2 &b) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += norm2_(x); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,FloatN  &w, FloatN &v) { sum += norm2_(x); }
     static int streams() { return 1; } //! total number of input and output streams
     static int flops() { return 2; } //! flops per element
   };
@@ -739,10 +740,9 @@ namespace quda {
 #include <reduce_core.h>
 
   double normCuda(const cudaColorSpinorField &x) {
-    const int kernel = 18;
     cudaColorSpinorField &y = (cudaColorSpinorField&)x; // FIXME
-    return reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0>
-      (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
+    return reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
   }
 
   /**
@@ -753,18 +753,16 @@ namespace quda {
   __device__ float dot_(const float4 &a, const float4 &b) { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w; }
 
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct Dot {
+  struct Dot : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Dot(const Float2 &a, const Float2 &b) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, const FloatN &y, const FloatN &z, 
-			       const FloatN &w, const FloatN &v) { sum += dot_(x,y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { sum += dot_(x,y); }
     static int streams() { return 2; } //! total number of input and output streams
     static int flops() { return 2; } //! flops per element
   };
 
   double reDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 19;
-    return reduceCuda<double,QudaSumFloat,QudaSumFloat,Dot,0,0,0>
-      (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    return reduceCuda<double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
   /**
@@ -772,19 +770,18 @@ namespace quda {
      Return the norm of y
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct axpyNorm2 {
+  struct axpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     axpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
       y += a.x*x; sum += norm2_(y); }
     static int streams() { return 3; } //! total number of input and output streams
     static int flops() { return 4; } //! flops per element
   };
 
   double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 20;
-    return reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0>
-      (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    return reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0,false>
+      (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
   /**
@@ -792,18 +789,17 @@ namespace quda {
      Second returns the norm of y
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct xmyNorm2 {
+  struct xmyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
     xmyNorm2(const Float2 &a, const Float2 &b) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
       y = x - y; sum += norm2_(y); }
     static int streams() { return 3; } //! total number of input and output streams
     static int flops() { return 3; } //! flops per element
   };
 
   double xmyNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 21;
-    return reduceCuda<double,QudaSumFloat,QudaSumFloat,xmyNorm2,0,1,0>
-      (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    return reduceCuda<double,QudaSumFloat,QudaSumFloat,xmyNorm2,0,1,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
   /**
@@ -811,19 +807,18 @@ namespace quda {
      Second returns the norm of y
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct caxpyNorm2 {
+  struct caxpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     caxpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
       caxpy_(a, x, y); sum += norm2_(y); }
     static int streams() { return 3; } //! total number of input and output streams
     static int flops() { return 6; } //! flops per element
   };
 
   double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 22;
-    return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyNorm2,0,1,0>
-      (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, x, x, x);
+    return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyNorm2,0,1,0,false>
+      (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
   /**
@@ -834,19 +829,18 @@ namespace quda {
      Third returns the norm of x
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct caxpyxmaznormx {
+  struct caxpyxmaznormx : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     caxpyxmaznormx(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, y); x-= a.x*z; sum += norm2_(x); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { caxpy_(a, x, y); x-= a.x*z; sum += norm2_(x); }
     static int streams() { return 5; } //! total number of input and output streams
     static int flops() { return 10; } //! flops per element
   };
 
   double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, 
 			    cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    const int kernel = 23;
-    return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyxmaznormx,1,1,0>
-      (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
+    return reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyxmaznormx,1,1,0,false>
+      (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
   }
 
   /**
@@ -857,20 +851,19 @@ namespace quda {
      Third returns the norm of x
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct cabxpyaxnorm {
+  struct cabxpyaxnorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     Float2 b;
     cabxpyaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { x *= a.x; caxpy_(b, x, y); sum += norm2_(y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { x *= a.x; caxpy_(b, x, y); sum += norm2_(y); }
     static int streams() { return 4; } //! total number of input and output streams
     static int flops() { return 10; } //! flops per element
   };
 
   double cabxpyAxNormCuda(const double &a, const Complex &b, 
 			  cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 24;
-    return reduceCuda<double,QudaSumFloat,QudaSumFloat,cabxpyaxnorm,1,1,0>
-      (kernel, make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x, x);
+    return reduceCuda<double,QudaSumFloat,QudaSumFloat,cabxpyaxnorm,1,1,0,false>
+      (make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x, x);
   }
 
   /**
@@ -884,17 +877,16 @@ namespace quda {
   { return make_double2(a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z); }
 
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct Cdot {
+  struct Cdot : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Cdot(const Float2 &a, const Float2 &b) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += cdot_(x,y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { sum += cdot_(x,y); }
     static int streams() { return 2; } //! total number of input and output streams
     static int flops() { return 4; } //! flops per element
   };
 
   Complex cDotProductCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 25;
-    double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0>
-      (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     return Complex(cdot.x, cdot.y);
   }
 
@@ -905,18 +897,17 @@ namespace quda {
      Second returns cdot product (z,y)
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct xpaycdotzy {
+  struct xpaycdotzy : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     xpaycdotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { y = x + a.x*y; sum += cdot_(z,y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { y = x + a.x*y; sum += cdot_(z,y); }
     static int streams() { return 4; } //! total number of input and output streams
     static int flops() { return 6; } //! flops per element
   };
 
   Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    const int kernel = 26;
-    double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,xpaycdotzy,0,1,0>
-      (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+    double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,xpaycdotzy,0,1,0,false>
+      (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     return Complex(cdot.x, cdot.y);
   }
 
@@ -927,19 +918,18 @@ namespace quda {
      Second returns the dot product (z,y)
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct caxpydotzy {
+  struct caxpydotzy : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     caxpydotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, y); sum += cdot_(z,y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { caxpy_(a, x, y); sum += cdot_(z,y); }
     static int streams() { return 4; } //! total number of input and output streams
     static int flops() { return 8; } //! flops per element
   };
 
   Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 			 cudaColorSpinorField &z) {
-    const int kernel = 27;
-    double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0>
-      (kernel, make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
+    double2 cdot = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0,false>
+      (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
     return Complex(cdot.x, cdot.y);
   }
 
@@ -957,17 +947,16 @@ namespace quda {
 			a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w); }
 
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct CdotNormA {
+  struct CdotNormA : public ReduceFunctor<ReduceType, Float2, FloatN> {
     CdotNormA(const Float2 &a, const Float2 &b) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += cdotNormA_(x,y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { sum += cdotNormA_(x,y); }
     static int streams() { return 2; } //! total number of input and output streams
     static int flops() { return 6; } //! flops per element
   };
 
   double3 cDotProductNormACuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 28;
-    return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormA,0,0,0>
-      (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormA,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
   /**
@@ -983,17 +972,16 @@ namespace quda {
 			b.x*b.x + b.y*b.y + b.z*b.z + b.w*b.w); }
 
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct CdotNormB {
+  struct CdotNormB : public ReduceFunctor<ReduceType, Float2, FloatN> {
     CdotNormB(const Float2 &a, const Float2 &b) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { sum += cdotNormB_(x,y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { sum += cdotNormB_(x,y); }
     static int streams() { return 2; } //! total number of input and output streams
     static int flops() { return 6; } //! flops per element
   };
 
   double3 cDotProductNormBCuda(cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 29;
-    return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormB,0,0,0>
-      (kernel, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormB,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
   /**
@@ -1001,11 +989,11 @@ namespace quda {
      z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct caxpbypzYmbwcDotProductUYNormY {
+  struct caxpbypzYmbwcDotProductUYNormY : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     Float2 b;
     caxpbypzYmbwcDotProductUYNormY(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, FloatN &z, const FloatN &w, const FloatN &v) { caxpy_(a, x, z); caxpy_(b, y, z); caxpy_(-b, w, y); sum += cdotNormB_(v,y); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { caxpy_(a, x, z); caxpy_(b, y, z); caxpy_(-b, w, y); sum += cdotNormB_(v,y); }
     static int streams() { return 7; } //! total number of input and output streams
     static int flops() { return 18; } //! flops per element
   };
@@ -1014,9 +1002,8 @@ namespace quda {
 					     const Complex &b, cudaColorSpinorField &y,
 					     cudaColorSpinorField &z, cudaColorSpinorField &w,
 					     cudaColorSpinorField &u) {
-    const int kernel = 30;
-    return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1>
-      (kernel, make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
+    return reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1,false>
+      (make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
   }
 
 
@@ -1027,10 +1014,10 @@ namespace quda {
      input and out y vector.
   */
   template <typename ReduceType, typename Float2, typename FloatN>
-  struct axpyCGNorm2 {
+  struct axpyCGNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Float2 a;
     axpyCGNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w, const FloatN &v) { 
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
       FloatN y_new = y + a.x*x;
       sum.x += norm2_(y_new); 
       sum.y += dot_(y_new, y_new-y);
@@ -1041,10 +1028,47 @@ namespace quda {
   };
 
   Complex axpyCGNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    const int kernel = 31;
-    double2 cg_norm = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,axpyCGNorm2,0,1,0>
-      (kernel, make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    double2 cg_norm = reduceCuda<double2,QudaSumFloat2,QudaSumFloat,axpyCGNorm2,0,1,0,false>
+      (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     return Complex(cg_norm.x, cg_norm.y);
   }
+
+/**
+   This kernel returns (x, x) and (r,r) and also returns the so-called
+   heavy quark norm as used by MILC: \sum_i (r, r)_i / (x, x)_i, where
+   i is site index.
+
+   When this kernel is launched, we must enforce that the parameter M
+   in the launcher corresponds to the number of FloatN fields used to
+   represent the spinor, e.g., M=6 for Wilson and M=3 for staggered.
+   This is only the case for half-precision kernels by default.  To
+   enable this, the siteUnroll template parameter must be set true
+   when reduceCuda is instantiated.
+ */
+template <typename ReduceType, typename Float2, typename FloatN>
+struct HeavyQuarkResidualNorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
+  Float2 a;
+  Float2 b;
+  ReduceType aux;
+  HeavyQuarkResidualNorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+  
+  __device__ void pre() { aux.x = 0; aux.y = 0; }
+
+  __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { aux.x += norm2_(x); aux.y += norm2_(y); }
+
+  //! sum the solution and residual norms, and compute the heavy-quark norm
+  __device__ void post(ReduceType &sum) 
+  { sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0) ? (aux.y / aux.x) : 1; }
+
+  static int streams() { return 2; } //! total number of input and output streams
+  static int flops() { return 4; } //! undercounts since it excludes the per-site division
+};
+
+double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r) {
+  double3 rtn = reduceCuda<double3,QudaSumFloat3,QudaSumFloat,HeavyQuarkResidualNorm,0,0,0,true>
+    (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
+  rtn.z /= x.Volume();
+  return rtn;
+}
 
 } // namespace quda
