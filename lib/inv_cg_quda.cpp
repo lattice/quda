@@ -75,6 +75,14 @@ namespace quda {
 
     double r2_old;
     double src_norm = norm2(b);
+    if(src_norm == 0){
+      printfQuda("Warning: inverting on zero-field source\n");
+      x=b;
+      invParam.true_res = 0.0;
+      return;
+    }
+
+
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver
 
     double heavy_quark_residual;
