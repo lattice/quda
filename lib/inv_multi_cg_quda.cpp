@@ -73,6 +73,7 @@ namespace quda {
     for (int i=0; i<num_offset; i++) {
       zeta[i] = zeta_old[i] = 1.0;
       beta[i] = 0.0;
+      alpha[i] = 0.0;
     }
   
     // flag whether we will be using reliable updates or not
@@ -125,6 +126,14 @@ namespace quda {
     profile[QUDA_PROFILE_PREAMBLE].Start();
 
     double b2 = normCuda(b);
+    if(b2 == 0){
+      printfQuda("Warning: inverting on zero-field source\n");
+      for(int i=0; i<num_offset[i]; ++i){
+        (*x)[i] = b;
+      }
+      return;
+    }
+    
 
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
