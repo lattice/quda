@@ -17,7 +17,6 @@ namespace quda {
   extern unsigned long long blas_flops;
   extern unsigned long long blas_bytes;
 
-
   // C++ linkage
 
   // Generic variants
@@ -72,6 +71,7 @@ namespace quda {
   Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 			       cudaColorSpinorField &z);
   Complex axpyCGNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+  double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r);
 
   // CPU variants
 
@@ -123,6 +123,7 @@ namespace quda {
 		      const Complex &, cpuColorSpinorField &, cpuColorSpinorField &);
   Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
 			      cpuColorSpinorField &z);
+  double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &r);
 
 } // namespace quda
 

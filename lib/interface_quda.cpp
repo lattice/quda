@@ -1112,6 +1112,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     x = new cudaColorSpinorField(cudaParam); // solution
   }
+
+  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL && 
+      (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) ) {
+    errorQuda("Heavy quark residual only supported for CG and BiCGStab");
+  }
     
   profileInvert[QUDA_PROFILE_H2D].Stop();
 
@@ -1236,6 +1241,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+
+  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL)
+    errorQuda("Heavy quark residual not yet supported for multi-shift solvers");
 
   verbosity = param->verbosity;
 
@@ -1618,6 +1626,9 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+
+  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL)
+    errorQuda("Heavy quark residual not yet supported for multi-shift solvers");
 
   do_create_sloppy_cuda_gauge();
 
