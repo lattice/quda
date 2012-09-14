@@ -128,7 +128,7 @@ namespace quda {
     double b2 = normCuda(b);
     if(b2 == 0){
       printfQuda("Warning: inverting on zero-field source\n");
-      for(int i=0; i<num_offset[i]; ++i){
+      for(int i=0; i<num_offset; ++i){
         (*x)[i] = b;
       }
       return;
