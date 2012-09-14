@@ -18,11 +18,11 @@ cudaStream_t *stream;
 bool globalReduce = true;
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
-		       const int nFace, const QudaPrecision precision, const int Ls) : 
+    const int nFace, const QudaPrecision precision, const int Ls) : 
   Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
 {
-//temporal hack for DW operator  
-//BEGIN NEW
+  //temporal hack for DW operator  
+  //BEGIN NEW
   int Y[nDim];
   Y[0] = X[0];
   Y[1] = X[1];
@@ -30,8 +30,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   Y[3] = X[3];
   if(nDim == 5) Y[nDim-1] = Ls;
   setupDims(Y);
-//END NEW
-  
+  //END NEW
+
   //setupDims(X);
 
   // set these both = 0 `for no overlap of qmp and cudamemcpyasync
@@ -54,25 +54,52 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
   unsigned int flag = cudaHostAllocDefault;
 
+  int pad[4] = {0,0,0,0};
+#if (CUDA_VERSION <= 4000)
+  static const int page_size = getpagesize();
+#endif
+
   for(int dir =0 ; dir < 4;dir++){
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
-    if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
-    
-    fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-    if( !fwd_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);
-    cudaHostRegister(fwd_nbr_spinor_sendbuf[dir], nbytes[dir], flag);
-  
-    back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-    if( !back_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[dir]);
-    cudaHostRegister(back_nbr_spinor_sendbuf[dir], nbytes[dir], flag);
+#if (CUDA_VERSION <= 4000)
+    pad[dir] = page_size - nbytes[dir]%page_size;
+#endif
 
+    if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
+
+#if (CUDA_VERSION > 4000)
+    fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
+#else
+    posix_memalign(&fwd_nbr_spinor_sendbuf[dir], page_size, nbytes[dir]+pad[dir]);
+#endif
+    if( !fwd_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);
+    cudaHostRegister(fwd_nbr_spinor_sendbuf[dir], nbytes[dir]+pad[dir], flag);
+
+#if (CUDA_VERSION > 4000) 
+    back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
+#else
+    posix_memalign(&back_nbr_spinor_sendbuf[dir], page_size, nbytes[dir]+pad[dir]);
+#endif
+
+    if( !back_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[dir]);
+    cudaHostRegister(back_nbr_spinor_sendbuf[dir], nbytes[dir]+pad[dir], flag);
+
+#if (CUDA_VERSION > 4000)
     fwd_nbr_spinor[dir] = malloc(nbytes[dir]);
+#else
+    posix_memalign(&fwd_nbr_spinor[dir], page_size, nbytes[dir]+pad[dir]);
+#endif
     if( !fwd_nbr_spinor[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);
-    cudaHostRegister(fwd_nbr_spinor[dir], nbytes[dir], flag);
-  
+    checkCudaError();
+    cudaHostRegister(fwd_nbr_spinor[dir], nbytes[dir]+pad[dir], flag);
+
+#if (CUDA_VERSION > 4000)
     back_nbr_spinor[dir] = malloc(nbytes[dir]);
+#else
+    posix_memalign(&back_nbr_spinor[dir], page_size, nbytes[dir]+pad[dir]);
+#endif
     if( !back_nbr_spinor[dir] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[dir]);
-    cudaHostRegister(back_nbr_spinor[dir], nbytes[dir], flag);
+    cudaHostRegister(back_nbr_spinor[dir], nbytes[dir]+pad[dir], flag);
 
     if (fwd_nbr_spinor[dir] == NULL || back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
@@ -85,19 +112,19 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 #else
     pageable_fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
     pageable_back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-    
+
     if (pageable_fwd_nbr_spinor_sendbuf[dir] == NULL || pageable_back_nbr_spinor_sendbuf[dir] == NULL)
       errorQuda("malloc failed for pageable_fwd_nbr_spinor_sendbuf/pageable_back_nbr_spinor_sendbuf");
-    
+
     pageable_fwd_nbr_spinor[dir]=malloc(nbytes[dir]);
     pageable_back_nbr_spinor[dir]=malloc(nbytes[dir]);
-    
+
     if (pageable_fwd_nbr_spinor[dir] == NULL || pageable_back_nbr_spinor[dir] == NULL)
       errorQuda("malloc failed for pageable_fwd_nbr_spinor/pageable_back_nbr_spinor"); 
 #endif
-    
+
   }
-  
+
   checkCudaError();
 
   return;
@@ -435,6 +462,11 @@ setup_dims(int* X)
 
 }
 
+
+
+
+
+
 void 
 exchange_llfat_init(QudaPrecision prec)
 {
@@ -444,32 +476,60 @@ exchange_llfat_init(QudaPrecision prec)
   }
   initialized = 1;
   
+  int pad[4] = {0,0,0,0};
+  int packet_size[4];
+  for(int dir=0; dir<4; ++dir){
+    packet_size[dir] = Vs[dir]*gaugeSiteSize*prec;
+  }
 
+#if (CUDA_VERSION < 4000)
+  const int page_size = getpagesize();
+  for(int dir<4; dir<4; ++dir){
+	  pad[dir] =  page_size - packet_size[dir]%page_size;
+  }
+#endif
+   
   unsigned int flag = cudaHostAllocDefault;
 
   for(int i=0;i < 4; i++){
-    if(cudaMalloc((void**)&fwd_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec) != cudaSuccess){
+    if(cudaMalloc((void**)&fwd_nbr_staple_gpu[i], packet_size[i]) != cudaSuccess){
       errorQuda("cudaMalloc() failed for fwd_nbr_staple_gpu\n");
     }
-    if(cudaMalloc((void**)&back_nbr_staple_gpu[i], Vs[i]*gaugeSiteSize*prec) != cudaSuccess){
+    if(cudaMalloc((void**)&back_nbr_staple_gpu[i], packet_size[i]) != cudaSuccess){
       errorQuda("cudaMalloc() failed for back_nbr_staple_gpu\n");
     }
 
-    fwd_nbr_staple[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    if( !fwd_nbr_staple[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", Vs[i]*gaugeSiteSize*prec);
-    cudaHostRegister(fwd_nbr_staple[i], Vs[i]*gaugeSiteSize*prec, flag);
-  
-    back_nbr_staple[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    if( !back_nbr_staple[i] ) errorQuda("Unable to allocate my_back_face with size %lu", Vs[i]*gaugeSiteSize*prec);
-    cudaHostRegister(back_nbr_staple[i], Vs[i]*gaugeSiteSize*prec, flag);
+#if (CUDA_VERSION > 4000)
+    fwd_nbr_staple[i] = malloc(packet_size[i]);
+#else
+    posix_memalign(&fwd_nbr_staple, page_size, packet_size[i]+pad[i]); 
+#endif
+    if( !fwd_nbr_staple[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", packet_size[i]+pad[i]);
+    cudaHostRegister(fwd_nbr_staple[i], packet_size[i]+pad[i], flag);
+ 
+#if (CUDA_VERSION > 4000)
+    back_nbr_staple[i] = malloc(packet_size[i]);
+#else
+    posix_memalign(&back_nbr_staple[i], page_size, packet_size[i]+pad[i]);
+#endif
+    if( !back_nbr_staple[i] ) errorQuda("Unable to allocate my_back_face with size %lu", packet_size[i]+pad[i]);
+    cudaHostRegister(back_nbr_staple[i], packet_size[i]+pad[i], flag);
 
-    fwd_nbr_staple_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    if( !fwd_nbr_staple_sendbuf[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", Vs[i]*gaugeSiteSize*prec);
-    cudaHostRegister(fwd_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec, flag);
-  
+#if (CUDA_VERSION > 4000)
+    fwd_nbr_staple_sendbuf[i] = malloc(packet_size[i]);
+#else
+    posix_memalign(&fwd_nbr_staple_sendbuf[i], page_size, packet_size[i]+pad[i]);
+#endif
+    if( !fwd_nbr_staple_sendbuf[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", packet_size[i]+pad[i]);
+    cudaHostRegister(fwd_nbr_staple_sendbuf[i], packet_size[i]+pad[i], flag);
+ 
+#if (CUDA_VERSION > 4000) 
     back_nbr_staple_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    if( !back_nbr_staple_sendbuf[i]) errorQuda("Unable to allocate my_back_face with size %lu", Vs[i]*gaugeSiteSize*prec);
-    cudaHostRegister(back_nbr_staple_sendbuf[i], Vs[i]*gaugeSiteSize*prec, flag);
+#else
+    posix_memalign(&back_nbr_staple_sendbuf[i], page_size, packet_size[i]+pad[i]);
+#endif
+    if( !back_nbr_staple_sendbuf[i]) errorQuda("Unable to allocate my_back_face with size %lu", packet_size[i] pad[i]);
+    cudaHostRegister(back_nbr_staple_sendbuf[i], packet_size[i]+pad[i], flag);
   }
 
   
@@ -495,10 +555,10 @@ exchange_llfat_init(QudaPrecision prec)
   }
 #endif
   
-  checkCudaError();
-
   return;
 }
+
+
 
 template<typename Float>
 void
