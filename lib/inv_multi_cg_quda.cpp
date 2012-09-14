@@ -126,6 +126,14 @@ namespace quda {
     profile[QUDA_PROFILE_PREAMBLE].Start();
 
     double b2 = normCuda(b);
+    if(b2 == 0){
+      printfQuda("Warning: inverting on zero-field source\n");
+      for(int i=0; i<num_offset[i]; ++i){
+        (*x)[i] = b;
+      }
+      return;
+    }
+    
 
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];

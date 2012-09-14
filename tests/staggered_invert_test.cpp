@@ -103,7 +103,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1;
-  inv_param->residual_type = QUDA_L2_RESIDUAL_NORM;
+  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
