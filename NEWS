@@ -1,7 +1,15 @@
 
-Version 0.4.1
+Version 0.5.0
 
-- Full support for CUDA 5.0, including GK110 (Kepler 2) GPUs.
+- Full support for CUDA 5.0, including GK110 (Kepler 2) GPUs.  QUDA
+  has, however, yet to be fully optimized for GK110.
+
+- The domain-wall dirac operator is now fully multi-GPU capable and
+  the kernels are built buy Python code generation.  These have yet to
+  be fully optimized.
+
+- QUDA now officially supports the qdp-jit library to enable complete
+  acceleration of Chroma on GPUs.
 
 - QUDA now supports a Fortran interface.  This can found in
   include/quda_fortran.h and lib/quda_fortran.F90.
@@ -11,13 +19,28 @@ Version 0.4.1
   multiple GPUs.  This currently requires a specific branch of BQCD
   (https://github.com/lattice/bqcd-r399-quda).
 
-- As of QUDA 0.4.0, support has been dropped for the very first
-  generation of CUDA-capable devices (implementing "compute
-  capability" 1.0).  These include the Tesla C870, the Quadro FX 5600
-  and 4600, and the GeForce 8800 GTX.
+- QUDA now lives behind a namespace, "quda", for better insulation
+  against external applications and libraries.
 
-- Fixed a typo that prevented domain_wall_dslash_test from compiling
-  (and thus subsequent tests unless domain wall was disabled).
+- Vastly improved the stability and accuracy of the multi-shift CG
+  solver.  The default invertMultiShiftQuda() interface now supports
+  mixed-precision and per-shift refinement after the multi-shift
+  solver completes ensures accuracy of the final result.
+
+- Improved the stability and accuracy of using CG with
+  mixed-precision.  As a result, double-single CG has a virtually
+  identical iteration count to pure double CG and using half precision
+  is now a win.
+
+- Both BiCGstab and CG have experimental support for employing the
+  Fermilab Heavy Quark residual as a stopping condition.  This
+  presently comes at a 20% performance cost.  A future release will
+  fix the performance and also incorporate this into the multi-shift
+  CG solver.
+
+- The BiCGstab solver now supports an initial guess strategy.  This is
+  presently only supported when employing a one-pass solve and does
+  not yet support a two-pass solve (e.g., of the normal equations).
 
 - Added a new interface function, setVerbosityQuda(), to allow for
   finer-grained control of status reporting.  See the description in
@@ -26,6 +49,16 @@ Version 0.4.1
 - Merged wilson_dslash_test and domain_wall_dslash_test together into
   a unified dslash_test, and likewise for invert_test.  The staggered
   tests are still separate for now.
+
+- Enabled by default double-precision textures since the Fermi double
+  precision instability has been fixed as CUDA 5.0 production release.
+
+- Fixed a bug related to CUDA and a NIC sharing pinned memory. This
+  affected the correct operation of both Chroma and MILC.
+
+- General cleanup and other minor fixes (see
+  https://github.com/lattice/quda/issues?milestone=7 for a break down
+  of all issues closed in this release).
 
 
 Version 0.4.0 - 4 April 2012
@@ -63,6 +96,11 @@ Version 0.4.0 - 4 April 2012
   precision texture reads.  These may be re-enabled on Fermi-based
   Tesla cards for improved performance, as described in the README
   file.
+
+- As of QUDA 0.4.0, support has been dropped for the very first
+  generation of CUDA-capable devices (implementing "compute
+  capability" 1.0).  These include the Tesla C870, the Quadro FX 5600
+  and 4600, and the GeForce 8800 GTX.
 
 - Added command-line options for most of the tests.  See, e.g.,
   "wilson_dslash_test --help"

@@ -1035,8 +1035,8 @@ namespace quda {
 
 /**
    This kernel returns (x, x) and (r,r) and also returns the so-called
-   heavy quark norm as used by MILC: \sum_i (r, r)_i / (x, x)_i, where
-   i is site index.
+   heavy quark norm as used by MILC: 1 / N * \sum_i (r, r)_i / (x, x)_i, where
+   i is site index and N is the number of sites.
 
    When this kernel is launched, we must enforce that the parameter M
    in the launcher corresponds to the number of FloatN fields used to

@@ -13,8 +13,8 @@
 #include <stdio.h> /* for FILE */
 
 #define QUDA_VERSION_MAJOR     0
-#define QUDA_VERSION_MINOR     4
-#define QUDA_VERSION_SUBMINOR  1
+#define QUDA_VERSION_MINOR     5
+#define QUDA_VERSION_SUBMINOR  0
 
 /**
  * @def   QUDA_VERSION
