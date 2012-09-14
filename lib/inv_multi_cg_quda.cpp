@@ -73,7 +73,7 @@ namespace quda {
     for (int i=0; i<num_offset; i++) {
       zeta[i] = zeta_old[i] = 1.0;
       beta[i] = 0.0;
-      alpha[i] = 0.0;
+      alpha[i] = 1.0;
     }
   
     // flag whether we will be using reliable updates or not
