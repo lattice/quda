@@ -130,6 +130,7 @@ namespace quda {
       printfQuda("Warning: inverting on zero-field source\n");
       for(int i=0; i<num_offset[i]; ++i){
         (*x)[i] = b;
+	invParam.true_res_offset[i] = 0.0;
       }
       return;
     }
