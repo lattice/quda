@@ -29,7 +29,18 @@ namespace quda {
   void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
     profile[QUDA_PROFILE_INIT].Start();
-    
+
+    // Check to see that we're not trying to invert on a zero-field source    
+    const double src_norm = norm2(b);
+    if(src_norm == 0){
+      profile[QUDA_PROFILE_INIT].Stop();
+      printfQuda("Warning: inverting on zero-field source\n");
+      x=b;
+      invParam.true_res = 0.0;
+      return;
+    }
+
+
     cudaColorSpinorField r(b);
 
     ColorSpinorParam param(x);
@@ -74,13 +85,6 @@ namespace quda {
     profile[QUDA_PROFILE_PREAMBLE].Start();
 
     double r2_old;
-    double src_norm = norm2(b);
-    if(src_norm == 0){
-      printfQuda("Warning: inverting on zero-field source\n");
-      x=b;
-      invParam.true_res = 0.0;
-      return;
-    }
 
 
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver

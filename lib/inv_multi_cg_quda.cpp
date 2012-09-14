@@ -63,6 +63,19 @@ namespace quda {
  
     if (num_offset == 0) return;
 
+    const double b2 = normCuda(b);
+    // Check to see that we're not trying to invert on a zero-field source
+    if(b2 == 0){
+      profile[QUDA_PROFILE_INIT].Stop();
+      printfQuda("Warning: inverting on zero-field source\n");
+      for(int i=0; i<num_offset; ++i){
+        *(x[i]) = b;
+	invParam.true_res_offset[i] = 0.0;
+      }
+      return;
+    }
+    
+
     double *zeta = new double[num_offset];
     double *zeta_old = new double[num_offset];
     double *alpha = new double[num_offset];
@@ -125,16 +138,6 @@ namespace quda {
     profile[QUDA_PROFILE_INIT].Stop();
     profile[QUDA_PROFILE_PREAMBLE].Start();
 
-    double b2 = normCuda(b);
-    if(b2 == 0){
-      printfQuda("Warning: inverting on zero-field source\n");
-      for(int i=0; i<num_offset; ++i){
-        *(x[i]) = b;
-	invParam.true_res_offset[i] = 0.0;
-      }
-      return;
-    }
-    
 
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
