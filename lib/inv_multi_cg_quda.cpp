@@ -129,7 +129,7 @@ namespace quda {
     if(b2 == 0){
       printfQuda("Warning: inverting on zero-field source\n");
       for(int i=0; i<num_offset; ++i){
-        (*x)[i] = b;
+        *(x[i]) = b;
 	invParam.true_res_offset[i] = 0.0;
       }
       return;
