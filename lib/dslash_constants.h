@@ -341,6 +341,7 @@ void initSpinorConstants(const cudaColorSpinorField &spinor)
   if (sp_stride_h != last_sp_stride) {
     cudaMemcpyToSymbol(sp_stride, &sp_stride_h, sizeof(int));
     checkCudaError();
+    last_sp_stride = sp_stride_h;
   }
   
   // for domain wall:
@@ -350,6 +351,7 @@ void initSpinorConstants(const cudaColorSpinorField &spinor)
       cudaMemcpyToSymbol(Ls, &Ls_h, sizeof(int));  
       dslashConstants.Ls = Ls_h; // needed by tuneLaunch()
       checkCudaError();
+      last_Ls = Ls_h;
     }
   }
 }
