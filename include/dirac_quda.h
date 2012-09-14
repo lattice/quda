@@ -46,6 +46,18 @@ namespace quda {
 
     }
 
+    void print() {
+      printfQuda("Printing DslashParam\n");
+      printfQuda("type = %d\n", type);
+      printfQuda("kappa = %g\n", kappa);
+      printfQuda("mass = %g\n", mass);
+      printfQuda("m5 = %g\n", m5);
+      printfQuda("Ls = %d\n", Ls);
+      printfQuda("matpcType = %d\n", matpcType);
+      printfQuda("dagger = %d\n", dagger);
+      printfQuda("mu = %g\n", mu);
+      for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
+    }
   };
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
