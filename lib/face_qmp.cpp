@@ -54,31 +54,54 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   
   unsigned int flag = cudaHostAllocDefault;
 
+  int pad[4] = {0,0,0,0}
+#if (CUDA_VERSION <= 4000)
+  static const int page_size = getpagesize();
+#endif
+  
   // Buffers hold half spinors
   for (int i=0; i<nDimComms; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
-
+#if (CUDA_VERSION > 4000)
+    pad[dir] = page_size - nbytes[dir]%page_size;
+#endif
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
-
+#if (CUDA_VERSION > 4000)
     my_fwd_face[i] = malloc(nbytes[i]);
-    if( !my_fwd_face[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[i]);
-    cudaHostRegister(my_fwd_face[i], nbytes[i], flag);
-  
+#else
+    posix_memalign(&my_fwd_face[i], page_size, nbytes[i]+pad[i]);
+#endif
+    if( !my_fwd_face[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[i]+pad[i]);
+    cudaHostRegister(my_fwd_face[i], nbytes[i]+pad[i], flag);
+
+#if (CUDA_VERSION > 4000) 
     my_back_face[i] = malloc(nbytes[i]);
-    if( !my_back_face[i] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[i]);
-    cudaHostRegister(my_back_face[i], nbytes[i], flag);
+#else
+    posix_memalign(&my_back_face[i], page_size, nbytes[i]+pad[i]);
+#endif
+    if( !my_back_face[i] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[i]+pad[i]);
+    cudaHostRegister(my_back_face[i], nbytes[i]+pad[i], flag);
   }
 
   for (int i=0; i<nDimComms; i++) {
 #ifdef QMP_COMMS
+
+#if (CUDA_VERSION > 4000)
     from_fwd_face[i] = malloc(nbytes[i]);
-    if( !from_fwd_face[i] ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes[i]);
-    cudaHostRegister(from_fwd_face[i], nbytes[i], flag);
-    
+#else
+    posix_memalign(&from_fwd_face[i], page_size, nbytes[i]+pad[i]);
+#endif
+    if( !from_fwd_face[i] ) errorQuda("Unable to allocate from_fwd_face with size %lu", nbytes[i]+pad[i]);
+    cudaHostRegister(from_fwd_face[i], nbytes[i]+pad[i], flag);
+
+#if (CUDA_VERSION > 4000)    
     from_back_face[i] = malloc(nbytes[i]);
-    if( !from_back_face[i] ) errorQuda("Unable to allocate from_back_face with size %lu", nbytes[i]);
-    cudaHostRegister(from_back_face[i], nbytes[i], flag);
+#else
+     posix_memalign(&from_back_face[i], page_size, nbytes[i]+pad[i]);
+#endif
+    if( !from_back_face[i] ) errorQuda("Unable to allocate from_back_face with size %lu", nbytes[i]+pad[i]);
+    cudaHostRegister(from_back_face[i], nbytes[i]+pad[i], flag);
 
 // if no GPUDirect so need separate IB and GPU host buffers
 #ifndef GPU_DIRECT
