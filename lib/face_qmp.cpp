@@ -54,7 +54,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   
   unsigned int flag = cudaHostAllocDefault;
 
-  int pad[4] = {0,0,0,0}
+  int pad[4] = {0,0,0,0};
 #if (CUDA_VERSION <= 4000)
   static const int page_size = getpagesize();
 #endif
@@ -98,7 +98,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 #if (CUDA_VERSION > 4000)    
     from_back_face[i] = malloc(nbytes[i]);
 #else
-     posix_memalign(&from_back_face[i], page_size, nbytes[i]+pad[i]);
+    posix_memalign(&from_back_face[i], page_size, nbytes[i]+pad[i]);
 #endif
     if( !from_back_face[i] ) errorQuda("Unable to allocate from_back_face with size %lu", nbytes[i]+pad[i]);
     cudaHostRegister(from_back_face[i], nbytes[i]+pad[i], flag);
