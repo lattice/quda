@@ -482,10 +482,10 @@ exchange_llfat_init(QudaPrecision prec)
     packet_size[dir] = Vs[dir]*gaugeSiteSize*prec;
   }
 
-#if (CUDA_VERSION < 4000)
+#if (CUDA_VERSION <= 4000)
   const int page_size = getpagesize();
-  for(int dir<4; dir<4; ++dir){
-	  pad[dir] =  page_size - packet_size[dir]%page_size;
+  for(int dir=4; dir<4; ++dir){
+    pad[dir] =  page_size - packet_size[dir]%page_size;
   }
 #endif
    
@@ -502,7 +502,7 @@ exchange_llfat_init(QudaPrecision prec)
 #if (CUDA_VERSION > 4000)
     fwd_nbr_staple[i] = malloc(packet_size[i]);
 #else
-    posix_memalign(&fwd_nbr_staple, page_size, packet_size[i]+pad[i]); 
+    posix_memalign(&fwd_nbr_staple[i], page_size, packet_size[i]+pad[i]); 
 #endif
     if( !fwd_nbr_staple[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", packet_size[i]+pad[i]);
     cudaHostRegister(fwd_nbr_staple[i], packet_size[i]+pad[i], flag);
@@ -528,7 +528,7 @@ exchange_llfat_init(QudaPrecision prec)
 #else
     posix_memalign(&back_nbr_staple_sendbuf[i], page_size, packet_size[i]+pad[i]);
 #endif
-    if( !back_nbr_staple_sendbuf[i]) errorQuda("Unable to allocate my_back_face with size %lu", packet_size[i] pad[i]);
+    if( !back_nbr_staple_sendbuf[i]) errorQuda("Unable to allocate my_back_face with size %lu", packet_size[i]+pad[i]);
     cudaHostRegister(back_nbr_staple_sendbuf[i], packet_size[i]+pad[i], flag);
   }
 
