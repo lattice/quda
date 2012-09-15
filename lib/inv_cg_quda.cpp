@@ -31,8 +31,8 @@ namespace quda {
     profile[QUDA_PROFILE_INIT].Start();
 
     // Check to see that we're not trying to invert on a zero-field source    
-    const double src_norm = norm2(b);
-    if(src_norm == 0){
+    const double b2 = norm2(b);
+    if(b2 == 0){
       profile[QUDA_PROFILE_INIT].Stop();
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
@@ -87,7 +87,7 @@ namespace quda {
     double r2_old;
 
 
-    double stop = src_norm*invParam.tol*invParam.tol; // stopping condition of solver
+    double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
 
     double heavy_quark_residual;
     if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
@@ -216,19 +216,20 @@ namespace quda {
 
     // compute the true residual
     mat(r, x, y);
-    double true_res = xmyNormCuda(b, r);
-    invParam.true_res = sqrt(true_res / src_norm);
+    double true_res = sqrt(xmyNormCuda(b, r) / b2);
     if (use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 
     if (invParam.verbosity >= QUDA_SUMMARIZE) {
       if (use_heavy_quark_res) {
-	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e, heavy-quark residual = %e\n", k, sqrt(r2/src_norm), invParam.true_res, heavy_quark_residual);    
+	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e, heavy-quark residual = %e\n", k, sqrt(r2/b2), true_res, heavy_quark_residual);    
       }else{
 	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		   k, sqrt(r2/src_norm), invParam.true_res);
+		   k, sqrt(r2/b2), true_res);
       }
 
     }
+
+    invParam.true_res = use_heavy_quark_res ? heavy_quark_residual : true_res;
 
     // reset the flops counters
     quda::blas_flops = 0;

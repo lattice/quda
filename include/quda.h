@@ -119,6 +119,9 @@ extern "C" {
     /** Solver tolerance for each offset */
     double tol_offset[QUDA_MAX_MULTI_SHIFT];     
 
+    /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
+    double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
+
     /** Actual L2 residual norm achieved in solver for each offset */
     double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
 

@@ -1242,9 +1242,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
 
-  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL)
-    errorQuda("Heavy quark residual not yet supported for multi-shift solvers");
-
   verbosity = param->verbosity;
 
   // Are we doing a preconditioned solve */
@@ -1415,7 +1412,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // check each shift has the desired tolerance and use sequential CG to refine
   for(int i=0; i < param->num_offset; i++) { 
     if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
-      if (param->true_res_offset[i] > param->tol_offset[i]) {
+
+      double rsd = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
+	HeavyQuarkResidualNormCuda(*x[i], *b).z : param->true_res_offset[i];
+      
+      if (rsd > param->tol_offset[i]) {
 	dirac.setMass(sqrt(param->offset[i]/4));  
 	diracSloppy.setMass(sqrt(param->offset[i]/4));  
 	if (param->verbosity >= QUDA_SUMMARIZE) 
@@ -1424,7 +1425,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	DiracMdagM m(dirac), mSloppy(diracSloppy);
 
 	param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-	param->tol = param->tol_offset[i];
+	param->tol = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
+	  param->tol_hq_offset[i] : param->tol_offset[i];
 	CG cg(m, mSloppy, *param, profileMulti);
 	cg(*x[i], *b);        
 	param->true_res_offset[i] = param->true_res;

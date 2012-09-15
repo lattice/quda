@@ -12,6 +12,7 @@
 #include <face_quda.h>
 #include "misc.h"
 #include <gauge_field.h>
+#include <blas_quda.h>
 
 #ifdef MULTI_GPU
 #include <face_quda.h>
@@ -103,7 +104,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1;
-  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
+  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;  
+  inv_param->residual_type = QUDA_HEAVY_QUARK_RESIDUAL;
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
@@ -382,9 +384,11 @@ invert_test(void)
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-      
-      printfQuda("relative residual, requested = %g, QUDA true = %g, host true = %g\n", 
-		 inv_param.tol_offset[i], inv_param.true_res_offset[i], sqrt(nrm2/src2));
+      double hqr = sqrt(HeavyQuarkResidualNormCpu(*spinorOutArray[i], *in).z);
+      double l2r = sqrt(nrm2/src2);
+
+      printfQuda("relative residual, requested = %g, QUDA true = %g, host L2 relative = %g, host heavy quark %f\n", 
+		 inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, hqr);
 
       //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
       if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
@@ -401,9 +405,12 @@ invert_test(void)
 
   if (test_type <=2){
 
-    printfQuda("Relative residual, requested = %g, QUDA true %g, host true = %g\n", 
-	       inv_param.tol, inv_param.true_res, sqrt(nrm2/src2));
-	
+    double hqr = sqrt(HeavyQuarkResidualNormCpu(*out, *in).z);
+    double l2r = sqrt(nrm2/src2);
+
+    printfQuda("Relative residual, requested = %g, QUDA true = %g, host L2 relative = %g, host heavy quark %f\n", 
+	       inv_param.tol, inv_param.true_res, l2r, hqr);
+
     printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	       time0, inv_param.secs, inv_param.iter, inv_param.secs,
 	       inv_param.gflops/inv_param.secs);

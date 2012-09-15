@@ -322,7 +322,7 @@ namespace quda {
       
       sum.x += x2;
       sum.y += r2;
-      sum.z += sqrt(r2 / x2); 
+      sum.z += (x2 > 0.0) ? sqrt(r2 / x2) : 1.0; 
     }
     return sum;
   }
