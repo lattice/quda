@@ -89,7 +89,7 @@ tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
-	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@ -Xptxas -abi=no
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@

@@ -34,9 +34,10 @@ Version 0.5.0
 
 - Both BiCGstab and CG have experimental support for employing the
   Fermilab Heavy Quark residual as a stopping condition.  This
-  presently comes at a 20% performance cost.  A future release will
-  fix the performance and also incorporate this into the multi-shift
-  CG solver.
+  presently comes at a 20% performance cost.  This is also
+  incorporated into the sequential CG refinement stage of the
+  multi-shift solver for staggered fermions.  A future release will
+  fix the performance issues related to this.
 
 - The BiCGstab solver now supports an initial guess strategy.  This is
   presently only supported when employing a one-pass solve and does

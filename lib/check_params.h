@@ -99,6 +99,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #if defined INIT_PARAM
 QudaInvertParam newQudaInvertParam(void) {
   QudaInvertParam ret;
+  QudaInvertParam *param=&ret;
 #elif defined CHECK_PARAM
 static void checkInvertParam(QudaInvertParam *param) {
 #else
@@ -136,6 +137,23 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tol, INVALID_DOUBLE);
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
+
+#ifndef CHECK_PARAM
+  P(num_offset, 0); /**< Number of offsets in the multi-shift solver */
+#endif
+
+  if (param->num_offset > 0) {
+    for (int i=0; i<param->num_offset; i++) {
+      P(offset[i], INVALID_DOUBLE);
+      P(tol_offset[i], INVALID_DOUBLE);     
+      if (param->residual_type==QUDA_HEAVY_QUARK_RESIDUAL)
+	P(tol_hq_offset[i], INVALID_DOUBLE);
+#ifndef CHECK_PARAM
+      P(true_res_offset[i], INVALID_DOUBLE); 
+#endif
+    }
+  }
+
   P(solution_type, QUDA_INVALID_SOLUTION);
   P(solve_type, QUDA_INVALID_SOLVE);
   P(matpc_type, QUDA_MATPC_INVALID);

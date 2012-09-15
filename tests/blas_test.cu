@@ -22,6 +22,8 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern int niter;
 
+extern bool tune;
+
 extern void usage(char** );
 
 const int Nkernels = 32;
@@ -683,7 +685,7 @@ int main(int argc, char** argv)
 #endif
 
   // enable the tuning
-  quda::setBlasTuning(QUDA_TUNE_YES, QUDA_SILENT);
+  quda::setBlasTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO, QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
 

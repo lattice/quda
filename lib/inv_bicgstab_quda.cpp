@@ -284,8 +284,7 @@ namespace quda {
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
       // Calculate the true residual
       mat(r, x);
-      double true_res = xmyNormCuda(b, r);
-      invParam.true_res = sqrt(true_res / b2);
+      double true_res = sqrt(xmyNormCuda(b, r) / b2);
       if (use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
       
       if (invParam.verbosity >= QUDA_SUMMARIZE) {
@@ -296,6 +295,8 @@ namespace quda {
 		     k, sqrt(r2/b2), invParam.true_res);
 	}
       }
+      
+      invParam.true_res = use_heavy_quark_res ? heavy_quark_residual : true_res;
     }
 
     // reset the flops counters
