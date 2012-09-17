@@ -62,8 +62,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   // Buffers hold half spinors
   for (int i=0; i<nDimComms; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
-#if (CUDA_VERSION > 4000)
-    pad[dir] = page_size - nbytes[dir]%page_size;
+#if (CUDA_VERSION <= 4000)
+    pad[i] = page_size - nbytes[i]%page_size;
 #endif
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
