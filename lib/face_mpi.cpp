@@ -61,15 +61,12 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
   for(int dir =0 ; dir < 4;dir++){
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
-#if (CUDA_VERSION <= 4000)
-    pad[dir] = page_size - nbytes[dir]%page_size;
-#endif
-
     if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
 
 #if (CUDA_VERSION > 4000)
     fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
 #else
+    pad[dir] = page_size - nbytes[dir]%page_size;
     posix_memalign(&fwd_nbr_spinor_sendbuf[dir], page_size, nbytes[dir]+pad[dir]);
 #endif
     if( !fwd_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);

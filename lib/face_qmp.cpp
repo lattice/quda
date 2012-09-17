@@ -62,14 +62,13 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   // Buffers hold half spinors
   for (int i=0; i<nDimComms; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
-#if (CUDA_VERSION <= 4000)
-    pad[i] = page_size - nbytes[i]%page_size;
-#endif
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
+
 #if (CUDA_VERSION > 4000)
     my_fwd_face[i] = malloc(nbytes[i]);
 #else
+    pad[i] = page_size - nbytes[i]%page_size;
     posix_memalign(&my_fwd_face[i], page_size, nbytes[i]+pad[i]);
 #endif
     if( !my_fwd_face[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[i]+pad[i]);
