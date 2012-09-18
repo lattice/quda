@@ -75,7 +75,7 @@ endif
 COPT += -D__COMPUTE_CAPABILITY__=$(GPU_ARCH:sm_%=%0)
 NVCCOPT += -D__COMPUTE_CAPABILITY__=$(GPU_ARCH:sm_%=%0)
 
-ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30))
+ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30 sm_35))
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
 endif
 
