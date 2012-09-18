@@ -105,7 +105,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1;
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;  
-  inv_param->residual_type = QUDA_HEAVY_QUARK_RESIDUAL;
+  //inv_param->residual_type = QUDA_HEAVY_QUARK_RESIDUAL;
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
@@ -320,7 +320,10 @@ invert_test(void)
     double masses[NUM_OFFSETS] ={0.002, 0.0021, 0.0064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
     inv_param.num_offset = NUM_OFFSETS;
     // these can be set independently
-    for (int i=0; i<inv_param.num_offset; i++) inv_param.tol_offset[i] = inv_param.tol;
+    for (int i=0; i<inv_param.num_offset; i++) {
+      inv_param.tol_offset[i] = inv_param.tol;
+      inv_param.tol_hq_offset[i] = inv_param.tol;
+    }
     void* outArray[NUM_OFFSETS];
     int len;
     
@@ -387,16 +390,15 @@ invert_test(void)
       double hqr = sqrt(HeavyQuarkResidualNormCpu(*spinorOutArray[i], *ref).z);
       double l2r = sqrt(nrm2/src2);
 
-      printfQuda("relative residual, requested = %g, QUDA true = %g, host L2 relative = %g, host heavy quark %f\n", 
-		 inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, hqr);
+      printfQuda("Residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g, host = %g\n",
+		 inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
+		 inv_param.true_res_hq_offset[i], hqr);
 
       //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
       if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
 	ret |=1;
       }
     }
-
-    if (ret ==1) printfQuda("Converge failed!\n");
 
     for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
     
@@ -408,18 +410,11 @@ invert_test(void)
     double hqr = sqrt(HeavyQuarkResidualNormCpu(*out, *ref).z);
     double l2r = sqrt(nrm2/src2);
 
-    printfQuda("Relative residual, requested = %g, QUDA true = %g, host L2 relative = %g, host heavy quark %f\n", 
-	       inv_param.tol, inv_param.true_res, l2r, hqr);
+    printfQuda("Residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g, host = %g\n", inv_param.tol, inv_param.true_res, l2r, inv_param.true_res_hq, hqr);
 
     printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	       time0, inv_param.secs, inv_param.iter, inv_param.secs,
 	       inv_param.gflops/inv_param.secs);
-    
-    //emperical, if the cpu residue is more than 2 order the target accuracy, the it fails to converge
-    if (sqrt(nrm2/src2) > 10*inv_param.tol){
-      ret = 1;
-      printfQuda("Convergence failed!\n");
-    }
   }
 
   end();

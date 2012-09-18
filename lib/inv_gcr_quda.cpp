@@ -248,7 +248,8 @@ namespace quda {
     double orthT = 0, matT = 0, preT = 0, resT = 0;
 
     if (invParam.verbosity >= QUDA_VERBOSE) 
-      printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
+      printfQuda("GCR: %d total iterations, %d Krylov iterations, <r,r> = %e, |r|/|b| = %e\n", 
+		 total_iter+k, k, r2, sqrt(r2/b2));
 
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
@@ -315,7 +316,9 @@ namespace quda {
       total_iter++;
 
       if (invParam.verbosity >= QUDA_VERBOSE) 
-	printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter, k, r2);
+	printfQuda("GCR: %d total iterations, %d Krylov iterations, <r,r> = %e, |r|/|b| = %e\n", 
+		   total_iter, k, r2, sqrt(r2/b2));
+
 
       gettimeofday(&rst0, NULL);
       // update solution and residual since max Nkrylov reached, converged or reliable update required

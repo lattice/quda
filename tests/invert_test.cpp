@@ -344,8 +344,11 @@ int main(int argc, char **argv)
       mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
-      printfQuda("Shift i=%d Relative residual: requested = %g, QUDA true = %g, host true %g\n", 
-		 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], sqrt(nrm2/src2));
+      double l2r = sqrt(nrm2 / src2);
+
+      printfQuda("Shift i=%d residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g\n",
+		 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
+		 inv_param.true_res_hq_offset[i]);
     }
     free(spinorTmp);
 
@@ -401,9 +404,11 @@ int main(int argc, char **argv)
     mxpy(spinorIn, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
     double src2 = norm_2(spinorIn, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-    printfQuda("Relative residual: requested = %g, QUDA true = %g, host true %g\n", 
-	       inv_param.tol, inv_param.true_res, sqrt(nrm2/src2));
-    
+    double l2r = sqrt(nrm2 / src2);
+
+    printfQuda("Residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g\n",
+	       inv_param.tol, inv_param.true_res, l2r, inv_param.true_res_hq);
+
   }
 
   freeGaugeQuda();

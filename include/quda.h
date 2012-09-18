@@ -108,6 +108,7 @@ extern "C" {
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */
+    double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
     int maxiter;
     double reliable_delta; /**< Reliable update tolerance */
 
@@ -124,6 +125,9 @@ extern "C" {
 
     /** Actual L2 residual norm achieved in solver for each offset */
     double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
+
+    /** Actual heavy quark residual norm achieved in solver for each offset */
+    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
     QudaSolutionType solution_type;  /**< Type of system to solve */
     QudaSolveType solve_type;        /**< How to solve it */

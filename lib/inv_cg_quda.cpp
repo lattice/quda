@@ -37,6 +37,7 @@ namespace quda {
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
       invParam.true_res = 0.0;
+      invParam.true_res_hq = 0.0;
       return;
     }
 
@@ -93,6 +94,7 @@ namespace quda {
     if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
     double & distance_to_solution   =  (use_heavy_quark_res) ? heavy_quark_residual : r2;
     double & convergence_threshold  =  (use_heavy_quark_res) ? invParam.tol : stop;
+    int heavy_quark_check = 10; // how often to check the heavy quark residual
 
     double alpha=0.0, beta=0.0;
     double pAp;
@@ -109,12 +111,13 @@ namespace quda {
     quda::blas_flops = 0;
 
     int k=0;
-
+    
     if (invParam.verbosity >= QUDA_VERBOSE) {
       if (use_heavy_quark_res) {
-        printfQuda("CG: %d iterations, r2 = %e, heavy-quark residual = %e\n", k, r2, heavy_quark_residual);
+	printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n", 
+		   k, r2, sqrt(r2/b2), heavy_quark_residual);
       } else {
-        printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+	printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2, sqrt(r2/b2));
       }
     }
 
@@ -143,7 +146,7 @@ namespace quda {
 	//beta = r2 / r2_old;
 	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
-	if (use_heavy_quark_res) { 
+	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	  copyCuda(tmp,y);
 	  heavy_quark_residual = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
 	}
@@ -187,9 +190,10 @@ namespace quda {
 
       if (invParam.verbosity >= QUDA_VERBOSE) {
 	if (use_heavy_quark_res) {
-	  printfQuda("CG: %d iterations, r2 = %e, heavy-quark residual = %e\n", k, r2, heavy_quark_residual);
+	  printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n", 
+		     k, r2, sqrt(r2/b2), heavy_quark_residual);
 	} else {
-	  printfQuda("CG: %d iterations, r2 = %e\n", k, r2);
+	  printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2, sqrt(r2/b2));
 	}
       }
 
@@ -210,25 +214,23 @@ namespace quda {
     if (k==invParam.maxiter) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
-    if (invParam.verbosity >= QUDA_SUMMARIZE)
+    if (invParam.verbosity >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
-    // compute the true residual
+    // compute the true residuals
     mat(r, x, y);
-    double true_res = sqrt(xmyNormCuda(b, r) / b2);
-    if (use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    invParam.true_res = sqrt(xmyNormCuda(b, r) / b2);
+    invParam.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 
     if (invParam.verbosity >= QUDA_SUMMARIZE) {
       if (use_heavy_quark_res) {
-	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e, heavy-quark residual = %e\n", k, sqrt(r2/b2), true_res, heavy_quark_residual);    
+	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e, heavy-quark residual = %e\n", k, sqrt(r2/b2), invParam.true_res, invParam.true_res_hq);    
       }else{
 	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		   k, sqrt(r2/b2), true_res);
+		   k, sqrt(r2/b2), invParam.true_res);
       }
 
     }
-
-    invParam.true_res = use_heavy_quark_res ? heavy_quark_residual : true_res;
 
     // reset the flops counters
     quda::blas_flops = 0;

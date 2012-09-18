@@ -71,6 +71,7 @@ namespace quda {
       for(int i=0; i<num_offset; ++i){
         *(x[i]) = b;
 	invParam.true_res_offset[i] = 0.0;
+	invParam.true_res_hq_offset[i] = 0.0;
       }
       return;
     }
@@ -171,6 +172,9 @@ namespace quda {
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
 
+    if (invParam.verbosity >= QUDA_VERBOSE) 
+      printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
+    
     while (r2[0] > stop[0] &&  k < invParam.maxiter) {
       matSloppy(*Ap, *p[0], tmp1, tmp2);
       if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) axpyCuda(offset[0], *p[0], *Ap);
@@ -264,7 +268,7 @@ namespace quda {
       k++;
       
       if (invParam.verbosity >= QUDA_VERBOSE) 
-	printfQuda("Multimass CG: %d iterations, r2 = %e\n", k, r2[0]);
+	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }
     
     
@@ -293,6 +297,7 @@ namespace quda {
       }
       double true_res = xmyNormCuda(b, *r);
       invParam.true_res_offset[i] = sqrt(true_res/b2);
+      invParam.true_res_hq_offset[i] = sqrt(HeavyQuarkResidualNormCuda(*x[i], *r).z);
     }
 
     if (invParam.verbosity >= QUDA_SUMMARIZE){

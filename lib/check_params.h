@@ -248,7 +248,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(verbosity, QUDA_INVALID_VERBOSITY);
 
-#ifdef PRINT_PARAM
+#ifdef INIT_PARAM
+  P(iter, 0);
+  P(spinorGiB, 0.0);
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)
+    P(cloverGiB, 0.0);
+  P(gflops, 0.0);
+  P(secs, 0.0);
+#elif defined(PRINT_PARAM)
   P(iter, INVALID_INT);
   P(spinorGiB, INVALID_DOUBLE);
   if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)

@@ -1410,29 +1410,37 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   */
 
   // check each shift has the desired tolerance and use sequential CG to refine
+  
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaColorSpinorField r(*b, cudaParam);
   for(int i=0; i < param->num_offset; i++) { 
     if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
 
+      dirac.setMass(sqrt(param->offset[i]/4));  
+      diracSloppy.setMass(sqrt(param->offset[i]/4));  
+
       double rsd = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
-	HeavyQuarkResidualNormCuda(*x[i], *b).z : param->true_res_offset[i];
+	param->true_res_hq_offset[i] : param->true_res_offset[i];
       
-      if (rsd > param->tol_offset[i]) {
-	dirac.setMass(sqrt(param->offset[i]/4));  
-	diracSloppy.setMass(sqrt(param->offset[i]/4));  
-	if (param->verbosity >= QUDA_SUMMARIZE) 
-	  printfQuda("Refining shift %d since achieved true residual %e is greater than requested %e\n",
-		     i, param->true_res_offset[i], param->tol_offset[i]);
+      double tol = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
+	param->tol_hq_offset[i] : param->tol_offset[i];
+
+      if (rsd > tol) {
+	if (param->verbosity >= QUDA_VERBOSE) 
+	  printfQuda("Refining shift %d since achieved residual %e is greater than requested %e\n",
+		     i, rsd, tol);
 	DiracMdagM m(dirac), mSloppy(diracSloppy);
 
 	param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-	param->tol = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
-	  param->tol_hq_offset[i] : param->tol_offset[i];
+	param->tol = tol;
 	CG cg(m, mSloppy, *param, profileMulti);
 	cg(*x[i], *b);        
 	param->true_res_offset[i] = param->true_res;
-	dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
-	diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+	param->true_res_hq_offset[i] = param->true_res_hq;
       }
+
+      dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+      diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
     } else {
       warningQuda("Refinement only supported on staggered quarks currently");
     }

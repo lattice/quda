@@ -33,13 +33,20 @@ Version 0.5.0
   is now a win.
 
 - Both BiCGstab and CG have experimental support for employing the
-  Fermilab Heavy Quark residual as a stopping condition.  This
-  presently comes at a 20% performance cost.  This is also
-  incorporated into the sequential CG refinement stage of the
-  multi-shift solver for staggered fermions.  A future release will
-  fix the performance issues related to this.
+  Fermilab Heavy Quark residual as a stopping condition.  To avoid
+  this affecting performance, the heavy quark residual is only
+  measured every 10 iterations.  This is also incorporated into the
+  sequential CG refinement stage of the multi-shift solver for
+  staggered fermions (this will be enabled for Wilson fermions with
+  the next release).
 
-- The BiCGstab solver now supports an initial guess strategy.  This is
+- The value of the true residual(s) are now returned in the true_res
+  and true_res_offset members of the QudaInvertParam struct.  When
+  using heavy quark residual stopping condition, the true_res_hq and
+  true_res_hq_offset members are additionally filled with the
+  heavy-quark residual value.
+
+- The BiCGstab solver now supports an initial-guess strategy.  This is
   presently only supported when employing a one-pass solve and does
   not yet support a two-pass solve (e.g., of the normal equations).
 
