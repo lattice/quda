@@ -70,7 +70,6 @@ int num_QMP;
 
 #include "face_quda.h"
 
-static QudaVerbosity verbosity;
 int numa_affinity_enabled = 1;
 
 using namespace quda;
@@ -254,7 +253,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge[QUDA_PROFILE_TOTAL].Start();
 
   if (!initialized) errorQuda("QUDA not initialized");
-  if (verbosity == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
 
   checkGaugeParam(param);
 
@@ -378,8 +377,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
   profileClover[QUDA_PROFILE_TOTAL].Start();
 
-  verbosity = inv_param->verbosity;
-  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  setVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (!initialized) errorQuda("QUDA not initialized");
 
@@ -535,7 +534,7 @@ void endQuda(void)
   profileEnd[QUDA_PROFILE_TOTAL].Stop();
 
   // print out the profile information of the lifetime of the library
-  if (verbosity >= QUDA_SUMMARIZE) {
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
     profileInit.Print();
     profileGauge.Print();
     profileClover.Print();
@@ -589,7 +588,7 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
-    diracParam.verbose = inv_param->verbosity;
+    diracParam.verbose = getVerbosity();
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
@@ -646,7 +645,7 @@ namespace quda {
   void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
 		   QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
   {   
-    if (verbosity >= QUDA_DEBUG_VERBOSE) {
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
       double nin = norm2(b);
@@ -692,8 +691,8 @@ namespace quda {
       errorQuda("Solution type %d not supported", solution_type);
     }
 
-    if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
-    if (verbosity >= QUDA_DEBUG_VERBOSE) {
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
       double nin = norm2(b);
@@ -744,7 +743,7 @@ namespace quda {
       errorQuda("Solution type %d not supported", solution_type);
     }
 
-    if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
   }
 }
 
@@ -758,8 +757,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
 
-  verbosity = inv_param->verbosity;
-  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  setVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   ColorSpinorParam cpuParam(h_in, inv_param->input_location, *inv_param, gaugePrecise->X(), 1);
 
@@ -770,7 +769,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
 
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*in_h);
     double gpu = norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
@@ -802,7 +801,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
   *out_h = out;
   
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*out_h);
     double gpu = norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
@@ -815,11 +814,11 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
-  verbosity = inv_param->verbosity;
+  setVerbosity(inv_param->verbosity);
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
-  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
@@ -831,7 +830,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
 
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*in_h);
     double gpu = norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
@@ -867,7 +866,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
   *out_h = out;
 
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*out_h);
     double gpu = norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
@@ -884,7 +883,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
-  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
 	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
@@ -896,7 +895,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
   
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*in_h);
     double gpu = norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
@@ -935,7 +934,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
   *out_h = out;
 
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*out_h);
     double gpu = norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
@@ -972,8 +971,8 @@ void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL) errorQuda("Clover field not allocated");
 
-  verbosity = inv_param->verbosity;
-  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  setVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH)
     errorQuda("Cannot apply the clover term for a non Wilson-clover dslash");
@@ -987,7 +986,7 @@ void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
 
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*in_h);
     double gpu = norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
@@ -1019,7 +1018,7 @@ void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
   *out_h = out;
   
-  if (verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double cpu = norm2(*out_h);
     double gpu = norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
@@ -1039,13 +1038,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert[QUDA_PROFILE_TOTAL].Start();
 
   if (!initialized) errorQuda("QUDA not initialized");
-  if (verbosity >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
+
+  setVerbosity(param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
 
   checkInvertParam(param);
-  verbosity = param->verbosity;
 
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE ||
 		   param->solve_type == QUDA_NORMEQ_PC_SOLVE);
@@ -1120,7 +1120,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     
   profileInvert[QUDA_PROFILE_H2D].Stop();
 
-  if (param->verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
     double nh_x = norm2(*h_x);
@@ -1129,11 +1129,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
   }
 
-  setDslashTuning(param->tune, param->verbosity);
-  setBlasTuning(param->tune, param->verbosity);
+  setDslashTuning(param->tune, getVerbosity());
+  setBlasTuning(param->tune, getVerbosity());
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
-  if (param->verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
     double nout = norm2(*out);
     printfQuda("Prepared source = %g\n", nin);   
@@ -1142,7 +1142,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
 
-  if (param->verbosity >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
     printfQuda("Prepared source post mass rescale = %g\n", nin);   
   }
@@ -1192,7 +1192,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Inverter type %d not implemented", param->inv_type);
   }
   
-  if (param->verbosity >= QUDA_VERBOSE){
+  if (getVerbosity() >= QUDA_VERBOSE){
    double nx = norm2(*x);
    printfQuda("Solution = %g\n",nx);
   }
@@ -1202,7 +1202,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   *h_x = *x;
   profileInvert[QUDA_PROFILE_D2H].Stop();
   
-  if (param->verbosity >= QUDA_VERBOSE){
+  if (getVerbosity() >= QUDA_VERBOSE){
     double nx = norm2(*x);
     double nh_x = norm2(*h_x);
     printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
@@ -1242,7 +1242,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
 
-  verbosity = param->verbosity;
+  setVerbosity(param->verbosity);
 
   // Are we doing a preconditioned solve */
   /* What does NormEq solve mean in the shifted case? 
@@ -1356,14 +1356,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   // Check source norms
-  if( param->verbosity >= QUDA_VERBOSE ) {
+  if(getVerbosity() >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
-  setDslashTuning(param->tune, param->verbosity);
-  setBlasTuning(param->tune, param->verbosity);
+  setDslashTuning(param->tune, getVerbosity());
+  setBlasTuning(param->tune, getVerbosity());
   
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];
@@ -1426,7 +1426,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	param->tol_hq_offset[i] : param->tol_offset[i];
 
       if (rsd > tol) {
-	if (param->verbosity >= QUDA_VERBOSE) 
+	if (getVerbosity() >= QUDA_VERBOSE) 
 	  printfQuda("Refining shift %d since achieved residual %e is greater than requested %e\n",
 		     i, rsd, tol);
 	DiracMdagM m(dirac), mSloppy(diracSloppy);
@@ -1455,7 +1455,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileMulti[QUDA_PROFILE_D2H].Start();
   for(int i=0; i < param->num_offset; i++) { 
-    if (param->verbosity >= QUDA_VERBOSE){
+    if (getVerbosity() >= QUDA_VERBOSE){
       double nx = norm2(*x[i]);
       printfQuda("Solution %d = %g\n", i, nx);
     }
@@ -1630,6 +1630,8 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMultiMixed[QUDA_PROFILE_TOTAL].Start();
   if (!initialized) errorQuda("QUDA not initialized");
 
+  setVerbosity(param->verbosity);
+
   QudaPrecision high_prec = param->cuda_prec;
   param->cuda_prec = param->cuda_prec_sloppy;
   
@@ -1648,7 +1650,6 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 
   checkInvertParam(param);
-  verbosity = param->verbosity;
 
   // Are we doing a preconditioned solve */
   /* What does NormEq solve mean in the shifted case? 
@@ -1768,15 +1769,15 @@ invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   // Check source norms
-  if( param->verbosity >= QUDA_VERBOSE ) {
+  if( getVerbosity() >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
   // tune the Dirac Kernel
-  setDslashTuning(param->tune, param->verbosity);
-  setBlasTuning(param->tune, param->verbosity);
+  setDslashTuning(param->tune, getVerbosity());
+  setBlasTuning(param->tune, getVerbosity());
   // if set, tuning will happen in the first multishift call
   
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
