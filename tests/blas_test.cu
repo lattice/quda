@@ -107,7 +107,7 @@ void initFields(int prec)
   lH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
 
   // Now set the parameters for the cuda fields
-  param.pad = 0; //LX*LY*LZ/2;
+  //param.pad = xdim*ydim*zdim/2;
   
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;

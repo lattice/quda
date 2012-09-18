@@ -322,7 +322,7 @@ namespace quda {
       
       sum.x += x2;
       sum.y += r2;
-      sum.z += (x2 > 0.0) ? sqrt(r2 / x2) : 1.0; 
+      sum.z += (x2 > 0.0) ? (r2 / x2) : 1.0; 
     }
     return sum;
   }
@@ -343,5 +343,11 @@ namespace quda {
     return rtn;
   }
   
+  double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &y, cpuColorSpinorField &r) {
+    cpuColorSpinorField tmp(x);
+    xpyCpu(y, tmp);
+    return HeavyQuarkResidualNormCpu(tmp, r);
+  }
+
 } // namespace quda
 

@@ -221,8 +221,7 @@ namespace quda {
 
       if (use_heavy_quark_res) { 
 	copyCuda(tmp,y);
-	xpyCuda(xSloppy,tmp);
-	heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(tmp,rSloppy).z);
+	heavy_quark_residual = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
       }
 
       // reliable updates

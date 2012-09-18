@@ -1033,42 +1033,81 @@ namespace quda {
     return Complex(cg_norm.x, cg_norm.y);
   }
 
-/**
-   This kernel returns (x, x) and (r,r) and also returns the so-called
-   heavy quark norm as used by MILC: 1 / N * \sum_i (r, r)_i / (x, x)_i, where
-   i is site index and N is the number of sites.
-
-   When this kernel is launched, we must enforce that the parameter M
-   in the launcher corresponds to the number of FloatN fields used to
-   represent the spinor, e.g., M=6 for Wilson and M=3 for staggered.
-   This is only the case for half-precision kernels by default.  To
-   enable this, the siteUnroll template parameter must be set true
-   when reduceCuda is instantiated.
- */
-template <typename ReduceType, typename Float2, typename FloatN>
-struct HeavyQuarkResidualNorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
-  Float2 a;
-  Float2 b;
-  ReduceType aux;
-  HeavyQuarkResidualNorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+  /**
+     This kernel returns (x, x) and (r,r) and also returns the so-called
+     heavy quark norm as used by MILC: 1 / N * \sum_i (r, r)_i / (x, x)_i, where
+     i is site index and N is the number of sites.
+     
+     When this kernel is launched, we must enforce that the parameter M
+     in the launcher corresponds to the number of FloatN fields used to
+     represent the spinor, e.g., M=6 for Wilson and M=3 for staggered.
+     This is only the case for half-precision kernels by default.  To
+     enable this, the siteUnroll template parameter must be set true
+     when reduceCuda is instantiated.
+  */
+  template <typename ReduceType, typename Float2, typename FloatN>
+  struct HeavyQuarkResidualNorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
+    Float2 a;
+    Float2 b;
+    ReduceType aux;
+    HeavyQuarkResidualNorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+    
+    __device__ void pre() { aux.x = 0; aux.y = 0; }
+    
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { aux.x += norm2_(x); aux.y += norm2_(y); }
+    
+    //! sum the solution and residual norms, and compute the heavy-quark norm
+    __device__ void post(ReduceType &sum) 
+    { 
+      sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0; 
+    }
+    
+    static int streams() { return 2; } //! total number of input and output streams
+    static int flops() { return 4; } //! undercounts since it excludes the per-site division
+  };
   
-  __device__ void pre() { aux.x = 0; aux.y = 0; }
-
-  __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { aux.x += norm2_(x); aux.y += norm2_(y); }
-
-  //! sum the solution and residual norms, and compute the heavy-quark norm
-  __device__ void post(ReduceType &sum) 
-  { sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0) ? (aux.y / aux.x) : 1; }
-
-  static int streams() { return 2; } //! total number of input and output streams
-  static int flops() { return 4; } //! undercounts since it excludes the per-site division
-};
-
-double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r) {
-  double3 rtn = reduceCuda<double3,QudaSumFloat3,QudaSumFloat,HeavyQuarkResidualNorm,0,0,0,true>
-    (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
-  rtn.z /= x.Volume();
-  return rtn;
-}
-
+  double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r) {
+    double3 rtn = reduceCuda<double3,QudaSumFloat3,QudaSumFloat,HeavyQuarkResidualNorm,0,0,0,true>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
+    rtn.z /= x.Volume();
+    return rtn;
+  }
+  
+  /**
+     Variant of the HeavyQuarkResidualNorm kernel: this takes three
+     arguments, the first two are summed together to form the
+     solution, with the third being the residual vector.  This removes
+     the need an additional xpy call in the solvers, impriving
+     performance.
+  */
+  template <typename ReduceType, typename Float2, typename FloatN>
+  struct xpyHeavyQuarkResidualNorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
+    Float2 a;
+    Float2 b;
+    ReduceType aux;
+    xpyHeavyQuarkResidualNorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+    
+    __device__ void pre() { aux.x = 0; aux.y = 0; }
+    
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) 
+    { aux.x += norm2_(x + y); aux.y += norm2_(z); }
+    
+    //! sum the solution and residual norms, and compute the heavy-quark norm
+    __device__ void post(ReduceType &sum) 
+    { 
+      sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0; 
+    }
+    
+    static int streams() { return 3; } //! total number of input and output streams
+    static int flops() { return 5; }
+  };
+  
+  double3 xpyHeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y,
+					cudaColorSpinorField &r) {
+    double3 rtn = reduceCuda<double3,QudaSumFloat3,QudaSumFloat,xpyHeavyQuarkResidualNorm,0,0,0,true>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
+    rtn.z /= x.Volume();
+    return rtn;
+  }
+  
 } // namespace quda
