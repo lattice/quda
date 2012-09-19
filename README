@@ -1,4 +1,3 @@
-
 Release Notes for QUDA v0.5.0                      XX September 2012
 -----------------------------
 
@@ -15,8 +14,7 @@ with support for double, single, and half (16-bit fixed-point)
 precision.  The staggered implementation additionally includes support
 for asqtad link fattening, force terms for the asqtad fermion action
 and one-loop improved Symanzik gauge action, and a multi-shift CG
-solver.  Use of multiple GPUs in parallel is supported for all actions
-except domain wall.
+solver.  Use of multiple GPUs in parallel is supported for all actions.
 
 
 Software Compatibility:
