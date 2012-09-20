@@ -1069,7 +1069,11 @@ namespace quda {
   double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r) {
     double3 rtn = reduceCuda<double3,QudaSumFloat3,QudaSumFloat,HeavyQuarkResidualNorm,0,0,0,true>
       (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
+#ifdef MULTI_GPU
+    rtn.z /= (x.Volume*comm_size());
+#else
     rtn.z /= x.Volume();
+#endif
     return rtn;
   }
   
@@ -1106,7 +1110,11 @@ namespace quda {
 					cudaColorSpinorField &r) {
     double3 rtn = reduceCuda<double3,QudaSumFloat3,QudaSumFloat,xpyHeavyQuarkResidualNorm,0,0,0,true>
       (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
+#ifdef MULTI_GPU
+    rtn.z /= (x.Volume()*comm_size());
+#else
     rtn.z /= x.Volume();
+#endif
     return rtn;
   }
   

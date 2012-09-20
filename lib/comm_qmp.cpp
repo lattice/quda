@@ -25,6 +25,11 @@ int comm_rank(void)
   return QMP_get_node_number();
 }
 
+int comm_size(void)
+{
+  return QMP_get_number_of_nodes();
+}
+
 void comm_broadcast(void *data, size_t nbytes)
 {
   QMP_broadcast(data, nbytes);

@@ -339,7 +339,11 @@ namespace quda {
     } else {
       errorQuda("Precision type %d not implemented", x.Precision());
     }
+#ifdef MULTI_GPU
+    rtn.z /= (x.Volume()*comm_size());
+#else
     rtn.z /= x.Volume();
+#endif
     return rtn;
   }
   

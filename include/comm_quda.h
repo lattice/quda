@@ -23,7 +23,6 @@ void            comm_set_gridsize(int x, int y, int z, int t);
 int             comm_dim_partitioned(int dir);
 /*testing/debugging use only */
 void            comm_dim_partitioned_set(int dir);
-int		comm_size(void);
 int             comm_dim(int);
 int             comm_coords(int);
 unsigned long	comm_send(void*, int, int, void*);
@@ -50,6 +49,7 @@ void		comm_init(void);
 void		comm_exit(int);
 char *          comm_hostname(void);
 int		comm_rank(void);
+int		comm_size(void);
 void            comm_broadcast(void *data, size_t nbytes);
   
 #ifdef __cplusplus
