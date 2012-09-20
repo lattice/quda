@@ -287,7 +287,7 @@ namespace quda {
       loadParityField(clover, norm, h_clover, cpu_prec, cpu_order);
       loadParityField((char*)clover+bytes/2, (char*)norm+norm_bytes/2, h_clover_odd, cpu_prec, cpu_order);
     } else if(cpu_order == QUDA_INTERNAL_CLOVER_ORDER) { // No reordering necessary, just a plain copy
-      cudaMemcpy(clover, h_clover, bytes, cudaMemcpyHostToDevice); 
+      cudaMemcpy(clover, h_clover, total_bytes, cudaMemcpyHostToDevice); 
     }else{
       errorQuda("Invalid clover_order");
     }
