@@ -7,7 +7,7 @@ QDPXX_LDFLAGS = @QDPXX_LDFLAGS@
 QDPXX_LIBS = @QDPXX_LIBS@
 
 CPU_ARCH = @CPU_ARCH@  	  # x86 or x86_64
-GPU_ARCH = @GPU_ARCH@	  # sm_10, sm_11, sm_12, sm_13, sm_20, sm_21, sm_30 or sm_35
+GPU_ARCH = @GPU_ARCH@	  # sm_10, sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, or sm_35
 OS       = @QUDA_OS@	  # linux or osx
 
 PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
@@ -72,10 +72,13 @@ else
   NVCCOPT = -DPOINTER_SIZE=4
 endif
 
-COPT += -D__COMPUTE_CAPABILITY__=$(GPU_ARCH:sm_%=%0)
-NVCCOPT += -D__COMPUTE_CAPABILITY__=$(GPU_ARCH:sm_%=%0)
+COMP_CAP = $(GPU_ARCH:sm_%=%0)
 
-ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30 sm_35))
+COPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
+NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
+
+TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
+ifeq ($(TESLA_ARCH),true)
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
 endif
 
