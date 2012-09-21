@@ -481,7 +481,7 @@ exchange_llfat_init(QudaPrecision prec)
 
 #if (CUDA_VERSION <= 4000)
   const int page_size = getpagesize();
-  for(int dir=4; dir<4; ++dir){
+  for(int dir=0; dir<4; ++dir){
     pad[dir] =  page_size - packet_size[dir]%page_size;
   }
 #endif
