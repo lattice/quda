@@ -1,54 +1,53 @@
 
 Version 0.5.0
 
-- Full support for CUDA 5.0, including GK110 (Kepler 2) GPUs.  QUDA
-  has, however, yet to be fully optimized for GK110.
+- Added full support for CUDA 5.0, including GK110 ("Kepler 2") GPUs.
+  QUDA has yet to be fully optimized for GK110, however.
 
-- The domain-wall dirac operator is now fully multi-GPU capable and
-  the kernels are built buy Python code generation.  These have yet to
-  be fully optimized.
+- Added multi-GPU support for the domain wall action, to be further
+  optimized in a future release.
 
-- QUDA now officially supports the qdp-jit library to enable complete
-  acceleration of Chroma on GPUs.
+- Added official support for the QDP-JIT library, enabled via the
+  "--enable-qdp-jit" configure option.  With the combination of QUDA
+  and QDP-JIT, Chroma runs almost entirely on the GPU.
 
-- QUDA now supports a Fortran interface.  This can found in
-  include/quda_fortran.h and lib/quda_fortran.F90.
+- Added a fortran interface, found in include/quda_fortran.h and
+  lib/quda_fortran.F90.
 
 - QUDA is now compatible with the Berlin QCD (BQCD) package,
   supporting both Wilson and Clover solvers, including support for
   multiple GPUs.  This currently requires a specific branch of BQCD
   (https://github.com/lattice/bqcd-r399-quda).
 
-- QUDA now lives behind a namespace, "quda", for better insulation
-  against external applications and libraries.
+- Moved all internal symbols behind a namespace, "quda", for better
+  insulation from external applications and libraries.
 
 - Vastly improved the stability and accuracy of the multi-shift CG
-  solver.  The default invertMultiShiftQuda() interface now supports
-  mixed-precision and per-shift refinement after the multi-shift
-  solver completes ensures accuracy of the final result.
+  solver.  The invertMultiShiftQuda() interface function now supports
+  mixed-precision and implements per-shift refinement after the
+  multi-shift solver completes to ensure accuracy of the final result.
 
-- Improved the stability and accuracy of using CG with
-  mixed-precision.  As a result, double-single CG has a virtually
-  identical iteration count to pure double CG and using half precision
-  is now a win.
+- Improved the stability and accuracy of mixed-precision CG.  As a
+  result, mixed double/single CG has a virtually identical iteration
+  count to pure double CG, and using half precision is now a win.
 
-- Both BiCGstab and CG have experimental support for employing the
-  Fermilab Heavy Quark residual as a stopping condition.  To avoid
-  this affecting performance, the heavy quark residual is only
-  measured every 10 iterations.  This is also incorporated into the
-  sequential CG refinement stage of the multi-shift solver for
-  staggered fermions (this will be enabled for Wilson fermions with
-  the next release).
+- Added experimental support for the Fermilab heavy quark residual as
+  a stopping condition in BiCGstab and CG.  To minimize the impact on
+  performance, the heavy quark residual is only measured every 10
+  iterations.  This stopping condition has also been incorporated into
+  the sequential CG refinement stage of the multi-shift solver for
+  staggered fermions (and will be enabled for Wilson fermions in a
+  future release).
 
 - The value of the true residual(s) are now returned in the true_res
-  and true_res_offset members of the QudaInvertParam struct.  When
-  using heavy quark residual stopping condition, the true_res_hq and
-  true_res_hq_offset members are additionally filled with the
-  heavy-quark residual value.
+  and (for multi-shift) true_res_offset members of the QudaInvertParam
+  struct.  When using heavy quark residual stopping condition, the
+  true_res_hq and true_res_hq_offset members are additionally filled
+  with the heavy-quark residual value.
 
 - The BiCGstab solver now supports an initial-guess strategy.  This is
   presently only supported when employing a one-pass solve and does
-  not yet support a two-pass solve (e.g., of the normal equations).
+  not yet work for a two-pass solve (e.g., of the normal equations).
 
 - Added a new interface function, setVerbosityQuda(), to allow for
   finer-grained control of status reporting.  See the description in
@@ -59,14 +58,50 @@ Version 0.5.0
   tests are still separate for now.
 
 - Enabled by default double-precision textures since the Fermi double
-  precision instability has been fixed as CUDA 5.0 production release.
+  precision instability has been fixed in the driver accompanying the
+  CUDA 5.0 production release.
 
-- Fixed a bug related to CUDA and a NIC sharing pinned memory. This
-  affected the correct operation of both Chroma and MILC.
+- Fixed a bug related to the sharing of page-locked (pinned) memory
+  between CUDA and Infiniband that affected correct operation of both
+  Chroma and MILC on some systems.
 
-- General cleanup and other minor fixes (see
-  https://github.com/lattice/quda/issues?milestone=7 for a break down
-  of all issues closed in this release).
+- Renamed the "QUDA_NORMEQ_SOLVE" solve_type to "QUDA_NORMOP_SOLVE",
+  and likewise for "QUDA_NORMOP_PC_SOLVE".  This better reflects their
+  behavior, since a "NORMOP" solve will always involve the normal operator
+  (A^dag A) but might not correspond to solving the normal equations
+  of the original system.
+
+- Fixed a long-standing issue so that solve_type and solution_type are
+  now interpreted as described in the NEWS entry for QUDA 0.3.0 below.
+  More specifically,
+
+    solution_type specifies *what* linear system is to be solved.
+    solve_type specifies *how* the linear system is to be solved.
+
+    We have the following four cases (plus preconditioned variants):
+
+    solution_type    solve_type    Effect
+    -------------    ----------    ------
+    MAT              DIRECT        Solve Ax=b
+    MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
+    MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
+    MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+
+    An even/odd preconditioned (PC) solution_type generally requires a PC
+    solve_type and vice versa.  As an exception, the unpreconditioned
+    MAT solution_type may be used with any solve_type, including
+    DIRECT_PC and NORMOP_PC.
+
+    As also noted in the entry for 0.3.0 below, with the CG inverter,
+    solve_type should generally be set to 'QUDA_NORMOP_PC_SOLVE',
+    which will solve the even/odd-preconditioned normal equations via
+    CGNR.  (The full solution will be reconstructed if necessary based
+    on solution_type.)  For BiCGstab (with Wilson or Wilson-clover
+    fermions), 'QUDA_DIRECT_PC_SOLVE' is generally best.
+
+- General cleanup and other minor fixes.  See
+  https://github.com/lattice/quda/issues?milestone=7 for a breakdown
+  of all issues closed in this release.
 
 
 Version 0.4.0 - 4 April 2012

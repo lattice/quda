@@ -118,7 +118,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   //inv_param->prec_precondition = prec_sloppy;
 
   inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-  inv_param->solve_type = QUDA_NORMEQ_PC_SOLVE;
+  inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
   inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param->dagger = QUDA_DAG_NO;
   inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;
@@ -364,7 +364,7 @@ invert_test(void)
     
     printfQuda("checking the solution\n");
     QudaParity parity = QUDA_INVALID_PARITY;
-    if (inv_param.solve_type == QUDA_NORMEQ_SOLVE){
+    if (inv_param.solve_type == QUDA_NORMOP_SOLVE){
       //parity = QUDA_EVENODD_PARITY;
       errorQuda("full parity not supported\n");
     }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
