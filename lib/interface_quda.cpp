@@ -377,7 +377,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
   profileClover[QUDA_PROFILE_TOTAL].Start();
 
-  setVerbosity(inv_param->verbosity);
+  pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -457,6 +457,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     cloverPrecondition = cloverSloppy;
   }
   profileClover[QUDA_PROFILE_H2D].Stop();
+
+  popVerbosity();
 
   profileClover[QUDA_PROFILE_TOTAL].Stop();
 }
@@ -757,7 +759,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
 
-  setVerbosity(inv_param->verbosity);
+  pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   ColorSpinorParam cpuParam(h_in, inv_param->input_location, *inv_param, gaugePrecise->X(), 1);
@@ -809,12 +811,15 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   delete out_h;
   delete in_h;
+
+  popVerbosity();
 }
 
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
-  setVerbosity(inv_param->verbosity);
+  pushVerbosity(inv_param->verbosity);
+
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
@@ -874,11 +879,15 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   delete out_h;
   delete in_h;
+
+  popVerbosity();
 }
 
 
 void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
+  pushVerbosity(inv_param->verbosity);
+
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
@@ -942,6 +951,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   delete out_h;
   delete in_h;
+
+  popVerbosity();
 }
 
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -967,11 +978,12 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
 
 void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
 {
+  pushVerbosity(inv_param->verbosity);
+
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL) errorQuda("Clover field not allocated");
 
-  setVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH)
@@ -1030,6 +1042,8 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   delete out_h;
   delete in_h;
+
+  popVerbosity();
 }
 
 
@@ -1039,8 +1053,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (!initialized) errorQuda("QUDA not initialized");
 
-  QudaVerbosity old_verb = getVerbosity();
-  setVerbosity(param->verbosity);
+  pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
   // check the gauge fields have been created
@@ -1224,7 +1237,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
 
-  setVerbosity(old_verb);
+  popVerbosity();
 
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
@@ -1254,7 +1267,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
 	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
 
-  setVerbosity(param->verbosity);
+  pushVerbosity(param->verbosity);
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
@@ -1496,6 +1509,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
   
+  popVerbosity();
+
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 

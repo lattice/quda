@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <stack>
 #include <sys/time.h>
 
 #include <enum_quda.h>
@@ -17,18 +18,41 @@ QudaVerbosity getVerbosity() { return verbosity_; }
 char *getOutputPrefix() { return prefix_; }
 FILE *getOutputFile() { return outfile_; }
 
-void setVerbosity(const QudaVerbosity verbosity)
+void setVerbosity(QudaVerbosity verbosity)
 {
   verbosity_ = verbosity;
-};
+}
 
 void setOutputPrefix(const char *prefix)
 {
   strncpy(prefix_, prefix, MAX_PREFIX_SIZE);
   prefix_[MAX_PREFIX_SIZE-1] = '\0';
-};
+}
 
 void setOutputFile(FILE *outfile)
 {
   outfile_ = outfile;
-};
+}
+
+
+static std::stack<QudaVerbosity> vstack;
+
+void pushVerbosity(QudaVerbosity verbosity)
+{
+  vstack.push(getVerbosity());
+  setVerbosity(verbosity);
+
+  if (vstack.size() > 10) {
+    warningQuda("Verbosity stack contains %u elements.  Is there a missing popVerbosity() somewhere?",
+		static_cast<unsigned int>(vstack.size()));
+  }
+}
+
+void popVerbosity()
+{
+  if (vstack.empty()) {
+    errorQuda("popVerbosity() called with empty stack");
+  }
+  setVerbosity(vstack.top());
+  vstack.pop();
+}
