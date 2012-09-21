@@ -1309,7 +1309,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-cpu-arch=arch  Set CPU arch: x86 or x86_64 (default: x86_64)
-  --enable-gpu-arch=arch  Set GPU arch: sm_10, sm_12, sm_13, sm_20, sm_21,
+  --enable-gpu-arch=arch  Set GPU arch: sm_11, sm_12, sm_13, sm_20, sm_21,
                           sm_30, sm_35 (default: sm_20)
   --enable-os=os          Set operating system: linux, osx (default: linux)
   --enable-host-debug     Enable debugging of host code
@@ -3727,9 +3727,9 @@ x86 | x86_64 ) ;;
 esac
 
 case ${gpu_arch} in
-sm_10 | sm_11 | sm_12 | sm_13 | sm_20 | sm_21 | sm_30 | sm_35) ;;
+sm_11 | sm_12 | sm_13 | sm_20 | sm_21 | sm_30 | sm_35) ;;
 *)
-  as_fn_error $? " GPU arch must be one of: sm_10, sm_11, sm_12, sm_13, sm_20, sm_21, sm_30 or sm_35 " "$LINENO" 5
+  as_fn_error $? " GPU arch must be one of: sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, or sm_35 " "$LINENO" 5
   ;;
 esac
 
