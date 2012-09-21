@@ -965,7 +965,7 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
 }
 
 
-void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
+void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
 {
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
@@ -1918,7 +1918,7 @@ void free_clover_quda_(void) { freeCloverQuda(); }
 void dslash_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity *parity) { dslashQuda(h_out, h_in, inv_param, *parity); }
 void clover_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
-		  QudaParity *parity, int *inverse) { CloverQuda(h_out, h_in, inv_param, *parity, *inverse); }
+		  QudaParity *parity, int *inverse) { cloverQuda(h_out, h_in, inv_param, *parity, *inverse); }
 void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)

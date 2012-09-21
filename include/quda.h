@@ -361,7 +361,7 @@ extern "C" {
    * @param parity The source and destination parity of the field
    * @param inverse Whether to apply the inverse of the clover term
    */
-  void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
+  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity *parity, int inverse);
 
   /**
