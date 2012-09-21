@@ -397,7 +397,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-		   inv_param->solve_type == QUDA_NORMEQ_PC_SOLVE);
+		   inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()
   bool pc_solution = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
@@ -965,7 +965,7 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
 }
 
 
-void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
+void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
 {
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
@@ -1039,6 +1039,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (!initialized) errorQuda("QUDA not initialized");
 
+  QudaVerbosity old_verb = getVerbosity();
   setVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
@@ -1047,11 +1048,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   checkInvertParam(param);
 
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-		   param->solve_type == QUDA_NORMEQ_PC_SOLVE);
+  // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
+  // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
+  // for now, though, so here we factorize everything for convenience.
 
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION ||
-		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
@@ -1103,7 +1107,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
-	(param->inv_type == QUDA_BICGSTAB_INVERTER || param->inv_type == QUDA_GCR_INVERTER)) {
+	(param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Initial guess not supported for two-pass solver");
     }
 
@@ -1147,51 +1151,54 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source post mass rescale = %g\n", nin);   
   }
   
-  switch (param->inv_type) {
-  case QUDA_CG_INVERTER:
-    // prepare source if we are doing CGNR
-    if (param->solution_type != QUDA_MATDAG_MAT_SOLUTION && 
-	param->solution_type != QUDA_MATPCDAG_MATPC_SOLUTION) {
-      cudaColorSpinorField tmp(*in);
-      dirac.Mdag(*in, tmp);
-    }
-    {
-      DiracMdagM m(dirac), mSloppy(diracSloppy);
-      CG cg(m, mSloppy, *param, profileInvert);
-      cg(*out, *in);
-    }
-    break;
-  case QUDA_BICGSTAB_INVERTER:
-    if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION)
-      {
-	DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-	BiCGstab bicg(m, mSloppy, mPre, *param, profileInvert);
-	bicg(*out, *in);
-	copyCuda(*in, *out);
-      }
-    {
-      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      BiCGstab bicg(m, mSloppy, mPre, *param, profileInvert);
-      bicg(*out, *in);
-    }
-    break;
-  case QUDA_GCR_INVERTER:
-    if (param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      GCR gcr(m, mSloppy, mPre, *param, profileInvert);
-      gcr(*out, *in);
-      copyCuda(*in, *out);
-    }
-    {
-      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      GCR gcr(m, mSloppy, mPre, *param, profileInvert);
-      gcr(*out, *in);
-    }
-    break;
-  default:
-    errorQuda("Inverter type %d not implemented", param->inv_type);
+  // solution_type specifies *what* system is to be solved.
+  // solve_type specifies *how* the system is to be solved.
+  //
+  // We have the following four cases (plus preconditioned variants):
+  //
+  // solution_type    solve_type    Effect
+  // -------------    ----------    ------
+  // MAT              DIRECT        Solve Ax=b
+  // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
+  // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
+  // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+  //
+  // We generally require that the solution_type and solve_type
+  // preconditioning match.  As an exception, the unpreconditioned MAT
+  // solution_type may be used with any solve_type, including
+  // DIRECT_PC and NORMOP_PC.  In these cases, preparation of the
+  // preconditioned source and reconstruction of the full solution are
+  // taken care of by Dirac::prepare() and Dirac::reconstruct(),
+  // respectively.
+
+  if (pc_solution && !pc_solve) {
+    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
   }
-  
+
+  if (!mat_solution && !pc_solution && pc_solve) {
+    errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
+  }
+
+  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
+    cudaColorSpinorField tmp(*in);
+    dirac.Mdag(*in, tmp);
+  } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
+    DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    (*solve)(*out, *in);
+    copyCuda(*in, *out);
+  }
+
+  if (direct_solve) {
+    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    (*solve)(*out, *in);
+  } else {
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    (*solve)(*out, *in);
+  }
+
   if (getVerbosity() >= QUDA_VERBOSE){
    double nx = norm2(*x);
    printfQuda("Solution = %g\n",nx);
@@ -1217,6 +1224,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
 
+  setVerbosity(old_verb);
+
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
@@ -1225,9 +1234,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
 
 /*! 
- *
  * Generic version of the multi-shift solver. Should work for
- * most fermions. Note, offset[0] is not folded into the mass parameter 
+ * most fermions. Note that offset[0] is not folded into the mass parameter.
+ *
+ * At present, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
+ * and solve_type must be NORMOP or NORMOP_PC.  The solution and solve
+ * preconditioning have to match.
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
@@ -1244,20 +1256,23 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   setVerbosity(param->verbosity);
 
-  // Are we doing a preconditioned solve */
-  /* What does NormEq solve mean in the shifted case? 
-   */
-  if (param->solve_type != QUDA_NORMEQ_PC_SOLVE &&
-      param->solve_type != QUDA_NORMEQ_SOLVE) { 
-    errorQuda("Direct solve_type is not supported in invertMultiShiftQuda()\n");
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+
+  if (mat_solution) {
+    errorQuda("Multi-shift solver does not support MAT or MATPC solution types");
   }
-
-  bool pc_solve = (param->solve_type == QUDA_NORMEQ_PC_SOLVE);
-
-  // In principle one can do a MATPC Solution for a hermitian M_pc
-  // In practice most of the time I guess one will do a M^\dagger_pc M_pc solution.
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION ||
-		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION );
+  if (direct_solve) {
+    errorQuda("Multi-shift solver does not support DIRECT or DIRECT_PC solve types");
+  }
+  if (pc_solution & !pc_solve) {
+    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
+  }
+  if (!pc_solution & pc_solve) {
+    errorQuda("In multi-shift solver, a preconditioned (PC) solve_type requires a PC solution_type");
+  }
 
   // No of GiB in a checkerboard of a spinor
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
@@ -1485,398 +1500,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   saveTuneCache(getVerbosity());
 
   profileMulti[QUDA_PROFILE_TOTAL].Stop();
-}
-
-/************************************** Ugly Mixed precision multishift CG solver ****************************/
-
-static void* fatlink;
-static int fatlink_pad;
-static void* longlink;
-static int longlink_pad;
-static QudaReconstructType longlink_recon;
-static QudaReconstructType longlink_recon_sloppy;
-static QudaGaugeParam* gauge_param;
-
-void 
-record_gauge(int* X, void *_fatlink, int _fatlink_pad, void* _longlink, int _longlink_pad, 
-	     QudaReconstructType _longlink_recon, QudaReconstructType _longlink_recon_sloppy,
-	     QudaGaugeParam *_param)
-{
-  
-
-  //the X and precision in fatlink must be set because we use them in dirac creation
-  //See dirac_staggered.cpp
-  /*
-  for(int i =0;i < 4;i++){
-    cudaFatLinkPrecise.X[i] = cudaFatLinkSloppy.X[i] = X[i];
-  }
-  cudaFatLinkPrecise.precision = _param->cuda_prec;
-  cudaFatLinkSloppy.precision = _param->cuda_prec_sloppy;
-  */
-
-  fatlink = _fatlink;
-  fatlink_pad = _fatlink_pad;
-  
-  longlink = _longlink;
-  longlink_pad = _longlink_pad;
-  longlink_recon = _longlink_recon;
-  longlink_recon_sloppy = _longlink_recon_sloppy;
-  
-  gauge_param = _param;
-
-  return;
-
-}
-
-
-void 
-do_create_precise_cuda_gauge(void)
-{
-  QudaPrecision prec = gauge_param->cuda_prec;
-  QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;
-  QudaPrecision prec_precondition = gauge_param->cuda_prec_precondition;
-  
-  //the sloppy gauge field will be filled, and needs to backup
-  cudaGaugeField *tmp_fat = gaugeFatSloppy;
-  cudaGaugeField *tmp_long= gaugeLongSloppy;
-  cudaGaugeField *tmp_fat_precondition = gaugeFatPrecondition;
-  cudaGaugeField *tmp_long_precondition = gaugeLongPrecondition;
-
-  
-  //create precise links
-  if(gauge_param->cuda_prec != gauge_param->cuda_prec_sloppy){
-    gaugeFatPrecise = gaugeFatSloppy = gaugeFatPrecondition = NULL;
-    gaugeLongPrecise = gaugeLongSloppy = gaugeLongPrecondition = NULL;
-    gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = gauge_param->cuda_prec_precondition = prec;
-    gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
-    gauge_param->ga_pad = fatlink_pad;
-    gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(fatlink, gauge_param);
-
-    
-    gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
-    gauge_param->ga_pad = longlink_pad;
-    gauge_param->reconstruct = longlink_recon;
-    gauge_param->reconstruct_sloppy = longlink_recon_sloppy;
-    loadGaugeQuda(longlink, gauge_param);
-  }else{
-    gaugeFatPrecise = gaugeFatSloppy;
-    gaugeLongPrecise = gaugeLongSloppy;
-  }
-
-  //set prec/prec_sloppy it back
-  gauge_param->cuda_prec = prec;
-  gauge_param->cuda_prec_sloppy =prec_sloppy;
-  gauge_param->cuda_prec_precondition = prec_precondition;
-
-  //set the sloopy gauge filed back
-  gaugeFatSloppy = tmp_fat;
-  gaugeLongSloppy = tmp_long;
-  
-  gaugeFatPrecondition = tmp_fat_precondition;
-  gaugeLongPrecondition = tmp_long_precondition;
-  return;
-}
-
-void 
-do_create_sloppy_cuda_gauge(void)
-{
-  QudaPrecision prec = gauge_param->cuda_prec;
-  QudaPrecision prec_sloppy = gauge_param->cuda_prec_sloppy;  
-  QudaPrecision prec_precondition = gauge_param->cuda_prec_precondition;
-
-  //the precise gauge field will be filled, and needs to backup
-  cudaGaugeField *tmp_fat = gaugeFatPrecise;
-  cudaGaugeField *tmp_long = gaugeLongPrecise;
-  cudaGaugeField *tmp_fat_precondition = gaugeFatPrecondition;
-  cudaGaugeField *tmp_long_precondition = gaugeLongPrecondition;
-  
-  gaugeFatPrecise = gaugeFatSloppy = gaugeFatPrecondition = NULL;
-  gaugeLongPrecise = gaugeLongSloppy = gaugeLongPrecondition= NULL;
-
-  //create sloppy links
-  gauge_param->cuda_prec = gauge_param->cuda_prec_sloppy = 
-    gauge_param->cuda_prec_precondition = prec_sloppy; 
-  gauge_param->type = QUDA_ASQTAD_FAT_LINKS;
-  gauge_param->ga_pad = fatlink_pad;
-  gauge_param->reconstruct = gauge_param->reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(fatlink, gauge_param);
-  
-  gauge_param->type = QUDA_ASQTAD_LONG_LINKS;
-  gauge_param->ga_pad = longlink_pad;
-  gauge_param->reconstruct = longlink_recon;
-  gauge_param->reconstruct_sloppy = longlink_recon_sloppy;
-  loadGaugeQuda(longlink, gauge_param);
-  
-  //set prec/prec_sloppy it back
-  gauge_param->cuda_prec = prec;
-  gauge_param->cuda_prec_sloppy =prec_sloppy;
-  gauge_param->cuda_prec_precondition = prec_precondition;
-  
-  //set the sloopy gauge filed back
-  gaugeFatPrecise = tmp_fat;
-  gaugeLongPrecise = tmp_long;  
-  
-  gaugeFatPrecondition = tmp_fat_precondition;
-  gaugeLongPrecondition = tmp_long_precondition;
-
-  return;
-}
-
-
-void 
-invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param)
-{
-  profileMultiMixed[QUDA_PROFILE_TOTAL].Start();
-  if (!initialized) errorQuda("QUDA not initialized");
-
-  setVerbosity(param->verbosity);
-
-  QudaPrecision high_prec = param->cuda_prec;
-  param->cuda_prec = param->cuda_prec_sloppy;
-  
-  if (param->num_offset > QUDA_MAX_MULTI_SHIFT) 
-    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
-	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
-
-  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL)
-    errorQuda("Heavy quark residual not yet supported for multi-shift solvers");
-
-  do_create_sloppy_cuda_gauge();
-
-  // check the gauge fields have been created
-  //cudaGaugeField *cudaGauge = checkGauge(param);
-  cudaGaugeField *cudaGauge = gaugeFatSloppy;
-
-
-  checkInvertParam(param);
-
-  // Are we doing a preconditioned solve */
-  /* What does NormEq solve mean in the shifted case? 
-   */
-  if (param->solve_type != QUDA_NORMEQ_PC_SOLVE &&
-      param->solve_type != QUDA_NORMEQ_SOLVE) { 
-    errorQuda("Direct solve_type is not supported in invertMultiShiftQuda()\n");
-  }
-
-  bool pc_solve = (param->solve_type == QUDA_NORMEQ_PC_SOLVE);
-
-  // In principle one can do a MATPC Solution for a hermitian M_pc
-  // In practice most of the time I guess one will do a M^\dagger_pc M_pc solution.
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION ||
-		      param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION );
-
-  // No of GiB in a checkerboard of a spinor
-  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
-  if( !pc_solve) param->spinorGiB *= 2; // Double volume for non PC solve
-  
-  // **** WARNING *** this may not match implementation... 
-  if( param->inv_type == QUDA_CG_INVERTER ) { 
-    // CG-M needs 5 vectors for the smallest shift + 2 for each additional shift
-    param->spinorGiB *= (5 + 2*(param->num_offset-1))/(double)(1<<30);
-  }
-  else {
-    // BiCGStab-M needs 7 for the original shift + 2 for each additional shift + 1 auxiliary
-    // (Jegerlehner hep-lat/9612014 eq (3.13)
-    param->spinorGiB *= (7 + 2*(param->num_offset-1))/(double)(1<<30);
-  }
-
-  // Timing and FLOP counters
-  param->secs = 0;
-  param->gflops = 0;
-  param->iter = 0;
-  
-  for (int i=0; i<param->num_offset-1; i++) {
-    for (int j=i+1; j<param->num_offset; j++) {
-      if (param->offset[i] > param->offset[j])
-	errorQuda("Offsets must be ordered from smallest to largest");
-    }
-  }
-
-  // Host pointers for x, take a copy of the input host pointers
-  void** hp_x;
-  hp_x = new void* [ param->num_offset ];
-
-  void* hp_b = _hp_b;
-  for(int i=0;i < param->num_offset;i++){
-    hp_x[i] = _hp_x[i];
-  }
-  
-  // Create the matrix.
-  // The way this works is that createDirac will create 'd' and 'dSloppy'
-  // which are global. We then grab these with references...
-  //
-  // Balint: Isn't there a  nice construction pattern we could use here? This is 
-  // expedient but yucky.
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH){
-    param->mass = sqrt(param->offset[0]/4);  
-  }
-  //FIXME: Dirty dirty hack
-  // At this moment, the precise fat/long gauge is not created (NULL)
-  // but we set it to be the same as sloppy to avoid segfault 
-  // in creating the dirac since it is needed 
-  gaugeFatPrecondition = gaugeFatPrecise = gaugeFatSloppy;
-  gaugeLongPrecondition = gaugeLongPrecise = gaugeLongSloppy;
-
-  Dirac *d = NULL;
-  Dirac *dSloppy = NULL;
-  Dirac *dPre = NULL;
-
-  // create the dirac operator
-  createDirac(d, dSloppy, dPre, *param, pc_solve);
-  // resetting to NULL
-  gaugeFatPrecise = NULL; gaugeFatPrecondition = NULL;
-  gaugeLongPrecise = NULL; gaugeLongPrecondition = NULL;
-
-  Dirac &diracSloppy = *dSloppy;
-
-  cpuColorSpinorField *h_b = NULL; // Host RHS
-  cpuColorSpinorField **h_x = NULL;
-  cudaColorSpinorField *b = NULL;   // Cuda RHS
-  cudaColorSpinorField **x = NULL;  // Cuda Solutions
-
-  // Grab the dimension array of the input gauge field.
-  const int *X = cudaGauge->X();
-
-  // Wrap CPU host side pointers
-  // 
-  // Balint: This creates a ColorSpinorParam struct, from the host data pointer, 
-  // the definitions in param, the dimensions X, and whether the solution is on 
-  // a checkerboard instruction or not. These can then be used as 'instructions' 
-  // to create the actual colorSpinorField
-  ColorSpinorParam cpuParam(hp_b, QUDA_CPU_FIELD_LOCATION, *param, X, pc_solution);
-  h_b = new cpuColorSpinorField(cpuParam);
-
-  h_x = new cpuColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
-  for(int i=0; i < param->num_offset; i++) { 
-    cpuParam.v = hp_x[i];
-    h_x[i] = new cpuColorSpinorField(cpuParam);
-  }
-
-  // Now I need a colorSpinorParam for the device
-  ColorSpinorParam cudaParam(cpuParam, *param);
-  // This setting will download a host vector
-  cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  profileMultiMixed[QUDA_PROFILE_H2D].Start();
-  b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
-  profileMultiMixed[QUDA_PROFILE_H2D].Stop();
-
-  // Create the solution fields filled with zero
-  x = new cudaColorSpinorField* [ param->num_offset ];
-  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  for(int i=0; i < param->num_offset; i++) { 
-    x[i] = new cudaColorSpinorField(cudaParam);
-  }
-
-  // Check source norms
-  if( getVerbosity() >= QUDA_VERBOSE ) {
-    double nh_b = norm2(*h_b);
-    double nb = norm2(*b);
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
-  }
-
-  // tune the Dirac Kernel
-  setDslashTuning(param->tune, getVerbosity());
-  setBlasTuning(param->tune, getVerbosity());
-  // if set, tuning will happen in the first multishift call
-  
-  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
-  double *rescaled_shifts = new double [param->num_offset];
-  for(int i=0; i < param->num_offset; i++){ 
-    rescaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, rescaled_shifts[i]);
-  }
-
-  {
-    DiracMdagM m(diracSloppy);
-    MultiShiftCG cg_m(m, m, *param, profileMultiMixed);
-    cg_m(x, *b);  
-  }
-    
-  delete [] rescaled_shifts;
-  
-  delete b;
-  
-  int total_iters = 0;
-  double total_secs = 0;
-  double total_gflops = 0;
-  total_iters += param->iter;
-  total_secs  += param->secs;
-  total_gflops += param->gflops;
-  
-  cudaParam.precision = high_prec;
-  param->cuda_prec = high_prec;
-  do_create_precise_cuda_gauge();
-  
-  profileMultiMixed[QUDA_PROFILE_H2D].Start();
-  b = new cudaColorSpinorField(cudaParam);
-  *b = *h_b;
-  profileMultiMixed[QUDA_PROFILE_H2D].Stop();
-  
-  /*FIXME: to avoid setfault*/
-  gaugeFatPrecondition =gaugeFatSloppy;
-  gaugeLongPrecondition =gaugeLongSloppy;
-  
-  delete dPre;
-  delete dSloppy;
-  delete d;
-  
-  // create the dirac operator
-  createDirac(d, dSloppy, dPre, *param, pc_solve);
-
-  gaugeFatPrecondition = NULL;
-  gaugeLongPrecondition = NULL;
-  {
-    Dirac& dirac2 = *d;
-    Dirac& diracSloppy2 = *dSloppy;
-    
-    cudaColorSpinorField* high_x;
-    high_x = new cudaColorSpinorField(cudaParam);
-    for(int i=0;i < param->num_offset; i++){
-      *high_x  = *x[i];
-      delete x[i];
-      double mass = sqrt(param->offset[i]/4);
-      dirac2.setMass(mass);
-      diracSloppy2.setMass(mass);
-      DiracMdagM m(dirac2), mSloppy(diracSloppy2);
-      CG cg(m, mSloppy, *param, profileMultiMixed);
-      cg(*high_x, *b);      
-      total_iters += param->iter;
-      total_secs  += param->secs;
-      total_gflops += param->gflops;      
-      profileMultiMixed[QUDA_PROFILE_D2H].Start();
-      *h_x[i] = *high_x;
-      profileMultiMixed[QUDA_PROFILE_D2H].Stop();
-    }
-    
-    param->iter = total_iters;
-    param->secs = total_secs;
-    param->gflops = total_gflops;	
-    delete high_x;
-  }
-  
-  
-  for(int i=0; i < param->num_offset; i++){ 
-    delete h_x[i];
-  }
-
-  delete h_b;
-  delete b;
-
-  delete [] h_x;
-  delete [] x;
-
-  delete [] hp_x;
-  
-  delete dPre;
-  delete dSloppy;
-  delete d;
-
-
-  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
-
-  profileMultiMixed[QUDA_PROFILE_TOTAL].Stop();
 }
 
 
@@ -2295,7 +1918,7 @@ void free_clover_quda_(void) { freeCloverQuda(); }
 void dslash_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity *parity) { dslashQuda(h_out, h_in, inv_param, *parity); }
 void clover_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param,
-		  QudaParity *parity, int *inverse) { CloverQuda(h_out, h_in, inv_param, *parity, *inverse); }
+		  QudaParity *parity, int *inverse) { cloverQuda(h_out, h_in, inv_param, *parity, *inverse); }
 void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)

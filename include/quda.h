@@ -342,16 +342,6 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
 
   /**
-   * Mixed-precision multi-shift solver.  In the future, this functionality
-   * will be folded into invertMultiShiftQuda().
-   * @param _hp_x    Array of solution spinor fields
-   * @param _hp_b    Array of source spinor fields
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
-   */
-  void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b, QudaInvertParam *param);
-    
-  /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -371,7 +361,7 @@ extern "C" {
    * @param parity The source and destination parity of the field
    * @param inverse Whether to apply the inverse of the clover term
    */
-  void CloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
+  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity *parity, int inverse);
 
   /**
@@ -398,11 +388,6 @@ extern "C" {
    * link-fattening code.
    */
 
-  void  record_gauge(int* X, void *_fatlink, int _fatlink_pad, 
-		     void* _longlink, int _longlink_pad, 
-		     QudaReconstructType _longlink_recon,
-		     QudaReconstructType _longlink_recon_sloppy,
-		     QudaGaugeParam *_param);
   void set_dim(int *);
   void pack_ghost(void **cpuLink, void **cpuGhost, int nFace,
 		  QudaPrecision precision);
@@ -412,7 +397,7 @@ extern "C" {
 			 QudaComputeFatMethod method);
 
   /**
-   * Compute the gauge action force.
+   * Compute the gauge force.
    */
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 			    void* loop_coeff, int num_paths, int max_length, double eb3,
@@ -430,6 +415,6 @@ extern "C" {
 #endif
 
 #include <quda_fortran.h>
-//#include <quda_new_interface.h>
+/* #include <quda_new_interface.h> */
 
 #endif /* _QUDA_H */

@@ -127,6 +127,9 @@ Known Issues:
   QMP) requires calling some initialization routines that are not
   exposed in quda.h.  This will be corrected in the next release.
 
+* Attempts to compile with GCC 4.7.x will fail due to bugs in the
+  compiler.
+
 
 Getting Help:
 

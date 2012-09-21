@@ -87,9 +87,11 @@
 
 #define QudaSolveType integer(4)
 #define QUDA_DIRECT_SOLVE 0
-#define QUDA_NORMEQ_SOLVE 1
+#define QUDA_NORMOP_SOLVE 1
 #define QUDA_DIRECT_PC_SOLVE 2
-#define QUDA_NORMEQ_PC_SOLVE 3
+#define QUDA_NORMOP_PC_SOLVE 3
+#define QUDA_NORMEQ_SOLVE QUDA_NORMOP_SOLVE // deprecated
+#define QUDA_NORMEQ_PC_SOLVE QUDA_NORMOP_PC_SOLVE // deprecated
 #define QUDA_INVALID_SOLVE QUDA_INVALID_ENUM
 
 #define QudaSchwarzType integer(4)

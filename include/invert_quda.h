@@ -20,8 +20,9 @@ namespace quda {
 
     virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
 
-    // Solver factory
-    static Solver* create(const QudaInvertParam &param);
+    // solver factory
+    static Solver* create(QudaInvertParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
+			  DiracMatrix &matPrecon, TimeProfile &profile);
   };
 
   class CG : public Solver {
