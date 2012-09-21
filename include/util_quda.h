@@ -15,6 +15,9 @@ void setVerbosity(const QudaVerbosity verbosity);
 void setOutputPrefix(const char *prefix);
 void setOutputFile(FILE *outfile);
 
+void pushVerbosity(QudaVerbosity verbosity);
+void popVerbosity();
+
 
 // Note that __func__ is part of C++11 and has long been supported by GCC.
 
