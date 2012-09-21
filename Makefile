@@ -10,18 +10,18 @@ lib:
 tests:
 	$(MAKE) -C tests/
 
+fortran: lib 
+	$(MAKE) -C lib/ quda_fortran.o
+
 tune:
 	@echo "Manual tuning is no longer required.  Please see README file."
 
 gen:
 	$(MAKE) -C lib/ gen
 
-fortran: lib 
-	$(MAKE) -C lib/ quda_fortran.o
-
 clean:
 	$(MAKE) -C lib/ clean
 	$(MAKE) -C tests/ clean
 	rm -rf ./config.log ./config.status ./autom4te.cache
 
-.PHONY: all lib tests tune gen clean
+.PHONY: all lib tests fortran tune gen clean
