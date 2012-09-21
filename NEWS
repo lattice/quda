@@ -24,8 +24,10 @@ Version 0.5.0
 
 - Vastly improved the stability and accuracy of the multi-shift CG
   solver.  The invertMultiShiftQuda() interface function now supports
-  mixed-precision and implements per-shift refinement after the
+  mixed precision and implements per-shift refinement after the
   multi-shift solver completes to ensure accuracy of the final result.
+  The old invertMultiShiftQudaMixed() interface function has been
+  removed.
 
 - Improved the stability and accuracy of mixed-precision CG.  As a
   result, mixed double/single CG has a virtually identical iteration
