@@ -15,7 +15,7 @@ Maybe this will be useful at some point
 void *
 aligned_malloc(size_t n, void **m0)
 {
-  size_t m = (size_t) malloc(n+ALIGN);
+  size_t m = (size_t) safe_malloc(n+ALIGN);
   *m0 = (void*)m;
   size_t r = m % ALIGN;
   if(r) m += (ALIGN - r);
@@ -140,10 +140,10 @@ namespace quda {
       // array of 4-d fields
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
 	int Ls = x[nDim-1];
-	v = (void**)malloc(Ls * sizeof(void*));
-	for (int i=0; i<Ls; i++) ((void**)v)[i] = (void*)malloc(bytes / Ls);
+	v = (void**)safe_malloc(Ls * sizeof(void*));
+	for (int i=0; i<Ls; i++) ((void**)v)[i] = safe_malloc(bytes / Ls);
       } else {
-	v = (void*)malloc(bytes);
+	v = safe_malloc(bytes);
       }
       init = true;
     }
@@ -189,8 +189,8 @@ namespace quda {
   
     if (init) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	for (int i=0; i<x[nDim-1]; i++) free(((void**)v)[i]);
-      free(v);
+	for (int i=0; i<x[nDim-1]; i++) host_free(((void**)v)[i]);
+      host_free(v);
       init = false;
     }
 
@@ -403,39 +403,30 @@ namespace quda {
     if(this->nSpin == 1) num_faces = 3; // staggered
 
     int spinor_size = 2*this->nSpin*this->nColor*this->precision;
-    for(int i=0;i < 4; i++){
-      fwdGhostFaceBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
-      backGhostFaceBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
+    for (int i=0; i<4; i++) {
+      size_t nbytes = num_faces*Vsh[i]*spinor_size;
 
-      fwdGhostFaceSendBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
-      backGhostFaceSendBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
-    
-      if(fwdGhostFaceBuffer[i]== NULL || backGhostFaceBuffer[i] == NULL||
-	 fwdGhostFaceSendBuffer[i]== NULL || backGhostFaceSendBuffer[i]==NULL){
-	errorQuda("malloc for ghost buf in cpu spinor failed\n");
-      }
+      fwdGhostFaceBuffer[i] = safe_malloc(nbytes);
+      backGhostFaceBuffer[i] = safe_malloc(nbytes);
+      fwdGhostFaceSendBuffer[i] = safe_malloc(nbytes);
+      backGhostFaceSendBuffer[i] = safe_malloc(nbytes);
     }
-  
     initGhostFaceBuffer = 1;
-    return;
   }
+
 
   void cpuColorSpinorField::freeGhostBuffer(void)
   {
     if(!initGhostFaceBuffer) return;
 
     for(int i=0;i < 4; i++){
-      free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
-      free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
-      free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
-      free(backGhostFaceSendBuffer[i]);  backGhostFaceSendBuffer[i] = NULL;
+      host_free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
+      host_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+      host_free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
+      host_free(backGhostFaceSendBuffer[i]);  backGhostFaceSendBuffer[i] = NULL;
     } 
-
     initGhostFaceBuffer = 0;
-  
-    return;
   }
-
 
 
   void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim, 

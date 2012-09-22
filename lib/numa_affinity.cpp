@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <numa_affinity.h>
-#include <util_quda.h>
+#include <quda_internal.h>
 
 static int 
 process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
@@ -123,10 +123,7 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
     return -1;
   }
   
-  my_line= (char *) malloc(nbytes +1);
-  if (my_line == NULL){ 
-    errorQuda("Error: allocating memory for my_line failed"); 
-  }
+  my_line= (char *) safe_malloc(nbytes +1);
   
   while (!feof(nvidia_info)){
     if ( -1 == getline(&my_line, &nbytes, nvidia_info)){
@@ -145,7 +142,7 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
   pci_bus_info= fopen(pci_bus_info_path,"r");
   if (pci_bus_info == NULL){
     //printfQuda("Warning: opening file %s failed\n", pci_bus_info_path);
-    free(my_line);
+    host_free(my_line);
     fclose(nvidia_info);
     return -1;
   }
@@ -157,15 +154,15 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
       int rc = process_core_string_list(my_line, cpu_cores, ncores);
       if(rc < 0){
 	printfQuda("Warning:%s: processing the line (%s) failed\n", __FUNCTION__, my_line);
-	free(my_line);
+	host_free(my_line);
 	fclose(nvidia_info);
 	return  -1;
       }
     }
   }
   
-  free(my_line);
-  return(0);
+  host_free(my_line);
+  return 0;
 }
 
 int 

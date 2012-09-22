@@ -1,3 +1,4 @@
+#include <quda_internal.h>
 #include <gauge_field.h>
 #include <face_quda.h>
 #include <assert.h>
@@ -6,34 +7,31 @@
 namespace quda {
 
   cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
-    GaugeField(param), pinned(param.pinned) {
-
-    if (precision == QUDA_HALF_PRECISION) errorQuda("CPU fields do not support half precision");
-    if (pad != 0) errorQuda("CPU fields do not support non-zero padding");
-  
-    if (reconstruct != QUDA_RECONSTRUCT_NO && 
-	reconstruct != QUDA_RECONSTRUCT_10)
+    GaugeField(param), pinned(param.pinned)
+  {
+    if (precision == QUDA_HALF_PRECISION) {
+      errorQuda("CPU fields do not support half precision");
+    }
+    if (pad != 0) {
+      errorQuda("CPU fields do not support non-zero padding");
+    }
+    if (reconstruct != QUDA_RECONSTRUCT_NO && reconstruct != QUDA_RECONSTRUCT_10) {
       errorQuda("Reconstruction type %d not supported", reconstruct);
-
-    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER)
-      errorQuda("10 reconstruction only supported with MILC gauge order");
+    }
+    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER) {
+      errorQuda("10-reconstruction only supported with MILC gauge order");
+    }
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
-      gauge = (void**)malloc(nDim * sizeof(void*));
+
+      gauge = (void**) safe_malloc(nDim * sizeof(void*));
 
       for (int d=0; d<nDim; d++) {
-	if (create == QUDA_NULL_FIELD_CREATE 
-	    || create == QUDA_ZERO_FIELD_CREATE) {
-	  if(pinned){
-	    if(cudaMallocHost(&gauge[d], volume * reconstruct * precision) == cudaErrorMemoryAllocation) {
-	      errorQuda("ERROR: cudaMallocHost failed for gauge\n");
-	    }
-	  }else{
-	    gauge[d] = malloc(volume * reconstruct * precision);
-	  }
-	
-	  if(create == QUDA_ZERO_FIELD_CREATE){
-	    memset(gauge[d], 0, volume * reconstruct * precision);
+	size_t nbytes = volume * reconstruct * precision;
+	if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
+	  gauge[d] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
+	  if (create == QUDA_ZERO_FIELD_CREATE){
+	    memset(gauge[d], 0, nbytes);
 	  }
 	} else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	  gauge[d] = ((void**)param.gauge)[d];
@@ -42,81 +40,56 @@ namespace quda {
 	}
       }
     
-    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || 
-	       order == QUDA_MILC_GAUGE_ORDER ||
-	       order == QUDA_BQCD_GAUGE_ORDER) {
-      if (create == QUDA_NULL_FIELD_CREATE ||
-	  create == QUDA_ZERO_FIELD_CREATE) {
-	if(pinned){
-	  if (cudaMallocHost(&(gauge), nDim*volume*reconstruct*precision) == cudaErrorMemoryAllocation) {
-	    errorQuda("ERROR: cudaMallocHost failed for gauge\n");
-	  }
-	}else{
-	  gauge = (void**)malloc(nDim * volume * reconstruct * precision);
-	}
+    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER) {
+
+      if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
+	size_t nbytes = nDim * volume * reconstruct * precision;
+	gauge = (void **) (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
 	if(create == QUDA_ZERO_FIELD_CREATE){
-	  memset(gauge, 0, nDim*volume * reconstruct * precision);
+	  memset(gauge, 0, nbytes);
 	}
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
-	gauge = (void**)param.gauge;
+	gauge = (void**) param.gauge;
       } else {
 	errorQuda("Unsupported creation type %d", create);
       }
+
     } else {
       errorQuda("Unsupported gauge order type %d", order);
     }
   
     // Ghost zone is always 2-dimensional
-    ghost = (void**)malloc(sizeof(void*)*QUDA_MAX_DIM);
+    ghost = (void**) safe_malloc(QUDA_MAX_DIM * sizeof(void*));
     for (int i=0; i<nDim; i++) {
-      if(pinned){
-	if (cudaMallocHost(&ghost[i], nFace * surface[i] * reconstruct * precision) == cudaErrorMemoryAllocation) {
-	  errorQuda("ERROR: cudaMallocHost failed for ghost \n");
-	}
-      }else{
-	ghost[i] = malloc(nFace * surface[i] * reconstruct * precision);
-      }
-    }
-  
+      size_t nbytes = nFace * surface[i] * reconstruct * precision;
+      ghost[i] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
+    }  
   }
 
-  cpuGaugeField::~cpuGaugeField() {
 
-    if (create == QUDA_NULL_FIELD_CREATE  
-	|| create == QUDA_ZERO_FIELD_CREATE  ) {
-      if (order == QUDA_QDP_GAUGE_ORDER){
+  cpuGaugeField::~cpuGaugeField()
+  {
+    if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
+      if (order == QUDA_QDP_GAUGE_ORDER) {
 	for (int d=0; d<nDim; d++) {
-	  if(pinned){
-	    if (gauge[d]) cudaFreeHost(gauge[d]);	  
-	  }else{
-	    if (gauge[d]) free(gauge[d]);
-	  }
+	  if (gauge[d]) host_free(gauge[d]);
 	}
-	if (gauge) free(gauge);
-      }else{      
-	if(pinned){
-	  if (gauge) cudaFreeHost(gauge);	  
-	}else{
-	  if (gauge) free(gauge);
-	}
+	if (gauge) host_free(gauge);
+      } else {
+	if (gauge) host_free(gauge);
       }
-    }else{ // QUDA_REFERENCE_FIELD_CREATE 
+    } else { // QUDA_REFERENCE_FIELD_CREATE 
       if (order == QUDA_QDP_GAUGE_ORDER){
-	free(gauge);
+	if (gauge) host_free(gauge);
       }
     }
-  
   
     for (int i=0; i<nDim; i++) {
-      if(pinned){
-	if (ghost[i]) cudaFreeHost(ghost[i]);
-      }else{
-	if (ghost[i]) free(ghost[i]);
-      }
+      if (ghost[i]) host_free(ghost[i]);
     }
-    free(ghost);
-  
+    if (ghost) host_free(ghost);
   }
+
   
   // transpose the matrix
   template <typename Float>
@@ -251,10 +224,10 @@ namespace quda {
   // into the ghost array.
   // This should be optimized so it is reused if called multiple times
   void cpuGaugeField::exchangeGhost() const {
-    void **send = (void**)malloc(sizeof(void*)*QUDA_MAX_DIM);
+    void **send = (void **) safe_malloc(QUDA_MAX_DIM*sizeof(void *));
 
     for (int d=0; d<nDim; d++) {
-      send[d] = malloc(nFace * surface[d] * reconstruct * precision);
+      send[d] = safe_malloc(nFace * surface[d] * reconstruct * precision);
     }
 
     // get the links into a contiguous buffer
@@ -268,17 +241,19 @@ namespace quda {
     FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
     faceBuf.exchangeCpuLink(ghost, send);
 
-    for (int d=0; d<nDim; d++) free(send[d]);
-    free(send);
+    for (int d=0; d<nDim; d++) {
+      host_free(send[d]);
+    }
+    host_free(send);
   }
 
-  void cpuGaugeField::setGauge(void**_gauge)
+  void cpuGaugeField::setGauge(void **_gauge)
   {
-    if(create != QUDA_REFERENCE_FIELD_CREATE){
+    if(create != QUDA_REFERENCE_FIELD_CREATE) {
       errorQuda("Setting gauge pointer is only allowed when cpu gauge"
 		"is of QUDA_REFERENCE_FIELD_CREATE type\n");
     }
-    gauge= _gauge;
+    gauge = _gauge;
   }
 
 /*template <typename Float>
@@ -311,8 +286,6 @@ void cpuColorSpinorField::PrintMatrix(unsigned int x) {
   }
 
 }
-
-
 */
 
 } // namespace quda

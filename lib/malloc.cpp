@@ -49,6 +49,27 @@ namespace quda {
   static long total_host_bytes, max_total_host_bytes;
 
 
+  static void print_alloc_header()
+  {
+    printfQuda("Type    Pointer          Size           \n");
+    printfQuda("----------------------------------------\n");
+  }
+
+
+  static void print_alloc(AllocType type)
+  {
+    const char *type_str[] = {"Device", "Host  ", "Pinned", "Mapped"};
+    std::map<void *, MemAlloc>::iterator entry;
+
+    for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
+      void *ptr = entry->first;
+      MemAlloc a = entry->second;
+      printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long) a.base_size,
+		 a.func.c_str(), a.file.c_str(), a.line);
+    }
+  }
+
+
   static void track_malloc(const AllocType &type, const MemAlloc &a, void *ptr)
   {
     total_bytes[type] += a.base_size;
@@ -247,5 +268,19 @@ namespace quda {
     free(ptr);
   }
 
+
+  void assertAllMemFree()
+  {
+    if (!alloc[DEVICE].empty() || !alloc[HOST].empty() || !alloc[PINNED].empty() || !alloc[MAPPED].empty()) {
+      warningQuda("The following internal memory allocations were not freed.");
+      printfQuda("\n");
+      print_alloc_header();
+      print_alloc(DEVICE);
+      print_alloc(HOST);
+      print_alloc(PINNED);
+      print_alloc(MAPPED);
+      printfQuda("\n");
+    }
+  }
 
 } // namespace quda

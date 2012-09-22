@@ -7,8 +7,7 @@
 
 #define hwSiteSize 12
 
-static ParityHw 
-allocateParityHw(int *X, QudaPrecision precision) 
+static ParityHw allocateParityHw(int *X, QudaPrecision precision) 
 {
     ParityHw ret;
     
@@ -27,21 +26,13 @@ allocateParityHw(int *X, QudaPrecision precision)
     else if (precision == QUDA_SINGLE_PRECISION) ret.bytes = ret.length*sizeof(float);
     else ret.bytes = ret.length*sizeof(short);
     
-    if (cudaMalloc((void**)&ret.data, ret.bytes) == cudaErrorMemoryAllocation) {
-	printf("Error allocating half wilson\n");
-	exit(0);
-    }
-    
+    ret.data = device_malloc(ret.bytes);    
     cudaMemset(ret.data, 0, ret.bytes);
     
-    if (precision == QUDA_HALF_PRECISION) { //FIXME not supported yet
-      printf("ERROR: half precision not supporte yet in function %s\n", __FUNCTION__);
-      //if (cudaMalloc((void**)&ret.dataNorm, 2*ret.bytes/spinorSiteSize) == cudaErrorMemoryAllocation) {
-      //printf("Error allocating half wilson Norm\n");
-      //exit(0);
-      //}
-    }
-    
+    if (precision == QUDA_HALF_PRECISION) {
+      errorQuda("Half precision not supported at present"); //FIXME
+      //ret.dataNorm = device_malloc(2*ret.bytes/spinorSiteSize);
+    }    
     return ret;
 }
 
@@ -56,24 +47,21 @@ createHwQuda(int *X, QudaPrecision precision)
 }
 
 
-static void
-freeParityHwQuda(ParityHw parity_hw) 
+static void freeParityHwQuda(ParityHw parity_hw) 
 {
-    
-    cudaFree(parity_hw.data);
-    if (parity_hw.precision == QUDA_HALF_PRECISION){
-	cudaFree(parity_hw.dataNorm);
-    }
-    
-    parity_hw.data = NULL;
-    parity_hw.dataNorm = NULL;
+  device_free(parity_hw.data);
+  if (parity_hw.precision == QUDA_HALF_PRECISION){
+    device_free(parity_hw.dataNorm);
+  }
+  parity_hw.data = NULL;
+  parity_hw.dataNorm = NULL;
 }
 
-void 
-freeHwQuda(FullHw hw) 
+
+void freeHwQuda(FullHw hw) 
 {
-    freeParityHwQuda(hw.even);
-    freeParityHwQuda(hw.odd);
+  freeParityHwQuda(hw.even);
+  freeParityHwQuda(hw.odd);
 }
 
 
@@ -226,49 +214,41 @@ static void unpackParityHw(Float *res, FloatN *hwPacked, int Vh) {
 
 
 
-void
-static loadParityHw(ParityHw ret, void *hw, QudaPrecision cpu_prec)
+void static loadParityHw(ParityHw ret, void *hw, QudaPrecision cpu_prec)
 {
-    void *packedHw1 = 0;
+  if (ret.precision == QUDA_DOUBLE_PRECISION && cpu_prec != QUDA_DOUBLE_PRECISION) {
+    errorQuda("CUDA double precision requires CPU double precision");
+  }
+  
+  if (ret.precision != QUDA_HALF_PRECISION) {	
     
-    if (ret.precision == QUDA_DOUBLE_PRECISION && cpu_prec != QUDA_DOUBLE_PRECISION) {
-	printf("Error, cannot have CUDA double precision without double CPU precision\n");
-	exit(-1);
-    }
-    
-    if (ret.precision != QUDA_HALF_PRECISION) {	
-      if (cudaMallocHost(&packedHw1, ret.bytes) == cudaErrorMemoryAllocation) {
-	  errorQuda("ERROR: cudaMallocHost failed for packedHw1\n");
-	}
-	
-	if (ret.precision == QUDA_DOUBLE_PRECISION) {
-	    packParityHw((double2*)packedHw1, (double*)hw, ret.volume);
-	} else {
-	    if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-		packParityHw((float2*)packedHw1, (double*)hw, ret.volume);
-	    }
-	    else {
-		packParityHw((float2*)packedHw1, (float*)hw, ret.volume);
-	    }
-	}
-	cudaMemcpy(ret.data, packedHw1, ret.bytes, cudaMemcpyHostToDevice);
-	cudaFreeHost(packedHw1);
+    void *packedHw1 = pinned_malloc(ret.bytes);
+      
+    if (ret.precision == QUDA_DOUBLE_PRECISION) {
+      packParityHw((double2*)packedHw1, (double*)hw, ret.volume);
     } else {
-	
-	//half precision
-	/*
-	  ParityHw tmp = allocateParityHw(ret.X, QUDA_SINGLE_PRECISION);
-	  loadParityHw(tmp, hw, cpu_prec, dirac_order);
-	  copyCuda(ret, tmp);
-	  freeParityHw(tmp);
-	*/
+      if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+	packParityHw((float2*)packedHw1, (double*)hw, ret.volume);
+      } else {
+	packParityHw((float2*)packedHw1, (float*)hw, ret.volume);
+      }
     }
+    cudaMemcpy(ret.data, packedHw1, ret.bytes, cudaMemcpyHostToDevice);
+    host_free(packedHw1);
     
+  } else {	
+    //half precision
+    /*
+      ParityHw tmp = allocateParityHw(ret.X, QUDA_SINGLE_PRECISION);
+      loadParityHw(tmp, hw, cpu_prec, dirac_order);
+      copyCuda(ret, tmp);
+      freeParityHw(tmp);
+    */
+  }
 }
 
 
-void
-loadHwToGPU(FullHw ret, void *hw, QudaPrecision cpu_prec)
+void loadHwToGPU(FullHw ret, void *hw, QudaPrecision cpu_prec)
 {
     void *hw_odd;
     if (cpu_prec == QUDA_SINGLE_PRECISION){
@@ -282,37 +262,34 @@ loadHwToGPU(FullHw ret, void *hw, QudaPrecision cpu_prec)
     
 }
 
-static void 
-retrieveParityHw(void *res, ParityHw hw, QudaPrecision cpu_prec)
+
+static void retrieveParityHw(void *res, ParityHw hw, QudaPrecision cpu_prec)
 {
-    void *packedHw1 = 0;
-    if (hw.precision != QUDA_HALF_PRECISION) {
-      if (cudaMallocHost((void**)&packedHw1, hw.bytes) == cudaErrorMemoryAllocation) {
-	errorQuda("ERROR: cudaMallocHost failed for packedHw1\n");
-      }
-	cudaMemcpy(packedHw1, hw.data, hw.bytes, cudaMemcpyDeviceToHost);
-	
-	if (hw.precision == QUDA_DOUBLE_PRECISION) {
-	    unpackParityHw((double*)res, (double2*)packedHw1, hw.volume);
-	} else {
-	    if (cpu_prec == QUDA_DOUBLE_PRECISION){
-		unpackParityHw((double*)res, (float2*)packedHw1, hw.volume);
-	    }
-	    else {
-		unpackParityHw((float*)res, (float2*)packedHw1, hw.volume);
-	    }
-	}
-	cudaFreeHost(packedHw1);
-	
+  if (hw.precision != QUDA_HALF_PRECISION) {
+
+    void *packedHw1 = pinned_malloc(hw.bytes);
+    cudaMemcpy(packedHw1, hw.data, hw.bytes, cudaMemcpyDeviceToHost);
+    
+    if (hw.precision == QUDA_DOUBLE_PRECISION) {
+      unpackParityHw((double*)res, (double2*)packedHw1, hw.volume);
     } else {
-	//half precision
-	/*
-	  ParityHw tmp = allocateParityHw(hw.X, QUDA_SINGLE_PRECISION);
-	  copyCuda(tmp, hw);
-	  retrieveParityHw(res, tmp, cpu_prec, dirac_order);
-	  freeParityHw(tmp);
-	*/
+      if (cpu_prec == QUDA_DOUBLE_PRECISION){
+	unpackParityHw((double*)res, (float2*)packedHw1, hw.volume);
+      } else {
+	unpackParityHw((float*)res, (float2*)packedHw1, hw.volume);
+      }
     }
+    host_free(packedHw1);
+    
+  } else {
+    //half precision
+    /*
+      ParityHw tmp = allocateParityHw(hw.X, QUDA_SINGLE_PRECISION);
+      copyCuda(tmp, hw);
+      retrieveParityHw(res, tmp, cpu_prec, dirac_order);
+      freeParityHw(tmp);
+    */
+  }
 }
 
 

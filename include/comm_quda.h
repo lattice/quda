@@ -32,7 +32,6 @@ unsigned long	comm_recv(void*, int, int, void*);
 unsigned long	comm_recv_from_rank(void*, int, int, void*);
 unsigned long   comm_recv_with_tag(void*, int, int, int, void*);
 int             comm_query(void*);
-void            comm_free(void*);
 void		comm_wait(void*);
 void		comm_allreduce(double* data);
 void            comm_allreduce_int(int* data);

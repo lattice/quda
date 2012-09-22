@@ -7,48 +7,44 @@
 namespace quda {
 
   cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
-    GaugeField(param), gauge(0), even(0), odd(0), 
-    backed_up(false)
+    GaugeField(param), gauge(0), even(0), odd(0), backed_up(false)
   {
     if(create != QUDA_NULL_FIELD_CREATE &&  create != QUDA_ZERO_FIELD_CREATE){
       errorQuda("ERROR: create type(%d) not supported yet\n", create);
     }
   
-    if (cudaMalloc((void **)&gauge, bytes) == cudaErrorMemoryAllocation) {
-      errorQuda("Error allocating gauge field");
-    }
+    gauge = device_malloc(bytes);
   
     if(create == QUDA_ZERO_FIELD_CREATE){
       cudaMemset(gauge, 0, bytes);
     }
-  
     even = gauge;
-    odd = (char*)gauge + bytes/2;
- 
+    odd = (char*)gauge + bytes/2; 
   }
 
-  cudaGaugeField::~cudaGaugeField() {
-    if (gauge) cudaFree(gauge);
-    checkCudaError();
+  cudaGaugeField::~cudaGaugeField()
+  {
+    if (gauge) device_free(gauge);
   }
 
   // FIXME temporary hack 
   static double anisotropy_;
   static double fat_link_max_;
   static const int *X_;
-  static QudaTboundary t_boundary_; 
+  static QudaTboundary t_boundary_;
+
 #include <pack_gauge.h>
 
   template <typename Float, typename FloatN>
   static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **cpuGhost,
 			     GaugeFieldOrder cpu_order, QudaReconstructType reconstruct, 
 			     size_t bytes, int volumeCB, int *surfaceCB, int pad, int nFace,
-			     QudaLinkType type, double &fat_link_max) {
+			     QudaLinkType type, double &fat_link_max)
+  {
     // Use pinned memory
     FloatN *packed, *packedEven, *packedOdd;
-    if (cudaMallocHost(&packed, bytes) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for packed\n");
-    }
+
+    packed = (FloatN *) pinned_malloc(bytes);
     packedEven = packed;
     packedOdd = (FloatN*)((char*)packed + bytes/2);
 
@@ -62,7 +58,6 @@ namespace quda {
     if (cpu_order != QUDA_QDP_GAUGE_ORDER && cpu_order != QUDA_BQCD_GAUGE_ORDER)
       errorQuda("Only QUDA_QDP_GAUGE_ORDER is supported for multi-gpu\n");
 #endif
-
 
     //for QUDA_ASQTAD_FAT_LINKS, need to find out the max value
     //fat_link_max will be used in encoding half precision fat link
@@ -134,19 +129,16 @@ namespace quda {
     cudaMemcpy(even, packed, bytes, cudaMemcpyHostToDevice);
     checkCudaError();
     
-    cudaFreeHost(packed);
+    host_free(packed);
   }
+
 
   template <typename Float, typename Float2>
   void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh, int pad) 
   {  
     Float2 *packedEven, *packedOdd;
-    if(cudaMallocHost(&packedEven, bytes/2) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
-    }
-    if (cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for packedOdd\n");
-    }
+    packedEven = (Float2 *) pinned_malloc(bytes/2);
+    packedOdd = (Float2 *) pinned_malloc(bytes/2);
     
     packMomField(packedEven, (Float*)mom, 0, Vh, pad);
     packMomField(packedOdd,  (Float*)mom, 1, Vh, pad);
@@ -154,9 +146,10 @@ namespace quda {
     cudaMemcpy(even, packedEven, bytes/2, cudaMemcpyHostToDevice);
     cudaMemcpy(odd,  packedOdd, bytes/2, cudaMemcpyHostToDevice); 
   
-    cudaFreeHost(packedEven);
-    cudaFreeHost(packedOdd);
+    host_free(packedEven);
+    host_free(packedOdd);
   }
+
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
   {
@@ -258,17 +251,14 @@ namespace quda {
   */
   template <typename Float, typename FloatN>
   static void storeGaugeField(Float *cpuGauge, FloatN *gauge, GaugeFieldOrder cpu_order,
-			      QudaReconstructType reconstruct, int bytes, int volumeCB, int pad) {
-
+			      QudaReconstructType reconstruct, int bytes, int volumeCB, int pad)
+  {
     // Use pinned memory
-    FloatN *packed;
-    if (cudaMallocHost(&packed, bytes) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for packed\n");
-    }
-    cudaMemcpy(packed, gauge, bytes, cudaMemcpyDeviceToHost);
-    
+    FloatN *packed = (FloatN *) pinned_malloc(bytes);
     FloatN *packedEven = packed;
     FloatN *packedOdd = (FloatN*)((char*)packed + bytes/2);
+
+    cudaMemcpy(packed, gauge, bytes, cudaMemcpyDeviceToHost);
     
     if (cpu_order == QUDA_QDP_GAUGE_ORDER) {
       unpackQDPGaugeField((Float**)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad);
@@ -286,7 +276,7 @@ namespace quda {
       errorQuda("Invalid gauge_order");
     }
     
-    cudaFreeHost(packed);
+    host_free(packed);
   }
 
 
@@ -309,11 +299,8 @@ namespace quda {
     FloatN *even = gauge;
     FloatN *odd = (FloatN*)((char*)gauge + bytes/2);
 
-    int datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
-    void *unpacked;  
-    if(cudaMalloc(&unpacked, datalen) != cudaSuccess){
-      errorQuda("cudaMalloc() failed for unpacked\n");
-    }
+    size_t datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
+    void *unpacked = device_malloc(datalen);
     void *unpackedEven = unpacked;
     void *unpackedOdd = (char*)unpacked + datalen/2;
   
@@ -334,30 +321,24 @@ namespace quda {
     cudaMemcpy(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
 #endif
   
-    cudaFree(unpacked);
+    device_free(unpacked);
     for(int i=0; i<2; i++) cudaStreamDestroy(streams[i]);
   }
 
   template <typename Float, typename Float2>
-  void 
-  storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd, 
-		     int bytes, int V, int pad) 
+  void storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd, int bytes, int V, int pad) 
   {    
-    Float2 *packedEven, *packedOdd;   
-    if (cudaMallocHost(&packedEven, bytes/2) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
-    }
-    if (cudaMallocHost(&packedOdd, bytes/2) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for packedEven\n");
-    }
+    Float2 *packedEven = (Float2 *) pinned_malloc(bytes/2);
+    Float2 *packedOdd = (Float2 *) pinned_malloc(bytes/2);
+
     cudaMemcpy(packedEven, even, bytes/2, cudaMemcpyDeviceToHost); 
     cudaMemcpy(packedOdd, odd, bytes/2, cudaMemcpyDeviceToHost);  
   
     unpackMomField((Float*)mom, packedEven,0, V/2, pad);
     unpackMomField((Float*)mom, packedOdd, 1, V/2, pad);
   
-    cudaFreeHost(packedEven); 
-    cudaFreeHost(packedOdd); 
+    host_free(packedEven); 
+    host_free(packedOdd); 
   }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const

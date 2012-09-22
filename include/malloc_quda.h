@@ -4,6 +4,9 @@
 #include <cstdlib>
 
 namespace quda {
+
+  void assertAllMemFree();
+
   /*
    * The following functions should not be called directly.  Use the
    * macros below instead.
@@ -14,6 +17,7 @@ namespace quda {
   void *mapped_malloc_(const char *func, const char *file, int line, size_t size);
   void device_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
+
 }
 
 #define device_malloc(size) quda::device_malloc_(__func__, __FILE__, __LINE__, size)

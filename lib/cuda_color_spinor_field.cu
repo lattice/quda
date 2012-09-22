@@ -7,7 +7,7 @@
 
 #include <string.h>
 #include <iostream>
-#include "misc_helpers.h"
+#include <misc_helpers.h>
 #include <face_quda.h>
 #include <dslash_quda.h>
 
@@ -200,24 +200,19 @@ namespace quda {
     //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (cudaMalloc((void**)&v, bytes) == cudaErrorMemoryAllocation) {
-	errorQuda("Error allocating spinor: bytes=%lu", (unsigned long)bytes);
-      }
-
+      v = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
-	if (cudaMalloc((void**)&norm, norm_bytes) == cudaErrorMemoryAllocation) {
-	  errorQuda("Error allocating norm");
-	}
+	norm = device_malloc(norm_bytes);
       }
       alloc = true;
     }
 
     // Check if buffer isn't big enough
-    if (bytes > bufferBytes && bufferInit) {
-      cudaFreeHost(buffer_h);
+    if ((bytes > bufferBytes) && bufferInit) {
+      host_free(buffer_h);
       buffer_h = NULL;
       if (REORDER_LOCATION == QUDA_CUDA_FIELD_LOCATION) {
-	cudaFree(buffer_d);
+	device_free(buffer_d);
 	buffer_d = NULL;
       }
       bufferInit = false;
@@ -225,13 +220,10 @@ namespace quda {
 
     if (!bufferInit) {
       bufferBytes = bytes;
-
-      if (cudaHostAlloc(&buffer_h, bufferBytes, 0) == cudaErrorMemoryAllocation)
-	errorQuda("cudaHostAlloc failed for buffer_h");
-      if (REORDER_LOCATION == QUDA_CUDA_FIELD_LOCATION) 
-	if (cudaMalloc(&buffer_d, bufferBytes) == cudaErrorMemoryAllocation)
-	  errorQuda("cudaHostAlloc failed for buffer_d");
-
+      buffer_h = pinned_malloc(bufferBytes);
+      if (REORDER_LOCATION == QUDA_CUDA_FIELD_LOCATION) {
+	buffer_d = device_malloc(bufferBytes);
+      }
       bufferInit = true;
     }
 
@@ -267,10 +259,10 @@ namespace quda {
   }
   void cudaColorSpinorField::freeBuffer() {
     if (bufferInit) {
-      cudaFreeHost(buffer_h);
+      host_free(buffer_h);
       buffer_h = NULL;
       if (REORDER_LOCATION == QUDA_CUDA_FIELD_LOCATION) {
-	cudaFree(buffer_d);
+	device_free(buffer_d);
 	buffer_d = NULL;
       }
       bufferInit = false;
@@ -279,8 +271,8 @@ namespace quda {
 
   void cudaColorSpinorField::destroy() {
     if (alloc) {
-      cudaFree(v);
-      if (precision == QUDA_HALF_PRECISION) cudaFree(norm);
+      device_free(v);
+      if (precision == QUDA_HALF_PRECISION) device_free(norm);
       if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 	delete even;
 	delete odd;
@@ -373,10 +365,10 @@ namespace quda {
 
   void cudaColorSpinorField::resizeBuffer(size_t bytes) const {
     if (bytes > bufferBytes) {
-      cudaFree(buffer_d);
-      cudaFreeHost(buffer_h);
-      cudaMalloc(&buffer_d, bytes);
-      cudaHostAlloc(&buffer_h, bytes, 0);
+      device_free(buffer_d);
+      host_free(buffer_h);
+      buffer_d = device_malloc(bytes);
+      buffer_h = pinned_malloc(bytes);
     }
   }
 
@@ -533,14 +525,12 @@ namespace quda {
 	if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostFace[i]*sizeof(float);
       
 	if (this->initGhostFaceBuffer) { // only free-ed if precision is higher than previous allocation
-	  //cudaFree(this->fwdGhostFaceBuffer[i]); 
-	  cudaFree(this->backGhostFaceBuffer[i]); this->backGhostFaceBuffer[i] = NULL;
+	  //device_free(this->fwdGhostFaceBuffer[i]); 
+	  device_free(this->backGhostFaceBuffer[i]); this->backGhostFaceBuffer[i] = NULL;
 	  this->fwdGhostFaceBuffer[i] = NULL;
 	}
-	//cudaMalloc((void**)&this->fwdGhostFaceBuffer[i], faceBytes);
-	if (cudaMalloc((void**)&this->backGhostFaceBuffer[i], 2*faceBytes) == cudaErrorMemoryAllocation){
-	  errorQuda("cudaMalloc() failed for backGhostFaceBuffer\n");
-	}
+	//this->fwdGhostFaceBuffer[i] = device_malloc(faceBytes);
+	this->backGhostFaceBuffer[i] = device_malloc(2*faceBytes);
 	fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
       }   
     
@@ -557,22 +547,21 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostFace[i]*sizeof(float);
       fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
     }
-
-
   }
 
-  void cudaColorSpinorField::freeGhostBuffer(void) {
+
+  void cudaColorSpinorField::freeGhostBuffer(void)
+  {
     if (!initGhostFaceBuffer) return;
   
     for(int i=0;i < 4; i++){
       if(!commDimPartitioned(i)){
 	continue;
       }
-      //cudaFree(fwdGhostFaceBuffer[i]); 
-      cudaFree(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+      //device_free(fwdGhostFaceBuffer[i]); 
+      device_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
       fwdGhostFaceBuffer[i] = NULL;
-    } 
-
+    }
     initGhostFaceBuffer = 0;  
   }
 

@@ -74,33 +74,20 @@ namespace quda {
     size_t bytes = 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat);
 
     if (!d_reduce) {
-      if (cudaMalloc((void**) &d_reduce, bytes) == cudaErrorMemoryAllocation) {
-	errorQuda("Error allocating device reduction array");
-      }
+      d_reduce = (QudaSumFloat *) device_malloc(bytes);
     }
     
     // these arrays are acutally oversized currently (only needs to be QudaSumFloat3)
     
     // if the device supports host-mapped memory then use a host-mapped array for the reduction
-    if(deviceProp.canMapHostMemory) {
-      if (!h_reduce) {
-	if (cudaHostAlloc((void**) &h_reduce, bytes, cudaHostAllocMapped) == cudaErrorMemoryAllocation) {
-	  errorQuda("Error allocating host reduction array");
-	}
-	
-	// set the matching device pointer
-	cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0);
+    if (!h_reduce) {
+      if(deviceProp.canMapHostMemory) {
+	h_reduce = (QudaSumFloat *) mapped_malloc(bytes);	
+	cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
+      } else {
+	h_reduce = (QudaSumFloat *) pinned_malloc(bytes);
+	hd_reduce = d_reduce;
       }
-      
-    } else {
-      
-      if (!h_reduce) {
-	if (cudaMallocHost((void**) &h_reduce, bytes) == cudaErrorMemoryAllocation) {
-	  errorQuda("Error allocating host reduction array");
-	}
-      }
-      
-      hd_reduce = d_reduce;
     }
     
     blasStream = &streams[Nstream-1];
@@ -113,15 +100,13 @@ namespace quda {
   void endBlas(void)
   {
     if (d_reduce) {
-      cudaFree(d_reduce);
+      device_free(d_reduce);
       d_reduce = 0;
     }
-    
     if (h_reduce) {
-      cudaFreeHost(h_reduce);
+      host_free(h_reduce);
       h_reduce = 0;
     }
-    
     hd_reduce = 0;
     
     cudaEventDestroy(reduceEnd);

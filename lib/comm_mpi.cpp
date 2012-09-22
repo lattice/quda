@@ -4,6 +4,7 @@
 #include <string.h>
 #include <mpi.h>
 #include <comm_quda.h>
+#include <quda_internal.h>
 
 static char hostname[128] = "undetermined";
 static int fwd_nbr=-1;
@@ -226,11 +227,7 @@ comm_init(void)
   }
 
   //determine which gpu this MPI process is going to use
-  char* hostname_recv_buf = (char*)malloc(128*size);
-  if(hostname_recv_buf == NULL){
-    printf("ERROR: malloc failed for host_recv_buf\n");
-    comm_exit(1);
-  }
+  char* hostname_recv_buf = (char*)safe_malloc(128*size);
   
   int rc = MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD);
   if (rc != MPI_SUCCESS){
@@ -255,7 +252,7 @@ comm_init(void)
   
   srand(rank*999);
   
-  free(hostname_recv_buf);
+  host_free(hostname_recv_buf);
   return;
 }
 
@@ -339,10 +336,6 @@ comm_send(void* buf, int len, int dst, void* _request)
 {
   
   MPI_Request* request = (MPI_Request*)_request;
-  if (request == NULL){
-    printf("ERROR: malloc failed for mpi request\n");
-    comm_exit(1);
-  }
 
   int dstproc;
   int sendtag=99;
@@ -366,10 +359,6 @@ comm_send_to_rank(void* buf, int len, int dst_rank, void* _request)
 {
   
   MPI_Request* request = (MPI_Request*)_request;
-  if (request == NULL){
-    printf("ERROR: malloc failed for mpi request\n");
-    comm_exit(1);
-  }
   
   if(dst_rank < 0 || dst_rank >= comm_size()){
     printf("ERROR: Invalid dst rank(%d)\n", dst_rank);
@@ -383,12 +372,7 @@ comm_send_to_rank(void* buf, int len, int dst_rank, void* _request)
 unsigned long
 comm_send_with_tag(void* buf, int len, int dst, int tag, void*_request)
 {
-
   MPI_Request* request = (MPI_Request*)_request;
-  if (request == NULL){
-    printf("ERROR: malloc failed for mpi request\n");
-    comm_exit(1);
-  }
 
   int dstproc = -1;
   switch(dst){
@@ -431,10 +415,6 @@ unsigned long
 comm_recv(void* buf, int len, int src, void*_request)
 {
   MPI_Request* request = (MPI_Request*)_request;
-  if (request == NULL){
-    printf("ERROR: malloc failed for mpi request\n");
-    comm_exit(1);
-  }
   
   int srcproc=-1;
   int recvtag=99; //recvtag is opposite to the sendtag
@@ -458,10 +438,6 @@ unsigned long
 comm_recv_from_rank(void* buf, int len, int src_rank, void* _request)
 {
   MPI_Request* request = (MPI_Request*)_request;
-  if (request == NULL){
-    printf("ERROR: malloc failed for mpi request\n");
-    comm_exit(1);
-  }
   
   if(src_rank < 0 || src_rank >= comm_size()){
     printf("ERROR: Invalid src rank(%d)\n", src_rank);
@@ -478,10 +454,6 @@ unsigned long
 comm_recv_with_tag(void* buf, int len, int src, int tag, void* _request)
 { 
   MPI_Request* request = (MPI_Request*)_request;
-  if (request == NULL){
-    printf("ERROR: malloc failed for mpi request\n");
-    comm_exit(1);
-  }
   
   int srcproc=-1;
   switch (src){
@@ -531,10 +503,6 @@ int comm_query(void* request)
   return query;
 }
 
-void comm_free(void* request) {
-  free((void*)request);
-  return;
-}
 
 //this request should be some return value from comm_recv
 void 
