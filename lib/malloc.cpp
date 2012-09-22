@@ -90,9 +90,9 @@ namespace quda {
 #if (CUDA_VERSION > 4000)
     a.base_size = size;
     ptr = malloc(size);
-#else // cudaHostRegister() under CUDA 4.0 seems to require that the beginning and end of the buffer be aligned on page boundaries
+#else
     static int page_size = getpagesize();
-    a.base_size = (size + page_size - 1) % page_size;
+    a.base_size = ((size + page_size - 1) % page_size) * page_size; // round up to the nearest multiple of page_size
     posix_memalign(&ptr, page_size, a.base_size);
 #endif
     if (!ptr) {
