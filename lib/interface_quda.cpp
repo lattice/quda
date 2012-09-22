@@ -1202,16 +1202,19 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     copyCuda(*in, *out);
+    delete solve;
   }
 
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    delete solve;
   } else {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    delete solve;
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){
