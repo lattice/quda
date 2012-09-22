@@ -22,7 +22,6 @@
 #define DiracFieldOrder QudaDiracFieldOrder
 #define CloverFieldOrder QudaCloverFieldOrder
 #define InverterType QudaInverterType  
-//#define Precision QudaPrecision
 #define MatPCType QudaMatPCType
 #define SolutionType QudaSolutionType
 #define MassNormalization QudaMassNormalization
@@ -33,6 +32,7 @@
 #include <enum_quda.h>
 #include <quda.h>
 #include <util_quda.h>
+#include <malloc_quda.h>
 
 #ifdef __cplusplus
 extern "C" {
