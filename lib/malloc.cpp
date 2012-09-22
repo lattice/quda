@@ -92,7 +92,7 @@ namespace quda {
     ptr = malloc(size);
 #else
     static int page_size = getpagesize();
-    a.base_size = ((size + page_size - 1) % page_size) * page_size; // round up to the nearest multiple of page_size
+    a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     posix_memalign(&ptr, page_size, a.base_size);
 #endif
     if (!ptr) {
