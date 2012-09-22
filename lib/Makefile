@@ -19,7 +19,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
 	gauge_field.h double_single.h texture.h	\
-	numa_affinity.h misc_helpers.h fermion_force_quda.h
+	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h reduce_core.h

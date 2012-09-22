@@ -41,65 +41,22 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
 
-  for(int i=0;i < QUDA_MAX_DIM; i++){
-    recv_request1[i] = malloc(sizeof(MPI_Request));
-    recv_request2[i] = malloc(sizeof(MPI_Request));
-    send_request1[i] = malloc(sizeof(MPI_Request));    
-    send_request2[i] = malloc(sizeof(MPI_Request));    
-    if( recv_request1[i] == 0 || recv_request2[i] == 0
-	|| send_request1[i] == 0 || send_request2[i] == 0){
-      errorQuda("ERROR: malloc failed for recv/send request handles\n");
-    }
+  for (int i=0; i < QUDA_MAX_DIM; i++) {
+    recv_request1[i] = safe_malloc(sizeof(MPI_Request));
+    recv_request2[i] = safe_malloc(sizeof(MPI_Request));
+    send_request1[i] = safe_malloc(sizeof(MPI_Request));    
+    send_request2[i] = safe_malloc(sizeof(MPI_Request));    
   }
 
-  unsigned int flag = cudaHostAllocDefault;
-
-  int pad[4] = {0,0,0,0};
-#if (CUDA_VERSION <= 4000)
-  static const int page_size = getpagesize();
-#endif
-
-  for(int dir =0 ; dir < 4;dir++){
+  for (int dir=0 ; dir < 4; dir++) {
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
     if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
 
-#if (CUDA_VERSION > 4000)
-    fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-#else
-    pad[dir] = page_size - nbytes[dir]%page_size;
-    posix_memalign(&fwd_nbr_spinor_sendbuf[dir], page_size, nbytes[dir]+pad[dir]);
-#endif
-    if( !fwd_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);
-    cudaHostRegister(fwd_nbr_spinor_sendbuf[dir], nbytes[dir]+pad[dir], flag);
+    fwd_nbr_spinor_sendbuf[dir] = pinned_malloc(nbytes[dir]);
+    back_nbr_spinor_sendbuf[dir] = pinned_malloc(nbytes[dir]);
 
-#if (CUDA_VERSION > 4000) 
-    back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-#else
-    posix_memalign(&back_nbr_spinor_sendbuf[dir], page_size, nbytes[dir]+pad[dir]);
-#endif
-
-    if( !back_nbr_spinor_sendbuf[dir] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[dir]);
-    cudaHostRegister(back_nbr_spinor_sendbuf[dir], nbytes[dir]+pad[dir], flag);
-
-#if (CUDA_VERSION > 4000)
-    fwd_nbr_spinor[dir] = malloc(nbytes[dir]);
-#else
-    posix_memalign(&fwd_nbr_spinor[dir], page_size, nbytes[dir]+pad[dir]);
-#endif
-    if( !fwd_nbr_spinor[dir] ) errorQuda("Unable to allocate my_fwd_face with size %lu", nbytes[dir]);
-    checkCudaError();
-    cudaHostRegister(fwd_nbr_spinor[dir], nbytes[dir]+pad[dir], flag);
-
-#if (CUDA_VERSION > 4000)
-    back_nbr_spinor[dir] = malloc(nbytes[dir]);
-#else
-    posix_memalign(&back_nbr_spinor[dir], page_size, nbytes[dir]+pad[dir]);
-#endif
-    if( !back_nbr_spinor[dir] ) errorQuda("Unable to allocate my_back_face with size %lu", nbytes[dir]);
-    cudaHostRegister(back_nbr_spinor[dir], nbytes[dir]+pad[dir], flag);
-
-    if (fwd_nbr_spinor[dir] == NULL || back_nbr_spinor[dir] == NULL)
-      errorQuda("malloc failed for fwd_nbr_spinor/back_nbr_spinor"); 
+    fwd_nbr_spinor[dir] = pinned_malloc(nbytes[dir]);
+    back_nbr_spinor[dir] = pinned_malloc(nbytes[dir]);
 
 #ifdef GPU_DIRECT
     pageable_fwd_nbr_spinor_sendbuf[dir] = fwd_nbr_spinor_sendbuf[dir];
@@ -107,19 +64,11 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     pageable_fwd_nbr_spinor[dir] = fwd_nbr_spinor[dir];
     pageable_back_nbr_spinor[dir] = back_nbr_spinor[dir];
 #else
-    pageable_fwd_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-    pageable_back_nbr_spinor_sendbuf[dir] = malloc(nbytes[dir]);
-
-    if (pageable_fwd_nbr_spinor_sendbuf[dir] == NULL || pageable_back_nbr_spinor_sendbuf[dir] == NULL)
-      errorQuda("malloc failed for pageable_fwd_nbr_spinor_sendbuf/pageable_back_nbr_spinor_sendbuf");
-
-    pageable_fwd_nbr_spinor[dir]=malloc(nbytes[dir]);
-    pageable_back_nbr_spinor[dir]=malloc(nbytes[dir]);
-
-    if (pageable_fwd_nbr_spinor[dir] == NULL || pageable_back_nbr_spinor[dir] == NULL)
-      errorQuda("malloc failed for pageable_fwd_nbr_spinor/pageable_back_nbr_spinor"); 
+    pageable_fwd_nbr_spinor_sendbuf[dir] = safe_malloc(nbytes[dir]);
+    pageable_back_nbr_spinor_sendbuf[dir] = safe_malloc(nbytes[dir]);
+    pageable_fwd_nbr_spinor[dir] = safe_malloc(nbytes[dir]);
+    pageable_back_nbr_spinor[dir] = safe_malloc(nbytes[dir]);
 #endif
-
   }
 
   checkCudaError();
@@ -152,34 +101,30 @@ void FaceBuffer::setupDims(const int* X)
 }
 
 FaceBuffer::~FaceBuffer()
-{
- 
-  for(int i=0;i < QUDA_MAX_DIM; i++){
-    free((void*)recv_request1[i]);
-    free((void*)recv_request2[i]);
-    free((void*)send_request1[i]);
-    free((void*)send_request2[i]);
+{ 
+  for (int i=0; i < QUDA_MAX_DIM; i++) {
+    host_free(recv_request1[i]);
+    host_free(recv_request2[i]);
+    host_free(send_request1[i]);
+    host_free(send_request2[i]);
   }
 
-  for(int dir =0; dir < 4; dir++){
+  for (int dir=0; dir < 4; dir++) {
+
     if(fwd_nbr_spinor_sendbuf[dir]) {
-      cudaHostUnregister(fwd_nbr_spinor_sendbuf[dir]);
-      free(fwd_nbr_spinor_sendbuf[dir]);
+      host_free(fwd_nbr_spinor_sendbuf[dir]);
       fwd_nbr_spinor_sendbuf[dir] = NULL;
     }
     if(back_nbr_spinor_sendbuf[dir]) {
-      cudaHostUnregister(back_nbr_spinor_sendbuf[dir]);
-      free(back_nbr_spinor_sendbuf[dir]);
+      host_free(back_nbr_spinor_sendbuf[dir]);
       back_nbr_spinor_sendbuf[dir] = NULL;
     }
     if(fwd_nbr_spinor[dir]) {
-      cudaHostUnregister(fwd_nbr_spinor[dir]);
-      free(fwd_nbr_spinor[dir]);
+      host_free(fwd_nbr_spinor[dir]);
       fwd_nbr_spinor[dir] = NULL;
     }
     if(back_nbr_spinor[dir]) {
-      cudaHostUnregister(back_nbr_spinor[dir]);
-      free(back_nbr_spinor[dir]);
+      host_free(back_nbr_spinor[dir]);
       back_nbr_spinor[dir] = NULL;
     }    
 
@@ -190,28 +135,24 @@ FaceBuffer::~FaceBuffer()
     pageable_back_nbr_spinor[dir]=NULL;
 #else
     if(pageable_fwd_nbr_spinor_sendbuf[dir]){
-      free(pageable_fwd_nbr_spinor_sendbuf[dir]);
+      host_free(pageable_fwd_nbr_spinor_sendbuf[dir]);
       pageable_fwd_nbr_spinor_sendbuf[dir] = NULL;
     }
-
     if(pageable_back_nbr_spinor_sendbuf[dir]){
-      free(pageable_back_nbr_spinor_sendbuf[dir]);
+      host_free(pageable_back_nbr_spinor_sendbuf[dir]);
       pageable_back_nbr_spinor_sendbuf[dir]=NULL;
-    }
-    
+    }    
     if(pageable_fwd_nbr_spinor[dir]){
-      free(pageable_fwd_nbr_spinor[dir]);
+      host_free(pageable_fwd_nbr_spinor[dir]);
       pageable_fwd_nbr_spinor[dir]=NULL;
-    }
-    
+    }    
     if(pageable_back_nbr_spinor[dir]){
-      free(pageable_back_nbr_spinor[dir]);
+      host_free(pageable_back_nbr_spinor[dir]);
       pageable_back_nbr_spinor[dir]=NULL;
     }
 #endif
 
   }
-
   checkCudaError();
 }
 
@@ -446,7 +387,6 @@ setup_dims(int* X)
   X3=X[2];
   X4=X[3];
 
-
   Vs[0] = Vs_x = X[1]*X[2]*X[3];
   Vs[1] = Vs_y = X[0]*X[2]*X[3];
   Vs[2] = Vs_z = X[0]*X[1]*X[3];
@@ -456,103 +396,36 @@ setup_dims(int* X)
   Vsh[1] = Vsh_y = Vs_y/2;
   Vsh[2] = Vsh_z = Vs_z/2;
   Vsh[3] = Vsh_t = Vs_t/2;
-
 }
 
 
-
-
-
-
-void 
-exchange_llfat_init(QudaPrecision prec)
+void exchange_llfat_init(QudaPrecision prec)
 {
-  static int initialized = 0;
-  if (initialized){
-    return;
-  }
-  initialized = 1;
+  static bool initialized = false;
+
+  if (initialized) return;
+  initialized = true;
   
-  int pad[4] = {0,0,0,0};
-  int packet_size[4];
-  for(int dir=0; dir<4; ++dir){
-    packet_size[dir] = Vs[dir]*gaugeSiteSize*prec;
-  }
+  for (int i=0; i < 4; i++) {
 
-#if (CUDA_VERSION <= 4000)
-  const int page_size = getpagesize();
-  for(int dir=0; dir<4; ++dir){
-    pad[dir] =  page_size - packet_size[dir]%page_size;
-  }
-#endif
-   
-  unsigned int flag = cudaHostAllocDefault;
+    packet_size = Vs[i]*gaugeSiteSize*prec;
 
-  for(int i=0;i < 4; i++){
-    if(cudaMalloc((void**)&fwd_nbr_staple_gpu[i], packet_size[i]) != cudaSuccess){
-      errorQuda("cudaMalloc() failed for fwd_nbr_staple_gpu\n");
-    }
-    if(cudaMalloc((void**)&back_nbr_staple_gpu[i], packet_size[i]) != cudaSuccess){
-      errorQuda("cudaMalloc() failed for back_nbr_staple_gpu\n");
-    }
+    fwd_nbr_staple_gpu[i] = device_malloc(packet_size);
+    back_nbr_staple_gpu[i] = device_malloc(packet_size);
 
-#if (CUDA_VERSION > 4000)
-    fwd_nbr_staple[i] = malloc(packet_size[i]);
-#else
-    posix_memalign(&fwd_nbr_staple[i], page_size, packet_size[i]+pad[i]); 
-#endif
-    if( !fwd_nbr_staple[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", packet_size[i]+pad[i]);
-    cudaHostRegister(fwd_nbr_staple[i], packet_size[i]+pad[i], flag);
- 
-#if (CUDA_VERSION > 4000)
-    back_nbr_staple[i] = malloc(packet_size[i]);
-#else
-    posix_memalign(&back_nbr_staple[i], page_size, packet_size[i]+pad[i]);
-#endif
-    if( !back_nbr_staple[i] ) errorQuda("Unable to allocate my_back_face with size %lu", packet_size[i]+pad[i]);
-    cudaHostRegister(back_nbr_staple[i], packet_size[i]+pad[i], flag);
-
-#if (CUDA_VERSION > 4000)
-    fwd_nbr_staple_sendbuf[i] = malloc(packet_size[i]);
-#else
-    posix_memalign(&fwd_nbr_staple_sendbuf[i], page_size, packet_size[i]+pad[i]);
-#endif
-    if( !fwd_nbr_staple_sendbuf[i] ) errorQuda("Unable to allocate my_fwd_face with size %lu", packet_size[i]+pad[i]);
-    cudaHostRegister(fwd_nbr_staple_sendbuf[i], packet_size[i]+pad[i], flag);
- 
-#if (CUDA_VERSION > 4000) 
-    back_nbr_staple_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-#else
-    posix_memalign(&back_nbr_staple_sendbuf[i], page_size, packet_size[i]+pad[i]);
-#endif
-    if( !back_nbr_staple_sendbuf[i]) errorQuda("Unable to allocate my_back_face with size %lu", packet_size[i]+pad[i]);
-    cudaHostRegister(back_nbr_staple_sendbuf[i], packet_size[i]+pad[i], flag);
-  }
-
-  
+    fwd_nbr_staple[i] = pinned_malloc(packet_size);
+    back_nbr_staple[i] = pinned_malloc(packet_size);
+    fwd_nbr_staple_sendbuf[i] = pinned_malloc(packet_size);
+    back_nbr_staple_sendbuf[i] = pinned_malloc(packet_size);
 
 #ifndef GPU_DIRECT
-  for(int i=0;i < 4; i++){
-    fwd_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    back_nbr_staple_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    if (fwd_nbr_staple_cpu[i] == NULL||back_nbr_staple_cpu[i] == NULL){
-      printf("ERROR: malloc failed for fwd_nbr_staple_cpu/back_nbr_staple_cpu\n");
-      comm_exit(1);
-    }
+    fwd_nbr_staple_cpu[i] = safe_malloc(packet_size);
+    back_nbr_staple_cpu[i] = safe_malloc(packet_size);
+    fwd_nbr_staple_sendbuf_cpu[i] = safe_malloc(packet_size);
+    back_nbr_staple_sendbuf_cpu[i] = safe_malloc(packet_size);
+#endif  
 
   }
-
-  for(int i=0;i < 4; i++){
-    fwd_nbr_staple_sendbuf_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    back_nbr_staple_sendbuf_cpu[i] = malloc(Vs[i]*gaugeSiteSize*prec);
-    if (fwd_nbr_staple_sendbuf_cpu[i] == NULL || back_nbr_staple_sendbuf_cpu[i] == NULL){
-      printf("ERROR: malloc failed for fwd_nbr_staple_sendbuf/back_nbr_staple_sendbuf\n");
-      comm_exit(1);
-    }
-  }
-#endif
-  
-  return;
 }
 
 
@@ -599,10 +472,7 @@ exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag, i
 	errorQuda("Invalid dir1/dir2");
       }
       int len = X[dir1]*X[dir2]*gaugeSiteSize*sizeof(Float);
-      void* sendbuf = malloc(len);
-      if(sendbuf == NULL){
-	errorQuda("Malloc failed for diag sendbuf\n");
-      }
+      void *sendbuf = safe_malloc(len);
       
       pack_gauge_diag(sendbuf, X, (void**)sitelink, nu, mu, dir1, dir2, (QudaPrecision)sizeof(Float));
   
@@ -623,7 +493,7 @@ exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag, i
       comm_wait(&recv_request);
       comm_wait(&send_request);
             
-      free(sendbuf);
+      host_free(sendbuf);
     }//mu
   }//nu
 }
@@ -716,19 +586,17 @@ void exchange_cpu_sitelink(int* X,
   setup_dims(X);
   static void*  sitelink_fwd_sendbuf[4];
   static void*  sitelink_back_sendbuf[4];
-  static int allocated = 0;
+  static bool allocated = false;
 
-  if(!allocated){
-    for(int i=0;i < 4;i++){
-      sitelink_fwd_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
-      sitelink_back_sendbuf[i] = malloc(4*Vs[i]*gaugeSiteSize*gPrecision);
-      if (sitelink_fwd_sendbuf[i] == NULL|| sitelink_back_sendbuf[i] == NULL){
-	errorQuda("ERROR: malloc failed for sitelink_sendbuf/site_link_back_sendbuf\n");
-      }  
-      memset(sitelink_fwd_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
-      memset(sitelink_back_sendbuf[i], 0, 4*Vs[i]*gaugeSiteSize*gPrecision);
+  if (!allocated) {
+    for (int i=0; i<4; i++) {
+      int nbytes = 4*Vs[i]*gaugeSiteSize*gPrecision;
+      sitelink_fwd_sendbuf[i] = safe_malloc(nbytes);
+      sitelink_back_sendbuf[i] = safe_malloc(nbytes);
+      memset(sitelink_fwd_sendbuf[i], 0, nbytes);
+      memset(sitelink_back_sendbuf[i], 0, nbytes);
     }
-    allocated = 1;
+    allocated = true;
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION){
@@ -741,10 +609,10 @@ void exchange_cpu_sitelink(int* X,
   
   if(!(param->preserve_gauge & QUDA_FAT_PRESERVE_COMM_MEM)){
     for(int i=0;i < 4;i++){
-      free(sitelink_fwd_sendbuf[i]);
-      free(sitelink_back_sendbuf[i]);
+      host_free(sitelink_fwd_sendbuf[i]);
+      host_free(sitelink_back_sendbuf[i]);
     }
-    allocated = 0;
+    allocated = false;
   }
 }
 
@@ -888,24 +756,18 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
   for(int i=0;i < 4;i++){
     len[i] = slice_3d[i] * R[i] * 4*gaugeSiteSize*gPrecision; //2 slices, 4 directions' links
   }
+
   void* ghost_sitelink_fwd_sendbuf[4];
   void* ghost_sitelink_back_sendbuf[4];
   void* ghost_sitelink_fwd[4];
   void* ghost_sitelink_back[4];  
-  for(int i=0;i < 4;i++){    
+
+  for(int i=0; i<4; i++) {
     if(!commDimPartitioned(i)) continue;
-    ghost_sitelink_fwd_sendbuf[i] = malloc(len[i]);
-    ghost_sitelink_back_sendbuf[i] = malloc(len[i]);
-    if(ghost_sitelink_fwd_sendbuf[i] == NULL || ghost_sitelink_back_sendbuf[i] == NULL){
-      errorQuda("Error: malloc for ghost sitelink send buffer failed\n");
-    } 
-    
-    ghost_sitelink_fwd[i] = malloc(len[i]);
-    ghost_sitelink_back[i] = malloc(len[i]);
-    if(ghost_sitelink_fwd[i] == NULL || ghost_sitelink_back[i] == NULL){
-      errorQuda("Error: malloc for ghost sitelink failed\n");
-    } 
-    
+    ghost_sitelink_fwd_sendbuf[i] = safe_malloc(len[i]);
+    ghost_sitelink_back_sendbuf[i] = safe_malloc(len[i]);
+    ghost_sitelink_fwd[i] = safe_malloc(len[i]);
+    ghost_sitelink_back[i] = safe_malloc(len[i]);
   }
 
   int back_nbr[4] = {X_BACK_NBR, Y_BACK_NBR, Z_BACK_NBR,T_BACK_NBR};
@@ -1112,10 +974,10 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
   
   for(int dir=0;dir < 4;dir++){
     if(!commDimPartitioned(dir)) continue;
-    free(ghost_sitelink_fwd_sendbuf[dir]);
-    free(ghost_sitelink_back_sendbuf[dir]);    
-    free(ghost_sitelink_fwd[dir]);
-    free(ghost_sitelink_back[dir]);    
+    host_free(ghost_sitelink_fwd_sendbuf[dir]);
+    host_free(ghost_sitelink_back_sendbuf[dir]);    
+    host_free(ghost_sitelink_fwd[dir]);
+    host_free(ghost_sitelink_back[dir]);    
   }
   
   
@@ -1195,38 +1057,33 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
     comm_wait(&send_request2);
   }
 }
+
+
 //this function is used for link fattening computation
-void exchange_cpu_staple(int* X,
-			 void* staple, void** ghost_staple,
-			 QudaPrecision gPrecision)
-{
-  
+void exchange_cpu_staple(int* X, void* staple, void** ghost_staple, QudaPrecision gPrecision)
+{  
   setup_dims(X);
 
   int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
-  void*  staple_fwd_sendbuf[4];
-  void*  staple_back_sendbuf[4];
+  void *staple_fwd_sendbuf[4];
+  void *staple_back_sendbuf[4];
 
   for(int i=0;i < 4; i++){
-    staple_fwd_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*gPrecision);
-    staple_back_sendbuf[i] = malloc(Vs[i]*gaugeSiteSize*gPrecision);
-    if (staple_fwd_sendbuf[i] == NULL|| staple_back_sendbuf[i] == NULL){
-      printf("ERROR: malloc failed for staple_sendbuf/site_link_back_sendbuf\n");
-      exit(1);
-    }
+    staple_fwd_sendbuf[i] = safe_malloc(Vs[i]*gaugeSiteSize*gPrecision);
+    staple_back_sendbuf[i] = safe_malloc(Vs[i]*gaugeSiteSize*gPrecision);
   }
   
-  if (gPrecision == QUDA_DOUBLE_PRECISION){
+  if (gPrecision == QUDA_DOUBLE_PRECISION) {
     do_exchange_cpu_staple((double*)staple, (double**)ghost_staple, 
 			   (double**)staple_fwd_sendbuf, (double**)staple_back_sendbuf, X);
-  }else{ //single
+  } else { //single
     do_exchange_cpu_staple((float*)staple, (float**)ghost_staple, 
 			   (float**)staple_fwd_sendbuf, (float**)staple_back_sendbuf, X);
   }
   
-  for(int i=0;i < 4;i++){
-    free(staple_fwd_sendbuf[i]);
-    free(staple_back_sendbuf[i]);
+  for (int i=0;i < 4;i++) {
+    host_free(staple_fwd_sendbuf[i]);
+    host_free(staple_back_sendbuf[i]);
   }
 }
 
@@ -1361,56 +1218,45 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaS
 void
 exchange_llfat_cleanup(void)
 {
-  
-  for(int i=0;i < 4; i++){
+  for (int i=0; i<4; i++) {
+
     if(fwd_nbr_staple_gpu[i]){
-      cudaFree(fwd_nbr_staple_gpu[i]); fwd_nbr_staple_gpu[i] =NULL;
+      device_free(fwd_nbr_staple_gpu[i]); fwd_nbr_staple_gpu[i] = NULL;
     }      
     if(back_nbr_staple_gpu[i]){
-      cudaFree(back_nbr_staple_gpu[i]);back_nbr_staple_gpu[i] = NULL;
+      device_free(back_nbr_staple_gpu[i]); back_nbr_staple_gpu[i] = NULL;
     }
-
-  }
 
 #ifndef GPU_DIRECT
-  for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_cpu[i]){
-      free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] =NULL;
+      host_free(fwd_nbr_staple_cpu[i]); fwd_nbr_staple_cpu[i] = NULL;
     }      
     if(back_nbr_staple_cpu[i]){
-      free(back_nbr_staple_cpu[i]);back_nbr_staple_cpu[i] = NULL;
+      host_free(back_nbr_staple_cpu[i]);back_nbr_staple_cpu[i] = NULL;
     }
-  }
-  for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_sendbuf_cpu[i]){
-      free(fwd_nbr_staple_sendbuf_cpu[i]); fwd_nbr_staple_sendbuf_cpu[i] = NULL;
+      host_free(fwd_nbr_staple_sendbuf_cpu[i]); fwd_nbr_staple_sendbuf_cpu[i] = NULL;
     }
     if(back_nbr_staple_sendbuf_cpu[i]){
-      free(back_nbr_staple_sendbuf_cpu[i]); back_nbr_staple_sendbuf_cpu[i] = NULL;
+      host_free(back_nbr_staple_sendbuf_cpu[i]); back_nbr_staple_sendbuf_cpu[i] = NULL;
     }    
-  }
 #endif
 
-  for(int i=0;i < 4; i++){
     if(fwd_nbr_staple[i]){
-      cudaHostUnregister(fwd_nbr_staple[i]); free(fwd_nbr_staple[i]); fwd_nbr_staple[i] = NULL;
+      host_free(fwd_nbr_staple[i]); fwd_nbr_staple[i] = NULL;
     }
     if(back_nbr_staple[i]){
-      cudaHostUnregister(back_nbr_staple[i]); free(back_nbr_staple[i]); back_nbr_staple[i] = NULL;
+      host_free(back_nbr_staple[i]); back_nbr_staple[i] = NULL;
     }
-  }
-  
-  for(int i=0;i < 4; i++){
     if(fwd_nbr_staple_sendbuf[i]){
-      cudaHostUnregister(fwd_nbr_staple_sendbuf[i]); free(fwd_nbr_staple_sendbuf[i]); fwd_nbr_staple_sendbuf[i] = NULL;
+      host_free(fwd_nbr_staple_sendbuf[i]); fwd_nbr_staple_sendbuf[i] = NULL;
     }
     if(back_nbr_staple_sendbuf[i]){
-      cudaHostUnregister(back_nbr_staple_sendbuf[i]); free(back_nbr_staple_sendbuf[i]); back_nbr_staple_sendbuf[i] = NULL;
+      host_free(back_nbr_staple_sendbuf[i]); back_nbr_staple_sendbuf[i] = NULL;
     }
+
   }
-
   checkCudaError();
-
 }
 
 #endif
