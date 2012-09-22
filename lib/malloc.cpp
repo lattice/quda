@@ -51,8 +51,8 @@ namespace quda {
 
   static void print_alloc_header()
   {
-    printfQuda("Type    Pointer          Size           \n");
-    printfQuda("----------------------------------------\n");
+    printfQuda("Type    Pointer          Size             Location\n");
+    printfQuda("----------------------------------------------------------\n");
   }
 
 

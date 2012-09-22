@@ -545,6 +545,8 @@ void endQuda(void)
     profileMultiMixed.Print();
     profileEnd.Print();
   }
+
+  assertAllMemFree();
 }
 
 
