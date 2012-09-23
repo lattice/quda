@@ -857,7 +857,7 @@ namespace quda {
   {  
     int datalen = 4*Vh*gaugeSiteSize*sizeof(Float);
 
-    double *unpackedDataEven = device_malloc(datalen);
+    double *unpackedDataEven = (double *) device_malloc(datalen);
     double *unpackedDataOdd = unpackedDataEven;
 
     //unpack even data kernel

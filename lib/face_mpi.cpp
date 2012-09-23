@@ -408,7 +408,7 @@ void exchange_llfat_init(QudaPrecision prec)
   
   for (int i=0; i < 4; i++) {
 
-    packet_size = Vs[i]*gaugeSiteSize*prec;
+    size_t packet_size = Vs[i]*gaugeSiteSize*prec;
 
     fwd_nbr_staple_gpu[i] = device_malloc(packet_size);
     back_nbr_staple_gpu[i] = device_malloc(packet_size);
