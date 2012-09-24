@@ -710,31 +710,82 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
 
 
 template <typename FloatN>
-void packFaceWilson(FloatN *faces, float *facesNorm, const FloatN *in, const float *inNorm, 
-		    const int dim, const int dagger, const int parity, 
-		    const dim3 &gridDim, const dim3 &blockDim, const cudaStream_t &stream)
-{
-#ifdef GPU_WILSON_DIRAC
-  if (dagger) {
-    switch (dim) {
-    case 0: packFaceWilsonKernel<0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceWilsonKernel<1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceWilsonKernel<2,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceWilsonKernel<3,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    }
-  } else {
-    switch (dim) {
-    case 0: packFaceWilsonKernel<0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceWilsonKernel<1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceWilsonKernel<2,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceWilsonKernel<3,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    }
-  }
-#else
-  errorQuda("Wilson face packing kernel is not built");
-#endif  
-}
+class PackFaceWilson : public Tunable {
 
+ private:
+  FloatN *faces;
+  float *facesNorm;
+  const FloatN *in;
+  const float *inNorm;
+  const int dim;
+  const int dagger;
+  const int parity;
+  const int *X;
+  const int *ghostFace;
+  const int stride;
+
+  int sharedBytesPerThread() const { return 0; }
+  int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+  
+  virtual bool advanceSharedBytes(TuneParam &param) const
+  {
+    TuneParam next(param);
+    advanceBlockDim(next); // to get next blockDim
+    int nthreads = next.block.x * next.block.y * next.block.z;
+    param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+      sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+    return false;
+  }
+  
+ public:
+  PackFaceWilson(FloatN *faces, float *facesNorm, const FloatN *in, const float *inNorm, 
+		 const int dim, const int dagger, const int parity, const int *X, 
+		 const int *ghostFace, const int stride)
+    : faces(faces), facesNorm(facesNorm), in(in), inNorm(inNorm), dim(dim), dagger(dagger), 
+    parity(parity), X(X), ghostFace(ghostFace), stride(stride) { }
+  virtual ~PackFaceWilson() { }
+  
+  TuneKey tuneKey() const {
+    std::stringstream vol, aux;
+    vol << X[0] << "x";
+    vol << X[1] << "x";
+    vol << X[2] << "x";
+    vol << X[3];    
+    aux << "dim=" << dim << ",stride=" << stride << ",prec=" << sizeof(((FloatN*)0)->x);
+    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+  }  
+  
+  void apply(const cudaStream_t &stream) {
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+
+#ifdef GPU_WILSON_DIRAC
+    if (dagger) {
+      switch (dim) {
+      case 0: packFaceWilsonKernel<0,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      case 1: packFaceWilsonKernel<1,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      case 2: packFaceWilsonKernel<2,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      case 3: packFaceWilsonKernel<3,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      }
+    } else {
+      switch (dim) {
+    case 0: packFaceWilsonKernel<0,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      case 1: packFaceWilsonKernel<1,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      case 2: packFaceWilsonKernel<2,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      case 3: packFaceWilsonKernel<3,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+      }
+    }
+#else
+    errorQuda("Wilson face packing kernel is not built");
+#endif  
+  }
+
+  long long flops() const { return 12*ghostFace[dim]; }
+  long long bytes() const { 
+    size_t bytes = 36 * sizeof(((FloatN*)0)->x); // 24 in and 12 out
+    if (sizeof(((FloatN*)0)->x) == QUDA_HALF_PRECISION) bytes += 2*sizeof(float);
+    return bytes*2*ghostFace[dim];  // 2 from two faces
+  }
+};
 
 void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 		    const int parity, const cudaStream_t &stream) {
@@ -750,16 +801,25 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 
   switch(in.Precision()) {
   case QUDA_DOUBLE_PRECISION:
-    packFaceWilson((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
-		   dim, dagger, parity, gridDim, blockDim, stream);
+    {
+      PackFaceWilson<double2> pack((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
+				   dim, dagger, parity, in.X(), in.GhostFace(), in.Stride());
+      pack.apply(stream);
+    }
     break;
   case QUDA_SINGLE_PRECISION:
-    packFaceWilson((float4*)ghost_buf, ghostNorm, (float4*)in.V(), (float*)in.Norm(), 
-		   dim, dagger, parity, gridDim, blockDim, stream);
+    {
+      PackFaceWilson<float4> pack((float4*)ghost_buf, ghostNorm, (float4*)in.V(), (float*)in.Norm(), 
+				  dim, dagger, parity, in.X(), in.GhostFace(), in.Stride());
+      pack.apply(stream);
+    }
     break;
   case QUDA_HALF_PRECISION:
-    packFaceWilson((short4*)ghost_buf, ghostNorm, (short4*)in.V(), (float*)in.Norm(), 
-		   dim, dagger, parity, gridDim, blockDim, stream);
+    {
+      PackFaceWilson<short4> pack((short4*)ghost_buf, ghostNorm, (short4*)in.V(), (float*)in.Norm(), 
+				  dim, dagger, parity, in.X(), in.GhostFace(), in.Stride());
+      pack.apply(stream);
+    }
     break;
   }  
 }
