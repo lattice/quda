@@ -10,6 +10,13 @@ namespace quda {
 
 #if (POINTER_SIZE==8) // 64-bit pointers
 
+  __device__ inline void load_streaming_double2(double2 &a, const double2* addr)
+  {
+    double x, y;
+    asm("ld.cs.global.v2.f64 {%0, %1}, [%2+0];" : "=d"(x), "=d"(y) : "l"(addr));
+    a.x = x; a.y = y;
+  }
+
   __device__ inline void load_streaming_float4(float4 &a, const float4* addr)
   {
     float x, y, z, w;
@@ -50,6 +57,13 @@ namespace quda {
   }
 
 #else // 32-bit pointers
+
+  __device__ inline void load_streaming_double2(double2 &a, const double2* addr)
+  {
+    double x, y;
+    asm("ld.cs.global.v2.f64 {%0, %1}, [%2+0];" : "=d"(x), "=d"(y) : "r"(addr));
+    a.x = x; a.y = y;
+  }
 
   __device__ inline void load_streaming_float4(float4 &a, const float4* addr)
   {

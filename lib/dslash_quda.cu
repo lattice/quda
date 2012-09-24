@@ -7,14 +7,17 @@
 #include <clover_field.h>
 
 // these control the Wilson-type actions
+#ifdef GPU_WILSON_DIRAC
 //#define DIRECT_ACCESS_LINK
 //#define DIRECT_ACCESS_WILSON_SPINOR
 //#define DIRECT_ACCESS_WILSON_ACCUM
 //#define DIRECT_ACCESS_WILSON_INTER
 //#define DIRECT_ACCESS_WILSON_PACK_SPINOR
 //#define DIRECT_ACCESS_CLOVER
+#endif // GPU_WILSON_DIRAC
 
 //these are access control for staggered action
+#ifdef GPU_STAGGERED_DIRAC
 #if (__COMPUTE_CAPABILITY__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
@@ -30,6 +33,7 @@
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
 #endif
+#endif // GPU_STAGGERED_DIRAC
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
@@ -134,6 +138,11 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_constants.h>
 
+#if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
+  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
+  defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
+  defined(DIRECT_ACCESS_CLOVER)
+
   static inline __device__ float short2float(short a) {
     return (float)a/MAX_SHORT;
   }
@@ -145,10 +154,6 @@ namespace quda {
   static inline __device__ short2 float22short2(float c, float2 a) {
     return make_short2((short)(a.x*c*MAX_SHORT), (short)(a.y*c*MAX_SHORT));
   }
-
-#if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
-  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
-  defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR)
 
   static inline __device__ short4 float42short4(float c, float4 a) {
     return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));

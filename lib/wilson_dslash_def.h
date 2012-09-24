@@ -228,7 +228,7 @@
 #endif
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
 #define CLOVERTEX clover
-#define READ_CLOVER READ_CLOVER_DOUBLE
+#define READ_CLOVER READ_CLOVER_DOUBLE_STR
 #else
 #define CLOVERTEX cloverTexDouble
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX

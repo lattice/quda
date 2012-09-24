@@ -18,6 +18,28 @@
   double2 C16 = clover[sid + (18*chi+16)*cl_stride];  \
   double2 C17 = clover[sid + (18*chi+17)*cl_stride];
 
+#define READ_CLOVER_DOUBLE_STR(clover, chi)				\
+  double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9;			\
+  double2 C10, C11, C12, C13, C14, C15, C16, C17;			\
+  load_streaming_double2(C0, &clover[sid + (18*chi+0)*cl_stride]);	\
+  load_streaming_double2(C1, &clover[sid + (18*chi+1)*cl_stride]);	\
+  load_streaming_double2(C2, &clover[sid + (18*chi+2)*cl_stride]);	\
+  load_streaming_double2(C3, &clover[sid + (18*chi+3)*cl_stride]);	\
+  load_streaming_double2(C4, &clover[sid + (18*chi+4)*cl_stride]);	\
+  load_streaming_double2(C5, &clover[sid + (18*chi+5)*cl_stride]);	\
+  load_streaming_double2(C6, &clover[sid + (18*chi+6)*cl_stride]);	\
+  load_streaming_double2(C7, &clover[sid + (18*chi+7)*cl_stride]);	\
+  load_streaming_double2(C8, &clover[sid + (18*chi+8)*cl_stride]);	\
+  load_streaming_double2(C9, &clover[sid + (18*chi+9)*cl_stride]);	\
+  load_streaming_double2(C10, &clover[sid + (18*chi+10)*cl_stride]);	\
+  load_streaming_double2(C11, &clover[sid + (18*chi+11)*cl_stride]);	\
+  load_streaming_double2(C12, &clover[sid + (18*chi+12)*cl_stride]);	\
+  load_streaming_double2(C13, &clover[sid + (18*chi+13)*cl_stride]);	\
+  load_streaming_double2(C14, &clover[sid + (18*chi+14)*cl_stride]);	\
+  load_streaming_double2(C15, &clover[sid + (18*chi+15)*cl_stride]);	\
+  load_streaming_double2(C16, &clover[sid + (18*chi+16)*cl_stride]);	\
+  load_streaming_double2(C17, &clover[sid + (18*chi+17)*cl_stride]);	
+
 #define READ_CLOVER_SINGLE(clover, chi)		  \
   float4 C0 = clover[sid + (9*chi+0)*cl_stride];  \
   float4 C1 = clover[sid + (9*chi+1)*cl_stride];  \
