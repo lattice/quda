@@ -544,7 +544,7 @@ int main(int argc, char **argv)
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
     // print timing information
-    printfQuda("%fms per loop\n", 1000*secs);
+    printfQuda("%fus per kernel call\n", 1e6*secs / niter);
     
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
