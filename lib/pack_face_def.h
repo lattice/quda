@@ -764,6 +764,8 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
   }  
 }
 
+#ifdef GPU_STAGGERED_DIRAC
+
 #if (defined DIRECT_ACCESS_PACK) || (defined FERMI_NO_DBLE_TEX)
 template <typename Float2>
 __device__ void packSpinor(Float2 *out, float *outNorm, int out_idx, int out_stride, 
@@ -804,7 +806,6 @@ __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, int out_str
 //
 // TODO: add support for textured reads
 
-#ifdef GPU_STAGGERED_DIRAC
 template <int dim, int ishalf, typename Float2>
 __global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *in, 
 				     const float *inNorm, const int parity)
