@@ -30,12 +30,18 @@ namespace quda {
   template<typename OutputType, typename InputType, int tex_id=0>
     class Texture {
   private: 
+#ifdef DIRECT_ACCESS_BLAS
   const InputType *spinor; // used when textures are disabled
+#endif
   //size_t bytes;
 
   public:
   Texture() { ; }
-  Texture(const InputType *x, size_t bytes) : spinor(x)/*, bytes(bytes)*/ { 
+  Texture(const InputType *x, size_t bytes) 
+#ifdef DIRECT_ACCESS_BLAS
+  : spinor(x)/*, bytes(bytes)*/ 
+#endif
+  { 
 
     if (bytes) bind(x, MAX_TEXELS*sizeof(InputType)); // only bind if bytes > 0
     //if (bytes) bind(x, bytes); // only bind if bytes > 0
@@ -43,7 +49,9 @@ namespace quda {
   ~Texture() { /*if (bytes) */ /*unbind()*/; } // unbinding is unnecessary and costly
 
   Texture& operator=(const Texture &tex) {
+#ifdef DIRECT_ACCESS_BLAS
     spinor = tex.spinor;
+#endif
     return *this;
   }
 
