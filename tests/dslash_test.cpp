@@ -139,7 +139,7 @@ void init(int argc, char **argv) {
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
 
-  //inv_param.sp_pad = 24*24*24;
+  //inv_param.sp_pad = xdim*ydim*zdim/2;
   //inv_param.cl_pad = 24*24*24;
 
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // test code only supports DeGrand-Rossi Basis
@@ -557,7 +557,7 @@ int main(int argc, char **argv)
     }
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printfQuda("GB/s = %f\n\n", 
-	       Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
+	       (double)Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
     
     if (!transfer) {
       double norm2_cpu = norm2(*spinorRef);

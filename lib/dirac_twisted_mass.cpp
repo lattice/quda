@@ -32,7 +32,7 @@ namespace quda {
     initSpinorConstants(in);
     twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, twistType);
 
-    flops += 24*in.Volume();
+    flops += 24ll*in.Volume();
   }
 
 
@@ -142,7 +142,7 @@ namespace quda {
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       initSpinorConstants(in);
       twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, flavor_mu, 0.0, commDim);
-      flops += (1320+72)*in.Volume();
+      flops += 1392ll*in.Volume();
     } else { // safe to use tmp2 here which may alias in
       bool reset = newTmp(&tmp2, in);
 
@@ -150,7 +150,7 @@ namespace quda {
       TwistInv(*tmp2, in);
       DiracWilson::Dslash(out, *tmp2, parity);
 
-      flops += 72*in.Volume();
+      flops += 72ll*in.Volume();
 
       // if the pointers alias, undo the twist
       if (tmp2->V() == in.V()) Twist(*tmp2, *tmp2); 
@@ -179,14 +179,14 @@ namespace quda {
       initSpinorConstants(in);
       twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, 
 			    flavor_mu, k, commDim);
-      flops += (1320+96)*in.Volume();
+      flops += 1416ll*in.Volume();
     } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
       bool reset = newTmp(&tmp1, in);
       initSpinorConstants(in);
       TwistInv(*tmp1, in);
       DiracWilson::Dslash(out, *tmp1, parity);
       xpayCuda((cudaColorSpinorField&)x, k, out);
-      flops += 96*in.Volume();
+      flops += 96ll*in.Volume();
 
       // if the pointers alias, undo the twist
       if (tmp1->V() == in.V()) Twist(*tmp1, *tmp1); 

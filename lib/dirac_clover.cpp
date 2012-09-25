@@ -53,7 +53,7 @@ namespace quda {
     cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
     asymCloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim);
 
-    flops += (1320+504+48)*in.Volume();
+    flops += 1872ll*in.Volume();
   }
 
   // Public method to apply the clover term only
@@ -68,7 +68,7 @@ namespace quda {
     cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
     cloverCuda(&out, gauge, cs, &in, parity);
 
-    flops += 504*in.Volume();
+    flops += 504ll*in.Volume();
   }
 
   void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
@@ -141,7 +141,7 @@ namespace quda {
     cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
     cloverCuda(&out, gauge, cs, &in, parity);
 
-    flops += 504*in.Volume();
+    flops += 504ll*in.Volume();
   }
 
   // apply hopping term, then clover: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
@@ -161,7 +161,7 @@ namespace quda {
     cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
     cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, 0, 0.0, commDim);
 
-    flops += (1320+504)*in.Volume();
+    flops += 1824ll*in.Volume();
   }
 
   // xpay version of the above
@@ -180,7 +180,7 @@ namespace quda {
     cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
     cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim);
 
-    flops += (1320+504+48)*in.Volume();
+    flops += 1872ll*in.Volume();
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
