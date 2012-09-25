@@ -33,13 +33,16 @@ Version 0.5.0
   result, mixed double/single CG has a virtually identical iteration
   count to pure double CG, and using half precision is now a win.
 
-- Added experimental support for the Fermilab heavy quark residual as
+- Added experimental support for the Fermilab heavy-quark residual as
   a stopping condition in BiCGstab and CG.  To minimize the impact on
-  performance, the heavy quark residual is only measured every 10
+  performance, the heavy-quark residual is only measured every 10
   iterations.  This stopping condition has also been incorporated into
   the sequential CG refinement stage of the multi-shift solver for
   staggered fermions (and will be enabled for Wilson fermions in a
-  future release).
+  future release).  Owing to hardware-limitations of the Tesla-class
+  architecture (e.g., GT200), the heavy-quark reisudal is not
+  supported for sm_1x targets.  Attempting to do so will result in a
+  runtime error.
 
 - The value of the true residual(s) are now returned in the true_res
   and (for multi-shift) true_res_offset members of the QudaInvertParam

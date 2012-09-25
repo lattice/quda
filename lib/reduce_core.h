@@ -117,12 +117,17 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
     W.load(w, i);
     V.load(v, i);
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
     r.pre();
+#endif
+
 
 #pragma unroll
     for (int j=0; j<M; j++) r(sum, x[j], y[j], z[j], w[j], v[j]);
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
     r.post(sum);
+#endif
 
     if (writeX) XX.save(x, i);
     if (writeY) YY.save(y, i);
