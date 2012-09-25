@@ -723,26 +723,25 @@ class PackFaceWilson : public Tunable {
   const int *X;
   const int *ghostFace;
   const int stride;
+  const int nFace;
 
   int sharedBytesPerThread() const { return 0; }
   int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   
-  virtual bool advanceSharedBytes(TuneParam &param) const
-  {
-    TuneParam next(param);
-    advanceBlockDim(next); // to get next blockDim
-    int nthreads = next.block.x * next.block.y * next.block.z;
-    param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-      sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
-    return false;
+  bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+  bool advanceBlockDim(TuneParam &param) const {
+    bool advance = Tunable::advanceBlockDim(param);
+    unsigned int threads = ghostFace[dim]*nFace*2; // 2 for forwards and backwards faces
+    if (advance) param.grid = dim3( (threads+param.block.x-1) / param.block.x, 1, 1);
+    return advance;
   }
-  
+
  public:
   PackFaceWilson(FloatN *faces, float *facesNorm, const FloatN *in, const float *inNorm, 
 		 const int dim, const int dagger, const int parity, const int *X, 
 		 const int *ghostFace, const int stride)
     : faces(faces), facesNorm(facesNorm), in(in), inNorm(inNorm), dim(dim), dagger(dagger), 
-    parity(parity), X(X), ghostFace(ghostFace), stride(stride) { }
+      parity(parity), X(X), ghostFace(ghostFace), stride(stride), nFace(1) { }
   virtual ~PackFaceWilson() { }
   
   TuneKey tuneKey() const {
@@ -781,10 +780,28 @@ class PackFaceWilson : public Tunable {
 
   long long flops() const { return 12*ghostFace[dim]; }
   long long bytes() const { 
-    size_t bytes = 36 * sizeof(((FloatN*)0)->x); // 24 in and 12 out
-    if (sizeof(((FloatN*)0)->x) == QUDA_HALF_PRECISION) bytes += 2*sizeof(float);
-    return bytes*2*ghostFace[dim];  // 2 from two faces
+    int Nint = 36;
+    size_t faceBytes = 2*nFace*ghostFace[dim]*Nint*sizeof(((FloatN*)0)->x);
+    if (sizeof(((FloatN*)0)->x) == QUDA_HALF_PRECISION) 
+      faceBytes += nFace*ghostFace[dim]*sizeof(float);
+    return faceBytes;
   }
+
+  virtual void initTuneParam(TuneParam &param) const
+  {
+    Tunable::initTuneParam(param);
+    unsigned int threads = ghostFace[dim]*nFace*2; // 2 for forwards and backwards faces
+    param.grid = dim3( (threads+param.block.x-1) / param.block.x, 1, 1);
+  }
+  
+  /** sets default values for when tuning is disabled */
+  virtual void defaultTuneParam(TuneParam &param) const
+  {
+    Tunable::defaultTuneParam(param);
+    unsigned int threads = ghostFace[dim]*nFace*2; // 2 for forwards and backwards faces
+    param.grid = dim3( (threads+param.block.x-1) / param.block.x, 1, 1);
+  }
+
 };
 
 void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
