@@ -871,6 +871,13 @@ __device__ void packSpinor(float2 *out, float *outNorm, int out_idx, int out_str
   out[out_idx + 1*out_stride] = tex1Dfetch(spinorTexSingle2, in_idx + 1*in_stride);
   out[out_idx + 2*out_stride] = tex1Dfetch(spinorTexSingle2, in_idx + 2*in_stride);	
 }
+
+// this is rather dumb: undoing the texture load because cudaNormalizedReadMode is used
+// should really bind to an appropriate texture instead of reusing
+static inline __device__ short2 float22short2(float c, float2 a) {
+  return make_short2((short)(a.x*c*MAX_SHORT), (short)(a.y*c*MAX_SHORT));
+}
+
 __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, int out_stride, 
 			   const short2 *in, const float *inNorm, int in_idx, int in_stride) {
   out[out_idx + 0*out_stride] = float22short2(1.0f, tex1Dfetch(spinorTexHalf2, in_idx + 0*in_stride));

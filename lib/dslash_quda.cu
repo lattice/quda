@@ -151,10 +151,6 @@ namespace quda {
     return (short)(a*c*MAX_SHORT);
   }
 
-  static inline __device__ short2 float22short2(float c, float2 a) {
-    return make_short2((short)(a.x*c*MAX_SHORT), (short)(a.y*c*MAX_SHORT));
-  }
-
   static inline __device__ short4 float42short4(float c, float4 a) {
     return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));
   }
