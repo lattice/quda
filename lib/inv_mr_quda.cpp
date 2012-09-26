@@ -23,13 +23,13 @@ namespace quda {
   }
 
   MR::~MR() {
-    profile[QUDA_PROFILE_FREE].Start();
+    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile[QUDA_PROFILE_FREE].Start();
     if (init) {
       if (allocate_r) delete rp;
       delete Arp;
       delete tmpp;
     }
-    profile[QUDA_PROFILE_FREE].Stop();
+    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile[QUDA_PROFILE_FREE].Stop();
   }
 
   void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
