@@ -375,6 +375,7 @@ namespace quda {
     mat(r, x);
     double true_res = xmyNormCuda(b, r);
     invParam.true_res = sqrt(true_res / b2);
+    invParam.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
     
     if (invParam.verbosity >= QUDA_SUMMARIZE)
       printfQuda("gflops = %f time = %e: Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
