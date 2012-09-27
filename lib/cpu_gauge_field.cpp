@@ -108,7 +108,8 @@ namespace quda {
     void packGhost(Float **ghost, const Float **gauge, const int nFace, const int *X, 
 		   const int volumeCB, const int *surfaceCB, const QudaGaugeFieldOrder order) {
     
-    if (order != QUDA_QDP_GAUGE_ORDER && order != QUDA_BQCD_GAUGE_ORDER) 
+    if (order != QUDA_QDP_GAUGE_ORDER && order != QUDA_BQCD_GAUGE_ORDER &&
+	order != QUDA_CPS_WILSON_GAUGE_ORDER) 
       errorQuda("packGhost not supported for %d gauge field order", order);
     
     int XY=X[0]*X[1];
@@ -150,6 +151,9 @@ namespace quda {
 	  for (int i=1; i<4; i++) mu_offset *= (X[i] + 2);
 	  even_src = (const Float*)gauge + (dir*2+0)*mu_offset*gaugeSiteSize;
 	  odd_src = (const Float*)gauge + (dir*2+1)*mu_offset*gaugeSiteSize;
+	} else if (order == QUDA_CPS_WILSON_GAUGE_ORDER) {
+	  even_src = (const Float*)gauge + (dir*2+0)*volumeCB*gaugeSiteSize;
+	  odd_src = (const Float*)gauge + (dir*2+1)*volumeCB*gaugeSiteSize;
 	} else { // QDP_GAUGE_FIELD_ORDER
 	  even_src = gauge[dir];
 	  odd_src = gauge[dir] + volumeCB*gaugeSiteSize;
@@ -180,7 +184,7 @@ namespace quda {
 		int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
 		int oddness = (a+b+c+d)%2;
 		if (oddness == 0){ //even
-		  if (order == QUDA_BQCD_GAUGE_ORDER) {
+		  if (order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_CPS_WILSON_GAUGE_ORDER) {
 		    // we do transposition here so we can just call packQDPGauge for the ghost zone
 		    Float gT[18];
 		    transpose(gT, &even_src[18*index]);
@@ -194,7 +198,7 @@ namespace quda {
 		  }
 		  even_dst_index++;
 		}else{ //odd
-		  if (order == QUDA_BQCD_GAUGE_ORDER) {
+		  if (order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_CPS_WILSON_GAUGE_ORDER) {
 		    // we do transposition here so we can just call packQDPGauge for the ghost zone
 		    Float gT[18];
 		    transpose(gT, &odd_src[18*index]);

@@ -55,8 +55,9 @@ namespace quda {
     if( ! cpuGauge ) errorQuda( "cpuGauge is borked\n");
 
 #ifdef MULTI_GPU
-    if (cpu_order != QUDA_QDP_GAUGE_ORDER && cpu_order != QUDA_BQCD_GAUGE_ORDER)
-      errorQuda("Only QUDA_QDP_GAUGE_ORDER is supported for multi-gpu\n");
+    if (cpu_order != QUDA_QDP_GAUGE_ORDER && cpu_order != QUDA_BQCD_GAUGE_ORDER &&
+	cpu_order != QUDA_CPS_WILSON_GAUGE_ORDER)
+      errorQuda("Gauge order %d is not supported for multi-gpu\n", cpu_order);
 #endif
 
     //for QUDA_ASQTAD_FAT_LINKS, need to find out the max value
@@ -80,10 +81,6 @@ namespace quda {
 	errorQuda("Gauge ordering scheme not supported\n");
       }
     } 
-
-
-
-
 
     double fat_link_max_double = fat_link_max;
 #ifdef MULTI_GPU

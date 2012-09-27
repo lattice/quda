@@ -118,7 +118,6 @@ void packTest() {
 
   printf("Sending fields to GPU...\n"); fflush(stdout);
   
-#ifndef MULTI_GPU
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
     
@@ -143,7 +142,6 @@ void packTest() {
     double cpsGRtime = stopwatchReadSeconds();
     printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
   }
-#endif
 
   {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
