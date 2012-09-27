@@ -28,7 +28,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 		       const int nFace, const QudaPrecision precision, const int Ls) :
   Ninternal(Ninternal), precision(precision), nDim(nDim), nDimComms(nDim), nFace(nFace)
 {
-
   if (nDim > QUDA_MAX_DIM) errorQuda("nDim = %d is greater than the maximum of %d\n", nDim, QUDA_MAX_DIM);
 //BEGIN NEW
   int Y[nDim];
@@ -58,13 +57,13 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
 
-    my_fwd_face[i] = pinned_malloc(nbytes[i]);
-    my_back_face[i] = pinned_malloc(nbytes[i]);
+    my_fwd_face[i] = allocatePinned(nbytes[i]);
+    my_back_face[i] = allocatePinned(nbytes[i]);
 
 #ifdef QMP_COMMS
 
-    from_fwd_face[i] = pinned_malloc(nbytes[i]);
-    from_back_face[i] = pinned_malloc(nbytes[i]);
+    from_fwd_face[i] = allocatePinned(nbytes[i]);
+    from_back_face[i] = allocatePinned(nbytes[i]);
 
 // if no GPUDirect so need separate IB and GPU host buffers
 #ifndef GPU_DIRECT
@@ -165,13 +164,13 @@ FaceBuffer::~FaceBuffer()
     QMP_free_msgmem(mm_from_fwd[i]);
     QMP_free_msgmem(mm_from_back[i]);
 
-    host_free(from_fwd_face[i]);
-    host_free(from_back_face[i]);
+    freePinned(from_fwd_face[i]);
+    freePinned(from_back_face[i]);
 
 #endif // QMP_COMMS
 
-    host_free(my_fwd_face[i]);
-    host_free(my_back_face[i]);
+    freePinned(my_fwd_face[i]);
+    freePinned(my_back_face[i]);
   }
 
   for (int i=0; i<nDimComms; i++) {

@@ -514,6 +514,7 @@ void endQuda(void)
   cudaColorSpinorField::freeBuffer();
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
+  FaceBuffer::flushPinnedCache();
   freeGaugeQuda();
   freeCloverQuda();
 

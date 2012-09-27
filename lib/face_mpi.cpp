@@ -52,11 +52,11 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     nbytes[dir] = nFace*faceVolumeCB[dir]*Ninternal*precision;
     if (precision == QUDA_HALF_PRECISION) nbytes[dir] += nFace*faceVolumeCB[dir]*sizeof(float);
 
-    fwd_nbr_spinor_sendbuf[dir] = pinned_malloc(nbytes[dir]);
-    back_nbr_spinor_sendbuf[dir] = pinned_malloc(nbytes[dir]);
+    fwd_nbr_spinor_sendbuf[dir] = allocatePinned(nbytes[dir]);
+    back_nbr_spinor_sendbuf[dir] = allocatePinned(nbytes[dir]);
 
-    fwd_nbr_spinor[dir] = pinned_malloc(nbytes[dir]);
-    back_nbr_spinor[dir] = pinned_malloc(nbytes[dir]);
+    fwd_nbr_spinor[dir] = allocatePinned(nbytes[dir]);
+    back_nbr_spinor[dir] = allocatePinned(nbytes[dir]);
 
 #ifdef GPU_DIRECT
     pageable_fwd_nbr_spinor_sendbuf[dir] = fwd_nbr_spinor_sendbuf[dir];
@@ -112,19 +112,19 @@ FaceBuffer::~FaceBuffer()
   for (int dir=0; dir < 4; dir++) {
 
     if(fwd_nbr_spinor_sendbuf[dir]) {
-      host_free(fwd_nbr_spinor_sendbuf[dir]);
+      freePinned(fwd_nbr_spinor_sendbuf[dir]);
       fwd_nbr_spinor_sendbuf[dir] = NULL;
     }
     if(back_nbr_spinor_sendbuf[dir]) {
-      host_free(back_nbr_spinor_sendbuf[dir]);
+      freePinned(back_nbr_spinor_sendbuf[dir]);
       back_nbr_spinor_sendbuf[dir] = NULL;
     }
     if(fwd_nbr_spinor[dir]) {
-      host_free(fwd_nbr_spinor[dir]);
+      freePinned(fwd_nbr_spinor[dir]);
       fwd_nbr_spinor[dir] = NULL;
     }
     if(back_nbr_spinor[dir]) {
-      host_free(back_nbr_spinor[dir]);
+      freePinned(back_nbr_spinor[dir]);
       back_nbr_spinor[dir] = NULL;
     }    
 
