@@ -18,7 +18,12 @@
 #define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
 #endif
 
+#ifdef DEVICE_PACK
+#define REORDER_LOCATION QUDA_CUDA_FIELD_LOCATION
+#else
 #define REORDER_LOCATION QUDA_CPU_FIELD_LOCATION
+#endif
+
 
 namespace quda {
 

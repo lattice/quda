@@ -39,6 +39,9 @@ OVERLAP_COMMS = @OVERLAP_COMMS@      # set to 'yes' to overlap comms and compute
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
 
+# Packing option
+DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
+
 BUILD_QIO = @BUILD_QIO@    # set to 'yes' to build QIO code for binary I/O
 
 USE_QDPJIT = @USE_QDPJIT@  # build QDP-JIT support?
@@ -199,6 +202,11 @@ endif
 ifeq ($(strip $(GPU_DIRECT)), yes)
   NVCCOPT += -DGPU_DIRECT
   COPT += -DGPU_DIRECT
+endif
+
+ifeq ($(strip $(DEVICE_PACK)), yes)
+  NVCCOPT += -DDEVICE_PACK
+  COPT += -DDEVICE_PACK
 endif
 
 ifeq ($(strip $(OS)), osx)

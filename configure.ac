@@ -141,6 +141,13 @@ AC_ARG_ENABLE(gpu-direct,
   [ gpu_direct="yes" ]
 )
 
+dnl enable packing and unpacking on the device
+AC_ARG_ENABLE(device-pack,
+  AC_HELP_STRING([--enable-device-pack], [ Enable the packing / unpacking of fields on the device (default: disabled)]),
+  [ device_pack=${enableval}],
+  [ device_pack="no" ]
+)
+
 AC_ARG_WITH(mpi,
  AC_HELP_STRING([--with-mpi=MPIDIR], [ Specify MPI installation directory]),
  [ mpi_home=${withval}; build_mpi="yes"],
@@ -511,8 +518,11 @@ AC_SUBST( BUILD_MPI, [${build_mpi}])
 AC_MSG_NOTICE([Setting OVERLAP_COMMS= ${overlap_comms}])
 AC_SUBST( OVERLAP_COMMS, [${overlap_comms}])
 
-AC_MSG_NOTICE([Setting GPU_DIRECTS= ${gpu_direct}])
+AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
 AC_SUBST( GPU_DIRECT, [${gpu_direct}])
+
+AC_MSG_NOTICE([Setting DEVICE_PACK= ${device_pack}])
+AC_SUBST( DEVICE_PACK, [${device_pack}])
 
 AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
 AC_SUBST( BUILD_QIO, [${build_qio}])

@@ -577,6 +577,7 @@ FEF90
 FECXX
 FECC
 BUILD_QIO
+DEVICE_PACK
 GPU_DIRECT
 OVERLAP_COMMS
 BUILD_MPI
@@ -678,6 +679,7 @@ enable_hisq_force
 enable_multi_gpu
 enable_overlap_comms
 enable_gpu_direct
+enable_device_pack
 with_mpi
 with_qmp
 with_qio
@@ -1340,6 +1342,8 @@ Optional Features:
   --enable-overlap-comms  Enable comms/compute overlap (default: enabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
+  --enable-device-pack    Enable the packing / unpacking of fields on the
+                          device (default: disabled)
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
                           (default: disabled)
   --enable-fermi-double-tex
@@ -2075,6 +2079,15 @@ if test "${enable_gpu_direct+set}" = set; then :
   enableval=$enable_gpu_direct;  gpu_direct=${enableval}
 else
    gpu_direct="yes"
+
+fi
+
+
+# Check whether --enable-device-pack was given.
+if test "${enable_device_pack+set}" = set; then :
+  enableval=$enable_device_pack;  device_pack=${enableval}
+else
+   device_pack="no"
 
 fi
 
@@ -4034,9 +4047,14 @@ $as_echo "$as_me: Setting OVERLAP_COMMS= ${overlap_comms}" >&6;}
 OVERLAP_COMMS=${overlap_comms}
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECTS= ${gpu_direct}" >&5
-$as_echo "$as_me: Setting GPU_DIRECTS= ${gpu_direct}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECT= ${gpu_direct}" >&5
+$as_echo "$as_me: Setting GPU_DIRECT= ${gpu_direct}" >&6;}
 GPU_DIRECT=${gpu_direct}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DEVICE_PACK= ${device_pack}" >&5
+$as_echo "$as_me: Setting DEVICE_PACK= ${device_pack}" >&6;}
+DEVICE_PACK=${device_pack}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QIO = ${build_qio} " >&5
