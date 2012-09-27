@@ -47,7 +47,7 @@ namespace quda {
   static long total_bytes[N_ALLOC_TYPE] = {0};
   static long max_total_bytes[N_ALLOC_TYPE] = {0};
   static long total_host_bytes, max_total_host_bytes;
-
+  static long total_pinned_bytes, max_total_pinned_bytes;
 
   static void print_alloc_header()
   {
@@ -82,15 +82,25 @@ namespace quda {
 	max_total_host_bytes = total_host_bytes;
       }
     }
+    if (type == PINNED || type == MAPPED) {
+      total_pinned_bytes += a.base_size;
+      if (total_pinned_bytes > max_total_pinned_bytes) {
+	max_total_pinned_bytes = total_pinned_bytes;
+      }
+    }
     alloc[type][ptr] = a;
   }
 
 
   static void track_free(const AllocType &type, void *ptr)
   {
-    total_bytes[type] -= alloc[type][ptr].base_size;
+    size_t size = alloc[type][ptr].base_size;
+    total_bytes[type] -= size;
     if (type != DEVICE) {
-      total_host_bytes -= alloc[type][ptr].base_size;
+      total_host_bytes -= size;
+    }
+    if (type == PINNED || type == MAPPED) {
+      total_pinned_bytes -= size;
     }
     alloc[type].erase(ptr);
   }
@@ -266,6 +276,14 @@ namespace quda {
       errorQuda("Aborting");
     }
     free(ptr);
+  }
+
+
+  void printPeakMemUsage()
+  {
+    printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1<<20));
+    printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1<<20));
+    printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1<<20));
   }
 
 

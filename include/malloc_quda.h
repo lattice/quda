@@ -5,6 +5,7 @@
 
 namespace quda {
 
+  void printPeakMemUsage();
   void assertAllMemFree();
 
   /*
