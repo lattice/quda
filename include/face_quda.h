@@ -108,6 +108,13 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 class FaceBuffer {
 
  private:
+  // We cache pinned memory allocations so that Dirac objects can be created and
+  // destroyed at will with minimal overhead.
+  static std::multimap<size_t, void *> pinnedCache;
+
+  // For convenience, we keep track of the sizes of active allocations (i.e., those not in the cache).
+  static std::map<void *, size_t> pinnedSize;
+
   // set these both = 0 `for no overlap of qmp and cudamemcpyasync
   // sendBackIdx = 0, and sendFwdIdx = 1 for overlap
   int sendBackStrmIdx; // = 0;
@@ -144,6 +151,9 @@ class FaceBuffer {
   
   void setupDims(const int *X);
   
+  void *allocatePinned(size_t nbytes);
+  void freePinned(void *ptr);
+
  public:
   FaceBuffer(const int *X, const int nDim, const int Ninternal,
 	     const int nFace, const QudaPrecision precision, const int Ls = 1);
@@ -160,6 +170,7 @@ class FaceBuffer {
 
   void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
 
+  static void flushPinnedCache();
 };
 
 #ifdef __cplusplus
