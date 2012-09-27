@@ -17,16 +17,19 @@ void *FaceBuffer::allocatePinned(size_t nbytes)
 
   if (pinnedCache.empty()) {
     ptr = pinned_malloc(nbytes);
-  } else if (pinnedCache.count(nbytes)) {
-    it = pinnedCache.find(nbytes);
-    ptr = it->second;
-    pinnedCache.erase(it);
-  } else { // sacrifice the first cached allocation (atypical)
-    it = pinnedCache.begin();
-    ptr = it->second;
-    pinnedCache.erase(it);
-    host_free(ptr);
-    ptr = pinned_malloc(nbytes);
+  } else {
+    it = pinnedCache.lower_bound(nbytes);
+    if (it != pinnedCache.end()) { // sufficiently large allocation found
+      nbytes = it->first;
+      ptr = it->second;
+      pinnedCache.erase(it);
+    } else { // sacrifice the smallest cached allocation
+      it = pinnedCache.begin();
+      ptr = it->second;
+      pinnedCache.erase(it);
+      host_free(ptr);
+      ptr = pinned_malloc(nbytes);
+    }
   }
   pinnedSize[ptr] = nbytes;
   return ptr;
