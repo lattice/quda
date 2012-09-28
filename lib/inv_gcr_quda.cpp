@@ -202,7 +202,7 @@ namespace quda {
     bool precMatch = true;
     cudaColorSpinorField *r_pre, *p_pre;
     if (invParam.prec_precondition != invParam.cuda_prec_sloppy || invParam.precondition_cycle > 1) {
-      param.precision = invParam.prec_precondition;
+      param.setPrecision(invParam.prec_precondition);
       p_pre = new cudaColorSpinorField(x, param);
       r_pre = new cudaColorSpinorField(x, param);
       precMatch = false;
@@ -278,6 +278,7 @@ namespace quda {
 	
 	  if (m==0) { copyCuda(*p[k], pPre); }
 	  else { copyCuda(tmp, pPre); xpyCuda(tmp, *p[k]); }
+
 	} else { // no preconditioner
 	  *p[k] = rSloppy;
 	} 
