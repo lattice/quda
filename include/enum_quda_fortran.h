@@ -99,6 +99,11 @@
 #define QUDA_MULTIPLICATIVE_SCHWARZ 1
 #define QUDA_INVALID_SCHWARZ QUDA_INVALID_ENUM
 
+#define QudaResidualType integer(4)
+#define QUDA_L2_RELATIVE_RESIDUAL 0
+#define QUDA_HEAVY_QUARK_RESIDUAL 1
+#define QUDA_INVALID_RESIDUAL QUDA_INVALID_ENUM
+
 #/*
    # Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
    #
@@ -142,9 +147,10 @@
 #define QUDA_INVALID_DIRAC_ORDER QUDA_INVALID_ENUM
 
 #define QudaCloverFieldOrder integer(4)
-#define QUDA_PACKED_CLOVER_ORDER 0    // even-odd packed
-#define QUDA_LEX_PACKED_CLOVER_ORDER 1 // lexicographical order packed
-#define QUDA_BQCD_CLOVER_ORDER 2 // BQCD order which is a packed super-diagonal form
+#define QUDA_INTERNAL_CLOVER_ORDER 0  // internal clover order use by QUDA.
+#define QUDA_PACKED_CLOVER_ORDER 1    // even-odd packed
+#define QUDA_LEX_PACKED_CLOVER_ORDER 2 // lexicographical order packed
+#define QUDA_BQCD_CLOVER_ORDER 3 // BQCD order which is a packed super-diagonal form
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)
