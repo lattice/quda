@@ -414,7 +414,8 @@ then
 
 
   if test "X${qmp_home}X" = "XX"; then
-    if test "X${mpi_home}X" = "XX"; then
+#    if test "X${mpi_home}X" = "XX"; then
+    if test "X${build_mpi}X" = "XnoX"; then
         AC_MSG_WARN([ Multi-GPU build without QMP or MPI.  Will build single node code with copies ])
     fi
   else
