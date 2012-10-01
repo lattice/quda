@@ -52,6 +52,6 @@ void FaceBuffer::flushPinnedCache()
   for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
     void *ptr = it->second;
     host_free(ptr);
-    pinnedCache.erase(it);
   }
+  pinnedCache.clear();
 }
