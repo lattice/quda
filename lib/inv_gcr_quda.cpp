@@ -415,10 +415,10 @@ namespace quda {
     delete[] p;
     delete[] Ap;
 
-    delete alpha;
+    delete []alpha;
     for (int i=0; i<Nkrylov; i++) delete []beta[i];
     delete []beta;
-    delete gamma;
+    delete []gamma;
 
     profile[QUDA_PROFILE_FREE].Stop();
 
