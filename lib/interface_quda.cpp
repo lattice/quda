@@ -511,6 +511,7 @@ void endQuda(void)
 
   if (!initialized) return;
 
+  LatticeField::freeBuffer();
   cudaColorSpinorField::freeBuffer();
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();

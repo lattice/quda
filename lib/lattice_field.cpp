@@ -6,6 +6,10 @@
 
 namespace quda {
 
+  void* LatticeField::bufferPinned = NULL;
+  bool LatticeField::bufferInit = false;
+  size_t LatticeField::bufferBytes = 0;
+
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision)
   {
@@ -47,6 +51,24 @@ namespace quda {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
     }
     return location;
+  }
+
+  void LatticeField::resizeBuffer(size_t bytes) const {
+    if (bytes > bufferBytes || bufferInit == 0) {
+      if (bufferInit) host_free(bufferPinned);
+      bufferPinned = pinned_malloc(bytes);
+      bufferBytes = bytes;
+      bufferInit = true;
+    }
+  }
+
+  void LatticeField::freeBuffer() {
+    if (bufferInit) {
+      host_free(bufferPinned);
+      bufferPinned = NULL;
+      bufferBytes = 0;
+      bufferInit = false;
+    }
   }
 
   // This doesn't really live here, but is fine for the moment
