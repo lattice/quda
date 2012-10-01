@@ -48,12 +48,10 @@ void FaceBuffer::freePinned(void *ptr)
 
 void FaceBuffer::flushPinnedCache()
 {
-  if (!pinnedCache.empty()) {
-    std::multimap<size_t, void *>::iterator it;
-    for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
-      void *ptr = it->second;
-      host_free(ptr);
-      pinnedCache.erase(it);
-    }
+  std::multimap<size_t, void *>::iterator it;
+  for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
+    void *ptr = it->second;
+    host_free(ptr);
+    pinnedCache.erase(it);
   }
 }
