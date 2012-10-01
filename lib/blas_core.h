@@ -65,7 +65,9 @@ private:
 public:
   BlasCuda(InputX &X, InputY &Y, InputZ &Z, InputW &W, Functor &f, 
 	   OutputX &XX, OutputY &YY, OutputZ &ZZ, OutputW &WW, int length) :
-  X(X), Y(Y), Z(Z), W(W), f(f), XX(XX), YY(YY), ZZ(ZZ), WW(WW), length(length)
+    X(X), Y(Y), Z(Z), W(W), f(f), XX(XX), YY(YY), ZZ(ZZ), WW(WW), 
+    X_h(0), Y_h(0), Z_h(0), W_h(0), Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), 
+    length(length)
     { ; }
   virtual ~BlasCuda() { }
 
