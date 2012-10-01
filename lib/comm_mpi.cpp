@@ -11,7 +11,6 @@ static int fwd_nbr=-1;
 static int back_nbr=-1;
 static int rank = 0;
 static int size = -1;
-extern int verbose;
 static int num_nodes;
 extern int getGpuCount();
 static int which_gpu = -1;
@@ -129,7 +128,8 @@ comm_partition(void)
 #define GRID_ID(xid,yid,zid,tid) (xid*ygridsize*zgridsize*tgridsize+yid*zgridsize*tgridsize+zid*tgridsize+tid)
 #endif
 
-  printf("My rank: %d, gridid(t,z,y,x): %d %d %d %d\n", rank, tgridid, zgridid, ygridid, xgridid);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    printf("My rank: %d, gridid(t,z,y,x): %d %d %d %d\n", rank, tgridid, zgridid, ygridid, xgridid);
 
 
   int xid, yid, zid, tid;
@@ -169,10 +169,12 @@ comm_partition(void)
   tid=(tgridid -1+tgridsize)%tgridsize;
   t_back_nbr = GRID_ID(xid,yid,zid,tid);
 
-  printf("MPI rank: rank=%d, hostname=%s, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, comm_hostname(), x_fwd_nbr, x_back_nbr);
-  printf("MPI rank: rank=%d, hostname=%s, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, comm_hostname(), y_fwd_nbr, y_back_nbr);
-  printf("MPI rank: rank=%d, hostname=%s, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, comm_hostname(), z_fwd_nbr, z_back_nbr);
-  printf("MPI rank: rank=%d, hostname=%s, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, comm_hostname(), t_fwd_nbr, t_back_nbr);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printf("MPI rank: rank=%d, hostname=%s, x_fwd_nbr=%d, x_back_nbr=%d\n", rank, comm_hostname(), x_fwd_nbr, x_back_nbr);
+    printf("MPI rank: rank=%d, hostname=%s, y_fwd_nbr=%d, y_back_nbr=%d\n", rank, comm_hostname(), y_fwd_nbr, y_back_nbr);
+    printf("MPI rank: rank=%d, hostname=%s, z_fwd_nbr=%d, z_back_nbr=%d\n", rank, comm_hostname(), z_fwd_nbr, z_back_nbr);
+    printf("MPI rank: rank=%d, hostname=%s, t_fwd_nbr=%d, t_back_nbr=%d\n", rank, comm_hostname(), t_fwd_nbr, t_back_nbr);
+  }
 }
 
 int 
