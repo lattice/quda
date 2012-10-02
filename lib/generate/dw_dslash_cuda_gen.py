@@ -738,8 +738,8 @@ def gen(dir, pack_only=False):
 
 
 def gen_dw():
-    if dagger: lsign='+'; ledge = 'Ls-1'; rsign='-'; redge='0'
-    else: lsign='-'; ledge = '0'; rsign='+'; redge='Ls-1'
+    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='Ls-1'
+    else: lsign='+'; ledge = 'Ls-1'; rsign='-'; redge='0'
 
     str = "\n\n"
     str += "// 5th dimension -- NB: not partitionable!\n"
