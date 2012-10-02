@@ -262,7 +262,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   cpuGaugeField cpu(gauge_param);
 
-  profileGauge[QUDA_PROFILE_H2D].Start();  
+  profileGauge[QUDA_PROFILE_INIT].Start();  
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
   gauge_param.precision = param->cuda_prec;
@@ -271,8 +271,10 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
-
   cudaGaugeField *precise = new cudaGaugeField(gauge_param);
+  profileGauge[QUDA_PROFILE_INIT].Stop();  
+
+  profileGauge[QUDA_PROFILE_H2D].Start();  
   precise->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
 
   param->gaugeGiB += precise->GBytes();
