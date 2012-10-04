@@ -11,6 +11,12 @@
 #include <qmp.h>
 #endif
 
+#define QMP_CHECK(a)							\
+  {QMP_status_t status;							\
+  if ((status = a) != QMP_SUCCESS)					\
+    errorQuda("QMP returned with error %s", QMP_error_string(status) );	\
+  }
+
 using namespace quda;
 
 cudaStream_t *stream;
@@ -215,23 +221,23 @@ void FaceBuffer::commsStart(int dir) {
 
 #ifdef QMP_COMMS  // Begin backward send
     // Prepost receive
-    QMP_start(mh_from_fwd[dim]);
+    QMP_CHECK(QMP_start(mh_from_fwd[dim]));
 #ifndef GPU_DIRECT
     memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
 #endif
-    QMP_start(mh_send_back[dim]);
+    QMP_CHECK(QMP_start(mh_send_back[dim]));
 #endif
 
   } else { //sending forwards
     
 #ifdef QMP_COMMS
   // Prepost receive
-    QMP_start(mh_from_back[dim]);
+    QMP_CHECK(QMP_start(mh_from_back[dim]));
     // Begin forward send
 #ifndef GPU_DIRECT
     memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
 #endif
-    QMP_start(mh_send_fwd[dim]);
+    QMP_CHECK(QMP_start(mh_send_fwd[dim]));
 #endif
   }
 
@@ -332,17 +338,17 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   }
 
   for (int i=0; i<4; i++) {
-    QMP_start(mh_from_back[i]);
-    QMP_start(mh_from_fwd[i]);
-    QMP_start(mh_send_fwd[i]);
-    QMP_start(mh_send_back[i]);
+    QMP_CHECK(QMP_start(mh_from_back[i]));
+    QMP_CHECK(QMP_start(mh_from_fwd[i]));
+    QMP_CHECK(QMP_start(mh_send_fwd[i]));
+    QMP_CHECK(QMP_start(mh_send_back[i]));
   }
 
   for (int i=0; i<4; i++) {
-    QMP_wait(mh_send_fwd[i]);
-    QMP_wait(mh_send_back[i]);
-    QMP_wait(mh_from_back[i]);
-    QMP_wait(mh_from_fwd[i]);
+    QMP_CHECK(QMP_wait(mh_send_fwd[i]));
+    QMP_CHECK(QMP_wait(mh_send_back[i]));
+    QMP_CHECK(QMP_wait(mh_from_back[i]));
+    QMP_CHECK(QMP_wait(mh_from_fwd[i]));
   }
 
   for (int i=0; i<4; i++) {
@@ -392,13 +398,13 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
   }
 
   for (int i=0; i<4; i++) {
-    QMP_start(mh_send_fwd[i]);
-    QMP_start(mh_from_back[i]);
+    QMP_CHECK(QMP_start(mh_send_fwd[i]));
+    QMP_CHECK(QMP_start(mh_from_back[i]));
   }
 
   for (int i=0; i<4; i++) {
-    QMP_wait(mh_send_fwd[i]);
-    QMP_wait(mh_from_back[i]);
+    QMP_CHECK(QMP_wait(mh_send_fwd[i]));
+    QMP_CHECK(QMP_wait(mh_from_back[i]));
   }
 
   for (int i=0; i<4; i++) {
@@ -489,7 +495,7 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 void reduceMaxDouble(double &max) {
 
 #ifdef QMP_COMMS
-  QMP_max_double(&max);
+  QMP_CHECK(QMP_max_double(&max));
 #endif
 
 }
@@ -497,7 +503,7 @@ void reduceMaxDouble(double &max) {
 void reduceDouble(double &sum) {
 
 #ifdef QMP_COMMS
-  if (globalReduce) QMP_sum_double(&sum);
+  if (globalReduce) QMP_CHECK(QMP_sum_double(&sum));
 #endif
 
 }
@@ -505,7 +511,7 @@ void reduceDouble(double &sum) {
 void reduceDoubleArray(double *sum, const int len) {
 
 #ifdef QMP_COMMS
-  if (globalReduce) QMP_sum_double_array(sum,len);
+  if (globalReduce) QMP_CHECK(QMP_sum_double_array(sum,len));
 #endif
 
 }

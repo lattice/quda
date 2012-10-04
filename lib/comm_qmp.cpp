@@ -1,6 +1,13 @@
 #include <unistd.h>
 #include <qmp.h>
 #include <comm_quda.h>
+#include <util_quda.h>
+
+#define QMP_CHECK(a)							\
+  {QMP_status_t status;							\
+  if ((status = a) != QMP_SUCCESS)					\
+    errorQuda("QMP returned with error %s", QMP_error_string(status) );	\
+  }
 
 static char hostname[128] = "undetermined";
 
@@ -32,5 +39,5 @@ int comm_size(void)
 
 void comm_broadcast(void *data, size_t nbytes)
 {
-  QMP_broadcast(data, nbytes);
+  QMP_CHECK(QMP_broadcast(data, nbytes));
 }
