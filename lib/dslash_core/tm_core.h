@@ -1,5 +1,5 @@
-#ifndef _TWIST_QUDA_CUH
-#define _TWIST_QUDA_CUH
+#ifndef _TM_CORE_H
+#define _TM_CORE_H
 
 //action of the operator b*(1 + i*a*gamma5)
 //used also macros from io_spinor.h
@@ -30,6 +30,7 @@ __device__ float4 operator*(const float &x, const float4 &y)
 __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, 
 				  const double2 *in, const float *null2, DslashParam param)
 {
+#ifdef GPU_TWISTED_MASS_DIRAC
 
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
@@ -148,7 +149,7 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
    spinor[sid + 10 * sp_stride] = I10;   
    spinor[sid + 11 * sp_stride] = I11;
 
-   return;  
+#endif // GPU_TWISTED_MASS_DIRAC
 }
 #endif // (__COMPUTE_CAPABILITY__ >= 130)
 
@@ -173,6 +174,8 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, 
 				  const float4 *in, const float *null2, DslashParam param)
 {
+#ifdef GPU_TWISTED_MASS_DIRAC
+
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
 
@@ -263,13 +266,15 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
    spinor[sid + 4  * sp_stride] = I4;   
    spinor[sid + 5  * sp_stride] = I5;   
 
-   return;  
+#endif // GPU_TWISTED_MASS_DIRAC
 }
 
 
 __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, 
 				  const short4 *in, const float *inNorm, DslashParam param)
 {
+#ifdef GPU_TWISTED_MASS_DIRAC
+
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
 
@@ -403,7 +408,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    spinor[sid+4*(sp_stride)] = make_short4((short)I4.x, (short)I4.y, (short)I4.z, (short)I4.w); 
    spinor[sid+5*(sp_stride)] = make_short4((short)I5.x, (short)I5.y, (short)I5.z, (short)I5.w);
 
-   return;  
+#endif // GPU_TWISTED_MASS_DIRAC
 }
 
 #undef tmp0_re
@@ -415,6 +420,4 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
 #undef tmp3_re
 #undef tmp3_im
 
-#endif //_TWIST_QUDA_CUH
-
-
+#endif // _TM_CORE_H
