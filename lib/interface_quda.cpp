@@ -28,13 +28,7 @@
 
 #ifdef MULTI_GPU
 extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
-                              QudaPrecision gPrecision, int optflag);
-#ifdef MPI_COMMS
-#include <mpi.h>
-#endif
-#ifdef QMP_COMMS
-#include <qmp.h>
-#endif
+				     QudaPrecision gPrecision, int optflag);
 #endif // MULTI_GPU
 
 #ifdef GPU_GAUGE_FORCE
@@ -62,11 +56,6 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 #define PRINT_PARAM
 #include "check_params.h"
 #undef PRINT_PARAM
-
-#ifdef QMP_COMMS
-int rank_QMP;
-int num_QMP;
-#endif
 
 #include "face_quda.h"
 
@@ -183,27 +172,7 @@ void initQuda(int dev)
 
 #ifdef MULTI_GPU
   comm_init();
-#endif
-
-#ifdef QMP_COMMS
-  int ndim;
-  const int *dim;
-
-  if ( QMP_is_initialized() != QMP_TRUE ) {
-    errorQuda("QMP is not initialized");
-  }
-  num_QMP=QMP_get_number_of_nodes();
-  rank_QMP=QMP_get_node_number();
-  
-  if (dev < 0) {
-    dev = rank_QMP % deviceCount;
-  }
-  ndim = QMP_get_logical_number_of_dimensions();
-  dim = QMP_get_logical_dimensions();
-#elif defined(MPI_COMMS)
-  if (dev < 0) {
-    dev=comm_gpuid();
-  }
+  if (dev < 0) dev = comm_gpuid();
 #else
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
@@ -1893,42 +1862,16 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 
 
 void initCommsQuda(int argc, char **argv, const int *X, int nDim) {
-  if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
-
 #ifdef MULTI_GPU
-
-#ifdef QMP_COMMS
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-
-  QMP_declare_logical_topology(X, nDim);
-#elif defined(MPI_COMMS)
-  MPI_Init (&argc, &argv);  
-
-  int volume = 1;
-  for (int d=0; d<nDim; d++) volume *= X[d];
-  int size = -1;
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-  if (volume != size)
-    errorQuda("Number of processes %d must match requested MPI volume %d",
-	      size, volume);
-
-  comm_set_gridsize(X[0], X[1], X[2], X[3]);  
+  comm_create(argc, argv);
+  comm_set_gridsize(X, nDim);  
   comm_init();
-#endif
-
 #endif
 }
 
 void endCommsQuda() {
 #ifdef MULTI_GPU
-
-#ifdef QMP_COMMS
-  QMP_finalize_msg_passing();
-#elif defined MPI_COMMS
   comm_cleanup();
-#endif 
-
 #endif
 }
 
@@ -1960,9 +1903,7 @@ void new_quda_invert_param_(QudaInvertParam *param) {
   *param = newQudaInvertParam();
 }
 void comm_set_gridsize_(int *grid) {
-#ifdef MPI_COMMS 
-  comm_set_gridsize(grid[0], grid[1], grid[2], grid[3]);
-#else
-  errorQuda("Not implemented for non-MPI communications");
+#ifdef MULTI_GPU
+  comm_set_gridsize(grid, 4);
 #endif
 }

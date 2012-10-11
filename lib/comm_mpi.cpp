@@ -38,12 +38,23 @@ static int manual_set_partition[4] ={0, 0, 0, 0};
 #define X_FASTEST_DIM_NODE_RANKING
 
 void
-comm_set_gridsize(int x, int y, int z, int t)
+comm_set_gridsize(const int *X, int nDim)
 {
-  xgridsize = x;
-  ygridsize = y;
-  zgridsize = z;
-  tgridsize = t;
+  if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
+
+  xgridsize = X[0];
+  ygridsize = X[1];
+  zgridsize = X[2];
+  tgridsize = X[3];
+
+  int volume = 1;
+  for (int i=0; i<nDim; i++) volume *= X[i];
+
+  int size = -1;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (volume != size)
+    errorQuda("Number of processes %d must match requested MPI volume %d",
+	      size, volume);
 
   return;
 }
@@ -199,6 +210,10 @@ comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
   return ret;
 }
 
+void comm_create(int argc, char **argv)
+{
+  MPI_Init (&argc, &argv);  
+}
 
 void 
 comm_init(void)
@@ -206,9 +221,7 @@ comm_init(void)
   int i;
   
   static int firsttime=1;
-  if (!firsttime){ 
-    return;
-  }
+  if (!firsttime) return;
   firsttime = 0;
 
   gethostname(hostname, 128);
