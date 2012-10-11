@@ -24,9 +24,11 @@ void popVerbosity();
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \
+  char buffer[1024];				       \
+  sprintf(buffer, __VA_ARGS__);			       \
   if (comm_rank() == 0) {	                       \
     fprintf(getOutputFile(), "%s", getOutputPrefix()); \
-    fprintf(getOutputFile(), __VA_ARGS__);             \
+    fprintf(getOutputFile(), "%s", buffer);	       \
     fflush(getOutputFile());                           \
   }                                                    \
 } while (0)
@@ -41,9 +43,11 @@ void popVerbosity();
 } while (0)
 
 #define warningQuda(...) do {                                   \
+  char buffer[1024];						\
+  sprintf(buffer, __VA_ARGS__);					\
   if (comm_rank() == 0) {                                       \
     fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-    fprintf(getOutputFile(), __VA_ARGS__);                      \
+    fprintf(getOutputFile(), "%s", buffer);			\
     fprintf(getOutputFile(), "\n");                             \
     fflush(getOutputFile());                                    \
   }                                                             \
