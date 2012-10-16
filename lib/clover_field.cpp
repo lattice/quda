@@ -294,11 +294,10 @@ namespace quda {
     if (cpu_order != QUDA_PACKED_CLOVER_ORDER && cpu_order != QUDA_BQCD_CLOVER_ORDER) 
       errorQuda("Invalid clover order %d", cpu_order);
 
-    packedClover = pinned_malloc(bytes/2);
-    if (precision == QUDA_HALF_PRECISION) {
-      packedCloverNorm = pinned_malloc(norm_bytes/2);
-    }
-    
+    resizeBuffer(bytes/2 + norm_bytes/2);
+    packedClover = bufferPinned;
+    if (precision == QUDA_HALF_PRECISION) packedCloverNorm = (char*)bufferPinned + bytes/2;
+
     if (precision == QUDA_DOUBLE_PRECISION) {
       packParityClover((double2 *)packedClover, (double *)h_clover, volumeCB, pad, cpu_order);
     } else if (precision == QUDA_SINGLE_PRECISION) {
@@ -320,9 +319,6 @@ namespace quda {
     cudaMemcpy(clover, packedClover, bytes/2, cudaMemcpyHostToDevice);
     if (precision == QUDA_HALF_PRECISION)
       cudaMemcpy(cloverNorm, packedCloverNorm, norm_bytes/2, cudaMemcpyHostToDevice);
-
-    host_free(packedClover);
-    if (precision == QUDA_HALF_PRECISION) host_free(packedCloverNorm);
   }
 
   void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void *oddNorm, 
@@ -339,12 +335,13 @@ namespace quda {
       errorQuda("Invalid clover order");
     }
 
-    packedEven = pinned_malloc(bytes/2);
-    packedOdd = pinned_malloc(bytes/2);
+    resizeBuffer(bytes + norm_bytes);
+    packedEven = bufferPinned;
+    packedOdd = (char*)bufferPinned + bytes/2;
 
     if (precision == QUDA_HALF_PRECISION) {
-      packedEvenNorm = pinned_malloc(norm_bytes/2);
-      packedOddNorm = pinned_malloc(norm_bytes/2);
+      packedEvenNorm = (char*)bufferPinned + bytes;
+      packedOddNorm = (char*)bufferPinned + bytes + norm_bytes/2;
     }
     
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -370,13 +367,6 @@ namespace quda {
     if (precision == QUDA_HALF_PRECISION) {
       cudaMemcpy(evenNorm, packedEvenNorm, norm_bytes/2, cudaMemcpyHostToDevice);
       cudaMemcpy(oddNorm, packedOddNorm, norm_bytes/2, cudaMemcpyHostToDevice);
-    }
-
-    host_free(packedEven);
-    host_free(packedOdd);
-    if (precision == QUDA_HALF_PRECISION) {
-      host_free(packedEvenNorm);
-      host_free(packedOddNorm);
     }
   }
 

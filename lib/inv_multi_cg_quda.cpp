@@ -294,7 +294,11 @@ namespace quda {
       }
       double true_res = xmyNormCuda(b, *r);
       invParam.true_res_offset[i] = sqrt(true_res/b2);
+#if (__COMPUTE_CAPABILITY__ >= 200)
       invParam.true_res_hq_offset[i] = sqrt(HeavyQuarkResidualNormCuda(*x[i], *r).z);
+#else
+      invParam.true_res_hq_offset[i] = 0.0;
+#endif   
     }
 
     if (invParam.verbosity >= QUDA_SUMMARIZE){

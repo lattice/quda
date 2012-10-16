@@ -56,12 +56,30 @@ namespace quda {
     int surface[QUDA_MAX_DIM];
     int surfaceCB[QUDA_MAX_DIM];
 
+    /** The precision of the field */
     QudaPrecision precision;
+
+    /** The verbosity to use for this field */
     QudaVerbosity verbosity;
+
+    /** Pinned-memory buffer that is used by all derived classes */
+    static void *bufferPinned; 
+
+    /** Whether the pinned-memory buffer has already been initialized or not */
+    static bool bufferInit;
+
+    /** The size in bytes of pinned-memory buffer */
+    static size_t bufferBytes;
+
+    /** Resize the pinned-memory buffer */
+    void resizeBuffer(size_t bytes) const;
 
   public:
     LatticeField(const LatticeFieldParam &param);
     virtual ~LatticeField() { ; }
+
+    /** Free the pinned-memory buffer */
+    static void freeBuffer();
 
     int Ndim() const { return nDim; }
     const int* X() const { return x; }

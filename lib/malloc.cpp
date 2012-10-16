@@ -127,7 +127,7 @@ namespace quda {
     posix_memalign(&ptr, page_size, a.base_size);
 #endif
     if (!ptr) {
-      printfQuda("ERROR: Failed to allocate host memory (%s:%d in %s())\n", a.file.c_str(), a.line, a.func.c_str());
+      printfQuda("ERROR: Failed to allocate aligned host memory (%s:%d in %s())\n", a.file.c_str(), a.line, a.func.c_str());
       errorQuda("Aborting");
     }
     return ptr;
@@ -148,7 +148,7 @@ namespace quda {
 
     cudaError_t err = cudaMalloc(&ptr, size);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to allocate host memory (%s:%d in %s())\n", file, line, func);
+      printfQuda("ERROR: Failed to allocate device memory (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
     track_malloc(DEVICE, a, ptr);

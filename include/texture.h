@@ -326,9 +326,11 @@ namespace quda {
       cudaMemcpy(spinor, *spinor_h, bytes, cudaMemcpyHostToDevice);
       if (norm_bytes > 0) {
 	cudaMemcpy(norm, *norm_h, norm_bytes, cudaMemcpyHostToDevice);
-	delete(*norm_h);
+	delete []*norm_h;
+	*norm_h = 0;
       }
-      delete(*spinor_h);
+      delete []*spinor_h;
+      *spinor_h = 0;
       checkCudaError();
     }
 

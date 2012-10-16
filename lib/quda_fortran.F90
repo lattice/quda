@@ -71,6 +71,8 @@ module quda_fortran
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor 
      
      real(8) :: tol
+     real(8) :: true_res ! Actual L2 residual norm achieved in solver
+     real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance 
      
@@ -79,6 +81,15 @@ module quda_fortran
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver 
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset 
      
+     ! Solver tolerance for each shift when refinement is applied using the heavy-quark residual
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_hq_offset
+
+     ! Actual L2 residual norm achieved in solver for each offset
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_offset
+
+     ! Actual heavy quark residual norm achieved in solver for each offset
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset; 
+
      QudaSolutionType :: solution_type  ! Type of system to solve 
      QudaSolveType :: solve_type        ! How to solve it 
      QudaMatPCType :: matpc_type
@@ -149,6 +160,9 @@ module quda_fortran
      ! Whether to use additive or multiplicative Schwarz preconditioning 
      QudaSchwarzType :: schwarz_type
      
+     ! Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence
+     QudaResidualType ::residual_type
+
   end type quda_invert_param
    
 end module quda_fortran

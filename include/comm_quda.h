@@ -19,7 +19,6 @@ extern "C" {
 
 /* The following routines are implemented over MPI only. */
 
-void            comm_set_gridsize(int x, int y, int z, int t);
 int             comm_dim_partitioned(int dir);
 /*testing/debugging use only */
 void            comm_dim_partitioned_set(int dir);
@@ -37,18 +36,20 @@ void		comm_allreduce(double* data);
 void            comm_allreduce_int(int* data);
 void		comm_allreduce_array(double* data, size_t size);
 void		comm_allreduce_max(double* data);
-void		comm_barrier(void);
-void		comm_cleanup(void);
 int		comm_gpuid();
 int		comm_get_neighbor_rank(int dx, int dy, int dz, int dt);
 
 /* implemented over both MPI and QMP */
 
+void            comm_create(int argc, char **argv);
 void		comm_init(void);
+void		comm_cleanup(void);
 void		comm_exit(int);
 char *          comm_hostname(void);
+void            comm_set_gridsize(const int *X, int nDim);
 int		comm_rank(void);
 int		comm_size(void);
+void		comm_barrier(void);
 void            comm_broadcast(void *data, size_t nbytes);
   
 #ifdef __cplusplus
