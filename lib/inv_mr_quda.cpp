@@ -59,6 +59,21 @@ namespace quda {
     double b2 = normCuda(b);
     if (&r != &b) copyCuda(r, b);
 
+    // FIXME: here we are running all the kernels in MR now to ensure they are tuned for all processes 
+    static bool firsttime = true;
+    if (firsttime) {
+      copyCuda(tmp, b);
+      cudaColorSpinorField tmp2(tmp);
+      axCuda(1.0, tmp2);
+      cDotProductNormBCuda(tmp, tmp2);
+      mat(tmp2, r, tmp);
+      cDotProductNormACuda(tmp, tmp2);
+      Complex alpha(1.0, 1.0);
+      caxpyXmazCuda(alpha, tmp2, tmp, Ar);
+      cDotProductCuda(tmp, tmp2);
+      firsttime = false;
+    }
+
     // domain-wise normalization of the initial residual to prevent underflow
     double r2=0.0; // if zero source then we will exit immediately doing no work
     if (b2 > 0.0) {
