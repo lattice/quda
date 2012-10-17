@@ -14,6 +14,9 @@ static QudaVerbosity verbosity_ = QUDA_SUMMARIZE;
 static char prefix_[MAX_PREFIX_SIZE] = "";
 static FILE *outfile_ = stdout;
 
+static const int MAX_BUFFER_SIZE = 1000;
+static char buffer_[MAX_BUFFER_SIZE] = "";
+
 QudaVerbosity getVerbosity() { return verbosity_; }
 char *getOutputPrefix() { return prefix_; }
 FILE *getOutputFile() { return outfile_; }
@@ -56,3 +59,5 @@ void popVerbosity()
   setVerbosity(vstack.top());
   vstack.pop();
 }
+
+char *getPrintBuffer() { return buffer_; }

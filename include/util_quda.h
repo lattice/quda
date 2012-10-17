@@ -18,17 +18,17 @@ void setOutputFile(FILE *outfile);
 void pushVerbosity(QudaVerbosity verbosity);
 void popVerbosity();
 
+char *getPrintBuffer();
 
 // Note that __func__ is part of C++11 and has long been supported by GCC.
 
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \
-  char buffer[1024];				       \
-  sprintf(buffer, __VA_ARGS__);			       \
+  sprintf(getPrintBuffer(), __VA_ARGS__);	       \
   if (comm_rank() == 0) {	                       \
     fprintf(getOutputFile(), "%s", getOutputPrefix()); \
-    fprintf(getOutputFile(), "%s", buffer);	       \
+    fprintf(getOutputFile(), "%s", getPrintBuffer());  \
     fflush(getOutputFile());                           \
   }                                                    \
 } while (0)
@@ -43,11 +43,10 @@ void popVerbosity();
 } while (0)
 
 #define warningQuda(...) do {                                   \
-  char buffer[1024];						\
-  sprintf(buffer, __VA_ARGS__);					\
+  sprintf(getPrintBuffer(), __VA_ARGS__);			\
   if (comm_rank() == 0) {                                       \
     fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-    fprintf(getOutputFile(), "%s", buffer);			\
+    fprintf(getOutputFile(), "%s", getPrintBuffer());		\
     fprintf(getOutputFile(), "\n");                             \
     fflush(getOutputFile());                                    \
   }                                                             \
