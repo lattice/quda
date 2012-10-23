@@ -53,7 +53,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
     if (cpu_order != QUDA_QDP_GAUGE_ORDER && cpu_order != QUDA_BQCD_GAUGE_ORDER &&
-	cpu_order != QUDA_CPS_WILSON_GAUGE_ORDER)
+	cpu_order != QUDA_CPS_WILSON_GAUGE_ORDER && cpu_order != QUDA_MILC_GAUGE_ORDER)
       errorQuda("Gauge order %d is not supported for multi-gpu\n", cpu_order);
 #endif
 
