@@ -1630,8 +1630,6 @@ namespace quda {
     dslashParam.threads = in->Volume();
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    //BEGIN NEW
-    kernelPackT = true; 
     //currently splitting in space-time is impelemented:
     int dirs = 4;
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
@@ -1641,7 +1639,6 @@ namespace quda {
       dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }  
-    //END NEW
 
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
@@ -1683,7 +1680,6 @@ namespace quda {
 #else
     errorQuda("Domain wall dslash has not been built");
 #endif
-
   }
 
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
