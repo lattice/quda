@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <cstring> // needed for memset
 
 #include <float_vector.h>
 #include <texture.h>
@@ -88,6 +89,7 @@ namespace quda {
 	h_reduce = (QudaSumFloat *) pinned_malloc(bytes);
 	hd_reduce = d_reduce;
       }
+      memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
     }
     
     blasStream = &streams[Nstream-1];
