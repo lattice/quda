@@ -28,25 +28,40 @@
   private: 
 #ifdef DIRECT_ACCESS_BLAS
   const InputType *spinor; // used when textures are disabled
+  size_t bytes;
 #endif
-  //size_t bytes;
+  static bool bound;
+  static int count;
 
   public:
-  Texture() { ; }
-  Texture(const InputType *x, size_t bytes) 
+  Texture()
 #ifdef DIRECT_ACCESS_BLAS
-  : spinor(x)/*, bytes(bytes)*/ 
+  : spinor(0), bytes(0)
+#endif
+  { count++; } 
+
+  Texture(const InputType *x, size_t bytes)
+#ifdef DIRECT_ACCESS_BLAS 
+  : spinor(x), bytes(bytes)
 #endif
   { 
-
-    if (bytes) bind(x, MAX_TEXELS*sizeof(InputType)); // only bind if bytes > 0
-    //if (bytes) bind(x, bytes); // only bind if bytes > 0
+    // only bind if bytes > 0
+    if (bytes) { bind(x, bytes); bound = true; } 
+    count++;
   }
-  ~Texture() { /*if (bytes) */ /*unbind()*/; } // unbinding is unnecessary and costly
+
+  Texture(const Texture &tex) 
+#ifdef DIRECT_ACCESS_BLAS
+  : spinor(spinor), bytes(tex.bytes)
+#endif
+  { count++; }
+
+  virtual ~Texture() { if (bound && !--count) { unbind(); bound = false;} }
 
   Texture& operator=(const Texture &tex) {
 #ifdef DIRECT_ACCESS_BLAS
     spinor = tex.spinor;
+    bytes = tex.bytes;
 #endif
     return *this;
   }
@@ -59,6 +74,11 @@
   __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
   };
 
+  template<typename OutputType, typename InputType, int tex_id>  
+    bool Texture<OutputType, InputType, tex_id>::bound = false;
+
+  template<typename OutputType, typename InputType, int tex_id>  
+    int Texture<OutputType, InputType, tex_id>::count = 0;
 
 #define DECL_TEX(id)							\
   texture<short2,1,cudaReadModeNormalizedFloat> tex_short2_##id;	\
@@ -200,11 +220,11 @@
 
 #if (__COMPUTE_CAPABILITY__ >= 000)
   SpinorTexture() 
-    : spinor((StoreType*)0, 0), norm(0), stride(0) {;} // default constructor
+    : spinor((StoreType*)0, 0), norm(0), stride(0) { } // default constructor
 
   SpinorTexture(const cudaColorSpinorField &x) 
     : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()),
-      stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+	stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
 #else
   SpinorTexture()
     : spinor((StoreType*)0, 0), norm(0, 0), stride(0) {;} // default constructor
@@ -214,7 +234,10 @@
       stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
 #endif
 
-    ~SpinorTexture() {;}
+  SpinorTexture(const SpinorTexture &st) 
+    : spinor(st.spinor), norm(st.norm), stride(st.stride) { }
+    
+    virtual ~SpinorTexture() { }
 
     SpinorTexture& operator=(const SpinorTexture &src) {
       if (&src != this) {
@@ -284,7 +307,7 @@
   Spinor(const cudaColorSpinorField &x) :
     spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
       { checkTypes<RegType,InterType,StoreType>(); } 
-    ~Spinor() {;}
+    virtual ~Spinor() {;}
 
     // default load used for simple fields
     __device__ inline void load(RegType x[], const int i) {

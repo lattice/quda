@@ -136,7 +136,6 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     return;
   }
 
-  Tunable *blas = 0;
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     const int M = 1;
     SpinorTexture<double2,double2,double2,M,0> xTex(x);
@@ -151,12 +150,13 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     Spinor<double2,double2,double2,M> Z(z);
     Spinor<double2,double2,double2,M> W(w);
     Functor<double2, double2> f(a,b,c);
-    blas = new BlasCuda<double2,M,writeX,writeY,writeZ,writeW,
+    BlasCuda<double2,M,writeX,writeY,writeZ,writeW,
       SpinorTexture<double2,double2,double2,M,0>, SpinorTexture<double2,double2,double2,M,1>,
       SpinorTexture<double2,double2,double2,M,2>, SpinorTexture<double2,double2,double2,M,3>,
       Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, 
       Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, Functor<double2, double2> >
-      (xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(2*M));
+      blas(xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(2*M));
+    blas.apply(*blasStream);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     const int M = 1;
     SpinorTexture<float4,float4,float4,M,0> xTex(x);
@@ -171,12 +171,13 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     Spinor<float4,float4,float4,M> Z(z);
     Spinor<float4,float4,float4,M> W(w);
     Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-    blas = new BlasCuda<float4,M,writeX,writeY,writeZ,writeW,
+    BlasCuda<float4,M,writeX,writeY,writeZ,writeW,
       SpinorTexture<float4,float4,float4,M,0>, SpinorTexture<float4,float4,float4,M,1>, 
       SpinorTexture<float4,float4,float4,M,2>, SpinorTexture<float4,float4,float4,M,3>, 
       Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, 
       Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, Functor<float2, float4> >
-      (xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(4*M));
+      blas(xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(4*M));
+    blas.apply(*blasStream);
   } else {
     if (x.Nspin() == 4){ //wilson
       SpinorTexture<float4,float4,short4,6,0> xTex(x);
@@ -191,12 +192,13 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       Spinor<float4,float4,short4,6> zStore(z);
       Spinor<float4,float4,short4,6> wStore(w);
       Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blas = new BlasCuda<float4, 6, writeX, writeY, writeZ, writeW, 
+      BlasCuda<float4, 6, writeX, writeY, writeZ, writeW, 
 	SpinorTexture<float4,float4,short4,6,0>, SpinorTexture<float4,float4,short4,6,1>, 
 	SpinorTexture<float4,float4,short4,6,2>, SpinorTexture<float4,float4,short4,6,3>, 
 	Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6>, 
 	Spinor<float4,float4,short4,6>,	Spinor<float4,float4,short4,6>, Functor<float2, float4> >
-	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
+	blas(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
+      blas.apply(*blasStream);
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
       SpinorTexture<float2,float2,short2,3,1> yTex;
@@ -210,20 +212,18 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       Spinor<float2,float2,short2,3> zStore(z);
       Spinor<float2,float2,short2,3> wStore(w);
       Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      blas = new BlasCuda<float2, 3,writeX,writeY,writeZ,writeW,
+      BlasCuda<float2, 3,writeX,writeY,writeZ,writeW,
 	SpinorTexture<float2,float2,short2,3,0>, SpinorTexture<float2,float2,short2,3,1>,
 	SpinorTexture<float2,float2,short2,3,2>, SpinorTexture<float2,float2,short2,3,3>,
 	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>,
 	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>, Functor<float2, float2> >
-	(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
+	blas(xTex, yTex, zTex, wTex, f, xStore, yStore, zStore, wStore, y.Volume());
+      blas.apply(*blasStream);
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
   }
   blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
   blas_flops += Functor<double2,double2>::flops()*x.RealLength();
-
-  blas->apply(*blasStream);
-  delete blas;
 
   checkCudaError();
 }

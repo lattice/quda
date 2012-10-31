@@ -494,7 +494,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   int reduce_length = siteUnroll ? x.RealLength() : x.Length();
   doubleN value;
 
-  Tunable *reduce = 0;
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
       const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
@@ -509,12 +508,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
       Spinor<double2,double2,double2,M> W(w);
       Spinor<double2,double2,double2,M> V(v);
       Reducer<ReduceType, double2, double2> r(a,b);
-      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ,
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ,
 	SpinorTexture<double2,double2,double2,M,0>, SpinorTexture<double2,double2,double2,M,1>,
 	SpinorTexture<double2,double2,double2,M,2>, Spinor<double2,double2,double2,M>,
 	Spinor<double2,double2,double2,M>, Reducer<ReduceType, double2, double2>, 
 	Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M> >
-	(value, xTex, yTex, zTex, W, V, r, X, Y, Z, reduce_length/(2*M));
+	reduce(value, xTex, yTex, zTex, W, V, r, X, Y, Z, reduce_length/(2*M));
+      reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1){ //staggered
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
       SpinorTexture<double2,double2,double2,M,0> xTex(x);
@@ -528,12 +528,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
       Spinor<double2,double2,double2,M> W(w);
       Spinor<double2,double2,double2,M> V(v);
       Reducer<ReduceType, double2, double2> r(a,b);
-      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ,
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ,
 	SpinorTexture<double2,double2,double2,M,0>, SpinorTexture<double2,double2,double2,M,1>,
 	SpinorTexture<double2,double2,double2,M,2>, Spinor<double2,double2,double2,M>,
 	Spinor<double2,double2,double2,M>, Reducer<ReduceType, double2, double2>, 
 	Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M> >
-	(value, xTex, yTex, zTex, W, V, r, X, Y, Z, reduce_length/(2*M));
+	reduce(value, xTex, yTex, zTex, W, V, r, X, Y, Z, reduce_length/(2*M));
+      reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
@@ -553,12 +554,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
       Spinor<float4,float4,float4,M> W(w);
       Spinor<float4,float4,float4,M> V(v);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,M,writeX,writeY,writeZ,
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,M,writeX,writeY,writeZ,
 	SpinorTexture<float4,float4,float4,M,0>,  SpinorTexture<float4,float4,float4,M,1>,
 	SpinorTexture<float4,float4,float4,M,2>,  SpinorTexture<float4,float4,float4,M,3>,
 	SpinorTexture<float4,float4,float4,M,4>, Reducer<ReduceType, float2, float4>,
 	Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M> >
-	(value, xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, reduce_length/(4*M));
+	reduce(value, xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, reduce_length/(4*M));
+      reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1) {
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
       SpinorTexture<float2,float2,float2,M,0> xTex(x);
@@ -576,12 +578,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
       Spinor<float2,float2,float2,M> W(w);
       Spinor<float2,float2,float2,M> V(v);
       Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,writeX,writeY,writeZ,
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,writeX,writeY,writeZ,
 	SpinorTexture<float2,float2,float2,M,0>,  SpinorTexture<float2,float2,float2,M,1>,
 	SpinorTexture<float2,float2,float2,M,2>,  SpinorTexture<float2,float2,float2,M,3>,
 	SpinorTexture<float2,float2,float2,M,4>, Reducer<ReduceType, float2, float2>,
 	Spinor<float2,float2,float2,M>, Spinor<float2,float2,float2,M>, Spinor<float2,float2,float2,M> >
-	(value, xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, reduce_length/(2*M));
+	reduce(value, xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, reduce_length/(2*M));
+      reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else {
     if (x.Nspin() == 4){ //wilson
@@ -598,12 +601,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
       Spinor<float4,float4,short4,6> yOut(y);
       Spinor<float4,float4,short4,6> zOut(z);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ,
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ,
 	SpinorTexture<float4,float4,short4,6,0>, SpinorTexture<float4,float4,short4,6,1>,
 	SpinorTexture<float4,float4,short4,6,2>, SpinorTexture<float4,float4,short4,6,3>,
 	SpinorTexture<float4,float4,short4,6,4>, Reducer<ReduceType, float2, float4>,
 	Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6> >
-	(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+	reduce(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+      reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1) {//staggered
       SpinorTexture<float2,float2,short2,3,0> xTex(x);
       SpinorTexture<float2,float2,short2,3,1> yTex;
@@ -618,20 +622,18 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
       Spinor<float2,float2,short2,3> yOut(y);
       Spinor<float2,float2,short2,3> zOut(z);
       Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      reduce = new ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,writeX,writeY,writeZ,
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,writeX,writeY,writeZ,
 	SpinorTexture<float2,float2,short2,3,0>, SpinorTexture<float2,float2,short2,3,1>,
 	SpinorTexture<float2,float2,short2,3,2>, SpinorTexture<float2,float2,short2,3,3>,
 	SpinorTexture<float2,float2,short2,3,4>, Reducer<ReduceType, float2, float2>,
 	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3> >
-	(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+	reduce(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+      reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.Volume()*sizeof(float);
   }
   blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.RealLength()*x.Precision();
   blas_flops += Reducer<ReduceType,double2,double2>::flops()*x.RealLength();
-
-  reduce->apply(*getBlasStream());
-  delete reduce;
 
   checkCudaError();
 
