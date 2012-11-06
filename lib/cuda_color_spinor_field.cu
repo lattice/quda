@@ -403,7 +403,7 @@ namespace quda {
 
     if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuColorSpinorField)) {
       // (temporary?) bug fix for padding
-      memset(buffer_h, 0, bufferBytes);
+      memset(buffer_h, 0, bytes);
 
       switch(nSpin){
       case 1:
@@ -421,7 +421,7 @@ namespace quda {
 
     } else {
       // (temporary?) bug fix for padding
-      cudaMemset(v, 0, bufferBytes);
+      cudaMemset(v, 0, bytes);
 
       if (typeid(src) == typeid(cpuColorSpinorField)) {
 	resizeBuffer(src.Bytes());
