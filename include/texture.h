@@ -6,6 +6,10 @@
 
 //namespace quda {
 
+// uncomment to disable texture reads
+#define DIRECT_ACCESS_BLAS
+
+
 #if (__COMPUTE_CAPABILITY__ >= 130)
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
@@ -52,7 +56,7 @@
 
   Texture(const Texture &tex) 
 #ifdef DIRECT_ACCESS_BLAS
-  : spinor(spinor), bytes(tex.bytes)
+  : spinor(tex.spinor), bytes(tex.bytes)
 #endif
   { count++; }
 
