@@ -208,6 +208,12 @@ fi
 
 
 
+AC_ARG_ENABLE(blas-tex,
+ AC_HELP_STRING([--enable-blas-tex], [ Enable texture reads for blas (default: enabled)]),
+ [ blas_tex=${enableval}],
+ [ blas_tex="yes" ]
+)
+
 AC_ARG_ENABLE(fermi-double-tex,
  AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: enabled)]),
  [ fermi_double_tex=${enableval}],
@@ -434,6 +440,14 @@ if test "X${build_qio}X" = "XyesX"; then
   fi	
 fi
  
+dnl Enables textures for blas functions
+case ${blas_tex} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-blas-tex ])
+  ;;
+esac
+
 dnl Enables textures on Fermi
 case ${fermi_double_tex} in
 yes|no);;
@@ -545,6 +559,9 @@ AC_SUBST( QMP_HOME, [${qmp_home}] )
 
 AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
 AC_SUBST( QIO_HOME, [${qio_home}] )
+
+AC_MSG_NOTICE([Setting BLAS_TEX= ${blas_tex}])
+AC_SUBST( BLAS_TEX, [${blas_tex}])
 
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
