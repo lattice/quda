@@ -86,7 +86,7 @@ namespace quda {
 					     act_path_coeff[2],
 					     recon, prec, halfGridDim,
 					     kparam, &stream[2*k]);
-	  
+
 	    exchange_gpu_staple_start(param->X, &cudaStaple, k, (int)QUDA_BACKWARDS, &stream[2*k]);
 	  
 	    kparam.kernel_type = ktype[2*k+1];
@@ -124,7 +124,8 @@ namespace quda {
 	    if(!commDimPartitioned(k)) continue;
 	    cudaStreamSynchronize(stream[2*k]);
 	    cudaStreamSynchronize(stream[2*k+1]);
-	  }	
+	  }
+	  cudaStreamSynchronize(stream[nStream-1]);
 #endif
 	  //end
 
@@ -139,7 +140,12 @@ namespace quda {
 					      act_path_coeff[5],
 					      recon, prec,  halfGridDim, kparam, &stream[nStream-1]);
 	  }
+
+#ifdef MULTI_GPU
+	  cudaStreamSynchronize(stream[nStream-1]);
+#endif
 	  //end
+
 	  for(int rho = 0; rho < 4; rho++){
 	    if (rho != dir && rho != nu){
 
@@ -193,6 +199,7 @@ namespace quda {
 		cudaStreamSynchronize(stream[2*k]);
 		cudaStreamSynchronize(stream[2*k+1]);
 	      }	
+	      cudaStreamSynchronize(stream[nStream-1]);
 #endif	    
 	      //end
 
@@ -212,8 +219,13 @@ namespace quda {
 
 		  //end
 		
-		}			    
+		}		    
 	      }//sig
+
+#ifdef MULTI_GPU
+	      cudaStreamSynchronize(stream[nStream-1]);
+#endif
+
 	    }
 	  }//rho	
 	}
