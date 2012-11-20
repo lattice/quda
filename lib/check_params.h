@@ -117,6 +117,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(Ls, INVALID_INT);
   P(mu, INVALID_DOUBLE);
   P(twist_flavor, QUDA_TWIST_INVALID);
+  P(hasNaik, true);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {

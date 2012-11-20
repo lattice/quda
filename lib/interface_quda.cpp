@@ -571,6 +571,8 @@ namespace quda {
     diracParam.mu = inv_param->mu;
     diracParam.verbose = getVerbosity();
 
+    diracParam.hasNaik = inv_param->hasNaik;
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -593,7 +595,7 @@ namespace quda {
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
-  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc, bool hasNaik=true)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -601,6 +603,8 @@ namespace quda {
     diracParam.fatGauge = gaugeFatPrecondition;
     diracParam.longGauge = gaugeLongPrecondition;    
     diracParam.clover = cloverPrecondition;
+
+    diracParam.hasNaik = hasNaik;
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 0; // comms are always off

@@ -426,88 +426,86 @@
 
 /************* the following is used by staggered *****************/
 
-#define READ_1ST_NBR_SPINOR_DOUBLE_TEX(spinor, idx, mystride)	\
-  double2 I0 = fetch_double2((spinor), idx + 0*mystride);	\
-  double2 I1 = fetch_double2((spinor), idx + 1*mystride);	\
-  double2 I2 = fetch_double2((spinor), idx + 2*mystride);
+#define READ_KS_NBR_SPINOR_DOUBLE_TEX(I, spinor, idx, mystride)	\
+  I##0 = fetch_double2((spinor), idx + 0*mystride);	\
+  I##1 = fetch_double2((spinor), idx + 1*mystride);	\
+  I##2 = fetch_double2((spinor), idx + 2*mystride);
 
-#define READ_3RD_NBR_SPINOR_DOUBLE_TEX(spinor, idx, mystride)	\
-  double2 T0 = fetch_double2((spinor), idx + 0*mystride);	\
-  double2 T1 = fetch_double2((spinor), idx + 1*mystride);	\
-  double2 T2 = fetch_double2((spinor), idx + 2*mystride);
+#define READ_3RD_NBR_SPINOR_DOUBLE_TEX(T, spinor, idx, mystride)	\
+  T##0 = fetch_double2((spinor), idx + 0*mystride);	\
+  T##1 = fetch_double2((spinor), idx + 1*mystride);	\
+  T##2 = fetch_double2((spinor), idx + 2*mystride);
 
-#define READ_1ST_NBR_SPINOR_SINGLE_TEX(spinor, idx, mystride)	\
-  float2 I0 = tex1Dfetch((spinor), idx + 0*mystride);		\
-  float2 I1 = tex1Dfetch((spinor), idx + 1*mystride);		\
-  float2 I2 = tex1Dfetch((spinor), idx + 2*mystride);
+#define READ_KS_NBR_SPINOR_SINGLE_TEX(I, spinor, idx, mystride) \
+  I##0 = tex1Dfetch((spinor), idx + 0*mystride);		\
+  I##1 = tex1Dfetch((spinor), idx + 1*mystride);		\
+  I##2 = tex1Dfetch((spinor), idx + 2*mystride);
 
-#define READ_3RD_NBR_SPINOR_SINGLE_TEX(spinor, idx, mystride)	\
-  float2 T0 = tex1Dfetch((spinor), idx + 0*mystride);		\
-  float2 T1 = tex1Dfetch((spinor), idx + 1*mystride);		\
-  float2 T2 = tex1Dfetch((spinor), idx + 2*mystride);
+#define READ_3RD_NBR_SPINOR_SINGLE_TEX(T, spinor, idx, mystride)	\
+  T##0 = tex1Dfetch((spinor), idx + 0*mystride);		\
+  T##1 = tex1Dfetch((spinor), idx + 1*mystride);		\
+  T##2 = tex1Dfetch((spinor), idx + 2*mystride);
 
-#define READ_1ST_NBR_SPINOR_HALF_TEX(spinor, idx, mystride)		\
-  float2 I0 = tex1Dfetch((spinor), idx + 0*mystride);			\
-  float2 I1 = tex1Dfetch((spinor), idx + 1*mystride);			\
-  float2 I2 = tex1Dfetch((spinor), idx + 2*mystride);			\
+#define READ_KS_NBR_SPINOR_HALF_TEX(I, spinor, idx, mystride)		\
+  I##0 = tex1Dfetch((spinor), idx + 0*mystride);			\
+  I##1 = tex1Dfetch((spinor), idx + 1*mystride);			\
+  I##2 = tex1Dfetch((spinor), idx + 2*mystride);			\
   {									\
-    float C = tex1Dfetch((spinorTexHalfNorm), norm_idx1);		\
-    I0.x *= C; I0.y *= C;						\
-    I1.x *= C; I1.y *= C;						\
-    I2.x *= C; I2.y *= C;}
+    float C = tex1Dfetch((spinorTexHalfNorm), norm_idx);		\
+    (I##0).x *= C; (I##0).y *= C;						\
+    (I##1).x *= C; (I##1).y *= C;						\
+    (I##2).x *= C; (I##2).y *= C;}
 
-#define READ_3RD_NBR_SPINOR_HALF_TEX(spinor, idx, mystride)		\
-  float2 T0 = tex1Dfetch((spinor), idx + 0*mystride);			\
-  float2 T1 = tex1Dfetch((spinor), idx + 1*mystride);			\
-  float2 T2 = tex1Dfetch((spinor), idx + 2*mystride);			\
+#define READ_3RD_NBR_SPINOR_HALF_TEX(T, spinor, idx, mystride)		\
+  T##0 = tex1Dfetch((spinor), idx + 0*mystride);			\
+  T##1 = tex1Dfetch((spinor), idx + 1*mystride);			\
+  T##2 = tex1Dfetch((spinor), idx + 2*mystride);			\
   {									\
     float C = tex1Dfetch((spinorTexHalfNorm), norm_idx3);		\
-    T0.x *= C; T0.y *= C;						\
-    T1.x *= C; T1.y *= C;						\
-    T2.x *= C; T2.y *= C;}
+    (T##0).x *= C; (T##0).y *= C;						\
+    (T##1).x *= C; (T##1).y *= C;						\
+    (T##2).x *= C; (T##2).y *= C;}
 
-#define READ_1ST_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
-  double2 I0 = spinor[idx + 0*mystride];			\
-  double2 I1 = spinor[idx + 1*mystride];			\
-  double2 I2 = spinor[idx + 2*mystride];
+#define READ_KS_NBR_SPINOR_DOUBLE(I, spinor, idx, mystride)	\
+  I##0 = spinor[idx + 0*mystride];			\
+  I##1 = spinor[idx + 1*mystride];			\
+  I##2 = spinor[idx + 2*mystride];
 
-#define READ_3RD_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
-  double2 T0 = spinor[idx + 0*mystride];			\
-  double2 T1 = spinor[idx + 1*mystride];			\
-  double2 T2 = spinor[idx + 2*mystride];
+#define READ_3RD_NBR_SPINOR_DOUBLE(T, spinor, idx, mystride)	\
+  T##0 = spinor[idx + 0*mystride];			\
+  T##1 = spinor[idx + 1*mystride];			\
+  T##2 = spinor[idx + 2*mystride];
 
-#define READ_1ST_NBR_SPINOR_SINGLE(spinor, idx, mystride)	\
-  float2 I0 = spinor[idx + 0*mystride];				\
-  float2 I1 = spinor[idx + 1*mystride];				\
-  float2 I2 = spinor[idx + 2*mystride];
+#define READ_KS_NBR_SPINOR_SINGLE(I, spinor, idx, mystride)	\
+  I##0 = spinor[idx + 0*mystride];				\
+  I##1 = spinor[idx + 1*mystride];				\
+  I##2 = spinor[idx + 2*mystride];
 
-#define READ_3RD_NBR_SPINOR_SINGLE(spinor, idx, mystride)	\
-  float2 T0 = spinor[idx + 0*mystride];				\
-  float2 T1 = spinor[idx + 1*mystride];				\
-  float2 T2 = spinor[idx + 2*mystride];
+#define READ_3RD_NBR_SPINOR_SINGLE(T, spinor, idx, mystride)	\
+  T##0 = spinor[idx + 0*mystride];				\
+  T##1 = spinor[idx + 1*mystride];				\
+  T##2 = spinor[idx + 2*mystride];
 
-#define READ_1ST_NBR_SPINOR_HALF(spinor, idx, mystride)			\
-  float2 I0, I1, I2;							\
+#define READ_KS_NBR_SPINOR_HALF(I, spinor, idx, mystride)			\
   {									\
     short2 S0 = in[idx + 0*mystride];					\
     short2 S1 = in[idx + 1*mystride];					\
     short2 S2 = in[idx + 2*mystride];					\
     float C = inNorm[idx];						\
-    I0.x =C*short2float(S0.x); I0.y =C*short2float(S0.y);		\
-    I1.x =C*short2float(S1.x); I1.y =C*short2float(S1.y);		\
-    I2.x =C*short2float(S2.x); I2.y =C*short2float(S2.y);		\
+    (I##0).x =C*short2float(S0.x); (I##0).y =C*short2float(S0.y);		\
+    (I##1).x =C*short2float(S1.x); (I##1).y =C*short2float(S1.y);		\
+    (I##2).x =C*short2float(S2.x); (I##2).y =C*short2float(S2.y);		\
   }
 
-#define READ_3RD_NBR_SPINOR_HALF(spinor, idx, mystride)			\
-  float2 T0, T1, T2;							\
+#define READ_3RD_NBR_SPINOR_HALF(T, spinor, idx, mystride)			\
   {									\
     short2 S0 = in[idx + 0*mystride];					\
     short2 S1 = in[idx + 1*mystride];					\
     short2 S2 = in[idx + 2*mystride];					\
     float C = inNorm[idx];						\
-    T0.x =C*short2float(S0.x); T0.y =C*short2float(S0.y);		\
-    T1.x =C*short2float(S1.x); T1.y =C*short2float(S1.y);		\
-    T2.x =C*short2float(S2.x); T2.y =C*short2float(S2.y);		\
+    (T##0).x =C*short2float(S0.x); (T##0).y =C*short2float(S0.y);		\
+    (T##1).x =C*short2float(S1.x); (T##1).y =C*short2float(S1.y);		\
+    (T##2).x =C*short2float(S2.x); (T##2).y =C*short2float(S2.y);		\
   }
 
 

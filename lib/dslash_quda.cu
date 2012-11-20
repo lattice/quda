@@ -6,6 +6,9 @@
 #include <color_spinor_field.h>
 #include <clover_field.h>
 
+
+#define imp 1
+
 // these control the Wilson-type actions
 #ifdef GPU_WILSON_DIRAC
 //#define DIRECT_ACCESS_LINK
@@ -279,6 +282,32 @@ namespace quda {
     }									\
   }
 
+
+#define STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, hasNaik, gridDim, blockDim, shared, stream, param,  ...) \
+  if (x==0) {								\
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
+      FUNC ## 18 ## DAG ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
+      FUNC ## 12 ## DAG ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+    } else {								\
+      FUNC ## 8 ## DAG ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    }									\
+  } else {								\
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
+      FUNC ## 18 ## DAG ## X ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
+      FUNC ## 12 ## DAG ## X ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
+      FUNC ## 8 ## DAG ## X ## Kernel<kernel_type, hasNaik> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    }									\
+  }
+
+
+
+
+
+
+
 #ifndef MULTI_GPU
 
 #define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
@@ -289,6 +318,17 @@ namespace quda {
   default:								\
     errorQuda("KernelType %d not defined for single GPU", param.kernel_type); \
   }
+
+
+#define STAGGERED_GENERIC_DSLASH(FUNC, DAG, X, hasNaik, gridDim, blockDim, shared, stream, param,  ...) \
+  switch(param.kernel_type) {						\
+  case INTERIOR_KERNEL:							\
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  default:								\
+    errorQuda("KernelType %d not defined for single GPU", param.kernel_type); \
+  }
+
 
 #else
 
@@ -311,6 +351,26 @@ namespace quda {
       break;								\
   }
 
+
+#define STAGGERED_GENERIC_DSLASH(FUNC, DAG, X, hasNaik, gridDim, blockDim, shared, stream, param,  ...) \
+  switch(param.kernel_type) {						\
+  case INTERIOR_KERNEL:							\
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, hasNaik,   gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_X:						\
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_X, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_Y:						\
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Y, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_Z:						\
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Z, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_T:						\
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  }
+
 #endif
 
   // macro used for dslash types with dagger kernel defined (Wilson, domain wall, etc.)
@@ -322,9 +382,12 @@ namespace quda {
       }
 
   // macro used for staggered dslash
-#define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param, ...)	\
-  GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param, __VA_ARGS__)
-
+#define STAGGERED_DSLASH(hasNaik, gridDim, blockDim, shared, stream, param, ...)	\
+  if(hasNaik){			\
+    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+  }else{					\
+    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+  }
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
@@ -1057,6 +1120,7 @@ namespace quda {
     const QudaReconstructType reconstruct;
     const int dagger;
     const double a;
+    const bool hasNaik;
 
   protected:
     int sharedBytesPerThread() const
@@ -1070,9 +1134,10 @@ namespace quda {
 			const longGFloat *long0, const longGFloat *long1,
 			const QudaReconstructType reconstruct, const sFloat *in, 
 			const float *inNorm, const sFloat *x, const float *xNorm, const double a,
-			const int dagger, const size_t bytes, const size_t norm_bytes)
+			const int dagger, const size_t bytes, const size_t norm_bytes,
+			const bool hasNaik)
       : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
-	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a)
+	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik)
     { 
       bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
     }
@@ -1093,7 +1158,7 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+      STAGGERED_DSLASH(hasNaik, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		       out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
     }
 
@@ -1685,7 +1750,8 @@ namespace quda {
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 			   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 			   const int parity, const int dagger, const cudaColorSpinorField *x,
-			   const double &k, const int *commOverride)
+			   const double &k, const int *commOverride,
+			   const bool hasNaik=true)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -1733,7 +1799,8 @@ namespace quda {
 								  (double2*)longGauge0, (double2*)longGauge1, 
 								  longGauge.Reconstruct(), (double2*)in->V(), 
 								  (float*)in->Norm(), (double2*)xv, (float*)xn, 
-								  k, dagger, in->Bytes(), in->NormBytes());
+								  k, dagger, in->Bytes(), in->NormBytes(),
+								  hasNaik);
       regSize = sizeof(double);
 #else
       errorQuda("Double precision not supported on this GPU");
@@ -1744,14 +1811,16 @@ namespace quda {
 							       (float4*)longGauge0, (float4*)longGauge1, 
 							       longGauge.Reconstruct(), (float2*)in->V(),
 							       (float*)in->Norm(), (float2*)xv, (float*)xn, 
-							       k, dagger, in->Bytes(), in->NormBytes());
+							       k, dagger, in->Bytes(), in->NormBytes(),
+							       hasNaik);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
       dslash = new StaggeredDslashCuda<short2, short2, short4>((short2*)out->V(), (float*)out->Norm(), 
 							       (short2*)fatGauge0, (short2*)fatGauge1,
 							       (short4*)longGauge0, (short4*)longGauge1, 
 							       longGauge.Reconstruct(), (short2*)in->V(), 
 							       (float*)in->Norm(), (short2*)xv, (float*)xn, 
-							       k, dagger,  in->Bytes(), in->NormBytes());
+							       k, dagger,  in->Bytes(), in->NormBytes(), 
+							       hasNaik);
     }
 
     dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());

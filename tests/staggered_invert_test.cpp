@@ -144,6 +144,9 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
+
+  inv_param.hasNaik = true;
+   
   double mass = 0.002;
 
   set_params(&gaugeParam, &inv_param,
