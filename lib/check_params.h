@@ -46,6 +46,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #if defined INIT_PARAM
   P(anisotropy, INVALID_DOUBLE);
   P(tadpole_coeff, INVALID_DOUBLE);
+  P(precondition, NULL);
 #else
   if (param->type == QUDA_WILSON_LINKS) {
     P(anisotropy, INVALID_DOUBLE);

@@ -82,6 +82,8 @@ extern "C" {
     double gaugeGiB;
 
     int preserve_gauge; /**< Used by link fattening */
+
+    void* precondition;  /**< Allows for a different gauge field in the preconditioner */
     
   } QudaGaugeParam;
 

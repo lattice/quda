@@ -229,7 +229,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // Set the specific cpu parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
 
-  cpuGaugeField cpu(gauge_param);
+  cpuGaugeField* cpu = new cpuGaugeField(gauge_param);
 
   profileGauge[QUDA_PROFILE_INIT].Start();  
   // switch the parameters for creating the mirror precise cuda gauge field
@@ -244,7 +244,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge[QUDA_PROFILE_INIT].Stop();  
 
   profileGauge[QUDA_PROFILE_H2D].Start();  
-  precise->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+  precise->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
 
   param->gaugeGiB += precise->GBytes();
 
@@ -257,26 +257,35 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *sloppy = NULL;
   if (param->cuda_prec != param->cuda_prec_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
-    sloppy->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+    sloppy->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
     param->gaugeGiB += sloppy->GBytes();
   } else {
     sloppy = precise;
   }
 
+  if(param->precondition){ // use "cpu" to load the gauge field for the preconditioner
+    GaugeFieldParam precon_gauge_param(param->precondition, *param);
+    delete cpu;
+    cpu = new cpuGaugeField(precon_gauge_param);
+  }
+
+  cudaGaugeField *precondition = NULL;
   // switch the parameters for creating the mirror preconditioner cuda gauge field
   gauge_param.precision = param->cuda_prec_precondition;
   gauge_param.reconstruct = param->reconstruct_precondition;
   gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
-  cudaGaugeField *precondition = NULL;
-  if (param->cuda_prec_sloppy != param->cuda_prec_precondition) {
+  QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  if ((param->cuda_prec_sloppy != param->cuda_prec_precondition) | (param->precondition != NULL)) {
     precondition = new cudaGaugeField(gauge_param);
-    precondition->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+    precondition->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
     param->gaugeGiB += precondition->GBytes();
   } else {
     precondition = sloppy;
   }
+  delete cpu;     
+   
+
   profileGauge[QUDA_PROFILE_H2D].Stop();  
   
   switch (param->type) {
