@@ -63,10 +63,51 @@ int comm_size(void)
   return QMP_get_number_of_nodes();
 }
 
+void* comm_declare_send_relative(void *buffer, int i, int dir)
+{
+  QMP_msghandle_t handle = QMP_declare_send_relative(buffer, i, dir, 0);
+  if( handle == NULL ) errorQuda("Unable to allocate send message handle");
+  return (void*)handle;
+}
+
+void* comm_declare_receive_relative(void *buffer, int i, int dir)
+{
+  QMP_msghandle_t handle = QMP_declare_receive_relative(buffer, i, dir, 0);
+  if( handle == NULL ) errorQuda("Unable to allocate receive message handle");
+  return (void*)handle;
+}
+
+void comm_free(void *handle) {
+  QMP_free_msghandle((QMP_msghandle_t)handle);
+}
+
 void comm_barrier(void)
 {
   QMP_CHECK(QMP_barrier());  
 }
+
+//we always reduce one double value
+void comm_allreduce(double* data)
+{
+  QMP_CHECK(QMP_sum_double(data));
+} 
+
+void comm_allreduce_int(int* data)
+{
+  QMP_CHECK(QMP_sum_int(data));
+}
+
+//reduce n double value
+void comm_allreduce_array(double* data, size_t len)
+{
+  QMP_CHECK(QMP_sum_double_array(data,len));
+}
+
+//we always reduce one double value
+void comm_allreduce_max(double* data)
+{
+  QMP_CHECK(QMP_max_double(data));
+} 
 
 void comm_broadcast(void *data, size_t nbytes)
 {
@@ -78,4 +119,15 @@ void comm_set_gridsize(const int *X, int nDim)
   if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
 
   QMP_CHECK(QMP_declare_logical_topology(X, nDim));
+}
+
+void comm_start(void *request)
+{
+  QMP_CHECK(QMP_start((QMP_msghandle_t)request));
+}
+
+int comm_query(void* request) 
+{
+  if (QMP_is_complete((QMP_msghandle_t)request) == QMP_TRUE) return 1;
+  return 0;
 }

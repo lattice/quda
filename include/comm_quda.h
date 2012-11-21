@@ -30,7 +30,6 @@ unsigned long   comm_send_with_tag(void*, int, int, int, void*);
 unsigned long	comm_recv(void*, int, int, void*);
 unsigned long	comm_recv_from_rank(void*, int, int, void*);
 unsigned long   comm_recv_with_tag(void*, int, int, int, void*);
-int             comm_query(void*);
 void		comm_wait(void*);
 void		comm_allreduce(double* data);
 void            comm_allreduce_int(int* data);
@@ -49,8 +48,13 @@ char *          comm_hostname(void);
 void            comm_set_gridsize(const int *X, int nDim);
 int		comm_rank(void);
 int		comm_size(void);
+void*           comm_declare_send_relative(void *buffer, int i, int dir);
+void*           comm_declare_receive_relative(void *buffer, int i, int dir);
+void            comm_free(void *handle);
 void		comm_barrier(void);
 void            comm_broadcast(void *data, size_t nbytes);
+void            comm_start(void *request);
+int             comm_query(void*);
   
 #ifdef __cplusplus
 }

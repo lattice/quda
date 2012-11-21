@@ -64,6 +64,11 @@ class FaceBuffer {
   QMP_msghandle_t mh_from_fwd[QUDA_MAX_DIM];
   QMP_msghandle_t mh_send_back[QUDA_MAX_DIM];
   QMP_msghandle_t mh_from_back[QUDA_MAX_DIM];
+
+  void* recv_handle_fwd[QUDA_MAX_DIM];
+  void* recv_handle_back[QUDA_MAX_DIM];
+  void* send_handle_fwd[QUDA_MAX_DIM];
+  void* send_handle_back[QUDA_MAX_DIM];
 #endif
 
   void setupDims(const int *X);
@@ -134,20 +139,21 @@ class FaceBuffer {
   int nDim;
   int nFace;
 
-  void* fwd_nbr_spinor_sendbuf[QUDA_MAX_DIM];
-  void* back_nbr_spinor_sendbuf[QUDA_MAX_DIM];
-  
-  void* fwd_nbr_spinor[QUDA_MAX_DIM];
-  void* back_nbr_spinor[QUDA_MAX_DIM];
+  // CUDA pinned memory
+  void *my_fwd_face[QUDA_MAX_DIM];
+  void *my_back_face[QUDA_MAX_DIM];
+  void *from_back_face[QUDA_MAX_DIM];
+  void *from_fwd_face[QUDA_MAX_DIM];
 
-  void* pageable_fwd_nbr_spinor_sendbuf[QUDA_MAX_DIM];
-  void* pageable_back_nbr_spinor_sendbuf[QUDA_MAX_DIM];
+  void* ib_my_fwd_face[QUDA_MAX_DIM];
+  void* ib_my_back_face[QUDA_MAX_DIM];
+  void* ib_from_back_face[QUDA_MAX_DIM];
+  void* ib_from_fwd_face[QUDA_MAX_DIM];
   
-  void* pageable_fwd_nbr_spinor[QUDA_MAX_DIM];
-  void* pageable_back_nbr_spinor[QUDA_MAX_DIM];
-  
-  void* recv_request1[QUDA_MAX_DIM], *recv_request2[QUDA_MAX_DIM];
-  void* send_request1[QUDA_MAX_DIM], *send_request2[QUDA_MAX_DIM];
+  void* recv_handle_fwd[QUDA_MAX_DIM];
+  void* recv_handle_back[QUDA_MAX_DIM];
+  void* send_handle_fwd[QUDA_MAX_DIM];
+  void* send_handle_back[QUDA_MAX_DIM];
   
   void setupDims(const int *X);
   

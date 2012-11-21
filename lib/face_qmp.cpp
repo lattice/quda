@@ -19,7 +19,7 @@
 
 using namespace quda;
 
-cudaStream_t *stream;
+extern cudaStream_t *stream;
 
 bool globalReduce = true;
 
@@ -46,9 +46,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     nDimComms = 4;
   }
   setupDims(Y);
-//END NEW  
-
-  //setupDims(X);
 
   // set these both = 0 separate streams for forwards and backwards comms
   // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
@@ -56,7 +53,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   sendFwdStrmIdx = 1;
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
-  
+
   // Buffers hold half spinors
   for (int i=0; i<nDimComms; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
@@ -71,17 +68,17 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     from_fwd_face[i] = allocatePinned(nbytes[i]);
     from_back_face[i] = allocatePinned(nbytes[i]);
 
-// if no GPUDirect so need separate IB and GPU host buffers
-#ifndef GPU_DIRECT
-    ib_my_fwd_face[i] = safe_malloc(nbytes[i]);
-    ib_my_back_face[i] = safe_malloc(nbytes[i]);
-    ib_from_fwd_face[i] = safe_malloc(nbytes[i]);
-    ib_from_back_face[i] = safe_malloc(nbytes[i]);
-#else // else just alias the pointer
+
+#ifdef GPU_DIRECT //  just alias the pointer
     ib_my_fwd_face[i] = my_fwd_face[i];
     ib_my_back_face[i] = my_back_face[i];
     ib_from_fwd_face[i] = from_fwd_face[i];
     ib_from_back_face[i] = from_back_face[i];
+#else // if no GPUDirect so need separate IB and GPU host buffers
+    ib_my_fwd_face[i] = safe_malloc(nbytes[i]);
+    ib_my_back_face[i] = safe_malloc(nbytes[i]);
+    ib_from_fwd_face[i] = safe_malloc(nbytes[i]);
+    ib_from_back_face[i] = safe_malloc(nbytes[i]);
 #endif
 
 #else
@@ -105,52 +102,18 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     mm_from_back[i] = QMP_declare_msgmem(ib_from_back_face[i], nbytes[i]);
     if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
 
-    mh_send_fwd[i] = QMP_declare_send_relative(mm_send_fwd[i], i, +1, 0);
-    if( mh_send_fwd[i] == NULL ) errorQuda("Unable to allocate forward send");
-    
-    mh_send_back[i] = QMP_declare_send_relative(mm_send_back[i], i, -1, 0);
-    if( mh_send_back[i] == NULL ) errorQuda("Unable to allocate backward send");
-    
-    mh_from_fwd[i] = QMP_declare_receive_relative(mm_from_fwd[i], i, +1, 0);
-    if( mh_from_fwd[i] == NULL ) errorQuda("Unable to allocate forward recv");
-    
-    mh_from_back[i] = QMP_declare_receive_relative(mm_from_back[i], i, -1, 0);
-    if( mh_from_back[i] == NULL ) errorQuda("Unable to allocate backward recv");
+    send_handle_fwd[i] = comm_declare_send_relative(mm_send_fwd[i], i, +1);
+    send_handle_back[i] = comm_declare_send_relative(mm_send_back[i], i, -1);
+    recv_handle_fwd[i] = comm_declare_receive_relative(mm_from_fwd[i], i, +1);
+    recv_handle_back[i] = comm_declare_receive_relative(mm_from_back[i], i, -1);
   }
 #endif
 
   checkCudaError();
 }
 
-FaceBuffer::FaceBuffer(const FaceBuffer &face) {
-  errorQuda("FaceBuffer copy constructor not implemented");
-}
-
-void FaceBuffer::setupDims(const int* X)
-{
-  Volume = 1;
-  for (int d=0; d<nDim; d++) {
-    this->X[d] = X[d];
-    Volume *= this->X[d];    
-  }
-  VolumeCB = Volume/2;
-
-  for (int i=0; i<nDim; i++) {
-    faceVolume[i] = 1;
-    for (int j=0; j<nDim; j++) {
-      if (i==j) continue;
-      faceVolume[i] *= this->X[j];
-    }
-    faceVolumeCB[i] = faceVolume[i]/2;
-
-  }
-
-}
-
 FaceBuffer::~FaceBuffer()
-{
-  
-  //printf("Ndim = %d\n", nDim);
+{  
   for (int i=0; i<nDimComms; i++) {
 #ifdef QMP_COMMS
 
@@ -161,10 +124,16 @@ FaceBuffer::~FaceBuffer()
     host_free(ib_from_back_face[i]);
 #endif
 
-    QMP_free_msghandle(mh_send_fwd[i]);
-    QMP_free_msghandle(mh_send_back[i]);
-    QMP_free_msghandle(mh_from_fwd[i]);
-    QMP_free_msghandle(mh_from_back[i]);
+    ib_my_fwd_face[i] = NULL;
+    ib_my_back_face[i] = NULL;
+    ib_from_fwd_face[i] = NULL;
+    ib_from_back_face[i] = NULL;
+
+    comm_free(send_handle_fwd[i]);
+    comm_free(send_handle_back[i]);
+    comm_free(recv_handle_fwd[i]);
+    comm_free(recv_handle_back[i]);
+
     QMP_free_msgmem(mm_send_fwd[i]);
     QMP_free_msgmem(mm_send_back[i]);
     QMP_free_msgmem(mm_from_fwd[i]);
@@ -184,108 +153,14 @@ FaceBuffer::~FaceBuffer()
     my_back_face[i]=NULL;
     from_fwd_face[i]=NULL;
     from_back_face[i]=NULL;
+
+    recv_handle_fwd[i] = NULL;
+    recv_handle_back[i] = NULL;
+    send_handle_fwd[i] = NULL;
+    send_handle_back[i] = NULL;
   }
 
   checkCudaError();
-}
-
-void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream_p)
-{
-  if(!commDimPartitioned(dim)) return;
-
-  in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated
-  stream = stream_p;
-
-  in.packGhost(dim, (QudaParity)parity, dagger, &stream[Nstream-1]);  
-}
-
-void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
-{
-  int dim = dir/2;
-  if(!commDimPartitioned(dim)) return;
-
-  if (dir%2==0) {
-    // backwards copy to host
-    in.sendGhost(my_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]);  
-  } else {
-    // forwards copy to host
-    in.sendGhost(my_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
-  }
-}
-
-void FaceBuffer::commsStart(int dir) {
-  int dim = dir / 2;
-  if(!commDimPartitioned(dim)) return;
-
-  if (dir%2 == 0) { // sending backwards
-
-#ifdef QMP_COMMS  // Begin backward send
-    // Prepost receive
-    QMP_CHECK(QMP_start(mh_from_fwd[dim]));
-#ifndef GPU_DIRECT
-    memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
-#endif
-    QMP_CHECK(QMP_start(mh_send_back[dim]));
-#endif
-
-  } else { //sending forwards
-    
-#ifdef QMP_COMMS
-  // Prepost receive
-    QMP_CHECK(QMP_start(mh_from_back[dim]));
-    // Begin forward send
-#ifndef GPU_DIRECT
-    memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
-#endif
-    QMP_CHECK(QMP_start(mh_send_fwd[dim]));
-#endif
-  }
-
-} 
-
-int FaceBuffer::commsQuery(int dir) {
-
-#ifdef QMP_COMMS
-
-  int dim = dir/2;
-  if(!commDimPartitioned(dim)) return 0;
-
-  if (dir%2==0) {// receive from forwards
-    if (QMP_is_complete(mh_send_back[dim]) == QMP_TRUE &&
-	QMP_is_complete(mh_from_fwd[dim]) == QMP_TRUE) {
-#ifndef GPU_DIRECT
-      memcpy(from_fwd_face[dim], ib_from_fwd_face[dim], nbytes[dim]);		
-#endif
-      return 1;
-    }
-  } else { // receive from backwards
-    if (QMP_is_complete(mh_send_fwd[dim]) == QMP_TRUE && 
-	QMP_is_complete(mh_from_back[dim]) == QMP_TRUE) {
-#ifndef GPU_DIRECT
-      memcpy(from_back_face[dim], ib_from_back_face[dim], nbytes[dim]);		
-#endif
-      return 1;
-    }
-  }
-  return 0;
-
-#else // no communications so just return true
-
-  return 1;
-
-#endif
-}
-
-void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir)
-{
-  int dim = dir/2;
-  if(!commDimPartitioned(dim)) return;
-
-  if (dir%2==0) {// receive from forwards
-    out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+recFwdStrmIdx]); // 0, 2, 4, 6
-  } else { // receive from backwards
-    out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+recBackStrmIdx]); // 1, 3, 5, 7
-  }
 }
 
 // This is just an initial hack for CPU comms - should be creating the message handlers at instantiation
@@ -490,30 +365,6 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
   }
 
 #endif // QMP_COMMS
-}
-
-void reduceMaxDouble(double &max) {
-
-#ifdef QMP_COMMS
-  QMP_CHECK(QMP_max_double(&max));
-#endif
-
-}
-
-void reduceDouble(double &sum) {
-
-#ifdef QMP_COMMS
-  if (globalReduce) QMP_CHECK(QMP_sum_double(&sum));
-#endif
-
-}
-
-void reduceDoubleArray(double *sum, const int len) {
-
-#ifdef QMP_COMMS
-  if (globalReduce) QMP_CHECK(QMP_sum_double_array(sum,len));
-#endif
-
 }
 
 #ifdef QMP_COMMS

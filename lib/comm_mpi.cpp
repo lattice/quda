@@ -505,6 +505,19 @@ comm_recv_with_tag(void* buf, int len, int src, int tag, void* _request)
   return (unsigned long)request;
 }
 
+void comm_start(void *request)
+{
+  MPI_Status status;
+  
+  int rc = MPI_Start( (MPI_Request*)request);
+  if (rc != MPI_SUCCESS) {
+    printf("ERROR: MPI_Test failed\n");
+    comm_exit(1);
+  }
+
+  return;
+}
+
 int comm_query(void* request) 
 {
   MPI_Status status;
