@@ -590,6 +590,7 @@ QDP_INSTALL_PATH
 USE_QDPJIT
 NUMA_AFFINITY
 FERMI_DBLE_TEX
+BLAS_TEX
 QIO_HOME
 QMP_HOME
 MPI_HOME
@@ -705,6 +706,7 @@ with_qmp
 with_qio
 enable_qdp_jit
 with_qdp
+enable_blas_tex
 enable_fermi_double_tex
 enable_numa_affinity
 '
@@ -1364,6 +1366,7 @@ Optional Features:
                           device (default: disabled)
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
                           (default: disabled)
+  --enable-blas-tex       Enable texture reads for blas (default: enabled)
   --enable-fermi-double-tex
                           Enable double-precision texture reads on Fermi
                           (default: enabled)
@@ -3730,6 +3733,15 @@ fi
 
 
 
+# Check whether --enable-blas-tex was given.
+if test "${enable_blas_tex+set}" = set; then :
+  enableval=$enable_blas_tex;  blas_tex=${enableval}
+else
+   blas_tex="yes"
+
+fi
+
+
 # Check whether --enable-fermi-double-tex was given.
 if test "${enable_fermi_double_tex+set}" = set; then :
   enableval=$enable_fermi_double_tex;  fermi_double_tex=${enableval}
@@ -3935,6 +3947,13 @@ if test "X${build_qio}X" = "XyesX"; then
   fi
 fi
 
+case ${blas_tex} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-blas-tex " "$LINENO" 5
+  ;;
+esac
+
 case ${fermi_double_tex} in
 yes|no);;
 *)
@@ -4107,6 +4126,11 @@ QMP_HOME=${qmp_home}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting QIO_HOME=${qio_home}" >&5
 $as_echo "$as_me: Setting QIO_HOME=${qio_home}" >&6;}
 QIO_HOME=${qio_home}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BLAS_TEX= ${blas_tex}" >&5
+$as_echo "$as_me: Setting BLAS_TEX= ${blas_tex}" >&6;}
+BLAS_TEX=${blas_tex}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting FERMI_DBLE_TEX= ${fermi_double_tex}" >&5
