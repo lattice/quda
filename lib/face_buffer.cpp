@@ -123,7 +123,7 @@ void FaceBuffer::commsStart(int dir) {
   } else { //sending forwards
     
   // Prepost receive
-    comm_start(send_handle_back[dim]);
+    comm_start(recv_handle_back[dim]);
     // Begin forward send
 #ifndef GPU_DIRECT
     memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
