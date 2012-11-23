@@ -22,7 +22,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
 {
   //temporal hack for DW operator  
-  //BEGIN NEW
   int Y[nDim];
   Y[0] = X[0];
   Y[1] = X[1];
@@ -37,13 +36,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   sendFwdStrmIdx = 1;
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
-
-  for (int i=0; i < QUDA_MAX_DIM; i++) {
-    recv_request_back[i] = safe_malloc(sizeof(MPI_Request));
-    recv_request_fwd[i] = safe_malloc(sizeof(MPI_Request));
-    send_request_back[i] = safe_malloc(sizeof(MPI_Request));    
-    send_request_fwd[i] = safe_malloc(sizeof(MPI_Request));    
-  }
 
   for (int i=0 ; i < 4; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
@@ -68,6 +60,13 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 #endif
   }
 
+  for (int i=0 ; i < 4; i++) {
+    send_handle_fwd[i] = comm_declare_send_relative(my_fwd_face[i], i, +1, nbytes[i]);
+    send_handle_back[i] = comm_declare_send_relative(my_back_face[i], i, -1, nbytes[i]);
+    recv_handle_fwd[i] = comm_declare_receive_relative(from_fwd_face[i], i, +1, nbytes[i]);
+    recv_handle_back[i] = comm_declare_receive_relative(from_back_face[i], i, -1, nbytes[i]);
+  }
+
   checkCudaError();
 
   return;
@@ -75,13 +74,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 
 FaceBuffer::~FaceBuffer()
 { 
-  for (int i=0; i<QUDA_MAX_DIM; i++) {
-    host_free(recv_request_fwd[i]);
-    host_free(recv_request_back[i]);
-    host_free(send_request_fwd[i]);
-    host_free(send_request_back[i]);
-  }
-
   for (int i=0; i<4; i++) {
 
 #ifndef GPU_DIRECT
@@ -105,37 +97,19 @@ FaceBuffer::~FaceBuffer()
     my_back_face[i]=NULL;
     from_fwd_face[i]=NULL;
     from_back_face[i]=NULL;
+
+    host_free(recv_handle_fwd[i]);
+    host_free(recv_handle_back[i]);
+    host_free(send_handle_fwd[i]);
+    host_free(send_handle_back[i]);
+
+    recv_handle_fwd[i] = NULL;
+    recv_handle_back[i] = NULL;
+    send_handle_fwd[i] = NULL;
+    send_handle_back[i] = NULL;
   }
   checkCudaError();
 }
-
-void FaceBuffer::commsStart(int dir) { 
-  int dim = dir / 2;
-  if(!commDimPartitioned(dim)) return;
-
-  int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
-  int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
-  int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
-  int uptags[4] = {XUP, YUP, ZUP, TUP};
-
-  if (dir %2 == 0) {
-    // Prepost all receives
-
-    comm_recv_with_tag(ib_from_fwd_face[dim], nbytes[dim], fwd_nbr[dim], downtags[dim], recv_request_fwd[dim]);
-#ifndef GPU_DIRECT
-    memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
-#endif
-    comm_send_with_tag(ib_my_back_face[dim], nbytes[dim], back_nbr[dim], downtags[dim], send_request_back[dim]);
-  } else {
-
-    comm_recv_with_tag(ib_from_back_face[dim], nbytes[dim], back_nbr[dim], uptags[dim], recv_request_back[dim]);
-#ifndef GPU_DIRECT
-    memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
-#endif
-    comm_send_with_tag(ib_my_fwd_face[dim], nbytes[dim], fwd_nbr[dim], uptags[dim], send_request_fwd[dim]);
-  }
-}
-
 
 void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)
 {
@@ -147,6 +121,16 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
     nFace*faceVolumeCB[2]*Ninternal*precision,
     nFace*faceVolumeCB[3]*Ninternal*precision
   };
+
+  void* recv_request_fwd[QUDA_MAX_DIM], *recv_request_back[QUDA_MAX_DIM];
+  void* send_request_fwd[QUDA_MAX_DIM], *send_request_back[QUDA_MAX_DIM];
+
+  for (int i=0; i < QUDA_MAX_DIM; i++) {
+    recv_request_fwd[i] = safe_malloc(sizeof(MPI_Request));
+    recv_request_back[i] = safe_malloc(sizeof(MPI_Request));
+    send_request_fwd[i] = safe_malloc(sizeof(MPI_Request));    
+    send_request_back[i] = safe_malloc(sizeof(MPI_Request));    
+  }
 
   // allocate the ghost buffer if not yet allocated
   spinor.allocateGhostBuffer();
@@ -161,7 +145,7 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   int uptags[4] = {XUP, YUP, ZUP, TUP};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   
-  for(int i= 0;i < 4; i++){
+  for(int i=0; i<4; i++){
     comm_recv_with_tag(spinor.backGhostFaceBuffer[i], len[i], back_nbr[i], uptags[i], recv_request_back[i]);
     comm_recv_with_tag(spinor.fwdGhostFaceBuffer[i], len[i], fwd_nbr[i], downtags[i], recv_request_fwd[i]);    
     comm_send_with_tag(spinor.fwdGhostFaceSendBuffer[i], len[i], fwd_nbr[i], uptags[i], send_request_back[i]);
@@ -173,6 +157,13 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
     comm_wait(recv_request_fwd[i]);
     comm_wait(send_request_back[i]);
     comm_wait(send_request_fwd[i]);
+  }
+
+  for (int i=0; i < QUDA_MAX_DIM; i++) {
+    host_free(recv_request_fwd[i]);
+    host_free(recv_request_back[i]);
+    host_free(send_request_fwd[i]);
+    host_free(send_request_back[i]);
   }
 
 }

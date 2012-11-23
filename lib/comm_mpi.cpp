@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include <comm_quda.h>
 #include <quda_internal.h>
+#include <face_quda.h>
 
 static char hostname[128] = "undetermined";
 static int fwd_nbr=-1;
@@ -384,42 +385,46 @@ comm_send_to_rank(void* buf, int len, int dst_rank, void* _request)
   return (unsigned long)request;  
 }
 
-unsigned long
-comm_send_with_tag(void* buf, int len, int dst, int tag, void*_request)
-{
-  MPI_Request* request = (MPI_Request*)_request;
-
-  int dstproc = -1;
-  switch(dst){
+int find_neighbor_proc(int which) {
+  int proc = -1;
+  switch(which){
   case X_BACK_NBR:
-    dstproc = x_back_nbr;
+    proc = x_back_nbr;
     break;
   case X_FWD_NBR:
-    dstproc = x_fwd_nbr;
+    proc = x_fwd_nbr;
     break;
   case Y_BACK_NBR:
-    dstproc = y_back_nbr;
+    proc = y_back_nbr;
     break;
   case Y_FWD_NBR:
-    dstproc = y_fwd_nbr;
+    proc = y_fwd_nbr;
     break;
   case Z_BACK_NBR:
-    dstproc = z_back_nbr;
+    proc = z_back_nbr;
     break;
   case Z_FWD_NBR:
-    dstproc = z_fwd_nbr;
+    proc = z_fwd_nbr;
     break;
   case T_BACK_NBR:
-    dstproc = t_back_nbr;
+    proc = t_back_nbr;
     break;
   case T_FWD_NBR:
-    dstproc = t_fwd_nbr;
+    proc = t_fwd_nbr;
     break;
   default:
     printf("ERROR: invalid dest, line %d, file %s\n", __LINE__, __FILE__);
     comm_exit(1);
   }
+  return proc;
+}
+ 
 
+unsigned long
+comm_send_with_tag(void* buf, int len, int dst, int tag, void*_request)
+{
+  MPI_Request* request = (MPI_Request*)_request;
+  int dstproc = find_neighbor_proc(dst);
   MPI_Isend(buf, len, MPI_BYTE, dstproc, tag, MPI_COMM_WORLD, request);
   return (unsigned long)request;
 }
@@ -469,46 +474,44 @@ unsigned long
 comm_recv_with_tag(void* buf, int len, int src, int tag, void* _request)
 { 
   MPI_Request* request = (MPI_Request*)_request;
-  
-  int srcproc=-1;
-  switch (src){
-  case X_BACK_NBR:
-    srcproc = x_back_nbr;
-    break;
-  case X_FWD_NBR:
-    srcproc = x_fwd_nbr;
-    break;
-  case Y_BACK_NBR:
-    srcproc = y_back_nbr;
-    break;
-  case Y_FWD_NBR:
-    srcproc = y_fwd_nbr;
-    break;
-  case Z_BACK_NBR:
-    srcproc = z_back_nbr;
-    break;
-  case Z_FWD_NBR:
-    srcproc = z_fwd_nbr;
-    break;
-  case T_BACK_NBR:
-    srcproc = t_back_nbr;
-    break;
-  case T_FWD_NBR:
-    srcproc = t_fwd_nbr;
-    break;
-  default:
-    printf("ERROR: invalid source, line %d, file %s\n", __LINE__, __FILE__);
-    comm_exit(1);
-  }
+  int srcproc = find_neighbor_proc(src);
   MPI_Irecv(buf, len, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);
   
   return (unsigned long)request;
 }
 
+void* comm_declare_send_relative(void *buffer, int dim, int dir, size_t count)
+{
+  int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
+  int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
+  int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+  int uptags[4] = {XUP, YUP, ZUP, TUP};
+
+  MPI_Request *request = (MPI_Request*)safe_malloc(sizeof(MPI_Request));
+  int tag = (dir == 1) ? uptags[dim] : downtags[dim];
+  int dst = (dir == 1) ? fwd_nbr[dim] : back_nbr[dim];
+  int dstproc = find_neighbor_proc(dst);  
+  MPI_Send_init(buffer, count, MPI_BYTE, dstproc, tag, MPI_COMM_WORLD, request);
+  return (void*)request;
+}
+
+void* comm_declare_receive_relative(void *buffer, int dim, int dir, size_t count)
+{
+  int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
+  int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
+  int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
+  int uptags[4] = {XUP, YUP, ZUP, TUP};
+
+  MPI_Request *request = (MPI_Request*)safe_malloc(sizeof(MPI_Request));
+  int tag = (dir == 1) ? uptags[dim] : downtags[dim];
+  int src = (dir == 1) ? back_nbr[dim] : fwd_nbr[dim];
+  int srcproc = find_neighbor_proc(src);  
+  MPI_Recv_init(buffer, count, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);
+  return (void*)request;
+}
+
 void comm_start(void *request)
 {
-  MPI_Status status;
-  
   int rc = MPI_Start( (MPI_Request*)request);
   if (rc != MPI_SUCCESS) {
     printf("ERROR: MPI_Test failed\n");

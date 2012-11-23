@@ -63,19 +63,20 @@ int comm_size(void)
   return QMP_get_number_of_nodes();
 }
 
-void* comm_declare_send_relative(void *buffer, int i, int dir)
+void* comm_declare_send_relative(void *buffer, int i, int dir, size_t bytes)
 {
   QMP_msghandle_t handle = QMP_declare_send_relative(buffer, i, dir, 0);
   if( handle == NULL ) errorQuda("Unable to allocate send message handle");
   return (void*)handle;
 }
 
-void* comm_declare_receive_relative(void *buffer, int i, int dir)
+void* comm_declare_receive_relative(void *buffer, int i, int dir, size_t bytes)
 {
   QMP_msghandle_t handle = QMP_declare_receive_relative(buffer, i, dir, 0);
   if( handle == NULL ) errorQuda("Unable to allocate receive message handle");
   return (void*)handle;
 }
+
 
 void comm_free(void *handle) {
   QMP_free_msghandle((QMP_msghandle_t)handle);

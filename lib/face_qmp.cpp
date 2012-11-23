@@ -102,10 +102,10 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     mm_from_back[i] = QMP_declare_msgmem(ib_from_back_face[i], nbytes[i]);
     if( mm_from_back[i] == NULL ) errorQuda("Unable to allocate recv from back message mem");
 
-    send_handle_fwd[i] = comm_declare_send_relative(mm_send_fwd[i], i, +1);
-    send_handle_back[i] = comm_declare_send_relative(mm_send_back[i], i, -1);
-    recv_handle_fwd[i] = comm_declare_receive_relative(mm_from_fwd[i], i, +1);
-    recv_handle_back[i] = comm_declare_receive_relative(mm_from_back[i], i, -1);
+    send_handle_fwd[i] = comm_declare_send_relative(mm_send_fwd[i], i, 1, nbytes[i]);
+    send_handle_back[i] = comm_declare_send_relative(mm_send_back[i], i, -1, nbytes[i]);
+    recv_handle_fwd[i] = comm_declare_receive_relative(mm_from_fwd[i], i, +1, nbytes[i]);
+    recv_handle_back[i] = comm_declare_receive_relative(mm_from_back[i], i, -1, nbytes[i]);
   }
 #endif
 
