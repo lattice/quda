@@ -98,10 +98,10 @@ FaceBuffer::~FaceBuffer()
     from_fwd_face[i]=NULL;
     from_back_face[i]=NULL;
 
-    host_free(recv_handle_fwd[i]);
-    host_free(recv_handle_back[i]);
-    host_free(send_handle_fwd[i]);
-    host_free(send_handle_back[i]);
+    comm_free(recv_handle_fwd[i]);
+    comm_free(recv_handle_back[i]);
+    comm_free(send_handle_fwd[i]);
+    comm_free(send_handle_back[i]);
 
     recv_handle_fwd[i] = NULL;
     recv_handle_back[i] = NULL;

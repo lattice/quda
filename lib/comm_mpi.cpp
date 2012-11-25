@@ -611,6 +611,10 @@ comm_allreduce_max(double* data)
   return;
 } 
 
+void comm_free(void *handle) {
+  host_free((MPI_Request*)handle);
+}
+
 // broadcast from rank 0
 void
 comm_broadcast(void *data, size_t nbytes)
