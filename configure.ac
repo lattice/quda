@@ -127,13 +127,6 @@ AC_ARG_ENABLE(multi-gpu,
   [ multi_gpu="no" ]
 )
 
-dnl enable comms compute/overlap
-AC_ARG_ENABLE(overlap-comms,
-  AC_HELP_STRING([--enable-overlap-comms], [ Enable comms/compute overlap (default: enabled)]),
-  [ overlap_comms=${enableval}],
-  [ overlap_comms="yes" ]
-)
-
 dnl enable cuda / nic interop buffer
 AC_ARG_ENABLE(gpu-direct,
   AC_HELP_STRING([--enable-gpu-direct], [ Enable CUDA/NIC interop pinned memory (default: enabled)]),
@@ -371,14 +364,6 @@ yes|no);;
   ;;
 esac
 
-dnl Enables overlapping comms
-case ${overlap_comms} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-overlap-comms ])
-  ;;
-esac
-
 dnl Enables CUDA/NIC buffer interop
 case ${gpu_direct} in
 yes|no);;
@@ -529,9 +514,6 @@ AC_SUBST( BUILD_QMP, [${build_qmp}])
 
 AC_MSG_NOTICE([Setting BUILD_MPI = ${build_mpi} ])
 AC_SUBST( BUILD_MPI, [${build_mpi}])
-
-AC_MSG_NOTICE([Setting OVERLAP_COMMS= ${overlap_comms}])
-AC_SUBST( OVERLAP_COMMS, [${overlap_comms}])
 
 AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
 AC_SUBST( GPU_DIRECT, [${gpu_direct}])

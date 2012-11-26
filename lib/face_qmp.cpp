@@ -23,13 +23,6 @@ extern cudaStream_t *stream;
 
 bool globalReduce = true;
 
-// Easy to switch between overlapping communication or not
-#ifdef OVERLAP_COMMS
-#define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpyAsync(dst, src, size, type, stream)
-#else
-#define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
-#endif
-
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision, const int Ls) :
   Ninternal(Ninternal), precision(precision), nDim(nDim), nDimComms(nDim), nFace(nFace)
@@ -53,10 +46,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     my_back_face[i] = allocatePinned(nbytes[i]);
 
 #ifdef QMP_COMMS
-
     from_fwd_face[i] = allocatePinned(nbytes[i]);
     from_back_face[i] = allocatePinned(nbytes[i]);
-
 
 #ifdef GPU_DIRECT //  just alias the pointer
     ib_my_fwd_face[i] = my_fwd_face[i];
@@ -97,8 +88,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     recv_handle_back[i] = comm_declare_receive_relative(mm_from_back[i], i, -1, nbytes[i]);
   }
 #endif
-
-  printf("End of constructor\n"); fflush(stdout);
 
   checkCudaError();
 }

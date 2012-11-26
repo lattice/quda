@@ -35,7 +35,6 @@ BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@			# build code for hisq fermion force?
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
-OVERLAP_COMMS = @OVERLAP_COMMS@      # set to 'yes' to overlap comms and compute
 
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
@@ -114,11 +113,6 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   FACE_COMMS_OBJS=face_qmp.o comm_qmp.o
 endif 
-
-ifeq ($(strip $(OVERLAP_COMMS)), yes)
-  COPT += -DOVERLAP_COMMS
-  NVCCOPT += -DOVERLAP_COMMS
-endif
 
 ifeq ($(strip $(BUILD_QIO)), yes)
   INC += -DHAVE_QIO -I$(QIO_HOME)/include
