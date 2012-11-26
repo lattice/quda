@@ -346,6 +346,16 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
 
   /**
+   * Solve for multiple shifts sequentially, use the solution for the previous (larger) shift 
+	 * as the initial guess for the solution for the current shift. 
+   * @param _hp_x  Array of solution spinor fields
+   * @param _hp_b  Array of source spinor fields 
+   * @param param  Contains all metadata regarding host and device 
+   *					     storage and solver parameters
+   */
+  void invertSequentialMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
+
+  /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
