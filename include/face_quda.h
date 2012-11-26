@@ -5,8 +5,6 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
-#ifndef MPI_COMMS
-
 class FaceBuffer {
 
  private:  
@@ -25,10 +23,6 @@ class FaceBuffer {
   int recFwdStrmIdx; // = sendBackIdx;
   int recBackStrmIdx; // = sendFwdIdx;
 
-  // Device memory buffer for coalescing the gathered messages
-  void *gather_fwd_face;
-  void *gather_back_face;
-
   // CUDA pinned memory
   void *my_fwd_face[QUDA_MAX_DIM];
   void *my_back_face[QUDA_MAX_DIM];
@@ -41,6 +35,18 @@ class FaceBuffer {
   void* ib_from_back_face[QUDA_MAX_DIM];
   void* ib_from_fwd_face[QUDA_MAX_DIM];
 
+#ifdef QMP_COMMS
+  QMP_msgmem_t mm_send_fwd[QUDA_MAX_DIM];
+  QMP_msgmem_t mm_from_fwd[QUDA_MAX_DIM];
+  QMP_msgmem_t mm_send_back[QUDA_MAX_DIM];
+  QMP_msgmem_t mm_from_back[QUDA_MAX_DIM];
+#endif
+
+  void* recv_handle_fwd[QUDA_MAX_DIM];
+  void* recv_handle_back[QUDA_MAX_DIM];
+  void* send_handle_fwd[QUDA_MAX_DIM];
+  void* send_handle_back[QUDA_MAX_DIM];
+
   int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
   QudaPrecision precision;
 
@@ -52,26 +58,9 @@ class FaceBuffer {
   int nDim; // the actual number of space-time communications
   int nDimComms; // the number of dimensions in which we communicate
   int nFace;
-
   size_t nbytes[QUDA_MAX_DIM];
-#ifdef QMP_COMMS
-  QMP_msgmem_t mm_send_fwd[QUDA_MAX_DIM];
-  QMP_msgmem_t mm_from_fwd[QUDA_MAX_DIM];
-  QMP_msgmem_t mm_send_back[QUDA_MAX_DIM];
-  QMP_msgmem_t mm_from_back[QUDA_MAX_DIM];
-  
-  QMP_msghandle_t mh_send_fwd[QUDA_MAX_DIM];
-  QMP_msghandle_t mh_from_fwd[QUDA_MAX_DIM];
-  QMP_msghandle_t mh_send_back[QUDA_MAX_DIM];
-  QMP_msghandle_t mh_from_back[QUDA_MAX_DIM];
 
-  void* recv_handle_fwd[QUDA_MAX_DIM];
-  void* recv_handle_back[QUDA_MAX_DIM];
-  void* send_handle_fwd[QUDA_MAX_DIM];
-  void* send_handle_back[QUDA_MAX_DIM];
-#endif
-
-  void setupDims(const int *X);
+  void setupDims(const int *X, int Ls);
 
   void *allocatePinned(size_t nbytes);
   void freePinned(void *ptr);
@@ -95,10 +84,8 @@ class FaceBuffer {
   static void flushPinnedCache();
 };
 
-void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
-			int veclength, QudaReconstructType reconstruct, int V, int Vs);
-
-#else // MPI comms
+//void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
+//			int veclength, QudaReconstructType reconstruct, int V, int Vs);
 
 #define XUP 0
 #define YUP 1
@@ -108,76 +95,6 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 #define ZDOWN 5
 #define YDOWN 6
 #define XDOWN 7
-
-
-class FaceBuffer {
-
- private:
-  // We cache pinned memory allocations so that Dirac objects can be created and
-  // destroyed at will with minimal overhead.
-  static std::multimap<size_t, void *> pinnedCache;
-
-  // For convenience, we keep track of the sizes of active allocations (i.e., those not in the cache).
-  static std::map<void *, size_t> pinnedSize;
-
-  // set these both = 0 `for no overlap of qmp and cudamemcpyasync
-  // sendBackIdx = 0, and sendFwdIdx = 1 for overlap
-  int sendBackStrmIdx; // = 0;
-  int sendFwdStrmIdx; // = 1;
-  int recFwdStrmIdx; // = sendBackIdx;
-  int recBackStrmIdx; // = sendFwdIdx;
-
-  int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
-  QudaPrecision precision;
-  size_t nbytes[QUDA_MAX_DIM];
-
-  int Volume;
-  int VolumeCB;
-  int faceVolume[QUDA_MAX_DIM];
-  int faceVolumeCB[QUDA_MAX_DIM];
-  int X[QUDA_MAX_DIM];
-  int nDim;
-  int nFace;
-
-  // CUDA pinned memory
-  void *my_fwd_face[QUDA_MAX_DIM];
-  void *my_back_face[QUDA_MAX_DIM];
-  void *from_back_face[QUDA_MAX_DIM];
-  void *from_fwd_face[QUDA_MAX_DIM];
-
-  void* ib_my_fwd_face[QUDA_MAX_DIM];
-  void* ib_my_back_face[QUDA_MAX_DIM];
-  void* ib_from_back_face[QUDA_MAX_DIM];
-  void* ib_from_fwd_face[QUDA_MAX_DIM];
-  
-  void* recv_handle_fwd[QUDA_MAX_DIM];
-  void* recv_handle_back[QUDA_MAX_DIM];
-  void* send_handle_fwd[QUDA_MAX_DIM];
-  void* send_handle_back[QUDA_MAX_DIM];
-  
-  void setupDims(const int *X);
-  
-  void *allocatePinned(size_t nbytes);
-  void freePinned(void *ptr);
-
- public:
-  FaceBuffer(const int *X, const int nDim, const int Ninternal,
-	     const int nFace, const QudaPrecision precision, const int Ls = 1);
-  FaceBuffer(const FaceBuffer &);
-  virtual ~FaceBuffer();
-
-  void pack(quda::cudaColorSpinorField &in, int parity, int dagger, int dim, cudaStream_t *stream);
-  void gather(quda::cudaColorSpinorField &in, int dagger, int dir);
-  void commsStart(int dir);
-  int  commsQuery(int dir);
-  void scatter(quda::cudaColorSpinorField &out, int dagger, int dir);
-
-  void exchangeCpuSpinor(quda::cpuColorSpinorField &in, int parity, int dagger);
-
-  void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
-
-  static void flushPinnedCache();
-};
 
 #ifdef __cplusplus
 extern "C" {
@@ -200,10 +117,6 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif
-
- // MPI_COMMS
 
 #ifdef __cplusplus
 extern "C" {

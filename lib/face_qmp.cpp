@@ -34,18 +34,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
 		       const int nFace, const QudaPrecision precision, const int Ls) :
   Ninternal(Ninternal), precision(precision), nDim(nDim), nDimComms(nDim), nFace(nFace)
 {
-  if (nDim > QUDA_MAX_DIM) errorQuda("nDim = %d is greater than the maximum of %d\n", nDim, QUDA_MAX_DIM);
-//BEGIN NEW
-  int Y[nDim];
-  Y[0] = X[0];
-  Y[1] = X[1];
-  Y[2] = X[2];
-  Y[3] = X[3];
-  if(nDim == 5) {
-    Y[nDim-1] = Ls;
-    nDimComms = 4;
-  }
-  setupDims(Y);
+  setupDims(X, Ls);
 
   // set these both = 0 separate streams for forwards and backwards comms
   // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
@@ -108,6 +97,8 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     recv_handle_back[i] = comm_declare_receive_relative(mm_from_back[i], i, -1, nbytes[i]);
   }
 #endif
+
+  printf("End of constructor\n"); fflush(stdout);
 
   checkCudaError();
 }
@@ -302,7 +293,7 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
 }
 
 
-
+#if 0
 void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 			int Nvec, QudaReconstructType reconstruct, int V, int Vs)
 {
@@ -366,6 +357,7 @@ void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
 
 #endif // QMP_COMMS
 }
+#endif
 
 #ifdef QMP_COMMS
 static int manual_set_partition[4] ={0, 0, 0, 0};

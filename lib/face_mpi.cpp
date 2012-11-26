@@ -21,14 +21,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     const int nFace, const QudaPrecision precision, const int Ls) : 
   Ninternal(Ninternal), precision(precision), nDim(nDim), nFace(nFace)
 {
-  //temporal hack for DW operator  
-  int Y[nDim];
-  Y[0] = X[0];
-  Y[1] = X[1];
-  Y[2] = X[2];
-  Y[3] = X[3];
-  if(nDim == 5) Y[nDim-1] = Ls;
-  setupDims(Y);
+  setupDims(X, Ls);
 
   // set these both = 0 `for no overlap of qmp and cudamemcpyasync
   // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
@@ -37,7 +30,7 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
 
-  for (int i=0 ; i < 4; i++) {
+  for (int i=0; i < 4; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
 

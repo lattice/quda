@@ -10,13 +10,17 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
 }
 
 // X here is a checkboarded volume
-void FaceBuffer::setupDims(const int* X)
+void FaceBuffer::setupDims(const int* X, int Ls)
 {
-  Volume = 1;
-  for (int d=0; d<nDim; d++) {
-    this->X[d] = X[d];
-    Volume *= this->X[d];    
+  if (nDim > QUDA_MAX_DIM) errorQuda("nDim = %d is greater than the maximum of %d\n", nDim, QUDA_MAX_DIM);
+  for (int d=0; d<4; d++) this->X[d] = X[d];
+  if(nDim == 5) {
+    this->X[nDim-1] = Ls;
+    nDimComms = 4;
   }
+
+  Volume = 1;
+  for (int d=0; d<nDim; d++) Volume *= this->X[d];    
   VolumeCB = Volume/2;
 
   for (int i=0; i<nDim; i++) {
