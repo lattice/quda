@@ -43,7 +43,7 @@ namespace quda {
 
 
 
-  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile) :
+  PreconCG::PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile) :
   Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrec(matPrec), K(NULL)
   {
     Kparam = newQudaInvertParam();

@@ -1526,7 +1526,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 // Sequential solver
 void invertSequentialMultiShiftQuda(void **_hp_x, 
-				    void *_hb_b, 
+				    void *_hp_b, 
 				    QudaInvertParam *param)
 {
 
@@ -1546,7 +1546,7 @@ void invertSequentialMultiShiftQuda(void **_hp_x,
   pushVerbosity(param->verbosity);
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIREC_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
@@ -1613,7 +1613,7 @@ void invertSequentialMultiShiftQuda(void **_hp_x,
   // Create the solution fields filled with zero
   x = new cudaColorSpinorField* [param->num_offset];
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  for(int i=0; i<param.num_offset; ++i) x[i] = new cudaColorSpinorField(cudaParam);
+  for(int i=0; i<param->num_offset; ++i) x[i] = new cudaColorSpinorField(cudaParam);
 
   // Check source norms 
   if(getVerbosity() >= QUDA_VERBOSE){

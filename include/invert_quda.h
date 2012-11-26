@@ -49,7 +49,7 @@ namespace quda {
       QudaInvertParam Kparam;
 
    public:
-     PreconCG(const DiracMatrix& mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile);
+     PreconCG(DiracMatrix& mat, DiracMatrix &matSloppy, DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile);
      virtual ~PreconCG();
    
      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
