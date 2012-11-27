@@ -108,7 +108,7 @@ extern "C" {
     double mu;    /**< Twisted mass parameter */
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
-    bool hasNaik; /**< Used for staggered only */
+    int hasNaik; /**< Used for staggered only */
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */

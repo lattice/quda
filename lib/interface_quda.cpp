@@ -4,6 +4,7 @@
 #include <math.h>
 #include <string.h>
 #include <sys/time.h>
+#include <cassert>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -585,7 +586,7 @@ namespace quda {
     diracParam.mu = inv_param->mu;
     diracParam.verbose = getVerbosity();
 
-    diracParam.hasNaik = inv_param->hasNaik;
+    diracParam.hasNaik = inv_param->hasNaik ? true : false;
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
@@ -1524,6 +1525,30 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 }
 
 
+
+static void computePolynomialCoefficients(double coeff[], double prev_mass[], double current_mass, int num_masses)
+{
+  if(num_masses == 0) return;
+  if(num_masses == 1) coeff[0] = 1.0;
+
+  double sum = 0;
+  for(int j=0; j<num_masses; ++j){
+    double temp = 1.0;
+    for(int i=0; i<num_masses; ++i){
+      if(i != j && (prev_mass[j] != prev_mass[i])){
+        temp *= (current_mass - prev_mass[i])/(prev_mass[j] - prev_mass[i]);
+      }
+    }
+    sum += temp;
+    coeff[j] = temp;
+  }
+  
+  assert(fabs(sum-1) < 1e-9);
+}
+
+
+
+
 // Sequential solver
 void invertSequentialMultiShiftQuda(void **_hp_x, 
 				    void *_hp_b, 
@@ -1551,7 +1576,7 @@ void invertSequentialMultiShiftQuda(void **_hp_x,
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
   for(int i=0; i<param->num_offset-1; i++){
-    for(int j=0; j<param->num_offset; j++){
+    for(int j=i+1; j<param->num_offset; j++){
       if(param->offset[i] > param->offset[j])
 	errorQuda("Offsets must be ordered from smallest to largest");
     }
@@ -1642,17 +1667,38 @@ void invertSequentialMultiShiftQuda(void **_hp_x,
   }
 
   { 
-    DiracMdagM m(dirac), mSloppy(diracSloppy);
     param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-
+    
     for(int i=param->num_offset-1; i>=0; --i){
-      if(i < param->num_offset-1) copyCuda(*x[i], *x[i+1]); 
+      dirac.setMass(sqrt(param->offset[i]/4));  
+      diracSloppy.setMass(sqrt(param->offset[i]/4));  
+      DiracMdagM m(dirac), mSloppy(diracSloppy);
+
+      // Perform polynomial extrapolation.
+      // At the moment, all previous solutions are used. 
+      // This may not be the optimal strategy.
+      if(i < param->num_offset-1){ 
+		    double* previous_offsets = new double[param->num_offset];
+        double* poly_coeffs = new double[param->num_offset];
+        int order = param->num_offset - i -1;
+        for(int j=0; j<order; ++j) previous_offsets[j] = param->offset[i+j+1];
+				computePolynomialCoefficients(poly_coeffs, previous_offsets, param->offset[i], order);
+        for(int j=0; j<order; ++j){
+          axpyCuda(poly_coeffs[j],*x[i+j+1], *x[i]); 
+			  }
+        delete[] previous_offsets;
+        delete[] poly_coeffs;
+      }
+
       param->tol = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
 					   param->tol_hq_offset[i] : param->tol_offset[i];
       CG cg(m, mSloppy, *param, profileSequential);
       cg(*x[i], *b);
       param->true_res_offset[i] = param->true_res;
       param->true_res_hq_offset[i] = param->true_res_hq;
+      
+      dirac.setMass(sqrt(param->offset[0]/4));  // Probably unnecessary 
+      diracSloppy.setMass(sqrt(param->offset[0]/4));   // Probably unnecessary
     }
   }
 
