@@ -26,10 +26,10 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
 
-    my_fwd_face[i] = allocatePinned(nbytes[i]);
-    my_back_face[i] = allocatePinned(nbytes[i]);
-    from_fwd_face[i] = allocatePinned(nbytes[i]);
-    from_back_face[i] = allocatePinned(nbytes[i]);
+    my_back_face[i] = allocatePinned(2*nbytes[i]);
+    my_fwd_face[i] = (char*)my_back_face[i] + nbytes[i];
+    from_back_face[i] = allocatePinned(2*nbytes[i]);
+    from_fwd_face[i] = (char*)from_back_face[i] + nbytes[i];
 
 #ifdef GPU_DIRECT //  just alias the pointer
     ib_my_fwd_face[i] = my_fwd_face[i];
@@ -75,9 +75,7 @@ FaceBuffer::~FaceBuffer()
     comm_free(comm_recv_fwd[i]);
     comm_free(comm_recv_back[i]);
 
-    freePinned(from_fwd_face[i]);
     freePinned(from_back_face[i]);
-    freePinned(my_fwd_face[i]);
     freePinned(my_back_face[i]);
   }
 
@@ -202,7 +200,6 @@ void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
   }
 }
 
-
 void FaceBuffer::commsStart(int dir) {
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
@@ -257,10 +254,11 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir)
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
+  // both scattering occurances now go through the same stream
   if (dir%2==0) {// receive from forwards
-    out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+recFwdStrmIdx]); // 0, 2, 4, 6
+    out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+recFwdStrmIdx*/]); // 0, 2, 4, 6
   } else { // receive from backwards
-    out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+recBackStrmIdx]); // 1, 3, 5, 7
+    out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+recBackStrmIdx*/]); // 1, 3, 5, 7
   }
 }
 

@@ -1216,6 +1216,7 @@ namespace quda {
   int gatherCompleted[Nstream];
   int previousDir[Nstream];
   int commsCompleted[Nstream];
+  int dslashCompleted[Nstream];
   int commDimTotal;
 
   /**
@@ -1225,6 +1226,7 @@ namespace quda {
     for (int i=0; i<Nstream-1; i++) {
       gatherCompleted[i] = 0;
       commsCompleted[i] = 0;
+      dslashCompleted[i] = 0;
     }
     gatherCompleted[Nstream-1] = 1;
     commsCompleted[Nstream-1] = 1;
@@ -1271,15 +1273,14 @@ namespace quda {
       face->pack(*inSpinor, 1-parity, dagger, i, streams);
     
       // Record the end of the packing
-      cudaEventRecord(packEnd[2*i+0], streams[Nstream-1]);
-      cudaEventRecord(packEnd[2*i+1], streams[Nstream-1]);
+      cudaEventRecord(packEnd[2*i], streams[Nstream-1]);
     }
 
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-	cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i+dir], 0);
+	cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i], 0);
 
 	// Record the start of the gathering
 	CUDA_EVENT_RECORD(gatherStart[2*i+dir], streams[2*i+dir]);
@@ -1309,7 +1310,7 @@ namespace quda {
 	
 	  // Query if gather has completed
 	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
-	    if (cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])) {
+	    if (cudaSuccess == cudaEventQuery(gatherEnd[2*i])) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
 	      gettimeofday(&commsStart[2*i+dir], NULL);
@@ -1329,31 +1330,32 @@ namespace quda {
 	      CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
 	    
 	      // Scatter into the end zone
-	      face->scatter(*inSpinor, dagger, 2*i+dir);
-	    
-	      // Record the end of the scattering
-	      cudaEventRecord(scatterEnd[2*i+dir], streams[2*i+dir]);
+	      face->scatter(*inSpinor, dagger, 2*i+dir);	    
 	    }
 	  }
 
 	}
+	 
+	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
+	if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
+	  // Record the end of the scattering
+	  cudaEventRecord(scatterEnd[2*i], streams[2*i]);
+
+	  dslashParam.kernel_type = static_cast<KernelType>(i);
+	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
+	  
+	  // wait for scattering to finish and then launch dslash
+	  cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
+	  
+	  CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
+	  dslash.apply(streams[Nstream-1]); // all faces use this stream
+	  CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);	  
+
+	  dslashCompleted[2*i] = 1;
+	}
+
       }
     
-    }
-
-    for (int i=3; i>=0; i--) {
-      if (!dslashParam.commDim[i]) continue;
-
-      dslashParam.kernel_type = static_cast<KernelType>(i);
-      dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-
-      // wait for scattering to finish and then launch dslash
-      cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
-      cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+1], 0);
-
-      CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
-      dslash.apply(streams[Nstream-1]); // all faces use this stream
-      CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);
     }
 
     CUDA_EVENT_RECORD(dslashEnd, 0);
