@@ -11,13 +11,6 @@
 #include <face_quda.h>
 #include <dslash_quda.h>
 
-// Easy to switch between overlapping communication or not
-#ifdef OVERLAP_COMMS
-#define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpyAsync(dst, src, size, type, stream)
-#else
-#define CUDAMEMCPY(dst, src, size, type, stream) cudaMemcpy(dst, src, size, type)
-#endif
-
 #ifdef DEVICE_PACK
 #define REORDER_LOCATION QUDA_CUDA_FIELD_LOCATION
 #else
@@ -603,7 +596,7 @@ namespace quda {
       void* gpu_buf = 
 	(dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
 
-      CUDAMEMCPY(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
+      cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
     } else { // do multiple cudaMemcpys 
 
       int Npad = Nint / Nvec; // number Nvec buffers we have
@@ -633,18 +626,11 @@ namespace quda {
       size_t spitch = stride*Nvec*precision;
       cudaMemcpy2DAsync(dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
-      /*for(int i=0; i < Npad; i++) {
-	int len = nFace*ghostFace[3]*Nvec*precision;     
-	void *dst = (char*)ghost_spinor + i*len;
-	void *src = (char*)v + (offset + i*stride)* Nvec*precision;
-	CUDAMEMCPY(dst, src, len, cudaMemcpyDeviceToHost, *stream); 
-	}*/
-    
       if (precision == QUDA_HALF_PRECISION) {
 	int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
 	void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision;
 	void *src = (char*)norm + norm_offset;
-	CUDAMEMCPY(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); 
+	cudaMemcpyAsync(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); 
       }
     }
 #else
@@ -667,7 +653,7 @@ namespace quda {
     void *dst = (char*)v + precision*offset;
     void *src = ghost_spinor;
 
-    CUDAMEMCPY(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
+    cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
     
     if (precision == QUDA_HALF_PRECISION) {
       int normlen = nFace*ghostFace[dim];
@@ -676,7 +662,7 @@ namespace quda {
 
       void *dst = (char*)norm + norm_offset*sizeof(float);
       void *src = (char*)ghost_spinor+nFace*Nint*ghostFace[dim]*precision; // norm region of host ghost zone
-      CUDAMEMCPY(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
+      cudaMemcpyAsync(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
     }
 
   }
