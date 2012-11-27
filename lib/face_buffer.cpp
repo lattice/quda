@@ -5,8 +5,100 @@ using namespace quda;
 
 cudaStream_t *stream;
 
+bool globalReduce = true;
+
+FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
+		       const int nFace, const QudaPrecision precision, const int Ls) :
+  Ninternal(Ninternal), precision(precision), nDim(nDim), nDimComms(nDim), nFace(nFace)
+{
+  setupDims(X, Ls);
+
+  // set these both = 0 separate streams for forwards and backwards comms
+  // sendBackStrmIdx = 0, and sendFwdStrmIdx = 1 for overlap
+  sendBackStrmIdx = 0;
+  sendFwdStrmIdx = 1;
+  recFwdStrmIdx = sendBackStrmIdx;
+  recBackStrmIdx = sendFwdStrmIdx;
+
+  // Buffers hold half spinors
+  for (int i=0; i<nDimComms; i++) {
+    nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
+    // add extra space for the norms for half precision
+    if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
+
+    my_fwd_face[i] = allocatePinned(nbytes[i]);
+    my_back_face[i] = allocatePinned(nbytes[i]);
+    from_fwd_face[i] = allocatePinned(nbytes[i]);
+    from_back_face[i] = allocatePinned(nbytes[i]);
+
+#ifdef GPU_DIRECT //  just alias the pointer
+    ib_my_fwd_face[i] = my_fwd_face[i];
+    ib_my_back_face[i] = my_back_face[i];
+    ib_from_fwd_face[i] = from_fwd_face[i];
+    ib_from_back_face[i] = from_back_face[i];
+#else // if no GPUDirect so need separate IB and GPU host buffers
+    ib_my_fwd_face[i] = safe_malloc(nbytes[i]);
+    ib_my_back_face[i] = safe_malloc(nbytes[i]);
+    ib_from_fwd_face[i] = safe_malloc(nbytes[i]);
+    ib_from_back_face[i] = safe_malloc(nbytes[i]);
+#endif
+
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_send_fwd[i] = comm_declare_send_relative(ib_my_fwd_face[i], i, 1, nbytes[i]);
+    comm_send_back[i] = comm_declare_send_relative(ib_my_back_face[i], i, -1, nbytes[i]);
+    comm_recv_fwd[i] = comm_declare_receive_relative(ib_from_fwd_face[i], i, +1, nbytes[i]);
+    comm_recv_back[i] = comm_declare_receive_relative(ib_from_back_face[i], i, -1, nbytes[i]);
+  }
+
+  checkCudaError();
+}
+
 FaceBuffer::FaceBuffer(const FaceBuffer &face) {
   errorQuda("FaceBuffer copy constructor not implemented");
+}
+
+FaceBuffer::~FaceBuffer()
+{  
+  for (int i=0; i<nDimComms; i++) {
+
+#ifndef GPU_DIRECT
+    host_free(ib_my_fwd_face[i]);
+    host_free(ib_my_back_face[i]);
+    host_free(ib_from_fwd_face[i]);
+    host_free(ib_from_back_face[i]);
+#endif
+
+    comm_free(comm_send_fwd[i]);
+    comm_free(comm_send_back[i]);
+    comm_free(comm_recv_fwd[i]);
+    comm_free(comm_recv_back[i]);
+
+    freePinned(from_fwd_face[i]);
+    freePinned(from_back_face[i]);
+    freePinned(my_fwd_face[i]);
+    freePinned(my_back_face[i]);
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    ib_my_fwd_face[i] = NULL;
+    ib_my_back_face[i] = NULL;
+    ib_from_fwd_face[i] = NULL;
+    ib_from_back_face[i] = NULL;
+
+    my_fwd_face[i] = NULL;
+    my_back_face[i] = NULL;
+    from_fwd_face[i] = NULL;
+    from_back_face[i] = NULL;
+
+    comm_recv_fwd[i] = NULL;
+    comm_recv_back[i] = NULL;
+    comm_send_fwd[i] = NULL;
+    comm_send_back[i] = NULL;
+  }
+
+  checkCudaError();
 }
 
 // X here is a checkboarded volume
@@ -118,21 +210,21 @@ void FaceBuffer::commsStart(int dir) {
   if (dir%2 == 0) { // sending backwards
 
     // Prepost receive
-    comm_start(recv_handle_fwd[dim]);
+    comm_start(comm_recv_fwd[dim]);
 #ifndef GPU_DIRECT
     memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
 #endif
-    comm_start(send_handle_back[dim]);
+    comm_start(comm_send_back[dim]);
 
   } else { //sending forwards
     
   // Prepost receive
-    comm_start(recv_handle_back[dim]);
+    comm_start(comm_recv_back[dim]);
     // Begin forward send
 #ifndef GPU_DIRECT
     memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
 #endif
-    comm_start(send_handle_fwd[dim]);
+    comm_start(comm_send_fwd[dim]);
   }
 
 } 
@@ -142,14 +234,14 @@ int FaceBuffer::commsQuery(int dir) {
   if(!commDimPartitioned(dim)) return 0;
 
   if(dir%2==0) {
-    if (comm_query(recv_handle_fwd[dim]) && comm_query(send_handle_back[dim])) {
+    if (comm_query(comm_recv_fwd[dim]) && comm_query(comm_send_back[dim])) {
 #ifndef GPU_DIRECT
       memcpy(from_fwd_face[dim], ib_from_fwd_face[dim], nbytes[dim]);		
 #endif
       return 1;
     }
   } else {
-    if (comm_query(recv_handle_back[dim]) && comm_query(send_handle_fwd[dim])) {
+    if (comm_query(comm_recv_back[dim]) && comm_query(comm_send_fwd[dim])) {
 #ifndef GPU_DIRECT
       memcpy(from_back_face[dim], ib_from_back_face[dim], nbytes[dim]);		
 #endif
@@ -172,25 +264,94 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir)
   }
 }
 
-void reduceMaxDouble(double &max) {
+// This is just an initial hack for CPU comms - should be creating the message handlers at instantiation
+void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)
+{
+  // allocate the ghost buffer if not yet allocated
+  spinor.allocateGhostBuffer();
 
-#ifdef MPI_COMMS
-  comm_allreduce_max(&max);
-#endif
+  for(int i=0;i < 4; i++){
+    spinor.packGhost(spinor.backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, (QudaParity)oddBit, dagger);
+    spinor.packGhost(spinor.fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, (QudaParity)oddBit, dagger);
+  }
+
+  void *comm_send_fwd[4];
+  void *comm_from_back[4];
+  void *comm_from_fwd[4];
+  void *comm_send_back[4];
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_send_fwd[i] = comm_declare_send_relative(spinor.fwdGhostFaceSendBuffer[i], i, +1, nbytes[i]);
+    comm_send_back[i] = comm_declare_send_relative(spinor.backGhostFaceSendBuffer[i], i, -1, nbytes[i]);
+    comm_from_fwd[i] = comm_declare_receive_relative(spinor.fwdGhostFaceBuffer[i], i, +1, nbytes[i]);
+    comm_from_back[i] = comm_declare_receive_relative(spinor.backGhostFaceBuffer[i], i, -1, nbytes[i]);
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_start(comm_from_back[i]);
+    comm_start(comm_from_fwd[i]);
+    comm_start(comm_send_fwd[i]);
+    comm_start(comm_send_back[i]);
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_wait(comm_send_fwd[i]);
+    comm_wait(comm_send_back[i]);
+    comm_wait(comm_from_back[i]);
+    comm_wait(comm_from_fwd[i]);
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_free(comm_send_fwd[i]);
+    comm_free(comm_send_back[i]);
+    comm_free(comm_from_back[i]);
+    comm_free(comm_from_fwd[i]);
+  }
 
 }
-void reduceDouble(double &sum) {
 
-#ifdef MPI_COMMS
-  if (globalReduce) comm_allreduce(&sum);
-#endif
+void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf) {
+
+  void *comm_from_back[4];
+  void *comm_send_fwd[4];
+
+  for (int i=0; i<nDimComms; i++) {
+    int len = 2*nFace*faceVolumeCB[i]*Ninternal;
+    comm_send_fwd[i] = comm_declare_send_relative(link_sendbuf[i], i, +1, len*precision);
+    comm_from_back[i] = comm_declare_receive_relative(ghost_link[i], i, -1, len*precision);
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_start(comm_send_fwd[i]);
+    comm_start(comm_from_back[i]);
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_wait(comm_send_fwd[i]);
+    comm_wait(comm_from_back[i]);
+  }
+
+  for (int i=0; i<nDimComms; i++) {
+    comm_free(comm_send_fwd[i]);
+    comm_free(comm_from_back[i]);
+  }
 
 }
 
-void reduceDoubleArray(double *sum, const int len) {
 
-#ifdef MPI_COMMS
-  if (globalReduce) comm_allreduce_array(sum, len);
-#endif
+void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
 
-}
+void reduceDouble(double &sum) { if (globalReduce) comm_allreduce(&sum); }
+
+void reduceDoubleArray(double *sum, const int len) 
+{ if (globalReduce) comm_allreduce_array(sum, len); }
+
+int commDim(int dir) { return comm_dim(dir); }
+
+int commCoords(int dir) { return comm_coords(dir); }
+
+int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
+
+void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+

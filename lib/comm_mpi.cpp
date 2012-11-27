@@ -480,6 +480,9 @@ comm_recv_with_tag(void* buf, int len, int src, int tag, void* _request)
   return (unsigned long)request;
 }
 
+/**
+   Send to the "dir" direction in the "dim" dimension
+ */
 void* comm_declare_send_relative(void *buffer, int dim, int dir, size_t count)
 {
   int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
@@ -495,6 +498,9 @@ void* comm_declare_send_relative(void *buffer, int dim, int dir, size_t count)
   return (void*)request;
 }
 
+/**
+   Receive from the "dir" direction in the "dim" dimension
+ */
 void* comm_declare_receive_relative(void *buffer, int dim, int dir, size_t count)
 {
   int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
@@ -503,7 +509,7 @@ void* comm_declare_receive_relative(void *buffer, int dim, int dir, size_t count
   int uptags[4] = {XUP, YUP, ZUP, TUP};
 
   MPI_Request *request = (MPI_Request*)safe_malloc(sizeof(MPI_Request));
-  int tag = (dir == 1) ? uptags[dim] : downtags[dim];
+  int tag = (dir == 1) ? downtags[dim] : uptags[dim];
   int src = (dir == 1) ? back_nbr[dim] : fwd_nbr[dim];
   int srcproc = find_neighbor_proc(src);  
   MPI_Recv_init(buffer, count, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);

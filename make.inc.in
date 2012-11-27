@@ -88,6 +88,8 @@ endif
 ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
   COPT += -DMULTI_GPU
   NVCCOPT += -DMULTI_GPU
+else
+  FACE_COMMS_OBJS=comm_single.o
 endif
 
 CC  = $(FECC)
@@ -101,8 +103,6 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
   FACE_COMMS_OBJS=face_mpi.o comm_mpi.o
-else
-  FACE_COMMS_OBJS=face_qmp.o
 endif
 
 ifeq ($(strip $(BUILD_QMP)), yes)
