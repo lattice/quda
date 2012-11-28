@@ -93,6 +93,8 @@ namespace quda {
       //r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
       caxpyXmazCuda(omega*alpha, r, x, Ar);
 
+      printf("%d alpha = %e %e\n", k, real(alpha), imag(alpha));
+
       if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
 	double x2 = norm2(x);
 	double r2 = norm2(r);
