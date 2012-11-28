@@ -2,10 +2,10 @@
 #undef SHARED_FLOATS_PER_THREAD 
 #define SHARED_FLOATS_PER_THREAD 6
 
-#define Vsh_x ghostFace[0]
-#define Vsh_y ghostFace[1]
-#define Vsh_z ghostFace[2]
-#define Vsh_t ghostFace[3]
+#define Vsh_x cudaConstants.ghostFace[0]
+#define Vsh_y cudaConstants.ghostFace[1]
+#define Vsh_z cudaConstants.ghostFace[2]
+#define Vsh_t cudaConstants.ghostFace[3]
 
 //#define kernel_type param.kernel_type
 
@@ -325,70 +325,70 @@ int X;
 
 if(kernel_type == INTERIOR_KERNEL){
   //data order: X4 X3 X2 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X2;
-  x2 = za - zb*X2;
-  x4 = zb / X3;
-  x3 = zb - x4*X3;
+  za = sid / cudaConstants.X1h;
+  x1h = sid - za*cudaConstants.X1h;
+  zb = za / cudaConstants.X2;
+  x2 = za - zb*cudaConstants.X2;
+  x4 = zb / cudaConstants.X3;
+  x3 = zb - x4*cudaConstants.X3;
   x1odd = (x2 + x3 + x4 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
   X = 2*sid + x1odd;
  }else if (kernel_type == EXTERIOR_KERNEL_X){
   //data order: X1 X4 X3 X2h
-  za = sid / X2h;
-  x2h = sid - za*X2h;
+  za = sid / cudaConstants.X2h;
+  x2h = sid - za*cudaConstants.X2h;
   zb = za / X3;
-  x3 = za - zb*X3;
-  x1 = zb / X4;
-  x4 = zb - x1*X4;
-  af = (x1 >= 3)?(X1-6):0;
+  x3 = za - zb*cudaConstants.X3;
+  x1 = zb / cudaConstants.X4;
+  x4 = zb - x1*cudaConstants.X4;
+  af = (x1 >= 3)?(cudaConstants.X1-6):0;
   x1_new = x1 + af;
   x1=x1_new;
   x2odd = (x3 + x4 + x1 + param.parity) & 1;
   x2 = 2*x2h + x2odd;
-  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  X = x4*cudaConstants.X3X2X1+x3*cudaConstants.X2X1+x2*cudaConstants.X1+x1;
   sid = X>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_Y){
   //data order: X2 X4 X3 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X3;
-  x3 = za - zb*X3;
-  x2 = zb / X4;
-  x4 = zb - x2*X4;
-  af = (x2 >= 3)?(X2-6):0;
+  za = sid / cudaConstants.X1h;
+  x1h = sid - za*cudaConstants.X1h;
+  zb = za / cudaConstants.X3;
+  x3 = za - zb*cudaConstants.X3;
+  x2 = zb / cudaConstants.X4;
+  x4 = zb - x2*cudaConstants.X4;
+  af = (x2 >= 3)?(cudaConstants.X2-6):0;
   x2_new = x2 + af;
   x2=x2_new;
   x1odd = (x3 + x4 + x2 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
-  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  X = x4*cudaConstants.X3X2X1+x3*cudaConstants.X2X1+x2*cudaConstants.X1+x1;
   sid = X>>1;
 
  }else if (kernel_type == EXTERIOR_KERNEL_Z){
   //data order: X3 X4 X2 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X2;
-  x2 = za - zb*X2;
-  x3 = zb / X4;
-  x4 = zb - x3*X4;
-  af = (x3 >= 3)?(X3-6):0;
+  za = sid / cudaConstants.X1h;
+  x1h = sid - za*cudaConstants.X1h;
+  zb = za / cudaConstants.X2;
+  x2 = za - zb*cudaConstants.X2;
+  x3 = zb / cudaConstants.X4;
+  x4 = zb - x3*cudaConstants.X4;
+  af = (x3 >= 3)?(cudaConstants.X3-6):0;
   x3_new = x3 + af;
   x3=x3_new;
   x1odd = (x2 + x4 + x3 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
-  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  X = x4*cudaConstants.X3X2X1+x3*cudaConstants.X2X1+x2*cudaConstants.X1+x1;
   sid = X>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_T){
   //data order: X4 X3 X2 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X2;
-  x2 = za - zb*X2;
-  x4 = zb / X3;
-  x3 = zb - x4*X3;
-  af = (x4 >= 3)?(X4-6):0;
+  za = sid / cudaConstants.X1h;
+  x1h = sid - za*cudaConstants.X1h;
+  zb = za / cudaConstants.X2;
+  x2 = za - zb*cudaConstants.X2;
+  x4 = zb / cudaConstants.X3;
+  x3 = zb - x4*cudaConstants.X3;
+  af = (x4 >= 3)?(cudaConstants.X4-6):0;
   x4_new = x4 + af;
   sid +=Vsh*(x4_new -x4);
   x4=x4_new;
@@ -402,37 +402,32 @@ o01_re = o01_im = 0.f;
 o02_re = o02_im = 0.f;
 
 
-{
-    //direction: +X
-
+{  //direction: +X
 #if (DD_RECON < 2)
     int sign = (x4%2 == 1) ? -1 : 1;
 #endif
-
     int ga_idx = sid;
-
 #ifdef MULTI_GPU
-    if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1m1) )|| (kernel_type == EXTERIOR_KERNEL_X && x1 >= X1m1))
+    if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < cudaConstants.X1m1) )|| (kernel_type == EXTERIOR_KERNEL_X && x1 >= cudaConstants.X1m1))
 #endif
-	{
-	    int sp_idx_1st_nbr = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;
+	  {
+	    int sp_idx_1st_nbr = ((x1==cudaConstants.X1m1) ? X-cudaConstants.X1m1 : X+1) >> 1;
 	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, ga_idx);
 	    int nbr_idx1 = sp_idx_1st_nbr;
-	    int stride1 = sp_stride;
+	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx1;
 #endif	    
 #ifdef MULTI_GPU
 	    if ( (kernel_type == EXTERIOR_KERNEL_X)){
-		int space_con = (x4*X3X2+x3*X2+x2)/2;	
-		if (x1 >= X1m1){
-		    nbr_idx1 = param.ghostOffset[0] + 9*Vsh_x +(x1-X1m1)*Vsh_x+ space_con;
-		    stride1 = 3*Vsh_x;
+		    int space_con = (x4*cudaConstants.X3X2+x3*cudaConstants.X2+x2)/2;	
+		    if (x1 >= X1m1){
+		      nbr_idx1 = param.ghostOffset[0] + 9*Vsh_x +(x1-cudaConstants.X1m1)*Vsh_x+ space_con;
+		      stride1 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[0] + 3*Vsh_x + (x1-X1m1)*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0] + 3*Vsh_x + (x1-cudaConstants.X1m1)*Vsh_x+ space_con;
 #endif		    
-		}
-		
+		    }
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
@@ -443,30 +438,30 @@ o02_re = o02_im = 0.f;
 	    o01_im += A1_im;
 	    o02_re += A2_re;
 	    o02_im += A2_im;
-	}
+	  }
 
   if(hasNaik){
 #ifdef MULTI_GPU
-    if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1m3) ) || (kernel_type == EXTERIOR_KERNEL_X && x1 >= X1m3)  )
+    if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < cudaConstants.X1m3) ) || (kernel_type == EXTERIOR_KERNEL_X && x1 >= cudaConstants.X1m3)  )
 #endif
-	{
-	    int sp_idx_3rd_nbr = ((x1 >= X1m3) ? X -X1m3 : X+3) >> 1;
+	  {
+	    int sp_idx_3rd_nbr = ((x1 >= cudaConstants.X1m3) ? X -cudaConstants.X1m3 : X+3) >> 1;
 	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 0, ga_idx);        
 	    int nbr_idx3 = sp_idx_3rd_nbr;
-	    int stride3 = sp_stride;    
+	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
-	    if ( (kernel_type == EXTERIOR_KERNEL_X)){
-		int space_con = (x4*X3X2+x3*X2+x2)/2;		
-		if (x1  >= X1m3){
-		    nbr_idx3 = param.ghostOffset[0] + 9*Vsh_x +(x1-X1m3)*Vsh_x+ space_con;
-		    stride3 = 3*Vsh_x;
+	    if( (kernel_type == EXTERIOR_KERNEL_X)){
+		    int space_con = (x4*cudaConstants.X3X2+x3*cudaConstants.X2+x2)/2;		
+		    if(x1  >= cudaConstants.X1m3){
+		      nbr_idx3 = param.ghostOffset[0] + 9*Vsh_x +(x1-cudaConstants.X1m3)*Vsh_x+ space_con;
+		      stride3 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[0] + 3*Vsh_x + (x1-X1m3)*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0] + 3*Vsh_x + (x1-cudaConstants.X1m3)*Vsh_x+ space_con;
 #endif	
-		}
+		    }
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);   
@@ -479,45 +474,42 @@ o02_re = o02_im = 0.f;
 	    o01_im += B1_im;
 	    o02_re += B2_re;
 	    o02_im += B2_im;  
-	}
+	  }
+  } // hasNaik    
+} // +X
 
-   } // hasNaik    
-}
-
-{
-    // direction: -X
+{  // direction: -X
 #if (DD_RECON < 2)
     int sign = (x4%2 == 1) ? -1 : 1;
 #endif
     int dir =1;
-
 #ifdef MULTI_GPU
-    int space_con = (x4*X3X2 + x3*X2+ x2) >>1;
+    int space_con = (x4*cudaConstants.X3X2 + x3*cudaConstants.X2+ x2) >>1;
     if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 1)) || (kernel_type == EXTERIOR_KERNEL_X && x1 < 1))
 #endif
-	{
-	    int sp_idx_1st_nbr = ((x1==0) ? X+X1m1 : X-1) >> 1;
+	  {
+	    int sp_idx_1st_nbr = ((x1==0) ? X+cudaConstants.X1m1 : X-1) >> 1;
 	    int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
-	    if ((x1 -1) < 0){
-		fat_idx = Vh + space_con;
+	    if((x1 -1) < 0){
+		    fat_idx = Vh + space_con;
 	    }
 #endif
 	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
 	    int nbr_idx1 = sp_idx_1st_nbr;
-	    int stride1 = sp_stride;
+	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx1;
 #endif	 
 #ifdef MULTI_GPU
-	    if (kernel_type == EXTERIOR_KERNEL_X){
-		if (x1 - 1 < 0){
-		    nbr_idx1 = param.ghostOffset[0] + (x1+2)*Vsh_x+ space_con;
-		    stride1 = 3*Vsh_x;
+	    if(kernel_type == EXTERIOR_KERNEL_X){
+		    if (x1-1 < 0){
+		      nbr_idx1 = param.ghostOffset[0] + (x1+2)*Vsh_x+ space_con;
+		      stride1 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[0]  + (x1+2)*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0]  + (x1+2)*Vsh_x+ space_con;
 #endif	
-		}        
+		    }        
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
@@ -528,35 +520,35 @@ o02_re = o02_im = 0.f;
 	    o01_im -= A1_im;
 	    o02_re -= A2_re;
 	    o02_im -= A2_im;
-	}
+	  }
 
   if(hasNaik){
 #ifdef MULTI_GPU    
     if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 3)) || (kernel_type == EXTERIOR_KERNEL_X && x1 < 3))
 #endif
-	{
-	    int sp_idx_3rd_nbr = ((x1<3) ? X + X1m3: X -3)>>1; 
+	  {
+	    int sp_idx_3rd_nbr = ((x1<3) ? X + cudaConstants.X1m3: X -3)>>1; 
 	    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
 	    if ((x1 -3) < 0){
-		long_idx =Vh + x1*X4X3X2h + space_con;
+		    long_idx = cudaConstants.Vh + x1*cudaConstants.X4X3X2h + space_con;
 	    }    
 #endif
 	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx); 		
 	    int nbr_idx3 = sp_idx_3rd_nbr;
-	    int stride3 = sp_stride;
+	    int stride3 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx3;
 #endif	     
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_X){
-		if (x1 - 3 < 0){
-		    nbr_idx3 = param.ghostOffset[0] + x1*Vsh_x+ space_con;
-		    stride3 = 3*Vsh_x;
+		    if (x1 - 3 < 0){
+		      nbr_idx3 = param.ghostOffset[0] + x1*Vsh_x+ space_con;
+		      stride3 = 3*Vsh_x;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[0]  + x1*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0]  + x1*Vsh_x+ space_con;
 #endif
-		}
+		    }
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);  
@@ -568,42 +560,38 @@ o02_re = o02_im = 0.f;
 	    o01_im -= B1_im;
 	    o02_re -= B2_re;
 	    o02_im -= B2_im;  
-	}
+	  }
   } // hasNaik
-    
-}
+} // -X
 
 
 
-{
-    //direction: +Y
+{ //direction: +Y
 #if (DD_RECON < 2)
     int sign = ((x4+x1)%2 == 1) ? -1 : 1;
 #endif
-   
     int ga_idx = sid;
-
 #ifdef MULTI_GPU
-    int space_con = (x4*X3X1+x3*X1+x1)/2;
-    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2m1))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= X2m1))
+    int space_con = (x4*cudaConstants.X3X1+x3*cudaConstants.X1+x1)/2;
+    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < cudaConstants.X2m1))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= cudaConstants.X2m1))
 #endif
-	{
-	    int sp_idx_1st_nbr = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;
+	  {
+	    int sp_idx_1st_nbr = ((x2==cudaConstants.X2m1) ? X-cudaConstants.X2X1mX1 : X+cudaConstants.X1) >> 1;
 	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, ga_idx);
 	    int nbr_idx1 = sp_idx_1st_nbr;
-	    int stride1 = sp_stride;
+	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx1;
 #endif	 
 #ifdef MULTI_GPU
-	    if (kernel_type == EXTERIOR_KERNEL_Y){	    
-		if (x2 >= X2m1){
-		    nbr_idx1 = param.ghostOffset[1] + 9*Vsh_y +(x2-X2m1)*Vsh_y+ space_con;
-		    stride1 = 3*Vsh_y;
+	    if(kernel_type == EXTERIOR_KERNEL_Y){	    
+		    if(x2 >= X2m1){
+		      nbr_idx1 = param.ghostOffset[1] + 9*Vsh_y +(x2-cudaConstants.X2m1)*Vsh_y+ space_con;
+		      stride1 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[1] + 3*Vsh_y + (x2-X2m1)*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1] + 3*Vsh_y + (x2-cudaConstants.X2m1)*Vsh_y+ space_con;
 #endif		    
-		}      
+		    }      
 	    }
 #endif 
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
@@ -614,29 +602,29 @@ o02_re = o02_im = 0.f;
 	    o01_im += A1_im;
 	    o02_re += A2_re;
 	    o02_im += A2_im;
-	}
+	  }
    
   if(hasNaik){ 
 #ifdef MULTI_GPU
-    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2m3))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= X2m3))    
+    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < cudaConstants.X2m3))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= cudaConstants.X2m3))    
 #endif
-	{
-	    int sp_idx_3rd_nbr = ((x2 >= X2m3 ) ? X-X2m3*X1 : X+3*X1) >> 1;    
+	  {
+	    int sp_idx_3rd_nbr = ((x2 >= cudaConstants.X2m3 ) ? X-cudaConstants.X2m3*X1 : X+3*cudaConstants.X1) >> 1;    
 	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 2, ga_idx);
 	    int nbr_idx3 = sp_idx_3rd_nbr;
-	    int stride3 = sp_stride;        
+	    int stride3 = cudaConstants.sp_stride;        
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
-		if (x2>= X2m3){
-		    nbr_idx3 = param.ghostOffset[1] + 9*Vsh_y +(x2-X2m3)*Vsh_y+ space_con;
-		    stride3 = 3*Vsh_y;
+		    if (x2>= cudaConstants.X2m3){
+		      nbr_idx3 = param.ghostOffset[1] + 9*Vsh_y +(x2-cudaConstants.X2m3)*Vsh_y+ space_con;
+		      stride3 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[1] + 3*Vsh_y + (x2-X2m3)*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1] + 3*Vsh_y + (x2-cudaConstants.X2m3)*Vsh_y+ space_con;
 #endif		    
-		}
+		    }
 	    }
 #endif    
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
@@ -648,28 +636,29 @@ o02_re = o02_im = 0.f;
 	    o01_im += B1_im;
 	    o02_re += B2_re;
 	    o02_im += B2_im;  
-	}
+	  }
   } // hasNaik
-}
+} // +Y
 
-{
-    //direction: -Y
 
+
+
+{  //direction: -Y
 #if (DD_RECON < 2)
     int sign = ((x4+x1)%2 == 1) ? -1 : 1;
 #endif
 
     int dir=3;
 #ifdef MULTI_GPU
-    int space_con = (x4*X3X1 + x3*X1+ x1) >>1;    
+    int space_con = (x4*cudaConstants.X3X1 + x3*cudaConstants.X1+ x1) >>1;    
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 1)) || (kernel_type == EXTERIOR_KERNEL_Y && x2 < 1))
 #endif
-	{
-	    int sp_idx_1st_nbr = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;
+	  {
+	    int sp_idx_1st_nbr = ((x2==0) ? X+cudaConstants.X2X1mX1 : X-cudaConstants.X1) >> 1;
 	    int fat_idx=sp_idx_1st_nbr;
 #ifdef MULTI_GPU
 	    if ((x2 -1) < 0){
-		fat_idx = Vh + space_con;
+		    fat_idx = cudaConstants.Vh + space_con;
 	    }    
 #endif
 	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
@@ -680,14 +669,14 @@ o02_re = o02_im = 0.f;
 #endif	 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
-		if (x2 - 1 < 0){
-		    nbr_idx1 = param.ghostOffset[1] + (x2+2)*Vsh_y+ space_con;
-		    stride1 = 3*Vsh_y;
+		    if (x2 - 1 < 0){
+		      nbr_idx1 = param.ghostOffset[1] + (x2+2)*Vsh_y+ space_con;
+		      stride1 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[1]  + (x2+2)*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1]  + (x2+2)*Vsh_y+ space_con;
 #endif	
-		}              
-    }
+		    }              
+      }
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    ADJ_MAT_MUL_V(A, fat, i);
@@ -697,35 +686,35 @@ o02_re = o02_im = 0.f;
 	    o01_im -= A1_im;
 	    o02_re -= A2_re;
 	    o02_im -= A2_im;
-	}
+	  }
 
   if(hasNaik){
 #ifdef MULTI_GPU
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 3)) || (kernel_type == EXTERIOR_KERNEL_Y && x2 < 3))
 #endif
-	{
-	    int sp_idx_3rd_nbr = ((x2 < 3) ? X + X2m3*X1: X -3*X1 )>> 1; 
+	  {
+	    int sp_idx_3rd_nbr = ((x2 < 3) ? X + cudaConstants.X2m3*cudaConstants.X1: X-3*cudaConstants.X1 )>> 1; 
 	    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
 	    if ((x2-3) < 0){
-		long_idx = Vh+ x2*X4X3X1h + space_con;
+		    long_idx = cudaConstants.Vh+ x2*cudaConstants.X4X3X1h + space_con;
 	    }    
 #endif
 	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx); 
 	    int nbr_idx3 = sp_idx_3rd_nbr;
-	    int stride3 = sp_stride;    
+	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
-		if (x2 - 3 < 0){
-		    nbr_idx3 = param.ghostOffset[1] + x2*Vsh_y+ space_con;
-		    stride3 = 3*Vsh_y;
+		    if (x2 - 3 < 0){
+		      nbr_idx3 = param.ghostOffset[1] + x2*Vsh_y+ space_con;
+		      stride3 = 3*Vsh_y;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[1]  + x2*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1]  + x2*Vsh_y+ space_con;
 #endif
-		}
+		    }
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
@@ -738,109 +727,105 @@ o02_re = o02_im = 0.f;
 	    o01_im -= B1_im;
 	    o02_re -= B2_re;
 	    o02_im -= B2_im;  
-	}
+	  }
   } // hasNaik    
-}
+} // -Y
 
-{
-    //direction: +Z
 
+
+{  //direction: +Z
 #if (DD_RECON < 2)
     int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
 #endif
-
     int ga_idx = sid;
 
 #ifdef MULTI_GPU
-    int space_con = (x4*X2X1+x2*X1+x1)/2;
-if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m1))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= X3m1))
+    int space_con = (x4*cudaConstants.X2X1+x2*cudaConstants.X1+x1)/2;
+    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < cudaConstants.X3m1))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= cudaConstants.X3m1))
 #endif
     {
-	int sp_idx_1st_nbr = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
-	READ_FAT_MATRIX(FAT, FATLINK0TEX, 4, ga_idx);
-	int nbr_idx1 = sp_idx_1st_nbr;
-	int stride1 = sp_stride;
+	    int sp_idx_1st_nbr = ((x3==cudaConstants.X3m1) ? X-cudaConstants.X3X2X1mX2X1 : X+cudaConstants.X2X1) >> 1;
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 4, ga_idx);
+	    int nbr_idx1 = sp_idx_1st_nbr;
+	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
-	int norm_idx = nbr_idx1;
+	    int norm_idx = nbr_idx1;
 #endif	 
 #ifdef MULTI_GPU
-	if (kernel_type == EXTERIOR_KERNEL_Z){	
-	    if (x3 >= X3m1){
-		nbr_idx1 = param.ghostOffset[2] + 9*Vsh_z +(x3-X3m1)*Vsh_z+ space_con;
-		stride1 = 3*Vsh_z;	    
+	    if(kernel_type == EXTERIOR_KERNEL_Z){	
+	      if (x3 >= cudaConstants.X3m1){
+		      nbr_idx1 = param.ghostOffset[2] + 9*Vsh_z +(x3-cudaConstants.X3m1)*Vsh_z+ space_con;
+		      stride1 = 3*Vsh_z;	    
 #if (DD_PREC == 2) //half precision
-		norm_idx = param.ghostNormOffset[2] + 3*Vsh_z + (x3-X3m1)*Vsh_z+ space_con;
+		      norm_idx = param.ghostNormOffset[2] + 3*Vsh_z + (x3-cudaConstants.X3m1)*Vsh_z+ space_con;
 #endif		
-	    }      
-	}
+	      }      
+	    }
 #endif
-	READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
-	MAT_MUL_V(A, fat, i);	 
-	o00_re += A0_re;
-	o00_im += A0_im;
-	o01_re += A1_re;
-	o01_im += A1_im;
-	o02_re += A2_re;
-	o02_im += A2_im;
+	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
+	    MAT_MUL_V(A, fat, i);	 
+	    o00_re += A0_re;
+	    o00_im += A0_im;
+	    o01_re += A1_re;
+	    o01_im += A1_im;
+	    o02_re += A2_re;
+	    o02_im += A2_im;
     }
+
 
   if(hasNaik){ 
 #ifdef MULTI_GPU
-if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= X3m3))
+    if ((kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < cudaConstants.X3m3))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= cudaConstants.X3m3))
 #endif
     {
-	int sp_idx_3rd_nbr = ((x3>= X3m3)? X -X3m3*X2X1: X + 3*X2X1)>> 1;    
-	READ_LONG_MATRIX(LONG, LONGLINK0TEX, 4, ga_idx);
-	int nbr_idx3 = sp_idx_3rd_nbr;
-	int stride3 = sp_stride;
+	    int sp_idx_3rd_nbr = ((x3>= cudaConstants.X3m3)? X -cudaConstants.X3m3*cudaConstants.X2X1: X + 3*cudaConstants.X2X1)>> 1;    
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 4, ga_idx);
+	    int nbr_idx3 = sp_idx_3rd_nbr;
+	    int stride3 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
-	int norm_idx = nbr_idx3;
+	    int norm_idx = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
-	if (kernel_type == EXTERIOR_KERNEL_Z){
-	    if (x3 >= X3m3){
-		nbr_idx3 = param.ghostOffset[2] + 9*Vsh_z +(x3-X3m3)*Vsh_z+ space_con;
-		stride3 = 3*Vsh_z;
+	    if (kernel_type == EXTERIOR_KERNEL_Z){
+	       if (x3 >= cudaConstants.X3m3){
+		       nbr_idx3 = param.ghostOffset[2] + 9*Vsh_z +(x3-cudaConstants.X3m3)*Vsh_z+ space_con;
+		       stride3 = 3*Vsh_z;
 #if (DD_PREC == 2) //half precision
-		norm_idx = param.ghostNormOffset[2] + 3*Vsh_z + (x3-X3m3)*Vsh_z+ space_con;
+		       norm_idx = param.ghostNormOffset[2] + 3*Vsh_z + (x3-cudaConstants.X3m3)*Vsh_z+ space_con;
 #endif
+	       }
 	    }
-	}
 #endif
-	READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
-	RECONSTRUCT_GAUGE_MATRIX(4, long, ga_idx, sign);    
-	MAT_MUL_V(B, long, t);        
-	o00_re += B0_re;
-	o00_im += B0_im;
-	o01_re += B1_re;
-	o01_im += B1_im;
-	o02_re += B2_re;
-	o02_im += B2_im;      
+	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
+	    RECONSTRUCT_GAUGE_MATRIX(4, long, ga_idx, sign);    
+	    MAT_MUL_V(B, long, t);        
+	    o00_re += B0_re;
+	    o00_im += B0_im;
+	    o01_re += B1_re;
+	    o01_im += B1_im;
+	    o02_re += B2_re;
+	    o02_im += B2_im;      
     }
-
   } // hasNaik
- 
-}
+} // Z 
 
-{
-    //direction: -Z
 
+
+{    //direction: -Z
 #if (DD_RECON < 2)
     int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
 #endif
-
     int dir = 5;
-
 #ifdef MULTI_GPU
-    int space_con = (x4*X2X1 + x2*X1+ x1) >>1;    
+    int space_con = (x4*cudaConstants.X2X1 + x2*cudaConstants.X1+ x1) >>1;    
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 1)) || (kernel_type == EXTERIOR_KERNEL_Z && x3 < 1))
 #endif
-	{
-	    int sp_idx_1st_nbr = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
+	  {
+	    int sp_idx_1st_nbr = ((x3==0) ? X+cudaConstants.X3X2X1mX2X1 : X-cudaConstants.X2X1) >> 1;
 	    int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
 	    if ((x3 -1) < 0){
-		fat_idx = Vh + space_con;
+		    fat_idx = cudaConstants.Vh + space_con;
 	    }    
 #endif
 	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
@@ -851,13 +836,13 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 #endif	 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
-		if (x3 - 1 < 0){
-		    nbr_idx1 = param.ghostOffset[2] + (x3+2)*Vsh_z+ space_con;
-		    stride1 = 3*Vsh_z;
+		    if (x3 - 1 < 0){
+		      nbr_idx1 = param.ghostOffset[2] + (x3+2)*Vsh_z+ space_con;
+		      stride1 = 3*Vsh_z;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[2]  + (x3+2)*Vsh_z+ space_con;
+		      norm_idx = param.ghostNormOffset[2]  + (x3+2)*Vsh_z+ space_con;
 #endif			    
-		}        
+		    }        
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
@@ -868,35 +853,35 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    o01_im -= A1_im;
 	    o02_re -= A2_re;
 	    o02_im -= A2_im;
-	}
+	  }
    
   if(hasNaik){ 
 #ifdef MULTI_GPU
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 3)) || (kernel_type == EXTERIOR_KERNEL_Z && x3 < 3))
 #endif
-	{
-	    int sp_idx_3rd_nbr = ((x3 <3) ? X + X3m3*X2X1: X - 3*X2X1)>>1;
+	  {
+	    int sp_idx_3rd_nbr = ((x3 <3) ? X + cudaConstants.X3m3*cudaConstants.X2X1: X - 3*cudaConstants.X2X1)>>1;
 	    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
-	    if ((x3 -3) < 0){
-		long_idx = Vh + x3*X4X2X1h + space_con;
+	    if ((x3-3) < 0){
+			  long_idx = cudaConstants.Vh + x3*cudaConstants.X4X2X1h + space_con;
 	    }    
 #endif
 	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx);         
 	    int nbr_idx3 = sp_idx_3rd_nbr;
-	    int stride3 = sp_stride;    
+	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
-		if (x3 - 3 < 0){
-		    nbr_idx3 = param.ghostOffset[2] + x3*Vsh_z+ space_con;
-		    stride3 = 3*Vsh_z;
+		    if(x3 - 3 < 0){
+		      nbr_idx3 = param.ghostOffset[2] + x3*Vsh_z+ space_con;
+		      stride3 = 3*Vsh_z;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[2]  + x3*Vsh_z+ space_con;
+		      norm_idx = param.ghostNormOffset[2]  + x3*Vsh_z+ space_con;
 #endif			    
-		}
+		    }
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
@@ -909,40 +894,37 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    o01_im -= B1_im;
 	    o02_re -= B2_re;
 	    o02_im -= B2_im;    
-	}
+	  }
   } // hasNaik
-}
+} // -Z direction
 
 
-{
-    //direction: +T
+{  //direction: +T
 #if (DD_RECON < 2)
     int sign = (x4 >= (X4-3)) ? -1 : 1;
 #endif
-
     int ga_idx = sid;
-
 #ifdef MULTI_GPU
-    int space_con = (x3*X2X1+x2*X1+x1)/2;
-    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < X4m1))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= X4m1))
+    int space_con = (x3*cudaConstants.X2X1+x2*cudaConstants.X1+x1)/2;
+    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < cudaConstants.X4m1))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= cudaConstants.X4m1))
 #endif
-	{    
-	    int sp_idx_1st_nbr = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+	  {    
+	    int sp_idx_1st_nbr = ((x4==cudaConstants.X4m1) ? X-cudaConstants.X4X3X2X1mX3X2X1 : X+cudaConstants.X3X2X1) >> 1;
 	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 6, ga_idx);
 	    int nbr_idx1 = sp_idx_1st_nbr;
-	    int stride1 = sp_stride;
+	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx1;
 #endif
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){      
-		if (x4 >= X4m1){
-		    nbr_idx1 = param.ghostOffset[3] + 9*Vsh_t +(x4-X4m1)*Vsh_t+ space_con;
-		    stride1 = 3*Vsh_t;
+		    if (x4 >= cudaConstants.X4m1){
+		      nbr_idx1 = param.ghostOffset[3] + 9*Vsh_t +(x4-cudaConstants.X4m1)*Vsh_t+ space_con;
+		      stride1 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[3] + 3*Vsh_t + (x4-X4m1)*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3] + 3*Vsh_t + (x4-cudaConstants.X4m1)*Vsh_t+ space_con;
 #endif
-		}
+		    }
 	    }
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);    
@@ -953,32 +935,31 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    o01_im += A1_im;
 	    o02_re += A2_re;
 	    o02_im += A2_im;
-	}
+	  }
 
  if(hasNaik){    
 #ifdef MULTI_GPU
-    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < X4m3))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= X4m3))
+    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < cudaConstants.X4m3))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= cudaConstants.X4m3))
 #endif
-	{
-	    int sp_idx_3rd_nbr = ((x4>=X4m3)? X -X4m3*X3X2X1 : X + 3*X3X2X1)>> 1;     
+	  {
+	    int sp_idx_3rd_nbr = ((x4>=cudaConstants.X4m3)? X -cudaConstants.X4m3*cudaConstants.X3X2X1 : X + 3*cudaConstants.X3X2X1)>> 1;     
 	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 6, ga_idx);    
 	    int nbr_idx3 = sp_idx_3rd_nbr;
-	    int stride3 = sp_stride;    
+	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx3;
 #endif
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){
-		if (x4  >= X4m3){
-		    nbr_idx3 = param.ghostOffset[3] + 9*Vsh_t +(x4-X4m3)*Vsh_t+ space_con;
-		    stride3 = 3*Vsh_t;
+		    if (x4  >= cudaConstants.X4m3){
+		      nbr_idx3 = param.ghostOffset[3] + 9*Vsh_t +(x4-cudaConstants.X4m3)*Vsh_t+ space_con;
+		      stride3 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[3] + 3*Vsh_t + (x4-X4m3)*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3] + 3*Vsh_t + (x4-cudaConstants.X4m3)*Vsh_t+ space_con;
 #endif
-		}
+		    }
 	    }
 #endif
-	    
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3); 
 	    RECONSTRUCT_GAUGE_MATRIX(6, long, ga_idx, sign);
 	    MAT_MUL_V(B, long, t);    
@@ -988,43 +969,38 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    o01_im += B1_im;
 	    o02_re += B2_re;
 	    o02_im += B2_im;      
-	}
+	  }
   } // hasNaik
 }
 
-{
-    //direction: -T
-#if (DD_RECON < 2)
-    int sign = ( ((x4+X4m3)%X4)>= X4m3 ) ? -1 : 1;
-#endif
-    
-    int dir = 7;
 
+{  //direction: -T
+#if (DD_RECON < 2)
+    int sign = ( ((x4+cudaConstants.X4m3)%cudaConstants.X4)>= cudaConstants.X4m3 ) ? -1 : 1;
+#endif
+    int dir = 7;
 #ifdef MULTI_GPU
-    int space_con = (x3*X2X1+x2*X1+x1)/2;
+    int space_con = (x3*cudaConstants.X2X1+x2*cudaConstants.X1+x1)/2;
     if ((kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 1)) || (kernel_type == EXTERIOR_KERNEL_T && x4 < 1))
 #endif
-	{
-	    int sp_idx_1st_nbr = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
+	  {
+	    int sp_idx_1st_nbr = ((x4==0)    ? X+cudaConstants.X4X3X2X1mX3X2X1 : X-cudaConstants.X3X2X1) >> 1;
 	    int fat_idx = sp_idx_1st_nbr;    
 	    int nbr_idx1 = sp_idx_1st_nbr;
-	    int stride1 = sp_stride;
+	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx1;
 #endif
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){
-		if ( (x4 - 1) < 0){
-		    fat_idx = Vh + space_con;
-		}
-		
-		if (x4 - 1 < 0){
-		    nbr_idx1 = param.ghostOffset[3] + (x4+2)*Vsh_t+ space_con;
-		    stride1 = 3*Vsh_t;
+		    if (x4==0){
+		      fat_idx = cudaConstants.Vh + space_con;
+		      nbr_idx1 = param.ghostOffset[3] + (x4+2)*Vsh_t+ space_con;
+		      stride1 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[3]  + (x4+2)*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3]  + (x4+2)*Vsh_t+ space_con;
 #endif		    
-		}        	
+		    }        	
 	    }
 #endif
 	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
@@ -1036,32 +1012,30 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    o01_im -= A1_im;
 	    o02_re -= A2_re;
 	    o02_im -= A2_im;
-	}
+	  }
    
   if(hasNaik){  
 #ifdef MULTI_GPU
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 3)) || (kernel_type == EXTERIOR_KERNEL_T && x4 < 3))
 #endif
-	{
-	    int sp_idx_3rd_nbr = ((x4<3) ? X + X4m3*X3X2X1: X - 3*X3X2X1) >> 1;
+	  {
+	    int sp_idx_3rd_nbr = ((x4<3) ? X + cudaConstants.X4m3*cudaConstants.X3X2X1: X - 3*cudaConstants.X3X2X1) >> 1;
 	    int long_idx = sp_idx_3rd_nbr;
 	    int nbr_idx3 = sp_idx_3rd_nbr;
-	    int stride3 = sp_stride;
+	    int stride3 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
 	    int norm_idx = nbr_idx3;
 #endif	    
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){
-		if ( (x4 - 3) < 0){
-		    long_idx = Vh + x4*Vsh_t+ space_con;
-		}	
-		if (x4 - 3 < 0){
-		    nbr_idx3 = param.ghostOffset[3] + x4*Vsh_t+ space_con;
-		    stride3 = 3*Vsh_t;
+		    if (x4<3){                      
+		      long_idx = cudaConstants.Vh + x4*Vsh_t+ space_con;
+		      nbr_idx3 = param.ghostOffset[3] + x4*Vsh_t+ space_con;
+		      stride3 = 3*Vsh_t;
 #if (DD_PREC == 2) //half precision
-		    norm_idx = param.ghostNormOffset[3]  + x4*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3]  + x4*Vsh_t+ space_con;
 #endif		    
-		}
+		    }
 	    }
 #endif	    
 	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx);
@@ -1074,9 +1048,9 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    o01_im -= B1_im;
 	    o02_re -= B2_re;
 	    o02_im -= B2_im;
-	}
+	  }
   } // hasNaik        
-}
+} // -T
 
 
 #if (DD_DAG == 1)
