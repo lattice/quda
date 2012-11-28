@@ -4,10 +4,6 @@
 #include <color_spinor_field.h>
 #include <convert.h>
 
-
-// uncomment to disable texture reads
-//#define DIRECT_ACCESS_BLAS
-
 namespace quda {
 
 #if (__COMPUTE_CAPABILITY__ >= 130)

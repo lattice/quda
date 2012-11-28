@@ -127,13 +127,6 @@ AC_ARG_ENABLE(multi-gpu,
   [ multi_gpu="no" ]
 )
 
-dnl enable comms compute/overlap
-AC_ARG_ENABLE(overlap-comms,
-  AC_HELP_STRING([--enable-overlap-comms], [ Enable comms/compute overlap (default: enabled)]),
-  [ overlap_comms=${enableval}],
-  [ overlap_comms="yes" ]
-)
-
 dnl enable cuda / nic interop buffer
 AC_ARG_ENABLE(gpu-direct,
   AC_HELP_STRING([--enable-gpu-direct], [ Enable CUDA/NIC interop pinned memory (default: enabled)]),
@@ -207,6 +200,12 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
 fi
 
 
+
+AC_ARG_ENABLE(blas-tex,
+ AC_HELP_STRING([--enable-blas-tex], [ Enable texture reads for blas (default: enabled)]),
+ [ blas_tex=${enableval}],
+ [ blas_tex="yes" ]
+)
 
 AC_ARG_ENABLE(fermi-double-tex,
  AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: enabled)]),
@@ -365,14 +364,6 @@ yes|no);;
   ;;
 esac
 
-dnl Enables overlapping comms
-case ${overlap_comms} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-overlap-comms ])
-  ;;
-esac
-
 dnl Enables CUDA/NIC buffer interop
 case ${gpu_direct} in
 yes|no);;
@@ -434,6 +425,14 @@ if test "X${build_qio}X" = "XyesX"; then
   fi	
 fi
  
+dnl Enables textures for blas functions
+case ${blas_tex} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-blas-tex ])
+  ;;
+esac
+
 dnl Enables textures on Fermi
 case ${fermi_double_tex} in
 yes|no);;
@@ -516,9 +515,6 @@ AC_SUBST( BUILD_QMP, [${build_qmp}])
 AC_MSG_NOTICE([Setting BUILD_MPI = ${build_mpi} ])
 AC_SUBST( BUILD_MPI, [${build_mpi}])
 
-AC_MSG_NOTICE([Setting OVERLAP_COMMS= ${overlap_comms}])
-AC_SUBST( OVERLAP_COMMS, [${overlap_comms}])
-
 AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
 AC_SUBST( GPU_DIRECT, [${gpu_direct}])
 
@@ -545,6 +541,9 @@ AC_SUBST( QMP_HOME, [${qmp_home}] )
 
 AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
 AC_SUBST( QIO_HOME, [${qio_home}] )
+
+AC_MSG_NOTICE([Setting BLAS_TEX= ${blas_tex}])
+AC_SUBST( BLAS_TEX, [${blas_tex}])
 
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])

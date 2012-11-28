@@ -17,7 +17,8 @@ HOST_DEBUG = @HOST_DEBUG@              # compile host debug code
 DEVICE_DEBUG = @DEVICE_DEBUG@          # compile device debug code for cuda-gdb 
 VERBOSE = @VERBOSE@                    # display kernel register useage
 DSLASH_PROFILING = @DSLASH_PROFILING@  # multi-gpu dslash profiling
-FERMI_DBLE_TEX=@FERMI_DBLE_TEX@        # enable double-precision texture reads on Fermi?
+BLAS_TEX = @BLAS_TEX@                  # disable texture reads?
+FERMI_DBLE_TEX = @FERMI_DBLE_TEX@      # enable double-precision texture reads on Fermi?
 
 BUILD_WILSON_DIRAC = @BUILD_WILSON_DIRAC@       	# build Wilson Dirac operators?
 BUILD_CLOVER_DIRAC = @BUILD_CLOVER_DIRAC@       	# build clover Dirac operators?
@@ -34,7 +35,6 @@ BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@			# build code for hisq fermion force?
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
-OVERLAP_COMMS = @OVERLAP_COMMS@      # set to 'yes' to overlap comms and compute
 
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
@@ -88,6 +88,8 @@ endif
 ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
   COPT += -DMULTI_GPU
   NVCCOPT += -DMULTI_GPU
+else
+  FACE_COMMS_OBJS=comm_single.o
 endif
 
 CC  = $(FECC)
@@ -101,8 +103,6 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
   FACE_COMMS_OBJS=face_mpi.o comm_mpi.o
-else
-  FACE_COMMS_OBJS=face_qmp.o
 endif
 
 ifeq ($(strip $(BUILD_QMP)), yes)
@@ -113,11 +113,6 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   FACE_COMMS_OBJS=face_qmp.o comm_qmp.o
 endif 
-
-ifeq ($(strip $(OVERLAP_COMMS)), yes)
-  COPT += -DOVERLAP_COMMS
-  NVCCOPT += -DOVERLAP_COMMS
-endif
 
 ifeq ($(strip $(BUILD_QIO)), yes)
   INC += -DHAVE_QIO -I$(QIO_HOME)/include
@@ -192,6 +187,11 @@ endif
 ifeq ($(strip $(DSLASH_PROFILING)), yes)
   NVCCOPT += -DDSLASH_PROFILING
   COPT +=  -DDSLASH_PROFILING
+endif
+
+ifeq ($(strip $(BLAS_TEX)), no)
+  NVCCOPT += -DDIRECT_ACCESS_BLAS
+  COPT += -DDIRECT_ACCESS_BLAS
 endif
 
 ifeq ($(strip $(FERMI_DBLE_TEX)), no)
