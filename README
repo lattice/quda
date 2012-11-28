@@ -1,1 +1,187 @@
-readme
+Release Notes for QUDA v0.5.0                      XX September 2012
+-----------------------------
+
+Overview:
+
+QUDA is a library for performing calculations in lattice QCD on
+graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
+This release includes optimized kernels for applying a variety of
+Dirac operators (Wilson, clover-improved Wilson, twisted mass,
+improved staggered, and domain wall), kernels for performing various
+BLAS-like operations, and full inverters built on these kernels.
+Mixed-precision implementations of both CG and BiCGstab are provided,
+with support for double, single, and half (16-bit fixed-point)
+precision.  The staggered implementation additionally includes support
+for HISQ link fattening, force terms for the HISQ fermion action
+and one-loop improved Symanzik gauge action, and a multi-shift CG
+solver.  Use of multiple GPUs in parallel is supported for all actions.
+
+
+Software Compatibility:
+
+The library has been tested under Linux (CentOS 5.7 and Ubuntu 10.04)
+using release 4.0, 4.1, 4.2 and 5.0 of the CUDA toolkit.  CUDA 3.x and
+earlier are not supported.  The library also works under Mac OS X
+10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
+Intel-based Macs.
+
+See also "Known Issues" below.
+
+
+Hardware Compatibility:
+
+For a list of supported devices, see
+
+http://developer.nvidia.com/cuda-gpus
+
+Before building the library, you should determine the "compute
+capability" of your card, either from NVIDIA's documentation or by
+running the deviceQuery example in the CUDA SDK, and pass the
+appropriate value to QUDA's configure script.  For example, the Tesla
+C1060 is listed on the above website as having compute capability 1.3,
+and so to configure the library for this card, you'd run "configure
+--enable-gpu-arch=sm_13 [other options]" before typing "make".
+
+As of QUDA 0.4.0, only devices of compute capability 1.1 or greater
+are supported.
+
+
+Installation:
+
+Installing the library involves running "configure" followed by
+"make".  See "./configure --help" for a list of configure options.
+At a minimum, you'll probably want to set the GPU architecture; see
+"Hardware Compatibility" above.
+
+Enabling multi-GPU support requires passing the --enable-multi-gpu
+flag to configure, as well as --with-mpi=<PATH> and optionally
+--with-qmp=<PATH>.  If the latter is given, QUDA will use QMP for
+communications; otherwise, MPI will be called directly.  By default,
+it is assumed that the MPI compiler wrappers are <MPI_PATH>/bin/mpicc
+and <MPI_PATH>/bin/mpicxx for C and C++, respectively.  These choices
+may be overriden by setting the CC and CXX variables on the command
+line as follows:
+
+./configure --enable-multi-gpu --with-mpi=<MPI_PATH> \
+[--with-qmp=<QMP_PATH>] [OTHER_OPTIONS] CC=my_mpicc CXX=my_mpicxx
+
+Finally, with some MPI implementations, executables compiled against
+MPI will not run without "mpirun".  This has the side effect of
+causing the configure script to believe that the compiler is failing
+to produce a valid executable.  To skip these checks, one can trick
+configure into thinking that it's cross-compiling by setting the
+--build=none and --host=<HOST> flags.  For the latter,
+"--host=x86_64-linux-gnu" should work on a 64-bit linux system.
+
+If Fortran interface support is desired, then the F90 environment
+variable should be set when configure is invoked.  To build the
+Fortran interface modules, then the Makefile target "fortran" should
+be given, since this is not built by default.
+
+Throughout the library, auto-tuning is used to select optimal launch
+parameters for most performance-critical kernels.  This tuning
+process takes some time and will generally slow things down the first
+time a given kernel is called during a run.  To avoid this one-time
+overhead in subsequent runs (using the same action, solver, lattice
+volume, etc.), the optimal parameters are cached to disk.  For this
+to work, the QUDA_RESOURCE_PATH environment variable must be set,
+pointing to a writeable directory.  Note that since the tuned parameters
+are hardware-specific, this "resource directory" should not be shared
+between jobs running on different systems (e.g., two clusters
+with different GPUs installed).  Attempting to use parameters tuned
+for one card on a different card may lead to unexpected errors.
+
+
+Using the Library:
+
+Include the header file include/quda.h in your application, link
+against lib/libquda.a, and study tests/invert_test.c (or the
+corresponding tests for staggered fermions) for an example of the
+interface.  The various inverter options are enumerated in
+include/enum_quda.h.
+
+
+Known Issues:
+
+* For compatibility with CUDA, on 32-bit platforms the library is
+  compiled with the GCC option -malign-double.  This differs from the
+  GCC default and may affect the alignment of various structures,
+  notably those of type QudaGaugeParam and QudaInvertParam, defined in
+  quda.h.  Therefore, any code to be linked against QUDA should also
+  be compiled with this option.
+
+* With drivers earlier than CUDA 5.0 (the final production release),
+  Fermi-based GeForce cards suffer from occasional hangs when reading
+  from double-precision textures, recoverable only with a soft reset.
+  The recommended solution is to upgrade to the CUDA 5.0 driver.
+  Alternatively, such texture reads can be disabled by default at the
+  expense of some performance.  To disable double-precision texture
+  reads pass the --disable-fermi-double-tex flag to configure.
+
+* The auto-tuner reports "0 Gflop/s" and "0 GB/s" for several of the
+  Dslash kernels (visible if the verbosity is set to at least
+  QUDA_SUMMARIZE), rather than the correct values.  This does not
+  affect the tuning process or actual performance.
+
+* At present, using MPI directly for communications (as opposed to
+  QMP) requires calling some initialization routines that are not
+  exposed in quda.h.  This will be corrected in the next release.
+
+* Attempts to compile with GCC 4.7.x will fail due to bugs in the
+  compiler.
+
+
+Getting Help:
+
+Please visit http://lattice.github.com/quda for contact information.
+Bug reports are especially welcome.
+
+
+Acknowledging QUDA:
+
+If you find this software useful in your work, please cite:
+
+M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
+Lattice QCD systems of equations using mixed precision solvers on GPUs,"
+Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
+
+When taking advantage of multi-GPU support, please also cite:
+
+R. Babich, M. A. Clark, B. Joo, G. Shi, R. C. Brower, and S. Gottlieb,
+"Scaling lattice QCD beyond 100 GPUs," International Conference for
+High Performance Computing, Networking, Storage and Analysis (SC),
+2011 [arXiv:1109.2935 [hep-lat]].
+
+Several other papers that might be of interest are listed at
+http://lattice.github.com/quda .
+
+
+Authors:
+
+Ronald Babich (NVIDIA)
+Kipton Barros (Los Alamos National Laboratory)
+Richard Brower (Boston University)
+Michael Clark (NVIDIA)
+Justin Foley (University of Utah)
+Joel Giedt (Rensselaer Polytechnic Institute)
+Steven Gottlieb (Indiana University)
+Balint Joo (Jefferson Laboratory)
+Claudio Rebbi (Boston University)
+Guochun Shi (NCSA)
+Alexei Strelchenko (Cyprus Institute)
+
+Portions of this software were developed at the Innovative Systems Lab,
+National Center for Supercomputing Applications
+http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html
+
+Development was supported in part by the U.S. Department of Energy
+under grants DE-FC02-06ER41440, DE-FC02-06ER41449, and
+DE-AC05-06OR23177; the National Science Foundation under grants
+DGE-0221680, PHY-0427646, PHY-0835713, OCI-0946441, and OCI-1060067;
+as well as the PRACE project funded in part by the EUs 7th Framework
+Programme (FP7/2007-2013) under grants RI-211528 and FP7-261557.  Any
+opinions, findings, and conclusions or recommendations expressed in
+this material are those of the authors and do not necessarily reflect
+the views of the Department of Energy, the National Science
+Foundation or the PRACE project.
+
