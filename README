@@ -77,6 +77,12 @@ variable should be set when configure is invoked.  To build the
 Fortran interface modules, then the Makefile target "fortran" should
 be given, since this is not built by default.
 
+To aid the configuration process, two example configure scripts are
+included: configure.milc.titan and configure.chroma.titan.  These
+configure QUDA for expected usage with MILC and Chroma, respectively,
+for use on Titan (the Tesla K20X powered supercomputer at Oak Ridge
+National Lab).
+
 Throughout the library, auto-tuning is used to select optimal launch
 parameters for most performance-critical kernels.  This tuning
 process takes some time and will generally slow things down the first
