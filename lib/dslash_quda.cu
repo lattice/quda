@@ -1266,8 +1266,7 @@ namespace quda {
       if (!dslashParam.commDim[i]) continue;
 
       // Record the start of the packing
-      CUDA_EVENT_RECORD(packStart[2*i+0], streams[Nstream-1]);
-      CUDA_EVENT_RECORD(packStart[2*i+1], streams[Nstream-1]);
+      CUDA_EVENT_RECORD(packStart[2*i], streams[Nstream-1]);
 
       // Initialize pack from source spinor
       face->pack(*inSpinor, 1-parity, dagger, i, streams);
@@ -1310,7 +1309,7 @@ namespace quda {
 	
 	  // Query if gather has completed
 	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
-	    if (cudaSuccess == cudaEventQuery(gatherEnd[2*i])) {
+	    if (cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
 	      gettimeofday(&commsStart[2*i+dir], NULL);
