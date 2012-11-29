@@ -45,7 +45,6 @@ and so to configure the library for this card, you'd run "configure
 As of QUDA 0.4.0, only devices of compute capability 1.1 or greater
 are supported.
 
-
 Installation:
 
 Installing the library involves running "configure" followed by
@@ -130,6 +129,12 @@ Known Issues:
 * Attempts to compile with GCC 4.7.x will fail due to bugs in the
   compiler.
 
+* On Kepler GPUs, there is an issue with using texture reads for blas
+  kernels that can cause the multi-shift staggered solver to give junk
+  results.  The cause of this issue is presently undetermined, but in
+  the meantime this can be worked around by configuring QUDA to
+  disable texture reads for all blas kernels (use the
+  --disable-blas-tex configure flag).
 
 Getting Help:
 
