@@ -85,15 +85,13 @@ namespace quda {
     while (r2 > stop && k < invParam.maxiter) {
     
       mat(Ar, r, tmp);
-    
+
       double3 Ar3 = cDotProductNormACuda(Ar, r);
-      quda::Complex alpha = quda::Complex(Ar3.x, Ar3.y) / Ar3.z;
+      Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
 
       // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = norm2(r)
       //r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
       caxpyXmazCuda(omega*alpha, r, x, Ar);
-
-      printf("%d alpha = %e %e\n", k, real(alpha), imag(alpha));
 
       if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
 	double x2 = norm2(x);
@@ -109,7 +107,7 @@ namespace quda {
   
     if (invParam.verbosity >= QUDA_VERBOSE) {
       mat(Ar, r, tmp);    
-      quda::Complex Ar2 = cDotProductCuda(Ar, r);
+      Complex Ar2 = cDotProductCuda(Ar, r);
       printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
     }
 
