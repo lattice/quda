@@ -8,29 +8,29 @@
 
 #pragma once
 
-__host__ __device__ double2 operator+(const double2& x, const double2 &y) {
+__host__ __device__ inline double2 operator+(const double2& x, const double2 &y) {
   return make_double2(x.x + y.x, x.y + y.y);
 }
 
-__host__ __device__ double2 operator-(const double2& x, const double2 &y) {
+__host__ __device__ inline double2 operator-(const double2& x, const double2 &y) {
   return make_double2(x.x - y.x, x.y - y.y);
 }
 
-__host__ __device__ float2 operator-(const float2& x, const float2 &y) {
+__host__ __device__ inline float2 operator-(const float2& x, const float2 &y) {
   return make_float2(x.x - y.x, x.y - y.y);
 }
 
-__host__ __device__ float4 operator-(const float4& x, const float4 &y) {
+__host__ __device__ inline float4 operator-(const float4& x, const float4 &y) {
   return make_float4(x.x - y.x, x.y - y.y, x.z - y.z, x.w - y.w);
 }
 
-__host__ double3 operator+(const double3& x, const double3 &y) {
+__host__ inline double3 operator+(const double3& x, const double3 &y) {
   double3 z;
   z.x = x.x + y.x; z.y = x.y + y.y; z.z = x.z + y.z;
   return z;
 }
 
-__device__ float4 operator*(const float a, const float4 x) {
+__device__ inline float4 operator*(const float a, const float4 x) {
   float4 y;
   y.x = a*x.x;
   y.y = a*x.y;
@@ -39,21 +39,21 @@ __device__ float4 operator*(const float a, const float4 x) {
   return y;
 }
 
-__device__ float2 operator*(const float a, const float2 x) {
+__device__ inline float2 operator*(const float a, const float2 x) {
   float2 y;
   y.x = a*x.x;
   y.y = a*x.y;
   return y;
 }
 
-__device__ double2 operator*(const double a, const double2 x) {
+__device__ inline double2 operator*(const double a, const double2 x) {
   double2 y;
   y.x = a*x.x;
   y.y = a*x.y;
   return y;
 }
 
-__device__ double4 operator*(const double a, const double4 x) {
+__device__ inline double4 operator*(const double a, const double4 x) {
   double4 y;
   y.x = a*x.x;
   y.y = a*x.y;
@@ -62,14 +62,14 @@ __device__ double4 operator*(const double a, const double4 x) {
   return y;
 }
 
-__device__ float2 operator+(const float2 x, const float2 y) {
+__device__ inline float2 operator+(const float2 x, const float2 y) {
   float2 z;
   z.x = x.x + y.x;
   z.y = x.y + y.y;
   return z;
 }
 
-__device__ float4 operator+(const float4 x, const float4 y) {
+__device__ inline float4 operator+(const float4 x, const float4 y) {
   float4 z;
   z.x = x.x + y.x;
   z.y = x.y + y.y;
@@ -78,7 +78,7 @@ __device__ float4 operator+(const float4 x, const float4 y) {
   return z;
 }
 
-__device__ float4 operator+=(float4 &x, const float4 y) {
+__device__ inline float4 operator+=(float4 &x, const float4 y) {
   x.x += y.x;
   x.y += y.y;
   x.z += y.z;
@@ -86,26 +86,26 @@ __device__ float4 operator+=(float4 &x, const float4 y) {
   return x;
 }
 
-__device__ float2 operator+=(float2 &x, const float2 y) {
+__device__ inline float2 operator+=(float2 &x, const float2 y) {
   x.x += y.x;
   x.y += y.y;
   return x;
 }
 
-__host__ __device__ double2 operator+=(double2 &x, const double2 y) {
+__host__ __device__ inline double2 operator+=(double2 &x, const double2 y) {
   x.x += y.x;
   x.y += y.y;
   return x;
 }
 
-__host__ __device__ double3 operator+=(double3 &x, const double3 y) {
+__host__ __device__ inline double3 operator+=(double3 &x, const double3 y) {
   x.x += y.x;
   x.y += y.y;
   x.z += y.z;
   return x;
 }
 
-__device__ float4 operator-=(float4 &x, const float4 y) {
+__device__ inline float4 operator-=(float4 &x, const float4 y) {
   x.x -= y.x;
   x.y -= y.y;
   x.z -= y.z;
@@ -113,25 +113,25 @@ __device__ float4 operator-=(float4 &x, const float4 y) {
   return x;
 }
 
-__device__ float2 operator-=(float2 &x, const float2 y) {
+__device__ inline float2 operator-=(float2 &x, const float2 y) {
   x.x -= y.x;
   x.y -= y.y;
   return x;
 }
 
-__device__ double2 operator-=(double2 &x, const double2 y) {
+__device__ inline double2 operator-=(double2 &x, const double2 y) {
   x.x -= y.x;
   x.y -= y.y;
   return x;
 }
 
-__device__ float2 operator*=(float2 &x, const float a) {
+__device__ inline float2 operator*=(float2 &x, const float a) {
   x.x *= a;
   x.y *= a;
   return x;
 }
 
-__device__ float4 operator*=(float4 &a, const float &b) {
+__device__ inline float4 operator*=(float4 &a, const float &b) {
   a.x *= b;
   a.y *= b;
   a.z *= b;
@@ -139,13 +139,13 @@ __device__ float4 operator*=(float4 &a, const float &b) {
   return a;
 }
 
-__device__ double2 operator*=(double2 &a, const float &b) {
+__device__ inline double2 operator*=(double2 &a, const float &b) {
   a.x *= b;
   a.y *= b;
   return a;
 }
 
-__device__ double4 operator*=(double4 &a, const float &b) {
+__device__ inline double4 operator*=(double4 &a, const float &b) {
   a.x *= b;
   a.y *= b;
   a.z *= b;
@@ -153,11 +153,11 @@ __device__ double4 operator*=(double4 &a, const float &b) {
   return a;
 }
 
-__device__ float2 operator-(const float2 &x) {
+__device__ inline float2 operator-(const float2 &x) {
   return make_float2(-x.x, -x.y);
 }
 
-__device__ double2 operator-(const double2 &x) {
+__device__ inline double2 operator-(const double2 &x) {
   return make_double2(-x.x, -x.y);
 }
 

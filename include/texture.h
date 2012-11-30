@@ -4,7 +4,7 @@
 #include <color_spinor_field.h>
 #include <convert.h>
 
-namespace quda {
+//namespace quda {
 
 #if (__COMPUTE_CAPABILITY__ >= 130)
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
@@ -384,6 +384,6 @@ namespace quda {
     saveHalf<short4, double4, 6>(spinor, norm, y, i, stride);
   }
 
-} // namespace quda
+//} // namespace quda
 
 #endif // _TEXTURE_H

@@ -421,7 +421,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, blasTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
     result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
       (X, Y, Z, W, V, r, XX, YY, ZZ, length, tp, stream);
   }
@@ -630,7 +630,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.RealLength()*x.Precision();
   blas_flops += Reducer<ReduceType,double2,double2>::flops()*x.RealLength();
 
-  reduce->apply(*blasStream);
+  reduce->apply(*getBlasStream());
   delete reduce;
 
   checkCudaError();

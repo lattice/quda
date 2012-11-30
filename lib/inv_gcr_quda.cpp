@@ -237,7 +237,8 @@ namespace quda {
     quda::blas_flops = 0;
 
     // calculate initial residual
-    mat(r, x);
+    mat(r, x, y);
+    zeroCuda(y);
     double r2 = xmyNormCuda(b, r);  
     copyCuda(rSloppy, r);
 
@@ -335,7 +336,7 @@ namespace quda {
 	double r2Sloppy = r2;
 
 	k = 0;
-	mat(r, y);
+	mat(r, y, x);
 	r2 = xmyNormCuda(b, r);  
 
 	if (r2 > stop) {
