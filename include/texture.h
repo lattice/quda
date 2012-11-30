@@ -273,16 +273,17 @@
 
   private:
     StoreType *spinor;
-    float *norm;
-    const int stride;
+    float *norm; // Probably need to change this!
+    const int in_stride;
+    const int out_stride;
 
   public:
-  Spinor(cudaColorSpinorField &x) : 
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  stride(x.Length()/(N*REG_LENGTH))
+  Spinor(const cudaColorSpinorField& y, const cudaColorSpinorField &x) : 
+    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  in_stride(x.Length()/(N*REG_LENGTH)), out_stride(y.Length()/(N*REG_LENGTH))
       { checkTypes<RegType,InterType,StoreType>(); } 
 
   Spinor(const cudaColorSpinorField &x) :
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+    spinor((StoreType*)x.V()), norm((float*)x.Norm()), in_stride(x.Length()/(N*REG_LENGTH)), out_stride(x.Length()/(N*REG_LENGTH))
       { checkTypes<RegType,InterType,StoreType>(); } 
     ~Spinor() {;}
 
@@ -292,7 +293,7 @@
       const int M = (N * sizeof(RegType)) / sizeof(InterType);
       InterType y[M];
 #pragma unroll
-      for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*stride]);
+      for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*in_stride]);
 
       convert<RegType, InterType>(x, y, N);
     }
@@ -303,7 +304,7 @@
       InterType y[M];
       convert<InterType, RegType>(y, x, M);
 #pragma unroll
-      for (int j=0; j<M; j++) copyFloatN(spinor[i+j*stride], y[j]);
+      for (int j=0; j<M; j++) copyFloatN(spinor[i+j*out_stride], y[j]);
     }
 
     // used to backup the field to the host
@@ -341,7 +342,7 @@
       return precision;
     }
 
-    int Stride() { return stride; }
+    int Stride() { return in_stride; }
   };
 
   template <typename OutputType, typename InputType, int M>
