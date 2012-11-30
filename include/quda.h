@@ -82,6 +82,8 @@ extern "C" {
     double gaugeGiB;
 
     int preserve_gauge; /**< Used by link fattening */
+
+    void* precondition;  /**< Allows for a different gauge field in the preconditioner */
     
   } QudaGaugeParam;
 
@@ -105,6 +107,8 @@ extern "C" {
 
     double mu;    /**< Twisted mass parameter */
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
+
+    int hasNaik; /**< Used for staggered only */
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */
@@ -340,6 +344,16 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
+
+  /**
+   * Solve for multiple shifts sequentially, use the solution for the previous (larger) shift 
+	 * as the initial guess for the solution for the current shift. 
+   * @param _hp_x  Array of solution spinor fields
+   * @param _hp_b  Array of source spinor fields 
+   * @param param  Contains all metadata regarding host and device 
+   *					     storage and solver parameters
+   */
+  void invertSequentialMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).

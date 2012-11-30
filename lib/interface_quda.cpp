@@ -4,6 +4,7 @@
 #include <math.h>
 #include <string.h>
 #include <sys/time.h>
+#include <cassert>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -105,6 +106,10 @@ TimeProfile profileInvert("invertQuda");
 
 //!< Profiler for invertMultiShiftQuda
 TimeProfile profileMulti("invertMultiShiftQuda");
+
+//!<Profiler for invertSequentialMultiShiftQuda
+TimeProfile profileSequential("invertSequentialMultiShiftQuda");
+
 
 //!< Profiler for invertMultiShiftMixedQuda
 TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
@@ -229,7 +234,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // Set the specific cpu parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
 
-  cpuGaugeField cpu(gauge_param);
+  cpuGaugeField* cpu = new cpuGaugeField(gauge_param);
 
   profileGauge[QUDA_PROFILE_INIT].Start();  
   // switch the parameters for creating the mirror precise cuda gauge field
@@ -244,7 +249,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge[QUDA_PROFILE_INIT].Stop();  
 
   profileGauge[QUDA_PROFILE_H2D].Start();  
-  precise->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+  precise->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
 
   param->gaugeGiB += precise->GBytes();
 
@@ -257,26 +262,35 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *sloppy = NULL;
   if (param->cuda_prec != param->cuda_prec_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
-    sloppy->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+    sloppy->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
     param->gaugeGiB += sloppy->GBytes();
   } else {
     sloppy = precise;
   }
 
+  if(param->precondition){ // use "cpu" to load the gauge field for the preconditioner
+    GaugeFieldParam precon_gauge_param(param->precondition, *param);
+    delete cpu;
+    cpu = new cpuGaugeField(precon_gauge_param);
+  }
+
+  cudaGaugeField *precondition = NULL;
   // switch the parameters for creating the mirror preconditioner cuda gauge field
   gauge_param.precision = param->cuda_prec_precondition;
   gauge_param.reconstruct = param->reconstruct_precondition;
   gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
-  cudaGaugeField *precondition = NULL;
-  if (param->cuda_prec_sloppy != param->cuda_prec_precondition) {
+  QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  if ((param->cuda_prec_sloppy != param->cuda_prec_precondition) | (param->precondition != NULL)) {
     precondition = new cudaGaugeField(gauge_param);
-    precondition->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+    precondition->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
     param->gaugeGiB += precondition->GBytes();
   } else {
     precondition = sloppy;
   }
+  delete cpu;     
+   
+
   profileGauge[QUDA_PROFILE_H2D].Stop();  
   
   switch (param->type) {
@@ -515,6 +529,7 @@ void endQuda(void)
     profileClover.Print();
     profileInvert.Print();
     profileMulti.Print();
+    profileSequential.Print();
     profileMultiMixed.Print();
     profileEnd.Print();
 
@@ -571,6 +586,8 @@ namespace quda {
     diracParam.mu = inv_param->mu;
     diracParam.verbose = getVerbosity();
 
+    diracParam.hasNaik = inv_param->hasNaik ? true : false;
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -593,7 +610,7 @@ namespace quda {
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
-  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc, bool hasNaik=true)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -601,6 +618,8 @@ namespace quda {
     diracParam.fatGauge = gaugeFatPrecondition;
     diracParam.longGauge = gaugeLongPrecondition;    
     diracParam.clover = cloverPrecondition;
+
+    diracParam.hasNaik = hasNaik;
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 0; // comms are always off
@@ -1504,6 +1523,229 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileMulti[QUDA_PROFILE_TOTAL].Stop();
 }
+
+
+
+static void computePolynomialCoefficients(double coeff[], double prev_mass[], double current_mass, int num_masses)
+{
+  if(num_masses == 0) return;
+  if(num_masses == 1) coeff[0] = 1.0;
+
+  double sum = 0;
+  for(int j=0; j<num_masses; ++j){
+    double temp = 1.0;
+    for(int i=0; i<num_masses; ++i){
+      if(i != j && (prev_mass[j] != prev_mass[i])){
+        temp *= (current_mass - prev_mass[i])/(prev_mass[j] - prev_mass[i]);
+      }
+    }
+    sum += temp;
+    coeff[j] = temp;
+  }
+  
+  assert(fabs(sum-1) < 1e-9);
+}
+
+
+
+
+// Sequential solver
+void invertSequentialMultiShiftQuda(void **_hp_x, 
+				    void *_hp_b, 
+				    QudaInvertParam *param)
+{
+
+  profileSequential[QUDA_PROFILE_TOTAL].Start();
+
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
+  checkInvertParam(param);
+
+  if (param->num_offset > QUDA_MAX_MULTI_SHIFT)
+    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", 
+	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+
+  pushVerbosity(param->verbosity);
+
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+
+  for(int i=0; i<param->num_offset-1; i++){
+    for(int j=i+1; j<param->num_offset; j++){
+      if(param->offset[i] > param->offset[j])
+	errorQuda("Offsets must be ordered from smallest to largest");
+    }
+  }
+
+  // Host pointers for x, take a copy of the input host pointers
+  void** hp_x;
+  hp_x = new void* [param->num_offset];
+
+  void* hp_b = _hp_b;
+  for(int i=0; i<param->num_offset; ++i){
+    hp_x[i] = _hp_x[i];
+  }
+
+  // Create the matrix.
+  // The way this works is that createDirac will create 'd' and 'dSloppy'
+  // which are global. We then grab these with references...
+  // 
+  if(param->dslash_type == QUDA_ASQTAD_DSLASH){
+    param->mass = sqrt(param->offset[0]/4);
+  }
+
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+
+  cpuColorSpinorField *h_b = NULL; // Host RHS
+  cpuColorSpinorField **h_x = NULL;
+  cudaColorSpinorField *b = NULL; // Cuda RHS
+  cudaColorSpinorField **x = NULL; // Cuda Solutions
+
+  // Grab the dimension array of the input gauge field.
+  const int *X = (param->dslash_type == QUDA_ASQTAD_DSLASH) ? gaugeFatPrecise->X() : gaugePrecise->X();
+  
+  // Wrap CPU host-side pointers
+  ColorSpinorParam cpuParam(hp_b, QUDA_CPU_FIELD_LOCATION, *param, X, pc_solution);
+  h_b = new cpuColorSpinorField(cpuParam);
+
+  h_x = new cpuColorSpinorField* [param->num_offset];
+  for(int i=0; i<param->num_offset; ++i){
+    cpuParam.v = hp_x[i];
+    h_x[i] = new cpuColorSpinorField(cpuParam);
+  }
+
+
+  profileSequential[QUDA_PROFILE_H2D].Start();
+
+  ColorSpinorParam cudaParam(cpuParam, *param);
+  cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  b = new cudaColorSpinorField(*h_b, cudaParam); // creates b and downloads h_b to it
+  
+  profileSequential[QUDA_PROFILE_H2D].Stop();
+
+  // Create the solution fields filled with zero
+  x = new cudaColorSpinorField* [param->num_offset];
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  for(int i=0; i<param->num_offset; ++i) x[i] = new cudaColorSpinorField(cudaParam);
+
+  // Check source norms 
+  if(getVerbosity() >= QUDA_VERBOSE){
+    double nh_b = norm2(*h_b);
+    double nb = norm2(*b);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+  }
+
+  setDslashTuning(param->tune, getVerbosity());
+  setBlasTuning(param->tune, getVerbosity());
+ 
+  massRescale(param->dslash_type, 
+	      param->kappa, 
+              param->solution_type, 
+	      param->mass_normalization,
+	      *b);
+
+  double *unscaled_shifts = new double [param->num_offset];
+  for(int i=0; i<param->num_offset; ++i){
+    unscaled_shifts[i] = param->offset[i];
+    massRescaleCoeff(param->dslash_type, 
+		     param->kappa, 
+		     param->solution_type,
+		     param->mass_normalization,
+		     param->offset[i]);
+  }
+
+  { 
+    param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    
+    for(int i=param->num_offset-1; i>=0; --i){
+      dirac.setMass(sqrt(param->offset[i]/4));  
+      diracSloppy.setMass(sqrt(param->offset[i]/4));  
+      DiracMdagM m(dirac), mSloppy(diracSloppy);
+
+      // Perform polynomial extrapolation.
+      // At the moment, all previous solutions are used. 
+      // This may not be the optimal strategy.
+      if(i < param->num_offset-1){ 
+		    double* previous_offsets = new double[param->num_offset];
+        double* poly_coeffs = new double[param->num_offset];
+        int order = param->num_offset - i -1;
+        for(int j=0; j<order; ++j) previous_offsets[j] = param->offset[i+j+1];
+				computePolynomialCoefficients(poly_coeffs, previous_offsets, param->offset[i], order);
+        for(int j=0; j<order; ++j){
+          axpyCuda(poly_coeffs[j],*x[i+j+1], *x[i]); 
+			  }
+        delete[] previous_offsets;
+        delete[] poly_coeffs;
+      }
+
+      param->tol = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
+					   param->tol_hq_offset[i] : param->tol_offset[i];
+      CG cg(m, mSloppy, *param, profileSequential);
+      cg(*x[i], *b);
+      param->true_res_offset[i] = param->true_res;
+      param->true_res_hq_offset[i] = param->true_res_hq;
+      
+      dirac.setMass(sqrt(param->offset[0]/4));  // Probably unnecessary 
+      diracSloppy.setMass(sqrt(param->offset[0]/4));   // Probably unnecessary
+    }
+  }
+
+  // restore shifts -- avoid side effects
+  for(int i=0; i<param->num_offset; ++i){
+    param->offset[i] = unscaled_shifts[i];
+  }
+
+  delete [] unscaled_shifts;
+
+  profileSequential[QUDA_PROFILE_D2H].Start();
+  for(int i=0; i<param->num_offset; ++i){
+    if( getVerbosity() >= QUDA_VERBOSE ){
+      double nx = norm2(*x[i]);
+      printfQuda("Solution %d = %g\n", i, nx);
+    }
+    *h_x[i] = *x[i];
+  }
+  profileSequential[QUDA_PROFILE_D2H].Stop();
+
+  for(int i=0; i<param->num_offset; ++i){
+    delete h_x[i];
+    delete x[i];
+  }
+
+  delete h_b;
+  delete b;
+
+  delete [] h_x;
+  delete [] x;
+
+  delete [] hp_x;
+  
+  delete d;
+  delete dSloppy;
+  delete dPre;
+
+  popVerbosity();
+
+  saveTuneCache(getVerbosity());
+
+  profileSequential[QUDA_PROFILE_TOTAL].Stop();
+
+  return;
+}
+
+
 
 
 #ifdef GPU_FATLINK 

@@ -46,6 +46,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #if defined INIT_PARAM
   P(anisotropy, INVALID_DOUBLE);
   P(tadpole_coeff, INVALID_DOUBLE);
+  P(precondition, NULL);
 #else
   if (param->type == QUDA_WILSON_LINKS) {
     P(anisotropy, INVALID_DOUBLE);
@@ -117,6 +118,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(Ls, INVALID_INT);
   P(mu, INVALID_DOUBLE);
   P(twist_flavor, QUDA_TWIST_INVALID);
+  P(hasNaik, 1);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {

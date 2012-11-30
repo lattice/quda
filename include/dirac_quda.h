@@ -30,6 +30,8 @@ namespace quda {
     cudaCloverField *clover;
   
     double mu; // used by twisted mass only
+    bool hasNaik; // used by stagggered only
+
 
     cudaColorSpinorField *tmp1;
     cudaColorSpinorField *tmp2; // used by Wilson-like kernels only
@@ -41,7 +43,7 @@ namespace quda {
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
       dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), 
-      tmp1(0), tmp2(0), verbose(QUDA_SILENT)
+      tmp1(0), tmp2(0), verbose(QUDA_SILENT), hasNaik(true)
     {
 
     }
@@ -339,6 +341,7 @@ namespace quda {
     cudaGaugeField &fatGauge;
     cudaGaugeField &longGauge;
     FaceBuffer face; // multi-gpu communication buffers
+    bool hasNaik;
 
   public:
     DiracStaggered(const DiracParam &param);
@@ -360,6 +363,8 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool includesNaik() const;
   };
 
   // Even-odd preconditioned staggered

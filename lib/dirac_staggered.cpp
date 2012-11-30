@@ -5,14 +5,14 @@ namespace quda {
 
   DiracStaggered::DiracStaggered(const DiracParam &param) : 
     Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
-    face(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
+    face(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()), hasNaik(param.hasNaik) 
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
     initStaggeredConstants(fatGauge, longGauge);
   }
 
   DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
-								fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face)
+								fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face), hasNaik(dirac.hasNaik)
   {
     initStaggeredConstants(fatGauge, longGauge);
   }
@@ -59,7 +59,7 @@ namespace quda {
 
     initSpinorConstants(in);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim);
+    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, hasNaik);
   
     flops += 1146ll*in.Volume();
   }
@@ -72,7 +72,7 @@ namespace quda {
 
     initSpinorConstants(in);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim);
+    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, hasNaik);
   
     flops += 1158ll*in.Volume();
   }
@@ -126,6 +126,8 @@ namespace quda {
   {
     // do nothing
   }
+
+  bool DiracStaggered::includesNaik() const { return hasNaik; }
 
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
@@ -193,5 +195,6 @@ namespace quda {
   {
     // do nothing
   }
+
 
 } // namespace quda

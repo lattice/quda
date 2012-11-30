@@ -18,6 +18,10 @@ namespace quda {
       report("CG");
       solver = new CG(mat, matSloppy, param, profile);
       break;
+    case QUDA_DD_CG_INVERTER:
+	    report("DD_CG");
+      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
+      break;
     case QUDA_BICGSTAB_INVERTER:
       report("BiCGstab");
       solver = new BiCGstab(mat, matSloppy, matPrecon, param, profile);

@@ -78,6 +78,7 @@ extern "C" {
 
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
+    QUDA_DD_CG_INVERTER,   // temporary option for domain-decomposed preconditioner
     QUDA_BICGSTAB_INVERTER,
     QUDA_GCR_INVERTER,
     QUDA_MR_INVERTER,
