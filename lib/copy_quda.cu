@@ -97,8 +97,8 @@ namespace quda {
       if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n", src.Nspin());
 
       if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-	copyCuda(dst.Even(), src.Even());
-	copyCuda(dst.Odd(), src.Odd());
+	copy::copyCuda(dst.Even(), src.Even());
+	copy::copyCuda(dst.Odd(), src.Odd());
 	return;
       }
 
