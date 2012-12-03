@@ -162,22 +162,24 @@ int main(int argc, char **argv)
     inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
   }
 
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 5e-7;
   //inv_param.residual_type = QUDA_HEAVY_QUARK_RESIDUAL;
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) inv_param.tol_offset[i] = inv_param.tol;
-  inv_param.maxiter = 1000;
+  inv_param.maxiter = 50;
   inv_param.reliable_delta = 1e-1; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
   inv_param.verbosity_precondition = QUDA_SILENT;
-  inv_param.prec_precondition = cuda_prec_precondition;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
 
   inv_param.cpu_prec = cpu_prec;

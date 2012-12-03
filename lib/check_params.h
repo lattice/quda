@@ -201,7 +201,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tol_precondition, INVALID_DOUBLE);
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-  P(prec_precondition, QUDA_INVALID_PRECISION);
   P(schwarz_type, QUDA_ADDITIVE_SCHWARZ); // defaults match previous interface behaviour
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
@@ -211,7 +210,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-    P(prec_precondition, QUDA_INVALID_PRECISION);
     P(schwarz_type, QUDA_INVALID_SCHWARZ);
     P(precondition_cycle, 0);              
   }
@@ -238,7 +236,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
 #else
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
-    param->cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+    param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
