@@ -324,6 +324,10 @@ int X;
 
 
 if(kernel_type == INTERIOR_KERNEL){
+
+
+  getCoords(&x1, &x2, &x3, &x4, &X, param.parity, sid);
+/*
   //data order: X4 X3 X2 X1h
   za = sid / cudaConstants.X1h;
   x1h = sid - za*cudaConstants.X1h;
@@ -334,6 +338,8 @@ if(kernel_type == INTERIOR_KERNEL){
   x1odd = (x2 + x3 + x4 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
   X = 2*sid + x1odd;
+*/
+
  }else if (kernel_type == EXTERIOR_KERNEL_X){
   //data order: X1 X4 X3 X2h
   za = sid / cudaConstants.X2h;

@@ -139,9 +139,9 @@ namespace quda {
     if (&src != this) {
       // keep current attributes unless unset
       if (!ColorSpinorField::init) { // note this will turn a reference field into a regular field
-	destroy();
-	ColorSpinorField::operator=(src);
-	create(QUDA_COPY_FIELD_CREATE);
+	      destroy();
+	      ColorSpinorField::operator=(src);
+	      create(QUDA_COPY_FIELD_CREATE);
       }
       if (isNative() && src.isNative()) copy(src);
       else errorQuda("Cannot copy using non-native fields");

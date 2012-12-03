@@ -365,24 +365,24 @@
 
   template <>
     __device__ inline void Spinor<float2, float2, short2, 3>::save(float2 x[3], int i) {
-    saveHalf<short2, float2, 3>(spinor, norm, x, i, stride);
+    saveHalf<short2, float2, 3>(spinor, norm, x, i, out_stride);
   }
 
   template <>
     __device__ inline void Spinor<float4, float4, short4, 6>::save(float4 x[6], int i) {
-    saveHalf<short4, float4, 6>(spinor, norm, x, i, stride);
+    saveHalf<short4, float4, 6>(spinor, norm, x, i, out_stride);
   }
 
   template <>
     __device__ inline void Spinor<double2, double2, short2, 3>::save(double2 x[3], int i) {
-    saveHalf<short2, double2, 3>(spinor, norm, x, i, stride);
+    saveHalf<short2, double2, 3>(spinor, norm, x, i, out_stride);
   }
 
   template <>
     __device__ inline void Spinor<double2, double4, short4, 12>::save(double2 x[12], int i) {
     double4 y[6];
     convert<double4, double2>(y, x, 6);
-    saveHalf<short4, double4, 6>(spinor, norm, y, i, stride);
+    saveHalf<short4, double4, 6>(spinor, norm, y, i, out_stride);
   }
 
 //} // namespace quda
