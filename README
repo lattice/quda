@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.5.0                      XX September 2012
+Release Notes for QUDA v0.5.0                        3 December 2012
 -----------------------------
 
 Overview:
@@ -19,9 +19,9 @@ solver.  Use of multiple GPUs in parallel is supported for all actions.
 
 Software Compatibility:
 
-The library has been tested under Linux (CentOS 5.7 and Ubuntu 10.04)
-using release 4.0, 4.1, 4.2 and 5.0 of the CUDA toolkit.  CUDA 3.x and
-earlier are not supported.  The library also works under Mac OS X
+The library has been tested under Linux (CentOS 5.8 and Ubuntu 12.04)
+using release 4.0, 4.1, 4.2, and 5.0 of the CUDA toolkit.  CUDA 3.x
+and earlier are not supported.  The library also works under Mac OS X
 10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
 Intel-based Macs.
 
@@ -44,6 +44,7 @@ and so to configure the library for this card, you'd run "configure
 
 As of QUDA 0.4.0, only devices of compute capability 1.1 or greater
 are supported.
+
 
 Installation:
 
@@ -72,16 +73,16 @@ configure into thinking that it's cross-compiling by setting the
 --build=none and --host=<HOST> flags.  For the latter,
 "--host=x86_64-linux-gnu" should work on a 64-bit linux system.
 
-If Fortran interface support is desired, then the F90 environment
-variable should be set when configure is invoked.  To build the
-Fortran interface modules, then the Makefile target "fortran" should
-be given, since this is not built by default.
+If Fortran interface support is desired, the F90 environment variable
+should be set when configure is invoked, and "make fortran" must be
+run explicitly, since the Fortran interface modules are not built by
+default.
 
-To aid the configuration process, two example configure scripts are
-included: configure.milc.titan and configure.chroma.titan.  These
-configure QUDA for expected usage with MILC and Chroma, respectively,
-for use on Titan (the Tesla K20X powered supercomputer at Oak Ridge
-National Lab).
+As examples, the scripts "configure.milc.titan" and
+"configure.chroma.titan" are provided.  These configure QUDA for
+expected use with MILC and Chroma, respectively, on Titan (the Tesla
+K20X-powered Cray XK7 supercomputer at the Oak Ridge Leadership
+Computing Facility).
 
 Throughout the library, auto-tuning is used to select optimal launch
 parameters for most performance-critical kernels.  This tuning
@@ -100,13 +101,29 @@ for one card on a different card may lead to unexpected errors.
 Using the Library:
 
 Include the header file include/quda.h in your application, link
-against lib/libquda.a, and study tests/invert_test.c (or the
-corresponding tests for staggered fermions) for an example of the
-interface.  The various inverter options are enumerated in
-include/enum_quda.h.
+against lib/libquda.a, and study tests/invert_test.cpp (for Wilson,
+clover, twisted-mass, or domain wall fermions) or
+tests/staggered_invert_test.cpp (for asqtad/HISQ fermions) for
+examples of the solver interface.  The various solver options are
+enumerated in include/enum_quda.h.
 
 
 Known Issues:
+
+* On Kepler GPUs, there is an undiagnosed issue (related to the use of
+  texture reads in the BLAS kernels) that can cause the staggered
+  multi-shift solver to give junk results (NaNs).  Until the root
+  cause is determined, users of the staggered multi-shift solver on
+  Kepler should disable texture reads in all BLAS kernels by passing
+  the --disable-blas-tex flag to configure.
+
+* When used with drivers predating the CUDA 5.0 production release,
+  Fermi-based GeForce cards suffer from occasional hangs when reading
+  from double-precision textures, recoverable only with a soft reset.
+  The recommended solution is to upgrade to the latest driver.
+  Alternatively, such texture reads can be disabled (at the
+  expense of some performance) by passing the
+  --disable-fermi-double-tex flag to configure.
 
 * For compatibility with CUDA, on 32-bit platforms the library is
   compiled with the GCC option -malign-double.  This differs from the
@@ -114,14 +131,6 @@ Known Issues:
   notably those of type QudaGaugeParam and QudaInvertParam, defined in
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
-
-* With drivers earlier than CUDA 5.0 (the final production release),
-  Fermi-based GeForce cards suffer from occasional hangs when reading
-  from double-precision textures, recoverable only with a soft reset.
-  The recommended solution is to upgrade to the CUDA 5.0 driver.
-  Alternatively, such texture reads can be disabled by default at the
-  expense of some performance.  To disable double-precision texture
-  reads pass the --disable-fermi-double-tex flag to configure.
 
 * The auto-tuner reports "0 Gflop/s" and "0 GB/s" for several of the
   Dslash kernels (visible if the verbosity is set to at least
@@ -135,12 +144,6 @@ Known Issues:
 * Attempts to compile with GCC 4.7.x will fail due to bugs in the
   compiler.
 
-* On Kepler GPUs, there is an issue with using texture reads for blas
-  kernels that can cause the multi-shift staggered solver to give junk
-  results.  The cause of this issue is presently undetermined, but in
-  the meantime this can be worked around by configuring QUDA to
-  disable texture reads for all blas kernels (use the
-  --disable-blas-tex configure flag).
 
 Getting Help:
 
@@ -194,5 +197,5 @@ Programme (FP7/2007-2013) under grants RI-211528 and FP7-261557.  Any
 opinions, findings, and conclusions or recommendations expressed in
 this material are those of the authors and do not necessarily reflect
 the views of the Department of Energy, the National Science
-Foundation or the PRACE project.
+Foundation, or the PRACE project.
 
