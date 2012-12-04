@@ -195,34 +195,74 @@
     Texture<float, float, tex_id> norm;
 #endif
     int stride;
+    int dim[QUDA_MAX_DIM];
 
   public:
 
 #if (__COMPUTE_CAPABILITY__ >= 000)
   SpinorTexture() 
-    : spinor((StoreType*)0, 0), norm(0), stride(0) {;} // default constructor
+    : spinor((StoreType*)0, 0), norm(0), stride(0) { for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i]=0; } // default constructor
 
   SpinorTexture(const cudaColorSpinorField &x) 
     : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()),
-      stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+      stride(x.Length()/(N*REG_LENGTH)) {
+		    for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i] = x.X()[i]; 
+			  checkTypes<RegType,InterType,StoreType>(); 
+			}
 #else
   SpinorTexture()
-    : spinor((StoreType*)0, 0), norm(0, 0), stride(0) {;} // default constructor
+    : spinor((StoreType*)0, 0), norm(0, 0), stride(0) { for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i]=0; } // default constructor
 
   SpinorTexture(const cudaColorSpinorField &x) 
     : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm(), x.NormBytes()),
-      stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+      stride(x.Length()/(N*REG_LENGTH)) { 
+		    for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i] = x.X()[i];
+			  checkTypes<RegType,InterType,StoreType>(); 
+	    }
 #endif
 
     ~SpinorTexture() {;}
 
     SpinorTexture& operator=(const SpinorTexture &src) {
       if (&src != this) {
-	spinor = src.spinor;
-	norm = src.norm;
-	stride = src.stride;
+			  spinor = src.spinor;
+	      norm = src.norm;
+	      stride = src.stride;
+			  for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i] = src.dim[i];
       }
       return *this;
+    }
+
+
+/*
+   __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity, int sid)
+{
+  int za = sid / cudaConstants.X1h;
+  int x1h = sid - za*cudaConstants.X1h;
+  int zb = za / cudaConstants.X2;
+  *x2 = za - zb*cudaConstants.X2;
+  *x4 = zb / cudaConstants.X3;
+  *x3 = zb - (*x4)*cudaConstants.X3;
+  int x1odd = ((*x2) + (*x3) + *(x4) + parity) & 1;
+  (*x1) = 2*x1h + x1odd;
+  (*X) = 2*sid + x1odd;
+  return;
+}
+
+*/
+
+    __device__ inline void get_coords(int* x1h, int* x2, int* x3, int* x4, const int id){
+      // note that i is the stride length, not the real length, so it includes padding
+	    int za = id/dim[0];
+      *x1h = id - za;
+	    int zb = za/dim[1];
+      *x2 = za - zb*dim[1];
+      *x4 = zb/dim[2];
+	    *x3 = zb - (*x4)*dim[2];
+    }
+
+    __device__ inline void get_index(int* index, int x1h, int x2, int x3, int x4){
+      *index = x1h + x2*dim[0] + x3*dim[0]*dim[1] + x4*dim[0]*dim[1]*dim[2];
     }
 
 
@@ -231,6 +271,7 @@
       const int M = (N * sizeof(RegType)) / sizeof(InterType);
       InterType y[M];
 
+       
       // half precision types
       if (sizeof(InterType) == 2*sizeof(StoreType)) { 
 	float xN = norm[i];
@@ -260,6 +301,7 @@
     }
 
     int Stride() { return stride; }
+    const int* Dim() const { return dim; }
   };
 
   /**
@@ -275,11 +317,15 @@
     StoreType *spinor;
     float *norm; // Probably need to change this!
     const int stride;
+	  int dim[QUDA_MAX_DIM];
 
   public:
   Spinor(const cudaColorSpinorField &x) :
     spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
-      { checkTypes<RegType,InterType,StoreType>(); } 
+      {
+        for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i]  = x.X()[i]; 
+			  checkTypes<RegType,InterType,StoreType>(); 
+      } 
     ~Spinor() {;}
 
     // default load used for simple fields
@@ -338,6 +384,24 @@
     }
 
     int Stride() { return stride; }
+    const int* Dim() const { return dim; }
+
+    
+    __device__ inline void get_coords(int* x1h, int* x2, int* x3, int* x4, const int id){
+      // note that i is the stride length, not the real length, so it includes padding
+	    int za = id/dim[0];
+      *x1h = id - za;
+	    int zb = za/dim[1];
+      *x2 = za - zb*dim[1];
+      *x4 = zb/dim[2];
+	    *x3 = zb - (*x4)*dim[2];
+    }
+
+    __device__ inline void get_index(int* index, int x1h, int x2, int x3, int x4){
+      *index = x1h + x2*dim[0] + x3*dim[0]*dim[1] + x4*dim[0]*dim[1]*dim[2];
+    }
+
+
   };
 
   template <typename OutputType, typename InputType, int M>
@@ -360,24 +424,24 @@
 
   template <>
     __device__ inline void Spinor<float2, float2, short2, 3>::save(float2 x[3], int i) {
-    saveHalf<short2, float2, 3>(spinor, norm, x, i, out_stride);
+    saveHalf<short2, float2, 3>(spinor, norm, x, i, stride);
   }
 
   template <>
     __device__ inline void Spinor<float4, float4, short4, 6>::save(float4 x[6], int i) {
-    saveHalf<short4, float4, 6>(spinor, norm, x, i, out_stride);
+    saveHalf<short4, float4, 6>(spinor, norm, x, i, stride);
   }
 
   template <>
     __device__ inline void Spinor<double2, double2, short2, 3>::save(double2 x[3], int i) {
-    saveHalf<short2, double2, 3>(spinor, norm, x, i, out_stride);
+    saveHalf<short2, double2, 3>(spinor, norm, x, i, stride);
   }
 
   template <>
     __device__ inline void Spinor<double2, double4, short4, 12>::save(double2 x[12], int i) {
     double4 y[6];
     convert<double4, double2>(y, x, 6);
-    saveHalf<short4, double4, 6>(spinor, norm, y, i, out_stride);
+    saveHalf<short4, double4, 6>(spinor, norm, y, i, stride);
   }
 
 //} // namespace quda
