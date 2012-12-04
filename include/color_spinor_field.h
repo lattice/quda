@@ -254,6 +254,17 @@ namespace quda {
     void *norm; // the normalization field
     bool alloc; // whether we allocated memory
     bool init;
+
+#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+    bool texInit;
+    cudaTextureObject_t tex;
+    cudaTextureObject_t texNorm;
+    void createTexObject();
+    void destroyTexObject();
+    const cudaTextureObject_t& Tex() { return tex; }
+    const cudaTextureObject_t& TexNorm() { return texNorm; }
+#endif
+
     bool reference; // whether the field is a reference or not
 
     static void *buffer_h;// pinned memory
