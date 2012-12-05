@@ -159,25 +159,47 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     blas.apply(*blasStream);
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     const int M = 1;
-    SpinorTexture<float4,float4,float4,M,0> xTex(x);
-    SpinorTexture<float4,float4,float4,M,1> yTex;
-    if (x.V() != y.V()) yTex = SpinorTexture<float4,float4,float4,M,1>(y);
-    SpinorTexture<float4,float4,float4,M,2> zTex;
-    if (x.V() != z.V()) zTex = SpinorTexture<float4,float4,float4,M,2>(z);
-    SpinorTexture<float4,float4,float4,M,3> wTex;
-    if (x.V() != w.V()) wTex = SpinorTexture<float4,float4,float4,M,3>(w);
-    Spinor<float4,float4,float4,M> X(x);
-    Spinor<float4,float4,float4,M> Y(y);
-    Spinor<float4,float4,float4,M> Z(z);
-    Spinor<float4,float4,float4,M> W(w);
-    Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-    BlasCuda<float4,M,writeX,writeY,writeZ,writeW,
-      SpinorTexture<float4,float4,float4,M,0>, SpinorTexture<float4,float4,float4,M,1>, 
-      SpinorTexture<float4,float4,float4,M,2>, SpinorTexture<float4,float4,float4,M,3>, 
-      Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, 
-      Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, Functor<float2, float4> >
-      blas(xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(4*M));
-    blas.apply(*blasStream);
+    if (x.Nspin() == 4) {
+      SpinorTexture<float4,float4,float4,M,0> xTex(x);
+      SpinorTexture<float4,float4,float4,M,1> yTex;
+      if (x.V() != y.V()) yTex = SpinorTexture<float4,float4,float4,M,1>(y);
+      SpinorTexture<float4,float4,float4,M,2> zTex;
+      if (x.V() != z.V()) zTex = SpinorTexture<float4,float4,float4,M,2>(z);
+      SpinorTexture<float4,float4,float4,M,3> wTex;
+      if (x.V() != w.V()) wTex = SpinorTexture<float4,float4,float4,M,3>(w);
+      Spinor<float4,float4,float4,M> X(x);
+      Spinor<float4,float4,float4,M> Y(y);
+      Spinor<float4,float4,float4,M> Z(z);
+      Spinor<float4,float4,float4,M> W(w);
+      Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+      BlasCuda<float4,M,writeX,writeY,writeZ,writeW,
+	SpinorTexture<float4,float4,float4,M,0>, SpinorTexture<float4,float4,float4,M,1>, 
+	SpinorTexture<float4,float4,float4,M,2>, SpinorTexture<float4,float4,float4,M,3>, 
+	Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, 
+	Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, Functor<float2, float4> >
+	blas(xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(4*M));
+      blas.apply(*blasStream);
+    } else {
+      SpinorTexture<float2,float2,float2,M,0> xTex(x);
+      SpinorTexture<float2,float2,float2,M,1> yTex;
+      if (x.V() != y.V()) yTex = SpinorTexture<float2,float2,float2,M,1>(y);
+      SpinorTexture<float2,float2,float2,M,2> zTex;
+      if (x.V() != z.V()) zTex = SpinorTexture<float2,float2,float2,M,2>(z);
+      SpinorTexture<float2,float2,float2,M,3> wTex;
+      if (x.V() != w.V()) wTex = SpinorTexture<float2,float2,float2,M,3>(w);
+      Spinor<float2,float2,float2,M> X(x);
+      Spinor<float2,float2,float2,M> Y(y);
+      Spinor<float2,float2,float2,M> Z(z);
+      Spinor<float2,float2,float2,M> W(w);
+      Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+      BlasCuda<float2,M,writeX,writeY,writeZ,writeW,
+	SpinorTexture<float2,float2,float2,M,0>, SpinorTexture<float2,float2,float2,M,1>, 
+	SpinorTexture<float2,float2,float2,M,2>, SpinorTexture<float2,float2,float2,M,3>, 
+	Spinor<float2,float2,float2,M>, Spinor<float2,float2,float2,M>, 
+	Spinor<float2,float2,float2,M>, Spinor<float2,float2,float2,M>, Functor<float2, float2> >
+	blas(xTex, yTex, zTex, wTex, f, X, Y, Z, W, x.Length()/(2*M));
+      blas.apply(*blasStream);
+    }
   } else {
     if (x.Nspin() == 4){ //wilson
       SpinorTexture<float4,float4,short4,6,0> xTex(x);

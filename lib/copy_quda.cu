@@ -124,14 +124,14 @@ namespace quda {
 	  Spinor<float4, float2, double2, 6> dst_spinor(dst);
 	  CopyCuda<float4, 6, Spinor<float4, float2, double2, 6>, 
 		   SpinorTexture<float4, float4, float4, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //src.Nspin() == 1
 	  SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
 	  Spinor<float2, float2, double2, 3> dst_spinor(dst);
 	  CopyCuda<float2, 3, Spinor<float2, float2, double2, 3>,
 		   SpinorTexture<float2, float2, float2, 3, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     } 
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -140,16 +140,16 @@ namespace quda {
 	  Spinor<float4, float4, float4, 6> dst_spinor(dst);
 	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6>,
 		   SpinorTexture<float4, float2, double2, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //src.Nspin() ==1
 	  SpinorTexture<float2, float2, double2, 3, 0> src_tex(src);
 	  Spinor<float2, float2, float2, 3> dst_spinor(dst);
 	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3>,
 		   SpinorTexture<float2, float2, double2, 3, 0> >
-	  copy(dst_spinor, src_tex, src.Stride());
-  copy.apply(*getBlasStream());	
-}
+	  copy(dst_spinor, src_tex, src.Volume());
+	  copy.apply(*getBlasStream());	
+      }
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	blas_bytes += src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){      
@@ -157,14 +157,14 @@ namespace quda {
 	  Spinor<float4, float4, float4, 6> dst_spinor(dst);
 	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6>,
 		   SpinorTexture<float4, float4, short4, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin== 1;
 	  SpinorTexture<float2, float2, short2, 3, 0> src_tex(src);
 	  Spinor<float2, float2, float2, 3> dst_spinor(dst);
 	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3>,
 		   SpinorTexture<float2, float2, short2, 3, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
@@ -174,14 +174,14 @@ namespace quda {
 	  Spinor<float4, float4, short4, 6> dst_spinor(dst);
 	  CopyCuda<float4, 6, Spinor<float4, float4, short4, 6>,
 		   SpinorTexture<float4, float4, float4, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
 	  SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
 	  Spinor<float2, float2, short2, 3> dst_spinor(dst);
 	  CopyCuda<float2, 3, Spinor<float2, float2, short2, 3>,
 		   SpinorTexture<float2, float2, float2, 3, 0> >
-	  copy(dst_spinor, src_tex, src.Stride());
+	  copy(dst_spinor, src_tex, src.Volume());
   copy.apply(*getBlasStream());	
 }
   } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
@@ -191,14 +191,14 @@ namespace quda {
 	  Spinor<double2, double2, double2, 12> dst_spinor(dst);
 	  CopyCuda<double2, 12, Spinor<double2, double2, double2, 12>,
 		   SpinorTexture<double2, float4, short4, 12, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
 	  SpinorTexture<double2, float2, short2, 3, 0> src_tex(src);
 	  Spinor<double2, double2, double2, 3> dst_spinor(dst);
 	  CopyCuda<double2, 3, Spinor<double2, double2, double2, 3>,
 		   SpinorTexture<double2, float2, short2, 3, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -208,17 +208,17 @@ namespace quda {
 	  Spinor<double2, double4, short4, 12> dst_spinor(dst);
 	  CopyCuda<double2, 12, Spinor<double2, double4, short4, 12>,
 		   SpinorTexture<double2, double2, double2, 12, 0> >
-	    copy(dst_spinor, src_tex, src.Stride());
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
 	  SpinorTexture<double2, double2, double2, 3, 0> src_tex(src);
 	  Spinor<double2, double2, short2, 3> dst_spinor(dst);
 	  CopyCuda<double2, 3, Spinor<double2, double2, short2, 3>,
 		   SpinorTexture<double2, double2, double2, 3, 0> >
-	  copy(dst_spinor, src_tex, src.Stride());
-	  copy.apply(*getBlasStream());	
-	}
-      } else {
+	  copy(dst_spinor, src_tex, src.Volume());
+  copy.apply(*getBlasStream());	
+}
+  } else {
 	errorQuda("Invalid precision combination dst=%d and src=%d", dst.Precision(), src.Precision());
       }
       

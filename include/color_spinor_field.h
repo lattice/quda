@@ -261,8 +261,6 @@ namespace quda {
     cudaTextureObject_t texNorm;
     void createTexObject();
     void destroyTexObject();
-    const cudaTextureObject_t& Tex() { return tex; }
-    const cudaTextureObject_t& TexNorm() { return texNorm; }
 #endif
 
     bool reference; // whether the field is a reference or not
@@ -313,6 +311,11 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+
+#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+    const cudaTextureObject_t& Tex() const { return tex; }
+    const cudaTextureObject_t& TexNorm() const { return texNorm; }
+#endif
 
     cudaColorSpinorField& Even() const;
     cudaColorSpinorField& Odd() const;

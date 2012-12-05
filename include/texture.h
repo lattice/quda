@@ -6,6 +6,60 @@
 
 //namespace quda {
 
+#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000) // texture objects
+
+template<typename OutputType, typename InputType>
+class Texture {
+
+private: 
+#ifndef DIRECT_ACCESS_BLAS
+  cudaTextureObject_t spinor;
+#else
+  const InputType *spinor; // used when textures are disabled
+#endif
+  
+public:
+  Texture() : spinor(0) { }   
+#ifndef DIRECT_ACCESS_BLAS
+  Texture(const cudaColorSpinorField *x) : spinor(x->Tex()) { }
+#else
+  Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
+#endif
+  Texture(const Texture &tex) : spinor(tex.spinor) { }
+  virtual ~Texture() { }
+  
+  Texture& operator=(const Texture &tex) {
+    if (this != &tex) spinor = tex.spinor;
+    return *this;
+  }
+  
+  // these do nothing with Texture objects
+  inline void bind(const InputType*, size_t bytes){ }
+  inline void unbind() { }
+  
+#ifndef DIRECT_ACCESS_BLAS
+  __device__ inline OutputType fetch(unsigned int idx) 
+  { return tex1Dfetch<OutputType>(spinor, idx); }
+#else
+  __device__ inline OutputType fetch(unsigned int idx) 
+  { OutputType out; copyFloatN(out, spinor[idx]); return out; } 
+#endif
+
+  __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
+};
+
+#ifndef DIRECT_ACCESS_BLAS
+__device__ inline double2 fetch_double2(int4 v)
+{ return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
+
+template<> __device__ inline double2 Texture<double2,double2>::fetch(unsigned int idx) 
+{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+#endif
+
+#else 
+
+// legacy Texture references
+
 #if (__COMPUTE_CAPABILITY__ >= 130)
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
@@ -19,7 +73,6 @@
     return make_double2(0.0, 0.0);
   }
 #endif
-
 
 #define MAX_TEXELS (1<<27)
 
@@ -40,9 +93,9 @@
 #endif
   { count++; } 
 
-  Texture(const InputType *x, size_t bytes)
+  Texture(const cudaColorSpinorField *x)
 #ifdef DIRECT_ACCESS_BLAS 
-  : spinor(x), bytes(bytes)
+  : spinor(x->V()), bytes(x->Bytes())
 #endif
   { 
     // only bind if bytes > 0
@@ -156,6 +209,8 @@
 #undef DEF_BIND_UNBIND_FETCH
 #undef DEF_ALL
 
+#endif  // CUDA_VERSION >= 5000 && __COMPUTE_CAPABILITY__ >= 300 
+
 
     /**
        Checks that the types are set correctly.  The precision used in the
@@ -206,38 +261,24 @@
     class SpinorTexture {
 
   private:
-    Texture<InterType, StoreType, tex_id> spinor;
-    /* It's faster to always use direct reads for the norm, but leave
-       this option in there for the future.*/
-#if (__COMPUTE_CAPABILITY__ >= 000)
-    float *norm;
+#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000) // texture objects
+    Texture<InterType, StoreType> spinor;
 #else
-    Texture<float, float, tex_id> norm;
+    Texture<InterType, StoreType, tex_id> spinor;
 #endif
+    float *norm; // direct reads for norm
     int stride;
 
   public:
+    SpinorTexture() 
+      : spinor(), norm(0), stride(0) { } // default constructor
 
-#if (__COMPUTE_CAPABILITY__ >= 000)
-  SpinorTexture() 
-    : spinor((StoreType*)0, 0), norm(0), stride(0) { } // default constructor
-
-  SpinorTexture(const cudaColorSpinorField &x) 
-    : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()),
-	stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
-#else
-  SpinorTexture()
-    : spinor((StoreType*)0, 0), norm(0, 0), stride(0) {;} // default constructor
-
-  SpinorTexture(const cudaColorSpinorField &x) 
-    : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm(), x.NormBytes()),
+    SpinorTexture(const cudaColorSpinorField &x) 
+      : spinor(&x), norm((float*)x.Norm()),
       stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
-#endif
 
-  SpinorTexture(const SpinorTexture &st) 
-    : spinor(st.spinor), norm(st.norm), stride(st.stride) { }
-    
-    virtual ~SpinorTexture() { }
+    SpinorTexture(const SpinorTexture &st) 
+      : spinor(st.spinor), norm(st.norm), stride(st.stride) { }
 
     SpinorTexture& operator=(const SpinorTexture &src) {
       if (&src != this) {
@@ -248,6 +289,7 @@
       return *this;
     }
 
+    virtual ~SpinorTexture() { }
 
     __device__ inline void load(RegType x[], const int i) {
       // load data into registers first using the storage order
