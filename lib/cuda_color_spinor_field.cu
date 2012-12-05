@@ -508,12 +508,13 @@ namespace quda {
     return;
   }
 
-  void cudaColorSpinorField::allocateGhostBuffer(void) {
-    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+  // Allocate the ghost buffer, specifying the thickness (number of Faces) explicitly
+  void cudaColorSpinorField::allocateGhostBuffer(int nface) {
     int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
     if (nSpin == 4) Nint /= 2; // spin projection for Wilson
 
-    if(this->initGhostFaceBuffer == 0 || precision > facePrecision){    
+    if(this->initGhostFaceBuffer == 0 || precision > facePrecision || nface > nFace){   
+			nFace = nface; 
       for (int i=0; i<4; i++) {
 	if(!commDimPartitioned(i)){
 	  continue;
@@ -547,6 +548,11 @@ namespace quda {
     }
   }
 
+
+  void cudaColorSpinorField::allocateGhostBuffer(void){ 
+    int nface = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+	  allocateGhostBuffer(nface);
+  }
 
   void cudaColorSpinorField::freeGhostBuffer(void)
   {

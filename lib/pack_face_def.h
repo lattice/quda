@@ -890,11 +890,11 @@ __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, int out_str
 //
 // TODO: add support for textured reads
 
-template <int dim, int ishalf, typename Float2>
-__global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *in, 
+template <int dim, int ishalf, int nFace, typename Float2>
+__global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float2 *in, 
 				     const float *inNorm, const int parity)
 {
-  const int nFace = 3; //3 faces for asqtad
+//  const int nFace = 3; //3 faces for asqtad
   const int Nint = 6; // number of internal degrees of freedom
   size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x);
   if (ishalf) faceBytes += nFace*ghostFace[dim]*sizeof(float);
@@ -939,17 +939,17 @@ void packFaceAsqtad(Float2 *faces, float *facesNorm, const Float2 *in, const flo
 #ifdef GPU_STAGGERED_DIRAC
   if(typeid(Float2) != typeid(short2)){
     switch (dim) {
-    case 0: packFaceAsqtadKernel<0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceAsqtadKernel<1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceAsqtadKernel<2,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceAsqtadKernel<3,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 0: packFaceStaggeredKernel<0,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 1: packFaceStaggeredKernel<1,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 2: packFaceStaggeredKernel<2,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 3: packFaceStaggeredKernel<3,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
     }
   }else{
     switch(dim){
-    case 0: packFaceAsqtadKernel<0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceAsqtadKernel<1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceAsqtadKernel<2,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceAsqtadKernel<3,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 0: packFaceStaggeredKernel<0,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 1: packFaceStaggeredKernel<1,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 2: packFaceStaggeredKernel<2,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 3: packFaceStaggeredKernel<3,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
     }
   }
 #else
