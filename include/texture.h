@@ -54,6 +54,9 @@ __device__ inline double2 fetch_double2(int4 v)
 
 template<> __device__ inline double2 Texture<double2,double2>::fetch(unsigned int idx) 
 { double2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+
+template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int idx) 
+{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
 #endif
 
 #else 
