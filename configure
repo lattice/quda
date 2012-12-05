@@ -600,7 +600,6 @@ FECC
 BUILD_QIO
 DEVICE_PACK
 GPU_DIRECT
-OVERLAP_COMMS
 BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
@@ -698,7 +697,6 @@ enable_gauge_force
 enable_staggered_force
 enable_hisq_force
 enable_multi_gpu
-enable_overlap_comms
 enable_gpu_direct
 enable_device_pack
 with_mpi
@@ -1359,7 +1357,6 @@ Optional Features:
                           Build asqtad fermion force (default: disabled)
   --enable-hisq-force     Build HISQ fermion force (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
-  --enable-overlap-comms  Enable comms/compute overlap (default: enabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
   --enable-device-pack    Enable the packing / unpacking of fields on the
@@ -2082,15 +2079,6 @@ if test "${enable_multi_gpu+set}" = set; then :
   enableval=$enable_multi_gpu;  multi_gpu=${enableval}
 else
    multi_gpu="no"
-
-fi
-
-
-# Check whether --enable-overlap-comms was given.
-if test "${enable_overlap_comms+set}" = set; then :
-  enableval=$enable_overlap_comms;  overlap_comms=${enableval}
-else
-   overlap_comms="yes"
 
 fi
 
@@ -3886,13 +3874,6 @@ yes|no);;
   ;;
 esac
 
-case ${overlap_comms} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-overlap-comms " "$LINENO" 5
-  ;;
-esac
-
 case ${gpu_direct} in
 yes|no);;
 *)
@@ -4076,11 +4057,6 @@ BUILD_QMP=${build_qmp}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MPI = ${build_mpi} " >&5
 $as_echo "$as_me: Setting BUILD_MPI = ${build_mpi} " >&6;}
 BUILD_MPI=${build_mpi}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting OVERLAP_COMMS= ${overlap_comms}" >&5
-$as_echo "$as_me: Setting OVERLAP_COMMS= ${overlap_comms}" >&6;}
-OVERLAP_COMMS=${overlap_comms}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECT= ${gpu_direct}" >&5
