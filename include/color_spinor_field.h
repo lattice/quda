@@ -255,8 +255,8 @@ namespace quda {
     bool alloc; // whether we allocated memory
     bool init;
 
+    bool texInit; // whether a texture object has been created or not
 #if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
-    bool texInit;
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
     void createTexObject();

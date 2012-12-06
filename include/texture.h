@@ -98,11 +98,11 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
   Texture(const cudaColorSpinorField *x)
 #ifdef DIRECT_ACCESS_BLAS 
-  : spinor(x->V()), bytes(x->Bytes())
+  : spinor((const InputType*)x->V()), bytes(x->Bytes())
 #endif
   { 
     // only bind if bytes > 0
-    if (bytes) { bind(x, bytes); bound = true; } 
+    if (x->Bytes()) { bind((const InputType*)x->V(), x->Bytes()); bound = true; } 
     count++;
   }
 
