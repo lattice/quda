@@ -110,12 +110,11 @@ enumerated in include/enum_quda.h.
 
 Known Issues:
 
-* On Kepler GPUs, there is an undiagnosed issue (related to the use of
-  texture reads in the BLAS kernels) that can cause the staggered
-  multi-shift solver to give junk results (NaNs).  Until the root
-  cause is determined, users of the staggered multi-shift solver on
-  Kepler should disable texture reads in all BLAS kernels by passing
-  the --disable-blas-tex flag to configure.
+* To perform staggered calculations on Kepler GPUs, it is necessary 
+  to use texture objects to implement texture reads in the BLAS kernels. 
+  Otherwise, for unclear reasons, the staggered multi-shift solver 
+  can give junk results (NaNs). Texture objects are enabled by passing 
+  the --enable-tex-object flag to configure.
 
 * When used with drivers predating the CUDA 5.0 production release,
   Fermi-based GeForce cards suffer from occasional hangs when reading
