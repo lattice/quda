@@ -256,7 +256,7 @@ namespace quda {
     bool init;
 
     bool texInit; // whether a texture object has been created or not
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#ifdef TEXTURE_OBJECT
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
     void createTexObject();
@@ -312,7 +312,7 @@ namespace quda {
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
 
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#ifdef TEXTURE_OBJECT
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
 #endif

@@ -253,14 +253,14 @@ namespace quda {
       }
     }
 
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#if TEXTURE_OBJECT
     createTexObject();
 #endif
 
     checkCudaError();
   }
 
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#if TEXTURE_OBJECT
   void cudaColorSpinorField::createTexObject() {
 
     if (texInit) errorQuda("Already bound textures");
@@ -358,7 +358,7 @@ namespace quda {
       alloc = false;
     }
 
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#if TEXTURE_OBJECT
     destroyTexObject();
 #endif
 

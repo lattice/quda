@@ -6,7 +6,7 @@
 
 //namespace quda {
 
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000) // texture objects
+#ifdef TEXTURE_OBJECT // texture objects
 
 template<typename OutputType, typename InputType>
 class Texture {
@@ -212,7 +212,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #undef DEF_BIND_UNBIND_FETCH
 #undef DEF_ALL
 
-#endif  // CUDA_VERSION >= 5000 && __COMPUTE_CAPABILITY__ >= 300 
+#endif  // TEXTURE_OBJECT
 
 
     /**
@@ -264,7 +264,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
     class SpinorTexture {
 
   private:
-#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000) // texture objects
+#if TEXTURE_OBJECT // texture objects
     Texture<InterType, StoreType> spinor;
 #else
     Texture<InterType, StoreType, tex_id> spinor;

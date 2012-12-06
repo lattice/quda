@@ -17,6 +17,7 @@ HOST_DEBUG = @HOST_DEBUG@              # compile host debug code
 DEVICE_DEBUG = @DEVICE_DEBUG@          # compile device debug code for cuda-gdb 
 VERBOSE = @VERBOSE@                    # display kernel register useage
 DSLASH_PROFILING = @DSLASH_PROFILING@  # multi-gpu dslash profiling
+TEX_OBJECT = @TEX_OBJECT@            # use texture objects 
 BLAS_TEX = @BLAS_TEX@                  # disable texture reads?
 FERMI_DBLE_TEX = @FERMI_DBLE_TEX@      # enable double-precision texture reads on Fermi?
 
@@ -187,6 +188,11 @@ endif
 ifeq ($(strip $(DSLASH_PROFILING)), yes)
   NVCCOPT += -DDSLASH_PROFILING
   COPT +=  -DDSLASH_PROFILING
+endif
+
+ifeq ($(strip $(TEX_OBJECT)), yes)
+  NVCCOPT += -DTEXTURE_OBJECT
+  COPT += -DTEXTURE_OBJECT
 endif
 
 ifeq ($(strip $(BLAS_TEX)), no)
