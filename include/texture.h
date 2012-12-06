@@ -292,7 +292,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
       return *this;
     }
 
-    virtual ~SpinorTexture() { }
+    ~SpinorTexture() { } /* on g80 / gt200 this must not be virtual */
 
     __device__ inline void load(RegType x[], const int i) {
       // load data into registers first using the storage order
@@ -352,7 +352,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
   Spinor(const cudaColorSpinorField &x) :
     spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
       { checkTypes<RegType,InterType,StoreType>(); } 
-    virtual ~Spinor() {;}
+    ~Spinor() {;} /* on g80 / gt200 this must not be virtual */
 
     // default load used for simple fields
     __device__ inline void load(RegType x[], const int i) {
