@@ -1159,7 +1159,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   int iter[18];
   for (int i=0; i<18; i++) iter[i] = 0;
   
-  for(int dir=0;dir < 4; dir++){
+  for(int dir=0;dir<4; dir++){
     for (int i=0; i<len; i++) {
       for (int j=0; j<18; j++) {
 	int is = i*18+j;
@@ -1182,7 +1182,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   }
 
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*gaugeSiteSize, fail[f] / (double)(len*6));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], 4*len*18, fail[f] / (double)(4*len*18));
   }
   
   return accuracy_level;

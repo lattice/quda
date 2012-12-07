@@ -25,7 +25,7 @@ process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
   int i;
   if(str == NULL || sub_list == NULL || sub_ncores == NULL ||
      *sub_ncores <= 0){
-    printfQuda("Warning: Wrong parameters in function %s!\n", __FUNCTION__);
+    warningQuda("Bad argument");
     return -1;
   }
 
@@ -33,11 +33,11 @@ process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
     //a range
     int low_core, high_core;
     if (sscanf(str,"%d-%d",&low_core, &high_core) != 2){
-      printfQuda("Warning: range scan failed\n");
+      warningQuda("Range scan failed");
       return -1;
     }
     if(*sub_ncores <  high_core-low_core +1){
-      printfQuda("Warning: not enough space in sub_list\n");
+      warningQuda("Not enough space in sub_list");
       return -1;
     }
     
@@ -50,7 +50,7 @@ process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
     //a number
     int core;
     if (sscanf(str, "%d", &core) != 1){
-      printfQuda("Warning: wrong format for core number\n");
+      warningQuda("Wrong format for core number");
       return -1;
     }
     sub_list[0] = core;
@@ -70,7 +70,7 @@ process_core_string_list(const char* _str, int* list, int* ncores)
 
   if(_str == NULL || list == NULL || ncores == NULL
      || *ncores <= 0){
-    printfQuda("Warning: Invalid arguments in function %s\n", __FUNCTION__ );
+    warningQuda("Bad argument");
     return  -1;
   }
 
@@ -82,7 +82,7 @@ process_core_string_list(const char* _str, int* list, int* ncores)
 
   char* item = strtok(str, ",");
   if(item == NULL){
-    printfQuda("ERROR: Invalid string format(%s)\n", str);
+    warningQuda("Invalid string format (%s)", str);
     return -1;
   }
   
@@ -92,7 +92,7 @@ process_core_string_list(const char* _str, int* list, int* ncores)
     
     int rc = process_core_string_item(item, sub_list, &sub_ncores);
     if(rc <0){
-      printfQuda("Warning: processing item(%s) failed\n", item);
+      warningQuda("Processing item (%s) failed", item);
       return -1;
     }
 
@@ -153,7 +153,7 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
     } else{
       int rc = process_core_string_list(my_line, cpu_cores, ncores);
       if(rc < 0){
-	printfQuda("Warning:%s: processing the line (%s) failed\n", __FUNCTION__, my_line);
+	warningQuda("Failed to process the line \"%s\"", my_line);
 	host_free(my_line);
 	fclose(nvidia_info);
 	return  -1;
@@ -172,11 +172,11 @@ setNumaAffinity(int devid)
   int ncores=128;
   int rc = getNumaAffinity(devid, cpu_cores, &ncores);
   if(rc != 0){
-    printfQuda("Warning: quda getting affinity for device %d failed\n", devid);
+    warningQuda("Failed to determine NUMA affinity for device %d (possibly not applicable)", devid);
     return 1;
   }
   int which = devid % ncores;
-  printfQuda("GPU: %d, Setting to affinity cpu cores:  %d\n", devid, cpu_cores[which]);
+  printfQuda("Setting NUMA affinity for device %d to CPU core %d\n", devid, cpu_cores[which]);
 /*
   for(int i=0;i < ncores;i++){
    if (i != which ) continue;
@@ -198,7 +198,7 @@ setNumaAffinity(int devid)
   
   rc = sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set);
   if (rc != 0){
-    printfQuda("Warning: quda settting affinity failed\n");
+    warningQuda("Failed to enforce NUMA affinity (probably due to lack of kernel support)");
     return -1;
   }
   

@@ -36,7 +36,7 @@ namespace quda {
     }*/
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-    ColorSpinorField(param), v(0), norm(0), alloc(false), init(true) {
+    ColorSpinorField(param), v(0), norm(0), alloc(false), init(true), texInit(false) {
 
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -59,7 +59,7 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-    ColorSpinorField(src), v(0), norm(0), alloc(false), init(true) {
+    ColorSpinorField(src), v(0), norm(0), alloc(false), init(true), texInit(false) {
     create(QUDA_COPY_FIELD_CREATE);
     if (isNative() && src.isNative()) copy(src);
     else errorQuda("Cannot copy using non-native fields");
@@ -67,7 +67,7 @@ namespace quda {
 
   // creates a copy of src, any differences defined in param
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
-    ColorSpinorField(src), v(0), norm(0), alloc(false), init(true) {  
+    ColorSpinorField(src), v(0), norm(0), alloc(false), init(true), texInit(false) {  
 
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -112,7 +112,7 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
-    : ColorSpinorField(src), alloc(false), init(true) {
+    : ColorSpinorField(src), alloc(false), init(true), texInit(false) {
     create(QUDA_COPY_FIELD_CREATE);
     if (typeid(src) == typeid(cudaColorSpinorField) && 
 	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
@@ -253,8 +253,88 @@ namespace quda {
       }
     }
 
+#if TEXTURE_OBJECT
+    createTexObject();
+#endif
+
     checkCudaError();
   }
+
+#if TEXTURE_OBJECT
+  void cudaColorSpinorField::createTexObject() {
+
+    if (texInit) errorQuda("Already bound textures");
+
+    // create the texture for the field components
+
+    cudaChannelFormatDesc desc;
+    memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+    if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
+    else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+
+    // staggered fields in half and single are always two component
+    if (nSpin == 1 && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
+      desc.x = 8*precision;
+      desc.y = 8*precision;
+      desc.z = 0;
+      desc.w = 0;
+    } else { // all others are four component
+      desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+      desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+      desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+      desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+    }
+
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeLinear;
+    resDesc.res.linear.devPtr = v;
+    resDesc.res.linear.desc = desc;
+    resDesc.res.linear.sizeInBytes = bytes;
+
+    cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+    else texDesc.readMode = cudaReadModeElementType;
+
+    cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+    checkCudaError();
+
+    // create the texture for the norm components
+    if (precision == QUDA_HALF_PRECISION) {
+      cudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+      desc.f = cudaChannelFormatKindFloat;
+      desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
+
+      cudaResourceDesc resDesc;
+      memset(&resDesc, 0, sizeof(resDesc));
+      resDesc.resType = cudaResourceTypeLinear;
+      resDesc.res.linear.devPtr = norm;
+      resDesc.res.linear.desc = desc;
+      resDesc.res.linear.sizeInBytes = norm_bytes;
+
+      cudaTextureDesc texDesc;
+      memset(&texDesc, 0, sizeof(texDesc));
+      texDesc.readMode = cudaReadModeElementType;
+
+      cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+      checkCudaError();
+    }
+
+    texInit = true;
+  }
+
+  void cudaColorSpinorField::destroyTexObject() {
+    if (texInit) {
+      cudaDestroyTextureObject(tex);
+      if (precision == QUDA_HALF_PRECISION) cudaDestroyTextureObject(texNorm);
+      texInit = false;
+      checkCudaError();
+    }
+  }
+#endif
+
   void cudaColorSpinorField::freeBuffer() {
     if (bufferInit) {
       host_free(buffer_h);
@@ -277,6 +357,11 @@ namespace quda {
       }
       alloc = false;
     }
+
+#if TEXTURE_OBJECT
+    destroyTexObject();
+#endif
+
   }
 
 

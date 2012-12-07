@@ -32,8 +32,8 @@ namespace quda {
     inner.maxiter = outer.maxiter_precondition;
     inner.reliable_delta = 1e-20; // no reliable updates within the inner solver
   
-    inner.cuda_prec = outer.prec_precondition; // preconditioners are uni-precision solvers
-    inner.cuda_prec_sloppy = outer.prec_precondition;
+    inner.cuda_prec = outer.cuda_prec_precondition; // preconditioners are uni-precision solvers
+    inner.cuda_prec_sloppy = outer.cuda_prec_precondition;
   
     inner.verbosity = outer.verbosity_precondition;
   
@@ -43,7 +43,7 @@ namespace quda {
 
     inner.inv_type_precondition = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
 
-    if (outer.inv_type == QUDA_GCR_INVERTER && outer.cuda_prec_sloppy != outer.prec_precondition) 
+    if (outer.inv_type == QUDA_GCR_INVERTER && outer.cuda_prec_sloppy != outer.cuda_prec_precondition) 
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
     else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
@@ -201,8 +201,8 @@ namespace quda {
     // these low precision fields are used by the inner solver
     bool precMatch = true;
     cudaColorSpinorField *r_pre, *p_pre;
-    if (invParam.prec_precondition != invParam.cuda_prec_sloppy || invParam.precondition_cycle > 1) {
-      param.setPrecision(invParam.prec_precondition);
+    if (invParam.cuda_prec_precondition != invParam.cuda_prec_sloppy || invParam.precondition_cycle > 1) {
+      param.setPrecision(invParam.cuda_prec_precondition);
       p_pre = new cudaColorSpinorField(x, param);
       r_pre = new cudaColorSpinorField(x, param);
       precMatch = false;
@@ -408,7 +408,7 @@ namespace quda {
       delete r_sloppy;
     }
 
-    if (invParam.prec_precondition != invParam.cuda_prec_sloppy) {
+    if (invParam.cuda_prec_precondition != invParam.cuda_prec_sloppy) {
       delete p_pre;
       delete r_pre;
     }

@@ -148,9 +148,6 @@ module quda_fortran
      ! Maximum number of iterations allowed in the inner solver 
      integer(4) :: maxiter_precondition
      
-     ! Precision used in the inner solver 
-     QudaPrecision :: prec_precondition
-     
      ! Relaxation parameter used in GCR-DD (default = 1.0) 
      real(8) :: omega
      

@@ -11,6 +11,8 @@
 
 #include <fat_force_quda.h>
 
+using namespace quda;
+
 extern cudaStream_t *stream;
   
 /**************************************************************
