@@ -22,6 +22,7 @@ namespace quda {
     int nColor; // Number of colors of the field
     int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
     int nDim; // number of spacetime dimensions
+    int nFace; // depth of the border region communicated between GPUs
     int x[QUDA_MAX_DIM]; // size of each dimension
     QudaPrecision precision; // Precision of the field
     int pad; // volumetric padding
@@ -298,6 +299,7 @@ namespace quda {
     cudaColorSpinorField& operator=(const cudaColorSpinorField&);
     cudaColorSpinorField& operator=(const cpuColorSpinorField&);
 
+    void allocateGhostBuffer(int nface);
     void allocateGhostBuffer(void);
     static void freeGhostBuffer(void);
 
@@ -382,6 +384,7 @@ namespace quda {
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
     void PrintVector(unsigned int x);
 
+    void allocateGhostBuffer(int nface);
     void allocateGhostBuffer(void);
     static void freeGhostBuffer(void);
 	

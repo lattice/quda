@@ -167,28 +167,39 @@ static inline __device__ int indexFromFaceIndexAsqtad(int face_idx, const int &f
   int idx = face_idx;
   int gap, aux;
 
+ // face_idx runs from 0 to (2*nFace*face_volume)-1
   switch (dim) {
-  case 0:
+  case 0: 
+   // face_idx runs from 0 to nFace*X2*X3*X4-1
     gap = X1 - nLayers;
     aux = face_idx;
-    idx += face_num*gap + aux*(X1-1);
-    idx += idx/V*(1-V);    
+    idx += face_num*gap + aux*(X1-1); 
+    // idx runs from 0 to nFace*X1*X2*X3*X4-1 in jumps of X1
+    idx += (idx/V)*(1-V);    
     break;
   case 1:
+   // face_idx runs from 0 to nFace*X1*X3*X4-1
     gap = X2 - nLayers;
     aux = face_idx / face_X;
-    idx += face_num * gap * face_X + aux*(X2-1)*face_X;
-    idx += idx/V*(X1-V);
+    idx += face_num * gap* face_X + aux*(X2-1)*face_X;
+   // idx = x1 + (face_idx/X1)*X1*X2
+   // idx runs from x1 + X1...
+    idx += (idx/V)*(X1-V);
     break;
   case 2:
+   // face_idx runs from 0 to nFace*X1*X2*X4-1
     gap = X3 - nLayers;
     aux = face_idx / face_XY;    
     idx += face_num * gap * face_XY +aux*(X3-1)*face_XY;
-    idx += idx/V*(X2X1-V);
+   // idx = x1 + x2*X1 + (face_idx/(X1*X2))*X1*X2*X3
+   // idx runs over the volume in jumps of X1*X2*X3
+    idx += (idx/V)*(X2X1-V);
     break;
   case 3:
+   // face_idx runs from 0 to nFace*X1*X2*X3-1
     gap = X4 - nLayers;
     idx += face_num * gap * face_XYZ;
+   // idx = x1 + x2*X1 + x3*X1*X2
     break;
   }
 
@@ -890,16 +901,16 @@ __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, int out_str
 //
 // TODO: add support for textured reads
 
-template <int dim, int ishalf, typename Float2>
-__global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *in, 
+template <int dim, int ishalf, int nFace, typename Float2>
+__global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float2 *in, 
 				     const float *inNorm, const int parity)
 {
-  const int nFace = 3; //3 faces for asqtad
+//  const int nFace = 3; //3 faces for asqtad
   const int Nint = 6; // number of internal degrees of freedom
-  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x);
+  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x); 
   if (ishalf) faceBytes += nFace*ghostFace[dim]*sizeof(float);
 
-  int face_volume = ghostFace[dim];
+  int face_volume = ghostFace[dim]; // ghostFace[0] = X[1]*X[2]*X[3]/2, etc.
   int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
 
   if (face_idx >= 2*nFace*face_volume) return;
@@ -932,24 +943,24 @@ __global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *
 
 
 template <typename Float2>
-void packFaceAsqtad(Float2 *faces, float *facesNorm, const Float2 *in, const float *inNorm, int dim,
+void packFaceStaggeredKernelWrapper(Float2 *faces, float *facesNorm, const Float2 *in, const float *inNorm, int dim,
 		    const int parity, const dim3 &gridDim, const dim3 &blockDim, 
 		    const cudaStream_t &stream)
 {
 #ifdef GPU_STAGGERED_DIRAC
   if(typeid(Float2) != typeid(short2)){
     switch (dim) {
-    case 0: packFaceAsqtadKernel<0,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceAsqtadKernel<1,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceAsqtadKernel<2,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceAsqtadKernel<3,0><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 0: packFaceStaggeredKernel<0,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 1: packFaceStaggeredKernel<1,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 2: packFaceStaggeredKernel<2,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 3: packFaceStaggeredKernel<3,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
     }
   }else{
     switch(dim){
-    case 0: packFaceAsqtadKernel<0,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceAsqtadKernel<1,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceAsqtadKernel<2,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceAsqtadKernel<3,1><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 0: packFaceStaggeredKernel<0,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 1: packFaceStaggeredKernel<1,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 2: packFaceStaggeredKernel<2,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 3: packFaceStaggeredKernel<3,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
     }
   }
 #else
@@ -958,7 +969,7 @@ void packFaceAsqtad(Float2 *faces, float *facesNorm, const Float2 *in, const flo
 }
 
 
-void packFaceAsqtad(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
+void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 		    const int parity, const cudaStream_t &stream) {
   const int nFace = 3; //3 faces for asqtad
 
@@ -972,26 +983,25 @@ void packFaceAsqtad(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 
   switch(in.Precision()) {
   case QUDA_DOUBLE_PRECISION:
-    packFaceAsqtad((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   case QUDA_SINGLE_PRECISION:
-    packFaceAsqtad((float2*)ghost_buf, ghostNorm, (float2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper((float2*)ghost_buf, ghostNorm, (float2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   case QUDA_HALF_PRECISION:
-    packFaceAsqtad((short2*)ghost_buf, ghostNorm, (short2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper((short2*)ghost_buf, ghostNorm, (short2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   }  
-
 }
 
 void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 	      const int parity, const cudaStream_t &stream)
 {
   if(in.Nspin() == 1){
-    packFaceAsqtad(ghost_buf, in, dim, dagger, parity, stream);
+    packFaceStaggered(ghost_buf, in, dim, dagger, parity, stream);
   }else{  
     packFaceWilson(ghost_buf, in, dim, dagger, parity, stream);
   }

@@ -378,9 +378,9 @@ namespace quda {
 
   }
 
-  void cpuColorSpinorField::allocateGhostBuffer(void)
+  void cpuColorSpinorField::allocateGhostBuffer(int nface)
   {
-    if (initGhostFaceBuffer) return;
+    if (initGhostFaceBuffer && nFace>nface) return;
 
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in alllocateGhostBuffer\n");
@@ -399,12 +399,9 @@ namespace quda {
 		 X1*X2*X3*X5/2};
     //END NEW  
   
-    int num_faces = 1;
-    if(this->nSpin == 1) num_faces = 3; // staggered
-
     int spinor_size = 2*this->nSpin*this->nColor*this->precision;
     for (int i=0; i<4; i++) {
-      size_t nbytes = num_faces*Vsh[i]*spinor_size;
+      size_t nbytes = nFace*Vsh[i]*spinor_size;
 
       fwdGhostFaceBuffer[i] = safe_malloc(nbytes);
       backGhostFaceBuffer[i] = safe_malloc(nbytes);
@@ -412,6 +409,12 @@ namespace quda {
       backGhostFaceSendBuffer[i] = safe_malloc(nbytes);
     }
     initGhostFaceBuffer = 1;
+  }
+
+  void cpuColorSpinorField::allocateGhostBuffer(void)
+  {
+    int nface = (this->nSpin == 1) ? 3 : 1;
+    allocateGhostBuffer(nface);
   }
 
 
@@ -440,10 +443,6 @@ namespace quda {
       errorQuda("Field order %d not supported", fieldOrder);
     }
 
-    int num_faces=1;
-    if(this->nSpin == 1){ //staggered
-      num_faces=3;
-    }
     int spinor_size = 2*this->nSpin*this->nColor*this->precision;
 
     int X1 = this->x[0]*2;
@@ -480,13 +479,13 @@ namespace quda {
       switch(dim){            
       case 0: //X dimension
 	if (dir == QUDA_BACKWARDS){
-	  if (x1 < num_faces){
+	  if (x1 < nFace){
 	    ghost_face_idx =  (x1*X5*X4*X3*X2 + x5*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);
 	  }
 	}else{  // QUDA_FORWARDS
-	  if (x1 >=X1 - num_faces){
-	    ghost_face_idx = ((x1-X1+num_faces)*X5*X4*X3*X2 + x5*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
+	  if (x1 >=X1 - nFace){
+	    ghost_face_idx = ((x1-X1+nFace)*X5*X4*X3*X2 + x5*X4*X3*X2 + x4*(X3*X2)+x3*X2 +x2)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	  }
 	}
@@ -494,13 +493,13 @@ namespace quda {
       
       case 1: //Y dimension
 	if (dir == QUDA_BACKWARDS){
-	  if (x2 < num_faces){
+	  if (x2 < nFace){
 	    ghost_face_idx = (x2*X5*X4*X3*X1 +x5*X4*X3*X1 + x4*X3*X1+x3*X1+x1)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	  }
 	}else{ // QUDA_FORWARDS      
-	  if (x2 >= X2 - num_faces){
-	    ghost_face_idx = ((x2-X2+num_faces)*X5*X4*X3*X1 +x5*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
+	  if (x2 >= X2 - nFace){
+	    ghost_face_idx = ((x2-X2+nFace)*X5*X4*X3*X1 +x5*X4*X3*X1+ x4*X3*X1+x3*X1+x1)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	  }
 	}
@@ -508,13 +507,13 @@ namespace quda {
 
       case 2: //Z dimension      
 	if (dir == QUDA_BACKWARDS){
-	  if (x3 < num_faces){
+	  if (x3 < nFace){
 	    ghost_face_idx = (x3*X5*X4*X2*X1 + x5*X4*X2*X1 + x4*X2*X1+x2*X1+x1)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	  }
 	}else{ // QUDA_FORWARDS     
-	  if (x3 >= X3 - num_faces){
-	    ghost_face_idx = ((x3-X3+num_faces)*X5*X4*X2*X1 + x5*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
+	  if (x3 >= X3 - nFace){
+	    ghost_face_idx = ((x3-X3+nFace)*X5*X4*X2*X1 + x5*X4*X2*X1 + x4*X2*X1 + x2*X1 + x1)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	  }
 	}
@@ -522,13 +521,13 @@ namespace quda {
       
       case 3:  //T dimension      
 	if (dir == QUDA_BACKWARDS){
-	  if (x4 < num_faces){
+	  if (x4 < nFace){
 	    ghost_face_idx = (x4*X5*X3*X2*X1 + x5*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	  }
 	}else{ // QUDA_FORWARDS     
-	  if (x4 >= X4 - num_faces){
-	    ghost_face_idx = ((x4-X4+num_faces)*X5*X3*X2*X1 + x5*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
+	  if (x4 >= X4 - nFace){
+	    ghost_face_idx = ((x4-X4+nFace)*X5*X3*X2*X1 + x5*X3*X2*X1 + x3*X2*X1+x2*X1+x1)>>1;
 	    memcpy( ((char*)ghost_spinor) + ghost_face_idx*spinor_size, ((char*)v)+i*spinor_size, spinor_size);	  
 	  }
 	}

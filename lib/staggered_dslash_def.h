@@ -4,6 +4,26 @@
 
 // initialize on first iteration
 
+#ifndef GET_COORDS
+#define GET_COORDS
+__device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity, int sid)
+{
+  int za = sid / cudaConstants.X1h;
+  int x1h = sid - za*cudaConstants.X1h;
+  int zb = za / cudaConstants.X2;
+  *x2 = za - zb*cudaConstants.X2;
+  *x4 = zb / cudaConstants.X3;
+  *x3 = zb - (*x4)*cudaConstants.X3;
+  int x1odd = ((*x2) + (*x3) + *(x4) + parity) & 1;
+  (*x1) = 2*x1h + x1odd;
+  (*X) = 2*sid + x1odd;
+  return; 
+}
+
+#endif
+
+
+
 #ifndef DD_LOOP
 #define DD_LOOP
 

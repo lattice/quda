@@ -271,34 +271,72 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
     float *norm; // direct reads for norm
     int stride;
+    int dim[QUDA_MAX_DIM];
 
   public:
-    SpinorTexture() 
-      : spinor(), norm(0), stride(0) { } // default constructor
+  SpinorTexture() 
+    : spinor((StoreType*)0, 0), norm(0), stride(0) { for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i]=0; } // default constructor
 
-    SpinorTexture(const cudaColorSpinorField &x) 
-      : spinor(&x), norm((float*)x.Norm()),
-      stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+  SpinorTexture(const cudaColorSpinorField &x) 
+    : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()),
+      stride(x.Length()/(N*REG_LENGTH)) {
+		    for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i] = x.X()[i]; 
+			  checkTypes<RegType,InterType,StoreType>(); 
+			}
 
     SpinorTexture(const SpinorTexture &st) 
       : spinor(st.spinor), norm(st.norm), stride(st.stride) { }
 
     SpinorTexture& operator=(const SpinorTexture &src) {
       if (&src != this) {
-	spinor = src.spinor;
-	norm = src.norm;
-	stride = src.stride;
+			  spinor = src.spinor;
+	      norm = src.norm;
+	      stride = src.stride;
+			  for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i] = src.dim[i];
       }
       return *this;
     }
 
     ~SpinorTexture() { } /* on g80 / gt200 this must not be virtual */
 
+/*
+   __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity, int sid)
+{
+  int za = sid / cudaConstants.X1h;
+  int x1h = sid - za*cudaConstants.X1h;
+  int zb = za / cudaConstants.X2;
+  *x2 = za - zb*cudaConstants.X2;
+  *x4 = zb / cudaConstants.X3;
+  *x3 = zb - (*x4)*cudaConstants.X3;
+  int x1odd = ((*x2) + (*x3) + *(x4) + parity) & 1;
+  (*x1) = 2*x1h + x1odd;
+  (*X) = 2*sid + x1odd;
+  return;
+}
+
+*/
+
+    __device__ inline void get_coords(int* x1h, int* x2, int* x3, int* x4, const int id){
+      // note that i is the stride length, not the real length, so it includes padding
+	    int za = id/dim[0];
+      *x1h = id - za;
+	    int zb = za/dim[1];
+      *x2 = za - zb*dim[1];
+      *x4 = zb/dim[2];
+	    *x3 = zb - (*x4)*dim[2];
+    }
+
+    __device__ inline void get_index(int* index, int x1h, int x2, int x3, int x4){
+      *index = x1h + x2*dim[0] + x3*dim[0]*dim[1] + x4*dim[0]*dim[1]*dim[2];
+    }
+
+
     __device__ inline void load(RegType x[], const int i) {
       // load data into registers first using the storage order
       const int M = (N * sizeof(RegType)) / sizeof(InterType);
       InterType y[M];
 
+       
       // half precision types
       if (sizeof(InterType) == 2*sizeof(StoreType)) { 
 	float xN = norm[i];
@@ -328,6 +366,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
     }
 
     int Stride() { return stride; }
+    const int* Dim() const { return dim; }
   };
 
   /**
@@ -342,17 +381,16 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
   private:
     StoreType *spinor;
     float *norm; // Probably need to change this!
-    const int in_stride;
-    const int out_stride;
+    const int stride;
+	  int dim[QUDA_MAX_DIM];
 
   public:
-  Spinor(const cudaColorSpinorField& y, const cudaColorSpinorField &x) : 
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()),  in_stride(x.Length()/(N*REG_LENGTH)), out_stride(y.Length()/(N*REG_LENGTH))
-      { checkTypes<RegType,InterType,StoreType>(); } 
-
   Spinor(const cudaColorSpinorField &x) :
-    spinor((StoreType*)x.V()), norm((float*)x.Norm()), in_stride(x.Length()/(N*REG_LENGTH)), out_stride(x.Length()/(N*REG_LENGTH))
-      { checkTypes<RegType,InterType,StoreType>(); } 
+    spinor((StoreType*)x.V()), norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+      {
+        for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i]  = x.X()[i]; 
+			  checkTypes<RegType,InterType,StoreType>(); 
+      } 
     ~Spinor() {;} /* on g80 / gt200 this must not be virtual */
 
     // default load used for simple fields
@@ -361,7 +399,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
       const int M = (N * sizeof(RegType)) / sizeof(InterType);
       InterType y[M];
 #pragma unroll
-      for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*in_stride]);
+      for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*stride]);
 
       convert<RegType, InterType>(x, y, N);
     }
@@ -372,7 +410,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
       InterType y[M];
       convert<InterType, RegType>(y, x, M);
 #pragma unroll
-      for (int j=0; j<M; j++) copyFloatN(spinor[i+j*out_stride], y[j]);
+      for (int j=0; j<M; j++) copyFloatN(spinor[i+j*stride], y[j]);
     }
 
     // used to backup the field to the host
@@ -410,7 +448,25 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
       return precision;
     }
 
-    int Stride() { return in_stride; }
+    int Stride() { return stride; }
+    const int* Dim() const { return dim; }
+
+    
+    __device__ inline void get_coords(int* x1h, int* x2, int* x3, int* x4, const int id){
+      // note that i is the stride length, not the real length, so it includes padding
+	    int za = id/dim[0];
+      *x1h = id - za;
+	    int zb = za/dim[1];
+      *x2 = za - zb*dim[1];
+      *x4 = zb/dim[2];
+	    *x3 = zb - (*x4)*dim[2];
+    }
+
+    __device__ inline void get_index(int* index, int x1h, int x2, int x3, int x4){
+      *index = x1h + x2*dim[0] + x3*dim[0]*dim[1] + x4*dim[0]*dim[1]*dim[2];
+    }
+
+
   };
 
   template <typename OutputType, typename InputType, int M>
