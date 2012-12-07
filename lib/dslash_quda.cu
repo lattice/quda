@@ -450,7 +450,14 @@ namespace quda {
     bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
     bool advanceBlockDim(TuneParam &param) const {
       bool advance = Tunable::advanceBlockDim(param);
-      if (advance) param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
+      if (advance) {
+	param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
+	if (param.grid.x > deviceProp.maxGridSize[0]) {
+	  warningQuda("Autotuner is skipping blockDim=%u (gridDim=%u) because lattice volume is too large",
+		      param.block.x, param.grid.x);
+	  advance = advanceBlockDim(param);
+	}
+      }
       return advance;
     }
 
@@ -471,6 +478,12 @@ namespace quda {
     {
       Tunable::initTuneParam(param);
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
+      if (param.grid.x > deviceProp.maxGridSize[0]) {
+	warningQuda("Autotuner is skipping blockDim=%u (gridDim=%u) because lattice volume is too large",
+		    param.block.x, param.grid.x);
+	bool ok = advanceBlockDim(param);
+	if (!ok) errorQuda("Lattice volume is too large for even the largest blockDim");
+      }
     }
 
     /** sets default values for when tuning is disabled */
@@ -478,6 +491,9 @@ namespace quda {
     {
       Tunable::defaultTuneParam(param);
       param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
+      if (param.grid.x > deviceProp.maxGridSize[0]) {
+	errorQuda("Lattice volume is too large for default blockDim");
+      }
     }
 
 

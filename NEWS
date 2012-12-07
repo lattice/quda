@@ -1,8 +1,9 @@
 
-Version 0.5.0
+Version 0.5.0 - 3 December 2012
 
-- Added full support for CUDA 5.0, including GK110 ("Kepler 2") GPUs.
-  QUDA has yet to be fully optimized for GK110, however.
+- Added full support for CUDA 5.0, including the Tesla K20 and other
+  GK110 ("Kepler 2") GPUs.  QUDA has yet to be fully optimized for
+  GK110, however.
 
 - Added multi-GPU support for the domain wall action, to be further
   optimized in a future release.

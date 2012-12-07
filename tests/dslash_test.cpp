@@ -75,7 +75,9 @@ void init(int argc, char **argv) {
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     dw_setDims(gauge_param.X, myLs);
     setKernelPackT(true);
   } else {

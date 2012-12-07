@@ -255,6 +255,15 @@ namespace quda {
     void *norm; // the normalization field
     bool alloc; // whether we allocated memory
     bool init;
+
+    bool texInit; // whether a texture object has been created or not
+#ifdef TEXTURE_OBJECT
+    cudaTextureObject_t tex;
+    cudaTextureObject_t texNorm;
+    void createTexObject();
+    void destroyTexObject();
+#endif
+
     bool reference; // whether the field is a reference or not
 
     static void *buffer_h;// pinned memory
@@ -304,6 +313,11 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+
+#ifdef TEXTURE_OBJECT
+    const cudaTextureObject_t& Tex() const { return tex; }
+    const cudaTextureObject_t& TexNorm() const { return texNorm; }
+#endif
 
     cudaColorSpinorField& Even() const;
     cudaColorSpinorField& Odd() const;

@@ -7,7 +7,7 @@ make.inc:
 lib:
 	$(MAKE) -C lib/
 
-tests:
+tests: lib
 	$(MAKE) -C tests/
 
 fortran: lib 
