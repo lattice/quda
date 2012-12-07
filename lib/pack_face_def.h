@@ -943,7 +943,7 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
 
 
 template <typename Float2>
-void packFaceAsqtad(Float2 *faces, float *facesNorm, const Float2 *in, const float *inNorm, int dim,
+void packFaceStaggeredKernelWrapper(Float2 *faces, float *facesNorm, const Float2 *in, const float *inNorm, int dim,
 		    const int parity, const dim3 &gridDim, const dim3 &blockDim, 
 		    const cudaStream_t &stream)
 {
@@ -969,7 +969,7 @@ void packFaceAsqtad(Float2 *faces, float *facesNorm, const Float2 *in, const flo
 }
 
 
-void packFaceAsqtad(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
+void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 		    const int parity, const cudaStream_t &stream) {
   const int nFace = 3; //3 faces for asqtad
 
@@ -983,26 +983,25 @@ void packFaceAsqtad(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 
   switch(in.Precision()) {
   case QUDA_DOUBLE_PRECISION:
-    packFaceAsqtad((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   case QUDA_SINGLE_PRECISION:
-    packFaceAsqtad((float2*)ghost_buf, ghostNorm, (float2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper((float2*)ghost_buf, ghostNorm, (float2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   case QUDA_HALF_PRECISION:
-    packFaceAsqtad((short2*)ghost_buf, ghostNorm, (short2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper((short2*)ghost_buf, ghostNorm, (short2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   }  
-
 }
 
 void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 	      const int parity, const cudaStream_t &stream)
 {
   if(in.Nspin() == 1){
-    packFaceAsqtad(ghost_buf, in, dim, dagger, parity, stream);
+    packFaceStaggered(ghost_buf, in, dim, dagger, parity, stream);
   }else{  
     packFaceWilson(ghost_buf, in, dim, dagger, parity, stream);
   }
