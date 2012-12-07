@@ -167,28 +167,39 @@ static inline __device__ int indexFromFaceIndexAsqtad(int face_idx, const int &f
   int idx = face_idx;
   int gap, aux;
 
+ // face_idx runs from 0 to (2*nFace*face_volume)-1
   switch (dim) {
-  case 0:
+  case 0: 
+   // face_idx runs from 0 to nFace*X2*X3*X4-1
     gap = X1 - nLayers;
     aux = face_idx;
-    idx += face_num*gap + aux*(X1-1);
-    idx += idx/V*(1-V);    
+    idx += face_num*gap + aux*(X1-1); 
+    // idx runs from 0 to nFace*X1*X2*X3*X4-1 in jumps of X1
+    idx += (idx/V)*(1-V);    
     break;
   case 1:
+   // face_idx runs from 0 to nFace*X1*X3*X4-1
     gap = X2 - nLayers;
     aux = face_idx / face_X;
-    idx += face_num * gap * face_X + aux*(X2-1)*face_X;
-    idx += idx/V*(X1-V);
+    idx += face_num * gap* face_X + aux*(X2-1)*face_X;
+   // idx = x1 + (face_idx/X1)*X1*X2
+   // idx runs from x1 + X1...
+    idx += (idx/V)*(X1-V);
     break;
   case 2:
+   // face_idx runs from 0 to nFace*X1*X2*X4-1
     gap = X3 - nLayers;
     aux = face_idx / face_XY;    
     idx += face_num * gap * face_XY +aux*(X3-1)*face_XY;
-    idx += idx/V*(X2X1-V);
+   // idx = x1 + x2*X1 + (face_idx/(X1*X2))*X1*X2*X3
+   // idx runs over the volume in jumps of X1*X2*X3
+    idx += (idx/V)*(X2X1-V);
     break;
   case 3:
+   // face_idx runs from 0 to nFace*X1*X2*X3-1
     gap = X4 - nLayers;
     idx += face_num * gap * face_XYZ;
+   // idx = x1 + x2*X1 + x3*X1*X2
     break;
   }
 
@@ -896,10 +907,10 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
 {
 //  const int nFace = 3; //3 faces for asqtad
   const int Nint = 6; // number of internal degrees of freedom
-  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x);
+  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x); 
   if (ishalf) faceBytes += nFace*ghostFace[dim]*sizeof(float);
 
-  int face_volume = ghostFace[dim];
+  int face_volume = ghostFace[dim]; // ghostFace[0] = X[1]*X[2]*X[3]/2, etc.
   int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
 
   if (face_idx >= 2*nFace*face_volume) return;
