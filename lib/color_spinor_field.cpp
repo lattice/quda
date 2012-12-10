@@ -22,7 +22,7 @@ namespace quda {
 								ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbose), init(false), 
 								even(0), odd(0) 
 								{
-																create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
+																create(param.nDim, param.x, param.nColor, param.nSpin, param.nFace, param.twistFlavor, param.precision, param.pad, 
 																																param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis);
 
 								}
@@ -30,7 +30,7 @@ namespace quda {
 								ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
 								even(0), odd(0)
 								{
-																create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
+																create(field.nDim, field.x, field.nColor, field.nSpin, field.nFace, field.twistFlavor, field.precision, field.pad,
 																																field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis);
 
 								}
@@ -118,7 +118,7 @@ namespace quda {
 																}
 								}
 
-								void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
+								void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nface, QudaTwistFlavorType Twistflavor, 
 																								QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
 																								QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
 																								QudaGammaBasis gammaBasis) {
@@ -133,6 +133,7 @@ namespace quda {
 																nDim = Ndim;
 																nColor = Nc;
 																nSpin = Ns;
+                nFace = Nface;
 																twistFlavor = Twistflavor;
 
 																precision = Prec;
@@ -168,7 +169,7 @@ namespace quda {
 
 								ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
 																if (&src != this) {
-																								create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
+																								create(src.nDim, src.x, src.nColor, src.nSpin, src.nFace, src.twistFlavor, 
 																																								src.precision, src.pad, src.siteSubset, 
 																																								src.siteOrder, src.fieldOrder, src.gammaBasis);    
 																}
@@ -180,6 +181,7 @@ namespace quda {
 
 																if (param.nColor != 0) nColor = param.nColor;
 																if (param.nSpin != 0) nSpin = param.nSpin;
+                if (param.nFace !=0) nFace = param.nFace;
 																if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
 																if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
@@ -230,6 +232,7 @@ namespace quda {
 								void ColorSpinorField::fill(ColorSpinorParam &param) const {
 																param.nColor = nColor;
 																param.nSpin = nSpin;
+                param.nFace = nFace;
 																param.twistFlavor = twistFlavor;
 																param.precision = precision;
 																param.nDim = nDim;
@@ -256,6 +259,10 @@ namespace quda {
 																if (a.Nspin() != b.Nspin()) {
 																								errorQuda("checkSpinor: spins do not match: %d %d", a.Nspin(), b.Nspin());
 																}
+
+                if (a.Nface() != b.Nface()){
+																								errorQuda("checkSpinor: bordor regions do not match: %d %d", a.Nface(), b.Nface());
+                }
 
 																if (a.TwistFlavor() != b.TwistFlavor()) {
 																								errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
