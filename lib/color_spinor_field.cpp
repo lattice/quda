@@ -44,12 +44,18 @@ namespace quda {
     if (verbose == QUDA_DEBUG_VERBOSE) 
       printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
 
+
+    int num_faces = nFace;
+    int num_norm_faces = 2*nFace;
+
+/*
     int num_faces = 1;
     int num_norm_faces=2;
     if (nSpin == 1) { //staggered
       num_faces=6;
       num_norm_faces=6;
     }
+*/
 
     // calculate size of ghost zone required
     int ghostVolume = 0;

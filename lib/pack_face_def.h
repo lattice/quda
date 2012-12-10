@@ -941,37 +941,43 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
 }
 #endif // GPU_STAGGERED_DIRAC
 
+template<typename T>
+struct isShort2
+{
+  static const int val = 0;
+};
 
-template <typename Float2>
-void packFaceStaggeredKernelWrapper(Float2 *faces, float *facesNorm, const Float2 *in, const float *inNorm, int dim,
+template<>
+struct isShort2<short2>
+{
+  static const int val = 1;
+};
+
+template<typename T> const int isShort2<T>::val;
+
+
+template <int nFace, typename Real2>
+void packFaceStaggeredKernelWrapper(Real2 *faces, float *facesNorm, const Real2 *in, const float *inNorm, int dim,
 		    const int parity, const dim3 &gridDim, const dim3 &blockDim, 
 		    const cudaStream_t &stream)
 {
 #ifdef GPU_STAGGERED_DIRAC
-  if(typeid(Float2) != typeid(short2)){
-    switch (dim) {
-    case 0: packFaceStaggeredKernel<0,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceStaggeredKernel<1,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceStaggeredKernel<2,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceStaggeredKernel<3,0,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    }
-  }else{
-    switch(dim){
-    case 0: packFaceStaggeredKernel<0,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceStaggeredKernel<1,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceStaggeredKernel<2,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceStaggeredKernel<3,1,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    }
+  const int ishalf = isShort2<Real2>::val;
+  switch (dim) {
+    case 0: packFaceStaggeredKernel<0,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 1: packFaceStaggeredKernel<1,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 2: packFaceStaggeredKernel<2,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 3: packFaceStaggeredKernel<3,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
   }
 #else
-  errorQuda("Asqtad face packing kernel is not built");
+  errorQuda("Staggered face packing kernel is not built");
 #endif  
 }
 
-
+template<int nFace>
 void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 		    const int parity, const cudaStream_t &stream) {
-  const int nFace = 3; //3 faces for asqtad
+//  const int nFace = 3; //3 faces for asqtad
 
   unsigned int threads = in.GhostFace()[dim]*nFace*2; 
   dim3 blockDim(64, 1, 1); // TODO: make this a parameter for auto-tuning
@@ -983,15 +989,15 @@ void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim,
 
   switch(in.Precision()) {
   case QUDA_DOUBLE_PRECISION:
-    packFaceStaggeredKernelWrapper((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper<nFace>((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   case QUDA_SINGLE_PRECISION:
-    packFaceStaggeredKernelWrapper((float2*)ghost_buf, ghostNorm, (float2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper<nFace>((float2*)ghost_buf, ghostNorm, (float2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   case QUDA_HALF_PRECISION:
-    packFaceStaggeredKernelWrapper((short2*)ghost_buf, ghostNorm, (short2*)in.V(), (float*)in.Norm(), 
+    packFaceStaggeredKernelWrapper<nFace>((short2*)ghost_buf, ghostNorm, (short2*)in.V(), (float*)in.Norm(), 
 		   dim, parity, gridDim, blockDim, stream);
     break;
   }  
@@ -1001,7 +1007,12 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
 	      const int parity, const cudaStream_t &stream)
 {
   if(in.Nspin() == 1){
-    packFaceStaggered(ghost_buf, in, dim, dagger, parity, stream);
+    switch(in.Nface()){
+      case 2: packFaceStaggered<2>(ghost_buf, in, dim, dagger, parity, stream); break;
+      case 3: packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); break;
+      case 4: packFaceStaggered<4>(ghost_buf, in, dim, dagger, parity, stream); break;
+      default: errorQuda("Only nFace 2/3/4 supported for staggered fermions\n"); break;
+	  }
   }else{  
     packFaceWilson(ghost_buf, in, dim, dagger, parity, stream);
   }

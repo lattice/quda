@@ -170,6 +170,8 @@ namespace quda {
     int pad;
     int stride;
 
+    int nFace;
+
     QudaTwistFlavorType twistFlavor;
   
     int real_length; // physical length only
@@ -216,6 +218,7 @@ namespace quda {
     QudaPrecision Precision() const { return precision; }
     int Ncolor() const { return nColor; } 
     int Nspin() const { return nSpin; } 
+    int Nface() const { return nFace; }
     int TwistFlavor() const { return twistFlavor; } 
     int Ndim() const { return nDim; }
     const int* X() const { return x; }

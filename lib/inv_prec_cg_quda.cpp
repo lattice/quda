@@ -24,8 +24,8 @@ namespace quda {
     inner.maxiter = outer.maxiter_precondition;
     inner.reliable_delta = 1e-20; // no reliable updates within the inner solver
 
-    inner.cuda_prec = outer.prec_precondition; // preconditioners are uni-precision solvers
-    inner.cuda_prec_sloppy = outer.prec_precondition;
+    inner.cuda_prec = outer.cuda_prec_precondition; // preconditioners are uni-precision solvers
+    inner.cuda_prec_sloppy = outer.cuda_prec_precondition;
 
     inner.verbosity = outer.verbosity;
 
@@ -35,7 +35,7 @@ namespace quda {
 
     inner.inv_type_precondition = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
 
-    if (outer.inv_type == QUDA_CG_INVERTER && outer.cuda_prec_sloppy != outer.prec_precondition)
+    if (outer.inv_type == QUDA_CG_INVERTER && outer.cuda_prec_sloppy != outer.cuda_prec_precondition)
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
     else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES; // What does this mean?
 
