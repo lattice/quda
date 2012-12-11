@@ -370,7 +370,7 @@ QudaPrecision bindCloverTex(const FullClover clover, const int oddBit,
     cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes); 
     cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
   }
-#endif
+#endif // not defined DIRECT_ACCESS_CLOVER
 
   return clover.precision;
 }
@@ -386,6 +386,6 @@ void unbindCloverTex(const FullClover clover)
     cudaUnbindTexture(cloverTexHalf);
     cudaUnbindTexture(cloverTexNorm);
   }
-#endif DIRECT_ACCESS_CLOVER
+#endif // not defined DIRECT_ACCESS_CLOVER
 }
 

@@ -7,7 +7,7 @@
 
 //namespace quda {
 
-#ifdef USE_TEXTURE_OBJECTS // texture objects
+#ifdef USE_TEXTURE_OBJECTS
 
 template<typename OutputType, typename InputType>
 class Texture {
@@ -198,10 +198,10 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
   // Declare the textures and define the member functions of the corresponding templated classes.
   DEF_ALL(0)
-    DEF_ALL(1)
-    DEF_ALL(2)
-    DEF_ALL(3)
-    DEF_ALL(4)
+  DEF_ALL(1)
+  DEF_ALL(2)
+  DEF_ALL(3)
+  DEF_ALL(4)
 
 
 #undef DECL_TEX
@@ -213,7 +213,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #undef DEF_BIND_UNBIND_FETCH
 #undef DEF_ALL
 
-#endif  // USE_TEXTURE_OBJECTS
+#endif // USE_TEXTURE_OBJECTS
 
 
     /**
@@ -265,7 +265,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
     class SpinorTexture {
 
   private:
-#if USE_TEXTURE_OBJECTS // texture objects
+#ifdef USE_TEXTURE_OBJECTS // texture objects
     Texture<InterType, StoreType> spinor;
 #else
     Texture<InterType, StoreType, tex_id> spinor;
