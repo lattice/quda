@@ -1,11 +1,11 @@
+#ifndef _COLOR_SPINOR_FIELD_H
+#define _COLOR_SPINOR_FIELD_H
+
 #include <quda_internal.h>
 #include <quda.h>
 
 #include <iostream>
 #include <complex>
-
-#ifndef _COLOR_SPINOR_FIELD_H
-#define _COLOR_SPINOR_FIELD_H
 
 // Probably want some checking for this limit
 #define QUDA_MAX_DIM 6
@@ -256,7 +256,7 @@ namespace quda {
     bool init;
 
     bool texInit; // whether a texture object has been created or not
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
     void createTexObject();
@@ -312,7 +312,7 @@ namespace quda {
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
 #endif
