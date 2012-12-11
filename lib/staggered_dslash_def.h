@@ -193,16 +193,26 @@
 #define FATLINK0TEX fatGauge0
 #define FATLINK1TEX fatGauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define FATLINK0TEX param.gauge0Tex
+#define FATLINK1TEX param.gauge1Tex
+#else
 #define FATLINK0TEX fatGauge0TexDouble
 #define FATLINK1TEX fatGauge1TexDouble
+#endif // TEXTURE_OBJECT
 #endif
 
 #if (defined DIRECT_ACCESS_LONG_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define LONGLINK0TEX longGauge0
 #define LONGLINK1TEX longGauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define LONGLINK0TEX param.longGauge0Tex
+#define LONGLINK1TEX param.longGauge1Tex
+#else
 #define LONGLINK0TEX longGauge0TexDouble
 #define LONGLINK1TEX longGauge1TexDouble
+#endif // TEXTURE_OBJECT
 #endif
 
 #define GAUGE_DOUBLE
@@ -245,14 +255,23 @@
 #define DD_PREC_F S
 
 #ifndef DIRECT_ACCESS_FAT_LINK
+#ifdef TEXTURE_OBJECT
+#define FATLINK0TEX param.gauge0Tex
+#define FATLINK1TEX param.gauge1Tex
+#else
 #define FATLINK0TEX fatGauge0TexSingle
 #define FATLINK1TEX fatGauge1TexSingle
+#endif
 #else
 #define FATLINK0TEX fatGauge0
 #define FATLINK1TEX fatGauge1
 #endif
 
 #ifndef DIRECT_ACCESS_LONG_LINK //longlink access
+#ifdef TEXTURE_OBJECT
+#define LONGLINK0TEX param.longGauge0Tex
+#define LONGLINK1TEX param.longGauge1Tex
+#else
 #if (DD_RECON ==2)
 #define LONGLINK0TEX longGauge0TexSingle_norecon
 #define LONGLINK1TEX longGauge1TexSingle_norecon
@@ -260,6 +279,7 @@
 #define LONGLINK0TEX longGauge0TexSingle
 #define LONGLINK1TEX longGauge1TexSingle
 #endif
+#endif // TEXTURE_OBJECT
 #else
 #define LONGLINK0TEX longGauge0
 #define LONGLINK1TEX longGauge1
@@ -302,6 +322,12 @@
 
 // gauge fields
 #define DD_PREC_F H
+#ifdef TEXTURE_OBJECT
+#define FATLINK0TEX param.gauge0Tex
+#define FATLINK1TEX param.gauge1Tex
+#define LONGLINK0TEX param.longGauge0Tex
+#define LONGLINK1TEX param.longGauge1Tex
+#else
 #define FATLINK0TEX fatGauge0TexHalf
 #define FATLINK1TEX fatGauge1TexHalf
 #if (DD_RECON ==2)
@@ -311,6 +337,7 @@
 #define LONGLINK0TEX longGauge0TexHalf
 #define LONGLINK1TEX longGauge1TexHalf
 #endif
+#endif // TEXTURE_OBJECT
 
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_HALF_TEX
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_HALF_TEX

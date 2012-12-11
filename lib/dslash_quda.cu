@@ -61,6 +61,21 @@ namespace quda {
     int ghostOffset[QUDA_MAX_DIM];
     int ghostNormOffset[QUDA_MAX_DIM];
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+
+#ifdef TEXTURE_OBJECT
+    cudaTextureObject_t inTex;
+    cudaTextureObject_t inNormTex;
+    cudaTextureObject_t xTex;
+    cudaTextureObject_t xNormTex;
+    cudaTextureObject_t outTex;
+    cudaTextureObject_t outNormTex;
+    cudaTextureObject_t gauge0Tex; // also applies to fat gauge
+    cudaTextureObject_t gauge1Tex; // also applies to fat gauge
+    cudaTextureObject_t longGauge0Tex;
+    cudaTextureObject_t longGauge1Tex;
+    cudaTextureObject_t cloverTex;
+    cudaTextureObject_t cloverNormTex;
+#endif
   };
 
   DslashParam dslashParam;

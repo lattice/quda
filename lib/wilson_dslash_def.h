@@ -177,8 +177,13 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #define GAUGE0TEX gauge0TexDouble2
 #define GAUGE1TEX gauge1TexDouble2
+#endif
 #endif
 
 #define GAUGE_FLOAT2
@@ -230,7 +235,11 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_DOUBLE_STR
 #else
+#ifdef TEXTURE_OBJECT
+#define CLOVERTEX (param.cloverTex)
+#else
 #define CLOVERTEX cloverTexDouble
+#endif
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX
 #endif
 #define CLOVER_DOUBLE
@@ -244,6 +253,10 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexSingle2
 #define GAUGE1TEX gauge1TexSingle2
@@ -251,6 +264,7 @@
 #define GAUGE0TEX gauge0TexSingle4
 #define GAUGE1TEX gauge1TexSingle4
 #endif
+#endif // TEXTURE_OBJECT
 #endif
 
 
@@ -298,7 +312,11 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_SINGLE
 #else
+#ifdef TEXTURE_OBJECT
+#define CLOVERTEX (param.cloverTex)
+#else
 #define CLOVERTEX cloverTexSingle
+#endif
 #define READ_CLOVER READ_CLOVER_SINGLE_TEX
 #endif
 
@@ -311,6 +329,10 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexHalf2
 #define GAUGE1TEX gauge1TexHalf2
@@ -318,6 +340,7 @@
 #define GAUGE0TEX gauge0TexHalf4
 #define GAUGE1TEX gauge1TexHalf4
 #endif
+#endif // TEXTURE_OBJECT
 #endif
 
 
@@ -365,7 +388,13 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_HALF
 #else
+#ifdef TEXTURE_OBJECT
+#define CLOVERTEX (param.cloverTex)
+#define CLOVERTEXNORM (param.cloverNormTex)
+#else
 #define CLOVERTEX cloverTexHalf
+#define CLOVERTEXNORM cloverTexNorm
+#endif
 #define READ_CLOVER READ_CLOVER_HALF_TEX
 #endif
 

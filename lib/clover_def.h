@@ -83,9 +83,14 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_DOUBLE
 #else
+#ifdef TEXTURE_OBJECT
+#define CLOVERTEX (param.cloverTex)
+#else
 #define CLOVERTEX cloverTexDouble
+#endif
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX
 #endif
+
 #define CLOVER_DOUBLE
 #elif (DD_PREC==1) // single-precision clover term
 #define DD_PREC_F S
@@ -94,7 +99,11 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_SINGLE
 #else
+#ifdef TEXTURE_OBJECT
+#define CLOVERTEX (param.cloverTex)
+#else
 #define CLOVERTEX cloverTexSingle
+#endif
 #define READ_CLOVER READ_CLOVER_SINGLE_TEX
 #endif
 #else               // half-precision clover term
@@ -104,7 +113,13 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_HALF
 #else
+#ifdef TEXTURE_OBJECT
+#define CLOVERTEX (param.cloverTex)
+#define CLOVERTEXNORM (param.cloverNormTex)
+#else
 #define CLOVERTEX cloverTexHalf
+#define CLOVERTEXNORM cloverTexNorm
+#endif
 #define READ_CLOVER READ_CLOVER_HALF_TEX
 #endif
 #endif

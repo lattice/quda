@@ -20,10 +20,66 @@ namespace quda {
     }
     even = gauge;
     odd = (char*)gauge + bytes/2; 
+
+#ifdef TEXTURE_OBJECT
+    createTexObject(evenTex, even);
+    createTexObject(oddTex, odd);
+#endif
+
   }
+
+#ifdef TEXTURE_OBJECT
+  void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field) {
+
+    // create the texture for the field components
+
+    cudaChannelFormatDesc desc;
+    memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+    if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
+    else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+
+    // always four components regardless of precision
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      desc.x = 8*sizeof(int);
+      desc.y = 8*sizeof(int);
+      desc.z = 8*sizeof(int);
+      desc.w = 8*sizeof(int);
+    } else {
+      desc.x = 8*precision;
+      desc.y = 8*precision;
+      desc.z = (reconstruct == 18) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
+      desc.w = (reconstruct == 18) ? 0 : 8*precision;
+    }
+
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeLinear;
+    resDesc.res.linear.devPtr = field;
+    resDesc.res.linear.desc = desc;
+    resDesc.res.linear.sizeInBytes = bytes/2;
+
+    cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+    else texDesc.readMode = cudaReadModeElementType;
+
+    cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+    checkCudaError();
+  }
+
+  void cudaGaugeField::destroyTexObject() {
+    cudaDestroyTextureObject(evenTex);
+    cudaDestroyTextureObject(oddTex);
+    checkCudaError();
+  }
+#endif
 
   cudaGaugeField::~cudaGaugeField()
   {
+#ifdef TEXTURE_OBJECT
+    destroyTexObject();
+#endif
+
     if (gauge) device_free(gauge);
   }
 

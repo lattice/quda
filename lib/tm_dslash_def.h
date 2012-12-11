@@ -11,7 +11,7 @@
 //
 // twistedMassDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a twisted mass Dslash^dagger kernel where the result is
+// This is a twisted mass Dslash^ger kernel where the result is
 // multiplied by "a" and summed with an input vector (Xpay), and the
 // gauge matrix is reconstructed from 12 real numbers.  More
 // generally, each function name is given by the concatenation of the
@@ -161,9 +161,14 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #define GAUGE0TEX gauge0TexDouble2
 #define GAUGE1TEX gauge1TexDouble2
-#endif
+#endif // TEXTURE_OBJECT
+#endif 
 
 #define GAUGE_FLOAT2
 
@@ -212,6 +217,10 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexSingle2
 #define GAUGE1TEX gauge1TexSingle2
@@ -219,6 +228,7 @@
 #define GAUGE0TEX gauge0TexSingle4
 #define GAUGE1TEX gauge1TexSingle4
 #endif
+#endif // TEXTURE_OBJECT
 #endif
 
 
@@ -265,6 +275,10 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef TEXTURE_OBJECT
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexHalf2
 #define GAUGE1TEX gauge1TexHalf2
@@ -272,6 +286,7 @@
 #define GAUGE0TEX gauge0TexHalf4
 #define GAUGE1TEX gauge1TexHalf4
 #endif
+#endif // TEXTURE_OBJECT
 #endif
 
 
