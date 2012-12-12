@@ -105,7 +105,7 @@ namespace quda {
       int length;
       const int src_length;
       const int dst_length;
-			int* border;
+      int* border;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -273,7 +273,7 @@ namespace quda {
 	  Spinor<float2, float2, short2, 3> dst_spinor(dst);
 	  CopyCuda<float2, 3, Spinor<float2, float2, short2, 3>,
 		   SpinorTexture<float2, float2, float2, 3, 0> >
-	  copy(dst_spinor, src_tex, src.Volume()), dst.Volume();
+	  copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
   copy.apply(*getBlasStream());	
 }
   } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
