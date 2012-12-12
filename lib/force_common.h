@@ -137,7 +137,7 @@
 #ifdef FERMI_NO_DBLE_TEX
 #define READ_DOUBLE2_TEXTURE(x_tex, x, i)      (x)[i]
 #else
-#define READ_DOUBLE2_TEXTURE(x_tex, x, i)  fetch_double2(x_tex, i)
+#define READ_DOUBLE2_TEXTURE(x_tex, x, i)  fetch_double2_old(x_tex, i)
 #endif
 
 

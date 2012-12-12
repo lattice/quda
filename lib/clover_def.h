@@ -34,7 +34,11 @@
 #define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexDouble
+#endif // TEXTURE_OBJECT
 #endif
 #if (DD_XPAY==1)  // never used
 #define ACCUMTEX accumTexDouble
@@ -51,7 +55,11 @@
 #define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexSingle
+#endif // TEXTURE_OBJECT
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY==1)
@@ -65,7 +73,11 @@
 #define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexHalf
+#endif // TEXTURE_OBJECT
 #endif
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm

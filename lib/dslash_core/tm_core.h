@@ -26,6 +26,12 @@ __device__ float4 operator*(const float &x, const float4 &y)
 #define tmp3_re tmp3.x
 #define tmp3_im tmp3.y
 
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
+#define SPINORTEX spinorTexDouble
+#endif
+
 #if (__COMPUTE_CAPABILITY__ >= 130)
 __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, 
 				  const double2 *in, const float *null2, DslashParam param)
@@ -36,18 +42,18 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
    if (sid >= param.threads) return;
 
 #ifndef FERMI_NO_DBLE_TEX
-   double2 I0  = fetch_double2(spinorTexDouble, sid + 0 * sp_stride);   
-   double2 I1  = fetch_double2(spinorTexDouble, sid + 1 * sp_stride);   
-   double2 I2  = fetch_double2(spinorTexDouble, sid + 2 * sp_stride);   
-   double2 I3  = fetch_double2(spinorTexDouble, sid + 3 * sp_stride);   
-   double2 I4  = fetch_double2(spinorTexDouble, sid + 4 * sp_stride);   
-   double2 I5  = fetch_double2(spinorTexDouble, sid + 5 * sp_stride);   
-   double2 I6  = fetch_double2(spinorTexDouble, sid + 6 * sp_stride);   
-   double2 I7  = fetch_double2(spinorTexDouble, sid + 7 * sp_stride);   
-   double2 I8  = fetch_double2(spinorTexDouble, sid + 8 * sp_stride);   
-   double2 I9  = fetch_double2(spinorTexDouble, sid + 9 * sp_stride);   
-   double2 I10 = fetch_double2(spinorTexDouble, sid + 10 * sp_stride); 
-   double2 I11 = fetch_double2(spinorTexDouble, sid + 11 * sp_stride);
+   double2 I0  = fetch_double2(SPINORTEX, sid + 0 * sp_stride);   
+   double2 I1  = fetch_double2(SPINORTEX, sid + 1 * sp_stride);   
+   double2 I2  = fetch_double2(SPINORTEX, sid + 2 * sp_stride);   
+   double2 I3  = fetch_double2(SPINORTEX, sid + 3 * sp_stride);   
+   double2 I4  = fetch_double2(SPINORTEX, sid + 4 * sp_stride);   
+   double2 I5  = fetch_double2(SPINORTEX, sid + 5 * sp_stride);   
+   double2 I6  = fetch_double2(SPINORTEX, sid + 6 * sp_stride);   
+   double2 I7  = fetch_double2(SPINORTEX, sid + 7 * sp_stride);   
+   double2 I8  = fetch_double2(SPINORTEX, sid + 8 * sp_stride);   
+   double2 I9  = fetch_double2(SPINORTEX, sid + 9 * sp_stride);   
+   double2 I10 = fetch_double2(SPINORTEX, sid + 10 * sp_stride); 
+   double2 I11 = fetch_double2(SPINORTEX, sid + 11 * sp_stride);
 #else
    double2 I0  = in[sid + 0 * sp_stride];   
    double2 I1  = in[sid + 1 * sp_stride];   
@@ -171,6 +177,13 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 #define tmp3_re tmp1.z
 #define tmp3_im tmp1.w
 
+#undef SPINORTEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
+#define SPINORTEX spinorTexSingle
+#endif
+
 __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, 
 				  const float4 *in, const float *null2, DslashParam param)
 {
@@ -179,12 +192,12 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
 
-   float4 I0 = tex1Dfetch(spinorTexSingle, sid + 0 * sp_stride);   
-   float4 I1 = tex1Dfetch(spinorTexSingle, sid + 1 * sp_stride);   
-   float4 I2 = tex1Dfetch(spinorTexSingle, sid + 2 * sp_stride);   
-   float4 I3 = tex1Dfetch(spinorTexSingle, sid + 3 * sp_stride);   
-   float4 I4 = tex1Dfetch(spinorTexSingle, sid + 4 * sp_stride);   
-   float4 I5 = tex1Dfetch(spinorTexSingle, sid + 5 * sp_stride);
+   float4 I0 = TEX1DFETCH(float4, SPINORTEX, sid + 0 * sp_stride);   
+   float4 I1 = TEX1DFETCH(float4, SPINORTEX, sid + 1 * sp_stride);   
+   float4 I2 = TEX1DFETCH(float4, SPINORTEX, sid + 2 * sp_stride);   
+   float4 I3 = TEX1DFETCH(float4, SPINORTEX, sid + 3 * sp_stride);   
+   float4 I4 = TEX1DFETCH(float4, SPINORTEX, sid + 4 * sp_stride);   
+   float4 I5 = TEX1DFETCH(float4, SPINORTEX, sid + 5 * sp_stride);
 
    volatile float4 tmp0, tmp1;
     
@@ -269,6 +282,15 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
 #endif // GPU_TWISTED_MASS_DIRAC
 }
 
+#undef SPINORTEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#define SPINORTEXNORM param.inTexNorm
+#else
+#define SPINORTEX spinorTexHalf
+#define SPINORTEXNORM spinorTexHalfNorm
+#endif
+
 
 __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, 
 				  const short4 *in, const float *inNorm, DslashParam param)
@@ -278,14 +300,14 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
 
-   float4 I0 = tex1Dfetch(spinorTexHalf, sid + 0 * sp_stride);   
-   float4 I1 = tex1Dfetch(spinorTexHalf, sid + 1 * sp_stride);   
-   float4 I2 = tex1Dfetch(spinorTexHalf, sid + 2 * sp_stride);   
-   float4 I3 = tex1Dfetch(spinorTexHalf, sid + 3 * sp_stride);   
-   float4 I4 = tex1Dfetch(spinorTexHalf, sid + 4 * sp_stride);   
-   float4 I5 = tex1Dfetch(spinorTexHalf, sid + 5 * sp_stride);
+   float4 I0 = TEX1DFETCH(float4, SPINORTEX, sid + 0 * sp_stride);   
+   float4 I1 = TEX1DFETCH(float4, SPINORTEX, sid + 1 * sp_stride);   
+   float4 I2 = TEX1DFETCH(float4, SPINORTEX, sid + 2 * sp_stride);   
+   float4 I3 = TEX1DFETCH(float4, SPINORTEX, sid + 3 * sp_stride);   
+   float4 I4 = TEX1DFETCH(float4, SPINORTEX, sid + 4 * sp_stride);   
+   float4 I5 = TEX1DFETCH(float4, SPINORTEX, sid + 5 * sp_stride);
    
-   float C = tex1Dfetch(spinorTexHalfNorm, sid);
+   float C = TEX1DFETCH(float, SPINORTEXNORM, sid);
    
    I0 = C * I0;
    I1 = C * I1;
@@ -410,6 +432,9 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
 
 #endif // GPU_TWISTED_MASS_DIRAC
 }
+
+#undef SPINORTEX
+#undef SPINORTEXNORM
 
 #undef tmp0_re
 #undef tmp0_im

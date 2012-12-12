@@ -201,14 +201,22 @@
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexDouble
+#endif // TEXTURE_OBJECT
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
+#ifdef TEXTURE_OBJECT
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexDouble
+#endif
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2_STR
 #define SPINOR_DOUBLE
@@ -217,7 +225,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
+#ifdef TEXTURE_OBJECT
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexDouble
+#endif // TEXTURE_OBJECT
 #define READ_ACCUM READ_ACCUM_DOUBLE_TEX
 #endif
 
@@ -280,14 +292,22 @@
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexSingle
+#endif // TEXTURE_OBJECT
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE_TEX
+#ifdef TEXTURE_OBJECT
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexSingle
+#endif // TEXTURE_OBJECT
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4_STR
 #if (DD_XPAY==1)
@@ -295,7 +315,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_SINGLE
 #else
+#ifdef TEXTURE_OBJECT
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexSingle
+#endif // TEXTURE_OBJECT
 #define READ_ACCUM READ_ACCUM_SINGLE_TEX
 #endif
 #endif
@@ -354,14 +378,22 @@
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
+#ifdef TEXTURE_OBJECT
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexHalf
+#endif // TEXTURE_OBJECT
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF_TEX
+#ifdef TEXTURE_OBJECT
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexHalf
+#endif // TEXTURE_OBJECT
 #endif
 #define DD_PARAM_OUT short4* out, float *outNorm,
 #define DD_PARAM_IN const short4* in, const float *inNorm,
@@ -371,7 +403,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_HALF
 #else
+#ifdef TEXTURE_OBJECT
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexHalf
+#endif // TEXTURE_OBJECT
 #define READ_ACCUM READ_ACCUM_HALF_TEX
 #endif
 #endif

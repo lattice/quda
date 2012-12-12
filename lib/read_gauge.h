@@ -584,33 +584,33 @@
 #else
 
 #define READ_GAUGE_MATRIX_18_DOUBLE2_TEX(G, gauge, dir, idx, stride) \
-  double2 G##0 = fetch_double2_new((gauge), idx + ((dir/2)*9+0)*stride); \
-  double2 G##1 = fetch_double2_new((gauge), idx + ((dir/2)*9+1)*stride); \
-  double2 G##2 = fetch_double2_new((gauge), idx + ((dir/2)*9+2)*stride); \
-  double2 G##3 = fetch_double2_new((gauge), idx + ((dir/2)*9+3)*stride); \
-  double2 G##4 = fetch_double2_new((gauge), idx + ((dir/2)*9+4)*stride); \
-  double2 G##5 = fetch_double2_new((gauge), idx + ((dir/2)*9+5)*stride); \
-  double2 G##6 = fetch_double2_new((gauge), idx + ((dir/2)*9+6)*stride); \
-  double2 G##7 = fetch_double2_new((gauge), idx + ((dir/2)*9+7)*stride); \
-  double2 G##8 = fetch_double2_new((gauge), idx + ((dir/2)*9+8)*stride); \
+  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*stride); \
+  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*stride); \
+  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*stride); \
+  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*stride); \
+  double2 G##4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*stride); \
+  double2 G##5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*stride); \
+  double2 G##6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*stride); \
+  double2 G##7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*stride); \
+  double2 G##8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*stride); \
 
 #define READ_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
-  double2 G##0 = fetch_double2_new((gauge), idx + ((dir/2)*6+0)*stride);	\
-  double2 G##1 = fetch_double2_new((gauge), idx + ((dir/2)*6+1)*stride);	\
-  double2 G##2 = fetch_double2_new((gauge), idx + ((dir/2)*6+2)*stride);	\
-  double2 G##3 = fetch_double2_new((gauge), idx + ((dir/2)*6+3)*stride);	\
-  double2 G##4 = fetch_double2_new((gauge), idx + ((dir/2)*6+4)*stride);	\
-  double2 G##5 = fetch_double2_new((gauge), idx + ((dir/2)*6+5)*stride);	\
+  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*6+0)*stride);	\
+  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*6+1)*stride);	\
+  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*stride);	\
+  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*6+3)*stride);	\
+  double2 G##4 = fetch_double2((gauge), idx + ((dir/2)*6+4)*stride);	\
+  double2 G##5 = fetch_double2((gauge), idx + ((dir/2)*6+5)*stride);	\
   double2 G##6 = make_double2(0,0);					\
   double2 G##7 = make_double2(0,0);					\
   double2 G##8 = make_double2(0,0);					\
 
 // set A to be last components of G4 (otherwise unused)
 #define READ_GAUGE_MATRIX_8_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
-  double2 G##0 = fetch_double2_new((gauge), idx + ((dir/2)*4+0)*stride);	\
-  double2 G##1 = fetch_double2_new((gauge), idx + ((dir/2)*4+1)*stride);	\
-  double2 G##2 = fetch_double2_new((gauge), idx + ((dir/2)*4+2)*stride);	\
-  double2 G##3 = fetch_double2_new((gauge), idx + ((dir/2)*4+3)*stride);	\
+  double2 G##0 = fetch_double2((gauge), idx + ((dir/2)*4+0)*stride);	\
+  double2 G##1 = fetch_double2((gauge), idx + ((dir/2)*4+1)*stride);	\
+  double2 G##2 = fetch_double2((gauge), idx + ((dir/2)*4+2)*stride);	\
+  double2 G##3 = fetch_double2((gauge), idx + ((dir/2)*4+3)*stride);	\
   double2 G##4 = make_double2(0,0);					\
   double2 G##5 = make_double2(0,0);					\
   double2 G##6 = make_double2(0,0);					\
@@ -622,33 +622,33 @@
 /*!For DW only*/
   
 #define ASSN_GAUGE_MATRIX_18_DOUBLE2_TEX(G, gauge, dir, idx, stride) \
-   G##0 = fetch_double2_new((gauge), idx + ((dir/2)*9+0)*stride); \
-   G##1 = fetch_double2_new((gauge), idx + ((dir/2)*9+1)*stride); \
-   G##2 = fetch_double2_new((gauge), idx + ((dir/2)*9+2)*stride); \
-   G##3 = fetch_double2_new((gauge), idx + ((dir/2)*9+3)*stride); \
-   G##4 = fetch_double2_new((gauge), idx + ((dir/2)*9+4)*stride); \
-   G##5 = fetch_double2_new((gauge), idx + ((dir/2)*9+5)*stride); \
-   G##6 = fetch_double2_new((gauge), idx + ((dir/2)*9+6)*stride); \
-   G##7 = fetch_double2_new((gauge), idx + ((dir/2)*9+7)*stride); \
-   G##8 = fetch_double2_new((gauge), idx + ((dir/2)*9+8)*stride); \
+   G##0 = fetch_double2((gauge), idx + ((dir/2)*9+0)*stride); \
+   G##1 = fetch_double2((gauge), idx + ((dir/2)*9+1)*stride); \
+   G##2 = fetch_double2((gauge), idx + ((dir/2)*9+2)*stride); \
+   G##3 = fetch_double2((gauge), idx + ((dir/2)*9+3)*stride); \
+   G##4 = fetch_double2((gauge), idx + ((dir/2)*9+4)*stride); \
+   G##5 = fetch_double2((gauge), idx + ((dir/2)*9+5)*stride); \
+   G##6 = fetch_double2((gauge), idx + ((dir/2)*9+6)*stride); \
+   G##7 = fetch_double2((gauge), idx + ((dir/2)*9+7)*stride); \
+   G##8 = fetch_double2((gauge), idx + ((dir/2)*9+8)*stride); \
 
 #define ASSN_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = fetch_double2_new((gauge), idx + ((dir/2)*6+0)*stride);	\
-   G##1 = fetch_double2_new((gauge), idx + ((dir/2)*6+1)*stride);	\
-   G##2 = fetch_double2_new((gauge), idx + ((dir/2)*6+2)*stride);		\
-   G##3 = fetch_double2_new((gauge), idx + ((dir/2)*6+3)*stride);	\
-   G##4 = fetch_double2_new((gauge), idx + ((dir/2)*6+4)*stride);	\
-   G##5 = fetch_double2_new((gauge), idx + ((dir/2)*6+5)*stride);	\
+   G##0 = fetch_double2((gauge), idx + ((dir/2)*6+0)*stride);	\
+   G##1 = fetch_double2((gauge), idx + ((dir/2)*6+1)*stride);	\
+   G##2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*stride);		\
+   G##3 = fetch_double2((gauge), idx + ((dir/2)*6+3)*stride);	\
+   G##4 = fetch_double2((gauge), idx + ((dir/2)*6+4)*stride);	\
+   G##5 = fetch_double2((gauge), idx + ((dir/2)*6+5)*stride);	\
    G##6 = make_double2(0,0);					\
    G##7 = make_double2(0,0);					\
    G##8 = make_double2(0,0);					\
 
 // set A to be last components of G4 (otherwise unused)
 #define ASSN_GAUGE_MATRIX_8_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = fetch_double2_new((gauge), idx + ((dir/2)*4+0)*stride);	\
-   G##1 = fetch_double2_new((gauge), idx + ((dir/2)*4+1)*stride);	\
-   G##2 = fetch_double2_new((gauge), idx + ((dir/2)*4+2)*stride);	\
-   G##3 = fetch_double2_new((gauge), idx + ((dir/2)*4+3)*stride);	\
+   G##0 = fetch_double2((gauge), idx + ((dir/2)*4+0)*stride);	\
+   G##1 = fetch_double2((gauge), idx + ((dir/2)*4+1)*stride);	\
+   G##2 = fetch_double2((gauge), idx + ((dir/2)*4+2)*stride);	\
+   G##3 = fetch_double2((gauge), idx + ((dir/2)*4+3)*stride);	\
    G##4 = make_double2(0,0);					\
    G##5 = make_double2(0,0);					\
    G##6 = make_double2(0,0);					\
