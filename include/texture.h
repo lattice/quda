@@ -276,10 +276,10 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
   public:
   SpinorTexture() 
-    : spinor((StoreType*)0, 0), norm(0), stride(0) { for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i]=0; } // default constructor
+    : spinor(), norm(0), stride(0) { for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i]=0; } // default constructor
 
   SpinorTexture(const cudaColorSpinorField &x) 
-    : spinor((StoreType*)x.V(), x.Bytes()), norm((float*)x.Norm()),
+    : spinor(&x), norm((float*)x.Norm()),
       stride(x.Length()/(N*REG_LENGTH)) {
 		    for(int i=0; i<QUDA_MAX_DIM; ++i) dim[i] = x.X()[i]; 
 			  checkTypes<RegType,InterType,StoreType>(); 

@@ -44,7 +44,7 @@ namespace quda {
     QudaVerbosity verbose;
 
   ColorSpinorParam()
-    : nColor(0), nSpin(0), nDim(0), precision(QUDA_INVALID_PRECISION), pad(0), 
+    : nColor(0), nSpin(0), nDim(0), nFace(0), precision(QUDA_INVALID_PRECISION), pad(0), 
       twistFlavor(QUDA_TWIST_INVALID), siteSubset(QUDA_INVALID_SITE_SUBSET), 
       siteOrder(QUDA_INVALID_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE), 
@@ -55,7 +55,7 @@ namespace quda {
   
     // used to create cpu params
   ColorSpinorParam(void *V, QudaFieldLocation location, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
-    : nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
+    : nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nFace(nSpin==1 ? 3 : 1), nDim(4), 
       pad(0), twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
       create(QUDA_REFERENCE_FIELD_CREATE), v(V), verbose(inv_param.verbosity)
@@ -103,6 +103,7 @@ namespace quda {
     // used to create cuda param from a cpu param
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
     : nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), 
+		    nFace(cpuParam.nFace),
       nDim(cpuParam.nDim), precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
       twistFlavor(cpuParam.twistFlavor), siteSubset(cpuParam.siteSubset), 
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
@@ -127,6 +128,7 @@ namespace quda {
       printfQuda("nSpin = %d\n", nSpin);
       printfQuda("twistFlavor = %d\n", twistFlavor);
       printfQuda("nDim = %d\n", nDim);
+      printfQuda("nFace = %d\n", nFace);
       for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
       printfQuda("precision = %d\n", precision);
       printfQuda("pad = %d\n", pad);
@@ -149,7 +151,7 @@ namespace quda {
   class ColorSpinorField {
 
   private:
-    void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
+    void create(int nDim, const int *x, int Nc, int Ns, int Nface, QudaTwistFlavorType Twistflavor, 
 		QudaPrecision precision, int pad, QudaSiteSubset subset, 
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
     void destroy();  
@@ -169,6 +171,8 @@ namespace quda {
     int volume;
     int pad;
     int stride;
+
+    int nFace;
 
     QudaTwistFlavorType twistFlavor;
   
@@ -216,6 +220,7 @@ namespace quda {
     QudaPrecision Precision() const { return precision; }
     int Ncolor() const { return nColor; } 
     int Nspin() const { return nSpin; } 
+    int Nface() const { return nFace; }
     int TwistFlavor() const { return twistFlavor; } 
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
