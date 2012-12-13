@@ -135,7 +135,6 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
   dslashParam.gauge0Tex = oddBit ? gauge.OddTex() : gauge.EvenTex();
   dslashParam.gauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
 #else
-#ifndef DIRECT_ACCESS_LINK  
   if (gauge.reconstruct == QUDA_RECONSTRUCT_NO) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       cudaBindTexture(0, gauge0TexDouble2, *gauge0, gauge.bytes/2); 
@@ -159,14 +158,13 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
       cudaBindTexture(0, gauge1TexHalf4, *gauge1, gauge.bytes/2);
     }
   }
-#endif
 #endif // USE_TEXTURE_OBJECTS
 
 }
 
 void unbindGaugeTex(const cudaGaugeField &gauge)
 {
-#if (!defined DIRECT_ACCESS_LINK && !defined USE_TEXTURE_OBJECTS)
+#if (!defined USE_TEXTURE_OBJECTS)
   if (gauge.reconstruct == QUDA_RECONSTRUCT_NO) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       cudaUnbindTexture(gauge0TexDouble2); 
@@ -207,7 +205,6 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge
   dslashParam.gauge0Tex = oddBit ? gauge.OddTex() : gauge.EvenTex();
   dslashParam.gauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
 #else
-#ifndef DIRECT_ACCESS_FAT_LINK  
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaBindTexture(0, fatGauge0TexDouble, *gauge0, gauge.bytes/2); 
     cudaBindTexture(0, fatGauge1TexDouble, *gauge1, gauge.bytes/2);
@@ -218,14 +215,13 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge
     cudaBindTexture(0, fatGauge0TexHalf, *gauge0, gauge.bytes/2); 
     cudaBindTexture(0, fatGauge1TexHalf, *gauge1, gauge.bytes/2);
   }
-#endif
 #endif // USE_TEXTURE_OBJECTS
 
 }
 
 void unbindFatGaugeTex(const cudaGaugeField &gauge)
 {
-#if (!defined DIRECT_ACCESS_FAT_LINK && !defined USE_TEXTURE_OBJECTS)
+#if (!defined USE_TEXTURE_OBJECTS)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(fatGauge0TexDouble);
     cudaUnbindTexture(fatGauge1TexDouble);
@@ -253,7 +249,6 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
   dslashParam.longGauge0Tex = oddBit ? gauge.OddTex() : gauge.EvenTex();
   dslashParam.longGauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
 #else
-#ifdef DIRECT_ACCESS_LONG_LINK
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaBindTexture(0, longGauge0TexDouble, *gauge0, gauge.bytes/2); 
     cudaBindTexture(0, longGauge1TexDouble, *gauge1, gauge.bytes/2);
@@ -274,13 +269,12 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
       cudaBindTexture(0, longGauge1TexHalf, *gauge1, gauge.bytes/2);
     }
   }
-#endif
 #endif // USE_TEXTURE_OBJECTS
 }
 
 void unbindLongGaugeTex(const cudaGaugeField &gauge)
 {
-#if (!defined DIRECT_ACCESS_LONG_LINK && !defined USE_TEXTURE_OBJECTS)
+#if (!defined USE_TEXTURE_OBJECTS)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(longGauge0TexDouble);
     cudaUnbindTexture(longGauge1TexDouble);
@@ -415,7 +409,6 @@ QudaPrecision bindCloverTex(const FullClover clover, const int oddBit,
   dslashParam.cloverTex = oddBit ? clover.OddTex() : clover.EvenTex();
   if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
 #else
-#ifndef DIRECT_ACCESS_CLOVER
   if (clover.precision == QUDA_DOUBLE_PRECISION) {
     cudaBindTexture(0, cloverTexDouble, *cloverP, clover.bytes); 
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {
@@ -424,15 +417,14 @@ QudaPrecision bindCloverTex(const FullClover clover, const int oddBit,
     cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes); 
     cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
   }
-#endif
-#endif // not defined USE_TEXTURE_OBJECTS
+#endif // USE_TEXTURE_OBJECTS
 
   return clover.precision;
 }
 
 void unbindCloverTex(const FullClover clover)
 {
-#if (!defined DIRECT_ACCESS_CLOVER && !defined USE_TEXTURE_OBJECTS)
+#if (!defined USE_TEXTURE_OBJECTS)
   if (clover.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(cloverTexDouble);
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {
@@ -441,6 +433,6 @@ void unbindCloverTex(const FullClover clover)
     cudaUnbindTexture(cloverTexHalf);
     cudaUnbindTexture(cloverTexNorm);
   }
-#endif // not defined DIRECT_ACCESS_CLOVER
+#endif // not defined USE_TEXTURE_OBJECTS
 }
 
