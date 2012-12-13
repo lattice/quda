@@ -200,13 +200,6 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
 fi
 
 
-
-AC_ARG_ENABLE(tex-object,
- AC_HELP_STRING([--enable-tex-object], [ Enable texture objects for blas (Kepler only, default: disabled)]),
- [ tex_object=${enableval}],
- [ tex_object="no" ]
-)
-
 AC_ARG_ENABLE(blas-tex,
  AC_HELP_STRING([--enable-blas-tex], [ Enable texture reads for blas (default: enabled)]),
  [ blas_tex=${enableval}],
@@ -431,14 +424,6 @@ if test "X${build_qio}X" = "XyesX"; then
   fi	
 fi
  
-dnl Enables texture objects for Kepler
-case ${tex_object} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-tex-object ])
-  ;;
-esac
-
 dnl Enables textures for blas functions
 case ${blas_tex} in
 yes|no);;
@@ -555,9 +540,6 @@ AC_SUBST( QMP_HOME, [${qmp_home}] )
 
 AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
 AC_SUBST( QIO_HOME, [${qio_home}] )
-
-AC_MSG_NOTICE([Setting TEX_OBJECT= ${tex_object}])
-AC_SUBST( TEX_OBJECT, [${tex_object}])
 
 AC_MSG_NOTICE([Setting BLAS_TEX= ${blas_tex}])
 AC_SUBST( BLAS_TEX, [${blas_tex}])

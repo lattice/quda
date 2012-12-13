@@ -318,6 +318,67 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y,
 
   int x, y, z, t;
 
+  // The full field index is 
+  // idx = x + y*X + z*X*Y + t*X*Y*Z
+  // The parity of lattice site (x,y,z,t) 
+  // is defined to be (x+y+z+t) & 1
+  // 0 => even parity 
+  // 1 => odd parity
+  // cb_idx runs over the half volume
+  // cb_idx = iidx/2 = (x + y*X + z*X*Y + t*X*Y*Z)/2
+  //
+  // We need to obtain idx from cb_idx + parity.
+  // 
+  // 1)  First, consider the case where X is even.
+  // Then, y*X + z*X*Y + t*X*Y*Z is even and
+  // 2*cb_idx = 2*(x/2) + y*X + z*X*Y + t*X*Y*Z
+  // Since, 2*(x/2) is even, if y+z+t is even
+  // (2*(x/2),y,z,t) is an even parity site.
+  // Similarly, if y+z+t is odd
+  // (2*(x/2),y,z,t) is an odd parity site. 
+  // 
+  // Note that (1+y+z+t)&1 = 1 for y+z+t even
+  //      and  (1+y+z+t)&1 = 0 for y+z+t odd
+  // Therefore, 
+  // (2*/(x/2) + (1+y+z+t)&1, y, z, t) is odd.
+  //
+  // 2)  Consider the case where X is odd but Y is even.
+  // Calculate 2*cb_idx
+  // t = 2*cb_idx/XYZ
+  // z = (2*cb_idx/XY) % Z
+  //
+  // Now, we  need to compute (x,y) for different parities.
+  // To select a site with even parity, consider (z+t).
+  // If (z+t) is even, this implies that (x+y) must also 
+  // be even in order that (x+y+z+t) is even. 
+  // Therefore,  x + y*X is even.
+  // Thus, 2*cb_idx = idx 
+  // and y =  (2*cb_idx/X) % Y
+  // and x =  (2*cb_idx) % X;
+  // 
+  // On the other hand, if (z+t) is odd, (x+y) must be 
+  // also be odd in order to get overall even parity. 
+  // Then x + y*X is odd (since X is odd and either x or y is odd)
+  // and 2*cb_idx = 2*(idx/2) = idx-1 =  x + y*X -1 + z*X*Y + t*X*Y*Z
+  // => idx = 2*cb_idx + 1
+  // and y = ((2*cb_idx + 1)/X) % Y
+  // and x = (2*cb_idx + 1) % X
+  //
+  // To select a site with odd parity if (z+t) is even,
+  // (x+y) must be odd, which, following the discussion above, implies that
+  // y = ((2*cb_idx + 1)/X) % Y
+  // x = (2*cb_idx + 1) % X
+  // Finally, if (z+t) is odd (x+y) must be even to get overall odd parity, 
+  // and 
+  // y = ((2*cb_idx)/X) % Y
+  // x = (2*cb_idx) % X
+  // 
+  // The code below covers these cases 
+  // as well as the cases where X, Y are odd and Z is even,
+  // and X,Y,Z are all odd
+
+
+
   if (!(LX & 1)) { // X even
     //   t = idx / XYZ;
     //   z = (idx / XY) % Z;

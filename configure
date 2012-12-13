@@ -571,7 +571,6 @@ USE_QDPJIT
 NUMA_AFFINITY
 FERMI_DBLE_TEX
 BLAS_TEX
-TEX_OBJECT
 QIO_HOME
 QMP_HOME
 MPI_HOME
@@ -685,7 +684,6 @@ with_qmp
 with_qio
 enable_qdp_jit
 with_qdp
-enable_tex_object
 enable_blas_tex
 enable_fermi_double_tex
 enable_numa_affinity
@@ -1347,8 +1345,6 @@ Optional Features:
                           device (default: disabled)
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
                           (default: disabled)
-  --enable-tex-object     Enable texture objects for blas (Kepler only,
-                          default: disabled)
   --enable-blas-tex       Enable texture reads for blas (default: enabled)
   --enable-fermi-double-tex
                           Enable double-precision texture reads on Fermi
@@ -3708,16 +3704,6 @@ $as_echo "$as_me: QDP++ libraries flags: ${QDPXX_LIBS}" >&6;}
 fi
 
 
-
-# Check whether --enable-tex-object was given.
-if test "${enable_tex_object+set}" = set; then :
-  enableval=$enable_tex_object;  tex_object=${enableval}
-else
-   tex_object="no"
-
-fi
-
-
 # Check whether --enable-blas-tex was given.
 if test "${enable_blas_tex+set}" = set; then :
   enableval=$enable_blas_tex;  blas_tex=${enableval}
@@ -3925,13 +3911,6 @@ if test "X${build_qio}X" = "XyesX"; then
   fi
 fi
 
-case ${tex_object} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-tex-object " "$LINENO" 5
-  ;;
-esac
-
 case ${blas_tex} in
 yes|no);;
 *)
@@ -4106,11 +4085,6 @@ QMP_HOME=${qmp_home}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting QIO_HOME=${qio_home}" >&5
 $as_echo "$as_me: Setting QIO_HOME=${qio_home}" >&6;}
 QIO_HOME=${qio_home}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting TEX_OBJECT= ${tex_object}" >&5
-$as_echo "$as_me: Setting TEX_OBJECT= ${tex_object}" >&6;}
-TEX_OBJECT=${tex_object}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BLAS_TEX= ${blas_tex}" >&5
