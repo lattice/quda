@@ -171,6 +171,8 @@ unitarize_link_test()
 
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
 
+  delete cpuOutLink;
+
   setUnitarizeLinksConstants(unitarize_eps,
 				   max_allowed_error,
 				   reunit_allow_svd,
