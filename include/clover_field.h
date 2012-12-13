@@ -95,7 +95,7 @@ namespace quda {
   };
 
   // lightweight struct used to send pointers to cuda driver code
-  struct FullClover {
+  class FullClover {
     void *even;
     void *odd;
     void *evenNorm;
