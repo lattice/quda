@@ -53,6 +53,8 @@ namespace quda {
 																const int num_norm_faces = 2*nFace;
 
 
+                printfQuda("In createGhostZone: nFace = %d\n",nFace);
+
 																// calculate size of ghost zone required
 																int ghostVolume = 0;
 																//BEGIN NEW:  

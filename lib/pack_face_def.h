@@ -920,8 +920,20 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
   face_idx -= face_num*nFace*face_volume;
 
   // compute an index into the local volume from the index into the face
-  const int idx = indexFromFaceIndexAsqtad<dim, nFace>(face_idx, face_volume, face_num, parity);
-  
+  //const int idx = indexFromFaceIndexAsqtad<dim, nFace>(face_idx, face_volume, face_num, parity);
+  int idx = indexFromFaceIndexAsqtad<dim, nFace>(face_idx, face_volume, face_num, parity);
+
+
+  // Test to see if this works!!
+  // Does coordsFromIndex work??
+  int x, y, z, t, full_idx; 
+  coordsFromIndex(full_idx , x, y, z, t, idx, parity);
+
+  idx = X1*X2*X3*t + X1*X2*z + X1*y + x;
+  idx = idx >> 1;
+
+
+
   if (face_num) {
     out = (Float2*)((char*)out + faceBytes);
     outNorm = (float*)((char*)outNorm + faceBytes);
@@ -939,6 +951,45 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
 
   if (ishalf) outNorm[face_idx] = inNorm[idx];*/
 }
+
+template <int dim, int ishalf, int nFace, typename Float2>
+__global__ void unpackFaceStaggeredKernel(Float2 *out, 
+																																										float *outNorm,
+																																									 const Float2* in,
+																																										const float* inNorm,
+																																									 const int parity)
+{
+  const int Nint = 6;
+  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x);
+  if(ishalf) faceBytes += nFace*ghostFace[dim]*sizeof(float);
+
+  int face_volume = ghostFace[dim];
+  int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+  if(face_idx >= 2*nFace*face_volume) return;
+  
+  const int face_num = (face_idx >= nFace*face_volume) ? 1 : 0;
+  face_idx -= face_num*nFace*face_volume;
+ 
+  // compute an index into the local volume from the index into the face 
+  const int idx = indexFromFaceIndexAsqtad<dim,nFace>(face_idx, face_volume, face_num, parity);
+
+ // Not sure if packSpinor will work out of the box, since it may use textures.
+//  packSpinor(out, outNorm, idx, sp_stride, (Float2*)(((char*)in+face_num*faceBytes)), (float*)((char*)inNorm+face_num*faceBytes), face_idx, nFace*face_volume);
+
+  Float2* tmp = (Float2*)(((char*)in + face_num*faceBytes));
+  Float2* tmpNorm = (float*)((char*)inNorm + face_num*faceBytes);
+
+  out[idx] 													  = tmp[face_idx];
+  out[idx +   sp_stride]  = tmp[face_idx +   nFace*face_volume];
+  out[idx + 2*sp_stride]  = tmp[face_idx + 2*nFace*face_volume];
+  if(ishalf) outNorm[idx] = tmpNorm[face_idx];
+
+  return;
+}
+
+
+
 #endif // GPU_STAGGERED_DIRAC
 
 template<typename T>
