@@ -21,14 +21,14 @@ namespace quda {
     even = gauge;
     odd = (char*)gauge + bytes/2; 
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     createTexObject(evenTex, even);
     createTexObject(oddTex, odd);
 #endif
 
   }
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field) {
 
     // create the texture for the field components
@@ -76,7 +76,7 @@ namespace quda {
 
   cudaGaugeField::~cudaGaugeField()
   {
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     destroyTexObject();
 #endif
 

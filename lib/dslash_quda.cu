@@ -62,7 +62,7 @@ namespace quda {
     int ghostNormOffset[QUDA_MAX_DIM];
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
     cudaTextureObject_t xTex;

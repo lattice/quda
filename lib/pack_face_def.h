@@ -643,7 +643,7 @@ static inline __device__ void coordsFromDWFaceIndex(int &cb_idx, Int &X, Int &Y,
 
 struct PackParam {
   int parity;
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   cudaTextureObject_t inTex;
   cudaTextureObject_t inTexNorm;
 #endif
@@ -661,7 +661,7 @@ struct PackParam {
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexDouble
@@ -700,7 +700,7 @@ static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, c
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexSingle
@@ -735,7 +735,7 @@ static inline __device__ void packFaceWilsonCore(float4 *out, float *outNorm, co
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexHalf
@@ -837,7 +837,7 @@ class PackFaceWilson : public Tunable {
 
     PackParam param;
     param.parity = parity;
-#if TEXTURE_OBJECT
+#if USE_TEXTURE_OBJECTS
     param.inTex = in->Tex();
     param.inTexNorm = in->TexNorm();
 #endif
@@ -929,7 +929,7 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 
 #ifdef GPU_STAGGERED_DIRAC
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEXDOUBLE param.inTex
 #define SPINORTEXSINGLE param.inTex
 #define SPINORTEXHALF param.inTex
@@ -1029,7 +1029,7 @@ void packFaceAsqtad(Float2 *faces, float *facesNorm, const cudaColorSpinorField 
 #ifdef GPU_STAGGERED_DIRAC
   PackParam param;
   param.parity = parity;
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   param.inTex = in.Tex();
   param.inTexNorm = in.TexNorm();
 #endif
@@ -1140,7 +1140,7 @@ void packFaceDW(FloatN *faces, float *facesNorm, const cudaColorSpinorField &in,
 
   PackParam param;
   param.parity = parity;
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   param.inTex = in.Tex();
   param.inTexNorm = in.TexNorm();
 #endif

@@ -141,7 +141,7 @@ namespace quda {
 
     double fat_link_max;
   
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t evenTex;
     cudaTextureObject_t oddTex;
     void createTexObject(cudaTextureObject_t &tex, void *gauge);
@@ -166,7 +166,7 @@ namespace quda {
     const void* Even_p() const { return even; }
     const void* Odd_p() const { return odd; }	
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& EvenTex() const { return evenTex; }
     const cudaTextureObject_t& OddTex() const { return oddTex; }
 #endif

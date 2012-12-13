@@ -193,26 +193,26 @@
 #define FATLINK0TEX fatGauge0
 #define FATLINK1TEX fatGauge1
 #else
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define FATLINK0TEX param.gauge0Tex
 #define FATLINK1TEX param.gauge1Tex
 #else
 #define FATLINK0TEX fatGauge0TexDouble
 #define FATLINK1TEX fatGauge1TexDouble
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #endif
 
 #if (defined DIRECT_ACCESS_LONG_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define LONGLINK0TEX longGauge0
 #define LONGLINK1TEX longGauge1
 #else
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define LONGLINK0TEX param.longGauge0Tex
 #define LONGLINK1TEX param.longGauge1Tex
 #else
 #define LONGLINK0TEX longGauge0TexDouble
 #define LONGLINK1TEX longGauge1TexDouble
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #endif
 
 #define GAUGE_DOUBLE
@@ -225,11 +225,11 @@
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE
 #else
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexDouble
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE_TEX
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_DOUBLE_TEX
 #endif
@@ -238,7 +238,7 @@
 #define INTERTEX out
 #else
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_DOUBLE_TEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define INTERTEX param.outTex
 #else
 #define INTERTEX interTexDouble
@@ -251,11 +251,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ST_ACCUM_DOUBLE
 #else
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define ACCUMTEX param.xTex
 #else
 #define ACCUMTEX accumTexDouble
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ST_ACCUM_DOUBLE_TEX
 #endif
 #endif // DD_AXPY
@@ -267,7 +267,7 @@
 #define DD_PREC_F S
 
 #ifndef DIRECT_ACCESS_FAT_LINK
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define FATLINK0TEX param.gauge0Tex
 #define FATLINK1TEX param.gauge1Tex
 #else
@@ -280,7 +280,7 @@
 #endif
 
 #ifndef DIRECT_ACCESS_LONG_LINK //longlink access
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define LONGLINK0TEX param.longGauge0Tex
 #define LONGLINK1TEX param.longGauge1Tex
 #else
@@ -291,7 +291,7 @@
 #define LONGLINK0TEX longGauge0TexSingle
 #define LONGLINK1TEX longGauge1TexSingle
 #endif
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #else
 #define LONGLINK0TEX longGauge0
 #define LONGLINK1TEX longGauge1
@@ -301,11 +301,11 @@
 #define DD_PARAM_OUT float2* out, float *null1
 #define DD_PARAM_IN const float2* in, const float *null4
 #ifndef DIRECT_ACCESS_SPINOR
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexSingle2
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_SINGLE_TEX
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_SINGLE_TEX
 #else
@@ -318,11 +318,11 @@
 #define INTERTEX out
 #else
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_SINGLE_TEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define INTERTEX param.outTex
 #else
 #define INTERTEX interTexSingle2
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_FLOAT2
 #if (DD_AXPY==1)
@@ -330,11 +330,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ST_ACCUM_SINGLE
 #else
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define ACCUMTEX param.xTex
 #else
 #define ACCUMTEX accumTexSingle2
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ST_ACCUM_SINGLE_TEX
 #endif
 #endif // DD_AXPY
@@ -346,7 +346,7 @@
 
 // gauge fields
 #define DD_PREC_F H
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define FATLINK0TEX param.gauge0Tex
 #define FATLINK1TEX param.gauge1Tex
 #define LONGLINK0TEX param.longGauge0Tex
@@ -361,15 +361,15 @@
 #define LONGLINK0TEX longGauge0TexHalf
 #define LONGLINK1TEX longGauge1TexHalf
 #endif
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_HALF_TEX
 #define READ_3RD_NBR_SPINOR READ_3RD_NBR_SPINOR_HALF_TEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexHalf2
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #define DD_PARAM_OUT short2* out, float *outNorm
 #define DD_PARAM_IN const short2* in, const float *inNorm
 #if (defined DIRECT_ACCESS_INTER)
@@ -377,19 +377,19 @@
 #define INTERTEX out
 #else
 #define READ_AND_SUM_SPINOR READ_AND_SUM_ST_SPINOR_HALF_TEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define INTERTEX param.outTex
 #else
 #define INTERTEX interTexHalf2
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define WRITE_SPINOR WRITE_ST_SPINOR_SHORT2
 #if (DD_AXPY==1)
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define ACCUMTEX param.xTex
 #else
 #define ACCUMTEX accumTexHalf2
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ST_ACCUM_HALF_TEX
 #endif // DD_AXPY
 

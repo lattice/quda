@@ -92,7 +92,7 @@
   double2 C16 = fetch_double2((clover), sid + (18*chi+16)*cl_stride);  \
   double2 C17 = fetch_double2((clover), sid + (18*chi+17)*cl_stride);
 
-//#endif // TEXTURE_OBJECT
+//#endif // USE_TEXTURE_OBJECTS
 
 #define READ_CLOVER_SINGLE_TEX(clover, chi)			\
   float4 C0 = TEX1DFETCH(float4, (clover), sid + (9*chi+0)*cl_stride);	\

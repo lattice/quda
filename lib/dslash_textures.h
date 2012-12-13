@@ -1,7 +1,7 @@
 #include <typeinfo>
 
 // Use this macro for texture fetching for supporting either texture objects of texture references
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define TEX1DFETCH(type, tex, idx) tex1Dfetch<type>((tex), idx)
 #else
 #define TEX1DFETCH(type, tex, idx) tex1Dfetch((tex), idx)
@@ -126,7 +126,7 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
     *gauge1 = gauge.odd;
   }
   
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   dslashParam.gauge0Tex = oddBit ? gauge.OddTex() : gauge.EvenTex();
   dslashParam.gauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
 #else
@@ -155,13 +155,13 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
     }
   }
 #endif
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 
 }
 
 void unbindGaugeTex(const cudaGaugeField &gauge)
 {
-#if (!defined DIRECT_ACCESS_LINK && !defined TEXTURE_OBJECT)
+#if (!defined DIRECT_ACCESS_LINK && !defined USE_TEXTURE_OBJECTS)
   if (gauge.reconstruct == QUDA_RECONSTRUCT_NO) {
     if (gauge.precision == QUDA_DOUBLE_PRECISION) {
       cudaUnbindTexture(gauge0TexDouble2); 
@@ -198,7 +198,7 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge
     *gauge1 = gauge.odd;
   }
   
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   dslashParam.gauge0Tex = oddBit ? gauge.OddTex() : gauge.EvenTex();
   dslashParam.gauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
 #else
@@ -214,13 +214,13 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge
     cudaBindTexture(0, fatGauge1TexHalf, *gauge1, gauge.bytes/2);
   }
 #endif
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 
 }
 
 void unbindFatGaugeTex(const cudaGaugeField &gauge)
 {
-#if (!defined DIRECT_ACCESS_FAT_LINK && !defined TEXTURE_OBJECT)
+#if (!defined DIRECT_ACCESS_FAT_LINK && !defined USE_TEXTURE_OBJECTS)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(fatGauge0TexDouble);
     cudaUnbindTexture(fatGauge1TexDouble);
@@ -244,7 +244,7 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
     *gauge1 = gauge.odd;
   }
   
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   dslashParam.longGauge0Tex = oddBit ? gauge.OddTex() : gauge.EvenTex();
   dslashParam.longGauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
 #else
@@ -270,12 +270,12 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
     }
   }
 #endif
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 }
 
 void unbindLongGaugeTex(const cudaGaugeField &gauge)
 {
-#if (!defined DIRECT_ACCESS_LONG_LINK && !defined TEXTURE_OBJECT)
+#if (!defined DIRECT_ACCESS_LONG_LINK && !defined USE_TEXTURE_OBJECTS)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(longGauge0TexDouble);
     cudaUnbindTexture(longGauge1TexDouble);
@@ -306,7 +306,7 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
   int size = (sizeof(((spinorFloat*)0)->x) < sizeof(float)) ? sizeof(float) :
     sizeof(((spinorFloat*)0)->x);
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   dslashParam.inTex = in->Tex();
   dslashParam.inTexNorm = in->TexNorm();
   if (out) dslashParam.outTex = out->Tex();
@@ -343,7 +343,7 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
   } else {
     errorQuda("Unsupported precision and short vector type");
   }
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 
   return size;
 }
@@ -351,7 +351,7 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
 template <typename spinorFloat>
 void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *out=0, 
 		     const cudaColorSpinorField *x=0) {
-#ifndef TEXTURE_OBJECT
+#ifndef USE_TEXTURE_OBJECTS
   if (typeid(spinorFloat) == typeid(double2)) {
     cudaUnbindTexture(spinorTexDouble);
     if (out) cudaUnbindTexture(interTexDouble);
@@ -381,7 +381,7 @@ void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField 
   } else {
     errorQuda("Unsupported precision and short vector type");
   }
-#endif // TEXTURE_OBJECT
+#endif // USE_TEXTURE_OBJECTS
 }
 
 // Double precision clover term
@@ -406,7 +406,7 @@ QudaPrecision bindCloverTex(const FullClover clover, const int oddBit,
     *cloverNormP = clover.evenNorm;
   }
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   dslashParam.cloverTex = oddBit ? clover.OddTex() : clover.EvenTex();
   if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
 #else
@@ -420,14 +420,14 @@ QudaPrecision bindCloverTex(const FullClover clover, const int oddBit,
     cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
   }
 #endif
-#endif // not defined TEXTURE_OBJECT
+#endif // not defined USE_TEXTURE_OBJECTS
 
   return clover.precision;
 }
 
 void unbindCloverTex(const FullClover clover)
 {
-#if (!defined DIRECT_ACCESS_CLOVER && !defined TEXTURE_OBJECT)
+#if (!defined DIRECT_ACCESS_CLOVER && !defined USE_TEXTURE_OBJECTS)
   if (clover.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(cloverTexDouble);
   } else if (clover.precision == QUDA_SINGLE_PRECISION) {

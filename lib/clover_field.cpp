@@ -81,7 +81,7 @@ namespace quda {
       }
     } 
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     createTexObject(evenTex, evenNormTex, even, evenNorm);
     createTexObject(oddTex, oddNormTex, odd, oddNorm);
     createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm);
@@ -90,7 +90,7 @@ namespace quda {
     
   }
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
 					void *field, void *norm) {
 
@@ -163,7 +163,7 @@ namespace quda {
 
   cudaCloverField::~cudaCloverField()
   {
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     destroyTexObject();
 #endif
 

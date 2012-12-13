@@ -44,7 +44,7 @@ namespace quda {
     // computes the clover field given the input gauge field
     void compute(const cudaGaugeField &gauge);
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t evenTex;
     cudaTextureObject_t evenNormTex;
     cudaTextureObject_t oddTex;
@@ -68,7 +68,7 @@ namespace quda {
     cudaCloverField(const cudaGaugeField &gauge, const CloverFieldParam &param);
     virtual ~cudaCloverField();
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& EvenTex() const { return evenTex; }
     const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
     const cudaTextureObject_t& OddTex() const { return oddTex; }
@@ -104,7 +104,7 @@ namespace quda {
     size_t bytes; // sizeof each clover field (per parity)
     size_t norm_bytes; // sizeof each norm field (per parity)
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t &evenTex;
     const cudaTextureObject_t &evenNormTex;
     const cudaTextureObject_t &oddTex;
@@ -117,7 +117,7 @@ namespace quda {
 
     FullClover(const cudaCloverField &clover, bool inverse=false) :
       precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes)
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 	, evenTex(inverse ? clover.evenInvTex : clover.evenTex)
 	, evenNormTex(inverse ? clover.evenInvNormTex : clover.evenNormTex)
 	, oddTex(inverse ? clover.oddInvTex : clover.oddTex)

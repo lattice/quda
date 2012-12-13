@@ -26,7 +26,7 @@ __device__ float4 operator*(const float &x, const float4 &y)
 #define tmp3_re tmp3.x
 #define tmp3_im tmp3.y
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexDouble
@@ -178,7 +178,7 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 #define tmp3_im tmp1.w
 
 #undef SPINORTEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #else
 #define SPINORTEX spinorTexSingle
@@ -283,7 +283,7 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
 }
 
 #undef SPINORTEX
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #define SPINORTEXNORM param.inTexNorm
 #else
