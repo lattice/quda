@@ -256,14 +256,14 @@ namespace quda {
       }
     }
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     createTexObject();
 #endif
 
     checkCudaError();
   }
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
 
     if (texInit) errorQuda("Already bound textures");
@@ -361,7 +361,7 @@ namespace quda {
       alloc = false;
     }
 
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     destroyTexObject();
 #endif
 
