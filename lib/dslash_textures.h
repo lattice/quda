@@ -39,13 +39,6 @@ texture<short4, 1, cudaReadModeNormalizedFloat> gauge1TexHalf4;
 texture<short2, 1, cudaReadModeNormalizedFloat> gauge0TexHalf2;
 texture<short2, 1, cudaReadModeNormalizedFloat> gauge1TexHalf2;
 
-texture<int4, 1> fatGauge0TexDouble;
-texture<int4, 1> fatGauge1TexDouble;
-texture<float2, 1, cudaReadModeElementType> fatGauge0TexSingle;
-texture<float2, 1, cudaReadModeElementType> fatGauge1TexSingle;
-texture<short2, 1, cudaReadModeNormalizedFloat> fatGauge0TexHalf;
-texture<short2, 1, cudaReadModeNormalizedFloat> fatGauge1TexHalf;
-
 texture<int4, 1> longGauge0TexDouble;
 texture<int4, 1> longGauge1TexDouble;
 texture<float4, 1, cudaReadModeElementType> longGauge0TexSingle;
@@ -99,6 +92,14 @@ texture<float, 1, cudaReadModeElementType> interTexHalf2Norm;
 #endif // not defined USE_TEXTURE_OBJECTS
 
 // FIXME update the below textures for texture objects
+
+// fatGauge textures are still used by llfat so we need to define
+texture<int4, 1> fatGauge0TexDouble;
+texture<int4, 1> fatGauge1TexDouble;
+texture<float2, 1, cudaReadModeElementType> fatGauge0TexSingle;
+texture<float2, 1, cudaReadModeElementType> fatGauge1TexSingle;
+texture<short2, 1, cudaReadModeNormalizedFloat> fatGauge0TexHalf;
+texture<short2, 1, cudaReadModeNormalizedFloat> fatGauge1TexHalf;
 
 //Double precision for site link
 texture<int4, 1> siteLink0TexDouble;
