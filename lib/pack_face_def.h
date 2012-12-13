@@ -837,7 +837,7 @@ class PackFaceWilson : public Tunable {
 
     PackParam param;
     param.parity = parity;
-#if USE_TEXTURE_OBJECTS
+#ifdef USE_TEXTURE_OBJECTS
     param.inTex = in->Tex();
     param.inTexNorm = in->TexNorm();
 #endif
@@ -935,10 +935,10 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 #define SPINORTEXHALF param.inTex
 #define SPINORTEXHALFNORM param.inTexNorm
 #else
-#define SPINORTEXDOUBLE spinorTexDouble2
+#define SPINORTEXDOUBLE spinorTexDouble
 #define SPINORTEXSINGLE spinorTexSingle2
 #define SPINORTEXHALF spinorTexHalf2
-#define SPINORTEXHALFNORM spinorTexHalfNorm
+#define SPINORTEXHALFNORM spinorTexHalf2Norm
 #endif
 
 #if (defined DIRECT_ACCESS_PACK) || (defined FERMI_NO_DBLE_TEX)

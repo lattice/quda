@@ -1,3 +1,4 @@
+#include <string.h>
 #include <gauge_field.h>
 #include <face_quda.h>
 #include <typeinfo>

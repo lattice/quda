@@ -81,7 +81,7 @@ namespace quda {
 
     friend class DiracClover;
     friend class DiracCloverPC;
-    friend class FullClover;
+    friend struct FullClover;
   };
 
   // this is a place holder for a future host-side clover object
@@ -95,7 +95,7 @@ namespace quda {
   };
 
   // lightweight struct used to send pointers to cuda driver code
-  class FullClover {
+  struct FullClover {
     void *even;
     void *odd;
     void *evenNorm;

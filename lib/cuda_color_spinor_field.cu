@@ -243,8 +243,10 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION) 
 	(dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + norm_bytes/2);
 
-     dynamic_cast<cudaColorSpinorField*>(odd)->destroyTexObject();
-     dynamic_cast<cudaColorSpinorField*>(odd)->createTexObject();
+#ifdef USE_TEXTURE_OBJECTS
+      dynamic_cast<cudaColorSpinorField*>(odd)->destroyTexObject();
+      dynamic_cast<cudaColorSpinorField*>(odd)->createTexObject();
+#endif
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {

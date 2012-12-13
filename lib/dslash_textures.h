@@ -22,6 +22,7 @@ static __inline__ __device__ double2 fetch_double2_old(texture<int4, 1> t, int i
 }
 #endif //__COMPUTE_CAPABILITY__ >= 130
 
+#ifndef USE_TEXTURE_OBJECTS
 // Double precision gauge field
 texture<int4, 1> gauge0TexDouble2;
 texture<int4, 1> gauge1TexDouble2;
@@ -57,6 +58,47 @@ texture<short4, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf;
 texture<short2, 1, cudaReadModeNormalizedFloat> longGauge0TexHalf_norecon;
 texture<short2, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf_norecon;
 
+// Double precision input spinor field
+texture<int4, 1> spinorTexDouble;
+
+// Single precision input spinor field
+texture<float4, 1, cudaReadModeElementType> spinorTexSingle;
+texture<float2, 1, cudaReadModeElementType> spinorTexSingle2;
+
+// Half precision input spinor field
+texture<short4, 1, cudaReadModeNormalizedFloat> spinorTexHalf;
+texture<short2, 1, cudaReadModeNormalizedFloat> spinorTexHalf2;
+texture<float, 1, cudaReadModeElementType> spinorTexHalfNorm;
+texture<float, 1, cudaReadModeElementType> spinorTexHalf2Norm;
+
+// Double precision accumulate spinor field
+texture<int4, 1> accumTexDouble;
+
+// Single precision accumulate spinor field
+texture<float4, 1, cudaReadModeElementType> accumTexSingle;
+texture<float2, 1, cudaReadModeElementType> accumTexSingle2;
+
+// Half precision accumulate spinor field
+texture<short4, 1, cudaReadModeNormalizedFloat> accumTexHalf;
+texture<short2, 1, cudaReadModeNormalizedFloat> accumTexHalf2;
+texture<float, 1, cudaReadModeElementType> accumTexHalfNorm;
+texture<float, 1, cudaReadModeElementType> accumTexHalf2Norm;
+
+// Double precision intermediate spinor field (used by exterior Dslash kernels)
+texture<int4, 1> interTexDouble;
+
+// Single precision intermediate spinor field
+texture<float4, 1, cudaReadModeElementType> interTexSingle;
+texture<float2, 1, cudaReadModeElementType> interTexSingle2;
+
+// Half precision intermediate spinor field
+texture<short4, 1, cudaReadModeNormalizedFloat> interTexHalf;
+texture<short2, 1, cudaReadModeNormalizedFloat> interTexHalf2;
+texture<float, 1, cudaReadModeElementType> interTexHalfNorm;
+texture<float, 1, cudaReadModeElementType> interTexHalf2Norm;
+#endif // not defined USE_TEXTURE_OBJECTS
+
+// FIXME update the below textures for texture objects
 
 //Double precision for site link
 texture<int4, 1> siteLink0TexDouble;
@@ -78,43 +120,6 @@ texture<int4, 1> muLink1TexDouble;
 // Single precision mulink field
 texture<float2, 1, cudaReadModeElementType> muLink0TexSingle;
 texture<float2, 1, cudaReadModeElementType> muLink1TexSingle;
-
-// Double precision input spinor field
-texture<int4, 1> spinorTexDouble;
-
-// Single precision input spinor field
-texture<float4, 1, cudaReadModeElementType> spinorTexSingle;
-texture<float2, 1, cudaReadModeElementType> spinorTexSingle2;
-
-// Half precision input spinor field
-texture<short4, 1, cudaReadModeNormalizedFloat> spinorTexHalf;
-texture<short2, 1, cudaReadModeNormalizedFloat> spinorTexHalf2;
-texture<float, 1, cudaReadModeElementType> spinorTexHalfNorm;
-
-// Double precision accumulate spinor field
-texture<int4, 1> accumTexDouble;
-
-// Single precision accumulate spinor field
-texture<float4, 1, cudaReadModeElementType> accumTexSingle;
-texture<float2, 1, cudaReadModeElementType> accumTexSingle2;
-
-// Half precision accumulate spinor field
-texture<short4, 1, cudaReadModeNormalizedFloat> accumTexHalf;
-texture<short2, 1, cudaReadModeNormalizedFloat> accumTexHalf2;
-texture<float, 1, cudaReadModeElementType> accumTexHalfNorm;
-
-// Double precision intermediate spinor field (used by exterior Dslash kernels)
-texture<int4, 1> interTexDouble;
-
-// Single precision intermediate spinor field
-texture<float4, 1, cudaReadModeElementType> interTexSingle;
-texture<float2, 1, cudaReadModeElementType> interTexSingle2;
-
-// Half precision intermediate spinor field
-texture<short4, 1, cudaReadModeNormalizedFloat> interTexHalf;
-texture<short2, 1, cudaReadModeNormalizedFloat> interTexHalf2;
-texture<float, 1, cudaReadModeElementType> interTexHalfNorm;
-texture<float, 1, cudaReadModeElementType> interTexHalf2Norm;
 
 void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, void **gauge1)
 {
@@ -335,11 +340,11 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
     if (x) cudaBindTexture(0, accumTexHalfNorm, x->Norm(), in->NormBytes()); 
   } else if (typeid(spinorFloat) == typeid(short2)) {
     cudaBindTexture(0, spinorTexHalf2, in->V(), in->Bytes()); 
-    cudaBindTexture(0, spinorTexHalfNorm, in->Norm(), in->NormBytes()); 
+    cudaBindTexture(0, spinorTexHalf2Norm, in->Norm(), in->NormBytes()); 
     if (out) cudaBindTexture(0, interTexHalf2, out->V(), in->Bytes()); 
     if (out) cudaBindTexture(0, interTexHalf2Norm, out->Norm(), in->NormBytes()); 
     if (x) cudaBindTexture(0, accumTexHalf2, x->V(), in->Bytes()); 
-    if (x) cudaBindTexture(0, accumTexHalfNorm, x->Norm(), in->NormBytes()); 
+    if (x) cudaBindTexture(0, accumTexHalf2Norm, x->Norm(), in->NormBytes()); 
   } else {
     errorQuda("Unsupported precision and short vector type");
   }
@@ -373,11 +378,11 @@ void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField 
     if (x) cudaUnbindTexture(accumTexHalfNorm);
   } else if (typeid(spinorFloat) == typeid(short2)) {
     cudaUnbindTexture(spinorTexHalf2); 
-    cudaUnbindTexture(spinorTexHalfNorm);
+    cudaUnbindTexture(spinorTexHalf2Norm);
     if (out) cudaUnbindTexture(interTexHalf2); 
     if (out) cudaUnbindTexture(interTexHalf2Norm);
     if (x) cudaUnbindTexture(accumTexHalf2); 
-    if (x) cudaUnbindTexture(accumTexHalfNorm);
+    if (x) cudaUnbindTexture(accumTexHalf2Norm);
   } else {
     errorQuda("Unsupported precision and short vector type");
   }
