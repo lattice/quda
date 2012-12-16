@@ -2,11 +2,6 @@
 #undef SHARED_FLOATS_PER_THREAD 
 #define SHARED_FLOATS_PER_THREAD 6
 
-#define Vsh_x cudaConstants.ghostFace[0]
-#define Vsh_y cudaConstants.ghostFace[1]
-#define Vsh_z cudaConstants.ghostFace[2]
-#define Vsh_t cudaConstants.ghostFace[3]
-
 //#define kernel_type param.kernel_type
 
 // input spinor
@@ -428,10 +423,10 @@ o02_re = o02_im = 0.f;
 	    if ( (kernel_type == EXTERIOR_KERNEL_X)){
 		    int space_con = (x4*cudaConstants.X3X2+x3*cudaConstants.X2+x2)/2;	
 		    if (x1 >= X1m1){
-		      nbr_idx1 = param.ghostOffset[0] + 9*Vsh_x +(x1-cudaConstants.X1m1)*Vsh_x+ space_con;
-		      stride1 = 3*Vsh_x;
+		      nbr_idx1 = param.ghostOffset[0] + 9*cudaConstants.ghostFace[0] +(x1-cudaConstants.X1m1)*cudaConstants.ghostFace[0]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[0] + 3*Vsh_x + (x1-cudaConstants.X1m1)*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0] + 3*cudaConstants.ghostFace[0] + (x1-cudaConstants.X1m1)*cudaConstants.ghostFace[0]+ space_con;
 #endif		    
 		    }
 	    }
@@ -462,10 +457,10 @@ o02_re = o02_im = 0.f;
 	    if( (kernel_type == EXTERIOR_KERNEL_X)){
 		    int space_con = (x4*cudaConstants.X3X2+x3*cudaConstants.X2+x2)/2;		
 		    if(x1  >= cudaConstants.X1m3){
-		      nbr_idx3 = param.ghostOffset[0] + 9*Vsh_x +(x1-cudaConstants.X1m3)*Vsh_x+ space_con;
-		      stride3 = 3*Vsh_x;
+		      nbr_idx3 = param.ghostOffset[0] + 9*cudaConstants.ghostFace[0] +(x1-cudaConstants.X1m3)*cudaConstants.ghostFace[0]+ space_con;
+		      stride3 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[0] + 3*Vsh_x + (x1-cudaConstants.X1m3)*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0] + 3*cudaConstants.ghostFace[0] + (x1-cudaConstants.X1m3)*cudaConstants.ghostFace[0]+ space_con;
 #endif	
 		    }
 	    }
@@ -510,10 +505,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if(kernel_type == EXTERIOR_KERNEL_X){
 		    if (x1-1 < 0){
-		      nbr_idx1 = param.ghostOffset[0] + (x1+2)*Vsh_x+ space_con;
-		      stride1 = 3*Vsh_x;
+		      nbr_idx1 = param.ghostOffset[0] + (x1+2)*cudaConstants.ghostFace[0]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[0]  + (x1+2)*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0]  + (x1+2)*cudaConstants.ghostFace[0]+ space_con;
 #endif	
 		    }        
 	    }
@@ -549,10 +544,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_X){
 		    if (x1 - 3 < 0){
-		      nbr_idx3 = param.ghostOffset[0] + x1*Vsh_x+ space_con;
-		      stride3 = 3*Vsh_x;
+		      nbr_idx3 = param.ghostOffset[0] + x1*cudaConstants.ghostFace[0]+ space_con;
+		      stride3 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[0]  + x1*Vsh_x+ space_con;
+		      norm_idx = param.ghostNormOffset[0]  + x1*cudaConstants.ghostFace[0]+ space_con;
 #endif
 		    }
 	    }
@@ -592,10 +587,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if(kernel_type == EXTERIOR_KERNEL_Y){	    
 		    if(x2 >= X2m1){
-		      nbr_idx1 = param.ghostOffset[1] + 9*Vsh_y +(x2-cudaConstants.X2m1)*Vsh_y+ space_con;
-		      stride1 = 3*Vsh_y;
+		      nbr_idx1 = param.ghostOffset[1] + 9*cudaConstants.ghostFace[1] +(x2-cudaConstants.X2m1)*cudaConstants.ghostFace[1]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[1] + 3*Vsh_y + (x2-cudaConstants.X2m1)*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1] + 3*cudaConstants.ghostFace[1] + (x2-cudaConstants.X2m1)*cudaConstants.ghostFace[1]+ space_con;
 #endif		    
 		    }      
 	    }
@@ -625,10 +620,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		    if (x2>= cudaConstants.X2m3){
-		      nbr_idx3 = param.ghostOffset[1] + 9*Vsh_y +(x2-cudaConstants.X2m3)*Vsh_y+ space_con;
-		      stride3 = 3*Vsh_y;
+		      nbr_idx3 = param.ghostOffset[1] + 9*cudaConstants.ghostFace[1] +(x2-cudaConstants.X2m3)*cudaConstants.ghostFace[1]+ space_con;
+		      stride3 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[1] + 3*Vsh_y + (x2-cudaConstants.X2m3)*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1] + 3*cudaConstants.ghostFace[1] + (x2-cudaConstants.X2m3)*cudaConstants.ghostFace[1]+ space_con;
 #endif		    
 		    }
 	    }
@@ -676,10 +671,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		    if (x2 - 1 < 0){
-		      nbr_idx1 = param.ghostOffset[1] + (x2+2)*Vsh_y+ space_con;
-		      stride1 = 3*Vsh_y;
+		      nbr_idx1 = param.ghostOffset[1] + (x2+2)*cudaConstants.ghostFace[1]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[1]  + (x2+2)*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1]  + (x2+2)*cudaConstants.ghostFace[1]+ space_con;
 #endif	
 		    }              
       }
@@ -715,10 +710,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		    if (x2 - 3 < 0){
-		      nbr_idx3 = param.ghostOffset[1] + x2*Vsh_y+ space_con;
-		      stride3 = 3*Vsh_y;
+		      nbr_idx3 = param.ghostOffset[1] + x2*cudaConstants.ghostFace[1]+ space_con;
+		      stride3 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[1]  + x2*Vsh_y+ space_con;
+		      norm_idx = param.ghostNormOffset[1]  + x2*cudaConstants.ghostFace[1]+ space_con;
 #endif
 		    }
 	    }
@@ -760,10 +755,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if(kernel_type == EXTERIOR_KERNEL_Z){	
 	      if (x3 >= cudaConstants.X3m1){
-		      nbr_idx1 = param.ghostOffset[2] + 9*Vsh_z +(x3-cudaConstants.X3m1)*Vsh_z+ space_con;
-		      stride1 = 3*Vsh_z;	    
+		      nbr_idx1 = param.ghostOffset[2] + 9*cudaConstants.ghostFace[2] +(x3-cudaConstants.X3m1)*cudaConstants.ghostFace[2]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[2];	    
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[2] + 3*Vsh_z + (x3-cudaConstants.X3m1)*Vsh_z+ space_con;
+		      norm_idx = param.ghostNormOffset[2] + 3*cudaConstants.ghostFace[2] + (x3-cudaConstants.X3m1)*cudaConstants.ghostFace[2]+ space_con;
 #endif		
 	      }      
 	    }
@@ -794,10 +789,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 	       if (x3 >= cudaConstants.X3m3){
-		       nbr_idx3 = param.ghostOffset[2] + 9*Vsh_z +(x3-cudaConstants.X3m3)*Vsh_z+ space_con;
-		       stride3 = 3*Vsh_z;
+		       nbr_idx3 = param.ghostOffset[2] + 9*cudaConstants.ghostFace[2] +(x3-cudaConstants.X3m3)*cudaConstants.ghostFace[2]+ space_con;
+		       stride3 = 3*cudaConstants.ghostFace[2];
 #if (DD_PREC == 2) //half precision
-		       norm_idx = param.ghostNormOffset[2] + 3*Vsh_z + (x3-cudaConstants.X3m3)*Vsh_z+ space_con;
+		       norm_idx = param.ghostNormOffset[2] + 3*cudaConstants.ghostFace[2] + (x3-cudaConstants.X3m3)*cudaConstants.ghostFace[2]+ space_con;
 #endif
 	       }
 	    }
@@ -843,10 +838,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 		    if (x3 - 1 < 0){
-		      nbr_idx1 = param.ghostOffset[2] + (x3+2)*Vsh_z+ space_con;
-		      stride1 = 3*Vsh_z;
+		      nbr_idx1 = param.ghostOffset[2] + (x3+2)*cudaConstants.ghostFace[2]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[2];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[2]  + (x3+2)*Vsh_z+ space_con;
+		      norm_idx = param.ghostNormOffset[2]  + (x3+2)*cudaConstants.ghostFace[2]+ space_con;
 #endif			    
 		    }        
 	    }
@@ -882,10 +877,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 		    if(x3 - 3 < 0){
-		      nbr_idx3 = param.ghostOffset[2] + x3*Vsh_z+ space_con;
-		      stride3 = 3*Vsh_z;
+		      nbr_idx3 = param.ghostOffset[2] + x3*cudaConstants.ghostFace[2]+ space_con;
+		      stride3 = 3*cudaConstants.ghostFace[2];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[2]  + x3*Vsh_z+ space_con;
+		      norm_idx = param.ghostNormOffset[2]  + x3*cudaConstants.ghostFace[2]+ space_con;
 #endif			    
 		    }
 	    }
@@ -925,10 +920,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){      
 		    if (x4 >= cudaConstants.X4m1){
-		      nbr_idx1 = param.ghostOffset[3] + 9*Vsh_t +(x4-cudaConstants.X4m1)*Vsh_t+ space_con;
-		      stride1 = 3*Vsh_t;
+		      nbr_idx1 = param.ghostOffset[3] + 9*cudaConstants.ghostFace[3] +(x4-cudaConstants.X4m1)*cudaConstants.ghostFace[3]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[3];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[3] + 3*Vsh_t + (x4-cudaConstants.X4m1)*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3] + 3*cudaConstants.ghostFace[3] + (x4-cudaConstants.X4m1)*cudaConstants.ghostFace[3]+ space_con;
 #endif
 		    }
 	    }
@@ -958,10 +953,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){
 		    if (x4  >= cudaConstants.X4m3){
-		      nbr_idx3 = param.ghostOffset[3] + 9*Vsh_t +(x4-cudaConstants.X4m3)*Vsh_t+ space_con;
-		      stride3 = 3*Vsh_t;
+		      nbr_idx3 = param.ghostOffset[3] + 9*cudaConstants.ghostFace[3] +(x4-cudaConstants.X4m3)*cudaConstants.ghostFace[3]+ space_con;
+		      stride3 = 3*cudaConstants.ghostFace[3];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[3] + 3*Vsh_t + (x4-cudaConstants.X4m3)*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3] + 3*cudaConstants.ghostFace[3] + (x4-cudaConstants.X4m3)*cudaConstants.ghostFace[3]+ space_con;
 #endif
 		    }
 	    }
@@ -1001,10 +996,10 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_T){
 		    if (x4==0){
 		      fat_idx = cudaConstants.Vh + space_con;
-		      nbr_idx1 = param.ghostOffset[3] + (x4+2)*Vsh_t+ space_con;
-		      stride1 = 3*Vsh_t;
+		      nbr_idx1 = param.ghostOffset[3] + (x4+2)*cudaConstants.ghostFace[3]+ space_con;
+		      stride1 = 3*cudaConstants.ghostFace[3];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[3]  + (x4+2)*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3]  + (x4+2)*cudaConstants.ghostFace[3]+ space_con;
 #endif		    
 		    }        	
 	    }
@@ -1035,11 +1030,11 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){
 		    if (x4<3){                      
-		      long_idx = cudaConstants.Vh + x4*Vsh_t+ space_con;
-		      nbr_idx3 = param.ghostOffset[3] + x4*Vsh_t+ space_con;
-		      stride3 = 3*Vsh_t;
+		      long_idx = cudaConstants.Vh + x4*cudaConstants.ghostFace[3]+ space_con;
+		      nbr_idx3 = param.ghostOffset[3] + x4*cudaConstants.ghostFace[3]+ space_con;
+		      stride3 = 3*cudaConstants.ghostFace[3];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[3]  + x4*Vsh_t+ space_con;
+		      norm_idx = param.ghostNormOffset[3]  + x4*cudaConstants.ghostFace[3]+ space_con;
 #endif		    
 		    }
 	    }
@@ -1194,10 +1189,6 @@ WRITE_SPINOR(out);
 #undef t02_im
 
 #undef SHARED_FLOATS_PER_THREAD
-#undef Vsh_x
-#undef Vsh_y
-#undef Vsh_z
-#undef Vsh_t
 #undef kernel_type
 
 #undef o00_re
