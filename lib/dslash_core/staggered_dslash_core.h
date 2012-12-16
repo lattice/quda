@@ -422,7 +422,7 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if ( (kernel_type == EXTERIOR_KERNEL_X)){
 		    int space_con = (x4*cudaConstants.X3X2+x3*cudaConstants.X2+x2)/2;	
-		    if (x1 >= X1m1){
+		    if (x1 >= cudaConstants.X1m1){
 		      nbr_idx1 = param.ghostOffset[0] + 9*cudaConstants.ghostFace[0] +(x1-cudaConstants.X1m1)*cudaConstants.ghostFace[0]+ space_con;
 		      stride1 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
@@ -492,7 +492,7 @@ o02_re = o02_im = 0.f;
 	    int sp_idx_1st_nbr = ((x1==0) ? X+cudaConstants.X1m1 : X-1) >> 1;
 	    int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
-	    if((x1 -1) < 0){
+	    if(x1 < 1){
 		    fat_idx = Vh + space_con;
 	    }
 #endif
@@ -504,7 +504,7 @@ o02_re = o02_im = 0.f;
 #endif	 
 #ifdef MULTI_GPU
 	    if(kernel_type == EXTERIOR_KERNEL_X){
-		    if (x1-1 < 0){
+		    if (x1 < 1){
 		      nbr_idx1 = param.ghostOffset[0] + (x1+2)*cudaConstants.ghostFace[0]+ space_con;
 		      stride1 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
@@ -531,7 +531,7 @@ o02_re = o02_im = 0.f;
 	    int sp_idx_3rd_nbr = ((x1<3) ? X + cudaConstants.X1m3: X -3)>>1; 
 	    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
-	    if ((x1 -3) < 0){
+	    if (x1 < 3){
 		    long_idx = cudaConstants.Vh + x1*cudaConstants.X4X3X2h + space_con;
 	    }    
 #endif
@@ -543,7 +543,7 @@ o02_re = o02_im = 0.f;
 #endif	     
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_X){
-		    if (x1 - 3 < 0){
+		    if (x1 < 3){
 		      nbr_idx3 = param.ghostOffset[0] + x1*cudaConstants.ghostFace[0]+ space_con;
 		      stride3 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
@@ -658,7 +658,7 @@ o02_re = o02_im = 0.f;
 	    int sp_idx_1st_nbr = ((x2==0) ? X+cudaConstants.X2X1mX1 : X-cudaConstants.X1) >> 1;
 	    int fat_idx=sp_idx_1st_nbr;
 #ifdef MULTI_GPU
-	    if ((x2 -1) < 0){
+	    if (x2 < 1){
 		    fat_idx = cudaConstants.Vh + space_con;
 	    }    
 #endif
@@ -670,7 +670,7 @@ o02_re = o02_im = 0.f;
 #endif	 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
-		    if (x2 - 1 < 0){
+		    if (x2  < 1){
 		      nbr_idx1 = param.ghostOffset[1] + (x2+2)*cudaConstants.ghostFace[1]+ space_con;
 		      stride1 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
@@ -697,7 +697,7 @@ o02_re = o02_im = 0.f;
 	    int sp_idx_3rd_nbr = ((x2 < 3) ? X + cudaConstants.X2m3*cudaConstants.X1: X-3*cudaConstants.X1 )>> 1; 
 	    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
-	    if ((x2-3) < 0){
+	    if (x2 < 3){
 		    long_idx = cudaConstants.Vh+ x2*cudaConstants.X4X3X1h + space_con;
 	    }    
 #endif
@@ -709,7 +709,7 @@ o02_re = o02_im = 0.f;
 #endif	 
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
-		    if (x2 - 3 < 0){
+		    if (x2 < 3){
 		      nbr_idx3 = param.ghostOffset[1] + x2*cudaConstants.ghostFace[1]+ space_con;
 		      stride3 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
