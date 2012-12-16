@@ -60,14 +60,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_8_DOUBLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2(FAT, gauge, dir, idx, stride)
 #else
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(FAT, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_8_DOUBLE2(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_DOUBLE2(LONG, gauge, dir, idx, stride)
 #else
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_8_DOUBLE2_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_DOUBLE2_TEX(LONG, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
@@ -75,14 +75,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_8_SINGLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2(FAT, gauge, dir, idx, stride)
 #else
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2_TEX(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2_TEX(FAT, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_8_FLOAT4(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_FLOAT4(LONG, gauge, dir, idx, stride)
 #else
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_8_FLOAT4_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_FLOAT4_TEX(LONG, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #else // HALF PRECISION
@@ -90,14 +90,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_8_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_ga_max);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_ga_max);
 #else*/
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_ga_max);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_ga_max);
 /*#endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_8_SHORT4(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(LONG, gauge, dir, idx, stride)
 #else*/
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_8_SHORT4_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4_TEX(LONG, gauge, dir, idx, stride)
 //#endif // DIRECT_ACCESS_LONG_LINK
 
 #endif // DD_PREC
@@ -111,14 +111,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_DOUBLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2(FAT, gauge, dir, idx, stride)
 #else
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(FAT, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_12_DOUBLE2(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_DOUBLE2(LONG, gauge, dir, idx, stride)
 #else
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_12_DOUBLE2_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_DOUBLE2_TEX(LONG, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
@@ -126,14 +126,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_SINGLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2(FAT, gauge, dir, idx, stride)
 #else
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2_TEX(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2_TEX(FAT, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_12_FLOAT4(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_FLOAT4(LONG, gauge, dir, idx, stride)
 #else
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_12_FLOAT4_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_FLOAT4_TEX(LONG, gauge, dir, idx, stride)
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #else // HALF PRECISION
@@ -141,14 +141,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_ga_max);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_ga_max);
 #else*/
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_ga_max);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_ga_max);
 /*#endif // DIRECT_ACCCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_12_SHORT4(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(LONG, gauge, dir, idx, stride)
 #else*/
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_12_SHORT4_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4_TEX(LONG, gauge, dir, idx, stride)
 									//#endif // DIRECT_ACCCESS_LONG_LINK
 
 #endif // DD_PREC
@@ -161,14 +161,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1
 
 #ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2(FAT, gauge, dir, idx, stride)
 #else
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(FAT, gauge, dir, idx, stride)
 #endif // DIRECT_ACCCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2(LONG, gauge, dir, idx, stride)
 #else
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_DOUBLE2_TEX(LONG, gauge, dir, idx, stride)
 #endif // DIRECT_ACCCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
@@ -176,14 +176,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1
 
 #ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2(FAT, gauge, dir, idx, stride)
 #else
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2_TEX(FAT, gauge, dir, idx, fat_ga_stride)
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2_TEX(FAT, gauge, dir, idx, stride)
 #endif // DIRECT_ACCCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2(LONG, gauge, dir, idx, stride)
 #else
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_FLOAT2_TEX(LONG, gauge, dir, idx, stride)
 #endif // DIRECT_ACCCESS_LONG_LINK
 
 #else  // HALF PRECISION
@@ -191,14 +191,14 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_ga_max);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_ga_max);
 #else*/
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_ga_max);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fat_ga_max);
 									 /*#endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(LONG, gauge, dir, idx, stride)
 #else*/
-#define READ_LONG_MATRIX(LONG, gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2_TEX(LONG, gauge, dir, idx, long_ga_stride)
+#define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(LONG, gauge, dir, idx, stride)
 									 //#endif // DIRECT_ACCCESS_LONG_LINK
 
 #endif // DD_PREC
@@ -362,6 +362,16 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
   #include "staggered_dslash_core.h"
 #endif
 }
+
+//// Add border zone
+//template <KernelType kernel_type, bool hasNaik>
+//__global__ void DD_FUNC(DD_FNAME, DD_RECON_F, D_AXPY_F)
+//  (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY, int bx, int by, int bz, int bt){
+//#ifdef GPU_STAGGERED_DIRAC
+//  #include "staggered_dslash_core.h"
+//#endif
+//}
+
 
 #endif // !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 

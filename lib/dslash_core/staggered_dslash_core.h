@@ -413,7 +413,7 @@ o02_re = o02_im = 0.f;
 #endif
 	  {
 	    int sp_idx_1st_nbr = ((x1==cudaConstants.X1m1) ? X-cudaConstants.X1m1 : X+1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, ga_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, ga_idx, fat_ga_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -447,7 +447,7 @@ o02_re = o02_im = 0.f;
 #endif
 	  {
 	    int sp_idx_3rd_nbr = ((x1 >= cudaConstants.X1m3) ? X -cudaConstants.X1m3 : X+3) >> 1;
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 0, ga_idx);        
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 0, ga_idx, long_ga_stride);        
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -496,7 +496,7 @@ o02_re = o02_im = 0.f;
 		    fat_idx = Vh + space_con;
 	    }
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fat_ga_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -535,7 +535,7 @@ o02_re = o02_im = 0.f;
 		    long_idx = cudaConstants.Vh + x1*cudaConstants.X4X3X2h + space_con;
 	    }    
 #endif
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx); 		
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, long_ga_stride); 		
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -578,7 +578,7 @@ o02_re = o02_im = 0.f;
 #endif
 	  {
 	    int sp_idx_1st_nbr = ((x2==cudaConstants.X2m1) ? X-cudaConstants.X2X1mX1 : X+cudaConstants.X1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, ga_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, ga_idx, fat_ga_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -611,7 +611,7 @@ o02_re = o02_im = 0.f;
 #endif
 	  {
 	    int sp_idx_3rd_nbr = ((x2 >= cudaConstants.X2m3 ) ? X-cudaConstants.X2m3*X1 : X+3*cudaConstants.X1) >> 1;    
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 2, ga_idx);
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 2, ga_idx, long_ga_stride);
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = cudaConstants.sp_stride;        
 #if (DD_PREC == 2) //half precision
@@ -662,7 +662,7 @@ o02_re = o02_im = 0.f;
 		    fat_idx = cudaConstants.Vh + space_con;
 	    }    
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fat_ga_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -701,7 +701,7 @@ o02_re = o02_im = 0.f;
 		    long_idx = cudaConstants.Vh+ x2*cudaConstants.X4X3X1h + space_con;
 	    }    
 #endif
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx); 
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, long_ga_stride); 
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -746,7 +746,7 @@ o02_re = o02_im = 0.f;
 #endif
     {
 	    int sp_idx_1st_nbr = ((x3==cudaConstants.X3m1) ? X-cudaConstants.X3X2X1mX2X1 : X+cudaConstants.X2X1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 4, ga_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 4, ga_idx, fat_ga_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -780,7 +780,7 @@ o02_re = o02_im = 0.f;
 #endif
     {
 	    int sp_idx_3rd_nbr = ((x3>= cudaConstants.X3m3)? X -cudaConstants.X3m3*cudaConstants.X2X1: X + 3*cudaConstants.X2X1)>> 1;    
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 4, ga_idx);
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 4, ga_idx, long_ga_stride);
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -829,7 +829,7 @@ o02_re = o02_im = 0.f;
 		    fat_idx = cudaConstants.Vh + space_con;
 	    }    
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fat_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -868,7 +868,7 @@ o02_re = o02_im = 0.f;
 			  long_idx = cudaConstants.Vh + x3*cudaConstants.X4X2X1h + space_con;
 	    }    
 #endif
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx);         
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, long_ga_stride);         
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -911,7 +911,7 @@ o02_re = o02_im = 0.f;
 #endif
 	  {    
 	    int sp_idx_1st_nbr = ((x4==cudaConstants.X4m1) ? X-cudaConstants.X4X3X2X1mX3X2X1 : X+cudaConstants.X3X2X1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 6, ga_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 6, ga_idx, fat_ga_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = cudaConstants.sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -944,7 +944,7 @@ o02_re = o02_im = 0.f;
 #endif
 	  {
 	    int sp_idx_3rd_nbr = ((x4>=cudaConstants.X4m3)? X -cudaConstants.X4m3*cudaConstants.X3X2X1 : X + 3*cudaConstants.X3X2X1)>> 1;     
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 6, ga_idx);    
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 6, ga_idx, long_ga_stride);    
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = cudaConstants.sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -1004,7 +1004,7 @@ o02_re = o02_im = 0.f;
 		    }        	
 	    }
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fat_ga_stride);
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    ADJ_MAT_MUL_V(A, fat, i);
 	    o00_re -= A0_re;
@@ -1039,7 +1039,7 @@ o02_re = o02_im = 0.f;
 		    }
 	    }
 #endif	    
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx);
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, long_ga_stride);
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);       
 	    RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
 	    ADJ_MAT_MUL_V(B, long, t);    
