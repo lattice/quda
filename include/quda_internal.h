@@ -34,6 +34,12 @@
 #include <util_quda.h>
 #include <malloc_quda.h>
 
+// Use bindless texture on Kepler
+#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#define USE_TEXTURE_OBJECTS
+#endif
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif

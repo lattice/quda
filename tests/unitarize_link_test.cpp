@@ -196,6 +196,7 @@ unitarize_link_test()
   int num_failures=0;
   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
+ delete cpuOutLink;
  delete cudaFatLink;
  delete cudaULink;
  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
