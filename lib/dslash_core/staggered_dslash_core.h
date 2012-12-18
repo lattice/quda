@@ -829,7 +829,7 @@ o02_re = o02_im = 0.f;
 		    fat_idx = cudaConstants.Vh + space_con;
 	    }    
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fat_stride);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fat_ga_stride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
