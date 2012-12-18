@@ -981,8 +981,20 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
   face_idx -= face_num*nFace*face_volume;
 
   // compute an index into the local volume from the index into the face
-  const int idx = indexFromFaceIndexAsqtad<dim, nFace>(face_idx, face_volume, face_num, parity);
-  
+  //const int idx = indexFromFaceIndexAsqtad<dim, nFace>(face_idx, face_volume, face_num, parity);
+  int idx = indexFromFaceIndexAsqtad<dim, nFace>(face_idx, face_volume, face_num, parity);
+
+
+  // Test to see if this works!!
+  // Does coordsFromIndex work??
+  int x, y, z, t, full_idx; 
+  coordsFromIndex(full_idx , x, y, z, t, idx, parity);
+
+  idx = X1*X2*X3*t + X1*X2*z + X1*y + x;
+  idx = idx >> 1;
+
+
+
   if (face_num) {
     out = (Float2*)((char*)out + faceBytes);
     outNorm = (float*)((char*)outNorm + faceBytes);
@@ -1000,6 +1012,45 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
 
   if (ishalf) outNorm[face_idx] = inNorm[idx];*/
 }
+
+template <int dim, int ishalf, int nFace, typename Float2>
+__global__ void unpackFaceStaggeredKernel(Float2 *out, 
+																																										float *outNorm,
+																																									 Float2* in,
+																																										float* inNorm,
+																																									 const int parity)
+{
+  const int Nint = 6;
+  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x);
+  if(ishalf) faceBytes += nFace*ghostFace[dim]*sizeof(float);
+
+  int face_volume = ghostFace[dim];
+  int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+  if(face_idx >= 2*nFace*face_volume) return;
+  
+  const int face_num = (face_idx >= nFace*face_volume) ? 1 : 0;
+  face_idx -= face_num*nFace*face_volume;
+ 
+  // compute an index into the local volume from the index into the face 
+  const int idx = indexFromFaceIndexAsqtad<dim,nFace>(face_idx, face_volume, face_num, parity);
+
+ // Not sure if packSpinor will work out of the box, since it may use textures.
+ // packSpinor(out, outNorm, idx, sp_stride, (Float2*)(((char*)in+face_num*faceBytes)), (float*)((char*)inNorm+face_num*faceBytes), face_idx, nFace*face_volume);
+
+  Float2* tmp = (Float2*)(((char*)in + face_num*faceBytes));
+  float* tmpNorm = (float*)((char*)inNorm + face_num*faceBytes);
+
+  out[idx] 													  = tmp[face_idx];
+  out[idx +   sp_stride]  = tmp[face_idx +   nFace*face_volume];
+  out[idx + 2*sp_stride]  = tmp[face_idx + 2*nFace*face_volume];
+  if(ishalf) outNorm[idx] = tmpNorm[face_idx];
+
+  return;
+}
+
+
+
 #endif // GPU_STAGGERED_DIRAC
 
 template<typename T>
@@ -1018,22 +1069,72 @@ template<typename T> const int isShort2<T>::val;
 
 
 template <int nFace, typename Real2>
-void packFaceStaggeredKernelWrapper(Real2 *faces, float *facesNorm, const Real2 *in, const float *inNorm, int dim,
+void packFaceStaggeredKernelWrapper(Real2 *faces, float *facesNorm, Real2 *in, float *inNorm, int dim,
 		    const int parity, const dim3 &gridDim, const dim3 &blockDim, 
 		    const cudaStream_t &stream)
 {
 #ifdef GPU_STAGGERED_DIRAC
   const int ishalf = isShort2<Real2>::val;
   switch (dim) {
-    case 0: packFaceStaggeredKernel<0,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 1: packFaceStaggeredKernel<1,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 2: packFaceStaggeredKernel<2,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
-    case 3: packFaceStaggeredKernel<3,ishalf,3><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 0: packFaceStaggeredKernel<0,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 1: packFaceStaggeredKernel<1,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break; 
+    case 2: packFaceStaggeredKernel<2,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 3: packFaceStaggeredKernel<3,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
   }
 #else
   errorQuda("Staggered face packing kernel is not built");
 #endif  
 }
+
+
+
+template<int nFace, typename Real2>
+void unpackFaceStaggeredKernelWrapper(Real2 *faces, float *facesNorm, Real2 *in, float *inNorm, int dim,
+																																					 const int parity, const dim3 &gridDim, const dim3 &blockDim,
+																																						const cudaStream_t &stream)
+{
+#ifdef GPU_STAGGERED_DIRAC
+  const int ishalf = isShort2<Real2>::val;
+  switch(dim) {
+    case 0: unpackFaceStaggeredKernel<0,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 1: unpackFaceStaggeredKernel<1,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break; 
+    case 2: unpackFaceStaggeredKernel<2,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+    case 3: unpackFaceStaggeredKernel<3,ishalf,nFace><<<gridDim, blockDim, 0, stream>>>(faces, facesNorm, in, inNorm, parity); break;
+  }
+#else
+  errorQuda("Staggered face unpacking kernel is not built");
+#endif
+}
+
+
+template<int nFace>
+void unpackFaceStaggered(cudaColorSpinorField &in, void* ghost_buf,  const int dim, const int dagger,
+					const int parity, const cudaStream_t &stream){
+
+  unsigned int threads = in.GhostFace()[dim]*nFace*2;
+  dim3 blockDim(64, 1, 1);
+  dim3 gridDim( (threads+blockDim.x-1)/blockDim.x, 1, 1);
+
+  // compute location of norm zone
+  int Nint = 6;
+  float *ghostNorm = (float*)((char*)ghost_buf + Nint*nFace*in.GhostFace()[dim]*in.Precision());
+ 
+  switch(in.Precision()){
+    case QUDA_DOUBLE_PRECISION:
+      unpackFaceStaggeredKernelWrapper<nFace>((double2*)in.V(), (float*)in.Norm(),(double2*)ghost_buf, ghostNorm, dim, parity, gridDim, blockDim, stream);
+      break;
+    case QUDA_SINGLE_PRECISION:
+      unpackFaceStaggeredKernelWrapper<nFace>((float2*)in.V(), (float*)in.Norm(), (float2*)ghost_buf, ghostNorm, dim, parity, gridDim, blockDim, stream);
+				  break;  
+    case  QUDA_HALF_PRECISION:
+      unpackFaceStaggeredKernelWrapper<nFace>((short2*)in.V(), (float*)in.Norm(), (short2*)ghost_buf, ghostNorm, dim, parity, gridDim, blockDim, stream);
+      break;
+  } 
+  return;
+}
+
+
+
 
 template<int nFace>
 void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
@@ -1067,10 +1168,15 @@ void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim,
 void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 	      const int parity, const cudaStream_t &stream)
 {
+
   if(in.Nspin() == 1){
     switch(in.Nface()){
       case 2: packFaceStaggered<2>(ghost_buf, in, dim, dagger, parity, stream); break;
-      case 3: packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); break;
+      case 3: 
+        packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); 
+        unpackFaceStaggered<3>(in, ghost_buf, dim, dagger, parity, stream); 
+        packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); 
+        break;
       case 4: packFaceStaggered<4>(ghost_buf, in, dim, dagger, parity, stream); break;
       default: errorQuda("Only nFace 2/3/4 supported for staggered fermions\n"); break;
 	  }

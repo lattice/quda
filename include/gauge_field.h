@@ -106,6 +106,7 @@ namespace quda {
 
     int Length() const { return length; }
     int Ncolor() const { return nColor; }
+    int Nface() const { return nFace; }
     QudaReconstructType Reconstruct() const { return reconstruct; }
     QudaGaugeFieldOrder Order() const { return order; }
     double Anisotropy() const { return anisotropy; }

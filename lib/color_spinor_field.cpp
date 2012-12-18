@@ -49,9 +49,11 @@ namespace quda {
 																}
 
 
-																int num_faces = nFace;
-																int num_norm_faces = 2*nFace;
+																const int num_faces = (nSpin==1) ? 2*nFace : nFace;
+																const int num_norm_faces = 2*nFace;
 
+
+                printfQuda("In createGhostZone: nFace = %d\n",nFace);
 
 																// calculate size of ghost zone required
 																int ghostVolume = 0;

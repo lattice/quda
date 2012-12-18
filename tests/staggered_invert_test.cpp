@@ -183,6 +183,7 @@ invert_test(void)
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=4;
+  csParam.nFace=3;
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gaugeParam.X[d];
   }
