@@ -105,7 +105,7 @@ namespace quda {
       int length;
       const int src_length;
       const int dst_length;
-			int* border;
+      int* border;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
