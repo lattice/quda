@@ -31,12 +31,12 @@ namespace { // anonymous namespace
   cudaEvent_t scatterEnd[Nstream];
 
   FaceBuffer *face;
-  cudaColorSpinorField *infield;
-
+  cudaColorSpinorField *inField;
+  cudaColorSpinorField *outField;
 } // anonymous namespace
 
 
-void setFace(const FaceBuffer& Face){
+static void setFace(const FaceBuffer& Face){
   face = (FaceBuffer*)&Face;
   return;
 }
@@ -93,7 +93,7 @@ void copyBorder(const int parity, const int volume, const int *faceVolumeCB)
   for(int i=3; i>=0; --i){
    if(domainParam.commDim[i]){
      // pack a single parity
-     face->pack(*inSpinor, parity, 0, i, streams); // pack in streams[Nstream-1]
+     face->pack(*inField, parity, 0, i, streams); // pack in streams[Nstream-1]
      cudaEvenRecord(packEnd[2*i], streams[Nstream-1]); 
    }
   }
@@ -104,7 +104,7 @@ void copyBorder(const int parity, const int volume, const int *faceVolumeCB)
         // different streams for send forwards and backwards
         // if dir = 0, pack at front and send backwards
         // if dir = 1, pack at back and send forwards
-        cudaStreamWaitEvent(streams[2*i+dir]. packEnd[2*i], 0);
+        cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i], 0);
         // copy from device to host
         face->gather(*inSpinor, 0, 2*i+dir);
 	       // record the end of the copy from device to host
@@ -120,27 +120,33 @@ void copyBorder(const int parity, const int volume, const int *faceVolumeCB)
       if(domainParam.commDim[i]){
         for(int dir=1; dir>=0; --dir){
 									
-										// Query if gather has completed. If so, start communication.
+	  // Query if gather has completed. If so, start communication.
           if(!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]){
-										  if(cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])){
-											   gatherCompleted[2*i+dir] = 1;
-														completeSum++;
-														face->commsStart(2*i+dir);
+	    if(cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])){
+	      gatherCompleted[2*i+dir] = 1;
+	      completeSum++;
+	      face->commsStart(2*i+dir); // start sending
             }
           }
          
           // Query if comms has finished 
-									 if(!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
-												 gatherCompleted[2*i+dir]) {
-										  if(face->commsQuery[2*i+dir]){
-												}
+	  if(!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
+	    gatherCompleted[2*i+dir]) {
+	    if(face->commsQuery[2*i+dir]){
+              commsCompleted[2*i+dir] = 1;
+              completeSum++;
+	      face->scatter(*inSpinor, dagger, 2*i+dir); // copy from host to device	
+	    }
           }
- 
-					   }
+	}
+	cudaEventRecord(scatterEnd[2*i], streams[2*i]);
+	cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
+
+        // unpack on the device. Why pack on the same stream?
+        face->unpack(*outField, parity, dagger, i, streams);
       }
     } // loop over i
   } // repeat while(completeSum < commDimTotal)
-  
 
   return;
 }

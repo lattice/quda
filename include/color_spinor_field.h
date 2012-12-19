@@ -317,6 +317,7 @@ namespace quda {
    void loadGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		     const int dagger, cudaStream_t* stream);
 
+    // unpacks the ghost zones. Only does a single parity at a time.
     void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		     const int dagger, cudaStream_t* stream);
 

@@ -1172,17 +1172,28 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
   if(in.Nspin() == 1){
     switch(in.Nface()){
       case 2: packFaceStaggered<2>(ghost_buf, in, dim, dagger, parity, stream); break;
-      case 3: 
-        packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); 
-        unpackFaceStaggered<3>(in, ghost_buf, dim, dagger, parity, stream); 
-        packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); 
-        break;
+      case 3: packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); break;
       case 4: packFaceStaggered<4>(ghost_buf, in, dim, dagger, parity, stream); break;
       default: errorQuda("Only nFace 2/3/4 supported for staggered fermions\n"); break;
 	  }
   }else{  
     packFaceWilson(ghost_buf, in, dim, dagger, parity, stream);
   }
+}
+
+void unpackFace(cudaColorSpinorField &out, void* ghost_buf, const int dim, const int dagger, 
+		const int parity, const cudaStream_t &stream)
+{
+  if(in.Nspin() == 1){
+    switch(in.Nface()){
+      case 2: unpackFaceStaggered<2>(out, ghost_buf, dim, dagger, parity, stream); break;
+      case 4: unpackFaceStaggered<4>(out, ghost_buf, dim, dagger, parity, stream); break;
+      default: errorQuda("Only border width 2/4 supported for staggered fermions\n"); break;
+    }
+  }else{
+    errorQuda("Unpacking only supported for staggered fermions\n");
+  }
+  return;
 }
 
 //BEGIN NEW
