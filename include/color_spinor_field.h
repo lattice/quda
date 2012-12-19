@@ -167,6 +167,7 @@ namespace quda {
   
     int nDim;
     int x[QUDA_MAX_DIM];
+    int border[QUDA_MAX_DIM]; // Border region needed to implement the domain decomposition algorithm
 
     int volume;
     int pad;

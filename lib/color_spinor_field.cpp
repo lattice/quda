@@ -28,7 +28,7 @@ namespace quda {
 								}
 
 								ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
-								even(0), odd(0)
+								even(0), odd(0) 
 								{
 																create(field.nDim, field.x, field.nColor, field.nSpin, field.nFace, field.twistFlavor, field.precision, field.pad,
 																																field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis);
@@ -67,7 +67,7 @@ namespace quda {
 																																ghostFace[i] = 1;
 																																for (int j=0; j<dims; j++) {
 																																  if (i==j) continue;
-																																		ghostFace[i] *= x[j];
+																																		ghostFace[i] *= (x[j] -2*border[j]);
 																																}
 																																ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
 																																if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;

@@ -758,6 +758,9 @@ namespace quda {
 
   }
 
+
+
+
   // Return the location of the field
   QudaFieldLocation cudaColorSpinorField::Location() const { 
     return QUDA_CUDA_FIELD_LOCATION;
