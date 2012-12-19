@@ -599,7 +599,7 @@ namespace quda {
     if (nSpin == 4) Nint /= 2; // spin projection for Wilson
 
     if(this->initGhostFaceBuffer == 0 || precision > facePrecision || nface > nFace){   
-			nFace = nface; 
+			  nFace = nface; 
       for (int i=0; i<4; i++) {
 	if(!commDimPartitioned(i)){
 	  continue;
@@ -635,8 +635,8 @@ namespace quda {
 
 
   void cudaColorSpinorField::allocateGhostBuffer(void){ 
-    int nface = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
-	  allocateGhostBuffer(nface);
+    //int nface = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+	  allocateGhostBuffer(nFace);
   }
 
   void cudaColorSpinorField::freeGhostBuffer(void)
@@ -677,7 +677,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+//    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
@@ -730,11 +730,11 @@ namespace quda {
 
   }
 
-  void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
+  void cudaColorSpinorField::loadGhost(void* ghost_spinor, const int dim, 
 					 const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
   {
-    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+//    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
     int len = nFace*ghostFace[dim]*Nint;

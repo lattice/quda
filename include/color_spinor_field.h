@@ -311,6 +311,11 @@ namespace quda {
     void packGhost(const int dim, const QudaParity parity, const int dagger, cudaStream_t* stream);
     void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
 		   const int dagger, cudaStream_t *stream);
+    
+   // copy ghost data from host to device after communication
+   void loadGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
+		     const int dagger, cudaStream_t* stream);
+
     void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		     const int dagger, cudaStream_t* stream);
 
