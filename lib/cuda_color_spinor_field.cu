@@ -763,31 +763,24 @@ namespace quda {
   // packing routines. Front of the sublattice first, then the back of the sublattice.
   // N.B. only unpacks a single parity. Can call twice to unpack both parities, 
   // but have to make sure the ghost buffers are not overwritten.
+  // no need to pass ghost_spinor to unpackGhost
   void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
 				       const QudaDirection dir, 
+											const QudaParity parity,
 				       const int dagger, cudaStream_t* stream)
   {
     int Nint =  (nColor*nSpin*2)/(nSpin==4 ? 2 : 1);
 
     int len = nFace*ghostFace[dim]*Nint;
-    int offset = length + ghostFaceOffset[dim]*nColor*nSpin*2;
+    int offset = length + ghostOffset[dim]*nColor*nSpin*2;
     offset += (dir == QUDA_BACKWARDS) ? 0 : len;
     void *src = (char*)v + precision*offset;
-`
-    unpackGhost(*this, src, dim, dagger, parity, *stream);
+
+    unpackFace(*this, src, dim, dagger, parity, *stream);
     return;
   }
 
 
-  void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
-					 const QudaDirection dir, 
-					 const int dagger, cudaStream_t* stream)
-  {
-#ifdef MULTI_GPU
-    void* gpu_buf = this->backGhostFaceBuffer[dim];
-#endif
-    return;
-  }
 
 
   // Return the location of the field

@@ -93,6 +93,9 @@ namespace quda {
 		  const int parity, const cudaStream_t &stream);		    
   //END NEW	      
 
+
+  void unpackFace(cudaColorSpinorField &out, void *ghost_buf, const int dim, const int dagger,
+								const int parity, const cudaStream_t &stream);
 }
 
 #endif // _DSLASH_QUDA_H
