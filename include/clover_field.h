@@ -44,6 +44,19 @@ namespace quda {
     // computes the clover field given the input gauge field
     void compute(const cudaGaugeField &gauge);
 
+#ifdef USE_TEXTURE_OBJECTS
+    cudaTextureObject_t evenTex;
+    cudaTextureObject_t evenNormTex;
+    cudaTextureObject_t oddTex;
+    cudaTextureObject_t oddNormTex;
+    cudaTextureObject_t evenInvTex;
+    cudaTextureObject_t evenInvNormTex;
+    cudaTextureObject_t oddInvTex;
+    cudaTextureObject_t oddInvNormTex;
+    void createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm);
+    void destroyTexObject();
+#endif
+
   public:
     // create a cudaCloverField from a cpu pointer
     cudaCloverField(const void *h_clov, const void *h_clov_inv, 
@@ -55,8 +68,20 @@ namespace quda {
     cudaCloverField(const cudaGaugeField &gauge, const CloverFieldParam &param);
     virtual ~cudaCloverField();
 
+#ifdef USE_TEXTURE_OBJECTS
+    const cudaTextureObject_t& EvenTex() const { return evenTex; }
+    const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
+    const cudaTextureObject_t& OddTex() const { return oddTex; }
+    const cudaTextureObject_t& OddNormTex() const { return oddNormTex; }
+    const cudaTextureObject_t& EvenInvTex() const { return evenInvTex; }
+    const cudaTextureObject_t& EvenInvNormTex() const { return evenInvNormTex; }
+    const cudaTextureObject_t& OddInvTex() const { return oddInvTex; }
+    const cudaTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
+#endif
+
     friend class DiracClover;
     friend class DiracCloverPC;
+    friend struct FullClover;
   };
 
   // this is a place holder for a future host-side clover object
@@ -78,6 +103,39 @@ namespace quda {
     QudaPrecision precision;
     size_t bytes; // sizeof each clover field (per parity)
     size_t norm_bytes; // sizeof each norm field (per parity)
+
+#ifdef USE_TEXTURE_OBJECTS
+    const cudaTextureObject_t &evenTex;
+    const cudaTextureObject_t &evenNormTex;
+    const cudaTextureObject_t &oddTex;
+    const cudaTextureObject_t &oddNormTex;
+    const cudaTextureObject_t& EvenTex() const { return evenTex; }
+    const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
+    const cudaTextureObject_t& OddTex() const { return oddTex; }
+    const cudaTextureObject_t& OddNormTex() const { return oddNormTex; }    
+#endif
+
+    FullClover(const cudaCloverField &clover, bool inverse=false) :
+      precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes)
+#ifdef USE_TEXTURE_OBJECTS
+	, evenTex(inverse ? clover.evenInvTex : clover.evenTex)
+	, evenNormTex(inverse ? clover.evenInvNormTex : clover.evenNormTex)
+	, oddTex(inverse ? clover.oddInvTex : clover.oddTex)
+	, oddNormTex(inverse ? clover.oddInvNormTex : clover.oddNormTex)
+#endif
+      { 
+	if (inverse) {
+	  even = clover.evenInv;
+	  evenNorm = clover.evenInvNorm;
+	  odd = clover.oddInv;	
+	  oddNorm = clover.oddInvNorm;
+	} else {
+	  even = clover.even;
+	  evenNorm = clover.evenNorm;
+	  odd = clover.odd;	
+	  oddNorm = clover.oddNorm;
+	}
+    }
   };
 
   // driver for computing the clover field from the gauge field

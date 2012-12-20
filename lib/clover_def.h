@@ -34,7 +34,11 @@
 #define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexDouble
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #if (DD_XPAY==1)  // never used
 #define ACCUMTEX accumTexDouble
@@ -51,7 +55,11 @@
 #define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexSingle
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY==1)
@@ -65,7 +73,11 @@
 #define SPINORTEX in
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexHalf
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm
@@ -83,9 +95,14 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_DOUBLE
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define CLOVERTEX (param.cloverTex)
+#else
 #define CLOVERTEX cloverTexDouble
+#endif
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX
 #endif
+
 #define CLOVER_DOUBLE
 #elif (DD_PREC==1) // single-precision clover term
 #define DD_PREC_F S
@@ -94,7 +111,11 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_SINGLE
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define CLOVERTEX (param.cloverTex)
+#else
 #define CLOVERTEX cloverTexSingle
+#endif
 #define READ_CLOVER READ_CLOVER_SINGLE_TEX
 #endif
 #else               // half-precision clover term
@@ -104,7 +125,13 @@
 #define CLOVERTEX clover
 #define READ_CLOVER READ_CLOVER_HALF
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define CLOVERTEX (param.cloverTex)
+#define CLOVERTEXNORM (param.cloverNormTex)
+#else
 #define CLOVERTEX cloverTexHalf
+#define CLOVERTEXNORM cloverTexNorm
+#endif
 #define READ_CLOVER READ_CLOVER_HALF_TEX
 #endif
 #endif

@@ -48,9 +48,7 @@ namespace quda {
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    FullClover cs;
-    cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+    FullClover cs(clover);
     asymCloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim);
 
     flops += 1872ll*in.Volume();
@@ -63,9 +61,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     // regular clover term
-    FullClover cs;
-    cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+    FullClover cs(clover);
     cloverCuda(&out, gauge, cs, &in, parity);
 
     flops += 504ll*in.Volume();
@@ -136,9 +132,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     // needs to be cloverinv
-    FullClover cs;
-    cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+    FullClover cs(clover, true);
     cloverCuda(&out, gauge, cs, &in, parity);
 
     flops += 504ll*in.Volume();
@@ -156,9 +150,7 @@ namespace quda {
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    FullClover cs;
-    cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+    FullClover cs(clover, true);
     cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, 0, 0.0, commDim);
 
     flops += 1824ll*in.Volume();
@@ -175,9 +167,7 @@ namespace quda {
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    FullClover cs;
-    cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+    FullClover cs(clover, true);
     cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim);
 
     flops += 1872ll*in.Volume();

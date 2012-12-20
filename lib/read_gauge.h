@@ -43,45 +43,45 @@
   a##_im -= b##_im * c##_re
 
 #define READ_GAUGE_MATRIX_18_FLOAT2_TEX(G, gauge, dir, idx, stride)	\
-  float2 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*stride);	\
-  float2 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*stride);	\
-  float2 G##2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*stride);	\
-  float2 G##3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*stride);	\
-  float2 G##4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*stride);	\
-  float2 G##5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*stride);	\
-  float2 G##6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*stride);	\
-  float2 G##7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*stride);	\
-  float2 G##8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*stride);	\
+  float2 G##0 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+0)*stride);	\
+  float2 G##1 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+1)*stride);	\
+  float2 G##2 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+2)*stride);	\
+  float2 G##3 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+3)*stride);	\
+  float2 G##4 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+4)*stride);	\
+  float2 G##5 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+5)*stride);	\
+  float2 G##6 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+6)*stride);	\
+  float2 G##7 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+7)*stride);	\
+  float2 G##8 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+8)*stride);	\
 
 #define READ_GAUGE_MATRIX_18_SHORT2_TEX(G, gauge, dir, idx, stride)	\
-  float2 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*stride);	\
-  float2 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*stride);	\
-  float2 G##2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*stride);	\
-  float2 G##3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*stride);	\
-  float2 G##4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*stride);	\
-  float2 G##5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*stride);	\
-  float2 G##6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*stride);	\
-  float2 G##7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*stride);	\
-  float2 G##8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*stride);	\
+  float2 G##0 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+0)*stride);	\
+  float2 G##1 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+1)*stride);	\
+  float2 G##2 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+2)*stride);	\
+  float2 G##3 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+3)*stride);	\
+  float2 G##4 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+4)*stride);	\
+  float2 G##5 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+5)*stride);	\
+  float2 G##6 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+6)*stride);	\
+  float2 G##7 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+7)*stride); \
+  float2 G##8 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+8)*stride);	\
 
 #define READ_GAUGE_MATRIX_12_FLOAT4_TEX(G, gauge, dir, idx, stride)	\
-  float4 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*stride);	\
-  float4 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*stride);	\
-  float4 G##2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*stride);	\
+  float4 G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+0)*stride);	\
+  float4 G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+1)*stride);	\
+  float4 G##2 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+2)*stride);	\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);				
 
 #define READ_GAUGE_MATRIX_12_SHORT4_TEX(G, gauge, dir, idx, stride)	\
-  float4 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*stride);	\
-  float4 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*stride);	\
-  float4 G##2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*stride);	\
+  float4 G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+0)*stride);	\
+  float4 G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+1)*stride);	\
+  float4 G##2 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+2)*stride);	\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);
 
 // set A to be last components of G4 (otherwise unused)
 #define READ_GAUGE_MATRIX_8_FLOAT4_TEX(G, gauge, dir, idx, stride)	\
-  float4 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*stride);	\
-  float4 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*stride);	\
+  float4 G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+0)*stride);	\
+  float4 G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+1)*stride);	\
   float4 G##2 = make_float4(0,0,0,0);					\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);					\
@@ -89,8 +89,8 @@
   (G##3).w = (G##0).y;
 
 #define READ_GAUGE_MATRIX_8_SHORT4_TEX(G, gauge, dir, idx, stride)	\
-  float4 G##0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*stride);	\
-  float4 G##1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*stride);	\
+  float4 G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+0)*stride);	\
+  float4 G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+1)*stride);	\
   float4 G##2 = make_float4(0,0,0,0);					\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);					\
@@ -191,58 +191,58 @@
 /*!----For DW only----!*/
 
 #define ASSN_GAUGE_MATRIX_18_FLOAT2_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*stride);	\
-   G##1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*stride);	\
-   G##2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*stride);	\
-   G##3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*stride);	\
-   G##4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*stride);	\
-   G##5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*stride);	\
-   G##6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*stride);	\
-   G##7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*stride);	\
-   G##8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*stride);	\
+  G##0 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+0)*stride);	\
+  G##1 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+1)*stride);	\
+  G##2 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+2)*stride);	\
+  G##3 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+3)*stride);	\
+  G##4 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+4)*stride);	\
+  G##5 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+5)*stride);	\
+  G##6 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+6)*stride);	\
+  G##7 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+7)*stride);	\
+  G##8 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+8)*stride);	\
 
 #define ASSN_GAUGE_MATRIX_18_SHORT2_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = tex1Dfetch((gauge), idx + ((dir/2)*9+0)*stride);	\
-   G##1 = tex1Dfetch((gauge), idx + ((dir/2)*9+1)*stride);	\
-   G##2 = tex1Dfetch((gauge), idx + ((dir/2)*9+2)*stride);	\
-   G##3 = tex1Dfetch((gauge), idx + ((dir/2)*9+3)*stride);	\
-   G##4 = tex1Dfetch((gauge), idx + ((dir/2)*9+4)*stride);	\
-   G##5 = tex1Dfetch((gauge), idx + ((dir/2)*9+5)*stride);	\
-   G##6 = tex1Dfetch((gauge), idx + ((dir/2)*9+6)*stride);	\
-   G##7 = tex1Dfetch((gauge), idx + ((dir/2)*9+7)*stride);	\
-   G##8 = tex1Dfetch((gauge), idx + ((dir/2)*9+8)*stride);	\
+  G##0 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+0)*stride);	\
+  G##1 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+1)*stride);	\
+  G##2 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+2)*stride);	\
+  G##3 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+3)*stride);	\
+  G##4 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+4)*stride);	\
+  G##5 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+5)*stride);	\
+  G##6 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+6)*stride);	\
+  G##7 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+7)*stride);	\
+  G##8 = TEX1DFETCH(float2, (gauge), idx + ((dir/2)*9+8)*stride);	\
 
 #define ASSN_GAUGE_MATRIX_12_FLOAT4_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*stride);	\
-   G##1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*stride);	\
-   G##2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*stride);	\
-   G##3 = make_float4(0,0,0,0);					\
-   G##4 = make_float4(0,0,0,0);				
+  G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+0)*stride);	\
+  G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+1)*stride);	\
+  G##2 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+2)*stride);	\
+  G##3 = make_float4(0,0,0,0);						\
+  G##4 = make_float4(0,0,0,0);				
 
 #define ASSN_GAUGE_MATRIX_12_SHORT4_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = tex1Dfetch((gauge), idx + ((dir/2)*3+0)*stride);	\
-   G##1 = tex1Dfetch((gauge), idx + ((dir/2)*3+1)*stride);	\
-   G##2 = tex1Dfetch((gauge), idx + ((dir/2)*3+2)*stride);	\
-   G##3 = make_float4(0,0,0,0);					\
-   G##4 = make_float4(0,0,0,0);
+  G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+0)*stride);	\
+  G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+1)*stride);	\
+  G##2 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*3+2)*stride);	\
+  G##3 = make_float4(0,0,0,0);						\
+  G##4 = make_float4(0,0,0,0);
 
 // set A to be last components of G4 (otherwise unused)
 #define ASSN_GAUGE_MATRIX_8_FLOAT4_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*stride);	\
-   G##1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*stride);	\
-   G##2 = make_float4(0,0,0,0);					\
-   G##3 = make_float4(0,0,0,0);					\
-   G##4 = make_float4(0,0,0,0);					\
+  G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+0)*stride);	\
+  G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+1)*stride);	\
+  G##2 = make_float4(0,0,0,0);						\
+  G##3 = make_float4(0,0,0,0);						\
+  G##4 = make_float4(0,0,0,0);						\
   (G##3).z = (G##0).x;							\
   (G##3).w = (G##0).y;
 
 #define ASSN_GAUGE_MATRIX_8_SHORT4_TEX(G, gauge, dir, idx, stride)	\
-   G##0 = tex1Dfetch((gauge), idx + ((dir/2)*2+0)*stride);	\
-   G##1 = tex1Dfetch((gauge), idx + ((dir/2)*2+1)*stride);	\
-   G##2 = make_float4(0,0,0,0);					\
-   G##3 = make_float4(0,0,0,0);					\
-   G##4 = make_float4(0,0,0,0);					\
-  (G##3).z = (G##0).x = pi_f*(G##0).x;						\
+  G##0 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+0)*stride);	\
+  G##1 = TEX1DFETCH(float4, (gauge), idx + ((dir/2)*2+1)*stride);	\
+  G##2 = make_float4(0,0,0,0);						\
+  G##3 = make_float4(0,0,0,0);						\
+  G##4 = make_float4(0,0,0,0);						\
+  (G##3).z = (G##0).x = pi_f*(G##0).x;					\
   (G##3).w = (G##0).y = pi_f*(G##0).y;
 
 #define ASSN_GAUGE_MATRIX_18_DOUBLE2(G, gauge, dir, idx, stride)    \
@@ -635,7 +635,7 @@
 #define ASSN_GAUGE_MATRIX_12_DOUBLE2_TEX(G, gauge, dir, idx, stride)	\
    G##0 = fetch_double2((gauge), idx + ((dir/2)*6+0)*stride);	\
    G##1 = fetch_double2((gauge), idx + ((dir/2)*6+1)*stride);	\
-   G##2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*stride);	\
+   G##2 = fetch_double2((gauge), idx + ((dir/2)*6+2)*stride);		\
    G##3 = fetch_double2((gauge), idx + ((dir/2)*6+3)*stride);	\
    G##4 = fetch_double2((gauge), idx + ((dir/2)*6+4)*stride);	\
    G##5 = fetch_double2((gauge), idx + ((dir/2)*6+5)*stride);	\

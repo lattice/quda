@@ -11,7 +11,7 @@
 //
 // twistedMassDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a twisted mass Dslash^dagger kernel where the result is
+// This is a twisted mass Dslash^ger kernel where the result is
 // multiplied by "a" and summed with an input vector (Xpay), and the
 // gauge matrix is reconstructed from 12 real numbers.  More
 // generally, each function name is given by the concatenation of the
@@ -161,9 +161,14 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #define GAUGE0TEX gauge0TexDouble2
 #define GAUGE1TEX gauge1TexDouble2
-#endif
+#endif // USE_TEXTURE_OBJECTS
+#endif 
 
 #define GAUGE_FLOAT2
 
@@ -179,14 +184,22 @@
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexDouble
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexDouble
+#endif
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
@@ -195,7 +208,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexDouble
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_DOUBLE_TEX
 #endif
 
@@ -212,6 +229,10 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexSingle2
 #define GAUGE1TEX gauge1TexSingle2
@@ -219,6 +240,7 @@
 #define GAUGE0TEX gauge0TexSingle4
 #define GAUGE1TEX gauge1TexSingle4
 #endif
+#endif // USE_TEXTURE_OBJECTS
 #endif
 
 
@@ -234,14 +256,22 @@
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexSingle
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexSingle
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY==1)
@@ -249,7 +279,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_SINGLE
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexSingle
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_SINGLE_TEX
 #endif
 #endif
@@ -265,6 +299,10 @@
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexHalf2
 #define GAUGE1TEX gauge1TexHalf2
@@ -272,6 +310,7 @@
 #define GAUGE0TEX gauge0TexHalf4
 #define GAUGE1TEX gauge1TexHalf4
 #endif
+#endif // USE_TEXTURE_OBJECTS
 #endif
 
 
@@ -285,14 +324,22 @@
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexHalf
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexHalf
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm
@@ -302,7 +349,11 @@
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_HALF
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexHalf
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_HALF_TEX
 #endif
 
