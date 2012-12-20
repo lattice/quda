@@ -81,7 +81,14 @@ void initCopyCommsPattern()
   return;
 }
 
+struct DomainParam {
+  int parity;
+  int commDim[QUDA_MAX_DIM];
+};
 
+namespace {
+  DomainParam domainParam;
+} // anonymous namespace
 
 // Need to define domainParam
 void copyBorder(const int parity, const int volume, const int *faceVolumeCB)

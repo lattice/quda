@@ -1184,8 +1184,8 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
 void unpackFace(cudaColorSpinorField &out, void* ghost_buf, const int dim, const int dagger, 
 		const int parity, const cudaStream_t &stream)
 {
-  if(in.Nspin() == 1){
-    switch(in.Nface()){
+  if(out.Nspin() == 1){
+    switch(out.Nface()){
       case 2: unpackFaceStaggered<2>(out, ghost_buf, dim, dagger, parity, stream); break;
       case 4: unpackFaceStaggered<4>(out, ghost_buf, dim, dagger, parity, stream); break;
       default: errorQuda("Only border width 2/4 supported for staggered fermions\n"); break;
