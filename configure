@@ -593,7 +593,6 @@ BUILD_STAGGERED_DIRAC
 BUILD_DOMAIN_WALL_DIRAC
 BUILD_CLOVER_DIRAC
 BUILD_WILSON_DIRAC
-DSLASH_PROFILING
 VERBOSE
 DEVICE_DEBUG
 HOST_DEBUG
@@ -665,7 +664,6 @@ with_python
 enable_host_debug
 enable_device_debug
 enable_verbose_build
-enable_dslash_profiling
 enable_wilson_dirac
 enable_clover_dirac
 enable_domain_wall_dirac
@@ -1317,8 +1315,6 @@ Optional Features:
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
   --enable-verbose-build  Display kernel register usage
-  --enable-dslash-profiling
-                          Enable profiling of multi-GPU Dslash
   --enable-wilson-dirac   Build Wilson Dirac operator (default: enabled)
   --enable-clover-dirac   Build Wilson-clover Dirac operator (default:
                           enabled)
@@ -1953,15 +1949,6 @@ if test "${enable_verbose_build+set}" = set; then :
   enableval=$enable_verbose_build;  quda_verbose_build=${enableval}
 else
    quda_verbose_build="no"
-
-fi
-
-
-# Check whether --enable-dslash-profiling was given.
-if test "${enable_dslash_profiling+set}" = set; then :
-  enableval=$enable_dslash_profiling;  quda_dslash_profiling=${enableval}
-else
-   quda_dslash_profiling="no"
 
 fi
 
@@ -3773,13 +3760,6 @@ yes|no);;
   ;;
 esac
 
-case ${quda_dslash_profiling} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-dslash-profiling " "$LINENO" 5
-  ;;
-esac
-
 case ${build_wilson_dirac} in
 yes|no);;
 *)
@@ -3970,11 +3950,6 @@ DEVICE_DEBUG=${quda_device_debug}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting VERBOSE = ${quda_verbose_build} " >&5
 $as_echo "$as_me: Setting VERBOSE = ${quda_verbose_build} " >&6;}
 VERBOSE=${quda_verbose_build}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DSLASH_PROFILING = ${quda_dslash_profiling} " >&5
-$as_echo "$as_me: Setting DSLASH_PROFILING = ${quda_dslash_profiling} " >&6;}
-DSLASH_PROFILING=${quda_dslash_profiling}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} " >&5
