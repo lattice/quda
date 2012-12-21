@@ -641,7 +641,15 @@ static inline __device__ void coordsFromDWFaceIndex(int &cb_idx, Int &X, Int &Y,
 
 #ifdef MULTI_GPU
 
+template <typename FloatN>
 struct PackParam {
+  
+  FloatN *out;
+  float *outNorm;
+
+  FloatN *in;
+  float *inNorm;
+
   int parity;
 #ifdef USE_TEXTURE_OBJECTS
   cudaTextureObject_t inTex;
@@ -672,7 +680,7 @@ struct PackParam {
 template <int dim, int dagger>
 static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, const double2 *in, const float *inNorm,
 						 const int &idx, const int &face_idx, const int &face_volume, 
-						 const int &face_num, const PackParam &param)
+						 const int &face_num, PackParam<double2> &param)
 {
 #if (__COMPUTE_CAPABILITY__ >= 130)
     if (dagger) {
@@ -710,7 +718,7 @@ static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, c
 template <int dim, int dagger>
 static inline __device__ void packFaceWilsonCore(float4 *out, float *outNorm, const float4 *in, const float *inNorm,
 						 const int &idx, const int &face_idx, const int &face_volume, 
-						 const int &face_num, const PackParam &param)
+						 const int &face_num, const PackParam<float4> &param)
 {
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
@@ -745,7 +753,7 @@ static inline __device__ void packFaceWilsonCore(float4 *out, float *outNorm, co
 template <int dim, int dagger>
 static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, const short4 *in, const float *inNorm,
 						 const int &idx, const int &face_idx, const int &face_volume, 
-						 const int &face_num, const PackParam &param)
+						 const int &face_num, const PackParam<short4> &param)
 {
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
@@ -761,12 +769,13 @@ static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, co
 
 
 template <int dim, int dagger, typename FloatN>
-__global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *in, 
-				     const float *inNorm, const PackParam param)
+  //__global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *in, 
+  //				     const float *inNorm, const PackParam<FloatN> param)
+__global__ void packFaceWilsonKernel(PackParam<FloatN> param)
 {
   const int nFace = 1; // 1 face for Wilson
   const int Nint = 12; // output is spin projected
-  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x);
+  size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(param.out->x);
   if (sizeof(FloatN)==sizeof(short4)) faceBytes += nFace*ghostFace[dim]*sizeof(float);
 
   int face_volume = ghostFace[dim];
@@ -781,13 +790,12 @@ __global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *
   // compute an index into the local volume from the index into the face
   const int idx = indexFromFaceIndex<dim, nFace>(face_idx, face_volume, face_num, param.parity);
 
-  if (face_num) {
-    out = (FloatN*)((char*)out + faceBytes);
-    outNorm = (float*)((char*)outNorm + faceBytes);
-  }
+  FloatN* out = (face_num) ? (FloatN*)((char*)param.out + faceBytes) : param.out;
+  float* outNorm = (face_num) ? (float*)((char*)param.outNorm + faceBytes) : param.outNorm;
 
   // read spinor, spin-project, and write half spinor to face
-  packFaceWilsonCore<dim, dagger>(out, outNorm, in, inNorm, idx, face_idx, face_volume, face_num, param);
+  packFaceWilsonCore<dim, dagger>(out, outNorm, param.in, param.inNorm, idx, face_idx, 
+				  face_volume, face_num, param);
 }
 
 #endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
@@ -822,6 +830,8 @@ class PackFaceWilson : public Tunable {
     : faces(faces), facesNorm(facesNorm), in(in), dim(dim), dagger(dagger), parity(parity), nFace(1) { }
   virtual ~PackFaceWilson() { }
   
+  int tuningIter() const { return 100; }
+
   TuneKey tuneKey() const {
     std::stringstream vol, aux;
     vol << in->X()[0] << "x";
@@ -832,10 +842,16 @@ class PackFaceWilson : public Tunable {
     return TuneKey(vol.str(), typeid(*this).name(), aux.str());
   }  
   
+
+
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 
-    PackParam param;
+    PackParam<FloatN> param;
+    param.out = faces;
+    param.outNorm = facesNorm;
+    param.in = (FloatN*)in->V();
+    param.inNorm = (float*)in->Norm();
     param.parity = parity;
 #ifdef USE_TEXTURE_OBJECTS
     param.inTex = in->Tex();
@@ -843,27 +859,21 @@ class PackFaceWilson : public Tunable {
 #endif
 
 #ifdef GPU_WILSON_DIRAC
+
     if (dagger) {
       switch (dim) {
-      case 0: packFaceWilsonKernel<0,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
-      case 1: packFaceWilsonKernel<1,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
-      case 2: packFaceWilsonKernel<2,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
-      case 3: packFaceWilsonKernel<3,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
+      case 0: packFaceWilsonKernel<0,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
+      case 1: packFaceWilsonKernel<1,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
+      case 2: packFaceWilsonKernel<2,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
+      case 3: packFaceWilsonKernel<3,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
+
       }
     } else {
       switch (dim) {
-    case 0: packFaceWilsonKernel<0,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
-      case 1: packFaceWilsonKernel<1,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
-      case 2: packFaceWilsonKernel<2,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
-      case 3: packFaceWilsonKernel<3,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>
-	  (faces, facesNorm, (FloatN*)in->V(), (float*)in->Norm(), param); break;
+    case 0: packFaceWilsonKernel<0,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
+      case 1: packFaceWilsonKernel<1,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
+      case 2: packFaceWilsonKernel<2,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
+      case 3: packFaceWilsonKernel<3,0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param); break;
       }
     }
 #else
