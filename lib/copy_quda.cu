@@ -120,101 +120,101 @@ namespace quda {
 	}
       } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	if (src.Nspin() == 4){
-	  SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
-	  Spinor<float4, float2, double2, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float2, double2, 6>, 
-		   SpinorTexture<float4, float4, float4, 6, 0> >
+	  Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float2, double2, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float2, double2, 6, 1>, 
+		   Spinor<float4, float4, float4, 6, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //src.Nspin() == 1
-	  SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, double2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, double2, 3>,
-		   SpinorTexture<float2, float2, float2, 3, 0> >
+	  Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
+		   Spinor<float2, float2, float2, 3, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     } 
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 	if (src.Nspin() == 4){
-	  SpinorTexture<float4, float2, double2, 6, 0> src_tex(src);
-	  Spinor<float4, float4, float4, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6>,
-		   SpinorTexture<float4, float2, double2, 6, 0> >
+	  Spinor<float4, float2, double2, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float4, float4, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6, 1>,
+		   Spinor<float4, float2, double2, 6, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //src.Nspin() ==1
-	  SpinorTexture<float2, float2, double2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, float2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3>,
-		   SpinorTexture<float2, float2, double2, 3, 0> >
+	  Spinor<float2, float2, double2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
+		   Spinor<float2, float2, double2, 3, 0, 0> >
 	  copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       }
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	blas_bytes += src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){      
-	  SpinorTexture<float4, float4, short4, 6, 0> src_tex(src);
-	  Spinor<float4, float4, float4, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6>,
-		   SpinorTexture<float4, float4, short4, 6, 0> >
+	  Spinor<float4, float4, short4, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float4, float4, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6, 1>,
+		   Spinor<float4, float4, short4, 6, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin== 1;
-	  SpinorTexture<float2, float2, short2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, float2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3>,
-		   SpinorTexture<float2, float2, short2, 3, 0> >
+	  Spinor<float2, float2, short2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
+		   Spinor<float2, float2, short2, 3, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	blas_bytes += dst.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
-	  SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
-	  Spinor<float4, float4, short4, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float4, short4, 6>,
-		   SpinorTexture<float4, float4, float4, 6, 0> >
+	  Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float4, short4, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float4, short4, 6, 1>,
+		   Spinor<float4, float4, float4, 6, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
-	  SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, short2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, short2, 3>,
-		   SpinorTexture<float2, float2, float2, 3, 0> >
+	  Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, short2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
+		   Spinor<float2, float2, float2, 3, 0, 0> >
 	  copy(dst_spinor, src_tex, src.Volume());
   copy.apply(*getBlasStream());	
 }
   } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	blas_bytes += src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
-	  SpinorTexture<double2, float4, short4, 12, 0> src_tex(src);
-	  Spinor<double2, double2, double2, 12> dst_spinor(dst);
-	  CopyCuda<double2, 12, Spinor<double2, double2, double2, 12>,
-		   SpinorTexture<double2, float4, short4, 12, 0> >
+	  Spinor<double2, float4, short4, 12, 0, 0> src_tex(src);
+	  Spinor<double2, double2, double2, 12, 1> dst_spinor(dst);
+	  CopyCuda<double2, 12, Spinor<double2, double2, double2, 12, 1>,
+		   Spinor<double2, float4, short4, 12, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
-	  SpinorTexture<double2, float2, short2, 3, 0> src_tex(src);
-	  Spinor<double2, double2, double2, 3> dst_spinor(dst);
-	  CopyCuda<double2, 3, Spinor<double2, double2, double2, 3>,
-		   SpinorTexture<double2, float2, short2, 3, 0> >
+	  Spinor<double2, float2, short2, 3, 0, 0> src_tex(src);
+	  Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
+	  CopyCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
+		   Spinor<double2, float2, short2, 3, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 	blas_bytes += dst.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
-	  SpinorTexture<double2, double2, double2, 12, 0> src_tex(src);
-	  Spinor<double2, double4, short4, 12> dst_spinor(dst);
-	  CopyCuda<double2, 12, Spinor<double2, double4, short4, 12>,
-		   SpinorTexture<double2, double2, double2, 12, 0> >
+	  Spinor<double2, double2, double2, 12, 0, 0> src_tex(src);
+	  Spinor<double2, double4, short4, 12, 1> dst_spinor(dst);
+	  CopyCuda<double2, 12, Spinor<double2, double4, short4, 12, 1>,
+		   Spinor<double2, double2, double2, 12, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
-	  SpinorTexture<double2, double2, double2, 3, 0> src_tex(src);
-	  Spinor<double2, double2, short2, 3> dst_spinor(dst);
-	  CopyCuda<double2, 3, Spinor<double2, double2, short2, 3>,
-		   SpinorTexture<double2, double2, double2, 3, 0> >
+	  Spinor<double2, double2, double2, 3, 0, 0> src_tex(src);
+	  Spinor<double2, double2, short2, 3, 1> dst_spinor(dst);
+	  CopyCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
+		   Spinor<double2, double2, double2, 3, 0, 0> >
 	  copy(dst_spinor, src_tex, src.Volume());
   copy.apply(*getBlasStream());	
 }

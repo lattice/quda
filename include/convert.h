@@ -38,12 +38,19 @@ __device__ inline void copyFloatN(double2 &a, const float2 &b) { a = make_double
 __device__ inline void copyFloatN(float4 &a, const double4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
 __device__ inline void copyFloatN(double4 &a, const float4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
 
+/* Here we assume that the input data has already been normalized and shifted. */
+__device__ inline void copyFloatN(short2 &a, const float2 &b) { a = make_short2(b.x, b.y); }
+__device__ inline void copyFloatN(short4 &a, const float4 &b) { a = make_short4(b.x, b.y, b.z, b.w); }
+__device__ inline void copyFloatN(short2 &a, const double2 &b) { a = make_short2(b.x, b.y); }
+__device__ inline void copyFloatN(short4 &a, const double4 &b) { a = make_short4(b.x, b.y, b.z, b.w); }
+
+
 /**
  Convert a vector of type InputType to type OutputType.
 
- The main current limitation is that there is an implicit asumption
+ The main current limitation is that there is an implicit assumption
  that N * sizeof(OutputType) / sizeof(InputType) is an integer.  E.g.,
- you can convert a vector 9 float2s into a vector of 5 float4s.
+ you cannot convert a vector 9 float2s into a vector of 5 float4s.
 
  @param x Output vector.
  @param y Input vector.
