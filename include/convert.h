@@ -25,11 +25,14 @@ template<> int vecLength<short4>() { return 4; }
 template<> int vecLength<float4>() { return 4; }
 template<> int vecLength<double4>() { return 4; }
 
-static inline __device__ float s2f(const short &a) { return static_cast<float>(a)/MAX_SHORT; }
+// MAX_SHORT 32767
+#define MAX_SHORT_INV 3.051850948e-5
+static inline __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
 
 template <typename FloatN>
 __device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }
 
+// This is emulating the texture normalized return
 __device__ inline void copyFloatN(float2 &a, const short2 &b) { a = make_float2(s2f(b.x), s2f(b.y)); }
 __device__ inline void copyFloatN(float4 &a, const short4 &b) { a = make_float4(s2f(b.x), s2f(b.y), s2f(b.z), s2f(b.w)); }
 

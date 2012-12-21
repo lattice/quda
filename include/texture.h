@@ -27,7 +27,7 @@ public:
   Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
 #endif
   Texture(const Texture &tex) : spinor(tex.spinor) { }
-  virtual ~Texture() { }
+  ~Texture() { }
   
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
@@ -109,7 +109,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
   { count++; }
 
-  virtual ~Texture() { if (bound && !--count) { unbind(); bound = false;} }
+  ~Texture() { if (bound && !--count) { unbind(); bound = false;} }
 
   Texture& operator=(const Texture &tex) {
 #ifdef DIRECT_ACCESS_BLAS
@@ -119,11 +119,11 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
     return *this;
   }
 
-  inline void bind(const InputType*, size_t bytes){ errorQuda("Texture id is out of range"); }
-  inline void unbind() { errorQuda("Texture id is out of range"); }
+  inline void bind(const InputType*, size_t bytes){ /*errorQuda("Texture id is out of range");*/ }
+  inline void unbind() { /*errorQuda("Texture id is out of range");*/ }
 
   //default should only be called if a tex_id is out of range
-  __device__ inline OutputType fetch(unsigned int idx) { return 0; };  
+  __device__ inline OutputType fetch(unsigned int idx) { OutputType x; x.x =0; return x; };  
   __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
   };
 
@@ -260,6 +260,9 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
   // the number of elements per virtual register
 #define REG_LENGTH (sizeof(RegType) / sizeof(((RegType*)0)->x))
 
+// whether the type is a shortN vector
+#define IS_SHORT(type) (sizeof( ((type*)0)->x ) == sizeof(short) )
+
   /**
      @param RegType Register type used in kernel
      @param InterType Intermediate format - RegType precision with StoreType ordering
@@ -311,24 +314,31 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 
       // If we are using tex references, then we can only use the predeclared texture ids
 #ifndef USE_TEXTURE_OBJECTS
-      if (tex_id < 0 || tex_id > MAX_TEX_ID) {
+      if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
 #endif
 	// half precision types
-	if (sizeof(InterType) == 2*sizeof(StoreType)) { 
+	if ( IS_SHORT(StoreType) ) { 
 	  float xN = norm[i];
 #pragma unroll
-	  for (int j=0; j<M; j++) {
-	    y[j] = tex[i + j*stride];
-	    y[j] *= xN;
-	  }
+	  for (int j=0; j<M; j++) y[j] = xN*tex[i + j*stride];
 	} else { // other types
 #pragma unroll 
 	  for (int j=0; j<M; j++) copyFloatN(y[j], tex[i + j*stride]);
 	}
 #ifndef USE_TEXTURE_OBJECTS
       } else { // default load when out of tex_id range
+
+	if ( IS_SHORT(StoreType) ) { 
+	  float xN = norm[i];
 #pragma unroll
-	for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*stride]);
+	  for (int j=0; j<M; j++) {
+	    copyFloatN(y[j], spinor[i + j*stride]);
+	    y[j] *= xN;
+	  }
+	} else { // other types
+#pragma unroll
+	  for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*stride]);
+	}
       }
 #endif
 
@@ -343,7 +353,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 	InterType y[M];
 	convert<InterType, RegType>(y, x, M);
 	
-	if ( sizeof(((StoreType*)0)->x) == sizeof(short) ) {
+	if ( IS_SHORT(StoreType) ) {
 	  float C = store_norm<InterType, M>(norm, y, i);
 #pragma unroll
 	  for (int j=0; j<M; j++) copyFloatN(spinor[i+j*stride], C*y[j]);
