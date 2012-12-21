@@ -52,12 +52,6 @@ AC_ARG_ENABLE(verbose-build,
    [ quda_verbose_build="no" ]
 )
 
-AC_ARG_ENABLE(dslash-profiling, 
-  AC_HELP_STRING([--enable-dslash-profiling], [ Enable profiling of multi-GPU Dslash]),
-  [ quda_dslash_profiling=${enableval} ], 
-  [ quda_dslash_profiling="no" ]
-)
-
 AC_ARG_ENABLE(wilson-dirac,
   AC_HELP_STRING([--enable-wilson-dirac], [ Build Wilson Dirac operator (default: enabled)]),
   [ build_wilson_dirac=${enableval} ], 
@@ -267,14 +261,6 @@ yes|no);;
   ;;
 esac
 
-dnl DSLASH_PROFILING
-case ${quda_dslash_profiling} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-dslash-profiling ])
-  ;;
-esac
-
 dnl Build Wilson Dirac
 case ${build_wilson_dirac} in
 yes|no);;
@@ -471,9 +457,6 @@ AC_SUBST( DEVICE_DEBUG,  [${quda_device_debug}] )
 
 AC_MSG_NOTICE([Setting VERBOSE = ${quda_verbose_build} ])
 AC_SUBST( VERBOSE,	 [${quda_verbose_build}] )
-
-AC_MSG_NOTICE([Setting DSLASH_PROFILING = ${quda_dslash_profiling} ])
-AC_SUBST( DSLASH_PROFILING,	 [${quda_dslash_profiling}] )
 
 AC_MSG_NOTICE([Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} ])
 AC_SUBST( BUILD_WILSON_DIRAC, [${build_wilson_dirac}])
