@@ -47,27 +47,27 @@ namespace quda {
       // Need to change this
       int x1h, x2, x3, x4, j;
       while(i < length){
-		    FloatN x[N];
+		      FloatN x[N];
         Y.get_coords(&x1h, &x2, &x3, &x4, i); // compute the coordinates of lattice sites on the smaller domain
 
-			  // Add border to get coordinates on the larger domain; 
-				x1h += border[0]; 
-				x2 += border[1];
-			  x3 += border[2];
-			  x4 += border[3];
+			     // Add border to get coordinates on the larger domain; 
+			  	  x1h += border[0]; 
+				    x2 += border[1];
+			     x3 += border[2];
+			     x4 += border[3];
 			  
         // Compute the site index on the larger domain
         X.get_index(&j, x1h, x2, x3, x4); 
 
         // load data from the larger domain
-			  X.load(x, j);
+			     X.load(x, j);
         // save to smaller domain
-			  Y.save(x, i);
+			     Y.save(x, i);
         // Repeat until data has been stored at each lattice site in the smaller domain
-			  i += gridSize;
-		  }
-		  return;
-    }
+			     i += gridSize;
+		    }
+		    return;
+  }
 
     template <typename FloatN, int N, typename Output, typename Input> 
 	  __global__ void extendKernel(Output Y, Input X, unsigned int length, const int* border){
@@ -76,11 +76,11 @@ namespace quda {
 			
       int x1h, x2, x3, x4, j;
       while(i<length){
-		    FloatN  x[N];
-				X.get_coords(&x1h, &x2, &x3, &x4, i);
+		      FloatN  x[N];
+				    X.get_coords(&x1h, &x2, &x3, &x4, i);
         X.load(x, i);
 			
-				x1h += border[0];
+				    x1h += border[0];
         x2  += border[1];
         x3  += border[2];
         x4  += border[3];
@@ -88,11 +88,11 @@ namespace quda {
         // Compute the site index on the larger domain	
         X.get_index(&j, x1h, x2, x3, x4);
 		  
-			  // write to larger domain
+			     // write to larger domain
         Y.save(x, j);
-		    i += gridSize; 
+		      i += gridSize; 
       }
-		  return;  
+		    return;  
     }
      
 
@@ -112,12 +112,12 @@ namespace quda {
 
       virtual bool advanceSharedBytes(TuneParam &param) const
       {
-	TuneParam next(param);
-	advanceBlockDim(next); // to get next blockDim
-	int nthreads = next.block.x * next.block.y * next.block.z;
-	param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-	  sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
-	return false;
+	       TuneParam next(param);
+       	advanceBlockDim(next); // to get next blockDim
+	       int nthreads = next.block.x * next.block.y * next.block.z;
+	       param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+	       sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+	       return false;
       }
 
     public:

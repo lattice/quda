@@ -764,7 +764,7 @@ namespace quda {
   // N.B. only unpacks a single parity. Can call twice to unpack both parities, 
   // but have to make sure the ghost buffers are not overwritten.
   // no need to pass ghost_spinor to unpackGhost
-  void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
+  void cudaColorSpinorField::unpackGhost(const int dim, 
 				       const QudaDirection dir, 
 											const QudaParity parity,
 				       const int dagger, cudaStream_t* stream)

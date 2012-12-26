@@ -186,6 +186,17 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, int dim,
   in.packGhost(dim, (QudaParity)parity, dagger, &stream[Nstream-1]);
 }
 
+void FaceBuffer::unpack(cudaColorSpinorField &field, int parity, int dagger, int dim, cudaStream_t *stream_p){
+  if(!commDimPartitioned(dim)) return;
+
+  stream = stream_p;
+ 
+  // need to add a border region to be unpacked 
+  field.unpackGhost(dim, (QudaParity)parity, dagger, &stream[Nstream-1]);
+}
+
+
+
 void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
 {
   int dim = dir/2;

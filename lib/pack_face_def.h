@@ -1019,6 +1019,10 @@ __global__ void unpackFaceStaggeredKernel(Float2 *out,
 																																									 Float2* in,
 																																										float* inNorm,
 																																									 const int parity)
+																																									//	const int bx, // (bx, by, bz, bt) is the border region for the overlapped domains
+																																								//  const int by,
+																																						  //  const int bz, 
+																																								//		const int bt)
 {
   const int Nint = 6;
   size_t faceBytes = nFace*ghostFace[dim]*Nint*sizeof(out->x);
@@ -1033,7 +1037,15 @@ __global__ void unpackFaceStaggeredKernel(Float2 *out,
   face_idx -= face_num*nFace*face_volume;
  
   // compute an index into the local volume from the index into the face 
-  const int idx = indexFromFaceIndexAsqtad<dim,nFace>(face_idx, face_volume, face_num, parity);
+  const int cb_idx = indexFromFaceIndexAsqtad<dim,nFace>(face_idx, face_volume, face_num, parity);
+  int idx = 2*cb_idx;
+  // compute an index into the larger volume 
+//  int x = idx % X1;
+//  int y = (idx/X1) % X2;
+//  int z = (idx/X2*X1) % X3;
+//  int t = idx/(X1*X2*X3);
+//  int even_odd;
+  // Work out the parity of the lattice site and add to zero
 
  // Not sure if packSpinor will work out of the box, since it may use textures.
  // packSpinor(out, outNorm, idx, sp_stride, (Float2*)(((char*)in+face_num*faceBytes)), (float*)((char*)inNorm+face_num*faceBytes), face_idx, nFace*face_volume);
@@ -1041,9 +1053,9 @@ __global__ void unpackFaceStaggeredKernel(Float2 *out,
   Float2* tmp = (Float2*)(((char*)in + face_num*faceBytes));
   float* tmpNorm = (float*)((char*)inNorm + face_num*faceBytes);
 
-  out[idx] 													  = tmp[face_idx];
-  out[idx +   sp_stride]  = tmp[face_idx +   nFace*face_volume];
-  out[idx + 2*sp_stride]  = tmp[face_idx + 2*nFace*face_volume];
+  out[cb_idx] 													  = tmp[face_idx];
+  out[cb_idx +   sp_stride]  = tmp[face_idx +   nFace*face_volume];
+  out[cb_idx + 2*sp_stride]  = tmp[face_idx + 2*nFace*face_volume];
   if(ishalf) outNorm[idx] = tmpNorm[face_idx];
 
   return;
