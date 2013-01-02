@@ -283,22 +283,22 @@ namespace quda {
   }
 
 
-#define STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, hasNaik, gridDim, blockDim, shared, stream, param,  ...) \
+#define STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, hasNaik, nFace, gridDim, blockDim, shared, stream, param,  ...) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## 18 ## DAG ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+      FUNC ## 18 ## DAG ## Kernel<kernel_type, hasNaik, nFace><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## 12 ## DAG ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+      FUNC ## 12 ## DAG ## Kernel<kernel_type, hasNaik, nFace><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
     } else {								\
-      FUNC ## 8 ## DAG ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      FUNC ## 8 ## DAG ## Kernel<kernel_type, hasNaik, nFace><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## 18 ## DAG ## X ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      FUNC ## 18 ## DAG ## X ## Kernel<kernel_type, hasNaik, nFace><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## 12 ## DAG ## X ## Kernel<kernel_type, hasNaik><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      FUNC ## 12 ## DAG ## X ## Kernel<kernel_type, hasNaik, nFace><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## 8 ## DAG ## X ## Kernel<kernel_type, hasNaik> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+      FUNC ## 8 ## DAG ## X ## Kernel<kernel_type, hasNaik, nFace> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
     }									\
   }
 
@@ -320,17 +320,17 @@ namespace quda {
   }
 
 
-#define STAGGERED_GENERIC_DSLASH(FUNC, DAG, X, hasNaik, gridDim, blockDim, shared, stream, param,  ...) \
+#define STAGGERED_GENERIC_DSLASH(FUNC, DAG, X, hasNaik, nFace, gridDim, blockDim, shared, stream, param,  ...) \
   switch(param.kernel_type) {						\
   case INTERIOR_KERNEL:							\
-    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, hasNaik, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
   default:								\
     errorQuda("KernelType %d not defined for single GPU", param.kernel_type); \
   }
 
 
-#else
+#else // multi-gpu code
 
 #define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
   switch(param.kernel_type) {						\
@@ -352,26 +352,26 @@ namespace quda {
   }
 
 
-#define STAGGERED_GENERIC_DSLASH(FUNC, DAG, X, hasNaik, gridDim, blockDim, shared, stream, param,  ...) \
+#define STAGGERED_GENERIC_DSLASH(FUNC, DAG, X, hasNaik, nFace, gridDim, blockDim, shared, stream, param,  ...) \
   switch(param.kernel_type) {						\
   case INTERIOR_KERNEL:							\
-    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, hasNaik,   gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, hasNaik, nFace,   gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
   case EXTERIOR_KERNEL_X:						\
-    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_X, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_X, hasNaik, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
   case EXTERIOR_KERNEL_Y:						\
-    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Y, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Y, hasNaik, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
   case EXTERIOR_KERNEL_Z:						\
-    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Z, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Z, hasNaik, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
   case EXTERIOR_KERNEL_T:						\
-    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, hasNaik, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    STAGGERED_MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, hasNaik, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
   }
 
-#endif
+#endif 
 
   // macro used for dslash types with dagger kernel defined (Wilson, domain wall, etc.)
 #define DSLASH(FUNC, gridDim, blockDim, shared, stream, param, ...)	\
@@ -382,11 +382,11 @@ namespace quda {
       }
 
   // macro used for staggered dslash
-#define STAGGERED_DSLASH(hasNaik, gridDim, blockDim, shared, stream, param, ...)	\
-  if(hasNaik){			\
-    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-  }else{					\
-    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+#define STAGGERED_DSLASH(hasNaik, nFace, gridDim, blockDim, shared, stream, param, ...)	\
+  if(hasNaik){										\
+    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+  } else {										\
+    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
   }
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
@@ -986,7 +986,7 @@ namespace quda {
 	inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm)
     { 
       bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
-      setTwistParam(a, b, kappa, mu, dagger, QUDA_TWIST_GAMMA5_INVERSE);
+      setTwistParam(a, b, kappa, mu, dagger,QUDA_TWIST_GAMMA5_INVERSE);
       if (x) b *= k;
     }
     virtual ~TwistedDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
@@ -1121,7 +1121,8 @@ namespace quda {
     }
   };
 
-  template <typename sFloat, typename fatGFloat, typename longGFloat>
+  // Can use default template parameters for a class, but not for a function.
+  template <typename sFloat, typename fatGFloat, typename longGFloat, int nFace=3>
   class StaggeredDslashCuda : public DslashCuda {
 
   private:
@@ -1174,7 +1175,7 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      STAGGERED_DSLASH(hasNaik, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+      STAGGERED_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		       out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
     }
 

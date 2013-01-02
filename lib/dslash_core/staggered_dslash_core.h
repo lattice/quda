@@ -423,10 +423,10 @@ o02_re = o02_im = 0.f;
 	    if ( (kernel_type == EXTERIOR_KERNEL_X)){
 		    int space_con = (x4*cudaConstants.X3X2+x3*cudaConstants.X2+x2)/2;	
 		    if (x1 >= cudaConstants.X1m1){
-		      nbr_idx1 = param.ghostOffset[0] + 9*cudaConstants.ghostFace[0] +(x1-cudaConstants.X1m1)*cudaConstants.ghostFace[0]+ space_con;
+		      nbr_idx1 = param.ghostOffset[0] + 3*Nface*cudaConstants.ghostFace[0] +(x1-cudaConstants.X1m1)*cudaConstants.ghostFace[0]+ space_con;
 		      stride1 = 3*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[0] + 3*cudaConstants.ghostFace[0] + (x1-cudaConstants.X1m1)*cudaConstants.ghostFace[0]+ space_con;
+		      norm_idx = param.ghostNormOffset[0] + Nface*cudaConstants.ghostFace[0] + (x1-cudaConstants.X1m1)*cudaConstants.ghostFace[0]+ space_con;
 #endif		    
 		    }
 	    }
@@ -457,8 +457,8 @@ o02_re = o02_im = 0.f;
 	    if( (kernel_type == EXTERIOR_KERNEL_X)){
 		    int space_con = (x4*cudaConstants.X3X2+x3*cudaConstants.X2+x2)/2;		
 		    if(x1  >= cudaConstants.X1m3){
-		      nbr_idx3 = param.ghostOffset[0] + 9*cudaConstants.ghostFace[0] +(x1-cudaConstants.X1m3)*cudaConstants.ghostFace[0]+ space_con;
-		      stride3 = 3*cudaConstants.ghostFace[0];
+		      nbr_idx3 = param.ghostOffset[0] + 3*Nface*cudaConstants.ghostFace[0] +(x1-cudaConstants.X1m3)*cudaConstants.ghostFace[0]+ space_con;
+		      stride3 = Nface*cudaConstants.ghostFace[0];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[0] + 3*cudaConstants.ghostFace[0] + (x1-cudaConstants.X1m3)*cudaConstants.ghostFace[0]+ space_con;
 #endif	
@@ -587,10 +587,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if(kernel_type == EXTERIOR_KERNEL_Y){	    
 		    if(x2 >= X2m1){
-		      nbr_idx1 = param.ghostOffset[1] + 9*cudaConstants.ghostFace[1] +(x2-cudaConstants.X2m1)*cudaConstants.ghostFace[1]+ space_con;
+		      nbr_idx1 = param.ghostOffset[1] + 3*Nface*cudaConstants.ghostFace[1] +(x2-cudaConstants.X2m1)*cudaConstants.ghostFace[1]+ space_con;
 		      stride1 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[1] + 3*cudaConstants.ghostFace[1] + (x2-cudaConstants.X2m1)*cudaConstants.ghostFace[1]+ space_con;
+		      norm_idx = param.ghostNormOffset[1] + Nface*cudaConstants.ghostFace[1] + (x2-cudaConstants.X2m1)*cudaConstants.ghostFace[1]+ space_con;
 #endif		    
 		    }      
 	    }
@@ -620,10 +620,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		    if (x2>= cudaConstants.X2m3){
-		      nbr_idx3 = param.ghostOffset[1] + 9*cudaConstants.ghostFace[1] +(x2-cudaConstants.X2m3)*cudaConstants.ghostFace[1]+ space_con;
+		      nbr_idx3 = param.ghostOffset[1] + 3*Nface*cudaConstants.ghostFace[1] +(x2-cudaConstants.X2m3)*cudaConstants.ghostFace[1]+ space_con;
 		      stride3 = 3*cudaConstants.ghostFace[1];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[1] + 3*cudaConstants.ghostFace[1] + (x2-cudaConstants.X2m3)*cudaConstants.ghostFace[1]+ space_con;
+		      norm_idx = param.ghostNormOffset[1] + Nface*cudaConstants.ghostFace[1] + (x2-cudaConstants.X2m3)*cudaConstants.ghostFace[1]+ space_con;
 #endif		    
 		    }
 	    }
@@ -755,10 +755,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if(kernel_type == EXTERIOR_KERNEL_Z){	
 	      if (x3 >= cudaConstants.X3m1){
-		      nbr_idx1 = param.ghostOffset[2] + 9*cudaConstants.ghostFace[2] +(x3-cudaConstants.X3m1)*cudaConstants.ghostFace[2]+ space_con;
+		      nbr_idx1 = param.ghostOffset[2] + 3*Nface*cudaConstants.ghostFace[2] +(x3-cudaConstants.X3m1)*cudaConstants.ghostFace[2]+ space_con;
 		      stride1 = 3*cudaConstants.ghostFace[2];	    
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[2] + 3*cudaConstants.ghostFace[2] + (x3-cudaConstants.X3m1)*cudaConstants.ghostFace[2]+ space_con;
+		      norm_idx = param.ghostNormOffset[2] + Nface*cudaConstants.ghostFace[2] + (x3-cudaConstants.X3m1)*cudaConstants.ghostFace[2]+ space_con;
 #endif		
 	      }      
 	    }
@@ -789,10 +789,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 	       if (x3 >= cudaConstants.X3m3){
-		       nbr_idx3 = param.ghostOffset[2] + 9*cudaConstants.ghostFace[2] +(x3-cudaConstants.X3m3)*cudaConstants.ghostFace[2]+ space_con;
+		       nbr_idx3 = param.ghostOffset[2] + 3*Nface*cudaConstants.ghostFace[2] +(x3-cudaConstants.X3m3)*cudaConstants.ghostFace[2]+ space_con;
 		       stride3 = 3*cudaConstants.ghostFace[2];
 #if (DD_PREC == 2) //half precision
-		       norm_idx = param.ghostNormOffset[2] + 3*cudaConstants.ghostFace[2] + (x3-cudaConstants.X3m3)*cudaConstants.ghostFace[2]+ space_con;
+		       norm_idx = param.ghostNormOffset[2] + Nface*cudaConstants.ghostFace[2] + (x3-cudaConstants.X3m3)*cudaConstants.ghostFace[2]+ space_con;
 #endif
 	       }
 	    }
@@ -920,10 +920,10 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){      
 		    if (x4 >= cudaConstants.X4m1){
-		      nbr_idx1 = param.ghostOffset[3] + 9*cudaConstants.ghostFace[3] +(x4-cudaConstants.X4m1)*cudaConstants.ghostFace[3]+ space_con;
+		      nbr_idx1 = param.ghostOffset[3] + 3*Nface*cudaConstants.ghostFace[3] +(x4-cudaConstants.X4m1)*cudaConstants.ghostFace[3]+ space_con;
 		      stride1 = 3*cudaConstants.ghostFace[3];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[3] + 3*cudaConstants.ghostFace[3] + (x4-cudaConstants.X4m1)*cudaConstants.ghostFace[3]+ space_con;
+		      norm_idx = param.ghostNormOffset[3] + Nface*cudaConstants.ghostFace[3] + (x4-cudaConstants.X4m1)*cudaConstants.ghostFace[3]+ space_con;
 #endif
 		    }
 	    }
@@ -953,8 +953,8 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 	    if (kernel_type == EXTERIOR_KERNEL_T){
 		    if (x4  >= cudaConstants.X4m3){
-		      nbr_idx3 = param.ghostOffset[3] + 9*cudaConstants.ghostFace[3] +(x4-cudaConstants.X4m3)*cudaConstants.ghostFace[3]+ space_con;
-		      stride3 = 3*cudaConstants.ghostFace[3];
+		      nbr_idx3 = param.ghostOffset[3] + 3*Nface*cudaConstants.ghostFace[3] +(x4-cudaConstants.X4m3)*cudaConstants.ghostFace[3]+ space_con;
+		      stride3 = Nface*cudaConstants.ghostFace[3];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[3] + 3*cudaConstants.ghostFace[3] + (x4-cudaConstants.X4m3)*cudaConstants.ghostFace[3]+ space_con;
 #endif

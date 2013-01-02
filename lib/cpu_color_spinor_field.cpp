@@ -540,7 +540,7 @@ namespace quda {
   }
 
   void cpuColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
-					const QudaDirection dir, const int dagger)
+					const QudaParity parity, const int dagger)
   {
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in unpackGhost for cpu");

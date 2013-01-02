@@ -731,8 +731,8 @@ namespace quda {
   }
 
   void cudaColorSpinorField::loadGhost(void* ghost_spinor, const int dim, 
-					 const QudaDirection dir, 
-					 const int dagger, cudaStream_t* stream) 
+				       const QudaDirection dir, 
+				       const int dagger, cudaStream_t* stream) 
   {
 //    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
@@ -765,18 +765,15 @@ namespace quda {
   // but have to make sure the ghost buffers are not overwritten.
   // no need to pass ghost_spinor to unpackGhost
   void cudaColorSpinorField::unpackGhost(const int dim, 
-				       const QudaDirection dir, 
-											const QudaParity parity,
-				       const int dagger, cudaStream_t* stream)
+				         const QudaParity parity,
+				         const int dagger, cudaStream_t* stream)
   {
-    int Nint =  (nColor*nSpin*2)/(nSpin==4 ? 2 : 1);
-
-    int len = nFace*ghostFace[dim]*Nint;
-    int offset = length + ghostOffset[dim]*nColor*nSpin*2;
-    offset += (dir == QUDA_BACKWARDS) ? 0 : len;
-    void *src = (char*)v + precision*offset;
-
+#ifdef MULTI_GPU
+    void *src = (char*)v;
     unpackFace(*this, src, dim, dagger, parity, *stream);
+#else
+    errorQuda("unpackGhost not built on single-GPU build");
+#endif
     return;
   }
 

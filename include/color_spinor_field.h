@@ -318,8 +318,8 @@ namespace quda {
 		     const int dagger, cudaStream_t* stream);
 
     // unpacks the ghost zones. Only does a single parity at a time.
-    void unpackGhost(const int dim, const QudaDirection dir, 
-						 const QudaParity parity,
+    void unpackGhost(const int dim,
+		     const QudaParity parity,
 		     const int dagger, cudaStream_t* stream);
 
     void* V() {return v;}
@@ -404,7 +404,7 @@ namespace quda {
     void packGhost(void* ghost_spinor, const int dim, 
 		   const QudaDirection dir, const QudaParity parity, const int dagger);
     void unpackGhost(void* ghost_spinor, const int dim, 
-		     const QudaDirection dir, const int dagger);
+		     const QudaParity parity, const int dagger);
   
     void* V() { return v; }
     const void * V() const { return v; }

@@ -1015,13 +1015,13 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
 
 template <int dim, int ishalf, int nFace, typename Float2>
 __global__ void unpackFaceStaggeredKernel(Float2 *out, 
-																																										float *outNorm,
-																																									 Float2* in,
-																																										float* inNorm,
-																																									 const int parity)
-																																									//	const int bx, // (bx, by, bz, bt) is the border region for the overlapped domains
-																																								//  const int by,
-																																						  //  const int bz, 
+		float *outNorm,
+		Float2* in,
+		float* inNorm,
+		const int parity)
+	//	const int bx, // (bx, by, bz, bt) is the border region for the overlapped domains
+	//  const int by,
+	//  const int bz, 
 																																								//		const int bt)
 {
   const int Nint = 6;
@@ -1053,7 +1053,7 @@ __global__ void unpackFaceStaggeredKernel(Float2 *out,
   Float2* tmp = (Float2*)(((char*)in + face_num*faceBytes));
   float* tmpNorm = (float*)((char*)inNorm + face_num*faceBytes);
 
-  out[cb_idx] 													  = tmp[face_idx];
+  out[cb_idx] = tmp[face_idx];
   out[cb_idx +   sp_stride]  = tmp[face_idx +   nFace*face_volume];
   out[cb_idx + 2*sp_stride]  = tmp[face_idx + 2*nFace*face_volume];
   if(ishalf) outNorm[idx] = tmpNorm[face_idx];
@@ -1102,8 +1102,8 @@ void packFaceStaggeredKernelWrapper(Real2 *faces, float *facesNorm, Real2 *in, f
 
 template<int nFace, typename Real2>
 void unpackFaceStaggeredKernelWrapper(Real2 *faces, float *facesNorm, Real2 *in, float *inNorm, int dim,
-																																					 const int parity, const dim3 &gridDim, const dim3 &blockDim,
-																																						const cudaStream_t &stream)
+		const int parity, const dim3 &gridDim, const dim3 &blockDim,
+		const cudaStream_t &stream)
 {
 #ifdef GPU_STAGGERED_DIRAC
   const int ishalf = isShort2<Real2>::val;

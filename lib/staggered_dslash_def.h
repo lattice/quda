@@ -355,7 +355,7 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 
 // define the kernel
 
-template <KernelType kernel_type, bool hasNaik>
+template <KernelType kernel_type, bool hasNaik, int Nface>
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
   (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
 #ifdef GPU_STAGGERED_DIRAC
