@@ -424,7 +424,7 @@ o02_re = o02_im = 0.f;
 		    int space_con = (x4*X3X2+x3*X2+x2)/2;	
 		    if (x1 >= X1m1){
 		      nbr_idx1 = param.ghostOffset[0] + 3*Nface*ghostFace[0] +(x1-X1m1)*ghostFace[0]+ space_con;
-		      stride1 = 3*ghostFace[0];
+		      stride1 = Nface*ghostFace[0];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[0] + Nface*ghostFace[0] + (x1-X1m1)*ghostFace[0]+ space_con;
 #endif		    
@@ -506,7 +506,7 @@ o02_re = o02_im = 0.f;
 	    if(kernel_type == EXTERIOR_KERNEL_X){
 		    if (x1 < 1){
 		      nbr_idx1 = param.ghostOffset[0] + (x1+2)*ghostFace[0]+ space_con;
-		      stride1 = 3*ghostFace[0];
+		      stride1 = Nface*ghostFace[0];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[0]  + (x1+2)*ghostFace[0]+ space_con;
 #endif	
@@ -545,7 +545,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_X){
 		    if (x1 < 3){
 		      nbr_idx3 = param.ghostOffset[0] + x1*ghostFace[0]+ space_con;
-		      stride3 = 3*ghostFace[0];
+		      stride3 = Nface*ghostFace[0];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[0]  + x1*ghostFace[0]+ space_con;
 #endif
@@ -588,7 +588,7 @@ o02_re = o02_im = 0.f;
 	    if(kernel_type == EXTERIOR_KERNEL_Y){	    
 		    if(x2 >= X2m1){
 		      nbr_idx1 = param.ghostOffset[1] + 3*Nface*ghostFace[1] +(x2-X2m1)*ghostFace[1]+ space_con;
-		      stride1 = 3*ghostFace[1];
+		      stride1 = Nface*ghostFace[1];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[1] + Nface*ghostFace[1] + (x2-X2m1)*ghostFace[1]+ space_con;
 #endif		    
@@ -621,7 +621,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		    if (x2>= X2m3){
 		      nbr_idx3 = param.ghostOffset[1] + 3*Nface*ghostFace[1] +(x2-X2m3)*ghostFace[1]+ space_con;
-		      stride3 = 3*ghostFace[1];
+		      stride3 = Nface*ghostFace[1];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[1] + Nface*ghostFace[1] + (x2-X2m3)*ghostFace[1]+ space_con;
 #endif		    
@@ -672,7 +672,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		    if (x2  < 1){
 		      nbr_idx1 = param.ghostOffset[1] + (x2+2)*ghostFace[1]+ space_con;
-		      stride1 = 3*ghostFace[1];
+		      stride1 = Nface*ghostFace[1];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[1]  + (x2+2)*ghostFace[1]+ space_con;
 #endif	
@@ -711,7 +711,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_Y){
 		    if (x2 < 3){
 		      nbr_idx3 = param.ghostOffset[1] + x2*ghostFace[1]+ space_con;
-		      stride3 = 3*ghostFace[1];
+		      stride3 = Nface*ghostFace[1];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[1]  + x2*ghostFace[1]+ space_con;
 #endif
@@ -756,7 +756,7 @@ o02_re = o02_im = 0.f;
 	    if(kernel_type == EXTERIOR_KERNEL_Z){	
 	      if (x3 >= X3m1){
 		      nbr_idx1 = param.ghostOffset[2] + 3*Nface*ghostFace[2] +(x3-X3m1)*ghostFace[2]+ space_con;
-		      stride1 = 3*ghostFace[2];	    
+		      stride1 = Nface*ghostFace[2];	    
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[2] + Nface*ghostFace[2] + (x3-X3m1)*ghostFace[2]+ space_con;
 #endif		
@@ -790,7 +790,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 	       if (x3 >= X3m3){
 		       nbr_idx3 = param.ghostOffset[2] + 3*Nface*ghostFace[2] +(x3-X3m3)*ghostFace[2]+ space_con;
-		       stride3 = 3*ghostFace[2];
+		       stride3 = Nface*ghostFace[2];
 #if (DD_PREC == 2) //half precision
 		       norm_idx = param.ghostNormOffset[2] + Nface*ghostFace[2] + (x3-X3m3)*ghostFace[2]+ space_con;
 #endif
@@ -839,7 +839,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 		    if (x3 - 1 < 0){
 		      nbr_idx1 = param.ghostOffset[2] + (x3+2)*ghostFace[2]+ space_con;
-		      stride1 = 3*ghostFace[2];
+		      stride1 = Nface*ghostFace[2];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[2]  + (x3+2)*ghostFace[2]+ space_con;
 #endif			    
@@ -878,7 +878,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_Z){
 		    if(x3 - 3 < 0){
 		      nbr_idx3 = param.ghostOffset[2] + x3*ghostFace[2]+ space_con;
-		      stride3 = 3*ghostFace[2];
+		      stride3 = Nface*ghostFace[2];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[2]  + x3*ghostFace[2]+ space_con;
 #endif			    
@@ -921,7 +921,7 @@ o02_re = o02_im = 0.f;
 	    if (kernel_type == EXTERIOR_KERNEL_T){      
 		    if (x4 >= X4m1){
 		      nbr_idx1 = param.ghostOffset[3] + 3*Nface*ghostFace[3] +(x4-X4m1)*ghostFace[3]+ space_con;
-		      stride1 = 3*ghostFace[3];
+		      stride1 = Nface*ghostFace[3];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[3] + Nface*ghostFace[3] + (x4-X4m1)*ghostFace[3]+ space_con;
 #endif
@@ -997,7 +997,7 @@ o02_re = o02_im = 0.f;
 		    if (x4==0){
 		      fat_idx = Vh + space_con;
 		      nbr_idx1 = param.ghostOffset[3] + (x4+2)*ghostFace[3]+ space_con;
-		      stride1 = 3*ghostFace[3];
+		      stride1 = Nface*ghostFace[3];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[3]  + (x4+2)*ghostFace[3]+ space_con;
 #endif		    
@@ -1032,7 +1032,7 @@ o02_re = o02_im = 0.f;
 		    if (x4<3){                      
 		      long_idx = Vh + x4*ghostFace[3]+ space_con;
 		      nbr_idx3 = param.ghostOffset[3] + x4*ghostFace[3]+ space_con;
-		      stride3 = 3*ghostFace[3];
+		      stride3 = Nface*ghostFace[3];
 #if (DD_PREC == 2) //half precision
 		      norm_idx = param.ghostNormOffset[3]  + x4*ghostFace[3]+ space_con;
 #endif		    
