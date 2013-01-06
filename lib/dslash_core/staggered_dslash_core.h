@@ -1104,7 +1104,7 @@ if (kernel_type != INTERIOR_KERNEL){
 
 
 // write spinor field back to device memory
-WRITE_SPINOR(out);
+WRITE_SPINOR(out, sid, sp_stride);
 
 
 // undefine to prevent warning when precision is changed
