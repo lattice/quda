@@ -1802,7 +1802,6 @@ namespace quda {
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
  
-    printfQuda("in->Nface() = %d\n", in->Nface());
     checkCudaError();
 
  

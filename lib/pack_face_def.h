@@ -1181,8 +1181,6 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
 	      const int parity, const cudaStream_t &stream)
 {
 
-  printfQuda("in.Nface = %d\n", in.Nface());
-
   if(in.Nspin() == 1){
     switch(in.Nface()){
       case 1: packFaceStaggered<1>(ghost_buf, in, dim, dagger, parity, stream); break;

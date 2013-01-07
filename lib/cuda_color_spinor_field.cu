@@ -43,7 +43,6 @@ namespace quda {
       v = param.v;
       norm = param.norm;
     }
-    printfQuda("Here 1\n");
     create(param.create);
 
     if  (param.create == QUDA_NULL_FIELD_CREATE) {
@@ -60,7 +59,6 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), v(0), norm(0), alloc(false), init(true), texInit(false) {
-    printfQuda("Here 2\n");
     create(QUDA_COPY_FIELD_CREATE);
     if (isNative() && src.isNative()) copy(src);
     else errorQuda("Cannot copy using non-native fields");
@@ -91,7 +89,6 @@ namespace quda {
       }
     }
 
-    printfQuda("Here 3\n");
     create(param.create);
 
     if (param.create == QUDA_NULL_FIELD_CREATE) {
@@ -115,7 +112,6 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false) {
-    printfQuda("Here 4\n");
     create(QUDA_COPY_FIELD_CREATE);
     if (typeid(src) == typeid(cudaColorSpinorField) && 
 	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
@@ -157,7 +153,6 @@ namespace quda {
     if (!ColorSpinorField::init) { // note this will turn a reference field into a regular field
       destroy();
       ColorSpinorField::operator=(src);
-      printfQuda("Here 5\n");
       create(QUDA_COPY_FIELD_CREATE);
     }
     loadSpinorField(src);
@@ -201,7 +196,6 @@ namespace quda {
     //if (precision == QUDA_DOUBLE_PRECISION) fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
-    printfQuda("bytes = %d\n", bytes);
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
@@ -662,7 +656,6 @@ namespace quda {
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int dim, const QudaParity parity, const int dagger, cudaStream_t *stream) 
   {
-    printfQuda("nFace = %d\n", nFace);
 #ifdef MULTI_GPU
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
       void* gpu_buf = this->backGhostFaceBuffer[dim];
