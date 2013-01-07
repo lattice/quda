@@ -12,7 +12,7 @@ namespace quda {
   Dirac::Dirac(const DiracParam &param) 
     : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
-      verbose(param.verbose)
+      verbose(param.verbose), Nface(param.Nface)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
     initLatticeConstants(gauge);
@@ -23,7 +23,7 @@ namespace quda {
   Dirac::Dirac(const Dirac &dirac) 
     : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
       dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
-      verbose(dirac.verbose)
+      verbose(dirac.verbose), Nface(dirac.Nface)
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
     initLatticeConstants(gauge);
@@ -44,6 +44,7 @@ namespace quda {
       tmp1 = dirac.tmp1;
       tmp2 = dirac.tmp2;
       verbose = dirac.verbose;
+      Nface = dirac.Nface;
 
       tune = dirac.tune;
 

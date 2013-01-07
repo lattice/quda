@@ -67,6 +67,7 @@ namespace quda {
 																																ghostFace[i] = 1;
 																																for (int j=0; j<dims; j++) {
 																																  if (i==j) continue;
+																																		border[j] = 0;
 																																		ghostFace[i] *= (x[j] -2*border[j]);
 																																}
 																																ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
@@ -88,7 +89,8 @@ namespace quda {
 																																																i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
 #endif
 																}//end of outmost for loop
-																//END NEW  
+																//END NEW 
+                printfQuda("ghostVolume = %d\n", ghostVolume); 
 																int ghostNormVolume = num_norm_faces * ghostVolume;
 																ghostVolume *= num_faces;
 
@@ -98,6 +100,8 @@ namespace quda {
 																// ghost zones are calculated on c/b volumes
 #ifdef MULTI_GPU
 																ghost_length = ghostVolume*nColor*nSpin*2; 
+
+		
 																ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
 #else
 																ghost_length = 0;
@@ -118,6 +122,10 @@ namespace quda {
 																								printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
 																								printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
 																}
+
+										printfQuda("length = %d\n", length);
+          printfQuda("ghost length = %d\n", ghost_length);
+          printfQuda("Call to createGhostZone() complete\n");
 								}
 
 								void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nface, QudaTwistFlavorType Twistflavor, 
@@ -156,6 +164,9 @@ namespace quda {
 																real_length = volume*nColor*nSpin*2; // physical length
 
 																createGhostZone();
+		
+                printfQuda("ColorSpinorField::total_length = %d\n", total_length);
+                printfQuda("precision = %d\n", precision); 
 
 																bytes = total_length * precision; // includes pads and ghost zones
 																bytes = ALIGNMENT_ADJUST(bytes);
@@ -163,6 +174,7 @@ namespace quda {
 																norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
 																init = true;
 
+																printfQuda("ColorSpinorField::bytes = %d\n", bytes);
 								}
 
 								void ColorSpinorField::destroy() {

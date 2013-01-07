@@ -587,6 +587,7 @@ namespace quda {
     diracParam.verbose = getVerbosity();
 
     diracParam.hasNaik = inv_param->hasNaik ? true : false;
+    diracParam.Nface = inv_param->nface; 
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
@@ -1091,6 +1092,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   Dirac *dPre = NULL;
 
   // create the dirac operator
+  // param->nface = 4;
+
   createDirac(d, dSloppy, dPre, *param, pc_solve);
 
   Dirac &dirac = *d;
@@ -1117,6 +1120,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param);
+  
+//  cudaParam.nFace = param->nFace;
+
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam); 
 

@@ -30,6 +30,8 @@ namespace quda {
   {
     profile[QUDA_PROFILE_INIT].Start();
 
+    printfQuda("b.Nface() = %d\n", b.Nface());
+    
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
     if(b2 == 0){

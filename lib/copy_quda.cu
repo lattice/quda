@@ -163,10 +163,10 @@ namespace quda {
 	        copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
         }else if(src_length > dst_length){
           // crop the domain
-	        cropKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length, border);
+	       // cropKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length, border);
         }else if(src_length < dst_length){
 				  // extend the domain!
-	        extendKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length, border);
+	     //   extendKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length, border);
 			    // No communication yet!
 			  }      
       }

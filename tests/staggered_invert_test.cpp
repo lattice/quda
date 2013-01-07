@@ -255,6 +255,7 @@ invert_test(void)
   double src2=0;
   int ret = 0;
 
+  inv_param.nface = 3;
   switch(test_type){
   case 0: //even
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;

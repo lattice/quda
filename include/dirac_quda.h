@@ -22,12 +22,15 @@ namespace quda {
     double mass;
     double m5; // used by domain wall only
     int Ls;    //!NEW: used by domain wall only  
+    int Nface; // used to overlap domains!
+
     MatPCType matpcType;
     DagType dagger;
     cudaGaugeField *gauge;
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
     cudaCloverField *clover;
+
   
     double mu; // used by twisted mass only
     bool hasNaik; // used by stagggered only
@@ -58,6 +61,7 @@ namespace quda {
       printfQuda("matpcType = %d\n", matpcType);
       printfQuda("dagger = %d\n", dagger);
       printfQuda("mu = %g\n", mu);
+      printfQuda("Nface = %d\n", Nface);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
     }
   };
@@ -83,6 +87,8 @@ namespace quda {
     cudaGaugeField &gauge;
     double kappa;
     double mass;
+    int Nface;
+
     MatPCType matpcType;
     mutable DagType dagger; // mutable to simplify implementation of Mdag
     mutable unsigned long long flops;

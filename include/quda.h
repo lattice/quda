@@ -109,6 +109,7 @@ extern "C" {
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
     int hasNaik; /**< Used for staggered only */
+    int nface;  /**< Width of the ghost zones */
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */

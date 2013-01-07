@@ -384,9 +384,35 @@ namespace quda {
   // macro used for staggered dslash
 #define STAGGERED_DSLASH(hasNaik, nFace, gridDim, blockDim, shared, stream, param, ...)	\
   if(hasNaik){										\
-    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+	   switch(nFace){  				\
+					 case 1:											\
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+								break;          \
+      case 2:											\
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        break;          \
+      case 3:									  \
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+							 break;          \
+					 case 4:										 \
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+						  break;          \	
+				 }                  \
   } else {										\
-    STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, nFace, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+	   switch(nFace){  				\
+					 case 1:											\
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+								break;          \
+      case 2:											\
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        break;          \
+      case 3:									  \
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+							 break;          \
+					 case 4:										 \
+        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+						  break;          \	
+				 }                  \
   }
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
@@ -1121,8 +1147,7 @@ namespace quda {
     }
   };
 
-  // Can use default template parameters for a class, but not for a function.
-  template <typename sFloat, typename fatGFloat, typename longGFloat, int nFace=3>
+  template <typename sFloat, typename fatGFloat, typename longGFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
   private:
@@ -1138,6 +1163,7 @@ namespace quda {
     const int dagger;
     const double a;
     const bool hasNaik;
+    const int nFace;
 
   protected:
     int sharedBytesPerThread() const
@@ -1152,9 +1178,10 @@ namespace quda {
 			const QudaReconstructType reconstruct, const sFloat *in, 
 			const float *inNorm, const sFloat *x, const float *xNorm, const double a,
 			const int dagger, const size_t bytes, const size_t norm_bytes,
+   const int nFace,
 			const bool hasNaik)
       : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
-	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik)
+	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace)
     { 
       bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
     }
@@ -1203,7 +1230,8 @@ namespace quda {
       }
     }
 
-    int Nface() { return 6; }
+    //int Nface() { return 6; }
+    int Nface() { return 2*nFace; } // This is weird. Note the different definitions for Nface and nFace.
 
     long long flops() const { return (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
   };
@@ -1769,10 +1797,15 @@ namespace quda {
 			   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 			   const int parity, const int dagger, const cudaColorSpinorField *x,
 			   const double &k, const int *commOverride,
+					 const int nFace,
 			   const bool hasNaik=true)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
+ 
+    printfQuda("in->Nface() = %d\n", in->Nface());
+    checkCudaError();
 
+ 
 #ifdef GPU_STAGGERED_DIRAC
 
 #ifdef MULTI_GPU
@@ -1781,9 +1814,11 @@ namespace quda {
 	errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in staggered dslash\n");
       }    
     }
+    checkCudaError();
 #endif
 
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
+    checkCudaError();
 
     dslashParam.parity = parity;
     dslashParam.threads = in->Volume();
@@ -1793,22 +1828,26 @@ namespace quda {
       dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
+    checkCudaError();
     void *fatGauge0, *fatGauge1;
     void* longGauge0, *longGauge1;
     bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
     bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
+    checkCudaError();
     
     if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
       errorQuda("Mixing gauge and spinor precision not supported"
 		"(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
 		in->Precision(), fatGauge.Precision(), longGauge.Precision());
     }
+    checkCudaError();
     
     const void *xv = x ? x->V() : 0;
     const void *xn = x ? x->Norm() : 0;
 
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);
+    checkCudaError();
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
@@ -1818,8 +1857,10 @@ namespace quda {
 								  longGauge.Reconstruct(), (double2*)in->V(), 
 								  (float*)in->Norm(), (double2*)xv, (float*)xn, 
 								  k, dagger, in->Bytes(), in->NormBytes(),
+          nFace,
 								  hasNaik);
       regSize = sizeof(double);
+    checkCudaError();
 #else
       errorQuda("Double precision not supported on this GPU");
 #endif
@@ -1830,7 +1871,9 @@ namespace quda {
 							       longGauge.Reconstruct(), (float2*)in->V(),
 							       (float*)in->Norm(), (float2*)xv, (float*)xn, 
 							       k, dagger, in->Bytes(), in->NormBytes(),
+														nFace,
 							       hasNaik);
+    checkCudaError();
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
       dslash = new StaggeredDslashCuda<short2, short2, short4>((short2*)out->V(), (float*)out->Norm(), 
 							       (short2*)fatGauge0, (short2*)fatGauge1,
@@ -1838,12 +1881,16 @@ namespace quda {
 							       longGauge.Reconstruct(), (short2*)in->V(), 
 							       (float*)in->Norm(), (short2*)xv, (float*)xn, 
 							       k, dagger,  in->Bytes(), in->NormBytes(), 
+														nFace,
 							       hasNaik);
     }
+    checkCudaError();
 
     dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
+    checkCudaError();
 
     delete dslash;
+    checkCudaError();
     unbindGaugeTex(fatGauge);
     unbindGaugeTex(longGauge);
 
