@@ -1185,10 +1185,11 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
 
   if(in.Nspin() == 1){
     switch(in.Nface()){
+      case 1: packFaceStaggered<1>(ghost_buf, in, dim, dagger, parity, stream); break;
       case 2: packFaceStaggered<2>(ghost_buf, in, dim, dagger, parity, stream); break;
       case 3: packFaceStaggered<3>(ghost_buf, in, dim, dagger, parity, stream); break;
       case 4: packFaceStaggered<4>(ghost_buf, in, dim, dagger, parity, stream); break;
-      default: errorQuda("Only nFace 2/3/4 supported for staggered fermions\n"); break;
+      default: errorQuda("Only nFace 1/2/3/4 supported for staggered fermions\n"); break;
 	  }
   }else{  
     packFaceWilson(ghost_buf, in, dim, dagger, parity, stream);
