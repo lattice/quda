@@ -234,7 +234,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
     if (reg_size != inter_size  && store_size != 2 && inter_size != 4)
       errorQuda("Precision of register (%lu) and intermediate (%lu) types must match\n",
-		reg_size, inter_size);
+		(unsigned long)reg_size, (unsigned long)inter_size);
   
     if (vecLength<InterType>() != vecLength<StoreType>()) {
       errorQuda("Vector lengths intermediate and register types must match\n");

@@ -338,12 +338,13 @@ doubleN reduceLaunch(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Redu
     errorQuda("Reduction not implemented for %d threads", tp.block.x);
   }
 
+#if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
   if(deviceProp.canMapHostMemory) {
     cudaEventRecord(reduceEnd, stream);
     while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
-  } else {
-    cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost);
-  }
+  } else 
+#endif
+    { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
 
   doubleN cpu_sum;
   zero(cpu_sum);

@@ -49,14 +49,18 @@ namespace quda {
 
     if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
     
-    // these arrays are acutally oversized currently (only needs to be QudaSumFloat3)
+    // these arrays are actually oversized currently (only needs to be QudaSumFloat3)
     
     // if the device supports host-mapped memory then use a host-mapped array for the reduction
     if (!h_reduce) {
+      // only use zero copy reductions when using 64-bit
+#if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
       if(deviceProp.canMapHostMemory) {
 	h_reduce = (QudaSumFloat *) mapped_malloc(bytes);	
 	cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
-      } else {
+      } else 
+#endif 
+      {
 	h_reduce = (QudaSumFloat *) pinned_malloc(bytes);
 	hd_reduce = d_reduce;
       }
