@@ -189,10 +189,10 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume());
       blas.apply(*blasStream);
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    blas_bytes += Functor<double2,double2>::streams()*x.Volume()*sizeof(float);
+    blas_bytes += Functor<double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
   }
-  blas_bytes += Functor<double2,double2>::streams()*x.RealLength()*x.Precision();
-  blas_flops += Functor<double2,double2>::flops()*x.RealLength();
+  blas_bytes += Functor<double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
+  blas_flops += Functor<double2,double2>::flops()*(unsigned long long)x.RealLength();
 
   checkCudaError();
 }

@@ -583,10 +583,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	reduce(value, X, Y, Z, W, V, r, y.Volume());
       reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.Volume()*sizeof(float);
+    blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
   }
-  blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.RealLength()*x.Precision();
-  blas_flops += Reducer<ReduceType,double2,double2>::flops()*x.RealLength();
+  blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
+  blas_flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x.RealLength();
 
   checkCudaError();
 
