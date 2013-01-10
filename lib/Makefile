@@ -10,7 +10,7 @@ QUDA_OBJS = timer.o malloc.o solver.o inv_bicgstab_quda.o		\
 	cuda_gauge_field.o dirac_clover.o dirac_wilson.o		\
 	dirac_staggered.o dirac_domain_wall.o dirac_twisted_mass.o	\
 	tune.o fat_force_quda.o llfat_quda_itf.o clover_quda.o		\
-	dslash_quda.o blas_quda.o copy_quda.o reduce_quda.o face_buffer.o ${FACE_COMMS_OBJS}	\
+	dslash_quda.o blas_quda.o reduce_quda.o copy_quda.o face_buffer.o ${FACE_COMMS_OBJS}	\
 	${NUMA_AFFINITY_OBJS}
 
 # header files, found in include/
@@ -22,7 +22,10 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h
 
 # These are only inlined into blas_quda.cu
-BLAS_INLN = blas_core.h reduce_core.h
+BLAS_INLN = blas_core.h
+
+# These are only inlined into reduce_quda.cu
+REDUCE_INLN = reduce_core.h
 
 # These are only inlined into cuda_color_spinor_field.cu
 CSF_INLN = pack_spinor.h
@@ -90,6 +93,9 @@ tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+
+reduce_quda.o: reduce_quda.cu $(HDRS) $(REDUCE_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
