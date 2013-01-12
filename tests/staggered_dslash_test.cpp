@@ -67,6 +67,7 @@ extern QudaPrecision prec;
 extern int device;
 
 int X[4];
+extern int Nsrc; // number of spinors to apply to simultaneously
 
 Dirac* dirac;
 
@@ -121,10 +122,12 @@ void init()
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
-  csParam.nDim=4;
+  csParam.nDim=5;
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gaugeParam.X[d];
   }
+  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
   if (test_type < 2) {
@@ -350,9 +353,16 @@ void staggeredDslashRef()
 			    spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
     cpu_parity = 0; //EVEN
-    staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
-		     inv_param.cpu_prec, gaugeParam.cpu_prec);
-    
+
+    for (int i=0; i<Nsrc; i++) {
+
+      void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
+      void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
+
+      staggered_dslash(out, fatlink, longlink, in, cpu_parity, dagger, 
+		       inv_param.cpu_prec, gaugeParam.cpu_prec);
+
+    }
 #endif    
 
 
@@ -364,8 +374,15 @@ void staggeredDslashRef()
     
 #else
     cpu_parity=1; //ODD
-    staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
-		     inv_param.cpu_prec, gaugeParam.cpu_prec);
+    for (int i=0; i<Nsrc; i++) {
+
+      void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
+      void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
+
+      staggered_dslash(out, fatlink, longlink, in, cpu_parity, dagger, 
+		       inv_param.cpu_prec, gaugeParam.cpu_prec);
+
+    }
 #endif
     break;
   case 2:

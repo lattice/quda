@@ -183,6 +183,8 @@ namespace quda {
   //#define SHARED_WILSON_DSLASH
   //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+  //#define STAGGERED_PARALLEL_DIR // parallelize over forwards and backwards dslash gather
+
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
@@ -965,12 +967,13 @@ namespace quda {
     const QudaReconstructType reconstruct;
     const int dagger;
     const double a;
+    const int nSrc; // number of sources we are applying dslash to
 
   protected:
     int sharedBytesPerThread() const
     {
       int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return 6 * reg_size;
+      return 6 * reg_size * nSrc;
     }
 
   public:
@@ -979,8 +982,11 @@ namespace quda {
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
       : DslashCuda(out, in, x), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
-	reconstruct(reconstruct), dagger(dagger), a(a)
+	reconstruct(reconstruct), dagger(dagger), a(a), nSrc(in->X(4))
     { 
+#ifdef MULTI_GPU
+      if (nSrc > 1) errorQuda("Multi-source dslash does not yet support multi-gpu");
+#endif
       bindSpinorTex<sFloat>(in, out, x);
     }
 
@@ -1000,14 +1006,20 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+#ifdef STAGGERED_PARALLEL_DIR    
+      dim3 blockDim(tp.block.x, nSrc, 2);
+#else
+      dim3 blockDim(tp.block.x, nSrc, 1);
+#endif
+
+      STAGGERED_DSLASH(gridDim, blockDim, tp.shared_bytes, stream, dslashParam,
 		       (sFloat*)out->V(), (float*)out->Norm(), fat0, fat1, long0, long1, 
 		       (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
     }
 
     int Nface() { return 6; }
 
-    long long flops() const { return (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const { return (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB() * nSrc; } // FIXME for multi-GPU
   };
 
 #ifdef DSLASH_PROFILING
@@ -1544,7 +1556,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
     for(int i=0;i < 4; i++){
-      if(commDimPartitioned(i) && (fatGauge.X()[i] < 6)){
+      if(commDimPartitioned(i) && (fatGauge.X(i) < 6)){
 	errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in staggered dslash\n");
       }    
     }
@@ -1553,7 +1565,6 @@ namespace quda {
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     dslashParam.parity = parity;
-    dslashParam.threads = in->Volume();
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
@@ -1593,7 +1604,7 @@ namespace quda {
 							       longGauge.Reconstruct(), in, x, k, dagger);
     }
 
-    dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
+    dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), in->GhostFace());
 
     delete dslash;
     unbindGaugeTex(fatGauge);
