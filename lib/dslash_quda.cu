@@ -973,7 +973,12 @@ namespace quda {
     int sharedBytesPerThread() const
     {
       int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return 6 * reg_size * nSrc;
+#if (STAGGERED_PARALLEL_DIR)
+      return return 6 * reg_size * nSrc;
+#else
+      if (typeid(sFloat) == typeid(double2)) return 6 * reg_size * nSrc;
+      else return 0;
+#endif
     }
 
   public:

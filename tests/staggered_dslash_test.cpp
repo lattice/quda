@@ -437,7 +437,7 @@ static int dslashTest()
     if (prec == QUDA_HALF_PRECISION) bytes_for_one_site += (8*2 + 1)*4;	
 
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*1e+9));
+    printfQuda("GB/s = %f\n\n", 1.0*Vh*Nsrc*bytes_for_one_site/((secs/loops)*1e+9));
 	
     if (!transfer) {
       double spinor_ref_norm2 = norm2(*spinorRef);
