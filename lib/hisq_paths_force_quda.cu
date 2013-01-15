@@ -46,10 +46,10 @@ namespace quda {
       fat_force_const_t hf_h;
 #ifdef MULTI_GPU
       int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
-      hf_h.site_ga_stride = Vh_ex + param->site_ga_pad;;
+      hf_h.sitelinkStride = Vh_ex + param->site_ga_pad;;
       hf_h.color_matrix_stride = Vh_ex;
 #else
-      hf_h.site_ga_stride = Vh + param->site_ga_pad;
+      hf_h.sitelinkStride = Vh + param->site_ga_pad;
       hf_h.color_matrix_stride = Vh;
 #endif
       hf_h.mom_ga_stride = Vh + param->mom_ga_pad;
@@ -521,9 +521,9 @@ namespace quda {
 #define PRECISION 0
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, hf.sitelinkStride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.sitelinkStride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -538,9 +538,9 @@ namespace quda {
 #define PRECISION 0
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, hf.sitelinkStride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, hf.sitelinkStride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
@@ -568,9 +568,9 @@ namespace quda {
 #define PRECISION 1
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, hf.sitelinkStride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.sitelinkStride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -585,9 +585,9 @@ namespace quda {
 #define PRECISION 1
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, hf.sitelinkStride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.sitelinkStride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)

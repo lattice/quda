@@ -404,7 +404,7 @@ namespace quda {
     int x1 = 2*x1h + x1odd;
     //int X = 2*sid + x1odd;
 
-    READ_ST_STAPLE(in, sid, fl.staple_stride);
+    READ_ST_STAPLE(in, sid, fl.stapleStride);
     int ghost_face_idx;
   
     if ( dir == 0 && whichway == QUDA_BACKWARDS){

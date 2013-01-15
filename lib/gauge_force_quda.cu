@@ -12,11 +12,11 @@ namespace quda {
 
   //single precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE_TEX(siteLink0TexSingle_recon, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_SINGLE_TEX(siteLink1TexSingle_recon, dir, idx, var, gf.sitelinkStride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkEven, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_SINGLE(linkOdd, dir, idx, var, gf.sitelinkStride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) RECONSTRUCT_LINK_12(sign,var)
@@ -34,11 +34,11 @@ namespace quda {
 
   //double precsison, 12-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_12_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, gf.sitelinkStride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkEven, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_12_DOUBLE(linkOdd, dir, idx, var, gf.sitelinkStride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) RECONSTRUCT_LINK_12(sign,var)
@@ -56,11 +56,11 @@ namespace quda {
 
   //single precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_TEX(siteLink0TexSingle, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_SINGLE_TEX(siteLink1TexSingle, dir, idx, var, gf.sitelinkStride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, gf.sitelinkStride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var,gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) 
@@ -78,11 +78,11 @@ namespace quda {
 
   //double precision, 18-reconstruct
 #if (GF_SITE_MATRIX_LOAD_TEX == 1)
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_TEX(siteLink0TexDouble, linkEven, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) 	LOAD_MATRIX_18_DOUBLE_TEX(siteLink1TexDouble, linkOdd, dir, idx, var, gf.sitelinkStride)
 #else
-#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, gf.site_ga_stride)
-#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, gf.site_ga_stride)
+#define LOAD_EVEN_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkEven, dir, idx, var, gf.sitelinkStride)
+#define LOAD_ODD_MATRIX(dir, idx, var) LOAD_MATRIX_18(linkOdd, dir, idx, var, gf.sitelinkStride)
 #endif
 #define LOAD_ANTI_HERMITIAN(src, dir, idx, var) LOAD_ANTI_HERMITIAN_DIRECT(src, dir, idx, var, gf.mom_ga_stride)
 #define RECONSTRUCT_MATRIX(sign, var) 
@@ -115,9 +115,9 @@ namespace quda {
     gf_h.path_max_length = path_max_length;  
 #ifdef MULTI_GPU  
     int Vh_ex = (X[0]+4)*(X[1]+4)*(X[2]+4)*(X[3]+4)/2;
-    gf_h.site_ga_stride = param->site_ga_pad + Vh_ex;
+    gf_h.sitelinkStride = param->site_ga_pad + Vh_ex;
 #else  
-    gf_h.site_ga_stride = param->site_ga_pad + Vh;
+    gf_h.sitelinkStride = param->site_ga_pad + Vh;
 #endif
   
     gf_h.mom_ga_stride = param->mom_ga_pad + Vh;  
