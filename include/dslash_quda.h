@@ -41,6 +41,7 @@ namespace quda {
   void initDslashConstants();
   void initCloverConstants (const cudaCloverField &clover);
   void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
+  void initDDStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
 
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

@@ -9,6 +9,12 @@ typedef struct fat_force_stride_s {
   int color_matrix_stride;
 } fat_force_const_t;
 
+struct StaggeredConstants {
+  int fatlinkStride;
+  int longlinkStride;
+  int fatlinkMax;
+};
+
 
 
 struct LatticeConstants {
@@ -71,6 +77,9 @@ struct LatticeConstants {
 
 __constant__ LatticeConstants  cudaConstants;
 LatticeConstants constants;
+
+__constant__ StaggeredConstants staggeredConstats;
+__constant__ StaggeredConstants ddStaggeredConstants; // for domain decomposition
 
 __constant__ int Y1h;
 __constant__ int Y1;
@@ -508,18 +517,34 @@ void initCloverConstants (const cudaCloverField &clover)
 }
 
 
-void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge)
+
+void initStaggeredConstants(const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge)
 {
-  int fatlinkStride_h = fatgauge.Stride();
-  int longlinkStride_h = longgauge.Stride();
-  float fat_link_max_h = fatgauge.LinkMax();
-  
-  cudaMemcpyToSymbol(fatlinkStride, &fatlinkStride_h, sizeof(int));  
-  cudaMemcpyToSymbol(longlinkStride, &longlinkStride_h, sizeof(int));  
-  cudaMemcpyToSymbol(fatlinkMax, &fat_link_max_h, sizeof(float));
+  StaggeredConstants hostConstants;
+  hostConstants.fatlinkStride = fatgauge.Stride();
+  hostConstants.longlinkStride = longgauge.Stride();
+  hostConstants.fatlinkMax = fatgauge.LinkMax();
+
+  cudaMemcpyToSymbol(staggeredConstants, &hostConstants, sizeof(StaggeredConstants));
 
   checkCudaError();
 }
+
+void initDDStaggeredConstants(const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge)
+{
+  StaggeredConstants hostConstants;
+  hostConstants.fatlinkStride = fatgauge.Stride();
+  hostConstants.longlinkStride = longgauge.Stride();
+  hostConstants.fatlinkMax = fatgauge.LinkMax();
+
+  cudaMemcpyToSymbol(ddStaggeredConstants, &hostConstants, sizeof(StaggeredConstants));
+
+  checkCudaError();
+}
+
+
+
+
 
 
 
