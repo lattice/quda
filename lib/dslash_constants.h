@@ -78,7 +78,7 @@ struct LatticeConstants {
 __constant__ LatticeConstants  cudaConstants;
 LatticeConstants constants;
 
-__constant__ StaggeredConstants staggeredConstats;
+__constant__ StaggeredConstants staggeredConstants;
 __constant__ StaggeredConstants ddStaggeredConstants; // for domain decomposition
 
 __constant__ int Y1h;
@@ -521,9 +521,9 @@ void initCloverConstants (const cudaCloverField &clover)
 void initStaggeredConstants(const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge)
 {
   StaggeredConstants hostConstants;
-  hostConstants.fatlinkStride = fatgauge.Stride();
-  hostConstants.longlinkStride = longgauge.Stride();
-  hostConstants.fatlinkMax = fatgauge.LinkMax();
+  hostConstants.fatlinkStride = fatGauge.Stride();
+  hostConstants.longlinkStride = longGauge.Stride();
+  hostConstants.fatlinkMax = fatGauge.LinkMax();
 
   cudaMemcpyToSymbol(staggeredConstants, &hostConstants, sizeof(StaggeredConstants));
 
@@ -533,9 +533,9 @@ void initStaggeredConstants(const cudaGaugeField &fatGauge, const cudaGaugeField
 void initDDStaggeredConstants(const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge)
 {
   StaggeredConstants hostConstants;
-  hostConstants.fatlinkStride = fatgauge.Stride();
-  hostConstants.longlinkStride = longgauge.Stride();
-  hostConstants.fatlinkMax = fatgauge.LinkMax();
+  hostConstants.fatlinkStride = fatGauge.Stride();
+  hostConstants.longlinkStride = longGauge.Stride();
+  hostConstants.fatlinkMax = fatGauge.LinkMax();
 
   cudaMemcpyToSymbol(ddStaggeredConstants, &hostConstants, sizeof(StaggeredConstants));
 
