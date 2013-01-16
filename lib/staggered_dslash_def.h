@@ -1,3 +1,5 @@
+#include "staggered_overlap_utilities.h" // utilities used in domain decomposition
+
 // staggered_dslash_def.h - staggered Dslash kernel definitions
 //
 // See comments in wilson_dslash_def.h
