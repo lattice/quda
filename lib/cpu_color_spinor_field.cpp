@@ -380,7 +380,7 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(int nface)
   {
-    if (initGhostFaceBuffer && nFace>nface) return;
+    if (initGhostFaceBuffer && nFace>=nface) return;
 
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in alllocateGhostBuffer\n");
