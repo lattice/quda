@@ -1071,7 +1071,7 @@ o02_re = o02_im = 0.f;
 #ifdef DSLASH_AXPY
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
-   READ_ACCUM(ACCUMTEX);
+   READ_ACCUM(ACCUMTEX, sp_stride);
    o00_re = -o00_re + a*accum0.x;
    o00_im = -o00_im + a*accum0.y;
    o01_re = -o01_re + a*accum1.x;
@@ -1087,7 +1087,7 @@ if (kernel_type == INTERIOR_KERNEL){
    o02_im = -o02_im;
  }
 #else
-READ_ACCUM(ACCUMTEX);
+READ_ACCUM(ACCUMTEX, sp_stride);
 o00_re = -o00_re + a*accum0.x;
 o00_im = -o00_im + a*accum0.y;
 o01_re = -o01_re + a*accum1.x;

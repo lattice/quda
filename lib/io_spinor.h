@@ -612,41 +612,41 @@
 #define READ_AND_SUM_ST_SPINOR_HALF(spinor)			\
   READ_AND_SUM_ST_SPINOR_HALF_(spinor)
 
-#define READ_ST_ACCUM_DOUBLE_TEX(spinor)			   \
-  double2 accum0 = fetch_double2((spinor), sid + 0*(sp_stride));   \
-  double2 accum1 = fetch_double2((spinor), sid + 1*(sp_stride));   \
-  double2 accum2 = fetch_double2((spinor), sid + 2*(sp_stride));   
+#define READ_ST_ACCUM_DOUBLE_TEX(spinor, stride)			   \
+  double2 accum0 = fetch_double2((spinor), sid + 0*(stride));   \
+  double2 accum1 = fetch_double2((spinor), sid + 1*(stride));   \
+  double2 accum2 = fetch_double2((spinor), sid + 2*(stride));   
 
-#define READ_ST_ACCUM_SINGLE_TEX(spinor)			\
-  float2 accum0 = tex1Dfetch((spinor), sid + 0*sp_stride);	\
-  float2 accum1 = tex1Dfetch((spinor), sid + 1*sp_stride);	\
-  float2 accum2 = tex1Dfetch((spinor), sid + 2*sp_stride);     
+#define READ_ST_ACCUM_SINGLE_TEX(spinor, stride)			\
+  float2 accum0 = tex1Dfetch((spinor), sid + 0*stride);	\
+  float2 accum1 = tex1Dfetch((spinor), sid + 1*stride);	\
+  float2 accum2 = tex1Dfetch((spinor), sid + 2*stride);     
 
-#define READ_ST_ACCUM_HALF_TEX(spinor)				\
-  float2 accum0 = tex1Dfetch((spinor), sid + 0*sp_stride);	\
-  float2 accum1 = tex1Dfetch((spinor), sid + 1*sp_stride);	\
-  float2 accum2 = tex1Dfetch((spinor), sid + 2*sp_stride);	\
+#define READ_ST_ACCUM_HALF_TEX(spinor, stride)				\
+  float2 accum0 = tex1Dfetch((spinor), sid + 0*stride);	\
+  float2 accum1 = tex1Dfetch((spinor), sid + 1*stride);	\
+  float2 accum2 = tex1Dfetch((spinor), sid + 2*stride);	\
   float C = tex1Dfetch((accumTexHalfNorm), sid);		\
   accum0.x *= C; accum0.y *= C;					\
   accum1.x *= C; accum1.y *= C;					\
   accum2.x *= C; accum2.y *= C;       
 
-#define READ_ST_ACCUM_DOUBLE(spinor)				   \
-  double2 accum0 = spinor[sid + 0*(sp_stride)];			   \
-  double2 accum1 = spinor[sid + 1*(sp_stride)];			   \
-  double2 accum2 = spinor[sid + 2*(sp_stride)];   
+#define READ_ST_ACCUM_DOUBLE(spinor, stride)				   \
+  double2 accum0 = spinor[sid + 0*(stride)];			   \
+  double2 accum1 = spinor[sid + 1*(stride)];			   \
+  double2 accum2 = spinor[sid + 2*(stride)];   
 
-#define READ_ST_ACCUM_SINGLE(spinor)				\
-  float2 accum0 = spinor[sid + 0*(sp_stride)];			\
-  float2 accum1 = spinor[sid + 1*(sp_stride)];			\
-  float2 accum2 = spinor[sid + 2*(sp_stride)];     
+#define READ_ST_ACCUM_SINGLE(spinor, stride)				\
+  float2 accum0 = spinor[sid + 0*(stride)];			\
+  float2 accum1 = spinor[sid + 1*(stride)];			\
+  float2 accum2 = spinor[sid + 2*(stride)];     
 
-#define READ_ST_ACCUM_HALF(spinor)					\
+#define READ_ST_ACCUM_HALF(spinor, stride)					\
   float2 accum0, accum1, accum2;					\
   {									\
-    short2 S0 = x[sid + 0*sp_stride];					\
-    short2 S1 = x[sid + 1*sp_stride];					\
-    short2 S2 = x[sid + 2*sp_stride];					\
+    short2 S0 = x[sid + 0*stride];					\
+    short2 S1 = x[sid + 1*stride];					\
+    short2 S2 = x[sid + 2*stride];					\
     float C = spinor##Norm[sid];					\
     accum0.x =C*short2float(S0.x); accum0.y =C*short2float(S0.y);	\
     accum1.x =C*short2float(S1.x); accum1.y =C*short2float(S1.y);	\

@@ -380,4 +380,98 @@ __device__ int getGluonCBIndexFromGhostIndex(int x1, int x2, int x3, int x4, int
   return getGluonFullIndexFromGhostIndex<Dir,nFace>(x1, x2, x3, x4, parity) >> 1;
 }
 
+
+
+template<typename T>
+void MatMulVectAppend(T (&vout)[3], const T(& mat)[9], const T (&vin)[3])
+{
+  // real part
+  vout[0].x += mat[0].x*vin[0].x - mat[0].y*vin[0].y;
+  vout[0].x += mat[1].x*vin[1].x - mat[1].y*vin[1].y;
+  vout[0].x += mat[2].x*vin[2].x - mat[2].y*vin[2].y;
+
+  vout[1].x += mat[3].x*vin[0].x - mat[3].y*vin[0].y;
+  vout[1].x += mat[4].x*vin[1].x - mat[4].y*vin[1].y;
+  vout[1].x += mat[5].x*vin[2].x - mat[5].y*vin[2].y;
+
+  vout[2].x += mat[6].x*vin[0].x - mat[6].y*vin[0].y;
+  vout[2].x += mat[7].x*vin[1].x - mat[7].y*vin[1].y;
+  vout[2].x += mat[8].x*vin[2].x - mat[8].y*vin[2].y;
+
+  // imaginary part
+  vout[0].y += mat[0].x*vin[0].y + mat[0].y*vin[0].x;
+  vout[0].y += mat[1].x*vin[1].y + mat[1].y*vin[1].x;
+  vout[0].y += mat[2].x*vin[2].y + mat[2].y*vin[2].x;
+
+  vout[1].y += mat[0].x*vin[0].y + mat[0].y*vin[0].x;
+  vout[1].y += mat[1].x*vin[1].y + mat[1].y*vin[1].x;
+  vout[1].y += mat[2].x*vin[2].y + mat[2].y*vin[2].x;
+
+  vout[2].y += mat[6].x*vin[0].y + mat[6].y*vin[0].x;
+  vout[2].y += mat[7].x*vin[1].y + mat[7].y*vin[1].x;
+  vout[2].y += mat[8].x*vin[2].y + mat[8].y*vin[2].x;
+
+  return;
+}
+
+
+void MatMulVecAppend(float2 (&vout)[3], const float4(& mat)[5], const float2 (&vin)[3])
+{
+
+  // real part 
+  vout[0].x += mat[0].x*vin[0].x - mat[0].y*vin[0].y;
+  vout[0].x += mat[0].z*vin[1].x - mat[0].w*vin[1].y;
+  vout[0].x += mat[1].x*vin[2].x - mat[1].y*vin[2].y;
+
+  vout[1].x += mat[1].z*vin[0].x - mat[3].w*vin[0].y;
+  vout[1].x += mat[2].x*vin[1].x - mat[2].y*vin[1].y;
+  vout[1].x += mat[2].z*vin[2].x - mat[2].w*vin[2].y;
+
+  vout[2].x += mat[3].x*vin[0].x - mat[3].y*vin[0].y;
+  vout[2].x += mat[3].z*vin[1].x - mat[3].w*vin[1].y;
+  vout[2].x += mat[4].x*vin[2].x - mat[4].y*vin[2].y;
+
+  // imaginary part
+  vout[0].y += mat[0].x*vin[0].y + mat[0].y*vin[0].x;
+  vout[0].y += mat[0].z*vin[1].y + mat[0].w*vin[1].x;
+  vout[0].y += mat[1].x*vin[2].y + mat[1].y*vin[2].x;
+
+  vout[1].y += mat[1].z*vin[0].y + mat[3].w*vin[0].x;
+  vout[1].y += mat[2].x*vin[1].y + mat[2].y*vin[1].x;
+  vout[1].y += mat[2].z*vin[2].y + mat[2].w*vin[2].x;
+
+  vout[2].y += mat[3].x*vin[0].y + mat[3].y*vin[0].x;
+  vout[2].y += mat[3].z*vin[1].y + mat[3].w*vin[1].x;
+  vout[2].y += mat[4].x*vin[2].y + mat[4].y*vin[2].x;
+
+  return;
+}
+
+
+
+// template the kernel so that 
+// we can switch between single-/double- and half- precision
+
+template<int Dir, int nFace>
+int getSpinorStride(int cb_index)
+{
+  const int stride = (cb_index < Vh) ? sp_stride : Nface*ghostFace[Dir];
+  return stride;
+}
+
+
+template<int Dir, int nFace>
+int getNormIndex(int cb_index)
+{
+  if(cb_index < Vh) return cb_index;
+
+  const int offset = param.ghostOffset[Dir] + 3*Nface*ghostFace[Dir];
+  const int norm_idx = (cb_index >= offset) ? cb_index - offset + param.ghostNormOffset[Dir] + Nface*ghostFace[Dir] : cb_index - param.ghostOffset[Dir] + param.ghostNormOffset[Dir];
+
+  return norm_idx;
+}
+
+
+
+
 #endif
