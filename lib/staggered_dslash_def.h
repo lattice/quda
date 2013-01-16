@@ -365,14 +365,16 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #endif
 }
 
-//// Add border zone
-//template <KernelType kernel_type, bool hasNaik>
-//__global__ void DD_FUNC(DD_FNAME, DD_RECON_F, D_AXPY_F)
-//  (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY, int bx, int by, int bz, int bt){
-//#ifdef GPU_STAGGERED_DIRAC
-//  #include "staggered_dslash_core.h"
-//#endif
-//}
+
+// define the kernel for the border region
+template <int Dir, bool hasNaik, int nFace>
+__global__ void DD_FUNC(staggeredBorderDslash, DD_RECON_F, DD_AXPY_T)
+(DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY){
+#ifdef GPU_STAGGERED_DIRAC
+  #include "staggered_dslash_border_core.h" // Need to fix by adding accum
+#endif
+}
+
 
 
 #endif // !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)

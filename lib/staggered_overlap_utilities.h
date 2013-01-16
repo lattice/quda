@@ -2,7 +2,7 @@
 #define STAGGERED_OVERLAP_UTILITIES_H
 
 
-template<int ghostDir, int nFace>
+template<int ghostDir, int Nface>
 struct NeighborIndex{
 
   // returns -1 if neighbor is out of bounds
@@ -14,20 +14,20 @@ struct NeighborIndex{
   __device__ static int minus(int x1, int x2, int x3, int x4){ return Dir; }
 };
 
-template<int nFace>
-struct NeighborIndex<0, nFace>{
+template<int Nface>
+struct NeighborIndex<0, Nface>{
 
   template<int Dir>
   __device__ static int plus(int x1, int x2, int x3, int x4, const DslashParam& param){
 
-    if(Dir==0 && x1 == nFace-1) return (x4*X3X2X1 + x3*X2X1 + x2*X1) >> 1;
+    if(Dir==0 && x1 == Nface-1) return (x4*X3X2X1 + x3*X2X1 + x2*X1) >> 1;
 
     int dirOffset=0;
-    if(x1 >= nFace) x1 -= nFace; dirOffset = 3*nFace*(X4X3X2>>1);
+    if(x1 >= Nface) x1 -= Nface; dirOffset = 3*Nface*(X4X3X2>>1);
 
     switch(Dir){
       case 0:
-	if(x1 == nFace-1) return -1;
+	if(x1 == Nface-1) return -1;
         x1 += 1;
       break;
 
@@ -54,14 +54,14 @@ struct NeighborIndex<0, nFace>{
   template<int Dir> 
   __device__ static int plus_three(int x1, int x2, int x3, int x4, const DslashParam& param){
 
-    if(Dir == 0 && x1 < nFace && x1 >= nFace-3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + x1-nFace + 3)>>1; 
+    if(Dir == 0 && x1 < Nface && x1 >= Nface-3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + x1-Nface + 3)>>1; 
 
     int dirOffset=0;
-    if(x1 >= nFace) x1 -= nFace; dirOffset = 3*nFace*(X4X3X2>>1); 
+    if(x1 >= Nface) x1 -= Nface; dirOffset = 3*Nface*(X4X3X2>>1); 
     
     switch(Dir){
       case 0: 
-        if(x1 >= nFace-3) return -1;
+        if(x1 >= Nface-3) return -1;
 	x1 += 3;
       break;
 
@@ -89,11 +89,11 @@ struct NeighborIndex<0, nFace>{
   __device__ static int minus(int x1, int x2, int x3, int x4, const DslashParam& param){
     
 
-    if(Dir == 0 && x1 == nFace) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + X1m1) >> 1;
+    if(Dir == 0 && x1 == Nface) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + X1m1) >> 1;
     
 
     int dirOffset = 0;
-    if(x1 >= nFace) x1 -= nFace; dirOffset = 3*nFace*(X4X3X2>>1);
+    if(x1 >= Nface) x1 -= Nface; dirOffset = 3*Nface*(X4X3X2>>1);
 
     switch(Dir){
       case 0:
@@ -123,10 +123,10 @@ struct NeighborIndex<0, nFace>{
   template<int Dir> 
   __device__ static int minus_three(int x1, int x2, int x3, int x4, const DslashParam& param){
 
-    if(Dir == 0 && x1 >= nFace && x1 < nFace+3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + X1m3 + x1-nFace)>>1; 
+    if(Dir == 0 && x1 >= Nface && x1 < Nface+3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + X1m3 + x1-Nface)>>1; 
 
     int dirOffset=0;
-    if(x1 >= nFace) x1 -= nFace; dirOffset = 3*nFace*(X4X3X2>>1);    
+    if(x1 >= Nface) x1 -= Nface; dirOffset = 3*Nface*(X4X3X2>>1);    
  
     switch(Dir){
       case 0: 
@@ -283,7 +283,7 @@ __device__ void getCoordinates(int* const x1_p, int* const x2_p,
   return;
 }
 
-template<int Dir, int nFace>
+template<int Dir, int Nface>
 __device__ void getGluonCoordsFromGhostCoords(int* const y1_p, int* const y2_p, int* const y3_p, int* const y4_p,
 				   int x1, int x2, int x3, int x4)
 {
@@ -295,31 +295,31 @@ __device__ void getGluonCoordsFromGhostCoords(int* const y1_p, int* const y2_p, 
 
   switch(Dir){
     case 0:
-      if(x1 >= nFace) *y1_p += X1;
-      if(Y2 > X2) *y2_p += nFace;
-      if(Y3 > X3) *y3_p += nFace;
-      if(Y4 > X4) *y4_p += nFace;
+      if(x1 >= Nface) *y1_p += X1;
+      if(Y2 > X2) *y2_p += Nface;
+      if(Y3 > X3) *y3_p += Nface;
+      if(Y4 > X4) *y4_p += Nface;
     break;
 
     case 1:
-      if(x2 >= nFace) *y2_p += X2;
-      if(Y1 > X1) *y1_p += nFace;
-      if(Y3 > X3) *y3_p += nFace;
-      if(Y4 > X4) *y4_p += nFace;
+      if(x2 >= Nface) *y2_p += X2;
+      if(Y1 > X1) *y1_p += Nface;
+      if(Y3 > X3) *y3_p += Nface;
+      if(Y4 > X4) *y4_p += Nface;
     break;
 
     case 2:
-      if(x3 >= nFace) *y3_p += X3;
-      if(Y1 > X1) *y1_p += nFace;
-      if(Y2 > X2) *y2_p += nFace;
-      if(Y4 > X4) *y4_p += nFace;
+      if(x3 >= Nface) *y3_p += X3;
+      if(Y1 > X1) *y1_p += Nface;
+      if(Y2 > X2) *y2_p += Nface;
+      if(Y4 > X4) *y4_p += Nface;
     break;
 
     case 3:
-      if(x4 >= nFace) *y4_p += X4;
-      if(Y1 > X1) *y1_p += nFace;
-      if(Y2 > X2) *y2_p += nFace;
-      if(Y3 > X3) *y3_p += nFace;
+      if(x4 >= Nface) *y4_p += X4;
+      if(Y1 > X1) *y1_p += Nface;
+      if(Y2 > X2) *y2_p += Nface;
+      if(Y3 > X3) *y3_p += Nface;
     break;
 
     default:
@@ -329,38 +329,38 @@ __device__ void getGluonCoordsFromGhostCoords(int* const y1_p, int* const y2_p, 
 }
 
 
-template<int Dir, int nFace>
+template<int Dir, int Nface>
 __device__ int getGluonFullIndexFromGhostIndex(int x1, int x2, int x3, int x4, int parity)
 {
   // Y4, Y3, Y2, Y1 are the dimensions of the extended domain
   switch(Dir){
     case 0:
-      if(x1 >= nFace) x1 += X1;
+      if(x1 >= Nface) x1 += X1;
       // shift so that the sites are within the Red Cross
-      if(Y2 > X2) x2 += nFace;
-      if(Y3 > X3) x3 += nFace;
-      if(Y4 > X4) x4 += nFace;
+      if(Y2 > X2) x2 += Nface;
+      if(Y3 > X3) x3 += Nface;
+      if(Y4 > X4) x4 += Nface;
     break;
 
     case 1:
-      if(x2 >= nFace) x2 += X2;
-      if(Y1 > X1) x1 += nFace;
-      if(Y3 > X3) x3 += nFace;
-      if(Y4 > X4) x4 += nFace;
+      if(x2 >= Nface) x2 += X2;
+      if(Y1 > X1) x1 += Nface;
+      if(Y3 > X3) x3 += Nface;
+      if(Y4 > X4) x4 += Nface;
     break;
 
     case 2:
-      if(x3 >= nFace) x3 += X3;
-      if(Y1 > X1) x1 += nFace;
-      if(Y2 > X2) x2 += nFace;
-      if(Y4 > X4) x4 += nFace;
+      if(x3 >= Nface) x3 += X3;
+      if(Y1 > X1) x1 += Nface;
+      if(Y2 > X2) x2 += Nface;
+      if(Y4 > X4) x4 += Nface;
     break;
 
     case 3:
-      if(x4 >= nFace) x4 += X4;
-      if(Y1 > X1) x1 += nFace;
-      if(Y2 > X2) x2 += nFace;
-      if(Y3 > X3) x3 += nFace;
+      if(x4 >= Nface) x4 += X4;
+      if(Y1 > X1) x1 += Nface;
+      if(Y2 > X2) x2 += Nface;
+      if(Y3 > X3) x3 += Nface;
     break;
 
     default:
@@ -374,10 +374,10 @@ __device__ int getGluonFullIndexFromGhostIndex(int x1, int x2, int x3, int x4, i
 
 
 // get the "checker-board" index
-template<int Dir, int nFace>
+template<int Dir, int Nface>
 __device__ int getGluonCBIndexFromGhostIndex(int x1, int x2, int x3, int x4, int parity)
 {
-  return getGluonFullIndexFromGhostIndex<Dir,nFace>(x1, x2, x3, x4, parity) >> 1;
+  return getGluonFullIndexFromGhostIndex<Dir,Nface>(x1, x2, x3, x4, parity) >> 1;
 }
 
 
@@ -452,7 +452,7 @@ void MatMulVecAppend(float2 (&vout)[3], const float4(& mat)[5], const float2 (&v
 // template the kernel so that 
 // we can switch between single-/double- and half- precision
 
-template<int Dir, int nFace>
+template<int Dir, int Nface>
 int getSpinorStride(int cb_index)
 {
   const int stride = (cb_index < Vh) ? sp_stride : Nface*ghostFace[Dir];
@@ -460,7 +460,7 @@ int getSpinorStride(int cb_index)
 }
 
 
-template<int Dir, int nFace>
+template<int Dir, int Nface>
 int getNormIndex(int cb_index)
 {
   if(cb_index < Vh) return cb_index;
