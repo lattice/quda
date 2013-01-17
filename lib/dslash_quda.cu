@@ -307,7 +307,6 @@ namespace quda {
 
 
 
-
 #ifndef MULTI_GPU
 
 #define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
@@ -413,7 +412,42 @@ namespace quda {
         STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
 						  break;          \	
 				 }                  \
-  }
+  } \
+  \
+  if(param.kernel_type != INTERIOR_KERNEL){ \
+    if(hasNaik){
+      switch(nFace){
+        case 1:  \											\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+        case 2:  \											\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+        case 3:  \											\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+        case 3:  \										\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+      } // switch(nFace)   
+    }else{ // hasNaik = false
+      switch(nFace){
+        case 1:  \											\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+        case 2:  \											\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+        case 3:  \											\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+        case 3:  \										\
+          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+          break; \
+      } // switch(nFace)  \ 
+    } // hasNaik
+  } \ // param.kernel_type != INTERIOR_KERNEL
+
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
