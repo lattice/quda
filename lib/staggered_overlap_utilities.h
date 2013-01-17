@@ -8,17 +8,18 @@ struct NeighborIndex{
   // returns -1 if neighbor is out of bounds
   // use this to determine whether site is updated
   template<int Dir>
-  __device__ static int plus(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
+  __host__ __device__ static int forward(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
 
   template<int Dir>
-  __device__ static int minus(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
+  __host__ __device__ static int back(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
 };
 
 template<int Nface>
-struct NeighborIndex<0, Nface>{
+struct NeighborIndex<0, Nface>
+{
 
   template<int Dir>
-  __device__ static int plus(int x1, int x2, int x3, int x4, const DslashParam& param){
+  __device__ static int forward(int x1, int x2, int x3, int x4, const DslashParam& param){
 
     if(Dir==0 && x1 == Nface-1) return (x4*X3X2X1 + x3*X2X1 + x2*X1) >> 1;
 
@@ -52,7 +53,7 @@ struct NeighborIndex<0, Nface>{
 
 
   template<int Dir> 
-  __device__ static int plus_three(int x1, int x2, int x3, int x4, const DslashParam& param){
+  __device__ static int forward_three(int x1, int x2, int x3, int x4, const DslashParam& param){
 
     if(Dir == 0 && x1 < Nface && x1 >= Nface-3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + x1-Nface + 3)>>1; 
 
@@ -86,7 +87,7 @@ struct NeighborIndex<0, Nface>{
 
 
   template<int Dir> 
-  __device__ static int minus(int x1, int x2, int x3, int x4, const DslashParam& param){
+  __device__ static int back(int x1, int x2, int x3, int x4, const DslashParam& param){
     
 
     if(Dir == 0 && x1 == Nface) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + X1m1) >> 1;
@@ -121,7 +122,7 @@ struct NeighborIndex<0, Nface>{
 
 
   template<int Dir> 
-  __device__ static int minus_three(int x1, int x2, int x3, int x4, const DslashParam& param){
+  __device__ static int back_three(int x1, int x2, int x3, int x4, const DslashParam& param){
 
     if(Dir == 0 && x1 >= Nface && x1 < Nface+3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + X1m3 + x1-Nface)>>1; 
 
@@ -152,7 +153,6 @@ struct NeighborIndex<0, Nface>{
     return param.ghostOffset[0] + dirOffset + ((x1*X3X2X1 + x4*X3X2 + x3*X2 + x2)>>1);
   }
 };
-
 
 /*
 template<int Dir>

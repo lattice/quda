@@ -202,12 +202,12 @@ VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #endif
 
 // output spinor
-#define o00_re s[0*SHARED_STRIDE]
-#define o00_im s[1*SHARED_STRIDE]
-#define o01_re s[2*SHARED_STRIDE]
-#define o01_im s[3*SHARED_STRIDE]
-#define o02_re s[4*SHARED_STRIDE]
-#define o02_im s[5*SHARED_STRIDE]
+#define o0_re s[0*SHARED_STRIDE]
+#define o0_im s[1*SHARED_STRIDE]
+#define o1_re s[2*SHARED_STRIDE]
+#define o1_im s[3*SHARED_STRIDE]
+#define o2_re s[4*SHARED_STRIDE]
+#define o2_im s[5*SHARED_STRIDE]
 
 
 #include "read_gauge.h"
@@ -400,9 +400,9 @@ if(kernel_type == INTERIOR_KERNEL){
   X = 2*sid + x1odd;
  }
 
-o00_re = o00_im = 0.f;
-o01_re = o01_im = 0.f;
-o02_re = o02_im = 0.f;
+o0_re = o0_im = 0.f;
+o1_re = o1_im = 0.f;
+o2_re = o2_im = 0.f;
 
 
 {  //direction: +X
@@ -435,12 +435,12 @@ o02_re = o02_im = 0.f;
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    MAT_MUL_V(A, fat, i);    
-	    o00_re += A0_re;
-	    o00_im += A0_im;
-	    o01_re += A1_re;
-	    o01_im += A1_im;
-	    o02_re += A2_re;
-	    o02_im += A2_im;
+	    o0_re += A0_re;
+	    o0_im += A0_im;
+	    o1_re += A1_re;
+	    o1_im += A1_im;
+	    o2_re += A2_re;
+	    o2_im += A2_im;
 	  }
 
   if(hasNaik){
@@ -471,12 +471,12 @@ o02_re = o02_im = 0.f;
 	    RECONSTRUCT_GAUGE_MATRIX(0, long, ga_idx, sign);
 	    
 	    MAT_MUL_V(B, long, t);        
-	    o00_re += B0_re;
-	    o00_im += B0_im;
-	    o01_re += B1_re;
-	    o01_im += B1_im;
-	    o02_re += B2_re;
-	    o02_im += B2_im;  
+	    o0_re += B0_re;
+	    o0_im += B0_im;
+	    o1_re += B1_re;
+	    o1_im += B1_im;
+	    o2_re += B2_re;
+	    o2_im += B2_im;  
 	  }
   } // hasNaik    
 } // +X
@@ -517,12 +517,12 @@ o02_re = o02_im = 0.f;
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    ADJ_MAT_MUL_V(A, fat, i);       
-	    o00_re -= A0_re;
-	    o00_im -= A0_im;
-	    o01_re -= A1_re;
-	    o01_im -= A1_im;
-	    o02_re -= A2_re;
-	    o02_im -= A2_im;
+	    o0_re -= A0_re;
+	    o0_im -= A0_im;
+	    o1_re -= A1_re;
+	    o1_im -= A1_im;
+	    o2_re -= A2_re;
+	    o2_im -= A2_im;
 	  }
 
   if(hasNaik){
@@ -557,12 +557,12 @@ o02_re = o02_im = 0.f;
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);  
 	    RECONSTRUCT_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, sign);
 	    ADJ_MAT_MUL_V(B, long, t);    
-	    o00_re -= B0_re;
-	    o00_im -= B0_im;
-	    o01_re -= B1_re;
-	    o01_im -= B1_im;
-	    o02_re -= B2_re;
-	    o02_im -= B2_im;  
+	    o0_re -= B0_re;
+	    o0_im -= B0_im;
+	    o1_re -= B1_re;
+	    o1_im -= B1_im;
+	    o2_re -= B2_re;
+	    o2_im -= B2_im;  
 	  }
   } // hasNaik
 } // -X
@@ -599,12 +599,12 @@ o02_re = o02_im = 0.f;
 #endif 
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    MAT_MUL_V(A, fat, i);
-	    o00_re += A0_re;
-	    o00_im += A0_im;
-	    o01_re += A1_re;
-	    o01_im += A1_im;
-	    o02_re += A2_re;
-	    o02_im += A2_im;
+	    o0_re += A0_re;
+	    o0_im += A0_im;
+	    o1_re += A1_re;
+	    o1_im += A1_im;
+	    o2_re += A2_re;
+	    o2_im += A2_im;
 	  }
    
   if(hasNaik){ 
@@ -633,12 +633,12 @@ o02_re = o02_im = 0.f;
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 	    RECONSTRUCT_GAUGE_MATRIX(2, long, ga_idx, sign);
 	    MAT_MUL_V(B, long, t);            
-	    o00_re += B0_re;
-	    o00_im += B0_im;
-	    o01_re += B1_re;
-	    o01_im += B1_im;
-	    o02_re += B2_re;
-	    o02_im += B2_im;  
+	    o0_re += B0_re;
+	    o0_im += B0_im;
+	    o1_re += B1_re;
+	    o1_im += B1_im;
+	    o2_re += B2_re;
+	    o2_im += B2_im;  
 	  }
   } // hasNaik
 } // +Y
@@ -683,12 +683,12 @@ o02_re = o02_im = 0.f;
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    ADJ_MAT_MUL_V(A, fat, i);
-	    o00_re -= A0_re;
-	    o00_im -= A0_im;
-	    o01_re -= A1_re;
-	    o01_im -= A1_im;
-	    o02_re -= A2_re;
-	    o02_im -= A2_im;
+	    o0_re -= A0_re;
+	    o0_im -= A0_im;
+	    o1_re -= A1_re;
+	    o1_im -= A1_im;
+	    o2_re -= A2_re;
+	    o2_im -= A2_im;
 	  }
 
   if(hasNaik){
@@ -724,12 +724,12 @@ o02_re = o02_im = 0.f;
 	    RECONSTRUCT_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,sign);
 	    
 	    ADJ_MAT_MUL_V(B, long, t);    
-	    o00_re -= B0_re;
-	    o00_im -= B0_im;
-	    o01_re -= B1_re;
-	    o01_im -= B1_im;
-	    o02_re -= B2_re;
-	    o02_im -= B2_im;  
+	    o0_re -= B0_re;
+	    o0_im -= B0_im;
+	    o1_re -= B1_re;
+	    o1_im -= B1_im;
+	    o2_re -= B2_re;
+	    o2_im -= B2_im;  
 	  }
   } // hasNaik    
 } // -Y
@@ -767,12 +767,12 @@ o02_re = o02_im = 0.f;
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    MAT_MUL_V(A, fat, i);	 
-	    o00_re += A0_re;
-	    o00_im += A0_im;
-	    o01_re += A1_re;
-	    o01_im += A1_im;
-	    o02_re += A2_re;
-	    o02_im += A2_im;
+	    o0_re += A0_re;
+	    o0_im += A0_im;
+	    o1_re += A1_re;
+	    o1_im += A1_im;
+	    o2_re += A2_re;
+	    o2_im += A2_im;
     }
 
 
@@ -802,12 +802,12 @@ o02_re = o02_im = 0.f;
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 	    RECONSTRUCT_GAUGE_MATRIX(4, long, ga_idx, sign);    
 	    MAT_MUL_V(B, long, t);        
-	    o00_re += B0_re;
-	    o00_im += B0_im;
-	    o01_re += B1_re;
-	    o01_im += B1_im;
-	    o02_re += B2_re;
-	    o02_im += B2_im;      
+	    o0_re += B0_re;
+	    o0_im += B0_im;
+	    o1_re += B1_re;
+	    o1_im += B1_im;
+	    o2_re += B2_re;
+	    o2_im += B2_im;      
     }
   } // hasNaik
 } // Z 
@@ -850,12 +850,12 @@ o02_re = o02_im = 0.f;
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    ADJ_MAT_MUL_V(A, fat, i);
-	    o00_re -= A0_re;
-	    o00_im -= A0_im;
-	    o01_re -= A1_re;
-	    o01_im -= A1_im;
-	    o02_re -= A2_re;
-	    o02_im -= A2_im;
+	    o0_re -= A0_re;
+	    o0_im -= A0_im;
+	    o1_re -= A1_re;
+	    o1_im -= A1_im;
+	    o2_re -= A2_re;
+	    o2_im -= A2_im;
 	  }
    
   if(hasNaik){ 
@@ -891,12 +891,12 @@ o02_re = o02_im = 0.f;
 	    RECONSTRUCT_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,sign);
 	    ADJ_MAT_MUL_V(B, long, t);    
 	    
-	    o00_re -= B0_re;
-	    o00_im -= B0_im;
-	    o01_re -= B1_re;
-	    o01_im -= B1_im;
-	    o02_re -= B2_re;
-	    o02_im -= B2_im;    
+	    o0_re -= B0_re;
+	    o0_im -= B0_im;
+	    o1_re -= B1_re;
+	    o1_im -= B1_im;
+	    o2_re -= B2_re;
+	    o2_im -= B2_im;    
 	  }
   } // hasNaik
 } // -Z direction
@@ -932,12 +932,12 @@ o02_re = o02_im = 0.f;
 #endif
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);    
 	    MAT_MUL_V(A, fat, i);
-	    o00_re += A0_re;
-	    o00_im += A0_im;
-	    o01_re += A1_re;
-	    o01_im += A1_im;
-	    o02_re += A2_re;
-	    o02_im += A2_im;
+	    o0_re += A0_re;
+	    o0_im += A0_im;
+	    o1_re += A1_re;
+	    o1_im += A1_im;
+	    o2_re += A2_re;
+	    o2_im += A2_im;
 	  }
 
  if(hasNaik){    
@@ -966,12 +966,12 @@ o02_re = o02_im = 0.f;
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3); 
 	    RECONSTRUCT_GAUGE_MATRIX(6, long, ga_idx, sign);
 	    MAT_MUL_V(B, long, t);    
-	    o00_re += B0_re;
-	    o00_im += B0_im;
-	    o01_re += B1_re;
-	    o01_im += B1_im;
-	    o02_re += B2_re;
-	    o02_im += B2_im;      
+	    o0_re += B0_re;
+	    o0_im += B0_im;
+	    o1_re += B1_re;
+	    o1_im += B1_im;
+	    o2_re += B2_re;
+	    o2_im += B2_im;      
 	  }
   } // hasNaik
 }
@@ -1009,12 +1009,12 @@ o02_re = o02_im = 0.f;
 	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, staggeredConstants.fatlinkStride);
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    ADJ_MAT_MUL_V(A, fat, i);
-	    o00_re -= A0_re;
-	    o00_im -= A0_im;
-	    o01_re -= A1_re;
-	    o01_im -= A1_im;
-	    o02_re -= A2_re;
-	    o02_im -= A2_im;
+	    o0_re -= A0_re;
+	    o0_im -= A0_im;
+	    o1_re -= A1_re;
+	    o1_im -= A1_im;
+	    o2_re -= A2_re;
+	    o2_im -= A2_im;
 	  }
    
   if(hasNaik){  
@@ -1045,12 +1045,12 @@ o02_re = o02_im = 0.f;
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);       
 	    RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
 	    ADJ_MAT_MUL_V(B, long, t);    
-	    o00_re -= B0_re;
-	    o00_im -= B0_im;
-	    o01_re -= B1_re;
-	    o01_im -= B1_im;
-	    o02_re -= B2_re;
-	    o02_im -= B2_im;
+	    o0_re -= B0_re;
+	    o0_im -= B0_im;
+	    o1_re -= B1_re;
+	    o1_im -= B1_im;
+	    o2_re -= B2_re;
+	    o2_im -= B2_im;
 	  }
   } // hasNaik        
 } // -T
@@ -1058,12 +1058,12 @@ o02_re = o02_im = 0.f;
 
 #if (DD_DAG == 1)
 {
-    o00_re = - o00_re;
-    o00_im = - o00_im;
-    o01_re = - o01_re;
-    o01_im = - o01_im;
-    o02_re = - o02_re;
-    o02_im = - o02_im;
+    o0_re = - o0_re;
+    o0_im = - o0_im;
+    o1_re = - o1_re;
+    o1_im = - o1_im;
+    o2_re = - o2_re;
+    o2_im = - o2_im;
 }
 
 #endif
@@ -1072,28 +1072,28 @@ o02_re = o02_im = 0.f;
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
    READ_ACCUM(ACCUMTEX, sp_stride);
-   o00_re = -o00_re + a*accum0.x;
-   o00_im = -o00_im + a*accum0.y;
-   o01_re = -o01_re + a*accum1.x;
-   o01_im = -o01_im + a*accum1.y;
-   o02_re = -o02_re + a*accum2.x;
-   o02_im = -o02_im + a*accum2.y;
+   o0_re = -o0_re + a*accum0.x;
+   o0_im = -o0_im + a*accum0.y;
+   o1_re = -o1_re + a*accum1.x;
+   o1_im = -o1_im + a*accum1.y;
+   o2_re = -o2_re + a*accum2.x;
+   o2_im = -o2_im + a*accum2.y;
  }else{
-   o00_re = -o00_re;
-   o00_im = -o00_im;
-   o01_re = -o01_re;
-   o01_im = -o01_im;
-   o02_re = -o02_re;
-   o02_im = -o02_im;
+   o0_re = -o0_re;
+   o0_im = -o0_im;
+   o1_re = -o1_re;
+   o1_im = -o1_im;
+   o2_re = -o2_re;
+   o2_im = -o2_im;
  }
 #else
 READ_ACCUM(ACCUMTEX, sp_stride);
-o00_re = -o00_re + a*accum0.x;
-o00_im = -o00_im + a*accum0.y;
-o01_re = -o01_re + a*accum1.x;
-o01_im = -o01_im + a*accum1.y;
-o02_re = -o02_re + a*accum2.x;
-o02_im = -o02_im + a*accum2.y;
+o0_re = -o0_re + a*accum0.x;
+o0_im = -o0_im + a*accum0.y;
+o1_re = -o1_re + a*accum1.x;
+o1_im = -o1_im + a*accum1.y;
+o2_re = -o2_re + a*accum2.x;
+o2_im = -o2_im + a*accum2.y;
 #endif //MULTI_GPU
 #endif // DSLASH_AXPY
 
@@ -1193,11 +1193,11 @@ WRITE_SPINOR(out, sid, sp_stride);
 #undef SHARED_FLOATS_PER_THREAD
 #undef kernel_type
 
-#undef o00_re
-#undef o00_im
-#undef o01_re
-#undef o01_im
-#undef o02_re
-#undef o02_im
+#undef o0_re
+#undef o0_im
+#undef o1_re
+#undef o1_im
+#undef o2_re
+#undef o2_im
 
 #undef VOLATILE
