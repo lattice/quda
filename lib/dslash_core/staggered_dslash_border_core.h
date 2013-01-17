@@ -443,7 +443,7 @@
 #endif
 
 #ifdef DSLASH_AXPY
-  READ_ACCUM(cb_index,Nface*ghostFace[Dir]);
+  READ_ACCUM(ACCUMTEX,cb_index,Nface*ghostFace[Dir]);
   o0_re = -o0_re + a*accum0.x;
   o0_im = -o0_im + a*accum0.y;
   o1_re = -o1_re + a*accum1.x;

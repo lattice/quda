@@ -371,7 +371,7 @@ template <int Dir, bool hasNaik, int Nface>
 __global__ void DD_FUNC(staggeredBorderDslash, DD_RECON_F, DD_AXPY_F)
 (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY){
 #ifdef GPU_STAGGERED_DIRAC
-  #include "staggered_dslash_border_core.h" // Need to fix by adding accum
+  #include "staggered_dslash_border_core.h" // Need to merge into staggere_dslash_core.h eventually
 #endif
 }
 
