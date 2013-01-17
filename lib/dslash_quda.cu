@@ -430,9 +430,9 @@ namespace quda {
         case 3:  \										\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
-      } // switch(nFace)   
-    }else{ // hasNaik = false
-      switch(nFace){
+      }  \  
+    }else{ \
+      switch(nFace){ \
         case 1:  \											\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
@@ -445,9 +445,9 @@ namespace quda {
         case 3:  \										\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
-      } // switch(nFace)  \ 
-    } // hasNaik
-  } \ // param.kernel_type != INTERIOR_KERNEL
+      } \
+    } \
+  }  // param.kernel_type != INTERIOR_KERNEL
 
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
@@ -1240,6 +1240,15 @@ namespace quda {
       STAGGERED_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		       out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
     }
+
+    void border_apply(const cudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+      STAGGERED_BORDER_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+		       out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
+    }
+
 
     void preTune()
     {
