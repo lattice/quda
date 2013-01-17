@@ -170,7 +170,7 @@
 // Kernel body
 {
 
-#ifdef (DD_PREC==0)
+#if (DD_PREC==0)
 #define Real double
 #define Real2 double2
 #else
@@ -183,10 +183,13 @@
   Real2 A0, A1, A2;
   Real2 I0, I1, I2;
   Real2 out0, out1, out2;
-
+  A0_re = A0_im = 0.0;
+  A1_re = A1_im = 0.0;
+  A2_re = A2_im = 0.0;
+  
   // Link variables
   Real2 FAT0, FAT1, FAT2, FAT3, FAT4, FAT5, FAT6, FAT7, FAT8;
-#ifdef(DD_PREC==0 || DD_RECON==2) // double precision or reconstruct 18
+#if (DD_PREC==0 || DD_RECON==2) // double precision or reconstruct 18
   Real2 LONG0, LONG1, LONG2, LONG3, LONG4, LONG5, LONG6, LONG7, LONG8;
 #else
   Real4 LONG0, LONG1, LONG2, LONG3, LONG4;
@@ -213,52 +216,54 @@
   { // First consider +ve displacements only 
     const int gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1) >> 1;
     // +X
-    spinor_neighbor_index = NeighborIndex<Dir>::plus<0>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus<0>(x1,x2,x3,x4,param);
 
     if(spinor_neighbor_index >= 0){  
-
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
-
+#if (DD_PREC == 2) // half precision
+      norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
 
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, gluon_index, extended_gluon_stride);
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, gluon_index, ddStaggeredConstants.fatlinkStride);
       MAT_MUL_V_APPEND(A, fat, I);
     }
 
     // +Y 
-    spinor_neighbor_index = NeighborIndex<Dir>::plus<1>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus<1>(x1,x2,x3,x4,param);
     if(spinor_neighbor_index >= 0){
 
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
-
+#if (DD_PREC == 2)
+      norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 1, gluon_index, extended_gluon_stride);
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 1, gluon_index, ddStaggeredConstants.fatlinkStride);
       MAT_MUL_V_APPEND(A, fat, I);
     }
 
     // +Z 
-    spinor_neighbor_index = NeighborIndex<Dir>::plus<2>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus<2>(x1,x2,x3,x4,param);
     if(spinor_neighbor_index >= 0){
 
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
-
+#if (DD_PREC == 2)
+      norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, gluon_index, extended_gluon_stride);
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, gluon_index, ddStaggeredConstants.fatlinkStride);
       MAT_MUL_V_APPEND(A, fat, I);
     }
 
     // +T
-    spinor_neighbor_index = NeighborIndex<Dir>::plus<3>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus<3>(x1,x2,x3,x4,param);
     if(spinor_neighbor_index >= 0){
-
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index);
-
+#if (DD_PREC == 2)
+      norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index,3);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 3, gluon_index, extended_gluon_stride);
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 3, gluon_index, ddStaggeredConstants.fatlinkStride);
       MAT_MUL_V_APPEND(A, fat, I);
     }
   } // +ve displacements
@@ -267,51 +272,51 @@
 
   // Need to be careful about this. Need to find neighboring gluon index.
   { // -ve displacements
-    spinor_neighbor_index = NeighborIndex<Dir>::minus<0>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus<0>(x1,x2,x3,x4,param);
     if(spinor_neighbor_index >= 0){
-
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
-
+#if (DD_PREC == 2)
+      norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-      gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1-1) >> 1;
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, gluon_index, extended_gluon_stride);
+      const int gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1-1) >> 1;
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, gluon_index, ddStaggeredConstants.fatlinkStride);
       MINUS_ADJ_MAT_MUL_V_APPEND(A, fat, I); // Need to change this!
     }
   
-    spinor_neighbor_index = NeighborIndex<Dir>::minus<1>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus<1>(x1,x2,x3,x4,param);
     if(spinor_neighbor_index >= 0){
-  
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
-
+#if (DD_PREC == 2) 
+      norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-      gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + (y2-1)*Y1 + y1) >> 1;
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 1, gluon_index, extended_gluon_stride);
+      const int gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + (y2-1)*Y1 + y1) >> 1;
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 1, gluon_index, ddStaggeredConstants.fatlinkStride);
       MINUS_ADJ_MAT_MUL_V_APPEND(A, fat, I); // Need to change this!
     }
 
-    spinor_neighbor_index = NeighborIndex<Dir>::minus<2>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus<2>(x1,x2,x3,x4,param);
     if(spinor_neighbor_index >= 0){
-
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
-
+#if (DD_PREC == 2)
+      norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-      gluon_index = (y4*Y3Y2Y1 + (y3-1)*Y2Y1 + Y1 + y1) >> 1;
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, gluon_index, extended_gluon_stride);
+      const int gluon_index = (y4*Y3Y2Y1 + (y3-1)*Y2Y1 + Y1 + y1) >> 1;
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, gluon_index, ddStaggeredConstants.fatlinkStride);
       MINUS_ADJ_MAT_MUL_V_APPEND(A, fat, I); // Need to change this!
     }
 
-    spinor_neighbor_index = NeighborIndex<Dir>::minus<3>(x1,x2,x3,x4);
+    spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus<3>(x1,x2,x3,x4,param);
     if(spinor_neighbor_index >= 0){
-      
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index);
-
+#if (DD_PREC == 2)      
+      norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index,param);
+#endif
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-      gluon_index = ((y4-1)*Y3Y2Y1 + Y2Y1 + Y1 + y1) >> 1; // divide by 2 since checkerboard index
-      READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-      READ_FAT_MATRIX(FAT, FATLINK0TEX, 3, gluon_index, extended_gluon_stride);
+      const int gluon_index = ((y4-1)*Y3Y2Y1 + Y2Y1 + Y1 + y1) >> 1; // divide by 2 since checkerboard index
+      READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+      READ_FAT_MATRIX(FAT, FATLINK0TEX, 3, gluon_index, ddStaggeredConstants.fatlinkStride);
       MINUS_ADJ_MAT_MUL_V_APPEND(A, fat, I); // Need to change this!
     }
   } // -ve displacements
@@ -322,42 +327,50 @@
     { // First consider +ve displacements only 
       const int gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1) >> 1;
       // +X
-      spinor_neighbor_index = NeighborIndex<Dir>::plus_three<0>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus_three<0>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){  
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(LONG, LONGLINK0TEX, 0, gluon_index, extended_gluon_stride);
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_LONG_MATRIX(LONG, LONGLINK0TEX, 0, gluon_index, ddStaggeredConstants.longlinkStride);
         MAT_MUL_V_APPEND(A, long, I);
       }
 
       // +Y 
-      spinor_neighbor_index = NeighborIndex<Dir>::plus_three<1>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus_three<1>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(LONG, LONGLINK0TEX, 1, gluon_index, extended_gluon_stride);
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_LONG_MATRIX(LONG, LONGLINK0TEX, 1, gluon_index, ddStaggeredConstants.longlinkStride);
         MAT_MUL_V_APPEND(A, long, I);
       }
 
       // +Z 
-      spinor_neighbor_index = NeighborIndex<Dir>::plus_three<2>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus_three<2>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(LONG, LONGLINK0TEX, 2, gluon_index, extended_gluon_stride);
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_LONG_MATRIX(LONG, LONGLINK0TEX, 2, gluon_index, ddStaggeredConstants.longlinkStride);
         MAT_MUL_V_APPEND(A, long, I);
       }
 
       // +T
-      spinor_neighbor_index = NeighborIndex<Dir>::plus_three<3>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::plus_three<3>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(LONG, LONGLINK0TEX, 3, gluon_index, extended_gluon_stride);
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_LONG_MATRIX(LONG, LONGLINK0TEX, 3, gluon_index, ddStaggeredConstants.longlinkStride);
         MINUS_ADJ_MAT_MUL_V_APPEND(A, long, I);
       }
     } // +ve displacements
@@ -366,43 +379,51 @@
 
     // Need to be careful about this. Need to find neighboring gluon index.
     { // -ve displacements
-      spinor_neighbor_index = NeighborIndex<Dir>::minus_three<0>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus_three<0>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1-3) >> 1;
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(LONG, LONGLINK0TEX, 0, gluon_index, extended_gluon_stride);
+        const int gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1-3) >> 1;
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_FAT_MATRIX(LONG, LONGLINK0TEX, 0, gluon_index, ddStaggeredConstants.longlinkStride);
         MINUS_ADJ_MAT_MUL_V_APPEND(A, long , I); // Need to change this!
       }
 
-      spinor_neighbor_index = NeighborIndex<Dir>::minus_three<1>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus_three<1>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + (y2-3)*Y1 + y1) >> 1;
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(FAT, FATLINK0TEX, 1, gluon_index, extended_gluon_stride);
+        const int gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + (y2-3)*Y1 + y1) >> 1;
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_LONG_MATRIX(LONG, LONGLINK0TEX, 1, gluon_index, ddStaggeredConstants.longlinkStride);
         MINUS_ADJ_MAT_MUL_V_APPEND(A, long, I); // Need to change this!
       }
 
-      spinor_neighbor_index = NeighborIndex<Dir>::minus_three<2>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus_three<2>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        gluon_index = (y4*Y3Y2Y1 + (y3-3)*Y2Y1 + Y1 + y1) >> 1;
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, gluon_index, extended_gluon_stride);
+        const int gluon_index = (y4*Y3Y2Y1 + (y3-3)*Y2Y1 + Y1 + y1) >> 1;
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_LONG_MATRIX(LONG, LONGLINK0TEX, 2, gluon_index, ddStaggeredConstants.longlinkStride);
         MINUS_ADJ_MAT_MUL_V_APPEND(A, long, I); // Need to change this!
       }
 
-      spinor_neighbor_index = NeighborIndex<Dir>::minus_three<3>(x1,x2,x3,x4);
+      spinor_neighbor_index = NeighborIndex<Dir,Nface>::minus_three<3>(x1,x2,x3,x4,param);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index);
+#if (DD_PREC == 2)
+        norm_idx = getNormIndex<3,Nface>(spinor_neighbor_index,param);
+#endif
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
-        gluon_index = ((y4-3)*Y3Y2Y1 + Y2Y1 + Y1 + y1) >> 1; // divide by 2 since checkerboard index
-        READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
-        READ_FAT_MATRIX(FAT, FATLINK0TEX, 3, gluon_index, extended_gluon_stride);
+        const int gluon_index = ((y4-3)*Y3Y2Y1 + Y2Y1 + Y1 + y1) >> 1; // divide by 2 since checkerboard index
+        READ_KS_NBR_SPINOR(I, SPINORTEX, spinor_neighbor_index, spinor_stride);
+        READ_LONG_MATRIX(LONG, LONGLINK0TEX, 3, gluon_index, ddStaggeredConstants.longlinkStride);
         MINUS_ADJ_MAT_MUL_V_APPEND(A, long, I); // Need to change this!
       }
     } // -ve displacements
@@ -432,6 +453,7 @@
 #endif
   // What about accumulation??
 
+  // Need to change WRITE_SPINOR
   WRITE_SPINOR(out, cb_index, Nface*ghostFace[Dir]); // Nface*ghostFace[Dir] is the stride in the boundary region
   return;
 } // end kernel body 

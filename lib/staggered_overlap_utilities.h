@@ -8,10 +8,10 @@ struct NeighborIndex{
   // returns -1 if neighbor is out of bounds
   // use this to determine whether site is updated
   template<int Dir>
-  __device__ static int plus(int x1, int x2, int x3, int x4){ return Dir; }
+  __device__ static int plus(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
 
   template<int Dir>
-  __device__ static int minus(int x1, int x2, int x3, int x4){ return Dir; }
+  __device__ static int minus(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
 };
 
 template<int Nface>
