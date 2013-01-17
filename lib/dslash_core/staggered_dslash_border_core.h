@@ -200,10 +200,10 @@
   int y1, y2, y3, y4; 
   
   // compute the quark-field coordinates in the ghost zone.
-  getCoordinates<Dir>(&x1, &x2, &x3, &x4, cb_index, parity);
+  getCoordinates<Dir>(&x1, &x2, &x3, &x4, cb_index, param.parity);
 
   getGluonCoordsFromGhostCoords<Dir,Nface>(&y1, &y2, &y3, &y4, 
-					    x1, x2, x3, x4, parity);
+					    x1, x2, x3, x4, param.parity);
 
 
   int spinor_stride;
@@ -217,7 +217,7 @@
 
     if(spinor_neighbor_index >= 0){  
 
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index);
+      if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
 
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
 
@@ -230,7 +230,7 @@
     spinor_neighbor_index = NeighborIndex<Dir>::plus<1>(x1,x2,x3,x4);
     if(spinor_neighbor_index >= 0){
 
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index);
+      if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
 
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
       READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
@@ -242,7 +242,7 @@
     spinor_neighbor_index = NeighborIndex<Dir>::plus<2>(x1,x2,x3,x4);
     if(spinor_neighbor_index >= 0){
 
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index);
+      if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
 
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
       READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
@@ -270,7 +270,7 @@
     spinor_neighbor_index = NeighborIndex<Dir>::minus<0>(x1,x2,x3,x4);
     if(spinor_neighbor_index >= 0){
 
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index);
+      if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
 
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
       gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1-1) >> 1;
@@ -282,7 +282,7 @@
     spinor_neighbor_index = NeighborIndex<Dir>::minus<1>(x1,x2,x3,x4);
     if(spinor_neighbor_index >= 0){
   
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index);
+      if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
 
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
       gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + (y2-1)*Y1 + y1) >> 1;
@@ -294,7 +294,7 @@
     spinor_neighbor_index = NeighborIndex<Dir>::minus<2>(x1,x2,x3,x4);
     if(spinor_neighbor_index >= 0){
 
-      if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index);
+      if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
 
       spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
       gluon_index = (y4*Y3Y2Y1 + (y3-1)*Y2Y1 + Y1 + y1) >> 1;
@@ -324,7 +324,7 @@
       // +X
       spinor_neighbor_index = NeighborIndex<Dir>::plus_three<0>(x1,x2,x3,x4);
       if(spinor_neighbor_index >= 0){  
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index);
+        if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
         READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
         READ_FAT_MATRIX(LONG, LONGLINK0TEX, 0, gluon_index, extended_gluon_stride);
@@ -334,7 +334,7 @@
       // +Y 
       spinor_neighbor_index = NeighborIndex<Dir>::plus_three<1>(x1,x2,x3,x4);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index);
+        if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
         READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
         READ_FAT_MATRIX(LONG, LONGLINK0TEX, 1, gluon_index, extended_gluon_stride);
@@ -344,7 +344,7 @@
       // +Z 
       spinor_neighbor_index = NeighborIndex<Dir>::plus_three<2>(x1,x2,x3,x4);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index);
+        if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
         READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
         READ_FAT_MATRIX(LONG, LONGLINK0TEX, 2, gluon_index, extended_gluon_stride);
@@ -368,7 +368,7 @@
     { // -ve displacements
       spinor_neighbor_index = NeighborIndex<Dir>::minus_three<0>(x1,x2,x3,x4);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index);
+        if(isShort2<RealN>::result) norm_idx = getNormIndex<0,Nface>(spinor_neighbor_index,param);
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
         gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + y2*Y1 + y1-3) >> 1;
         READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
@@ -378,7 +378,7 @@
 
       spinor_neighbor_index = NeighborIndex<Dir>::minus_three<1>(x1,x2,x3,x4);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index);
+        if(isShort2<RealN>::result) norm_idx = getNormIndex<1,Nface>(spinor_neighbor_index,param);
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
         gluon_index = (y4*Y3Y2Y1 + y3*Y2Y1 + (y2-3)*Y1 + y1) >> 1;
         READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
@@ -388,7 +388,7 @@
 
       spinor_neighbor_index = NeighborIndex<Dir>::minus_three<2>(x1,x2,x3,x4);
       if(spinor_neighbor_index >= 0){
-        if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index);
+        if(isShort2<RealN>::result) norm_idx = getNormIndex<2,Nface>(spinor_neighbor_index,param);
         spinor_stride = getSpinorStride<Dir,Nface>(spinor_neighbor_index);
         gluon_index = (y4*Y3Y2Y1 + (y3-3)*Y2Y1 + Y1 + y1) >> 1;
         READ_KS_NBR_SPINOR(I, SPINOR_TEX, spinor_neighbor_index, spinor_stride);
@@ -500,7 +500,11 @@
 #undef long22_re
 #undef long22_im
 
-
+#undef Real
+#undef Real2
+#ifdef Real4
+#undef Real4
+#endif
 
 
 //      - NEED to set the strides  				- Done

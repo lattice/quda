@@ -461,7 +461,7 @@ int getSpinorStride(int cb_index)
 
 
 template<int Dir, int Nface>
-int getNormIndex(int cb_index)
+int getNormIndex(int cb_index, const DslashParam& param)
 {
   if(cb_index < Vh) return cb_index;
 
