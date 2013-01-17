@@ -413,7 +413,8 @@ namespace quda {
 						  break;          \	
 				 }                  \
   } \
-  \
+
+#define STAGGERED_BORDER_DSLASH(hasNaik, nFace, gridDim, blockDim, shared, stream, param, ...)	\
   if(param.kernel_type != INTERIOR_KERNEL){ \
     if(hasNaik){
       switch(nFace){
