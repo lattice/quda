@@ -1197,6 +1197,8 @@ namespace quda {
     const float *inNorm, *xNorm;
     const fatGFloat *fat0, *fat1;
     const longGFloat *long0, *long1;
+    const fatGFloat *xfat0, *xfat1; // extended fat field needed to update overlap region in the DD preconditioner
+    const longGFloat *xlong0, *xlong1; // extended long field needed to update overlap region in the DD preconditioner
     const QudaReconstructType reconstruct;
     const int dagger;
     const double a;
@@ -1216,9 +1218,23 @@ namespace quda {
 			const QudaReconstructType reconstruct, const sFloat *in, 
 			const float *inNorm, const sFloat *x, const float *xNorm, const double a,
 			const int dagger, const size_t bytes, const size_t norm_bytes,
-   const int nFace,
+                        const int nFace,
 			const bool hasNaik)
+    
+    StaggeredDslashCuda(sFloat *out, float *outNorm, 
+                        const fatGFloat *fat0, const fatGFloat *fat1,
+			const longGFloat *long0, const longGFloat *long1,
+                        const fatGFloat *xfat0, const fatGFloat *xfat1,   // extended fat field for border region
+                        const longGFloat *xlong0, const longGFloat *xlong1, // extended long field for border region
+			const QudaReconstructType reconstruct, const sFloat *in, 
+			const float *inNorm, const sFloat *x, const float *xNorm, const double a,
+			const int dagger, const size_t bytes, const size_t norm_bytes,
+                        const int nFace,
+			const bool hasNaik)
+        
+
       : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
+        xfat0(xfat0), xfat1(xfat1), xlong0(xlong0), xlong1(xlong1),
 	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace)
     { 
       bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
@@ -1249,7 +1265,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       STAGGERED_BORDER_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
-		       out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
+		       out, outNorm, xfat0, xfat1, xlong0, xlong1, in, inNorm, x, xNorm, a); // Note that the "extended" gauge fields 
+                                                                                             // xfat0, xfat1, xlong0, xlong1 are needed to update the overlap region
     }
 
 
@@ -1407,6 +1424,11 @@ namespace quda {
     for (int i=3; i>=0; i--) commDimTotal += dslashParam.commDim[i];
     commDimTotal *= 4; // 2 from pipe length, 2 from direction
   }
+
+
+
+
+
 
   void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		  const int volume, const int *faceVolumeCB) {
