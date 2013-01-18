@@ -383,41 +383,44 @@ namespace quda {
   // macro used for staggered dslash
 #define STAGGERED_DSLASH(hasNaik, nFace, gridDim, blockDim, shared, stream, param, ...)	\
   if(hasNaik){										\
-	   switch(nFace){  				\
-					 case 1:											\
+    switch(nFace){  				\
+      case 1:											\
         STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-								break;          \
-      case 2:											\
+	break;          \
+      case 2:		\
         STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
         break;          \
-      case 3:									  \
+      case 3:		\
         STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-							 break;          \
-					 case 4:										 \
+	break;          \
+      case 4:										 \
         STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-						  break;          \	
-				 }                  \
-  } else {										\
-	   switch(nFace){  				\
-					 case 1:											\
-        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-								break;          \
-      case 2:											\
-        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-        break;          \
-      case 3:									  \
-        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-							 break;          \
-					 case 4:										 \
-        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-						  break;          \	
-				 }                  \
-  } \
+        break;         \
+      } \
+  }else{	       \
+    switch(nFace){  				\
+      case 1:											\
+      STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;          \
+    case 2:											\
+      STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;          \
+    case 3:									  \
+      STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;          \
+    case 4:										 \
+      STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;  \
+    } \
+  } // !hasNaik
+
+
+
 
 #define STAGGERED_BORDER_DSLASH(hasNaik, nFace, gridDim, blockDim, shared, stream, param, ...)	\
   if(param.kernel_type != INTERIOR_KERNEL){ \
-    if(hasNaik){
-      switch(nFace){
+    if(hasNaik){ \
+      switch(nFace){ \
         case 1:  \											\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
@@ -427,11 +430,11 @@ namespace quda {
         case 3:  \											\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
-        case 3:  \										\
+        case 4:  \										\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
-      }  \  
-    }else{ \
+        } \
+    }else{  \
       switch(nFace){ \
         case 1:  \											\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
@@ -442,7 +445,7 @@ namespace quda {
         case 3:  \											\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
-        case 3:  \										\
+        case 4:  \										\
           STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
           break; \
       } \
