@@ -250,7 +250,7 @@ void initLatticeConstants(const LatticeField &lat)
 
   int L4_3 = 3*L4;
   cudaMemcpyToSymbol(X4_3, &L4_3, sizeof(int));  
-  constants.X4_3 = X4_3;
+  constants.X4_3 = L4_3;
 
   int L2L1 = L2*L1;
   cudaMemcpyToSymbol(X2X1, &L2L1, sizeof(int));  

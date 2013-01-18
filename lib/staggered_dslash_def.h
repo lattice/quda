@@ -367,7 +367,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 
 
 // define the kernel for the border region
-template <int Dir, bool hasNaik, int Nface>
+template <KernelType Dir, bool hasNaik, int Nface>
 __global__ void DD_FUNC(staggeredBorderDslash, DD_RECON_F, DD_AXPY_F)
 (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY){
 #ifdef GPU_STAGGERED_DIRAC

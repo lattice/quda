@@ -7,10 +7,10 @@ struct NeighborIndex{
 
   // returns -1 if neighbor is out of bounds
   // use this to determine whether site is updated
-  template<int Dir>
+  template<KernelType Dir>
   __host__ __device__ static int forward(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
 
-  template<int Dir>
+  template<KernelType Dir>
   __host__ __device__ static int back(int x1, int x2, int x3, int x4, const DslashParam& param){ return Dir; }
 };
 
@@ -18,7 +18,7 @@ template<int Nface>
 struct NeighborIndex<0, Nface>
 {
 
-  template<int Dir>
+  template<KernelType Dir>
   __device__ static int forward(int x1, int x2, int x3, int x4, const DslashParam& param){
 
     if(Dir==0 && x1 == Nface-1) return (x4*X3X2X1 + x3*X2X1 + x2*X1) >> 1;
@@ -52,7 +52,7 @@ struct NeighborIndex<0, Nface>
 
 
 
-  template<int Dir> 
+  template<KernelType Dir> 
   __device__ static int forward_three(int x1, int x2, int x3, int x4, const DslashParam& param){
 
     if(Dir == 0 && x1 < Nface && x1 >= Nface-3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + x1-Nface + 3)>>1; 
@@ -86,7 +86,7 @@ struct NeighborIndex<0, Nface>
 
 
 
-  template<int Dir> 
+  template<KernelType Dir> 
   __device__ static int back(int x1, int x2, int x3, int x4, const DslashParam& param){
     
 
@@ -121,7 +121,7 @@ struct NeighborIndex<0, Nface>
   }
 
 
-  template<int Dir> 
+  template<KernelType Dir> 
   __device__ static int back_three(int x1, int x2, int x3, int x4, const DslashParam& param){
 
     if(Dir == 0 && x1 >= Nface && x1 < Nface+3) return (x4*X3X2X1 + x3*X2X1 + x2*X1 + X1m3 + x1-Nface)>>1; 
@@ -155,7 +155,7 @@ struct NeighborIndex<0, Nface>
 };
 
 /*
-template<int Dir>
+template<KernelType Dir>
 void getCoordinates(int* x1_p, int* x2_p, int* x3_p, int* x4_p, 
 		    int cb_index, int parity){ return; }
 
@@ -227,7 +227,7 @@ void getCoordinates<3>(int* const x1_p, int* const x2_p,
 
 */
 
-template<int Dir> 
+template<KernelType Dir> 
 __device__ void getCoordinates(int* const x1_p, int* const x2_p,
 		    int* const x3_p, int* const x4_p,
 		    int cb_index, int parity)
@@ -283,7 +283,7 @@ __device__ void getCoordinates(int* const x1_p, int* const x2_p,
   return;
 }
 
-template<int Dir, int Nface>
+template<KernelType Dir, int Nface>
 __device__ void getGluonCoordsFromGhostCoords(int* const y1_p, int* const y2_p, int* const y3_p, int* const y4_p,
 				   int x1, int x2, int x3, int x4)
 {
@@ -329,7 +329,7 @@ __device__ void getGluonCoordsFromGhostCoords(int* const y1_p, int* const y2_p, 
 }
 
 
-template<int Dir, int Nface>
+template<KernelType Dir, int Nface>
 __device__ int getGluonFullIndexFromGhostIndex(int x1, int x2, int x3, int x4, int parity)
 {
   // Y4, Y3, Y2, Y1 are the dimensions of the extended domain
@@ -374,7 +374,7 @@ __device__ int getGluonFullIndexFromGhostIndex(int x1, int x2, int x3, int x4, i
 
 
 // get the "checker-board" index
-template<int Dir, int Nface>
+template<KernelType Dir, int Nface>
 __device__ int getGluonCBIndexFromGhostIndex(int x1, int x2, int x3, int x4, int parity)
 {
   return getGluonFullIndexFromGhostIndex<Dir,Nface>(x1, x2, x3, x4, parity) >> 1;
@@ -452,16 +452,16 @@ void MatMulVecAppend(float2 (&vout)[3], const float4(& mat)[5], const float2 (&v
 // template the kernel so that 
 // we can switch between single-/double- and half- precision
 
-template<int Dir, int Nface>
-int getSpinorStride(int cb_index)
+template<KernelType Dir, int Nface>
+__device__ int getSpinorStride(int cb_index)
 {
   const int stride = (cb_index < Vh) ? sp_stride : Nface*ghostFace[Dir];
   return stride;
 }
 
 
-template<int Dir, int Nface>
-int getNormIndex(int cb_index, const DslashParam& param)
+template<KernelType Dir, int Nface>
+__device__ int getNormIndex(int cb_index, const DslashParam& param)
 {
   if(cb_index < Vh) return cb_index;
 

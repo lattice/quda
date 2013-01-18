@@ -415,42 +415,41 @@ namespace quda {
   } // !hasNaik
 
 
-
-
+  // macro used for staggered dslash
 #define STAGGERED_BORDER_DSLASH(hasNaik, nFace, gridDim, blockDim, shared, stream, param, ...)	\
-  if(param.kernel_type != INTERIOR_KERNEL){ \
-    if(hasNaik){ \
-      switch(nFace){ \
-        case 1:  \											\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
-        case 2:  \											\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
-        case 3:  \											\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
-        case 4:  \										\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
-        } \
-    }else{  \
-      switch(nFace){ \
-        case 1:  \											\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
-        case 2:  \											\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
-        case 3:  \											\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
-        case 4:  \										\
-          STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-          break; \
+if(param.kernel_type != INTERIOR_KERNEL){ \
+  if(hasNaik){										\
+    switch(nFace){  				\
+      case 1:											\
+        STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+	break;          \
+      case 2:		\
+        STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        break;          \
+      case 3:		\
+        STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+	break;          \
+      case 4:										 \
+        STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        break;         \
       } \
+  }else{	       \
+    switch(nFace){  				\
+      case 1:											\
+      STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;          \
+    case 2:											\
+      STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;          \
+    case 3:									  \
+      STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;          \
+    case 4:										 \
+      STAGGERED_GENERIC_DSLASH(staggeredBorderDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;  \
     } \
-  }  // param.kernel_type != INTERIOR_KERNEL
+  } \
+} // param.kernel_type != INTERIOR_KERNEL
 
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
@@ -1220,7 +1219,12 @@ namespace quda {
 			const int dagger, const size_t bytes, const size_t norm_bytes,
                         const int nFace,
 			const bool hasNaik)
-    
+      : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
+	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace)
+    { 
+      bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
+    }
+
     StaggeredDslashCuda(sFloat *out, float *outNorm, 
                         const fatGFloat *fat0, const fatGFloat *fat1,
 			const longGFloat *long0, const longGFloat *long1,
@@ -1268,7 +1272,6 @@ namespace quda {
 		       out, outNorm, xfat0, xfat1, xlong0, xlong1, in, inNorm, x, xNorm, a); // Note that the "extended" gauge fields 
                                                                                              // xfat0, xfat1, xlong0, xlong1 are needed to update the overlap region
     }
-
 
     void preTune()
     {
