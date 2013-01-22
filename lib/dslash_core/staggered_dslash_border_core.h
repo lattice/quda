@@ -2,7 +2,6 @@
 
 
 
-
 #define MAT_MUL_V_APPEND(VOUT, M, V)            \
   VOUT##0_re += M##00_re * V##0_re;            \
   VOUT##0_re -= M##00_im * V##0_im;            \
@@ -192,7 +191,14 @@
   // y1, y2, y3, y4 are gluon site coordinates in the extended domain
   int x1, x2, x3, x4; 
   int y1, y2, y3, y4; 
-  
+ 
+  // This may not be the right way to assign coordinates because loads 
+  // from the gauge links are not asynchronous. However, it may not really be an issue 
+  // since the border updates can all be executed concurrently.
+  // Consider assigning coordinates differently.
+  // Either way, I will have memory coalescing issues. 
+  // Need to look at shared memory to facilitate coalescing.
+   
   // compute the quark-field coordinates in the ghost zone.
   getCoordinates<Dir>(&x1, &x2, &x3, &x4, cb_index, param.parity);
 

@@ -1432,6 +1432,53 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 
 
 
+ void dslashDomainDecompCuda(DslashCuda &dslash, 
+                       const size_t regSize, // what is this for??
+                       const int parity, 
+                       const int dagger,
+                       const int volume,
+                       const int *faceVolumeCB)
+{
+
+  // first the dslash operator to interior region
+  dslashParam.parity  = parity; // dslashParam is local to this file
+  dslashParam.kernel = INTERIOR_KERNEL;
+  dslashParam.threads = volume;
+  
+  // apply the dslash operator to the interior region
+  dslash.apply(streams[Nstream-1]);
+
+
+  // Execute the border update kernels in different streams
+  // If sufficient SM resources are available, these kernels will 
+  // execute concurrently. 
+  // Note that these kernels can run independently of each other, unlike 
+  // the interior and exterior kernels
+  // If this is the last call to the domain-decomposed Dslash operator, 
+  // I should not perform this update. 
+  // Note that the field accesses are not coalesced in memory.
+  for(int dim=0; dim<4; ++dim){
+    if(dslashParam.commDim[dim]){
+      dslashParam.kernel_type = static_cast<KernelType>(dim);
+      dslashParam.threads = dslash.Nface()*faceVolumeCB[dim];
+      dslash.border_apply(streams[dim]);
+    }
+  }
+
+  // The exterior kernels and the interior kernel have to be launched sequentially, since 
+  // they may act on the same sites.
+  for(int dim=0; dim<4; ++dim){
+    if(dslashParam.commDim[dim]){
+      dslashParam.kernel_type = static_case<KernelType>(dim);
+      dslashParam.threads = dslash.Nface()*faceVolumeCB[dim];
+      dslashParam.threads = dslash.Nface()*faceVolumeCB[dim];
+      dslash.apply(streams[Nstream-1]);
+    }
+  }
+
+  cudaDeviceSynchronize(); // probably don't want this
+  return;
+}
 
   void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		  const int volume, const int *faceVolumeCB) {
@@ -1864,6 +1911,21 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
     errorQuda("Domain wall dslash has not been built");
 #endif
   }
+
+
+  void staggeredDslashBorderCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge,
+                                 const cudaGaugeField &longGauge, 
+                                 const cudaGaugeField &xfatGauge,
+                                 const cudaGaugeField &xlongGauge, 
+                                 const cudaColorSpinorField *in,
+                                 const int parity, 
+                                 const int dagger,
+                                 const cudaColorSpinorField *x,
+                                 const double &k, const int *commOverride, 
+                                 const int nFace, const bool hasNaik=true)
+{
+}
+
 
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 			   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
