@@ -968,13 +968,13 @@ template<> __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, 
 }
 #else
 __device__ void packSpinor(double2 *out, float *outNorm, int out_idx, int out_stride, 
-			   const double2 *in, const float *inNorm, int in_idx, int in_stride, const PackParam &param) {
+			   const double2 *in, const float *inNorm, int in_idx, int in_stride, const PackParam<double2> &param) {
   out[out_idx + 0*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx + 0*in_stride);
   out[out_idx + 1*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx + 1*in_stride);
   out[out_idx + 2*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx + 2*in_stride);
 }	
 __device__ void packSpinor(float2 *out, float *outNorm, int out_idx, int out_stride, 
-			   const float2 *in, const float *inNorm, int in_idx, int in_stride, const PackParam &param) {
+			   const float2 *in, const float *inNorm, int in_idx, int in_stride, const PackParam<float2> &param) {
   out[out_idx + 0*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 0*in_stride);
   out[out_idx + 1*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 1*in_stride);
   out[out_idx + 2*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx + 2*in_stride);	
@@ -987,7 +987,7 @@ static inline __device__ short2 float22short2(float c, float2 a) {
 }
 
 __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, int out_stride, 
-			   const short2 *in, const float *inNorm, int in_idx, int in_stride, const PackParam &param) {
+			   const short2 *in, const float *inNorm, int in_idx, int in_stride, const PackParam<short2> &param) {
   out[out_idx + 0*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+0*in_stride));
   out[out_idx + 1*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+1*in_stride));
   out[out_idx + 2*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+2*in_stride));
@@ -997,7 +997,7 @@ __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, int out_str
 
 template <int dim, int ishalf, typename Float2>
 __global__ void packFaceAsqtadKernel(Float2 *out, float *outNorm, const Float2 *in, 
-				     const float *inNorm, const PackParam param)
+				     const float *inNorm, const PackParam<Float2> param)
 {
   const int nFace = 3; //3 faces for asqtad
   const int Nint = 6; // number of internal degrees of freedom
@@ -1037,7 +1037,7 @@ void packFaceAsqtad(Float2 *faces, float *facesNorm, const cudaColorSpinorField 
 		    const int parity, const dim3 &gridDim, const dim3 &blockDim, const cudaStream_t &stream)
 {
 #ifdef GPU_STAGGERED_DIRAC
-  PackParam param;
+  PackParam<Float2> param;
   param.parity = parity;
 #ifdef USE_TEXTURE_OBJECTS
   param.inTex = in.Tex();
@@ -1113,7 +1113,7 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
 #ifdef GPU_DOMAIN_WALL_DIRAC
 template <int dim, int dagger, typename FloatN>
 __global__ void packFaceDWKernel(FloatN *out, float *outNorm, const FloatN *in, 
-				 const float *inNorm, const PackParam param)
+				 const float *inNorm, const PackParam<FloatN> param)
 {
   const int nFace = 1; // 1 face for Wilson
   const int Nint = 12; // output is spin projected
@@ -1148,7 +1148,7 @@ void packFaceDW(FloatN *faces, float *facesNorm, const cudaColorSpinorField &in,
 		    const dim3 &gridDim, const dim3 &blockDim, const cudaStream_t &stream){
 #ifdef GPU_DOMAIN_WALL_DIRAC  
 
-  PackParam param;
+  PackParam<FloatN> param;
   param.parity = parity;
 #ifdef USE_TEXTURE_OBJECTS
   param.inTex = in.Tex();
