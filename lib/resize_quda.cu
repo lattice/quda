@@ -93,29 +93,29 @@ namespace quda {
         case 0:
           // cb_idx = (x1*X4X3X2 + x4*X3X2 + x3*X2 + x2)/2
           xh = cb_index % params.X2h;
-          *x3_p = (cb_index/X2h) % X3;
+          *x3_p = (cb_index/params.X2h) % params.X3;
           *x1_p = cb_index/params.X4X3X2h;
-          *x4_p = (cb_index/(X3X2>>1)) % X4;
+          *x4_p = (cb_index/params.X3X2h) % params.X4;
           xodd = (*x1_p + *x3_p + *x2_p + parity) & 1;
           *x2_p = 2*xh + xodd;
           break;
 
         case 1:
           // cb_index = (x2*X4X3X1 + x4*X3X1 + x3*X1 + x1)/2
-          xh = cb_index % X1h;
-          *x3_p = (cb_index/X1h) % X3;
-          *x2_p = cb_index/X4X3X1h;
-          *x4_p = (cb_index/(X3X1>>1)) % X4;
+          xh = cb_index % params.X1h;
+          *x3_p = (cb_index/params.X1h) % params.X3;
+          *x2_p = cb_index/params.X4X3X1h;
+          *x4_p = (cb_index/(params.X3X1h)) % params.X4;
           xodd = (*x2_p + *x3_p + *x4_p + parity) & 1;
           *x1_p = 2*xh + xodd;
           break;
 
         case 2:
           // cb_index = (x3*X4X2X1 + x4*X2X1 + x2*X1 + x1)/2
-          xh = cb_index % X1h;
-          *x2_p = (cb_index/X1h) % X2;
-          *x3_p = cb_index/X4X2X1h;
-          *x4_p = (cb_index/(X2X1>>1)) % X4;
+          xh = cb_index % params.X1h;
+          *x2_p = (cb_index/params.X1h) % params.X2;
+          *x3_p = cb_index/params.X4X2X1h;
+          *x4_p = (cb_index/params.X2X1h) % params.X4;
           xodd = (*x2_p + *x3_p + *x4_p + parity) & 1;
           *x1_p = 2*xh + xodd;
           break; 
@@ -123,10 +123,10 @@ namespace quda {
         case 3:
           // cb_index = (x4*X3X2X1 + x3*X2X1 + x2*X1 + x1)/2
           // Note that this is the canonical ordering in the interior region.
-          xh = cb_index % X1h;
-          *x2_p = (cb_index/X1h) % X2;
-          *x4_p = (cb_index/(X3X2X1>>1));
-          *x3_p = (cb_index/(X2X1>>1)) % X3;
+          xh = cb_index % params.X1h;
+          *x2_p = (cb_index/params.X1h) % params.X2;
+          *x4_p = (cb_index/params.X3X2X1h);
+          *x3_p = (cb_index/params.X2X1h) % params.X3;
           xodd = (*x2_p + *x3_p + *x4_p + parity) & 1;
           *x1_p = 2*xh + xodd;
           break;

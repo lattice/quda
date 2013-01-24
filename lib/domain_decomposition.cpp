@@ -25,6 +25,16 @@ namespace quda {
    params->X3X2X1  = params->X3*params->X2*params->X1;
    params->X3X2X1h = params->X3*params->X2*params->X1h;
 
+   params->X4X3X2 = params->X4*params->X3*params->X2;
+   params->X4X3X2h = params->X4*params->X3*params->X2h;
+   params->X3X2h = params->X3*params->X2h;
+
+   params->X4X3X1 = params->X4*params->X3*params->X1;
+   params->X4X3X1h = params->X4*params->X3*params->X1h;
+   params->X3X1h = params->X3*params->X1h;
+
+   params->X4X2X1 = params->X4*params->X2*params->X1;
+   params->X4X2X1h = params->X4*params->X2*params->X1h;
 
 
    params->Y1 = Y[0];
@@ -38,6 +48,8 @@ namespace quda {
    params->Y4h = Y[3]/2;
 
 
+   params->Y2Y1 = params->Y2*params->Y1;
+   params->Y2Y1h = params->Y2*params->Y1h;
    params->Y3Y2Y1 = params->Y3*params->Y2*params->Y1;
    params->Y3Y2Y1h = params->Y3*params->Y2*params->Y1h; 
 

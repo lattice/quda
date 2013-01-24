@@ -10,7 +10,16 @@ namespace quda {
     unsigned int X1h, X2h, X3h, X4h;
     unsigned int X2X1, X2X1h;
     unsigned int X3X2X1, X3X2X1h;
+
+    // new 
     unsigned int X4X3X2, X4X3X2h;
+    unsigned int X3X2h;
+    
+    unsigned int X4X3X1, X4X3X1h;
+    unsigned int X3X1h;
+
+    unsigned int X4X2X1, X4X2X1h;
+    //
 
     // dimensions of the larger lattice
     unsigned int Y1, Y2, Y3, Y4;
