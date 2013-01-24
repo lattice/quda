@@ -74,7 +74,7 @@ namespace quda {
   //  Kparam.maxiter = 2;
 
 
-	  K = new CG(matPrec, matPrec, Kparam, profile);
+    K = new CG(matPrec, matPrec, Kparam, profile);
   }
 
 
