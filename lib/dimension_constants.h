@@ -64,6 +64,7 @@ __constant__ LatticeConstants  cudaConstants;
 LatticeConstants constants;
 
 
+
 __constant__ int Y1h;
 __constant__ int Y1;
 __constant__ int Y2;

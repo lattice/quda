@@ -10,6 +10,7 @@ QUDA_OBJS = timer.o malloc.o solver.o inv_bicgstab_quda.o		\
 	cuda_gauge_field.o dirac_clover.o dirac_wilson.o		\
 	dirac_staggered.o dirac_domain_wall.o dirac_twisted_mass.o	\
 	tune.o fat_force_quda.o llfat_quda_itf.o clover_quda.o		\
+	kernel_params.o domain_decomposition.o resize_quda.o \
 	dslash_quda.o blas_quda.o copy_quda.o reduce_quda.o face_buffer.o ${FACE_COMMS_OBJS}	\
 	${NUMA_AFFINITY_OBJS}
 
@@ -19,7 +20,8 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
 	gauge_field.h double_single.h texture.h	\
-	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h
+	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h \
+	kernel_params.h domain_decomposition.h resize_quda.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h reduce_core.h

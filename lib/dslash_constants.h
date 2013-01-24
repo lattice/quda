@@ -73,12 +73,8 @@ __constant__ fat_force_const_t gf; //gauge force
 __constant__ fat_force_const_t hf; //hisq force
 
 
-void initLatticeConstants(const LatticeField &lat)
+void initCommunicationConstants(const LatticeField &lat)
 {
-  checkCudaError();
-  // Set the subdomain dimensions
-  initDimensionConstants(lat);
-
   int L1 = lat.X()[0];
   int L2 = lat.X()[1];
   int L3 = lat.X()[2];
@@ -104,7 +100,15 @@ void initLatticeConstants(const LatticeField &lat)
 
   cudaMemcpyToSymbol(Pt0, &(first_node_in_t), sizeof(bool)); 
   cudaMemcpyToSymbol(PtNm1, &(last_node_in_t), sizeof(bool)); 
+}
 
+
+void initLatticeConstants(const LatticeField &lat)
+{
+  checkCudaError();
+  // Set the subdomain dimensions
+  initDimensionConstants(lat);
+  initCommunicationConstants(lat);
   checkCudaError();
 }
 
