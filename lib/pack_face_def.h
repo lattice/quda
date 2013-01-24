@@ -769,8 +769,6 @@ static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, co
 
 
 template <int dim, int dagger, typename FloatN>
-  //__global__ void packFaceWilsonKernel(FloatN *out, float *outNorm, const FloatN *in, 
-  //				     const float *inNorm, const PackParam<FloatN> param)
 __global__ void packFaceWilsonKernel(PackParam<FloatN> param)
 {
   const int nFace = 1; // 1 face for Wilson
@@ -842,11 +840,10 @@ class PackFaceWilson : public Tunable {
     return TuneKey(vol.str(), typeid(*this).name(), aux.str());
   }  
   
-
-
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
 
+#ifdef GPU_WILSON_DIRAC
     PackParam<FloatN> param;
     param.out = faces;
     param.outNorm = facesNorm;
@@ -857,8 +854,6 @@ class PackFaceWilson : public Tunable {
     param.inTex = in->Tex();
     param.inTexNorm = in->TexNorm();
 #endif
-
-#ifdef GPU_WILSON_DIRAC
 
     if (dagger) {
       switch (dim) {
