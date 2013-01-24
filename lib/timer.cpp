@@ -5,7 +5,8 @@ namespace quda {
   /**< Print out the profile information */
   void TimeProfile::Print() {
     if (profile[QUDA_PROFILE_TOTAL].time > 0.0) {
-      printfQuda("\n   %20s Total time = %g secs\n", (const char*)&fname[0], profile[QUDA_PROFILE_TOTAL].time);
+      printfQuda("\n   %20s Total time = %g secs\n", fname.c_str(), 
+		 profile[QUDA_PROFILE_TOTAL].time);
     }
 
     double accounted = 0.0;

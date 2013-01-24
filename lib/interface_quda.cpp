@@ -92,25 +92,25 @@ cudaStream_t *streams;
 static bool initialized = false;
 
 //!< Profiler for initQuda
-TimeProfile profileInit("initQuda");
+static TimeProfile profileInit("initQuda");
 
 //!< Profile for loadGaugeQuda / saveGaugeQuda
-TimeProfile profileGauge("loadGaugeQuda");
+static TimeProfile profileGauge("loadGaugeQuda");
 
 //!< Profile for loadCloverQuda
-TimeProfile profileClover("loadCloverQuda");
+static TimeProfile profileClover("loadCloverQuda");
 
 //!< Profiler for invertQuda
-TimeProfile profileInvert("invertQuda");
+static TimeProfile profileInvert("invertQuda");
 
 //!< Profiler for invertMultiShiftQuda
-TimeProfile profileMulti("invertMultiShiftQuda");
+static TimeProfile profileMulti("invertMultiShiftQuda");
 
 //!< Profiler for invertMultiShiftMixedQuda
-TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
+static TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
 
 //!< Profiler for endQuda
-TimeProfile profileEnd("endQuda");
+static TimeProfile profileEnd("endQuda");
 
 int getGpuCount()
 {
