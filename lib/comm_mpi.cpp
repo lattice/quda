@@ -300,7 +300,7 @@ comm_size(void)
 int
 comm_dim(int dir) {
 
-  int i;
+  int i=1;
   switch(dir) {
   case 0:
     i = xgridsize;
@@ -325,7 +325,7 @@ comm_dim(int dir) {
 int
 comm_coords(int dir) {
 
-  int i;
+  int i=-1;
   switch(dir) {
   case 0:
     i = xgridid;
@@ -353,7 +353,7 @@ comm_send(void* buf, int len, int dst, void* _request)
   
   MPI_Request* request = (MPI_Request*)_request;
 
-  int dstproc;
+  int dstproc=-1;
   int sendtag=99;
   if (dst == BACK_NBR){
     dstproc = back_nbr;
@@ -509,7 +509,7 @@ void* comm_declare_receive_relative(void *buffer, int dim, int dir, size_t count
   int uptags[4] = {XUP, YUP, ZUP, TUP};
 
   MPI_Request *request = (MPI_Request*)safe_malloc(sizeof(MPI_Request));
-  int tag = (dir == 1) ? downtags[dim] : uptags[dim];
+  int tag = (dir == 1) ? uptags[dim] : downtags[dim];
   int src = (dir == 1) ? back_nbr[dim] : fwd_nbr[dim];
   int srcproc = find_neighbor_proc(src);  
   MPI_Recv_init(buffer, count, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);
