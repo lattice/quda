@@ -295,6 +295,12 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor(const Spinor &st) 
       : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
 
+    Spinor(const StoreType* spinor, const Texture& tex, const float* norm, int stride) 
+      : spinor(spinor), tex(tex), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
+
+    Spinor(const StoreType* spinor, const float* norm, int stride) 
+      : spinor(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
+
     Spinor& operator=(const Spinor &src) {
       if (&src != this) {
 	spinor = src.spinor;
