@@ -162,7 +162,6 @@ void initQuda(int dev)
   }
 
   for(int i=0; i<deviceCount; i++) {
-    cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, i);
     checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
     if (getVerbosity() >= QUDA_SUMMARIZE) {
