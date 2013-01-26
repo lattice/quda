@@ -14,16 +14,19 @@ namespace quda {
     if(num_offsets == 0) return;
     if(num_offsets == 1) coeff[0] = 1.0;
 
-    double sum = 0;
+    double sum=0.0;
     for(int i=0; i<num_offsets; ++i){
       double temp = 1.0;
       for(int j=0; j<num_offsets; ++j){
         if(i == j) continue;
         if(prev_offset[i] == prev_offset[j]) errorQuda("Offsets must be distinct\n");
-        temp *= (current_offset - prev_offset[j])/(prev_offset[i] - prev_offset[j]) 
+        temp *= (offset - prev_offset[j])/(prev_offset[i] - prev_offset[j]);
       }
       coeff[i] = temp;
+      sum += temp;
     }
+
+    assert(fabs(sum-1) < 1e-9);
     return;
   }
 
@@ -35,7 +38,9 @@ namespace quda {
                    const QudaInvertParam& param,
                    int idx)
   {
+
     const int last_idx = param.num_offset-1;
+    
     if(idx > last_idx) errorQuda("index exceeds number of solutions\n");
 
     if(idx == last_idx) return; // nothing to do 
