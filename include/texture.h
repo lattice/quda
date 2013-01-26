@@ -295,7 +295,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor(const Spinor &st) 
       : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
 
-    Spinor(const StoreType* spinor, const float* norm, int stride) 
+    Spinor(StoreType* spinor, float* norm, int stride) 
       : spinor(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
 
     Spinor& operator=(const Spinor &src) {
