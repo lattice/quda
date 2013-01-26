@@ -20,7 +20,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbose), init(false), 
-								      even(0), odd(0) 
+								      even(0), odd(0), v(0), norm(0)
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
 	   param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis);
@@ -28,7 +28,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
-								      even(0), odd(0)
+								      even(0), odd(0), v(0), norm(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
 	   field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis);
@@ -114,12 +114,24 @@ namespace quda {
       printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
-  }
+ 
+    // initialize the ghost pointers 
+    if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      for(int i=0; i<dims; ++i){
+        if(commDimPartitioned(i)){
+          ghost[i] = (char*)v + (stride + ghostOffset[i])*nColor*nSpin*2*precision;
+          if(precision == QUDA_HALF_PRECISION)
+            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
+        }
+      }
+    }
+
+  } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
-				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
-				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
-				QudaGammaBasis gammaBasis) {
+      QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
+      QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
+      QudaGammaBasis gammaBasis) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -158,6 +170,7 @@ namespace quda {
     norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
     init = true;
 
+    clearGhostPointers();
   }
 
   void ColorSpinorField::destroy() {
@@ -167,8 +180,8 @@ namespace quda {
   ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
     if (&src != this) {
       create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
-	     src.precision, src.pad, src.siteSubset, 
-	     src.siteOrder, src.fieldOrder, src.gammaBasis);    
+          src.precision, src.pad, src.siteSubset, 
+          src.siteOrder, src.fieldOrder, src.gammaBasis);    
     }
     return *this;
   }
@@ -188,7 +201,7 @@ namespace quda {
       if (param.x[0] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
-  
+
     if (param.pad != 0) pad = param.pad;
 
     if (param.siteSubset == QUDA_FULL_SITE_SUBSET){
@@ -258,6 +271,38 @@ namespace quda {
     if (a.TwistFlavor() != b.TwistFlavor()) {
       errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
     }
+  }
+
+  // Set the ghost pointers to NULL.
+  // This is a private initialisation routine. 
+  void ColorSpinorField::clearGhostPointers() 
+  {
+    for(int dim=0; dim<QUDA_MAX_DIM; ++dim){
+      ghost[dim] = NULL;
+      ghostNorm[dim] = NULL;
+    }
+  }
+
+
+  void* ColorSpinorField::Ghost() {
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghost;
+  }
+  
+  const void* ColorSpinorField::Ghost() const {
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghost;
+  }
+
+
+  void* ColorSpinorField::GhostNorm(){
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghostNorm;
+  }
+
+  const void* ColorSpinorField::GhostNorm() const{
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghostNorm;
   }
 
   double norm2(const ColorSpinorField &a) {

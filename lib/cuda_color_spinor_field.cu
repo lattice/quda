@@ -36,7 +36,7 @@ namespace quda {
     }*/
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-    ColorSpinorField(param), v(0), norm(0), alloc(false), init(true), texInit(false) {
+    ColorSpinorField(param), alloc(false), init(true), texInit(false) {
 
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -55,11 +55,12 @@ namespace quda {
     } else if (param.create == QUDA_COPY_FIELD_CREATE){
       errorQuda("not implemented");
     }
+
     checkCudaError();
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-    ColorSpinorField(src), v(0), norm(0), alloc(false), init(true), texInit(false) {
+    ColorSpinorField(src), alloc(false), init(true), texInit(false) {
     create(QUDA_COPY_FIELD_CREATE);
     if (isNative() && src.isNative()) copy(src);
     else errorQuda("Cannot copy using non-native fields");
@@ -67,7 +68,7 @@ namespace quda {
 
   // creates a copy of src, any differences defined in param
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
-    ColorSpinorField(src), v(0), norm(0), alloc(false), init(true), texInit(false) {  
+    ColorSpinorField(src), alloc(false), init(true), texInit(false) {  
 
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -108,7 +109,7 @@ namespace quda {
     } else {
       errorQuda("CreateType %d not implemented", param.create);
     }
-
+    clearGhostPointers();
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
@@ -122,6 +123,7 @@ namespace quda {
     } else {
       errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
     }
+    clearGhostPointers();
   }
 
   ColorSpinorField& cudaColorSpinorField::operator=(const ColorSpinorField &src) {
