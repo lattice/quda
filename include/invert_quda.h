@@ -161,6 +161,14 @@ namespace quda {
 		    cudaColorSpinorField **q, int N);
   };
 
+
+  // polynomial extrapolation in the quark mass
+  void polyMassExt(cudaColorSpinorField **x,
+                   const QudaInvertParam& param,
+                   int idx);
+
+
+
 } // namespace quda
 
 #endif // _INVERT_QUDA_H

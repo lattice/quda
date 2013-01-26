@@ -340,6 +340,14 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
 
   /**
+   * Solve for multiple masses. 
+   * Starting with the heaviest mass, use polynomial extrapolation 
+   * to construct trial solutions for the lighter mass systems.
+   *
+   */
+  void invertMultiShiftSequentialQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
+
+  /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
