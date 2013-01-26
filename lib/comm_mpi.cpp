@@ -509,8 +509,8 @@ void* comm_declare_receive_relative(void *buffer, int dim, int dir, size_t count
   int uptags[4] = {XUP, YUP, ZUP, TUP};
 
   MPI_Request *request = (MPI_Request*)safe_malloc(sizeof(MPI_Request));
-  int tag = (dir == 1) ? uptags[dim] : downtags[dim];
-  int src = (dir == 1) ? back_nbr[dim] : fwd_nbr[dim];
+  int tag = (dir == 1) ? downtags[dim] : uptags[dim];  // this should match neighbour's tag
+  int src = (dir == 1) ? fwd_nbr[dim] : back_nbr[dim]; // this is relative
   int srcproc = find_neighbor_proc(src);  
   MPI_Recv_init(buffer, count, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);
   return (void*)request;
