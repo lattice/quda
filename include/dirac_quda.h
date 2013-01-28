@@ -11,6 +11,8 @@
 
 #include <typeinfo>
 
+#include <kernel_params.h>
+
 namespace quda {
 
   // Params for Dirac operator
@@ -103,6 +105,8 @@ namespace quda {
 
     int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
+    mutable KernelParams kernel_params;
+
   public:
     Dirac(const DiracParam &param);
     Dirac(const Dirac &dirac);
@@ -134,6 +138,8 @@ namespace quda {
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
     QudaVerbosity Verbose() const { return verbose; }
+
+    KernelParams kernelParams() const { return kernel_params; }
   };
 
   // Full Wilson

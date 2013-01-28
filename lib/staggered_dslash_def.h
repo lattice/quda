@@ -46,11 +46,11 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #endif
 
 #if (DD_PREC == 0)
-#define DD_PARAM_AXPY const double2 *x, const float *xNorm, const double a, const DslashParam param
+#define DD_PARAM_AXPY const double2 *x, const float *xNorm, const double a, const KernelParams kparam, const DslashParam param
 #elif (DD_PREC == 1) 
-#define DD_PARAM_AXPY const float2 *x, const float *xNorm, const float a, const DslashParam param
+#define DD_PARAM_AXPY const float2 *x, const float *xNorm, const float a, const KernelParams kparam, const DslashParam param
 #else
-#define DD_PARAM_AXPY const short2 *x, const float *xNorm, const float a, const DslashParam param
+#define DD_PARAM_AXPY const short2 *x, const float *xNorm, const float a, const KernelParams kparam, const DslashParam param
 #endif
 
 

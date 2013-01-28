@@ -18,6 +18,10 @@ namespace quda {
     initLatticeConstants(gauge);
     initGaugeConstants(gauge);
     initDslashConstants();
+
+    initLatticeParams(&kernel_params, gauge);
+    initGaugeParams(&kernel_params, gauge);
+
   }
 
   Dirac::Dirac(const Dirac &dirac) 
@@ -29,6 +33,9 @@ namespace quda {
     initLatticeConstants(gauge);
     initGaugeConstants(gauge);
     initDslashConstants();
+    
+    initLatticeParams(&kernel_params, gauge);
+    initGaugeParams(&kernel_params, gauge);
   }
 
   Dirac::~Dirac() { }

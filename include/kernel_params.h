@@ -46,6 +46,9 @@ namespace quda {
     unsigned int gf; // gauge fixed?
     double anisotropy, t_bc, coeff;
     float anisotropy_f, t_bc_f, coeff_f;
+
+
+
   };
 
   class LatticeField;

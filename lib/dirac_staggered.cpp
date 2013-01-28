@@ -1,6 +1,7 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 
+
 namespace quda {
 
   DiracStaggered::DiracStaggered(const DiracParam &param) : 
@@ -62,7 +63,10 @@ namespace quda {
 
     initSpinorConstants(in);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, Nface, hasNaik);
+    initSpinorParams(&kernel_params, in);
+
+    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, kernel_params, Nface, hasNaik);
+    //staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, Nface, hasNaik);
   
     flops += 1146ll*in.Volume();
   }
@@ -77,7 +81,12 @@ namespace quda {
 
     initSpinorConstants(in);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, Nface, hasNaik);
+
+     
+    initSpinorParams(&kernel_params, in);
+
+    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, kernel_params, Nface, hasNaik);
+    //staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, Nface, hasNaik);
   
     flops += 1158ll*in.Volume();
   }

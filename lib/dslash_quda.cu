@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 
+#include <kernel_params.h>
 #include <color_spinor_field.h>
 #include <clover_field.h>
 
@@ -384,33 +385,21 @@ namespace quda {
 #define STAGGERED_DSLASH(hasNaik, nFace, gridDim, blockDim, shared, stream, param, ...)	\
   if(hasNaik){										\
     switch(nFace){  				\
-      case 1:											\
-        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-	break;          \
       case 2:		\
         STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
         break;          \
       case 3:		\
         STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
 	break;          \
-      case 4:										 \
-        STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, true, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-        break;         \
       } \
   }else{	       \
     switch(nFace){  				\
-      case 1:											\
-      STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 1, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-      break;          \
     case 2:											\
       STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 2, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;          \
     case 3:									  \
       STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 3, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;          \
-    case 4:										 \
-      STAGGERED_GENERIC_DSLASH(staggeredDslash, , Axpy, false, 4, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-      break;  \
     } \
   } // !hasNaik
 
@@ -1203,6 +1192,7 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
     const double a;
     const bool hasNaik;
     const int nFace;
+    const KernelParams kernel_params;
 
   protected:
     int sharedBytesPerThread() const
@@ -1217,10 +1207,12 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 			const QudaReconstructType reconstruct, const sFloat *in, 
 			const float *inNorm, const sFloat *x, const float *xNorm, const double a,
 			const int dagger, const size_t bytes, const size_t norm_bytes,
+                        const KernelParams& kernel_params,
                         const int nFace,
 			const bool hasNaik)
       : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
-	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace)
+	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace),
+        kernel_params(kernel_params)
     { 
       bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
     }
@@ -1233,13 +1225,15 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 			const QudaReconstructType reconstruct, const sFloat *in, 
 			const float *inNorm, const sFloat *x, const float *xNorm, const double a,
 			const int dagger, const size_t bytes, const size_t norm_bytes,
+                        const KernelParams& kernel_params,
                         const int nFace,
 			const bool hasNaik)
         
 
       : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
         xfat0(xfat0), xfat1(xfat1), xlong0(xlong0), xlong1(xlong1),
-	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace)
+	in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace),
+        kernel_params(kernel_params)
     { 
       bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
     }
@@ -1261,9 +1255,10 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       STAGGERED_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
-		       out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a);
+		       out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a, kernel_params);
     }
 
+/*
     void border_apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
@@ -1272,6 +1267,7 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 		       out, outNorm, xfat0, xfat1, xlong0, xlong1, in, inNorm, x, xNorm, a); // Note that the "extended" gauge fields 
                                                                                              // xfat0, xfat1, xlong0, xlong1 are needed to update the overlap region
     }
+*/
 
     void preTune()
     {
@@ -1933,7 +1929,8 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 			   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 			   const int parity, const int dagger, const cudaColorSpinorField *x,
 			   const double &k, const int *commOverride,
-					 const int nFace,
+                           const KernelParams& kernel_params, 
+			   const int nFace,
 			   const bool hasNaik=true)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
@@ -1992,7 +1989,8 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 								  longGauge.Reconstruct(), (double2*)in->V(), 
 								  (float*)in->Norm(), (double2*)xv, (float*)xn, 
 								  k, dagger, in->Bytes(), in->NormBytes(),
-          nFace,
+                                                                  kernel_params,
+                                                                  nFace,
 								  hasNaik);
       regSize = sizeof(double);
     checkCudaError();
@@ -2006,7 +2004,8 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 							       longGauge.Reconstruct(), (float2*)in->V(),
 							       (float*)in->Norm(), (float2*)xv, (float*)xn, 
 							       k, dagger, in->Bytes(), in->NormBytes(),
-														nFace,
+                                                               kernel_params,
+							       nFace,
 							       hasNaik);
     checkCudaError();
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
@@ -2016,7 +2015,8 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 							       longGauge.Reconstruct(), (short2*)in->V(), 
 							       (float*)in->Norm(), (short2*)xv, (float*)xn, 
 							       k, dagger,  in->Bytes(), in->NormBytes(), 
-														nFace,
+                                                               kernel_params, 
+							       nFace,
 							       hasNaik);
     }
     checkCudaError();
