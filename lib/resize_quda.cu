@@ -6,7 +6,7 @@
 
 namespace quda {
 
-
+/*
   cudaStream_t* getBlasStream();
 
 #include <texture.h>  
@@ -333,14 +333,6 @@ namespace quda {
       }else if(dst.Precision() == QUDA_HALF_PRECISION){ 
 
         errorQuda("half precision not yet supported\n");
-        /*
-           SpinorTexture<short2, short2, short2, 3, 0> src_tex(src);
-           Spinor<short2, short2, short2, 3> dst_spinor(dst);
-           ExtendCuda<short2, 3, Spinor<short2, short2, short2, 3>,
-           SpinorTexture<short2, short2, short2, 3, 0> >
-           extend(dst_spinor, src_tex, src.Volume(), params, parity);
-           extend.apply(*getBlasStream());
-         */
       }
     }
     return;
@@ -380,17 +372,10 @@ namespace quda {
         crop.apply(*getBlasStream());
       }else if(dst.Precision() == QUDA_HALF_PRECISION){ 
         errorQuda("half precision not yet supported\n");
-        /*
-           SpinorTexture<short2, short2, short2, 3, 0> src_tex(src);
-           Spinor<short2, short2, short2, 3> dst_spinor(dst);
-           CropCuda<short2, 3, Spinor<short2, short2, short2, 3>,
-           SpinorTexture<short2, short2, short2, 3, 0> >
-           crop(dst_spinor, src_tex, dst.Volume(), params, parity);
-           crop.apply(*getBlasStream());
-         */
       }
     }
     return;
   }
+*/
 
 } // namespace

@@ -32,69 +32,12 @@ namespace quda {
       unsigned int gridSize = gridDim.x*blockDim.x;
 
       while (i < length) {
-	      FloatN x[N];
-	      X.load(x, i);
-	      Y.save(x, i);
-	      i += gridSize;
+	FloatN x[N];
+	X.load(x, i);
+	Y.save(x, i);
+	i += gridSize;
       }
     }
-
-    template <typename FloatN, int N, typename Output, typename Input>
-    __global__ void cropKernel(Output Y, Input X, unsigned int length, const int* border){ // length is the size of the smaller domain
-      unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-      unsigned int gridSize = gridDim.x*blockDim.x;
-      
-      // Need to change this
-      int x1h, x2, x3, x4, j;
-      while(i < length){
-		      FloatN x[N];
-        Y.get_coords(&x1h, &x2, &x3, &x4, i); // compute the coordinates of lattice sites on the smaller domain
-
-			     // Add border to get coordinates on the larger domain; 
-			  	  x1h += border[0]; 
-				    x2 += border[1];
-			     x3 += border[2];
-			     x4 += border[3];
-			  
-        // Compute the site index on the larger domain
-        X.get_index(&j, x1h, x2, x3, x4); 
-
-        // load data from the larger domain
-			     X.load(x, j);
-        // save to smaller domain
-			     Y.save(x, i);
-        // Repeat until data has been stored at each lattice site in the smaller domain
-			     i += gridSize;
-		    }
-		    return;
-  }
-
-    template <typename FloatN, int N, typename Output, typename Input> 
-	  __global__ void extendKernel(Output Y, Input X, unsigned int length, const int* border){
-      unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-      unsigned int gridSize = gridDim.x*blockDim.x;
-			
-      int x1h, x2, x3, x4, j;
-      while(i<length){
-		      FloatN  x[N];
-				    X.get_coords(&x1h, &x2, &x3, &x4, i);
-        X.load(x, i);
-			
-				    x1h += border[0];
-        x2  += border[1];
-        x3  += border[2];
-        x4  += border[3];
-			
-        // Compute the site index on the larger domain	
-        X.get_index(&j, x1h, x2, x3, x4);
-		  
-			     // write to larger domain
-        Y.save(x, j);
-		      i += gridSize; 
-      }
-		    return;  
-    }
-     
 
     template <typename FloatN, int N, typename Output, typename Input>
     class CopyCuda : public Tunable {
@@ -102,49 +45,24 @@ namespace quda {
     private:
       Input &X;
       Output &Y;
-      int length;
-      const int src_length;
-      const int dst_length;
-      int* border;
+      const int length;
 
       int sharedBytesPerThread() const { return 0; }
       int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       virtual bool advanceSharedBytes(TuneParam &param) const
       {
-	       TuneParam next(param);
-       	advanceBlockDim(next); // to get next blockDim
-	       int nthreads = next.block.x * next.block.y * next.block.z;
-	       param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-	       sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
-	       return false;
+	TuneParam next(param);
+	advanceBlockDim(next); // to get next blockDim
+	int nthreads = next.block.x * next.block.y * next.block.z;
+	param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+	  sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+	return false;
       }
 
     public:
-      // Set up a border region
-      CopyCuda(Output &Y, Input &X, int src_length, int dst_length) : X(X), Y(Y), src_length(src_length), dst_length(dst_length), border(NULL)
-      {
-			  // Is there a way to specify length if it is a constant?
-        length = (src_length < dst_length) ? src_length : dst_length;
-			  int host_border[QUDA_MAX_DIM];
-			  if(src_length != dst_length){
-			    cudaMalloc((void**)&border, sizeof(int)*QUDA_MAX_DIM);
-				  if(src_length > dst_length){
-			      for(int i=0; i < QUDA_MAX_DIM; ++i){ host_border[i]  = (X.Dim()[i] - Y.Dim()[i])/2; } 
-          }else{
-			      for(int i=0; i < QUDA_MAX_DIM; ++i){ host_border[i]  = (Y.Dim()[i] - X.Dim()[i])/2; } 
-				  }
-				  cudaMemcpy(border, host_border, sizeof(int)*QUDA_MAX_DIM, cudaMemcpyHostToDevice);
-			  } // 
-      }
-   
-
-      virtual ~CopyCuda() { 
-        if(border){ 
-			    cudaFree(border);
-				  border = NULL;
-			  }
-      }
+      CopyCuda(Output &Y, Input &X, int length) : X(X), Y(Y), length(length) { ; }
+      virtual ~CopyCuda() { ; }
 
       TuneKey tuneKey() const {
 	std::stringstream vol, aux;
@@ -157,18 +75,8 @@ namespace quda {
       }  
 
       void apply(const cudaStream_t &stream) {
-	      TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
-        int border[4] = {0,0,0,0};
-        if(src_length == dst_length){
-	        copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
-        }else if(src_length > dst_length){
-          // crop the domain
-	       // cropKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length, border);
-        }else if(src_length < dst_length){
-				  // extend the domain!
-	     //   extendKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length, border);
-			    // No communication yet!
-			  }      
+	TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
+	copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
       }
 
       void preTune() { ; } // no need to save state for copy kernels
@@ -189,9 +97,9 @@ namespace quda {
       if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n", src.Nspin());
 
       if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-	      copy::copyCuda(dst.Even(), src.Even());
-	      copy::copyCuda(dst.Odd(), src.Odd());
-	      return;
+	copy::copyCuda(dst.Even(), src.Even());
+	copy::copyCuda(dst.Odd(), src.Odd());
+	return;
       }
 
       checkSpinorLength(dst, src);
@@ -202,112 +110,112 @@ namespace quda {
       // For a given dst precision, there are two non-trivial possibilities for the
       // src precision.
 
-      blas_bytes += src.RealLength()*((int)src.Precision() + (int)dst.Precision());
+      blas_bytes += (unsigned long long)src.RealLength()*(src.Precision() + dst.Precision());
 
       if (dst.Precision() == src.Precision()) {
 	cudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
 	if (dst.Precision() == QUDA_HALF_PRECISION) {
 	  cudaMemcpy(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice);
-	  blas_bytes += 2*dst.RealLength()*sizeof(float);
+	  blas_bytes += 2*(unsigned long long)dst.RealLength()*sizeof(float);
 	}
       } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	if (src.Nspin() == 4){
-	  SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
-	  Spinor<float4, float2, double2, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float2, double2, 6>, 
-		   SpinorTexture<float4, float4, float4, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float2, double2, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float2, double2, 6, 1>, 
+		   Spinor<float4, float4, float4, 6, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //src.Nspin() == 1
-	  SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, double2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, double2, 3>,
-		   SpinorTexture<float2, float2, float2, 3, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
+		   Spinor<float2, float2, float2, 3, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     } 
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 	if (src.Nspin() == 4){
-	  SpinorTexture<float4, float2, double2, 6, 0> src_tex(src);
-	  Spinor<float4, float4, float4, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6>,
-		   SpinorTexture<float4, float2, double2, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float4, float2, double2, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float4, float4, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6, 1>,
+		   Spinor<float4, float2, double2, 6, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //src.Nspin() ==1
-	  SpinorTexture<float2, float2, double2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, float2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3>,
-		   SpinorTexture<float2, float2, double2, 3, 0> >
-	  copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float2, float2, double2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
+		   Spinor<float2, float2, double2, 3, 0, 0> >
+	  copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       }
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-	blas_bytes += src.Volume()*sizeof(float);
+	blas_bytes += (unsigned long long)src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){      
-	  SpinorTexture<float4, float4, short4, 6, 0> src_tex(src);
-	  Spinor<float4, float4, float4, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6>,
-		   SpinorTexture<float4, float4, short4, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float4, float4, short4, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float4, float4, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float4, float4, 6, 1>,
+		   Spinor<float4, float4, short4, 6, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin== 1;
-	  SpinorTexture<float2, float2, short2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, float2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3>,
-		   SpinorTexture<float2, float2, short2, 3, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float2, float2, short2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
+		   Spinor<float2, float2, short2, 3, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-	blas_bytes += dst.Volume()*sizeof(float);
+	blas_bytes += (unsigned long long)dst.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
-	  SpinorTexture<float4, float4, float4, 6, 0> src_tex(src);
-	  Spinor<float4, float4, short4, 6> dst_spinor(dst);
-	  CopyCuda<float4, 6, Spinor<float4, float4, short4, 6>,
-		   SpinorTexture<float4, float4, float4, 6, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
+	  Spinor<float4, float4, short4, 6, 1> dst_spinor(dst);
+	  CopyCuda<float4, 6, Spinor<float4, float4, short4, 6, 1>,
+		   Spinor<float4, float4, float4, 6, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
-	  SpinorTexture<float2, float2, float2, 3, 0> src_tex(src);
-	  Spinor<float2, float2, short2, 3> dst_spinor(dst);
-	  CopyCuda<float2, 3, Spinor<float2, float2, short2, 3>,
-		   SpinorTexture<float2, float2, float2, 3, 0> >
-	  copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
+	  Spinor<float2, float2, short2, 3, 1> dst_spinor(dst);
+	  CopyCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
+		   Spinor<float2, float2, float2, 3, 0, 0> >
+	  copy(dst_spinor, src_tex, src.Volume());
   copy.apply(*getBlasStream());	
 }
   } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-	blas_bytes += src.Volume()*sizeof(float);
+	blas_bytes += (unsigned long long)src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
-	  SpinorTexture<double2, float4, short4, 12, 0> src_tex(src);
-	  Spinor<double2, double2, double2, 12> dst_spinor(dst);
-	  CopyCuda<double2, 12, Spinor<double2, double2, double2, 12>,
-		   SpinorTexture<double2, float4, short4, 12, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<double2, float4, short4, 12, 0, 0> src_tex(src);
+	  Spinor<double2, double2, double2, 12, 1> dst_spinor(dst);
+	  CopyCuda<double2, 12, Spinor<double2, double2, double2, 12, 1>,
+		   Spinor<double2, float4, short4, 12, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
-	  SpinorTexture<double2, float2, short2, 3, 0> src_tex(src);
-	  Spinor<double2, double2, double2, 3> dst_spinor(dst);
-	  CopyCuda<double2, 3, Spinor<double2, double2, double2, 3>,
-		   SpinorTexture<double2, float2, short2, 3, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<double2, float2, short2, 3, 0, 0> src_tex(src);
+	  Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
+	  CopyCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
+		   Spinor<double2, float2, short2, 3, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
-	blas_bytes += dst.Volume()*sizeof(float);
+	blas_bytes += (unsigned long long)dst.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
-	  SpinorTexture<double2, double2, double2, 12, 0> src_tex(src);
-	  Spinor<double2, double4, short4, 12> dst_spinor(dst);
-	  CopyCuda<double2, 12, Spinor<double2, double4, short4, 12>,
-		   SpinorTexture<double2, double2, double2, 12, 0> >
-	    copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<double2, double2, double2, 12, 0, 0> src_tex(src);
+	  Spinor<double2, double4, short4, 12, 1> dst_spinor(dst);
+	  CopyCuda<double2, 12, Spinor<double2, double4, short4, 12, 1>,
+		   Spinor<double2, double2, double2, 12, 0, 0> >
+	    copy(dst_spinor, src_tex, src.Volume());
 	  copy.apply(*getBlasStream());	
       } else { //nSpin == 1
-	  SpinorTexture<double2, double2, double2, 3, 0> src_tex(src);
-	  Spinor<double2, double2, short2, 3> dst_spinor(dst);
-	  CopyCuda<double2, 3, Spinor<double2, double2, short2, 3>,
-		   SpinorTexture<double2, double2, double2, 3, 0> >
-	  copy(dst_spinor, src_tex, src.Volume(), dst.Volume());
+	  Spinor<double2, double2, double2, 3, 0, 0> src_tex(src);
+	  Spinor<double2, double2, short2, 3, 1> dst_spinor(dst);
+	  CopyCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
+		   Spinor<double2, double2, double2, 3, 0, 0> >
+	  copy(dst_spinor, src_tex, src.Volume());
   copy.apply(*getBlasStream());	
 }
   } else {
