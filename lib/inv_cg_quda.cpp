@@ -16,7 +16,7 @@
 
 namespace quda {
 
-  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile) :
+  CG::CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile) :
     Solver(invParam, profile), mat(mat), matSloppy(matSloppy)
   {
 
@@ -30,7 +30,6 @@ namespace quda {
   {
     profile[QUDA_PROFILE_INIT].Start();
 
-    
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
     if(b2 == 0){

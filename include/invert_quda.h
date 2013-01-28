@@ -32,28 +32,32 @@ namespace quda {
     const DiracMatrix &matSloppy;
 
   public:
-    CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile);
+    CG(const DiracMatrix &mat, const  DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~CG();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
+
   class PreconCG : public Solver {
-  
-    private:
-	    const DiracMatrix &mat;
-		  const DiracMatrix &matSloppy;
-	    const DiracMatrix &matPrec;
 
-      Solver* K;
-      QudaInvertParam Kparam;
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
 
-   public:
-     PreconCG(DiracMatrix& mat, DiracMatrix &matSloppy, DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile);
-     virtual ~PreconCG();
-   
-     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    Solver* K;
+    QudaInvertParam Kparam;
+
+  public:
+    PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaInvertParam &invParam, TimeProfile &profile);
+    virtual ~PreconCG();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
+
+
+
 
   class BiCGstab : public Solver {
 
@@ -177,6 +181,14 @@ namespace quda {
     void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p,
 		    cudaColorSpinorField **q, int N);
   };
+
+
+  // polynomial extrapolation in the quark mass
+  void polyMassExt(cudaColorSpinorField **x,
+                   const QudaInvertParam& param,
+                   int idx);
+
+
 
 } // namespace quda
 

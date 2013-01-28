@@ -18,8 +18,8 @@
 
 namespace quda {
 
-   // set the required parameters for the inner solver
-  void localFillInnerInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) {
+  // set the required parameters for the inner solver
+  void fillInnerCGInvertParam(QudaInvertParam &inner, const QudaInvertParam &outer) {
     inner.tol = outer.tol_precondition;
     inner.maxiter = outer.maxiter_precondition;
     inner.reliable_delta = 1e-20; // no reliable updates within the inner solver
@@ -33,7 +33,7 @@ namespace quda {
     inner.gflops = 0;
     inner.secs = 0;
 
-    inner.inv_type_precondition = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
+    inner.inv_type_precondition = QUDA_CG_INVERTER; // used to tell the inner solver it is an inner solver
 
     if (outer.inv_type == QUDA_CG_INVERTER && outer.cuda_prec_sloppy != outer.cuda_prec_precondition)
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
@@ -43,14 +43,13 @@ namespace quda {
 
 
 
-  PreconCG::PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile) :
-  Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrec(matPrec), K(NULL)
+  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile) :
+    Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrec), K(NULL)
   {
     Kparam = newQudaInvertParam();
-    invParam.maxiter_precondition = 2;
-    localFillInnerInvertParam(Kparam, invParam);
+    fillInnerCGInvertParam(Kparam, invParam);
 
-    
+
     Kparam.dslash_type   = invParam.dslash_type;
     Kparam.inv_type      = invParam.inv_type;
     Kparam.solution_type = invParam.solution_type;
@@ -65,16 +64,13 @@ namespace quda {
     Kparam.dagger = invParam.dagger;
     Kparam.mass_normalization = invParam.mass_normalization;
     Kparam.preserve_source = invParam.preserve_source;
-    
+
     Kparam.cpu_prec = invParam.cpu_prec;
     Kparam.cuda_prec = invParam.cuda_prec_precondition;
     Kparam.cuda_prec_sloppy = invParam.cuda_prec_precondition;
-  
-  //  Kparam = invParam;
-  //  Kparam.maxiter = 2;
 
 
-    K = new CG(matPrec, matPrec, Kparam, profile);
+    K = new CG(matPrecon, matPrecon, Kparam, profile);
   }
 
 
@@ -87,9 +83,11 @@ namespace quda {
     printfQuda("Calling preconditioned solver\n");
     int k=0;
     int rUpdate;
-    QudaInvertParam newInvParam = invParam;
-    newInvParam.maxiter = 2;
-   // CG cg(matPrec, matPrec, newInvParam, profile);
+
+    cudaColorSpinorField* minvrPre_ptr;
+    cudaColorSpinorField* rPre_ptr;
+    cudaColorSpinorField* minvr_ptr;
+    cudaColorSpinorField* p_ptr;
 
     cudaColorSpinorField r(b);
     ColorSpinorParam param(x);
@@ -97,9 +95,9 @@ namespace quda {
     cudaColorSpinorField y(b,param);
 
     mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
-		  //		cudaColorSpinorField& tmp);
-		  //
-		  // => r = A*x;
+    //		cudaColorSpinorField& tmp);
+    //
+    // => r = A*x;
     double r2 = xmyNormCuda(b,r);
     rUpdate++;
 
@@ -112,64 +110,73 @@ namespace quda {
     prec_param.create = QUDA_COPY_FIELD_CREATE;
     prec_param.precision = invParam.cuda_prec_precondition;
 
-    cudaColorSpinorField minvr_pre(r,prec_param);
-    cudaColorSpinorField r_pre(r,prec_param); // I trust this copies r, but changes the precision
-    cudaColorSpinorField minv_r(r);
+    if(K){
+      minvrPre_ptr = new cudaColorSpinorField(r, prec_param);
+      rPre_ptr  = new cudaColorSpinorField(r, prec_param);
+      minvr_ptr = new cudaColorSpinorField(r);
+      K->operator()(*minvrPre_ptr, *rPre_ptr);  
+      *minvr_ptr = *minvrPre_ptr;
+      p_ptr = new cudaColorSpinorField(*minvr_ptr);
+    }else{
+      p_ptr = new cudaColorSpinorField(r);
+    }
 
-    // p_{0} = M^{-1} r_{0}
-    K->operator()(minvr_pre, r_pre);
-    minv_r = minvr_pre;
 
-    cudaColorSpinorField p(minv_r);
-    
     double src_norm = norm2(b);
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition
     double alpha = 0.0, beta=0.0;
     double pAp;
-    double rMinvr  = reDotProductCuda(r,minv_r);
+    double rMinvr  = reDotProductCuda(r,*minvr_ptr);
     double rMinvr_old = 0.0;
+    double r_new_Minvr_old = 0.0;
+    double r2_old = 0;
     r2 = normCuda(r);
     printfQuda("r2 = %e\n",r2);
 
- 
+
     while(r2 > stop && k < invParam.maxiter){
-      mat(Ap, p, tmp);
-      pAp   = reDotProductCuda(p,Ap);
-      alpha = rMinvr/pAp;
+      mat(Ap, *p_ptr, tmp);
+      pAp   = reDotProductCuda(*p_ptr,Ap);
+      alpha = (K) ? rMinvr/pAp : r2/pAp;
       printfQuda("alpha = %e\n",alpha);
-
-      
-      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r); // disregard cg_norm
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r); 
+      // disregard cg_norm
       //axpyCuda(-alpha, Ap, r);
-						       // r --> r - alpha*A*p
-      rMinvr_old = rMinvr;
-      double r_new_Minvr_old = reDotProductCuda(r,minv_r);
-      r_pre = r;
-      minvr_pre = r_pre;
-      K->operator()(minvr_pre, r_pre);
-      minv_r = minvr_pre;
+      // r --> r - alpha*A*p
 
-      rMinvr = reDotProductCuda(r,minv_r);
+      if(K){
+        rMinvr_old = rMinvr;
+        r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
+        *rPre_ptr = r;
+        *minvrPre_ptr = *rPre_ptr;
+        K->operator()(*minvrPre_ptr, *rPre_ptr);
+        *minvr_ptr = *minvrPre_ptr;
+        rMinvr = reDotProductCuda(r,*minvr_ptr);
 
-      double r2_old = r2;
-      r2 = real(cg_norm);
-      printfQuda("r2 = %e\n",r2);
-      fflush(stdout);
 
-      beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; // Not flexible!
-      if(beta < 0){ beta = 0.0; }
-      else{
-        if(beta > (rMinvr/rMinvr_old)) beta = rMinvr/rMinvr_old;
+        beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
+        if(beta < 0){ 
+          beta = 0.0; 
+        }else{
+          if(beta > (rMinvr/rMinvr_old)) beta = rMinvr/rMinvr_old;
+        }
+
+        r2 = real(cg_norm);
+        // x = x + alpha*p, p = Minvr + beta*p
+        axpyZpbxCuda(alpha, *p_ptr, x, *minvr_ptr, beta);
+      }else{
+        r2_old = r2;
+        r2 = real(cg_norm);
+        beta = r2/r2_old;
+        axpyZpbxCuda(alpha, *p_ptr, x, r, beta);
       }
+
+      printfQuda("r2 = %e\n", r2);
       // update x and p
       // x = x + alpha*p
       // p = Minv_r + beta*p
-      axpyZpbxCuda(alpha, p, x, minv_r, beta);
-      //axpyCuda(alpha,p,x);
-      //axpyCuda(beta,p,minv_r);
       ++k;
     }
-
     printfQuda("Number of iterations = %d\n",k);
 
     // compute the true residual 
@@ -177,7 +184,15 @@ namespace quda {
     double true_res = xmyNormCuda(b, r);
     invParam.true_res = sqrt(true_res / src_norm);
     printfQuda("true_res = %e\n", invParam.true_res);
-   
+
+
+    if(K){ // These are only needed if preconditioning is used
+      delete minvrPre_ptr;
+      delete rPre_ptr;
+      delete minvr_ptr;
+    }
+    delete p_ptr;
+
     return;
   }
 

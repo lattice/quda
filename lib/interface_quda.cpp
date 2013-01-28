@@ -620,7 +620,8 @@ namespace quda {
     diracParam.longGauge = gaugeLongPrecondition;    
     diracParam.clover = cloverPrecondition;
 
-    diracParam.hasNaik = hasNaik;
+    //diracParam.hasNaik = hasNaik;
+    diracParam.hasNaik = false;
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 0; // comms are always off

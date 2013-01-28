@@ -16,10 +16,7 @@ namespace quda {
     switch (param.inv_type) {
     case QUDA_CG_INVERTER:
       report("CG");
-      solver = new CG(mat, matSloppy, param, profile);
-      break;
-    case QUDA_DD_CG_INVERTER:
-	    report("DD_CG");
+      //solver = new CG(mat, matSloppy, param, profile);
       solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_BICGSTAB_INVERTER:
