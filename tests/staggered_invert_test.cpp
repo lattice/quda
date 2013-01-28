@@ -332,7 +332,10 @@ invert_test(void)
 	inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
       }
     
-      invertMultiShiftQuda(outArray, in->V(), &inv_param);	
+      //invertMultiShiftQuda(outArray, in->V(), &inv_param);	
+      invertMultiShiftSequentialQuda(outArray, in->V(), &inv_param);	
+ 
+
 
       cudaDeviceSynchronize();
       time0 += clock(); // stop the timer
