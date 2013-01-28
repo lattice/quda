@@ -415,7 +415,7 @@ o2_re = o2_im = 0.f;
 #endif
 	  {
 	    int sp_idx_1st_nbr = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, ga_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 0, ga_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -449,7 +449,7 @@ o2_re = o2_im = 0.f;
 #endif
 	  {
 	    int sp_idx_3rd_nbr = ((x1 >= X1m3) ? X -X1m3 : X+3) >> 1;
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 0, ga_idx, staggeredConstants.longlinkStride);        
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 0, ga_idx, longlinkStride);        
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -498,7 +498,7 @@ o2_re = o2_im = 0.f;
 		    fat_idx = Vh + space_con;
 	    }
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -537,7 +537,7 @@ o2_re = o2_im = 0.f;
 		    long_idx = Vh + x1*X4X3X2h + space_con;
 	    }    
 #endif
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, staggeredConstants.longlinkStride); 		
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, longlinkStride); 		
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -580,7 +580,7 @@ o2_re = o2_im = 0.f;
 #endif
 	  {
 	    int sp_idx_1st_nbr = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, ga_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, ga_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -613,7 +613,7 @@ o2_re = o2_im = 0.f;
 #endif
 	  {
 	    int sp_idx_3rd_nbr = ((x2 >= X2m3 ) ? X-X2m3*X1 : X+3*X1) >> 1;    
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 2, ga_idx, staggeredConstants.longlinkStride);
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 2, ga_idx, longlinkStride);
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;        
 #if (DD_PREC == 2) //half precision
@@ -664,7 +664,7 @@ o2_re = o2_im = 0.f;
 		    fat_idx = Vh + space_con;
 	    }    
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -703,7 +703,7 @@ o2_re = o2_im = 0.f;
 		    long_idx = Vh+ x2*X4X3X1h + space_con;
 	    }    
 #endif
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, staggeredConstants.longlinkStride); 
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, longlinkStride); 
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -748,7 +748,7 @@ o2_re = o2_im = 0.f;
 #endif
     {
 	    int sp_idx_1st_nbr = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 4, ga_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 4, ga_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -782,7 +782,7 @@ o2_re = o2_im = 0.f;
 #endif
     {
 	    int sp_idx_3rd_nbr = ((x3>= X3m3)? X -X3m3*X2X1: X + 3*X2X1)>> 1;    
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 4, ga_idx, staggeredConstants.longlinkStride);
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 4, ga_idx, longlinkStride);
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -831,7 +831,7 @@ o2_re = o2_im = 0.f;
 		    fat_idx = Vh + space_con;
 	    }    
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -870,7 +870,7 @@ o2_re = o2_im = 0.f;
 			  long_idx = Vh + x3*X4X2X1h + space_con;
 	    }    
 #endif
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, staggeredConstants.longlinkStride);         
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, longlinkStride);         
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -913,7 +913,7 @@ o2_re = o2_im = 0.f;
 #endif
 	  {    
 	    int sp_idx_1st_nbr = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
-	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 6, ga_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 6, ga_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -946,7 +946,7 @@ o2_re = o2_im = 0.f;
 #endif
 	  {
 	    int sp_idx_3rd_nbr = ((x4>=X4m3)? X -X4m3*X3X2X1 : X + 3*X3X2X1)>> 1;     
-	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 6, ga_idx, staggeredConstants.longlinkStride);    
+	    READ_LONG_MATRIX(LONG, LONGLINK0TEX, 6, ga_idx, longlinkStride);    
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -1006,7 +1006,7 @@ o2_re = o2_im = 0.f;
 		    }        	
 	    }
 #endif
-	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, staggeredConstants.fatlinkStride);
+	    READ_FAT_MATRIX(FAT, FATLINK1TEX, dir, fat_idx, fatlinkStride);
 	    READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
 	    ADJ_MAT_MUL_V(A, fat, i);
 	    o0_re -= A0_re;
@@ -1041,7 +1041,7 @@ o2_re = o2_im = 0.f;
 		    }
 	    }
 #endif	    
-	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, staggeredConstants.longlinkStride);
+	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, longlinkStride);
 	    READ_KS_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);       
 	    RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
 	    ADJ_MAT_MUL_V(B, long, t);    

@@ -1,9 +1,9 @@
 #define MAX(a,b) ((a)>(b) ? (a):(b))
 
 typedef struct fat_force_stride_s {
-  int fat_ga_stride;
-  int site_ga_stride;
-  int staple_stride;
+  int fatlinkStride;
+  int sitelinkStride;
+  int stapleStride;
   int mom_ga_stride;
   int path_max_length;
   int color_matrix_stride;
@@ -65,9 +65,9 @@ __constant__ int ga_stride;
 __constant__ int cl_stride;
 __constant__ int ghostFace[QUDA_MAX_DIM];
 
-__constant__ int fat_ga_stride;
-__constant__ int long_ga_stride;
-__constant__ float fat_ga_max;
+__constant__ int fatlinkStride;
+__constant__ int longlinkStride;
+__constant__ float fatlinkMax;
 
 __constant__ int gauge_fixed;
 
@@ -385,13 +385,13 @@ void initCloverConstants (const cudaCloverField &clover)
 
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge)
 {
-  int fat_ga_stride_h = fatgauge.Stride();
-  int long_ga_stride_h = longgauge.Stride();
+  int fatlinkStride_h = fatgauge.Stride();
+  int longlinkStride_h = longgauge.Stride();
   float fat_link_max_h = fatgauge.LinkMax();
   
-  cudaMemcpyToSymbol(fat_ga_stride, &fat_ga_stride_h, sizeof(int));  
-  cudaMemcpyToSymbol(long_ga_stride, &long_ga_stride_h, sizeof(int));  
-  cudaMemcpyToSymbol(fat_ga_max, &fat_link_max_h, sizeof(float));
+  cudaMemcpyToSymbol(fatlinkStride, &fatlinkStride_h, sizeof(int));  
+  cudaMemcpyToSymbol(longlinkStride, &longlinkStride_h, sizeof(int));  
+  cudaMemcpyToSymbol(fatlinkMax, &fat_link_max_h, sizeof(float));
 
   checkCudaError();
 }

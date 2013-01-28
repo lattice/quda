@@ -1,7 +1,7 @@
 #ifndef STAGGERED_OVERLAP_UTILITIES_H
 #define STAGGERED_OVERLAP_UTILITIES_H
 
-
+/*
 template<int ghostDir, int Nface>
 struct NeighborIndex{
 
@@ -154,78 +154,7 @@ struct NeighborIndex<0, Nface>
   }
 };
 
-/*
-template<KernelType Dir>
-void getCoordinates(int* x1_p, int* x2_p, int* x3_p, int* x4_p, 
-		    int cb_index, int parity){ return; }
 
-
-template<>
-void getCoordinates<0>(int* const x1_p, int* const x2_p, 
-		       int* const x3_p, int* const x4_p,
-		       int cb_index, int parity)
-{
-  // cb_idx = (x1*X4X3X2 + x4*X3X2 + x3*X2 + x2)/2
-  const int x2h = cb_index % X2h;
-  *x3_p = (cb_index/X2h) % X3;
-  *x1_p = cb_index/X4X3X2h;
-  *x4_p = (cb_index/(X3X2>>1)) % X4;
-  const int x2odd = (*x1_p + *x3_p + *x2_p + parity) & 1;
-  *x2_p = 2*x2h + x2odd;
-  return;
-}
-
-
-template<>
-void getCoordinates<1>(int* const x1_p, int* const x2_p, 
-		       int* const x3_p, int* const x4_p,
-		       int cb_index, int parity)
-{
-  // cb_index = (x2*X4X3X1 + x4*X3X1 + x3*X1 + x1)/2
-  const int x1h = cb_index % X1h;
-  *x3_p = (cb_index/X1h) % X3;
-  *x2_p = cb_index/X4X3X1h;
-  *x4_p = (cb_index/(X3X1>>1)) % X4;
-  const int x1odd = (*x2_p + *x3_p + *x4_p + parity) & 1;
-  *x1_p = 2*x1h + x1odd;
-
-  return;
-}
-
-template<>
-void getCoordinates<2>(int* const x1_p, int* const x2_p,
-		       int* const x3_p, int* const x4_p,
-		       int cb_index, int parity)
-{
-  // cb_index = (x3*X4X2X1 + x4*X2X1 + x2*X1 + x1)/2
-  const int x1h = cb_index % X1h;
-  *x2_p = (cb_index/X1h) % X2;
-  *x3_p = cb_index/X4X2X1h;
-  *x4_p = (cb_index/(X2X1>>1)) % X4;
-  const int x1odd = (*x2_p + *x3_p + *x4_p + parity) & 1;
-  *x1_p = 2*x1h + x1odd;
-
-  return;
-}
-
-template<>
-void getCoordinates<3>(int* const x1_p, int* const x2_p,
-		       int* const x3_p, int* const x4_p,
-		       int cb_index, int parity)
-{
-  // cb_index = (x4*X3X2X1 + x3*X2X1 + x2*X1 + x1)/2
-  // Note that this is the canonical ordering
-  const int x1h = cb_index % X1h;
-  *x2_p = (cb_index/X1h) % X2;
-  *x4_p = (cb_index/X3X2X1h);
-  *x3_p = (cb_index/(X2X1>>1)) % X3;
-  const int x1odd = (*x2_p + *x3_p + *x4_p + parity) & 1;
-  *x1_p = 2*x1h + x1odd;
-
-  return;
-}
-
-*/
 
 template<KernelType Dir> 
 __device__ void getCoordinates(int* const x1_p, int* const x2_p,
@@ -472,6 +401,6 @@ __device__ int getNormIndex(int cb_index, const DslashParam& param)
 }
 
 
-
+*/
 
 #endif

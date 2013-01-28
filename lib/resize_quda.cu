@@ -192,7 +192,7 @@ namespace quda {
 
   // Need to generalise SpinorIndex
   template<int Dir, typename FloatN>
-    __global__ void copyExteriorKernel(int parity)
+    __global__ void copyExteriorKernel(int parity, DecompParams params)
     {
       int cb_index = blockIdx.x*blockDim.x + threadIdx.x;
       int gridSize = gridDim.x*blockDim.x; 

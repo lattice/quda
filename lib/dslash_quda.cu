@@ -1431,7 +1431,7 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
 
 
 
-
+/*
  void dslashDomainDecompCuda(DslashCuda &dslash, 
                        const size_t regSize, // what is this for??
                        const int parity, 
@@ -1479,6 +1479,8 @@ if(param.kernel_type != INTERIOR_KERNEL){ \
   cudaDeviceSynchronize(); // probably don't want this
   return;
 }
+
+*/
 
   void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		  const int volume, const int *faceVolumeCB) {

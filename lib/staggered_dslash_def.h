@@ -10,12 +10,12 @@
 #define GET_COORDS
 __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity, int sid)
 {
-  int za = sid / cudaConstants.X1h;
-  int x1h = sid - za*cudaConstants.X1h;
-  int zb = za / cudaConstants.X2;
-  *x2 = za - zb*cudaConstants.X2;
-  *x4 = zb / cudaConstants.X3;
-  *x3 = zb - (*x4)*cudaConstants.X3;
+  int za = sid / X1h;
+  int x1h = sid - za*X1h;
+  int zb = za / X2;
+  *x2 = za - zb*X2;
+  *x4 = zb / X3;
+  *x3 = zb - (*x4)*X3;
   int x1odd = ((*x2) + (*x3) + *(x4) + parity) & 1;
   (*x1) = 2*x1h + x1odd;
   (*X) = 2*sid + x1odd;
@@ -92,9 +92,9 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_8_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, staggeredConstants.fatlinkMax);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fatlinkMax);
 #else*/
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, staggeredConstants.fatlinkMax);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fatlinkMax);
 /*#endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
 #define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_8_SHORT4(LONG, gauge, dir, idx, stride)
@@ -143,9 +143,9 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, staggeredConstants.fatlinkMax);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fatlinkMax);
 #else*/
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, staggeredConstants.fatlinkMax);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fatlinkMax);
 /*#endif // DIRECT_ACCCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
 #define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_12_SHORT4(LONG, gauge, dir, idx, stride)
@@ -193,9 +193,9 @@ __device__ void getCoords(int *x1, int *x2, int *x3, int *x4, int *X, int parity
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, staggeredConstants.fatlinkMax);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fatlinkMax);
 #else*/
-#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, staggeredConstants.fatlinkMax);
+#define READ_FAT_MATRIX(FAT, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2_TEX(FAT, gauge, dir, idx, stride); RESCALE2(FAT, fatlinkMax);
 									 /*#endif // DIRECT_ACCESS_FAT_LINK
 #ifdef DIRECT_ACCESS_LONG_LINK
 #define READ_LONG_MATRIX(LONG, gauge, dir, idx, stride) READ_GAUGE_MATRIX_18_SHORT2(LONG, gauge, dir, idx, stride)
