@@ -146,7 +146,7 @@ namespace quda {
       int x2,
       int x3, 
       int x4,
-      const DecompParams& params
+      const DecompParams& params,
       int Dir)
   {
 
@@ -190,7 +190,7 @@ namespace quda {
 
   // Need to generalise SpinorIndex
   template<typename FloatN, int N, typename Output, typename Input>
-    __global__ void copyExteriorKernel(int parity, DecompParams params, int Dir)
+    __global__ void copyExteriorKernel(Output Y, Input X, unsigned int length, DecompParams params, int parity, int Dir)
     {
       int cb_index = blockIdx.x*blockDim.x + threadIdx.x;
       int gridSize = gridDim.x*blockDim.x; 
@@ -293,9 +293,9 @@ namespace quda {
 
       ExtendCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
         Spinor<double2, double2, double2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
-      extend.apply(*getBlasStream());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
+      extend.apply(*getBlasStream());
     } else if (dst.Precision() == src.Precision() == QUDA_SINGLE_PRECISION){
 
       Spinor<float2, float2, float2, 3, 0> src_spinor(src);
@@ -303,10 +303,9 @@ namespace quda {
 
       ExtendCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
         Spinor<float2, float2, float2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
-      extend.apply(*getBlasStream());:
-
+      extend.apply(*getBlasStream());
 
     } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 
@@ -314,7 +313,7 @@ namespace quda {
       Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
       ExtendCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
         Spinor<float2, float2, float2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       extend.apply(*getBlasStream());	
 
@@ -325,7 +324,7 @@ namespace quda {
 
       ExtendCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
         Spinor<float2, float2, double2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       extend.apply(*getBlasStream());	
 
@@ -336,7 +335,7 @@ namespace quda {
 
       ExtendCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
         Spinor<float2, float2, short2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       extend.apply(*getBlasStream());	
 
@@ -346,7 +345,7 @@ namespace quda {
 
       ExtendCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
         Spinor<float2, float2, float2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       extend.apply(*getBlasStream());	
 
@@ -357,7 +356,7 @@ namespace quda {
 
       ExtendCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
         Spinor<double2, float2, short2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       extend.apply(*getBlasStream());	
 
@@ -368,7 +367,7 @@ namespace quda {
 
       ExtendCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
         Spinor<double2, double2, double2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       extend.apply(*getBlasStream());	
     }
@@ -404,7 +403,7 @@ namespace quda {
 
       CropCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
         Spinor<double2, double2, double2, 3, 0> >
-          crop(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());
 
@@ -415,9 +414,9 @@ namespace quda {
 
       CropCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
         Spinor<float2, float2, float2, 3, 0> >
-          crop(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
-      crop.apply(*getBlasStream());:
+      crop.apply(*getBlasStream());
 
     } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 
@@ -425,7 +424,7 @@ namespace quda {
       Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
       CropCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
         Spinor<float2, float2, float2, 3, 0> >
-          crop(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
@@ -436,7 +435,7 @@ namespace quda {
 
       CropCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
         Spinor<float2, float2, double2, 3, 0> >
-          crop(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
@@ -447,7 +446,7 @@ namespace quda {
 
       CropCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
         Spinor<float2, float2, short2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
@@ -457,9 +456,9 @@ namespace quda {
 
       CropCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
         Spinor<float2, float2, float2, 3, 0> >
-          crop(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
-      extend.apply(*getBlasStream());	
+      crop.apply(*getBlasStream());	
 
     } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 
@@ -468,7 +467,7 @@ namespace quda {
 
       CropCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
         Spinor<double2, float2, short2, 3, 0> >
-          crop(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
@@ -479,7 +478,7 @@ namespace quda {
 
       CropCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
         Spinor<double2, double2, double2, 3, 0> >
-          crop(dst_spinor, src_spinor, src.Volume());
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
     }

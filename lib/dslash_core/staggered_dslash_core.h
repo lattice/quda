@@ -402,7 +402,9 @@ o2_re = o2_im = 0.f;
 
 const int fatlinkStride = kparam.fatlinkStride;
 const int longlinkStride = kparam.longlinkStride;
+#if (DD_PREC == 2)
 const float fatlinkMax = kparam.fatlinkMax;
+#endif
 
 {  //direction: +X
 #if (DD_RECON < 2)

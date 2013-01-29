@@ -298,6 +298,14 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor(StoreType* spinor, float* norm, int stride) 
       : spinor(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
 
+    void set(StoreType* spinor, float* norm, int stride)
+    {
+      spinor = spinor;
+      norm = norm;
+      stride = stride;
+    }
+
+
     Spinor& operator=(const Spinor &src) {
       if (&src != this) {
 	spinor = src.spinor;
