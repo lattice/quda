@@ -47,7 +47,9 @@ namespace quda {
     double anisotropy, t_bc, coeff;
     float anisotropy_f, t_bc_f, coeff_f;
 
-
+    unsigned int fatlinkStride;
+    unsigned int longlinkStride;
+    float fatlinkMax;
 
   };
 
@@ -59,6 +61,7 @@ namespace quda {
   void initLatticeParams(KernelParams* params, const LatticeField &lat);
   void initGaugeParams(KernelParams* params, const cudaGaugeField& gauge);
   void initSpinorParams(KernelParams* params, const cudaColorSpinorField& spinor);
+  void initStaggeredParams(KernelParams* params, const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge);
 
 } // namespace
 

@@ -126,6 +126,13 @@ namespace quda {
     return;
   }
 
+  void initStaggeredParams(KernelParams* params, const cudaGaugeField& fatgauge, const cudaGaugeField& longgauge)
+  {
+    params->fatlinkStride = fatgauge.Stride();
+    params->longlinkStride = longgauge.Stride();
+    params->fatlinkMax = fatgauge.LinkMax();
+  }
+
 } // namespace quda
 
 #undef MAX

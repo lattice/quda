@@ -11,12 +11,15 @@ namespace quda {
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
     initStaggeredConstants(fatGauge, longGauge);
+    initStaggeredParams(&kernel_params, fatGauge, longGauge);
   }
 
   DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
 								fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face), hasNaik(dirac.hasNaik)
   {
     initStaggeredConstants(fatGauge, longGauge);
+
+    initStaggeredParams(&kernel_params, fatGauge, longGauge);
   }
 
   DiracStaggered::~DiracStaggered() { }
