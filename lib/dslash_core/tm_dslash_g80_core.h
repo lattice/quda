@@ -233,18 +233,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   if (sid >= param.threads) return;
 
   // Inline by hand for the moment and assume even dimensions
-  //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
-
-  X = 2*sid;
-  int aux1 = X / X1;
-  x1 = X - aux1 * X1;
-  int aux2 = aux1 / X2;
-  x2 = aux1 - aux2 * X2;
-  x4 = aux2 / X3;
-  x3 = aux2 - x4 * X3;
-  aux1 = (param.parity + x4 + x3 + x2) & 1;
-  x1 += aux1;
-  X += aux1;
+  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
 
   o00_re = 0;  o00_im = 0;
   o01_re = 0;  o01_im = 0;
