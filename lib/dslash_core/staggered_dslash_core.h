@@ -322,7 +322,6 @@ int X;
 
 if(kernel_type == INTERIOR_KERNEL){
 
-
   //data order: kparam.X4 kparam.X3 kparam.X2 kparam.X1h
   za = sid / kparam.X1h;
   x1h = sid - za*kparam.X1h;
@@ -335,7 +334,7 @@ if(kernel_type == INTERIOR_KERNEL){
   X = 2*sid + x1odd;
 
  }else if (kernel_type == EXTERIOR_KERNEL_X){
-  //data order: X1 kparam.X4 kparam.X3 kparam.X2h
+  //data order: kparam.X1 kparam.X4 kparam.X3 kparam.X2h
   za = sid / kparam.X2h;
   x2h = sid - za*kparam.X2h;
   zb = za / kparam.X3;
@@ -573,10 +572,10 @@ o2_re = o2_im = 0.f;
     int ga_idx = sid;
 #ifdef MULTI_GPU
     int space_con = (x4*kparam.X3X1+x3*kparam.X1+x1)/2;
-    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < kparam.kparam.X2m1))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= kparam.kparam.X2m1))
+    if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < kparam.X2m1))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= kparam.X2m1))
 #endif
 	  {
-	    int sp_idx_1st_nbr = ((x2==kparam.kparam.X2m1) ? X-kparam.X2X1mX1 : X+kparam.X1) >> 1;
+	    int sp_idx_1st_nbr = ((x2==kparam.X2m1) ? X-kparam.X2X1mX1 : X+kparam.X1) >> 1;
 	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 2, ga_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
@@ -585,11 +584,11 @@ o2_re = o2_im = 0.f;
 #endif	 
 #ifdef MULTI_GPU
 	    if(kernel_type == EXTERIOR_KERNEL_Y){	    
-		    if(x2 >= kparam.kparam.X2m1){
-		      nbr_idx1 = param.ghostOffset[1] + 3*Nface*kparam.ghostFace[1] +(x2-kparam.kparam.X2m1)*kparam.ghostFace[1]+ space_con;
+		    if(x2 >= kparam.X2m1){
+		      nbr_idx1 = param.ghostOffset[1] + 3*Nface*kparam.ghostFace[1] +(x2-kparam.X2m1)*kparam.ghostFace[1]+ space_con;
 		      stride1 = Nface*kparam.ghostFace[1];
 #if (DD_PREC == 2) //half precision
-		      norm_idx = param.ghostNormOffset[1] + Nface*kparam.ghostFace[1] + (x2-kparam.kparam.X2m1)*kparam.ghostFace[1]+ space_con;
+		      norm_idx = param.ghostNormOffset[1] + Nface*kparam.ghostFace[1] + (x2-kparam.X2m1)*kparam.ghostFace[1]+ space_con;
 #endif		    
 		    }      
 	    }
@@ -697,7 +696,7 @@ o2_re = o2_im = 0.f;
 	    int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
 	    if (x2 < 3){
-		    long_idx = Vh+ x2*kparam. + space_con;
+		    long_idx = Vh+ x2*kparam.X4X3X1h + space_con;
 	    }    
 #endif
 	    READ_LONG_MATRIX(LONG, LONGLINK1TEX, dir, long_idx, longlinkStride); 
@@ -744,7 +743,7 @@ o2_re = o2_im = 0.f;
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < kparam.X3m1))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= kparam.X3m1))
 #endif
     {
-	    int sp_idx_1st_nbr = ((x3==kparam.X3m1) ? X-kparam.X3X3X1mX2X1 : X+kparam.X2X1) >> 1;
+	    int sp_idx_1st_nbr = ((x3==kparam.X3m1) ? X-kparam.X3X2X1mX2X1 : X+kparam.X2X1) >> 1;
 	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 4, ga_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
@@ -821,7 +820,7 @@ o2_re = o2_im = 0.f;
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 1)) || (kernel_type == EXTERIOR_KERNEL_Z && x3 < 1))
 #endif
 	  {
-	    int sp_idx_1st_nbr = ((x3==0) ? X+kparam.X3X3X1mX2X1 : X-kparam.X2X1) >> 1;
+	    int sp_idx_1st_nbr = ((x3==0) ? X+kparam.X3X2X1mX2X1 : X-kparam.X2X1) >> 1;
 	    int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
 	    if ((x3 -1) < 0){
@@ -909,7 +908,7 @@ o2_re = o2_im = 0.f;
     if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < kparam.X4m1))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= kparam.X4m1))
 #endif
 	  {    
-	    int sp_idx_1st_nbr = ((x4==kparam.X4m1) ? X-X4X3X2X1mX3X2X1 : X+kparam.X3X2X1) >> 1;
+	    int sp_idx_1st_nbr = ((x4==kparam.X4m1) ? X-kparam.X4X3X2X1mX3X2X1 : X+kparam.X3X2X1) >> 1;
 	    READ_FAT_MATRIX(FAT, FATLINK0TEX, 6, ga_idx, fatlinkStride);
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;
@@ -984,7 +983,7 @@ o2_re = o2_im = 0.f;
     if ((kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 1)) || (kernel_type == EXTERIOR_KERNEL_T && x4 < 1))
 #endif
 	  {
-	    int sp_idx_1st_nbr = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-kparam.X3X2X1) >> 1;
+	    int sp_idx_1st_nbr = ((x4==0)    ? X+kparam.X4X3X2X1mX3X2X1 : X-kparam.X3X2X1) >> 1;
 	    int fat_idx = sp_idx_1st_nbr;    
 	    int nbr_idx1 = sp_idx_1st_nbr;
 	    int stride1 = sp_stride;

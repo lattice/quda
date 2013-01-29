@@ -34,24 +34,24 @@ namespace quda {
 
     // 3D volumes
     params->X3X2X1 = params->X3*params->X2*params->X1;
-    params->X3X2X1h = params->X3X2X1/2;
+    params->X3X2X1h = params->X3*params->X2*params->X1h;
 
     params->X4X2X1  = params->X4*params->X2*params->X1;
-    params->X4X2X1h = params->X4X2X1/2;
+    params->X4X2X1h = params->X4*params->X2*params->X1h;
 
     params->X4X3X1  = params->X4*params->X3*params->X1;
-    params->X4X3X1h = params->X4X3X1/2;
+    params->X4X3X1h = params->X4*params->X3*params->X1h;
 
     params->X4X3X2  = params->X4*params->X3*params->X2;
-    params->X4X3X2h = params->X4X3X2/2;
-    // 
+    params->X4X3X2h = params->X4*params->X3*params->X2h;
+
 
     params->X2X1_3 = 3*params->X2*params->X1;
     params->X3X2X1_3 = params->X3*params->X2X1_3; 
 
 
     params->X1m1 = params->X1 - 1;
-    params->X1m1 = params->X2 - 1;
+    params->X2m1 = params->X2 - 1;
     params->X3m1 = params->X3 - 1;
     params->X4m1 = params->X4 - 1;
 
@@ -62,7 +62,7 @@ namespace quda {
     params->X4m3 = params->X4 - 3;
 
 
-    params->X2X1m1 = params->X2X1 - params->X1;
+    params->X2X1mX1 = params->X2X1 - params->X1;
 
     params->X3X2X1mX2X1 = params->X3X2X1 - params->X2X1;
 
@@ -70,9 +70,9 @@ namespace quda {
 
     params->X4X3X2X1hmX3X2X1h = (params->X4-1)*params->X3*params->X2*params->X1h;
 
-    params->X2X1m3X1 = params->X3X2X1 - 3*params->X2X1;
+    params->X2X1m3X1 = params->X3X2X1 - 3*params->X1;
 
-    params->X3X2X1m3X2X1 = (params->X4-3)*params->X3X2X1;
+    params->X3X2X1m3X2X1 = (params->X3-3)*params->X2X1;
 
     params->X4X3X2X1hm3X3X2X1h = (params->X4-3)*params->X3*params->X2*params->X1h;
 

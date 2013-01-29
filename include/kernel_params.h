@@ -22,7 +22,7 @@ namespace quda {
     unsigned int X1m1, X2m1, X3m1, X4m1;
     unsigned int X1m3, X2m3, X3m3, X4m3;
 
-    unsigned int X2X1m1, X3X2X1mX2X1;
+    unsigned int X2X1mX1, X3X2X1mX2X1;
     unsigned int X4X3X2X1mX3X2X1;
     unsigned int X4X3X2X1hmX3X2X1h;
 
