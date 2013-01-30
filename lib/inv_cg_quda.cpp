@@ -141,6 +141,9 @@ namespace quda {
       int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
+      // force a reliable update if we are within target tolerance (experimental)
+      //if (distance_to_solution < convergence_threshold) updateX = 1;
+
       if ( !(updateR || updateX)) {
 	beta = zr / r2_old; // use the stabilized beta computation
 	//beta = r2 / r2_old;
@@ -163,7 +166,7 @@ namespace quda {
 	zeroCuda(xSloppy);
 
 	// break-out check if we have reached the limit of the precision
-	if (sqrt(r2) > r0Norm) { // reuse r0Norm for this
+	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
 	  k++;
 	  rUpdate++;

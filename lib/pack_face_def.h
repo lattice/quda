@@ -302,12 +302,18 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int &X,
   //printf("Global sid %d (%d, %d, %d, %d)\n", cb_int, x, y, z, t);
 }
 
+enum IndexType {
+  EVEN_X = 0,
+  EVEN_Y = 1,
+  EVEN_Z = 2,
+  EVEN_T = 3
+};
 
 // compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
-template <typename Int>
-static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y, Int &Z, Int &T, const int &cb_idx, const int &parity)
+template <IndexType idxType, typename Int>
+static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y, Int &Z, Int &T, 
+						       const int &cb_idx, const int &parity)
 {
-
   int &LX = X1;
   int &LY = X2;
   int &LZ = X3;
@@ -377,9 +383,7 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y,
   // as well as the cases where X, Y are odd and Z is even,
   // and X,Y,Z are all odd
 
-
-
-  if (!(LX & 1)) { // X even
+  if (idxType == EVEN_X /*!(LX & 1)*/) { // X even
     //   t = idx / XYZ;
     //   z = (idx / XY) % Z;
     //   y = (idx / X) % Y;
@@ -395,13 +399,13 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y,
     aux1 = (parity + t + z + y) & 1;
     x += aux1;
     idx += aux1;
-  } else if (!(LY & 1)) { // Y even
+  } else if (idxType == EVEN_Y /*!(LY & 1)*/) { // Y even
     t = idx / XYZ;
     z = (idx / XY) % LZ;
     idx += (parity + t + z) & 1;
     y = (idx / LX) % LY;
     x = idx % LX;
-  } else if (!(LZ & 1)) { // Z even
+  } else if (idxType == EVEN_Z /*!(LZ & 1)*/) { // Z even
     t = idx / XYZ;
     idx += (parity + t) & 1;
     z = (idx / XY) % LZ;
@@ -413,6 +417,39 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &X, Int &Y,
     z = (idx / XY) % LZ;
     y = (idx / LX) % LY;
     x = idx % LX;
+  }
+
+  X = x;
+  Y = y;
+  Z = z;
+  T = t;
+}
+
+// compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
+// This is the variant used byt the shared memory wilson dslash
+template <IndexType idxType, typename Int>
+static __device__ __forceinline__ void coordsFromIndex3D(int &idx, Int &X, Int &Y, Int &Z, Int &T, 
+							 int &cb_idx, const int &parity)
+{
+  int &LX = X1;
+  int &LY = X2;
+  int &LZ = X3;
+
+  int x, y, z, t;
+
+  if (idxType == EVEN_X) { // X even
+    int xt = blockIdx.x*blockDim.x + threadIdx.x;
+    int aux = xt+xt;
+    t = aux / LX;
+    x = aux - t*LX;
+    y = blockIdx.y*blockDim.y + threadIdx.y;
+    z = blockIdx.z*blockDim.z + threadIdx.z;
+    x += (parity + t + z + y) &1;
+    idx = ((t*LZ + z)*LY + y)*LX + x;
+    cb_idx = idx >> 1; 
+  } else {
+    // Non-even X is not (yet) supported.
+    return;
   }
 
   X = x;
