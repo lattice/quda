@@ -4,6 +4,9 @@
 #include <domain_decomposition.h>
 #include <color_spinor_field.h>
 
+#include <spinor_types.h>
+
+
 namespace quda {
 
   cudaStream_t* getBlasStream();
@@ -46,6 +49,7 @@ namespace quda {
       }
       return;
     }
+
 
   template<typename FloatN, int N, typename Output, typename Input>
     __global__ void copyInteriorKernel(Output Y, Input X, unsigned int length, 
@@ -377,7 +381,7 @@ namespace quda {
     return;
   }
 
-
+// Write a macro that implements parts of the following code
 
   void cropCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParams& params) {
     if (&src == &dst) return; // aliasing fields
@@ -398,86 +402,117 @@ namespace quda {
 
     if (dst.Precision() == src.Precision() == QUDA_DOUBLE_PRECISION) {
 
-      Spinor<double2, double2, double2, 3, 0> src_spinor(src);
-      Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION>::OutType DstType;
 
-      CropCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
-        Spinor<double2, double2, double2, 3, 0> >
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda<double2, 3, DstType, SrcType>
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());
 
     } else if (dst.Precision() == src.Precision() == QUDA_SINGLE_PRECISION){
 
-      Spinor<float2, float2, float2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
+      typedef typename SpinorType<1, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION>::OutType DstType;
 
-      CropCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-        Spinor<float2, float2, float2, 3, 0> >
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda<float2, 3, DstType, SrcType>
+          crop(dst_spinor, src_spinor, src.Volume(), params, parity);
+
+      crop.apply(*getBlasStream());
+
+    } else if (dst.Precision() == src.Precision() == QUDA_HALF_PRECISION){
+
+      typedef typename SpinorType<1, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION>::OutType DstType;
+
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda<float2, 3, DstType, SrcType>
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());
 
     } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 
-      Spinor<float2, float2, float2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
-      CropCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
-        Spinor<float2, float2, float2, 3, 0> >
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION>::OutType DstType;
+
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda<float2, 3, DstType, SrcType >
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
     } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 
-      Spinor<float2, float2, double2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
+      typedef typename SpinorType<1, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION>::OutType DstType;
 
-      CropCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-        Spinor<float2, float2, double2, 3, 0> >
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda<float2, 3, DstType, SrcType >
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
     } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 
-      Spinor<float2, float2, short2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
+      typedef typename SpinorType<1, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION>::OutType DstType;
 
-      CropCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-        Spinor<float2, float2, short2, 3, 0> >
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda<float2, 3, DstType, SrcType >
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
     } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-      Spinor<float2, float2, float2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, short2, 3, 1> dst_spinor(dst);
 
-      CropCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
-        Spinor<float2, float2, float2, 3, 0> >
+      typedef typename SpinorType<1, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION>::OutType DstType;
+
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda<float2, 3, DstType, SrcType >
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
 
     } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 
-      Spinor<double2, float2, short2, 3, 0> src_spinor(src);
-      Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
 
-      CropCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
-        Spinor<double2, float2, short2, 3, 0> >
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION>::OutType DstType;
+
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
+
+      CropCuda< double2, 3, DstType, SrcType >
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
-
     } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 
-      Spinor<double2, double2, double2, 3, 0> src_spinor(src);
-      Spinor<double2, double2, short2, 3, 1> dst_spinor(dst);
+      typedef typename SpinorType<1, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION>::InType SrcType;
+      typedef typename SpinorType<1, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION>::OutType DstType;
+    
+      SrcType src_spinor(src);
+      DstType dst_spinor(dst);
 
-      CropCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
-        Spinor<double2, double2, double2, 3, 0> >
+      CropCuda<double2, 3, DstType, SrcType >
           crop(dst_spinor, src_spinor, src.Volume(), params, parity);
 
       crop.apply(*getBlasStream());	
