@@ -26,8 +26,9 @@ namespace quda {
   size_t cudaColorSpinorField::bufferBytes = 0;
 
   int cudaColorSpinorField::initGhostFaceBuffer = 0;
-  void* cudaColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
-  void* cudaColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
+  void* cudaColorSpinorField::ghostFaceBuffer; //gpu memory
+  void* cudaColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
+  void* cudaColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   QudaPrecision cudaColorSpinorField::facePrecision; 
 
   /*cudaColorSpinorField::cudaColorSpinorField() : 
@@ -605,38 +606,41 @@ namespace quda {
     int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
     if (nSpin == 4) Nint /= 2; // spin projection for Wilson
 
-    if(this->initGhostFaceBuffer == 0 || precision > facePrecision){    
+    // only allocate if not already allocated or precision is greater then previously
+    if(initGhostFaceBuffer == 0 || precision > facePrecision){    
+
+      if (initGhostFaceBuffer) device_free(ghostFaceBuffer); 
+
+      // allocate a single contiguous buffer for the buffers
+      size_t faceBytes = 0;
       for (int i=0; i<4; i++) {
-	if(!commDimPartitioned(i)){
-	  continue;
-	}
-	size_t faceBytes = nFace*ghostFace[i]*Nint*precision;
+	if(!commDimPartitioned(i)) continue;
+	faceBytes += 2*nFace*ghostFace[i]*Nint*precision;
 	// add extra space for the norms for half precision
-	if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostFace[i]*sizeof(float);
-      
-	if (this->initGhostFaceBuffer) { // only free-ed if precision is higher than previous allocation
-	  //device_free(this->fwdGhostFaceBuffer[i]); 
-	  device_free(this->backGhostFaceBuffer[i]); this->backGhostFaceBuffer[i] = NULL;
-	  this->fwdGhostFaceBuffer[i] = NULL;
-	}
-	//this->fwdGhostFaceBuffer[i] = device_malloc(faceBytes);
-	this->backGhostFaceBuffer[i] = device_malloc(2*faceBytes);
-	fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
-      }   
-    
-      this->facePrecision = precision;
-      this->initGhostFaceBuffer = 1;
+	if (precision == QUDA_HALF_PRECISION) faceBytes += 2*nFace*ghostFace[i]*sizeof(float);
+      }
+
+      if (faceBytes > 0) {
+	ghostFaceBuffer = device_malloc(faceBytes);
+	initGhostFaceBuffer = 1;
+	facePrecision = precision;
+      }
+
     }
 
+    size_t offset = 0;
     for (int i=0; i<4; i++) {
-      if(!commDimPartitioned(i)){
-	continue;
-      }
-      size_t faceBytes = nFace*ghostFace[i]*Nint*precision;
-      // add extra space for the norms for half precision
-      if (precision == QUDA_HALF_PRECISION) faceBytes += nFace*ghostFace[i]*sizeof(float);
-      fwdGhostFaceBuffer[i] = (void*)(((char*)backGhostFaceBuffer[i]) + faceBytes);
-    }
+      if(!commDimPartitioned(i)) continue;
+      
+      backGhostFaceBuffer[i] = (void*)(((char*)ghostFaceBuffer) + offset);
+      offset += nFace*ghostFace[i]*Nint*precision;
+      if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
+      
+      fwdGhostFaceBuffer[i] = (void*)(((char*)ghostFaceBuffer) + offset);
+      offset += nFace*ghostFace[i]*Nint*precision;
+      if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
+    }   
+    
   }
 
 
@@ -644,12 +648,11 @@ namespace quda {
   {
     if (!initGhostFaceBuffer) return;
   
+    device_free(ghostFaceBuffer); 
+
     for(int i=0;i < 4; i++){
-      if(!commDimPartitioned(i)){
-	continue;
-      }
-      //device_free(fwdGhostFaceBuffer[i]); 
-      device_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+      if(!commDimPartitioned(i)) continue;
+      backGhostFaceBuffer[i] = NULL;
       fwdGhostFaceBuffer[i] = NULL;
     }
     initGhostFaceBuffer = 0;  

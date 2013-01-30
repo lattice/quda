@@ -281,8 +281,9 @@ namespace quda {
     static bool bufferInit;
     static size_t bufferBytes;
 
-    static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
-    static void* backGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
+    static void* ghostFaceBuffer; // gpu memory
+    static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static void* backGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static int initGhostFaceBuffer;
     static QudaPrecision facePrecision;
 
