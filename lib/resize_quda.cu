@@ -274,14 +274,15 @@ namespace quda {
 BORK_COMPILATION;
 #endif
 #define EXTEND_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
+if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
 typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcType; \
 typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstType; \
 SrcType src_spinor(src);                                                       \
 DstType dst_spinor(dst);                                                       \
 ExtendCuda<DataType, 3, DstType, SrcType >                                       \
   extend(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
-extend.apply(*getBlasStream());
-
+extend.apply(*getBlasStream());                                                  \
+}
 
   void extendCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParams& params) {
     if (&src == &dst) return; // aliasing fields
@@ -299,92 +300,24 @@ extend.apply(*getBlasStream());
 
     const int parity = 0; // Need to change this
 
-
-    if (dst.Precision() == src.Precision() == QUDA_DOUBLE_PRECISION) {
-
-      Spinor<double2, double2, double2, 3, 0> src_spinor(src);
-      Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
-
-      ExtendCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
-        Spinor<double2, double2, double2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());
-    } else if (dst.Precision() == src.Precision() == QUDA_SINGLE_PRECISION){
-
-      Spinor<float2, float2, float2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
-
-      ExtendCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-        Spinor<float2, float2, float2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());
-
-    } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-
-      Spinor<float2, float2, float2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
-      ExtendCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
-        Spinor<float2, float2, float2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());	
-
-    } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
-
-      Spinor<float2, float2, double2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
-
-      ExtendCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-        Spinor<float2, float2, double2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());	
-
-    } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-
-      Spinor<float2, float2, short2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
-
-      ExtendCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-        Spinor<float2, float2, short2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());	
-
-    } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-      Spinor<float2, float2, float2, 3, 0> src_spinor(src);
-      Spinor<float2, float2, short2, 3, 1> dst_spinor(dst);
-
-      ExtendCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
-        Spinor<float2, float2, float2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());	
-
-    } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-
-      Spinor<double2, float2, short2, 3, 0> src_spinor(src);
-      Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
-
-      ExtendCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
-        Spinor<double2, float2, short2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());	
-
-    } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
-
-      Spinor<double2, double2, double2, 3, 0> src_spinor(src);
-      Spinor<double2, double2, short2, 3, 1> dst_spinor(dst);
-
-      ExtendCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
-        Spinor<double2, double2, double2, 3, 0> >
-          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      extend.apply(*getBlasStream());	
-    }
+    // I should really use a function to do this
+    EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
+    else
+    EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
+    else 
+    EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
+    else
+    EXTEND_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
+    else
+    EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
+    else
+    EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+    else
+    EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+    else
+    EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+    else
+    EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
 
     return;
   }
@@ -394,13 +327,15 @@ extend.apply(*getBlasStream());
 BORK_COMPILATION;
 #endif
 #define CROP_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
+if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
 typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcType; \
 typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstType; \
 SrcType src_spinor(src);                                                       \
 DstType dst_spinor(dst);                                                       \
 CropCuda<DataType, 3, DstType, SrcType >                                       \
   crop(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
-crop.apply(*getBlasStream());
+crop.apply(*getBlasStream());                                                  \
+} 
 
 
   void cropCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParams& params) {
@@ -419,43 +354,24 @@ crop.apply(*getBlasStream());
 
     const int parity = 0; // Need to change this
 
-
-    if (dst.Precision() == src.Precision() == QUDA_DOUBLE_PRECISION) {
-
-      CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION);  
-
-    } else if (dst.Precision() == src.Precision() == QUDA_SINGLE_PRECISION){
-      
-      CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION);
-
-    } else if (dst.Precision() == src.Precision() == QUDA_HALF_PRECISION){
+    CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
+    else
+    CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
+    else
+    CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
+    else
+    CROP_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
+    else
+    CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
+    else
+    CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+    else
+    CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+    else
+    CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+    else
+    CROP_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
     
-      CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION);
-
-    } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-
-      CROP_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION);
-
-    } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
-
-      CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION);
-
-    } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-
-      CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION);
-
-    } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-
-      CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION);
-
-    } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-
-      CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION);
-
-    } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
-
-      CROP_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION);
-    }
     return;
   } // cropCuda
 #undef CROP_CORE
