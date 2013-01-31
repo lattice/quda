@@ -424,8 +424,7 @@ namespace quda {
 
           // now copy the data from the ghost zone on the smaller field 
           // to the ghost zone in the larger field
-          //SrcSpinorType src_spinor(src.Ghost()[i], src.GhostNorm()[i], src.GhostFace()[i]); 
-          SrcSpinorType src_spinor(src); // Temporary hack to get the code to compile 
+          SrcSpinorType src_spinor(src.Ghost(i), src.GhostNorm(i), src.GhostFace()[i]); 
           DstSpinorType dst_spinor(dst);
 
           ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
@@ -435,7 +434,6 @@ namespace quda {
 
         } // i = 0,1,2,3
       } // completeSum < commDimTotal
-
 
       return;
     }

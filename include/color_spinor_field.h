@@ -176,11 +176,17 @@ namespace quda {
     int nFace;
 
     QudaTwistFlavorType twistFlavor;
-  
+
+    void *v; // the field elements
+    void *norm; // the normalization field
+
     int real_length; // physical length only
     int length; // length including pads, but not ghost zone - used for BLAS
 
     // multi-GPU parameters
+    void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
+    void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
+
     int ghostFace[QUDA_MAX_DIM];// the size of each face
     int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
     int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
@@ -208,6 +214,7 @@ namespace quda {
     void reset(const ColorSpinorParam &);
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
+    void clearGhostPointers();
 
   public:
     //ColorSpinorField();
@@ -246,6 +253,10 @@ namespace quda {
     const int *GhostFace() const { return ghostFace; }  
     int GhostOffset(const int i) const { return ghostOffset[i]; }  
     int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
+    void* Ghost(const int i);
+    const void* Ghost(const int i) const;
+    void* GhostNorm(const int i);
+    const void* GhostNorm(const int i) const;
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
@@ -257,8 +268,8 @@ namespace quda {
     friend class cpuColorSpinorField;
 
   private:
-    void *v; // the field elements
-    void *norm; // the normalization field
+   // void *v; // the field elements
+   // void *norm; // the normalization field
     bool alloc; // whether we allocated memory
     bool init;
 
@@ -367,8 +378,8 @@ namespace quda {
     static int initGhostFaceBuffer;
 
   private:
-    void *v; // the field elements
-    void *norm; // the normalization field
+  //  void *v; // the field elements
+  //  void *norm; // the normalization field
     bool init;
     bool reference; // whether the field is a reference or not
 
