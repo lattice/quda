@@ -659,16 +659,10 @@ namespace quda {
   }
 
   // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhost(const int dim, const QudaParity parity, const int dagger, cudaStream_t *stream) 
+  void cudaColorSpinorField::packGhost(const QudaParity parity, const int dagger, cudaStream_t *stream) 
   {
 #ifdef MULTI_GPU
-    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
-      void* gpu_buf = this->backGhostFaceBuffer[dim];
-      if(this->nDim == 5)//!For DW fermions
-	packFaceDW(gpu_buf, *this, dim, dagger, parity, *stream);
-      else	
-	packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
-    }
+    packFace(ghostFaceBuffer, *this, dagger, parity, *stream); 
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif

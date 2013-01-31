@@ -1142,31 +1142,20 @@ namespace quda {
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
-    CUDA_EVENT_RECORD(dslashStart, 0);
     gettimeofday(&dslashStart_h, NULL);
 
 #ifdef MULTI_GPU
-    for(int i = 3; i >=0; i--){
-      if (!dslashParam.commDim[i]) continue;
-
-      // Record the start of the packing
-      CUDA_EVENT_RECORD(packStart[2*i], streams[Nstream-1]);
-
-      // Initialize pack from source spinor
-      face->pack(*inSpinor, 1-parity, dagger, i, streams);
+    // Initialize pack from source spinor
+    face->pack(*inSpinor, 1-parity, dagger, streams);
     
-      // Record the end of the packing
-      cudaEventRecord(packEnd[2*i], streams[Nstream-1]);
-    }
+    // Record the end of the packing
+    cudaEventRecord(packEnd[0], streams[Nstream-1]);
 
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-	cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i], 0);
-
-	// Record the start of the gathering
-	CUDA_EVENT_RECORD(gatherStart[2*i+dir], streams[2*i+dir]);
+	if (i!=3 || kernelPackT) cudaStreamWaitEvent(streams[2*i+dir], packEnd[0], 0);
 
 	// Initialize host transfer from source spinor
 	face->gather(*inSpinor, dagger, 2*i+dir);
@@ -1177,9 +1166,7 @@ namespace quda {
     }
 #endif
 
-    CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
     dslash.apply(streams[Nstream-1]);
-    CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
 
 #ifdef MULTI_GPU
     initDslashCommsPattern();
@@ -1209,9 +1196,6 @@ namespace quda {
 	      completeSum++;
 	      gettimeofday(&commsEnd[2*i+dir], NULL);
 	    
-	      // Record the end of the scattering
-	      CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
-	    
 	      // Scatter into the end zone
 	      face->scatter(*inSpinor, dagger, 2*i+dir);	    
 	    }
@@ -1230,9 +1214,7 @@ namespace quda {
 	  // wait for scattering to finish and then launch dslash
 	  cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
 	  
-	  CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
 	  dslash.apply(streams[Nstream-1]); // all faces use this stream
-	  CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);	  
 
 	  dslashCompleted[2*i] = 1;
 	}
@@ -1241,9 +1223,7 @@ namespace quda {
     
     }
 
-    CUDA_EVENT_RECORD(dslashEnd, 0);
-    DSLASH_TIME_PROFILE();
-
+    //DSLASH_TIME_PROFILE();
 #endif // MULTI_GPU
   }
 
