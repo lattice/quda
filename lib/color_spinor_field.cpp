@@ -282,25 +282,25 @@ namespace quda {
   }
 
 
-  void* ColorSpinorField::Ghost() {
+  void* ColorSpinorField::Ghost(const int i) {
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghost;
+    return ghost[i];
   }
   
-  const void* ColorSpinorField::Ghost() const {
+  const void* ColorSpinorField::Ghost(const int i) const {
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghost;
+    return ghost[i];
   }
 
 
-  void* ColorSpinorField::GhostNorm(){
+  void* ColorSpinorField::GhostNorm(const int i){
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghostNorm;
+    return ghostNorm[i];
   }
 
-  const void* ColorSpinorField::GhostNorm() const{
+  const void* ColorSpinorField::GhostNorm(const int i) const{
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghostNorm;
+    return ghostNorm[i];
   }
 
   double norm2(const ColorSpinorField &a) {

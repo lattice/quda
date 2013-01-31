@@ -246,10 +246,10 @@ namespace quda {
     const int *GhostFace() const { return ghostFace; }  
     int GhostOffset(const int i) const { return ghostOffset[i]; }  
     int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
-    void* Ghost();
-    const void* Ghost() const;
-    void* GhostNorm();
-    const void* GhostNorm() const;
+    void* Ghost(const int i);
+    const void* Ghost(const int i) const;
+    void* GhostNorm(const int i);
+    const void* GhostNorm(const int i) const;
    
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
