@@ -6,11 +6,13 @@
 
 #include <spinor_types.h>
 
+// streams is defined in interface_quda.cpp
 
 namespace quda {
 
-  cudaStream_t* getBlasStream();
-
+  FaceBuffer* face; // need to set this. I can u
+  // I need to use setFace to set this. 
+  // Factor out of dslash_quda.cu
 #include <texture.h>  
 
   // code for extending and cropping cudaColorSpinorField
@@ -228,12 +230,13 @@ namespace quda {
         const int length;
         DecompParams params;
         const int parity;
+        const int dir; // if copying from border
 
         int sharedBytesPerThread() const { return 0; }
 
 
       public:
-        ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity) {;}
+        ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity), dir(dir) {;}
         virtual ~ExtendCuda();
 
         void apply(const cudaStream_t &stream){
@@ -242,7 +245,12 @@ namespace quda {
 
           dim3 blockDim(32,1,1); // warp size on GK110
           dim3 gridDix(128,1,1); // random choice - change this
-          copyInteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity); 
+
+          if(dir<0){
+            copyInteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity); 
+          }else if(dir>=0 && dir<4){
+            copyExteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity, dir); 
+          }
         }
     };
 
@@ -255,6 +263,7 @@ namespace quda {
         const int length;
         DecompParams params;
         int parity; // parity of the destination field
+
 
         int sharedBytesPerThread() const { return 0; }
       public:
@@ -271,18 +280,167 @@ namespace quda {
 
 
 #ifdef EXTEND_CORE
-BORK_COMPILATION;
+  BORK_COMPILATION;
 #endif
 #define EXTEND_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
-if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
-typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcType; \
-typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstType; \
-SrcType src_spinor(src);                                                       \
-DstType dst_spinor(dst);                                                       \
-ExtendCuda<DataType, 3, DstType, SrcType >                                       \
-  extend(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
-extend.apply(*getBlasStream());                                                  \
-}
+  if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
+    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcSpinorType; \
+    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstSpinorType; \
+    SrcSpinorType src_spinor(src);                                                       \
+    DstSpinorType dst_spinor(dst);                                                       \
+    ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType >                                       \
+    extend(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
+    extend.apply(streams[Nstream-1]);                                                  \
+  }
+
+
+
+
+  struct CommParam {
+    struct threads; // the desired number of active threads
+    int parity; // even or odd
+    int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+    // a given dimension
+  };
+
+  static CommParam commParam;
+
+  int gatherCompleted[Nstream]; // transfer of ghost data from device to host
+  int previousDir[Nstream];
+  int commsCompleted[Nstream];
+  int extendCompleted[Nstream];
+  int commDimTotal;
+
+
+  static cudaEvent_t packEnd[Nstream];
+  static cudaEvent_t gatherStart[Nstream];
+  static cudaEvent_t gatherEnd[Nstream];
+  static cudaEvent_t scatterStart[Nstream];
+  static cudaEvent_t scatterEnd[Nstream];
+
+
+
+  static void initCommsPattern() {
+
+    for(int i=0; i<Nstream-1; i++){
+      gatherCompleted[i] = 0;
+      commsCompleted[i] = 0;
+    }
+    gatherCompleted[Nstream-1] = 1; // nothing required there
+    commsCompleted[Nstream-1] = 1; 
+
+    // We need to know which was the previous direction in which 
+    // communication was issued, since we only query a given event /
+    // comms call after the previous one has successfully 
+    // completed
+    for(int i=3; i>=0; --i){
+      if(commParam.commDim[i]){
+        int prev = Nstream-1;
+        for(int j=3; j>i; --j) if(commParam.commDim[j]) prev = 2*j;
+        previousDir[2*i + 1] = prev;
+        previousDir[2*i + 0] = 2*i + 1;
+      }
+    }
+
+    // this tells us how many events / comms occurances there are in total.
+    // Used for exiting the while loop.
+    commDimTotal = 0;
+    for (int i=3; i>=0; --i) commDimTotal += commParam.commDim[i];
+    commDimTotal *= 4; // 2 from pipe length, 2 from direction
+    return;
+  }
+
+
+  template<class DataType, class DstSpinorType, class SrcSpinorType>
+    static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParams& params, int parity)
+    {
+      commParam.parity = parity;
+#ifdef MULTI_GPU
+      for(int i=3; i >= 0; i--){
+        if(!commParam.commDim[i]) continue;
+
+        // Initialise pack from source spinor on the device
+        face->pack(src, parity, 0, i, streams); // pack in stream[Nstream-1]
+        // Record the end of the packing 
+        cudaEventRecord(packEnd[2*i], streams[Nstream-1]);
+      }
+
+      for(int i=3; i >= 0; i--){
+        if(!commParam.commDim[i]) continue;
+
+        for(int dir=1; dir >= 0; dir--){
+          cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i+dir], 0);
+
+          // Initialise transfer of packed ghost data from device to host
+          face->gather(src, 0, 2*i+dir); // what does dagger do, and should I be concerned
+
+          // Record the end of the gathering 
+          cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]);
+        } // dir = 0,1
+      } // i = 0,1,2,3
+
+#endif  // MULTI_GPU  
+
+      SrcSpinorType src_spinor(src);  
+      DstSpinorType dst_spinor(dst);
+
+      ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
+        extend(dst_spinor, src_spinor, src.Volume(), params, parity);
+      extend.apply(streams[Nstream-1]); // copy the interior region. 
+
+      initCommsPattern();
+
+      int completeSum = 0;
+      while(completeSum < commDimTotal) {
+        for(int i=3; i >= 0; i--){
+          if(!commParam.commDim[i]) continue;
+
+          for(int dir=1; dir >= 0; dir--){
+
+            // Query if gather (transfer of ghost data to host) has completed
+            if(!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]){
+
+              if(cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])){
+                gatherCompleted[2*i+dir] = 1;
+                completeSum++;
+                face->commsStart(2*i+dir); // start communication
+              }
+            } // if not gather completed
+
+
+            // Query if comms has finished 
+            if(!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] && 
+                gatherCompleted[2*i+dir]){
+
+              if(face->commsQuery(2*i+dir)){     
+                commsCompleted[2*i+dir] = 1;
+                completeSum++;
+
+                // copy data back to the ghost zones on the device
+                face->scatter(src, 0, 2*i+dir);
+              }
+            } // if comms not completed
+          } // dir = 0,1
+
+          // now copy the data from the ghost zone on the smaller field 
+          // to the ghost zone in the larger field
+          //SrcSpinorType src_spinor(src.Ghost()[i], src.GhostNorm()[i], src.GhostFace()[i]); 
+          SrcSpinorType src_spinor(src); // Temporary hack to get the code to compile 
+          DstSpinorType dst_spinor(dst);
+
+          ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
+            extend(dst_spinor, src_spinor, src.GhostFace()[i], params, parity, i);
+          extend.apply();
+
+
+        } // i = 0,1,2,3
+      } // completeSum < commDimTotal
+
+
+      return;
+    }
+
+
 
   void extendCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParams& params) {
     if (&src == &dst) return; // aliasing fields
@@ -303,39 +461,44 @@ extend.apply(*getBlasStream());                                                 
     // I should really use a function to do this
     EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
     else
-    EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
+      EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
     else 
-    EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
+      EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
     else
-    EXTEND_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
+      EXTEND_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
     else
-    EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
-    else
-    EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
-    else
-    EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
-    else
-    EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
-    else
-    EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
+      EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
+        else
+          EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+            else
+              EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+                else
+                  EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+                    else
+                      EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
 
-    return;
+                        return;
   }
+
+
+  //  template<DataType, DstSpinorType, SrcSpinorType>
+  //  void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, DiracParam& param)
+
 #undef EXTEND_CORE
 
 #ifdef CROP_CORE
-BORK_COMPILATION;
+  BORK_COMPILATION;
 #endif
 #define CROP_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
-if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
-typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcType; \
-typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstType; \
-SrcType src_spinor(src);                                                       \
-DstType dst_spinor(dst);                                                       \
-CropCuda<DataType, 3, DstType, SrcType >                                       \
-  crop(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
-crop.apply(*getBlasStream());                                                  \
-} 
+  if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
+    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcSpinorType; \
+    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstSpinorType; \
+    SrcSpinorType src_spinor(src);                                                       \
+    DstSpinorType dst_spinor(dst);                                                       \
+    CropCuda<DataType, 3, DstSpinorType, SrcSpinorType >                                       \
+    crop(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
+    crop.apply(streams[Nstream-1]);                                                  \
+  } 
 
 
   void cropCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParams& params) {
@@ -356,23 +519,23 @@ crop.apply(*getBlasStream());                                                  \
 
     CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
     else
-    CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
+      CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
     else
-    CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
+      CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
     else
-    CROP_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
+      CROP_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
     else
-    CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
-    else
-    CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
-    else
-    CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
-    else
-    CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
-    else
-    CROP_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
-    
-    return;
+      CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
+        else
+          CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+            else
+              CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+                else
+                  CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+                    else
+                      CROP_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION);
+
+                    return;
   } // cropCuda
 #undef CROP_CORE
 
