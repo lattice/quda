@@ -126,6 +126,21 @@ namespace quda {
     printfQuda("length = %d\n", length);
     printfQuda("ghost length = %d\n", ghost_length);
     printfQuda("Call to createGhostZone() complete\n");
+
+
+    // initialize the ghost pointers 
+    if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      for(int i=0; i<dims; ++i){
+        if(commDimPartitioned(i)){
+          ghost[i] = (char*)v + (length*precision + nColor*nSpin*2*ghostOffset[i])*precision;
+          if(precision == QUDA_HALF_PRECISION)
+            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
+        }
+      }
+    }
+
+
+
   }
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nface, QudaTwistFlavorType Twistflavor, 
@@ -297,7 +312,7 @@ namespace quda {
 
 
 
- void* ColorSpinorField::Ghost(const int i) {
+  void* ColorSpinorField::Ghost(const int i) {
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
     return ghost;
   }
