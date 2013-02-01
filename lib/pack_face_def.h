@@ -1,9 +1,8 @@
 // The following indexing routines work for arbitrary (including odd) lattice dimensions.
 // compute an index into the local volume from an index into the face (used by the face packing routines)
 
-template <int nLayers>
-static inline __device__ int indexFromFaceIndex(int face_idx, const int dim, const int &face_volume,
-						const int &face_num, const int &parity)
+template <int dim, int nLayers, int face_num>
+static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_volume, const int &parity)
 {
   // dimensions of the face (FIXME: optimize using constant cache)
 
@@ -681,8 +680,8 @@ static inline __device__ void coordsFromDWFaceIndex(int &cb_idx, Int &X, Int &Y,
 template <typename FloatN>
 struct PackParam {
   
-  FloatN *out;
-  float *outNorm;
+  FloatN *out[2*QUDA_MAX_DIM];
+  float *outNorm[2*QUDA_MAX_DIM];
 
   FloatN *in;
   float *inNorm;
@@ -690,13 +689,8 @@ struct PackParam {
   int threads; // total number of threads
 
   // offsets which determine thread mapping to dimension
-  int threadDimMap[QUDA_MAX_DIM];
-
-  int faceBytes[QUDA_MAX_DIM];
-
-  // offsets which determine thread mapping to output
-  int outputOffset[QUDA_MAX_DIM];
-  int outputNormOffset[QUDA_MAX_DIM];
+  int threadDimMapLower[QUDA_MAX_DIM]; // lowest thread which maps to dim
+  int threadDimMapUpper[QUDA_MAX_DIM]; // greatest thread + 1 which maps to dim
 
   int parity;
 #ifdef USE_TEXTURE_OBJECTS
@@ -725,11 +719,11 @@ struct PackParam {
 #endif
 #define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
-template <int dagger>
+template <int dim, int dagger, int face_num>
 static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, const double2 *in, 
-						 const float *inNorm, const int dim, const int &idx, 
+						 const float *inNorm, const int &idx, 
 						 const int &face_idx, const int &face_volume, 
-						 const int &face_num, PackParam<double2> &param)
+						 PackParam<double2> &param)
 {
 #if (__COMPUTE_CAPABILITY__ >= 130)
     if (dagger) {
@@ -764,10 +758,10 @@ static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, c
 #endif
 #endif
 #define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
-template <int dagger>
+template <int dim, int dagger, int face_num>
 static inline __device__ void packFaceWilsonCore(float4 *out, float *outNorm, const float4 *in, const float *inNorm,
-						 const int dim, const int &idx, const int &face_idx, 
-						 const int &face_volume, const int &face_num, 
+						 const int &idx, const int &face_idx, 
+						 const int &face_volume, 
 						 const PackParam<float4> &param)
 {
     if (dagger) {
@@ -800,10 +794,10 @@ static inline __device__ void packFaceWilsonCore(float4 *out, float *outNorm, co
 #endif
 #endif
 #define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_SHORT4
-template <int dagger>
+template <int dim, int dagger, int face_num>
 static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, const short4 *in, const float *inNorm,
-						 const int dim, const int &idx, const int &face_idx, 
-						 const int &face_volume, const int &face_num, 
+						 const int &idx, const int &face_idx, 
+						 const int &face_volume, 
 						 const PackParam<short4> &param)
 {
     if (dagger) {
@@ -822,17 +816,18 @@ static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, co
  * Determines which face a given thread is computing.  Also rescale
  * face_idx so that is relative to a given dimension.
  */
-__device__ int dimFromFaceIndex (int &face_idx, const int threadDimMap[QUDA_MAX_DIM]) {
-  if (face_idx < threadDimMap[0]) {
+template <typename Param>
+__device__ inline int dimFromFaceIndex (int &face_idx, const Param param) {
+  if (face_idx < param.threadDimMapUpper[0]) {
     return 0;
-  } else if (face_idx < threadDimMap[1]) {
-    face_idx -= threadDimMap[0];
+  } else if (face_idx < param.threadDimMapUpper[1]) {
+    face_idx -= param.threadDimMapLower[1];
     return 1;
-  } else if (face_idx < threadDimMap[2]) {
-    face_idx -= threadDimMap[1];
+  } else if (face_idx < param.threadDimMapUpper[2]) {
+    face_idx -= param.threadDimMapLower[2];
     return 2;
   } else { // this is only called if we use T kernel packing 
-    face_idx -= threadDimMap[2];
+    face_idx -= param.threadDimMapLower[3];
     return 3;
   }
 }
@@ -846,23 +841,57 @@ __global__ void packFaceWilsonKernel(PackParam<FloatN> param)
   if (face_idx >= param.threads) return;
 
   // determine which dimension we are packing
-  const int dim = dimFromFaceIndex(face_idx, param.threadDimMap);
+  const int dim = dimFromFaceIndex(face_idx, param);
 
-  // face_num determines which end of the lattice we are packing: 0 = beginning, 1 = end
+  // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
   const int face_num = (face_idx >= nFace*ghostFace[dim]) ? 1 : 0;
   face_idx -= face_num*nFace*ghostFace[dim];
 
+  // compute where the output is located
   // compute an index into the local volume from the index into the face
-  const int idx = indexFromFaceIndex<nFace>(face_idx, dim, ghostFace[dim], face_num, param.parity);
-
-  FloatN *out = 
-    (FloatN*)((char*)param.out + param.outputOffset[dim] + face_num*param.faceBytes[dim]);
-  float* outNorm = 
-    (float*)((char*)param.out + param.outputNormOffset[dim] + face_num*param.faceBytes[dim]);
-
   // read spinor, spin-project, and write half spinor to face
-  packFaceWilsonCore<dagger>(out, outNorm, param.in, param.inNorm, dim,
-			     idx, face_idx, ghostFace[dim], face_num, param);
+  if (dim == 0) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndex<0,nFace,0>(face_idx,ghostFace[0],param.parity);
+      packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
+				    param.inNorm,idx, face_idx, ghostFace[0], param);
+    } else {
+      const int idx = indexFromFaceIndex<0,nFace,1>(face_idx,ghostFace[0],param.parity);
+      packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
+					    param.inNorm,idx, face_idx, ghostFace[0], param);
+    }
+  } else if (dim == 1) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndex<1,nFace,0>(face_idx,ghostFace[1],param.parity);
+      packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
+				    param.inNorm,idx, face_idx, ghostFace[1], param);
+    } else {
+      const int idx = indexFromFaceIndex<1,nFace,1>(face_idx,ghostFace[1],param.parity);
+      packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
+				    param.inNorm,idx, face_idx, ghostFace[1], param);
+    }
+  } else if (dim == 2) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndex<2,nFace,0>(face_idx,ghostFace[2],param.parity);
+      packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
+				      param.inNorm,idx, face_idx, ghostFace[2], param);
+    } else {
+      const int idx = indexFromFaceIndex<2,nFace,1>(face_idx,ghostFace[2],param.parity);
+      packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
+				      param.inNorm,idx, face_idx, ghostFace[2], param);
+    }
+  } else {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndex<3,nFace,0>(face_idx,ghostFace[3],param.parity);
+      packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
+				      param.inNorm,idx, face_idx, ghostFace[3], param);
+    } else {
+      const int idx = indexFromFaceIndex<3,nFace,1>(face_idx,ghostFace[3],param.parity);
+      packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
+				      param.inNorm,idx, face_idx, ghostFace[3], param);
+    }
+  }
+
 }
 
 #endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
@@ -896,7 +925,6 @@ class PackFace : public Tunable {
   // prepare the param struct with kernel arguments
   PackParam<FloatN> prepareParam() {
     PackParam<FloatN> param;
-    param.out = faces;
     param.in = (FloatN*)in->V();
     param.inNorm = (float*)in->Norm();
     param.parity = parity;
@@ -906,13 +934,35 @@ class PackFace : public Tunable {
 #endif
 
     param.threads = threads();
+    int prev = -1; // previous dimension that was partitioned
     for (int i=0; i<4; i++) {
+      param.threadDimMapLower[i] = 0;
+      param.threadDimMapUpper[i] = 0;
       if (!dslashParam.commDim[i]) continue;
-      param.threadDimMap[i] = (i>0 ? param.threadDimMap[i-1] : 0) + 2*nFace*in->GhostFace()[i];
-      param.faceBytes[i] = nFace*outputPerSite()*in->GhostFace()[i]*sizeof(faces->x);
-      if (sizeof(FloatN)==sizeof(short4)) param.faceBytes[i] += nFace*in->GhostFace()[i]*sizeof(float);
-      param.outputOffset[i] = (i>0 ? outputPerSite()*param.threadDimMap[i-1] : 0)*sizeof(faces->x);
-      param.outputNormOffset[i] = param.outputOffset[i] + nFace*outputPerSite()*in->GhostFace()[i]*sizeof(faces->x);
+      param.threadDimMapLower[i] = (prev>=0 ? param.threadDimMapUpper[prev] : 0);
+      param.threadDimMapUpper[i] = param.threadDimMapLower[i] + 2*nFace*in->GhostFace()[i];
+
+      size_t faceBytes = nFace*outputPerSite()*in->GhostFace()[i]*sizeof(faces->x);
+      if (sizeof(FloatN)==sizeof(short4)) faceBytes += nFace*in->GhostFace()[i]*sizeof(float);
+
+      if (typeid(FloatN)== typeid(short4)) {
+	param.out[2*i] = (FloatN*)((char*)faces + 
+			 (outputPerSite()*sizeof(faces->x) + sizeof(float))*param.threadDimMapLower[i]);
+	param.outNorm[2*i] = (float*)((char*)param.out[2*i] + 
+				      nFace*outputPerSite()*in->GhostFace()[i]*sizeof(faces->x));
+      } else {
+	param.out[2*i] = (FloatN*)((char*)faces+outputPerSite()*sizeof(faces->x)*param.threadDimMapLower[i]);
+      }
+
+      param.out[2*i+1] = (FloatN*)((char*)param.out[2*i] + faceBytes);
+      param.outNorm[2*i+1] = (float*)((char*)param.outNorm[2*i] + faceBytes);
+
+      prev=i;
+
+      /*      printf("%d: map=%d %d offset=%d %d normOffset=%d %d bytes=%d\n", 
+	     i,param.threadDimMapLower[i],  param.threadDimMapUpper[i], 
+      	     param.outputOffset[2*i], param.outputOffset[2*i+1], 
+	     param.outputNormOffset[2*i], param.outputNormOffset[2*i+1], faceBytes);*/
     }
     return param;
   }
@@ -983,7 +1033,7 @@ class PackFaceWilson : public PackFace<FloatN> {
   virtual ~PackFaceWilson() { }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, dslashTuning, QUDA_VERBOSE);
 
 #ifdef GPU_WILSON_DIRAC
     PackParam<FloatN> param = this->prepareParam();
@@ -996,10 +1046,10 @@ class PackFaceWilson : public PackFace<FloatN> {
     errorQuda("Wilson face packing kernel is not built");
 #endif  
   }
-
+    
   long long flops() const { return outputPerSite()*this->threads(); }
 };
-
+  
 void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 
 		    const int parity, const cudaStream_t &stream) {
 
@@ -1174,7 +1224,7 @@ void packFaceAsqtad(void *ghost_buf, cudaColorSpinorField &in, const int dagger,
   }  
 
 }
-
+  
 #ifdef GPU_DOMAIN_WALL_DIRAC
 template <int dim, int dagger, typename FloatN>
 __global__ void packFaceDWKernel(PackParam<FloatN> param)
@@ -1263,9 +1313,16 @@ void packFaceDW(void *ghost_buf, cudaColorSpinorField &in, const int dagger,
     break;
   }  
 }
-
+  
 void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, const cudaStream_t &stream)
 {
+  int nDimPack = 0;
+  for (int dim=0; dim<4; dim++) {
+    if(!commDimPartitioned(dim)) continue;
+    if (dim != 3 || getKernelPackT()) nDimPack++;
+  }
+  if (!nDimPack) return; // if zero then we have nothing to pack 
+
   // Need to update this logic for other multi-src dslash packing
   if (in.Nspin() == 1) {
     packFaceAsqtad(ghost_buf, in, dagger, parity, stream);
@@ -1278,3 +1335,4 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const
 
 
 #endif // MULTI_GPU
+  

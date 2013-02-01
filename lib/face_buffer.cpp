@@ -179,16 +179,8 @@ void FaceBuffer::flushPinnedCache()
 
 void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, cudaStream_t *stream_p)
 {
-  int nDimPack = 0;
-  for (int dim=0; dim<4; dim++) {
-    if(!commDimPartitioned(dim)) continue;
-    if (dim != 3 || getKernelPackT()) nDimPack++;
-  }
-  if (!nDimPack) return; // if zero then we have nothing to pack 
-
   in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated  
   stream = stream_p;
-
   in.packGhost((QudaParity)parity, dagger, &stream[Nstream-1]);
 }
 
