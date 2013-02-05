@@ -12,7 +12,7 @@ TESTS = su3_test blas_test pack_test $(DIRAC_TEST)			\
 	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)	\
 	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
 	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)	\
-	additive_schwarz_test
+	domain_decomposition_test
 
 all: $(TESTS)
 
@@ -55,7 +55,7 @@ hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force
 hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-additive_schwarz_test: additive_schwarz.o  $(QUDA)
+domain_decomposition_test: domain_decomposition_test.o debug_utilities.o  $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS) 
 
 
@@ -63,7 +63,7 @@ clean:
 	-rm -f *.o dslash_test invert_test staggered_dslash_test	\
 	staggered_invert_test su3_test pack_test blas_test llfat_test	\
 	gauge_force_test fermion_force_test hisq_paths_force_test	\
-	hisq_unitarize_force_test unitarize_link_test additive_schwarz_test
+	hisq_unitarize_force_test unitarize_link_test domain_decomposition_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

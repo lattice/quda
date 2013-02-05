@@ -5,7 +5,7 @@
 #include <quda_internal.h>
 #include <cuda.h>
 #include <color_spinor_field.h>
-
+#include <cassert>
 
 using namespace std;
 using namespace quda;
@@ -97,14 +97,14 @@ void* getFieldData(const cudaColorSpinorField& field)
   }
   const unsigned int real_length = field.RealLength();
   const QudaPrecision precision = field.Precision();
-  const QudaSiteSubset subset = field.Subset();
+  const QudaSiteSubset subset = field.SiteSubset();
   const unsigned int pad = field.Pad();
   const unsigned int stride = field.Stride();
 
   // Throw an exception is memory isn't properly allocated
-  try {
+//  try {
     void* host_field = new char[real_length*precision];
-  }
+//  }
 
   // Now copy the field
   // Need to refactor so that this is done in another function
@@ -223,8 +223,10 @@ bool resizeTest(const cudaColorSpinorField& field)
 }
 
   */
+/*
 int main(int argc, char* argv[])
 {
 
   return EXIT_SUCCESS;
 }
+*/
