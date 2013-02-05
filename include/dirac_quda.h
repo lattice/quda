@@ -35,13 +35,13 @@ namespace quda {
 
   
     double mu; // used by twisted mass only
-    bool hasNaik; // used by stagggered only
 
 
     cudaColorSpinorField *tmp1;
     cudaColorSpinorField *tmp2; // used by Wilson-like kernels only
 
     QudaVerbosity verbose;
+    bool hasNaik; // used by stagggered only
 
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 

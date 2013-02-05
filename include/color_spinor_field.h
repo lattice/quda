@@ -55,7 +55,7 @@ namespace quda {
   
     // used to create cpu params
   ColorSpinorParam(void *V, QudaFieldLocation location, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
-    : nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nFace(inv_param.nface), nDim(4), 
+    : nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), nFace(inv_param.nface),
       pad(0), twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
       create(QUDA_REFERENCE_FIELD_CREATE), v(V), verbose(inv_param.verbosity)
@@ -103,8 +103,8 @@ namespace quda {
     // used to create cuda param from a cpu param
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
     : nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), 
-		    nFace(cpuParam.nFace),
-      nDim(cpuParam.nDim), precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
+      nDim(cpuParam.nDim), nFace(cpuParam.nFace),
+      precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
       twistFlavor(cpuParam.twistFlavor), siteSubset(cpuParam.siteSubset), 
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 

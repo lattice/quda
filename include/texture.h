@@ -299,6 +299,10 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       : spinor(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
 
 
+    Spinor(void* spinor, float* norm, int stride)
+      : spinor(static_cast<StoreType*>(spinor)), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
+
+
     void set(StoreType* spinor, float* norm, int stride)
     {
       spinor = spinor;

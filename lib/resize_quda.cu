@@ -236,7 +236,10 @@ namespace quda {
 
 
       public:
-        ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity), dir(dir) {;}
+        ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity), dir(-1) {}
+
+        ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity, const int dir) :
+        X(X), Y(Y), length(length), params(params), parity(parity), dir(dir) {}
         virtual ~ExtendCuda();
 
         void apply(const cudaStream_t &stream){
@@ -250,6 +253,8 @@ namespace quda {
             copyInteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity); 
           }else if(dir>=0 && dir<4){
             copyExteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity, dir); 
+          }else{
+            errorQuda("dir %d is unrecognized");
           }
         }
     };
@@ -424,12 +429,16 @@ namespace quda {
 
           // now copy the data from the ghost zone on the smaller field 
           // to the ghost zone in the larger field
-          SrcSpinorType src_spinor(src.Ghost(i), src.GhostNorm(i), src.GhostFace()[i]); 
+          // Call the constructor Spinor(void* spinor, float* norm, int stride)
+          SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
           DstSpinorType dst_spinor(dst);
 
           ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
             extend(dst_spinor, src_spinor, src.GhostFace()[i], params, parity, i);
-          extend.apply();
+
+          // Need to be careful here to ensure that face->scatter has completed
+          // I believe that streams used for extend.apply now match the scatter streams
+          extend.apply(streams[2*i]);
 
 
         } // i = 0,1,2,3
@@ -440,7 +449,7 @@ namespace quda {
 
 
 
-  void extendCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParams& params) {
+  void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParams& params) {
     if (&src == &dst) return; // aliasing fields
 
     if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
@@ -455,6 +464,14 @@ namespace quda {
     }
 
     const int parity = 0; // Need to change this
+
+    if((src.Precision()==QUDA_DOUBLE_PRECISION) && (dst.Precision()==QUDA_DOUBLE_PRECISION)){
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION>::InType SrcSpinorType; 
+      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION>::OutType DstSpinorType; 
+      extendCuda__<double2,DstSpinorType,SrcSpinorType>(dst, src, params, parity);
+    }
+
+
 
     // I should really use a function to do this
     EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
