@@ -18,7 +18,14 @@
 
 //these are access control for staggered action
 #ifdef GPU_STAGGERED_DIRAC
-#if (__COMPUTE_CAPABILITY__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 300) // Kepler works best with texture loads only
+//#define DIRECT_ACCESS_FAT_LINK
+//#define DIRECT_ACCESS_LONG_LINK
+//#define DIRECT_ACCESS_SPINOR
+//#define DIRECT_ACCESS_ACCUM
+//#define DIRECT_ACCESS_INTER
+//#define DIRECT_ACCESS_PACK
+#elif (__COMPUTE_CAPABILITY__ >= 200)
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
