@@ -138,9 +138,9 @@ namespace quda {
       prec_param.siteOrder  = QUDA_EVEN_ODD_SITE_ORDER;
       prec_param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
       prec_param.x[0]       = invParam.domain_overlap[0]/2 + r.X(0); // only works for QUDA_PARITY_SITE_SUBSET
-      prec.param.x[1]       = invParam.domain_overlap[1] + r.X(1);   // and even dimensions at the moment.
-      prec.param.x[2]       = invParam.domain_overlap[2] + r.X(2);
-      prec.param.x[3]       = invParam.domain_overlap[3] + r.X(3);
+      prec_param.x[1]       = invParam.domain_overlap[1] + r.X(1);   // and even dimensions at the moment.
+      prec_param.x[2]       = invParam.domain_overlap[2] + r.X(2);
+      prec_param.x[3]       = invParam.domain_overlap[3] + r.X(3);
         
       rPre_ptr = new cudaColorSpinorField(prec_param);
       *rPre_ptr = r;
