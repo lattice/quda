@@ -101,7 +101,18 @@ namespace quda {
         max_overlap = invParam.domain_overlap[dir];
       }
     }
-  
+    
+    int X[4]; // smaller sublattice dimensions
+    int Y[4]; // extended subdomain dimensions
+    X[0] = b.X(0)*2; // assume QUDA_PARITY_SITE_SUBSET
+    X[1] = b.X(1);
+    X[2] = b.X(2);
+    X[3] = b.X(3);
+
+    for(int dir=0; dir<4; ++dir) Y[dir] = X[dir] + 2*invParam.domain_overlap[dir];
+    DecompParams dparam;
+    initDecompParams(&dparam,X,Y);
+
     ColorSpinorParam param(b);
     param.nFace  = max_overlap;
     param.create = QUDA_COPY_FIELD_CREATE; 
@@ -137,17 +148,26 @@ namespace quda {
       prec_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       prec_param.siteOrder  = QUDA_EVEN_ODD_SITE_ORDER;
       prec_param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      prec_param.x[0]       = invParam.domain_overlap[0]/2 + r.X(0); // only works for QUDA_PARITY_SITE_SUBSET
-      prec_param.x[1]       = invParam.domain_overlap[1] + r.X(1);   // and even dimensions at the moment.
-      prec_param.x[2]       = invParam.domain_overlap[2] + r.X(2);
-      prec_param.x[3]       = invParam.domain_overlap[3] + r.X(3);
-        
+      for(int dir=0; dir<4; ++dir) prec_param.x[dir] = Y[dir];
+ 
       rPre_ptr = new cudaColorSpinorField(prec_param);
-      *rPre_ptr = r;
+
+      if(max_overlap > 0){
+        extendCuda(*rPre_ptr,r,dparam,invParam.domain_overlap);
+      }else{
+        *rPre_ptr = r;
+      }
+
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       minvr_ptr = new cudaColorSpinorField(r);
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
-      *minvr_ptr = *minvrPre_ptr;
+
+      if(max_overlap > 0){
+        cropCuda(*minvr_ptr, *minvrPre_ptr);
+      }else{
+        *minvr_ptr = *minvrPre_ptr;
+      }
+
       p_ptr = new cudaColorSpinorField(*minvr_ptr);
     }else{
       p_ptr = new cudaColorSpinorField(r);
