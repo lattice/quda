@@ -7,7 +7,7 @@ struct cudaColorSpinorField;
 namespace quda {
   
   void cropCuda(cudaColorSpinorField& dst, const cudaColorSpinorField &src, const DecompParams& params);
-  void extendCuda(cudaColorSpinorField& dst, cudaColorSpinorField &src, const DecompParams& params);
+  void extendCuda(cudaColorSpinorField& dst, cudaColorSpinorField &src, const DecompParams& params, int domain_overlap[]);
 
 } // namespace quda
 

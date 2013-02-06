@@ -287,17 +287,15 @@ namespace quda {
   struct CommParam {
     struct threads; // the desired number of active threads
     int parity; // even or odd
-    int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+    int commDim[QUDA_MAX_DIM]; 
+    // Whether to do comms or not
     // a given dimension
   };
-
-  static CommParam commParam;
 
   int gatherCompleted[Nstream]; // transfer of ghost data from device to host
   int previousDir[Nstream];
   int commsCompleted[Nstream];
   int extendCompleted[Nstream];
-  int commDimTotal;
 
 
   static cudaEvent_t packEnd[Nstream];
@@ -308,7 +306,8 @@ namespace quda {
 
 
 
-  static void initCommsPattern() {
+  static void initCommsPattern(int* commDimTotal, const int* const domain_overlap) 
+  {
 
     for(int i=0; i<Nstream-1; i++){
       gatherCompleted[i] = 0;
@@ -322,9 +321,9 @@ namespace quda {
     // comms call after the previous one has successfully 
     // completed
     for(int i=3; i>=0; --i){
-      if(commParam.commDim[i]){
+      if(domain_overlap[i]){
         int prev = Nstream-1;
-        for(int j=3; j>i; --j) if(commParam.commDim[j]) prev = 2*j;
+        for(int j=3; j>i; --j) if(domain_overlap[j]) prev = 2*j;
         previousDir[2*i + 1] = prev;
         previousDir[2*i + 0] = 2*i + 1;
       }
@@ -332,39 +331,35 @@ namespace quda {
 
     // this tells us how many events / comms occurances there are in total.
     // Used for exiting the while loop.
-    commDimTotal = 0;
-    for (int i=3; i>=0; --i) commDimTotal += commParam.commDim[i];
-    commDimTotal *= 4; // 2 from pipe length, 2 from direction
+    *commDimTotal = 0;
+    for (int i=3; i>=0; --i) *commDimTotal += param.commDim[i];
+    *commDimTotal *= 4; // 2 from pipe length, 2 from direction
     return;
   }
 
 
   template<class DataType, class DstSpinorType, class SrcSpinorType>
-    static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParams& params, int parity)
+    static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParams& params, int parity, int domain_overlap[])
     {
-      commParam.parity = parity;
 #ifdef MULTI_GPU
       for(int i=3; i >= 0; i--){
-        if(!commParam.commDim[i]) continue;
-
-        // Initialise pack from source spinor on the device
-        face->pack(src, parity, 0, i, streams); // pack in stream[Nstream-1]
-        // Record the end of the packing 
-        cudaEventRecord(packEnd[2*i], streams[Nstream-1]);
+        if(domain_overlap[i]){
+          // Initiate pack from source spinor on the device
+          face->pack(src, parity, 0, i, streams); // pack in stream[Nstream-1]
+          cudaEventRecord(packEnd[2*i], streams[Nstream-1]);
+        }
       }
 
       for(int i=3; i >= 0; i--){
-        if(!commParam.commDim[i]) continue;
-
-        for(int dir=1; dir >= 0; dir--){
-          cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i+dir], 0);
-
-          // Initialise transfer of packed ghost data from device to host
-          face->gather(src, 0, 2*i+dir); // what does dagger do, and should I be concerned
-
-          // Record the end of the gathering 
-          cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]);
-        } // dir = 0,1
+        if(domain_overlap[i]){
+          for(int dir=1; dir >= 0; dir--){
+            cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i], 0);
+            // Initiate transfer of packed ghost data from device to host
+            face->gather(src, 0, 2*i+dir); // what does dagger do, and should I be concerned?
+            // Record the end of the gathering 
+            cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]);
+          } // dir = 0,1
+        } // if domain_overlap[i]
       } // i = 0,1,2,3
 
 #endif  // MULTI_GPU  
@@ -376,57 +371,59 @@ namespace quda {
         extend(dst_spinor, src_spinor, src.Volume(), params, parity);
       extend.apply(streams[Nstream-1]); // copy the interior region. 
 
-      initCommsPattern();
+#ifdef MULTI_GPU
+      int commDimTotal=0;
+      initCommsPattern(&commDimTotal,domain_overlap);
 
       int completeSum = 0;
       while(completeSum < commDimTotal) {
         for(int i=3; i >= 0; i--){
-          if(!commParam.commDim[i]) continue;
-
-          for(int dir=1; dir >= 0; dir--){
-
-            // Query if gather (transfer of ghost data to host) has completed
-            if(!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]){
-
-              if(cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])){
-                gatherCompleted[2*i+dir] = 1;
-                completeSum++;
-                face->commsStart(2*i+dir); // start communication
-              }
-            } // if not gather completed
+          if(domain_overlap[i]){
+            for(int dir=1; dir >= 0; dir--){
+              // Query if gather (transfer of ghost data to host) has completed
+              if(!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]){
+                if(cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])){
+                  gatherCompleted[2*i+dir] = 1;
+                  completeSum++;
+                  face->commsStart(2*i+dir); // start communication
+                }
+              } // if not gather completed
 
 
-            // Query if comms has finished 
-            if(!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] && 
-                gatherCompleted[2*i+dir]){
+              // Query if comms has finished 
+              if(!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] && 
+                  gatherCompleted[2*i+dir]){
 
-              if(face->commsQuery(2*i+dir)){     
-                commsCompleted[2*i+dir] = 1;
-                completeSum++;
+                if(face->commsQuery(2*i+dir)){     
+                  commsCompleted[2*i+dir] = 1;
+                  completeSum++;
+                  // copy data back to the ghost zones on the device
+                  face->scatter(src, 0, 2*i+dir);
+                }
+              } // if comms not completed
+            } // dir = 0,1
 
-                // copy data back to the ghost zones on the device
-                face->scatter(src, 0, 2*i+dir);
-              }
-            } // if comms not completed
-          } // dir = 0,1
+            cudaEventRecord(scatterEnd[2*i], streams[2*i]);
+            // now copy the data from the ghost zone on the smaller field 
+            // to the ghost zone in the larger field
+            // Call the constructor Spinor(void* spinor, float* norm, int stride)
+            DstSpinorType dst_spinor(dst);
+       
+            // Wait for the scatter to finish 
+            cudaStreamWaitEvent(streams[2*i], scatterEnd[2*i], 0);
+            SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
 
-          // now copy the data from the ghost zone on the smaller field 
-          // to the ghost zone in the larger field
-          // Call the constructor Spinor(void* spinor, float* norm, int stride)
-          SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
-          DstSpinorType dst_spinor(dst);
+            ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
+              extend(dst_spinor, src_spinor, src.GhostFace()[i], params, parity, i);
+            // Need to be careful here to ensure that face->scatter has completed
+            // I believe that streams used for extend.apply now match the scatter streams
+            extend.apply(streams[2*i]);
 
-          ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
-            extend(dst_spinor, src_spinor, src.GhostFace()[i], params, parity, i);
-
-          // Need to be careful here to ensure that face->scatter has completed
-          // I believe that streams used for extend.apply now match the scatter streams
-          extend.apply(streams[2*i]);
-
-
+          }
         } // i = 0,1,2,3
       } // completeSum < commDimTotal
-
+#endif
+      cudaDeviceSynchronize(); // as a safety measure
       return;
     }
 
@@ -439,11 +436,12 @@ namespace quda {
     typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstSpinorType; \
     SrcSpinorType src_spinor(src);                                                       \
     DstSpinorType dst_spinor(dst);                                                       \
-    extendCuda__<DataType,DstSpinorType,SrcSpinorType>(dst, src, params, parity);        \
+    extendCuda__<DataType,DstSpinorType,SrcSpinorType>(dst, src, params, parity, domain_overlap);        \
   }
 
 
-  void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParams& params) {
+  void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParams& params, const int * const domain_overlap) 
+  {
     if (&src == &dst) return; // aliasing fields
 
     if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
@@ -469,16 +467,16 @@ namespace quda {
       EXTEND_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
     else
       EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
-    else
-      EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
-    else
-      EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
-    else
-      EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
-    else
-      EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
+        else
+          EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+            else
+              EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+                else
+                  EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+                    else
+                      EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
 
-    return;
+                        return;
   }
 
 
