@@ -1412,6 +1412,7 @@ int xdim = 24;
 int ydim = 24;
 int zdim = 24;
 int tdim = 24;
+int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4]={1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -1439,6 +1440,7 @@ void usage(char** argv )
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
+  printf("    --Lsdim <n>                                # Set Ls dimension size(default 16)\n");  
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1598,6 +1600,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printfQuda("ERROR: invalid S dimension\n");
     }
     xdim=ydim=zdim=sdim;
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--Lsdim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    int Ls =  atoi(argv[i+1]);
+    if (Ls < 0 || Ls > 128){
+      printfQuda("ERROR: invalid Ls dimension\n");
+    }
+    Lsdim=Ls;
     i++;
     ret = 0;
     goto out;

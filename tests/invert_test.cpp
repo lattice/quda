@@ -33,6 +33,7 @@ extern int xdim;
 extern int ydim;
 extern int zdim;
 extern int tdim;
+extern int Lsdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
@@ -48,11 +49,11 @@ display_test_info()
 {
   printfQuda("running the following test:\n");
     
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d \n",
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
 	     get_prec_str(prec),get_prec_str(prec_sloppy),
 	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim);     
+	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -107,14 +108,13 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
  
-  int myLs = 8; // FIXME
   double kappa5;
 
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
-  inv_param.Ls = (dslash_type == QUDA_DOMAIN_WALL_DSLASH) ? myLs : 1;
+  inv_param.Ls = (dslash_type == QUDA_DOMAIN_WALL_DSLASH) ? Lsdim : 1;
 
   gauge_param.anisotropy = 2.38;
   gauge_param.type = QUDA_WILSON_LINKS;

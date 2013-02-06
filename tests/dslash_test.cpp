@@ -26,7 +26,6 @@ using namespace quda;
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const int transfer = 0; // include transfer time in the benchmark?
 
-const int myLs = 16; // FIXME
 double kappa5;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -55,6 +54,7 @@ extern int xdim;
 extern int ydim;
 extern int zdim;
 extern int tdim;
+extern int Lsdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
@@ -78,7 +78,7 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-    dw_setDims(gauge_param.X, myLs);
+    dw_setDims(gauge_param.X, Lsdim);
     setKernelPackT(true);
   } else {
     setDims(gauge_param.X);
@@ -484,10 +484,10 @@ void display_test_info()
 {
   printfQuda("running the following test:\n");
  
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension   dslash_type niter\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d            %s   %d\n", 
+  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension   Ls_dimension dslash_type niter\n");
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d             %d        %s   %d\n", 
 	     get_prec_str(prec), get_recon_str(link_recon), 
-	     test_type, dagger, xdim, ydim, zdim, tdim, 
+	     test_type, dagger, xdim, ydim, zdim, tdim, Lsdim,
 	     get_dslash_type_str(dslash_type), niter);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
