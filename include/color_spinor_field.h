@@ -80,6 +80,10 @@ namespace quda {
 	  nDim++;
 	  x[4] = inv_param.Ls;
 	}
+	else if(inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)){
+	  nDim++;
+	  x[4] = 2;//for two flavors
+    	}
 
 	if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
 	  fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
@@ -173,14 +177,14 @@ namespace quda {
   
     int real_length; // physical length only
     int length; // length including pads, but not ghost zone - used for BLAS
-    
+
     void *v; // the field elements
     void *norm; // the normalization field
 
     // multi-GPU parameters
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
-
+    
     int ghostFace[QUDA_MAX_DIM];// the size of each face
     int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
     int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
@@ -222,7 +226,7 @@ namespace quda {
     QudaPrecision Precision() const { return precision; }
     int Ncolor() const { return nColor; } 
     int Nspin() const { return nSpin; } 
-    int TwistFlavor() const { return twistFlavor; } 
+    QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }  
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
     int X(int d) const { return x[d]; }
@@ -250,7 +254,7 @@ namespace quda {
     const void* Ghost(const int i) const;
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
-   
+
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
   };
@@ -261,8 +265,8 @@ namespace quda {
     friend class cpuColorSpinorField;
 
   private:
-//    void *v; // the field elements
-//    void *norm; // the normalization field
+    //void *v; // the field elements
+    //void *norm; // the normalization field
     bool alloc; // whether we allocated memory
     bool init;
 
@@ -323,6 +327,7 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
@@ -363,8 +368,8 @@ namespace quda {
     static int initGhostFaceBuffer;
 
   private:
-//    void *v; // the field elements
-//    void *norm; // the normalization field
+    //void *v; // the field elements
+    //void *norm; // the normalization field
     bool init;
     bool reference; // whether the field is a reference or not
 

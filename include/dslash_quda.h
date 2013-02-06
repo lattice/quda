@@ -41,6 +41,8 @@ namespace quda {
   void initDslashConstants();
   void initCloverConstants (const cudaCloverField &clover);
   void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge);
+//!ndeg tm:
+  void initTwistedMassConstants(const int flv_stride);
 
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
@@ -74,25 +76,29 @@ namespace quda {
 			   const cudaColorSpinorField *x, const double &k, 
 			   const int *commDim);
 
+//!ndeg tm:
   // twisted mass Dslash  
-  void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+  void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
 			     const int parity, const int dagger, const cudaColorSpinorField *x, 
-			     const double &kappa, const double &mu, const double &a, const int *commDim);
+			     const double &kappa, const double &mu, const double &epsilon, const int *commDim);
 
+//!ndeg tm:
   // solo twist term
-  void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		       const int dagger, const double &kappa, const double &mu,
-		       const QudaTwistGamma5Type);
+  void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger,     
+                       const double &kappa, const double &mu, const double &epsilon, 
+                       const QudaTwistGamma5Type);
 
   // face packing routines
   void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 		const int parity, const cudaStream_t &stream);
-  //BEGIN NEW	
+	
   //currently as a separate function (can be integrated into packFace)
   void packFaceDW(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 		  const int parity, const cudaStream_t &stream);		    
-  //END NEW	      
 
+//!ndeg tm:		    
+  void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
+		  const int parity, const cudaStream_t &stream);
 }
 
 #endif // _DSLASH_QUDA_H

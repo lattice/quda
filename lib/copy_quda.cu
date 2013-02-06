@@ -110,13 +110,13 @@ namespace quda {
       // For a given dst precision, there are two non-trivial possibilities for the
       // src precision.
 
-      blas_bytes += (unsigned long long)src.RealLength()*(src.Precision() + dst.Precision());
+      blas_bytes += src.RealLength()*((int)src.Precision() + (int)dst.Precision());
 
       if (dst.Precision() == src.Precision()) {
 	cudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
 	if (dst.Precision() == QUDA_HALF_PRECISION) {
 	  cudaMemcpy(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice);
-	  blas_bytes += 2*(unsigned long long)dst.RealLength()*sizeof(float);
+	  blas_bytes += 2*dst.RealLength()*sizeof(float);
 	}
       } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	if (src.Nspin() == 4){
@@ -151,7 +151,7 @@ namespace quda {
 	  copy.apply(*getBlasStream());	
       }
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-	blas_bytes += (unsigned long long)src.Volume()*sizeof(float);
+	blas_bytes += src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){      
 	  Spinor<float4, float4, short4, 6, 0, 0> src_tex(src);
 	  Spinor<float4, float4, float4, 6, 1> dst_spinor(dst);
@@ -168,7 +168,7 @@ namespace quda {
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-	blas_bytes += (unsigned long long)dst.Volume()*sizeof(float);
+	blas_bytes += dst.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
 	  Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
 	  Spinor<float4, float4, short4, 6, 1> dst_spinor(dst);
@@ -185,7 +185,7 @@ namespace quda {
   copy.apply(*getBlasStream());	
 }
   } else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
-	blas_bytes += (unsigned long long)src.Volume()*sizeof(float);
+	blas_bytes += src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
 	  Spinor<double2, float4, short4, 12, 0, 0> src_tex(src);
 	  Spinor<double2, double2, double2, 12, 1> dst_spinor(dst);
@@ -202,7 +202,7 @@ namespace quda {
 	  copy.apply(*getBlasStream());	
     }
   } else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
-	blas_bytes += (unsigned long long)dst.Volume()*sizeof(float);
+	blas_bytes += dst.Volume()*sizeof(float);
 	if (src.Nspin() == 4){
 	  Spinor<double2, double2, double2, 12, 0, 0> src_tex(src);
 	  Spinor<double2, double4, short4, 12, 1> dst_spinor(dst);

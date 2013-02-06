@@ -78,12 +78,23 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+
     dw_setDims(gauge_param.X, myLs);
     setKernelPackT(true);
   } else {
     setDims(gauge_param.X);
-    Ls = 1;
-    setKernelPackT(false);
+    if (dslash_type == QUDA_TWISTED_MASS_DSLASH)
+    {
+       Ls = 2;
+       setKernelPackT(true);
+       //!Ls = 1;
+       //setKernelPackT(false);
+    }
+    else
+    {
+       Ls = 1;
+       setKernelPackT(false);
+    }
   }
 
   setSpinorSiteSize(24);
@@ -105,7 +116,9 @@ void init(int argc, char **argv) {
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     inv_param.mu = 0.01;
-    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+    inv_param.epsilon = 0.01; 
+//!    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     inv_param.mass = 0.01;
     inv_param.m5 = -1.5;
@@ -201,6 +214,14 @@ void init(int argc, char **argv) {
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
+
+//ndeg_tm    
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+    csParam.twistFlavor = inv_param.twist_flavor;
+    csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) ? 4 : 5;
+    csParam.x[4] = Ls;    
+  }
+
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
@@ -422,28 +443,75 @@ void dslashRef() {
   } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     switch (test_type) {
     case 0:
-      tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-		parity, dagger, inv_param.cpu_prec, gauge_param);
+      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)
+	tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity, dagger, inv_param.cpu_prec, gauge_param);
+      else
+      {
+        int tm_offset = 12*spinorRef->Volume();
+
+	void *ref1 = spinorRef->V();
+	void *ref2 = cpu_prec == sizeof(double) ? (void*)((double*)ref1 + tm_offset): (void*)((float*)ref1 + tm_offset);
+    
+	void *flv1 = spinor->V();
+	void *flv2 = cpu_prec == sizeof(double) ? (void*)((double*)flv1 + tm_offset): (void*)((float*)flv1 + tm_offset);
+    
+	tm_ndeg_dslash(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, 
+	               parity, dagger, inv_param.matpc_type, inv_param.cpu_prec, gauge_param);	
+      }
       break;
-    case 1:    
-      tm_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-	       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+    case 1:
+      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
+	tm_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+      else
+      {
+        int tm_offset = 12*spinorRef->Volume();
+
+	void *ref1 = spinorRef->V();
+	void *ref2 = cpu_prec == sizeof(double) ? (void*)((double*)ref1 + tm_offset): (void*)((float*)ref1 + tm_offset);
+    
+	void *flv1 = spinor->V();
+	void *flv2 = cpu_prec == sizeof(double) ? (void*)((double*)flv1 + tm_offset): (void*)((float*)flv1 + tm_offset);
+    
+	tm_ndeg_matpc(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);	
+      }	
       break;
     case 2:
-      tm_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-	     dagger, inv_param.cpu_prec, gauge_param);
+      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
+	tm_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
+      else
+      {
+        int tm_offset = 12*spinorRef->Volume();
+
+	void *evenOut = spinorRef->V();
+	void *oddOut  = cpu_prec == sizeof(double) ? (void*)((double*)evenOut + tm_offset): (void*)((float*)evenOut + tm_offset);
+    
+	void *evenIn = spinor->V();
+	void *oddIn  = cpu_prec == sizeof(double) ? (void*)((double*)evenIn + tm_offset): (void*)((float*)evenIn + tm_offset);
+    
+	tm_ndeg_mat(evenOut, oddOut, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);	
+      }
       break;
     case 3:    
-      tm_matpc(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS){      
+	tm_matpc(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	       inv_param.matpc_type, QUDA_DAG_NO, inv_param.cpu_prec, gauge_param);
-      tm_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+	tm_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	       inv_param.matpc_type, QUDA_DAG_YES, inv_param.cpu_prec, gauge_param);
+      }
+      else
+      {
+      }
       break;
     case 4:
-      tm_mat(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS){      
+	tm_mat(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	     QUDA_DAG_NO, inv_param.cpu_prec, gauge_param);
-      tm_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+	tm_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param);
+      }
+      else
+      {
+      }
       break;
     default:
       printfQuda("Test type not defined\n");

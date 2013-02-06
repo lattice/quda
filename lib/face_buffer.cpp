@@ -1,6 +1,10 @@
 #include <quda_internal.h>
 #include <face_quda.h>
 
+#ifndef GPU_DIRECT
+#include <string.h>    
+#endif
+
 using namespace quda;
 
 cudaStream_t *stream;

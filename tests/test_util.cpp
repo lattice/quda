@@ -19,6 +19,7 @@ using namespace std;
 #define ZUP 2
 #define TUP 3
 
+
 int Z[4];
 int V;
 int Vh;
@@ -1159,7 +1160,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   int iter[18];
   for (int i=0; i<18; i++) iter[i] = 0;
   
-  for(int dir=0;dir<4; dir++){
+  for(int dir=0;dir < 4; dir++){
     for (int i=0; i<len; i++) {
       for (int j=0; j<18; j++) {
 	int is = i*18+j;
@@ -1782,3 +1783,5 @@ double stopwatchReadSeconds() {
   long dus = endTime.tv_usec - startTime.tv_usec;
   return ds + 0.000001*dus;
 }
+
+

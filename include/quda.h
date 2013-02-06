@@ -104,6 +104,8 @@ extern "C" {
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
     double mu;    /**< Twisted mass parameter */
+    double epsilon; /**< Twisted mass parameter */
+    
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
@@ -191,7 +193,6 @@ extern "C" {
 
     /** Maximum number of iterations allowed in the inner solver */
     int maxiter_precondition;
-
 
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;

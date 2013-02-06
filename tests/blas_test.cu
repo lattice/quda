@@ -26,11 +26,7 @@ extern bool tune;
 
 extern void usage(char** );
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
 const int Nkernels = 32;
-#else // exclude Heavy Quark Norm if on Tesla architecture
-const int Nkernels = 31;
-#endif
 
 using namespace quda;
 

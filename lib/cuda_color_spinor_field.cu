@@ -56,7 +56,6 @@ namespace quda {
     } else if (param.create == QUDA_COPY_FIELD_CREATE){
       errorQuda("not implemented");
     }
-
     checkCudaError();
   }
 
@@ -110,6 +109,7 @@ namespace quda {
     } else {
       errorQuda("CreateType %d not implemented", param.create);
     }
+
     clearGhostPointers();
   }
 
@@ -124,6 +124,7 @@ namespace quda {
     } else {
       errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
     }
+
     clearGhostPointers();
   }
 
@@ -664,10 +665,19 @@ namespace quda {
 #ifdef MULTI_GPU
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
       void* gpu_buf = this->backGhostFaceBuffer[dim];
-      if(this->nDim == 5)//!For DW fermions
-	packFaceDW(gpu_buf, *this, dim, dagger, parity, *stream);
-      else	
-	packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
+      if(this->nDim == 5)//!For DW  and non-degenerate TM fermions
+      {
+        if(this->TwistFlavor() == QUDA_TWIST_INVALID)
+          packFaceDW(gpu_buf, *this, dim, dagger, parity, *stream);
+        else if(this->TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET)
+        {
+          packFaceNdegTM(gpu_buf, *this, dim, dagger, parity, *stream);
+        }
+      }
+      else
+      {
+    	packFace(gpu_buf, *this, dim, dagger, parity, *stream);
+      }
     }
 #else
     errorQuda("packGhost not built on single-GPU build");

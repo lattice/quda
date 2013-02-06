@@ -544,15 +544,23 @@ namespace quda {
       break;
     case QUDA_DOMAIN_WALL_DSLASH:
       diracParam.type = pc ? QUDA_DOMAIN_WALLPC_DIRAC : QUDA_DOMAIN_WALL_DIRAC;
-      //BEGIN NEW :
       diracParam.Ls = inv_param->Ls;
-      //END NEW    
       break;
     case QUDA_ASQTAD_DSLASH:
       diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;
       break;
     case QUDA_TWISTED_MASS_DSLASH:
       diracParam.type = pc ? QUDA_TWISTED_MASSPC_DIRAC : QUDA_TWISTED_MASS_DIRAC;
+      if (inv_param->twist_flavor == QUDA_TWIST_MINUS || inv_param->twist_flavor == QUDA_TWIST_PLUS)  
+      {
+        diracParam.Ls = 1;
+        diracParam.epsilon = 0.0;
+      }
+      else 
+      {
+        diracParam.Ls = 2;
+        diracParam.epsilon = inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? inv_param->epsilon : 0.0;
+      } 
       break;
     default:
       errorQuda("Unsupported dslash_type %d", inv_param->dslash_type);
@@ -733,8 +741,8 @@ namespace quda {
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
@@ -800,7 +808,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
@@ -870,6 +878,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   pushVerbosity(inv_param->verbosity);
 
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
+
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
@@ -1031,10 +1041,12 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
+
   profileInvert[QUDA_PROFILE_TOTAL].Start();
 
   if (!initialized) errorQuda("QUDA not initialized");
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
@@ -1244,7 +1256,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
   profileMulti[QUDA_PROFILE_TOTAL].Start();
 
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
+
   if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
