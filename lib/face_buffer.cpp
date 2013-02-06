@@ -186,6 +186,10 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, cudaStre
 
 void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
 {
+
+  // FIXME workaround to call gather immediately
+  stream = streams;
+
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
@@ -198,22 +202,67 @@ void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
   }
 }
 
+// experimenting with callbacks for GPU -> MPI interaction.
+// much slower though because callbacks are done on a background thread
+//#define QUDA_CALLBACK
+#if QUDA_CALLBACK
+struct commCallback_t {
+  void *comm_recv;
+  void *comm_send;
+  void *ib_buffer;
+  void *face_buffer;
+  size_t bytes;
+};
+
+static commCallback_t commCB[2*QUDA_MAX_DIM];
+
+void CUDART_CB commCallback(cudaStream_t stream, cudaError_t status, void *data) {
+  const unsigned long long dir = (unsigned long long)data;
+
+  comm_start(commCB[dir].comm_recv);
+#ifndef GPU_DIRECT
+  memcpy(commCB[dir].ib_buffer, commCB[dir].face_buffer, commCB[dir].bytes);
+#endif
+  comm_start(commCB[dir].comm_send);
+
+}
+
 void FaceBuffer::commsStart(int dir) {
   int dim = dir / 2;
   if(!commDimPartitioned(dim)) return;
 
   if (dir%2 == 0) { // sending backwards
+    commCB[dir].comm_recv = comm_recv_fwd[dim]; 
+    commCB[dir].comm_send = comm_send_back[dim];
+    commCB[dir].ib_buffer = ib_my_back_face[dim];
+    commCB[dir].face_buffer = my_back_face[dim];
+    commCB[dir].bytes = nbytes[dim];
+  } else { //sending forwards
+    commCB[dir].comm_recv = comm_recv_back[dim]; 
+    commCB[dir].comm_send = comm_send_fwd[dim];
+    commCB[dir].ib_buffer = ib_my_fwd_face[dim];
+    commCB[dir].face_buffer = my_fwd_face[dim];
+    commCB[dir].bytes = nbytes[dim];
+  }
 
+  cudaStreamAddCallback(stream[dir], commCallback, (void*)dir, 0);
+} 
+
+#else
+
+void FaceBuffer::commsStart(int dir) {
+  int dim = dir / 2;
+  if(!commDimPartitioned(dim)) return;
+
+  if (dir%2 == 0) { // sending backwards
     // Prepost receive
     comm_start(comm_recv_fwd[dim]);
 #ifndef GPU_DIRECT
     memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
 #endif
     comm_start(comm_send_back[dim]);
-
   } else { //sending forwards
-    
-  // Prepost receive
+    // Prepost receive
     comm_start(comm_recv_back[dim]);
     // Begin forward send
 #ifndef GPU_DIRECT
@@ -221,8 +270,9 @@ void FaceBuffer::commsStart(int dir) {
 #endif
     comm_start(comm_send_fwd[dim]);
   }
+}
 
-} 
+#endif
 
 int FaceBuffer::commsQuery(int dir) {
   int dim = dir / 2;
