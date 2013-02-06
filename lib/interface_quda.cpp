@@ -620,7 +620,7 @@ namespace quda {
     diracParam.longGauge = gaugeLongPrecondition;    
     diracParam.clover = cloverPrecondition;
 
-    //diracParam.hasNaik = hasNaik;
+    diracParam.Nface = 0; // No need for ghost zones in the preconditioner
     diracParam.hasNaik = false;
 
     for (int i=0; i<4; i++) {
@@ -1049,6 +1049,188 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   popVerbosity();
 }
+
+
+
+
+void invertStaggeredQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
+{
+  profileInvert[QUDA_PROFILE_TOTAL].Start();
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  pushVerbosity(param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
+
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
+
+  checkInvertParam(param);
+
+  // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
+  // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
+  // for now, though, so here we factorize everything for convenience.
+
+  bool pc_solution = true;
+  bool pc_solve = true;
+  bool mat_solution = false;
+  bool direct_solve = false;
+
+  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
+  param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
+  if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 5 : 7)/(double)(1<<30);
+  } else {
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 8 : 9)/(double)(1<<30);
+  }
+
+  param->secs = 0;
+  param->gflops = 0;
+  param->iter = 0;
+
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
+
+  // create the dirac operator
+  // param->nface = 4;
+
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
+
+  profileInvert[QUDA_PROFILE_H2D].Start();
+
+  cudaColorSpinorField *b = NULL;
+  cudaColorSpinorField *x = NULL;
+  cudaColorSpinorField *in = NULL;
+  cudaColorSpinorField *out = NULL;
+
+  const int *X = cudaGauge->X();
+
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam(hp_b, param->input_location, *param, X, pc_solution);
+  ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  cpuParam.v = hp_x;
+  ColorSpinorField *h_x = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  // download source
+  ColorSpinorParam cudaParam(cpuParam, *param);
+  
+  cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  b = new cudaColorSpinorField(*h_b, cudaParam); 
+
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
+    // initial guess only supported for single-pass solvers
+    x = new cudaColorSpinorField(*h_x, cudaParam); // solution  
+  } else { // zero initial guess
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+    x = new cudaColorSpinorField(cudaParam); // solution
+  }
+
+  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL && 
+      (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) ) {
+    errorQuda("Heavy quark residual only supported for CG and BiCGStab");
+  }
+    
+  profileInvert[QUDA_PROFILE_H2D].Stop();
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nh_b = norm2(*h_b);
+    double nb = norm2(*b);
+    double nh_x = norm2(*h_x);
+    double nx = norm2(*x);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+    printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+  }
+
+  setDslashTuning(param->tune, getVerbosity());
+  setBlasTuning(param->tune, getVerbosity());
+
+  in=x;
+  out=b;
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nin = norm2(*in);
+    double nout = norm2(*out);
+    printfQuda("Prepared source = %g\n", nin);   
+    printfQuda("Prepared solution = %g\n", nout);   
+  }
+
+  massRescale(QUDA_ASQTAD_DSLASH, 
+              param->kappa, 
+              QUDA_MATPCDAG_MATPC_SOLUTION, 
+              QUDA_MASS_NORMALIZATION, 
+              *in);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nin = norm2(*in);
+    printfQuda("Prepared source post mass rescale = %g\n", nin);   
+  }
+  
+  // solution_type specifies *what* system is to be solved.
+  // solve_type specifies *how* the system is to be solved.
+  //
+  // We have the following four cases (plus preconditioned variants):
+  //
+  // solution_type    solve_type    Effect
+  // -------------    ----------    ------
+  // MAT              DIRECT        Solve Ax=b
+  // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
+  // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
+  // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+  //
+  // We generally require that the solution_type and solve_type
+  // preconditioning match.  As an exception, the unpreconditioned MAT
+  // solution_type may be used with any solve_type, including
+  // DIRECT_PC and NORMOP_PC.  In these cases, preparation of the
+  // preconditioned source and reconstruction of the full solution are
+  // taken care of by Dirac::prepare() and Dirac::reconstruct(),
+  // respectively.
+
+
+  DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+  Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+  solve->operator()(*out, *in);
+  delete solve;
+
+  if (getVerbosity() >= QUDA_VERBOSE){
+   double nx = norm2(*x);
+   printfQuda("Solution = %g\n",nx);
+  }
+  
+  profileInvert[QUDA_PROFILE_D2H].Start();
+  *h_x = *x;
+  profileInvert[QUDA_PROFILE_D2H].Stop();
+  
+  if (getVerbosity() >= QUDA_VERBOSE){
+    double nx = norm2(*x);
+    double nh_x = norm2(*h_x);
+    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+  }
+  
+  delete h_b;
+  delete h_x;
+  delete b;
+  delete x;
+
+  delete d;
+  delete dSloppy;
+  delete dPre;
+
+  popVerbosity();
+
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
+
+  profileInvert[QUDA_PROFILE_TOTAL].Stop();
+}
+
+
 
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)

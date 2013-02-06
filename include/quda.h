@@ -334,6 +334,9 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
+  
+  // For testing...
+  void invertStaggeredQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
    * Solve for multiple shifts (e.g., masses).
