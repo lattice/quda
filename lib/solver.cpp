@@ -14,10 +14,13 @@ namespace quda {
     Solver *solver=0;
 
     switch (param.inv_type) {
+    case QUDA_PCG_INVERTER:
+      report("PCG");
+      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
+      break;
     case QUDA_CG_INVERTER:
       report("CG");
-      //solver = new CG(mat, matSloppy, param, profile);
-      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
+      solver = new CG(mat, matSloppy, param, profile);
       break;
     case QUDA_BICGSTAB_INVERTER:
       report("BiCGstab");
