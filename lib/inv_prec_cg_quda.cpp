@@ -91,8 +91,23 @@ namespace quda {
     cudaColorSpinorField* minvr_ptr;
     cudaColorSpinorField* p_ptr;
 
-    cudaColorSpinorField r(b);
-    ColorSpinorParam param(x);
+    // Find the maximum domain overlap.
+    // This will determine the number of faces needed by the vector r.
+    // Have to be very careful to ensure that setting the number of 
+    // ghost faces here doesn't screw anything up further down the line.
+    int max_overlap = invParam.domain_overlap[0];
+    for(int dir=1; dir<4; ++dir){
+      if(invParam.domain_overlap[dir] > max_overlap){ 
+        max_overlap = invParam.domain_overlap[dir];
+      }
+    }
+  
+    ColorSpinorParam param(b);
+    param.nFace  = max_overlap;
+    param.create = QUDA_COPY_FIELD_CREATE; 
+    cudaColorSpinorField r(b,param);
+
+    param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b,param);
 
@@ -123,7 +138,7 @@ namespace quda {
       prec_param.siteOrder  = QUDA_EVEN_ODD_SITE_ORDER;
       prec_param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
       prec_param.x[0]       = invParam.domain_overlap[0]/2 + r.X(0); // only works for QUDA_PARITY_SITE_SUBSET
-      prec.param.x[1]       = invParam.domain_overlap[1] + r.X(1);
+      prec.param.x[1]       = invParam.domain_overlap[1] + r.X(1);   // and even dimensions at the moment.
       prec.param.x[2]       = invParam.domain_overlap[2] + r.X(2);
       prec.param.x[3]       = invParam.domain_overlap[3] + r.X(3);
         
