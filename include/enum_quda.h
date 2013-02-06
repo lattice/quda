@@ -76,6 +76,7 @@ extern "C" {
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
 
+
   typedef enum QudaInverterType_s {
     QUDA_PCG_INVERTER,
     QUDA_CG_INVERTER,
@@ -115,6 +116,13 @@ extern "C" {
     QUDA_HEAVY_QUARK_RESIDUAL, // Fermilab heavy quark residual
     QUDA_INVALID_RESIDUAL
   } QudaResidualType;
+
+  
+  typedef enum QudaFieldType_s { 
+    QUDA_PRECISE_FIELD,
+    QUDA_SLOPPY_FIELD,
+    QUDA_PRECONDITION_FIELD
+  } QudaFieldType;
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //
