@@ -920,7 +920,58 @@ namespace quda {
     const double mferm;
     const double a;
 
+    bool checkGrid(TuneParam &param) const {
+      if (param.grid.x > deviceProp.maxGridSize[0] || param.grid.y > deviceProp.maxGridSize[1]) {
+	warningQuda("Autotuner is skipping blockDim=(%u,%u,%u), gridDim=(%u,%u,%u) because lattice volume is too large",
+		    param.block.x, param.block.y, param.block.z, 
+		    param.grid.x, param.grid.y, param.grid.z);
+	return false;
+      } else {
+	return true;
+      }
+    }
+
   protected:
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
+      const int step[2] = { deviceProp.warpSize, 1 };
+      bool advance[2] = { false, false };
+
+      // first try to advance block.x
+      param.block.x += step[0];
+      if (param.block.x > deviceProp.maxThreadsDim[0] || 
+	  sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
+	advance[0] = false;
+	param.block.x = step[0]; // reset block.x
+      } else {
+	advance[0] = true; // successfully advanced block.x
+      }
+
+      if (!advance[0]) {  // if failed to advance block.x, now try block.y
+	param.block.y += step[1];
+
+	if (param.block.y > in->X(4) || 
+	  sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
+	  advance[1] = false;
+	  param.block.y = step[1]; // reset block.x
+	} else {
+	  advance[1] = true; // successfully advanced block.y
+	}
+      }
+
+      if (advance[0] || advance[1]) {
+	param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
+			   (in->X(4)+param.block.y-1) / param.block.y, 1);
+
+	bool advance = true;
+	if (!checkGrid(param)) advance = advanceBlockDim(param);
+	return advance;
+      } else {
+	return false;
+      }
+    }
+
     int sharedBytesPerThread() const { return 0; }
   
   public:
@@ -934,6 +985,27 @@ namespace quda {
       bindSpinorTex<sFloat>(in, out, x);
     }
     virtual ~DomainWallDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
+
+    virtual void initTuneParam(TuneParam &param) const
+    {
+      Tunable::initTuneParam(param);
+      param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
+			 (in->X(4)+param.block.y-1) / param.block.y, 1);
+      bool ok = true;
+      if (!checkGrid(param)) ok = advanceBlockDim(param);
+      if (!ok) errorQuda("Lattice volume is too large for even the largest blockDim");
+    }
+
+    /** sets default values for when tuning is disabled */
+    virtual void defaultTuneParam(TuneParam &param) const
+    {
+      Tunable::defaultTuneParam(param);
+      param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 
+			 (in->X(4)+param.block.y-1) / param.block.y, 1);
+      bool ok = true;
+      if (!checkGrid(param)) ok = advanceBlockDim(param);
+      if (!ok) errorQuda("Lattice volume is too large for even the largest blockDim");
+    }
 
     TuneKey tuneKey() const
     {
@@ -950,8 +1022,7 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-      dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      DSLASH(domainWallDslash, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+      DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 	     (sFloat*)in->V(), (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
     }
@@ -959,7 +1030,7 @@ namespace quda {
     long long flops() const { // FIXME for multi-GPU
       long long bulk = (dslashConstants.Ls-2)*(dslashConstants.VolumeCB()/dslashConstants.Ls);
       long long wall = 2*dslashConstants.VolumeCB()/dslashConstants.Ls;
-      return (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB() + 96ll*bulk + 120ll*wall;
+      return (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB()*dslashConstants.Ls + 96ll*bulk + 120ll*wall;
     }
   };
 
@@ -1471,7 +1542,6 @@ namespace quda {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
     dslashParam.parity = parity;
-    dslashParam.threads = in->Volume();
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
     //currently splitting in space-time is impelemented:
@@ -1509,7 +1579,11 @@ namespace quda {
 						       gauge.Reconstruct(), in, x, m_f, k2, dagger);
     }
 
-    dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
+    // the parameters passed to dslashCuda must be 4-d volume and 3-d
+    // faces because Ls is added as the y-dimension in thread space
+    int ghostFace[QUDA_MAX_DIM];
+    for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
+    dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace);
 
     delete dslash;
     unbindGaugeTex(gauge);
@@ -1540,7 +1614,7 @@ namespace quda {
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     dslashParam.parity = parity;
-    dslashParam.threads = in->Volume();
+
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
