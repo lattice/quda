@@ -459,9 +459,9 @@ static __device__ __forceinline__ void coordsFromIndex3D(int &idx, Int &X, Int &
 
 //Used in DW kernels only:
 
-template <int dim, int nLayers>
+template <int dim, int nLayers, int face_num>
 static inline __device__ int indexFromDWFaceIndex(int face_idx, const int &face_volume,
-						const int &face_num, const int &parity)
+						  const int &parity)
 {
   // dimensions of the face (FIXME: optimize using constant cache)
 
@@ -964,8 +964,8 @@ class PackFace : public Tunable {
       prev=i;
 
       //printf("%d: map=%d %d out=%llu %llu outNorm=%llu %llu bytes=%d\n", 
-      //   i,param.threadDimMapLower[i],  param.threadDimMapUpper[i], 
-      //   param.out[2*i], param.out[2*i+1], param.outNorm[2*i], param.outNorm[2*i+1], faceBytes);
+      //     i,param.threadDimMapLower[i],  param.threadDimMapUpper[i], 
+      //     param.out[2*i], param.out[2*i+1], param.outNorm[2*i], param.outNorm[2*i+1], faceBytes);
     }
 
     return param;
@@ -1269,32 +1269,66 @@ void packFaceAsqtad(void *ghost_buf, cudaColorSpinorField &in, const int dagger,
 }
   
 #ifdef GPU_DOMAIN_WALL_DIRAC
-template <int dim, int dagger, typename FloatN>
+template <int dagger, typename FloatN>
 __global__ void packFaceDWKernel(PackParam<FloatN> param)
 {
-  const int nFace = 1; // 1 face for Wilson
-  const int Nint = 12; // output is spin projected
-  size_t faceBytes = nFace*Ls*ghostFace[dim]*Nint*sizeof(param.out->x);
-  if (sizeof(FloatN)==sizeof(short4)) faceBytes += nFace*Ls*ghostFace[dim]*sizeof(float);
+  const int nFace = 1; // 1 face for dwf
 
-  int face_volume = Ls*ghostFace[dim];
   int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+  if (face_idx >= param.threads) return;
 
-  if (face_idx >= 2*nFace*face_volume) return;
+  // determine which dimension we are packing
+  const int dim = dimFromFaceIndex(face_idx, param);
 
   // face_num determines which end of the lattice we are packing: 0 = beginning, 1 = end
-  const int face_num = (face_idx >= nFace*face_volume) ? 1 : 0;
-  face_idx -= face_num*nFace*face_volume;
+  // FIXME these ghostFace constants do not incude the Ls dimension
+  const int face_num = (face_idx >= nFace*Ls*ghostFace[dim]) ? 1 : 0; 
+  face_idx -= face_num*nFace*Ls*ghostFace[dim];
 
+  // compute where the output is located
   // compute an index into the local volume from the index into the face
-  int idx = indexFromDWFaceIndex<dim, 1>(face_idx, face_volume, face_num, param.parity);
-
-  FloatN* out = (face_num) ? (FloatN*)((char*)param.out + faceBytes) : param.out;
-  float* outNorm = (face_num) ? (float*)((char*)param.outNorm + faceBytes) : param.outNorm;
-  
-  // read spinor, spin-project, and write half spinor to face (the same kernel as for Wilson): 
-  packFaceWilsonCore<dim, dagger>(out, outNorm, param.in, param.inNorm, idx, face_idx, 
-				  face_volume, face_num, param);
+  // read spinor, spin-project, and write half spinor to face
+  if (dim == 0) {
+    if (face_num == 0) {
+      const int idx = indexFromDWFaceIndex<0,nFace,0>(face_idx,Ls*ghostFace[0],param.parity);
+      packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
+				     param.inNorm, idx, face_idx, Ls*ghostFace[0], param);
+    } else {
+      const int idx = indexFromDWFaceIndex<0,nFace,1>(face_idx,Ls*ghostFace[0],param.parity);
+      packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
+				     param.inNorm, idx, face_idx, Ls*ghostFace[0], param);
+    }
+  } else if (dim == 1) {
+    if (face_num == 0) {
+      const int idx = indexFromDWFaceIndex<1,nFace,0>(face_idx,Ls*ghostFace[1],param.parity);
+      packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
+				      param.inNorm, idx, face_idx, Ls*ghostFace[1], param);
+    } else {
+      const int idx = indexFromDWFaceIndex<1,nFace,1>(face_idx,Ls*ghostFace[1],param.parity);
+      packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
+				      param.inNorm, idx, face_idx, Ls*ghostFace[1], param);
+    }
+  } else if (dim == 2) {
+    if (face_num == 0) {
+      const int idx = indexFromDWFaceIndex<2,nFace,0>(face_idx,Ls*ghostFace[2],param.parity);
+      packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
+				      param.inNorm, idx, face_idx, Ls*ghostFace[2], param);
+    } else {
+      const int idx = indexFromDWFaceIndex<2,nFace,1>(face_idx,Ls*ghostFace[2],param.parity);
+      packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
+				      param.inNorm, idx, face_idx, Ls*ghostFace[2], param);
+    }
+  } else {
+    if (face_num == 0) {
+      const int idx = indexFromDWFaceIndex<3,nFace,0>(face_idx,Ls*ghostFace[3],param.parity);
+      packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
+				      param.inNorm, idx, face_idx, Ls*ghostFace[3], param);
+    } else {
+      const int idx = indexFromDWFaceIndex<3,nFace,1>(face_idx,Ls*ghostFace[3],param.parity);
+      packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
+				      param.inNorm, idx, face_idx, Ls*ghostFace[3], param);
+    }
+  }
 }
 #endif
 
@@ -1317,8 +1351,6 @@ class PackFaceDW : public PackFace<FloatN> {
     
 #ifdef GPU_DOMAIN_WALL_DIRAC
     PackParam<FloatN> param = this->prepareParam();
-    param.out = this->faces;
-
     if (this->dagger) {
       packFaceDWKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
     } else {
