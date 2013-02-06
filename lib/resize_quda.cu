@@ -239,7 +239,7 @@ namespace quda {
         ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity), dir(-1) {}
 
         ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity, const int dir) :
-        X(X), Y(Y), length(length), params(params), parity(parity), dir(dir) {}
+          X(X), Y(Y), length(length), params(params), parity(parity), dir(dir) {}
         virtual ~ExtendCuda();
 
         void apply(const cudaStream_t &stream){
@@ -282,23 +282,6 @@ namespace quda {
           cropKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity); 
         }
     };
-
-
-#ifdef EXTEND_CORE
-  BORK_COMPILATION;
-#endif
-#define EXTEND_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
-  if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
-    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcSpinorType; \
-    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstSpinorType; \
-    SrcSpinorType src_spinor(src);                                                       \
-    DstSpinorType dst_spinor(dst);                                                       \
-    ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType >                                       \
-    extend(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
-    extend.apply(streams[Nstream-1]);                                                  \
-  }
-
-
 
 
   struct CommParam {
@@ -447,6 +430,17 @@ namespace quda {
       return;
     }
 
+#ifdef EXTEND_CORE
+  BORK_COMPILATION;
+#endif
+#define EXTEND_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
+  if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
+    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::InType SrcSpinorType; \
+    typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstSpinorType; \
+    SrcSpinorType src_spinor(src);                                                       \
+    DstSpinorType dst_spinor(dst);                                                       \
+    extendCuda__<DataType,DstSpinorType,SrcSpinorType>(dst, src, params, parity);        \
+  }
 
 
   void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParams& params) {
@@ -465,14 +459,6 @@ namespace quda {
 
     const int parity = 0; // Need to change this
 
-    if((src.Precision()==QUDA_DOUBLE_PRECISION) && (dst.Precision()==QUDA_DOUBLE_PRECISION)){
-      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION>::InType SrcSpinorType; 
-      typedef typename SpinorType<1, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION>::OutType DstSpinorType; 
-      extendCuda__<double2,DstSpinorType,SrcSpinorType>(dst, src, params, parity);
-    }
-
-
-
     // I should really use a function to do this
     EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
     else
@@ -483,21 +469,18 @@ namespace quda {
       EXTEND_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
     else
       EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
-        else
-          EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
-            else
-              EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
-                else
-                  EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
-                    else
-                      EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
+    else
+      EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+    else
+      EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+    else
+      EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+    else
+      EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
 
-                        return;
+    return;
   }
 
-
-  //  template<DataType, DstSpinorType, SrcSpinorType>
-  //  void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, DiracParam& param)
 
 #undef EXTEND_CORE
 
