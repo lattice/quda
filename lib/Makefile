@@ -22,7 +22,10 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h
 
 # These are only inlined into blas_quda.cu
-BLAS_INLN = blas_core.h reduce_core.h
+BLAS_INLN = blas_core.h 
+
+# These are only inlined into reduce_quda.cu
+REDUCE_INLN = reduce_core.h
 
 # These are only inlined into cuda_color_spinor_field.cu
 CSF_INLN = pack_spinor.h
@@ -92,6 +95,9 @@ tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+
+reduce_quda.o: reduce_quda.cu $(HDRS) $(REDUCE_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
