@@ -117,6 +117,10 @@ extern "C" {
     int maxiter;
     double reliable_delta; /**< Reliable update tolerance */
 
+
+    unsigned int domain_overlap[QUDA_MAX_DIM]; /**< overlaps for Schwarz preconditioning */
+
+
     int num_offset; /**< Number of offsets in the multi-shift solver */
 
     /** Offsets for multi-shift solver */

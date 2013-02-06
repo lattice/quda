@@ -135,6 +135,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(twist_flavor, QUDA_TWIST_INVALID);
   }
 #endif
+  for (int i=0; i<4; i++) P(domain_overlap[i], INVALID_INT);
 
   P(tol, INVALID_DOUBLE);
   P(maxiter, INVALID_INT);

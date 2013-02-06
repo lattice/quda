@@ -47,6 +47,8 @@ namespace quda {
     Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrec), K(NULL)
   {
     Kparam = newQudaInvertParam();
+
+    for(int dir=0; dir<4; ++dir) invParam.domain_overlap[dir] = 0;
     fillInnerCGInvertParam(Kparam, invParam);
 
 
@@ -111,8 +113,23 @@ namespace quda {
     prec_param.precision = invParam.cuda_prec_precondition;
 
     if(K){
-      minvrPre_ptr = new cudaColorSpinorField(r, prec_param);
-      rPre_ptr  = new cudaColorSpinorField(r, prec_param);
+      prec_param.create     = QUDA_ZERO_FIELD_CREATE;
+      prec_param.precision  = invParam.cuda_prec_precondition;
+      prec_param.nColor     = 3;
+      prec_param.nDim       = 4;
+      prec_param.pad        = 0; // Not sure if this will cause a problem
+      prec_param.nSpin      = 1;
+      prec_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      prec_param.siteOrder  = QUDA_EVEN_ODD_SITE_ORDER;
+      prec_param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      prec_param.x[0]       = invParam.domain_overlap[0]/2 + r.X(0); // only works for QUDA_PARITY_SITE_SUBSET
+      prec.param.x[1]       = invParam.domain_overlap[1] + r.X(1);
+      prec.param.x[2]       = invParam.domain_overlap[2] + r.X(2);
+      prec.param.x[3]       = invParam.domain_overlap[3] + r.X(3);
+        
+      rPre_ptr = new cudaColorSpinorField(prec_param);
+      *rPre_ptr = r;
+      minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       minvr_ptr = new cudaColorSpinorField(r);
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
       *minvr_ptr = *minvrPre_ptr;
