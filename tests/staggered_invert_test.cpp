@@ -154,7 +154,14 @@ invert_test(void)
 	     cpu_prec, prec, prec_sloppy,
 	     link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
 	     0.8);
+ 
+  printfQuda("Got here\n");
+  fflush(stdout);
+  checkCudaError();
   
+  printfQuda("Got there\n");
+  fflush(stdout);
+ 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
@@ -518,9 +525,19 @@ int main(int argc, char** argv)
     link_recon_sloppy = link_recon;
   }
   
+  checkCudaError();
+  printfQuda("About to call initCommsQuda\n");
+  fflush(stdout);
+  checkCudaError();
 
   initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  checkCudaError();
+  printfQuda("Called initCommsQuda\n");
+  fflush(stdout);
+  checkCudaError();
+
   display_test_info();
+  checkCudaError();
   
   int ret = invert_test();
 

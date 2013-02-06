@@ -142,10 +142,12 @@ void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfil
 void initQuda(int dev)
 {
   profileInit[QUDA_PROFILE_TOTAL].Start();
+  checkCudaError();
 
   //static bool initialized = false;
   if (initialized) return;
   initialized = true;
+  checkCudaError();
 
 #if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
@@ -159,6 +161,7 @@ void initQuda(int dev)
     errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1\n");    
   }
 #endif
+  checkCudaError();
 
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
@@ -174,6 +177,7 @@ void initQuda(int dev)
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
     }
   }
+  checkCudaError();
 
 #ifdef MULTI_GPU
   comm_init();
@@ -181,24 +185,28 @@ void initQuda(int dev)
 #else
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
+  checkCudaError();
 
   cudaGetDeviceProperties(&deviceProp, dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
+  checkCudaError();
   
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
   cudaSetDevice(dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+  checkCudaError();
 
 #ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
     setNumaAffinity(dev);
   }
 #endif
+  checkCudaError();
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
   checkCudaError();

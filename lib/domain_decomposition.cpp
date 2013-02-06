@@ -61,11 +61,6 @@ namespace quda {
    params->B4 = (Y[3] - X[3])/2;
 
 
-
-
-
-
-
    return;
  }
   
