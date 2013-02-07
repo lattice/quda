@@ -2,11 +2,9 @@
 #define __SPINOR_TYPES_H__
 
 
-namespace quda {
 
 #include <texture.h>
-
-
+  
   class NullType {};
 
   template <int Nspin, QudaPrecision outPrec, QudaPrecision inPrec>
@@ -107,7 +105,6 @@ namespace quda {
       typedef Spinor<double2, double2, double2, 3, 0, 1> TexType;
       typedef Spinor<double2, double2, short2, 3, 1> OutType;
     };
-
 
   /*
   // I could be much more sophisticated and use templates
@@ -210,8 +207,6 @@ struct ConversionTraits<1, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION>
   typedef float2 InterType; 
   typedef short2 DstType;
 };
-
 */
-} // namespace quda
 
 #endif

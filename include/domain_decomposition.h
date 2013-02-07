@@ -3,7 +3,7 @@
 
 namespace quda {
 
-  struct DecompParams
+  struct DecompParam
   {
     // dimensions of the smaller lattice
     unsigned int X1, X2, X3, X4;
@@ -31,7 +31,7 @@ namespace quda {
     unsigned int B1, B2, B3, B4;    
   };
 
-  void initDecompParams(DecompParams* const params, const int X[], const int Y[]);
+  void initDecompParam(DecompParam* const params, const int X[], const int Y[]);
 
 }
 #endif

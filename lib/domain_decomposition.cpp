@@ -3,7 +3,7 @@
 
 namespace quda {
 
- void initDecompParams(DecompParams* const params, const int X[], const int Y[])
+ void initDecompParam(DecompParam* const params, const int X[], const int Y[])
  {
    for(int dir=0; dir<4; ++dir){
     const int border = Y[dir] - X[dir];

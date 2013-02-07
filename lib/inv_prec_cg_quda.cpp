@@ -11,6 +11,8 @@
 #include <util_quda.h>
 #include <sys/time.h>
 #include <face_quda.h>
+#include <domain_decomposition.h>
+#include <resize_quda.h>
 
 // I need to add functionality to the conjugate-gradient solver.
 // Should I do this by simple inheritance, or should I use a decorator? 
@@ -110,8 +112,8 @@ namespace quda {
     X[3] = b.X(3);
 
     for(int dir=0; dir<4; ++dir) Y[dir] = X[dir] + 2*invParam.domain_overlap[dir];
-    DecompParams dparam;
-    initDecompParams(&dparam,X,Y);
+    DecompParam dparam;
+    initDecompParam(&dparam,X,Y);
 
     ColorSpinorParam param(b);
     param.nFace  = max_overlap;
@@ -152,8 +154,12 @@ namespace quda {
  
       rPre_ptr = new cudaColorSpinorField(prec_param);
 
+      // HACK!!!
+      int domain_overlap[4];
+      for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
+
       if(max_overlap > 0){
-        extendCuda(*rPre_ptr,r,dparam,invParam.domain_overlap);
+        extendCuda(*rPre_ptr,r,dparam,domain_overlap);
       }else{
         *rPre_ptr = r;
       }
@@ -163,7 +169,7 @@ namespace quda {
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
 
       if(max_overlap > 0){
-        cropCuda(*minvr_ptr, *minvrPre_ptr);
+    //    cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
       }else{
         *minvr_ptr = *minvrPre_ptr;
       }

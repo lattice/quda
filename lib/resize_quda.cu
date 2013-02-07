@@ -4,7 +4,6 @@
 #include <domain_decomposition.h>
 #include <color_spinor_field.h>
 
-#include <spinor_types.h>
 
 // streams is defined in interface_quda.cpp
 
@@ -13,12 +12,17 @@ namespace quda {
   FaceBuffer* face; // need to set this. I can u
   // I need to use setFace to set this. 
   // Factor out of dslash_quda.cu
-#include <texture.h>  
+
+namespace resize {
+#include <texture.h> 
+#include <spinor_types.h>
+} 
+using namespace resize;
 
   // code for extending and cropping cudaColorSpinorField
   template<typename FloatN, int N, typename Output, typename Input>
     __global__ void cropKernel(Output Y, Input X, unsigned int length, 
-        DecompParams params, int parity)
+        DecompParam params, int parity)
     {
       // length is the size of the smaller domain
       int little_cb_index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -55,7 +59,7 @@ namespace quda {
 
   template<typename FloatN, int N, typename Output, typename Input>
     __global__ void copyInteriorKernel(Output Y, Input X, unsigned int length, 
-        DecompParams params, int parity)
+        DecompParam params, int parity)
     {
       // length is the size of the smaller domain
       int little_cb_index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -89,7 +93,7 @@ namespace quda {
 
   __device__ void getCoordinates(int* const x1_p, int* const x2_p,
       int* const x3_p, int* const x4_p,
-      int cb_index, const DecompParams& params, int parity, int Dir)
+      int cb_index, const DecompParam& params, int parity, int Dir)
   {
 
     int xh, xodd;
@@ -152,7 +156,7 @@ namespace quda {
       int x2,
       int x3, 
       int x4,
-      const DecompParams& params,
+      const DecompParam& params,
       int Dir)
   {
 
@@ -196,7 +200,7 @@ namespace quda {
 
   // Need to generalise SpinorIndex
   template<typename FloatN, int N, typename Output, typename Input>
-    __global__ void copyExteriorKernel(Output Y, Input X, unsigned int length, DecompParams params, int parity, int Dir)
+    __global__ void copyExteriorKernel(Output Y, Input X, unsigned int length, DecompParam params, int parity, int Dir)
     {
       int cb_index = blockIdx.x*blockDim.x + threadIdx.x;
       int gridSize = gridDim.x*blockDim.x; 
@@ -215,7 +219,8 @@ namespace quda {
         FloatN x[N];
         X.load(x, cb_index);
         Y.save(x, large_cb_index);
-
+        
+        cb_index += gridSize;
       }
       return;
     }
@@ -228,7 +233,7 @@ namespace quda {
         Input &X;
         Output &Y;
         const int length;
-        DecompParams params;
+        DecompParam params;
         const int parity;
         const int dir; // if copying from border
 
@@ -236,9 +241,9 @@ namespace quda {
 
 
       public:
-        ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity), dir(-1) {}
+        ExtendCuda(Output &Y, Input &X, int length, const DecompParam& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity), dir(-1) {}
 
-        ExtendCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity, const int dir) :
+        ExtendCuda(Output &Y, Input &X, int length, const DecompParam& params, int parity, const int dir) :
           X(X), Y(Y), length(length), params(params), parity(parity), dir(dir) {}
         virtual ~ExtendCuda();
 
@@ -247,7 +252,7 @@ namespace quda {
           int parity = 0;
 
           dim3 blockDim(32,1,1); // warp size on GK110
-          dim3 gridDix(128,1,1); // random choice - change this
+          dim3 gridDim(128,1,1); // random choice - change this
 
           if(dir<0){
             copyInteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity); 
@@ -266,13 +271,13 @@ namespace quda {
         Input &X;
         Output &Y;
         const int length;
-        DecompParams params;
+        DecompParam params;
         int parity; // parity of the destination field
 
 
         int sharedBytesPerThread() const { return 0; }
       public:
-        CropCuda(Output &Y, Input &X, int length, const DecompParams& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity) {;}
+        CropCuda(Output &Y, Input &X, int length, const DecompParam& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity) {;}
         virtual ~CropCuda();
 
         void apply(const cudaStream_t &stream){
@@ -292,11 +297,12 @@ namespace quda {
     // a given dimension
   };
 
+#ifdef MULTI_GPU
   int gatherCompleted[Nstream]; // transfer of ghost data from device to host
   int previousDir[Nstream];
   int commsCompleted[Nstream];
   int extendCompleted[Nstream];
-
+#endif
 
   static cudaEvent_t packEnd[Nstream];
   static cudaEvent_t gatherStart[Nstream];
@@ -305,7 +311,7 @@ namespace quda {
   static cudaEvent_t scatterEnd[Nstream];
 
 
-
+#ifdef MULTI_GPU
   static void initCommsPattern(int* commDimTotal, const int* const domain_overlap) 
   {
 
@@ -332,14 +338,14 @@ namespace quda {
     // this tells us how many events / comms occurances there are in total.
     // Used for exiting the while loop.
     *commDimTotal = 0;
-    for (int i=3; i>=0; --i) *commDimTotal += param.commDim[i];
+    for (int i=3; i>=0; --i) *commDimTotal += domain_overlap[i];
     *commDimTotal *= 4; // 2 from pipe length, 2 from direction
     return;
   }
-
+#endif
 
   template<class DataType, class DstSpinorType, class SrcSpinorType>
-    static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParams& params, int parity, int domain_overlap[])
+    static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParam& params, const int parity, const int* const domain_overlap)
     {
 #ifdef MULTI_GPU
       for(int i=3; i >= 0; i--){
@@ -427,6 +433,8 @@ namespace quda {
       return;
     }
 
+
+
 #ifdef EXTEND_CORE
   BORK_COMPILATION;
 #endif
@@ -440,25 +448,27 @@ namespace quda {
   }
 
 
-  void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParams& params, const int * const domain_overlap) 
+  void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParam& params, const int * const domain_overlap) 
   {
     if (&src == &dst) return; // aliasing fields
 
-    if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
+    if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported");
 
-    if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length\n");
+    if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length");
 
     if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
     {
-      extendCuda(dst.Even(), src.Even(), params);
-      extendCuda(dst.Odd(), src.Odd(), params);   
+      errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported\n");
+      // This probably won't work. Need to think about it.
+      // extendCuda(dst.Even(), src.Even(), params, domain_overlap);
+      //extendCuda(dst.Odd(), src.Odd(), params, domain_overlap);   
       return;
     }
 
     const int parity = 0; // Need to change this
-
     // I should really use a function to do this
     EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
+/*
     else
       EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
     else 
@@ -475,11 +485,11 @@ namespace quda {
                   EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
                     else
                       EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
-
-                        return;
+*/
+    return;
   }
 
-
+/*
 #undef EXTEND_CORE
 
 #ifdef CROP_CORE
@@ -497,7 +507,7 @@ namespace quda {
   } 
 
 
-  void cropCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParams& params) {
+  void cropCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParam& params) {
     if (&src == &dst) return; // aliasing fields
 
     if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
@@ -506,8 +516,9 @@ namespace quda {
 
     if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
     {
-      cropCuda(dst.Even(), src.Even(), params);
-      cropCuda(dst.Odd(), src.Odd(), params);   
+      errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported");
+  //    cropCuda(dst.Even(), src.Even(), params);
+  //    cropCuda(dst.Odd(), src.Odd(), params);   
       return;
     }
 
@@ -535,6 +546,6 @@ namespace quda {
   } // cropCuda
 #undef CROP_CORE
 
+*/
 
-
-} // namespace
+} // namespace quda

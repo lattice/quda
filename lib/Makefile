@@ -36,7 +36,7 @@ DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h \
         llfat_quda.cu unitarize_links_quda.cu fermion_force_quda.cu          \
 	gauge_force_quda.cu hisq_paths_force_quda.cu unitarize_force_quda.cu    \
 	gauge_force_core.h hisq_paths_force_core.h  llfat_core.h svd_quda.h \
-	read_clover.h read_gauge.h misc_helpers.cu
+	read_clover.h read_gauge.h misc_helpers.cu spinor_types.h
 
 
 # files containing complex macros and other code fragments to be inlined,

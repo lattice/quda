@@ -60,8 +60,8 @@ void applyDDSolver(cudaColorSpinorField* const solution,
                 QUDA_ASQTAD_LONG_LINKS);
 
 
-  DecompParams decompParam;
-  initDecompParams(&decompParam, preciseFatGauge.X(), preconLongGauge.X());
+  DecompParam decompParam;
+  initDecompParam(&decompParam, preciseFatGauge.X(), preconLongGauge.X());
 
   Dirac *d = NULL;
   Dirac *dSloppy = NULL;
