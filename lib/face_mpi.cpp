@@ -415,7 +415,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
   int startb[] = {R[2],     R[2],       0,     0};
   int endb[]   = {X[2]+R[2], X[2]+R[2], X[1]+2*R[1], X[1]+2*R[1]};
   
-  int startc[] = {R[2],     0,       0,     0};
+  int startc[] = {R[1],     0,       0,     0};
   int endc[]   = {X[1]+R[1], X[0]+2*R[0],  X[0]+2*R[0],  X[0]+2*R[0]};
   
   int f_main[4][4] = {

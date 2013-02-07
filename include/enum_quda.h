@@ -269,11 +269,13 @@ extern "C" {
   } QudaSourceType;
   
   typedef enum QudaTwistFlavorType_s {
-    QUDA_TWIST_NO  = 0,
     QUDA_TWIST_MINUS = -1,
     QUDA_TWIST_PLUS = +1,
+    QUDA_TWIST_NONDEG_DOUBLET = +2,
+    QUDA_TWIST_DEG_DOUBLET = -2,    
+    QUDA_TWIST_NO  = 0,
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
-  } QudaTwistFlavorType;  
+  } QudaTwistFlavorType; 
 
   typedef enum QudaTwistGamma5Type_s {
     QUDA_TWIST_GAMMA5_DIRECT,

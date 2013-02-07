@@ -609,6 +609,7 @@ BUILD_GAUGE_FORCE
 BUILD_HISQLINK
 BUILD_FATLINK
 BUILD_TWISTED_MASS_DIRAC
+BUILD_NDEG_TWISTED_MASS_DIRAC
 BUILD_STAGGERED_DIRAC
 BUILD_DOMAIN_WALL_DIRAC
 BUILD_CLOVER_DIRAC
@@ -689,6 +690,7 @@ enable_clover_dirac
 enable_domain_wall_dirac
 enable_staggered_dirac
 enable_twisted_mass_dirac
+enable_ndeg_twisted_mass_dirac
 enable_staggered_fatlink
 enable_hisq_fatlink
 enable_gauge_force
@@ -1342,6 +1344,8 @@ Optional Features:
                           Build staggered Dirac operator (default: enabled)
   --enable-twisted-mass-dirac
                           Build twisted mass Dirac operator (default: enabled)
+  --enable-ndeg-twisted-mass-dirac
+                          Build non-degenerate twisted mass Dirac operator (default: disabled)
   --enable-staggered-fatlink
                           Build asqtad link-fattening routines (default:
                           disabled)
@@ -2012,6 +2016,16 @@ if test "${enable_twisted_mass_dirac+set}" = set; then :
   enableval=$enable_twisted_mass_dirac;  build_twm_dirac=${enableval}
 else
    build_twm_dirac="yes"
+
+fi
+
+
+
+# Check whether --enable-ndeg-twisted-mass-dirac was given.
+if test "${enable_ndeg_twisted_mass_dirac+set}" = set; then :
+  enableval=$enable_ndeg_twisted_mass_dirac;  build_ndegtwm_dirac=${enableval}
+else
+   build_ndegtwm_dirac="no"
 
 fi
 
@@ -3804,6 +3818,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_ndegtwm_dirac} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-ndeg-twisted-mass-dirac " "$LINENO" 5
+  ;;
+esac
+
 case ${build_twm_dirac} in
 yes|no);;
 *)
@@ -3992,6 +4013,9 @@ BUILD_STAGGERED_DIRAC=${build_staggered_dirac}
 $as_echo "$as_me: Setting BUILD_TWISTED_MASS_DIRAC = ${build_twm_dirac} " >&6;}
 BUILD_TWISTED_MASS_DIRAC=${build_twm_dirac}
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_NDEG_TWISTED_MASS_DIRAC = ${build_ndegtwm_dirac} " >&5
+$as_echo "$as_me: Setting BUILD_NDEG_TWISTED_MASS_DIRAC = ${build_ndegtwm_dirac} " >&6;}
+BUILD_NDEG_TWISTED_MASS_DIRAC=${build_ndegtwm_dirac}
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_FATLINK = ${build_staggered_fatlink}  " >&5
 $as_echo "$as_me: Setting BUILD_FATLINK = ${build_staggered_fatlink}  " >&6;}

@@ -56,7 +56,6 @@ namespace quda {
     } else if (param.create == QUDA_COPY_FIELD_CREATE){
       errorQuda("not implemented");
     }
-
     checkCudaError();
   }
 
@@ -110,6 +109,7 @@ namespace quda {
     } else {
       errorQuda("CreateType %d not implemented", param.create);
     }
+
     clearGhostPointers();
   }
 
@@ -124,6 +124,7 @@ namespace quda {
     } else {
       errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
     }
+
     clearGhostPointers();
   }
 

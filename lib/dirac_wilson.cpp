@@ -10,10 +10,8 @@ namespace quda {
   DiracWilson::DiracWilson(const DiracWilson &dirac) : 
     Dirac(dirac), face(dirac.face) { }
 
-  //BEGIN NEW
   DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : 
-    Dirac(param), face(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) { }//temporal hack (for DW only) 
-  //END NEW
+    Dirac(param), face(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) { }//temporal hack (for DW and TM operators) 
 
   DiracWilson::~DiracWilson() { }
 

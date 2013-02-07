@@ -673,6 +673,104 @@ static inline __device__ void coordsFromDWFaceIndex(int &cb_idx, Int &X, Int &Y,
 }
 
 
+//!ndeg tm:
+template <int dim, int nLayers, int face_num>
+static inline __device__ int indexFromNdegTMFaceIndex(int face_idx, const int &face_volume,
+						      const int &parity)
+{
+  // dimensions of the face (FIXME: optimize using constant cache)
+
+  int face_X = X1, face_Y = X2, face_Z = X3, face_T = X4;
+  int face_parity;  
+  
+  switch (dim) {
+  case 0:
+    face_X = nLayers;
+    face_parity = (parity + face_num * (X1 - nLayers)) & 1;
+    break;
+  case 1:
+    face_Y = nLayers;
+    face_parity = (parity + face_num * (X2 - nLayers)) & 1;
+    break;
+  case 2:
+    face_Z = nLayers;
+    face_parity = (parity + face_num * (X3 - nLayers)) & 1;
+    break;
+  case 3:
+    face_T = nLayers;    
+    face_parity = (parity + face_num * (X4 - nLayers)) & 1;
+    break;
+  }
+  
+  int face_XYZT = face_X * face_Y * face_Z * face_T;  
+  int face_XYZ  = face_X * face_Y * face_Z;
+  int face_XY   = face_X * face_Y;
+
+  // reconstruct full face index from index into the checkerboard
+
+  face_idx *= 2;
+
+  if (!(face_X & 1)) { // face_X even
+    //   int t = (face_idx / face_XYZ) % face_T;
+    //   int z = (face_idx / face_XY) % face_Z;
+    //   int y = (face_idx / face_X) % face_Y;
+    //   face_idx += (face_parity + t + z + y) & 1;//the same parity for both flavors 
+    // equivalent to the above, but with fewer divisions/mods:
+    int aux1 = face_idx / face_X;
+    int aux2 = aux1 / face_Y;
+    int aux3 = aux2 / face_Z;
+    int y = aux1 - aux2 * face_Y;
+    int z = aux2 - aux3 * face_Z;    
+    int Nf = aux3 / face_T;
+    int t  = aux3 - Nf * face_T;
+    face_idx += (face_parity + t + z + y) & 1;
+  } else if (!(face_Y & 1)) { // face_Y even
+    int t  = (face_idx / face_XYZ) % face_T;
+    int z  = (face_idx / face_XY) % face_Z;
+    face_idx += (face_parity + t + z) & 1;
+  } else if (!(face_Z & 1)) { // face_Z even
+    int t = (face_idx / face_XYZ) % face_T;
+    face_idx += (face_parity + t) & 1;
+  } else if(!(face_T)){
+    face_idx += face_parity & 1;
+  }else{    
+    face_idx += face_parity;
+  }
+
+  // compute index into the full local volume
+
+  int idx = face_idx;
+  int gap, aux;
+
+  switch (dim) {
+  case 0:
+    gap = X1 - nLayers;
+    aux = face_idx / face_X;
+    idx += (aux + face_num) * gap;
+    break;
+  case 1:
+    gap = X2 - nLayers;
+    aux = face_idx / face_XY;
+    idx += (aux + face_num) * gap * face_X;
+    break;
+  case 2:
+    gap = X3 - nLayers;
+    aux = face_idx / face_XYZ;
+    idx += (aux + face_num) * gap * face_XY;
+    break;
+  case 3:
+    gap = X4 - nLayers;
+    aux = face_idx / face_XYZT;
+    idx += (aux + face_num) * gap * face_XYZ;
+    break;
+  }
+
+  // return index into the checkerboard
+
+  return idx >> 1;
+}
+
+
 // routines for packing the ghost zones (multi-GPU only)
 
 #ifdef MULTI_GPU
@@ -1389,6 +1487,129 @@ void packFaceDW(void *ghost_buf, cudaColorSpinorField &in, const int dagger,
   }  
 }
   
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
+template <int dagger, typename FloatN>
+__global__ void packFaceNdegTMKernel(PackParam<FloatN> param)
+{
+  const int nFace = 1; // 1 face for Wilson
+  const int Nf = 2;
+
+  int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+  if (face_idx >= param.threads) return;
+
+  // determine which dimension we are packing
+  const int dim = dimFromFaceIndex(face_idx, param);
+
+  // face_num determines which end of the lattice we are packing: 0 = beginning, 1 = end
+  // FIXME these ghostFace constants do not include the Nf dimension
+  const int face_num = (face_idx >= nFace*Nf*ghostFace[dim]) ? 1 : 0;
+  face_idx -= face_num*nFace*Nf*ghostFace[dim];
+
+  // compute where the output is located
+  // compute an index into the local volume from the index into the face
+  // read spinor, spin-project, and write half spinor to face
+  if (dim == 0) {
+    if (face_num == 0) {
+      const int idx = indexFromNdegTMFaceIndex<0,nFace,0>(face_idx,Nf*ghostFace[0],param.parity);
+      packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
+				     param.inNorm, idx, face_idx, Nf*ghostFace[0], param);
+    } else {
+      const int idx = indexFromNdegTMFaceIndex<0,nFace,1>(face_idx,Nf*ghostFace[0],param.parity);
+      packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
+				     param.inNorm, idx, face_idx, Nf*ghostFace[0], param);
+    }
+  } else if (dim == 1) {
+    if (face_num == 0) {
+      const int idx = indexFromNdegTMFaceIndex<1,nFace,0>(face_idx,Nf*ghostFace[1],param.parity);
+      packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
+				      param.inNorm, idx, face_idx, Nf*ghostFace[1], param);
+    } else {
+      const int idx = indexFromNdegTMFaceIndex<1,nFace,1>(face_idx,Nf*ghostFace[1],param.parity);
+      packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
+				      param.inNorm, idx, face_idx, Nf*ghostFace[1], param);
+    }
+  } else if (dim == 2) {
+    if (face_num == 0) {
+      const int idx = indexFromNdegTMFaceIndex<2,nFace,0>(face_idx,Nf*ghostFace[2],param.parity);
+      packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
+				      param.inNorm, idx, face_idx, Nf*ghostFace[2], param);
+    } else {
+      const int idx = indexFromNdegTMFaceIndex<2,nFace,1>(face_idx,Nf*ghostFace[2],param.parity);
+      packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
+				      param.inNorm, idx, face_idx, Nf*ghostFace[2], param);
+    }
+  } else {
+    if (face_num == 0) {
+      const int idx = indexFromNdegTMFaceIndex<3,nFace,0>(face_idx,Nf*ghostFace[3],param.parity);
+      packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
+				      param.inNorm, idx, face_idx, Nf*ghostFace[3], param);
+    } else {
+      const int idx = indexFromNdegTMFaceIndex<3,nFace,1>(face_idx,Nf*ghostFace[3],param.parity);
+      packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
+				      param.inNorm, idx, face_idx, Nf*ghostFace[3], param);
+    }
+  }
+}
+#endif
+
+template <typename FloatN>
+class PackFaceNdegTM : public PackFace<FloatN> {
+
+ private:
+
+  int inputPerSite() const { return 24; } // input is full spinor
+  int outputPerSite() const { return 12; } // output is spin projected
+
+ public:
+  PackFaceNdegTM(FloatN *faces, const cudaColorSpinorField *in, 
+		 const int dagger, const int parity)
+    : PackFace<FloatN>(faces, in, dagger, parity, 1) { }
+  virtual ~PackFaceNdegTM() { }
+  
+  void apply(const cudaStream_t &stream) {    
+    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
+    PackParam<FloatN> param = this->prepareParam();
+    if (this->dagger) {
+      packFaceNdegTMKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
+    } else {
+      packFaceNdegTMKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
+    }
+#else
+    errorQuda("Non-degenerate twisted mass face packing kernel is not built");
+#endif  
+  }
+
+  long long flops() const { return outputPerSite()*this->threads(); }
+
+};
+
+void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 
+		    const int parity, const cudaStream_t &stream) {
+
+  switch(in.Precision()) {
+  case QUDA_DOUBLE_PRECISION:
+    {
+      PackFaceNdegTM<double2> pack((double2*)ghost_buf, &in, dagger, parity);
+      pack.apply(stream);
+    }
+    break;
+  case QUDA_SINGLE_PRECISION:
+    {
+      PackFaceNdegTM<float4> pack((float4*)ghost_buf, &in, dagger, parity);
+      pack.apply(stream);
+    }
+    break;
+  case QUDA_HALF_PRECISION:
+    {
+      PackFaceNdegTM<short4> pack((short4*)ghost_buf, &in, dagger, parity);
+      pack.apply(stream);
+    }
+    break;
+  } 
+}
+
 void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, const cudaStream_t &stream)
 {
   int nDimPack = 0;
@@ -1402,12 +1623,15 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const
   if (in.Nspin() == 1) {
     packFaceAsqtad(ghost_buf, in, dagger, parity, stream);
   } else if (in.Ndim() == 5) {
-    packFaceDW(ghost_buf, in, dagger, parity, stream);
+    if(in.TwistFlavor() == QUDA_TWIST_INVALID) {
+      packFaceDW(ghost_buf, in, dagger, parity, stream);
+    } else {
+      packFaceNdegTM(ghost_buf, in, dagger, parity, stream);
+    }
   } else {
     packFaceWilson(ghost_buf, in, dagger, parity, stream);
   }
 }
-
 
 #endif // MULTI_GPU
   
